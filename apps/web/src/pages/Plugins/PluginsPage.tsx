@@ -43,7 +43,11 @@ export function PluginsPage() {
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
-      <PageHeader title={t('plugins.title')} subtitle={t('plugins.subtitle')} />
+      <PageHeader
+        title={t('plugins.title')}
+        subtitle={t('plugins.subtitle')}
+        helpTopic="plugins"
+      />
 
       <ExplainBox title={t('plugins.explainTitle')} text={t('plugins.explain')} />
 

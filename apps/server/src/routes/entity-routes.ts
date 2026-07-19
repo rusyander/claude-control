@@ -1,32 +1,21 @@
 import type { FastifyInstance } from 'fastify';
 import type {
   EntityKind,
+  EnvVar,
   HookDraft,
   McpServerDraft,
   PermissionDraft,
   RuleDraft,
+  SettingsSource,
   SkillDraft,
 } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import { readRules, saveRule, deleteRule } from '../domains/rules.ts';
-import { readHooks, upsertHook, deleteHook, writeHooks } from '../domains/hooks.ts';
-import {
-  readSkills,
-  saveSkill,
-  setSkillEnabled,
-  deleteSkill,
-  readSkillFile,
-  writeSkillFile,
-  deleteSkillFile,
-  moveSkillFile,
-} from '../domains/skills.ts';
-import {
-  readMcpServers,
-  saveMcpServer,
-  setMcpServerEnabled,
-  deleteMcpServer,
-  checkMcpHealth,
-} from '../domains/mcp.ts';
+import { readHooks, upsertHook, deleteHook } from '../domains/hooks.ts';
+import { readSkills, saveSkill, deleteSkill } from '../domains/skills.ts';
+import { readMcpServers, saveMcpServer, deleteMcpServer, checkMcpHealth } from '../domains/mcp.ts';
+import { applyEntityState, rewriteHooks, findHook } from '../domains/entity-toggle.ts';
+import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 import { readPermissions, savePermission, deletePermission } from '../domains/permissions.ts';
 import { readEnvVars, revealEnvValue, saveEnvVar, deleteEnvVar } from '../domains/env.ts';
 
@@ -43,6 +32,18 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     needsRestart: true,
   });
 
+  /**
+   * В какой файл писать запись с этим идентификатором.
+   *
+   * Правка локальной записи возвращается в `settings.local.json`, а не
+   * переезжает в общий конфиг: личная настройка иначе стала бы общей. Префикс
+   * `local:` живёт только в панели — файлу он неизвестен, поэтому снимается.
+   */
+  const targetOf = (id: string): { path: string; source: SettingsSource } =>
+    isLocalId(id)
+      ? { path: paths().settingsLocal, source: 'settings-local' }
+      : { path: paths().settings, source: 'settings' };
+
   // --- Правила (CLAUDE.md) ---
   app.get('/api/rules', () => readRules(paths().claudeMd, ctx.store));
 
@@ -58,29 +59,36 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     done(deleteRule(paths().claudeMd, request.params.id, ctx.store, ctx.backupDir)),
   );
 
-  // --- Хуки (settings.json) ---
-  app.get('/api/hooks', () => readHooks(paths().settings, ctx.store));
+  // --- Хуки (settings.json + settings.local.json) ---
+  app.get('/api/hooks', () => readHooks(paths().settings, ctx.store, paths().settingsLocal));
 
   app.post<{ Body: HookDraft }>('/api/hooks', (request) =>
     done(upsertHook(paths().settings, paths().hooks, null, request.body, ctx.store, ctx.backupDir)),
   );
 
-  app.put<{ Params: { id: string }; Body: HookDraft }>('/api/hooks/:id', (request) =>
-    done(
+  app.put<{ Params: { id: string }; Body: HookDraft }>('/api/hooks/:id', (request) => {
+    // Ссылка могла быть сохранена до перехода на контентные id — приводим.
+    const id = findHook(ctx, request.params.id)?.id ?? request.params.id;
+    const target = targetOf(id);
+
+    return done(
       upsertHook(
         paths().settings,
         paths().hooks,
-        request.params.id,
+        stripLocalPrefix(id),
         request.body,
         ctx.store,
         ctx.backupDir,
+        target,
       ),
-    ),
-  );
+    );
+  });
 
-  app.delete<{ Params: { id: string } }>('/api/hooks/:id', (request) =>
-    done(deleteHook(paths().settings, request.params.id, ctx.store, ctx.backupDir)),
-  );
+  app.delete<{ Params: { id: string } }>('/api/hooks/:id', (request) => {
+    const id = findHook(ctx, request.params.id)?.id ?? request.params.id;
+
+    return done(deleteHook(paths().settings, id, ctx.store, ctx.backupDir, targetOf(id)));
+  });
 
   // --- Скиллы (папки в skills/) ---
   app.get('/api/skills', () => readSkills(paths().skills, ctx.store));
@@ -93,52 +101,14 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     done(saveSkill(paths().skills, request.params.id, request.body, ctx.backupDir)),
   );
 
-  // Содержимое вложенного файла скилла: большие скиллы состоят из десятков
-  // файлов, и заглянуть в них нужно не выходя из списка.
-  app.get<{ Params: { id: string }; Querystring: { file: string } }>(
-    '/api/skills/:id/file',
-    (request) => ({
-      file: request.query.file,
-      content: readSkillFile(paths().skills, request.params.id, request.query.file),
-    }),
-  );
+  // Файлы внутри скилла живут на общих ресурсных маршрутах
+  // (`/api/resources/skill/:id/file`) — там же, где файлы остальных видов.
+  // Отдельного набора для скиллов больше нет: две почти одинаковые реализации
+  // расходились, и правка попадала не туда, куда ходит интерфейс.
 
-  // Правка одного файла скилла: у больших скиллов десятки файлов, и
-  // пересохранять весь скилл ради одной строки незачем.
-  app.put<{ Params: { id: string }; Body: { file: string; content: string } }>(
-    '/api/skills/:id/file',
-    (request) => {
-      writeSkillFile(
-        paths().skills,
-        request.params.id,
-        request.body.file,
-        request.body.content,
-        ctx.backupDir,
-      );
-      return done();
-    },
+  app.delete<{ Params: { id: string } }>('/api/skills/:id', (request) =>
+    done(deleteSkill(paths().skills, request.params.id, ctx.backupDir)),
   );
-
-  app.delete<{ Params: { id: string }; Querystring: { file: string } }>(
-    '/api/skills/:id/file',
-    (request) => {
-      deleteSkillFile(paths().skills, request.params.id, request.query.file);
-      return done();
-    },
-  );
-
-  app.post<{ Params: { id: string }; Body: { from: string; to: string } }>(
-    '/api/skills/:id/move',
-    (request) => {
-      moveSkillFile(paths().skills, request.params.id, request.body.from, request.body.to);
-      return done();
-    },
-  );
-
-  app.delete<{ Params: { id: string } }>('/api/skills/:id', (request) => {
-    deleteSkill(paths().skills, request.params.id);
-    return done();
-  });
 
   // --- MCP-серверы (~/.claude.json) ---
   app.get('/api/mcp', () => readMcpServers(paths().mcpConfig, ctx.store));
@@ -165,35 +135,59 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     return checkMcpHealth(server);
   });
 
-  // --- Правила доступа (permissions) ---
-  app.get('/api/permissions', () => readPermissions(paths().settings, ctx.store));
+  // --- Правила доступа (settings.json + settings.local.json) ---
+  app.get('/api/permissions', () =>
+    readPermissions(paths().settings, ctx.store, paths().settingsLocal),
+  );
 
   app.post<{ Body: PermissionDraft }>('/api/permissions', (request) =>
     done(savePermission(paths().settings, null, request.body, ctx.backupDir)),
   );
 
-  app.put<{ Params: { id: string }; Body: PermissionDraft }>('/api/permissions/:id', (request) =>
-    done(savePermission(paths().settings, request.params.id, request.body, ctx.backupDir)),
-  );
+  app.put<{ Params: { id: string }; Body: PermissionDraft }>('/api/permissions/:id', (request) => {
+    const { id } = request.params;
 
-  app.delete<{ Params: { id: string } }>('/api/permissions/:id', (request) =>
-    done(deletePermission(paths().settings, request.params.id, ctx.backupDir)),
-  );
+    return done(
+      savePermission(targetOf(id).path, stripLocalPrefix(id), request.body, ctx.backupDir),
+    );
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/permissions/:id', (request) => {
+    const { id } = request.params;
+
+    return done(deletePermission(targetOf(id).path, stripLocalPrefix(id), ctx.backupDir));
+  });
 
   // --- Переменные окружения ---
-  app.get('/api/env', () => readEnvVars(paths().settings, paths().secretsEnv));
+  app.get('/api/env', () =>
+    readEnvVars(paths().settings, paths().secretsEnv, paths().settingsLocal),
+  );
 
-  app.get<{ Querystring: { key: string; source: 'settings' | 'secrets' } }>(
+  app.get<{ Querystring: { key: string; source: EnvVar['source'] } }>(
     '/api/env/reveal',
     (request) =>
-      revealEnvValue(paths().settings, paths().secretsEnv, request.query.key, request.query.source),
+      revealEnvValue(
+        paths().settings,
+        paths().secretsEnv,
+        request.query.key,
+        request.query.source,
+        paths().settingsLocal,
+      ),
   );
 
   app.post<{ Body: Parameters<typeof saveEnvVar>[2] }>('/api/env', (request) =>
-    done(saveEnvVar(paths().settings, paths().secretsEnv, request.body, ctx.backupDir)),
+    done(
+      saveEnvVar(
+        paths().settings,
+        paths().secretsEnv,
+        request.body,
+        ctx.backupDir,
+        paths().settingsLocal,
+      ),
+    ),
   );
 
-  app.delete<{ Querystring: { key: string; source: 'settings' | 'secrets' } }>(
+  app.delete<{ Querystring: { key: string; source: EnvVar['source'] } }>(
     '/api/env',
     (request) =>
       done(
@@ -203,6 +197,7 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
           request.query.key,
           request.query.source,
           ctx.backupDir,
+          paths().settingsLocal,
         ),
       ),
   );
@@ -211,30 +206,28 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
   app.post<{ Params: { kind: EntityKind; id: string }; Body: { isEnabled: boolean } }>(
     '/api/entities/:kind/:id/enabled',
     (request) => {
-      const { kind, id } = request.params;
+      const { kind } = request.params;
       const { isEnabled } = request.body;
 
-      // У скиллов и MCP-серверов выключение физическое: перенос папки или
-      // секции конфига. Остальное хранится отметкой в состоянии приложения.
-      if (kind === 'skill') setSkillEnabled(paths().skills, id, isEnabled);
-      if (kind === 'mcp') setMcpServerEnabled(paths().mcpConfig, id, isEnabled, ctx.backupDir);
+      // Идентификатор мог прийти в прежнем, позиционном виде — из состава
+      // группы или из ссылки, сохранённой до перехода на контентные id.
+      // Приводим его к нынешнему, попутно забирая старый: отметку надо снять
+      // и с него, иначе она осталась бы висеть навсегда.
+      const hook = kind === 'hook' ? findHook(ctx, request.params.id) : undefined;
+      const id = hook?.id ?? request.params.id;
+      const legacyId = hook?.legacyId;
 
-      // Отметку ставим до перечитывания: разбор файлов опирается на неё,
-      // чтобы вернуть сущность уже с новым состоянием.
-      ctx.store.setEnabled(kind, id, isEnabled);
+      // Отметку ставим до применения: разбор файлов опирается на неё, чтобы
+      // вернуть сущность уже с новым состоянием.
+      ctx.store.setEnabled(kind, id, isEnabled, legacyId);
 
-      // Правила и хуки физически перезаписываются в своих файлах: правило
-      // уезжает в раздел отключённых, хук исчезает из settings.json.
-      if (kind === 'rule') {
-        const rule = readRules(paths().claudeMd, ctx.store).find((item) => item.id === id);
-        if (rule) saveRule(paths().claudeMd, id, rule, ctx.store, ctx.backupDir);
-      }
-      if (kind === 'hook') {
-        const hooks = readHooks(paths().settings, ctx.store);
-        return done(writeHooks(paths().settings, hooks, ctx.backupDir));
-      }
+      // Применяем не то, что попросили, а итог: сущность, погашенную группой,
+      // одиночный переключатель включить не может — иначе состояние в панели
+      // разошлось бы с состоянием группы.
+      const effective = !ctx.store.isDisabled(kind, id, legacyId);
+      const { needsHookRewrite } = applyEntityState(ctx, kind, id, effective);
 
-      return done();
+      return done(needsHookRewrite ? rewriteHooks(ctx) : undefined);
     },
   );
 }

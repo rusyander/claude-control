@@ -1,8 +1,7 @@
-import { spawn } from 'node:child_process';
-import type { McpServer, McpServerDraft, McpHealth } from '@claude-control/contracts';
+import type { McpServer, McpServerDraft, McpHealth, McpTransport } from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
 import type { AppStore } from '../lib/app-store.ts';
-import { shellArgs } from '../lib/cli-args.ts';
+import { openMcpSession } from './mcp-client.ts';
 
 /**
  * Регистрация MCP-серверов живёт в ~/.claude.json — рядом с каталогом .claude,
@@ -27,6 +26,29 @@ interface RawMcpConfig {
 /** Секция, куда приложение прячет выключенные серверы. Claude Code её игнорирует. */
 const DISABLED_KEY = 'mcpServersDisabled';
 
+/**
+ * Список повторяет mcpTransportSchema из contracts, а не берёт его оттуда:
+ * в сервер contracts приходит только как `import type` — реэкспорты идут без
+ * расширений, и Node ESM их не резолвит, так что значением схема упала бы в
+ * рантайме. Разъехаться списку со схемой не даст тип McpTransport: лишнее
+ * значение здесь не соберётся, недостающее поймает проверка на стороне схемы.
+ */
+const TRANSPORTS: McpTransport[] = ['stdio', 'sse', 'http'];
+
+/**
+ * Транспорт приходит из чужого файла, который правят руками и другие
+ * программы. Незнакомое значение молча приводить к типу нельзя: раньше в
+ * McpServer.transport могло попасть что угодно, и до места, где по нему
+ * выбирается способ подключения, ошибка доезжала в виде невнятного отказа.
+ * Здесь она превращается в понятную догадку — по наличию url.
+ */
+function readTransport(raw: RawMcpServer): McpTransport {
+  const known = TRANSPORTS.find((transport) => transport === raw.type);
+  if (known) return known;
+
+  return raw.url ? 'http' : 'stdio';
+}
+
 export function readMcpServers(mcpConfigPath: string, store: AppStore): McpServer[] {
   const config = readJsonFile<RawMcpConfig>(mcpConfigPath, {});
   const active = config.mcpServers ?? {};
@@ -35,7 +57,7 @@ export function readMcpServers(mcpConfigPath: string, store: AppStore): McpServe
   const toServer = (name: string, raw: RawMcpServer, isEnabled: boolean): McpServer => ({
     id: name,
     name,
-    transport: (raw.type as McpServer['transport']) ?? (raw.url ? 'http' : 'stdio'),
+    transport: readTransport(raw),
     command: raw.command,
     args: raw.args ?? [],
     url: raw.url,
@@ -114,115 +136,28 @@ export interface HealthResult {
 }
 
 /**
- * Проверка живости: поднимаем сервер и говорим с ним на языке MCP —
- * initialize, затем tools/list. Это честнее, чем просто проверить наличие файла:
- * видно и что процесс стартует, и сколько инструментов он отдаёт.
+ * Проверка живости: подключаемся к серверу и говорим с ним на языке MCP —
+ * рукопожатие, затем tools/list. Это честнее, чем проверять наличие файла или
+ * стучаться в порт: видно и что сервер поднимается, и сколько инструментов он
+ * отдаёт.
+ *
+ * До этого http и sse проверялись HEAD-запросом, то есть отвечали на вопрос
+ * «порт открыт» вместо «это работающий MCP-сервер», и toolCount у них не
+ * заполнялся вовсе. Теперь все три транспорта идут одним путём — через общего
+ * клиента, который знает про транспорты всё, что нужно.
  */
 export async function checkMcpHealth(server: McpServer, timeoutMs = 30_000): Promise<HealthResult> {
   if (!server.isEnabled) return { health: 'disabled' };
-  if (server.transport !== 'stdio') {
-    // Для sse/http достаточно проверить доступность адреса.
-    return checkHttpHealth(server, timeoutMs);
-  }
-  if (!server.command) return { health: 'failed', detail: 'Не задана команда запуска' };
-
-  return new Promise<HealthResult>((resolve) => {
-    const child = spawn(server.command as string, shellArgs(server.args), {
-      env: { ...process.env, ...server.env },
-      stdio: ['pipe', 'pipe', 'pipe'],
-      // На Windows оболочка нужна всегда, а не только для явных .cmd/.bat:
-      // npx, node и uvx там тоже .cmd-обёртки, просто пишут их без расширения,
-      // и spawn без shell не находит их вовсе (ENOENT). Оболочка не экранирует
-      // аргументы сама — этим занимается shellArgs.
-      shell: process.platform === 'win32',
-      windowsHide: true,
-    });
-
-    let buffer = '';
-    let stderr = '';
-    let settled = false;
-
-    const finish = (result: HealthResult): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      child.kill();
-      resolve(result);
-    };
-
-    const timer = setTimeout(
-      () =>
-        finish({ health: 'failed', detail: stderr.slice(0, 400) || 'Сервер не ответил вовремя' }),
-      timeoutMs,
-    );
-
-    const send = (message: unknown): void => {
-      child.stdin.write(`${JSON.stringify(message)}\n`);
-    };
-
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-
-    child.on('error', (error) => finish({ health: 'failed', detail: error.message }));
-    child.on('exit', (code) => {
-      if (code !== 0)
-        finish({
-          health: 'failed',
-          detail: stderr.slice(0, 400) || `Процесс завершился с кодом ${code}`,
-        });
-    });
-
-    child.stdout.on('data', (chunk: Buffer) => {
-      buffer += chunk.toString();
-      let newline: number;
-      while ((newline = buffer.indexOf('\n')) !== -1) {
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        if (!line) continue;
-
-        let message: { id?: number; result?: { tools?: unknown[] } };
-        try {
-          message = JSON.parse(line);
-        } catch {
-          continue;
-        }
-
-        if (message.id === 1 && message.result) {
-          send({ jsonrpc: '2.0', method: 'notifications/initialized' });
-          send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
-        } else if (message.id === 2) {
-          finish({ health: 'connected', toolCount: message.result?.tools?.length ?? 0 });
-        }
-      }
-    });
-
-    send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {
-        protocolVersion: '2024-11-05',
-        capabilities: {},
-        clientInfo: { name: 'claude-control', version: '0.1.0' },
-      },
-    });
-  });
-}
-
-async function checkHttpHealth(server: McpServer, timeoutMs: number): Promise<HealthResult> {
-  if (!server.url) return { health: 'failed', detail: 'Не задан адрес' };
 
   try {
-    const response = await fetch(server.url, {
-      method: 'HEAD',
-      signal: AbortSignal.timeout(timeoutMs),
-      headers: server.headers,
-    });
-    return response.ok || response.status === 405
-      ? { health: 'connected' }
-      : { health: 'failed', detail: `HTTP ${response.status}` };
+    const session = await openMcpSession(server, timeoutMs);
+    try {
+      return { health: 'connected', toolCount: (await session.listTools()).length };
+    } finally {
+      await session.close();
+    }
   } catch (error) {
-    return { health: 'failed', detail: error instanceof Error ? error.message : String(error) };
+    const detail = error instanceof Error ? error.message : String(error);
+    return { health: 'failed', detail: detail.slice(0, 400) };
   }
 }

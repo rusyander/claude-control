@@ -21,7 +21,14 @@ export const STALL_MS = 120_000;
  * Статус одного прогона с поправкой на зависание: если агент «работает», но
  * событий нет дольше STALL_MS, показываем это красным, а не зелёным.
  */
-export function runStatus(run: { status: RunStatus; lastEventAt: number; now: number }): RunStatus {
+export function runStatus(run: {
+  status: RunStatus;
+  lastEventAt: number;
+  now: number;
+  /** Агент ждёт разрешения инструмента — это «нужен ответ», хоть процесс и жив. */
+  pendingPermission?: boolean;
+}): RunStatus {
+  if (run.status === 'running' && run.pendingPermission) return 'waiting';
   if (run.status === 'running' && run.now - run.lastEventAt > STALL_MS) return 'error';
   return run.status;
 }

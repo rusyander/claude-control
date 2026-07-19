@@ -59,7 +59,9 @@ export function WorkspaceTabs({
             >
               <StatusDot
                 tone={statusTone(status)}
-                pulse={status === 'running'}
+                // Пульсируем не только у «работает», но и у «ждёт ответа»/«ошибка»:
+                // это те состояния, где от тебя что-то нужно — пусть бросаются в глаза.
+                pulse={status !== 'idle'}
                 label={status !== 'idle' ? t(`workspace.status.${status}`) : undefined}
               />
               <Icon name="folder" size={16} />

@@ -2,8 +2,10 @@ import type {
   PermissionDecision,
   PermissionDraft,
   PermissionRule,
+  SettingsSource,
 } from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
+import { LOCAL_ID_PREFIX } from '../lib/settings-source.ts';
 import type { AppStore } from '../lib/app-store.ts';
 
 /**
@@ -22,13 +24,18 @@ interface RawSettings {
 
 const MCP_PATTERN = /^mcp__([^_]+(?:[^_]|_(?!_))*)__(.+)$/;
 
-export function readPermissions(settingsPath: string, store: AppStore): PermissionRule[] {
+function readPermissionsFrom(
+  settingsPath: string,
+  store: AppStore,
+  source: SettingsSource,
+): PermissionRule[] {
   const settings = readJsonFile<RawSettings>(settingsPath, {});
   const rules: PermissionRule[] = [];
+  const prefix = source === 'settings-local' ? LOCAL_ID_PREFIX : '';
 
   for (const decision of ['allow', 'ask', 'deny'] as const) {
     for (const pattern of settings.permissions?.[decision] ?? []) {
-      const id = `${decision}:${pattern}`;
+      const id = `${prefix}${decision}:${pattern}`;
       const mcp = MCP_PATTERN.exec(pattern);
 
       rules.push({
@@ -38,11 +45,28 @@ export function readPermissions(settingsPath: string, store: AppStore): Permissi
         mcpServer: mcp?.[1],
         mcpTool: mcp?.[2],
         groupIds: store.getGroupIdsFor('permission', id),
+        source,
       });
     }
   }
 
   return rules;
+}
+
+/**
+ * Все действующие права. Локальный файл читается наравне с основным — иначе
+ * список врал бы: запрет, живущий в `settings.local.json`, действует ровно
+ * так же, а в панели его не было видно вовсе.
+ */
+export function readPermissions(
+  settingsPath: string,
+  store: AppStore,
+  localPath?: string,
+): PermissionRule[] {
+  const own = readPermissionsFrom(settingsPath, store, 'settings');
+  if (!localPath) return own;
+
+  return [...own, ...readPermissionsFrom(localPath, store, 'settings-local')];
 }
 
 export function savePermission(

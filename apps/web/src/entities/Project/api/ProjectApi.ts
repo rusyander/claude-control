@@ -78,7 +78,7 @@ export function useFsList(path: string | undefined) {
   });
 }
 
-/** Открыть каталог проекта в VS Code. */
+/** Открыть каталог проекта во внешнем редакторе (команда — из настроек). */
 export function useOpenInEditor() {
   return useMutation({
     mutationFn: async (path: string) => {
@@ -86,5 +86,24 @@ export function useOpenInEditor() {
       return data;
     },
     meta: { successMessage: 'toasts.openingEditor' },
+  });
+}
+
+export interface EditorInfo {
+  id: string;
+  name: string;
+  command: string;
+  available: boolean;
+}
+
+/** Редакторы, установленные в системе, — для выбора в настройках. */
+export function useEditors() {
+  return useQuery({
+    queryKey: ['editors'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<EditorInfo[]>('/editors');
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }

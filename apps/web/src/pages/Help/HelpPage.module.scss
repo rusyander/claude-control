@@ -2,14 +2,54 @@
   max-width: var(--layout-content-max);
 }
 
-.text {
-  max-width: 76ch;
+// Вводный абзац занимает ту же ширину, что и остальной документ: справка
+// не должна выглядеть колонкой вдвое уже соседних страниц.
+.lead {
+  max-width: 100%;
 }
 
-.eventRow {
-  padding: var(--spacing-2xs) 0;
+// Карточки разделов: колонка подстраивается под ширину сама, отдельных
+// точек перелома под планшет и телефон не нужно.
+.topicGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-sm);
+}
 
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--color-border);
+/* ── Документ раздела ───────────────────────────────────────────────── */
+
+// Ссылка «все разделы» стоит над заголовком: путь назад виден раньше, чем
+// прочитан документ.
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  align-self: flex-start;
+  margin-left: calc(var(--spacing-2xs) * -1);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-fg-muted);
+  text-decoration: none;
+
+  &:hover {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-fg);
   }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+.backIcon {
+  flex-shrink: 0;
+}
+
+// Между секциями документа расстояние больше, чем внутри секции: границы
+// разделов должны читаться без линеек.
+.topicBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
 }

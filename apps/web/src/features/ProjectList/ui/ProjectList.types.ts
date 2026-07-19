@@ -11,4 +11,6 @@ export interface ProjectListProps {
   onOpen: (project: ProjectInfo) => void;
   /** Открыть системный диалог добавления папки проекта. */
   onAddFolder?: () => void;
+  /** Открыть окно параллельного запуска в нескольких проектах. */
+  onParallelLaunch?: () => void;
 }

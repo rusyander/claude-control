@@ -4,6 +4,8 @@
  */
 export const queryKeys = {
   location: ['location'] as const,
+  /** Платформа, домашний каталог, оболочка — за сессию не меняются. */
+  system: ['system'] as const,
   settings: ['settings'] as const,
   overview: ['overview'] as const,
   rules: ['rules'] as const,
@@ -15,6 +17,8 @@ export const queryKeys = {
   env: ['env'] as const,
   groups: ['groups'] as const,
   automations: ['automations'] as const,
+  /** Резервные копии: список обновляется после каждой записи в конфиг. */
+  backups: ['backups'] as const,
 };
 
 /** Какие ключи обновлять при изменении конкретного домена на диске. */

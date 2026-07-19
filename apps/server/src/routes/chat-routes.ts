@@ -1,12 +1,13 @@
 import { join, isAbsolute } from 'node:path';
 import { statSync } from 'node:fs';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../context.ts';
 import { readChats, readChatMessages } from '../domains/chat/ChatHistory.ts';
 import { listProjects } from '../domains/chat/ChatProjects.ts';
 import { listRoots, listDirectory } from '../domains/fs/FileBrowser.ts';
-import { isEditorAvailable, openInEditor } from '../domains/fs/EditorLauncher.ts';
-import { ChatRun, type ChatEvent } from '../domains/chat/ChatRunner.ts';
+import { detectEditors, resolveEditorCommand, openInEditor } from '../domains/fs/EditorLauncher.ts';
+import { ChatRunRegistry, type RunSubscriber } from '../domains/chat/ChatRunRegistry.ts';
+import { PermissionBroker } from '../domains/chat/ChatPermissions.ts';
 import {
   readArtifacts,
   readArtifactText,
@@ -20,15 +21,88 @@ import {
   buildPromptWithFiles,
 } from '../domains/chat/ChatUploads.ts';
 
+/** Заголовки SSE-ответа: держим поток открытым, ничего не кэшируем. */
+const SSE_HEADERS = {
+  'Content-Type': 'text/event-stream',
+  'Cache-Control': 'no-cache',
+  Connection: 'keep-alive',
+} as const;
+
 /**
  * Маршруты чата. Ответ отдаётся потоком (SSE): пользователь видит текст по мере
- * генерации, как в самом Claude Code. Запущенные разговоры лежат в реестре,
- * чтобы их можно было остановить кнопкой.
+ * генерации, как в самом Claude Code.
+ *
+ * Прогоны живут в реестре, отвязанном от HTTP-запроса: обрыв соединения или уход
+ * на другую вкладку не убивают агента, а к идущему прогону можно переподключиться
+ * потоком, догнав пропущенное. Остановка — только по явной кнопке.
  */
 export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): void {
-  const running = new Map<string, ChatRun>();
+  const registry = new ChatRunRegistry();
+  const permissions = new PermissionBroker();
+
+  // Адрес, по которому мини-MCP-сервер прав стучится за решением пользователя.
+  const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
 
   const projectsDir = join(ctx.location.paths.root, 'projects');
+
+  /**
+   * Отдать SSE-поток прогона в ответ, начиная с `fromSeq`. Держит соединение
+   * живым пингом, догоняет буфер и живые события. Обрыв соединения только
+   * отцепляет слушателя — прогон в реестре продолжается. Промис разрешается,
+   * когда поток закрыт (прогон завершён или клиент отключился).
+   */
+  const streamRun = (reply: FastifyReply, chatId: string, fromSeq: number): Promise<void> =>
+    new Promise((resolve) => {
+      reply.raw.writeHead(200, SSE_HEADERS);
+
+      // Пинг-комментарии не дают прокси/браузеру закрыть «молчащее» соединение,
+      // пока агент долго работает в инструменте. Клиент их игнорирует.
+      const heartbeat = setInterval(() => {
+        try {
+          reply.raw.write(': ping\n\n');
+        } catch {
+          // Соединение уже закрыто — обработчик close всё уберёт.
+        }
+      }, 10_000);
+
+      let closed = false;
+      const finish = (): void => {
+        if (closed) return;
+        closed = true;
+        clearInterval(heartbeat);
+        try {
+          reply.raw.end();
+        } catch {
+          // уже закрыто
+        }
+        resolve();
+      };
+
+      const subscriber: RunSubscriber = {
+        send: (buffered) => {
+          try {
+            reply.raw.write(
+              `data: ${JSON.stringify({ ...buffered.event, seq: buffered.seq })}\n\n`,
+            );
+          } catch {
+            // Клиент отвалился — close-обработчик отцепит.
+          }
+        },
+        close: finish,
+      };
+
+      const unsubscribe = registry.attach(chatId, fromSeq, subscriber);
+
+      // Клиент закрыл соединение — отцепляем слушателя, но прогон НЕ трогаем.
+      reply.raw.on('close', () => {
+        clearInterval(heartbeat);
+        unsubscribe?.();
+        resolve();
+      });
+
+      // Прогон уже завершён (буфер отдан) или его нет — закрываемся.
+      if (!unsubscribe) finish();
+    });
 
   app.get('/api/chats', () => readChats(projectsDir));
 
@@ -65,17 +139,29 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
     }
   });
 
-  // --- Открыть проект в VS Code ---
+  // --- Открыть проект во внешнем редакторе ---
 
-  app.post<{ Body: { path?: string } }>('/api/projects/open-in-editor', (request, reply) => {
-    const path = validTargetCwd(request.body.path);
-    if (!path) return reply.code(400).send({ message: 'Каталог не найден' });
-    if (!isEditorAvailable()) {
-      return reply.code(400).send({ message: 'VS Code не найден: команда code недоступна в PATH' });
-    }
-    openInEditor(path);
-    return { ok: true };
-  });
+  /** Редакторы, установленные в системе, — для выбора в настройках. */
+  app.get('/api/editors', () => detectEditors());
+
+  app.post<{ Body: { path?: string; editor?: string } }>(
+    '/api/projects/open-in-editor',
+    (request, reply) => {
+      const path = validTargetCwd(request.body.path);
+      if (!path) return reply.code(400).send({ message: 'Каталог не найден' });
+
+      // Явно заданный редактор → настроенный → первый найденный в системе.
+      const command = resolveEditorCommand(request.body.editor || ctx.store.getSettings().editor);
+      if (!command) {
+        return reply.code(400).send({
+          message: 'Редактор кода не найден. Укажите его в настройках или установите code/cursor.',
+        });
+      }
+
+      openInEditor(path, command);
+      return { ok: true, editor: command };
+    },
+  );
 
   app.get<{ Params: { chatId: string } }>('/api/chats/:chatId/messages', (request) =>
     readChatMessages(projectsDir, request.params.chatId),
@@ -91,11 +177,29 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
       files?: { name: string; base64: string }[];
       /** Разрешить правку файлов в настоящем проекте — тумблером из шапки. */
       allowEdits?: boolean;
+      /** Полный доступ (bypassPermissions) — «Разрешить и продолжить» у упавшего агента. */
+      fullAccess?: boolean;
       /** Каталог проекта для нового разговора — когда чат открыт из списка проектов. */
       projectPath?: string;
+      /** Модель для этого разговора (алиас или полное имя); пусто = по умолчанию. */
+      model?: string;
+      /** Глубина продумывания (--effort); пусто = по умолчанию. */
+      effort?: string;
     };
   }>('/api/chat/send', { bodyLimit: 64 * 1024 * 1024 }, async (request, reply) => {
-    const { chatId, prompt, sessionId, name, fork, files, allowEdits, projectPath } = request.body;
+    const {
+      chatId,
+      prompt,
+      sessionId,
+      name,
+      fork,
+      files,
+      allowEdits,
+      fullAccess,
+      projectPath,
+      model,
+      effort,
+    } = request.body;
 
     // Разговор продолжается только из той папки, где он начинался. Для нового
     // чата, открытого из проекта, рабочей папкой становится каталог проекта.
@@ -107,21 +211,14 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
       validTargetCwd(projectPath),
     );
 
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-
-    const send = (event: ChatEvent): void => {
-      reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
-    };
-
     if (workspace.isMissing) {
-      send({
-        kind: 'error',
-        message: `Рабочая папка этого чата не найдена: ${workspace.cwd}. Разговор начинался в ней, и продолжить его можно только оттуда.`,
-      });
+      reply.raw.writeHead(200, SSE_HEADERS);
+      reply.raw.write(
+        `data: ${JSON.stringify({
+          kind: 'error',
+          message: `Рабочая папка этого чата не найдена: ${workspace.cwd}. Разговор начинался в ней, и продолжить его можно только оттуда.`,
+        })}\n\n`,
+      );
       reply.raw.end();
       return;
     }
@@ -139,43 +236,104 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
       .filter((file) => isSupportedUpload(file.name))
       .map((file) => saveUpload(uploadDir, file.name, file.base64));
 
-    const run = new ChatRun();
-    running.set(chatId, run);
+    // Запускаем прогон в реестре (или подхватываем уже идущий) и подключаемся к
+    // нему потоком. Обрыв этого соединения агента не тронет.
+    registry.start(
+      chatId,
+      {
+        prompt: buildPromptWithFiles(prompt, saved),
+        sessionId,
+        name,
+        fork,
+        cwd,
+        // Модель и глубина продумывания — выбор пользователя в шапке чата.
+        model,
+        effort,
+        // Полный доступ снимает все проверки прав — по кнопке «Разрешить и
+        // продолжить» у агента, вставшего из-за отсутствия разрешения.
+        permissionMode: fullAccess ? 'bypassPermissions' : permissionModeFor(workspace, allowEdits),
+        // Интерактивные права: запрос на инструмент вне авторазрешённого уходит
+        // человеку кнопкой в чате (при полном доступе ChatRun это пропустит).
+        permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl },
+      },
+      // Каталог проекта — для группировки статусов и восстановления после F5;
+      // у песочницы/домашнего чата проекта нет.
+      { projectPath: workspace.isSandbox ? undefined : cwd, sessionId },
+    );
 
-    // Пользователь может закрыть вкладку — процесс за ней тянуть незачем.
-    // Следим именно за ответом: запрос закрывается сразу, как только дочитано
-    // тело, и по нему разговор обрывался бы, не начавшись.
-    reply.raw.on('close', () => {
-      if (running.get(chatId) === run) {
-        run.stop();
-        running.delete(chatId);
-      }
-    });
-
-    try {
-      await run.start(
-        {
-          prompt: buildPromptWithFiles(prompt, saved),
-          sessionId,
-          name,
-          fork,
-          cwd,
-          permissionMode: permissionModeFor(workspace, allowEdits),
-        },
-        send,
-      );
-    } catch (error) {
-      send({ kind: 'error', message: error instanceof Error ? error.message : String(error) });
-    } finally {
-      running.delete(chatId);
-      reply.raw.end();
-    }
+    await streamRun(reply, chatId, 0);
   });
 
+  /**
+   * Переподключение к идущему прогону: догнать пропущенное с `from` и слушать
+   * дальше. Так клиент восстанавливает поток после обрыва связи и после
+   * перезагрузки страницы. Если прогона нет — отвечаем маркером `gone`, чтобы
+   * клиент прекратил переподключение, а не долбил впустую.
+   */
+  app.get<{ Params: { chatId: string }; Querystring: { from?: string } }>(
+    '/api/chat/:chatId/stream',
+    async (request, reply) => {
+      const { chatId } = request.params;
+      const fromSeq = Number(request.query.from) || 0;
+
+      if (!registry.has(chatId)) {
+        reply.raw.writeHead(200, SSE_HEADERS);
+        reply.raw.write(`data: ${JSON.stringify({ kind: 'gone' })}\n\n`);
+        reply.raw.end();
+        return;
+      }
+
+      await streamRun(reply, chatId, fromSeq);
+    },
+  );
+
+  /** Идущие прогоны — клиент подхватывает их после перезагрузки страницы. */
+  app.get('/api/chat/active', () => registry.active());
+
   app.post<{ Params: { chatId: string } }>('/api/chat/:chatId/stop', (request) => {
-    const run = running.get(request.params.chatId);
-    run?.stop();
-    return { ok: Boolean(run) };
+    // Заодно отклоняем висящие запросы прав — иначе агент ждал бы решения зря.
+    permissions.cancelRun(request.params.chatId);
+    return { ok: registry.stop(request.params.chatId) };
+  });
+
+  /**
+   * Запрос на разрешение от мини-MCP-сервера прав. Показываем его в потоке
+   * разговора карточкой и держим ответ, пока человек не решит. Ответ уходит
+   * обратно серверу прав, а он — агенту. Разговора нет (уже закрыт) → запрещаем.
+   */
+  app.post<{
+    Body: { runId: string; toolName: string; input: unknown; toolUseId: string };
+  }>('/api/chat/permission-request', async (request, reply) => {
+    const { runId, toolName, input, toolUseId } = request.body;
+
+    const shown = registry.emitExternal(runId, { kind: 'permission', toolName, input, toolUseId });
+    if (!shown) return reply.send({ behavior: 'deny', message: 'Разговор не найден.' });
+
+    const decision = await permissions.request({ runId, toolName, input, toolUseId });
+    // Помечаем в потоке, что решение принято — карточка в чате обновится.
+    registry.emitExternal(runId, {
+      kind: 'permissionResolved',
+      toolUseId,
+      behavior: decision.behavior,
+    });
+    return reply.send(decision);
+  });
+
+  /** Решение пользователя по запросу прав (клик «Разрешить»/«Запретить»). */
+  app.post<{
+    Params: { chatId: string };
+    Body: { toolUseId: string; behavior: 'allow' | 'deny'; message?: string };
+  }>('/api/chat/:chatId/permission-decision', (request) => {
+    const { chatId } = request.params;
+    const { toolUseId, behavior, message } = request.body;
+    const ok = permissions.decide(
+      chatId,
+      toolUseId,
+      behavior === 'allow'
+        ? { behavior: 'allow' }
+        : { behavior: 'deny', message: message ?? 'Отклонено пользователем.' },
+    );
+    return { ok };
   });
 
   /**

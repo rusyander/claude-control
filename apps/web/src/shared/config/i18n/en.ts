@@ -1,7 +1,10 @@
 import type { TranslationSchema } from './ru';
+import { helpEn } from './help/en';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
+  help: helpEn,
+
   common: {
     appName: 'Claude Control',
     appTagline: 'Every Claude Code setting in one place',
@@ -36,11 +39,20 @@ export const en: TranslationSchema = {
     deleteRule:
       'The rule will be cut from CLAUDE.md. A backup of the file goes to claude-control/backups, but the rule itself will be gone from the file.',
     deleteSkill:
-      'The skill folder will be deleted from disk with everything inside. This cannot be undone: no backup of the folder is made.',
+      'The skill folder will be deleted from disk with everything inside. A copy of the folder goes to claude-control/backups — restoring it from there is a manual job.',
     deleteHook:
       'The hook will be removed from settings.json. The script file stays on disk but stops being called. A config backup goes to claude-control/backups.',
     deleteMcp:
       'The server will be removed from the configuration. Its tools stop being available to Claude after a restart.',
+    sourceLocal: 'local',
+    deleteHookLocal:
+      'The hook will be removed from settings.local.json, your personal settings file. The script file stays on disk. A config backup goes to claude-control/backups.',
+    localReadOnly:
+      'An entry from settings.local.json, your personal settings file. Claude Code applies it alongside the shared ones; edits go back to that same file.',
+    deleteGroup:
+      'The group will be deleted. The rules, skills, hooks and servers themselves stay where they are — only the grouping disappears. If the group is currently off, its members are switched back on.',
+    deleteAutomation:
+      'The automation will be deleted and the hook compiled from it removed from settings.json. Hand-written hooks are left alone.',
   },
   nav: {
     overview: 'Overview',
@@ -172,6 +184,22 @@ export const en: TranslationSchema = {
     pendingTools: 'Claude is working with files',
     questionTitle: 'Your choice is needed',
     questionMulti: 'multiple choices allowed',
+    pickOption: 'Answer with this option',
+    permissionTitle: 'The agent needs permission',
+    allow: 'Allow',
+    deny: 'Deny',
+    model: 'Model',
+    modelHint: 'Model for this conversation. Empty — as set in Settings.',
+    modelClaudeDefault: 'Opus 4.8 (1M)',
+    effort: 'Thinking effort',
+    effortAuto: 'default',
+    effortHint: 'How deeply the agent reasons about the answer. Empty — as set in Settings.',
+    fromSettings: 'Default: {{value}}',
+    effort_low: 'Low',
+    effort_medium: 'Medium',
+    effort_high: 'High',
+    effort_xhigh: 'Very high',
+    effort_max: 'Max',
     copyMessage: 'Copy message',
     editMessage: 'Edit and send again',
     copyArtifact: 'Copy contents',
@@ -190,6 +218,13 @@ export const en: TranslationSchema = {
     allowEdits: 'Allow editing project files',
     readOnly: 'Read-only',
     editsAllowed: 'Edits allowed',
+    retry: 'Retry',
+    retryHint: 'Restart with the same prompt',
+    continue: 'Continue',
+    continueWord: 'continue',
+    continueHint: 'Ask the agent to pick up where it stopped',
+    allowAndContinue: 'Allow and continue',
+    allowAndContinueHint: 'Restart with full access — the agent does everything without asking',
     today: 'Today',
     yesterday: 'Yesterday',
     thisWeek: 'This week',
@@ -234,6 +269,8 @@ export const en: TranslationSchema = {
     explain:
       'Every file in the hooks/ folder of your Claude Code configuration. Hooks on the neighbouring page decide when a script runs — here you edit the code itself. A script with no event bound to it simply sits in the folder and does nothing.',
     addScript: 'Add script',
+    mode_constructor: 'Builder',
+    mode_bulk: 'Several at once',
     templatesTitle: 'Ready-made scaffolds',
     templatesHint: 'Pick a code template — then tweak the condition and text.',
     fileName: 'File name',
@@ -258,6 +295,8 @@ export const en: TranslationSchema = {
     command: 'Command',
     scriptMissing: 'Script file not found',
     addHook: 'Add hook',
+    mode_constructor: 'Builder',
+    mode_bulk: 'Several at once',
     presetsTitle: 'Ready-made hooks',
     presetsHint: 'Pick a preset — every field fills in, then tweak the details.',
     matcherHint:
@@ -339,8 +378,8 @@ export const en: TranslationSchema = {
     transport: 'Transport',
     command: 'Start command',
     addServer: 'Add server',
-    modeSingle: 'One server',
-    modeImport: 'Import from JSON',
+    modeSingle: 'Builder',
+    modeImport: 'Several from JSON',
     importLabel: 'Paste the mcpServers block from the server docs',
     importHint:
       'Understands both a {{"mcpServers": …}} wrapper and a plain servers object. Transport is detected automatically.',
@@ -357,6 +396,9 @@ export const en: TranslationSchema = {
     url: 'Address',
     env: 'Environment variables',
     envHint: 'One KEY=VALUE per line. Do not put secrets here — they belong in .mcp-secrets.env',
+    headers: 'Request headers',
+    headersHint:
+      'One Name=value per line. Needed by servers behind auth: without them the check stops at 401',
   },
   permissions: {
     title: 'Permissions',
@@ -500,6 +542,52 @@ export const en: TranslationSchema = {
     watchHint: 'Refresh the interface when configs are edited outside the app',
     revealSecrets: 'Reveal secrets by default',
     revealSecretsHint: 'Otherwise values stay masked',
+    editorTitle: 'Code editor',
+    editorHint: 'Used by the "Open in editor" button. Editors installed on your system are shown.',
+    editorAuto: 'Auto',
+    editorMissing: 'not found',
+    editorCustom: 'Custom command',
+    editorCustomHint: 'The editor CLI command if it is not in the list (e.g. mate).',
+    spendTitle: 'Spend',
+    spendMoney: 'Show in money',
+    spendHint: 'Spend is shown in tokens by default',
+    chatDefaultsTitle: 'Chat: default model and effort',
+    chatDefaultsHint:
+      'Apply to all chats. A single chat can override them locally — the global settings stay unchanged.',
+    chatModel: 'Default model',
+    chatModelHint: 'Which model to use for new conversations.',
+    chatModelAuto: 'Whatever Claude picks (Opus 4.8, 1M)',
+    chatEffort: 'Default thinking effort',
+    chatEffortHint: 'How deeply the agent reasons about the answer.',
+    chatEffortAuto: 'CLI default',
+    pricingTitle: 'Rates used to estimate cost',
+    pricingHint:
+      'Prices per million tokens behind the cost figures in Analytics. The panel pulls them from the Anthropic site — at most once a day, when you open Settings. Rates are tied to a specific model version, so older runs are priced at the rates that applied back then. You can set your own price: it overrides the list.',
+    pricingLive: 'Anthropic price list',
+    pricingBuiltIn: 'Built-in table',
+    pricingUpdated: 'updated {{date}}',
+    pricingRefresh: 'Refresh prices',
+    pricingRefreshing: 'Refreshing…',
+    pricingOffline:
+      'Could not fetch the current price list — costs are computed from the table built into the panel on its build date. Check your internet connection and press “Refresh prices”.',
+    pricingModel: 'Model',
+    pricingActions: 'Own price',
+    pricingOwn: 'own price',
+    pricingUntil: 'until {{date}}',
+    pricing_input: 'Input',
+    pricing_output: 'Output',
+    pricing_cacheRead: 'Cache read',
+    pricing_cacheWrite: 'Cache write',
+    pricingReset: 'Clear own prices',
+    backupsTitle: 'Backups',
+    backupsHint:
+      'A copy is made before every write to your configuration. Restoring replaces the file with the chosen state and saves the current one as a fresh copy — so even a restore can be undone.',
+    backupsEmpty: 'No backups yet',
+    backupsRestore: 'Restore',
+    backupsManual: 'by hand only',
+    backupsConfirmTitle: 'Restore the file to this copy?',
+    backupsConfirmText:
+      'The file {{target}} will be replaced whole: anything changed after this copy disappears from it. The current state is saved as a separate copy. Changes apply after restarting Claude Code.',
   },
   assistant: {
     title: 'Assistant',
@@ -609,6 +697,7 @@ export const en: TranslationSchema = {
     deleted: 'Deleted',
     updated: 'Updated',
     moved: 'Moved',
+    restored: 'File restored from a backup',
     copied: 'Copied',
     templateApplied: 'Template applied',
     locationChanged: 'Settings directory updated',
@@ -631,7 +720,7 @@ export const en: TranslationSchema = {
     title: 'Projects',
     sidebarLabel: 'Chats or projects',
     addFolder: 'Add folder',
-    openInEditor: 'Open in VS Code',
+    openInEditor: 'Open in editor',
     search: 'Search project',
     searchPlaceholder: 'name or path',
     count: 'Projects: {{count}}',
@@ -640,6 +729,10 @@ export const en: TranslationSchema = {
     emptyTitle: 'No projects yet',
     emptyText: 'Directories Claude Code has worked in will appear here.',
     newChat: 'New chat in project',
+    notifyWaiting: 'Project "{{name}}": agent is waiting for a reply',
+    notifyPermission: 'Project "{{name}}": agent needs permission',
+    notifyError: 'Project "{{name}}": error or limit',
+    notifyDone: 'Project "{{name}}": agent finished',
     starterPrompt:
       'You are working in the project "{{name}}". Read-only for now. Look around and briefly say what this project is and what you suggest starting with.',
     introHint:
@@ -658,5 +751,30 @@ export const en: TranslationSchema = {
     up: 'Up',
     empty: 'No subfolders inside',
     pick: 'Open this folder',
+  },
+  agents: {
+    title: 'Agents',
+    active: 'Active agents: {{count}}',
+    empty: 'No active agents',
+    stopAll: 'Stop all',
+    totalCost: 'Total this session',
+    total: 'Total this session',
+    chat: 'Chat',
+    sound: 'Sound',
+    soundHint: 'Notification sound: an agent is waiting, failed or finished',
+  },
+  parallel: {
+    button: 'Run in several',
+    title: 'Run in several projects',
+    hint: 'One request — a separate agent in each selected project. Track them in the panel and by the tab dots.',
+    prompt: 'What to do',
+    promptPlaceholder: 'For example: do a code review and suggest fixes',
+    pickProjects: 'Projects selected: {{count}}',
+    launch: 'Run in {{count}}',
+  },
+  bulkPresets: {
+    hint: 'Tick the presets you need — I will create them all at once. Each can be edited afterwards.',
+    createSelected: 'Create selected ({{count}})',
+    creating: 'Creating… {{done}} of {{total}}',
   },
 };

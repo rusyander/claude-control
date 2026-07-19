@@ -16,13 +16,24 @@ interface RawSettings {
   [key: string]: unknown;
 }
 
-export function readEnvVars(settingsPath: string, secretsPath: string): EnvVar[] {
-  const settings = readJsonFile<RawSettings>(settingsPath, {});
-  const fromSettings = Object.entries(settings.env ?? {}).map(([key, value]) =>
-    toEnvVar(key, value, 'settings'),
-  );
+/**
+ * Переменные из обоих файлов настроек и из файла секретов. Локальные помечены
+ * источником: Claude Code их применяет, а панель — только показывает.
+ */
+export function readEnvVars(
+  settingsPath: string,
+  secretsPath: string,
+  settingsLocalPath?: string,
+): EnvVar[] {
+  const fromSettings = readSettingsEnv(settingsPath, 'settings');
+  const fromLocal = settingsLocalPath ? readSettingsEnv(settingsLocalPath, 'settings-local') : [];
 
-  return [...fromSettings, ...parseEnvFile(readTextFile(secretsPath))];
+  return [...fromSettings, ...fromLocal, ...parseEnvFile(readTextFile(secretsPath))];
+}
+
+function readSettingsEnv(path: string, source: EnvVar['source']): EnvVar[] {
+  const settings = readJsonFile<RawSettings>(path, {});
+  return Object.entries(settings.env ?? {}).map(([key, value]) => toEnvVar(key, value, source));
 }
 
 /** Полное значение — отдельным запросом, по явному действию пользователя. */
@@ -31,19 +42,42 @@ export function revealEnvValue(
   secretsPath: string,
   key: string,
   source: EnvVar['source'],
+  settingsLocalPath?: string,
 ): string | undefined {
   if (source === 'settings') {
     return readJsonFile<RawSettings>(settingsPath, {}).env?.[key];
   }
+  // Локальную переменную показать можно — это чтение; запись в этот файл
+  // закрыта, а прятать значение, которое лежит открытым текстом рядом,
+  // смысла нет.
+  if (source === 'settings-local') {
+    return settingsLocalPath
+      ? readJsonFile<RawSettings>(settingsLocalPath, {}).env?.[key]
+      : undefined;
+  }
   return parseEnvFile(readTextFile(secretsPath), false).find((item) => item.key === key)?.value;
 }
 
+/**
+ * Запись переменной. Локальная уходит в свой файл: панель показывает оба и
+ * правит каждый на месте — переезд в общий конфиг сделал бы личную настройку
+ * общей, чего никто не просил.
+ */
 export function saveEnvVar(
   settingsPath: string,
   secretsPath: string,
   draft: EnvVarDraft,
   backupDir?: string,
+  settingsLocalPath?: string,
 ): string | undefined {
+  if (draft.source === 'settings-local') {
+    if (!settingsLocalPath) throw new Error('Не задан путь к settings.local.json');
+
+    const local = readJsonFile<RawSettings>(settingsLocalPath, {});
+    local.env = { ...local.env, [draft.key]: draft.value };
+    return writeJsonFile(settingsLocalPath, local, { backupDir });
+  }
+
   if (draft.source === 'settings') {
     const settings = readJsonFile<RawSettings>(settingsPath, {});
     settings.env = { ...settings.env, [draft.key]: draft.value };
@@ -59,7 +93,16 @@ export function deleteEnvVar(
   key: string,
   source: EnvVar['source'],
   backupDir?: string,
+  settingsLocalPath?: string,
 ): string | undefined {
+  if (source === 'settings-local') {
+    if (!settingsLocalPath) throw new Error('Не задан путь к settings.local.json');
+
+    const local = readJsonFile<RawSettings>(settingsLocalPath, {});
+    delete local.env?.[key];
+    return writeJsonFile(settingsLocalPath, local, { backupDir });
+  }
+
   if (source === 'settings') {
     const settings = readJsonFile<RawSettings>(settingsPath, {});
     delete settings.env?.[key];

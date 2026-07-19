@@ -29,6 +29,7 @@ export function ProjectList({
   statuses,
   onOpen,
   onAddFolder,
+  onParallelLaunch,
 }: ProjectListProps) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
@@ -45,15 +46,36 @@ export function ProjectList({
   return (
     <Stack className={styles.panel}>
       <Stack gap="var(--spacing-xs)" className={styles.header}>
-        {onAddFolder && (
-          <Button
-            variant="secondary"
-            leftIcon={<Icon name="plus" size={20} />}
-            onClick={onAddFolder}
-          >
-            {t('projects.addFolder')}
-          </Button>
-        )}
+        {/*
+          Кнопки идут в столбик, а не в строку: панель шириной 300px, и два
+          полноразмерных действия с подписями в неё не помещаются — вторая
+          кнопка вылезала за край панели. Сокращать подписи до «Папка» и
+          «Мульти-запуск» пришлось бы сильнее, чем это читаемо.
+        */}
+        <Stack gap="var(--spacing-2xs)">
+          {onAddFolder && (
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<Icon name="plus" size={20} />}
+              onClick={onAddFolder}
+              fullWidth
+            >
+              {t('projects.addFolder')}
+            </Button>
+          )}
+          {onParallelLaunch && projects.length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<Icon name="send" size={20} />}
+              onClick={onParallelLaunch}
+              fullWidth
+            >
+              {t('parallel.button')}
+            </Button>
+          )}
+        </Stack>
         <SearchField
           label={t('projects.search')}
           value={query}

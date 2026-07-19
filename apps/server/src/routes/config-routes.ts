@@ -55,10 +55,12 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
   app.get('/api/overview', (): Overview => {
     const { paths } = ctx.location;
     const rules = readRules(paths.claudeMd, ctx.store);
-    const hooks = readHooks(paths.settings, ctx.store);
+    // Обзор отвечает на вопрос «что сейчас действует», поэтому локальные
+    // настройки считаются наравне с основными.
+    const hooks = readHooks(paths.settings, ctx.store, paths.settingsLocal);
     const skills = readSkills(paths.skills, ctx.store);
     const servers = readMcpServers(paths.mcpConfig, ctx.store);
-    const permissions = readPermissions(paths.settings, ctx.store);
+    const permissions = readPermissions(paths.settings, ctx.store, paths.settingsLocal);
     const scripts = readScripts(
       paths.hooks,
       hooks.map((hook) => hook.scriptPath).filter((path): path is string => Boolean(path)),
@@ -91,7 +93,7 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       groups: { total: ctx.store.getGroups().length },
     };
   });
-/**
+  /**
    * Доступ Claude Code к аккаунту.
    *
    * Наружу отдаётся только источник и причина — сам токен не возвращается

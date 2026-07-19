@@ -1,16 +1,8 @@
-import {
-  readdirSync,
-  statSync,
-  existsSync,
-  mkdirSync,
-  renameSync,
-  rmSync,
-  readFileSync,
-} from 'node:fs';
-import { join, resolve, dirname, sep } from 'node:path';
+import { readdirSync, statSync, existsSync, mkdirSync, renameSync } from 'node:fs';
+import { join, dirname, basename } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import type { Skill, SkillDraft } from '@claude-control/contracts';
-import { readTextFile, writeTextFile } from '../lib/safe-io.ts';
+import { readTextFile, writeTextFile, backupEntry, removeEntry } from '../lib/safe-io.ts';
 import type { AppStore } from '../lib/app-store.ts';
 
 /**
@@ -134,10 +126,32 @@ export function setSkillEnabled(skillsDir: string, skillId: string, isEnabled: b
   renameSync(from, to);
 }
 
-export function deleteSkill(skillsDir: string, skillId: string): void {
+/**
+ * Удаление скилла стирает папку целиком, и отменить это нечем — поэтому копия
+ * снимается до `rmSync`. Скилл может лежать в обеих папках сразу (руками
+ * положили и туда, и туда), и копии тогда различаются именем корня.
+ */
+export function deleteSkill(
+  skillsDir: string,
+  skillId: string,
+  backupDir?: string,
+): string | undefined {
+  let backupPath: string | undefined;
+
   for (const dir of [join(skillsDir, skillId), join(skillsDir, '..', DISABLED_DIR_NAME, skillId)]) {
-    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+    if (!existsSync(dir)) continue;
+
+    const made = backupDir
+      ? backupEntry(dir, backupDir, `${basename(dirname(dir))}-${skillId}`)
+      : undefined;
+    backupPath ??= made;
+
+    // removeEntry, а не rmSync: у скилла может быть нелатинское имя, а
+    // рекурсивный rmSync на такой папке рапортует об успехе, ничего не удалив.
+    removeEntry(dir);
   }
+
+  return backupPath;
 }
 
 /** Разделяет YAML-frontmatter и тело markdown. */
@@ -217,63 +231,4 @@ function slugifyName(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-}
-
-/**
- * Содержимое вложенного файла скилла. Путь приходит из запроса, поэтому он
- * проверяется: за пределы папки скилла выйти нельзя, а двоичные файлы и
- * слишком большие тексты не отдаются — читать их в браузере нечем.
- */
-export function readSkillFile(skillsDir: string, skillId: string, file: string): string {
-  const skillDir = join(skillsDir, skillId.replace(/[^a-zA-Z0-9._-]/g, ''));
-  const target = resolve(skillDir, file);
-
-  if (!target.startsWith(resolve(skillDir))) return '';
-  if (!existsSync(target)) return '';
-  if (statSync(target).size > 512 * 1024) return '// Файл слишком большой для просмотра';
-
-  return readFileSync(target, 'utf8');
-}
-
-/** Безопасный путь внутри папки скилла: наружу выйти нельзя. */
-function resolveInsideSkill(skillsDir: string, skillId: string, file: string): string | undefined {
-  const skillDir = resolve(join(skillsDir, skillId.replace(/[^a-zA-Z0-9._-]/g, '')));
-  const target = resolve(skillDir, file);
-
-  // Сравниваем с разделителем на конце, иначе `skills/foo-evil` пройдёт
-  // проверку на префикс `skills/foo`.
-  return target === skillDir || target.startsWith(`${skillDir}${sep}`) ? target : undefined;
-}
-
-/** Запись файла скилла — создаёт недостающие папки по пути. */
-export function writeSkillFile(
-  skillsDir: string,
-  skillId: string,
-  file: string,
-  content: string,
-  backupDir?: string,
-): void {
-  const target = resolveInsideSkill(skillsDir, skillId, file);
-  if (!target) throw new Error('Путь выходит за пределы скилла');
-
-  mkdirSync(dirname(target), { recursive: true });
-  writeTextFile(target, content, { backupDir });
-}
-
-/** Удаление файла или папки целиком. */
-export function deleteSkillFile(skillsDir: string, skillId: string, file: string): void {
-  const target = resolveInsideSkill(skillsDir, skillId, file);
-  if (!target || !existsSync(target)) return;
-
-  rmSync(target, { recursive: true, force: true });
-}
-
-/** Переименование или перенос внутри скилла. */
-export function moveSkillFile(skillsDir: string, skillId: string, from: string, to: string): void {
-  const source = resolveInsideSkill(skillsDir, skillId, from);
-  const target = resolveInsideSkill(skillsDir, skillId, to);
-  if (!source || !target || !existsSync(source)) throw new Error('Неверный путь');
-
-  mkdirSync(dirname(target), { recursive: true });
-  renameSync(source, target);
 }

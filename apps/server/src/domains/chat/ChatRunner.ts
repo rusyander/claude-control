@@ -1,7 +1,13 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { mkdirSync } from 'node:fs';
-import { safeSessionId, safeName, safeModel, shellArgs } from '../../lib/cli-args.ts';
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { safeSessionId, safeName, safeModel, safeEffort, shellArgs } from '../../lib/cli-args.ts';
+
+/** Путь к мини-MCP-серверу прав рядом с этим модулем. */
+const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs', import.meta.url));
 
 /**
  * Запуск Claude Code для чата и разбор потока событий.
@@ -24,8 +30,12 @@ export type ChatEvent =
   | { kind: 'toolResult'; id: string; isError: boolean }
   | { kind: 'status'; text: string }
   | { kind: 'limit'; resetsAt: number; type: string; status: string }
+  | { kind: 'usage'; input: number; output: number; cacheRead: number; cacheCreation: number }
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string }
+  // Интерактивные права: агент хочет применить инструмент — ждём решения человека.
+  | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
+  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' };
 
 export interface RunOptions {
   prompt: string;
@@ -35,7 +45,10 @@ export interface RunOptions {
   cwd: string;
   /** Имя чата — CLI сохранит его в транскрипт, и список чатов его покажет. */
   name?: string;
+  /** Модель: алиас (opus/sonnet/haiku/fable) или полное имя; пусто = по умолчанию. */
   model?: string;
+  /** Глубина продумывания (--effort): low/medium/high/xhigh/max; пусто = по умолчанию. */
+  effort?: string;
   /**
    * Ветвление вместо продолжения: нужно, когда пользователь правит своё
    * сообщение — исходная ветка диалога при этом остаётся нетронутой.
@@ -59,11 +72,20 @@ export interface RunOptions {
    * рабочем коде молча не меняет.
    */
   permissionMode?: string;
+  /**
+   * Интерактивные права: когда задано, к агенту подключается мини-MCP-сервер, и
+   * каждый запрос на разрешение инструмента (вне авторазрешённого режимом)
+   * уходит человеку кнопкой в чате. `runId` связывает запрос с разговором,
+   * `baseUrl` — адрес приложения, куда MCP-сервер стучится за решением. При
+   * полном доступе (bypassPermissions) не нужно — там всё и так разрешено.
+   */
+  permissionPrompt?: { runId: string; baseUrl: string };
 }
 
 export class ChatRun {
   private child: ChildProcessWithoutNullStreams | undefined;
   private isStopped = false;
+  private mcpConfigDir: string | undefined;
 
   /** Запускает CLI и вызывает onEvent по мере поступления событий. */
   async start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
@@ -84,11 +106,43 @@ export class ChatRun {
     const sessionId = safeSessionId(options.sessionId);
     const name = safeName(options.name);
     const model = safeModel(options.model);
+    const effort = safeEffort(options.effort);
 
     if (sessionId) args.push('--resume', sessionId);
     if (options.fork) args.push('--fork-session');
     if (name) args.push('--name', name);
     if (model) args.push('--model', model);
+    if (effort) args.push('--effort', effort);
+
+    // Интерактивные права: добавляем свой MCP-сервер и указываем его инструмент
+    // как обработчик запросов на разрешение. Конфиг сливается с настоящим (без
+    // --strict-mcp-config), поэтому пользовательские MCP-серверы остаются. При
+    // полном доступе не подключаем — там подтверждать нечего.
+    if (options.permissionPrompt && options.permissionMode !== 'bypassPermissions') {
+      this.mcpConfigDir = mkdtempSync(join(tmpdir(), 'cc-perm-'));
+      const mcpConfigPath = join(this.mcpConfigDir, 'mcp.json');
+      writeFileSync(
+        mcpConfigPath,
+        JSON.stringify({
+          mcpServers: {
+            'perm-guard': {
+              command: process.execPath,
+              args: [PERMISSION_SERVER],
+              env: {
+                PERM_RUN_ID: options.permissionPrompt.runId,
+                PERM_BASE_URL: options.permissionPrompt.baseUrl,
+              },
+            },
+          },
+        }),
+      );
+      args.push(
+        '--mcp-config',
+        mcpConfigPath,
+        '--permission-prompt-tool',
+        'mcp__perm-guard__approve',
+      );
+    }
 
     // Имя чата — обычный текст с пробелами, а оболочка Windows разобрала бы
     // его как несколько аргументов, поэтому аргументы квотируются.
@@ -115,7 +169,22 @@ export class ChatRun {
       if (!line.trim()) continue;
 
       try {
-        const event = translate(JSON.parse(line) as RawEvent);
+        const raw = JSON.parse(line) as RawEvent;
+
+        // Токены расхода приходят в usage сообщений ассистента — отдаём их
+        // отдельным событием, чтобы показать расход в токенах, а не только в деньгах.
+        const usage = raw.message?.usage;
+        if (usage) {
+          onEvent({
+            kind: 'usage',
+            input: usage.input_tokens ?? 0,
+            output: usage.output_tokens ?? 0,
+            cacheRead: usage.cache_read_input_tokens ?? 0,
+            cacheCreation: usage.cache_creation_input_tokens ?? 0,
+          });
+        }
+
+        const event = translate(raw);
         if (event) onEvent(event);
       } catch {
         // Строка не JSON — предупреждение CLI, для чата это шум.
@@ -132,12 +201,26 @@ export class ChatRun {
         message: stderr.join('').trim() || `claude завершился с кодом ${code}`,
       });
     }
+
+    this.cleanup();
   }
 
   /** Прерывание по кнопке «Остановить». */
   stop(): void {
     this.isStopped = true;
     this.child?.kill();
+    this.cleanup();
+  }
+
+  /** Убрать временный mcp-config сервера прав. */
+  private cleanup(): void {
+    if (!this.mcpConfigDir) return;
+    try {
+      rmSync(this.mcpConfigDir, { recursive: true, force: true });
+    } catch {
+      // Временную папку подчистит и сама ОС — не критично.
+    }
+    this.mcpConfigDir = undefined;
   }
 }
 
@@ -149,6 +232,12 @@ interface RawEvent {
   tools?: unknown[];
   message?: {
     content?: { type: string; text?: string; name?: string; input?: unknown; id?: string }[];
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+    };
   };
   event?: {
     type: string;

@@ -70,16 +70,36 @@ export function ToastItem({ toast, onDismiss }: ToastItemProps) {
         <Icon name={TONE_ICON[toast.tone]} size={20} />
       </span>
 
-      <Stack gap="var(--spacing-3xs)" className={styles.body}>
-        {toast.title && (
-          <Typography variant="body-sm" weight="medium" as="span">
-            {toast.title}
+      {toast.onClick ? (
+        <button
+          type="button"
+          className={`${styles.body} ${styles.clickable}`}
+          onClick={() => {
+            toast.onClick?.();
+            dismiss();
+          }}
+        >
+          {toast.title && (
+            <Typography variant="body-sm" weight="medium" as="span">
+              {toast.title}
+            </Typography>
+          )}
+          <Typography variant="body-sm" color={toast.title ? 'muted' : 'default'} as="span">
+            {toast.message}
           </Typography>
-        )}
-        <Typography variant="body-sm" color={toast.title ? 'muted' : 'default'} as="span">
-          {toast.message}
-        </Typography>
-      </Stack>
+        </button>
+      ) : (
+        <Stack gap="var(--spacing-3xs)" className={styles.body}>
+          {toast.title && (
+            <Typography variant="body-sm" weight="medium" as="span">
+              {toast.title}
+            </Typography>
+          )}
+          <Typography variant="body-sm" color={toast.title ? 'muted' : 'default'} as="span">
+            {toast.message}
+          </Typography>
+        </Stack>
+      )}
 
       <button type="button" className={styles.close} onClick={dismiss} aria-label="Закрыть">
         <Icon name="close" size={16} />

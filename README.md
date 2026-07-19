@@ -23,6 +23,7 @@ Runs entirely on your machine. No account, no server, no telemetry.
 - [How it works](#how-it-works)
 - [Where your data lives](#where-your-data-lives)
 - [The sandbox](#the-sandbox)
+- [Chat and parallel agents](#chat-and-parallel-agents)
 - [Security](#security)
 - [Quick start](#quick-start)
 - [Platform support](#platform-support)
@@ -54,7 +55,7 @@ Claude Control answers all three. It gives the configuration a shape you can see
 - **Skills** — the `skills/` folder, with a file tree and editor per skill
 - **Hooks** — grouped by lifecycle event, with the matcher shown plainly
 - **Scripts** — the files in `hooks/`, flagged when nothing calls them
-- **MCP servers** — with a real connection check over the MCP protocol
+- **MCP servers** — with a real connection check over the MCP protocol: stdio, HTTP and SSE
 - **Permissions** — allow / ask / deny, including `mcp__*` patterns
 - **Environment** — from `settings.json` and `.mcp-secrets.env`, secrets masked
 - **Plugins** — installed set plus the marketplace catalogue
@@ -64,11 +65,13 @@ Claude Control answers all three. It gives the configuration a shape you can see
 **Working with it**
 
 - **Sandbox** — try a rule, skill, hook or MCP server in isolation
-- **Chat** — talk to Claude Code from the panel, with streaming, attachments and artifact preview
+- **Chat** — talk to Claude Code from the panel: streaming, attachments, voice, artifact preview
+- **Several projects at once** — project tabs, with agents running in parallel and surviving tab switches
 - **Analytics** — token spend and estimated cost, read from your local transcripts
 - **Groups** — arbitrary sets of entities, switchable together
 - **Automations** — scenarios that compile down to ordinary hooks
 - **AI assistant** — describe a rule or skill in words, get the form filled in
+- **Help** — a walkthrough of every section with diagrams, in English and Russian
 - **Live reload** — the panel follows file changes, including ones Claude Code makes itself
 - **Backups** — every write is backed up and atomic
 
@@ -77,7 +80,9 @@ Claude Control answers all three. It gives the configuration a shape you can see
 
 ### Soft disable
 
-Turning something off never deletes it. A disabled rule moves to a holding section of `CLAUDE.md`, a disabled skill moves to `skills-disabled/`, a disabled MCP server moves to an `mcpServersDisabled` key. The text survives; only Claude Code's view of it changes. That is what makes bisecting a misbehaving setup practical.
+Turning something off never deletes it. A disabled rule moves to a holding section of `CLAUDE.md`, a disabled skill moves to `skills-disabled/`, a disabled MCP server moves to an `mcpServersDisabled` key, and a disabled hook's command is kept in the panel's own state (it must not stay in `settings.json`, or Claude Code would keep running it). The text survives; only Claude Code's view of it changes. That is what makes bisecting a misbehaving setup practical.
+
+A group switches off as a whole: every member goes dark at once and comes back when you switch it on. The group's mark is kept separately from the manual one, so a member you disabled individually will not spring back when the group returns, and a member of two groups only comes back once both have let go of it.
 
 ## How it works
 
@@ -137,6 +142,7 @@ Everything is under your home directory. The panel creates no files inside the r
 | ------------------------------------- | ------------- | ----------------------------------------------------------- |
 | `~/.claude/CLAUDE.md`                 | read / write  | Rules                                                       |
 | `~/.claude/settings.json`             | read / write  | Hooks, permissions, env                                     |
+| `~/.claude/settings.local.json`       | read / write  | Personal hooks, permissions and vars — tagged "local"       |
 | `~/.claude/skills/`                   | read / write  | Skills                                                      |
 | `~/.claude/skills-disabled/`          | read / write  | Disabled skills                                             |
 | `~/.claude/hooks/`                    | read / write  | Hook scripts                                                |
@@ -182,6 +188,47 @@ A second line of defence is written into the sandbox's own `settings.json`: `~/.
 
 Hook and script testing needs no model at all. Nine prepared events (a harmless command, `rm -rf`, `git push`, a secret being written, a placeholder key, and so on) are replayed straight at the script, and the verdict is compared against what the fixture expects. It costs nothing and takes under a tenth of a second, so it is practical to run on every edit.
 
+## Chat and parallel agents
+
+Chat in the panel is not a separate bot and not a wrapper around the API. It launches the very same `claude` you use in the terminal, and the conversation stays in ordinary Claude Code transcripts. A conversation started in the terminal shows up in the panel, and the other way around.
+
+What the panel adds on top of the CLI is concurrency. Each project opens in its own tab and runs its own process; switching tabs does not stop an agent.
+
+```mermaid
+flowchart LR
+    subgraph tabs["Panel tabs"]
+        HOME["Chats<br/>no project"]
+        P1["Project A 🟢"]
+        P2["Project B 🟡"]
+        P3["Project C 🔴"]
+    end
+
+    subgraph runs["A process each"]
+        R1["claude<br/>working"]
+        R2["claude<br/>waiting for a reply"]
+        R3["claude<br/>error"]
+    end
+
+    PANEL["Agents panel<br/>status · spend · stop"]
+
+    P1 --> R1 --> PANEL
+    P2 --> R2 --> PANEL
+    P3 --> R3 --> PANEL
+    PANEL -.->|"click a row"| P2
+
+    style P1 fill:#e6f4ea,stroke:#34a853
+    style P2 fill:#fef7e0,stroke:#fbbc04
+    style P3 fill:#fce8e6,stroke:#ea4335
+```
+
+**The dot on a tab says what is happening.** Green — the agent is working; yellow — it asked a question and is waiting; red — an error, a rate limit, or a stall: if no events arrive for two minutes the run is treated as broken. A background agent that finishes or gets stuck on a question sends a notification, and clicking it opens that project.
+
+**Edits are allowed by default, and the toggle remembers where you left it.** It used to reset on every reload, which made agents stall over nothing — so now it sticks, and switching to read-only is a deliberate act. Worth checking before you hand a task to an unfamiliar repository. If a run does stall, the header offers **Retry** and **Allow and continue**; the second one re-runs the same request with full access, bypassing both the toggle and the rules in the Permissions section.
+
+**Spending is visible as it happens** — in tokens by default, because on a subscription dollars mean nothing. Switch it to money in the settings if you prefer.
+
+The honest boundary: "background" here means between panel tabs, not between browser sessions. Closing the tab kills the run, and reloading the page loses active runs along with the session's spend counter. You answer an agent's question in text — there are no choice buttons.
+
 ## Security
 
 The threat model is worth stating plainly, because this tool sits on sensitive files by design: it has full read and write access to `~/.claude`, including `.credentials.json` and `.mcp-secrets.env`, and it can start processes. It is a single-user tool for your own machine — not a multi-user service, and not something to expose.
@@ -202,7 +249,7 @@ One consequence worth knowing: chat attachments now land in the panel's own fold
 
 - **No telemetry, no analytics, no error reporting.** Zero references to Sentry, PostHog, Google Analytics, Mixpanel, Segment and the rest — in the code and in the lockfile alike. No external CDN, font or script in the page.
 - The **Analytics** section reads your local transcripts and computes everything in memory. It is a log parser, not a reporting client.
-- The server makes exactly **one** kind of outbound request: a `HEAD` to an MCP server's URL that you configured yourself, to see whether it is up.
+- The only outbound requests the server makes go to an MCP server's URL that you configured yourself: an MCP protocol handshake, to see whether it answers and what tools it offers.
 - The frontend talks only to its own API on a relative `/api` path.
 - Secrets never appear in command-line arguments — prompts go in over stdin, tokens through the environment — so they are not visible in `ps` or Task Manager. There is no logging of secrets anywhere.
 
@@ -223,7 +270,7 @@ Verified against a live server: a request carrying `Origin: https://evil.example
 
 ### Things to know
 
-- Sandboxes under `~/.claude-control/sandboxes/` contain a copy of `.credentials.json` and any MCP server `env` values in plain text. They are removed when you close the sandbox, but a crash can leave one behind; delete the folder if you want to be sure.
+- Sandboxes under `~/.claude-control/sandboxes/` contain a copy of `.credentials.json` and any MCP server `env` values in plain text. They are removed when you close the sandbox, and any left behind by a crash are swept on the next server start: the sandbox registry lives in memory, so whatever is still on disk at startup belongs to nobody. Folders younger than a minute are left alone, so two servers starting at once do not clear each other's work.
 - Backups in `~/.claude/claude-control/backups/` include copies of `.mcp-secrets.env` in plain text. Same directory permissions as the original, no encryption.
 - `HookProbe.ts` contains a synthetic, non-functional `glpat-…` string. It is bait used to check that a secret-blocking hook actually fires. It is not a leak, but GitHub secret scanning will flag it.
 
@@ -244,18 +291,18 @@ Anything unexpected — a port in use, an empty configuration directory, plugins
 
 The core is portable: the home directory is always resolved through `os.homedir()`, paths through `path.join`, and text parsing tolerates both `\n` and `\r\n`.
 
-|                                | Windows           | Linux | macOS |
-| ------------------------------ | ----------------- | ----- | ----- |
-| Panel, configuration editing   | ✅                | ✅    | ✅    |
-| Chat, sandbox, assistant       | ✅                | ✅    | ✅    |
-| MCP connection check           | ✅                | ✅    | ✅    |
-| Running agents in Analytics    | ⚠️                | ⚠️    | ⚠️    |
-| `.ps1` hook scripts in sandbox | ✅                | ❌    | ❌    |
-| `.sh` hook scripts in sandbox  | ⚠️ needs Git Bash | ✅    | ✅    |
+|                                | Windows           | Linux         | macOS         |
+| ------------------------------ | ----------------- | ------------- | ------------- |
+| Panel, configuration editing   | ✅                | ✅            | ✅            |
+| Chat, sandbox, assistant       | ✅                | ✅            | ✅            |
+| MCP connection check           | ✅                | ✅            | ✅            |
+| Running agents in Analytics    | ⚠️                | ⚠️            | ⚠️            |
+| `.ps1` hook scripts in sandbox | ✅                | ⚠️ needs pwsh | ⚠️ needs pwsh |
+| `.sh` hook scripts in sandbox  | ⚠️ needs Git Bash | ✅            | ✅            |
 
-⚠️ **Running agents** is a best-effort panel: it looks for a process named `claude`, but the CLI runs as `node`, so the list is usually empty on every platform.
+⚠️ **Running agents** is a best-effort panel: agents are matched by their command line, because a CLI installed through npm runs under the name `node`, not `claude`. If listing processes is not permitted, the section simply stays empty.
 
-The built-in sandbox fixtures and the filesystem MCP preset use Windows-style example paths, which makes them less useful as-is on Linux and macOS. Nothing breaks; the examples are just less relevant.
+Sandbox fixtures use example paths in the style of whichever system the panel runs on, and the filesystem MCP preset fills in your home directory.
 
 ## Development
 
@@ -285,13 +332,18 @@ The server has no build step: Node runs the TypeScript sources directly via `--e
 
 ## Known limitations
 
+The full section-by-section breakdown is in [LIMITATIONS.md](LIMITATIONS.md): what is limited, why, and whether it is worth waiting for.
+
 - **Restart required.** Claude Code loads its configuration at startup, so most changes only take effect after you restart it. The UI marks these.
 - **Plugins depend on the CLI.** Everything on that page shells out to `claude plugin`; if the CLI cannot reach a marketplace, the panel shows you its raw output rather than inventing a friendlier error.
-- **Analytics costs are indicative.** Prices are hard-coded per million tokens. On a subscription you are not billed per token, so treat the number as relative volume, not money owed.
-- **MCP health checks cover stdio and HTTP only**, and stdio servers must respond to a standard handshake within 30 seconds.
-- **Skill file operations have two API routes** — `/api/skills/:id/file` and `/api/resources/skill/:id/file`. The first is legacy and still present.
-- **`settings.local.json` is not read or written**, though the path is defined internally.
-- Deleting a skill deletes its folder from disk with no backup. The UI makes you type the name to confirm; there is no undo.
+- **Analytics costs are indicative.** On a subscription you are not billed per token, so treat the number as relative volume, not money owed. The rates behind it are visible and editable in Settings — built-in prices go stale.
+- **A restore rewrites the whole file.** Backups are listed in Settings and any of them applies with one click — but it replaces the entire file, not a single entry inside it. The state before the restore is itself saved as a fresh copy.
+- **A skill folder is put back by hand.** The restore button covers configuration files; the copy of a deleted skill sits in `claude-control/backups`, but returning it is a manual job.
+- **Chat runs live in the open tab.** Closing the browser tab kills the agent, and reloading the page loses active runs together with the session's accumulated spend. The registry of running processes is held in server memory, so restarting the server ends everything.
+- **The chat does not let you pick a model**, and editing your own message does not branch the conversation — it goes back as a new turn. (Answering an agent's question by clicking is supported: the options in the card are buttons.)
+- **The list of created files exists only for chats outside a project.** Inside a real repository it is deliberately not shown.
+- **MCP servers behind OAuth are not supported.** The health check passes static headers, so a server that needs an interactive redirect login cannot be checked from the panel.
+- **Editing a hook changes its id.** The id is derived from the content, so a rewritten command is a different hook: a saved link to it stops opening, and its group membership has to be set again.
 
 ## License
 

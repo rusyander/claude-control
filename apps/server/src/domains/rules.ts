@@ -10,6 +10,8 @@ import type { AppStore } from '../lib/app-store.ts';
  */
 
 const HEADING = /^##\s+(.+)$/;
+/** Заголовок правила внутри служебного раздела — на уровень глубже. */
+const DISABLED_HEADING = /^###\s+(.+)$/;
 const RULE_PREFIX = /^ПРАВИЛО:\s*/i;
 /** Раздел, куда складываются выключенные правила, чтобы не терять их текст. */
 const DISABLED_SECTION = '## Отключённые правила (Claude Control)';
@@ -27,6 +29,8 @@ export function parseRules(markdown: string, scope: string, store: AppStore): Pa
   let current: { title: string; body: string[] } | null = null;
   let order = 0;
   let inDisabledSection = false;
+  /** Разбирается ли сейчас правило из служебного раздела выключенных. */
+  let isCurrentDisabled = false;
   const usedIds = new Set<string>();
 
   const flush = (): void => {
@@ -45,11 +49,14 @@ export function parseRules(markdown: string, scope: string, store: AppStore): Pa
       title: current.title,
       body: current.body.join('\n').trim(),
       order: order++,
-      isEnabled: !store.isDisabled('rule', id),
+      // Правило из служебного раздела выключено по самому факту нахождения
+      // там: отметка в состоянии панели могла и не сохраниться.
+      isEnabled: !isCurrentDisabled && !store.isDisabled('rule', id),
       groupIds: store.getGroupIdsFor('rule', id),
       scope,
     });
     current = null;
+    isCurrentDisabled = false;
   };
 
   for (const line of lines) {
@@ -67,6 +74,25 @@ export function parseRules(markdown: string, scope: string, store: AppStore): Pa
       inDisabledSection = false;
       current = { title: title.replace(RULE_PREFIX, ''), body: [] };
       continue;
+    }
+
+    /**
+     * Правила внутри служебного раздела тоже разбираем.
+     *
+     * Раньше содержимое раздела пропускалось целиком, и выключенное правило
+     * пропадало из списка. А `serializeRules` пересобирает раздел заново из
+     * того же списка — значит следующая же перезапись файла стирала текст
+     * правила навсегда, хотя выключение обещает обратное. Потеря обнаружена
+     * на живом CLAUDE.md.
+     */
+    if (inDisabledSection) {
+      const subHeading = DISABLED_HEADING.exec(line);
+      if (subHeading) {
+        flush();
+        current = { title: (subHeading[1]?.trim() ?? '').replace(RULE_PREFIX, ''), body: [] };
+        isCurrentDisabled = true;
+        continue;
+      }
     }
 
     if (current) current.body.push(line);

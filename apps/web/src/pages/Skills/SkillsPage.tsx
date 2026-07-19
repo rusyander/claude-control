@@ -61,6 +61,7 @@ export function SkillsPage() {
       <PageHeader
         title={t('skills.title')}
         subtitle={t('skills.subtitle')}
+        helpTopic="skills"
         actions={
           <Button variant="primary" leftIcon={<Icon name="plus" size={24} />} onClick={openCreate}>
             {t('skills.addSkill')}

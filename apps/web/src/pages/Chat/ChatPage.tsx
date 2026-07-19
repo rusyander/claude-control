@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import type { Artifact, ChatMessage, ChatSummary } from '@claude-control/contracts';
+import { HELP_ROUTE } from '@shared/config/routes';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -9,11 +11,27 @@ import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { Toggle } from '@shared/ui/toggle';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
-import { useWorkspace, normalizeProjectPath } from '@shared/lib/workspace';
-import { agentRuns, useAgentRun, useProjectStatuses } from '@shared/lib/agent-runs';
+import { useWorkspace, normalizeProjectPath, HOME_TAB_ID } from '@shared/lib/workspace';
+import {
+  agentRuns,
+  useAgentRun,
+  useProjectStatuses,
+  useActiveRuns,
+  useTotalCost,
+  useTotalTokens,
+  type ActiveRunView,
+} from '@shared/lib/agent-runs';
+import { toast } from '@shared/lib/toast';
+import { useChatPrefs, getChatPrefs } from '@shared/lib/chat-prefs';
+import { playNotification } from '@shared/lib/notify-sound';
+import { useDraft } from '@shared/lib/draft';
+import { formatSpend } from '@shared/lib/format';
 import { ChatList } from '@features/ChatList';
 import { ProjectList } from '@features/ProjectList';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
+import { AgentsPanel } from '@features/AgentsPanel';
+import { ChatModelPicker } from '@features/ChatModelPicker';
+import { ParallelLaunch } from '@features/ParallelLaunch';
 import { FolderPicker } from '@features/FolderPicker';
 import { ChatMessages } from '@features/ChatMessages';
 import { ChatComposer } from '@features/ChatComposer';
@@ -27,6 +45,7 @@ import {
 } from '@entities/Chat/api/ChatApi';
 import type { StreamState } from '@entities/Chat/model/useChatStream';
 import { useProjects, useOpenInEditor, type ProjectInfo } from '@entities/Project';
+import { useSettings } from '@entities/AppConfig';
 import { ResizeHandle } from '@shared/ui/resize-handle';
 import styles from './ChatPage.module.scss';
 
@@ -54,16 +73,20 @@ export function ChatPage() {
 
   const [activeChat, setActiveChat] = useState<ChatSummary | undefined>(undefined);
   const [draftId, setDraftId] = useState<string | undefined>(undefined);
-  const [input, setInput] = useState('');
   const [preview, setPreview] = useState<Artifact | undefined>(undefined);
   const [pending, setPending] = useState<ChatMessage[]>([]);
   const [previewWidth, setPreviewWidth] = useState(
     () => Number(localStorage.getItem(PREVIEW_WIDTH_KEY)) || 520,
   );
-  const [allowEdits, setAllowEdits] = useState(false);
+  // Тумблер прав хранится в chatPrefs (localStorage): по умолчанию правки
+  // разрешены и не слетают после перезагрузки.
+  const { allowEdits, setAllowEdits } = useChatPrefs();
   const [homeSection, setHomeSection] = useState<'chats' | 'projects'>('chats');
   const [isFolderPickerOpen, setFolderPickerOpen] = useState(false);
+  const [isParallelOpen, setParallelOpen] = useState(false);
   const openEditor = useOpenInEditor();
+  const { data: settings } = useSettings();
+  const costUnit = settings?.costUnit ?? 'tokens';
 
   const chatId = activeChat?.id ?? draftId;
 
@@ -71,6 +94,9 @@ export function ChatPage() {
   const projects = useProjects();
   const ws = useWorkspace();
   const projectStatuses = useProjectStatuses();
+  const activeRuns = useActiveRuns();
+  const totalCost = useTotalCost();
+  const totalTokens = useTotalTokens();
 
   // Прогон активного чата: текст, инструменты и статус. Фоновые прогоны других
   // чатов живут в том же сторе и продолжаются независимо.
@@ -94,6 +120,27 @@ export function ChatPage() {
     ws.activeProject?.path ??
     (activeChat && !activeChat.isSandbox ? activeChat.projectPath : undefined);
   const isProjectContext = Boolean(projectPath);
+
+  // Черновик поля ввода: у каждого разговора/проекта/домашнего чата — свой
+  // невыпущенный текст, который переживает перезагрузку страницы (localStorage).
+  // Ключ строим по контексту: существующий чат — по id, черновик проекта — по
+  // пути (стабилен между перезагрузками, в отличие от временного `new-…`).
+  const draftKey = activeChat
+    ? `chat:${activeChat.id}`
+    : projectPath
+      ? `project:${normalizeProjectPath(projectPath)}`
+      : 'home';
+  const [input, setInput] = useDraft(draftKey);
+
+  // Модель и глубина продумывания. Глобальный дефолт — из настроек; в конкретном
+  // чате его можно переопределить локально (пер-чат оверрайд в localStorage,
+  // пусто = брать из настроек). Настройки этим не меняются.
+  const defaultModel = settings?.chatModel ?? '';
+  const defaultEffort = settings?.chatEffort ?? 'xhigh';
+  const [modelOverride, setModelOverride] = useDraft(`chat-model:${draftKey}`);
+  const [effortOverride, setEffortOverride] = useDraft(`chat-effort:${draftKey}`);
+  const effectiveModel = modelOverride || defaultModel;
+  const effectiveEffort = effortOverride || defaultEffort;
 
   const visibleChats = useMemo(() => {
     const all = chats.data ?? [];
@@ -128,6 +175,77 @@ export function ChatPage() {
     return () => agentRuns.setOnFinished(undefined);
   }, [queryClient]);
 
+  // После перезагрузки страницы подхватываем прогоны, что ещё идут на сервере, —
+  // их живой вывод и цветные точки на табах возвращаются сами, без повторной
+  // отправки. Один раз при входе на страницу чата.
+  useEffect(() => {
+    void agentRuns.resumeActive();
+  }, []);
+
+  // Открытый чат — чтобы стор не уведомлял о его собственном завершении.
+  useEffect(() => {
+    agentRuns.setActiveId(chatId);
+  }, [chatId]);
+
+  // Фоновый агент в другом проекте задал вопрос, завершил или упал — сообщаем
+  // тостом. Так за несколькими агентами видно из одного места.
+  useEffect(() => {
+    agentRuns.setOnBackgroundEvent((backgroundRun) => {
+      const path = backgroundRun.projectPath;
+      const name = path ? projectShortName(path) : t('workspace.homeTab');
+      // Клик по тосту открывает тот проект — сразу видно, к кому идти.
+      const options = path ? { onClick: () => ws.openProject(path, name) } : undefined;
+      if (backgroundRun.status === 'waiting')
+        toast.warning(t('projects.notifyWaiting', { name }), options);
+      else if (backgroundRun.status === 'error')
+        toast.error(t('projects.notifyError', { name }), options);
+      else toast.success(t('projects.notifyDone', { name }), options);
+
+      // Звук уведомления — чтобы услышать другого агента, не глядя в экран.
+      if (getChatPrefs().sound) {
+        playNotification(
+          backgroundRun.status === 'error'
+            ? 'error'
+            : backgroundRun.status === 'waiting'
+              ? 'waiting'
+              : 'done',
+        );
+      }
+    });
+    return () => agentRuns.setOnBackgroundEvent(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t]);
+
+  // Агент попросил разрешение (интерактивные права) — звук всегда, а для агента
+  // из другого проекта ещё и тост с переходом: работа стоит, пока не ответишь.
+  useEffect(() => {
+    agentRuns.setOnPermissionRequest((permissionRun) => {
+      const isActive = permissionRun.id === chatId || permissionRun.sessionId === chatId;
+      if (!isActive) {
+        const path = permissionRun.projectPath;
+        const name = path ? projectShortName(path) : t('workspace.homeTab');
+        const options = path ? { onClick: () => ws.openProject(path, name) } : undefined;
+        toast.warning(t('projects.notifyPermission', { name }), options);
+      }
+      if (getChatPrefs().sound) playNotification('waiting');
+    });
+    return () => agentRuns.setOnPermissionRequest(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, chatId]);
+
+  // Агент, за которым сейчас смотрим, задал вопрос или упал — тоже звук, чтобы
+  // не пропустить момент, когда от тебя ждут ответа. Только переход из «работает»,
+  // чтобы открытие уже ждущего чата не пищало.
+  const prevStatusRef = useRef(run.status);
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = run.status;
+    if (prev !== 'running') return;
+    if ((run.status === 'waiting' || run.status === 'error') && getChatPrefs().sound) {
+      playNotification(run.status);
+    }
+  }, [run.status]);
+
   // Завершение прогона активного чата — перечитываем его переписку из истории.
   const wasRunningRef = useRef(false);
   useEffect(() => {
@@ -139,17 +257,29 @@ export function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning]);
 
-  const enterProjectDraft = useCallback(
-    (project: { name: string }) => {
+  const enterProjectDraft = useCallback(() => {
+    setActiveChat(undefined);
+    setDraftId(`new-${Date.now()}`);
+    setPreview(undefined);
+    setPending([]);
+    // Поле не трогаем: заранее вписанного вопроса про проект больше нет, а свой
+    // недописанный черновик проекта хук подгрузит сам по смене ключа контекста.
+    writeUrl(undefined);
+  }, [writeUrl]);
+
+  // Просмотр конкретного прогона агента (клик в пульте): когда открытие проекта
+  // сменит таб, эффект ниже покажет этот прогон, а не заведёт новый черновик.
+  const pendingViewRef = useRef<string | undefined>(undefined);
+
+  const showRun = useCallback(
+    (runId: string) => {
       setActiveChat(undefined);
-      setDraftId(`new-${Date.now()}`);
+      setDraftId(runId);
       setPreview(undefined);
       setPending([]);
-      setAllowEdits(false);
-      setInput(t('projects.starterPrompt', { name: project.name }));
       writeUrl(undefined);
     },
-    [t, writeUrl],
+    [writeUrl],
   );
 
   // Смена активного таба: вид сбрасываем, для проекта готовим новый разговор с
@@ -163,14 +293,22 @@ export function ChatPage() {
 
     const project = ws.state.projectTabs.find((tab) => tab.id === tabId);
     if (project) {
-      enterProjectDraft(project);
+      // Пришли смотреть конкретного агента — показываем его прогон.
+      if (pendingViewRef.current) {
+        showRun(pendingViewRef.current);
+        pendingViewRef.current = undefined;
+      } else {
+        enterProjectDraft();
+      }
+    } else if (pendingViewRef.current) {
+      // Просмотр домашнего прогона.
+      showRun(pendingViewRef.current);
+      pendingViewRef.current = undefined;
     } else {
       setActiveChat(undefined);
       setDraftId(undefined);
       setPreview(undefined);
       setPending([]);
-      setAllowEdits(false);
-      setInput('');
       writeUrl(undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -219,8 +357,6 @@ export function ChatPage() {
     setDraftId(`new-${Date.now()}`);
     setPreview(undefined);
     setPending([]);
-    setAllowEdits(false);
-    setInput('');
     writeUrl(undefined);
   };
 
@@ -229,14 +365,36 @@ export function ChatPage() {
     setDraftId(undefined);
     setPreview(undefined);
     setPending([]);
-    setAllowEdits(false);
     writeUrl(chat.id);
   };
 
   const openProject = (project: ProjectInfo): void => {
     const wasActive = ws.activeProject?.id === normalizeProjectPath(project.path);
     ws.openProject(project.path, project.name);
-    if (wasActive) enterProjectDraft(project);
+    if (wasActive) enterProjectDraft();
+  };
+
+  // Клик по агенту в пульте: показать его живой поток в главном чате. Если агент
+  // в проекте — открываем таб (эффект смены таба подхватит pendingViewRef и
+  // покажет прогон); если уже в этом табе — показываем сразу.
+  const viewRun = (activeRun: ActiveRunView): void => {
+    if (activeRun.projectPath) {
+      const id = normalizeProjectPath(activeRun.projectPath);
+      if (ws.activeProject?.id === id) {
+        showRun(activeRun.id);
+      } else {
+        pendingViewRef.current = activeRun.id;
+        ws.openProject(activeRun.projectPath, projectShortName(activeRun.projectPath));
+      }
+    } else {
+      // Домашний прогон — переходим на домашний таб и показываем его.
+      if (!ws.isHome) {
+        pendingViewRef.current = activeRun.id;
+        ws.activate(HOME_TAB_ID);
+      } else {
+        showRun(activeRun.id);
+      }
+    }
   };
 
   // Папка, выбранная через файловую систему: открываем её как проект, даже если
@@ -244,8 +402,27 @@ export function ChatPage() {
   const openProjectPath = (path: string, name: string): void => {
     const wasActive = ws.activeProject?.id === normalizeProjectPath(path);
     ws.openProject(path, name);
-    if (wasActive) enterProjectDraft({ name });
+    if (wasActive) enterProjectDraft();
     setFolderPickerOpen(false);
+  };
+
+  // Один запрос в нескольких проектах разом: в каждом открываем таб и стартуем
+  // свой прогон. Они идут в фоне, а следить за ними — по точкам и в пульте.
+  const launchParallel = (selected: ProjectInfo[], prompt: string, editsAllowed: boolean): void => {
+    const stamp = Date.now();
+    selected.forEach((project, index) => {
+      ws.openProject(project.path, project.name);
+      agentRuns.start({
+        chatId: `new-${stamp}-${index}`,
+        prompt,
+        projectPath: project.path,
+        allowEdits: editsAllowed,
+        model: effectiveModel,
+        effort: effectiveEffort,
+      });
+    });
+    setParallelOpen(false);
+    void queryClient.invalidateQueries({ queryKey: chatKeys.list });
   };
 
   const hasContent =
@@ -256,17 +433,15 @@ export function ChatPage() {
     Boolean(run.text) ||
     Boolean(run.error);
 
-  const send = (files: { name: string; base64: string }[]): void => {
-    const prompt = input.trim();
-    if (!prompt) return;
-
+  // Общий путь отправки: и для поля ввода, и для клика по варианту вопроса.
+  // Показываем реплику сразу (pending), продолжаем существующую сессию.
+  const dispatch = (prompt: string, files: { name: string; base64: string }[]): void => {
     let id = chatId;
     if (!id) {
       id = `new-${Date.now()}`;
       setDraftId(id);
     }
 
-    setInput('');
     setPending((current) => [
       ...current,
       {
@@ -284,10 +459,29 @@ export function ChatPage() {
       sessionId: activeChat?.id ?? run.sessionId,
       files,
       allowEdits,
+      // Модель и глубина: дефолт из настроек или локальный оверрайд чата.
+      model: effectiveModel,
+      effort: effectiveEffort,
       // Каталог проекта: серверу — рабочая папка нового чата, стору — группировка
       // статусов. У продолжения сессии рабочая папка уже известна.
       projectPath,
     });
+  };
+
+  const send = (files: { name: string; base64: string }[]): void => {
+    const prompt = input.trim();
+    if (!prompt) return;
+    setInput('');
+    dispatch(prompt, files);
+  };
+
+  // Клик по варианту в карточке вопроса: отвечаем этим вариантом, продолжая тот
+  // же разговор — выбрать можно прямо в чате, не уходя в терминал. Пока агент
+  // занят, отвечать нельзя (кнопки уже недоступны, но подстрахуемся).
+  const answerQuestion = (answer: string): void => {
+    const prompt = answer.trim();
+    if (!prompt || isRunning) return;
+    dispatch(prompt, []);
   };
 
   return (
@@ -343,6 +537,7 @@ export function ChatPage() {
                 statuses={projectStatuses}
                 onOpen={openProject}
                 onAddFolder={() => setFolderPickerOpen(true)}
+                onParallelLaunch={() => setParallelOpen(true)}
               />
             ) : (
               <ChatList
@@ -351,9 +546,7 @@ export function ChatPage() {
                 activeId={activeChat?.id}
                 onSelect={openChat}
                 onCreate={
-                  ws.activeProject
-                    ? () => ws.activeProject && enterProjectDraft(ws.activeProject)
-                    : startNewChat
+                  ws.activeProject ? () => ws.activeProject && enterProjectDraft() : startNewChat
                 }
               />
             )}
@@ -372,6 +565,36 @@ export function ChatPage() {
             </Stack>
 
             <Stack direction="row" align="center" gap="var(--spacing-xs)">
+              {/* Шапки PageHeader здесь нет — ссылку на справку ставим рядом с пультом. */}
+              <Link
+                to={HELP_ROUTE}
+                search={{ topic: 'chat' }}
+                className={styles.help}
+                title={t('help.common.openHelp')}
+                aria-label={t('help.common.openHelp')}
+              >
+                <Icon name="help" size={24} />
+              </Link>
+
+              <AgentsPanel
+                activeRuns={activeRuns}
+                totalCost={totalCost}
+                totalTokens={totalTokens}
+                costUnit={costUnit}
+                onStop={agentRuns.stop}
+                onStopAll={agentRuns.stopAll}
+                onView={viewRun}
+              />
+
+              <ChatModelPicker
+                model={modelOverride}
+                effort={effortOverride}
+                defaultModel={defaultModel}
+                defaultEffort={defaultEffort}
+                onModelChange={setModelOverride}
+                onEffortChange={setEffortOverride}
+              />
+
               {isProjectContext && projectPath && (
                 <Button
                   variant="ghost"
@@ -398,7 +621,38 @@ export function ChatPage() {
                 </label>
               )}
 
-              {run.costUsd !== undefined && <Badge tone="neutral">${run.costUsd.toFixed(3)}</Badge>}
+              {run.status === 'error' && chatId && (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leftIcon={<Icon name="refresh" size={18} />}
+                    onClick={() => agentRuns.retry(chatId)}
+                    title={t('chat.retryHint')}
+                  >
+                    {t('chat.retry')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => dispatch(t('chat.continueWord'), [])}
+                    title={t('chat.continueHint')}
+                  >
+                    {t('chat.continue')}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => agentRuns.retry(chatId, { fullAccess: true })}
+                    title={t('chat.allowAndContinueHint')}
+                  >
+                    {t('chat.allowAndContinue')}
+                  </Button>
+                </>
+              )}
+              {(run.tokens > 0 || run.costUsd !== undefined) && (
+                <Badge tone="neutral">{formatSpend(costUnit, run.tokens, run.costUsd ?? 0)}</Badge>
+              )}
               {run.limitResetsAt !== undefined && (
                 <Badge tone="info">
                   {t('chat.limitResets', { time: formatTime(run.limitResetsAt) })}
@@ -436,6 +690,12 @@ export function ChatPage() {
               stream={stream}
               isLoading={messages.isLoading}
               onEdit={setInput}
+              onPickOption={answerQuestion}
+              isRunning={isRunning}
+              permissions={run.permissions}
+              onPermissionDecide={(toolUseId, behavior) =>
+                chatId && agentRuns.decidePermission(chatId, toolUseId, behavior)
+              }
             />
           ) : (
             <div className={styles.empty}>
@@ -456,6 +716,16 @@ export function ChatPage() {
                       {t('projects.introHint')}
                     </Typography>
                     <div className={styles.suggestions}>
+                      {projectPath && (
+                        <button
+                          type="button"
+                          className={`${styles.suggestion} ${styles.suggestionAction}`}
+                          onClick={() => openEditor.mutate(projectPath)}
+                        >
+                          <Icon name="scripts" size={16} />
+                          {t('projects.openInEditor')}
+                        </button>
+                      )}
                       {PROJECT_ACTIONS.map((key) => (
                         <button
                           key={key}
@@ -526,6 +796,13 @@ export function ChatPage() {
         onOpenChange={setFolderPickerOpen}
         onPick={openProjectPath}
       />
+
+      <ParallelLaunch
+        isOpen={isParallelOpen}
+        onOpenChange={setParallelOpen}
+        projects={projects.data ?? []}
+        onLaunch={launchParallel}
+      />
     </div>
   );
 }
@@ -544,4 +821,9 @@ function formatTime(unixSeconds: number): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/** Короткое имя проекта из пути — для тоста-уведомления о фоновом агенте. */
+function projectShortName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() || path;
 }

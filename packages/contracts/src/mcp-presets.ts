@@ -5,6 +5,16 @@ import type { McpTransport } from './mcp';
  * и синтаксис запуска: выбираете сервер — поля заполняются, остаётся вписать
  * свои значения переменных.
  */
+/**
+ * Подстановка домашнего каталога в аргументах заготовки.
+ *
+ * Раньше в пресете файловой системы стоял буквальный `C:/work` — на Linux и
+ * macOS такого пути нет вовсе, и заготовка получалась нерабочей. Настоящий
+ * путь знает только сервер (`/api/system`), а contracts работают и на фронте,
+ * поэтому здесь стоит метка, которую форма заменяет при подстановке.
+ */
+export const HOME_DIR_TOKEN = '{{home}}';
+
 export interface McpPreset {
   id: string;
   title: string;
@@ -26,7 +36,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: 'Доступ к файлам в указанных каталогах: чтение, запись, поиск.',
     transport: 'stdio',
     command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-filesystem', 'C:/work'],
+    args: ['-y', '@modelcontextprotocol/server-filesystem', HOME_DIR_TOKEN],
     env: {},
     needsSecret: false,
   },

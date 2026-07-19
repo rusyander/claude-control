@@ -11,7 +11,7 @@ import type {
   TokenTotals,
   ToolUsage,
 } from '@claude-control/contracts';
-import { estimateCost } from './pricing.ts';
+import { estimateCost, type ModelPricing, type PricingEntry } from './pricing.ts';
 
 /**
  * Сканер транскриптов. Файлы читаются построчно потоком: их больше тысячи,
@@ -82,6 +82,10 @@ export interface ScanOptions {
   days: number;
   /** Сколько сессий вернуть в списке последних. */
   recentSessionsLimit: number;
+  /** Свои тарифы из настроек: фрагмент имени модели → цена за миллион токенов. */
+  pricing?: Record<string, ModelPricing>;
+  /** Прайс, по которому считать. Пусто — встроенная запасная таблица. */
+  pricingEntries?: PricingEntry[];
 }
 
 export async function scanAnalytics(
@@ -103,7 +107,7 @@ export async function scanAnalytics(
   };
 
   const files = collectTranscripts(projectsDir, since);
-  for (const file of files) await scanFile(file, since, accumulator);
+  for (const file of files) await scanFile(file, since, accumulator, options);
 
   return buildResult(accumulator, options, files.length, Date.now() - startedAt, since);
 }
@@ -138,6 +142,7 @@ async function scanFile(
   file: { path: string; mtimeMs: number },
   since: number,
   acc: Accumulator,
+  options: Pick<ScanOptions, 'pricing' | 'pricingEntries'>,
 ): Promise<void> {
   const isActive = Date.now() - file.mtimeMs < ACTIVE_WINDOW_MS;
   const stream = createReadStream(file.path, { encoding: 'utf8' });
@@ -168,7 +173,14 @@ async function scanFile(
       cacheRead: usage.cache_read_input_tokens ?? 0,
       cacheCreation: usage.cache_creation_input_tokens ?? 0,
     };
-    const cost = estimateCost(model, tokens);
+    // Цену берём НА МОМЕНТ записи, а не на сегодня: у части моделей цена
+    // менялась по расписанию (вводная цена Sonnet 5), и пересчёт старого
+    // расхода по сегодняшнему прайсу дал бы неверную историю.
+    const cost = estimateCost(model, tokens, {
+      overrides: options.pricing,
+      entries: options.pricingEntries,
+      at: time,
+    });
 
     addUsage(acc.overall, usage);
     acc.cost += cost;

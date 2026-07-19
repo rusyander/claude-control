@@ -23,9 +23,15 @@ const rootRoute = createRootRoute({ component: MainLayout });
  * `?id=…` — единый способ сослаться на что угодно: разговор, правило, скилл,
  * хук, сервер. Открытие элемента дописывает id в адрес, а переход по такому
  * адресу открывает элемент — ссылкой можно поделиться и вернуться к ней позже.
+ *
+ * `?topic=…` — раздел справки. Тем же способом: ссылка на объяснение
+ * конкретного раздела открывается сразу на нужном документе.
  */
-function validateSearch(search: Record<string, unknown>): { id?: string } {
-  return typeof search.id === 'string' && search.id ? { id: search.id } : {};
+function validateSearch(search: Record<string, unknown>): { id?: string; topic?: string } {
+  return {
+    ...(typeof search.id === 'string' && search.id ? { id: search.id } : {}),
+    ...(typeof search.topic === 'string' && search.topic ? { topic: search.topic } : {}),
+  };
 }
 
 /** Маршруты объявлены кодом: страниц немного, генератор файловых роутов избыточен. */

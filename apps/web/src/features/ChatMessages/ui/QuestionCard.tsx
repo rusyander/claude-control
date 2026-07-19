@@ -9,6 +9,10 @@ import styles from './ChatMessages.module.scss';
  * ответит. Свёрнутой строкой «AskUserQuestion» среди десятка других вызовов
  * инструментов его было не заметить — приходилось вычитывать весь ответ,
  * чтобы понять, что от тебя ждут выбора. Поэтому вопрос вынесен карточкой.
+ *
+ * Вариант кликабелен: клик отправляет его ответом в тот же разговор (продолжение
+ * сессии), и выбрать можно прямо здесь, не уходя в терминал. Если колбэк не
+ * передан (витрина, поток ещё идёт), варианты показываются просто списком.
  */
 
 interface Option {
@@ -35,7 +39,15 @@ export function parseQuestions(input: string): Question[] | undefined {
   }
 }
 
-export function QuestionCard({ questions }: { questions: Question[] }) {
+interface QuestionCardProps {
+  questions: Question[];
+  /** Ответить выбранным вариантом (отправка в тот же разговор). */
+  onPick?: (answer: string) => void;
+  /** Пока идёт прогон, отвечать нельзя — варианты недоступны. */
+  disabled?: boolean;
+}
+
+export function QuestionCard({ questions, onPick, disabled }: QuestionCardProps) {
   const { t } = useTranslation();
 
   return (
@@ -55,14 +67,34 @@ export function QuestionCard({ questions }: { questions: Question[] }) {
           )}
 
           <ul className={styles.options}>
-            {(item.options ?? []).map((option, optionIndex) => (
-              <li key={optionIndex} className={styles.option}>
-                <span className={styles.optionLabel}>{option.label}</span>
-                {option.description && (
-                  <span className={styles.optionText}>{option.description}</span>
-                )}
-              </li>
-            ))}
+            {(item.options ?? []).map((option, optionIndex) => {
+              const content = (
+                <>
+                  <span className={styles.optionLabel}>{option.label}</span>
+                  {option.description && (
+                    <span className={styles.optionText}>{option.description}</span>
+                  )}
+                </>
+              );
+
+              return (
+                <li key={optionIndex}>
+                  {onPick && option.label ? (
+                    <button
+                      type="button"
+                      className={`${styles.option} ${styles.optionClickable}`}
+                      onClick={() => onPick(option.label as string)}
+                      disabled={disabled}
+                      title={t('chat.pickOption')}
+                    >
+                      {content}
+                    </button>
+                  ) : (
+                    <div className={styles.option}>{content}</div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       ))}

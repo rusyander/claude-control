@@ -3,6 +3,7 @@ import { object, string, boolean, enum as zodEnum, type infer as Infer } from 'z
 /** Откуда взялась переменная — от этого зависит, куда её сохранять. */
 export const envSourceSchema = zodEnum([
   'settings', // settings.json → env, видна всем сессиям Claude Code
+  'settings-local', // settings.local.json → env: личный файл, панель его только читает
   'secrets', // .mcp-secrets.env, читается лаунчером MCP-серверов
   'group', // env группы приложения
 ]);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes } from './format';
+import { formatBytes, formatTokens, formatSpend } from './format';
 import { formatMoney, formatPercent, formatCompact } from './format-number';
 import { sourceLabel } from './location-label';
 import type { ClaudeLocation } from '@claude-control/contracts';
@@ -31,6 +31,24 @@ describe('formatBytes', () => {
 
   it('крупный размер округляется до десятых', () => {
     expect(formatBytes(5.25 * 1024 * 1024)).toBe('5.3 MB');
+  });
+});
+
+describe('formatTokens', () => {
+  it('до тысячи — как есть, тысячи — k, миллионы — M', () => {
+    expect(formatTokens(42)).toBe('42');
+    expect(formatTokens(1500)).toBe('1.5k');
+    expect(formatTokens(2_500_000)).toBe('2.5M');
+  });
+});
+
+describe('formatSpend', () => {
+  it('по умолчанию (tokens) показывает токены, а не деньги', () => {
+    expect(formatSpend('tokens', 1500, 0.42)).toBe('1.5k tok');
+  });
+
+  it('в режиме money показывает доллары', () => {
+    expect(formatSpend('money', 1500, 0.42)).toBe('$0.420');
   });
 });
 

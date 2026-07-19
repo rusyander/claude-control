@@ -9,6 +9,7 @@ import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
+import { SourceBadge } from '@shared/ui/source-badge';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
@@ -67,6 +68,7 @@ export function EnvPage() {
       <PageHeader
         title={t('env.title')}
         subtitle={t('env.subtitle')}
+        helpTopic="env"
         actions={
           <Button
             variant="primary"
@@ -101,9 +103,15 @@ export function EnvPage() {
                   <Typography variant="mono" weight="medium" as="span">
                     {item.key}
                   </Typography>
-                  <Badge tone={item.source === 'secrets' ? 'warning' : 'neutral'}>
-                    {item.source}
-                  </Badge>
+                  {/* Локальный источник показываем общим бейджем: у него своё
+                      объяснение, почему запись нельзя править. */}
+                  {item.source === 'settings-local' ? (
+                    <SourceBadge source="settings-local" />
+                  ) : (
+                    <Badge tone={item.source === 'secrets' ? 'warning' : 'neutral'}>
+                      {item.source}
+                    </Badge>
+                  )}
                 </Stack>
 
                 <Typography variant="mono" color="subtle" as="span" truncate>

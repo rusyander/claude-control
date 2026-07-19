@@ -34,6 +34,7 @@ export function AnalyticsPage() {
       <PageHeader
         title={t('analytics.title')}
         subtitle={t('analytics.subtitle')}
+        helpTopic="analytics"
         actions={
           <Stack direction="row" gap="var(--spacing-2xs)">
             {PERIODS.map((period) => (

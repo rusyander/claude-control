@@ -49,6 +49,7 @@ export function McpPage() {
       <PageHeader
         title={t('mcp.title')}
         subtitle={t('mcp.subtitle')}
+        helpTopic="mcp"
         actions={
           <Button variant="primary" leftIcon={<Icon name="plus" size={24} />} onClick={openCreate}>
             {t('mcp.addServer')}

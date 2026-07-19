@@ -10,6 +10,7 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
+import { SourceBadge } from '@shared/ui/source-badge';
 import { Button } from '@shared/ui/button';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
@@ -78,6 +79,7 @@ export function PermissionsPage() {
       <PageHeader
         title={t('permissions.title')}
         subtitle={t('permissions.subtitle')}
+        helpTopic="permissions"
         actions={
           <Button
             variant="primary"
@@ -154,6 +156,9 @@ export function PermissionsPage() {
                   <Badge tone={TONE[rule.decision]} withDot>
                     {t(`permissions.${rule.decision}`)}
                   </Badge>
+                  <SourceBadge source={rule.source} />
+                  {/* Локальное право правится там же, где лежит: запись уходит
+                      обратно в settings.local.json, а не в общий конфиг. */}
                   <Button
                     variant="ghost"
                     size="sm"

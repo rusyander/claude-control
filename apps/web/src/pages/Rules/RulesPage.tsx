@@ -64,6 +64,7 @@ export function RulesPage() {
       <PageHeader
         title={t('rules.title')}
         subtitle={t('rules.subtitle')}
+        helpTopic="rules"
         actions={
           <Button variant="primary" leftIcon={<Icon name="plus" size={24} />} onClick={openCreate}>
             {t('rules.addRule')}

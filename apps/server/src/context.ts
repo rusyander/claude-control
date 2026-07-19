@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import type { ClaudeLocation } from '@claude-control/contracts';
 import { detectClaudeLocation } from './lib/claude-paths.ts';
 import { AppStore } from './lib/app-store.ts';
+import { PricingStore } from './domains/analytics/pricing-source.ts';
 
 /**
  * Общее состояние сервера: где лежит конфигурация Claude Code и хранилище
@@ -11,12 +12,15 @@ import { AppStore } from './lib/app-store.ts';
 export class ServerContext {
   location: ClaudeLocation;
   store: AppStore;
+  /** Прайс Anthropic: кэш на диске рядом с состоянием приложения. */
+  pricing: PricingStore;
 
   constructor() {
     // На первом запуске настроек ещё нет, поэтому определяем путь без override,
     // затем перечитываем — вдруг в сохранённых настройках указан другой каталог.
     this.location = detectClaudeLocation();
     this.store = this.createStore();
+    this.pricing = new PricingStore(this.location.paths.appData);
 
     const override = this.store.getSettings().claudeDirOverride;
     if (override) this.relocate(override);
@@ -36,6 +40,9 @@ export class ServerContext {
 
     this.location = next;
     this.store = this.createStore();
+    // Кэш прайса лежит рядом с состоянием приложения, а оно у каждого каталога
+    // своё — иначе панель показывала бы дату обновления из чужого каталога.
+    this.pricing = new PricingStore(this.location.paths.appData);
     return next;
   }
 

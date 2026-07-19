@@ -131,4 +131,44 @@ describe('ResourceFiles', () => {
       expect(existsSync(join(root, 'skills', 'demo', 'temp.txt'))).toBe(false);
     });
   });
+
+  /**
+   * Это единственный путь, которым интерфейс удаляет файлы внутри скилла, —
+   * значит и копия должна делаться здесь. Раньше её не было вовсе: копия
+   * лежала в параллельной реализации на легаси-маршрутах, куда интерфейс не
+   * ходил, а сами маршруты с тех пор убраны.
+   */
+  describe('резервная копия при удалении', () => {
+    const backupDir = (): string => join(root, 'claude-control', 'backups');
+
+    it('файл копируется перед удалением', () => {
+      writeResourceFile('skill', 'demo', 'заметки.md', 'текст заметки', location);
+
+      const backupPath = deleteResourceFile('skill', 'demo', 'заметки.md', location, backupDir());
+
+      expect(existsSync(join(root, 'skills', 'demo', 'заметки.md'))).toBe(false);
+      expect(readFileSync(backupPath!, 'utf8')).toBe('текст заметки');
+    });
+
+    it('папка внутри скилла копируется целиком', () => {
+      const backupPath = deleteResourceFile('skill', 'demo', 'references', location, backupDir());
+
+      expect(existsSync(join(root, 'skills', 'demo', 'references'))).toBe(false);
+      expect(readFileSync(join(backupPath!, 'rules.md'), 'utf8')).toBe('rules');
+    });
+
+    it('без каталога копий удаляет как раньше', () => {
+      writeResourceFile('skill', 'demo', 'temp.txt', 'x', location);
+
+      expect(deleteResourceFile('skill', 'demo', 'temp.txt', location)).toBeUndefined();
+      expect(existsSync(join(root, 'skills', 'demo', 'temp.txt'))).toBe(false);
+    });
+
+    it('удаление несуществующего файла копию не создаёт', () => {
+      expect(
+        deleteResourceFile('skill', 'demo', 'нет-такого.md', location, backupDir()),
+      ).toBeUndefined();
+      expect(existsSync(backupDir())).toBe(false);
+    });
+  });
 });

@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Automation, Group, GroupDraft } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import { readHooks, writeHooks } from '../domains/hooks.ts';
+import { applyEntityState, rewriteHooks } from '../domains/entity-toggle.ts';
 
 /**
  * Группы и сценарии — надстройка приложения. Claude Code про них не знает,
@@ -47,7 +48,56 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     }),
   );
 
+  /**
+   * Переключатель группы. Выключение гасит все её участники разом — ради
+   * этого группы и заводят: набор правил и скиллов под задачу включается и
+   * выключается одним движением.
+   *
+   * Групповая отметка ставится отдельно от ручной. Поэтому участник, который
+   * человек выключил сам, не оживёт при включении группы, а участник двух
+   * групп оживёт только когда его отпустят обе.
+   */
+  app.post<{ Params: { id: string }; Body: { isEnabled: boolean } }>(
+    '/api/groups/:id/enabled',
+    (request, reply) => {
+      const group = ctx.store.getGroups().find((item) => item.id === request.params.id);
+      if (!group) return reply.code(404).send({ error: 'Группа не найдена' });
+
+      const { isEnabled } = request.body;
+      ctx.store.saveGroup({ ...group, isEnabled });
+
+      let needsHookRewrite = false;
+
+      for (const member of group.members) {
+        ctx.store.setGroupDisabled(member.kind, member.id, group.id, !isEnabled);
+
+        const effective = !ctx.store.isDisabled(member.kind, member.id);
+        const result = applyEntityState(ctx, member.kind, member.id, effective);
+        needsHookRewrite ||= result.needsHookRewrite;
+      }
+
+      // Хуки лежат в одном файле, поэтому перезапись одна на всю группу.
+      const backupPath = needsHookRewrite ? rewriteHooks(ctx) : undefined;
+
+      return { ok: true, backupPath, needsRestart: true, affected: group.members.length };
+    },
+  );
+
   app.delete<{ Params: { id: string } }>('/api/groups/:id', (request) => {
+    // Группа уходит — её отметки должны уйти вместе с ней, иначе участники
+    // остались бы погашенными навсегда, без видимой причины.
+    const group = ctx.store.getGroups().find((item) => item.id === request.params.id);
+
+    if (group && !group.isEnabled) {
+      for (const member of group.members) {
+        ctx.store.setGroupDisabled(member.kind, member.id, group.id, false);
+
+        const effective = !ctx.store.isDisabled(member.kind, member.id);
+        applyEntityState(ctx, member.kind, member.id, effective);
+      }
+      rewriteHooks(ctx);
+    }
+
     ctx.store.deleteGroup(request.params.id);
     return { ok: true };
   });
@@ -96,6 +146,9 @@ function compileAutomations(ctx: ServerContext): void {
       timeout: automation.action.timeout,
       isEnabled: true,
       groupIds: automation.groupIds,
+      // Скомпилированные сценарии всегда уходят в основной settings.json:
+      // локальный файл панель не переписывает.
+      source: 'settings' as const,
     }));
 
   writeHooks(settings, [...manual, ...compiled], ctx.backupDir);

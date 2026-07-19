@@ -1,25 +1,21 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { McpServer } from '@claude-control/contracts';
-import { shellArgs } from '../../lib/cli-args.ts';
+import { openMcpSession, type McpTool } from '../mcp-client.ts';
 
 /**
- * Стенд для MCP-сервера: поднять, посмотреть, что он умеет, и вызвать
+ * Стенд для MCP-сервера: подключиться, посмотреть, что он умеет, и вызвать
  * конкретный инструмент с заданными параметрами.
  *
  * Проверка соединения на странице MCP отвечает только «отзывается или нет».
  * Здесь на шаг дальше: видно список инструментов с их параметрами и можно
  * посмотреть настоящий ответ — примерно как в отладчике запросов.
  *
- * Сервер поднимается отдельным процессом и гасится сразу после ответа,
- * поэтому проверка не влияет на серверы, подключённые к самому Claude Code.
+ * Соединение поднимается на время одного вопроса и закрывается сразу после
+ * ответа, поэтому проверка не влияет на серверы, подключённые к самому
+ * Claude Code. Сам разговор ведёт общий клиент из domains/mcp-client.ts —
+ * он же обслуживает проверку здоровья, и транспорт ему безразличен.
  */
 
-export interface McpTool {
-  name: string;
-  description?: string;
-  /** Схема параметров как есть — по ней рисуется форма вызова. */
-  inputSchema?: unknown;
-}
+export type { McpTool };
 
 export interface McpCallResult {
   ok: boolean;
@@ -29,171 +25,57 @@ export interface McpCallResult {
   durationMs: number;
 }
 
-const DEFAULT_TIMEOUT = 30_000;
+/** Список инструментов запрашивается сразу после рукопожатия — ждать долго нечего. */
+const LIST_TIMEOUT = 30_000;
+
+/**
+ * Вызов инструмента ждём дольше: в отличие от служебных запросов, инструмент
+ * делает настоящую работу — ходит в чужой API, ищет по репозиторию, — и минута
+ * для него не аномалия, а норма.
+ */
+const CALL_TIMEOUT = 60_000;
 
 export async function listMcpTools(
   server: McpServer,
-  timeoutMs = DEFAULT_TIMEOUT,
+  timeoutMs = LIST_TIMEOUT,
 ): Promise<McpTool[]> {
-  const session = await talk(server, timeoutMs, (send) => {
-    send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
-  });
-
-  const tools = (session.result as { tools?: McpTool[] } | undefined)?.tools;
-  if (!tools) throw new Error(session.error ?? 'Сервер не вернул список инструментов');
-
-  return tools;
+  const session = await openMcpSession(server, timeoutMs);
+  try {
+    return await session.listTools();
+  } finally {
+    await session.close();
+  }
 }
 
 export async function callMcpTool(
   server: McpServer,
   toolName: string,
   args: Record<string, unknown>,
-  timeoutMs = DEFAULT_TIMEOUT,
+  timeoutMs = CALL_TIMEOUT,
 ): Promise<McpCallResult> {
   const startedAt = Date.now();
 
-  const session = await talk(server, timeoutMs, (send) => {
-    send({
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'tools/call',
-      params: { name: toolName, arguments: args },
-    });
-  });
-
-  const result = session.result as
-    { content?: { type: string; text?: string }[]; isError?: boolean } | undefined;
-
-  if (!result) {
+  // Неудачу возвращаем значением, а не исключением: маршрут песочницы
+  // показывает её тем же блоком ответа, что и успешный вызов, — пользователю
+  // важно увидеть текст ошибки инструмента, а не пустой экран.
+  try {
+    const session = await openMcpSession(server, timeoutMs);
+    try {
+      const result = await session.callTool(toolName, args);
+      return {
+        ...result,
+        content: result.content.slice(0, 100_000),
+        durationMs: Date.now() - startedAt,
+      };
+    } finally {
+      await session.close();
+    }
+  } catch (error) {
     return {
       ok: false,
-      content: session.error ?? 'Сервер не ответил',
+      content: error instanceof Error ? error.message : String(error),
       isError: true,
       durationMs: Date.now() - startedAt,
     };
   }
-
-  const text = (result.content ?? [])
-    .map((block) => (block.type === 'text' ? (block.text ?? '') : `[${block.type}]`))
-    .join('\n');
-
-  return {
-    ok: !result.isError,
-    content: text.slice(0, 100_000),
-    isError: Boolean(result.isError),
-    durationMs: Date.now() - startedAt,
-  };
-}
-
-interface Session {
-  result?: unknown;
-  error?: string;
-}
-
-/**
- * Один разговор с сервером по протоколу MCP: рукопожатие, затем нужный запрос.
- * Обмен всегда идёт в одном порядке — инициализация, уведомление о готовности,
- * запрос, — поэтому общая часть вынесена сюда.
- */
-function talk(
-  server: McpServer,
-  timeoutMs: number,
-  request: (send: (message: unknown) => void) => void,
-): Promise<Session> {
-  if (server.transport !== 'stdio') {
-    return Promise.resolve({ error: 'Пока поддерживаются только серверы, запускаемые командой' });
-  }
-  const command = server.command;
-  if (!command) return Promise.resolve({ error: 'Не задана команда запуска' });
-
-  return new Promise<Session>((resolve) => {
-    let child: ChildProcessWithoutNullStreams;
-
-    try {
-      child = spawn(command, shellArgs(server.args), {
-        env: { ...process.env, ...server.env },
-        stdio: ['pipe', 'pipe', 'pipe'],
-        // См. mcp.ts: на Windows npx/node/uvx — .cmd-обёртки без расширения
-        // в записи, и без оболочки spawn их не находит; экранирование
-        // аргументов оболочка не делает, поэтому shellArgs.
-        shell: process.platform === 'win32',
-        windowsHide: true,
-      });
-    } catch (error) {
-      resolve({ error: error instanceof Error ? error.message : String(error) });
-      return;
-    }
-
-    let buffer = '';
-    let stderr = '';
-    let settled = false;
-
-    const finish = (session: Session): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      child.kill();
-      resolve(session);
-    };
-
-    const timer = setTimeout(
-      () => finish({ error: stderr.slice(0, 600) || 'Сервер не ответил вовремя' }),
-      timeoutMs,
-    );
-
-    const send = (message: unknown): void => {
-      child.stdin.write(`${JSON.stringify(message)}\n`);
-    };
-
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-
-    child.on('error', (error) => finish({ error: error.message }));
-    child.on('exit', (code) => {
-      if (code !== 0)
-        finish({ error: stderr.slice(0, 600) || `Процесс завершился с кодом ${code}` });
-    });
-
-    child.stdout.on('data', (chunk: Buffer) => {
-      buffer += chunk.toString();
-
-      let newline: number;
-      while ((newline = buffer.indexOf('\n')) !== -1) {
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        if (!line) continue;
-
-        let message: { id?: number; result?: unknown; error?: { message?: string } };
-        try {
-          message = JSON.parse(line);
-        } catch {
-          continue;
-        }
-
-        if (message.id === 1 && message.result) {
-          send({ jsonrpc: '2.0', method: 'notifications/initialized' });
-          request(send);
-        } else if (message.id === 2) {
-          finish(
-            message.error
-              ? { error: message.error.message ?? 'Инструмент вернул ошибку' }
-              : { result: message.result },
-          );
-        }
-      }
-    });
-
-    send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {
-        protocolVersion: '2024-11-05',
-        capabilities: {},
-        clientInfo: { name: 'claude-control-sandbox', version: '0.1.0' },
-      },
-    });
-  });
 }

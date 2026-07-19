@@ -1,15 +1,7 @@
-import {
-  readdirSync,
-  statSync,
-  existsSync,
-  mkdirSync,
-  rmSync,
-  renameSync,
-  readFileSync,
-} from 'node:fs';
+import { readdirSync, statSync, existsSync, mkdirSync, renameSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname, basename, sep } from 'node:path';
 import type { ClaudeLocation } from '@claude-control/contracts';
-import { writeTextFile } from '../../lib/safe-io.ts';
+import { writeTextFile, backupEntry, removeEntry } from '../../lib/safe-io.ts';
 import { layoutOf, type ResourceKind } from './registry.ts';
 
 /**
@@ -116,18 +108,32 @@ export function writeResourceFile(
   writeTextFile(target, content, { backupDir });
 }
 
+/**
+ * Удаление файла или папки внутри ресурса — под резервную копию: отменить его
+ * в интерфейсе нечем, а стереть можно целую вложенную папку.
+ *
+ * Удаляем через `removeEntry`, а не `rmSync`: рекурсивный `rmSync` на путях с
+ * нелатинскими символами рапортует об успехе, ничего не удалив (см. safe-io.ts),
+ * а имена файлов внутри скилла пишет пользователь.
+ */
 export function deleteResourceFile(
   kind: ResourceKind,
   id: string,
   file: string,
   location: ClaudeLocation,
-): void {
+  backupDir?: string,
+): string | undefined {
   assertWritable(kind);
 
   const target = safePath(kind, id, file, location);
-  if (!target || !existsSync(target)) return;
+  if (!target || !existsSync(target)) return undefined;
 
-  rmSync(target, { recursive: true, force: true });
+  const backupPath = backupDir
+    ? backupEntry(target, backupDir, `${kind}-${id}-${basename(target)}`)
+    : undefined;
+
+  removeEntry(target);
+  return backupPath;
 }
 
 export function moveResourceFile(

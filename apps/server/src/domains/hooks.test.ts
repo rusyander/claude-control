@@ -67,6 +67,7 @@ describe('hooks', () => {
     matcher: undefined,
     isEnabled: true,
     groupIds: [],
+    source: 'settings',
     ...partial,
   });
 
@@ -85,17 +86,19 @@ describe('hooks', () => {
       const hooks = readHooks(settingsPath, store);
 
       expect(hooks).toHaveLength(3);
-      // Каждое событие/группа/команда получает стабильный id вида event:group:command.
+      // Идентификатор считается от содержимого: событие плюс хеш команды.
       const bash = hooks.find((h) => h.matcher === 'Bash');
-      expect(bash?.id).toBe('PreToolUse:0:0');
+      expect(bash?.id).toMatch(/^PreToolUse:[0-9a-f]{8}$/);
+      // Прежний позиционный id остаётся рядом — по нему находятся старые отметки.
+      expect(bash?.legacyId).toBe('PreToolUse:0:0');
       expect(bash?.event).toBe('PreToolUse');
       expect(bash?.command).toBe('echo pre-bash');
 
       const write = hooks.find((h) => h.matcher === 'Write');
-      expect(write?.id).toBe('PreToolUse:1:0');
+      expect(write?.legacyId).toBe('PreToolUse:1:0');
 
       const post = hooks.find((h) => h.event === 'PostToolUse');
-      expect(post?.id).toBe('PostToolUse:0:0');
+      expect(post?.legacyId).toBe('PostToolUse:0:0');
       expect(post?.matcher).toBe('Skill');
     });
 
@@ -116,7 +119,9 @@ describe('hooks', () => {
 
       const hooks = readHooks(settingsPath, store);
 
-      expect(hooks.map((h) => h.id)).toEqual(['PreToolUse:0:0', 'PreToolUse:0:1']);
+      expect(hooks.map((h) => h.legacyId)).toEqual(['PreToolUse:0:0', 'PreToolUse:0:1']);
+      // Разные команды — разные идентификаторы, несмотря на общий matcher.
+      expect(new Set(hooks.map((h) => h.id)).size).toBe(2);
       expect(hooks.map((h) => h.command)).toEqual(['echo first', 'echo second']);
     });
 

@@ -11,10 +11,12 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+// Горизонтальный отступ тот же, что в списке чатов: сегмент «Чаты | Проекты»
+// переключает содержимое одной и той же полосы.
 .items {
   flex: 1;
   min-height: 0;
-  padding: var(--spacing-2xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -27,6 +29,10 @@
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
+  // Без этого браузер держит на кнопке свой `buttontext` — иконки внутри
+  // рисуются через `currentColor` и уходят в чёрный на тёмном фоне. Текст
+  // не страдал: Typography задаёт цвет сам, а `font: inherit` цвет не несёт.
+  color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;

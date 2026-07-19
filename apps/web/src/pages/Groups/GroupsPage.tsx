@@ -12,10 +12,19 @@ import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { EmptyState } from '@shared/ui/empty-state';
+import { Toggle } from '@shared/ui/toggle';
 import { GroupFormModal } from '@features/GroupEditor';
 import { AutomationFormModal } from '@features/AutomationEditor';
 import { SandboxButton } from '@features/SandboxRunner';
-import { useGroups, useAutomations, useDeleteGroup, useDeleteAutomation } from '@entities/Group';
+import { DeleteButton } from '@features/EntityDelete';
+import {
+  useGroups,
+  useAutomations,
+  useSetGroupEnabled,
+  useDeleteGroup,
+  useSaveAutomation,
+  useDeleteAutomation,
+} from '@entities/Group';
 import type { SandboxSelection } from '@entities/Sandbox/api/SandboxApi';
 import styles from './GroupsPage.module.scss';
 
@@ -42,7 +51,9 @@ export function GroupsPage() {
 
   const { data: groups = [], isLoading } = useGroups();
   const { data: automations = [] } = useAutomations();
+  const setGroupEnabled = useSetGroupEnabled();
   const deleteGroup = useDeleteGroup();
+  const saveAutomation = useSaveAutomation();
   const deleteAutomation = useDeleteAutomation();
 
   const openCreateGroup = (): void => {
@@ -75,6 +86,7 @@ export function GroupsPage() {
       <PageHeader
         title={t('groups.title')}
         subtitle={t('groups.subtitle')}
+        helpTopic="groups"
         actions={
           <Button
             variant="primary"
@@ -134,13 +146,19 @@ export function GroupsPage() {
                   aria-label={`${t('common.edit')}: ${group.name}`}
                   onClick={() => openEditGroup(group)}
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon={<Icon name="trash" size={24} />}
-                  aria-label={`${t('common.delete')}: ${group.name}`}
-                  onClick={() => deleteGroup.mutate(group.id)}
+                <DeleteButton
+                  entityName={group.name}
+                  description={t('common.deleteGroup')}
+                  onDelete={() => deleteGroup.mutate(group.id)}
+                  isPending={deleteGroup.isPending}
+                />
+                <Toggle
+                  checked={group.isEnabled}
+                  onCheckedChange={(isEnabled) =>
+                    setGroupEnabled.mutate({ id: group.id, isEnabled })
+                  }
+                  disabled={setGroupEnabled.isPending}
+                  aria-label={`${t('common.enabled')}: ${group.name}`}
                 />
               </Stack>
             </Stack>
@@ -185,9 +203,12 @@ export function GroupsPage() {
               width="100%"
             >
               <Stack gap="var(--spacing-2xs)">
-                <Typography variant="body" weight="medium" as="span">
-                  {automation.name}
-                </Typography>
+                <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+                  <Typography variant="body" weight="medium" as="span">
+                    {automation.name}
+                  </Typography>
+                  {!automation.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
+                </Stack>
                 <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
                   <Badge tone="accent">{automation.trigger.event}</Badge>
                   {automation.trigger.matcher && (
@@ -212,13 +233,24 @@ export function GroupsPage() {
                     setIsAutomationFormOpen(true);
                   }}
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon={<Icon name="trash" size={24} />}
-                  aria-label={`${t('common.delete')}: ${automation.name}`}
-                  onClick={() => deleteAutomation.mutate(automation.id)}
+                <DeleteButton
+                  entityName={automation.name}
+                  description={t('common.deleteAutomation')}
+                  onDelete={() => deleteAutomation.mutate(automation.id)}
+                  isPending={deleteAutomation.isPending}
+                />
+                {/* Выключенный сценарий не компилируется в хук — сервер это уже
+                    умел, не хватало только переключателя. */}
+                <Toggle
+                  checked={automation.isEnabled}
+                  onCheckedChange={(isEnabled) =>
+                    saveAutomation.mutate({
+                      id: automation.id,
+                      automation: { ...automation, isEnabled },
+                    })
+                  }
+                  disabled={saveAutomation.isPending}
+                  aria-label={`${t('common.enabled')}: ${automation.name}`}
                 />
               </Stack>
             </Stack>

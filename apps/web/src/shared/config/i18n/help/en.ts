@@ -1,0 +1,2173 @@
+import type { HelpSchema } from './ru';
+
+/** Типизирован по русской версии: забыть ключ при переводе не получится. */
+export const helpEn: HelpSchema = {
+  index: {
+    subtitle: 'How every section of the panel works',
+    lead:
+      'The panel has no database of its own: everything you change here is a ' +
+      'Claude Code configuration file on your disk. That is why each help ' +
+      'article starts by naming the exact file it edits and when the change ' +
+      'reaches Claude.',
+
+    howTitle: 'How the app is put together',
+    howCaption:
+      'There is no database behind the panel, and two things follow from that. ' +
+      'The same files can be edited by hand outside the panel, and almost every ' +
+      'change reaches Claude only after a restart.',
+    howPanel: 'The panel',
+    howPanelCaption: 'forms, lists, assistant',
+    howFiles: 'Files in ~/.claude',
+    howFilesCaption: 'CLAUDE.md, settings.json, skills/…',
+    howClaude: 'Claude Code',
+    howClaudeCaption: 'reads them when a session starts',
+    howEdgeWrite: 'write with a backup',
+    howEdgeRestart: 'restart',
+
+    helpTitle: 'How to use the help itself',
+    helpButton: 'The “?” button on a page',
+    helpButtonText:
+      'Next to the heading of every section sits a question mark that opens the ' +
+      'walkthrough for that section. The question usually comes up on the page itself, ' +
+      'not in the contents.',
+    helpLink: 'Links can be shared',
+    helpLinkText:
+      'The address of an article contains the section name, so a link to the right ' +
+      'explanation can be sent to a colleague or saved. Links to a specific rule, skill ' +
+      'or server inside the sections work the same way.',
+    helpNav: 'Moving to the next section',
+    helpNavText:
+      'At the bottom of each article are links to the previous and next one. The help ' +
+      'can be read straight through without going back to the contents.',
+    helpAssistant: 'An assistant in almost every form',
+    helpAssistantText:
+      'Rules, skills, hooks, scripts, servers, permissions, variables, groups and ' +
+      'scenarios can all be filled in by the assistant: describe the task in words and ' +
+      'it returns ready fields. It runs on your subscription; no separate key is needed.',
+
+    sectionsTitle: 'Sections',
+    sectionsCaption: 'Each card is a detailed walkthrough of its section of the panel.',
+
+    notFoundTitle: 'No such help article',
+    notFoundText: 'The link may be out of date. Open the list of sections and pick one.',
+  },
+
+  common: {
+    back: 'All sections',
+    openSection: 'Go to the section',
+    openHelp: 'Help for this section',
+    storageTitle: 'Where this lives',
+    fieldName: 'Field',
+    fieldPurpose: 'What it controls',
+    required: 'required',
+    prevTopic: 'Previous section',
+    nextTopic: 'Next section',
+    canTitle: 'What you can do here',
+    cantTitle: 'What is not here',
+    whyTitle: 'Why this exists',
+    howTitle: 'How it works',
+    recipesTitle: 'How to do it',
+    assistantTitle: 'The assistant',
+    notesTitle: 'Things people trip over',
+    onlyOnCreate: 'when creating only',
+    readOnly: 'read only',
+  },
+
+  topics: {
+    chat: {
+      title: 'Chat',
+      summary: 'The same claude CLI, plus several agents, projects and one shared history',
+      lead:
+        'Chat in the panel is not a separate bot and not a wrapper around the API. ' +
+        'The panel runs the very same claude you use in the terminal and shows its ' +
+        'output as it arrives. Everything else follows from that: conversations ' +
+        'live in ordinary Claude Code transcripts, conversations started in the ' +
+        'terminal show up here, and you pay through your own subscription rather ' +
+        'than separately for the panel.',
+
+      whyParallel: 'Several agents at once',
+      whyParallelText:
+        'Each project runs its own process. Switching tabs does not stop a run: ' +
+        'start an agent in one project, move to another, and come back to a ' +
+        'finished answer.',
+      whyHistory: 'One place for the whole history',
+      whyHistoryText:
+        'The panel reads the same transcripts Claude Code writes. A conversation ' +
+        'started in the terminal or in an editor shows up here — and the other way ' +
+        'around.',
+      whyVisible: 'You can see what is going on',
+      whyVisibleText:
+        'Coloured dots on tabs, the agents panel, the cost of a run, attachments ' +
+        'and voice input — none of which the terminal has.',
+
+      canParallel: 'Hold several conversations at once, across different projects',
+      canOpenFolder: 'Open any folder as a project, even one Claude has never worked in',
+      canAttach: 'Attach files by dragging them in or with the paperclip',
+      canVoice: 'Dictate a request by voice',
+      canStop: 'Stop one agent or all of them at once',
+      canEditor: 'Open the project in your code editor with one button',
+      canContinue: 'Continue any past conversation, including ones started in the terminal',
+      canRetry: 'Repeat a failed request with one button, without retyping it',
+      canSpend: 'See what a run cost — in tokens or in money, your choice',
+      canAnswerButtons: 'Answer an agent question by clicking an option',
+      canModel: 'Pick a model and thinking depth — for the whole panel or for one chat',
+      canApprove: 'Allow or deny a specific action right in the conversation',
+
+      cantApprove:
+        'Grant permissions in advance: the panel asks at the moment of the action, and ' +
+        'the standing list of what is allowed lives in the Permissions section',
+      cantSessionCost:
+        'Keep the session spend counter: it lives in the tab and starts over after a reload',
+      cantFork: 'Branch a conversation: editing a message just copies the text back into the field',
+      cantDelete: 'Delete or rename conversations — transcripts are only ever read',
+      cantSearchInside: 'Search inside conversations — search covers titles and previews only',
+
+      storageTranscripts: 'Transcripts',
+      storageTranscriptsValue: '~/.claude/projects/<project-path>/<sessionId>.jsonl',
+      storageWhatRuns: 'What is launched',
+      storageWhatRunsValue: 'claude -p --output-format stream-json',
+      storageSandbox: 'Chats outside a project',
+      storageSandboxValue: '~/.claude-control/chats/<chat id>/',
+      storageStream: 'How the answer arrives',
+      storageStreamValue: 'as an SSE stream — text appears as it is generated',
+
+      flowTitle: 'What happens when you send a message',
+      flowCaption:
+        'The prompt goes to the process through standard input rather than as a ' +
+        'command-line argument: long text with quotes would otherwise fall apart in ' +
+        'the Windows shell.',
+      flowComposer: 'Composer',
+      flowComposerCaption: 'text, files, edit mode',
+      flowServer: 'POST /api/chat/send',
+      flowServerCaption: 'picks the working directory',
+      flowProcess: 'The claude process',
+      flowProcessCaption: 'the same CLI as in the terminal',
+      flowStream: 'Stream on screen',
+      flowStreamCaption: 'text, thinking, tools',
+      flowTranscript: 'Transcript',
+      flowTranscriptCaption: 'the conversation is saved to disk',
+
+      tabsTitle: 'Tabs and projects',
+      tabsCaption:
+        'The project list does not scan your disk: it is assembled from transcripts ' +
+        'already read, by the directory the conversation ran in.',
+      tabHome: 'The home “Chats” tab',
+      tabHomeText:
+        'Conversations without a project. They run in a separate panel folder — ' +
+        'Claude Code treats ~/.claude as protected and will not write inside it.',
+      tabProject: 'A project tab',
+      tabProjectText:
+        'The conversation runs right inside the project directory. Only that ' +
+        "project's chats are listed, and a new chat is pre-filled with “look around " +
+        'and tell me what this project is”.',
+      tabAdd: 'Add a folder',
+      tabAddText:
+        'The button in the project list opens a directory picker across your drives. ' +
+        'That is how you start in a folder Claude has never run in.',
+      tabsNote:
+        'Tabs survive a page reload, and closing a tab closes only the tab — neither ' +
+        'chats nor files are touched.',
+
+      dotsTitle: 'Coloured dots: what the agent is doing',
+      dotsCaption:
+        'The dot sits on the project tab and in the project list. For a project with ' +
+        'several runs, the most alarming state is shown.',
+      dotGreen: 'Green',
+      dotGreenText: 'The agent is working. The dot pulses while events keep arriving.',
+      dotYellow: 'Yellow',
+      dotYellowText: 'The agent asked a question and is waiting. Reply in the input field.',
+      dotRed: 'Red',
+      dotRedText:
+        'An error, a rate limit — or a stalled run: if no events arrive for two ' +
+        'minutes, the panel treats the run as broken and turns the dot red.',
+      dotNone: 'No dot',
+      dotNoneText: 'Nothing is running in this project right now.',
+
+      panelTitle: 'The agents panel and parallel launch',
+      panelAgents: 'Agents panel',
+      panelAgentsText:
+        'A button in the chat header with a counter. Inside are all active runs, ' +
+        'sorted by how alarming they are: errors first, then those waiting for a ' +
+        'reply, then those working. Each row shows the project, status, spending and a ' +
+        'stop button. Clicking a row opens that project’s tab and shows the live ' +
+        'stream of that agent. At the bottom: the session total across all runs.',
+      panelParallel: 'Run in several projects',
+      panelParallelText:
+        'The button lives in the project list on the home tab, not in the header. One ' +
+        'request goes to several projects at once: tick the projects, write the task, ' +
+        'and an agent starts in each. The window has its own edit toggle, switched off ' +
+        'every time it opens. Handy for sweeps like “check every repository for X”.',
+      panelNote:
+        'Projects missing from disk are excluded from a parallel launch and cannot be ' +
+        'clicked in the list — they carry a separate badge.',
+
+      composerTitle: 'What the input field can do',
+      composerEnter: 'Enter and Shift+Enter',
+      composerEnterText: 'Enter sends the message, Shift+Enter adds a line break.',
+      composerVoice: 'Voice input',
+      composerVoiceText:
+        'The microphone button starts dictation with a sound track. What you dictate ' +
+        'is appended to what you already typed rather than replacing it. It works ' +
+        'where the browser supports speech recognition — otherwise the button is off.',
+      composerFiles: 'Attachments',
+      composerFilesText:
+        'The paperclip or a drag onto the field. Up to 20 MB per file; images, PDF, ' +
+        'markdown, text, tables, code. The file is stored in a panel folder, and ' +
+        'Claude gets the path and reads it from disk itself.',
+      composerChips: 'Quick action chips',
+      composerChipsText:
+        'In an empty chat — ready-made openings: in a project that means review, ' +
+        'bug hunting, a structure walkthrough, tests. A chip fills the field but does ' +
+        'not send: you can add to it first. Next to them sits a separate “Open in ' +
+        'editor” chip — not about the conversation, it just opens the project.',
+      composerStop: 'Stop',
+      composerStopText: 'While an answer is streaming, the send button becomes a stop button.',
+
+      editsTitle: 'Edit mode: what the agent may change',
+      editsCaption:
+        'The toggle appears only inside a project: outside one, edits are always ' +
+        'allowed because there the files are the result of the work. Inside a project ' +
+        'edits are allowed by default too, so check where the toggle stands before ' +
+        'giving a task in an unfamiliar repository.',
+      editsOff: 'Read only',
+      editsOffCaption: 'toggle switched off',
+      editsMode: 'permission-mode default',
+      editsModeCaption: 'reading, search, analysis',
+      editsResult: 'Edits do not go through',
+      editsResultCaption: 'there is nowhere to confirm them',
+      editsOn: 'Edits allowed',
+      editsOnCaption: 'the default position',
+      editsOnMode: 'permission-mode acceptEdits',
+      editsOnModeCaption: 'edits without asking',
+      editsOnResult: 'Project files change',
+      editsOnResultCaption: 'the agent writes to disk',
+      editsResetTitle: 'The toggle remembers where you left it',
+      editsResetText:
+        'Its position survives tab switches, other chats and page reloads: it used to ' +
+        'reset on every refresh, and the agent stalled over nothing. The flip side is ' +
+        'that switching it off is a deliberate act — it never returns to read-only on ' +
+        'its own. The exception is the parallel launch window: it has its own toggle, ' +
+        'switched off every time it opens.',
+
+      historyTitle: 'How a conversation continues',
+      historyCaption:
+        'The chat identifier is the transcript file name. That is what the ' +
+        'conversation is resumed by.',
+      historyId: 'chat id',
+      historyIdCaption: 'also the sessionId',
+      historyResume: '--resume <id>',
+      historyResumeCaption: 'the CLI brings the past session back',
+      historyCwd: 'Working directory',
+      historyCwdCaption: 'taken from the transcript itself',
+      historyFolderTitle: 'A session is bound to its directory',
+      historyFolderText:
+        'A conversation can only be continued from the folder it started in: the CLI ' +
+        'looks for the session among the sessions of the current directory. That is ' +
+        'why a chat folder is never renamed, and if the project directory is gone ' +
+        'from disk the panel says plainly that there is nothing to continue.',
+
+      retryTitle: 'When a run fails',
+      retryCaption:
+        'On an error two buttons appear in the header. Both repeat the last request — ' +
+        'there is nothing to retype.',
+      retryRepeat: 'Retry',
+      retryRepeatText:
+        'The same request with the same permissions. Useful when the cause was ' +
+        'external: the network dropped, a limit was hit, the process died.',
+      retryFull: 'Allow and continue',
+      retryFullText:
+        'The same request but with full access: the agent does everything without ' +
+        'asking. The button for when the run stalled on permissions specifically.',
+      retryNoteTitle: 'Full access really does mean full access',
+      retryNoteText:
+        'In that mode neither the edit toggle nor the rules from the Permissions ' +
+        'section apply: the agent does whatever it decides to. Worth pressing when ' +
+        'you know exactly what it stalled on.',
+
+      spendTitle: 'What it cost',
+      spendCaption:
+        'Spending is shown in tokens — visible without an API subscription. You can ' +
+        'switch it to money in the panel settings.',
+      spendRun: 'The badge in the header',
+      spendRunText:
+        'The current run: tokens or dollars, depending on the chosen unit. It updates ' +
+        'as the answer streams.',
+      spendSession: '“Session total” in the agents panel',
+      spendSessionText:
+        'Everything across all runs since the page loaded. Individual runs get cleared, ' +
+        'the counter does not; only a reload resets it.',
+      spendLimit: 'The limit badge',
+      spendLimitText:
+        'Appears only when a limit was hit: it shows when the limit resets. How much of ' +
+        'the limit is left cannot be found out locally.',
+
+      recipesTitle: 'How to start working with a project',
+      recipe1: 'Open the project',
+      recipe1Text:
+        'The “Chats” tab → the “Projects” section → the project you need. Not in the ' +
+        'list? Use “Add a folder” and pick the directory on disk.',
+      recipe2: 'Check the edit toggle',
+      recipe2Text:
+        'It is in the header and switched on by default. To look around first, move it ' +
+        'to read-only: the field already holds a question about the project, so send ' +
+        'it as is.',
+      recipe3: 'Give the task',
+      recipe3Text:
+        'Once it is clear what to change and where, switch edits back on. The toggle ' +
+        'keeps that position until you change it again.',
+      recipe4: 'Go do something else',
+      recipe4Text:
+        'The run does not stop when you switch tabs. When a background agent finishes, ' +
+        'asks a question or fails, a notification arrives in its own colour — green, ' +
+        'yellow or red. Clicking it opens the project in question.',
+
+      notesTitle: 'Things people trip over',
+      noteTabTitle: 'Reloading the page does not kill the agent',
+      noteTabText:
+        'The process belongs to the server, not to the tab: closing the tab or pressing ' +
+        'F5 only detaches the listener. Come back and a running job is picked up, with ' +
+        'the stream catching up on what you missed. What is lost is the accumulated ' +
+        'session spend — it lives in the tab and starts from zero. A run that finished ' +
+        'while the page was away will not reappear in the feed: look for the answer in ' +
+        'the conversation history.',
+      noteQuestionTitle: 'An option is picked with a click',
+      noteQuestionText:
+        'The card draws the options as buttons: a click sends the chosen text as an ' +
+        'ordinary message into the same conversation. While the agent is busy the ' +
+        'buttons are disabled — wait for the reply or stop the run. If none of the ' +
+        'options fits, type your own answer as usual.',
+      noteArtifactsTitle: 'The list of created files exists only for chats outside a project',
+      noteArtifactsText:
+        'Inside a real project the panel deliberately does not show it: dumping a ' +
+        'whole repository as a list of “created files” would be useless.',
+      noteLimitTitle: 'Spending is shown per run, not for all time',
+      noteLimitText:
+        'The badge in the header is the current run; “session total” in the agents ' +
+        'panel is everything since the page loaded. History across days and the ' +
+        'breakdown by model live in the Analytics section.',
+      noteMemoryTitle: 'A background agent’s answer is in the history, not the stream',
+      noteMemoryText:
+        'When a background run ends, the panel frees memory and drops the accumulated ' +
+        'stream: the answer is already saved in the transcript. The status and any ' +
+        'error text stay.',
+      noteHistoryTitle: 'The last 400 messages are shown',
+      noteHistoryText:
+        'Very long conversations are trimmed from the top: transcripts run to hundreds ' +
+        'of megabytes, and there is nothing to read them whole with in a browser.',
+    },
+
+    overview: {
+      title: 'Overview',
+      summary: 'What is wired in right now, and where the configuration was found',
+      lead:
+        'The start page answers two questions: which configuration directory was found ' +
+        'and what is in it. It is the one place where problems that otherwise stay ' +
+        'silent become visible: a hook whose script is missing, a script bound to ' +
+        'nothing, and the wrong settings directory.',
+
+      whyWhere: 'It shows what you are writing to',
+      whyWhereText:
+        'The panel can work with several configuration directories. If empty or ' +
+        'unfamiliar settings open, the answer is here: which path was chosen and by ' +
+        'which rule.',
+      whyBroken: 'It catches silent breakage',
+      whyBrokenText:
+        'A hook with a broken path raises no error — it simply never fires. On the ' +
+        'overview that tile turns red, and that is the only signal you get.',
+      whyEntry: 'A way into the sections',
+      whyEntryText:
+        'Every tile is a link. The scale is visible too: how many rules there are, how ' +
+        'many are on, how many scripts are unused.',
+
+      canSee: 'See how many settings of each kind exist and how many are enabled',
+      canPath: 'Check the configuration directory and which rule selected it',
+      canMissing: 'Find out which configuration files are missing',
+      canBroken: 'Spot broken hooks and unused scripts',
+      canJump: 'Jump into a section by clicking its tile',
+
+      cantEdit: 'Change anything: the page only shows',
+      cantHistory: 'See what changed since yesterday — there is no history here',
+      cantDeep: 'Work out why one particular setting misbehaves: that lives in its own section',
+
+      sourceTitle: 'Where the configuration directory comes from',
+      sourceCaption:
+        'Checked in order; the first match wins. Hence a common story: the path was set ' +
+        'by hand once and now overrides the environment variable.',
+      sourceTop: 'stronger',
+      sourceManual: 'a path set in the panel settings',
+      sourceEnv: 'the CLAUDE_CONFIG_DIR environment variable',
+      sourceHome: 'the ordinary ~/.claude directory',
+      sourceNote:
+        'If the overview shows zeroes everywhere, start here: most likely the wrong ' +
+        'directory was found. The path is changed in the panel settings and applies at once.',
+
+      tilesTitle: 'What the tiles mean',
+      tileRules: 'Rules, skills, hooks',
+      tileRulesText:
+        'Three separate tiles. Each shows the total and how many are on: the gap ' +
+        'between the numbers is what sits disabled and has no effect.',
+      tileScripts: 'Scripts',
+      tileScriptsText:
+        'How many files are in the directory and how many are bound to no hook. An ' +
+        'unbound file is usually a forgotten setting. When every one is bound, the ' +
+        'caption says so.',
+      tileHooksBroken: 'Hooks in red',
+      tileHooksBrokenText:
+        'The tile turns red when a hook’s script is missing from disk. Such a hook fails ' +
+        'silently, and nothing else reports it.',
+      tileMcp: 'MCP servers and permissions',
+      tileMcpText:
+        'The number of connected servers and the total count of permission rules, split ' +
+        'into allowed and denied.',
+      tileGroups: 'Groups',
+      tileGroupsText:
+        'How many setting bundles exist. While there are none, the caption says so ' +
+        'plainly — the tile does not look broken.',
+
+      notesTitle: 'Things people trip over',
+      noteZeroTitle: 'Zeroes everywhere almost always means the wrong directory',
+      noteZeroText:
+        'Look at the directory card: it states which path was chosen and by which rule. A ' +
+        'manually set path overrides the environment variable.',
+      noteLiveTitle: 'The numbers are counted on the fly',
+      noteLiveText:
+        'The panel has no database: configuration files are re-read every time the page ' +
+        'opens. Hand edits show up immediately.',
+      noteMissingTitle: '“Missing files” is not always a problem',
+      noteMissingText:
+        'Some configuration files are created on first use. An empty rule list only means ' +
+        'CLAUDE.md has not been started yet.',
+    },
+
+    analytics: {
+      title: 'Analytics',
+      summary: 'Token usage and activity, counted from local transcripts',
+      lead:
+        'This section counts from your own files rather than from Anthropic’s data: every ' +
+        'model answer in a transcript carries usage information, and the panel adds it up. ' +
+        'That is both its strength and its limit: everything that happened on this machine ' +
+        'is visible, and nothing that happened on another one.',
+
+      whyLocal: 'Counted from your files',
+      whyLocalText:
+        'No requests go anywhere and no keys are needed: the source is the transcripts on ' +
+        'disk. It works offline.',
+      whyWhere: 'Shows where the usage goes',
+      whyWhereText:
+        'Broken down by day, model, project, hour and tool. One glance is usually enough to ' +
+        'see which project eats the most.',
+      whyCache: 'Shows what the cache saves',
+      whyCacheText:
+        'The share read from cache is counted separately. A high share means long ' +
+        'conversations cost less than their size suggests.',
+
+      canPeriod: 'Switch the period: a week, a month, a quarter, or all time',
+      canDetail: 'Open the detail for a model or a project by clicking its bar',
+      canLive: 'See the Claude Code processes actually running now and their memory use',
+      canTools: 'See which tools and skills come up most often',
+      canSessions: 'Find recent conversations with their git branches and size',
+
+      cantLimits:
+        'See what is left of your subscription limits: that lives on Anthropic servers and ' +
+        'is not available locally',
+      cantBill:
+        'See a real bill: this is tokens converted at the Anthropic price list, not an ' +
+        'invoice — discounts, batch rates and account-specific terms are not included',
+      cantOther: 'Include work from another machine: only the transcripts of this one are counted',
+      cantExport: 'Export a report as a file',
+
+      storageSource: 'Source',
+      storageSourceValue: '~/.claude/projects/**/*.jsonl — conversation transcripts',
+      storageWhat: 'What is taken from a file',
+      storageWhatValue: 'the usage information attached to every model answer',
+      storageCache: 'Caching',
+      storageCacheValue: 'the summary is cached for a minute; live processes refresh faster',
+      storageSkills: 'Skills',
+      storageSkillsValue: 'call statistics come from ~/.claude.json',
+
+      flowTitle: 'How the numbers are produced',
+      flowCaption:
+        'Files can be enormous, so very large transcripts are not read whole: the start and ' +
+        'the end are taken. That barely moves the totals and saves the page from a ' +
+        'multi-second wait.',
+      flowFiles: 'Transcripts',
+      flowFilesCaption: 'conversation files on disk',
+      flowScan: 'Scan and parse',
+      flowScanCaption: 'usage data from answers',
+      flowSum: 'Adding up',
+      flowSumCaption: 'by day, model and project',
+      flowView: 'Charts',
+      flowViewCaption: 'what you see on the page',
+
+      metricsTitle: 'What the numbers mean',
+      metricTotal: 'Total tokens',
+      metricTotalText:
+        'The sum of four kinds: input, output, read from cache and written to cache. One ' +
+        'request almost always spends several kinds at once.',
+      metricCache: 'Cache share',
+      metricCacheText:
+        'How much of the input came from cache instead of being counted afresh. The higher ' +
+        'it is, the cheaper long conversations become.',
+      metricCost: 'Cost estimate',
+      metricCostText:
+        'Tokens converted at API rates. It is a reference figure: on a subscription no money ' +
+        'is charged for these requests. The panel pulls the price list from the Anthropic site ' +
+        'when you open Settings (at most once a day) and prices each record at the model version ' +
+        'named in the transcript: Opus 4.1 costs three times Opus 4.8. Rates are visible and ' +
+        'editable there if your terms differ.',
+      metricRequests: 'Requests and active sessions',
+      metricRequestsText:
+        'How many calls to the model happened in the period, and how many ' +
+        'conversations are running right now. Useful when the token count is high and ' +
+        'it is unclear whether that is many conversations or one long one.',
+      metricOutput: 'Output tokens',
+      metricOutputText:
+        'A separate tile: how much the model wrote. This part grows with long answers, ' +
+        'while the input part grows with the size of the context.',
+      metricHours: 'The hourly chart',
+      metricHoursText:
+        'The only chart about your routine: which hours of the day the work happens in. ' +
+        'Good for noticing that half the spending comes from night-time runs.',
+      metricScan: 'The scan line at the bottom',
+      metricScanText:
+        'How many files the panel walked and in how many milliseconds. It also explains ' +
+        'why numbers from giant transcripts are approximate — they are read in parts.',
+      metricSessions: 'Sessions',
+      metricSessionsText:
+        'Conversations in the period with their project, git branches and size. Active ones ' +
+        'are marked separately.',
+
+      liveTitle: 'Live agents',
+      liveCaption:
+        'The one block that shows the present rather than history: Claude Code processes ' +
+        'actually running, with their memory use and start time. Agents are recognised ' +
+        'by their command line rather than by process name, so runs of a CLI installed ' +
+        'through npm show up too.',
+
+      notesTitle: 'Things people trip over',
+      noteLimitsTitle: 'Remaining subscription limits cannot be shown',
+      noteLimitsText:
+        'They live on Anthropic servers and never reach local files. All that is ever ' +
+        'visible is the reset time, and only when a limit was hit in the chat itself.',
+      noteCostTitle: 'The cost is an estimate, not a bill',
+      noteCostText:
+        'Tokens are converted at API rates. On a subscription those amounts are never ' +
+        'charged: the figure is for comparing projects with each other.',
+      noteBigTitle: 'Very large transcripts are read in part',
+      noteBigText:
+        'For files beyond a few megabytes the start and the end are taken. Otherwise opening ' +
+        'the page would take tens of seconds.',
+      noteLiveTitle: 'Agents are found by command line, not by process name',
+      noteLiveText:
+        'A CLI installed through npm runs as node — there is simply no process named ' +
+        'claude on the system. While the panel searched by name, the Live agents ' +
+        'block stayed almost always empty even while agents were working. The command ' +
+        'line is parsed now, and those runs are found. The panel leaves itself out of ' +
+        'the list, and the start time is shown only on Windows: on other systems there ' +
+        'is nowhere to take it from.',
+      noteScopeTitle: 'Only this machine is counted',
+      noteScopeText:
+        'Work from another computer or another configuration directory will not appear in ' +
+        'these numbers.',
+    },
+
+    settings: {
+      title: 'Settings',
+      summary: 'The panel’s own settings, the configuration path, and sandbox access',
+      lead:
+        'The one section that edits the panel’s settings rather than the Claude Code ' +
+        'configuration. It also holds two things everything else depends on: the path to ' +
+        'the configuration directory, and account access for the sandbox.',
+
+      whyPath: 'It decides what you are working with',
+      whyPathText:
+        'The configuration directory determines which rules, skills and hooks the panel ' +
+        'sees. It is changed here and applies at once, without a restart.',
+      whySandbox: 'It brings the sandbox to life',
+      whySandboxText:
+        'The sandbox runs Claude with a separate settings directory that your normal access ' +
+        'does not reach. The access card exists precisely for that.',
+      whyComfort: 'It fits the panel to you',
+      whyComfortText:
+        'Theme, language, large text, reduced motion, higher contrast — and the editor your ' +
+        'projects open in.',
+
+      canPath: 'Set the configuration directory by hand and switch between sets',
+      canTheme: 'Pick a theme, a language and accessibility options',
+      canEditor: 'Pick a code editor from those found on the system, or give your own command',
+      canCreds: 'Set account access by hand when it is not found automatically',
+      canSpendUnit: 'Choose how spending is shown: in tokens or in money',
+      canBackup: 'Turn on a backup before every write',
+      canWatch: 'Watch the files and refresh the interface when they change outside the panel',
+
+      cantLogin: 'Sign in to a Claude account: authentication is the CLI’s job',
+      cantToken: 'See the token: the server reports only the source of access, never the value',
+      cantSync: 'Sync settings between machines',
+      cantChange:
+        'Edit Claude Code settings field by field: this section is about the panel itself. ' +
+        'The exception is a restore: it brings back a configuration file whole',
+
+      storageApp: 'Panel settings',
+      storageAppValue: 'stored apart from the Claude Code configuration',
+      storageManual: 'Manual access',
+      storageManualValue: '~/.claude-control/credentials.json',
+      storageBackups: 'Backups',
+      storageBackupsValue: '~/.claude/claude-control/backups/',
+      storageApply: 'When it applies',
+      storageApplyValue: 'at once: changing the directory needs no restart',
+
+      cardsTitle: 'The cards',
+      cardAccount: 'Account',
+      cardAccountText:
+        'Whose account is in use: email, organisation, subscription type. Taken from the same ' +
+        'configuration Claude Code authenticates with.',
+      cardDir: 'Configuration directory',
+      cardDirText:
+        'The path and a badge for the source: detected automatically, taken from an ' +
+        'environment variable, or set by hand. A change applies immediately.',
+      cardCreds: 'Claude Code access',
+      cardCredsText:
+        'Needed by exactly one thing — the sandbox. The token is never shown: the panel knows ' +
+        'only the source of access, and the reason when there is none.',
+      cardEditor: 'Code editor',
+      cardEditorText:
+        'Editors installed on the system are highlighted, missing ones are dimmed. “Auto” ' +
+        'takes the first one found, but you can give your own command.',
+
+      credsTitle: 'Where sandbox access comes from',
+      credsCaption:
+        'Checked in order; the first one found wins. The difference between systems matters ' +
+        'here.',
+      credsTop: 'stronger',
+      credsManual: 'set by hand in this section',
+      credsFile: 'the access file in the configuration directory',
+      credsKeychain: 'the macOS keychain',
+      credsApiKey: 'an environment variable with an API key',
+      credsNote:
+        'On Windows and Linux access sits in a file. On macOS there is no file — Claude Code ' +
+        'keeps it in the keychain, and the system asks for permission on first use. So ' +
+        '“Not logged in” in the sandbox while the chat works is not an account problem.',
+
+      fieldsTitle: 'What you can switch',
+      fieldsCaption: 'Every switch saves immediately; there is no save button here.',
+      fieldTheme: 'The colour theme: light, dark, or follow the system.',
+      fieldLanguage: 'The interface language.',
+      fieldDir: 'The path to the configuration directory. Empty means detect it automatically.',
+      fieldReveal: 'Show secret values straight away, without clicking the eye.',
+      fieldBackup: 'Make a backup of the file before every write.',
+      fieldWatch: 'Watch the files and refresh the interface on outside changes.',
+      fieldA11y: 'Large text, less motion, higher contrast.',
+      fieldEditor: 'The code editor command. Empty means the first one found on the system.',
+      fieldCostUnit:
+        'How spending is shown in the chat: tokens (the default) or money. Tokens are ' +
+        'always visible, while the dollar figure is an estimate at API rates and is ' +
+        'never charged on a subscription.',
+
+      notesTitle: 'Things people trip over',
+      noteManualTitle: 'A manually set path overrides the environment variable',
+      noteManualText:
+        'If you once set a directory here, it beats CLAUDE_CONFIG_DIR. This is the most ' +
+        'common reason the panel shows the wrong configuration.',
+      noteMacTitle: 'On macOS access lives in the keychain',
+      noteMacText:
+        'There is no token file there. The system asks for permission on first use — worth ' +
+        'granting it permanently, or the sandbox will ask every time.',
+      noteSandboxTitle: 'Only the sandbox needs this access',
+      noteSandboxText:
+        'The ordinary chat works through your normal Claude Code sign-in. If the chat works ' +
+        'but the sandbox says “Not logged in”, this card is the place to look.',
+      noteBackupTitle: 'Backups are worth leaving on',
+      noteBackupText:
+        'The panel edits your real configuration. A copy before writing is the only way back ' +
+        'if an edit turns out badly.',
+    },
+
+    groups: {
+      title: 'Groups',
+      summary: 'Bundles of settings, and scenarios of the form “when X happens, do Y”',
+      lead:
+        'The one section Claude Code knows nothing about: groups and scenarios live in ' +
+        'the panel’s own data. A group collects settings into a bundle that switches on ' +
+        'as one. A scenario is a hook described in plain words — the panel turns it into ' +
+        'a real hook in the configuration.',
+
+      whyBundle: 'Switch things on as sets',
+      whyBundleText:
+        'Rules, skills, hooks and servers for one job go into a group. Switch the group ' +
+        'off and everything inside goes with it, with no toggling one by one.',
+      whyEnv: 'Swap a whole environment',
+      whyEnvText:
+        'A group carries its own environment variables. While the group is on they are ' +
+        'written into the settings — that is how several environments are kept and swapped ' +
+        'with a single toggle.',
+      whySimple: 'Automation without syntax',
+      whySimpleText:
+        'A scenario asks “when” and “what to do” in plain words. There is no need to ' +
+        'remember which event and which filter to type.',
+
+      canCollect:
+        'Collect five kinds of thing into a group: rules, skills, hooks, servers, permissions',
+      canToggleGroup: 'Switch a group off with a toggle — all of its members go dark at once',
+      canToggleAutomation: 'Switch an individual scenario off with a toggle without deleting it',
+      canBadge: 'See from a “disabled” badge that a group or a scenario is switched off',
+      canSandbox: 'Run a group’s entire contents in the sandbox at once',
+      canAutomation: 'Describe a scenario in words and get a working hook',
+      canAssistant: 'Fill the group or scenario form with the assistant',
+
+      cantKnow: 'Expect Claude to know about groups: all it sees is the resulting settings',
+      cantMagic: 'Get more from a scenario than a hook can do — it is a hook, just more convenient',
+      cantOverride:
+        'Switch a member back on with its own toggle while a disabled group is ' +
+        'holding it down: the group outranks the individual switch',
+      cantRevive:
+        'Undo a manual switch-off by enabling the group: what you disabled ' +
+        'individually stays disabled',
+      cantGroupEnv:
+        'Switch environments with a group: the variables field is saved but never reaches settings.json',
+      cantNest: 'Nest groups inside one another',
+      cantConflict:
+        'Be told about conflicting settings inside a group: the panel does not compare them',
+
+      storageWhere: 'Where they live',
+      storageWhereValue: 'in the panel’s data, apart from the Claude Code configuration',
+      storageWhy: 'Why separately',
+      storageWhyValue:
+        'Claude Code has no concept of a group — it only sees the resulting settings',
+      storageAuto: 'What reaches the configuration',
+      storageAutoValue: 'compiled scenarios — as ordinary hooks in settings.json',
+      storageMarker: 'How yours are told apart',
+      storageMarkerValue: 'a marker referring back to the scenario is appended to the command',
+
+      flowTitle: 'How a scenario becomes a hook',
+      flowCaption:
+        'The rebuild happens every time a scenario is saved. Hooks written by hand are ' +
+        'left alone: what distinguishes them is the absence of the marker.',
+      flowScenario: 'Scenario',
+      flowScenarioCaption: 'an event and a command',
+      flowCompile: 'Rebuild',
+      flowCompileCaption: 'on every save',
+      flowHook: 'A hook in settings.json',
+      flowHookCaption: 'marked with its origin',
+      flowRun: 'It runs',
+      flowRunCaption: 'like any other hook',
+
+      groupTitle: 'What a group gives you',
+      groupMembers: 'Contents',
+      groupMembersText:
+        'References to existing things — rules, skills, hooks, servers, permissions. One ' +
+        'thing can belong to several groups: no copies are made.',
+      groupToggle: 'The group toggle',
+      groupToggleText:
+        'The switch in the list darkens every member at once: rules move to ' +
+        '“Disabled”, skill folders to skills-disabled, servers to mcpServersDisabled, ' +
+        'hooks disappear from settings.json. Switching it back on restores all of it. ' +
+        'A disabled group carries a badge.',
+      groupEnv: 'Group variables',
+      groupEnvText:
+        'While the group is on, its variables go into the Claude Code settings. That is how ' +
+        'several environments are kept and swapped wholesale.',
+
+      toggleTitle: 'Who outranks whom: the group and the individual toggle',
+      toggleCaption:
+        'There are two independent reasons for a thing to be off: you switched it off ' +
+        'yourself, or a group is holding it down. The panel remembers the two apart, ' +
+        'and a thing is on only once both reasons are gone. Hence the four rules ' +
+        'below — between them they explain every “I switch it on and nothing happens”.',
+      toggleManual: 'A group does not undo a manual switch-off',
+      toggleManualText:
+        'If a member was switched off by its own toggle, enabling the group will not ' +
+        'revive it. These are separate decisions: a group only releases what it ' +
+        'darkened itself.',
+      toggleTwo: 'Two groups hold in turn',
+      toggleTwoText:
+        'A member of two disabled groups comes back only when both are enabled. While ' +
+        'even one is off, it keeps holding the member down.',
+      toggleSingle: 'The individual toggle is weaker than the group',
+      toggleSingleText:
+        'You cannot switch a member back on with its own toggle while a group is ' +
+        'holding it down. The panel answers with success and remembers your choice, ' +
+        'but nothing changes on disk — it stays off until the group is enabled.',
+      toggleDelete: 'Deleting a disabled group releases its members',
+      toggleDeleteText:
+        'The group is gone, so nothing holds them, and the members switch on — all ' +
+        'except those disabled by hand or held by a second disabled group.',
+
+      automationTitle: 'Scenarios: automation in plain words',
+      automationCaption:
+        'Scenarios have no magic of their own. Anything a scenario does, a hook does — the ' +
+        'value is in not having to remember the syntax. Each scenario has its own ' +
+        'toggle: a disabled one is left out of the compiled hooks and carries a badge.',
+      autoWhen: 'When',
+      autoWhenText:
+        'A Claude Code event from a list: before a tool call, at session start, after an ' +
+        'answer. The same as a hook event, but picked from a readable list.',
+      autoWhat: 'What to do',
+      autoWhatText:
+        'The shell command that will run. Plus an optional timeout so a stuck command does ' +
+        'not hold things up.',
+      autoFilter: 'Filter',
+      autoFilterText:
+        'A narrowing: a tool name or a specific skill. For a skill there is a quick picker — ' +
+        'the form fills in the right entry itself.',
+
+      fieldsTitle: 'Fields of a group and a scenario',
+      fieldsCaption: 'Names match the groupSchema and automationSchema schemas.',
+      fieldName: 'The name of the group or scenario.',
+      fieldDescription:
+        'What the group is for. It is what reminds you of the point of the bundle a month later.',
+      fieldMembers: 'The contents: references to rules, skills, hooks, servers and permissions.',
+      fieldEnv: 'Environment variables of the group, one KEY=VALUE per line.',
+      fieldTrigger: 'The scenario event and an optional filter.',
+      fieldAction: 'The command to run and its timeout.',
+      fieldCompiled: 'A reference to the hook the scenario became. Read only.',
+
+      recipesTitle: 'Assembling a bundle for a job',
+      recipe1: 'Create a group and say what it is for',
+      recipe1Text: 'A name and one sentence about the purpose of the bundle is enough.',
+      recipe2: 'Add the contents',
+      recipe2Text:
+        'You pick rules, skills, hooks and servers that already exist. Nothing is recreated; ' +
+        'the group only refers to them.',
+      recipe3: 'Set variables if you need them',
+      recipe3Text: 'They take effect while the group is on and go away when it is switched off.',
+      recipe4: 'Check the bundle in the sandbox',
+      recipe4Text:
+        'The sandbox button runs the whole set at once — you can see whether the settings ' +
+        'argue with each other.',
+
+      notesTitle: 'Things people trip over',
+      notePermTitle: 'Permissions are not carried into the sandbox',
+      notePermText:
+        'Even when they belong to the group. An isolated run has boundaries of its own, and ' +
+        'replacing them with yours would be wrong.',
+      noteRebuildTitle: 'Scenarios are rebuilt on every save',
+      noteRebuildText:
+        'The panel recreates hooks from them and leaves hand-written hooks as they are. ' +
+        'Editing a compiled hook directly is lost at the next rebuild.',
+      noteInvisibleTitle: 'Claude does not know about groups',
+      noteInvisibleText:
+        'It only sees the resulting settings. A group is a way to keep order for yourself, ' +
+        'not something you can ask about in a conversation.',
+      noteDeleteTitle: 'Deleting asks you to type the name',
+      noteDeleteText:
+        'Just as for rules, skills and hooks: the delete button opens a dialog that ' +
+        'waits until you type the name of the group or scenario. The rules and skills ' +
+        'themselves stay — the group only referred to them. And if the group being ' +
+        'deleted was disabled, its members switch on: nothing holds them any more.',
+      noteConflictTitle: 'The panel does not catch conflicts inside a bundle',
+      noteConflictText:
+        'Two rules that contradict each other will sit happily in one group. Only a run will ' +
+        'show it.',
+    },
+
+    plugins: {
+      title: 'Plugins',
+      summary: 'Ready-made bundles of skills, hooks and servers from community catalogues',
+      lead:
+        'A plugin is a bundle of settings someone else put together: usually skills, ' +
+        'hooks and MCP servers for one particular job. Everywhere else in the panel ' +
+        'you configure things yourself; here you take something ready. The section ' +
+        'works differently from its neighbours: the panel does not edit files but ' +
+        'calls the standard Claude Code commands and shows their output as is.',
+
+      whyReady: 'Ready-made instead of hand-rolled',
+      whyReadyText:
+        'A bundle for a job — working with a particular framework, say — is already ' +
+        'assembled and tested. You never have to work out which skills and hooks it needs.',
+      whyUpdate: 'Updated with one button',
+      whyUpdateText:
+        'The author releases a new version, you press update. Your own configuration ' +
+        'cannot do that: it has to be carried over by hand.',
+      whyOfficial: 'Through the standard mechanism',
+      whyOfficialText:
+        'The panel invents no installation of its own; it runs the same commands you would ' +
+        'in the terminal. What is installed behaves the same in both.',
+
+      canCatalog: 'Browse the catalogue of available plugins and search it',
+      canInstall: 'Install a plugin from the catalogue or by identifier by hand',
+      canUpdate: 'Update an installed plugin to a new version',
+      canToggle: 'Switch a plugin off without removing it',
+      canUninstall: 'Remove an installed plugin',
+      canMarketplaces: 'See the list of connected marketplaces and their sources',
+      canSee: 'See where a plugin came from and when it was last updated',
+
+      cantEdit: 'Edit the contents of a plugin: its skills and hooks belong to the author',
+      cantPick: 'Take only part of a plugin — it installs whole',
+      cantCreate: 'Build your own plugin in the panel: here they are only installed',
+      cantOffline: 'Work offline: both the catalogue and installation reach the source',
+
+      storageWhere: 'Who is in charge',
+      storageWhereValue: 'the claude plugin commands — the panel calls them and touches no files',
+      storageId: 'Identifier',
+      storageIdValue:
+        'name@marketplace — plugins with the same name from different sources stay distinct',
+      storageSource: 'Source',
+      storageSourceValue: 'a marketplace, usually a GitHub repository',
+      storageResult: 'What the panel shows',
+      storageResultValue: 'the command output as is — the only source of truth about a failure',
+
+      flowTitle: 'What happens on installation',
+      flowCaption:
+        'This is exactly where the section differs from the others: Claude Code stands ' +
+        'between the panel and the files. So the result is reported in its words.',
+      flowClick: 'A button in the panel',
+      flowClickCaption: 'install or update',
+      flowCli: 'claude plugin',
+      flowCliCaption: 'the standard command',
+      flowFetch: 'Fetched from the marketplace',
+      flowFetchCaption: 'usually a repository',
+      flowReady: 'The plugin is installed',
+      flowReadyCaption: 'it works after a restart',
+
+      fieldsTitle: 'What a plugin shows',
+      fieldsCaption: 'There are no creation forms here: apart from installing, it is read only.',
+      fieldId: 'An identifier of the form name@marketplace. Used for manual installation.',
+      fieldMarketplace: 'The source the plugin came from.',
+      fieldVersion: 'The installed version.',
+      fieldScope: 'The scope the plugin applies to.',
+      fieldInstalled: 'When it was installed and when it was last updated.',
+      fieldCount: 'How many times the plugin has been installed. Catalogue entries only.',
+
+      recipesTitle: 'Installing a plugin',
+      recipe1: 'Open the catalogue',
+      recipe1Text:
+        'It loads on a button rather than up front: there are several hundred entries and ' +
+        'no reason to fetch them on every visit.',
+      recipe2: 'Find what you need with search',
+      recipe2Text: 'Search covers the name, the marketplace and the description.',
+      recipe3: 'Install it and read the output',
+      recipe3Text:
+        'The panel shows the command’s answer in full. If something went wrong, the reason ' +
+        'is written there rather than in the panel interface.',
+      recipe4: 'Restart Claude Code',
+      recipe4Text: 'The plugin’s skills and hooks are picked up on the next start.',
+
+      notesTitle: 'Things people trip over',
+      noteCliTitle: 'This section depends on the CLI',
+      noteCliText:
+        'If claude is not found on the system, nothing here works — unlike the other ' +
+        'sections, which edit files directly.',
+      noteSlowTitle: 'Installation can take a while',
+      noteSlowText:
+        'The command reaches the network and may take minutes. The panel waits for it ' +
+        'and shows the result when it arrives. While any operation runs, the buttons on ' +
+        'the whole page are disabled — plugin commands cannot be interleaved.',
+      noteContentTitle: 'Plugin contents do not show up as yours in other sections',
+      noteContentText:
+        'A plugin’s skills and hooks belong to it. Editing them through the panel is not ' +
+        'possible — an update from the author would overwrite the changes anyway.',
+      noteManualTitle: 'Manual installation is tucked away on purpose',
+      noteManualText:
+        'Installing by identifier is collapsed and sits after the catalogue: it is worth ' +
+        'checking the list first.',
+    },
+
+    env: {
+      title: 'Environment',
+      summary: 'Settings and tokens: two different files and two attitudes to secrets',
+      lead:
+        'Environment variables are how a value reaches a place it should never be ' +
+        'hard-coded into: an access token, an instance address, a mode flag. This ' +
+        'section manages two files at once, and the difference between them matters: ' +
+        'one is read by Claude Code itself, the other exists purely for secrets and ' +
+        'never travels with your configuration.',
+
+      whySeparate: 'Secrets apart from settings',
+      whySeparateText:
+        'Tokens live in their own file rather than in the shared configuration. You can ' +
+        'show, export or copy that configuration without carrying keys along.',
+      whyMasked: 'The value is never revealed by accident',
+      whyMaskedText:
+        'Secrets arrive from the server already masked — only the start and the tail are ' +
+        'visible. The full value is fetched separately and only on your action.',
+      whyBulk: 'A whole .env moves at once',
+      whyBulkText:
+        'A batch of variables can be pasted line by line as is. The panel files secrets ' +
+        'and ordinary settings into different places itself.',
+
+      canTwo: 'Keep variables in two places: for Claude Code and for launching MCP servers',
+      canReveal: 'Reveal the full value of a secret with a button',
+      canBulkAdd: 'Paste a batch of KEY=value lines, up to a whole .env',
+      canComment: 'Leave a comment: where the value comes from or what it is for',
+      canAssistant: 'Fill the form with the assistant by describing the variable in words',
+      canAuto: 'Rely on detection: a variable with TOKEN in its name goes to the secrets file',
+
+      cantEncrypt:
+        'Encrypt the values: the token file is protected by file permissions, not a cipher',
+      cantEdit:
+        'Adjust a secret without retyping it: the panel does not know the old value — it ' +
+        'only ever received it masked',
+      cantScope: 'Split variables per project — the set is shared',
+      cantSee: 'See which variable actually reached a process: the panel only writes them',
+      cantLocal:
+        'Edit or delete variables from settings.local.json: they are listed with a ' +
+        '“local” badge, but the panel never writes to that file',
+
+      storageSettings: 'Settings',
+      storageSettingsValue: '~/.claude/settings.json → the env key',
+      storageLocal: 'The personal file',
+      storageLocalValue:
+        '~/.claude/settings.local.json → read and written; entries carry a "local" badge',
+      storageSecrets: 'Secrets',
+      storageSecretsValue: '~/.claude/.mcp-secrets.env',
+      storageWhoReads: 'Who reads what',
+      storageWhoReadsValue:
+        'the first file is read by Claude Code, the second by the MCP server launcher',
+      storageDetect: 'How a secret is detected',
+      storageDetectValue: 'by name: TOKEN, SECRET, KEY, PASSWORD, PAT, CREDENTIAL',
+
+      flowTitle: 'Where a variable ends up',
+      flowCaption:
+        'Choosing the file is the real decision in this form. Everything else follows: who ' +
+        'reads the value, and whether it is masked in the interface.',
+      flowName: 'Variable name',
+      flowNameCaption: 'upper case with underscores',
+      flowDetect: 'Does it look like a secret?',
+      flowDetectCaption: 'checked by name',
+      flowSecrets: '.mcp-secrets.env',
+      flowSecretsCaption: 'the value is masked',
+      flowSettings: 'settings.json',
+      flowSettingsCaption: 'the value is shown as is',
+
+      placesTitle: 'Two files, two jobs',
+      placeSettings: 'Claude Code settings',
+      placeSettingsText:
+        'Values Claude Code itself sees at launch. Everything non-secret goes here: modes, ' +
+        'addresses, behaviour flags.',
+      placeSecrets: 'The token file',
+      placeSecretsText:
+        'A separate file read by the MCP server launcher. It exists precisely so that keys ' +
+        'stay out of the shared configuration, which gets shown, copied and exported more ' +
+        'often than people think.',
+
+      fieldsTitle: 'Fields of a variable',
+      fieldsCaption: 'Names match the envVarDraftSchema schema.',
+      fieldKey: 'The variable name in upper case with underscores.',
+      fieldValue:
+        'The value. When editing a secret the field is empty: the panel does not know the ' +
+        'old one.',
+      fieldSource: 'Where to save it: settings — visible to Claude Code, secrets — the token file.',
+      fieldIsSecret:
+        'Whether the variable counts as a secret. Not set by hand — detected from the name.',
+      fieldComment:
+        'A comment above the variable in the file: where the value comes from or what it is for.',
+
+      recipesTitle: 'Adding a token for an MCP server',
+      recipe1: 'Create a variable with a clear name',
+      recipe1Text:
+        'GITLAB_PERSONAL_ACCESS_TOKEN — the word TOKEN makes the panel file it under ' +
+        'secrets and pick the right file.',
+      recipe2: 'Write down where the value came from',
+      recipe2Text:
+        'The comment is stored next to the variable in the file. Six months later it is the ' +
+        'only thing that explains where to reissue the key.',
+      recipe3: 'Reference it in the server configuration',
+      recipe3Text:
+        'In the MCP section, name the variable rather than the value. The token itself must ' +
+        'never reach the shared configuration file.',
+      recipe4: 'Restart Claude Code',
+      recipe4Text: 'Variables are read at startup — a running session will not see new ones.',
+
+      notesTitle: 'Things people trip over',
+      noteRewriteTitle: 'A secret is retyped when edited',
+      noteRewriteText:
+        'The panel received the value masked and cannot put it back: a string of dots would ' +
+        'end up in the file. The field is deliberately left empty.',
+      noteDetectTitle: 'Secret detection works by name',
+      noteDetectText:
+        'A variable called API_ENDPOINT lands in ordinary settings even if you keep ' +
+        'something sensitive in it. Check the chosen file before saving: the word lists ' +
+        'used by the form and by the server do not match exactly, and a name containing ' +
+        'CREDENTIAL may be offered as an ordinary setting.',
+      noteLocalTitle: 'Variables from settings.local.json are shown, nothing more',
+      noteLocalText:
+        'The panel reads both the main settings.json and the personal ' +
+        'settings.local.json, so the list shows everything that will really reach the ' +
+        'environment. Entries from the personal file carry a “local” badge: the value ' +
+        'can be revealed, but editing and deleting them is closed, and trying it ' +
+        'through the API is refused. The panel never writes to that file — edit it by ' +
+        'hand.',
+      noteCommentsTitle: 'Comments in the token file survive',
+      noteCommentsText:
+        'The panel rewrites the file but carries the comments above variables across. Hand ' +
+        'edits are not lost.',
+      noteRevealTitle: 'Revealing a value is a separate request',
+      noteRevealText:
+        'The full text of a secret does not travel with the list: it is fetched only on a ' +
+        'click. The default behaviour can be changed in the application settings.',
+    },
+
+    mcp: {
+      title: 'MCP servers',
+      summary: 'External tools: giving Claude access to your tracker, database or browser',
+      lead:
+        'An MCP server is a program that hands Claude new tools: file an issue in a ' +
+        'tracker, query a database, drive a browser. Skills and rules change ' +
+        'behaviour; a server extends capability. Without one, Claude physically ' +
+        'cannot reach your GitLab.',
+
+      whyTools: 'New abilities, not new instructions',
+      whyToolsText:
+        'A connected server adds tools Claude did not have. It is the only way to give ' +
+        'it access to an external system.',
+      whyCheck: 'Checked before the work',
+      whyCheckText:
+        'The connection button shakes hands with the server over the MCP protocol and ' +
+        'asks for its tool list. Whether it really answers is visible before you find ' +
+        'out in the middle of a task.',
+      whyImport: 'Moves as a ready configuration',
+      whyImportText:
+        'Server setup usually arrives as a chunk of JSON. You can paste it whole — no ' +
+        'need to pick the fields apart by hand.',
+
+      canPreset: 'Fill the form from a preset for common servers',
+      canImport:
+        'Paste a whole JSON configuration: the “Several from JSON” mode creates every ' +
+        'server described in it',
+      canAssistant: 'Fill the form with the assistant by describing the server in words',
+      canHealth:
+        'Check the connection with a real MCP handshake on any transport and see the ' +
+        'number of tools',
+      canProbe:
+        'Call a server tool in the sandbox and see the real answer — the same on ' +
+        'stdio, http and sse',
+      canToggle: 'Switch a server off without deleting its configuration',
+      canTransport: 'Connect a server over one of three transports',
+      canHeaders: 'Set request headers for http and sse — for authorisation, for instance',
+
+      cantInstall:
+        'Install the server itself: the panel configures a connection, it does not ' +
+        'install software',
+      cantSecrets:
+        'Keep passwords here: values from this form land in the shared configuration file',
+      cantAuto: 'Check connections automatically on open — starting a server costs time',
+      cantPerTool:
+        'Enable individual tools of a server: a server connects whole, and limits are ' +
+        'set through permissions',
+
+      storageFile: 'Where it is stored',
+      storageFileValue: '~/.claude.json — outside the .claude directory',
+      storageWhy: 'Why separately',
+      storageWhyValue: 'this is a shared Claude Code file; the panel only rewrites its own section',
+      storageOff: 'Disabled ones',
+      storageOffValue: 'move to the mcpServersDisabled key, which Claude Code ignores',
+      storageRestart: 'When it takes effect',
+      storageRestartValue: 'after Claude Code is restarted',
+
+      flowTitle: 'How a server’s tools reach Claude',
+      flowCaption:
+        'A server is a separate process. Claude Code starts it at launch, asks for the ' +
+        'tool list, and calls the tools as they are needed.',
+      flowConfig: 'Server configuration',
+      flowConfigCaption: 'a command or an address',
+      flowStart: 'Claude Code starts it',
+      flowStartCaption: 'when a session begins',
+      flowList: 'The server lists tools',
+      flowListCaption: 'with their arguments',
+      flowUse: 'Claude calls them',
+      flowUseCaption: 'when the task calls for it',
+
+      transportTitle: 'Three transports: how the panel talks to a server',
+      transportCaption:
+        'The transport decides which fields the form shows. Showing them all at once was ' +
+        'deliberately avoided.',
+      transportStdio: 'stdio',
+      transportStdioText:
+        'The server runs as a local program and talks over streams. Needs a command and ' +
+        'arguments. The most common case: the server is fetched with npx.',
+      transportSse: 'sse',
+      transportSseText:
+        'The server is already running and listening on an address, and answers stream ' +
+        'back. Needs the address, plus headers if the server sits behind ' +
+        'authorisation: they go into the requests and into opening the stream itself. ' +
+        'This is how local apps with a developer mode connect.',
+      transportHttp: 'http',
+      transportHttpText:
+        'Ordinary requests to an address. Needs the address and, where required, ' +
+        'authorisation headers. Without them a token-protected server will not even ' +
+        'let the check through.',
+
+      presetsTitle: 'Ready-made presets',
+      presetsCaption:
+        'They fill in the transport, the command and the variables. Your name is never ' +
+        'overwritten once you have typed one.',
+      presetFs: 'File system',
+      presetFsText:
+        'Access to a chosen directory: reading and writing files outside the working folder.',
+      presetGithub: 'GitHub',
+      presetGithubText: 'Repositories, issues, pull requests. Needs a personal access token.',
+      presetGitlab: 'GitLab',
+      presetGitlabText:
+        'The same for GitLab: the address of your instance and a personal token. Both go ' +
+        'in as variables.',
+      presetPostgres: 'PostgreSQL',
+      presetPostgresText: 'Database queries over a connection string.',
+      presetPlaywright: 'Playwright',
+      presetPlaywrightText:
+        'Driving a browser: open a page, click, take a screenshot. This is where live ' +
+        'layout checking comes from.',
+      presetSse: 'Local SSE server',
+      presetSseText:
+        'A starting point for an application already running and listening on this machine.',
+
+      importTitle: 'The “Several from JSON” mode',
+      importCaption:
+        'Both shapes are accepted: a wrapper with an mcpServers key, and a plain object ' +
+        'of servers. The transport is worked out from the presence of an address rather ' +
+        'than a type field — different sources name that field differently.',
+      importNote:
+        'Servers are created one at a time rather than all at once: the configuration ' +
+        'file is shared, and parallel writes would overwrite each other.',
+
+      fieldsTitle: 'Fields of a server',
+      fieldsCaption: 'Names match the mcpServerDraftSchema schema.',
+      fieldName:
+        'The server name in the configuration. Also the identifier and the prefix used in ' +
+        'permissions.',
+      fieldTransport: 'How the panel talks to the server: stdio, sse or http.',
+      fieldCommand: 'The launch command. For stdio only, npx for example.',
+      fieldArgs: 'Command arguments. Typed as one space-separated line.',
+      fieldUrl: 'The server address. For sse and http only.',
+      fieldEnv:
+        'Environment variables, one KEY=VALUE per line. What belongs here are references ' +
+        'to variables, not the secrets themselves.',
+      fieldHeaders:
+        'Request headers, one Name=value per line — the same shape as environment ' +
+        'variables. For http and sse only: for stdio the form clears them.',
+      fieldHealth: 'Connection state from the last check, plus the reason if it failed. Read only.',
+      fieldTools: 'How many tools the server reported during the check. Read only.',
+
+      recipesTitle: 'Connecting a server that needs a token',
+      recipe1: 'Take a preset',
+      recipe1Text:
+        'It fills in the transport and the command and tells you which variables are needed.',
+      recipe2: 'Put the token in the Environment section',
+      recipe2Text:
+        'Secrets live in a separate token file, not in the shared configuration. The panel ' +
+        'files a variable with TOKEN in its name under secrets by itself.',
+      recipe3: 'Reference the variable, not the value',
+      recipe3Text:
+        'In the server variables field, name the key. The token itself should never reach ' +
+        'the configuration file.',
+      recipe4: 'Save and check the connection',
+      recipe4Text:
+        'The check button on the card starts the server and shows the tool count. Zero ' +
+        'tools on a successful connection usually means a bad token.',
+
+      notesTitle: 'Things people trip over',
+      noteSecretTitle: 'Secrets do not belong here',
+      noteSecretText:
+        'Server configuration lives in a shared file that easily leaks along with a ' +
+        'settings dump. The variables field takes the name of a key, while the value ' +
+        'itself stays in the Environment section.',
+      noteWindowsTitle: 'On Windows npx runs through a shell',
+      noteWindowsText:
+        'The panel does that itself, and escapes the arguments itself too: a path with ' +
+        'spaces would otherwise split into two arguments.',
+      noteHandshakeTitle: 'The connection check is a handshake, not a port ping',
+      noteHandshakeText:
+        'The panel greets the server over the MCP protocol using the official library ' +
+        'and asks for its tool list — the same for stdio, http and sse. Previously ' +
+        'http and sse were only asked “is this address alive”, so any unrelated web ' +
+        'server on the same port passed the check. What follows in practice: a green ' +
+        'answer now means there really is an MCP server there, and the tool count ' +
+        'beside it is what it actually reported.',
+      noteHealthTitle: 'The connection check does not run by itself',
+      noteHealthText:
+        'Starting a server costs time, so opening the page shows the state from the last ' +
+        'check. A fresh one is a button away.',
+      noteRestartTitle: 'Tools appear after a restart',
+      noteRestartText:
+        'Claude Code asks for the tool list when a session starts. A server connected just ' +
+        'now is not there in an open conversation.',
+    },
+
+    permissions: {
+      title: 'Permissions',
+      summary: 'What Claude does without asking, what it asks about, and what it never does',
+      lead:
+        'A permission is a tool pattern plus a decision about it: allow, ask, or deny. ' +
+        'Rules and skills explain to Claude how to behave; permissions draw a line it ' +
+        'will not cross even if it decides that would be better. This is the one ' +
+        'section where a refusal is mechanical.',
+
+      whyHard: 'A boundary, not a request',
+      whyHardText:
+        'A rule can be interpreted; a permission cannot. Denying a command means the ' +
+        'command does not run, whatever the model reasons.',
+      whyQuiet: 'Fewer pointless questions',
+      whyQuietText:
+        'Actions you always allow anyway — reading files, git status — can be moved to ' +
+        'allowed so you stop confirming them by hand.',
+      whySystem: 'In plain language',
+      whySystemText:
+        'The System tab shows not raw patterns but ordinary actions with a risk rating: ' +
+        '“any shell commands”, “deleting files”, “pushing to a remote”.',
+
+      canThree: 'Assign one of three decisions: allow, ask, deny',
+      canPattern: 'Narrow a rule to a specific command: not all of Bash, only git push',
+      canPreset: 'Configure a common action from a ready list in one click',
+      canBulk:
+        'Create a batch of rules as a list, one per line: one decision is chosen for ' +
+        'the whole list',
+      canMcp: 'Manage permissions for MCP server tools on a separate tab',
+      canSee: 'See which common actions are still unconfigured',
+      canAssistant: 'Fill the form with the assistant by describing the rule in words',
+
+      cantWhy: 'Find out why Claude asked for confirmation of a particular action',
+      cantOrderCustom: 'Set your own resolution order: the priority of decisions is fixed',
+      cantValidate:
+        'Have a pattern checked for typos: the panel only watches bracket pairs, the rest ' +
+        'is parsed by Claude Code itself',
+      cantProject: 'Split permissions per project — the panel keeps one shared set',
+      cantLocal:
+        'Edit or delete permissions from settings.local.json: they are listed with a ' +
+        '“local” badge, but the panel never writes to that file',
+
+      storageFile: 'Where it is stored',
+      storageFileValue: '~/.claude/settings.json → permissions.allow, .ask, .deny',
+      storageLocal: 'The personal file',
+      storageLocalValue:
+        '~/.claude/settings.local.json → read and written; entries carry a "local" badge',
+      storageId: 'Rule identifier',
+      storageIdValue: 'the decision and the pattern together — it changes with the decision',
+      storageMove: 'Changing the decision',
+      storageMoveValue: 'the rule physically moves between the three lists',
+      storageOs: 'Your system matters',
+      storageOsValue: 'the set of dangerous commands and the shape of paths depend on your OS',
+
+      priorityTitle: 'Priority: what beats what',
+      priorityCaption:
+        'One action can fall under several rules. The strictest wins: a denial beats a ' +
+        'question, a question beats an allowance.',
+      priorityTop: 'stronger',
+      priorityBottom: 'weaker',
+      priorityDeny: 'never runs',
+      priorityAsk: 'needs confirmation',
+      priorityAllow: 'runs without asking',
+      priorityNote:
+        'Which has a practical consequence: a broad allowance such as Bash is safer ' +
+        'balanced by narrow denials than by narrowing the allowance itself.',
+
+      patternTitle: 'What a pattern is made of',
+      patternCaption: 'A pattern is a tool name, narrowed where needed down to a specific command.',
+      patternTool: 'A whole tool',
+      patternToolText:
+        'Read, Write, WebFetch, Bash — the rule covers every call of that tool. The ' +
+        'broadest option.',
+      patternNarrow: 'Narrowed down',
+      patternNarrowText:
+        'Bash(git push:*) — only pushing to a remote; other shell commands are untouched. ' +
+        'The asterisk stands for the rest of the command.',
+      patternMcp: 'An MCP server tool',
+      patternMcpText:
+        'mcp__server__tool — a rule for one tool of a connected server. There can be over ' +
+        'a hundred of these, which is why they get their own tab.',
+
+      tabsTitle: 'The three tabs of the section',
+      tabSystem: 'System',
+      tabSystemText:
+        'Common actions by category: files, shell, network, git, tools. Each has a risk ' +
+        'rating and its current state. “Not set” means there is no rule and Claude Code ' +
+        'decides by its own defaults.',
+      tabMcp: 'MCP',
+      tabMcpText:
+        'Permissions for the tools of connected servers, grouped by server. Kept apart ' +
+        'because otherwise they swamp the general list.',
+      tabAll: 'All',
+      tabAllText:
+        'A flat list of every rule with a filter by decision and a search by pattern. This ' +
+        'is where you go to find one specific rule.',
+
+      risksTitle: 'Risk ratings on the System tab',
+      riskLow: 'Low',
+      riskLowText:
+        'The action changes nothing and goes nowhere: reading files, git status, web ' +
+        'search, calling skills.',
+      riskMedium: 'Medium',
+      riskMediumText:
+        'It changes files or reaches the network: editing and creating files, committing, ' +
+        'fetching pages, running subordinate agents.',
+      riskHigh: 'High',
+      riskHighText:
+        'Irreversible or visible to others: any shell command, deleting files, pushing to ' +
+        'a remote.',
+
+      fieldsTitle: 'Fields of a rule',
+      fieldsCaption: 'Names match the permissionDraftSchema schema.',
+      fieldPattern:
+        'The pattern: a whole tool name or a narrowed one, or an MCP server tool in the ' +
+        'form mcp__server__tool.',
+      fieldDecision: 'The decision: allow — no questions, ask — confirm first, deny — refuse.',
+      fieldGroups: 'Groups the rule belongs to.',
+
+      recipesTitle: 'Closing the dangerous and opening the routine',
+      recipe1: 'Start on the System tab',
+      recipe1Text:
+        'It shows what is still unconfigured. The “Configure” button opens the form with ' +
+        'the pattern already filled in — nothing to invent.',
+      recipe2: 'Deny the irreversible',
+      recipe2Text:
+        'Deleting files from the shell and pushing to a remote usually go into deny: you ' +
+        'can always run them by hand when you really mean to.',
+      recipe3: 'Allow the routine',
+      recipe3Text:
+        'Confirming reads and git status every time is pointless — move them to allowed.',
+      recipe4: 'Leave the rest on “ask”',
+      recipe4Text:
+        'The middle decision is more useful than it looks: the action still happens, but ' +
+        'you see it before it does.',
+
+      notesTitle: 'Things people trip over',
+      noteDenyTitle: 'A denial beats an allowance',
+      noteDenyText:
+        'If the same pattern is in both allowed and denied, denial wins. The redundant ' +
+        'allowance is not highlighted anywhere.',
+      noteIdTitle: 'Changing the decision changes the identifier',
+      noteIdText:
+        'The rule physically moves between lists in the file, so a link to it stops ' +
+        'opening the right thing once the decision changes.',
+      noteExactTitle: 'The System tab matches patterns literally',
+      noteExactText:
+        'A preset counts as configured only on an exact match. Bash(git push:*) and ' +
+        'Bash(git push origin:*) are different things to it, and the second shows up as ' +
+        '“not set”.',
+      noteLocalTitle: 'Permissions from settings.local.json are shown, nothing more',
+      noteLocalText:
+        'The panel reads both files — otherwise the list could not answer “why is ' +
+        'this allowed”. Entries from the personal file carry a “local” badge: they ' +
+        'are visible and they count, but editing and deleting them is closed, and ' +
+        'trying it through the API is refused. The panel never writes to that file — ' +
+        'edit it by hand. Priority is shared regardless: a deny in the personal file ' +
+        'beats an allow in the main one exactly as it would otherwise.',
+      noteChatTitle: 'There is nothing to confirm in the panel chat',
+      noteChatText:
+        'The “ask” decision is meant for an interactive terminal. The panel chat has no ' +
+        'confirmation buttons, so there the edit toggle does the job wholesale.',
+    },
+
+    scripts: {
+      title: 'Scripts',
+      summary: 'The code hooks run: written, edited and tested here',
+      lead:
+        'A hook answers “when to run”; a script answers “what exactly to do”. These ' +
+        'are ordinary files in the hooks/ directory: you can write them yourself, or ' +
+        'let the panel create one for you from a hook template. This section shows ' +
+        'the whole directory, including files not wired to any hook.',
+
+      whyEdit: 'Edited in one place',
+      whyEditText:
+        'No hunting for the file on disk and opening an editor: the code is visible ' +
+        'and editable right in the card, next to the file tree.',
+      whyOrphans: 'Unused files are visible',
+      whyOrphansText:
+        'The panel matches files against hooks and marks the ones nothing points to. ' +
+        'Such a file was either never wired up or is left over from a deleted hook.',
+      whyTest: 'Tested without the model',
+      whyTestText:
+        'A script can be run against a prepared event straight from its card: you see ' +
+        'the output, the exit code and the decision. Fast, and it uses none of your limit.',
+
+      canWrite: 'Write and edit code right in the panel',
+      canTemplate: 'Start from a ready scaffold instead of an empty file',
+      canBulkTemplates: 'Create several scaffolds at once by ticking the ones you want',
+      canProbe: 'Run a script against nine prepared events',
+      canSee: 'See the whole hooks/ directory, including unwired files',
+      canExpand: 'Expand a file’s contents right in the list, without opening the form',
+      canRename: 'Rename a file while editing — unlike skills, the name is not locked here',
+      canLang:
+        'Use more than Node: .mjs, .cjs, .js, .ts, .sh, .ps1 and .py are listed — but .ts ' +
+        'goes to bash in the sandbox, there is no separate TypeScript runner',
+      canAssistant: 'Ask the assistant to write the body of the script from a description',
+
+      cantSchedule: 'Run a script on a schedule — only on a Claude Code event',
+      cantInstall: 'Install dependencies: a script gets whatever is already on the system',
+      cantDebug: 'Step through it in a debugger — only output and the exit code are visible',
+      cantAuto:
+        'Expect a file created here to work on its own: it still has to be bound to an ' +
+        'event by a hook',
+
+      storageFolder: 'Directory',
+      storageExt: 'What counts as a script',
+      storageExtValue: 'files with the extensions .mjs .cjs .js .ts .sh .ps1 .py',
+      storageDesc: 'Where the description comes from',
+      storageDescValue: 'the first comment lines at the top of the file',
+      storageUsed: 'How “in use” is decided',
+      storageUsedValue: 'the file name appears in the command of at least one hook',
+
+      flowTitle: 'How a script receives an event and answers',
+      flowCaption:
+        'A script talks to Claude Code through streams: the event arrives on input, the ' +
+        'answer leaves on output. Nothing extra to wire up.',
+      flowStdin: 'stdin',
+      flowStdinCaption: 'the event as JSON',
+      flowCode: 'Your code',
+      flowCodeCaption: 'decides what to do',
+      flowStdout: 'stdout',
+      flowStdoutCaption: 'text or a JSON decision',
+      flowExit: 'Exit code',
+      flowExitCaption: '0 to pass, 2 to refuse',
+
+      answersTitle: 'Two ways to answer',
+      answersCaption:
+        'Both work. The second one came later and is easier: the decision and the reason ' +
+        'travel together, without leaning on a numeric code.',
+      answerExit: 'With an exit code',
+      answerExitText:
+        'Exit with code 2 and write the reason to stderr. The action stops, and Claude ' +
+        'sees the reason.',
+      answerJson: 'With a JSON answer',
+      answerJsonText:
+        'Print a decision to stdout with a permissionDecision field — deny, ask or ' +
+        'allow — plus an explanation. The exit code then does not matter.',
+
+      templatesTitle: 'Ready scaffolds',
+      templatesCaption:
+        'Available when creating only, so a template button never wipes code you have ' +
+        'written. The file name is filled in only if the field is still empty.',
+      bulkTitle: 'Several at once',
+      bulkText:
+        'The second creation mode: tick several scaffolds and the panel creates them ' +
+        'one by one, showing progress. Handy when you want the whole set rather than ' +
+        'one file at a time.',
+      tplBlank: 'Blank scaffold',
+      tplBlankText:
+        'Reads the event from stdin, with comments pointing at where things are and room ' +
+        'for your logic.',
+      tplGuard: 'Command guard',
+      tplGuardText:
+        'Checks the command against dangerous patterns and answers with a JSON decision ' +
+        'asking for confirmation. No exit code needed — the decision travels in the answer.',
+      tplFormat: 'Format on save',
+      tplFormatText:
+        'Takes the path of the changed file, filters by extension and runs prettier over ' +
+        'it. A formatter error is deliberately swallowed so it never gets in the way.',
+      tplBrief: 'Session briefing',
+      tplBriefText:
+        'Reads nothing and immediately prints extra context for the session — a reminder ' +
+        'to check the working notes.',
+
+      fieldsTitle: 'Fields of a script',
+      fieldsCaption:
+        'There are only two fields: the rest is file information the panel shows itself.',
+      fieldName:
+        'The file name with its extension, for example notify.mjs. The extension decides ' +
+        'what runs the file.',
+      fieldContent: 'The full script code.',
+      fieldPath: 'The path on disk. Read only.',
+      fieldIsUsed:
+        'Whether the file is bound to at least one hook. Worked out by matching against ' +
+        'hook commands.',
+      fieldSize: 'File size and last modification date. Shown in the list row.',
+
+      recipesTitle: 'Writing your own script',
+      recipe1: 'Create a file from a scaffold',
+      recipe1Text:
+        'Take the blank scaffold — it already reads the event and points at where the ' +
+        'command and the file path live.',
+      recipe2: 'Write the logic and save',
+      recipe2Text: 'The decision can come back as exit code 2 or as a JSON answer — both work.',
+      recipe3: 'Run it against the prepared events',
+      recipe3Text:
+        'The sandbox button on the card. It has a safe command, a destructive one and a ' +
+        'token write — you see what the script caught.',
+      recipe4: 'Bind it to an event',
+      recipe4Text:
+        'A file does not run by itself. Create a hook pointing at this script, or it stays ' +
+        'marked “unused”.',
+
+      notesTitle: 'Things people trip over',
+      noteUnusedTitle: '“Unused” is not an error, but worth a look',
+      noteUnusedText:
+        'That mark goes on files whose name appears in no hook command. Usually it means ' +
+        'a forgotten binding or a leftover from a deleted hook.',
+      noteDeleteTitle: 'Deleting a script in use breaks its hook silently',
+      noteDeleteText:
+        'The hook stays in the settings but has nothing to run — and no error appears. The ' +
+        'panel warns separately about this kind of deletion.',
+      noteInterpreterTitle: 'The extension decides what runs it',
+      noteInterpreterText:
+        '.mjs, .cjs and .js go through node, .py through python, anything else through ' +
+        'bash. .ps1 is the special case: powershell on Windows, pwsh on Linux and macOS ' +
+        'if it is installed. The panel checks for it before running and says so plainly ' +
+        'when it is missing, instead of failing with a cryptic error. Other interpreters ' +
+        'may be missing too.',
+      noteRestartTitle: 'Editing code needs no restart',
+      noteRestartText:
+        'A script is read from disk when it runs, so new code takes effect on the next ' +
+        'event. A restart is only needed when the hooks themselves change.',
+    },
+
+    hooks: {
+      title: 'Hooks',
+      summary: 'Commands that run by themselves on Claude Code events',
+      lead:
+        'A hook is a command tied to an event: before a tool is called, after a file ' +
+        'is written, when a session starts. Unlike rules and skills this is not a ' +
+        'request to the model but ordinary code that always runs. So hooks are for ' +
+        'the things you cannot leave to judgement: hard stops, auto-formatting, ' +
+        'preparing context.',
+
+      whyGuarantee: 'It always fires',
+      whyGuaranteeText:
+        'A rule can be interpreted by the model however it likes; a hook cannot. It ' +
+        'is your code, and it runs on every event no matter what the model decided.',
+      whyBlock: 'It can say no',
+      whyBlockText:
+        'Two events — before a tool call and when you submit a message — can stop the ' +
+        'action. That is how a guard against rm -rf or writing a token into a file is ' +
+        'built.',
+      whyAutomate: 'It removes manual chores',
+      whyAutomateText:
+        'Formatting on save, a briefing at session start, a checkpoint before the ' +
+        'context is compacted — things you would otherwise have to remember and do ' +
+        'yourself.',
+
+      canPreset: 'Build a hook from a ready-made preset in one click',
+      canScript: 'Let the panel create the script file and fill in the launch command',
+      canMatcher: 'Limit the event to specific tools with checkboxes',
+      canAssistant: 'Fill the form with the assistant by describing the task in words',
+      canProbe: 'Run the hook against a prepared event — instantly, without using your limit',
+      canBulkPresets: 'Create several presets at once by ticking the ones you want',
+      canToggle: 'Switch a hook off without losing its settings',
+      canTimeout: 'Set a timeout so a stuck script does not hold up the work',
+
+      cantOrder: 'Set the order between hooks on the same event',
+      cantDebug: 'Step through a script in a debugger — only runs and output',
+      cantBlockAll: 'Block an action on any event: only two of the nine can stop anything',
+      cantStable:
+        'Rely on a stable link: a hook identifier depends on its position in the file ' +
+        'and changes when things are reordered',
+      cantLocal:
+        'Edit or delete hooks from settings.local.json: they are listed with a ' +
+        '“local” badge, but the panel never writes to that file',
+
+      storageFile: 'Settings',
+      storageFileValue: '~/.claude/settings.json → the hooks key',
+      storageLocal: 'The personal file',
+      storageLocalValue:
+        '~/.claude/settings.local.json → read and written; entries carry a "local" badge',
+      storageScripts: 'Scripts',
+      storageStructure: 'How it is stored',
+      storageStructureValue: 'event → filter → commands; the panel flattens that into a plain list',
+      storageOff: 'Disabled ones',
+      storageOffValue: 'never written to settings.json at all — their text is kept by the panel',
+
+      flowTitle: 'How a hook fires',
+      flowCaption:
+        'Exit code 2 means refusal. On the events that can block, it stops the ' +
+        'action; on the rest it only writes to the log.',
+      flowEvent: 'Event',
+      flowEventCaption: 'PreToolUse, for example',
+      flowMatcher: 'Filter',
+      flowMatcherCaption: 'does the tool match',
+      flowScript: 'Your script',
+      flowScriptCaption: 'gets the event on stdin',
+      flowDecision: 'Decision',
+      flowDecisionCaption: 'pass, ask, or refuse',
+
+      badgeBlocks: 'can stop it',
+      badgeMatcher: 'has a filter',
+
+      evtPreToolUse:
+        'Before Claude calls a tool. This is where hard stops go: refuse a dangerous ' +
+        'command or demand confirmation.',
+      evtPostToolUse:
+        'Right after a tool has finished. Reacting to the result: format the changed ' +
+        'file, run a linter, record the event.',
+      evtUserPromptSubmit:
+        'Once you send a message, before Claude has seen it. You can append context to ' +
+        'the request or bring up a rule by keyword.',
+      evtNotification:
+        'When Claude Code shows a notification. Useful for passing it on: a sound, a ' +
+        'system window, a message in a chat app.',
+      evtStop:
+        'When Claude has finished answering. Wrap-up work: collect a report, signal ' +
+        'completion.',
+      evtSubagentStop:
+        'When a subordinate agent has finished. Handling the results of background tasks.',
+      evtSessionStart:
+        'When a session starts or resumes. Preparing context: repository state, open ' +
+        'tasks, an environment check.',
+      evtSessionEnd: 'When a session ends. Tidying up: save notes, close temporary files.',
+      evtPreCompact:
+        'Before an overflowing context is compacted. The last chance to write what ' +
+        'matters to a file — after compaction the details are gone.',
+
+      eventsTitle: 'Nine events: what fires when',
+      eventsCaption:
+        'Only PreToolUse and UserPromptSubmit can block an action. Four events support ' +
+        'a tool filter; on the others a hook always fires.',
+
+      templatesTitle: 'What a hook does: four templates',
+      templatesCaption:
+        'The template decides what code the panel writes for you and which fields the ' +
+        'form shows.',
+      tplMessage: 'Message',
+      tplMessageText:
+        'Prints text that Claude will see. That is how a reminder at session start or ' +
+        'before compaction is added.',
+      tplGuard: 'Guard',
+      tplGuardText:
+        'Looks for your patterns in the command or the file path and, on a match, ' +
+        'stops the action with an explanation. Patterns are listed comma-separated.',
+      tplShell: 'Shell command',
+      tplShellText:
+        'Runs an ordinary shell command — a formatter over the saved file, say. The ' +
+        'action itself is not blocked.',
+      tplBlank: 'Blank scaffold',
+      tplBlankText:
+        'A ready file that reads the event from stdin with room for your own logic. ' +
+        'The place to start for anything custom.',
+
+      presetsTitle: 'Ready-made presets',
+      presetsCaption:
+        'They fill in the event, filter, template and every related field at once. ' +
+        'Available when creating only, so a configured hook is never overwritten.',
+      bulkTitle: 'Several at once',
+      bulkText:
+        'The second creation mode: instead of one form, a list of presets with ' +
+        'checkboxes. Tick what you need and the panel creates them one by one, showing ' +
+        'progress. A set of guards goes in with one action rather than five trips ' +
+        'through the form. A failure on one preset does not cancel the rest, and what ' +
+        'was created is edited as usual afterwards.',
+      presetDestructive: 'Destructive command guard',
+      presetDestructiveText:
+        'Before Bash and PowerShell calls it checks the command for rm -rf, DROP ' +
+        'TABLE, TRUNCATE, kubectl delete, docker volume rm — and stops it.',
+      presetSecret: 'Secret guard',
+      presetSecretText:
+        'Before a file is written or edited it looks for token prefixes in the ' +
+        'content: glpat-, ghp_, sk-, AKIA, the start of a private key.',
+      presetFormat: 'Format on save',
+      presetFormatText: 'After a file is written or edited it runs prettier over it.',
+      presetBrief: 'Session briefing',
+      presetBriefText: 'At session start it reminds you to check the project working notes.',
+      presetCheckpoint: 'Checkpoint before compaction',
+      presetCheckpointText:
+        'Before an overflowing context is compacted it reminds you to write progress ' +
+        'to a file — after compaction the details cannot be recovered.',
+
+      fieldsTitle: 'Fields of a hook',
+      fieldsCaption: 'Names match the hookDraftSchema schema.',
+      fieldEvent: 'The Claude Code event the hook runs on. One of the nine.',
+      fieldMatchers:
+        'A filter by tool. Picked with checkboxes and written to the config joined by ' +
+        'a vertical bar — syntax you do not need to remember.',
+      fieldScriptName:
+        'The script file name without an extension. If set, the panel creates the file ' +
+        'in hooks/ and fills in the launch command itself.',
+      fieldTemplate: 'What the hook does: message, guard, shell command, or a blank scaffold.',
+      fieldDescription:
+        'One sentence about what the hook is for. It goes into the header of the ' +
+        'created script.',
+      fieldMessage: 'The text of the message, or the explanation given when blocking.',
+      fieldGuardPatterns:
+        'What to intercept — patterns separated by commas. For the guard template only.',
+      fieldCommand: 'A ready command, when no script file needs to be created.',
+      fieldTimeout: 'How many seconds to wait for the script before cutting it off.',
+      fieldGroups: 'Groups the hook belongs to.',
+
+      recipesTitle: 'Setting up a guard in a minute',
+      recipe1: 'Create → pick a preset',
+      recipe1Text:
+        'The destructive command guard fills in the event, filter, template and the ' +
+        'pattern list for you.',
+      recipe2: 'Adjust the patterns to your work',
+      recipe2Text:
+        'The comma-separated list is what will be intercepted. Add your own — a deploy ' +
+        'command, for instance.',
+      recipe3: 'Save and run it in the sandbox',
+      recipe3Text:
+        'The direct-run tab has prepared events: a safe command, a destructive one, a ' +
+        'git push. You see at once what the hook caught and what it let through.',
+      recipe4: 'Restart Claude Code',
+      recipe4Text: 'Hooks are read at startup — in an open session a new hook is not active yet.',
+
+      notesTitle: 'Things people trip over',
+      noteBrokenTitle: 'A hook with a missing script fails silently',
+      noteBrokenText:
+        'There is no error — nothing simply happens. The panel marks such hooks with a ' +
+        'red badge, and on the Overview the whole hooks tile turns red.',
+      noteIdTitle: 'A hook identifier is not stable',
+      noteIdText:
+        'It is built from the event and the position in the file, so it changes when ' +
+        'things are reordered. A link to one hook may in time open its neighbour.',
+      noteDisabledTitle: 'A disabled hook disappears from settings.json',
+      noteDisabledText:
+        'Its text is kept by the panel, not by the configuration file. Editing the file ' +
+        'by hand outside the panel will not show disabled hooks.',
+      noteLocalTitle: 'Hooks from settings.local.json are shown, nothing more',
+      noteLocalText:
+        'The panel reads both the main settings.json and the personal ' +
+        'settings.local.json — otherwise the list would lie about what actually ' +
+        'fires. Entries from the personal file carry a “local” badge: you can see ' +
+        'them, but their edit and delete buttons are closed, and trying it through ' +
+        'the API is refused. The file is personal and the panel never writes to it — ' +
+        'edit it by hand. For the same reason a local hook is always shown as ' +
+        'enabled: the panel’s toggle cannot reach it.',
+      noteScriptTitle: 'Deleting a hook does not delete its script',
+      noteScriptText:
+        'The file stays in hooks/ and shows up in the Scripts section marked “unused”. ' +
+        'That is deliberate: another hook may need it.',
+      noteExitTitle: 'Exit code 2 means refusal',
+      noteExitText:
+        'On PreToolUse and UserPromptSubmit it stops the action, and the text from ' +
+        'stderr explains why. On the other events nothing is blocked.',
+    },
+
+    skills: {
+      title: 'Skills',
+      summary: 'Instructions that switch on for a task instead of applying all the time',
+      lead:
+        'A skill is a folder with an instruction that Claude pulls in not always, ' +
+        'but when the task matches its description. A rule applies in every ' +
+        'conversation and takes up context; a skill sits aside and its text is ' +
+        'loaded only when it is needed. That makes skills the right place for long ' +
+        'multi-step processes that would never fit in a rule.',
+
+      whyOnDemand: 'Switches on for the task',
+      whyOnDemandText:
+        'Claude reads the descriptions of all skills and takes the one that fits ' +
+        'the request. Twenty detailed instructions do not get in each other’s way, ' +
+        'because only one is active at a time.',
+      whyProcess: 'Holds a whole process',
+      whyProcessText:
+        'A skill can lay out the order of work step by step and carry examples, ' +
+        'file templates and configs — it is a folder, not a single field.',
+      whyPortable: 'Moves as one piece',
+      whyPortableText:
+        'A skill is an ordinary directory with markdown inside. Copy it to another ' +
+        'machine, put it in a repository, or link a folder that lives elsewhere.',
+
+      canCreate: 'Create a skill as one file or with a ready-made structure',
+      canTree: 'Edit any file of the skill right in its card, as a tree',
+      canAssistant: 'Ask the assistant to build the structure from a description of the task',
+      canSearch: 'Search by the name and description of a skill',
+      canToggle: 'Switch a skill off without deleting it from disk',
+      canSandbox: 'Check in the sandbox whether the description actually fires',
+      canLink:
+        'Keep a skill elsewhere: a symlink or junction inside skills/ is read by the ' +
+        'panel as an ordinary folder',
+
+      cantRename:
+        'Rename an existing skill: the name is the folder name, and changing it would ' +
+        'create a new one',
+      cantAutoRead:
+        'Count on Claude reading nested files by itself — it only takes them through ' +
+        'a link from SKILL.md',
+      cantGuarantee:
+        'Know in advance whether a skill will be picked: the model decides from the ' +
+        'description, and only a run shows it',
+      cantVersions: 'Keep versions and an edit history inside the panel',
+      cantRestore:
+        'Bring a deleted skill back with a button: the folder copy lands in ' +
+        'claude-control/backups and shows up in the list, but a restore only returns ' +
+        'configuration files',
+
+      storageFolder: 'Skill folder',
+      storageMain: 'Main file',
+      storageMainValue: 'SKILL.md with a YAML header of name and description',
+      storageDisabled: 'Disabled ones',
+      storageOff: 'What Claude reads',
+      storageOffValue: 'the skills/ directory only — anything else is invisible',
+
+      flowTitle: 'How a skill gets into the work',
+      flowCaption:
+        'The second step is the key one. Only the descriptions go into context up ' +
+        'front; the full text of the instruction is loaded after the skill has been ' +
+        'chosen.',
+      flowFolder: 'Skill folder',
+      flowFolderCaption: 'SKILL.md and nested files',
+      flowDescriptions: 'Claude reads the descriptions',
+      flowDescriptionsCaption: 'of every skill at once',
+      flowMatch: 'The task matched',
+      flowMatchCaption: 'the model decides from description',
+      flowBody: 'The instruction is loaded',
+      flowBodyCaption: 'the skill text is in play',
+
+      descriptionTitle: 'The description is the field that matters',
+      descriptionCaption:
+        'It alone decides whether the skill is used. The body of the skill has no ' +
+        'say in it: nobody has read it yet.',
+      descGood: 'A description that works',
+      descGoodText:
+        'It names the situation and the words the user arrives with: “Use WHEN the ' +
+        'user asks to write e2e tests, cover a flow with Playwright”.',
+      descBad: 'A description that will not fire',
+      descBadText:
+        '“Helps with tests” gives nothing to catch on. The model cannot tell this ' +
+        'skill from the three next to it and picks none of them.',
+      descTip: 'Check it on the spot',
+      descTipText:
+        'Run the skill in the sandbox: the panel builds a provoking task out of the ' +
+        'description and shows whether the skill took it on.',
+
+      templatesTitle: 'Structure templates',
+      templatesCaption:
+        'Chosen when creating a skill in builder mode, and expanded as soon as the ' +
+        'skill appears on disk.',
+      tplMinimal: 'Simple skill',
+      tplMinimalText: 'A single SKILL.md. Right when the instruction fits on one page.',
+      tplRefs: 'Skill with modules',
+      tplRefsText:
+        'SKILL.md plus references/rules.md and references/examples.md. Rules and ' +
+        'examples live separately, and SKILL.md links to them.',
+      tplFull: 'Skill with configs and templates',
+      tplFullText:
+        'Adds config/ and templates/ directories — for ready-made files the skill ' +
+        'suggests copying into a project.',
+      templatesNote:
+        'A template never overwrites what you wrote: a file with content is skipped ' +
+        'and only the missing ones are created.',
+
+      fieldsTitle: 'Fields of a skill',
+      fieldsCaption: 'Names match the skillDraftSchema schema.',
+      fieldName:
+        'A latin name with dashes. It is also the folder name and the identifier. ' +
+        'Locked once the skill exists.',
+      fieldDescription:
+        'When to use the skill: the situation and the words of the user. The model ' +
+        'decides from this field whether to load the skill.',
+      fieldBody:
+        'Instructions in markdown: what to do step by step, what not to do, how to ' +
+        'verify the result.',
+      fieldFiles:
+        'Nested files of the skill: examples, configs, templates. Edited as a tree in ' +
+        'the card.',
+      fieldGroups: 'Groups the skill belongs to.',
+
+      offTitle: 'What happens when you switch a skill off',
+      offCaption:
+        'Here switching off physically moves the folder. Claude scans only skills/, ' +
+        'so a moved skill simply does not exist for it.',
+      offToggle: 'Toggle switched off',
+      offMove: 'skills-disabled/',
+      offMoveCaption: 'the whole folder moved',
+      offResult: 'The skill is invisible',
+      offResultCaption: 'files are intact, the toggle brings it back',
+
+      assistantTitle: 'Two assistants',
+      assistantCaption:
+        'One fills in form fields, the other assembles files. They are different ' +
+        'things and worth keeping apart.',
+      assistantForm: 'Form assistant',
+      assistantFormText:
+        'Fills in the name, description and text of the skill from your account of ' +
+        'the task. You see the result before saving, and can keep refining it.',
+      assistantStructure: 'Structure assistant',
+      assistantStructureText:
+        'Returns not fields but a list of files with content, and lays them out in ' +
+        'the skill folder. Existing files are updated, new ones added, nothing is ' +
+        'deleted on its own. It works step by step: the structure can be refined in ' +
+        'the same conversation.',
+      assistantNote:
+        'The structure assistant sees the current tree and edits it sensibly, but ' +
+        'large files are shown to it trimmed — a very long file may not be understood ' +
+        'in full.',
+
+      notesTitle: 'Things people trip over',
+      noteNestedTitle: 'Nested files are read only through a link',
+      noteNestedText:
+        'Claude Code does not walk the skill folder by itself. If nothing in SKILL.md ' +
+        'links to references/rules.md, that file is never read — it just sits there.',
+      noteNameTitle: 'The name cannot be changed',
+      noteNameText:
+        'The skill name is the directory name and the identifier. For an existing ' +
+        'skill the field is locked: changing it would create a second folder rather ' +
+        'than rename the first.',
+      noteDeleteTitle: 'Deleting wipes the whole folder, but takes a backup first',
+      noteDeleteText:
+        'Every nested file goes at once. Before that the folder is copied whole into ' +
+        'claude-control/backups — as it is for rules and hooks. Restoring is done by ' +
+        'hand: there is no restore button in the panel, only the path to the copy in ' +
+        'the response. No copy is made if backups before writing are switched off in ' +
+        'the settings. To disable a skill for a while, use the toggle — it deletes ' +
+        'nothing.',
+      noteDescTitle: 'A skill that never fires is almost always a description problem',
+      noteDescText:
+        'If the instruction is good but Claude keeps ignoring it, rewrite the ' +
+        'description rather than the body: that is what the decision is made on.',
+    },
+
+    rules: {
+      title: 'Rules',
+      summary: 'Standing instructions in CLAUDE.md that Claude always takes into account',
+      lead:
+        'A rule is a standing instruction that Claude Code reads at the start of ' +
+        'every session. Everything written here applies by default: the language ' +
+        'to answer in, what is off limits, how to work, what counts as verified. ' +
+        'It is not a prompt for one conversation but behaviour you never have to ' +
+        'repeat.',
+
+      whyRepeat: 'Stop repeating yourself',
+      whyRepeatText:
+        'What you explain to Claude in every conversation — the language to answer ' +
+        'in, what is off limits, how to verify — is written once and then holds on ' +
+        'its own.',
+      whyEverywhere: 'The same in every project',
+      whyEverywhereText:
+        'Personal rules are read in any folder where Claude Code runs. Moving to ' +
+        'another project does not start with explaining everything again.',
+      whyVisible: 'Visible and reversible',
+      whyVisibleText:
+        'It is an ordinary markdown file: a rule can be read with your own eyes, ' +
+        'switched off with a toggle and restored from a backup.',
+
+      canWrite: 'Write rules as text, with the builder, or a batch at once',
+      canToggle: 'Switch a rule off without losing its text',
+      canSearch: 'Search by the heading and the body of a rule',
+      canSandbox: 'Check a rule with a real conversation in the sandbox',
+      canGroup: 'Collect rules into groups and switch them on as sets',
+      canEditByHand: 'Edit CLAUDE.md by hand — the panel picks the changes up',
+
+      cantProject: 'Project-level rules: the panel only manages your own ~/.claude/CLAUDE.md',
+      cantPriority:
+        'Priority between rules: Claude reads the whole file, and a contradiction ' +
+        'between two rules is not resolved for you',
+      cantHistory:
+        'A per-rule edit history: what accumulates is copies of the whole CLAUDE.md — a ' +
+        'restore brings back the file of that moment, not one corrected rule',
+      cantForce: 'A guarantee of compliance: a rule is an instruction, not a technical limit',
+
+      storageFile: 'File',
+      storageUnit: 'One rule',
+      storageUnitValue: 'a markdown section starting with ##',
+      storageReader: 'Who reads it',
+      storageReaderValue: 'Claude Code, when a session starts',
+      storageBackup: 'Backups',
+
+      flowTitle: 'How a rule reaches Claude',
+      flowCaption:
+        'The file stays ordinary markdown: the panel parses it into rules and ' +
+        'writes it back without breaking the format. You can open and edit it by ' +
+        'hand — the panel will pick the changes up.',
+      flowForm: 'Form in the panel',
+      flowFormCaption: 'title and text',
+      flowFile: 'CLAUDE.md',
+      flowFileCaption: 'a ## Heading section',
+      flowStart: 'Session start',
+      flowStartCaption: 'Claude Code reads the file',
+      flowAnswer: 'Every answer',
+      flowAnswerCaption: 'the rule applies',
+      flowEdgeSave: 'save',
+      flowEdgeRestart: 'restart',
+      flowEdgeAlways: 'always',
+
+      modesTitle: 'Three ways to write a rule',
+      modesCaption:
+        'The choice of mode appears only when creating a rule. An existing rule ' +
+        'is edited in a plain text field.',
+      modeSimple: 'Plain text',
+      modeSimpleText: 'A single field, markdown allowed. Best when the wording is already clear.',
+      modeBuilder: 'Builder',
+      modeBuilderText:
+        'Blocks for “allowed”, “not allowed” and “with care”. The panel turns them ' +
+        'into markdown with headings and drops empty entries. Best when the rule is ' +
+        'a list of limits.',
+      modeBulk: 'Bulk list',
+      modeBulkText:
+        'One line per rule in the form “Title :: text”. Creates a batch at once — ' +
+        'handy for moving over a ready-made set.',
+      modesNote:
+        'All three modes produce the same thing — ## sections in CLAUDE.md. The ' +
+        'mode only changes how comfortable it is to type.',
+
+      fieldsTitle: 'Fields of a rule',
+      fieldsCaption:
+        'Field names match the ruleDraftSchema schema, so they are searchable in code.',
+      fieldTitle:
+        'The rule heading. It becomes the ## heading in the file, and the ' +
+        'identifier for links like /rules?id=… is derived from it.',
+      fieldBody: 'The rule text in markdown: what to do, what not to do, how to verify the result.',
+      fieldEnabled:
+        'Whether the rule is on. A disabled rule is not deleted — it moves to the ' +
+        'end of the file.',
+      fieldGroups:
+        'Groups the rule belongs to. Through a group it can be switched on and off ' +
+        'together with other settings.',
+
+      offTitle: 'What happens when you switch a rule off',
+      offCaption:
+        'Switching off is not deleting. The text stays in the file and returns to ' +
+        'its place when the toggle goes back on.',
+      offToggle: 'Toggle switched off',
+      offToggleCaption: 'the rule is hidden from Claude',
+      offSection: '## Disabled rules',
+      offSectionCaption: 'a section at the end of CLAUDE.md',
+      offResult: 'Claude does not read it',
+      offResultCaption: 'the text is kept',
+
+      assistantTitle: 'The assistant',
+      assistantCaption:
+        'The rule form has an assistant: the right half of the window is a normal ' +
+        'chat that fills in the fields on the left.',
+      assistantAsk: 'You describe the task',
+      assistantAskCaption: 'by typing or by voice',
+      assistantRun: 'The panel runs Claude',
+      assistantRunCaption: 'on your subscription',
+      assistantReply: 'The model returns fields',
+      assistantReplyCaption: 'title and body',
+      assistantFill: 'Fields are filled in',
+      assistantFillCaption: 'changed ones are highlighted',
+
+      assistantStep1: 'Describe the task in plain words',
+      assistantStep1Text:
+        'For example: “always answer in Russian, including the choice options”. ' +
+        'There is no need for formal wording.',
+      assistantStep2: 'Look at what was filled in',
+      assistantStep2Text:
+        'Changed fields get green badges. The form does not save itself — you see ' +
+        'the result before anything is written to the file.',
+      assistantStep3: 'Refine it in the same conversation',
+      assistantStep3Text:
+        '“Make it stricter”, “add something about tests” — the assistant remembers ' +
+        'the previous messages and edits the text it already produced.',
+      assistantStep4: 'Save',
+      assistantStep4Text: 'Until you press save, CLAUDE.md is untouched.',
+
+      assistantKeyTitle: 'No separate API key is needed',
+      assistantKeyText:
+        'The assistant runs the same claude you use in the terminal, on your ' + 'subscription.',
+      assistantMemoryTitle: 'The conversation lasts as long as the window is open',
+      assistantMemoryText:
+        'Close the form and the next conversation with the assistant starts from ' +
+        'a blank slate.',
+
+      checkTitle: 'How to check that a rule works',
+      checkCaption: 'The check runs in isolation and does not touch your real ~/.claude directory.',
+      checkStep1: 'Press the sandbox icon on the rule card',
+      checkStep1Text: 'The sandbox is a temporary configuration containing only what you selected.',
+      checkStep2: 'Ask something the rule should affect',
+      checkStep2Text:
+        'If the rule is about the language of the answer, ask anything and look at ' +
+        'the language you get back.',
+      checkStep3: 'Compare with the usual behaviour',
+      checkStep3Text:
+        'The difference between the sandbox run and a normal conversation is exactly ' +
+        'what the rule contributes.',
+
+      notesTitle: 'Things people trip over',
+      noteRestartTitle: 'Changes apply after a restart',
+      noteRestartText:
+        'Claude Code reads CLAUDE.md when a session starts. An open conversation ' +
+        'keeps working by the old rules — that is not a fault.',
+      noteRenameTitle: 'Renaming changes the identifier',
+      noteRenameText:
+        'The identifier is derived from the heading. After a rename, a link like ' +
+        '/rules?id=old-name will no longer open the rule.',
+      noteDuplicateTitle: 'Identical headings get a suffix',
+      noteDuplicateText:
+        'A second rule with the same heading becomes -2, a third -3. Otherwise an ' +
+        'edit to one would land in the other.',
+      noteDeleteTitle: 'Deleting cuts the section out of the file',
+      noteDeleteText:
+        'A copy of the file stays in claude-control/backups, but the rule will be ' +
+        'gone from CLAUDE.md itself. To disable it temporarily, use the toggle.',
+      noteWordingTitle: 'Word it so it can be checked',
+      noteWordingText:
+        'A rule applies in every conversation. “Answer in Russian” can be checked, ' +
+        '“write well” cannot — and Claude has no way to comply with the second.',
+    },
+  },
+};

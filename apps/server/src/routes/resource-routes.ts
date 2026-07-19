@@ -169,8 +169,14 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
       if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
 
       try {
-        deleteResourceFile(kind, request.params.id, request.query.file, ctx.location);
-        return { ok: true, needsRestart: true };
+        const backupPath = deleteResourceFile(
+          kind,
+          request.params.id,
+          request.query.file,
+          ctx.location,
+          ctx.backupDir,
+        );
+        return { ok: true, needsRestart: true, backupPath };
       } catch (error) {
         return reply.code(400).send({ message: messageOf(error) });
       }

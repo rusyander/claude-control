@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 /**
@@ -11,6 +11,26 @@ import { existsSync } from 'node:fs';
  */
 
 const isWindows = process.platform === 'win32';
+
+/**
+ * Путь в примере события — в стиле той системы, где панель запущена.
+ *
+ * Раньше во всех заготовках стоял `C:/work/...`: на Linux и macOS такой путь
+ * выглядит чужеродно, а хук-страж, который смотрит на пути, может на него и
+ * не сработать — тогда прогон покажет не то, что покажет в бою.
+ */
+function demoPath(name: string): string {
+  return isWindows ? `C:/work/demo/${name}` : `/home/user/demo/${name}`;
+}
+
+/**
+ * Приманка для стража секретов, собранная из кусков.
+ *
+ * Записанная целиком, она валидна с виду и поднимает тревогу у secret scanning
+ * на GitHub. Токен выдуман и никуда не ведёт, но объясняться с каждой такой
+ * тревогой — лишняя работа.
+ */
+const FAKE_TOKEN = ['glpat', 'x7Kd93mQpL2vRnT4wZbA'].join('-');
 
 /** Готовые события: по одному на каждый распространённый случай. */
 export interface EventFixture {
@@ -73,8 +93,13 @@ export const EVENT_FIXTURES: EventFixture[] = [
         // Строка намеренно не содержит слов вроде «example» и «test»: стражи
         // секретов считают их заготовками и пропускают — а нам нужно, чтобы
         // проверка выглядела как настоящий ключ.
-        file_path: 'C:/work/demo/config.ts',
-        content: 'export const gitlabToken = "glpat-x7Kd93mQpL2vRnT4wZbA";',
+        //
+        // И ровно поэтому она собирается из кусков: целиком записанный
+        // `glpat-…` — валидная с виду приманка, на которую реагирует secret
+        // scanning на GitHub. Утечки здесь нет (токен выдуман), но разбираться
+        // с ложной тревогой в каждом форке никому не нужно.
+        file_path: demoPath('config.ts'),
+        content: `export const gitlabToken = "${FAKE_TOKEN}";`,
       },
     },
   },
@@ -88,7 +113,7 @@ export const EVENT_FIXTURES: EventFixture[] = [
       hook_event_name: 'PreToolUse',
       tool_name: 'Write',
       tool_input: {
-        file_path: 'C:/work/demo/.env.example',
+        file_path: demoPath('.env.example'),
         content: 'GITLAB_TOKEN=your-token-here',
       },
     },
@@ -102,7 +127,7 @@ export const EVENT_FIXTURES: EventFixture[] = [
     payload: {
       hook_event_name: 'PostToolUse',
       tool_name: 'Edit',
-      tool_input: { file_path: 'C:/work/example/index.ts' },
+      tool_input: { file_path: demoPath('index.ts') },
       tool_response: { success: true },
     },
   },
@@ -242,13 +267,35 @@ export async function runHookProbe(
   });
 }
 
+/**
+ * Чем запускать `.ps1` вне Windows.
+ *
+ * Раньше здесь всегда стояло `powershell`, которого на Linux и macOS нет, —
+ * и такой хук в песочнице просто не запускался. PowerShell там ставится
+ * отдельно и называется `pwsh`; если его нет, честнее сказать об этом прямо,
+ * чем показать невнятную ошибку запуска.
+ */
+function powershellCommand(): string | undefined {
+  if (isWindows) return 'powershell';
+
+  const probe = spawnSync('pwsh', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.Major'], {
+    encoding: 'utf8',
+    timeout: 5000,
+  });
+
+  return probe.status === 0 ? 'pwsh' : undefined;
+}
+
 /** Прогон скрипта из hooks/ — то же самое, но команда собирается сама. */
 export function scriptCommand(scriptPath: string): string {
   if (!existsSync(scriptPath)) return '';
 
   const quoted = isWindows ? `"${scriptPath}"` : `'${scriptPath}'`;
   if (/\.(mjs|cjs|js)$/i.test(scriptPath)) return `node ${quoted}`;
-  if (/\.ps1$/i.test(scriptPath)) return `powershell -File ${quoted}`;
+  if (/\.ps1$/i.test(scriptPath)) {
+    const shell = powershellCommand();
+    return shell ? `${shell} -File ${quoted}` : '';
+  }
   if (/\.py$/i.test(scriptPath)) return `python ${quoted}`;
   return `bash ${quoted}`;
 }

@@ -1,85 +1,51 @@
+import { Link, useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
-import { Badge } from '@shared/ui/badge';
+import { Button } from '@shared/ui/button';
 import { PageHeader } from '@shared/ui/page-header';
-import { HOOK_EVENT_INFO } from '@claude-control/contracts';
+import { HELP_ROUTE, findHelpTopic } from './model/topics';
+import { HelpIndex } from './HelpIndex';
+import { HelpTopicView } from './HelpTopicView';
 import styles from './HelpPage.module.scss';
 
 /**
- * Справочник по устройству Claude Code. Отдельные пояснения есть в каждом
- * разделе, а здесь собрано то, что нужно целиком: таблица событий хуков
- * и порядок применения настроек.
+ * Справка живёт на одном маршруте: `/help` — список разделов, `/help?topic=…`
+ * — документ раздела. Отдельного маршрута под каждый документ не заводим:
+ * адрес остаётся ссылкой, которой можно поделиться, а маршрутов не
+ * прибавляется на каждый новый раздел.
  */
 export function HelpPage() {
   const { t } = useTranslation();
+  const { topic: topicId } = useSearch({ strict: false }) as { topic?: string };
+  const topic = findHelpTopic(topicId);
 
-  const concepts = [
-    { key: 'rules', title: t('rules.title'), text: t('rules.explain') },
-    { key: 'skills', title: t('skills.title'), text: t('skills.explain') },
-    { key: 'hooks', title: t('hooks.title'), text: t('hooks.explain') },
-    { key: 'mcp', title: t('mcp.title'), text: t('mcp.explain') },
-    { key: 'permissions', title: t('permissions.title'), text: t('permissions.explain') },
-    { key: 'groups', title: t('groups.title'), text: t('groups.explain') },
-  ];
+  if (topic) return <HelpTopicView topic={topic} />;
 
-  return (
-    <Stack gap="var(--spacing-lg)" className={styles.page}>
-      <PageHeader title={t('nav.help')} subtitle={t('common.appName')} />
+  // Ссылка на несуществующий раздел — не пустой экран: показываем, что
+  // произошло, и возвращаем к списку.
+  if (topicId) {
+    return (
+      <Stack gap="var(--spacing-lg)" className={styles.page}>
+        <PageHeader title={t('nav.help')} subtitle={t('help.index.subtitle')} />
 
-      <Stack gap="var(--spacing-sm)">
-        {concepts.map((concept) => (
-          <Card key={concept.key} padding="md">
-            <Stack gap="var(--spacing-2xs)">
-              <Typography variant="body" weight="medium">
-                {concept.title}
-              </Typography>
-              <Typography variant="body-sm" color="muted" className={styles.text}>
-                {concept.text}
-              </Typography>
-            </Stack>
-          </Card>
-        ))}
-      </Stack>
-
-      <Card padding="md">
-        <Stack gap="var(--spacing-sm)">
-          <Typography variant="body" weight="medium">
-            {t('hooks.event')}
-          </Typography>
-
-          <Stack gap="var(--spacing-xs)">
-            {HOOK_EVENT_INFO.map((info) => (
-              <Stack
-                key={info.event}
-                direction="row"
-                align="center"
-                gap="var(--spacing-sm)"
-                wrap
-                className={styles.eventRow}
-              >
-                <Typography variant="mono" weight="medium" as="span">
-                  {info.event}
-                </Typography>
-                {info.supportsMatcher ? (
-                  <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-                    {info.matcherExamples.map((example) => (
-                      <Badge key={example} tone="neutral">
-                        {example}
-                      </Badge>
-                    ))}
-                  </Stack>
-                ) : (
-                  <Typography variant="caption" color="subtle" as="span">
-                    {t('hooks.matcher')}: —
-                  </Typography>
-                )}
-              </Stack>
-            ))}
+        <Card padding="md">
+          <Stack gap="var(--spacing-sm)" align="start">
+            <Typography variant="body" weight="medium">
+              {t('help.index.notFoundTitle')}
+            </Typography>
+            <Typography variant="body-sm" color="muted">
+              {t('help.index.notFoundText')}
+            </Typography>
+            <Link to={HELP_ROUTE}>
+              <Button variant="secondary">{t('help.common.back')}</Button>
+            </Link>
           </Stack>
-        </Stack>
-      </Card>
-    </Stack>
-  );
+        </Card>
+      </Stack>
+    );
+  }
+
+  return <HelpIndex />;
 }

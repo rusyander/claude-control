@@ -76,6 +76,7 @@ What should be inside:
 ~/.claude/
 ├── CLAUDE.md              your rules
 ├── settings.json          hooks, permissions, environment
+├── settings.local.json    personal hooks and permissions — shown, tagged "local"
 ├── skills/                one folder per skill
 ├── hooks/                 hook scripts
 ├── projects/              conversation transcripts
@@ -83,7 +84,7 @@ What should be inside:
 ├── .mcp-secrets.env       MCP tokens (optional)
 └── claude-control/        created by this panel
     ├── state.json         groups, automations, panel settings
-    └── backups/           a copy of every file before each write
+    └── backups/           copies before each write (last ten per file)
 
 ~/.claude.json             MCP servers and account — NOTE: beside .claude, not inside
 ```
@@ -463,18 +464,19 @@ Common causes:
 
 - **The command is not on `PATH`.** `npx`, `uvx` and `node` must be resolvable by the server process.
 - **A missing token.** Servers needing credentials read them from `~/.claude/.mcp-secrets.env`; check the key exists and the value is current. An expired token usually surfaces as a handshake that starts and then dies.
-- **Slow start.** The check gives up after 30 seconds. A server that pulls a large package on first run can exceed that; run it once by hand to warm the cache.
-- **A non-stdio transport.** Only stdio servers get a full handshake; HTTP and SSE servers are checked with a plain `HEAD` request.
+- **Slow start.** Starting a process gets up to 45 seconds — `npx` pulls the package on first run. Network servers get less: an address that stays silent for ten seconds will not answer in a minute either. Run the server once by hand to warm the cache.
+- **Headers are needed.** For a server behind authentication, set them in the server form under "Request headers" (one per line, `Name=value`). Without them the check stops at a 401.
+- **Interactive OAuth.** A server that requires a redirect login cannot be checked from the panel: only static headers are passed.
 
-The built-in filesystem preset points at `C:/work` and needs editing on macOS and Linux.
+The MCP handshake runs for every transport — stdio, HTTP and SSE — and the reply shows the tool count. The built-in filesystem preset fills in your home directory.
 
 #### Analytics is empty or has gaps
 
 It reads `~/.claude/projects/*.jsonl`. An empty section means no transcripts — a fresh install, or the wrong configuration directory.
 
-Costs are estimates from a hard-coded price table. On a subscription nothing is billed per token, so read the number as volume, not money. An unrecognised model falls back to Sonnet pricing.
+Costs are estimates from a price table. On a subscription nothing is billed per token, so read the number as volume, not money. An unrecognised model falls back to Sonnet pricing. The rates themselves are shown under **Settings → Rates used to estimate cost** and can be edited there: built-in prices go stale over time.
 
-_Running agents_ is usually empty on every platform: it looks for a process called `claude`, but the CLI runs as `node`. Nothing is broken.
+_Running agents_ matches processes by their command line: a CLI installed through npm runs under the name `node`, which is why matching by process name found nothing. If the section is empty while Claude Code is running, your system most likely does not allow listing other processes.
 
 #### Sandbox conversations behave oddly
 
@@ -515,7 +517,7 @@ If it still does not apply:
 
 #### A file looks wrong after an edit
 
-Every write is backed up first. Look in `~/.claude/claude-control/backups/` for `<name>.<timestamp>.bak` and copy the version you want back over the original.
+Every write is backed up first. Look in `~/.claude/claude-control/backups/` for `<name>.<timestamp>.bak` and copy the version you want back over the original. The last ten copies of each file are kept — otherwise the directory would grow without limit, and it holds copies of the secrets file too.
 
 If backups are missing, they were switched off in **Settings → back up before writing**. It is on by default and worth leaving on.
 
@@ -577,7 +579,7 @@ The server logs warnings and errors to the terminal it runs in. The browser cons
 
 ## Undoing things
 
-**Reverting a single edit** — restore from `~/.claude/claude-control/backups/`, where every write left a timestamped copy.
+**Reverting a single edit** — easiest from the panel: **Settings → Backups**, the "Restore" button next to the copy you want. The file is replaced whole, and the state before the restore is saved as a fresh copy — so even a restore can be undone. The copies still live in `~/.claude/claude-control/backups/` (last ten per file) and can be copied back by hand.
 
 **Resetting the panel itself** — delete `~/.claude/claude-control/state.json`. Groups, automations and panel settings go; your Claude Code configuration is untouched.
 

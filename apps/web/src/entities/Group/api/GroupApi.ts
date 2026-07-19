@@ -43,6 +43,41 @@ export function useSaveGroup() {
   });
 }
 
+/**
+ * Переключатель группы гасит и зажигает все её участники сразу, поэтому
+ * устаревает не только список групп: правила, скиллы, хуки, MCP-серверы и
+ * права меняют состояние вместе с ней.
+ */
+function invalidateGroupMembers(queryClient: ReturnType<typeof useQueryClient>): void {
+  for (const key of [
+    queryKeys.groups,
+    queryKeys.rules,
+    queryKeys.skills,
+    queryKeys.hooks,
+    queryKeys.mcp,
+    queryKeys.permissions,
+    queryKeys.overview,
+  ]) {
+    void queryClient.invalidateQueries({ queryKey: key });
+  }
+}
+
+export function useSetGroupEnabled() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; isEnabled: boolean }) => {
+      const { data } = await apiClient.post<{ ok: true; affected: number }>(
+        `/groups/${input.id}/enabled`,
+        { isEnabled: input.isEnabled },
+      );
+      return data;
+    },
+    onSuccess: () => invalidateGroupMembers(queryClient),
+    meta: { successMessage: 'toasts.updated' },
+  });
+}
+
 export function useDeleteGroup() {
   const queryClient = useQueryClient();
 
@@ -50,10 +85,9 @@ export function useDeleteGroup() {
     mutationFn: async (id: string) => {
       await apiClient.delete(`/groups/${id}`);
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.groups });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.overview });
-    },
+    // Удаление выключенной группы отпускает её участников, поэтому обновляем
+    // их списки тем же способом, что и переключатель.
+    onSuccess: () => invalidateGroupMembers(queryClient),
     meta: { successMessage: 'toasts.deleted' },
   });
 }

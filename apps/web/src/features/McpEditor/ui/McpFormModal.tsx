@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { MCP_PRESETS, type McpPreset, type McpTransport } from '@claude-control/contracts';
+import {
+  MCP_PRESETS,
+  HOME_DIR_TOKEN,
+  type McpPreset,
+  type McpTransport,
+} from '@claude-control/contracts';
+import { apiClient } from '@shared/api/client';
+import { queryKeys } from '@shared/api/query-keys';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Modal } from '@shared/ui/modal';
@@ -30,6 +38,7 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
   const [args, setArgs] = useState('');
   const [url, setUrl] = useState('');
   const [envText, setEnvText] = useState('');
+  const [headersText, setHeadersText] = useState('');
   // Один сервер по полям или пачка из JSON-конфига.
   const [isImport, setIsImport] = useState(false);
 
@@ -44,17 +53,34 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
     setArgs(server ? formatArgs(server.args) : '');
     setUrl(server?.url ?? '');
     setEnvText(server ? envToText(server.env) : '');
+    setHeadersText(server ? envToText(server.headers) : '');
     setIsImport(false);
   }, [isOpen, server]);
+
+  /**
+   * Домашний каталог для заготовок, где нужен путь. Заготовка не может знать
+   * его сама: contracts работают и на фронте, а путь зависит от системы —
+   * поэтому в аргументах стоит метка, которую подставляем здесь.
+   */
+  const { data: system } = useQuery({
+    queryKey: queryKeys.system,
+    queryFn: async () => (await apiClient.get<{ homeDir: string }>('/system')).data,
+    staleTime: Infinity,
+  });
 
   /** Подставляет заготовку в поля формы; имя не трогаем, если уже введено. */
   const applyPreset = (preset: McpPreset): void => {
     if (!name.trim()) setName(preset.id);
     setTransport(preset.transport);
     setCommand(preset.command ?? '');
-    setArgs(formatArgs(preset.args));
+    setArgs(
+      formatArgs(
+        preset.args.map((arg) => arg.replace(HOME_DIR_TOKEN, system?.homeDir ?? HOME_DIR_TOKEN)),
+      ),
+    );
     setUrl(preset.url ?? '');
     setEnvText(envToText(preset.env));
+    setHeadersText('');
   };
 
   const isPending = create.isPending || update.isPending;
@@ -72,7 +98,9 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
       args: isStdio ? parseArgs(args) : [],
       url: isStdio ? undefined : url.trim(),
       env: textToEnv(envText),
-      headers: {},
+      // Заголовки нужны только сетевым транспортам: у stdio их некуда деть,
+      // и сохранённые «на всякий случай» они только мусорят конфиг.
+      headers: isStdio ? {} : textToEnv(headersText),
       groupIds: [],
     };
 
@@ -132,7 +160,7 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
       ) : (
         <FormWithAssistant
           kind={t('mcp.title')}
-          fields={{ name, transport, command, args, url, envText }}
+          fields={{ name, transport, command, args, url, envText, headersText }}
           schema={{
             name: 'Имя сервера в конфиге',
             transport: 'Транспорт: stdio, sse или http',
@@ -140,6 +168,7 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
             args: 'Аргументы команды через пробел',
             url: 'Адрес для sse и http',
             envText: 'Переменные окружения по строке в формате KEY=VALUE',
+            headersText: 'HTTP-заголовки для sse и http по строке в формате Имя=значение',
           }}
           onApply={(applied) => {
             if (typeof applied.name === 'string') setName(applied.name);
@@ -149,6 +178,7 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
             if (typeof applied.args === 'string') setArgs(applied.args);
             if (typeof applied.url === 'string') setUrl(applied.url);
             if (typeof applied.envText === 'string') setEnvText(applied.envText);
+            if (typeof applied.headersText === 'string') setHeadersText(applied.headersText);
           }}
         >
           <Stack gap="var(--spacing-md)">
@@ -218,13 +248,27 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
                 />
               </>
             ) : (
-              <TextField
-                label={t('mcp.url')}
-                value={url}
-                onChange={setUrl}
-                placeholder="http://127.0.0.1:3845/sse"
-                isMono
-              />
+              <>
+                <TextField
+                  label={t('mcp.url')}
+                  value={url}
+                  onChange={setUrl}
+                  placeholder="http://127.0.0.1:3845/sse"
+                  isMono
+                />
+                {/* Без заголовков сервер за авторизацией нельзя ни подключить,
+                ни проверить: он отвечает 401 ещё на рукопожатии. */}
+                <TextField
+                  label={t('mcp.headers')}
+                  value={headersText}
+                  onChange={setHeadersText}
+                  multiline
+                  rows={3}
+                  placeholder={'Authorization=Bearer ${MY_TOKEN}'}
+                  hint={t('mcp.headersHint')}
+                  isMono
+                />
+              </>
             )}
 
             <TextField

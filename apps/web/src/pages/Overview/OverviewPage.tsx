@@ -1,9 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { SkeletonTiles } from '@shared/ui/skeleton';
-import { Typography } from '@shared/ui/typography';
-import { Card } from '@shared/ui/card';
-import { Badge } from '@shared/ui/badge';
 import { PageHeader } from '@shared/ui/page-header';
 import { useLocation, useOverview } from '@entities/AppConfig';
 import { LocationCard } from './LocationCard';
@@ -76,38 +73,32 @@ export function OverviewPage() {
             value={
               overview.permissions.allow + overview.permissions.ask + overview.permissions.deny
             }
-            hint={`${overview.permissions.allow} / ${overview.permissions.deny}`}
+            // Раньше здесь стояло «119 / 7» — два числа без пояснения, гадать
+            // приходилось каждый раз. Подписываем.
+            hint={`${overview.permissions.allow} ${t(
+              'permissions.allow',
+            ).toLowerCase()} · ${overview.permissions.deny} ${t('permissions.deny').toLowerCase()}`}
             to="/permissions"
           />
           <StatTile
             icon="groups"
             label={t('nav.groups')}
             value={overview.groups.total}
+            hint={
+              overview.groups.total > 0
+                ? `${overview.groups.total} ${t('overview.groupsHint')}`
+                : t('overview.groupsEmpty')
+            }
             to="/groups"
           />
         </div>
       )}
 
-      {overview && (
-        <Card padding="md">
-          <Stack gap="var(--spacing-sm)">
-            <Typography variant="body" weight="medium">
-              {t('permissions.title')}
-            </Typography>
-            <Stack direction="row" gap="var(--spacing-xs)" wrap>
-              <Badge tone="success" withDot>
-                {t('permissions.allow')}: {overview.permissions.allow}
-              </Badge>
-              <Badge tone="warning" withDot>
-                {t('permissions.ask')}: {overview.permissions.ask}
-              </Badge>
-              <Badge tone="danger" withDot>
-                {t('permissions.deny')}: {overview.permissions.deny}
-              </Badge>
-            </Stack>
-          </Stack>
-        </Card>
-      )}
+      {/*
+        Отдельной карточки с разбивкой прав здесь больше нет: она повторяла
+        числа из плитки выше, а подробности всё равно смотрят на самой
+        странице прав.
+      */}
     </Stack>
   );
 }

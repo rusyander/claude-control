@@ -64,8 +64,12 @@
   white-space: nowrap;
 }
 
+// Счётчик файлов идёт сразу за именем папки, а не у края строки: у края он
+// читался как отдельное число, не связанное с папкой.
 .count {
-  margin-left: auto;
+  padding: 0 var(--spacing-2xs);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
   color: var(--color-fg-subtle);
   font-size: var(--font-size-caption);
   flex-shrink: 0;
@@ -178,4 +182,66 @@
   color: var(--color-fg);
   font: inherit;
   font-size: var(--font-size-body-sm);
+}
+
+// Карточка шаблона: предлагается пустому ресурсу вместо чистого листа.
+.template {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast),
+    background var(--duration-fast);
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-accent);
+    background: var(--color-accent-subtle);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+}
+
+// Помощник структуры: собирает или дополняет всё дерево по описанию задачи.
+.assistant {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-subtle);
+}
+
+.assistantInput {
+  width: 100%;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  resize: vertical;
+
+  &:focus-within,
+  &:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+}
+
+.assistantReply {
+  padding-top: var(--spacing-2xs);
+  border-top: 1px solid var(--color-border);
 }

@@ -16,6 +16,7 @@ export function TextField({
   isMono,
   error,
   autoFocus,
+  disabled,
 }: TextFieldProps) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -41,6 +42,7 @@ export function TextField({
           aria-describedby={hint ? hintId : undefined}
           aria-invalid={Boolean(error)}
           autoFocus={autoFocus}
+          disabled={disabled}
           spellCheck={false}
         />
       ) : (
@@ -53,6 +55,7 @@ export function TextField({
           aria-describedby={hint ? hintId : undefined}
           aria-invalid={Boolean(error)}
           autoFocus={autoFocus}
+          disabled={disabled}
           spellCheck={false}
         />
       )}

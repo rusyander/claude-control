@@ -39,6 +39,7 @@ export function useSaveGroup() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.groups });
       void queryClient.invalidateQueries({ queryKey: queryKeys.overview });
     },
+    meta: { successMessage: 'toasts.saved' },
   });
 }
 
@@ -53,6 +54,7 @@ export function useDeleteGroup() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.groups });
       void queryClient.invalidateQueries({ queryKey: queryKeys.overview });
     },
+    meta: { successMessage: 'toasts.deleted' },
   });
 }
 
@@ -72,6 +74,7 @@ export function useSaveAutomation() {
       // Сценарий компилируется в хук, поэтому список хуков тоже устаревает.
       void queryClient.invalidateQueries({ queryKey: queryKeys.hooks });
     },
+    meta: { successMessage: 'toasts.saved' },
   });
 }
 
@@ -86,5 +89,6 @@ export function useDeleteAutomation() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.automations });
       void queryClient.invalidateQueries({ queryKey: queryKeys.hooks });
     },
+    meta: { successMessage: 'toasts.deleted' },
   });
 }

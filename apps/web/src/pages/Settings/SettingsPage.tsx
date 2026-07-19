@@ -9,6 +9,7 @@ import { PageHeader } from '@shared/ui/page-header';
 import { useSettings, useUpdateSettings } from '@entities/AppConfig';
 import { AccountCard } from './AccountCard';
 import { ClaudeDirField } from './ClaudeDirField';
+import { CredentialsCard } from './CredentialsCard';
 import { SettingToggleRow } from './SettingToggleRow';
 import styles from './SettingsPage.module.scss';
 
@@ -31,6 +32,8 @@ export function SettingsPage() {
       <AccountCard />
 
       <ClaudeDirField />
+
+      <CredentialsCard />
 
       <Card padding="md">
         <Stack gap="var(--spacing-md)">

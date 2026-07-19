@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { safeSessionId } from '../lib/cli-args.ts';
 
 /**
  * Помощник по заполнению форм. Работает через сам Claude Code в неинтерактивном
@@ -81,7 +82,8 @@ function extractJson(text: string): { reply: string; fields: Record<string, unkn
  */
 function runClaude(prompt: string, sessionId?: string): Promise<string> {
   const args = ['-p', '--output-format', 'json'];
-  if (sessionId) args.push('--resume', sessionId);
+  const safeId = safeSessionId(sessionId);
+  if (safeId) args.push('--resume', safeId);
 
   return new Promise((resolve, reject) => {
     const child = spawn(isWindows ? 'claude.cmd' : 'claude', args, {

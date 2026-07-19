@@ -18,3 +18,12 @@
     border-color: var(--color-border-strong);
   }
 }
+
+// Предупреждение о секрете в окне ручного ввода: должно читаться как
+// предупреждение, а не как ещё одна подпись поля.
+.credentialsWarning {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-left: 2px solid var(--color-warning);
+  background: var(--color-warning-subtle);
+  border-radius: var(--radius-sm);
+}

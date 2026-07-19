@@ -3,7 +3,6 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  border-right: 1px solid var(--color-border);
   background: var(--color-surface);
 }
 
@@ -66,4 +65,19 @@
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+// Заголовок группы по дате: разделяет «Сегодня», «Вчера» и остальное, чтобы
+// порядок списка читался с первого взгляда.
+.group {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--spacing-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dot {
+  color: var(--color-fg-subtle);
 }

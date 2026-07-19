@@ -13,9 +13,26 @@ import { readHooks, writeHooks } from '../domains/hooks.ts';
 export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): void {
   app.get('/api/groups', () => ctx.store.getGroups());
 
+  /**
+   * Умолчания проставляются здесь, а не берутся из схемы контрактов: типы
+   * TypeScript при выполнении стираются, а сам пакет contracts реэкспортирует
+   * модули без расширений — Node его как значение не подключит. Без этого
+   * запись без необязательного поля доходила до интерфейса неполной, и
+   * страница групп падала на `Object.keys(undefined)`.
+   */
+  const withDefaults = (body: Partial<Group>): Omit<Group, 'id' | 'order'> => ({
+    name: body.name ?? '',
+    description: body.description ?? '',
+    color: body.color ?? 'accent',
+    icon: body.icon ?? 'folder',
+    members: body.members ?? [],
+    env: body.env ?? {},
+    isEnabled: body.isEnabled ?? true,
+  });
+
   app.post<{ Body: GroupDraft }>('/api/groups', (request) => {
     const group: Group = {
-      ...request.body,
+      ...withDefaults(request.body),
       id: randomUUID(),
       order: ctx.store.getGroups().length,
     };
@@ -23,7 +40,11 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
   });
 
   app.put<{ Params: { id: string }; Body: Group }>('/api/groups/:id', (request) =>
-    ctx.store.saveGroup({ ...request.body, id: request.params.id }),
+    ctx.store.saveGroup({
+      ...withDefaults(request.body),
+      id: request.params.id,
+      order: request.body.order ?? 0,
+    }),
   );
 
   app.delete<{ Params: { id: string } }>('/api/groups/:id', (request) => {

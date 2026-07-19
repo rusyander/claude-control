@@ -9,6 +9,7 @@ import {
   useSaveResourceFile,
   type ResourceKind,
 } from '@entities/Resource/api/ResourceApi';
+import { toast } from '@shared/lib/toast';
 import styles from './ResourceFileTree.module.scss';
 
 interface ResourceFileEditorProps {
@@ -99,7 +100,11 @@ export function ResourceFileEditor({
               iconOnly
               icon={<Icon name="copy" size={20} />}
               aria-label={t('chat.copyArtifact')}
-              onClick={() => void navigator.clipboard.writeText(draft)}
+              onClick={() =>
+                void navigator.clipboard.writeText(draft).then(() => {
+                  toast.success(t('toasts.copied'));
+                })
+              }
             />
           )}
           <Button

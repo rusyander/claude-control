@@ -1,0 +1,86 @@
+// Выбор режима — простой скилл или конструктор. Две крупные карточки, чтобы
+// точка входа в конструктор была заметна сразу, а не пряталась после создания.
+.modeTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modeTab {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast),
+    background var(--duration-fast);
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+.modeTabActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+}
+
+// Структура файлов под полями SKILL.md: отделяем линией, чтобы конструктор
+// не сливался с формой самого файла.
+.structure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+// Заготовка структуры — выбирается до создания скилла.
+.template {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast),
+    background var(--duration-fast);
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+}
+
+.templateActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+}

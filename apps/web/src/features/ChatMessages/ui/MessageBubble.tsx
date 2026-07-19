@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
+import { toast } from '@shared/lib/toast';
+import { QuestionCard, parseQuestions } from './QuestionCard';
 import type { MessageBubbleProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 
@@ -34,7 +36,11 @@ export function MessageBubble({ message, onEdit }: MessageBubbleProps) {
             iconOnly
             icon={<Icon name="copy" size={20} />}
             aria-label={t('chat.copyMessage')}
-            onClick={() => void navigator.clipboard.writeText(plainText)}
+            onClick={() =>
+              void navigator.clipboard.writeText(plainText).then(() => {
+                toast.success(t('toasts.copied'));
+              })
+            }
           />
           {isUser && (
             <Button
@@ -71,6 +77,13 @@ export function MessageBubble({ message, onEdit }: MessageBubbleProps) {
           }
 
           if (block.type === 'tool') {
+            // Вопрос с вариантами показываем карточкой, а не строкой вызова:
+            // это не техническая подробность, а место, где ждут ответа.
+            const questions =
+              block.name === 'AskUserQuestion' ? parseQuestions(block.input) : undefined;
+
+            if (questions) return <QuestionCard key={index} questions={questions} />;
+
             return (
               <details key={index} className={styles.tool}>
                 <summary>{block.name}</summary>

@@ -1,0 +1,65 @@
+// Блок правила: цветная левая кромка подсказывает смысл — можно, нельзя,
+// с осторожностью — ещё до чтения текста.
+.section {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.allow {
+  border-left-color: var(--color-success);
+}
+
+.deny {
+  border-left-color: var(--color-danger);
+}
+
+.caution {
+  border-left-color: var(--color-warning);
+}
+
+.custom {
+  border-left-color: var(--color-border-strong);
+}
+
+.sectionTitle {
+  padding: 2px var(--spacing-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+}
+
+.bullet {
+  color: var(--color-fg-subtle);
+  flex-shrink: 0;
+}
+
+.itemInput {
+  flex: 1;
+  min-width: 0;
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+
+  &:focus,
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+}

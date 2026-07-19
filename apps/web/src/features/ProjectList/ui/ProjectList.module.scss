@@ -1,0 +1,70 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-surface);
+}
+
+.header {
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.items {
+  flex: 1;
+  min-height: 0;
+  padding: var(--spacing-2xs);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  margin-bottom: var(--spacing-3xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast);
+
+  &:hover {
+    background: var(--color-bg);
+    border-color: var(--color-border);
+  }
+}
+
+.itemActive {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-subtle);
+}
+
+// Исчезнувший с диска проект: виден, но открыть нельзя — работать негде.
+.itemGone {
+  opacity: 0.6;
+  cursor: not-allowed;
+
+  &:hover {
+    background: transparent;
+    border-color: transparent;
+  }
+}
+
+.name {
+  min-width: 0;
+}
+
+.path {
+  display: block;
+  font-size: 11px;
+}
+
+.dot {
+  color: var(--color-fg-subtle);
+}

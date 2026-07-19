@@ -6,8 +6,9 @@ import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
+import { Card } from '@shared/ui/card';
 import { useSaveScript, useScriptContent } from '@entities/Script/api/ScriptApi';
-import { NEW_SCRIPT_TEMPLATE } from '../model/ScriptTemplate';
+import { NEW_SCRIPT_TEMPLATE, SCRIPT_TEMPLATES } from '../model/ScriptTemplate';
 import type { ScriptFormModalProps } from './ScriptFormModal.types';
 
 /**
@@ -74,6 +75,39 @@ export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModa
         }}
       >
         <Stack gap="var(--spacing-md)">
+          {/* Готовые каркасы — только при создании: подмена кода у
+              существующего скрипта затёрла бы его содержимое. */}
+          {!script && (
+            <Card padding="md">
+              <Stack gap="var(--spacing-sm)">
+                <Typography variant="body-sm" weight="medium">
+                  {t('scripts.templatesTitle')}
+                </Typography>
+                <Typography variant="caption" color="subtle">
+                  {t('scripts.templatesHint')}
+                </Typography>
+
+                <Stack direction="row" gap="var(--spacing-2xs)" wrap>
+                  {SCRIPT_TEMPLATES.map((template) => (
+                    <Button
+                      key={template.id}
+                      size="sm"
+                      variant="secondary"
+                      title={template.description}
+                      onClick={() => {
+                        setContent(template.content);
+                        // Имя подставляем, только если пользователь его ещё не ввёл.
+                        if (!name.trim()) setName(template.fileName);
+                      }}
+                    >
+                      {template.title}
+                    </Button>
+                  ))}
+                </Stack>
+              </Stack>
+            </Card>
+          )}
+
           <TextField
             label={t('scripts.fileName')}
             value={name}

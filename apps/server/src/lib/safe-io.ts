@@ -75,6 +75,6 @@ export function assertValidJson(raw: string): void {
     JSON.parse(raw);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`Невалидный JSON: ${detail}`);
+    throw new Error(`Невалидный JSON: ${detail}`, { cause: error });
   }
 }

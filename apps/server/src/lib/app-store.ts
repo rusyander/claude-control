@@ -55,11 +55,17 @@ export class AppStore {
 
   private load(): AppState {
     const loaded = readJsonFile<Partial<AppState>>(this.stateFile, {});
+    // Клонируем дефолт целиком. Иначе при пустом state.json вложенные массивы
+    // (groups, automations, disabled.hook и т.д.) остаются ОБЩЕЙ ссылкой с
+    // модульным DEFAULT_STATE, и мутации одного стора (setEnabled/saveGroup)
+    // протекают в другие экземпляры и в сам дефолт — а экземпляров несколько
+    // (песочницы, смена целевого каталога через claudeDirOverride).
+    const base = structuredClone(DEFAULT_STATE);
     return {
-      ...DEFAULT_STATE,
+      ...base,
       ...loaded,
-      disabled: { ...DEFAULT_STATE.disabled, ...loaded.disabled },
-      settings: { ...DEFAULT_STATE.settings, ...loaded.settings },
+      disabled: { ...base.disabled, ...loaded.disabled },
+      settings: { ...base.settings, ...loaded.settings },
     };
   }
 

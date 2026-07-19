@@ -38,7 +38,10 @@ export function useScriptContent(id: string | undefined) {
   });
 }
 
-function useScriptMutation<TInput>(request: (input: TInput) => Promise<unknown>) {
+function useScriptMutation<TInput>(
+  request: (input: TInput) => Promise<unknown>,
+  successMessage: string,
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: request,
@@ -46,6 +49,7 @@ function useScriptMutation<TInput>(request: (input: TInput) => Promise<unknown>)
       void queryClient.invalidateQueries({ queryKey: scriptsKey });
       void queryClient.invalidateQueries({ queryKey: ['hooks'] });
     },
+    meta: { successMessage },
   });
 }
 
@@ -56,11 +60,11 @@ export function useSaveScript() {
       return;
     }
     await apiClient.post('/scripts', { name: input.name, content: input.content });
-  });
+  }, 'toasts.saved');
 }
 
 export function useDeleteScript() {
   return useScriptMutation(async (id: string) => {
     await apiClient.delete(`/scripts/${encodeURIComponent(id)}`);
-  });
+  }, 'toasts.deleted');
 }

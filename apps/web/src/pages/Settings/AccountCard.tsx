@@ -61,7 +61,7 @@ export function AccountCard() {
           )}
         </Stack>
 
-        <Typography variant="caption" color="subtle">
+        <Typography variant="caption" color="subtle" className="prose">
           {t('settings.limitsNote')}
         </Typography>
       </Stack>

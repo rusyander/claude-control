@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
+import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
@@ -34,6 +35,16 @@ export function ScriptsPage() {
   const openForm = (script?: ScriptFile): void => {
     setEditing(script);
     setIsFormOpen(true);
+    writeUrl(script?.id);
+  };
+
+  // Ссылка /scripts?id=<имя файла> открывает этот скрипт в редакторе.
+  const writeUrl = useEntityUrlWriter();
+  useEntityUrl<ScriptFile>({ items: scripts, getId: (script) => script.id, onOpen: openForm });
+
+  const closeForm = (open: boolean): void => {
+    setIsFormOpen(open);
+    if (!open) writeUrl(undefined);
   };
 
   return (
@@ -141,7 +152,7 @@ export function ScriptsPage() {
         <Typography color="subtle">{t('common.empty')}</Typography>
       )}
 
-      <ScriptFormModal isOpen={isFormOpen} onOpenChange={setIsFormOpen} script={editing} />
+      <ScriptFormModal isOpen={isFormOpen} onOpenChange={closeForm} script={editing} />
     </Stack>
   );
 }

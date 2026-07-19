@@ -20,24 +20,47 @@
   }
 }
 
+// Размер значка задаёт сама кнопка, а не место вызова. По приложению
+// значки в кнопках были пяти разных размеров (14, 16, 18, 20, 24) — на глаз
+// это читалось как разнобой, а уследить за числом в каждом вызове нельзя.
+// Правило в одном месте закрывает вопрос навсегда.
+.root svg {
+  flex-shrink: 0;
+}
+
 .sm {
   // Кнопки действий в списках были мелкими — по ним трудно попасть
   // и иконка внутри выглядела незаметной.
   height: 34px;
   padding: 0 var(--spacing-sm);
   font-size: var(--font-size-body-sm);
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
 }
 
 .md {
   height: 36px;
   padding: 0 var(--spacing-md);
   font-size: var(--font-size-body);
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
 }
 
 .lg {
   height: 44px;
   padding: 0 var(--spacing-lg);
   font-size: var(--font-size-body-lg);
+
+  svg {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 .primary {

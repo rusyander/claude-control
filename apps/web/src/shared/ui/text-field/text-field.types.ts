@@ -12,4 +12,6 @@ export interface TextFieldProps {
   isMono?: boolean;
   error?: string;
   autoFocus?: boolean;
+  /** Заблокировать ввод: например, имя папки у уже созданного скилла. */
+  disabled?: boolean;
 }

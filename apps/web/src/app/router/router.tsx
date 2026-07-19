@@ -17,6 +17,17 @@ import { HelpPage } from '@pages/Help/HelpPage';
 
 const rootRoute = createRootRoute({ component: MainLayout });
 
+/**
+ * Адрес открытого элемента.
+ *
+ * `?id=…` — единый способ сослаться на что угодно: разговор, правило, скилл,
+ * хук, сервер. Открытие элемента дописывает id в адрес, а переход по такому
+ * адресу открывает элемент — ссылкой можно поделиться и вернуться к ней позже.
+ */
+function validateSearch(search: Record<string, unknown>): { id?: string } {
+  return typeof search.id === 'string' && search.id ? { id: search.id } : {};
+}
+
 /** Маршруты объявлены кодом: страниц немного, генератор файловых роутов избыточен. */
 const routes = [
   { path: '/', component: OverviewPage },
@@ -33,7 +44,7 @@ const routes = [
   { path: '/groups', component: GroupsPage },
   { path: '/settings', component: SettingsPage },
   { path: '/help', component: HelpPage },
-].map((route) => createRoute({ getParentRoute: () => rootRoute, ...route }));
+].map((route) => createRoute({ getParentRoute: () => rootRoute, validateSearch, ...route }));
 
 export const router = createRouter({
   routeTree: rootRoute.addChildren(routes),

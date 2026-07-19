@@ -10,87 +10,83 @@
   padding: var(--spacing-xl);
 }
 
-.sidebar {
-  width: var(--layout-sidebar-width);
-  min-width: var(--layout-sidebar-width);
-  flex-shrink: 0;
-  height: 100%;
-  padding: var(--spacing-md);
-  border-right: 1px solid var(--color-border);
-  background-color: var(--color-surface);
-  overflow-x: hidden;
-  overflow-y: auto;
-  transition: width var(--duration-normal) ease;
+// Обёртка страницы для анимации перехода: раскладку не меняет, растёт
+// вместе с колонкой — иначе полноэкранные страницы вроде чата сжались бы.
+.page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
-// Свёрнутая панель: остаются только значки, ширины хватает ровно на них.
-.sidebarCollapsed {
-  width: 60px;
-  min-width: 60px;
-  padding: var(--spacing-md) var(--spacing-2xs);
+// Панель — окно, которое обрезает содержимое. Ширину задаёт и анимирует motion
+// (см. Sidebar.tsx): здесь её нет намеренно, иначе `width` из класса и
+// inline-значение анимации спорили бы, а `min-width` не дал бы панели сжаться.
+.sidebar {
+  flex-shrink: 0;
+  height: 100%;
+  border-right: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  // `clip` по обеим осям — панель вообще не прокручиваемая.
+  //
+  // Это принципиально. С `overflow-x: hidden` панель остаётся горизонтально
+  // прокручиваемой, и при нажатии на кнопку сворачивания браузер доводил до неё
+  // фокус — уезжал вбок на 185 пикселей. Дальше, пока ширина росла, содержимое
+  // «догоняло» край: замерено, значок стартовал с −173 и ехал к 12. Это и был
+  // рывок при разворачивании.
+  //
+  // Написать `overflow-x: clip; overflow-y: auto` нельзя: по спецификации рядом
+  // со скроллящей осью `clip` вырождается обратно в `hidden` (проверено —
+  // computed style так и показывал). Поэтому прокрутка живёт на вложенном блоке.
+  overflow: clip;
+}
 
-  .navLink {
-    justify-content: center;
-    padding: var(--spacing-xs) 0;
-  }
-
-  .brand {
-    flex-direction: column;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-2xs) 0 var(--spacing-md);
-  }
+// Содержимое постоянной ширины. Это и есть главное условие плавности: внутри
+// панели при сворачивании не двигается и не перевёрстывается ничего — меняется
+// только край, за который его обрезают.
+.sidebarInner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  width: 244px; // 260 минус горизонтальные отступы панели
+  height: 100%;
+  // 8 + 8 = 16 до значка: в свёрнутой панели шириной 60 он встаёт почти ровно
+  // по центру рейки (28 против 30), и колонка значков читается как колонка.
+  padding: var(--spacing-md) var(--spacing-xs);
+  // Прокрутка списка разделов живёт здесь, а не на панели: панель обязана
+  // остаться непрокручиваемой, иначе возвращается рывок с фокусом.
+  overflow-y: auto;
+  overflow-x: clip;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-2xs) var(--spacing-md);
 }
 
-.brandText {
-  min-width: 0;
-  flex: 1;
-
-  // Название в панели набирается мельче заголовка страницы: иначе оно
-  // не помещается рядом со знаком и обрезается.
-  h1,
-  h2,
-  h3,
-  h4 {
-    font-size: var(--font-size-body);
-  }
-
-  // Название и подпись не переносим по слогам: в узкой панели это выглядит
-  // рвано — лучше подрезать многоточием.
-  > * {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-// Кнопка сворачивания заметна только при наведении на панель: постоянно
-// висящая стрелка отвлекает от навигации.
-.collapseButton {
-  opacity: 0;
-  transition: opacity var(--duration-fast) ease;
-
-  .sidebar:hover &,
-  &:focus-visible {
-    opacity: 1;
-  }
-}
-
-.sidebarCollapsed .collapseButton {
-  opacity: 1;
+.navSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
 }
 
 .navLink {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-sm);
+  // Отступ постоянный в обоих состояниях: раньше он переключался классом в
+  // момент клика, и значки прыгали, пока ширина ещё ехала.
+  padding: var(--spacing-xs) var(--spacing-xs);
+  // Кнопка сворачивания — такая же строка, поэтому сбрасываем стили кнопки.
+  width: 100%;
+  border: none;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
   border-radius: var(--radius-md);
   color: var(--color-fg-muted);
   text-decoration: none;
@@ -112,6 +108,19 @@
   }
 }
 
+// Подпись и счётчик едут вместе: их гасит анимация при сворачивании панели,
+// поэтому они лежат в общей обёртке, а не прямо в ссылке.
+.navLabel {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  // Подпись не переносится и не сжимается — она уезжает за край панели
+  // целиком. Перенос на вторую строку менял бы высоту строки прямо
+  // во время анимации, и это читалось бы рывком.
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .navCount {
   margin-left: auto;
   font-size: var(--font-size-caption);
@@ -119,5 +128,9 @@
 }
 
 .sectionLabel {
-  padding: var(--spacing-md) var(--spacing-sm) var(--spacing-2xs);
+  display: block;
+  padding: var(--spacing-md) var(--spacing-xs) var(--spacing-2xs);
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
 }

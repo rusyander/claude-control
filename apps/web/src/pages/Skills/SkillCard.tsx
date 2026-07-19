@@ -41,7 +41,7 @@ export function SkillCard({ skill, onToggle, onEdit, onDelete, isDeleting }: Ski
               >
                 <Icon
                   name="chevronRight"
-                  size={16}
+                  size={14}
                   className={`${styles.filesChevron} ${isExpanded ? styles.filesChevronOpen : ''}`}
                 />
                 {skill.files.length} {t('skills.files')}
@@ -80,11 +80,7 @@ export function SkillCard({ skill, onToggle, onEdit, onDelete, isDeleting }: Ski
             onDelete={onDelete}
             isPending={isDeleting}
           />
-          <Toggle
-            checked={skill.isEnabled}
-            onCheckedChange={onToggle}
-            aria-label={`${skill.name}: ${skill.isEnabled ? t('common.disabled') : t('common.enabled')}`}
-          />
+          <Toggle checked={skill.isEnabled} onCheckedChange={onToggle} aria-label={skill.name} />
         </Stack>
       </Stack>
     </Card>

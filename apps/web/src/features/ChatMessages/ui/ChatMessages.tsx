@@ -5,6 +5,7 @@ import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { MessageBubble } from './MessageBubble';
+import { QuestionCard, parseQuestions } from './QuestionCard';
 import type { ChatMessagesProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 
@@ -16,14 +17,34 @@ import styles from './ChatMessages.module.scss';
 export function ChatMessages({ messages, stream, isLoading, onEdit }: ChatMessagesProps) {
   const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  // Держим ленту у нижнего края, пока текст набирается.
+  // Держаться ли низа. Пока пользователь внизу — лента едет за ответом; стоит
+  // ему отлистать вверх, чтобы перечитать, — отпускаем. Раньше лента тянула
+  // вниз на каждом слове, и читать прошлые сообщения во время ответа было
+  // нельзя.
+  const isPinned = useRef(true);
+
+  // Смена разговора — снова к последнему сообщению.
+  const conversationId = messages[0]?.id;
   useEffect(() => {
+    isPinned.current = true;
     bottomRef.current?.scrollIntoView({ block: 'end' });
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (isPinned.current) bottomRef.current?.scrollIntoView({ block: 'end' });
   }, [messages.length, stream.text, stream.tools.length]);
 
   return (
-    <div className={styles.list}>
+    <div
+      className={styles.list}
+      ref={listRef}
+      onScroll={(event) => {
+        const list = event.currentTarget;
+        isPinned.current = list.scrollHeight - list.scrollTop - list.clientHeight < 160;
+      }}
+    >
       {isLoading && <SkeletonList rows={3} withActions={false} />}
 
       {messages.map((message) => (
@@ -40,20 +61,50 @@ export function ChatMessages({ messages, stream, isLoading, onEdit }: ChatMessag
               </details>
             )}
 
-            {stream.tools.map((tool, index) => (
-              <details key={`${tool.name}-${index}`} className={styles.tool}>
-                <summary>{tool.name}</summary>
-                <div className={styles.toolInput}>{tool.input}</div>
-              </details>
-            ))}
+            {stream.tools.map((tool, index) => {
+              const questions =
+                tool.name === 'AskUserQuestion' ? parseQuestions(tool.input) : undefined;
 
-            <div
-              className={styles.text}
-              // Разметку строит markdown-it с выключенным сырым html.
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(stream.text) }}
-            />
+              if (questions) {
+                return <QuestionCard key={`${tool.name}-${index}`} questions={questions} />;
+              }
 
-            {stream.isRunning && <span className={styles.caret} />}
+              return (
+                <details key={`${tool.name}-${index}`} className={styles.tool}>
+                  <summary>{tool.name}</summary>
+                  <div className={styles.toolInput}>{tool.input}</div>
+                </details>
+              );
+            })}
+
+            {stream.text && (
+              <div
+                className={styles.text}
+                // Разметку строит markdown-it с выключенным сырым html.
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(stream.text) }}
+              />
+            )}
+
+            {/*
+              Пока ответа ещё нет, показываем, что работа идёт. Одной мигающей
+              каретки на пустом месте мало: со стороны это неотличимо от
+              зависшего разговора, а до первого слова проходят секунды —
+              модель успевает подумать и сходить в инструменты.
+            */}
+            {stream.isRunning && !stream.text && (
+              <div className={styles.pending}>
+                <span className={styles.dots} aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span className={styles.pendingLabel}>
+                  {stream.tools.length > 0 ? t('chat.pendingTools') : t('chat.pending')}
+                </span>
+              </div>
+            )}
+
+            {stream.isRunning && stream.text && <span className={styles.caret} />}
           </div>
         </div>
       )}

@@ -27,10 +27,19 @@ export function parseRules(markdown: string, scope: string, store: AppStore): Pa
   let current: { title: string; body: string[] } | null = null;
   let order = 0;
   let inDisabledSection = false;
+  const usedIds = new Set<string>();
 
   const flush = (): void => {
     if (!current) return;
-    const id = slugify(current.title);
+    // Заголовки в файле повторяются — их пишет человек, а не программа.
+    // Идентификатор при этом служит ключом для правки и удаления: с
+    // одинаковыми id правка ушла бы в первое совпавшее правило, а удаление
+    // вынесло бы разом все одноимённые. Поэтому повтор получает суффикс.
+    const base = slugify(current.title);
+    let id = base;
+    for (let n = 2; usedIds.has(id); n += 1) id = `${base}-${n}`;
+    usedIds.add(id);
+
     rules.push({
       id,
       title: current.title,
@@ -104,7 +113,7 @@ export function saveRule(
 
   const index = rules.findIndex((rule) => rule.id === ruleId);
   const updated: Rule = {
-    id: index >= 0 ? ruleId : slugify(draft.title),
+    id: index >= 0 ? ruleId : freeId(slugify(draft.title), rules),
     title: draft.title,
     body: draft.body,
     order: index >= 0 ? (rules[index]?.order ?? rules.length) : rules.length,
@@ -129,6 +138,17 @@ export function deleteRule(
   const { preamble, rules } = parseRules(markdown, 'global', store);
   const remaining = rules.filter((rule) => rule.id !== ruleId);
   return writeTextFile(claudeMdPath, serializeRules(preamble, remaining), { backupDir });
+}
+
+/**
+ * Свободный идентификатор: новое правило может называться так же, как уже
+ * существующее, и без проверки заняло бы его ключ.
+ */
+function freeId(base: string, rules: readonly Rule[]): string {
+  const taken = new Set(rules.map((rule) => rule.id));
+  let id = base;
+  for (let n = 2; taken.has(id); n += 1) id = `${base}-${n}`;
+  return id;
 }
 
 /**

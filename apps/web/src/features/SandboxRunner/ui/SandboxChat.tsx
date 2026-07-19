@@ -8,6 +8,7 @@ import { Icon } from '@shared/ui/icon';
 import { TextField } from '@shared/ui/text-field';
 import { useSandboxRun } from '@entities/Sandbox/model/useSandboxRun';
 import type { SandboxKind } from '@entities/Sandbox/api/SandboxApi';
+import { toast } from '@shared/lib/toast';
 import { buildTestPrompts, type TestContext } from '../model/buildTestPrompt';
 import styles from './SandboxModal.module.scss';
 
@@ -51,7 +52,11 @@ export function SandboxChat({ sandboxId, kind, title, context }: SandboxChatProp
               type="button"
               className={styles.chipCopy}
               aria-label={`${t('chat.copyMessage')}: ${suggestion.label}`}
-              onClick={() => void navigator.clipboard.writeText(suggestion.prompt)}
+              onClick={() =>
+                void navigator.clipboard.writeText(suggestion.prompt).then(() => {
+                  toast.success(t('toasts.copied'));
+                })
+              }
             >
               <Icon name="copy" size={14} />
             </button>

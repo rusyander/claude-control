@@ -8,10 +8,13 @@ import {
   useResourceFiles,
   useSaveResourceFile,
   useDeleteResourceFile,
+  useResourceTemplates,
+  useApplyTemplate,
   type ResourceKind,
 } from '@entities/Resource/api/ResourceApi';
 import { buildTree, countFiles, type TreeNode } from '../model/buildTree';
 import { ResourceFileEditor } from './ResourceFileEditor';
+import { StructureAssistant } from './StructureAssistant';
 import styles from './ResourceFileTree.module.scss';
 
 interface ResourceFileTreeProps {
@@ -35,6 +38,8 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
   const data = useResourceFiles(kind, id);
   const save = useSaveResourceFile(kind, id);
   const remove = useDeleteResourceFile(kind, id);
+  const templates = useResourceTemplates(kind);
+  const applyTemplate = useApplyTemplate(kind, id);
 
   const files = data.data?.files ?? [];
   const isWritable = data.data?.isWritable ?? false;
@@ -53,12 +58,67 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
     setCreatingIn(undefined);
   };
 
+  // Пустому ресурсу предлагаем шаблон: начинать с чистого листа тяжелее,
+  // чем дополнить готовую форму.
   if (files.length === 0 && !data.isLoading) {
     return (
       <div className={styles.tree}>
-        <Typography variant="caption" color="subtle">
-          {t('resources.noFiles')}
-        </Typography>
+        {isWritable && (templates.data?.length ?? 0) > 0 ? (
+          <Stack gap="var(--spacing-xs)">
+            <Typography variant="caption" color="subtle">
+              {t('resources.startFromTemplate')}
+            </Typography>
+
+            {templates.data?.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                className={styles.template}
+                onClick={() => applyTemplate.mutate(template.id)}
+                disabled={applyTemplate.isPending}
+              >
+                <Stack gap="var(--spacing-3xs)">
+                  <Stack direction="row" align="center" gap="var(--spacing-2xs)">
+                    <Icon name="skills" size={16} />
+                    <Typography variant="body-sm" weight="medium" as="span">
+                      {template.title}
+                    </Typography>
+                    <Typography variant="caption" color="subtle" as="span">
+                      {template.fileCount} · {template.paths.join(', ')}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="caption" color="muted">
+                    {template.description}
+                  </Typography>
+                </Stack>
+              </button>
+            ))}
+
+            <Button
+              size="sm"
+              variant="ghost"
+              leftIcon={<Icon name="plus" size={16} />}
+              onClick={() => setCreatingIn('')}
+            >
+              {t('resources.emptyStart')}
+            </Button>
+
+            {creatingIn === '' && (
+              <NewNodeInput
+                placeholder="SKILL.md"
+                onCancel={() => setCreatingIn(undefined)}
+                onSubmit={(name) => createFile('', name)}
+              />
+            )}
+
+            {/* Помощник умеет собрать структуру с нуля — по описанию задачи. */}
+            <StructureAssistant kind={kind} id={id} />
+          </Stack>
+        ) : (
+          <Typography variant="caption" color="subtle">
+            {t('resources.noFiles')}
+          </Typography>
+        )}
       </div>
     );
   }
@@ -119,6 +179,8 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
           onClose={() => setSelected(undefined)}
         />
       )}
+
+      {isWritable && <StructureAssistant kind={kind} id={id} />}
     </div>
   );
 }
@@ -184,9 +246,8 @@ function TreeItem({
           />
           <Icon name="folder" size={16} />
           <span className={styles.name}>{node.name}</span>
+          <span className={styles.count}>{countFiles(node)}</span>
         </button>
-
-        <span className={styles.count}>{countFiles(node)}</span>
 
         {isWritable && (
           <span className={styles.nodeActions}>

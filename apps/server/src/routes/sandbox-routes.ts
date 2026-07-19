@@ -16,6 +16,7 @@ import {
 } from '../domains/sandbox/HookProbe.ts';
 import { listMcpTools, callMcpTool } from '../domains/sandbox/McpProbe.ts';
 import { ChatRun, type ChatEvent } from '../domains/chat/ChatRunner.ts';
+import { readClaudeCredentials } from '../lib/credentials.ts';
 import { readHooks } from '../domains/hooks.ts';
 import { readMcpServers } from '../domains/mcp.ts';
 import { readArtifacts } from '../domains/chat/ChatArtifacts.ts';
@@ -50,6 +51,9 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
         configDir: sandbox.configDir,
         workDir: sandbox.workDir,
         description: sandbox.description,
+        // Без доступа к аккаунту разговор в песочнице не пойдёт — пусть
+        // интерфейс скажет об этом сразу, а не после неудачной попытки.
+        credentials: sandbox.credentials,
       };
     },
   );
@@ -147,6 +151,10 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       }
 
       const { configDir, workDir } = sandboxPaths(id);
+      // Доступ может быть не файлом, а ключом API: тогда он приходит
+      // переменной окружения и в каталоге песочницы его нет.
+      const { apiKey } = readClaudeCredentials(ctx.location.paths.root);
+      const env = apiKey ? { ANTHROPIC_API_KEY: apiKey } : undefined;
 
       reply.raw.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -169,7 +177,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       });
 
       try {
-        await run.start({ prompt, sessionId, cwd: workDir, configDir }, send);
+        await run.start({ prompt, sessionId, cwd: workDir, configDir, env }, send);
       } catch (error) {
         send({ kind: 'error', message: error instanceof Error ? error.message : String(error) });
       } finally {

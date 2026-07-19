@@ -28,3 +28,121 @@ process.stdin.on('end', () => {
   process.exit(0);
 });
 `;
+
+/**
+ * Готовые скрипты под типовые задачи хуков. Пустой файл почти всегда
+ * переписывают одним из этих каркасов, поэтому предлагаем их сразу — остаётся
+ * поправить условие и текст.
+ */
+export interface ScriptTemplate {
+  id: string;
+  title: string;
+  description: string;
+  fileName: string;
+  content: string;
+}
+
+export const SCRIPT_TEMPLATES: ScriptTemplate[] = [
+  {
+    id: 'blank',
+    title: 'Пустой каркас',
+    description: 'Чтение события со stdin и место под логику.',
+    fileName: 'new-hook.mjs',
+    content: NEW_SCRIPT_TEMPLATE,
+  },
+  {
+    id: 'guard',
+    title: 'Страж команды',
+    description:
+      'Проверяет команду и при совпадении требует подтверждения (код выхода не нужен — решение в JSON).',
+    fileName: 'guard.mjs',
+    content: `#!/usr/bin/env node
+/**
+ * Страж: проверяет действие перед выполнением и просит подтверждения,
+ * если оно похоже на опасное.
+ */
+import { stdin } from 'node:process';
+
+let raw = '';
+for await (const chunk of stdin) raw += chunk;
+
+let input;
+try {
+  input = JSON.parse(raw);
+} catch {
+  process.exit(0);
+}
+
+const command = String(input?.tool_input?.command ?? '');
+
+// Условие срабатывания — замените на своё.
+if (/rm\\s+-rf|DROP\\s+TABLE/i.test(command)) {
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'ask',
+        permissionDecisionReason: 'Команда выглядит разрушительной — нужно подтверждение.',
+      },
+    }),
+  );
+}
+
+process.exit(0);
+`,
+  },
+  {
+    id: 'format',
+    title: 'Формат при сохранении',
+    description: 'Запускает форматтер по изменённому файлу (PostToolUse на Write/Edit).',
+    fileName: 'format-on-edit.mjs',
+    content: `#!/usr/bin/env node
+/**
+ * Тихий автоформат изменённого файла. Вешается на PostToolUse (Write/Edit).
+ */
+import { stdin } from 'node:process';
+import { execFileSync } from 'node:child_process';
+
+let raw = '';
+for await (const chunk of stdin) raw += chunk;
+
+let filePath = '';
+try {
+  filePath = String(JSON.parse(raw)?.tool_input?.file_path ?? '');
+} catch {
+  process.exit(0);
+}
+
+if (/\\.(ts|tsx|js|jsx|json|css|scss|md)$/.test(filePath)) {
+  try {
+    execFileSync('npx', ['prettier', '--write', filePath], { stdio: 'ignore' });
+  } catch {
+    // Форматтер недоступен — не мешаем работе.
+  }
+}
+
+process.exit(0);
+`,
+  },
+  {
+    id: 'brief',
+    title: 'Брифинг при старте',
+    description: 'Добавляет контекст в начало сессии (SessionStart).',
+    fileName: 'session-brief.mjs',
+    content: `#!/usr/bin/env node
+/**
+ * Брифинг на старте сессии: добавляет напоминание в контекст Claude.
+ */
+process.stdout.write(
+  JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'SessionStart',
+      additionalContext: 'Напоминание: сверься с .agent/notes.md перед работой.',
+    },
+  }),
+);
+
+process.exit(0);
+`,
+  },
+];

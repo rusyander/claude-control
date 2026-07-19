@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { mkdirSync } from 'node:fs';
+import { safeSessionId, safeName, safeModel, shellArgs } from '../../lib/cli-args.ts';
 
 /**
  * Запуск Claude Code для чата и разбор потока событий.
@@ -46,6 +47,18 @@ export interface RunOptions {
    * действует, а всё остальное из реальной конфигурации не подключается.
    */
   configDir?: string;
+  /**
+   * Дополнительные переменные окружения. Нужны песочнице: доступ к аккаунту
+   * может быть не файлом, а ключом API — его передают именно так.
+   */
+  env?: Record<string, string>;
+  /**
+   * Права на действия с файлами. В песочнице — acceptEdits: там файлы Claude
+   * и есть результат. В настоящем проекте по умолчанию `default`: чтение
+   * работает, а правки без подтверждения не проходят, и панель ничего в
+   * рабочем коде молча не меняет.
+   */
+  permissionMode?: string;
 }
 
 export class ChatRun {
@@ -62,24 +75,32 @@ export class ChatRun {
       'stream-json',
       '--verbose',
       '--include-partial-messages',
-      // Чат сам по себе безобиден, но Claude в нём пишет файлы артефактов.
-      // acceptEdits разрешает правки в рабочей папке, не отдавая ему команды.
       '--permission-mode',
-      'acceptEdits',
+      options.permissionMode ?? 'acceptEdits',
     ];
 
-    if (options.sessionId) args.push('--resume', options.sessionId);
-    if (options.fork) args.push('--fork-session');
-    if (options.name) args.push('--name', options.name);
-    if (options.model) args.push('--model', options.model);
+    // На Windows CLI запускается через оболочку (см. cli-args.ts), поэтому
+    // всё, что пришло из запроса, проверяется до попадания в командную строку.
+    const sessionId = safeSessionId(options.sessionId);
+    const name = safeName(options.name);
+    const model = safeModel(options.model);
 
-    this.child = spawn(isWindows ? 'claude.cmd' : 'claude', args, {
+    if (sessionId) args.push('--resume', sessionId);
+    if (options.fork) args.push('--fork-session');
+    if (name) args.push('--name', name);
+    if (model) args.push('--model', model);
+
+    // Имя чата — обычный текст с пробелами, а оболочка Windows разобрала бы
+    // его как несколько аргументов, поэтому аргументы квотируются.
+    this.child = spawn(isWindows ? 'claude.cmd' : 'claude', shellArgs(args), {
       cwd: options.cwd,
       shell: isWindows,
       windowsHide: true,
-      env: options.configDir
-        ? { ...process.env, CLAUDE_CONFIG_DIR: options.configDir }
-        : process.env,
+      env: {
+        ...process.env,
+        ...(options.configDir ? { CLAUDE_CONFIG_DIR: options.configDir } : {}),
+        ...options.env,
+      },
     });
 
     // Длинный промпт нельзя передавать аргументом: оболочка Windows его рвёт.

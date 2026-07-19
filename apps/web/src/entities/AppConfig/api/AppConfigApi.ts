@@ -64,5 +64,6 @@ export function useSetLocation() {
       // Смена каталога меняет вообще всё, что показывает приложение.
       void queryClient.invalidateQueries();
     },
+    meta: { successMessage: 'toasts.locationChanged' },
   });
 }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
+import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { PageHeader } from '@shared/ui/page-header';
@@ -33,6 +34,16 @@ export function SkillsPage() {
   const openEdit = (skill: Skill): void => {
     setEditing(skill);
     setIsFormOpen(true);
+    writeUrl(skill.id);
+  };
+
+  // Ссылка вида /skills?id=<имя> открывает этот скилл сразу в редакторе.
+  const writeUrl = useEntityUrlWriter();
+  useEntityUrl<Skill>({ items: skills, getId: (skill) => skill.id, onOpen: openEdit });
+
+  const closeForm = (open: boolean): void => {
+    setIsFormOpen(open);
+    if (!open) writeUrl(undefined);
   };
 
   const filtered = useMemo(() => {
@@ -85,7 +96,7 @@ export function SkillsPage() {
         <Typography color="subtle">{t('common.empty')}</Typography>
       )}
 
-      <SkillFormModal isOpen={isFormOpen} onOpenChange={setIsFormOpen} skill={editing} />
+      <SkillFormModal isOpen={isFormOpen} onOpenChange={closeForm} skill={editing} />
     </Stack>
   );
 }

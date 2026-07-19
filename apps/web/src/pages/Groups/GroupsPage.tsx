@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Automation, EntityRef, Group } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
+import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
@@ -10,6 +11,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
+import { EmptyState } from '@shared/ui/empty-state';
 import { GroupFormModal } from '@features/GroupEditor';
 import { AutomationFormModal } from '@features/AutomationEditor';
 import { SandboxButton } from '@features/SandboxRunner';
@@ -46,6 +48,21 @@ export function GroupsPage() {
   const openCreateGroup = (): void => {
     setEditingGroup(undefined);
     setIsGroupFormOpen(true);
+  };
+
+  const openEditGroup = (group: Group): void => {
+    setEditingGroup(group);
+    setIsGroupFormOpen(true);
+    writeUrl(group.id);
+  };
+
+  // Ссылка /groups?id=<uuid> открывает эту группу в редакторе.
+  const writeUrl = useEntityUrlWriter();
+  useEntityUrl<Group>({ items: groups, getId: (group) => group.id, onOpen: openEditGroup });
+
+  const closeGroupForm = (open: boolean): void => {
+    setIsGroupFormOpen(open);
+    if (!open) writeUrl(undefined);
   };
 
   const openCreateAutomation = (): void => {
@@ -91,8 +108,8 @@ export function GroupsPage() {
                   <Badge tone="accent">
                     {group.members.length} {t('groups.members')}
                   </Badge>
-                  {Object.keys(group.env).length > 0 && (
-                    <Badge tone="info">env: {Object.keys(group.env).length}</Badge>
+                  {Object.keys(group.env ?? {}).length > 0 && (
+                    <Badge tone="info">env: {Object.keys(group.env ?? {}).length}</Badge>
                   )}
                   {!group.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
                 </Stack>
@@ -115,10 +132,7 @@ export function GroupsPage() {
                   iconOnly
                   icon={<Icon name="edit" size={24} />}
                   aria-label={`${t('common.edit')}: ${group.name}`}
-                  onClick={() => {
-                    setEditingGroup(group);
-                    setIsGroupFormOpen(true);
-                  }}
+                  onClick={() => openEditGroup(group)}
                 />
                 <Button
                   variant="ghost"
@@ -135,7 +149,20 @@ export function GroupsPage() {
       </Stack>
 
       {!isLoading && groups.length === 0 && (
-        <Typography color="subtle">{t('common.empty')}</Typography>
+        <EmptyState
+          icon="groups"
+          title={t('groups.emptyTitle')}
+          text={t('groups.emptyText')}
+          action={
+            <Button
+              variant="primary"
+              leftIcon={<Icon name="plus" size={20} />}
+              onClick={openCreateGroup}
+            >
+              {t('groups.addGroup')}
+            </Button>
+          }
+        />
       )}
 
       <Stack gap="var(--spacing-sm)" marginTop="var(--spacing-lg)">
@@ -201,11 +228,7 @@ export function GroupsPage() {
         {automations.length === 0 && <Typography color="subtle">{t('common.empty')}</Typography>}
       </Stack>
 
-      <GroupFormModal
-        isOpen={isGroupFormOpen}
-        onOpenChange={setIsGroupFormOpen}
-        group={editingGroup}
-      />
+      <GroupFormModal isOpen={isGroupFormOpen} onOpenChange={closeGroupForm} group={editingGroup} />
       <AutomationFormModal
         isOpen={isAutomationFormOpen}
         onOpenChange={setIsAutomationFormOpen}

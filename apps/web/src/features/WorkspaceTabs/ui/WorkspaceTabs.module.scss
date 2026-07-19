@@ -1,0 +1,87 @@
+.bar {
+  display: flex;
+  align-items: stretch;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  overflow-x: auto;
+  // Тонкая полоса прокрутки: табов может быть много, но полоса не должна красть высоту.
+  scrollbar-width: thin;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+
+  &:hover {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+}
+
+.active {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border);
+  color: var(--color-fg);
+  font-weight: 500;
+}
+
+// Таб проекта — контейнер с подписью и кнопкой закрытия.
+.project {
+  gap: var(--spacing-3xs);
+  padding-right: var(--spacing-3xs);
+}
+
+.tabLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  max-width: 180px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.name {
+  min-width: 0;
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-subtle);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}

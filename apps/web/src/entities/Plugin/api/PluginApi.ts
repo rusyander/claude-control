@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CommandResult, Plugin, PluginsState } from '@claude-control/contracts';
 import { apiClient } from '@shared/api/client';
+import { i18n } from '@shared/config/i18n';
+import { toast } from '@shared/lib/toast';
 
 const pluginsKey = ['plugins'] as const;
 
@@ -35,14 +37,23 @@ export function useAvailablePlugins(isEnabled: boolean) {
  * репозиторий маркетплейса. Поэтому таймаут увеличен, а список обновляется
  * только после завершения команды.
  */
-function usePluginCommand<TInput>(request: (input: TInput) => Promise<CommandResult>) {
+function usePluginCommand<TInput>(
+  request: (input: TInput) => Promise<CommandResult>,
+  successMessage: string,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: request,
-    onSuccess: () => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: pluginsKey });
+      // У CLI-команд ошибка приходит не исключением, а полем ok=false —
+      // поэтому итог разбираем здесь, а не в глобальном обработчике.
+      if (result.ok) toast.success(i18n.t(successMessage));
+      else toast.error(result.output?.trim() || i18n.t('plugins.commandFailed'));
     },
+    // Тост об успехе/ошибке команды ставим сами (по ok). Брошенные (сетевые)
+    // ошибки при этом по-прежнему подхватит глобальный обработчик.
   });
 }
 
@@ -54,7 +65,7 @@ export function useInstallPlugin() {
       { timeout: 300_000 },
     );
     return data;
-  });
+  }, 'toasts.pluginInstalled');
 }
 
 export function useUninstallPlugin() {
@@ -65,7 +76,7 @@ export function useUninstallPlugin() {
       { timeout: 300_000 },
     );
     return data;
-  });
+  }, 'toasts.pluginRemoved');
 }
 
 export function useSetPluginEnabled() {
@@ -76,7 +87,7 @@ export function useSetPluginEnabled() {
       { timeout: 120_000 },
     );
     return data;
-  });
+  }, 'toasts.updated');
 }
 
 export function useUpdatePlugin() {
@@ -87,5 +98,5 @@ export function useUpdatePlugin() {
       { timeout: 300_000 },
     );
     return data;
-  });
+  }, 'toasts.pluginUpdated');
 }

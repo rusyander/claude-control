@@ -108,7 +108,14 @@ export function SystemPermissions({ rules, onEdit, onCreate }: SystemPermissions
                         </>
                       ) : (
                         <>
-                          <Badge tone="neutral">{t('permissions.notConfigured')}</Badge>
+                          {/*
+                            Не значок, а спокойный текст: залитая плашка рядом
+                            с кнопкой сама читалась кнопкой — казалось, что
+                            «Не задано» можно нажать.
+                          */}
+                          <Typography variant="body-sm" color="subtle" as="span">
+                            {t('permissions.notConfigured')}
+                          </Typography>
                           <Button
                             size="sm"
                             variant="secondary"

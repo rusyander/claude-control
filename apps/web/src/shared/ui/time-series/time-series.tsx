@@ -83,7 +83,9 @@ export function TimeSeries({ points, seriesName, height = 220 }: TimeSeriesProps
         {points.map((point, index) =>
           index % labelStep === 0 ? (
             <text
-              key={point.label}
+              // Ключ по номеру точки, а не по подписи: подписи повторяются —
+              // при почасовой разбивке «00:00» встречается каждый день.
+              key={index}
               className={styles.axisLabel}
               x={positionOf(index)}
               y={height - 6}
@@ -94,9 +96,9 @@ export function TimeSeries({ points, seriesName, height = 220 }: TimeSeriesProps
           ) : null,
         )}
 
-        {points.map((point, index) => (
+        {points.map((_point, index) => (
           <rect
-            key={point.label}
+            key={index}
             className={styles.hitArea}
             x={positionOf(index) - plotWidth / points.length / 2}
             y={PADDING.top}

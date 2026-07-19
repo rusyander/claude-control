@@ -7,7 +7,7 @@ import {
   renameSync,
   readFileSync,
 } from 'node:fs';
-import { join, resolve, dirname, sep } from 'node:path';
+import { join, resolve, dirname, basename, sep } from 'node:path';
 import type { ClaudeLocation } from '@claude-control/contracts';
 import { writeTextFile } from '../../lib/safe-io.ts';
 import { layoutOf, type ResourceKind } from './registry.ts';
@@ -66,8 +66,14 @@ export function listResourceFiles(
   if (!layout || !root || !existsSync(root)) return [];
 
   if (!layout.isDirectory) {
-    const target = join(root, id);
-    return existsSync(target) && statSync(target).isFile() ? [describe(root, id)] : [];
+    // У одиночного файла (скрипт, хук) идентификатор — это имя файла. Берём
+    // из него только имя без пути: иначе через id="../x" можно было бы
+    // выйти из папки.
+    const name = basename(id);
+    if (!name || name === '.' || name === '..') return [];
+
+    const target = join(root, name);
+    return existsSync(target) && statSync(target).isFile() ? [describe(root, name)] : [];
   }
 
   return walk(root, root).sort((a, b) => a.path.localeCompare(b.path));
@@ -97,11 +103,14 @@ export function writeResourceFile(
   content: string,
   location: ClaudeLocation,
   backupDir?: string,
+  /** Не трогать файл, если он уже есть, — нужно шаблонам. */
+  skipExisting = false,
 ): void {
   assertWritable(kind);
 
   const target = safePath(kind, id, file, location);
   if (!target) throw new Error('Путь выходит за пределы ресурса');
+  if (skipExisting && existsSync(target)) return;
 
   mkdirSync(dirname(target), { recursive: true });
   writeTextFile(target, content, { backupDir });
@@ -134,6 +143,10 @@ export function moveResourceFile(
   const target = safePath(kind, id, to, location);
   if (!source || !target || !existsSync(source)) throw new Error('Неверный путь');
 
+  // Перенос не должен молча затирать существующий файл — иначе одна опечатка
+  // в имени уничтожает чужое содержимое без следа.
+  if (existsSync(target)) throw new Error('Файл с таким именем уже существует');
+
   mkdirSync(dirname(target), { recursive: true });
   renameSync(source, target);
 }
@@ -143,9 +156,12 @@ function assertWritable(kind: ResourceKind): void {
 }
 
 /**
- * Путь внутри ресурса. Имя приходит из запроса, поэтому проверяется, что
- * результат остаётся внутри корня: сравниваем с разделителем на конце, иначе
- * соседняя папка с похожим именем пройдёт проверку на префикс.
+ * Путь к файлу внутри ресурса. Имя приходит из запроса, поэтому проверяется,
+ * что результат остаётся внутри корня и указывает на файл, а не на сам корень.
+ *
+ * Совпадение с корнем отвергается намеренно: пустой `file` или `.` привёл бы
+ * к операции над всей папкой ресурса — а удаление такого пути снесло бы весь
+ * скилл целиком. Файл всегда должен быть строго внутри.
  */
 function safePath(
   kind: ResourceKind,
@@ -156,10 +172,16 @@ function safePath(
   const root = rootOf(kind, id, location);
   if (!root) return undefined;
 
-  const base = resolve(root);
-  const target = resolve(base, file);
+  // Пустое имя или одни точки не адресуют файл — это ссылка на саму папку.
+  const trimmed = file.trim();
+  if (!trimmed || /^\.+$/.test(trimmed.replace(/[/\\]/g, ''))) return undefined;
 
-  return target === base || target.startsWith(`${base}${sep}`) ? target : undefined;
+  const base = resolve(root);
+  const target = resolve(base, trimmed);
+
+  // Строго внутри корня: сам корень и всё, что снаружи, — отказ. Сравниваем
+  // с разделителем на конце, иначе соседняя папка с похожим именем прошла бы.
+  return target.startsWith(`${base}${sep}`) ? target : undefined;
 }
 
 /** Обход папки. Путь наружу отдаётся относительным, а stat берётся по полному. */

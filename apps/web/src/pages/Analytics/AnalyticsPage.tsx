@@ -79,6 +79,7 @@ export function AnalyticsPage() {
             <StatCard
               label={t('analytics.outputTokens')}
               value={formatCompact(data.overall.output, locale)}
+              detail={formatNumber(data.overall.output, locale)}
             />
             <StatCard
               label={t('analytics.cacheHit')}
@@ -90,6 +91,7 @@ export function AnalyticsPage() {
               label={t('analytics.estimatedCost')}
               value={formatMoney(data.estimatedCost, locale)}
               hint={t('analytics.estimatedCostHint')}
+              detail={t('analytics.estimatedCostDetail')}
             />
           </div>
 

@@ -9,7 +9,9 @@
     "dev": "node --watch --experimental-strip-types src/index.ts",
     "start": "node --experimental-strip-types src/index.ts",
     "build": "tsc --noEmit",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@claude-control/contracts": "workspace:*",
@@ -21,6 +23,8 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
-    "typescript": "^5.9.3"
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   }
 }

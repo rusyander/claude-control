@@ -1,0 +1,42 @@
+.modeTabs {
+  display: flex;
+  gap: var(--spacing-3xs);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.jsonInput {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.6;
+  resize: vertical;
+
+  &:focus,
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+}
+
+.importPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-2xs);
+}
+
+.importRow {
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-radius: var(--radius-sm);
+}

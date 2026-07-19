@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { McpServer } from '@claude-control/contracts';
+import { shellArgs } from '../../lib/cli-args.ts';
 
 /**
  * Стенд для MCP-сервера: поднять, посмотреть, что он умеет, и вызвать
@@ -110,11 +111,13 @@ function talk(
     let child: ChildProcessWithoutNullStreams;
 
     try {
-      child = spawn(command, server.args, {
+      child = spawn(command, shellArgs(server.args), {
         env: { ...process.env, ...server.env },
         stdio: ['pipe', 'pipe', 'pipe'],
-        // На Windows .cmd-обёртку без оболочки не запустить.
-        shell: process.platform === 'win32' && /\.(cmd|bat)$/i.test(command),
+        // См. mcp.ts: на Windows npx/node/uvx — .cmd-обёртки без расширения
+        // в записи, и без оболочки spawn их не находит; экранирование
+        // аргументов оболочка не делает, поэтому shellArgs.
+        shell: process.platform === 'win32',
         windowsHide: true,
       });
     } catch (error) {

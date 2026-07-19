@@ -9,6 +9,8 @@ import {
   isWritable,
 } from '../domains/resources/ResourceFiles.ts';
 import { layoutOf, type ResourceKind } from '../domains/resources/registry.ts';
+import { templatesFor, templateById } from '../domains/resources/templates.ts';
+import { assistStructure } from '../domains/resources/ResourceAssistant.ts';
 
 /**
  * Файлы ресурсов — общие маршруты для всех видов.
@@ -21,6 +23,96 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
   type Params = { kind: string; id: string };
 
   const kindOf = (params: Params): ResourceKind | undefined => layoutOf(params.kind)?.kind;
+
+  // Заготовки структуры: начинать с пустого файла тяжело, а форма скилла
+  // с модулями повторяется от скилла к скиллу.
+  app.get<{ Params: { kind: string } }>('/api/resources/:kind/templates', (request) =>
+    templatesFor(request.params.kind).map(({ id, title, description, files }) => ({
+      id,
+      title,
+      description,
+      fileCount: files.length,
+      paths: files.map((file) => file.path),
+    })),
+  );
+
+  /** Разворачивает шаблон в готовые файлы ресурса. */
+  app.post<{ Params: Params; Body: { templateId: string } }>(
+    '/api/resources/:kind/:id/apply-template',
+    (request, reply) => {
+      const kind = kindOf(request.params);
+      const template = templateById(request.body.templateId);
+      if (!kind || !template) return reply.code(404).send({ message: 'Шаблон не найден' });
+
+      try {
+        // Существующие файлы не трогаем: SKILL.md уже создан формой с введённым
+        // именем и описанием — шаблон добавляет только недостающие модули.
+        let created = 0;
+        for (const file of template.files) {
+          const before = readResourceFile(kind, request.params.id, file.path, ctx.location);
+          if (before.content || before.isBinary) continue;
+
+          writeResourceFile(
+            kind,
+            request.params.id,
+            file.path,
+            file.content,
+            ctx.location,
+            ctx.backupDir,
+            true,
+          );
+          created += 1;
+        }
+        return { ok: true, created, needsRestart: true };
+      } catch (error) {
+        return reply.code(400).send({ message: messageOf(error) });
+      }
+    },
+  );
+
+  /**
+   * Помощник структуры: по описанию задачи собирает или дополняет файлы.
+   * Применяет их сразу слиянием — существующее обновляется, новое добавляется,
+   * ничего не удаляется само.
+   */
+  app.post<{ Params: Params; Body: { prompt: string; sessionId?: string } }>(
+    '/api/resources/:kind/:id/assist',
+    { bodyLimit: 4 * 1024 * 1024 },
+    async (request, reply) => {
+      const kind = kindOf(request.params);
+      if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
+
+      const result = await assistStructure(
+        kind,
+        request.params.id,
+        request.body.prompt,
+        ctx.location,
+        request.body.sessionId,
+      );
+
+      if (result.error) return reply.code(400).send({ message: result.error });
+
+      const applied: string[] = [];
+      for (const file of result.files) {
+        try {
+          writeResourceFile(
+            kind,
+            request.params.id,
+            file.path,
+            file.content,
+            ctx.location,
+            ctx.backupDir,
+          );
+          applied.push(file.path);
+        } catch {
+          // Путь за границами ресурса — молча пропускаем этот файл, остальные
+          // применяем: одна плохая строка не должна ронять весь ответ.
+        }
+      }
+
+      return { reply: result.reply, applied, sessionId: result.sessionId };
+    },
+  );
 
   app.get<{ Params: Params }>('/api/resources/:kind/:id/files', (request, reply) => {
     const kind = kindOf(request.params);

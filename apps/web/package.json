@@ -9,7 +9,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@claude-control/contracts": "workspace:*",
@@ -24,17 +27,22 @@
     "axios": "^1.18.1",
     "i18next": "^26.3.6",
     "markdown-it": "^14.3.0",
+    "motion": "^12.42.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-i18next": "^17.0.10",
     "shiki": "^4.3.1"
   },
   "devDependencies": {
+    "@storybook/addon-a11y": "^10.5.2",
+    "@storybook/addon-docs": "^10.5.2",
+    "@storybook/react-vite": "^10.5.2",
     "@types/markdown-it": "^14.1.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "sass": "^1.101.0",
+    "storybook": "^10.5.2",
     "typescript": "^5.9.3",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"

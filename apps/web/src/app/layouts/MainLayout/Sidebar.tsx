@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { Stack } from '@shared/ui/stack';
+import { motion } from 'motion/react';
+import { SPRING, DURATION, EASE, withReducedMotion } from '@shared/lib/motion';
+import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMotion';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
-import { Button } from '@shared/ui/button';
 import { useOverview } from '@entities/AppConfig';
 import { NAV_SECTIONS } from './Sidebar.constants';
 import { AppMark } from './AppMark';
@@ -15,9 +16,21 @@ interface SidebarProps {
 }
 
 /**
+ * Ширины держим числами: анимировать значение из CSS-переменной нельзя,
+ * а раскладка на них и так завязана (см. --layout-sidebar-width).
+ */
+const EXPANDED_WIDTH = 260;
+const COLLAPSED_WIDTH = 60;
+
+/**
  * Боковая навигация со счётчиками: видно объём каждого раздела до перехода.
- * В свёрнутом виде остаются только значки — подписи и счётчики прячутся,
- * а сама панель ужимается до ширины иконки.
+ *
+ * Как устроено сворачивание. Анимируется **только ширина самой панели**, а её
+ * содержимое всегда лежит в блоке постоянной ширины и просто обрезается краем.
+ * Так задумано: пока содержимое пережималось вместе с панелью, подписи
+ * переносились на новую строку, значки ползли по горизонтали, а часть стилей
+ * (отступы, выравнивание) переключалась классом мгновенно — и всё это читалось
+ * как рывок. Теперь внутри не двигается ничего: подписи гаснут на месте.
  */
 export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   const { t } = useTranslation();
@@ -35,65 +48,93 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
     groups: overview?.groups.total,
   };
 
-  return (
-    <Stack
-      as="nav"
-      className={`${styles.sidebar} ${isCollapsed ? styles.sidebarCollapsed : ''}`}
-      gap="var(--spacing-3xs)"
+  const isReduced = useReducedMotion();
+  const width = withReducedMotion(SPRING, isReduced);
+  const fade = withReducedMotion({ duration: DURATION.normal, ease: EASE }, isReduced);
+
+  /** Подпись, исчезающая вместе со сворачиванием. Место за собой сохраняет. */
+  const label = (children: React.ReactNode, className?: string) => (
+    <motion.span
+      className={className}
+      initial={false}
+      animate={{ opacity: isCollapsed ? 0 : 1 }}
+      transition={fade}
+      // Погасшая подпись не должна перехватывать курсор на узкой панели.
+      style={{ pointerEvents: isCollapsed ? 'none' : undefined }}
     >
-      <div className={styles.brand}>
-        <AppMark size={isCollapsed ? 28 : 32} />
+      {children}
+    </motion.span>
+  );
 
-        {!isCollapsed && (
-          <Stack gap="var(--spacing-3xs)" className={styles.brandText}>
-            <Typography variant="heading-sm">{t('common.appName')}</Typography>
-            <Typography variant="caption" color="subtle">
-              {t('common.appTagline')}
-            </Typography>
-          </Stack>
-        )}
-
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          icon={<Icon name={isCollapsed ? 'chevronRight' : 'chevronLeft'} size={20} />}
-          aria-label={t(isCollapsed ? 'common.expandSidebar' : 'common.collapseSidebar')}
-          onClick={onToggle}
-          className={styles.collapseButton}
-        />
-      </div>
-
-      {NAV_SECTIONS.map((section) => (
-        <Stack key={section.label} gap="var(--spacing-3xs)">
-          {!isCollapsed && (
-            <Typography variant="caption" color="subtle" className={styles.sectionLabel}>
-              {t(section.label)}
-            </Typography>
+  return (
+    <motion.nav
+      className={styles.sidebar}
+      // initial={false} — при первой отрисовке панель стоит на месте,
+      // а не разъезжается на глазах.
+      initial={false}
+      animate={{ width: isCollapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
+      transition={width}
+      aria-label={t('nav.sectionMain')}
+    >
+      <div className={styles.sidebarInner}>
+        <div className={styles.brand}>
+          <AppMark size={32} />
+          {label(
+            <Typography variant="heading-sm" as="span">
+              {t('common.appName')}
+            </Typography>,
           )}
+        </div>
 
-          {section.items.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={styles.navLink}
-              // В свёрнутом виде подписи нет — подсказка браузера её заменяет.
-              title={isCollapsed ? t(item.label) : undefined}
-            >
-              <Icon name={item.icon} size={24} />
+        {/*
+          Сворачивание — такая же строка, как пункты меню: значок всегда на
+          одном месте, поэтому при смене ширины кнопке некуда прыгать.
+        */}
+        <button
+          type="button"
+          className={styles.navLink}
+          onClick={onToggle}
+          data-sidebar-toggle
+          // Подпись рядом гаснет при сворачивании, поэтому имя кнопки задаём
+          // явно: иначе в свёрнутом виде она осталась бы без названия.
+          aria-label={t(isCollapsed ? 'common.expandSidebar' : 'common.collapseSidebar')}
+          aria-expanded={!isCollapsed}
+        >
+          <Icon name={isCollapsed ? 'chevronRight' : 'chevronLeft'} size={24} />
+          {label(
+            t(isCollapsed ? 'common.expandSidebar' : 'common.collapseSidebar'),
+            styles.navLabel,
+          )}
+        </button>
 
-              {!isCollapsed && (
-                <>
-                  {t(item.label)}
-                  {counts[item.key] !== undefined && (
-                    <span className={styles.navCount}>{counts[item.key]}</span>
-                  )}
-                </>
-              )}
-            </Link>
-          ))}
-        </Stack>
-      ))}
-    </Stack>
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label} className={styles.navSection}>
+            {label(t(section.label), styles.sectionLabel)}
+
+            {section.items.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={styles.navLink}
+                // В свёрнутом виде подписи не видно — подсказка браузера её заменяет.
+                title={isCollapsed ? t(item.label) : undefined}
+              >
+                <Icon name={item.icon} size={24} />
+
+                {label(
+                  <>
+                    {t(item.label)}
+                    {counts[item.key] !== undefined && (
+                      <span className={styles.navCount}>{counts[item.key]}</span>
+                    )}
+                  </>,
+                  styles.navLabel,
+                )}
+              </Link>
+            ))}
+          </div>
+        ))}
+      </div>
+    </motion.nav>
   );
 }

@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import type { McpServer, McpServerDraft, McpHealth } from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
 import type { AppStore } from '../lib/app-store.ts';
+import { shellArgs } from '../lib/cli-args.ts';
 
 /**
  * Регистрация MCP-серверов живёт в ~/.claude.json — рядом с каталогом .claude,
@@ -126,10 +127,14 @@ export async function checkMcpHealth(server: McpServer, timeoutMs = 30_000): Pro
   if (!server.command) return { health: 'failed', detail: 'Не задана команда запуска' };
 
   return new Promise<HealthResult>((resolve) => {
-    const child = spawn(server.command as string, server.args, {
+    const child = spawn(server.command as string, shellArgs(server.args), {
       env: { ...process.env, ...server.env },
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: process.platform === 'win32' && /\.(cmd|bat)$/i.test(server.command as string),
+      // На Windows оболочка нужна всегда, а не только для явных .cmd/.bat:
+      // npx, node и uvx там тоже .cmd-обёртки, просто пишут их без расширения,
+      // и spawn без shell не находит их вовсе (ENOENT). Оболочка не экранирует
+      // аргументы сама — этим занимается shellArgs.
+      shell: process.platform === 'win32',
       windowsHide: true,
     });
 

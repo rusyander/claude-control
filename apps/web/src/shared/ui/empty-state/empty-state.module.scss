@@ -1,0 +1,19 @@
+.root {
+  padding: var(--spacing-xl) var(--spacing-lg);
+  text-align: center;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-subtle);
+}
+
+.text {
+  max-width: 46ch;
+}

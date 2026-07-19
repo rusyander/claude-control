@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { McpServer } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
+import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -31,6 +32,16 @@ export function McpPage() {
   const openEdit = (server: McpServer): void => {
     setEditing(server);
     setIsFormOpen(true);
+    writeUrl(server.id);
+  };
+
+  // Ссылка /mcp?id=<имя сервера> открывает его настройки.
+  const writeUrl = useEntityUrlWriter();
+  useEntityUrl<McpServer>({ items: servers, getId: (server) => server.id, onOpen: openEdit });
+
+  const closeForm = (open: boolean): void => {
+    setIsFormOpen(open);
+    if (!open) writeUrl(undefined);
   };
 
   return (
@@ -66,7 +77,7 @@ export function McpPage() {
         <Typography color="subtle">{t('common.empty')}</Typography>
       )}
 
-      <McpFormModal isOpen={isFormOpen} onOpenChange={setIsFormOpen} server={editing} />
+      <McpFormModal isOpen={isFormOpen} onOpenChange={closeForm} server={editing} />
     </Stack>
   );
 }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PermissionDecision, PermissionRule } from '@claude-control/contracts';
 import { Icon } from '@shared/ui/icon';
+import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { PermissionFormModal } from '@features/PermissionEditor';
 import { DeleteButton } from '@features/EntityDelete';
@@ -48,6 +49,16 @@ export function PermissionsPage() {
     setEditing(rule);
     setPresetPattern(undefined);
     setIsFormOpen(true);
+    writeUrl(rule.id);
+  };
+
+  // Ссылка /permissions?id=<решение:шаблон> открывает это право.
+  const writeUrl = useEntityUrlWriter();
+  useEntityUrl<PermissionRule>({ items: rules, getId: (rule) => rule.id, onOpen: openEdit });
+
+  const closeForm = (open: boolean): void => {
+    setIsFormOpen(open);
+    if (!open) writeUrl(undefined);
   };
 
   const filtered = useMemo(() => {
@@ -170,7 +181,7 @@ export function PermissionsPage() {
 
       <PermissionFormModal
         isOpen={isFormOpen}
-        onOpenChange={setIsFormOpen}
+        onOpenChange={closeForm}
         rule={editing}
         initialPattern={presetPattern}
       />

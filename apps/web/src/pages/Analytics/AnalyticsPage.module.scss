@@ -15,6 +15,48 @@
   align-items: start;
 }
 
+// Процессы свёрнуты: развёрнутый список PID занимал весь первый экран и
+// отодвигал вниз расход и графики — то, ради чего на страницу заходят.
+.agents {
+  summary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2xs);
+    // Свой указатель вместо системного: со сменой display стандартный маркер
+    // пропадает, и строка перестаёт читаться как раскрывающаяся.
+    list-style: none;
+    color: var(--color-fg-muted);
+    font-size: var(--font-size-body-sm);
+    cursor: pointer;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::before {
+      content: '';
+      width: 0;
+      height: 0;
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      border-left: 5px solid currentColor;
+      transition: transform var(--duration-fast);
+    }
+
+    &:hover {
+      color: var(--color-fg);
+    }
+  }
+
+  &[open] summary::before {
+    transform: rotate(90deg);
+  }
+}
+
+.agentsBody {
+  margin-top: var(--spacing-xs);
+}
+
 .agentRow {
   padding: var(--spacing-3xs) 0;
 

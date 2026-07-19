@@ -1,0 +1,21 @@
+/** Тон уведомления — задаёт цвет, иконку и роль для скринридера. */
+export type ToastTone = 'success' | 'error' | 'warning' | 'info';
+
+export interface ToastItem {
+  /** Уникальный идентификатор — для анимации и закрытия. */
+  id: string;
+  tone: ToastTone;
+  /** Основной текст. */
+  message: string;
+  /** Необязательный заголовок над текстом. */
+  title?: string;
+  /** Сколько держать на экране, мс. 0 — не скрывать автоматически. */
+  duration: number;
+}
+
+/** Что можно задать при показе тоста, помимо самого текста. */
+export interface ToastOptions {
+  title?: string;
+  /** Переопределить длительность (по умолчанию 3 секунды). */
+  duration?: number;
+}

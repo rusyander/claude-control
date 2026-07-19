@@ -14,12 +14,50 @@ import { registerSandboxRoutes } from './routes/sandbox-routes.ts';
 import { registerResourceRoutes } from './routes/resource-routes.ts';
 
 const PORT = Number(process.env.PORT ?? 5178);
+const WEB_PORT = Number(process.env.WEB_PORT ?? 8888);
 const HOST = '127.0.0.1'; // только локально: приложение читает и пишет личные конфиги
+
+/**
+ * Свой интерфейс и никто больше. У API нет аутентификации — он по построению
+ * отдаёт секреты (`/api/env/reveal`) и заводит хуки, то есть команды, которые
+ * Claude Code выполнит сам. Пока сервер запущен, он доступен и любой открытой
+ * вкладке: браузер отправит запрос на localhost с чужой страницы. Отражать
+ * присланный Origin поэтому нельзя — иначе сторонний сайт вычитает токены
+ * из .mcp-secrets.env и поставит хук с произвольной командой.
+ */
+const ALLOWED_ORIGINS = new Set([`http://localhost:${WEB_PORT}`, `http://127.0.0.1:${WEB_PORT}`]);
+
+/** Запрос без Origin — curl, сам сервер, переход по адресу: не кросс-доменный вызов. */
+function isAllowedOrigin(origin: string | undefined): boolean {
+  return !origin || ALLOWED_ORIGINS.has(origin);
+}
 
 const ctx = new ServerContext();
 const app = Fastify({ logger: { level: 'warn' } });
 
-await app.register(cors, { origin: true });
+/**
+ * Отказ выдаётся до маршрутов и до CORS — свой обработчик, а не ошибка плагина:
+ * так чужой запрос не доходит до кода, а ответ остаётся понятным (403, а не 500).
+ *
+ * Проверок две. Origin ловит обычный кросс-доменный вызов. Sec-Fetch-Site нужен
+ * там, где Origin не присылают: форма или <img> с чужой страницы уходят на
+ * localhost и без него, а CORS ограничивает лишь чтение ответа — не отправку.
+ */
+app.addHook('onRequest', (request, reply, done) => {
+  const origin = request.headers.origin;
+  const site = request.headers['sec-fetch-site'];
+
+  if (!isAllowedOrigin(origin) || site === 'cross-site') {
+    reply.code(403).send({ error: 'Запрос с постороннего сайта отклонён' });
+    return;
+  }
+
+  done();
+});
+
+await app.register(cors, {
+  origin: (origin, callback) => callback(null, isAllowedOrigin(origin ?? undefined)),
+});
 
 registerConfigRoutes(app, ctx);
 registerEntityRoutes(app, ctx);

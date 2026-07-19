@@ -1,0 +1,13 @@
+export { HOME_TAB_ID } from './workspace.types';
+export type { ProjectTab, WorkspaceState } from './workspace.types';
+export {
+  workspace,
+  getWorkspaceState,
+  subscribeWorkspace,
+  normalizeProjectPath,
+  openProjectTab,
+  closeProjectTab,
+  activateTab,
+  sanitizeState,
+} from './workspaceStore';
+export { useWorkspace, type UseWorkspace } from './useWorkspace';

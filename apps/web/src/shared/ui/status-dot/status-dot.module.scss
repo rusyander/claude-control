@@ -1,0 +1,38 @@
+.dot {
+  flex: none;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+}
+
+.success {
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px var(--color-success-subtle);
+}
+
+.warning {
+  background: var(--color-warning);
+  box-shadow: 0 0 0 3px var(--color-warning-subtle);
+}
+
+.danger {
+  background: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--color-danger-subtle);
+}
+
+// Пульсация активной работы. Под «меньше движения» гасится вместе со всеми
+// анимациями (global.scss обнуляет длительности).
+.pulse {
+  animation: statusPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}

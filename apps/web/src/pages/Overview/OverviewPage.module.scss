@@ -2,9 +2,12 @@
   max-width: var(--layout-content-max);
 }
 
+// Плиток семь: при узких колонках они ложились как 5 + 2 и второй ряд
+// выглядел обрубком. Колонка пошире — раскладка 4 + 3, ряды ровнее, а
+// подписям вроде «119 разрешено · 7 запрещено» хватает места в одну строку.
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: var(--spacing-md);
 }
 
@@ -13,6 +16,18 @@
   text-decoration: none;
   color: inherit;
   border-radius: var(--radius-lg);
+
+  // Плитки ведут на свои разделы, но выглядели неподвижными карточками —
+  // подсветка на наведении показывает, что по ним можно перейти.
+  transition: transform var(--duration-fast);
+
+  &:hover > * {
+    border-color: var(--color-accent);
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+  }
 
   // Плитка без нижней подписи была ниже соседних, и ряд выглядел рваным —
   // растягиваем карточку на всю высоту ячейки сетки.

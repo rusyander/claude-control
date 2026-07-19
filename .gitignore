@@ -3,5 +3,9 @@ dist/
 *.local
 .DS_Store
 
+# Сборка Storybook — артефакт, пересобирается командой storybook build
+storybook-static/
+
 # Скриншоты и артефакты проверок — рабочий мусор, в репозитории не нужны
 .qa-screenshots/
+.agent

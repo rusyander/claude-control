@@ -9,6 +9,7 @@ import { useArtifactSource, artifactUrl } from '@entities/Chat/api/ChatApi';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { highlightCode } from '@shared/lib/markdown/highlightCode';
 import { useTheme } from '@shared/hooks/use-theme';
+import { toast } from '@shared/lib/toast';
 import type { ArtifactPreviewProps } from './ArtifactPreview.types';
 import styles from './ArtifactPreview.module.scss';
 
@@ -52,7 +53,9 @@ export function ArtifactPreview({ chatId, artifact, onClose }: ArtifactPreviewPr
   );
 
   const copy = (): void => {
-    void navigator.clipboard.writeText(source.data ?? '');
+    void navigator.clipboard.writeText(source.data ?? '').then(() => {
+      toast.success(t('toasts.copied'));
+    });
   };
 
   return (

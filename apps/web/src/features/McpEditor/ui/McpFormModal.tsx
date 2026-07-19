@@ -12,6 +12,8 @@ import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { mcpServerApi } from '@entities/McpServer';
 import { envToText, textToEnv, parseArgs, formatArgs } from '@shared/lib/env-text';
 import type { McpFormModalProps } from './McpFormModal.types';
+import { McpJsonImport } from './McpJsonImport';
+import styles from './McpFormModal.module.scss';
 
 const TRANSPORTS: McpTransport[] = ['stdio', 'sse', 'http'];
 
@@ -28,6 +30,8 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
   const [args, setArgs] = useState('');
   const [url, setUrl] = useState('');
   const [envText, setEnvText] = useState('');
+  // Один сервер по полям или пачка из JSON-конфига.
+  const [isImport, setIsImport] = useState(false);
 
   const create = mcpServerApi.useCreate();
   const update = mcpServerApi.useUpdate();
@@ -40,6 +44,7 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
     setArgs(server ? formatArgs(server.args) : '');
     setUrl(server?.url ?? '');
     setEnvText(server ? envToText(server.env) : '');
+    setIsImport(false);
   }, [isOpen, server]);
 
   /** Подставляет заготовку в поля формы; имя не трогаем, если уже введено. */
@@ -82,131 +87,165 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
       onOpenChange={onOpenChange}
       title={server ? `${t('common.edit')}: ${server.name}` : t('mcp.addServer')}
       description={t('common.needsRestart')}
-      size="lg"
+      // Как у остальных форм с помощником: поля и чат в две колонки.
+      // Раньше это окно было уже прочих и выбивалось из ряда.
+      size="xl"
       footer={
-        <>
-          <Button onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
-          <Button variant="primary" onClick={handleSave} disabled={!canSave} isLoading={isPending}>
-            {t('common.save')}
-          </Button>
-        </>
+        isImport ? (
+          <Button onClick={() => onOpenChange(false)}>{t('common.close')}</Button>
+        ) : (
+          <>
+            <Button onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
+            <Button
+              variant="primary"
+              onClick={handleSave}
+              disabled={!canSave}
+              isLoading={isPending}
+            >
+              {t('common.save')}
+            </Button>
+          </>
+        )
       }
     >
-      <FormWithAssistant
-        kind={t('mcp.title')}
-        fields={{ name, transport, command, args, url, envText }}
-        schema={{
-          name: 'Имя сервера в конфиге',
-          transport: 'Транспорт: stdio, sse или http',
-          command: 'Команда запуска для stdio, например npx',
-          args: 'Аргументы команды через пробел',
-          url: 'Адрес для sse и http',
-          envText: 'Переменные окружения по строке в формате KEY=VALUE',
-        }}
-        onApply={(applied) => {
-          if (typeof applied.name === 'string') setName(applied.name);
-          if (typeof applied.transport === 'string')
-            setTransport(applied.transport as McpTransport);
-          if (typeof applied.command === 'string') setCommand(applied.command);
-          if (typeof applied.args === 'string') setArgs(applied.args);
-          if (typeof applied.url === 'string') setUrl(applied.url);
-          if (typeof applied.envText === 'string') setEnvText(applied.envText);
-        }}
-      >
-        <Stack gap="var(--spacing-md)">
-          {/* Заготовки показываем только при создании: у существующего сервера
+      {!server && (
+        <div className={styles.modeTabs}>
+          <Button
+            size="sm"
+            variant={!isImport ? 'primary' : 'ghost'}
+            onClick={() => setIsImport(false)}
+          >
+            {t('mcp.modeSingle')}
+          </Button>
+          <Button
+            size="sm"
+            variant={isImport ? 'primary' : 'ghost'}
+            onClick={() => setIsImport(true)}
+          >
+            {t('mcp.modeImport')}
+          </Button>
+        </div>
+      )}
+
+      {isImport ? (
+        <McpJsonImport onDone={() => onOpenChange(false)} />
+      ) : (
+        <FormWithAssistant
+          kind={t('mcp.title')}
+          fields={{ name, transport, command, args, url, envText }}
+          schema={{
+            name: 'Имя сервера в конфиге',
+            transport: 'Транспорт: stdio, sse или http',
+            command: 'Команда запуска для stdio, например npx',
+            args: 'Аргументы команды через пробел',
+            url: 'Адрес для sse и http',
+            envText: 'Переменные окружения по строке в формате KEY=VALUE',
+          }}
+          onApply={(applied) => {
+            if (typeof applied.name === 'string') setName(applied.name);
+            if (typeof applied.transport === 'string')
+              setTransport(applied.transport as McpTransport);
+            if (typeof applied.command === 'string') setCommand(applied.command);
+            if (typeof applied.args === 'string') setArgs(applied.args);
+            if (typeof applied.url === 'string') setUrl(applied.url);
+            if (typeof applied.envText === 'string') setEnvText(applied.envText);
+          }}
+        >
+          <Stack gap="var(--spacing-md)">
+            {/* Заготовки показываем только при создании: у существующего сервера
             подмена всех полей разом почти наверняка не то, чего ждут. */}
-          {!server && (
-            <Card padding="md">
-              <Stack gap="var(--spacing-sm)">
-                <Typography variant="body-sm" weight="medium">
-                  {t('mcp.presetsTitle')}
-                </Typography>
-                <Typography variant="caption" color="subtle">
-                  {t('mcp.presetsHint')}
-                </Typography>
+            {!server && (
+              <Card padding="md">
+                <Stack gap="var(--spacing-sm)">
+                  <Typography variant="body-sm" weight="medium">
+                    {t('mcp.presetsTitle')}
+                  </Typography>
+                  <Typography variant="caption" color="subtle">
+                    {t('mcp.presetsHint')}
+                  </Typography>
 
-                <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-                  {MCP_PRESETS.map((preset) => (
-                    <Button
-                      key={preset.id}
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => applyPreset(preset)}
-                      title={preset.description}
-                    >
-                      {preset.title}
-                    </Button>
-                  ))}
+                  <Stack direction="row" gap="var(--spacing-2xs)" wrap>
+                    {MCP_PRESETS.map((preset) => (
+                      <Button
+                        key={preset.id}
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => applyPreset(preset)}
+                        title={preset.description}
+                      >
+                        {preset.title}
+                      </Button>
+                    ))}
+                  </Stack>
                 </Stack>
-              </Stack>
-            </Card>
-          )}
+              </Card>
+            )}
 
-          <TextField
-            label={t('mcp.serverName')}
-            value={name}
-            onChange={setName}
-            placeholder="например: gitlab-gorgona"
-            hint={t('mcp.serverNameHint')}
-            isMono
-            autoFocus={!server}
-          />
-
-          <SelectField
-            label={t('mcp.transport')}
-            value={transport}
-            onChange={(value) => setTransport(value as McpTransport)}
-            options={TRANSPORTS.map((value) => ({ value, label: value }))}
-            hint={t('mcp.transportHint')}
-          />
-
-          {isStdio ? (
-            <>
-              <TextField
-                label={t('mcp.command')}
-                value={command}
-                onChange={setCommand}
-                placeholder="npx"
-                isMono
-              />
-              <TextField
-                label={t('mcp.args')}
-                value={args}
-                onChange={setArgs}
-                placeholder="-y @scope/mcp-server"
-                hint={t('mcp.argsHint')}
-                isMono
-              />
-            </>
-          ) : (
             <TextField
-              label={t('mcp.url')}
-              value={url}
-              onChange={setUrl}
-              placeholder="http://127.0.0.1:3845/sse"
+              label={t('mcp.serverName')}
+              value={name}
+              onChange={setName}
+              placeholder="например: gitlab-gorgona"
+              hint={t('mcp.serverNameHint')}
+              isMono
+              autoFocus={!server}
+            />
+
+            <SelectField
+              label={t('mcp.transport')}
+              value={transport}
+              onChange={(value) => setTransport(value as McpTransport)}
+              options={TRANSPORTS.map((value) => ({ value, label: value }))}
+              hint={t('mcp.transportHint')}
+            />
+
+            {isStdio ? (
+              <>
+                <TextField
+                  label={t('mcp.command')}
+                  value={command}
+                  onChange={setCommand}
+                  placeholder="npx"
+                  isMono
+                />
+                <TextField
+                  label={t('mcp.args')}
+                  value={args}
+                  onChange={setArgs}
+                  placeholder="-y @scope/mcp-server"
+                  hint={t('mcp.argsHint')}
+                  isMono
+                />
+              </>
+            ) : (
+              <TextField
+                label={t('mcp.url')}
+                value={url}
+                onChange={setUrl}
+                placeholder="http://127.0.0.1:3845/sse"
+                isMono
+              />
+            )}
+
+            <TextField
+              label={t('mcp.env')}
+              value={envText}
+              onChange={setEnvText}
+              multiline
+              rows={5}
+              placeholder={'MCP_SECRET_KEYS=TOKEN_A,TOKEN_B'}
+              hint={t('mcp.envHint')}
               isMono
             />
-          )}
 
-          <TextField
-            label={t('mcp.env')}
-            value={envText}
-            onChange={setEnvText}
-            multiline
-            rows={5}
-            placeholder={'MCP_SECRET_KEYS=TOKEN_A,TOKEN_B'}
-            hint={t('mcp.envHint')}
-            isMono
-          />
-
-          {(create.isError || update.isError) && (
-            <Typography variant="body-sm" color="danger">
-              {t('errors.saveFailed')}
-            </Typography>
-          )}
-        </Stack>
-      </FormWithAssistant>
+            {(create.isError || update.isError) && (
+              <Typography variant="body-sm" color="danger">
+                {t('errors.saveFailed')}
+              </Typography>
+            )}
+          </Stack>
+        </FormWithAssistant>
+      )}
     </Modal>
   );
 }

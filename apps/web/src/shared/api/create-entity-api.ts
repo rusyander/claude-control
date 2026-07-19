@@ -62,24 +62,42 @@ export function createEntityApi<TItem, TDraft>(config: EntityApiConfig) {
     };
   }
 
+  // Тосты об успехе — общие для всех сущностей: текст generic («Создано»,
+  // «Удалено»), а об ошибке сообщает глобальный MutationCache сам.
   function useCreate() {
     const invalidate = useInvalidate();
-    return useMutation({ mutationFn: create, onSuccess: invalidate });
+    return useMutation({
+      mutationFn: create,
+      onSuccess: invalidate,
+      meta: { successMessage: 'toasts.created' },
+    });
   }
 
   function useUpdate() {
     const invalidate = useInvalidate();
-    return useMutation({ mutationFn: update, onSuccess: invalidate });
+    return useMutation({
+      mutationFn: update,
+      onSuccess: invalidate,
+      meta: { successMessage: 'toasts.saved' },
+    });
   }
 
   function useDelete() {
     const invalidate = useInvalidate();
-    return useMutation({ mutationFn: remove, onSuccess: invalidate });
+    return useMutation({
+      mutationFn: remove,
+      onSuccess: invalidate,
+      meta: { successMessage: 'toasts.deleted' },
+    });
   }
 
   function useSetEnabled() {
     const invalidate = useInvalidate();
-    return useMutation({ mutationFn: setEnabled, onSuccess: invalidate });
+    return useMutation({
+      mutationFn: setEnabled,
+      onSuccess: invalidate,
+      meta: { successMessage: 'toasts.updated' },
+    });
   }
 
   return { useList, useCreate, useUpdate, useDelete, useSetEnabled };

@@ -10,6 +10,7 @@ import {
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { ChatSummary, ChatMessage, ChatBlock } from '@claude-control/contracts';
+import { isSandboxPath } from './ChatArtifacts.ts';
 
 /**
  * Чтение истории разговоров Claude Code из ~/.claude/projects.
@@ -78,12 +79,14 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
     record.type === 'ai-title' ? record.aiTitle : undefined,
   );
   const lastMessage = [...records].reverse().find(isDialogMessage);
+  const projectPath = lastValue(records, (record) => record.cwd) ?? '';
 
   const summary: ChatSummary = {
     id: fileSessionId(path),
     title: title?.trim() || firstMeaningfulText(records).slice(0, 70) || projectName,
     project: projectName,
-    projectPath: lastValue(records, (record) => record.cwd) ?? '',
+    projectPath,
+    isSandbox: Boolean(projectPath) && isSandboxPath(projectPath),
     messageCount: records.filter(isDialogMessage).length,
     createdAt: records[0]?.timestamp ?? stats.birthtime.toISOString(),
     updatedAt: stats.mtime.toISOString(),
@@ -140,6 +143,23 @@ export async function readChatMessages(
   }
 
   return messages;
+}
+
+/**
+ * Рабочая папка, из которой велась сессия.
+ *
+ * Claude Code привязывает сессию к каталогу: транскрипты разложены по папкам
+ * вида `~/.claude/projects/<путь-с-заменёнными-разделителями>/`, и `--resume`
+ * ищет сессию только среди сессий текущего каталога. Поэтому продолжать
+ * разговор можно лишь оттуда, где он начинался, — этот путь и берём из самого
+ * транскрипта, он записан в каждой строке.
+ */
+export function findSessionCwd(projectsDir: string, sessionId: string): string | undefined {
+  const path = findTranscript(projectsDir, sessionId);
+  if (!path) return undefined;
+
+  const records = readRecords(path, statSync(path).size);
+  return lastValue(records, (record) => record.cwd);
 }
 
 export function findTranscript(projectsDir: string, chatId: string): string | undefined {
@@ -250,6 +270,13 @@ function isDialogMessage(record: Record): boolean {
   const content = record.message?.content;
   if (Array.isArray(content) && content.every((block) => block.type === 'tool_result'))
     return false;
+
+  // Отметка самого CLI: в пакетном режиме он дописывает её в конец хода, когда
+  // отвечать не на что. Репликой разговора она не является и в ленте только
+  // разбивает переписку пустыми вставками.
+  if (record.type === 'assistant' && textOf(record).trim() === 'No response requested.') {
+    return false;
+  }
 
   return true;
 }

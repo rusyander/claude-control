@@ -1,7 +1,15 @@
 import { homedir } from 'node:os';
+import { existsSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import type { AppSettings, Overview } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
+import {
+  readClaudeCredentials,
+  validatePanelCredentials,
+  savePanelCredentials,
+  removePanelCredentials,
+  panelCredentialsPath,
+} from '../lib/credentials.ts';
 import { readRules } from '../domains/rules.ts';
 import { readHooks } from '../domains/hooks.ts';
 import { readSkills } from '../domains/skills.ts';
@@ -82,5 +90,39 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       },
       groups: { total: ctx.store.getGroups().length },
     };
+  });
+/**
+   * Доступ Claude Code к аккаунту.
+   *
+   * Наружу отдаётся только источник и причина — сам токен не возвращается
+   * никогда: он нужен серверу, а браузеру знать его незачем.
+   */
+  app.get('/api/credentials', () => {
+    const found = readClaudeCredentials(ctx.location.paths.root);
+
+    return {
+      source: found.source,
+      reason: found.reason,
+      hasManual: existsSync(panelCredentialsPath()),
+      manualPath: panelCredentialsPath(),
+      platform: process.platform,
+    };
+  });
+
+  app.post<{ Body: { value: string } }>('/api/credentials', (request, reply) => {
+    const check = validatePanelCredentials(request.body.value ?? '');
+    if (!check.ok) return reply.code(400).send({ message: check.error });
+
+    savePanelCredentials(request.body.value);
+    const found = readClaudeCredentials(ctx.location.paths.root);
+
+    return { source: found.source, reason: found.reason, hasManual: true };
+  });
+
+  app.delete('/api/credentials', () => {
+    removePanelCredentials();
+    const found = readClaudeCredentials(ctx.location.paths.root);
+
+    return { source: found.source, reason: found.reason, hasManual: false };
   });
 }

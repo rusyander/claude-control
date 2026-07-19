@@ -28,6 +28,7 @@ export const en: TranslationSchema = {
     other: 'Other',
     close: 'Close',
     megabytes: 'MB',
+    gigabytes: 'GB',
     showAll: 'Show all ({{count}})',
     showLess: 'Collapse',
     details: 'Details',
@@ -72,6 +73,8 @@ export const en: TranslationSchema = {
     missingFiles: 'Missing files',
     brokenHooks: 'hooks with a broken path',
     unusedScripts: 'not bound to any event',
+    groupsHint: 'setting bundles',
+    groupsEmpty: 'none yet',
     allScriptsUsed: 'all bound to hooks',
   },
   rules: {
@@ -81,8 +84,37 @@ export const en: TranslationSchema = {
     explain:
       'CLAUDE.md is read at the start of every session. Everything here acts as standing instructions for Claude: language, restrictions, workflow.',
     addRule: 'Add rule',
+    mode_simple: 'Simple',
+    mode_builder: 'Builder',
+    mode_bulk: 'Several at once',
+    builderTitle: 'Rule blocks',
+    builderHint:
+      'Assemble the rule from blocks — allowed, forbidden, with care. The text builds itself.',
+    section_allow: 'Allowed',
+    section_deny: 'Forbidden',
+    section_caution: 'With care',
+    section_custom: 'Custom section',
+    sectionTitlePlaceholder: 'Section name',
+    itemPlaceholder: 'One rule item',
+    addItem: 'Item',
+    addSection: 'Add block:',
+
     ruleTitle: 'Title',
     ruleBody: 'Rule text',
+  },
+  bulk: {
+    modeSingle: 'One',
+    modeMany: 'Several at once',
+    inputLabel: 'A list — one {{kind}} per line',
+    hint: 'Each line is a separate entry. Empty lines are skipped.',
+    recognized: 'recognised',
+    withErrors: 'with an error',
+    createAll: 'Create all ({{count}})',
+    sharedDecision: 'The action applies to every line in the list.',
+    unbalanced: 'unbalanced brackets',
+    needEquals: 'no = sign',
+    emptyTitle: 'empty title',
+    badKey: 'invalid variable name',
   },
   sandbox: {
     title: 'Sandbox',
@@ -135,6 +167,11 @@ export const en: TranslationSchema = {
     stop: 'Stop',
     attach: 'Attach a file',
     thinking: 'Thinking',
+    /** Пока ответа ещё нет: без этого пустая лента выглядит зависшей. */
+    pending: 'Claude is thinking',
+    pendingTools: 'Claude is working with files',
+    questionTitle: 'Your choice is needed',
+    questionMulti: 'multiple choices allowed',
     copyMessage: 'Copy message',
     editMessage: 'Edit and send again',
     copyArtifact: 'Copy contents',
@@ -143,7 +180,22 @@ export const en: TranslationSchema = {
     emptyTitle: 'Chat with Claude Code',
     emptyText:
       'A full conversation: attach a PDF, an image or some markup, ask for a page or a document — and see the result in the preview straight away.',
+    suggestions: {
+      page: 'Build a page with a chart from this data',
+      explain: 'Explain what this code does',
+      summarize: 'Summarise the attached document',
+    },
     sandboxHint: 'This chat keeps its files in a separate folder; your projects stay untouched',
+    sandboxLabel: 'Panel chat',
+    allowEdits: 'Allow editing project files',
+    readOnly: 'Read-only',
+    editsAllowed: 'Edits allowed',
+    today: 'Today',
+    yesterday: 'Yesterday',
+    thisWeek: 'This week',
+    earlier: 'Earlier',
+    justNow: 'just now',
+    minutesAgo: '{{count}} min ago',
     limitResets: 'limit until {{time}}',
     resizePreview: 'Resize the preview',
     kind: {
@@ -158,6 +210,18 @@ export const en: TranslationSchema = {
   },
   resources: {
     newFile: 'New file',
+    assistantTitle: 'Structure assistant',
+    assistantHint:
+      'Describe the task — the assistant creates and fills files wholesale. Existing files are kept.',
+    assistantPlaceholder:
+      'For example: split this skill into topic modules and link them from SKILL.md',
+    assistantRun: 'Build',
+    assistantWorking:
+      'The assistant is building the structure — this takes up to a couple of minutes…',
+
+    startFromTemplate: 'Start from a structure template:',
+    emptyStart: 'Or create an empty file',
+
     treeHint: 'Files — open, edit, create or delete them here',
     readOnlyHint: 'These files are read-only: Claude Code installs and updates them',
     noFiles: 'No nested files',
@@ -170,6 +234,8 @@ export const en: TranslationSchema = {
     explain:
       'Every file in the hooks/ folder of your Claude Code configuration. Hooks on the neighbouring page decide when a script runs — here you edit the code itself. A script with no event bound to it simply sits in the folder and does nothing.',
     addScript: 'Add script',
+    templatesTitle: 'Ready-made scaffolds',
+    templatesHint: 'Pick a code template — then tweak the condition and text.',
     fileName: 'File name',
     fileNameHint: 'With an extension: .mjs for Node.js, .ps1 for PowerShell, .sh for the shell.',
     renameHint: 'Changing the name creates a new file — the old one stays where it is.',
@@ -192,6 +258,8 @@ export const en: TranslationSchema = {
     command: 'Command',
     scriptMissing: 'Script file not found',
     addHook: 'Add hook',
+    presetsTitle: 'Ready-made hooks',
+    presetsHint: 'Pick a preset — every field fills in, then tweak the details.',
     matcherHint:
       'Narrows the event: a tool name, or several separated by a pipe. Empty means it always fires.',
     noMatcherSupport: 'This event always fires — it takes no matcher.',
@@ -243,6 +311,18 @@ export const en: TranslationSchema = {
     skillName: 'Skill name',
     skillNameHint: 'Latin letters with dashes — becomes the folder name in skills/',
     skillBody: 'Instructions',
+    saveFrontmatter: 'Save and continue',
+    modeSimple: 'Simple skill',
+    modeSimpleHint: 'A single SKILL.md',
+    modeBuilder: 'Builder',
+    modeBuilderHint: 'A folder of topic modules',
+    createAndBuild: 'Create and build structure',
+    pickTemplate: 'Structure template',
+    pickTemplateHint:
+      'Pick a shape — it unfolds right after creation. You can skip and build by hand.',
+    structureTitle: 'File structure',
+    structureHint:
+      'A skill can be a folder of modules. Build the structure from a template, the assistant, or by hand — SKILL.md already exists.',
     skillBodyHint: 'The body of SKILL.md: what exactly to do, step by step. Markdown.',
   },
   mcp: {
@@ -259,6 +339,13 @@ export const en: TranslationSchema = {
     transport: 'Transport',
     command: 'Start command',
     addServer: 'Add server',
+    modeSingle: 'One server',
+    modeImport: 'Import from JSON',
+    importLabel: 'Paste the mcpServers block from the server docs',
+    importHint:
+      'Understands both a {{"mcpServers": …}} wrapper and a plain servers object. Transport is detected automatically.',
+    importFound: 'servers found',
+    importAll: 'Add all ({{count}})',
     presetsTitle: 'Ready-made servers',
     presetsHint: 'Click one — the fields fill in. Then put in your own variable values and tokens.',
     serverName: 'Server name',
@@ -331,6 +418,9 @@ export const en: TranslationSchema = {
     explain:
       'A group joins entities of any kind so you can toggle them together and share environment variables. Claude Code itself knows nothing about groups — they live in the app data.',
     addGroup: 'Create group',
+    emptyTitle: 'No groups yet',
+    emptyText:
+      'A group bundles rules, skills, hooks and servers so you can toggle them together and set shared variables. Handy when a set of settings belongs to one task.',
     members: 'members',
     membersTitle: 'Group contents',
     groupName: 'Name',
@@ -354,6 +444,31 @@ export const en: TranslationSchema = {
     automationAction: 'What to run',
     compiledInto: 'Compiles into a hook',
   },
+  credentials: {
+    title: 'Claude Code access',
+    purpose:
+      'Only sandboxes need this: they run Claude against a separate settings directory, which your normal login does not reach. Chat, plugins and MCP use your real directory and need nothing here.',
+    source_file: 'settings file',
+    source_keychain: 'macOS Keychain',
+    source_panel: 'set manually',
+    source_apiKey: 'API key',
+    source_none: 'not found',
+    setManually: 'Set manually',
+    clearManual: 'Remove manual',
+    manualFile: 'File',
+    manualTitle: 'Access, set by hand',
+    manualHint: 'Any of the three shapes will do — pick a template and fill in your own values.',
+    templates: 'Templates',
+    template_oauth: 'Subscription token',
+    template_apiKey: 'API key',
+    template_readFrom: 'Your own file',
+    jsonLabel: 'JSON',
+    jsonHint:
+      'claudeAiOauth — the subscription token as in .credentials.json. apiKey — an Anthropic API key. readFrom — a path to your own file, which the panel will read.',
+    securityNote:
+      'This is real access to your account. The file is saved in your home directory with 600 permissions and is never sent back to the browser. A file like this must not reach a repository.',
+    saveFailed: 'Could not save',
+  },
   settings: {
     title: 'Settings',
     subtitle: 'Application, accessibility and configuration path',
@@ -369,7 +484,7 @@ export const en: TranslationSchema = {
     claudeDir: '.claude directory',
     claudeDirHint:
       'Detected automatically. Fill this in if the directory is non-standard or detection failed.',
-    claudeDirPlaceholder: 'For example, /Users/name/.claude',
+    claudeDirPlaceholder: 'For example, ~/.claude or C:\\Users\\name\\.claude',
     apply: 'Apply',
     accessibility: 'Accessibility',
     largeText: 'Large text',
@@ -448,6 +563,7 @@ export const en: TranslationSchema = {
     cacheHit: 'Read from cache',
     cacheHitHint: 'Share of input tokens served from cache instead of being paid for again',
     estimatedCost: 'API equivalent',
+    estimatedCostDetail: 'if billed at API rates',
     estimatedCostHint:
       'What the same work would cost through the API at per-token rates. On a subscription no tokens are billed — this figure compares volume, it is not an invoice.',
     byDay: 'Spend by day',
@@ -463,6 +579,7 @@ export const en: TranslationSchema = {
     liveAgentsHint:
       'Claude Code processes running on this machine. There is no agent registry, so we count processes.',
     noAgents: 'No running Claude Code processes found',
+    agentsSummary: 'Show processes — {{count}}, {{memory}}',
     activeSessions: 'active sessions',
     memory: 'memory',
     scanInfo: 'Scanned {{files}} files in {{ms}} ms',
@@ -485,5 +602,61 @@ export const en: TranslationSchema = {
     loadFailed: 'Failed to load data',
     saveFailed: 'Failed to save',
     serverUnreachable: 'The app server is not responding. Check that it is running.',
+  },
+  toasts: {
+    created: 'Created',
+    saved: 'Saved',
+    deleted: 'Deleted',
+    updated: 'Updated',
+    moved: 'Moved',
+    copied: 'Copied',
+    templateApplied: 'Template applied',
+    locationChanged: 'Settings directory updated',
+    pluginInstalled: 'Plugin installed',
+    pluginRemoved: 'Plugin removed',
+    pluginUpdated: 'Plugin updated',
+    openingEditor: 'Opening in VS Code',
+  },
+  workspace: {
+    tabsLabel: 'Workspaces',
+    homeTab: 'Chats',
+    closeTab: 'Close {{name}}',
+    status: {
+      running: 'agent working',
+      waiting: 'agent waiting for a reply',
+      error: 'error or limit',
+    },
+  },
+  projects: {
+    title: 'Projects',
+    sidebarLabel: 'Chats or projects',
+    addFolder: 'Add folder',
+    openInEditor: 'Open in VS Code',
+    search: 'Search project',
+    searchPlaceholder: 'name or path',
+    count: 'Projects: {{count}}',
+    chats: 'chats: {{count}}',
+    missing: 'not on disk',
+    emptyTitle: 'No projects yet',
+    emptyText: 'Directories Claude Code has worked in will appear here.',
+    newChat: 'New chat in project',
+    starterPrompt:
+      'You are working in the project "{{name}}". Read-only for now. Look around and briefly say what this project is and what you suggest starting with.',
+    introHint:
+      'A new conversation in the project directory. Read-only by default — enable edits with the toggle in the header when ready.',
+    actions: {
+      review: 'Do a code review: find problems and suggest fixes.',
+      bugs: 'Find potential bugs and explain the cause of each.',
+      structure: 'Explain the project structure and main modules.',
+      tests: 'Run the tests and show what fails.',
+    },
+  },
+  folderPicker: {
+    title: 'Choose a project folder',
+    hint: 'Open any folder on disk as a project — even one Claude has not worked in yet.',
+    roots: 'Pick a drive or folder',
+    up: 'Up',
+    empty: 'No subfolders inside',
+    pick: 'Open this folder',
   },
 };

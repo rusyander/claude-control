@@ -11,6 +11,7 @@ import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { hookApi } from '@entities/Hook';
+import { HOOK_PRESETS, type HookPreset } from '../model/hookPresets';
 import { MatcherPicker } from './MatcherPicker';
 import { TemplateFields } from './TemplateFields';
 import type { HookFormModalProps } from './HookFormModal.types';
@@ -49,6 +50,18 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
   }, [isOpen, hook]);
 
   const eventInfo = useMemo(() => HOOK_EVENT_INFO.find((info) => info.event === event), [event]);
+
+  /** Заполняет форму готовым хуком — все увязанные поля разом. */
+  const applyPreset = (preset: HookPreset): void => {
+    setEvent(preset.event);
+    setMatchers(preset.matchers);
+    setTemplate(preset.template);
+    setScriptName(preset.scriptName);
+    setDescription(preset.description);
+    setMessage(preset.message ?? '');
+    setGuardPatterns(preset.guardPatterns ?? '');
+    setCommand(preset.command ?? '');
+  };
 
   const isPending = create.isPending || update.isPending;
   // Либо создаём файл по имени, либо задаём команду напрямую — что-то одно.
@@ -134,6 +147,35 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
         }}
       >
         <Stack gap="var(--spacing-md)">
+          {/* Готовые хуки — при создании. У существующего подмена всех полей
+              разом почти наверняка не то, чего ждут. */}
+          {!hook && (
+            <Card padding="md">
+              <Stack gap="var(--spacing-sm)">
+                <Typography variant="body-sm" weight="medium">
+                  {t('hooks.presetsTitle')}
+                </Typography>
+                <Typography variant="caption" color="subtle">
+                  {t('hooks.presetsHint')}
+                </Typography>
+
+                <Stack direction="row" gap="var(--spacing-2xs)" wrap>
+                  {HOOK_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.id}
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => applyPreset(preset)}
+                      title={preset.description}
+                    >
+                      {preset.title}
+                    </Button>
+                  ))}
+                </Stack>
+              </Stack>
+            </Card>
+          )}
+
           <SelectField
             label={t('hooks.event')}
             value={event}
@@ -142,7 +184,7 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
           />
 
           {eventInfo && (
-            <Card padding="sm" className={styles.eventInfo}>
+            <Card padding="md" className={styles.eventInfo}>
               <Stack gap="var(--spacing-2xs)">
                 <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
                   <Typography variant="body-sm" weight="medium" as="span">

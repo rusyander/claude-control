@@ -15,6 +15,12 @@ export const chatSummarySchema = object({
   /** Каталог проекта, в котором шёл разговор. */
   project: string(),
   projectPath: string(),
+  /**
+   * Разговор заведён в самой панели и живёт в её песочнице. У таких чатов
+   * файлы Claude — это артефакты, а у остальных за папкой стоит настоящий
+   * проект, и трогать его без разрешения нельзя.
+   */
+  isSandbox: boolean(),
   messageCount: number(),
   createdAt: string(),
   updatedAt: string(),

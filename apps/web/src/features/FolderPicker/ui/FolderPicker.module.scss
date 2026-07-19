@@ -1,0 +1,68 @@
+.roots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-3xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-accent);
+    background: var(--color-accent-subtle);
+    color: var(--color-fg);
+  }
+}
+
+.list {
+  min-height: 240px;
+  max-height: 48vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+    border-color: var(--color-border);
+  }
+
+  // Стрелка «внутрь» прижата вправо.
+  > :last-child {
+    margin-left: auto;
+    color: var(--color-fg-subtle);
+  }
+}
+
+.empty {
+  padding: var(--spacing-md);
+  text-align: center;
+}
+
+.current {
+  min-width: 0;
+}

@@ -1,13 +1,5 @@
-import {
-  readdirSync,
-  statSync,
-  existsSync,
-  readFileSync,
-  mkdirSync,
-  renameSync,
-  rmSync,
-} from 'node:fs';
-import { join, extname, basename } from 'node:path';
+import { readdirSync, statSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
+import { join, extname, basename, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 
 /**
@@ -115,10 +107,35 @@ export function readArtifactBinary(chatDir: string, name: string): Buffer | unde
  * защищённым и запрещает туда запись, поэтому артефакты там просто не
  * создавались бы. Держим их рядом, в отдельной папке пользователя.
  */
-export function chatDirectory(chatId: string): string {
-  const dir = join(homedir(), '.claude-control', 'chats', chatId.replace(/[^a-zA-Z0-9-]/g, ''));
-  mkdirSync(dir, { recursive: true });
+export function chatDirectory(chatId: string, create = true): string {
+  const dir = join(sandboxRoot(), chatId.replace(/[^a-zA-Z0-9-]/g, ''));
+  // Читающие запросы папку не заводят: иначе каждый открытый черновик
+  // оставлял бы за собой пустой каталог.
+  if (create) mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+/** Корень песочницы — папки чатов, заведённых в самой панели. */
+export function sandboxRoot(): string {
+  return join(homedir(), '.claude-control', 'chats');
+}
+
+/**
+ * Лежит ли путь внутри песочницы. По этому признаку решается главное: свои
+ * чаты пишут файлы свободно, а разговор из настоящего проекта по умолчанию
+ * ничего в нём не меняет.
+ */
+export function isSandboxPath(path: string): boolean {
+  // Путь приходит из транскрипта, а туда один и тот же каталог попадает в
+  // разном написании — буква диска то строчная, то заглавная. Без приведения
+  // регистра своя же папка перестаёт опознаваться как песочница, и Claude
+  // теряет право писать файлы там, где они и есть результат работы.
+  const normalize = (value: string): string =>
+    process.platform === 'win32' ? resolve(value).toLowerCase() : resolve(value);
+
+  const root = normalize(sandboxRoot());
+  const target = normalize(path);
+  return target === root || target.startsWith(root + sep);
 }
 
 /**
@@ -129,22 +146,12 @@ function safePath(chatDir: string, name: string): string {
   return join(chatDir, basename(name));
 }
 
-/**
- * Переезд папки нового чата под настоящий идентификатор сессии.
+/*
+ * Папку чата намеренно не переименовываем под идентификатор сессии.
  *
- * До первого ответа идентификатора сессии не существует, и папка заводится под
- * временным именем. Как только Claude Code выдал свой — переносим, иначе
- * созданные файлы остались бы в папке, которую больше никто не откроет.
+ * Раньше она переезжала с временного имени на выданный sessionId — и ровно это
+ * рвало разговор: сессия Claude Code привязана к каталогу, из которого её
+ * начали, а после переезда `--resume` искал её уже в другом месте и отвечал
+ * «No conversation found». Папка остаётся на месте, а найти её по чату всегда
+ * можно через сам транскрипт (см. findSessionCwd).
  */
-export function renameChatDirectory(fromId: string, toId: string): void {
-  if (fromId === toId) return;
-
-  const from = chatDirectory(fromId);
-  const to = chatDirectory(toId);
-
-  for (const entry of readdirSync(from, { withFileTypes: true })) {
-    if (entry.isFile()) renameSync(join(from, entry.name), join(to, entry.name));
-  }
-
-  rmSync(from, { recursive: true, force: true });
-}

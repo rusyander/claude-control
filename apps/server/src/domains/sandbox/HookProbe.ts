@@ -269,8 +269,11 @@ interface HookOutput {
  * Решение хука по его ответу. Код 2 останавливает действие сразу, а в JSON
  * решение приходит словом: deny — запрет, ask — нужно подтверждение
  * пользователя, allow — согласие. Молчание означает «не вмешиваюсь».
+ *
+ * Экспортируется ради тестов: это чистая логика, которую хочется проверить
+ * без запуска настоящего процесса хука.
  */
-function readDecision(
+export function readDecision(
   exitCode: number,
   parsed: unknown,
 ): { decision: HookDecision; reason?: string; addedContext?: string } {

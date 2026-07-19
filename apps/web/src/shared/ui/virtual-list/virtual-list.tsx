@@ -18,10 +18,16 @@ export function VirtualList<TItem>({
 }: VirtualListProps<TItem>) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const sizeOf = (index: number): number => {
+    const item = items[index];
+    if (typeof rowHeight !== 'function') return rowHeight;
+    return item === undefined ? 0 : rowHeight(item, index);
+  };
+
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => rowHeight,
+    estimateSize: sizeOf,
     // Небольшой запас сверху и снизу: строки успевают отрисоваться
     // до того, как попадут в кадр при быстрой прокрутке.
     overscan: 8,

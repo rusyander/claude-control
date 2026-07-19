@@ -6,7 +6,7 @@
   "description": "Универсальный пульт управления конфигурацией Claude Code: правила, хуки, скиллы, MCP-серверы, группы и связи",
   "packageManager": "pnpm@10.28.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.6"
   },
   "scripts": {
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
@@ -18,13 +18,16 @@
     "format:check": "prettier --check .",
     "depcruise": "depcruise apps/web/src",
     "test": "pnpm -r test",
-    "check": "pnpm format:check && pnpm type-check && pnpm lint && pnpm depcruise && pnpm build"
+    "qa:setup": "playwright install --with-deps chromium",
+    "check": "pnpm format:check && pnpm type-check && pnpm lint && pnpm depcruise && pnpm build",
+    "doctor": "node tools/doctor.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "dependency-cruiser": "^18.1.0",
     "eslint": "^10.7.0",
     "eslint-plugin-boundaries": "^7.0.2",
+    "eslint-plugin-check-file": "^3.3.2",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",

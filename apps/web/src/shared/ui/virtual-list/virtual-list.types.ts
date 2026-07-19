@@ -2,8 +2,11 @@ import type { ReactNode } from 'react';
 
 export interface VirtualListProps<TItem> {
   items: TItem[];
-  /** Высота строки в пикселях: нужна для расчёта окна прокрутки. */
-  rowHeight: number;
+  /**
+   * Высота строки в пикселях: нужна для расчёта окна прокрутки. Функция —
+   * когда строки разной высоты, например заголовки групп между записями.
+   */
+  rowHeight: number | ((item: TItem, index: number) => number);
   /** Высота видимой области. */
   height: number;
   renderRow: (item: TItem, index: number) => ReactNode;

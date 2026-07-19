@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
+import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
@@ -35,6 +36,16 @@ export function HooksPage() {
   const openEdit = (hook: Hook): void => {
     setEditing(hook);
     setIsFormOpen(true);
+    writeUrl(hook.id);
+  };
+
+  // Ссылка /hooks?id=<событие:группа:номер> открывает этот хук в редакторе.
+  const writeUrl = useEntityUrlWriter();
+  useEntityUrl<Hook>({ items: hooks, getId: (hook) => hook.id, onOpen: openEdit });
+
+  const closeForm = (open: boolean): void => {
+    setIsFormOpen(open);
+    if (!open) writeUrl(undefined);
   };
 
   // Группируем по событию: так видно, что происходит в каждой точке жизненного цикла.
@@ -131,7 +142,7 @@ export function HooksPage() {
         </Stack>
       ))}
 
-      <HookFormModal isOpen={isFormOpen} onOpenChange={setIsFormOpen} hook={editing} />
+      <HookFormModal isOpen={isFormOpen} onOpenChange={closeForm} hook={editing} />
     </Stack>
   );
 }

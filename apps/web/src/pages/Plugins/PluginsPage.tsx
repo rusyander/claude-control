@@ -47,52 +47,6 @@ export function PluginsPage() {
 
       <ExplainBox title={t('plugins.explainTitle')} text={t('plugins.explain')} />
 
-      <Card padding="md">
-        <Stack gap="var(--spacing-sm)">
-          <Typography variant="body" weight="medium">
-            {t('plugins.installTitle')}
-          </Typography>
-
-          <Stack direction="row" gap="var(--spacing-xs)" align="end" wrap>
-            <div className={styles.installField}>
-              <TextField
-                label={t('plugins.installLabel')}
-                value={installId}
-                onChange={setInstallId}
-                placeholder={t('plugins.installPlaceholder')}
-                hint={t('plugins.installHint')}
-                isMono
-              />
-            </div>
-            <Button
-              variant="primary"
-              onClick={() => install.mutate(installId.trim())}
-              disabled={!installId.trim() || isBusy}
-              isLoading={install.isPending}
-            >
-              {t('plugins.install')}
-            </Button>
-          </Stack>
-
-          {lastResult && !lastResult.ok && (
-            <Stack gap="var(--spacing-2xs)">
-              <Typography variant="body-sm" color="danger">
-                {t('plugins.commandFailed')}
-              </Typography>
-              <Typography variant="mono" color="muted" className={styles.output}>
-                {lastResult.output}
-              </Typography>
-            </Stack>
-          )}
-
-          {lastResult?.ok && (
-            <Typography variant="caption" color="success">
-              {t('common.needsRestart')}
-            </Typography>
-          )}
-        </Stack>
-      </Card>
-
       {isLoading && <SkeletonList rows={5} />}
 
       <Stack gap="var(--spacing-sm)">
@@ -133,11 +87,61 @@ export function PluginsPage() {
             onInstall={(id) => install.mutate(id)}
           />
         ) : (
-          <Typography variant="body-sm" color="subtle">
+          <Typography variant="body-sm" color="subtle" className="prose">
             {t('plugins.catalogHint')}
           </Typography>
         )}
       </Stack>
+
+      {/*
+        Установка по идентификатору — путь для тех, кто уже знает имя плагина.
+        Раньше эта форма занимала верх страницы и отодвигала вниз каталог, то
+        есть единственный способ что-то найти. Теперь она свёрнута и стоит
+        после каталога.
+      */}
+      <details className={styles.manualInstall}>
+        <summary>{t('plugins.installTitle')}</summary>
+
+        <Stack gap="var(--spacing-sm)" className={styles.manualInstallBody}>
+          <Stack direction="row" gap="var(--spacing-xs)" align="end" wrap>
+            <div className={styles.installField}>
+              <TextField
+                label={t('plugins.installLabel')}
+                value={installId}
+                onChange={setInstallId}
+                placeholder={t('plugins.installPlaceholder')}
+                hint={t('plugins.installHint')}
+                isMono
+              />
+            </div>
+            <Button
+              variant="primary"
+              onClick={() => install.mutate(installId.trim())}
+              disabled={!installId.trim() || isBusy}
+              isLoading={install.isPending}
+            >
+              {t('plugins.install')}
+            </Button>
+          </Stack>
+
+          {lastResult && !lastResult.ok && (
+            <Stack gap="var(--spacing-2xs)">
+              <Typography variant="body-sm" color="danger">
+                {t('plugins.commandFailed')}
+              </Typography>
+              <Typography variant="mono" color="muted" className={styles.output}>
+                {lastResult.output}
+              </Typography>
+            </Stack>
+          )}
+
+          {lastResult?.ok && (
+            <Typography variant="caption" color="success">
+              {t('common.needsRestart')}
+            </Typography>
+          )}
+        </Stack>
+      </details>
 
       <Stack gap="var(--spacing-sm)">
         <Typography variant="heading-sm">{t('plugins.marketplaces')}</Typography>

@@ -37,6 +37,10 @@ export interface SendInput {
   name?: string;
   fork?: boolean;
   files?: { name: string; base64: string }[];
+  /** Разрешить правку файлов, когда чат идёт в настоящем проекте. */
+  allowEdits?: boolean;
+  /** Каталог проекта для нового разговора, открытого из списка проектов. */
+  projectPath?: string;
 }
 
 export function useChatStream(onFinished?: () => void) {
@@ -49,7 +53,16 @@ export function useChatStream(onFinished?: () => void) {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      setState({ ...EMPTY, isRunning: true });
+      // Текст и инструменты прошлого ответа стираем, а идентификатор сессии
+      // сохраняем: он и есть ниточка, по которой разговор продолжается. Раньше
+      // он обнулялся вместе со всем остальным, и второе сообщение в новом чате
+      // начинало разговор заново.
+      setState((current) => ({
+        ...EMPTY,
+        sessionId: current.sessionId,
+        limitResetsAt: current.limitResetsAt,
+        isRunning: true,
+      }));
 
       try {
         const response = await fetch(`${apiClient.defaults.baseURL}/chat/send`, {
@@ -59,6 +72,7 @@ export function useChatStream(onFinished?: () => void) {
           signal: controller.signal,
         });
 
+        if (!response.ok) throw new Error(`Сервер ответил ${response.status}`);
         if (!response.body) throw new Error('Пустой ответ сервера');
 
         const reader = response.body.getReader();

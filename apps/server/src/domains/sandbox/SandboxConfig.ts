@@ -7,6 +7,11 @@ import { readHooks } from '../hooks.ts';
 import { readMcpServers } from '../mcp.ts';
 import type { ClaudeLocation } from '@claude-control/contracts';
 import type { AppStore } from '../../lib/app-store.ts';
+import {
+  readClaudeCredentials,
+  writeSecretFile,
+  type CredentialsSource,
+} from '../../lib/credentials.ts';
 
 /**
  * Изолированная конфигурация для проверки отдельных настроек.
@@ -18,7 +23,9 @@ import type { AppStore } from '../../lib/app-store.ts';
  * хука, а переписка пишется в тот же временный каталог, а не в настоящий.
  *
  * Наружу из песочницы не выходит ничего: настоящие настройки открываются
- * только на чтение, файл с токенами не копируется, а рабочая папка своя.
+ * только на чтение, файл с токенами MCP-серверов не копируется, а рабочая
+ * папка своя. Единственное исключение — учётные данные Claude Code: без них
+ * проверять нечего (см. lib/credentials.ts, там же разница между системами).
  */
 
 /** Что именно проверяем. */
@@ -47,6 +54,13 @@ export interface Sandbox {
   configDir: string;
   workDir: string;
   description: SandboxDescription;
+  /**
+   * Откуда взялся токен и почему не взялся. Нужно интерфейсу: без токена
+   * разговор в песочнице не пойдёт, и причину лучше назвать заранее.
+   */
+  credentials: { source: CredentialsSource; reason?: string };
+  /** Переменные окружения для запуска: сюда попадает ключ API, если доступ им. */
+  env: Record<string, string>;
 }
 
 /** Корень всех песочниц — намеренно вне каталога Claude Code: туда писать нельзя. */
@@ -78,8 +92,15 @@ export function createSandbox(
   mkdirSync(configDir, { recursive: true });
   mkdirSync(workDir, { recursive: true });
 
-  const credentials = join(location.paths.root, '.credentials.json');
-  if (existsSync(credentials)) copyFileSync(credentials, join(configDir, '.credentials.json'));
+  // Источник токена зависит от системы: файл на Windows и Linux, связка ключей
+  // на macOS. Не нашлось — песочницу всё равно собираем: пусть человек увидит
+  // внятную причину в интерфейсе, а не «Not logged in» из недр CLI.
+  const credentials = readClaudeCredentials(location.paths.root);
+  if (credentials.content) {
+    // Именно writeSecretFile: это копия настоящего доступа к аккаунту, и она
+    // не должна ни мгновения лежать с правами по умолчанию.
+    writeSecretFile(join(configDir, '.credentials.json'), credentials.content);
+  }
 
   const description: SandboxDescription = {
     rules: writeRules(configDir, selection, location, store),
@@ -94,7 +115,15 @@ export function createSandbox(
   const settings = buildSettings(configDir, workDir, selection, location, store, description);
   writeFileSync(join(configDir, 'settings.json'), JSON.stringify(settings, null, 2), 'utf8');
 
-  return { id, configDir, workDir, description };
+  return {
+    id,
+    configDir,
+    workDir,
+    description,
+    credentials: { source: credentials.source, reason: credentials.reason },
+    // Ключ API файлом не кладётся: Claude Code читает его из окружения.
+    env: credentials.apiKey ? { ANTHROPIC_API_KEY: credentials.apiKey } : {},
+  };
 }
 
 export function removeSandbox(id: string): void {

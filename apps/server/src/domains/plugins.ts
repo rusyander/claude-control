@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CommandResult, Marketplace, Plugin, PluginsState } from '@claude-control/contracts';
+import { safePluginId } from '../lib/cli-args.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -166,17 +167,33 @@ async function runPluginCommand(args: string[]): Promise<CommandResult> {
   }
 }
 
-export const installPlugin = (id: string): Promise<CommandResult> =>
-  runPluginCommand(['install', id]);
+/**
+ * Идентификатор приходит из запроса, а на Windows команда уходит в оболочку —
+ * поэтому он сверяется с допустимым видом до запуска. Отказ возвращается
+ * обычным ответом: страница плагинов покажет его как результат операции.
+ */
+function runPluginAction(action: string, id: string): Promise<CommandResult> {
+  let checked: string;
+  try {
+    checked = safePluginId(id);
+  } catch (error) {
+    return Promise.resolve({
+      ok: false,
+      output: error instanceof Error ? error.message : String(error),
+      needsRestart: false,
+    });
+  }
+
+  return runPluginCommand([action, checked]);
+}
+
+export const installPlugin = (id: string): Promise<CommandResult> => runPluginAction('install', id);
 
 export const uninstallPlugin = (id: string): Promise<CommandResult> =>
-  runPluginCommand(['uninstall', id]);
+  runPluginAction('uninstall', id);
 
-export const enablePlugin = (id: string): Promise<CommandResult> =>
-  runPluginCommand(['enable', id]);
+export const enablePlugin = (id: string): Promise<CommandResult> => runPluginAction('enable', id);
 
-export const disablePlugin = (id: string): Promise<CommandResult> =>
-  runPluginCommand(['disable', id]);
+export const disablePlugin = (id: string): Promise<CommandResult> => runPluginAction('disable', id);
 
-export const updatePlugin = (id: string): Promise<CommandResult> =>
-  runPluginCommand(['update', id]);
+export const updatePlugin = (id: string): Promise<CommandResult> => runPluginAction('update', id);

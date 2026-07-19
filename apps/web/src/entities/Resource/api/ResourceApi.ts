@@ -58,10 +58,11 @@ export function useResourceFile(kind: ResourceKind, id: string | undefined, file
   });
 }
 
-function useResourceMutation<TInput>(
+function useResourceMutation<TInput, TResult = unknown>(
   kind: ResourceKind,
   id: string,
-  request: (input: TInput) => Promise<unknown>,
+  request: (input: TInput) => Promise<TResult>,
+  successMessage?: string,
 ) {
   const queryClient = useQueryClient();
 
@@ -73,25 +74,100 @@ function useResourceMutation<TInput>(
       void queryClient.invalidateQueries({ queryKey: ['skills'] });
       void queryClient.invalidateQueries({ queryKey: ['scripts'] });
     },
+    meta: successMessage ? { successMessage } : undefined,
   });
 }
 
 export function useSaveResourceFile(kind: ResourceKind, id: string) {
-  return useResourceMutation(kind, id, async (input: { file: string; content: string }) => {
-    await apiClient.put(`/resources/${kind}/${encodeURIComponent(id)}/file`, input);
-  });
+  return useResourceMutation(
+    kind,
+    id,
+    async (input: { file: string; content: string }) => {
+      await apiClient.put(`/resources/${kind}/${encodeURIComponent(id)}/file`, input);
+    },
+    'toasts.saved',
+  );
 }
 
 export function useDeleteResourceFile(kind: ResourceKind, id: string) {
-  return useResourceMutation(kind, id, async (file: string) => {
-    await apiClient.delete(`/resources/${kind}/${encodeURIComponent(id)}/file`, {
-      params: { file },
-    });
-  });
+  return useResourceMutation(
+    kind,
+    id,
+    async (file: string) => {
+      await apiClient.delete(`/resources/${kind}/${encodeURIComponent(id)}/file`, {
+        params: { file },
+      });
+    },
+    'toasts.deleted',
+  );
 }
 
 export function useMoveResourceFile(kind: ResourceKind, id: string) {
-  return useResourceMutation(kind, id, async (input: { from: string; to: string }) => {
-    await apiClient.post(`/resources/${kind}/${encodeURIComponent(id)}/move`, input);
+  return useResourceMutation(
+    kind,
+    id,
+    async (input: { from: string; to: string }) => {
+      await apiClient.post(`/resources/${kind}/${encodeURIComponent(id)}/move`, input);
+    },
+    'toasts.moved',
+  );
+}
+
+export interface ResourceTemplate {
+  id: string;
+  title: string;
+  description: string;
+  fileCount: number;
+  paths: string[];
+}
+
+/** Заготовки структуры для вида ресурса — их немного, кешируем надолго. */
+export function useResourceTemplates(kind: ResourceKind) {
+  return useQuery({
+    queryKey: ['resources', kind, 'templates'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ResourceTemplate[]>(`/resources/${kind}/templates`);
+      return data;
+    },
+    staleTime: Infinity,
   });
+}
+
+export function useApplyTemplate(kind: ResourceKind, id: string) {
+  return useResourceMutation(
+    kind,
+    id,
+    async (templateId: string) => {
+      await apiClient.post(`/resources/${kind}/${encodeURIComponent(id)}/apply-template`, {
+        templateId,
+      });
+    },
+    'toasts.templateApplied',
+  );
+}
+
+export interface StructureAssistReply {
+  reply: string;
+  applied: string[];
+  sessionId?: string;
+}
+
+/**
+ * Помощник структуры: по описанию задачи собирает или дополняет файлы ресурса
+ * целиком и сразу их применяет. В отличие от помощника форм заполняет не поля,
+ * а дерево.
+ */
+export function useStructureAssistant(kind: ResourceKind, id: string) {
+  return useResourceMutation(
+    kind,
+    id,
+    async (input: { prompt: string; sessionId?: string }): Promise<StructureAssistReply> => {
+      const { data } = await apiClient.post<StructureAssistReply>(
+        `/resources/${kind}/${encodeURIComponent(id)}/assist`,
+        input,
+        { timeout: 260_000 },
+      );
+      return data;
+    },
+  );
 }

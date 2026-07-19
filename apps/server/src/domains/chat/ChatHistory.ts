@@ -1,0 +1,350 @@
+import {
+  readdirSync,
+  statSync,
+  existsSync,
+  createReadStream,
+  openSync,
+  readSync,
+  closeSync,
+} from 'node:fs';
+import { join } from 'node:path';
+import { createInterface } from 'node:readline';
+import type { ChatSummary, ChatMessage, ChatBlock } from '@claude-control/contracts';
+
+/**
+ * Чтение истории разговоров Claude Code из ~/.claude/projects.
+ *
+ * Транскрипт — это JSON Lines, куда строки только дописываются. Файлы бывают
+ * очень большими (медиана около двух мегабайт, отдельные — за сотню), поэтому
+ * читать их целиком ради строки в списке нельзя: для списка берём начало и
+ * конец файла, а разобранное держим в кеше по времени изменения.
+ */
+
+/** Файл больше этого размера не читается целиком — только начало и хвост. */
+const FULL_READ_LIMIT = 4 * 1024 * 1024;
+/** Сколько байт хвоста читать у большого файла. */
+const TAIL_BYTES = 1024 * 1024;
+/** Сколько первых строк достаточно, чтобы найти первую реплику человека. */
+const HEAD_LINES = 300;
+/** Сколько последних сообщений отдавать в ленту чата. */
+const MESSAGE_LIMIT = 400;
+
+interface CacheEntry {
+  mtimeMs: number;
+  size: number;
+  summary: ChatSummary;
+}
+
+const cache = new Map<string, CacheEntry>();
+
+/**
+ * Список чатов. Разговоры лежат в подкаталогах по проектам; вложенные папки
+ * с ветками субагентов пропускаем — в списке нужны только сами сессии.
+ */
+export function readChats(projectsDir: string): ChatSummary[] {
+  if (!existsSync(projectsDir)) return [];
+
+  const chats: ChatSummary[] = [];
+
+  for (const projectEntry of readdirSync(projectsDir, { withFileTypes: true })) {
+    if (!projectEntry.isDirectory()) continue;
+
+    const projectDir = join(projectsDir, projectEntry.name);
+    for (const fileEntry of readdirSync(projectDir, { withFileTypes: true })) {
+      if (!fileEntry.isFile() || !fileEntry.name.endsWith('.jsonl')) continue;
+
+      const summary = readSummary(join(projectDir, fileEntry.name), projectEntry.name);
+      if (summary) chats.push(summary);
+    }
+  }
+
+  return chats.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+function readSummary(path: string, projectName: string): ChatSummary | undefined {
+  const stats = statSync(path);
+
+  const cached = cache.get(path);
+  if (cached && cached.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
+    return cached.summary;
+  }
+
+  const records = readRecords(path, stats.size);
+  if (records.length === 0) return undefined;
+
+  // Заголовок Claude Code генерирует сам и дописывает несколько раз —
+  // верным считается последний.
+  const title = lastValue(records, (record) =>
+    record.type === 'ai-title' ? record.aiTitle : undefined,
+  );
+  const lastMessage = [...records].reverse().find(isDialogMessage);
+
+  const summary: ChatSummary = {
+    id: fileSessionId(path),
+    title: title?.trim() || firstMeaningfulText(records).slice(0, 70) || projectName,
+    project: projectName,
+    projectPath: lastValue(records, (record) => record.cwd) ?? '',
+    messageCount: records.filter(isDialogMessage).length,
+    createdAt: records[0]?.timestamp ?? stats.birthtime.toISOString(),
+    updatedAt: stats.mtime.toISOString(),
+    preview: cleanText(textOf(lastMessage)).slice(0, 160) || undefined,
+    model: lastValue(records, (record) => record.message?.model),
+  };
+
+  cache.set(path, { mtimeMs: stats.mtimeMs, size: stats.size, summary });
+  return summary;
+}
+
+/**
+ * Переписка одного чата. Здесь, в отличие от списка, нужен полный проход по
+ * файлу — иначе выпадут реплики из середины. Файл читается построчно и сразу
+ * превращается в сообщения, а в памяти остаётся только хвост ленты: держать
+ * стомегабайтный транскрипт целиком незачем, дальше начала никто не листает.
+ */
+export async function readChatMessages(
+  projectsDir: string,
+  chatId: string,
+  limit = MESSAGE_LIMIT,
+): Promise<ChatMessage[]> {
+  const path = findTranscript(projectsDir, chatId);
+  if (!path) return [];
+
+  const messages: ChatMessage[] = [];
+
+  for await (const line of streamLines(path)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+
+    let record: Record;
+    try {
+      record = JSON.parse(trimmed) as Record;
+    } catch {
+      continue;
+    }
+
+    if (!isDialogMessage(record)) continue;
+
+    const blocks = toBlocks(record);
+    if (blocks.length === 0) continue;
+
+    messages.push({
+      id: record.uuid ?? String(messages.length),
+      role: record.type === 'user' ? 'user' : 'assistant',
+      blocks,
+      timestamp: record.timestamp ?? '',
+      parentId: record.parentUuid ?? undefined,
+    });
+
+    // Лишнее с начала выбрасываем сразу, не дожидаясь конца файла.
+    if (messages.length > limit) messages.shift();
+  }
+
+  return messages;
+}
+
+export function findTranscript(projectsDir: string, chatId: string): string | undefined {
+  if (!existsSync(projectsDir)) return undefined;
+
+  const safeId = chatId.replace(/[^a-zA-Z0-9-]/g, '');
+  for (const entry of readdirSync(projectsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+
+    const candidate = join(projectsDir, entry.name, `${safeId}.jsonl`);
+    if (existsSync(candidate)) return candidate;
+  }
+
+  return undefined;
+}
+
+interface Record {
+  type?: string;
+  uuid?: string;
+  parentUuid?: string | null;
+  timestamp?: string;
+  cwd?: string;
+  aiTitle?: string;
+  isMeta?: boolean;
+  isCompactSummary?: boolean;
+  isApiErrorMessage?: boolean;
+  toolUseResult?: unknown;
+  message?: {
+    role?: string;
+    model?: string;
+    content?: string | ContentBlock[];
+  };
+}
+
+interface ContentBlock {
+  type: string;
+  text?: string;
+  thinking?: string;
+  name?: string;
+  input?: unknown;
+  is_error?: boolean;
+  source?: { type?: string; media_type?: string; data?: string };
+  title?: string;
+}
+
+/**
+ * Разбор файла. Маленькие читаются целиком, у больших берём начало и хвост:
+ * этого хватает и на заголовок, и на первую с последней репликой, а на файле
+ * в сотню мегабайт полный проход занял бы секунды.
+ */
+function readRecords(path: string, sizeHint: number): Record[] {
+  const size = sizeHint || statSync(path).size;
+
+  if (size <= FULL_READ_LIMIT) return parseLines(readWholeFile(path));
+
+  return [...parseLines(readHead(path)), ...parseLines(readTail(path, size))];
+}
+
+function parseLines(text: string): Record[] {
+  const records: Record[] = [];
+
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+
+    try {
+      records.push(JSON.parse(trimmed) as Record);
+    } catch {
+      // Обрезанная строка на границе куска — пропускаем.
+    }
+  }
+
+  return records;
+}
+
+function readWholeFile(path: string): string {
+  return readChunk(path, 0, statSync(path).size);
+}
+
+function readHead(path: string): string {
+  const text = readChunk(path, 0, 512 * 1024);
+  return text.split('\n').slice(0, HEAD_LINES).join('\n');
+}
+
+function readTail(path: string, size: number): string {
+  return readChunk(path, Math.max(0, size - TAIL_BYTES), Math.min(TAIL_BYTES, size));
+}
+
+function readChunk(path: string, position: number, length: number): string {
+  const handle = openSync(path, 'r');
+
+  try {
+    const buffer = Buffer.alloc(length);
+    const read = readSync(handle, buffer, 0, length, position);
+    return buffer.subarray(0, read).toString('utf8');
+  } finally {
+    closeSync(handle);
+  }
+}
+
+/** Настоящая реплика диалога, а не служебная запись. */
+function isDialogMessage(record: Record): boolean {
+  if (record.type !== 'user' && record.type !== 'assistant') return false;
+  if (record.isMeta || record.isCompactSummary || record.isApiErrorMessage) return false;
+  // У результата инструмента есть разобранный результат — это не реплика.
+  if (record.type === 'user' && record.toolUseResult !== undefined) return false;
+
+  const content = record.message?.content;
+  if (Array.isArray(content) && content.every((block) => block.type === 'tool_result'))
+    return false;
+
+  return true;
+}
+
+/**
+ * Первые осмысленные слова человека — из них делается название чата, когда
+ * Claude Code не успел придумать своё. Реплика нередко начинается со служебной
+ * вставки среды (открытый файл, напоминание), после очистки от неё остаётся
+ * пусто — поэтому идём по репликам, пока не найдётся непустой текст.
+ */
+function firstMeaningfulText(records: Record[]): string {
+  for (const record of records) {
+    if (!isDialogMessage(record) || record.type !== 'user') continue;
+
+    const text = cleanText(textOf(record));
+    if (text.length > 1) return text;
+  }
+
+  return '';
+}
+
+function toBlocks(record: Record): ChatBlock[] {
+  const content = record.message?.content;
+  if (typeof content === 'string') return content.trim() ? [{ type: 'text', text: content }] : [];
+  if (!Array.isArray(content)) return [];
+
+  const blocks: ChatBlock[] = [];
+
+  for (const block of content) {
+    if (block.type === 'text' && block.text?.trim()) {
+      blocks.push({ type: 'text', text: block.text });
+    } else if (block.type === 'thinking' && block.thinking?.trim()) {
+      blocks.push({ type: 'thinking', text: block.thinking });
+    } else if (block.type === 'tool_use') {
+      blocks.push({
+        type: 'tool',
+        name: block.name ?? '',
+        input: JSON.stringify(block.input ?? {}),
+      });
+    } else if (block.type === 'image' && block.source?.data) {
+      // Картинки лежат в транскрипте прямо в base64.
+      blocks.push({
+        type: 'image',
+        source: `data:${block.source.media_type ?? 'image/png'};base64,${block.source.data}`,
+      });
+    } else if (block.type === 'document') {
+      blocks.push({ type: 'text', text: `📎 ${block.title ?? 'документ'}` });
+    }
+  }
+
+  return blocks;
+}
+
+function textOf(record: Record | undefined): string {
+  if (!record) return '';
+
+  const content = record.message?.content;
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+
+  // Служебная вставка среды часто идёт отдельным блоком перед настоящим
+  // текстом, поэтому склеиваем все текстовые блоки, а не берём первый.
+  return content
+    .filter((block) => block.type === 'text' && block.text)
+    .map((block) => block.text)
+    .join(' ');
+}
+
+/**
+ * Служебные обёртки среды попадают в текст первой реплики и в названии чата
+ * выглядят мусором, поэтому их вырезаем.
+ */
+function cleanText(text: string): string {
+  return text
+    .replace(/<(ide_[a-z_]+|command-[a-z]+|task-notification|system-reminder)>[\s\S]*?<\/\1>/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function lastValue<T>(records: Record[], pick: (record: Record) => T | undefined): T | undefined {
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    const value = record && pick(record);
+    if (value !== undefined && value !== false) return value as T;
+  }
+
+  return undefined;
+}
+
+function fileSessionId(path: string): string {
+  return path.split(/[\\/]/).pop()?.replace('.jsonl', '') ?? '';
+}
+
+async function* streamLines(path: string): AsyncGenerator<string> {
+  const lines = createInterface({ input: createReadStream(path, { encoding: 'utf8' }) });
+  for await (const line of lines) yield line;
+}

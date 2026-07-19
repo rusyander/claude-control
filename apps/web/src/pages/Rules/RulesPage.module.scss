@@ -1,0 +1,8 @@
+.page {
+  max-width: var(--layout-content-max);
+}
+
+.body {
+  white-space: pre-wrap; // правила пишутся списками, переносы значимы
+  max-width: var(--text-measure);
+}

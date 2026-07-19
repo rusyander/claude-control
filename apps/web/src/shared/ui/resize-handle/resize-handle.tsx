@@ -1,0 +1,63 @@
+import { useCallback, useEffect, useRef } from 'react';
+import type { ResizeHandleProps } from './resize-handle.types';
+import styles from './resize-handle.module.scss';
+
+/**
+ * Вертикальный разделитель, за который панель тянут мышью.
+ *
+ * Во время перетаскивания слушатели висят на документе, а не на самой полоске:
+ * курсор легко убегает за её пределы, и без этого панель бросало бы при первом
+ * же резком движении. Клавиатура тоже работает — стрелками, шагом по 24px.
+ */
+export function ResizeHandle({ width, onResize, min = 320, max = 900, label }: ResizeHandleProps) {
+  const startRef = useRef({ x: 0, width: 0 });
+
+  const clamp = useCallback((value: number) => Math.min(max, Math.max(min, value)), [min, max]);
+
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
+    startRef.current = { x: event.clientX, width };
+
+    const onMove = (moveEvent: PointerEvent): void => {
+      // Панель справа, поэтому движение влево её расширяет.
+      onResize(clamp(startRef.current.width - (moveEvent.clientX - startRef.current.x)));
+    };
+
+    const onUp = (): void => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+
+    // Пока тянем, выделение текста и «мигающий» курсор только мешают.
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  };
+
+  useEffect(() => {
+    onResize(clamp(width));
+    // Пересчитываем только при смене границ: например, когда окно уменьшилось.
+  }, [min, max]);
+
+  return (
+    <div
+      className={styles.handle}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={label}
+      aria-valuenow={width}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowLeft') onResize(clamp(width + 24));
+        if (event.key === 'ArrowRight') onResize(clamp(width - 24));
+      }}
+    >
+      <span className={styles.grip} />
+    </div>
+  );
+}

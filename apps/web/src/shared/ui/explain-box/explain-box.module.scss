@@ -1,0 +1,53 @@
+// Свёрнутая справка — компактная плашка по содержимому: раньше она тянулась
+// на всю ширину ради одной строки заголовка и выглядела пустой полосой.
+.root {
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-info-subtle);
+  overflow: hidden;
+}
+
+// Раскрытая занимает всю ширину: там уже есть что показывать.
+.root[open] {
+  width: 100%;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+}
+
+.chevron {
+  margin-left: var(--spacing-xs);
+  transition: transform var(--duration-fast) ease;
+  color: var(--color-info);
+  flex-shrink: 0;
+}
+
+.root[open] .chevron {
+  transform: rotate(90deg);
+}
+
+.body {
+  padding: 0 var(--spacing-md) var(--spacing-md);
+  // Строку длиннее этой читать тяжело, но и узкая колонка в широком блоке
+  // смотрится сиротливо — берём середину.
+  max-width: 95ch;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}

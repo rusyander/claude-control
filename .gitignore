@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# Скриншоты и артефакты проверок — рабочий мусор, в репозитории не нужны
+.qa-screenshots/

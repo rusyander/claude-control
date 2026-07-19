@@ -1,0 +1,204 @@
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-lg) var(--spacing-xl);
+}
+
+.row {
+  display: flex;
+  margin-bottom: var(--spacing-lg);
+}
+
+.rowUser {
+  justify-content: flex-end;
+}
+
+.bubble {
+  position: relative;
+  max-width: min(var(--text-measure), 100%);
+  border-radius: var(--radius-lg);
+  color: var(--color-fg);
+
+  // Кнопки над сообщением появляются при наведении: постоянно висящий ряд
+  // иконок в ленте мешает читать.
+  &:hover .actions {
+    opacity: 1;
+  }
+}
+
+.bubbleUser {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-accent-subtle);
+}
+
+.bubbleAssistant {
+  width: 100%;
+  max-width: var(--text-measure);
+  min-width: 0;
+}
+
+.actions {
+  position: absolute;
+  top: calc(-1 * var(--spacing-lg));
+  right: 0;
+  display: flex;
+  gap: var(--spacing-3xs);
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+}
+
+.text {
+  // Длинные пути, ссылки и куски JSON приходят одной строкой без пробелов:
+  // без принудительного переноса они распирают колонку и внизу появляется
+  // горизонтальная прокрутка.
+  min-width: 0;
+  overflow-wrap: anywhere;
+
+  :global {
+    h1,
+    h2,
+    h3 {
+      margin: var(--spacing-sm) 0 var(--spacing-2xs);
+      font-size: var(--font-size-body);
+      line-height: 1.35;
+    }
+
+    p {
+      margin-bottom: var(--spacing-xs);
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    ul,
+    ol {
+      margin-bottom: var(--spacing-xs);
+      padding-left: var(--spacing-lg);
+    }
+
+    li {
+      margin-bottom: var(--spacing-3xs);
+    }
+
+    code {
+      padding: 0.1em 0.35em;
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-sunken);
+      font-family: var(--font-mono);
+      font-size: 0.92em;
+    }
+
+    pre {
+      margin-bottom: var(--spacing-xs);
+      padding: var(--spacing-sm);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-sunken);
+      // Код переносим по словам: прокрутка под каждым блоком мешает читать.
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+
+      code {
+        padding: 0;
+        background: none;
+      }
+    }
+
+    a {
+      color: var(--color-accent);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--spacing-xs);
+    }
+
+    th,
+    td {
+      padding: var(--spacing-3xs) var(--spacing-xs);
+      border: 1px solid var(--color-border);
+      text-align: left;
+    }
+  }
+}
+
+.thinking {
+  margin-bottom: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+
+  summary {
+    padding: var(--spacing-2xs) var(--spacing-sm);
+    color: var(--color-fg-muted);
+    font-size: var(--font-size-body-sm);
+    cursor: pointer;
+  }
+}
+
+.thinkingBody {
+  padding: 0 var(--spacing-sm) var(--spacing-sm);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+  white-space: pre-wrap;
+}
+
+// Вызовы инструментов идут подряд десятками, поэтому каждый — одна узкая
+// строка: подробности разворачиваются по клику.
+.tool {
+  margin-bottom: var(--spacing-3xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+
+  summary {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2xs);
+    padding: var(--spacing-3xs) var(--spacing-xs);
+    color: var(--color-fg-muted);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-caption);
+    cursor: pointer;
+  }
+}
+
+.toolInput {
+  padding: 0 var(--spacing-xs) var(--spacing-xs);
+  color: var(--color-fg-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.image {
+  display: block;
+  max-width: 100%;
+  margin-bottom: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  background: var(--color-accent);
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}

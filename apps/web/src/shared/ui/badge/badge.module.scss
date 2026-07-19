@@ -1,0 +1,51 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  // Чип был слишком мелким и терялся рядом с текстом: подняли шрифт
+  // до основного размера подписи и увеличили внутренние отступы.
+  padding: 3px var(--spacing-sm);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background-color: currentcolor;
+  flex-shrink: 0;
+}
+
+.neutral {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+}
+
+.accent {
+  background-color: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.success {
+  background-color: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
+.warning {
+  background-color: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+
+.danger {
+  background-color: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.info {
+  background-color: var(--color-info-subtle);
+  color: var(--color-info);
+}

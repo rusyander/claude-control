@@ -1,0 +1,38 @@
+{
+  "name": "claude-control",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Универсальный пульт управления конфигурацией Claude Code: правила, хуки, скиллы, MCP-серверы, группы и связи",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm --filter \"./apps/*\" build",
+    "start": "pnpm --filter @claude-control/server start",
+    "type-check": "pnpm -r type-check",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "depcruise": "depcruise apps/web/src",
+    "test": "pnpm -r test",
+    "check": "pnpm format:check && pnpm type-check && pnpm lint && pnpm depcruise && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "dependency-cruiser": "^18.1.0",
+    "eslint": "^10.7.0",
+    "eslint-plugin-boundaries": "^7.0.2",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
+    "playwright": "^1.61.1",
+    "prettier": "^3.9.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.64.0"
+  }
+}

@@ -1,0 +1,28 @@
+.page {
+  max-width: var(--layout-content-max);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.tileLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-lg);
+
+  // Плитка без нижней подписи была ниже соседних, и ряд выглядел рваным —
+  // растягиваем карточку на всю высоту ячейки сетки.
+  > * {
+    height: 100%;
+  }
+}
+
+.tileBody {
+  height: 100%;
+  min-height: 116px;
+  justify-content: flex-start;
+}

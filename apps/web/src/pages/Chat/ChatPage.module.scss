@@ -1,0 +1,64 @@
+// Чат занимает всю высоту экрана: лента прокручивается внутри, а поле ввода
+// и список остаются на месте.
+.page {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  height: calc(100vh - var(--layout-header-height, 0px));
+  margin: calc(-1 * var(--spacing-lg));
+  overflow: hidden;
+}
+
+.pageWithPreview {
+  grid-template-columns: 300px minmax(0, 1fr) minmax(360px, 40%);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-xl);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.headerText {
+  min-width: 0;
+}
+
+.title {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.artifacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-2xs) var(--spacing-xl);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+}
+
+.empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+@media (max-width: 1200px) {
+  .pageWithPreview {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+}

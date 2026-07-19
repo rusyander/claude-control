@@ -1,0 +1,50 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(90px, 190px) 1fr auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.clickable {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  margin: calc(var(--spacing-3xs) * -1) calc(var(--spacing-2xs) * -1);
+
+  &:hover {
+    background-color: var(--color-surface-sunken);
+  }
+}
+
+.track {
+  position: relative;
+  height: 10px;
+  background-color: var(--color-surface-sunken);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  // Скругление на конце данных: полоса читается как величина, а не как блок.
+  border-radius: var(--radius-full);
+  transition: width var(--duration-normal) ease;
+}
+
+.label,
+.value {
+  min-width: 0;
+}
+
+// Значение всегда видно текстом: в светлой теме часть цветов серий не даёт
+// 3:1 контраста к фону, и подпись обязательна по правилам доступности.
+.value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

@@ -1,0 +1,65 @@
+.root {
+  position: relative;
+  width: 100%;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+// Сетка нарочно бледная: она ориентир, а не содержание.
+.grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.line {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.area {
+  fill: var(--series-1);
+  opacity: 0.12;
+}
+
+.marker {
+  fill: var(--series-1);
+  stroke: var(--color-surface);
+  stroke-width: 2;
+}
+
+.crosshair {
+  stroke: var(--color-fg-subtle);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+// Зона захвата шире самой точки: попасть курсором в маркер 4px невозможно.
+.hitArea {
+  fill: transparent;
+  cursor: crosshair;
+}
+
+.tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.axisLabel {
+  font-size: var(--font-size-caption);
+  fill: var(--color-fg-subtle);
+}

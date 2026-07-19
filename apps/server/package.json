@@ -1,0 +1,26 @@
+{
+  "name": "@claude-control/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Локальный API поверх файлов конфигурации Claude Code",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "node --watch --experimental-strip-types src/index.ts",
+    "start": "node --experimental-strip-types src/index.ts",
+    "build": "tsc --noEmit",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@claude-control/contracts": "workspace:*",
+    "@fastify/cors": "^11.3.0",
+    "chokidar": "^5.0.0",
+    "fastify": "^5.10.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^5.9.3"
+  }
+}

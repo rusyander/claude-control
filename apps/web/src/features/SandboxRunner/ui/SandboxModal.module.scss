@@ -1,0 +1,169 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: var(--spacing-md);
+  min-height: 460px;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+// Состав песочницы: что именно подключено к прогону.
+.aside {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  align-self: start;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--spacing-3xs);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--spacing-2xs);
+}
+
+.tab {
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+}
+
+.tabActive {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent);
+  }
+}
+
+// Готовые запросы. Каждый — плашка из двух частей: подставить и скопировать.
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+}
+
+.chipText {
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-accent);
+  }
+}
+
+.chipCopy {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacing-xs);
+  border: none;
+  border-left: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-fg-subtle);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface);
+    color: var(--color-accent);
+  }
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.result {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.resultBlock {
+  border-left: 3px solid var(--color-danger);
+}
+
+.resultAsk {
+  border-left: 3px solid var(--color-warning);
+}
+
+.resultPass {
+  border-left: 3px solid var(--color-border-strong);
+}
+
+.output {
+  margin-top: var(--spacing-2xs);
+  padding: var(--spacing-2xs);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.answer {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  min-height: 180px;
+  max-height: 380px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.toolList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3xs);
+}
+
+.isolation {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}

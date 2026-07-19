@@ -1,0 +1,32 @@
+// Две колонки: слева поля, справа помощник. На узком экране складываются
+// в одну, помощник уходит вниз — он вспомогательный, а не главный.
+.root {
+  display: grid;
+  // Помощнику отдано около 40% ширины: в узкой колонке переписку
+  // невозможно перечитать, а именно в неё смотрят при уточнениях.
+  grid-template-columns: minmax(0, 1.5fr) minmax(340px, 1fr);
+  gap: var(--spacing-lg);
+  align-items: stretch;
+}
+
+.fields {
+  min-width: 0;
+}
+
+.assistant {
+  position: sticky;
+  top: 0;
+  min-width: 0;
+  height: 100%;
+}
+
+@media (max-width: 900px) {
+  .root {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant {
+    position: static;
+    min-height: 280px;
+  }
+}

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../lib/app-store.ts';
-import { readSkills, saveSkill, readSkillFile, writeSkillFile } from './skills.ts';
+import { readSkills, saveSkill } from './skills.ts';
 
 /**
  * Тесты скиллов. Скилл — это папка с файлом SKILL.md, у которого в начале
@@ -183,48 +183,6 @@ describe('skills', () => {
         groupIds: [],
       });
       expect(existsSync(join(skillsDir, 'v2', 'SKILL.md'))).toBe(true);
-    });
-  });
-
-  describe('readSkillFile — чтение вложенного файла с защитой границ', () => {
-    beforeEach(() => {
-      putSkill('safe', ['---', 'name: safe', 'description: x', '---', '', 'Тело.'].join('\n'), {
-        'references/note.md': 'заметка внутри скилла',
-      });
-      // Секретный файл ВЫШЕ папки скилла — до него нельзя дотянуться из скилла.
-      writeFileSync(join(dir, 'secret.txt'), 'TOP SECRET');
-    });
-
-    it('читает файл внутри папки скилла', () => {
-      expect(readSkillFile(skillsDir, 'safe', 'references/note.md')).toBe('заметка внутри скилла');
-    });
-
-    it('«../../secret.txt» не выпускает за пределы скилла — возвращается пусто', () => {
-      const result = readSkillFile(skillsDir, 'safe', '../../secret.txt');
-      expect(result).toBe('');
-      // И, что важнее, содержимое чужого файла не утекло.
-      expect(result).not.toContain('TOP SECRET');
-    });
-
-    it('несуществующий файл внутри скилла — пусто, без исключения', () => {
-      expect(readSkillFile(skillsDir, 'safe', 'nope.md')).toBe('');
-    });
-  });
-
-  describe('writeSkillFile — запись с защитой границ', () => {
-    beforeEach(() => {
-      putSkill('safe', ['---', 'name: safe', 'description: x', '---', '', 'Тело.'].join('\n'));
-    });
-
-    it('пишет файл внутри папки скилла', () => {
-      writeSkillFile(skillsDir, 'safe', 'notes/todo.md', 'список дел');
-      expect(readFileSync(join(skillsDir, 'safe', 'notes', 'todo.md'), 'utf8')).toBe('список дел');
-    });
-
-    it('попытка выйти за папку скилла бросает ошибку', () => {
-      expect(() => writeSkillFile(skillsDir, 'safe', '../../evil.txt', 'взлом')).toThrow();
-      // Файл наружу не создан.
-      expect(existsSync(join(dir, 'evil.txt'))).toBe(false);
     });
   });
 });

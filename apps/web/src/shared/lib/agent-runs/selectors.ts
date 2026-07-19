@@ -1,0 +1,71 @@
+import { runStatus, type RunStatus } from './status';
+
+/**
+ * Чистые выборки поверх прогонов — для пульта агентов и суммарной стоимости.
+ * Работают со структурной формой прогона (не завязаны на класс стора), поэтому
+ * легко тестируются отдельно.
+ */
+
+export interface RunLike {
+  id: string;
+  sessionId?: string;
+  projectPath?: string;
+  status: RunStatus;
+  lastEventAt: number;
+  costUsd?: number;
+  tokens?: number;
+  /** Запросы прав, ждущие ответа — влияют на статус (жёлтая точка). */
+  permissions?: { toolUseId: string }[];
+}
+
+export interface ActiveRunView {
+  id: string;
+  sessionId?: string;
+  projectPath?: string;
+  /** Статус с поправкой на зависание; idle сюда не попадает. */
+  status: Exclude<RunStatus, 'idle'>;
+  costUsd?: number;
+  tokens?: number;
+}
+
+/**
+ * Активные прогоны — те, у кого есть что показать точкой: работает, ждёт ответа
+ * или упал. Завершённые (idle) отсеиваем. Порядок по тревожности: сначала
+ * ошибки, потом ждущие, потом работающие.
+ */
+export function selectActiveRuns(runs: RunLike[], now: number): ActiveRunView[] {
+  const active: ActiveRunView[] = [];
+  for (const run of runs) {
+    const status = runStatus({
+      status: run.status,
+      lastEventAt: run.lastEventAt,
+      now,
+      pendingPermission: (run.permissions?.length ?? 0) > 0,
+    });
+    if (status === 'idle') continue;
+    active.push({
+      id: run.id,
+      sessionId: run.sessionId,
+      projectPath: run.projectPath,
+      status,
+      costUsd: run.costUsd,
+      tokens: run.tokens,
+    });
+  }
+
+  const order: Record<Exclude<RunStatus, 'idle'>, number> = { error: 0, waiting: 1, running: 2 };
+  return active.sort((a, b) => order[a.status] - order[b.status]);
+}
+
+/** Сколько активных прогонов сейчас работает (для бейджа-счётчика). */
+export function countRunning(runs: RunLike[], now: number): number {
+  return runs.filter(
+    (run) =>
+      runStatus({
+        status: run.status,
+        lastEventAt: run.lastEventAt,
+        now,
+        pendingPermission: (run.permissions?.length ?? 0) > 0,
+      }) === 'running',
+  ).length;
+}

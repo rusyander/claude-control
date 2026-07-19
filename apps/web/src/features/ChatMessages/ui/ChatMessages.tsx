@@ -6,6 +6,7 @@ import { Typography } from '@shared/ui/typography';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { MessageBubble } from './MessageBubble';
 import { QuestionCard, parseQuestions } from './QuestionCard';
+import { PermissionCard } from './PermissionCard';
 import type { ChatMessagesProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 
@@ -14,7 +15,16 @@ import styles from './ChatMessages.module.scss';
  * блоком и живёт отдельно от истории: он ещё не записан в транскрипт, а
  * показывать его нужно немедленно.
  */
-export function ChatMessages({ messages, stream, isLoading, onEdit }: ChatMessagesProps) {
+export function ChatMessages({
+  messages,
+  stream,
+  isLoading,
+  onEdit,
+  onPickOption,
+  isRunning,
+  permissions,
+  onPermissionDecide,
+}: ChatMessagesProps) {
   const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -34,7 +44,7 @@ export function ChatMessages({ messages, stream, isLoading, onEdit }: ChatMessag
 
   useEffect(() => {
     if (isPinned.current) bottomRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length, stream.text, stream.tools.length]);
+  }, [messages.length, stream.text, stream.tools.length, permissions?.length]);
 
   return (
     <div
@@ -48,7 +58,13 @@ export function ChatMessages({ messages, stream, isLoading, onEdit }: ChatMessag
       {isLoading && <SkeletonList rows={3} withActions={false} />}
 
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} onEdit={onEdit} />
+        <MessageBubble
+          key={message.id}
+          message={message}
+          onEdit={onEdit}
+          onPickOption={onPickOption}
+          isRunning={isRunning}
+        />
       ))}
 
       {(stream.isRunning || stream.text) && (
@@ -66,7 +82,14 @@ export function ChatMessages({ messages, stream, isLoading, onEdit }: ChatMessag
                 tool.name === 'AskUserQuestion' ? parseQuestions(tool.input) : undefined;
 
               if (questions) {
-                return <QuestionCard key={`${tool.name}-${index}`} questions={questions} />;
+                return (
+                  <QuestionCard
+                    key={`${tool.name}-${index}`}
+                    questions={questions}
+                    onPick={onPickOption}
+                    disabled={isRunning}
+                  />
+                );
               }
 
               return (
@@ -107,6 +130,10 @@ export function ChatMessages({ messages, stream, isLoading, onEdit }: ChatMessag
             {stream.isRunning && stream.text && <span className={styles.caret} />}
           </div>
         </div>
+      )}
+
+      {permissions && permissions.length > 0 && onPermissionDecide && (
+        <PermissionCard permissions={permissions} onDecide={onPermissionDecide} />
       )}
 
       {stream.error && (

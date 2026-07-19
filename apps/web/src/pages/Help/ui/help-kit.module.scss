@@ -1,0 +1,399 @@
+// Кит, из которого собраны документы справки. Все документы устроены
+// одинаково, поэтому стили лежат в одном месте: правка отступа здесь меняет
+// ритм сразу во всех разделах, а не в одном.
+
+/* ── Секция документа ───────────────────────────────────────────────── */
+
+// Своей ширины у справки нет: документ занимает ту же колонку, что списки
+// на остальных страницах (--layout-content-max у .page). Внутренних
+// ограничений по ширине здесь нет намеренно — иначе справка выглядела бы
+// вдвое уже соседних разделов.
+.section {
+  scroll-margin-top: var(--spacing-lg);
+}
+
+/* ── Где это лежит ──────────────────────────────────────────────────── */
+
+.storageIcon {
+  color: var(--color-fg-subtle);
+  flex-shrink: 0;
+}
+
+.storageList {
+  display: grid;
+  // Колонка подписей ровно по самой длинной из них, остальное — значению.
+  grid-template-columns: max-content 1fr;
+  gap: var(--spacing-xs) var(--spacing-md);
+  margin: 0;
+}
+
+.storageRow {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+}
+
+.storageLabel {
+  margin: 0;
+}
+
+.storageValue {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+// Узкий экран: подпись встаёт над значением, иначе путь к файлу сжимается
+// в нечитаемый столбик из двух символов.
+@media (width <= 560px) {
+  .storageList {
+    grid-template-columns: 1fr;
+  }
+
+  .storageRow {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-3xs);
+  }
+}
+
+/* ── Таблица полей ──────────────────────────────────────────────────── */
+
+.fields {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  text-align: left;
+}
+
+.fieldsCaption {
+  padding-bottom: var(--spacing-xs);
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  text-align: left;
+  caption-side: top;
+}
+
+.fields th,
+.fields td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  vertical-align: top;
+}
+
+.fields thead th {
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fields tbody tr + tr th,
+.fields tbody tr + tr td {
+  border-top: 1px solid var(--color-border);
+}
+
+.fieldName {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+  width: 1%;
+  // Имя поля не переносится по буквам, но и не растягивает таблицу.
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.fieldDescription {
+  color: var(--color-fg-muted);
+}
+
+// Узкий экран: строки превращаются в карточки. Таблица остаётся таблицей для
+// скринридера — меняется только раскладка.
+@media (width <= 640px) {
+  .fields thead {
+    // clip вместо display:none — заголовки остаются доступными.
+    position: absolute;
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  .fields tbody tr {
+    display: block;
+  }
+
+  .fields tbody tr + tr th {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .fields tbody tr + tr td {
+    border-top: 0;
+  }
+
+  .fieldName {
+    display: flex;
+    width: auto;
+    padding-bottom: var(--spacing-3xs);
+    white-space: normal;
+  }
+
+  .fieldDescription {
+    display: block;
+    padding-top: 0;
+  }
+}
+
+/* ── Пошаговый рецепт ───────────────────────────────────────────────── */
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: help-step;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: var(--spacing-3xs) var(--spacing-sm);
+  counter-increment: help-step;
+
+  &::before {
+    content: counter(help-step);
+    display: flex;
+    align-items: center;
+    grid-row: 1 / span 2;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-accent-subtle);
+    color: var(--color-accent);
+    font-size: var(--font-size-caption);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    // Кружок стоит по верхней строке текста, а не по её базовой линии.
+    align-self: start;
+  }
+}
+
+.stepTitle {
+  grid-column: 2;
+}
+
+.stepText {
+  grid-column: 2;
+}
+
+/* ── Тонкость ───────────────────────────────────────────────────────── */
+
+.callout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--callout-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  background-color: var(--callout-bg);
+}
+
+.callout-info {
+  --callout-bg: var(--color-info-subtle);
+  --callout-border: var(--color-info);
+}
+
+.callout-warning {
+  --callout-bg: var(--color-warning-subtle);
+  --callout-border: var(--color-warning);
+}
+
+.callout-danger {
+  --callout-bg: var(--color-danger-subtle);
+  --callout-border: var(--color-danger);
+}
+
+.callout-success {
+  --callout-bg: var(--color-success-subtle);
+  --callout-border: var(--color-success);
+}
+
+.calloutIcon {
+  color: var(--callout-border);
+  flex-shrink: 0;
+}
+
+.calloutText {
+  overflow-wrap: anywhere;
+}
+
+/* ── Что умеет и чего не умеет ──────────────────────────────────────── */
+
+.capabilities {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.capabilityColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-md);
+  border: 1px solid var(--column-border);
+  border-radius: var(--radius-md);
+  background-color: var(--column-bg);
+}
+
+.capabilityCan {
+  --column-bg: var(--color-success-subtle);
+  --column-border: var(--color-success);
+}
+
+// Столбец ограничений подчёркнуто нейтрален: «нельзя» здесь — не ошибка
+// пользователя и не предупреждение, а граница раздела.
+.capabilityCant {
+  --column-bg: var(--color-surface-sunken);
+  --column-border: var(--color-border);
+}
+
+.capabilityTitle {
+  color: var(--color-fg);
+}
+
+.capabilityList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capabilityItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.capabilityIconCan {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.capabilityIconCant {
+  color: var(--color-fg-subtle);
+  flex-shrink: 0;
+}
+
+/* ── Равнозначные варианты ──────────────────────────────────────────── */
+
+.optionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--option-min, 260px), 1fr));
+  gap: var(--spacing-sm);
+  align-items: stretch;
+
+  // Карточка растягивается на всю ячейку: описания разной длины иначе
+  // выстраиваются лесенкой.
+  > * {
+    height: 100%;
+  }
+}
+
+/* ── Переход к соседнему разделу ────────────────────────────────────── */
+
+.topicNav {
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  max-width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-muted);
+  text-decoration: none;
+
+  &:hover {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+.navLinkNext {
+  text-align: right;
+}
+
+/* ── Карточка раздела в индексе ─────────────────────────────────────── */
+
+// Ячейку сетки растягивает сама сетка, но растянуться должна карточка, а не
+// только ссылка-обёртка вокруг неё: иначе в ряду соседствуют коробки разной
+// высоты, хотя занимают одинаковые ячейки.
+.topicLink {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-lg);
+  color: inherit;
+  text-decoration: none;
+
+  > * {
+    height: 100%;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+.topicIcon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.topicSummary {
+  overflow-wrap: anywhere;
+}
+
+.topicChevron {
+  color: var(--color-fg-subtle);
+  flex-shrink: 0;
+  transition: transform var(--duration-fast) ease;
+}
+
+.topicLink:hover .topicChevron {
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topicChevron {
+    transition: none;
+  }
+}

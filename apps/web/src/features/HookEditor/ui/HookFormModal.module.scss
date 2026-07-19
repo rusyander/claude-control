@@ -19,3 +19,12 @@
     border-color: var(--color-border-strong);
   }
 }
+
+// Переключатель режимов «Конструктор / Несколько сразу» — как у правил.
+.modeTabs {
+  display: flex;
+  gap: var(--spacing-3xs);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}

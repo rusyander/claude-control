@@ -305,6 +305,68 @@
   background: var(--color-surface-sunken);
 }
 
+// Кликабельный вариант: тот же вид, но реагирует на курсор — по нему можно
+// ответить прямо в чате, не уходя в терминал. Цвет и шрифт наследуем явно:
+// у <button> свои системные значения, из-за которых текст варианта тускнел
+// (раньше это был <div>, наследовавший цвет карточки).
+.optionClickable {
+  display: block;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.optionClickable:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+.optionClickable:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.optionClickable:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+// Карточка запроса прав: тот же каркас, что у вопроса, но тон «требует решения»
+// (жёлтая рамка) — работа стоит, пока не ответишь.
+.permission {
+  border-color: var(--color-warning, #d9822b);
+  border-left-color: var(--color-warning, #d9822b);
+}
+
+.permissionHead {
+  color: var(--color-warning, #d9822b);
+}
+
+.permissionInput {
+  margin: var(--spacing-2xs) 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
+.permissionActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2xs);
+  margin-top: var(--spacing-2xs);
+}
+
 .optionLabel {
   display: block;
   font-size: var(--font-size-body-sm);

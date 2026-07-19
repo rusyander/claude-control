@@ -62,6 +62,7 @@ function push(tone: ToastTone, message: string, options: ToastOptions = {}): str
     message: trimmed,
     title: options.title,
     duration: options.duration ?? DEFAULT_DURATION,
+    onClick: options.onClick,
   };
 
   // Старейший вытесняется, если стопка переросла лимит.

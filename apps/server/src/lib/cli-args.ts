@@ -31,6 +31,14 @@ export function safeModel(value: string | undefined): string | undefined {
   return MODEL.test(value) ? value : undefined;
 }
 
+/** Уровень продумывания (--effort). Белый список — чужого в аргументы не пустим. */
+const EFFORT_LEVELS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
+
+export function safeEffort(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return EFFORT_LEVELS.has(value) ? value : undefined;
+}
+
 /**
  * Имя чата — произвольный текст пользователя, белым списком его не описать.
  * Поэтому метасимволы оболочки заменяются пробелом: имя останется читаемым,

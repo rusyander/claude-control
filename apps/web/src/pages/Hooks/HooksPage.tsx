@@ -6,6 +6,7 @@ import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
+import { SourceBadge } from '@shared/ui/source-badge';
 import { Toggle } from '@shared/ui/toggle';
 import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
@@ -59,6 +60,7 @@ export function HooksPage() {
       <PageHeader
         title={t('hooks.title')}
         subtitle={t('hooks.subtitle')}
+        helpTopic="hooks"
         actions={
           <Button variant="primary" leftIcon={<Icon name="plus" size={24} />} onClick={openCreate}>
             {t('hooks.addHook')}
@@ -87,6 +89,7 @@ export function HooksPage() {
                         {t('hooks.scriptMissing')}
                       </Badge>
                     )}
+                    <SourceBadge source={hook.source} />
                   </Stack>
 
                   {hook.description && (
@@ -126,15 +129,24 @@ export function HooksPage() {
                   />
                   <DeleteButton
                     entityName={`${hook.event}${hook.matcher ? ` · ${hook.matcher}` : ''}`}
-                    description={t('common.deleteHook')}
+                    description={
+                      hook.source === 'settings-local'
+                        ? t('common.deleteHookLocal')
+                        : t('common.deleteHook')
+                    }
                     onDelete={() => deleteHook.mutate(hook.id)}
                     isPending={deleteHook.isPending}
                   />
-                  <Toggle
-                    checked={hook.isEnabled}
-                    onCheckedChange={(isEnabled) => setEnabled.mutate({ id: hook.id, isEnabled })}
-                    aria-label={`${hook.event} ${hook.matcher ?? ''}`}
-                  />
+                  {/* Тумблер только у своих записей: выключение хука — это его
+                      удаление из файла, а личный файл панель правит лишь тогда,
+                      когда об этом попросили явно. */}
+                  {hook.source !== 'settings-local' && (
+                    <Toggle
+                      checked={hook.isEnabled}
+                      onCheckedChange={(isEnabled) => setEnabled.mutate({ id: hook.id, isEnabled })}
+                      aria-label={`${hook.event} ${hook.matcher ?? ''}`}
+                    />
+                  )}
                 </Stack>
               </Stack>
             </Card>

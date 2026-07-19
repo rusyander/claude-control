@@ -13,3 +13,18 @@ export function formatDate(iso: string, locale: string): string {
     year: 'numeric',
   });
 }
+
+/** Компактное число токенов: 1234 → «1.2k», 2_500_000 → «2.5M». */
+export function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return String(Math.round(tokens));
+}
+
+/**
+ * Расход в выбранных единицах: токены (по умолчанию) или деньги. Так пользователь
+ * видит именно то, что ему привычнее, а второе можно включить в настройках.
+ */
+export function formatSpend(unit: 'tokens' | 'money', tokens: number, costUsd: number): string {
+  return unit === 'money' ? `$${costUsd.toFixed(3)}` : `${formatTokens(tokens)} tok`;
+}

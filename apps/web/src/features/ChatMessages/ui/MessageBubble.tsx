@@ -13,7 +13,7 @@ import styles from './ChatMessages.module.scss';
  * ширину колонки. Размышления и вызовы инструментов свёрнуты: их бывает
  * десятки на один ответ, и развёрнутыми они топят сам ответ.
  */
-export function MessageBubble({ message, onEdit }: MessageBubbleProps) {
+export function MessageBubble({ message, onEdit, onPickOption, isRunning }: MessageBubbleProps) {
   const { t } = useTranslation();
   const isUser = message.role === 'user';
 
@@ -82,7 +82,15 @@ export function MessageBubble({ message, onEdit }: MessageBubbleProps) {
             const questions =
               block.name === 'AskUserQuestion' ? parseQuestions(block.input) : undefined;
 
-            if (questions) return <QuestionCard key={index} questions={questions} />;
+            if (questions)
+              return (
+                <QuestionCard
+                  key={index}
+                  questions={questions}
+                  onPick={onPickOption}
+                  disabled={isRunning}
+                />
+              );
 
             return (
               <details key={index} className={styles.tool}>

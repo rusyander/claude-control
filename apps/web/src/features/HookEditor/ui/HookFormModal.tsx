@@ -10,6 +10,7 @@ import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
+import { BulkPresets } from '@features/BulkPresets';
 import { hookApi } from '@entities/Hook';
 import { HOOK_PRESETS, type HookPreset } from '../model/hookPresets';
 import { MatcherPicker } from './MatcherPicker';
@@ -33,6 +34,8 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
   const [message, setMessage] = useState('');
   const [guardPatterns, setGuardPatterns] = useState('');
   const [command, setCommand] = useState('');
+  // Конструктор (одно) или набор заготовок сразу.
+  const [mode, setMode] = useState<'constructor' | 'bulk'>('constructor');
 
   const create = hookApi.useCreate();
   const update = hookApi.useUpdate();
@@ -47,7 +50,29 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
     setMessage('');
     setGuardPatterns('');
     setCommand(hook?.command ?? '');
+    setMode('constructor');
   }, [isOpen, hook]);
+
+  /** Заготовка → черновик хука (для пакетного создания). */
+  const draftFromPreset = (id: string) => {
+    const preset = HOOK_PRESETS.find((item) => item.id === id);
+    if (!preset) return undefined;
+    return {
+      event: preset.event,
+      matchers: preset.matchers,
+      isEnabled: true,
+      groupIds: [],
+      scriptName: preset.scriptName || undefined,
+      template: preset.template,
+      description: preset.description,
+      message: preset.message ?? '',
+      guardPatterns: (preset.guardPatterns ?? '')
+        .split(',')
+        .map((pattern) => pattern.trim())
+        .filter(Boolean),
+      command: preset.command ?? '',
+    };
+  };
 
   const eventInfo = useMemo(() => HOOK_EVENT_INFO.find((info) => info.event === event), [event]);
 
@@ -97,154 +122,193 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
       description={t('common.needsRestart')}
       size="xl"
       footer={
-        <>
-          <Button onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
-          <Button variant="primary" onClick={handleSave} disabled={!canSave} isLoading={isPending}>
-            {t('common.save')}
-          </Button>
-        </>
+        mode === 'bulk' ? (
+          <Button onClick={() => onOpenChange(false)}>{t('common.close')}</Button>
+        ) : (
+          <>
+            <Button onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
+            <Button
+              variant="primary"
+              onClick={handleSave}
+              disabled={!canSave}
+              isLoading={isPending}
+            >
+              {t('common.save')}
+            </Button>
+          </>
+        )
       }
     >
-      <FormWithAssistant
-        kind={t('hooks.title')}
-        fields={{
-          event,
-          matchers: matchers.join(','),
-          scriptName,
-          template,
-          description,
-          message,
-          guardPatterns,
-          command,
-        }}
-        schema={{
-          event: `Событие Claude Code, одно из: ${HOOK_EVENT_INFO.map((info) => info.event).join(', ')}`,
-          matchers: 'Инструменты через запятую, например Bash,Write',
-          scriptName: 'Имя файла скрипта без расширения, латиницей через дефис',
-          template:
-            'Тип действия: message (подсказка), guard (запрет), shell (команда), blank (пусто)',
-          description: 'Одной фразой, что делает хук',
-          message: 'Текст подсказки или сообщения при срабатывании запрета',
-          guardPatterns: 'Для типа guard: что перехватывать, через запятую',
-          command: 'Для типа shell: команда оболочки',
-        }}
-        onApply={(applied) => {
-          if (typeof applied.event === 'string') setEvent(applied.event as HookEvent);
-          if (typeof applied.matchers === 'string') {
-            setMatchers(
-              applied.matchers
-                .split(',')
-                .map((item) => item.trim())
-                .filter(Boolean),
-            );
-          }
-          if (typeof applied.scriptName === 'string') setScriptName(applied.scriptName);
-          if (typeof applied.template === 'string') setTemplate(applied.template);
-          if (typeof applied.description === 'string') setDescription(applied.description);
-          if (typeof applied.message === 'string') setMessage(applied.message);
-          if (typeof applied.guardPatterns === 'string') setGuardPatterns(applied.guardPatterns);
-          if (typeof applied.command === 'string') setCommand(applied.command);
-        }}
-      >
-        <Stack gap="var(--spacing-md)">
-          {/* Готовые хуки — при создании. У существующего подмена всех полей
+      {!hook && (
+        <div className={styles.modeTabs}>
+          {(['constructor', 'bulk'] as const).map((item) => (
+            <Button
+              key={item}
+              size="sm"
+              variant={mode === item ? 'primary' : 'ghost'}
+              onClick={() => setMode(item)}
+            >
+              {t(`hooks.mode_${item}`)}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {mode === 'bulk' ? (
+        <BulkPresets
+          items={HOOK_PRESETS.map((preset) => ({
+            id: preset.id,
+            title: preset.title,
+            description: preset.description,
+          }))}
+          createOne={(id) => {
+            const draft = draftFromPreset(id);
+            return draft ? create.mutateAsync(draft) : Promise.resolve();
+          }}
+          onDone={() => onOpenChange(false)}
+        />
+      ) : (
+        <FormWithAssistant
+          kind={t('hooks.title')}
+          fields={{
+            event,
+            matchers: matchers.join(','),
+            scriptName,
+            template,
+            description,
+            message,
+            guardPatterns,
+            command,
+          }}
+          schema={{
+            event: `Событие Claude Code, одно из: ${HOOK_EVENT_INFO.map((info) => info.event).join(', ')}`,
+            matchers: 'Инструменты через запятую, например Bash,Write',
+            scriptName: 'Имя файла скрипта без расширения, латиницей через дефис',
+            template:
+              'Тип действия: message (подсказка), guard (запрет), shell (команда), blank (пусто)',
+            description: 'Одной фразой, что делает хук',
+            message: 'Текст подсказки или сообщения при срабатывании запрета',
+            guardPatterns: 'Для типа guard: что перехватывать, через запятую',
+            command: 'Для типа shell: команда оболочки',
+          }}
+          onApply={(applied) => {
+            if (typeof applied.event === 'string') setEvent(applied.event as HookEvent);
+            if (typeof applied.matchers === 'string') {
+              setMatchers(
+                applied.matchers
+                  .split(',')
+                  .map((item) => item.trim())
+                  .filter(Boolean),
+              );
+            }
+            if (typeof applied.scriptName === 'string') setScriptName(applied.scriptName);
+            if (typeof applied.template === 'string') setTemplate(applied.template);
+            if (typeof applied.description === 'string') setDescription(applied.description);
+            if (typeof applied.message === 'string') setMessage(applied.message);
+            if (typeof applied.guardPatterns === 'string') setGuardPatterns(applied.guardPatterns);
+            if (typeof applied.command === 'string') setCommand(applied.command);
+          }}
+        >
+          <Stack gap="var(--spacing-md)">
+            {/* Готовые хуки — при создании. У существующего подмена всех полей
               разом почти наверняка не то, чего ждут. */}
-          {!hook && (
-            <Card padding="md">
-              <Stack gap="var(--spacing-sm)">
-                <Typography variant="body-sm" weight="medium">
-                  {t('hooks.presetsTitle')}
-                </Typography>
-                <Typography variant="caption" color="subtle">
-                  {t('hooks.presetsHint')}
-                </Typography>
-
-                <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-                  {HOOK_PRESETS.map((preset) => (
-                    <Button
-                      key={preset.id}
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => applyPreset(preset)}
-                      title={preset.description}
-                    >
-                      {preset.title}
-                    </Button>
-                  ))}
-                </Stack>
-              </Stack>
-            </Card>
-          )}
-
-          <SelectField
-            label={t('hooks.event')}
-            value={event}
-            onChange={(value) => setEvent(value as HookEvent)}
-            options={HOOK_EVENT_INFO.map((info) => ({ value: info.event, label: info.event }))}
-          />
-
-          {eventInfo && (
-            <Card padding="md" className={styles.eventInfo}>
-              <Stack gap="var(--spacing-2xs)">
-                <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-                  <Typography variant="body-sm" weight="medium" as="span">
-                    {eventInfo.when}
+            {!hook && (
+              <Card padding="md">
+                <Stack gap="var(--spacing-sm)">
+                  <Typography variant="body-sm" weight="medium">
+                    {t('hooks.presetsTitle')}
                   </Typography>
-                  {eventInfo.canBlock && <Badge tone="warning">{t('hooks.canBlock')}</Badge>}
+                  <Typography variant="caption" color="subtle">
+                    {t('hooks.presetsHint')}
+                  </Typography>
+
+                  <Stack direction="row" gap="var(--spacing-2xs)" wrap>
+                    {HOOK_PRESETS.map((preset) => (
+                      <Button
+                        key={preset.id}
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => applyPreset(preset)}
+                        title={preset.description}
+                      >
+                        {preset.title}
+                      </Button>
+                    ))}
+                  </Stack>
                 </Stack>
-                <Typography variant="caption" color="muted">
-                  {eventInfo.useFor}
-                </Typography>
-              </Stack>
-            </Card>
-          )}
+              </Card>
+            )}
 
-          {eventInfo?.supportsMatcher ? (
-            <MatcherPicker
-              value={matchers}
-              onChange={setMatchers}
-              suggestions={eventInfo.matcherExamples}
+            <SelectField
+              label={t('hooks.event')}
+              value={event}
+              onChange={(value) => setEvent(value as HookEvent)}
+              options={HOOK_EVENT_INFO.map((info) => ({ value: info.event, label: info.event }))}
             />
-          ) : (
-            <Typography variant="caption" color="subtle">
-              {t('hooks.noMatcherSupport')}
-            </Typography>
-          )}
 
-          <TextField
-            label={t('hooks.scriptName')}
-            value={scriptName}
-            onChange={setScriptName}
-            placeholder="my-hook"
-            hint={t('hooks.scriptNameHint')}
-            isMono
-          />
+            {eventInfo && (
+              <Card padding="md" className={styles.eventInfo}>
+                <Stack gap="var(--spacing-2xs)">
+                  <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+                    <Typography variant="body-sm" weight="medium" as="span">
+                      {eventInfo.when}
+                    </Typography>
+                    {eventInfo.canBlock && <Badge tone="warning">{t('hooks.canBlock')}</Badge>}
+                  </Stack>
+                  <Typography variant="caption" color="muted">
+                    {eventInfo.useFor}
+                  </Typography>
+                </Stack>
+              </Card>
+            )}
 
-          <TextField
-            label={t('hooks.description')}
-            value={description}
-            onChange={setDescription}
-            placeholder={t('hooks.descriptionPlaceholder')}
-          />
+            {eventInfo?.supportsMatcher ? (
+              <MatcherPicker
+                value={matchers}
+                onChange={setMatchers}
+                suggestions={eventInfo.matcherExamples}
+              />
+            ) : (
+              <Typography variant="caption" color="subtle">
+                {t('hooks.noMatcherSupport')}
+              </Typography>
+            )}
 
-          <TemplateFields
-            template={template}
-            onTemplateChange={setTemplate}
-            message={message}
-            onMessageChange={setMessage}
-            guardPatterns={guardPatterns}
-            onGuardPatternsChange={setGuardPatterns}
-            command={command}
-            onCommandChange={setCommand}
-          />
+            <TextField
+              label={t('hooks.scriptName')}
+              value={scriptName}
+              onChange={setScriptName}
+              placeholder="my-hook"
+              hint={t('hooks.scriptNameHint')}
+              isMono
+            />
 
-          {(create.isError || update.isError) && (
-            <Typography variant="body-sm" color="danger">
-              {t('errors.saveFailed')}
-            </Typography>
-          )}
-        </Stack>
-      </FormWithAssistant>
+            <TextField
+              label={t('hooks.description')}
+              value={description}
+              onChange={setDescription}
+              placeholder={t('hooks.descriptionPlaceholder')}
+            />
+
+            <TemplateFields
+              template={template}
+              onTemplateChange={setTemplate}
+              message={message}
+              onMessageChange={setMessage}
+              guardPatterns={guardPatterns}
+              onGuardPatternsChange={setGuardPatterns}
+              command={command}
+              onCommandChange={setCommand}
+            />
+
+            {(create.isError || update.isError) && (
+              <Typography variant="body-sm" color="danger">
+                {t('errors.saveFailed')}
+              </Typography>
+            )}
+          </Stack>
+        </FormWithAssistant>
+      )}
     </Modal>
   );
 }

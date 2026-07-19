@@ -1,4 +1,5 @@
 export * from './claude-location';
+export * from './settings-source';
 export * from './rules';
 export * from './hooks';
 export * from './skills';

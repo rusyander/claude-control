@@ -1,0 +1,28 @@
+.picker {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+}
+
+// Компактный select под шапку: неброский, но кликабельный. Цвет наследуем явно —
+// у select свои системные значения.
+.select {
+  max-width: 130px;
+  padding: 4px var(--spacing-2xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+.select:hover {
+  border-color: var(--color-accent);
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { platform } from 'node:process';
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
 import {
@@ -95,7 +96,19 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       command = scriptCommand(source);
     }
 
-    if (!command) return { results: [], error: 'Нечего запускать: команда не найдена' };
+    if (!command) {
+      // Отдельный случай: сам скрипт на месте, но запустить его нечем.
+      // Молчаливое «команда не найдена» отправило бы искать несуществующую
+      // проблему в пути к файлу.
+      const needsPowerShell = scriptName?.toLowerCase().endsWith('.ps1') && platform !== 'win32';
+
+      return {
+        results: [],
+        error: needsPowerShell
+          ? 'Скрипты .ps1 запускаются через PowerShell — вне Windows нужен pwsh (PowerShell Core). Установите его или перепишите хук на .sh либо .mjs.'
+          : 'Нечего запускать: команда не найдена',
+      };
+    }
 
     const fixtures = EVENT_FIXTURES.filter(
       (fixture) => !fixtureIds?.length || fixtureIds.includes(fixture.id),

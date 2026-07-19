@@ -52,6 +52,7 @@ export function ScriptsPage() {
       <PageHeader
         title={t('scripts.title')}
         subtitle={t('scripts.subtitle')}
+        helpTopic="scripts"
         actions={
           <Button
             variant="primary"

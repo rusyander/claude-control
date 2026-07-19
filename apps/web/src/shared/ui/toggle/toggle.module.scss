@@ -1,10 +1,16 @@
 .root {
-  position: relative;
+  // Кружок позиционируется через flex, а не через смещение от края кнопки:
+  // у <button> есть браузерный padding, который иначе съезжал бы в отступы
+  // и выталкивал кружок за правую границу трека.
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  padding: var(--toggle-gap);
   border: none;
   border-radius: var(--radius-full);
   background-color: var(--color-border-strong);
   cursor: pointer;
+  appearance: none;
   transition: background-color var(--duration-fast) ease;
 
   &[data-state='checked'] {
@@ -17,41 +23,40 @@
   }
 }
 
+// Ход кружка = ширина трека − кружок − отступы с обеих сторон:
+// в крайних положениях зазор слева и справа одинаковый.
 .md {
+  --toggle-gap: 2px;
+  --toggle-thumb: 18px;
+  --toggle-travel: 18px; // 40 − 18 − 2×2
+
   width: 40px;
   height: 22px;
 }
 
 .sm {
+  --toggle-gap: 2px;
+  --toggle-thumb: 14px;
+  --toggle-travel: 14px; // 32 − 14 − 2×2
+
   width: 32px;
   height: 18px;
 }
 
 .thumb {
   display: block;
+  flex-shrink: 0;
+  width: var(--toggle-thumb);
+  height: var(--toggle-thumb);
   border-radius: var(--radius-full);
   background-color: #fff;
   box-shadow: var(--shadow-sm);
+  // Выключенный — у левого края, включённый — у правого.
+  transform: translateX(0);
   transition: transform var(--duration-fast) ease;
   will-change: transform;
-}
-
-.md .thumb {
-  width: 18px;
-  height: 18px;
-  transform: translateX(2px);
 
   &[data-state='checked'] {
-    transform: translateX(20px);
-  }
-}
-
-.sm .thumb {
-  width: 14px;
-  height: 14px;
-  transform: translateX(2px);
-
-  &[data-state='checked'] {
-    transform: translateX(16px);
+    transform: translateX(var(--toggle-travel));
   }
 }

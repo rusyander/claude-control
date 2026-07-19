@@ -15,7 +15,11 @@ export function OverviewPage() {
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
-      <PageHeader title={t('overview.title')} subtitle={t('overview.subtitle')} />
+      <PageHeader
+        title={t('overview.title')}
+        subtitle={t('overview.subtitle')}
+        helpTopic="overview"
+      />
 
       {location && <LocationCard location={location} />}
 

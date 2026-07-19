@@ -1,4 +1,13 @@
-import { mkdirSync, writeFileSync, copyFileSync, existsSync, rmSync, cpSync } from 'node:fs';
+import {
+  mkdirSync,
+  writeFileSync,
+  copyFileSync,
+  existsSync,
+  rmSync,
+  cpSync,
+  readdirSync,
+  statSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { readRules } from '../rules.ts';
@@ -128,6 +137,40 @@ export function createSandbox(
 
 export function removeSandbox(id: string): void {
   rmSync(sandboxPaths(id).root, { recursive: true, force: true });
+}
+
+/**
+ * Пауза, на которую подметание щадит свежие папки: два сервера, стартующие
+ * почти одновременно, не должны сносить песочницы друг друга.
+ */
+const SWEEP_GRACE_MS = 60_000;
+
+/**
+ * Подметание при старте. Реестр песочниц живёт только в памяти сервера,
+ * поэтому всё, что осталось на диске к моменту запуска, — след аварийного
+ * завершения. Внутри такой папки лежит копия `.credentials.json` и значения
+ * `env` MCP-серверов открытым текстом, и ждать, пока человек удалит её руками,
+ * неправильно.
+ */
+export function sweepAbandonedSandboxes(
+  now: number = Date.now(),
+  root: string = sandboxRoot(),
+): string[] {
+  if (!existsSync(root)) return [];
+
+  const removed: string[] = [];
+
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+
+    const dir = join(root, entry.name);
+    if (now - statSync(dir).mtimeMs < SWEEP_GRACE_MS) continue;
+
+    rmSync(dir, { recursive: true, force: true });
+    removed.push(entry.name);
+  }
+
+  return removed;
 }
 
 /**

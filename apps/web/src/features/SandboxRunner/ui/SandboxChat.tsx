@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -9,6 +9,7 @@ import { TextField } from '@shared/ui/text-field';
 import { useSandboxRun } from '@entities/Sandbox/model/useSandboxRun';
 import type { SandboxKind } from '@entities/Sandbox/api/SandboxApi';
 import { toast } from '@shared/lib/toast';
+import { useDraft } from '@shared/lib/draft';
 import { buildTestPrompts, type TestContext } from '../model/buildTestPrompt';
 import styles from './SandboxModal.module.scss';
 
@@ -22,7 +23,8 @@ import styles from './SandboxModal.module.scss';
 export function SandboxChat({ sandboxId, kind, title, context }: SandboxChatProps) {
   const { t } = useTranslation();
   const { state, run, stop } = useSandboxRun();
-  const [prompt, setPrompt] = useState('');
+  // Черновик запроса переживает перезагрузку: у каждой песочницы — свой.
+  const [prompt, setPrompt] = useDraft(`sandbox:${sandboxId}`);
 
   // Запросы собираются из самой настройки, поэтому проверяют именно её.
   const suggestions = useMemo(

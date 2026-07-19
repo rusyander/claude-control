@@ -1,4 +1,5 @@
 import { object, string, array, number, boolean, enum as zodEnum, type infer as Infer } from 'zod';
+import { settingsSourceSchema } from './settings-source';
 
 /**
  * События Claude Code, к которым можно привязать хук.
@@ -136,8 +137,18 @@ export type HookCommand = Infer<typeof hookCommandSchema>;
  * и собирает обратно при сохранении.
  */
 export const hookSchema = object({
-  /** Стабильный идентификатор: событие + индексы в исходной структуре. */
+  /**
+   * Идентификатор: событие плюс короткий хеш от matcher и команды. Считается
+   * от содержимого, а не от места в файле, — иначе удаление соседнего хука
+   * сдвигало бы чужие идентификаторы вместе с отметками «выключено».
+   * У записей из локального файла — с префиксом `local:`.
+   */
   id: string(),
+  /**
+   * Прежний позиционный идентификатор (`Stop:0:0`). Нужен, чтобы после
+   * обновления панели найти отметки, поставленные до перехода на новые id.
+   */
+  legacyId: string().optional(),
   event: hookEventSchema,
   matcher: string().optional(),
   command: string(),
@@ -154,6 +165,13 @@ export const hookSchema = object({
   /** Описание из шапки скрипта — первые строки комментария. */
   description: string().optional(),
   groupIds: array(string()),
+  /**
+   * Из какого файла прочитан хук. Локальные настройки Claude Code читает
+   * наравне с основными, поэтому не показывать их — значит врать о том, что
+   * сейчас действует. Но и править их панель не берётся: файл личный и в
+   * общий settings.json не переносится.
+   */
+  source: settingsSourceSchema,
 });
 
 export type Hook = Infer<typeof hookSchema>;

@@ -12,6 +12,8 @@ import { registerScriptRoutes } from './routes/script-routes.ts';
 import { registerChatRoutes } from './routes/chat-routes.ts';
 import { registerSandboxRoutes } from './routes/sandbox-routes.ts';
 import { registerResourceRoutes } from './routes/resource-routes.ts';
+import { registerBackupRoutes } from './routes/backup-routes.ts';
+import { sweepAbandonedSandboxes } from './domains/sandbox/SandboxConfig.ts';
 
 const PORT = Number(process.env.PORT ?? 5178);
 const WEB_PORT = Number(process.env.WEB_PORT ?? 8888);
@@ -69,6 +71,7 @@ registerScriptRoutes(app, ctx);
 registerChatRoutes(app, ctx);
 registerSandboxRoutes(app, ctx);
 registerResourceRoutes(app, ctx);
+registerBackupRoutes(app, ctx);
 
 /**
  * Поток событий об изменениях файлов. Конфиги правит не только это приложение:
@@ -108,7 +111,14 @@ function startWatching(): void {
 
   const { paths } = ctx.location;
   watcher = watch(
-    [paths.settings, paths.claudeMd, paths.secretsEnv, paths.skills, paths.mcpConfig],
+    [
+      paths.settings,
+      paths.settingsLocal,
+      paths.claudeMd,
+      paths.secretsEnv,
+      paths.skills,
+      paths.mcpConfig,
+    ],
     {
       ignoreInitial: true,
       // Конфиги пишутся целиком, и без задержки прилетает событие на недописанный
@@ -129,11 +139,21 @@ function domainsForPath(changedPath: string): string[] {
   if (changedPath === paths.claudeMd) return ['rules'];
   if (changedPath === paths.mcpConfig) return ['mcp'];
   if (changedPath === paths.secretsEnv) return ['env'];
-  if (changedPath === paths.settings) return ['hooks', 'permissions', 'env'];
+  // Локальные настройки попадают в те же списки: панель показывает их наравне
+  // с основными, поэтому и обновлять надо то же самое.
+  if (changedPath === paths.settings || changedPath === paths.settingsLocal) {
+    return ['hooks', 'permissions', 'env'];
+  }
   return ['overview'];
 }
 
 startWatching();
+
+// Песочницы существуют только пока жив сервер: их реестр держится в памяти.
+// Всё, что лежит на диске к моменту старта, — след аварийного завершения, а
+// внутри копия .credentials.json. Подметаем, не дожидаясь, пока человек
+// сделает это руками.
+const sweptSandboxes = sweepAbandonedSandboxes();
 
 await app.listen({ port: PORT, host: HOST });
 
@@ -144,6 +164,9 @@ process.stdout.write(
     `Каталог конфигурации: ${location.paths.root} (источник: ${location.source})`,
     location.isValid ? '' : `ВНИМАНИЕ: ${location.problem ?? 'каталог недоступен'}`,
     location.missing.length > 0 ? `Не найдено: ${location.missing.join(', ')}` : '',
+    sweptSandboxes.length > 0
+      ? `Убрано брошенных песочниц: ${sweptSandboxes.length} (в них лежала копия учётных данных)`
+      : '',
     '',
   ]
     .filter(Boolean)

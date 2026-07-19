@@ -1,0 +1,26 @@
+.page {
+  max-width: var(--layout-content-max);
+}
+
+.installField {
+  flex: 1;
+  min-width: 320px;
+}
+
+// Вывод команды может быть длинным и с переносами — сохраняем как есть.
+.output {
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: var(--spacing-xs);
+  background-color: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+
+.marketplaceRow {
+  padding: var(--spacing-xs) var(--spacing-md);
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+}

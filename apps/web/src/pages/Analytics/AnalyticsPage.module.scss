@@ -1,0 +1,47 @@
+.page {
+  max-width: var(--layout-content-max);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.twoColumns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--spacing-md);
+  align-items: start;
+}
+
+.agentRow {
+  padding: var(--spacing-3xs) 0;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+.detailRow {
+  padding: var(--spacing-xs) 0;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+.sessionRow {
+  padding: var(--spacing-xs) 0;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+// Блок про лимиты — пояснение, а не ошибка: нейтральный информационный тон.
+.limitsNote {
+  border-left: 3px solid var(--color-info);
+  padding-left: var(--spacing-sm);
+  max-width: 78ch;
+}

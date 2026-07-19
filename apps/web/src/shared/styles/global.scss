@@ -1,0 +1,246 @@
+// Глобальные стили и палитры тем.
+// Тема переключается атрибутом data-theme на <html>; режимы доступности —
+// отдельными data-атрибутами, чтобы их можно было комбинировать с любой темой.
+
+:root {
+  // Отступы
+  --spacing-3xs: 2px;
+  --spacing-2xs: 4px;
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  // Радиусы
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  // Типографика
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+
+  --font-size-caption: 12px;
+  --font-size-body-sm: 13px;
+  --font-size-body: 14px;
+  --font-size-body-lg: 16px;
+  --font-size-heading-sm: 18px;
+  --font-size-heading: 22px;
+  --font-size-heading-lg: 28px;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.7;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  // Скорость анимаций — обнуляется в режиме reduce-motion
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+
+  --layout-sidebar-width: 260px;
+  --layout-header-height: 56px;
+  --layout-content-max: 1180px;
+
+  /**
+   * Предельная ширина строки текста. Глаз теряет начало следующей строки,
+   * когда она длиннее примерно 80 знаков, поэтому описания и пояснения
+   * ограничиваем по этой мере, а не по ширине карточки.
+   */
+  --text-measure: 78ch;
+}
+
+// Светлая тема — значение по умолчанию
+:root,
+:root[data-theme='light'] {
+  --color-bg: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #f0f2f5;
+  --color-border: #e2e5ea;
+  --color-border-strong: #c9ced7;
+
+  --color-fg: #16181d;
+  --color-fg-muted: #5b616e;
+  --color-fg-subtle: #868c99;
+  --color-fg-inverse: #ffffff;
+
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-subtle: #eef2ff;
+  --color-accent-fg: #ffffff;
+
+  --color-success: #15803d;
+  --color-success-subtle: #dcfce7;
+  --color-warning: #b45309;
+  --color-warning-subtle: #fef3c7;
+  --color-danger: #b91c1c;
+  --color-danger-subtle: #fee2e2;
+  --color-info: #0369a1;
+  --color-info-subtle: #e0f2fe;
+
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 6%);
+  --shadow-md: 0 4px 12px rgb(16 24 40 / 8%);
+  --shadow-lg: 0 12px 32px rgb(16 24 40 / 12%);
+
+  // Категориальные цвета графиков. Порядок фиксирован и не перетасовывается:
+  // цвет закреплён за сущностью, а не за её местом в рейтинге. Набор проверен
+  // валидатором на различимость при дальтонизме под обе поверхности.
+  --series-1: #2a78d6;
+  --series-2: #008300;
+  --series-3: #e87ba4;
+  --series-4: #eda100;
+  --series-5: #1baf7a;
+  --chart-grid: #eceef2;
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #0e1014;
+  --color-surface: #16191f;
+  --color-surface-raised: #1c2027;
+  --color-surface-sunken: #101318;
+  --color-border: #272c35;
+  --color-border-strong: #3a4150;
+
+  --color-fg: #e8eaee;
+  --color-fg-muted: #9aa2b1;
+  --color-fg-subtle: #6b7383;
+  --color-fg-inverse: #0e1014;
+
+  --color-accent: #818cf8;
+  --color-accent-hover: #a5b4fc;
+  --color-accent-subtle: #1e1b4b;
+  --color-accent-fg: #0e1014;
+
+  --color-success: #4ade80;
+  --color-success-subtle: #052e16;
+  --color-warning: #fbbf24;
+  --color-warning-subtle: #3b2a06;
+  --color-danger: #f87171;
+  --color-danger-subtle: #3f1414;
+  --color-info: #38bdf8;
+  --color-info-subtle: #082f49;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 45%);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 55%);
+
+  // Те же восемь оттенков, пересчитанные под тёмную поверхность, а не
+  // автоматически осветлённые: набор валидирован отдельным прогоном.
+  --series-1: #3987e5;
+  --series-2: #008300;
+  --series-3: #d55181;
+  --series-4: #c98500;
+  --series-5: #199e70;
+  --chart-grid: #232830;
+}
+
+// Крупный текст: увеличиваем шкалу целиком, а не отдельные места,
+// чтобы пропорции интерфейса не поехали.
+:root[data-large-text='true'] {
+  --font-size-caption: 14px;
+  --font-size-body-sm: 15px;
+  --font-size-body: 16px;
+  --font-size-body-lg: 18px;
+  --font-size-heading-sm: 20px;
+  --font-size-heading: 26px;
+  --font-size-heading-lg: 32px;
+}
+
+:root[data-high-contrast='true'] {
+  --color-border: var(--color-border-strong);
+  --color-fg-muted: var(--color-fg);
+  --color-fg-subtle: var(--color-fg-muted);
+}
+
+:root[data-reduce-motion='true'] {
+  --duration-fast: 0ms;
+  --duration-normal: 0ms;
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+// Системная настройка уважается независимо от предпочтений в приложении.
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-normal);
+  color: var(--color-fg);
+  background-color: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+// Фокус виден всегда и одинаково: это основной ориентир при работе с клавиатуры.
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::selection {
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+// Полосы прокрутки тоньше системных: в плотном интерфейсе широкая полоса
+// съедает место и спорит с содержимым. Цвет берётся из темы.
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-full);
+  background-color: var(--color-border-strong);
+
+  &:hover {
+    background-color: var(--color-fg-subtle);
+  }
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

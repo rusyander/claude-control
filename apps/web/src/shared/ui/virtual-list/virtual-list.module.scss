@@ -1,0 +1,21 @@
+.viewport {
+  overflow-y: auto;
+  contain: strict; // изолируем пересчёт раскладки внутри окна прокрутки
+}
+
+.canvas {
+  position: relative;
+  width: 100%;
+}
+
+.row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+.plain {
+  display: flex;
+  flex-direction: column;
+}

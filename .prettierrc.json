@@ -1,0 +1,11 @@
+{
+  "//": "Эталонный Prettier фронт-доктрины. Подставлять по согласию; если в проекте свой — проектный побеждает.",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "endOfLine": "lf"
+}

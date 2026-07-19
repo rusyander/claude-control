@@ -1,0 +1,33 @@
+.root {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 420px;
+}
+
+.icon {
+  position: absolute;
+  left: var(--spacing-sm);
+  color: var(--color-fg-subtle);
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--spacing-sm) 0 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+
+  &::placeholder {
+    color: var(--color-fg-subtle);
+  }
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+}

@@ -1,0 +1,113 @@
+import { useTranslation } from 'react-i18next';
+import { Stack } from '@shared/ui/stack';
+import { SkeletonTiles } from '@shared/ui/skeleton';
+import { Typography } from '@shared/ui/typography';
+import { Card } from '@shared/ui/card';
+import { Badge } from '@shared/ui/badge';
+import { PageHeader } from '@shared/ui/page-header';
+import { useLocation, useOverview } from '@entities/AppConfig';
+import { LocationCard } from './LocationCard';
+import { StatTile } from './StatTile';
+import styles from './OverviewPage.module.scss';
+
+/** Главный экран: где лежит конфигурация и что в ней есть. */
+export function OverviewPage() {
+  const { t } = useTranslation();
+  const { data: location } = useLocation();
+  const { data: overview, isLoading } = useOverview();
+
+  return (
+    <Stack gap="var(--spacing-lg)" className={styles.page}>
+      <PageHeader title={t('overview.title')} subtitle={t('overview.subtitle')} />
+
+      {location && <LocationCard location={location} />}
+
+      {isLoading && <SkeletonTiles count={7} />}
+
+      {overview && (
+        <div className={styles.grid}>
+          <StatTile
+            icon="rules"
+            label={t('nav.rules')}
+            value={overview.rules.total}
+            hint={`${overview.rules.enabled} ${t('common.enabled').toLowerCase()}`}
+            to="/rules"
+          />
+          <StatTile
+            icon="skills"
+            label={t('nav.skills')}
+            value={overview.skills.total}
+            hint={`${overview.skills.enabled} ${t('common.enabled').toLowerCase()}`}
+            to="/skills"
+          />
+          <StatTile
+            icon="hooks"
+            label={t('nav.hooks')}
+            value={overview.hooks.total}
+            hint={
+              overview.hooks.broken > 0
+                ? `${overview.hooks.broken} ${t('overview.brokenHooks')}`
+                : `${overview.hooks.enabled} ${t('common.enabled').toLowerCase()}`
+            }
+            tone={overview.hooks.broken > 0 ? 'danger' : undefined}
+            to="/hooks"
+          />
+          <StatTile
+            icon="scripts"
+            label={t('nav.scripts')}
+            value={overview.scripts.total}
+            hint={
+              overview.scripts.unused > 0
+                ? `${overview.scripts.unused} ${t('overview.unusedScripts')}`
+                : t('overview.allScriptsUsed')
+            }
+            to="/scripts"
+          />
+          <StatTile
+            icon="mcp"
+            label={t('nav.mcp')}
+            value={overview.mcp.total}
+            hint={`${overview.mcp.enabled} ${t('common.enabled').toLowerCase()}`}
+            to="/mcp"
+          />
+          <StatTile
+            icon="permissions"
+            label={t('nav.permissions')}
+            value={
+              overview.permissions.allow + overview.permissions.ask + overview.permissions.deny
+            }
+            hint={`${overview.permissions.allow} / ${overview.permissions.deny}`}
+            to="/permissions"
+          />
+          <StatTile
+            icon="groups"
+            label={t('nav.groups')}
+            value={overview.groups.total}
+            to="/groups"
+          />
+        </div>
+      )}
+
+      {overview && (
+        <Card padding="md">
+          <Stack gap="var(--spacing-sm)">
+            <Typography variant="body" weight="medium">
+              {t('permissions.title')}
+            </Typography>
+            <Stack direction="row" gap="var(--spacing-xs)" wrap>
+              <Badge tone="success" withDot>
+                {t('permissions.allow')}: {overview.permissions.allow}
+              </Badge>
+              <Badge tone="warning" withDot>
+                {t('permissions.ask')}: {overview.permissions.ask}
+              </Badge>
+              <Badge tone="danger" withDot>
+                {t('permissions.deny')}: {overview.permissions.deny}
+              </Badge>
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+    </Stack>
+  );
+}

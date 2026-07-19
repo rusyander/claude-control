@@ -1,0 +1,36 @@
+.root {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition:
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    background-color var(--duration-fast) ease;
+}
+
+.raised {
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.interactive {
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.padding-none {
+  padding: 0;
+}
+.padding-sm {
+  padding: var(--spacing-sm);
+}
+.padding-md {
+  padding: var(--spacing-md);
+}
+.padding-lg {
+  padding: var(--spacing-lg);
+}

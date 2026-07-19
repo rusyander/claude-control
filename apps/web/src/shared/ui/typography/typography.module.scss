@@ -1,0 +1,112 @@
+.root {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-fg);
+}
+
+// Варианты — пары «размер + высота строки» из шкалы токенов.
+.heading-lg {
+  font-size: var(--font-size-heading-lg);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+}
+
+.heading {
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+.heading-sm {
+  font-size: var(--font-size-heading-sm);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+}
+
+.body-lg {
+  font-size: var(--font-size-body-lg);
+  line-height: var(--line-height-normal);
+}
+
+.body {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-normal);
+}
+
+.body-sm {
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-normal);
+}
+
+.caption {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-normal);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-normal);
+}
+
+.color-default {
+  color: var(--color-fg);
+}
+.color-muted {
+  color: var(--color-fg-muted);
+}
+.color-subtle {
+  color: var(--color-fg-subtle);
+}
+.color-accent {
+  color: var(--color-accent);
+}
+.color-success {
+  color: var(--color-success);
+}
+.color-warning {
+  color: var(--color-warning);
+}
+.color-danger {
+  color: var(--color-danger);
+}
+.color-info {
+  color: var(--color-info);
+}
+.color-inverse {
+  color: var(--color-fg-inverse);
+}
+
+.weight-regular {
+  font-weight: var(--font-weight-regular);
+}
+.weight-medium {
+  font-weight: var(--font-weight-medium);
+}
+.weight-semibold {
+  font-weight: var(--font-weight-semibold);
+}
+
+.align-left {
+  text-align: left;
+}
+.align-center {
+  text-align: center;
+}
+.align-right {
+  text-align: right;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

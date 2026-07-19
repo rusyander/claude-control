@@ -1,0 +1,181 @@
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-top: var(--spacing-xs);
+  margin-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+}
+
+// Строка дерева: слева кнопка перехода, справа действия по наведению.
+.node {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+
+  &:hover {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+}
+
+.nodeMain {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nodeActive {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent);
+  }
+}
+
+.chevron {
+  transition: transform var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  margin-left: auto;
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  flex-shrink: 0;
+}
+
+// Вложенность обозначаем отступом и линией: так видно, что к чему относится.
+.children {
+  margin-left: var(--spacing-sm);
+  padding-left: var(--spacing-xs);
+  border-left: 1px solid var(--color-border);
+}
+
+.viewer {
+  margin-top: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+}
+
+.viewerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.viewerBody {
+  max-height: 360px;
+  padding: var(--spacing-sm);
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  line-height: 1.6;
+  // Длинные строки переносим — горизонтальная прокрутка тут только мешает.
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+// Редактор файла: те же размеры, что у просмотра, чтобы карточка не прыгала
+// при переключении между чтением и правкой.
+.editor {
+  display: block;
+  width: 100%;
+  min-height: 320px;
+  max-height: 480px;
+  padding: var(--spacing-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  line-height: 1.6;
+  resize: vertical;
+
+  &,
+  &:focus,
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+// Кнопки создания появляются у строки под курсором: постоянный ряд иконок
+// в дереве из сотни файлов превращается в кашу.
+.nodeActions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+}
+
+.node:hover .nodeActions,
+.node:focus-within .nodeActions {
+  opacity: 1;
+}
+
+.nodeAction {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-subtle);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface);
+    color: var(--color-accent);
+  }
+}
+
+// Поле для имени нового файла или папки — прямо в дереве, как в редакторах кода.
+.newNode {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+}
+
+.newNodeInput {
+  flex: 1;
+  min-width: 0;
+  padding: 2px var(--spacing-2xs);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+}

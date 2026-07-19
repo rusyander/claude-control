@@ -1,0 +1,27 @@
+// Полоска узкая, но зона захвата шире неё: попасть в линию в один пиксель
+// мышью тяжело, поэтому сам разделитель шире, а видимая линия — по центру.
+.handle {
+  position: relative;
+  width: 10px;
+  margin: 0 -5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 1;
+
+  &:hover .grip,
+  &:focus-visible .grip {
+    background: var(--color-accent);
+  }
+}
+
+.grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--color-border);
+  transition: background var(--duration-fast);
+}

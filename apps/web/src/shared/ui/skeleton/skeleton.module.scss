@@ -1,0 +1,114 @@
+// Заглушки на время загрузки. Блик пробегает по элементу слева направо —
+// движение подсказывает, что данные идут, а не что интерфейс завис.
+.skeleton {
+  display: block;
+  position: relative;
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--color-fg) 8%, transparent),
+      transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+}
+
+.sm {
+  border-radius: var(--radius-sm);
+}
+
+.md {
+  border-radius: var(--radius-md);
+}
+
+.full {
+  border-radius: var(--radius-full);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  width: 100%;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  min-height: 84px;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-height: 132px;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+// Столбики разной высоты, выровненные по нижнему краю, — узнаваемая форма графика.
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}

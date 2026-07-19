@@ -1,0 +1,21 @@
+// Токены дизайн-системы. Значения объявлены как CSS-переменные, потому что
+// тема переключается на лету: меняется только data-атрибут на <html>,
+// пересборка стилей не нужна.
+
+// Брейкпоинты — единственное, что остаётся SCSS-переменными:
+// медиазапросы не умеют читать CSS-переменные.
+$breakpoint-sm: 640px;
+$breakpoint-md: 900px;
+$breakpoint-lg: 1280px;
+
+@mixin up($breakpoint) {
+  @media (min-width: $breakpoint) {
+    @content;
+  }
+}
+
+@mixin down($breakpoint) {
+  @media (max-width: $breakpoint - 1px) {
+    @content;
+  }
+}

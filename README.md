@@ -336,7 +336,7 @@ The full section-by-section breakdown is in [LIMITATIONS.md](LIMITATIONS.md): wh
 
 - **Restart required.** Claude Code loads its configuration at startup, so most changes only take effect after you restart it. The UI marks these.
 - **Plugins depend on the CLI.** Everything on that page shells out to `claude plugin`; if the CLI cannot reach a marketplace, the panel shows you its raw output rather than inventing a friendlier error.
-- **Analytics costs are indicative.** On a subscription you are not billed per token, so treat the number as relative volume, not money owed. The rates behind it are visible and editable in Settings — built-in prices go stale.
+- **Analytics costs are indicative.** On a subscription you are not billed per token, so treat the number as relative volume, not money owed. The price list is pulled from the Anthropic site and shown in Settings; it excludes discounts, batch rates and negotiated account terms.
 - **A restore rewrites the whole file.** Backups are listed in Settings and any of them applies with one click — but it replaces the entire file, not a single entry inside it. The state before the restore is itself saved as a fresh copy.
 - **A skill folder is put back by hand.** The restore button covers configuration files; the copy of a deleted skill sits in `claude-control/backups`, but returning it is a manual job.
 - **Chat runs live in the open tab.** Closing the browser tab kills the agent, and reloading the page loses active runs together with the session's accumulated spend. The registry of running processes is held in server memory, so restarting the server ends everything.

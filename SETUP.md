@@ -474,7 +474,7 @@ The MCP handshake runs for every transport — stdio, HTTP and SSE — and the r
 
 It reads `~/.claude/projects/*.jsonl`. An empty section means no transcripts — a fresh install, or the wrong configuration directory.
 
-Costs are estimates from a price table. On a subscription nothing is billed per token, so read the number as volume, not money. An unrecognised model falls back to Sonnet pricing. The rates themselves are shown under **Settings → Rates used to estimate cost** and can be edited there: built-in prices go stale over time.
+Costs are estimates based on the Anthropic price list. On a subscription nothing is billed per token, so read the number as volume, not money. The list is pulled from the site when you open Settings (at most once a day) and cached in `claude-control/pricing-cache.json`; each record is priced at the model version named in the transcript, and an unrecognised model falls back to Sonnet pricing. With no network the last cache is used, and failing that the table built into the panel; what is currently in effect is shown under **Settings → Rates used to estimate cost** along with the update date and a “Refresh prices” button. You can set your own price there — it overrides the list.
 
 _Running agents_ matches processes by their command line: a CLI installed through npm runs under the name `node`, which is why matching by process name found nothing. If the section is empty while Claude Code is running, your system most likely does not allow listing other processes.
 

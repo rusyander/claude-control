@@ -43,7 +43,14 @@ export function OverviewTopic() {
         <CapabilityGrid
           canTitle={t('help.common.canTitle')}
           cantTitle={t('help.common.cantTitle')}
-          can={[tr('canSee'), tr('canPath'), tr('canMissing'), tr('canBroken'), tr('canJump')]}
+          can={[
+            tr('canSee'),
+            tr('canPath'),
+            tr('canMissing'),
+            tr('canBroken'),
+            tr('canBackups'),
+            tr('canJump'),
+          ]}
           cant={[tr('cantEdit'), tr('cantHistory'), tr('cantDeep')]}
         />
       </HelpSection>

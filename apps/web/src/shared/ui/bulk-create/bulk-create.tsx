@@ -5,8 +5,8 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
-import type { BulkCreateProps, ParsedLine } from './BulkCreate.types';
-import styles from './BulkCreate.module.scss';
+import type { BulkCreateProps, ParsedLine } from './bulk-create.types';
+import styles from './bulk-create.module.scss';
 
 /**
  * Пакетное создание: одна строка ввода — одна сущность.

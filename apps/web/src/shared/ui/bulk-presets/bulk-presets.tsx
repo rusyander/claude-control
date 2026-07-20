@@ -4,8 +4,8 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import type { BulkPresetsProps } from './BulkPresets.types';
-import styles from './BulkPresets.module.scss';
+import type { BulkPresetsProps } from './bulk-presets.types';
+import styles from './bulk-presets.module.scss';
 
 /**
  * Пакетное создание из заготовок: отмечаешь несколько пресетов/шаблонов и

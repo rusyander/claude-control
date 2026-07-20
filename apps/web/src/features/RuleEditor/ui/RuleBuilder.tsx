@@ -4,12 +4,8 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import type { RuleSection, SectionKind } from '../model/ruleSections';
+import type { RuleBuilderProps } from './RuleBuilder.types';
 import styles from './RuleBuilder.module.scss';
-
-interface RuleBuilderProps {
-  sections: RuleSection[];
-  onChange: (sections: RuleSection[]) => void;
-}
 
 /**
  * Конструктор составного правила.
@@ -67,7 +63,7 @@ export function RuleBuilder({ sections, onChange }: RuleBuilderProps) {
 
           <Stack gap="var(--spacing-3xs)">
             {section.items.map((item, itemIndex) => (
-              <div key={itemIndex} className={styles.item}>
+              <Stack key={itemIndex} direction="row" align="center" gap="var(--spacing-2xs)">
                 <span className={styles.bullet}>—</span>
                 <input
                   className={styles.itemInput}
@@ -97,7 +93,7 @@ export function RuleBuilder({ sections, onChange }: RuleBuilderProps) {
                     patch(index, { items: section.items.filter((_, i) => i !== itemIndex) })
                   }
                 />
-              </div>
+              </Stack>
             ))}
 
             <Button

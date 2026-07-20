@@ -19,6 +19,8 @@ export const queryKeys = {
   automations: ['automations'] as const,
   /** Резервные копии: список обновляется после каждой записи в конфиг. */
   backups: ['backups'] as const,
+  /** Сырой глобальный CLAUDE.md — для страницы просмотра/правки целиком. */
+  claudeMd: ['claude-md'] as const,
 };
 
 /** Какие ключи обновлять при изменении конкретного домена на диске. */

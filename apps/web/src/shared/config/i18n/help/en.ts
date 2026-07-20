@@ -107,6 +107,9 @@ export const helpEn: HelpSchema = {
       canStop: 'Stop one agent or all of them at once',
       canEditor: 'Open the project in your code editor with one button',
       canContinue: 'Continue any past conversation, including ones started in the terminal',
+      canFork:
+        'Branch the conversation: editing your own message goes off as a new branch ' +
+        'instead of appending to the same one',
       canRetry: 'Repeat a failed request with one button, without retyping it',
       canSpend: 'See what a run cost — in tokens or in money, your choice',
       canAnswerButtons: 'Answer an agent question by clicking an option',
@@ -116,9 +119,6 @@ export const helpEn: HelpSchema = {
       cantApprove:
         'Grant permissions in advance: the panel asks at the moment of the action, and ' +
         'the standing list of what is allowed lives in the Permissions section',
-      cantSessionCost:
-        'Keep the session spend counter: it lives in the tab and starts over after a reload',
-      cantFork: 'Branch a conversation: editing a message just copies the text back into the field',
       cantDelete: 'Delete or rename conversations — transcripts are only ever read',
       cantSearchInside: 'Search inside conversations — search covers titles and previews only',
 
@@ -294,8 +294,8 @@ export const helpEn: HelpSchema = {
         'as the answer streams.',
       spendSession: '“Session total” in the agents panel',
       spendSessionText:
-        'Everything across all runs since the page loaded. Individual runs get cleared, ' +
-        'the counter does not; only a reload resets it.',
+        'Everything across all runs in the session. The server keeps the count, so ' +
+        'reloading the tab does not reset it — the client just pulls the value again.',
       spendLimit: 'The limit badge',
       spendLimitText:
         'Appears only when a limit was hit: it shows when the limit resets. How much of ' +
@@ -326,10 +326,10 @@ export const helpEn: HelpSchema = {
       noteTabText:
         'The process belongs to the server, not to the tab: closing the tab or pressing ' +
         'F5 only detaches the listener. Come back and a running job is picked up, with ' +
-        'the stream catching up on what you missed. What is lost is the accumulated ' +
-        'session spend — it lives in the tab and starts from zero. A run that finished ' +
-        'while the page was away will not reappear in the feed: look for the answer in ' +
-        'the conversation history.',
+        'the stream catching up on what you missed. The accumulated session spend now ' +
+        'survives a reload too: the server keeps the count and the tab just pulls it. A ' +
+        'run that finished while the page was away comes back to the feed if you return ' +
+        'within a grace minute; later, look for the answer in the conversation history.',
       noteQuestionTitle: 'An option is picked with a click',
       noteQuestionText:
         'The card draws the options as buttons: a click sends the chosen text as an ' +
@@ -382,7 +382,8 @@ export const helpEn: HelpSchema = {
       canSee: 'See how many settings of each kind exist and how many are enabled',
       canPath: 'Check the configuration directory and which rule selected it',
       canMissing: 'Find out which configuration files are missing',
-      canBroken: 'Spot broken hooks and unused scripts',
+      canBroken: 'Spot broken hooks, failed MCP servers and unused scripts',
+      canBackups: 'See the number of backups and the date of the last one',
       canJump: 'Jump into a section by clicking its tile',
 
       cantEdit: 'Change anything: the page only shows',
@@ -466,6 +467,7 @@ export const helpEn: HelpSchema = {
       canLive: 'See the Claude Code processes actually running now and their memory use',
       canTools: 'See which tools and skills come up most often',
       canSessions: 'Find recent conversations with their git branches and size',
+      canExport: 'Export the report to a file — CSV or JSON',
 
       cantLimits:
         'See what is left of your subscription limits: that lives on Anthropic servers and ' +
@@ -474,7 +476,6 @@ export const helpEn: HelpSchema = {
         'See a real bill: this is tokens converted at the Anthropic price list, not an ' +
         'invoice — discounts, batch rates and account-specific terms are not included',
       cantOther: 'Include work from another machine: only the transcripts of this one are counted',
-      cantExport: 'Export a report as a file',
 
       storageSource: 'Source',
       storageSourceValue: '~/.claude/projects/**/*.jsonl — conversation transcripts',
@@ -597,12 +598,16 @@ export const helpEn: HelpSchema = {
       canEditor: 'Pick a code editor from those found on the system, or give your own command',
       canCreds: 'Set account access by hand when it is not found automatically',
       canSpendUnit: 'Choose how spending is shown: in tokens or in money',
-      canBackup: 'Turn on a backup before every write',
+      canBackup: 'Turn on a backup before every write and set how many to keep',
+      canTransfer:
+        'Move the panel settings to another machine: export and import the state.json file',
       canWatch: 'Watch the files and refresh the interface when they change outside the panel',
 
       cantLogin: 'Sign in to a Claude account: authentication is the CLI’s job',
       cantToken: 'See the token: the server reports only the source of access, never the value',
-      cantSync: 'Sync settings between machines',
+      cantSync:
+        'Sync settings between machines automatically: there is no live sync, only a ' +
+        'manual file transfer',
       cantChange:
         'Edit Claude Code settings field by field: this section is about the panel itself. ' +
         'The exception is a restore: it brings back a configuration file whole',
@@ -708,8 +713,14 @@ export const helpEn: HelpSchema = {
       canCollect:
         'Collect five kinds of thing into a group: rules, skills, hooks, servers, permissions',
       canToggleGroup: 'Switch a group off with a toggle — all of its members go dark at once',
+      canGroupEnv:
+        'Set group variables: switching the group on writes them to settings.json and ' +
+        'switching it off removes them, without touching ones set by hand or by another group',
       canToggleAutomation: 'Switch an individual scenario off with a toggle without deleting it',
       canBadge: 'See from a “disabled” badge that a group or a scenario is switched off',
+      canConflict:
+        'See a warning about a conflict inside a group: two permission members with the ' +
+        'same pattern and opposite decisions',
       canSandbox: 'Run a group’s entire contents in the sandbox at once',
       canAutomation: 'Describe a scenario in words and get a working hook',
       canAssistant: 'Fill the group or scenario form with the assistant',
@@ -722,11 +733,7 @@ export const helpEn: HelpSchema = {
       cantRevive:
         'Undo a manual switch-off by enabling the group: what you disabled ' +
         'individually stays disabled',
-      cantGroupEnv:
-        'Switch environments with a group: the variables field is saved but never reaches settings.json',
       cantNest: 'Nest groups inside one another',
-      cantConflict:
-        'Be told about conflicting settings inside a group: the panel does not compare them',
 
       storageWhere: 'Where they live',
       storageWhereValue: 'in the panel’s data, apart from the Claude Code configuration',
@@ -764,8 +771,9 @@ export const helpEn: HelpSchema = {
         'A disabled group carries a badge.',
       groupEnv: 'Group variables',
       groupEnvText:
-        'While the group is on, its variables go into the Claude Code settings. That is how ' +
-        'several environments are kept and swapped wholesale.',
+        'The variables from the form go into settings.json while the group is on and are ' +
+        'removed when it is switched off. The panel remembers the ones it set, so ' +
+        'variables set by hand or by another group are left untouched.',
 
       toggleTitle: 'Who outranks whom: the group and the individual toggle',
       toggleCaption:
@@ -854,10 +862,12 @@ export const helpEn: HelpSchema = {
         'waits until you type the name of the group or scenario. The rules and skills ' +
         'themselves stay — the group only referred to them. And if the group being ' +
         'deleted was disabled, its members switch on: nothing holds them any more.',
-      noteConflictTitle: 'The panel does not catch conflicts inside a bundle',
+      noteConflictTitle: 'The panel only catches a permission conflict on the same pattern',
       noteConflictText:
-        'Two rules that contradict each other will sit happily in one group. Only a run will ' +
-        'show it.',
+        'Two permission members with the same pattern and opposite decisions (allow and ' +
+        'deny at once) are flagged with a warning right in the group form. Semantic ' +
+        'contradictions, though — two rules or skills that argue in substance — it does ' +
+        'not see: only a run shows those.',
     },
 
     plugins: {
@@ -888,7 +898,7 @@ export const helpEn: HelpSchema = {
       canUpdate: 'Update an installed plugin to a new version',
       canToggle: 'Switch a plugin off without removing it',
       canUninstall: 'Remove an installed plugin',
-      canMarketplaces: 'See the list of connected marketplaces and their sources',
+      canMarketplaces: 'Add and remove marketplace sources right from the panel and see their list',
       canSee: 'See where a plugin came from and when it was last updated',
 
       cantEdit: 'Edit the contents of a plugin: its skills and hooks belong to the author',
@@ -1134,6 +1144,9 @@ export const helpEn: HelpSchema = {
       canToggle: 'Switch a server off without deleting its configuration',
       canTransport: 'Connect a server over one of three transports',
       canHeaders: 'Set request headers for http and sse — for authorisation, for instance',
+      canOAuth:
+        'Sign in interactively over OAuth to a network server: the panel opens the ' +
+        'authorization window, stores the token and refreshes it on expiry',
 
       cantInstall:
         'Install the server itself: the panel configures a connection, it does not ' +
@@ -1312,13 +1325,13 @@ export const helpEn: HelpSchema = {
         'the whole list',
       canMcp: 'Manage permissions for MCP server tools on a separate tab',
       canSee: 'See which common actions are still unconfigured',
+      canValidate:
+        'Get a warning when a pattern does not look like the known forms: ' +
+        'Bash(…), mcp__server__tool, Read(…)',
       canAssistant: 'Fill the form with the assistant by describing the rule in words',
 
       cantWhy: 'Find out why Claude asked for confirmation of a particular action',
       cantOrderCustom: 'Set your own resolution order: the priority of decisions is fixed',
-      cantValidate:
-        'Have a pattern checked for typos: the panel only watches bracket pairs, the rest ' +
-        'is parsed by Claude Code itself',
       cantProject: 'Split permissions per project — the panel keeps one shared set',
       cantLocal:
         'Edit or delete permissions from settings.local.json: they are listed with a ' +
@@ -1472,12 +1485,14 @@ export const helpEn: HelpSchema = {
       canTemplate: 'Start from a ready scaffold instead of an empty file',
       canBulkTemplates: 'Create several scaffolds at once by ticking the ones you want',
       canProbe: 'Run a script against nine prepared events',
-      canSee: 'See the whole hooks/ directory, including unwired files',
+      canSee:
+        'See the whole hooks/ directory, including unwired files and scripts in nested folders',
       canExpand: 'Expand a file’s contents right in the list, without opening the form',
       canRename: 'Rename a file while editing — unlike skills, the name is not locked here',
       canLang:
-        'Use more than Node: .mjs, .cjs, .js, .ts, .sh, .ps1 and .py are listed — but .ts ' +
-        'goes to bash in the sandbox, there is no separate TypeScript runner',
+        'Use more than Node: .mjs, .cjs, .js, .ts, .sh, .ps1 and .py are listed — and .ts, ' +
+        '.mts and .cts run through node --experimental-strip-types, with no separate ' +
+        'TypeScript build',
       canAssistant: 'Ask the assistant to write the body of the script from a description',
 
       cantSchedule: 'Run a script on a schedule — only on a Claude Code event',
@@ -1587,7 +1602,8 @@ export const helpEn: HelpSchema = {
         'panel warns separately about this kind of deletion.',
       noteInterpreterTitle: 'The extension decides what runs it',
       noteInterpreterText:
-        '.mjs, .cjs and .js go through node, .py through python, anything else through ' +
+        '.mjs, .cjs and .js go through node, .ts, .mts and .cts through ' +
+        'node --experimental-strip-types, .py through python, anything else through ' +
         'bash. .ps1 is the special case: powershell on Windows, pwsh on Linux and macOS ' +
         'if it is installed. The panel checks for it before running and says so plainly ' +
         'when it is missing, instead of failing with a cryptic error. Other interpreters ' +
@@ -1630,14 +1646,14 @@ export const helpEn: HelpSchema = {
       canProbe: 'Run the hook against a prepared event — instantly, without using your limit',
       canBulkPresets: 'Create several presets at once by ticking the ones you want',
       canToggle: 'Switch a hook off without losing its settings',
+      canOrder: 'Reorder hooks within a single event with up and down buttons',
       canTimeout: 'Set a timeout so a stuck script does not hold up the work',
 
-      cantOrder: 'Set the order between hooks on the same event',
       cantDebug: 'Step through a script in a debugger — only runs and output',
       cantBlockAll: 'Block an action on any event: only two of the nine can stop anything',
       cantStable:
-        'Rely on a stable link: a hook identifier depends on its position in the file ' +
-        'and changes when things are reordered',
+        'Rely on a stable link for two identical hooks: the identifier is derived from ' +
+        'the content, and full duplicates differ only by a suffix',
       cantLocal:
         'Edit or delete hooks from settings.local.json: they are listed with a ' +
         '“local” badge, but the panel never writes to that file',
@@ -1789,10 +1805,12 @@ export const helpEn: HelpSchema = {
       noteBrokenText:
         'There is no error — nothing simply happens. The panel marks such hooks with a ' +
         'red badge, and on the Overview the whole hooks tile turns red.',
-      noteIdTitle: 'A hook identifier is not stable',
+      noteIdTitle: 'A hook identifier is derived from its content',
       noteIdText:
-        'It is built from the event and the position in the file, so it changes when ' +
-        'things are reordered. A link to one hook may in time open its neighbour.',
+        'It carries the event and a short hash of the filter and command, so deleting a ' +
+        'neighbouring hook no longer shifts other links. The old positional form is kept ' +
+        'as a fallback: marks made before the switch are still found by it. Editing the ' +
+        'command itself does change the link, though — that is a different entry.',
       noteDisabledTitle: 'A disabled hook disappears from settings.json',
       noteDisabledText:
         'Its text is kept by the panel, not by the configuration file. Editing the file ' +
@@ -1845,6 +1863,7 @@ export const helpEn: HelpSchema = {
       canAssistant: 'Ask the assistant to build the structure from a description of the task',
       canSearch: 'Search by the name and description of a skill',
       canToggle: 'Switch a skill off without deleting it from disk',
+      canRestore: 'Restore a deleted skill from a backup with one button',
       canSandbox: 'Check in the sandbox whether the description actually fires',
       canLink:
         'Keep a skill elsewhere: a symlink or junction inside skills/ is read by the ' +
@@ -1860,10 +1879,6 @@ export const helpEn: HelpSchema = {
         'Know in advance whether a skill will be picked: the model decides from the ' +
         'description, and only a run shows it',
       cantVersions: 'Keep versions and an edit history inside the panel',
-      cantRestore:
-        'Bring a deleted skill back with a button: the folder copy lands in ' +
-        'claude-control/backups and shows up in the list, but a restore only returns ' +
-        'configuration files',
 
       storageFolder: 'Skill folder',
       storageMain: 'Main file',
@@ -1979,11 +1994,11 @@ export const helpEn: HelpSchema = {
       noteDeleteTitle: 'Deleting wipes the whole folder, but takes a backup first',
       noteDeleteText:
         'Every nested file goes at once. Before that the folder is copied whole into ' +
-        'claude-control/backups — as it is for rules and hooks. Restoring is done by ' +
-        'hand: there is no restore button in the panel, only the path to the copy in ' +
-        'the response. No copy is made if backups before writing are switched off in ' +
-        'the settings. To disable a skill for a while, use the toggle — it deletes ' +
-        'nothing.',
+        'claude-control/backups — as it is for rules and hooks. You can bring it back ' +
+        'with the “Restore” button in the backups list on the settings page — the folder ' +
+        'is unpacked back into skills/. No copy is made if backups before writing are ' +
+        'switched off in the settings. To disable a skill for a while, use the toggle — ' +
+        'it deletes nothing.',
       noteDescTitle: 'A skill that never fires is almost always a description problem',
       noteDescText:
         'If the instruction is good but Claude keeps ignoring it, rewrite the ' +
@@ -2168,6 +2183,132 @@ export const helpEn: HelpSchema = {
       noteWordingText:
         'A rule applies in every conversation. “Answer in Russian” can be checked, ' +
         '“write well” cannot — and Claude has no way to comply with the second.',
+    },
+
+    claudeMd: {
+      title: 'CLAUDE.md',
+      summary: 'The same rules file, whole and unchanged: preamble, order, formatting',
+      lead:
+        'The Rules section splits CLAUDE.md into cards, and that is enough while ' +
+        'the file consists of rules. But it also holds things that do not fit into ' +
+        'cards: the opening preamble, your own headings, the order of sections, ' +
+        'blank lines and links. Here the file is open as plain text — exactly as ' +
+        'Claude Code itself reads it.',
+
+      whyWhole: 'The whole file is visible',
+      whyWholeText:
+        'A list of cards shows the rules but not the file. The preamble, custom ' +
+        'sections and whatever sits between them are visible only here.',
+      whyRaw: 'The text is saved as is',
+      whyRawText:
+        'The panel writes exactly what is in the field: no rebuilt headings, no ' +
+        'reordered sections. The formatting you shaped by hand stays yours.',
+      whyFast: 'A quick edit without a form',
+      whyFastText:
+        'Changing a single word in the middle of a rule, fixing a typo or swapping ' +
+        'two paragraphs is easier in the text itself than through a card form.',
+
+      canSeeAll: 'Read the global CLAUDE.md in full, preamble and service sections included',
+      canEditAnything: 'Edit any part of the file, including what the Rules section does not show',
+      canOrder: 'Reorder sections and set your own sequence of rules',
+      canRevert: 'Discard unsaved edits and go back to what is on disk',
+      canFixParse:
+        'Repair the file by hand if edits made outside the panel left it parsing wrongly',
+
+      cantProject: 'Open a project CLAUDE.md — this is the global one from ~/.claude only',
+      cantPreview: 'Get a markdown preview or syntax highlighting: this is a plain text field',
+      cantToggle: 'Switch a single rule off or put rules into a group — that is the Rules section',
+      cantHistory:
+        'Browse an edit history here: copies go to backups, and rollback lives in Settings',
+
+      storageFile: 'File',
+      storageFormat: 'Format',
+      storageFormatValue: 'plain markdown; rules are second-level sections',
+      storageReader: 'Who reads it',
+      storageReaderValue: 'Claude Code itself, in full, when a session starts',
+      storageBackup: 'Copy before writing',
+
+      flowTitle: 'What happens when you save',
+      flowCaption:
+        'The backup is made before the write, not after: the file you are editing is ' +
+        'a live configuration, and there has to be something to roll back to.',
+      flowEditor: 'Edit in the field',
+      flowEditorCaption: 'the whole text',
+      flowBackup: 'Backup copy',
+      flowBackupCaption: 'claude-control/backups',
+      flowFile: '~/.claude/CLAUDE.md',
+      flowFileCaption: 'overwritten as is',
+      flowSession: 'New session',
+      flowSessionCaption: 'reads the updated file',
+      flowEdgeSave: 'the Save button',
+      flowEdgeWrite: 'write',
+      flowEdgeRestart: 'restart',
+
+      pairTitle: 'How this differs from the Rules section',
+      pairCaption:
+        'The file is the same one; the difference is in how it gets written. That is ' +
+        'what decides the fate of your formatting.',
+      pairRules: 'The Rules section',
+      pairRulesText:
+        'A card per rule: toggle, groups, assistant, a link to a specific rule. On save ' +
+        'the file is rebuilt — preamble, then sections shaped as “## ПРАВИЛО: heading”. ' +
+        'A second-level heading of your own becomes a rule with that same name after ' +
+        'such a rebuild.',
+      pairFile: 'This section',
+      pairFileText:
+        'One text field for the whole file. No toggles, no groups, no assistant — but ' +
+        'the text reaches disk byte for byte. Reach for it when the structure of the ' +
+        'file matters more than managing an individual rule.',
+      pairNoteTitle: 'Do not keep both sections open at once',
+      pairNoteText:
+        'The field here holds the text that loaded when the page opened. Save a rule in ' +
+        'the other tab, then save here, and the write from this page returns the file to ' +
+        'its loaded state, overwriting the edit made in Rules.',
+
+      recipesTitle: 'How to edit the file by hand',
+      recipe1: 'Open the section and read what the file contains',
+      recipe1Text:
+        'The character count is shown at the bottom. An empty file and a forty-thousand ' +
+        'character one are different conversations: all of it goes into the context of ' +
+        'every session.',
+      recipe2: 'Make your edit in the text',
+      recipe2Text:
+        'While edits are unsaved, a note next to the counter says so, and the Discard ' +
+        'edits button brings back the loaded text.',
+      recipe3: 'Save',
+      recipe3Text:
+        'A backup copy is created in ~/.claude/claude-control/backups/ before the write. ' +
+        'The list of copies and the rollback live in Settings.',
+      recipe4: 'Restart Claude Code',
+      recipe4Text:
+        'CLAUDE.md is read when a session starts. A running conversation will not see the ' +
+        'new text — neither in the terminal nor in the panel chat.',
+
+      notesTitle: 'Details people trip over',
+      noteRestartTitle: 'Changes reach Claude only after a restart',
+      noteRestartText:
+        'The file is written immediately, but a session reads it once, at startup. Check ' +
+        'your edit in a new conversation, or it will look as if the rule does not work.',
+      noteDisabledTitle: 'The “Отключённые правила (Claude Control)” section is not junk',
+      noteDisabledText:
+        'It is where the panel keeps the text of rules switched off by toggle: they must ' +
+        'not stay in the file itself, or Claude would follow them. Delete that section by ' +
+        'hand and the text of the disabled rules is gone — the toggle cannot bring it back.',
+      noteStaleTitle: 'The text in the field is a snapshot from the moment you opened it',
+      noteStaleText:
+        'The panel does not watch the file. If it was changed elsewhere — by an editor, ' +
+        'another agent or the Rules section — reload the page before editing, otherwise ' +
+        'saving restores the older version.',
+      noteBackupTitle: 'A copy is made on every save',
+      noteBackupText:
+        'Even if you changed a single character. Copies live in ' +
+        '~/.claude/claude-control/backups/ and are rolled back from Settings — that is the ' +
+        'safety net for editing by hand.',
+      noteHeadingTitle: 'Second-level headings are rules',
+      noteHeadingText:
+        'The Rules section shows any “## Heading” as a rule, and the “ПРАВИЛО:” prefix is ' +
+        'optional — it is stripped on read and added back on write. For a subheading inside ' +
+        'a rule use the third level, “### ”.',
     },
   },
 };

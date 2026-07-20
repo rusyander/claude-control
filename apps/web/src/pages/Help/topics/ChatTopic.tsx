@@ -95,6 +95,7 @@ export function ChatTopic() {
           can={[
             tr('canParallel'),
             tr('canContinue'),
+            tr('canFork'),
             tr('canAnswerButtons'),
             tr('canModel'),
             tr('canApprove'),
@@ -106,13 +107,7 @@ export function ChatTopic() {
             tr('canSpend'),
             tr('canEditor'),
           ]}
-          cant={[
-            tr('cantApprove'),
-            tr('cantSessionCost'),
-            tr('cantFork'),
-            tr('cantDelete'),
-            tr('cantSearchInside'),
-          ]}
+          cant={[tr('cantApprove'), tr('cantDelete'), tr('cantSearchInside')]}
         />
       </HelpSection>
 

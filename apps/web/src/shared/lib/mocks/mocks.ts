@@ -1,5 +1,5 @@
 import type { Artifact, ChatMessage, ChatSummary } from '@claude-control/contracts';
-import type { StreamState } from '@entities/Chat/model/useChatStream';
+import type { StreamState } from '@shared/lib/chat-stream';
 
 /**
  * Данные для витрины.

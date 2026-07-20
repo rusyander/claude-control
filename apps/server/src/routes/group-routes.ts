@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import type { Automation, Group, GroupDraft } from '@claude-control/contracts';
+import type { Automation, EntityRef, Group, GroupDraft } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import { readHooks, writeHooks } from '../domains/hooks.ts';
 import { applyEntityState, rewriteHooks } from '../domains/entity-toggle.ts';
+import { applyGroupEnv, existingEnvKeys } from '../domains/env.ts';
 
 /**
  * Группы и сценарии — надстройка приложения. Claude Code про них не знает,
@@ -40,13 +41,35 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     return ctx.store.saveGroup(group);
   });
 
-  app.put<{ Params: { id: string }; Body: Group }>('/api/groups/:id', (request) =>
-    ctx.store.saveGroup({
+  app.put<{ Params: { id: string }; Body: Group }>('/api/groups/:id', (request) => {
+    // Клиент шлёт GroupDraft без поля order, поэтому при правке порядок нельзя
+    // сбрасывать в 0 (иначе редактирование любой группы перекидывало бы её в
+    // начало списка и сталкивало по order с уже существующей нулевой). Берём
+    // прежний order группы, если тело его не прислало.
+    const existing = ctx.store.getGroups().find((item) => item.id === request.params.id);
+    const previousMembers = existing?.members ?? [];
+    const saved = ctx.store.saveGroup({
       ...withDefaults(request.body),
       id: request.params.id,
-      order: request.body.order ?? 0,
-    }),
-  );
+      order: request.body.order ?? existing?.order ?? 0,
+    });
+    // Смена состава должна привести отметки disabledByGroup к новому составу,
+    // иначе участник, убранный из ВЫКЛЮЧЕННОЙ группы, остался бы заперт её
+    // отметкой навсегда (в списках уже не видно, какая группа его держит), а
+    // добавленный в выключенную группу — не погас бы.
+    reconcileMembers(ctx, saved, previousMembers);
+    // Правка переменных у включённой группы применяется сразу: снимаем прежние
+    // свои ключи и накладываем заново. Но переприменяем только когда есть за чем:
+    // набор env реально изменился ЛИБО группу этим же PUT включили (её ключи
+    // были сняты при выключении и их надо вернуть). Правка без изменения env
+    // (переименование, смена цвета) не должна зря переписывать settings.json.
+    const envChanged = !sameEnv(existing?.env, saved.env);
+    if (saved.isEnabled && (envChanged || !existing?.isEnabled)) {
+      applyGroupEnvState(ctx, saved, false);
+      applyGroupEnvState(ctx, saved, true);
+    }
+    return saved;
+  });
 
   /**
    * Переключатель группы. Выключение гасит все её участники разом — ради
@@ -77,9 +100,17 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
       }
 
       // Хуки лежат в одном файле, поэтому перезапись одна на всю группу.
-      const backupPath = needsHookRewrite ? rewriteHooks(ctx) : undefined;
+      const hookBackup = needsHookRewrite ? rewriteHooks(ctx) : undefined;
+      // Переменные окружения группы: включение пишет их в settings.json,
+      // выключение — снимает свои, не задев ручные и общие с другой группой.
+      const envBackup = applyGroupEnvState(ctx, group, isEnabled);
 
-      return { ok: true, backupPath, needsRestart: true, affected: group.members.length };
+      return {
+        ok: true,
+        backupPath: hookBackup ?? envBackup,
+        needsRestart: true,
+        affected: group.members.length,
+      };
     },
   );
 
@@ -97,6 +128,10 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
       }
       rewriteHooks(ctx);
     }
+
+    // Снимаем переменные окружения, которые держала эта группа (кроме общих с
+    // другими). Работает и для включённой группы: её ключи не должны пережить её.
+    if (group) applyGroupEnvState(ctx, group, false);
 
     ctx.store.deleteGroup(request.params.id);
     return { ok: true };
@@ -129,6 +164,91 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
  * записи помечены маркером в команде, поэтому их можно отличить от хуков,
  * написанных руками, и пересобрать, не задев чужое.
  */
+/** Совпадают ли наборы env двух версий группы (одни ключи и значения). */
+function sameEnv(a: Record<string, string> = {}, b: Record<string, string> = {}): boolean {
+  const keysA = Object.keys(a);
+  if (keysA.length !== Object.keys(b).length) return false;
+  return keysA.every((key) => a[key] === b[key]);
+}
+
+/**
+ * Применить или снять переменные окружения группы в settings.json.
+ *
+ * Включение: пишем ключи группы, но пропускаем те, что уже заданы вручную (есть
+ * в settings и не принадлежат ни одной группе) — ручная переменная важнее. Что
+ * реально записали, запоминаем за группой.
+ *
+ * Выключение: снимаем только свои ключи и только те, что больше не держит ни
+ * одна другая группа. Поэтому ручные и общие с другой группой ключи остаются.
+ */
+function applyGroupEnvState(
+  ctx: ServerContext,
+  group: Group,
+  isEnabled: boolean,
+): string | undefined {
+  const settingsPath = ctx.location.paths.settings;
+
+  if (isEnabled) {
+    const manual = new Set(
+      existingEnvKeys(settingsPath).filter((key) => !ctx.store.isEnvKeyOwnedByGroup(key)),
+    );
+    const set: Record<string, string> = {};
+    const applied: string[] = [];
+    for (const [key, value] of Object.entries(group.env ?? {})) {
+      if (manual.has(key)) continue;
+      set[key] = value;
+      applied.push(key);
+    }
+    ctx.store.setGroupEnvKeys(group.id, applied);
+    return Object.keys(set).length
+      ? applyGroupEnv(settingsPath, set, [], ctx.backupDir)
+      : undefined;
+  }
+
+  const owned = ctx.store.getGroupEnvKeys(group.id);
+  ctx.store.setGroupEnvKeys(group.id, []);
+  const remove = owned.filter((key) => !ctx.store.isEnvKeyOwnedByGroup(key));
+  return remove.length ? applyGroupEnv(settingsPath, {}, remove, ctx.backupDir) : undefined;
+}
+
+/**
+ * Привести отметки «погашено этой группой» к новому составу после правки PUT.
+ *
+ * Ушедший из группы участник освобождается от её удержания: снимаем отметку
+ * этой группы, и если сущность больше не держит ни другая группа, ни ручное
+ * выключение — она оживает на диске (как будто участник вышел из группы).
+ * Пришедший в ВЫКЛЮЧЕННУЮ группу участник, симметрично, гасится ею.
+ *
+ * На диск ходим только когда итог реально сменился — иначе каждая правка имени
+ * включённой группы дёргала бы перезапись файлов и плодила резервные копии.
+ * Хуки лежат в одном файле, поэтому перезапись одна на всю правку.
+ */
+function reconcileMembers(ctx: ServerContext, group: Group, previousMembers: EntityRef[]): void {
+  const keyOf = (member: EntityRef): string => `${member.kind} ${member.id}`;
+  const nextKeys = new Set(group.members.map(keyOf));
+  const prevKeys = new Set(previousMembers.map(keyOf));
+
+  const removed = previousMembers.filter((member) => !nextKeys.has(keyOf(member)));
+  const added = group.members.filter((member) => !prevKeys.has(keyOf(member)));
+
+  let needsHookRewrite = false;
+
+  const reapply = (member: EntityRef, heldByGroup: boolean): void => {
+    const before = ctx.store.isDisabled(member.kind, member.id);
+    ctx.store.setGroupDisabled(member.kind, member.id, group.id, heldByGroup);
+    const after = ctx.store.isDisabled(member.kind, member.id);
+    if (before !== after) {
+      const result = applyEntityState(ctx, member.kind, member.id, !after);
+      needsHookRewrite ||= result.needsHookRewrite;
+    }
+  };
+
+  for (const member of removed) reapply(member, false);
+  if (!group.isEnabled) for (const member of added) reapply(member, true);
+
+  if (needsHookRewrite) rewriteHooks(ctx);
+}
+
 const MARKER = '# claude-control:automation';
 
 function compileAutomations(ctx: ServerContext): void {

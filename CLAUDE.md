@@ -246,6 +246,15 @@ state.json со старыми записями.
 через `targetOf`. Стоит перепутать — и личная настройка уедет в общий конфиг
 или наоборот.
 
+**OAuth-callback MCP намеренно пропущен мимо origin-guard** (`index.ts`).
+Возврат с сервера авторизации — это переход по адресу в отдельном окне с чужого
+домена, то есть заведомо `Sec-Fetch-Site: cross-site`; общий запрет его бы
+отклонил. Исключение узкое: только `GET /api/mcp/oauth/callback`, без побочных
+эффектов, а сам вход защищён параметром `state`, который генерирует панель и по
+нему же ищет незавершённый вход (`domains/mcp-oauth.ts`). Убирать исключение
+нельзя — сломается вход; расширять на другие маршруты тоже нельзя. Токены лежат
+отдельным файлом с правами 600, а не в общем `~/.claude.json`.
+
 ---
 
 **Справка — часть кода, а не отдельный документ.** Разделы описаны в
@@ -296,25 +305,26 @@ node tools/qa/audit-layout.mjs
 
 **Сервер** (`apps/server/src/`)
 
-| Что                               | Где                                   |
-| --------------------------------- | ------------------------------------- |
-| Поиск каталога конфигурации       | `lib/claude-paths.ts`                 |
-| Доступ к аккаунту, различия ОС    | `lib/credentials.ts`                  |
-| Экранирование аргументов CLI      | `lib/cli-args.ts`                     |
-| Безопасная запись с бэкапом       | `lib/safe-io.ts`                      |
-| Копии и откат к ним               | `domains/backups.ts`                  |
-| Прайс Anthropic: загрузка и кэш   | `domains/analytics/pricing-source.ts` |
-| Тарифы и подбор цены по модели    | `domains/analytics/pricing.ts`        |
-| Включение и выключение на диске   | `domains/entity-toggle.ts`            |
-| Клиент MCP: stdio, HTTP, SSE      | `domains/mcp-client.ts`               |
-| Признак локальных настроек        | `lib/settings-source.ts`              |
-| Запуск `claude`, разбор потока    | `domains/chat/ChatRunner.ts`          |
-| Чтение транскриптов               | `domains/chat/ChatHistory.ts`         |
-| Рабочая папка разговора           | `domains/chat/ChatWorkspace.ts`       |
-| Список проектов из транскриптов   | `domains/chat/ChatProjects.ts`        |
-| Обзор диска, открытие в редакторе | `domains/fs/`                         |
-| Сборка песочницы                  | `domains/sandbox/SandboxConfig.ts`    |
-| Маршруты                          | `routes/*.ts`                         |
+| Что                                | Где                                   |
+| ---------------------------------- | ------------------------------------- |
+| Поиск каталога конфигурации        | `lib/claude-paths.ts`                 |
+| Доступ к аккаунту, различия ОС     | `lib/credentials.ts`                  |
+| Экранирование аргументов CLI       | `lib/cli-args.ts`                     |
+| Безопасная запись с бэкапом        | `lib/safe-io.ts`                      |
+| Копии и откат к ним                | `domains/backups.ts`                  |
+| Прайс Anthropic: загрузка и кэш    | `domains/analytics/pricing-source.ts` |
+| Тарифы и подбор цены по модели     | `domains/analytics/pricing.ts`        |
+| Включение и выключение на диске    | `domains/entity-toggle.ts`            |
+| Клиент MCP: stdio, HTTP, SSE       | `domains/mcp-client.ts`               |
+| OAuth у MCP: вход, токены, refresh | `domains/mcp-oauth.ts`                |
+| Признак локальных настроек         | `lib/settings-source.ts`              |
+| Запуск `claude`, разбор потока     | `domains/chat/ChatRunner.ts`          |
+| Чтение транскриптов                | `domains/chat/ChatHistory.ts`         |
+| Рабочая папка разговора            | `domains/chat/ChatWorkspace.ts`       |
+| Список проектов из транскриптов    | `domains/chat/ChatProjects.ts`        |
+| Обзор диска, открытие в редакторе  | `domains/fs/`                         |
+| Сборка песочницы                   | `domains/sandbox/SandboxConfig.ts`    |
+| Маршруты                           | `routes/*.ts`                         |
 
 **Фронт** (`apps/web/src/`) — слои FSD: `app` → `pages` → `features` →
 `entities` → `shared`.

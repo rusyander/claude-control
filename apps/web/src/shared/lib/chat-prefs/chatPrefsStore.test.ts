@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizePrefs } from './chatPrefsStore';
+import {
+  sanitizePrefs,
+  getChatPrefs,
+  setAllowEdits,
+  setSound,
+  subscribeChatPrefs,
+} from './chatPrefsStore';
 
 /**
  * Тесты санитайза настроек чата из localStorage. Ключевое: по умолчанию правки
@@ -25,5 +31,60 @@ describe('sanitizePrefs', () => {
     expect(sanitizePrefs(undefined).sound).toBe(true);
     expect(sanitizePrefs({}).sound).toBe(true);
     expect(sanitizePrefs({ sound: false }).sound).toBe(false);
+  });
+});
+
+/**
+ * Реактивный стор настроек: сеттеры меняют значение, уведомляют подписчиков и не
+ * шумят при установке того же значения. Стор — модульный синглтон, поэтому
+ * значения задаём явно (не полагаемся на порядок тестов). localStorage в
+ * node-окружении нет — доступ к нему в сторе обёрнут опционально, стор работает
+ * в памяти.
+ */
+describe('chatPrefs — сеттеры и подписка', () => {
+  it('setAllowEdits меняет значение и уведомляет подписчиков', () => {
+    // Приводим к известному состоянию.
+    setAllowEdits(true);
+
+    let notified = 0;
+    const unsubscribe = subscribeChatPrefs(() => {
+      notified += 1;
+    });
+
+    setAllowEdits(false);
+    expect(getChatPrefs().allowEdits).toBe(false);
+    expect(notified).toBe(1);
+
+    unsubscribe();
+    setAllowEdits(true); // после отписки не считаем
+    expect(notified).toBe(1);
+    expect(getChatPrefs().allowEdits).toBe(true);
+  });
+
+  it('установка того же значения — без уведомления (no-op)', () => {
+    setSound(true);
+
+    let notified = 0;
+    const unsubscribe = subscribeChatPrefs(() => {
+      notified += 1;
+    });
+
+    setSound(true); // значение не изменилось
+    expect(notified).toBe(0);
+
+    setSound(false); // изменилось — одно уведомление
+    expect(notified).toBe(1);
+    expect(getChatPrefs().sound).toBe(false);
+
+    unsubscribe();
+  });
+
+  it('allowEdits и sound независимы друг от друга', () => {
+    setAllowEdits(false);
+    setSound(true);
+    expect(getChatPrefs()).toMatchObject({ allowEdits: false, sound: true });
+
+    setAllowEdits(true);
+    expect(getChatPrefs()).toMatchObject({ allowEdits: true, sound: true });
   });
 });

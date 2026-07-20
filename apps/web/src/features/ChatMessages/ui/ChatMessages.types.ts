@@ -1,5 +1,5 @@
 import type { ChatMessage } from '@claude-control/contracts';
-import type { StreamState } from '@entities/Chat/model/useChatStream';
+import type { StreamState } from '@entities/Chat';
 import type { PendingPermission } from '@shared/lib/agent-runs';
 
 export interface ChatMessagesProps {

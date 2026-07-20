@@ -8,7 +8,7 @@ import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { ResourceFileTree } from '@features/ResourceFiles';
-import { useResourceTemplates, useApplyTemplate } from '@entities/Resource/api/ResourceApi';
+import { useResourceTemplates, useApplyTemplate } from '@entities/Resource';
 import { skillApi } from '@entities/Skill';
 import type { SkillFormModalProps } from './SkillFormModal.types';
 import styles from './SkillFormModal.module.scss';
@@ -210,7 +210,7 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
           {/* Конструктор до создания: выбор заготовки структуры. Разворачивается
               она сразу после того, как скилл появится на диске. */}
           {isBuilder && !activeId && (
-            <div className={styles.structure}>
+            <Stack gap="var(--spacing-3xs)" className={styles.structure}>
               <Typography variant="body-sm" weight="medium">
                 {t('skills.pickTemplate')}
               </Typography>
@@ -246,13 +246,13 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
                   </button>
                 ))}
               </Stack>
-            </div>
+            </Stack>
           )}
 
           {/* Структура файлов — дерево со всем: шаблоны, помощник, правка,
               создание. Появляется, когда у скилла есть папка на диске. */}
           {activeId && (
-            <div className={styles.structure}>
+            <Stack gap="var(--spacing-3xs)" className={styles.structure}>
               <Typography variant="body-sm" weight="medium">
                 {t('skills.structureTitle')}
               </Typography>
@@ -260,7 +260,7 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
                 {t('skills.structureHint')}
               </Typography>
               <ResourceFileTree kind="skill" id={activeId} />
-            </div>
+            </Stack>
           )}
         </Stack>
       </FormWithAssistant>

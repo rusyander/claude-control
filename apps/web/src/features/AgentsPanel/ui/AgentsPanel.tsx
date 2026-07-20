@@ -10,7 +10,7 @@ import { StatusDot } from '@shared/ui/status-dot';
 import { statusTone, type ActiveRunView } from '@shared/lib/agent-runs';
 import { useChatPrefs } from '@shared/lib/chat-prefs';
 import { formatSpend } from '@shared/lib/format';
-import type { AgentsPanelProps } from './AgentsPanel.types';
+import type { AgentsPanelProps, AgentRowProps } from './AgentsPanel.types';
 import styles from './AgentsPanel.module.scss';
 
 /** Короткое имя проекта из пути. */
@@ -116,28 +116,26 @@ export function AgentsPanel({
               ))}
             </div>
 
-            <div className={styles.foot}>
+            <Stack
+              direction="row"
+              align="center"
+              justify="between"
+              gap="var(--spacing-sm)"
+              padding="var(--spacing-xs) var(--spacing-sm)"
+              className={styles.foot}
+            >
               <Typography variant="caption" color="subtle" as="span">
                 {t('agents.total')}
               </Typography>
               <Typography variant="mono" as="span">
                 {formatSpend(costUnit, totalTokens, totalCost)}
               </Typography>
-            </div>
+            </Stack>
           </div>
         </>
       )}
     </div>
   );
-}
-
-interface AgentRowProps {
-  run: ActiveRunView;
-  costUnit: 'tokens' | 'money';
-  statusLabel: string;
-  chatLabel: string;
-  onOpen: () => void;
-  onStop: () => void;
 }
 
 function AgentRow({ run, costUnit, statusLabel, chatLabel, onOpen, onStop }: AgentRowProps) {
@@ -146,7 +144,13 @@ function AgentRow({ run, costUnit, statusLabel, chatLabel, onOpen, onStop }: Age
     run.tokens || run.costUsd ? formatSpend(costUnit, run.tokens ?? 0, run.costUsd ?? 0) : '';
 
   return (
-    <div className={styles.row}>
+    <Stack
+      direction="row"
+      align="center"
+      gap="var(--spacing-2xs)"
+      padding="var(--spacing-3xs) var(--spacing-2xs) var(--spacing-3xs) var(--spacing-sm)"
+      className={styles.row}
+    >
       <button type="button" className={styles.rowMain} onClick={onOpen} title={run.projectPath}>
         {/* Все активные прогоны пульсируют: работает — виден, ждёт/упал — зовёт. */}
         <StatusDot tone={statusTone(run.status)} pulse />
@@ -169,7 +173,7 @@ function AgentRow({ run, costUnit, statusLabel, chatLabel, onOpen, onStop }: Age
         aria-label={t('chat.stop')}
         onClick={onStop}
       />
-    </div>
+    </Stack>
   );
 }
 

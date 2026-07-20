@@ -1,6 +1,9 @@
 import { useTranslation } from 'react-i18next';
+import { Stack } from '@shared/ui/stack';
+import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { Button } from '@shared/ui/button';
+import type { PermissionCardProps } from './PermissionCard.types';
 import styles from './ChatMessages.module.scss';
 
 /**
@@ -8,12 +11,6 @@ import styles from './ChatMessages.module.scss';
  * поэтому карточка заметная, а решение — в один клик прямо в чате, без перехода
  * в терминал. Показываем, что именно агент хочет сделать (команду, файл, адрес).
  */
-
-interface PendingPermission {
-  toolName: string;
-  input: unknown;
-  toolUseId: string;
-}
 
 /** Короткая суть запроса: команда/файл/адрес, иначе — компактный JSON. */
 function summarize(input: unknown): string {
@@ -30,27 +27,34 @@ function summarize(input: unknown): string {
   }
 }
 
-interface PermissionCardProps {
-  permissions: PendingPermission[];
-  onDecide: (toolUseId: string, behavior: 'allow' | 'deny') => void;
-}
-
 export function PermissionCard({ permissions, onDecide }: PermissionCardProps) {
   const { t } = useTranslation();
   if (permissions.length === 0) return null;
 
   return (
     <div className={`${styles.question} ${styles.permission}`}>
-      <div className={`${styles.questionHead} ${styles.permissionHead}`}>
+      <Stack
+        direction="row"
+        align="center"
+        gap="var(--spacing-2xs)"
+        className={`${styles.questionHead} ${styles.permissionHead}`}
+      >
         <Icon name="permissions" size={20} />
-        <span>{t('chat.permissionTitle')}</span>
-      </div>
+        <Typography as="span" variant="body-sm" weight="semibold" color="warning">
+          {t('chat.permissionTitle')}
+        </Typography>
+      </Stack>
 
       {permissions.map((permission) => (
         <div key={permission.toolUseId} className={styles.questionItem}>
           <span className={styles.questionBadge}>{permission.toolName}</span>
           <pre className={styles.permissionInput}>{summarize(permission.input)}</pre>
-          <div className={styles.permissionActions}>
+          <Stack
+            direction="row"
+            justify="end"
+            gap="var(--spacing-2xs)"
+            marginTop="var(--spacing-2xs)"
+          >
             <Button
               size="sm"
               variant="secondary"
@@ -65,7 +69,7 @@ export function PermissionCard({ permissions, onDecide }: PermissionCardProps) {
             >
               {t('chat.allow')}
             </Button>
-          </div>
+          </Stack>
         </div>
       ))}
     </div>

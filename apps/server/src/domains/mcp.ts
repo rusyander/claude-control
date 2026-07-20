@@ -1,7 +1,12 @@
+import {
+  UnauthorizedError,
+  type OAuthClientProvider,
+} from '@modelcontextprotocol/sdk/client/auth.js';
 import type { McpServer, McpServerDraft, McpHealth, McpTransport } from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
 import type { AppStore } from '../lib/app-store.ts';
 import { openMcpSession } from './mcp-client.ts';
+import { hasOAuthTokens } from './mcp-oauth.ts';
 
 /**
  * Регистрация MCP-серверов живёт в ~/.claude.json — рядом с каталогом .claude,
@@ -49,28 +54,47 @@ function readTransport(raw: RawMcpServer): McpTransport {
   return raw.url ? 'http' : 'stdio';
 }
 
-export function readMcpServers(mcpConfigPath: string, store: AppStore): McpServer[] {
+export function readMcpServers(
+  mcpConfigPath: string,
+  store: AppStore,
+  appData?: string,
+): McpServer[] {
   const config = readJsonFile<RawMcpConfig>(mcpConfigPath, {});
   const active = config.mcpServers ?? {};
   const disabled = (config[DISABLED_KEY] as Record<string, RawMcpServer> | undefined) ?? {};
 
-  const toServer = (name: string, raw: RawMcpServer, isEnabled: boolean): McpServer => ({
-    id: name,
-    name,
-    transport: readTransport(raw),
-    command: raw.command,
-    args: raw.args ?? [],
-    url: raw.url,
-    env: raw.env ?? {},
-    headers: raw.headers ?? {},
-    health: isEnabled ? 'unknown' : 'disabled',
-    isEnabled,
-    groupIds: store.getGroupIdsFor('mcp', name),
-  });
+  const toServer = (name: string, raw: RawMcpServer, isEnabled: boolean): McpServer => {
+    const transport = readTransport(raw);
+    return {
+      id: name,
+      name,
+      transport,
+      command: raw.command,
+      args: raw.args ?? [],
+      url: raw.url,
+      env: raw.env ?? {},
+      headers: raw.headers ?? {},
+      health: isEnabled ? 'unknown' : 'disabled',
+      isEnabled,
+      groupIds: store.getGroupIdsFor('mcp', name),
+      // Кнопку «Авторизоваться» показываем только у сетевых серверов и только
+      // когда есть где смотреть токены. appData не передан — значит список
+      // строит вызов, которому OAuth-статус не нужен.
+      hasOAuth: transport !== 'stdio' && appData !== undefined && hasOAuthTokens(appData, name),
+    };
+  };
+
+  // Секции эксклюзивны по смыслу (сервер либо включён, либо нет), но файл правят
+  // руками — одно имя может оказаться в обеих. Тогда активная запись побеждает:
+  // иначе вернулись бы два McpServer с одним id, а `find`/toggle рассчитывают на
+  // одну. Детерминированно и без зависимости от стабильности сортировки.
+  const activeNames = new Set(Object.keys(active));
 
   return [
     ...Object.entries(active).map(([name, raw]) => toServer(name, raw, true)),
-    ...Object.entries(disabled).map(([name, raw]) => toServer(name, raw, false)),
+    ...Object.entries(disabled)
+      .filter(([name]) => !activeNames.has(name))
+      .map(([name, raw]) => toServer(name, raw, false)),
   ].sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -146,18 +170,33 @@ export interface HealthResult {
  * заполнялся вовсе. Теперь все три транспорта идут одним путём — через общего
  * клиента, который знает про транспорты всё, что нужно.
  */
-export async function checkMcpHealth(server: McpServer, timeoutMs = 30_000): Promise<HealthResult> {
+export async function checkMcpHealth(
+  server: McpServer,
+  timeoutMs = 30_000,
+  authProvider?: OAuthClientProvider,
+): Promise<HealthResult> {
   if (!server.isEnabled) return { health: 'disabled' };
 
   try {
-    const session = await openMcpSession(server, timeoutMs);
+    const session = await openMcpSession(server, timeoutMs, authProvider);
     try {
       return { health: 'connected', toolCount: (await session.listTools()).length };
     } finally {
       await session.close();
     }
   } catch (error) {
+    // Отказ по авторизации объясняем прямо: без этого пользователь видит
+    // «сервер не ответил на рукопожатие» и не понимает, что нужно войти.
+    if (error instanceof UnauthorizedError || isUnauthorized(error)) {
+      return { health: 'failed', detail: 'Требуется авторизация OAuth — нажмите «Авторизоваться»' };
+    }
     const detail = error instanceof Error ? error.message : String(error);
     return { health: 'failed', detail: detail.slice(0, 400) };
   }
+}
+
+/** `UnauthorizedError` от SDK иногда прилетает завёрнутым — ловим и по тексту. */
+function isUnauthorized(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b401\b|unauthorized/i.test(message);
 }

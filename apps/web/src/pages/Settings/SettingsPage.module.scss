@@ -27,3 +27,20 @@
   background: var(--color-warning-subtle);
   border-radius: var(--radius-sm);
 }
+
+.numberInput {
+  width: 88px;
+  padding: 6px var(--spacing-xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: var(--font-size-body-sm);
+  text-align: right;
+}
+
+.numberInput:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

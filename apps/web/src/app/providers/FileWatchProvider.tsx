@@ -1,10 +1,7 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DOMAIN_KEYS } from '@shared/api/query-keys';
-
-interface FileWatchProviderProps {
-  children: ReactNode;
-}
+import type { FileWatchProviderProps } from './FileWatchProvider.types';
 
 /**
  * Подписка на поток изменений с сервера. Конфиги правит не только это

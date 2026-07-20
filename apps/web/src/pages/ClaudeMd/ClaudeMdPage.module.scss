@@ -1,0 +1,23 @@
+.page {
+  max-width: 900px;
+}
+
+.editor {
+  width: 100%;
+  min-height: 460px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.editor:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

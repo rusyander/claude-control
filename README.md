@@ -51,23 +51,23 @@ Claude Control answers all three. It gives the configuration a shape you can see
 
 **Configuration**
 
-- **Rules** — `## RULE:` sections of `CLAUDE.md`, individually searchable and toggleable
+- **Rules** — `## RULE:` sections of `CLAUDE.md`, individually searchable and toggleable; a separate page shows and edits the whole `CLAUDE.md`
 - **Skills** — the `skills/` folder, with a file tree and editor per skill
-- **Hooks** — grouped by lifecycle event, with the matcher shown plainly
-- **Scripts** — the files in `hooks/`, flagged when nothing calls them
-- **MCP servers** — with a real connection check over the MCP protocol: stdio, HTTP and SSE
+- **Hooks** — grouped by lifecycle event, with the matcher shown plainly, reorderable within an event
+- **Scripts** — the files in `hooks/`, including nested folders, flagged when nothing calls them
+- **MCP servers** — with a real connection check over the MCP protocol: stdio, HTTP and SSE; interactive OAuth sign-in for network ones
 - **Permissions** — allow / ask / deny, including `mcp__*` patterns
 - **Environment** — from `settings.json` and `.mcp-secrets.env`, secrets masked
-- **Plugins** — installed set plus the marketplace catalogue
+- **Plugins** — installed set plus the marketplace catalogue, with sources you can add and remove
 
 </td><td width="50%" valign="top">
 
 **Working with it**
 
 - **Sandbox** — try a rule, skill, hook or MCP server in isolation
-- **Chat** — talk to Claude Code from the panel: streaming, attachments, voice, artifact preview
+- **Chat** — talk to Claude Code from the panel: streaming, attachments, voice, artifact preview, model and effort picker, branching by editing a message, clickable answer options
 - **Several projects at once** — project tabs, with agents running in parallel and surviving tab switches
-- **Analytics** — token spend and estimated cost, read from your local transcripts
+- **Analytics** — token spend and estimated cost, read from your local transcripts, exportable to CSV and JSON
 - **Groups** — arbitrary sets of entities, switchable together
 - **Automations** — scenarios that compile down to ordinary hooks
 - **AI assistant** — describe a rule or skill in words, get the form filled in
@@ -91,7 +91,7 @@ There is no database. The panel is a view over the files Claude Code already rea
 ```mermaid
 flowchart LR
     subgraph browser["Browser · localhost:8888"]
-        UI["React UI<br/>14 sections"]
+        UI["React UI<br/>15 sections"]
     end
 
     subgraph server["Node server · 127.0.0.1:5178"]
@@ -227,7 +227,7 @@ flowchart LR
 
 **Spending is visible as it happens** — in tokens by default, because on a subscription dollars mean nothing. Switch it to money in the settings if you prefer.
 
-The honest boundary: "background" here means between panel tabs, not between browser sessions. Closing the tab kills the run, and reloading the page loses active runs along with the session's spend counter. You answer an agent's question in text — there are no choice buttons.
+The honest boundary: a run belongs to the server, not to the tab. Closing the tab or pressing F5 only detaches the listener — the agent keeps working, and on return the panel picks the running jobs back up; one that finished while the tab was closed comes back to the feed within a grace minute, and after that stays in the transcript. The session's spend counter is likewise counted on the server and survives a reload. The real boundary is restarting the server itself: the run registry lives in its memory. You answer an agent's question either in text or by clicking one of the offered options.
 
 ## Security
 
@@ -338,11 +338,8 @@ The full section-by-section breakdown is in [LIMITATIONS.md](LIMITATIONS.md): wh
 - **Plugins depend on the CLI.** Everything on that page shells out to `claude plugin`; if the CLI cannot reach a marketplace, the panel shows you its raw output rather than inventing a friendlier error.
 - **Analytics costs are indicative.** On a subscription you are not billed per token, so treat the number as relative volume, not money owed. The price list is pulled from the Anthropic site and shown in Settings; it excludes discounts, batch rates and negotiated account terms.
 - **A restore rewrites the whole file.** Backups are listed in Settings and any of them applies with one click — but it replaces the entire file, not a single entry inside it. The state before the restore is itself saved as a fresh copy.
-- **A skill folder is put back by hand.** The restore button covers configuration files; the copy of a deleted skill sits in `claude-control/backups`, but returning it is a manual job.
-- **Chat runs live in the open tab.** Closing the browser tab kills the agent, and reloading the page loses active runs together with the session's accumulated spend. The registry of running processes is held in server memory, so restarting the server ends everything.
-- **The chat does not let you pick a model**, and editing your own message does not branch the conversation — it goes back as a new turn. (Answering an agent's question by clicking is supported: the options in the card are buttons.)
+- **Chat runs live in server memory.** Closing the tab or reloading the page does not touch the agent: the run belongs to the server, and on return the panel picks the running ones back up (one that finished while the tab was closed returns to the feed within a grace minute, and after that only in the transcript). The session's accumulated spend is likewise counted on the server and survives F5. The real boundary is restarting the server: the registry of running processes is held in its memory, so that ends everything.
 - **The list of created files exists only for chats outside a project.** Inside a real repository it is deliberately not shown.
-- **MCP servers behind OAuth are not supported.** The health check passes static headers, so a server that needs an interactive redirect login cannot be checked from the panel.
 - **Editing a hook changes its id.** The id is derived from the content, so a rewritten command is a different hook: a saved link to it stops opening, and its group membership has to be set again.
 
 ## License

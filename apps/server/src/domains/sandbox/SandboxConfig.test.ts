@@ -91,4 +91,77 @@ describe('SandboxConfig', () => {
     const { root: sandboxRoot } = sandboxPaths(sandboxId);
     expect(sandboxRoot).toContain('.claude-control');
   });
+
+  it('id из запрещённых символов не схлопывается в корень всех песочниц', () => {
+    // Регрессия: чистка `[^a-zA-Z0-9-]` превращает такие id в пустую строку, и
+    // тогда root совпадал с корнем sandboxes — а по нему createSandbox/
+    // removeSandbox делают rmSync(recursive), то есть снесли бы ВСЕ песочницы
+    // разом (в каждой — копия .credentials.json). Теперь это ошибка.
+    for (const bad of ['', '..', '///', '!!!']) {
+      expect(() => sandboxPaths(bad)).toThrow(/идентификатор/i);
+    }
+  });
+
+  it('обход каталога через id не выводит за пределы корня песочниц', () => {
+    const { root } = sandboxPaths('../../etc');
+    // Точки и слэши вычищены — остаётся безобидное имя внутри корня.
+    expect(root).toMatch(/[\\/]sandboxes[\\/]etc$/);
+  });
+
+  it('черновик правила попадает в CLAUDE.md и в состав', () => {
+    const sandbox = createSandbox(
+      sandboxId,
+      { draftRule: { title: 'Тестовое', text: 'Текст правила' } },
+      location,
+      store,
+    );
+
+    const claudeMd = readFileSync(join(sandbox.configDir, 'CLAUDE.md'), 'utf8');
+    expect(claudeMd).toContain('Тестовое');
+    expect(claudeMd).toContain('Текст правила');
+    expect(sandbox.description.rules.some((name) => name.includes('черновик'))).toBe(true);
+  });
+
+  it('выбранный скрипт копируется в песочницу, а не берётся из оригинала', () => {
+    writeFileSync(join(root, 'hooks', 'guard.mjs'), 'process.exit(0)');
+
+    const sandbox = createSandbox(sandboxId, { scriptNames: ['guard.mjs'] }, location, store);
+
+    expect(existsSync(join(sandbox.configDir, 'hooks', 'guard.mjs'))).toBe(true);
+    expect(sandbox.description.scripts).toContain('guard.mjs');
+  });
+
+  it('рабочая папка едет в sandbox.env, а не в глобальный process.env', () => {
+    delete process.env.CLAUDE_CONTROL_SANDBOX_WORKDIR;
+
+    // hookIds непуст — collectHooks идёт ровно по тому пути, который РАНЬШЕ писал
+    // рабочую папку в process.env сервера (даже когда конкретный хук не найден).
+    const sandbox = createSandbox(sandboxId, { hookIds: ['нет-такого-хука'] }, location, store);
+
+    // Значение доступно запуску через окружение самой песочницы.
+    expect(sandbox.env.CLAUDE_CONTROL_SANDBOX_WORKDIR).toBe(sandbox.workDir);
+    // А глобальное окружение сервера не тронуто: раньше при параллельной сборке
+    // двух песочниц значение протекало во все последующие дочерние процессы.
+    expect(process.env.CLAUDE_CONTROL_SANDBOX_WORKDIR).toBeUndefined();
+  });
+
+  it('MCP-сервер попадает в settings.json песочницы со своими полями', () => {
+    writeFileSync(
+      join(root, '.claude.json'),
+      JSON.stringify({
+        mcpServers: {
+          local: { type: 'stdio', command: 'npx', args: ['-y', 'demo'], env: { A: '1' } },
+        },
+      }),
+    );
+
+    const sandbox = createSandbox(sandboxId, { mcpIds: ['local'] }, location, store);
+    const settings = JSON.parse(readFileSync(join(sandbox.configDir, 'settings.json'), 'utf8')) as {
+      mcpServers?: Record<string, { command?: string; env?: Record<string, string> }>;
+    };
+
+    expect(settings.mcpServers?.local?.command).toBe('npx');
+    expect(settings.mcpServers?.local?.env).toEqual({ A: '1' });
+    expect(sandbox.description.mcpServers).toContain('local');
+  });
 });

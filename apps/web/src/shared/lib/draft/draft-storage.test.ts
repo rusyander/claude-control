@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { loadDraft, saveDraft, clearDraft } from './draft-storage';
+import { loadDraft, saveDraft, clearDraft, migrateDraft } from './draft-storage';
 
 /**
  * Черновики форм. Ключевое: непустой текст переживает «перезагрузку» (чтение из
@@ -51,5 +51,35 @@ describe('draft-storage', () => {
 
   it('отсутствующий ключ — пустая строка', () => {
     expect(loadDraft('нет-такого')).toBe('');
+  });
+
+  describe('migrateDraft — перенос черновика при «взрослении» чата', () => {
+    it('переносит значение на новый ключ и стирает старый', () => {
+      // Оверрайд модели задан под ключом нового чата (`home`); чат получил id.
+      saveDraft('chat-model:home', 'opus');
+      migrateDraft('chat-model:home', 'chat-model:chat:abc');
+
+      expect(loadDraft('chat-model:chat:abc')).toBe('opus');
+      expect(loadDraft('chat-model:home')).toBe('');
+      expect([...store.map.keys()]).toEqual(['claude-control:draft:chat-model:chat:abc']);
+    });
+
+    it('пустой источник — ничего не создаёт (no-op)', () => {
+      migrateDraft('chat-effort:home', 'chat-effort:chat:abc');
+      expect(loadDraft('chat-effort:chat:abc')).toBe('');
+      expect([...store.map.keys()]).toHaveLength(0);
+    });
+
+    it('совпадающие ключи не стирают значение', () => {
+      saveDraft('home', 'недописанный текст');
+      migrateDraft('home', 'home');
+      expect(loadDraft('home')).toBe('недописанный текст');
+    });
+
+    it('не затирает уже существующий черновик под целевым ключом, если источник пуст', () => {
+      saveDraft('chat:abc', 'уже набранное в реальном чате');
+      migrateDraft('home', 'chat:abc'); // источник пуст → цель не трогаем
+      expect(loadDraft('chat:abc')).toBe('уже набранное в реальном чате');
+    });
   });
 });

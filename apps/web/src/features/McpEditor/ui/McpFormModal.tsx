@@ -137,7 +137,7 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
       }
     >
       {!server && (
-        <div className={styles.modeTabs}>
+        <Stack direction="row" gap="var(--spacing-3xs)" className={styles.modeTabs}>
           <Button
             size="sm"
             variant={!isImport ? 'primary' : 'ghost'}
@@ -152,7 +152,7 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
           >
             {t('mcp.modeImport')}
           </Button>
-        </div>
+        </Stack>
       )}
 
       {isImport ? (

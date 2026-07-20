@@ -27,8 +27,6 @@ export type ChatEvent =
   | { kind: 'text'; text: string }
   | { kind: 'thinking'; text: string }
   | { kind: 'tool'; name: string; input: unknown; id: string }
-  | { kind: 'toolResult'; id: string; isError: boolean }
-  | { kind: 'status'; text: string }
   | { kind: 'limit'; resetsAt: number; type: string; status: string }
   | { kind: 'usage'; input: number; output: number; cacheRead: number; cacheCreation: number }
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
@@ -184,8 +182,7 @@ export class ChatRun {
           });
         }
 
-        const event = translate(raw);
-        if (event) onEvent(event);
+        for (const event of translate(raw)) onEvent(event);
       } catch {
         // Строка не JSON — предупреждение CLI, для чата это шум.
       }
@@ -255,53 +252,73 @@ interface RawEvent {
  * Перевод событий CLI в события интерфейса. Текст берём из потоковых дельт,
  * а не из готового сообщения: иначе ответ появится целиком в конце, и вся
  * ценность стриминга пропадёт.
+ *
+ * Возвращает МАССИВ событий: одному сообщению ассистента может отвечать
+ * несколько вызовов инструментов (модель зовёт их параллельно одним сообщением),
+ * и каждый должен дойти до ленты. Пустой массив — событие для интерфейса ничего
+ * не значит (шум CLI, дельта ввода инструмента).
+ *
+ * Экспортируется ради модульных тестов разбора потока (частичные события,
+ * usage/done, ошибки/лимиты) — сам запуск CLI в тестах не поднять.
  */
-function translate(raw: RawEvent): ChatEvent | undefined {
+export function translate(raw: RawEvent): ChatEvent[] {
   if (raw.type === 'system' && raw.subtype === 'init') {
-    return {
-      kind: 'session',
-      sessionId: raw.session_id ?? '',
-      model: raw.model ?? '',
-      tools: raw.tools?.length ?? 0,
-    };
+    return [
+      {
+        kind: 'session',
+        sessionId: raw.session_id ?? '',
+        model: raw.model ?? '',
+        tools: raw.tools?.length ?? 0,
+      },
+    ];
   }
 
   if (raw.type === 'stream_event' && raw.event?.type === 'content_block_delta') {
     const delta = raw.event.delta;
-    if (delta?.type === 'text_delta' && delta.text) return { kind: 'text', text: delta.text };
+    if (delta?.type === 'text_delta' && delta.text) return [{ kind: 'text', text: delta.text }];
     if (delta?.type === 'thinking_delta' && delta.thinking) {
-      return { kind: 'thinking', text: delta.thinking };
+      return [{ kind: 'thinking', text: delta.thinking }];
     }
-    return undefined;
+    return [];
   }
 
   // Готовое сообщение нужно только ради вызовов инструментов: их в дельтах нет.
+  // Перебираем ВСЕ tool_use-блоки: при параллельных вызовах их несколько, и если
+  // взять только первый (как было), остальные потеряются — а среди них может
+  // оказаться AskUserQuestion, без которого не зажжётся точка «агент ждёт ответа».
   if (raw.type === 'assistant') {
-    const toolUse = raw.message?.content?.find((block) => block.type === 'tool_use');
-    if (toolUse) {
-      return { kind: 'tool', name: toolUse.name ?? '', input: toolUse.input, id: toolUse.id ?? '' };
-    }
-    return undefined;
+    return (raw.message?.content ?? [])
+      .filter((block) => block.type === 'tool_use')
+      .map((block) => ({
+        kind: 'tool',
+        name: block.name ?? '',
+        input: block.input,
+        id: block.id ?? '',
+      }));
   }
 
   if (raw.type === 'rate_limit_event' && raw.rate_limit_info) {
-    return {
-      kind: 'limit',
-      resetsAt: raw.rate_limit_info.resetsAt ?? 0,
-      type: raw.rate_limit_info.rateLimitType ?? '',
-      status: raw.rate_limit_info.status ?? '',
-    };
+    return [
+      {
+        kind: 'limit',
+        resetsAt: raw.rate_limit_info.resetsAt ?? 0,
+        type: raw.rate_limit_info.rateLimitType ?? '',
+        status: raw.rate_limit_info.status ?? '',
+      },
+    ];
   }
 
   if (raw.type === 'result') {
-    if (raw.is_error) return { kind: 'error', message: raw.result ?? 'Запрос не выполнен' };
-    return {
-      kind: 'done',
-      costUsd: raw.total_cost_usd ?? 0,
-      durationMs: raw.duration_ms ?? 0,
-      sessionId: raw.session_id ?? '',
-    };
+    if (raw.is_error) return [{ kind: 'error', message: raw.result ?? 'Запрос не выполнен' }];
+    return [
+      {
+        kind: 'done',
+        costUsd: raw.total_cost_usd ?? 0,
+        durationMs: raw.duration_ms ?? 0,
+        sessionId: raw.session_id ?? '',
+      },
+    ];
   }
 
-  return undefined;
+  return [];
 }

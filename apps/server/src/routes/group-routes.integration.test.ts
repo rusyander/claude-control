@@ -209,6 +209,47 @@ describe('маршруты групп: переключатель гасит у�
 
     expect(res.statusCode).toBe(404);
   });
+
+  const readEnv = (): Record<string, string> =>
+    (JSON.parse(readFileSync(settingsPath(), 'utf8')) as { env?: Record<string, string> }).env ??
+    {};
+
+  it('переменные группы уходят в settings.json при включении и снимаются при выключении', async () => {
+    // Раньше поле env группы сохранялось, но в settings.json не попадало.
+    await app.inject({
+      method: 'PUT',
+      url: `/api/groups/${groupId}`,
+      payload: { name: 'g', members: [], env: { MY_VAR: '123', TOKEN: 'abc' }, isEnabled: true },
+    });
+    expect(readEnv().MY_VAR).toBe('123');
+    expect(readEnv().TOKEN).toBe('abc');
+
+    await toggle(false);
+    expect(readEnv().MY_VAR).toBeUndefined();
+    expect(readEnv().TOKEN).toBeUndefined();
+  });
+
+  it('ручную переменную с тем же именем группа не затирает и не удаляет', async () => {
+    const settings = JSON.parse(readFileSync(settingsPath(), 'utf8')) as {
+      env?: Record<string, string>;
+    };
+    settings.env = { MANUAL: 'keep' };
+    writeFileSync(settingsPath(), JSON.stringify(settings));
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/groups/${groupId}`,
+      payload: { name: 'g', members: [], env: { MANUAL: 'group', OWN: 'x' }, isEnabled: true },
+    });
+    // Ручную не тронули, свою добавили.
+    expect(readEnv().MANUAL).toBe('keep');
+    expect(readEnv().OWN).toBe('x');
+
+    await toggle(false);
+    // Ручная осталась, свою сняли.
+    expect(readEnv().MANUAL).toBe('keep');
+    expect(readEnv().OWN).toBeUndefined();
+  });
 });
 
 /**

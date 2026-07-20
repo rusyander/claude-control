@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { AppSettings } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
@@ -5,8 +7,11 @@ import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Button } from '@shared/ui/button';
+import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { SelectField } from '@shared/ui/select-field';
+import { apiClient } from '@shared/api/client';
+import { toast } from '@shared/lib/toast';
 import { MODEL_OPTIONS, EFFORT_LEVELS, modelLabel } from '@shared/lib/chat-model';
 import { useSettings, useUpdateSettings } from '@entities/AppConfig';
 import { AccountCard } from './AccountCard';
@@ -21,8 +26,10 @@ import styles from './SettingsPage.module.scss';
 /** Настройки приложения: оформление, доступность, путь к конфигурации, безопасность правок. */
 export function SettingsPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
+  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!settings) return <SkeletonList rows={4} withActions={false} />;
 
@@ -38,6 +45,30 @@ export function SettingsPage() {
     value: level,
     label: level ? t(`chat.effort_${level}`) : t('settings.chatEffortAuto'),
   }));
+
+  // Перенос настроек панели: снимок state.json скачивается файлом и вливается
+  // обратно на другой машине — раньше это делали только копированием руками.
+  const exportState = async (): Promise<void> => {
+    const { data } = await apiClient.get('/settings/export');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'claude-control-settings.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importState = async (file: File): Promise<void> => {
+    try {
+      const parsed: unknown = JSON.parse(await file.text());
+      await apiClient.post('/settings/import', parsed);
+      await queryClient.invalidateQueries();
+      toast.success(t('settings.transferImported'));
+    } catch {
+      toast.error(t('settings.transferImportError'));
+    }
+  };
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
@@ -178,6 +209,30 @@ export function SettingsPage() {
             checked={settings.backupBeforeWrite}
             onChange={(backupBeforeWrite) => patch({ backupBeforeWrite })}
           />
+          <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
+            <Stack gap="var(--spacing-3xs)" flex={1} minWidth="200px">
+              <Typography variant="body-sm" weight="medium">
+                {t('settings.backupKeep')}
+              </Typography>
+              <Typography variant="caption" color="subtle">
+                {t('settings.backupKeepHint')}
+              </Typography>
+            </Stack>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={settings.backupKeep}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isFinite(next) && next >= 1 && next <= 100) {
+                  patch({ backupKeep: Math.floor(next) });
+                }
+              }}
+              className={styles.numberInput}
+              aria-label={t('settings.backupKeep')}
+            />
+          </Stack>
           <SettingToggleRow
             label={t('settings.watchFiles')}
             hint={t('settings.watchHint')}
@@ -190,6 +245,46 @@ export function SettingsPage() {
             checked={settings.revealSecretsByDefault}
             onChange={(revealSecretsByDefault) => patch({ revealSecretsByDefault })}
           />
+        </Stack>
+      </Card>
+
+      <Card padding="md">
+        <Stack gap="var(--spacing-sm)">
+          <Typography variant="body" weight="medium">
+            {t('settings.transferTitle')}
+          </Typography>
+          <Typography variant="body-sm" color="subtle">
+            {t('settings.transferHint')}
+          </Typography>
+          <Stack direction="row" gap="var(--spacing-xs)" wrap>
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<Icon name="file" size={18} />}
+              onClick={() => void exportState()}
+            >
+              {t('settings.transferExport')}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<Icon name="file" size={18} />}
+              onClick={() => fileRef.current?.click()}
+            >
+              {t('settings.transferImport')}
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void importState(file);
+                event.target.value = '';
+              }}
+            />
+          </Stack>
         </Stack>
       </Card>
 

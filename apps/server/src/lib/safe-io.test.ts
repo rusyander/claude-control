@@ -95,6 +95,17 @@ describe('safe-io', () => {
       writeTextFile(nested, 'x');
       expect(existsSync(nested)).toBe(true);
     });
+
+    it('серия записей в один путь не оставляет .tmp-хвостов, итог — последнее значение', () => {
+      // Имя временного файла завязано на pid И монотонный счётчик, поэтому
+      // каждая запись берёт собственный tmp — соседние записи не наступают на
+      // промежуточный файл друг друга и не оставляют мусор.
+      const path = join(dir, 'settings.json');
+      for (let i = 0; i < 25; i += 1) writeTextFile(path, `v${i}`);
+
+      expect(readFileSync(path, 'utf8')).toBe('v24');
+      expect(readdirSync(dir).some((name) => name.includes('.tmp-'))).toBe(false);
+    });
   });
 
   describe('резервные копии', () => {

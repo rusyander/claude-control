@@ -49,7 +49,14 @@ app.addHook('onRequest', (request, reply, done) => {
   const origin = request.headers.origin;
   const site = request.headers['sec-fetch-site'];
 
-  if (!isAllowedOrigin(origin) || site === 'cross-site') {
+  // Возврат с сервера авторизации MCP — это переход по адресу в отдельном окне
+  // с чужого домена, то есть заведомо cross-site. Пропускаем именно его: это
+  // GET без побочных эффектов, а сам вход защищён параметром state, который
+  // сгенерировали мы, — подделать его нельзя. Всё прочее остаётся под запретом.
+  const path = request.url.split('?')[0];
+  const isOAuthCallback = request.method === 'GET' && path === '/api/mcp/oauth/callback';
+
+  if (!isOAuthCallback && (!isAllowedOrigin(origin) || site === 'cross-site')) {
     reply.code(403).send({ error: 'Запрос с постороннего сайта отклонён' });
     return;
   }

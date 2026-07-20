@@ -110,6 +110,43 @@ describe('parsePricingTable', () => {
   });
 });
 
+describe('колонка output ищется по последнему совпадению (регрессия)', () => {
+  // Комментарий в коде обещал «последнее совпадение», а findIndex брал первое.
+  // Стоит появиться в заголовке колонке со словом «output» ЛЕВЕЕ настоящей —
+  // цена вывода уезжала в неё. Здесь это зафиксировано на разметке с колонкой
+  // «Batch Output» перед «Output Tokens».
+  const PAGE_EXTRA_OUTPUT = `## Model pricing
+
+| Model | Base Input Tokens | 5m Cache Writes | Batch Output | Cache Hits & Refreshes | Output Tokens |
+| ----- | ----------------- | --------------- | ------------ | ---------------------- | ------------- |
+| Claude Opus 4.8 | $5 / MTok | $6.25 / MTok | $12.50 / MTok | $0.50 / MTok | $25 / MTok |
+`;
+
+  it('берёт настоящую колонку вывода ($25), а не «Batch Output» ($12.50)', () => {
+    const opus = parsePricingTable(PAGE_EXTRA_OUTPUT).find((e) => e.id === 'claude-opus-4-8');
+    expect(opus?.price.output).toBe(25);
+    expect(opus?.price).toEqual({ input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 });
+  });
+});
+
+describe('срок действия цены — дата собирается локально, без сдвига на день', () => {
+  // Грабля: `new Date('August 31, 2026').toISOString()` в поясах восточнее UTC
+  // отдаёт `2026-08-30` — вводная цена «закончилась» бы на сутки раньше. Дату
+  // собираем из ЛОКАЛЬНЫХ полей, поэтому день не должен уезжать ни при каком TZ.
+  it('through August 31, 2026 → ровно 2026-08-31', () => {
+    expect(parseModelCell('Claude Sonnet 5 through August 31, 2026')?.until).toBe('2026-08-31');
+  });
+
+  it('starting September 1, 2026 → ровно 2026-09-01', () => {
+    expect(parseModelCell('Claude Sonnet 5 starting September 1, 2026')?.from).toBe('2026-09-01');
+  });
+
+  it('первый день месяца не откатывается в предыдущий месяц', () => {
+    // Именно на первых числах ошибка -1 день заметнее всего: 2026-09-01 → 08-31.
+    expect(parseModelCell('Claude X starting March 1, 2027')?.from).toBe('2027-03-01');
+  });
+});
+
 describe('parseModelCell', () => {
   it('обычная модель', () => {
     expect(parseModelCell('Claude Opus 4.8')).toMatchObject({

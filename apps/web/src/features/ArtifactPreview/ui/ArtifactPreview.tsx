@@ -5,12 +5,17 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
-import { useArtifactSource, artifactUrl } from '@entities/Chat/api/ChatApi';
+import { useArtifactSource, artifactUrl } from '@entities/Chat';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { highlightCode } from '@shared/lib/markdown/highlightCode';
 import { useTheme } from '@shared/hooks/use-theme';
 import { toast } from '@shared/lib/toast';
-import type { ArtifactPreviewProps } from './ArtifactPreview.types';
+import type {
+  ArtifactPreviewProps,
+  PreviewBodyProps,
+  ArtifactPlainTextProps,
+  TabButtonProps,
+} from './ArtifactPreview.types';
 import styles from './ArtifactPreview.module.scss';
 
 type Tab = 'preview' | 'source';
@@ -102,14 +107,19 @@ export function ArtifactPreview({ chatId, artifact, onClose }: ArtifactPreviewPr
       </Stack>
 
       {artifact.hasSource && (
-        <div className={styles.tabs}>
+        <Stack
+          direction="row"
+          gap="var(--spacing-3xs)"
+          padding="var(--spacing-2xs) var(--spacing-md)"
+          className={styles.tabs}
+        >
           <TabButton isActive={tab === 'preview'} onClick={() => setTab('preview')}>
             {t('chat.tabPreview')}
           </TabButton>
           <TabButton isActive={tab === 'source'} onClick={() => setTab('source')}>
             {t('chat.tabSource')}
           </TabButton>
-        </div>
+        </Stack>
       )}
 
       <div className={styles.body}>
@@ -126,12 +136,6 @@ export function ArtifactPreview({ chatId, artifact, onClose }: ArtifactPreviewPr
       </div>
     </Stack>
   );
-}
-
-interface PreviewBodyProps {
-  chatId: string;
-  artifact: ArtifactPreviewProps['artifact'];
-  documentHtml: string;
 }
 
 function PreviewBody({ chatId, artifact, documentHtml }: PreviewBodyProps) {
@@ -163,20 +167,12 @@ function PreviewBody({ chatId, artifact, documentHtml }: PreviewBodyProps) {
   return <ArtifactPlainText chatId={chatId} name={artifact.name} />;
 }
 
-function ArtifactPlainText({ chatId, name }: { chatId: string; name: string }) {
+function ArtifactPlainText({ chatId, name }: ArtifactPlainTextProps) {
   const source = useArtifactSource(chatId, name);
   return <div className={styles.source}>{source.data}</div>;
 }
 
-function TabButton({
-  isActive,
-  onClick,
-  children,
-}: {
-  isActive: boolean;
-  onClick: () => void;
-  children: string;
-}) {
+function TabButton({ isActive, onClick, children }: TabButtonProps) {
   return (
     <button
       type="button"

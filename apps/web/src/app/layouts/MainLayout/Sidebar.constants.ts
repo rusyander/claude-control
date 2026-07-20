@@ -30,6 +30,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'nav.sectionBehavior',
     items: [
       { path: '/rules', label: 'nav.rules', icon: 'rules', key: 'rules' },
+      { path: '/claude-md', label: 'nav.claudeMd', icon: 'file', key: 'claudeMd' },
       { path: '/skills', label: 'nav.skills', icon: 'skills', key: 'skills' },
       { path: '/hooks', label: 'nav.hooks', icon: 'hooks', key: 'hooks' },
       { path: '/scripts', label: 'nav.scripts', icon: 'scripts', key: 'scripts' },

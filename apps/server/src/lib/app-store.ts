@@ -32,6 +32,13 @@ export interface AppState {
    * хранится здесь, пока он выключен, и подмешивается обратно в список.
    */
   disabledHooks: Record<string, Hook>;
+  /**
+   * Какие переменные окружения применила каждая группа: id группы → имена
+   * ключей, записанных ею в settings.json. По этой отметке при выключении
+   * снимаются только свои ключи (не задев ручные и чужие), а при пересечении
+   * групп ключ остаётся, пока его держит хотя бы одна.
+   */
+  envByGroup: Record<string, string[]>;
   settings: AppSettings;
 }
 
@@ -41,12 +48,14 @@ const DEFAULT_STATE: AppState = {
   disabled: { rule: [], hook: [], skill: [], mcp: [], permission: [] },
   disabledByGroup: { rule: {}, hook: {}, skill: {}, mcp: {}, permission: {} },
   disabledHooks: {},
+  envByGroup: {},
   settings: {
     theme: 'system',
     language: 'ru',
     claudeDirOverride: '',
     revealSecretsByDefault: false,
     backupBeforeWrite: true,
+    backupKeep: 10,
     watchFiles: true,
     largeText: false,
     reduceMotion: false,
@@ -92,6 +101,7 @@ export class AppStore {
       disabled: { ...base.disabled, ...loaded.disabled },
       disabledByGroup: { ...base.disabledByGroup, ...loaded.disabledByGroup },
       disabledHooks: { ...base.disabledHooks, ...loaded.disabledHooks },
+      envByGroup: { ...base.envByGroup, ...loaded.envByGroup },
       settings: { ...base.settings, ...loaded.settings },
     };
   }
@@ -102,6 +112,31 @@ export class AppStore {
 
   getState(): AppState {
     return this.state;
+  }
+
+  /** Полный снимок состояния панели — для переноса на другую машину. */
+  exportState(): AppState {
+    return structuredClone(this.state);
+  }
+
+  /**
+   * Заменить состояние импортом. Сливаем с дефолтами теми же правилами, что и
+   * при загрузке: чужой файл может быть неполным или из старой версии, а панель
+   * не должна на нём падать.
+   */
+  importState(raw: unknown): void {
+    const loaded = (raw ?? {}) as Partial<AppState>;
+    const base = structuredClone(DEFAULT_STATE);
+    this.state = {
+      ...base,
+      ...loaded,
+      disabled: { ...base.disabled, ...loaded.disabled },
+      disabledByGroup: { ...base.disabledByGroup, ...loaded.disabledByGroup },
+      disabledHooks: { ...base.disabledHooks, ...loaded.disabledHooks },
+      envByGroup: { ...base.envByGroup, ...loaded.envByGroup },
+      settings: { ...base.settings, ...loaded.settings },
+    };
+    this.persist();
   }
 
   getSettings(): AppSettings {
@@ -175,6 +210,27 @@ export class AppStore {
     else delete byId[id];
 
     this.persist();
+  }
+
+  /** Какие ключи env применила группа (записала в settings.json). */
+  getGroupEnvKeys(groupId: string): string[] {
+    return this.state.envByGroup[groupId] ?? [];
+  }
+
+  /** Запомнить/очистить набор ключей env, применённых группой. */
+  setGroupEnvKeys(groupId: string, keys: string[]): void {
+    if (keys.length > 0) this.state.envByGroup[groupId] = [...keys];
+    else delete this.state.envByGroup[groupId];
+    this.persist();
+  }
+
+  /** Держит ли этот ключ env хоть одна группа (кроме, если задано, `exceptId`). */
+  isEnvKeyOwnedByGroup(key: string, exceptId?: string): boolean {
+    for (const [groupId, keys] of Object.entries(this.state.envByGroup)) {
+      if (groupId === exceptId) continue;
+      if (keys.includes(key)) return true;
+    }
+    return false;
   }
 
   /**

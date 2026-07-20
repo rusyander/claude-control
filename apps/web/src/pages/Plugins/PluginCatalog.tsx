@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Plugin } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
@@ -9,7 +8,7 @@ import { Button } from '@shared/ui/button';
 import { SearchField } from '@shared/ui/search-field';
 import { VirtualList } from '@shared/ui/virtual-list';
 import { TruncatedText } from '@shared/ui/truncated-text';
-import type { PluginCatalogProps } from './PluginCatalog.types';
+import type { CatalogRowProps, PluginCatalogProps } from './PluginCatalog.types';
 import styles from './PluginCatalog.module.scss';
 
 /**
@@ -76,13 +75,6 @@ export function PluginCatalog({
       {found.length === 0 && <Typography color="subtle">{t('common.empty')}</Typography>}
     </Stack>
   );
-}
-
-interface CatalogRowProps {
-  plugin: Plugin;
-  isBusy: boolean;
-  isInstalling: boolean;
-  onInstall: () => void;
 }
 
 function CatalogRow({ plugin, isBusy, isInstalling, onInstall }: CatalogRowProps) {

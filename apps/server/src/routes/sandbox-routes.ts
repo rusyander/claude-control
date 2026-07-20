@@ -20,6 +20,7 @@ import { ChatRun, type ChatEvent } from '../domains/chat/ChatRunner.ts';
 import { readClaudeCredentials } from '../lib/credentials.ts';
 import { readHooks } from '../domains/hooks.ts';
 import { readMcpServers } from '../domains/mcp.ts';
+import { hasOAuthTokens, oauthProviderFor } from '../domains/mcp-oauth.ts';
 import { readArtifacts } from '../domains/chat/ChatArtifacts.ts';
 
 /**
@@ -122,6 +123,15 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
     return { results, command };
   });
 
+  // Сетевой сервер с сохранёнными токенами опрашиваем через OAuth-провайдер —
+  // так же, как проверка связи на странице MCP. Без этого стенд ходил в
+  // OAuth-сервер без токена и всегда получал «требуется авторизация», хотя вход
+  // уже был выполнен.
+  const mcpAuthProvider = (server: ReturnType<typeof readMcpServers>[number]) =>
+    server.transport !== 'stdio' && hasOAuthTokens(ctx.location.paths.appData, server.id)
+      ? oauthProviderFor(server, ctx.location.paths.appData)
+      : undefined;
+
   app.post<{ Body: { mcpId: string } }>('/api/sandbox/mcp-tools', async (request) => {
     const server = readMcpServers(ctx.location.paths.mcpConfig, ctx.store).find(
       (item) => item.id === request.body.mcpId,
@@ -129,7 +139,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
     if (!server) return { tools: [], error: 'Сервер не найден' };
 
     try {
-      return { tools: await listMcpTools(server) };
+      return { tools: await listMcpTools(server, undefined, mcpAuthProvider(server)) };
     } catch (error) {
       return { tools: [], error: error instanceof Error ? error.message : String(error) };
     }
@@ -143,7 +153,13 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       );
       if (!server) return { ok: false, content: 'Сервер не найден', isError: true, durationMs: 0 };
 
-      return callMcpTool(server, request.body.tool, request.body.args ?? {});
+      return callMcpTool(
+        server,
+        request.body.tool,
+        request.body.args ?? {},
+        undefined,
+        mcpAuthProvider(server),
+      );
     },
   );
 

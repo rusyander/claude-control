@@ -5,17 +5,9 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
-import {
-  useStructureAssistant,
-  type ResourceKind,
-  type StructureAssistReply,
-} from '@entities/Resource/api/ResourceApi';
+import { useStructureAssistant, type StructureAssistReply } from '@entities/Resource';
+import type { StructureAssistantProps } from './StructureAssistant.types';
 import styles from './ResourceFileTree.module.scss';
-
-interface StructureAssistantProps {
-  kind: ResourceKind;
-  id: string;
-}
 
 /**
  * Помощник структуры. Заполняет не одно поле, а всё дерево: по описанию задачи

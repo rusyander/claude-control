@@ -1,4 +1,4 @@
-import type { SandboxKind } from '@entities/Sandbox/api/SandboxApi';
+import type { SandboxKind } from '@entities/Sandbox';
 
 /**
  * Готовый запрос для проверки конкретной настройки.

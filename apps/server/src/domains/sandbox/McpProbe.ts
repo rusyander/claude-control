@@ -1,3 +1,4 @@
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { McpServer } from '@claude-control/contracts';
 import { openMcpSession, type McpTool } from '../mcp-client.ts';
 
@@ -38,8 +39,9 @@ const CALL_TIMEOUT = 60_000;
 export async function listMcpTools(
   server: McpServer,
   timeoutMs = LIST_TIMEOUT,
+  authProvider?: OAuthClientProvider,
 ): Promise<McpTool[]> {
-  const session = await openMcpSession(server, timeoutMs);
+  const session = await openMcpSession(server, timeoutMs, authProvider);
   try {
     return await session.listTools();
   } finally {
@@ -52,6 +54,7 @@ export async function callMcpTool(
   toolName: string,
   args: Record<string, unknown>,
   timeoutMs = CALL_TIMEOUT,
+  authProvider?: OAuthClientProvider,
 ): Promise<McpCallResult> {
   const startedAt = Date.now();
 
@@ -59,7 +62,7 @@ export async function callMcpTool(
   // показывает её тем же блоком ответа, что и успешный вызов, — пользователю
   // важно увидеть текст ошибки инструмента, а не пустой экран.
   try {
-    const session = await openMcpSession(server, timeoutMs);
+    const session = await openMcpSession(server, timeoutMs, authProvider);
     try {
       const result = await session.callTool(toolName, args);
       return {

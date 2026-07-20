@@ -12,7 +12,7 @@ import { SelectField } from '@shared/ui/select-field';
 import { Typography } from '@shared/ui/typography';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { Badge } from '@shared/ui/badge';
-import { BulkCreate } from '@features/BulkCreate';
+import { BulkCreate } from '@shared/ui/bulk-create';
 import type { EnvFormModalProps } from './EnvFormModal.types';
 import styles from './EnvFormModal.module.scss';
 
@@ -91,7 +91,7 @@ export function EnvFormModal({ isOpen, onOpenChange, envVar }: EnvFormModalProps
       }
     >
       {!envVar && (
-        <div className={styles.modeTabs}>
+        <Stack direction="row" gap="var(--spacing-3xs)" className={styles.modeTabs}>
           <Button
             size="sm"
             variant={!isBulk ? 'primary' : 'ghost'}
@@ -102,7 +102,7 @@ export function EnvFormModal({ isOpen, onOpenChange, envVar }: EnvFormModalProps
           <Button size="sm" variant={isBulk ? 'primary' : 'ghost'} onClick={() => setIsBulk(true)}>
             {t('bulk.modeMany')}
           </Button>
-        </div>
+        </Stack>
       )}
 
       {isBulk ? (

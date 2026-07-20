@@ -28,9 +28,18 @@ const queryClient = new QueryClient({
   // успехе — только если мутация задала meta.successMessage (осмысленные
   // действия: создание, удаление и т.п.), чтобы фоновые запросы не шумели.
   mutationCache: new MutationCache({
-    onSuccess: (_data, _variables, _context, mutation) => {
+    onSuccess: (data, _variables, _context, mutation) => {
       const key = mutation.meta?.successMessage;
-      if (key) toast.success(i18n.t(key));
+      if (!key) return;
+      // Если сервер вернул путь резервной копии — называем её: раньше о копии
+      // можно было узнать только из справки.
+      const backupPath = (data as { backupPath?: unknown } | null)?.backupPath;
+      if (typeof backupPath === 'string' && backupPath) {
+        const name = backupPath.split(/[\\/]/).pop();
+        toast.success(`${i18n.t(key)} · ${i18n.t('toasts.backupSaved', { name })}`);
+      } else {
+        toast.success(i18n.t(key));
+      }
     },
     onError: (error, _variables, _context, mutation) => {
       if (mutation.meta?.silentError) return;

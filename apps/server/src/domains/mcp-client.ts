@@ -3,6 +3,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { McpServer, McpTransport } from '@claude-control/contracts';
 
 /**
@@ -83,11 +84,19 @@ function splitBudget(
 /**
  * Поднимает соединение и отдаёт готовую сессию. Закрывать обязательно — за
  * сессией стоит либо живой процесс, либо открытый поток событий.
+ *
+ * `authProvider` передаётся для серверов с OAuth: SDK сам подставит
+ * сохранённый токен и обновит его при истечении. Без токена подключение упадёт
+ * `UnauthorizedError` — сервер честно объявляется требующим авторизации.
  */
-export async function openMcpSession(server: McpServer, totalMs: number): Promise<McpSession> {
+export async function openMcpSession(
+  server: McpServer,
+  totalMs: number,
+  authProvider?: OAuthClientProvider,
+): Promise<McpSession> {
   const { connectMs, requestMs } = splitBudget(server.transport, totalMs);
 
-  const { transport, readStderr } = createTransport(server);
+  const { transport, readStderr } = createTransport(server, authProvider);
   const client = new Client({ name: 'claude-control', version: '0.1.0' }, { capabilities: {} });
 
   try {
@@ -151,9 +160,19 @@ interface PreparedTransport {
   readStderr: () => string;
 }
 
-function createTransport(server: McpServer): PreparedTransport {
-  if (server.transport === 'stdio') return createStdioTransport(server);
+/** Сетевой транспорт (http/sse) — оба умеют интерактивный OAuth через `finishAuth`. */
+export type NetworkTransport = StreamableHTTPClientTransport | SSEClientTransport;
 
+/**
+ * Транспорт для сетевого сервера (http/sse). Единая точка сборки: тем же
+ * билдером пользуется интерактивный OAuth (`mcp-oauth.ts`), иначе разбор
+ * url/headers/SSE-подписки разъехался бы между проверкой связи и входом, а
+ * лечить пришлось бы в двух местах.
+ */
+export function createNetworkTransport(
+  server: McpServer,
+  authProvider?: OAuthClientProvider,
+): NetworkTransport {
   if (!server.url) throw new Error('Не задан адрес');
 
   let url: URL;
@@ -165,21 +184,25 @@ function createTransport(server: McpServer): PreparedTransport {
 
   const headers = Object.keys(server.headers).length > 0 ? server.headers : undefined;
 
-  const transport =
-    server.transport === 'http'
-      ? new StreamableHTTPClientTransport(url, { requestInit: { headers } })
-      : new SSEClientTransport(url, {
-          requestInit: { headers },
-          // Заголовки нужны и на самой подписке, а не только на POST-ах с
-          // сообщениями: авторизованный сервер отдаёт 401 уже на открытии
-          // потока, и без этого проверка вечно упиралась бы в «не отвечает».
-          eventSourceInit: headers && {
-            fetch: (input, init) =>
-              fetch(input, { ...init, headers: { ...init?.headers, ...headers } }),
-          },
-        });
+  return server.transport === 'sse'
+    ? new SSEClientTransport(url, {
+        authProvider,
+        requestInit: { headers },
+        // Заголовки нужны и на самой подписке, а не только на POST-ах с
+        // сообщениями: авторизованный сервер отдаёт 401 уже на открытии
+        // потока, и без этого проверка вечно упиралась бы в «не отвечает».
+        eventSourceInit: headers && {
+          fetch: (input, init) =>
+            fetch(input, { ...init, headers: { ...init?.headers, ...headers } }),
+        },
+      })
+    : new StreamableHTTPClientTransport(url, { authProvider, requestInit: { headers } });
+}
 
-  return { transport, readStderr: () => '' };
+function createTransport(server: McpServer, authProvider?: OAuthClientProvider): PreparedTransport {
+  if (server.transport === 'stdio') return createStdioTransport(server);
+
+  return { transport: createNetworkTransport(server, authProvider), readStderr: () => '' };
 }
 
 function createStdioTransport(server: McpServer): PreparedTransport {

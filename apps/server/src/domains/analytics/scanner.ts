@@ -93,7 +93,12 @@ export async function scanAnalytics(
   options: ScanOptions,
 ): Promise<Omit<Analytics, 'runningAgents' | 'topSkills'>> {
   const startedAt = Date.now();
-  const since = Date.now() - options.days * 24 * 60 * 60 * 1000;
+  // days из запроса может прийти мусором (`?days=abc` → NaN). Без защиты since
+  // становится NaN, фильтры по времени молча пропускают всё, а сборка отчёта
+  // падает на `new Date(NaN).toISOString()` — маршрут отвечает 500. Непонятный
+  // ввод трактуем как период по умолчанию.
+  const days = Number.isFinite(options.days) ? options.days : 30;
+  const since = Date.now() - days * 24 * 60 * 60 * 1000;
 
   const accumulator: Accumulator = {
     overall: emptyTotals(),
@@ -186,7 +191,11 @@ async function scanFile(
     acc.cost += cost;
 
     upsert(acc.byModel, model, usage, cost);
-    upsert(acc.byDay, entry.timestamp.slice(0, 10), usage, cost);
+    // byDay берётся по ЛОКАЛЬНОЙ дате — как и час ниже (getHours). Иначе одна и
+    // та же запись у пользователя в поясе ≠ UTC попадала бы в «день» и «час» из
+    // разных суток. На цену это не влияет: стоимость считается по абсолютному
+    // моменту записи (estimateCost выше, at: time), а не по ключу группировки.
+    upsert(acc.byDay, localDay(entry.timestamp), usage, cost);
 
     const hour = new Date(entry.timestamp).getHours();
     const hourly = acc.byHour.get(hour) ?? { requests: 0, tokens: 0 };
@@ -289,6 +298,19 @@ function normalizeProject(cwd: string): string {
 function shortenProject(cwd: string): string {
   const parts = cwd.split(/[\\/]/).filter(Boolean);
   return parts.slice(-2).join('/') || cwd;
+}
+
+/**
+ * Локальная дата записи в виде `YYYY-MM-DD`. День активности воспринимается по
+ * локальным суткам пользователя, поэтому и группировка byDay — по локальному
+ * времени, в один пояс с byHour (`getHours`).
+ */
+function localDay(timestamp: string): string {
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function buildResult(

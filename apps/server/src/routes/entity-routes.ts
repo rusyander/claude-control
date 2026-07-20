@@ -11,13 +11,22 @@ import type {
 } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import { readRules, saveRule, deleteRule } from '../domains/rules.ts';
-import { readHooks, upsertHook, deleteHook } from '../domains/hooks.ts';
+import { readHooks, upsertHook, deleteHook, moveHook } from '../domains/hooks.ts';
 import { readSkills, saveSkill, deleteSkill } from '../domains/skills.ts';
 import { readMcpServers, saveMcpServer, deleteMcpServer, checkMcpHealth } from '../domains/mcp.ts';
+import {
+  startOAuth,
+  finishOAuth,
+  clearOAuth,
+  hasOAuthTokens,
+  oauthProviderFor,
+  oauthCallbackPage,
+} from '../domains/mcp-oauth.ts';
 import { applyEntityState, rewriteHooks, findHook } from '../domains/entity-toggle.ts';
 import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 import { readPermissions, savePermission, deletePermission } from '../domains/permissions.ts';
 import { readEnvVars, revealEnvValue, saveEnvVar, deleteEnvVar } from '../domains/env.ts';
+import { readTextFile, writeTextFile } from '../lib/safe-io.ts';
 
 /**
  * Маршруты сущностей. Ответ на изменение всегда содержит needsRestart:
@@ -59,6 +68,27 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     done(deleteRule(paths().claudeMd, request.params.id, ctx.store, ctx.backupDir)),
   );
 
+  // --- Глобальный CLAUDE.md целиком (сырой markdown) ---
+  // Раздел «Правила» разбирает CLAUDE.md на карточки, но там видно не всё: шапка,
+  // произвольные секции и форматирование остаются за кадром. Здесь — файл целиком,
+  // как его читает сам Claude, с правкой и резервной копией перед записью.
+  app.get('/api/claude-md', () => ({ content: readTextFile(paths().claudeMd) }));
+
+  app.put<{ Body: { content?: unknown } }>('/api/claude-md', (request, reply) => {
+    const content = (request.body ?? {}).content;
+    // Различаем «намеренно пустой файл» ('') и «поля content нет / оно не строка».
+    // Раньше писали `content ?? ''`: запрос без поля затирал CLAUDE.md пустотой.
+    // Пустая строка — валидна (осознанная очистка), всё нестроковое — отказ.
+    if (typeof content !== 'string') {
+      return reply.code(400).send({
+        error: 'invalid_content',
+        message: 'Поле content обязано быть строкой (пустая строка допустима).',
+      });
+    }
+
+    return done(writeTextFile(paths().claudeMd, content, { backupDir: ctx.backupDir }));
+  });
+
   // --- Хуки (settings.json + settings.local.json) ---
   app.get('/api/hooks', () => readHooks(paths().settings, ctx.store, paths().settingsLocal));
 
@@ -90,6 +120,25 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     return done(deleteHook(paths().settings, id, ctx.store, ctx.backupDir, targetOf(id)));
   });
 
+  // Порядок хуков внутри одного события: раньше он равнялся порядку в файле,
+  // переставить из панели было нельзя.
+  app.post<{ Params: { id: string }; Body: { direction: 'up' | 'down' } }>(
+    '/api/hooks/:id/move',
+    (request) => {
+      const id = findHook(ctx, request.params.id)?.id ?? request.params.id;
+      return done(
+        moveHook(
+          paths().settings,
+          ctx.store,
+          id,
+          request.body.direction === 'up' ? 'up' : 'down',
+          ctx.backupDir,
+          paths().settingsLocal,
+        ),
+      );
+    },
+  );
+
   // --- Скиллы (папки в skills/) ---
   app.get('/api/skills', () => readSkills(paths().skills, ctx.store));
 
@@ -111,7 +160,7 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
   );
 
   // --- MCP-серверы (~/.claude.json) ---
-  app.get('/api/mcp', () => readMcpServers(paths().mcpConfig, ctx.store));
+  app.get('/api/mcp', () => readMcpServers(paths().mcpConfig, ctx.store, paths().appData));
 
   app.post<{ Body: McpServerDraft }>('/api/mcp', (request) =>
     done(saveMcpServer(paths().mcpConfig, null, request.body, ctx.backupDir)),
@@ -125,14 +174,70 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     done(deleteMcpServer(paths().mcpConfig, request.params.id, ctx.backupDir)),
   );
 
+  const findMcpServer = (id: string): ReturnType<typeof readMcpServers>[number] | undefined =>
+    readMcpServers(paths().mcpConfig, ctx.store, paths().appData).find((item) => item.id === id);
+
   /** Проверка живости конкретного сервера — запускает его и говорит по протоколу MCP. */
   app.post<{ Params: { id: string } }>('/api/mcp/:id/health', async (request, reply) => {
-    const server = readMcpServers(paths().mcpConfig, ctx.store).find(
-      (item) => item.id === request.params.id,
-    );
+    const server = findMcpServer(request.params.id);
     if (!server) return reply.code(404).send({ error: 'not_found', message: 'Сервер не найден' });
 
-    return checkMcpHealth(server);
+    // Сервер с сохранёнными токенами проверяем через OAuth-провайдер: SDK
+    // подставит токен и обновит его при истечении.
+    const authProvider =
+      server.transport !== 'stdio' && hasOAuthTokens(paths().appData, server.id)
+        ? oauthProviderFor(server, paths().appData)
+        : undefined;
+
+    return checkMcpHealth(server, 30_000, authProvider);
+  });
+
+  /**
+   * Начать интерактивный вход. Ответ либо `authorized` (токены уже есть), либо
+   * `redirect` с адресом, который интерфейс откроет в отдельном окне.
+   */
+  app.post<{ Params: { id: string } }>('/api/mcp/:id/oauth/start', async (request, reply) => {
+    const server = findMcpServer(request.params.id);
+    if (!server) return reply.code(404).send({ error: 'not_found', message: 'Сервер не найден' });
+
+    try {
+      return await startOAuth(server, paths().appData);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return reply.code(400).send({ error: 'oauth_failed', message });
+    }
+  });
+
+  /**
+   * Куда сервер авторизации возвращает пользователя после входа. Это переход по
+   * адресу в отдельном окне, а не запрос из интерфейса, поэтому ответ — HTML.
+   * Маршрут пропущен мимо origin-guard в index.ts: подделать вход нельзя, state
+   * сгенерирован нами и по нему же ищется незавершённый вход.
+   */
+  app.get<{ Querystring: { code?: string; state?: string; error?: string } }>(
+    '/api/mcp/oauth/callback',
+    async (request, reply) => {
+      const { code, state, error } = request.query;
+
+      if (error) return reply.type('text/html').send(oauthCallbackPage(false, error));
+      if (!code || !state) {
+        return reply.type('text/html').send(oauthCallbackPage(false, 'Не пришёл код авторизации'));
+      }
+
+      try {
+        await finishOAuth(state, code);
+        return reply.type('text/html').send(oauthCallbackPage(true));
+      } catch (finishError) {
+        const message = finishError instanceof Error ? finishError.message : String(finishError);
+        return reply.type('text/html').send(oauthCallbackPage(false, message));
+      }
+    },
+  );
+
+  /** Забыть авторизацию сервера — удалить сохранённые токены. */
+  app.delete<{ Params: { id: string } }>('/api/mcp/:id/oauth', async (request) => {
+    await clearOAuth(paths().appData, request.params.id);
+    return { ok: true };
   });
 
   // --- Правила доступа (settings.json + settings.local.json) ---
@@ -187,19 +292,17 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     ),
   );
 
-  app.delete<{ Querystring: { key: string; source: EnvVar['source'] } }>(
-    '/api/env',
-    (request) =>
-      done(
-        deleteEnvVar(
-          paths().settings,
-          paths().secretsEnv,
-          request.query.key,
-          request.query.source,
-          ctx.backupDir,
-          paths().settingsLocal,
-        ),
+  app.delete<{ Querystring: { key: string; source: EnvVar['source'] } }>('/api/env', (request) =>
+    done(
+      deleteEnvVar(
+        paths().settings,
+        paths().secretsEnv,
+        request.query.key,
+        request.query.source,
+        ctx.backupDir,
+        paths().settingsLocal,
       ),
+    ),
   );
 
   // --- Включение и выключение любой сущности ---

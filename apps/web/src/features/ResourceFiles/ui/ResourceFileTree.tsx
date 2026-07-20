@@ -10,17 +10,16 @@ import {
   useDeleteResourceFile,
   useResourceTemplates,
   useApplyTemplate,
-  type ResourceKind,
-} from '@entities/Resource/api/ResourceApi';
-import { buildTree, countFiles, type TreeNode } from '../model/buildTree';
+} from '@entities/Resource';
+import { buildTree, countFiles } from '../model/buildTree';
 import { ResourceFileEditor } from './ResourceFileEditor';
 import { StructureAssistant } from './StructureAssistant';
+import type {
+  NewNodeInputProps,
+  ResourceFileTreeProps,
+  TreeItemProps,
+} from './ResourceFileTree.types';
 import styles from './ResourceFileTree.module.scss';
-
-interface ResourceFileTreeProps {
-  kind: ResourceKind;
-  id: string;
-}
 
 /**
  * Файлы ресурса деревом с правкой на месте.
@@ -185,18 +184,6 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
   );
 }
 
-interface TreeItemProps {
-  node: TreeNode;
-  selected?: string;
-  creatingIn?: string;
-  isWritable: boolean;
-  onSelect: (path: string) => void;
-  onCreateIn: (folder: string) => void;
-  onCreateFile: (folder: string, name: string) => void;
-  onDelete: (path: string) => void;
-  defaultOpen?: boolean;
-}
-
 function TreeItem({
   node,
   selected,
@@ -307,19 +294,16 @@ function TreeItem({
  * Поле имени прямо в дереве — как в редакторах кода. Enter создаёт, Escape
  * отменяет; отдельного окна ради одного имени не нужно.
  */
-function NewNodeInput({
-  placeholder,
-  onSubmit,
-  onCancel,
-}: {
-  placeholder: string;
-  onSubmit: (name: string) => void;
-  onCancel: () => void;
-}) {
+function NewNodeInput({ placeholder, onSubmit, onCancel }: NewNodeInputProps) {
   const [name, setName] = useState('');
 
   return (
-    <div className={styles.newNode}>
+    <Stack
+      direction="row"
+      align="center"
+      gap="var(--spacing-2xs)"
+      padding="var(--spacing-3xs) var(--spacing-2xs)"
+    >
       <Icon name="file" size={16} />
       <input
         className={styles.newNodeInput}
@@ -333,6 +317,6 @@ function NewNodeInput({
         }}
         onBlur={() => !name.trim() && onCancel()}
       />
-    </div>
+    </Stack>
   );
 }

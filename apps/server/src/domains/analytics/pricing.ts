@@ -136,6 +136,15 @@ function activeAt(entries: PricingEntry[], at: number): PricingEntry[] {
   return entries.filter((entry) => {
     // Дату сравниваем как границу суток: `until: '2026-08-31'` означает
     // «включительно», а не «до полуночи 31-го».
+    //
+    // Границы — именно UTC (в отличие от byDay-группировки в scanner.ts, которая
+    // локальная). Это осознанно: `from`/`until` — это даты смены цены из графика
+    // Anthropic, единого для всех часовых поясов, а не «полночь у пользователя».
+    // Привязка к UTC делает переключение цены детерминированным и независимым от
+    // пояса панели; на итоговую стоимость это не влияет — она считается по
+    // абсолютному моменту записи (`at`), а не по локальной дате. Смена цены может
+    // разойтись с локальной полуночью пользователя максимум на ~половину суток,
+    // что для справочной («сколько стоило бы через API») оценки допустимо.
     if (entry.from && at < Date.parse(`${entry.from}T00:00:00.000Z`)) return false;
     if (entry.until && at > Date.parse(`${entry.until}T23:59:59.999Z`)) return false;
     return true;
@@ -200,9 +209,13 @@ export interface PricingLookup {
 export function getPricing(model: string, lookup: PricingLookup = {}): ModelPricing {
   const name = model.toLowerCase();
 
-  const own = Object.entries(lookup.overrides ?? {}).find(([fragment]) =>
-    name.includes(fragment.toLowerCase()),
-  );
+  // При нескольких подходящих фрагментах побеждает самый длинный (самый точный),
+  // как и в findEntry по id: для overrides {opus, 'claude-opus-4-8'} и модели
+  // claude-opus-4-8 берём цену точного 'claude-opus-4-8', а не общего 'opus'.
+  // Порядок ключей объекта на выбор не влияет.
+  const own = Object.entries(lookup.overrides ?? {})
+    .filter(([fragment]) => name.includes(fragment.toLowerCase()))
+    .sort((a, b) => b[0].length - a[0].length)[0];
   if (own) return own[1];
 
   const entries = lookup.entries ?? BUILT_IN_ENTRIES;

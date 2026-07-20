@@ -465,8 +465,8 @@ Common causes:
 - **The command is not on `PATH`.** `npx`, `uvx` and `node` must be resolvable by the server process.
 - **A missing token.** Servers needing credentials read them from `~/.claude/.mcp-secrets.env`; check the key exists and the value is current. An expired token usually surfaces as a handshake that starts and then dies.
 - **Slow start.** Starting a process gets up to 45 seconds — `npx` pulls the package on first run. Network servers get less: an address that stays silent for ten seconds will not answer in a minute either. Run the server once by hand to warm the cache.
-- **Headers are needed.** For a server behind authentication, set them in the server form under "Request headers" (one per line, `Name=value`). Without them the check stops at a 401.
-- **Interactive OAuth.** A server that requires a redirect login cannot be checked from the panel: only static headers are passed.
+- **Headers are needed.** For a server behind a static token, set them in the server form under "Request headers" (one per line, `Name=value`). Without them the check stops at a 401.
+- **Interactive OAuth is needed.** A server that requires a redirect login is supported: network servers get an "Authorize" button. It opens a sign-in window; after you authorize, the token is stored in a separate file (`claude-control/mcp-oauth.json`, mode 600) and refreshed automatically on expiry. If the window did not open, allow pop-ups for the panel and click again. To reset, use "Sign out".
 
 The MCP handshake runs for every transport — stdio, HTTP and SSE — and the reply shows the tool count. The built-in filesystem preset fills in your home directory.
 

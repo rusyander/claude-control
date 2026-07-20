@@ -14,6 +14,11 @@ export interface ScriptFile {
 
 const scriptsKey = ['scripts'] as const;
 
+/** Кодируем каждый сегмент, но сохраняем слэши: id скрипта может быть вложенным путём. */
+function encodeScriptId(id: string): string {
+  return id.split('/').map(encodeURIComponent).join('/');
+}
+
 export function useScripts() {
   return useQuery({
     queryKey: scriptsKey,
@@ -30,7 +35,7 @@ export function useScriptContent(id: string | undefined) {
     queryKey: ['scripts', id, 'content'],
     queryFn: async () => {
       const { data } = await apiClient.get<{ content: string }>(
-        `/scripts/${encodeURIComponent(id ?? '')}`,
+        `/scripts/${encodeScriptId(id ?? '')}`,
       );
       return data.content;
     },
@@ -56,7 +61,7 @@ function useScriptMutation<TInput>(
 export function useSaveScript() {
   return useScriptMutation(async (input: { id?: string; name: string; content: string }) => {
     if (input.id) {
-      await apiClient.put(`/scripts/${encodeURIComponent(input.id)}`, { content: input.content });
+      await apiClient.put(`/scripts/${encodeScriptId(input.id)}`, { content: input.content });
       return;
     }
     await apiClient.post('/scripts', { name: input.name, content: input.content });
@@ -65,6 +70,6 @@ export function useSaveScript() {
 
 export function useDeleteScript() {
   return useScriptMutation(async (id: string) => {
-    await apiClient.delete(`/scripts/${encodeURIComponent(id)}`);
+    await apiClient.delete(`/scripts/${encodeScriptId(id)}`);
   }, 'toasts.deleted');
 }

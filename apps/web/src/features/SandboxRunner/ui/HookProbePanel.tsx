@@ -5,19 +5,9 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
-import {
-  useEventFixtures,
-  useProbeHook,
-  type HookDecision,
-  type ProbeResult,
-} from '@entities/Sandbox/api/SandboxApi';
+import { useEventFixtures, useProbeHook, type HookDecision } from '@entities/Sandbox';
+import type { HookProbePanelProps, ResultRowProps } from './HookProbePanel.types';
 import styles from './SandboxModal.module.scss';
-
-interface HookProbePanelProps {
-  sandboxId: string;
-  hookId?: string;
-  scriptName?: string;
-}
 
 /**
  * Прогон хука на заготовленных событиях.
@@ -106,7 +96,7 @@ export function HookProbePanel({ sandboxId, hookId, scriptName }: HookProbePanel
   );
 }
 
-function ResultRow({ result, title }: { result: ProbeResult; title: string }) {
+function ResultRow({ result, title }: ResultRowProps) {
   const { t } = useTranslation();
 
   const className = {

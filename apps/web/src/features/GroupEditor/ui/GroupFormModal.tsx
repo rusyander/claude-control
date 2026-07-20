@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EntityRef } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
@@ -8,6 +8,7 @@ import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { useSaveGroup } from '@entities/Group';
+import { permissionApi } from '@entities/Permission';
 import { envToText, textToEnv } from '@shared/lib/env-text';
 import { MemberPicker } from './MemberPicker';
 import type { GroupFormModalProps } from './GroupFormModal.types';
@@ -25,6 +26,25 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
   const [envText, setEnvText] = useState('');
 
   const saveGroup = useSaveGroup();
+  const { data: permissions = [] } = permissionApi.useList();
+
+  // Конфликт внутри группы: два участника-права с одним шаблоном, но разными
+  // решениями (allow и deny разом). Claude Code возьмёт какое-то одно, а группа
+  // — именно то место, где такое легко собрать по недосмотру.
+  const conflicts = useMemo(() => {
+    const decisionsByPattern = new Map<string, Set<string>>();
+    for (const member of members) {
+      if (member.kind !== 'permission') continue;
+      const rule = permissions.find((item) => item.id === member.id);
+      if (!rule) continue;
+      const set = decisionsByPattern.get(rule.pattern) ?? new Set<string>();
+      set.add(rule.decision);
+      decisionsByPattern.set(rule.pattern, set);
+    }
+    return [...decisionsByPattern.entries()]
+      .filter(([, decisions]) => decisions.size > 1)
+      .map(([pattern]) => pattern);
+  }, [members, permissions]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -110,6 +130,11 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
               {t('groups.membersTitle')}
             </Typography>
             <MemberPicker value={members} onChange={setMembers} />
+            {conflicts.length > 0 && (
+              <Typography variant="caption" color="warning" as="span">
+                {t('groups.conflict', { patterns: conflicts.join(', ') })}
+              </Typography>
+            )}
           </Stack>
 
           <TextField

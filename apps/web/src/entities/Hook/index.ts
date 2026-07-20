@@ -1,1 +1,1 @@
-﻿export { hookApi } from './api/HookApi';
+﻿export { hookApi, useMoveHook } from './api/HookApi';

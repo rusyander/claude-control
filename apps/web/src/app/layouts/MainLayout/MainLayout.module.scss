@@ -60,19 +60,6 @@
   overflow-x: clip;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-2xs) var(--spacing-md);
-}
-
-.navSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3xs);
-}
-
 .navLink {
   display: flex;
   align-items: center;

@@ -249,9 +249,6 @@
 }
 
 .questionHead {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2xs);
   margin-bottom: var(--spacing-xs);
   color: var(--color-accent);
   font-size: var(--font-size-body-sm);
@@ -276,20 +273,14 @@
 
 .questionText {
   margin: 0 0 var(--spacing-xs);
-  font-weight: 500;
 }
 
 .questionHint {
   display: block;
   margin-bottom: var(--spacing-2xs);
-  color: var(--color-fg-muted);
-  font-size: var(--font-size-caption);
 }
 
 .options {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-2xs);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -360,17 +351,8 @@
   overflow-x: auto;
 }
 
-.permissionActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--spacing-2xs);
-  margin-top: var(--spacing-2xs);
-}
-
 .optionLabel {
   display: block;
-  font-size: var(--font-size-body-sm);
-  font-weight: 600;
 }
 
 .optionText {
@@ -395,9 +377,6 @@
 // секундами, поэтому нужен не просто индикатор, а понятная подпись: видно,
 // что разговор жив и чем именно занят.
 .pending {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
   color: var(--color-fg-muted);
   font-size: var(--font-size-body-sm);
 }

@@ -28,8 +28,11 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
     async (request): Promise<Analytics> => {
       // days=0 означает «за всё время»: берём заведомо больший интервал,
       // чем возраст любых транскриптов, вместо отдельной ветки без фильтра.
+      // Нечисловой ввод (`?days=abc` → NaN) откатываем к периоду по умолчанию:
+      // иначе NaN пролез бы в расчёт since и уронил сборку отчёта.
       const requested = Number(request.query.days ?? 30);
-      const days = requested === 0 ? 36_500 : Math.min(Math.max(requested, 1), 3650);
+      const normalized = Number.isFinite(requested) ? requested : 30;
+      const days = normalized === 0 ? 36_500 : Math.min(Math.max(normalized, 1), 3650);
       const snapshot = ctx.pricing.current();
       // Тарифы входят в ключ: иначе после правки цен (или после обновления
       // прайса) панель ещё минуту показывала бы стоимость по старым.

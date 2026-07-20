@@ -9,8 +9,14 @@ import type { AppStore } from '../lib/app-store.ts';
  * markdown: пользователь и Claude продолжают читать его как раньше.
  */
 
-const HEADING = /^##\s+(.+)$/;
-/** Заголовок правила внутри служебного раздела — на уровень глубже. */
+/**
+ * Заголовок правила — только «## ПРАВИЛО: …». Прочие h2 (`## Обзор`) и любые
+ * под-заголовки (`##`/`###`) внутри тела правилами НЕ считаются: иначе сборка
+ * навесила бы им префикс «ПРАВИЛО:» и молча испортила соседний markdown, а
+ * граница правила рвалась бы о разметку в его же теле.
+ */
+const RULE_HEADING = /^##\s+ПРАВИЛО:\s*(.+)$/i;
+/** Заголовок выключенного правила внутри служебного раздела — на уровень глубже. */
 const DISABLED_HEADING = /^###\s+(.+)$/;
 const RULE_PREFIX = /^ПРАВИЛО:\s*/i;
 /** Раздел, куда складываются выключенные правила, чтобы не терять их текст. */
@@ -60,19 +66,22 @@ export function parseRules(markdown: string, scope: string, store: AppStore): Pa
   };
 
   for (const line of lines) {
-    const heading = HEADING.exec(line);
-
-    if (heading) {
+    // Служебный раздел выключенных: его заголовок — обычный h2, но правилом он
+    // не является. Внутри лежат правила, помеченные `### …`.
+    if (line.trim() === DISABLED_SECTION) {
       flush();
-      const title = heading[1]?.trim() ?? '';
-      // Служебный раздел не показываем как правило: его содержимое —
-      // это правила, помеченные выключенными.
-      if (line.trim() === DISABLED_SECTION) {
-        inDisabledSection = true;
-        continue;
-      }
+      inDisabledSection = true;
+      continue;
+    }
+
+    // Новое правило начинается ТОЛЬКО с «## ПРАВИЛО:». Любой другой заголовок
+    // (обычная секция или разметка внутри тела) правилом не считается и потому
+    // не рвёт текущее правило и не обрастёт префиксом при сборке.
+    const ruleHeading = RULE_HEADING.exec(line);
+    if (ruleHeading) {
+      flush();
       inDisabledSection = false;
-      current = { title: title.replace(RULE_PREFIX, ''), body: [] };
+      current = { title: ruleHeading[1]?.trim() ?? '', body: [] };
       continue;
     }
 

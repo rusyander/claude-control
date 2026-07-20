@@ -9,6 +9,7 @@ import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
+import { Icon } from '@shared/ui/icon';
 import {
   usePlugins,
   useAvailablePlugins,
@@ -16,6 +17,8 @@ import {
   useUninstallPlugin,
   useSetPluginEnabled,
   useUpdatePlugin,
+  useAddMarketplace,
+  useRemoveMarketplace,
 } from '@entities/Plugin';
 import { PluginCard } from './PluginCard';
 import { PluginCatalog } from './PluginCatalog';
@@ -25,6 +28,7 @@ import styles from './PluginsPage.module.scss';
 export function PluginsPage() {
   const { t } = useTranslation();
   const [installId, setInstallId] = useState('');
+  const [marketplaceSource, setMarketplaceSource] = useState('');
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
 
   const { data, isLoading } = usePlugins();
@@ -33,6 +37,8 @@ export function PluginsPage() {
   const uninstall = useUninstallPlugin();
   const setEnabled = useSetPluginEnabled();
   const update = useUpdatePlugin();
+  const addMarketplace = useAddMarketplace();
+  const removeMarketplace = useRemoveMarketplace();
 
   const isBusy =
     install.isPending || uninstall.isPending || setEnabled.isPending || update.isPending;
@@ -43,11 +49,7 @@ export function PluginsPage() {
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
-      <PageHeader
-        title={t('plugins.title')}
-        subtitle={t('plugins.subtitle')}
-        helpTopic="plugins"
-      />
+      <PageHeader title={t('plugins.title')} subtitle={t('plugins.subtitle')} helpTopic="plugins" />
 
       <ExplainBox title={t('plugins.explainTitle')} text={t('plugins.explain')} />
 
@@ -150,6 +152,28 @@ export function PluginsPage() {
       <Stack gap="var(--spacing-sm)">
         <Typography variant="heading-sm">{t('plugins.marketplaces')}</Typography>
 
+        <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+          <TextField
+            label={t('plugins.marketplaceSource')}
+            value={marketplaceSource}
+            onChange={setMarketplaceSource}
+            placeholder="owner/repo, https://… или путь"
+          />
+          <Button
+            variant="secondary"
+            leftIcon={<Icon name="plus" size={20} />}
+            isLoading={addMarketplace.isPending}
+            disabled={!marketplaceSource.trim()}
+            onClick={() =>
+              addMarketplace.mutate(marketplaceSource.trim(), {
+                onSuccess: () => setMarketplaceSource(''),
+              })
+            }
+          >
+            {t('plugins.marketplaceAdd')}
+          </Button>
+        </Stack>
+
         <Card padding="none">
           <Stack>
             {data?.marketplaces.map((marketplace) => (
@@ -161,10 +185,21 @@ export function PluginsPage() {
                 gap="var(--spacing-sm)"
                 className={styles.marketplaceRow}
               >
-                <Typography variant="body-sm" weight="medium" as="span">
-                  {marketplace.name}
-                </Typography>
-                <Badge tone="neutral">{marketplace.source}</Badge>
+                <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap minWidth={0}>
+                  <Typography variant="body-sm" weight="medium" as="span">
+                    {marketplace.name}
+                  </Typography>
+                  <Badge tone="neutral">{marketplace.source}</Badge>
+                </Stack>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  icon={<Icon name="trash" size={20} />}
+                  aria-label={`${t('common.delete')}: ${marketplace.name}`}
+                  isLoading={removeMarketplace.isPending}
+                  onClick={() => removeMarketplace.mutate(marketplace.name)}
+                />
               </Stack>
             ))}
           </Stack>

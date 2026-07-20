@@ -5,3 +5,12 @@
 .description {
   max-width: var(--text-measure);
 }
+
+/* Стрелки «вверх/вниз» из горизонтального шеврона — отдельной иконки нет. */
+.moveUp {
+  transform: rotate(90deg);
+}
+
+.moveDown {
+  transform: rotate(-90deg);
+}

@@ -19,7 +19,7 @@ export function registerBackupRoutes(app: FastifyInstance, ctx: ServerContext): 
   app.get('/api/backups', () => ({
     // store.backupDir, а не ctx.backupDir: копии надо показывать и тогда,
     // когда пользователь выключил их создание, — старые никуда не делись.
-    items: listBackups(ctx.store.backupDir, restorableTargets()),
+    items: listBackups(ctx.store.backupDir, restorableTargets(), ctx.location.paths.skills),
     isEnabled: ctx.store.getSettings().backupBeforeWrite,
   }));
 
@@ -28,6 +28,7 @@ export function registerBackupRoutes(app: FastifyInstance, ctx: ServerContext): 
       ctx.store.backupDir,
       decodeURIComponent(request.params.name),
       restorableTargets(),
+      ctx.location.paths.skills,
     );
 
     if (!result.ok) return reply.code(400).send({ error: result.error });

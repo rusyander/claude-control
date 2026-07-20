@@ -70,6 +70,8 @@ export interface StartInput {
   model?: string;
   /** Глубина продумывания (--effort); пусто = по умолчанию. */
   effort?: string;
+  /** Ветвление: правка своего сообщения не дописывает разговор, а создаёт ветку. */
+  fork?: boolean;
 }
 
 type ChatEvent =
@@ -129,10 +131,12 @@ let onPermissionRequest: ((run: AgentRun) => void) | undefined;
 let activeId: string | undefined;
 let statusSnapshot = new Map<string, RunStatus>();
 let activeRunsSnapshot: ActiveRunView[] = [];
-/** Накопленная стоимость всех прогонов за сессию (прогоны очищаются, счётчик — нет). */
-let totalCostUsd = 0;
-/** Накопленные токены всех прогонов за сессию. */
-let totalTokensUsed = 0;
+/**
+ * Накопленный за сеанс расход. Считает его сервер (реестр прогонов) — так
+ * счётчик переживает перезагрузку вкладки, как и сами прогоны; клиент лишь
+ * подтягивает значение. Прежде он жил в памяти вкладки и обнулялся на F5.
+ */
+let sessionSpend = { costUsd: 0, tokens: 0 };
 let watchdog: ReturnType<typeof setInterval> | undefined;
 
 function emit(): void {
@@ -220,16 +224,15 @@ function applyEvent(id: string, event: ChatEvent): void {
       next.limitResetsAt = event.resetsAt;
       break;
     case 'usage': {
+      // Токены прогона — для бейджа этого разговора; общий счётчик за сеанс
+      // считает сервер (см. loadSpend), чтобы он не слетал на перезагрузке.
       const spent = event.input + event.output + event.cacheRead + event.cacheCreation;
       next.tokens = run.tokens + spent;
-      totalTokensUsed += spent;
       break;
     }
     case 'done':
       next.costUsd = event.costUsd;
       next.sessionId = event.sessionId || run.sessionId;
-      // Копим стоимость по всем прогонам: отдельные прогоны потом очищаются.
-      totalCostUsd += event.costUsd;
       break;
     case 'error':
       next.error = event.message;
@@ -294,6 +297,22 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
+ * Разобрать один SSE-фрейм в событие. Пинг-комментарий (нет строки `data:`) и
+ * неразборный JSON → `undefined`: битый data-фрейм пропускаем, а не роняем им
+ * весь цикл чтения (иначе прогон всплыл бы «ошибкой» и мог уйти в авто-ретрай).
+ * Так же терпимо к мусору разбирает строки CLI сервер (см. `ChatRunner`).
+ */
+export function parseSseFrame(part: string): { kind: string; seq?: number } | undefined {
+  const line = part.split('\n').find((piece) => piece.startsWith('data:'));
+  if (!line) return undefined; // пинг-комментарий
+  try {
+    return JSON.parse(line.slice(5)) as { kind: string; seq?: number };
+  } catch {
+    return undefined; // неразборный фрейм — пропускаем, поток не роняем
+  }
+}
+
+/**
  * Прочитать SSE-поток прогона в стор. Пинг-комментарии (`: ping`) пропускаем.
  * Возвращает, как поток завершился: `clean` — пришло терминальное событие
  * (done/error); `gone` — сервер сообщил, что прогона больше нет; `dirty` —
@@ -324,9 +343,8 @@ async function pumpStream(
     const parts = buffer.split('\n\n');
     buffer = parts.pop() ?? '';
     for (const part of parts) {
-      const line = part.split('\n').find((piece) => piece.startsWith('data:'));
-      if (!line) continue; // пинг-комментарий
-      const parsed = JSON.parse(line.slice(5)) as { kind: string; seq?: number };
+      const parsed = parseSseFrame(part);
+      if (!parsed) continue; // пинг-комментарий или неразборный фрейм
       if (typeof parsed.seq === 'number') lastSeqs.set(id, parsed.seq);
       if (parsed.kind === 'gone') return 'gone';
       if (parsed.kind === 'done' || parsed.kind === 'error') sawTerminal = true;
@@ -423,6 +441,8 @@ async function runStream(
       autoRetries.delete(id);
       finalize(id);
       onFinished?.();
+      // Прогон завершён — обновляем накопленный расход с сервера.
+      void agentRuns.loadSpend();
     }
   }
 }
@@ -484,6 +504,9 @@ export const agentRuns = {
    * после перезагрузки страницы. Тянем каждый с нуля, восстанавливая вывод.
    */
   async resumeActive(): Promise<void> {
+    // Заодно подтягиваем накопленный расход — чтобы счётчик не был нулём после F5.
+    void agentRuns.loadSpend();
+
     let active: { chatId: string; sessionId?: string; projectPath?: string; seq: number }[];
     try {
       const response = await apiClient.get('/chat/active');
@@ -516,6 +539,20 @@ export const agentRuns = {
       rebuildStatuses();
       emit();
       void runStream(info.chatId, { chatId: info.chatId, prompt: '' }, controller, 'attach');
+    }
+  },
+
+  /** Подтянуть накопленный за сеанс расход с сервера (переживает F5). */
+  async loadSpend(): Promise<void> {
+    try {
+      const { data } = await apiClient.get('/chat/spend');
+      sessionSpend = {
+        costUsd: Number((data as { costUsd?: number })?.costUsd) || 0,
+        tokens: Number((data as { tokens?: number })?.tokens) || 0,
+      };
+      emit();
+    } catch {
+      // Нет связи — оставляем прежнее значение.
     }
   },
 
@@ -659,11 +696,11 @@ export function getActiveRuns(): ActiveRunView[] {
 }
 
 export function getTotalCost(): number {
-  return totalCostUsd;
+  return sessionSpend.costUsd;
 }
 
 export function getTotalTokens(): number {
-  return totalTokensUsed;
+  return sessionSpend.tokens;
 }
 
 export function subscribeRuns(listener: () => void): () => void {

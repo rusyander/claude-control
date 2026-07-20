@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { McpServer as SdkMcpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { McpServer } from '@claude-control/contracts';
 import { openMcpSession } from './mcp-client.ts';
 import { checkMcpHealth } from './mcp.ts';
@@ -44,6 +45,7 @@ function makeServer(partial: Partial<McpServer>): McpServer {
     health: 'unknown',
     isEnabled: true,
     groupIds: [],
+    hasOAuth: false,
     ...partial,
   };
 }
@@ -435,6 +437,65 @@ describe('mcp-client', () => {
         BUDGET,
       );
       expect(result.health).toBe('failed');
+    });
+  });
+
+  /**
+   * OAuth-провайдер в стенде MCP. Раньше песочница ходила в сервер без токена и
+   * на защищённом сервере всегда получала «требуется авторизация», хотя вход уже
+   * был. Провайдер отдаёт SDK сохранённый токен — он и уезжает заголовком
+   * Authorization. Здесь это проверяется тем же auth-фикстуром, что и заголовки:
+   * токен подобран так, чтобы `Bearer <access_token>` совпал с ожидаемым TOKEN.
+   */
+  describe('McpProbe с OAuth-провайдером', () => {
+    // Минимальный провайдер: SDK на транспорте берёт из него текущие токены и
+    // ставит их заголовком. Остальные методы вход не задействует.
+    const bearerProvider = (accessToken: string): OAuthClientProvider =>
+      ({
+        get redirectUrl() {
+          return 'http://127.0.0.1/cb';
+        },
+        get clientMetadata() {
+          return { redirect_uris: ['http://127.0.0.1/cb'] };
+        },
+        clientInformation: () => undefined,
+        saveClientInformation: () => undefined,
+        tokens: () => ({ access_token: accessToken, token_type: 'Bearer' }),
+        saveTokens: () => undefined,
+        redirectToAuthorization: () => undefined,
+        saveCodeVerifier: () => undefined,
+        codeVerifier: () => '',
+        state: () => 'state',
+      }) as unknown as OAuthClientProvider;
+
+    it('listMcpTools подставляет токен провайдера — защищённый сервер пускает', async () => {
+      const tools = await listMcpTools(
+        makeServer({ transport: 'http', url: `${httpAuthUrl}/mcp` }),
+        BUDGET,
+        bearerProvider('test-token'),
+      );
+      expect(tools).toHaveLength(2);
+    });
+
+    it('callMcpTool подставляет токен провайдера — вызов доходит до сервера', async () => {
+      const result = await callMcpTool(
+        makeServer({ transport: 'http', url: `${httpAuthUrl}/mcp` }),
+        'echo',
+        { text: 'привет' },
+        BUDGET,
+        bearerProvider('test-token'),
+      );
+      expect(result).toMatchObject({ ok: true, content: 'привет' });
+    });
+
+    it('без провайдера защищённый сервер стенду не отвечает', async () => {
+      // Контраст к предыдущим: без токена тот же сервер отбивает — значит дело
+      // именно в проброшенном провайдере, а не в открытом доступе.
+      const tools = await listMcpTools(
+        makeServer({ transport: 'http', url: `${httpAuthUrl}/mcp` }),
+        BUDGET,
+      ).catch(() => 'rejected' as const);
+      expect(tools).toBe('rejected');
     });
   });
 });

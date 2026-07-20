@@ -15,6 +15,7 @@ import { StatCard } from './StatCard';
 import { LiveAgentsCard } from './LiveAgentsCard';
 import { DetailModal } from './DetailModal';
 import type { DetailKind } from './DetailModal.types';
+import { buildReportCsv, buildJson } from './model/report';
 import styles from './AnalyticsPage.module.scss';
 
 /** Ноль — «за всё время»: сервер понимает его как отсутствие ограничения. */
@@ -29,6 +30,30 @@ export function AnalyticsPage() {
 
   const locale = i18n.language;
 
+  // Выгрузка: числа только на экране мешают собрать отчёт — отдаём файлом.
+  const download = (filename: string, content: string, mime: string): void => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const suffix = days === 0 ? 'all' : `${days}d`;
+
+  const exportJson = (): void => {
+    if (data) download(`analytics-${suffix}.json`, buildJson(data), 'application/json');
+  };
+
+  const exportCsv = (): void => {
+    if (!data) return;
+    download(`analytics-${suffix}.csv`, buildReportCsv(data), 'text/csv');
+  };
+
+  const hasData = Boolean(data && data.overall.requests > 0);
+
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
       <PageHeader
@@ -36,7 +61,7 @@ export function AnalyticsPage() {
         subtitle={t('analytics.subtitle')}
         helpTopic="analytics"
         actions={
-          <Stack direction="row" gap="var(--spacing-2xs)">
+          <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
             {PERIODS.map((period) => (
               <Button
                 key={period}
@@ -47,6 +72,26 @@ export function AnalyticsPage() {
                 {period === 0 ? t('analytics.allTime') : t(`analytics.days${period}`)}
               </Button>
             ))}
+            {hasData && (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={exportCsv}
+                  title={t('analytics.exportCsv')}
+                >
+                  CSV
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={exportJson}
+                  title={t('analytics.exportJson')}
+                >
+                  JSON
+                </Button>
+              </>
+            )}
           </Stack>
         }
       />

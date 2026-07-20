@@ -15,7 +15,7 @@ import { Button } from '@shared/ui/button';
 import { HookFormModal } from '@features/HookEditor';
 import { DeleteButton } from '@features/EntityDelete';
 import { SandboxButton } from '@features/SandboxRunner';
-import { hookApi } from '@entities/Hook';
+import { hookApi, useMoveHook } from '@entities/Hook';
 import type { Hook } from '@claude-control/contracts';
 import styles from './HooksPage.module.scss';
 
@@ -28,6 +28,7 @@ export function HooksPage() {
   const { data: hooks = [], isLoading } = hookApi.useList();
   const setEnabled = hookApi.useSetEnabled();
   const deleteHook = hookApi.useDelete();
+  const moveHook = useMoveHook();
 
   const openCreate = (): void => {
     setEditing(undefined);
@@ -78,7 +79,7 @@ export function HooksPage() {
             {event}
           </Typography>
 
-          {eventHooks.map((hook) => (
+          {eventHooks.map((hook, index) => (
             <Card key={hook.id} padding="md">
               <Stack direction="row" gap="var(--spacing-md)" align="start" width="100%">
                 <Stack gap="var(--spacing-2xs)" flex={1} minWidth={0}>
@@ -112,6 +113,28 @@ export function HooksPage() {
                 </Stack>
 
                 <Stack direction="row" align="center" gap="var(--spacing-xs)" flexShrink={0}>
+                  {eventHooks.length > 1 && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        icon={<Icon name="chevronLeft" size={20} className={styles.moveUp} />}
+                        aria-label={t('hooks.moveUp')}
+                        disabled={index === 0 || moveHook.isPending}
+                        onClick={() => moveHook.mutate({ id: hook.id, direction: 'up' })}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        icon={<Icon name="chevronLeft" size={20} className={styles.moveDown} />}
+                        aria-label={t('hooks.moveDown')}
+                        disabled={index === eventHooks.length - 1 || moveHook.isPending}
+                        onClick={() => moveHook.mutate({ id: hook.id, direction: 'down' })}
+                      />
+                    </>
+                  )}
                   <SandboxButton
                     kind="hook"
                     title={`${hook.event}${hook.matcher ? ` · ${hook.matcher}` : ''}`}

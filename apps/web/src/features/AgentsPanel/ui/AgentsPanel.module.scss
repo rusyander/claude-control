@@ -39,11 +39,6 @@
 }
 
 .row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2xs);
-  padding: var(--spacing-3xs) var(--spacing-2xs) var(--spacing-3xs) var(--spacing-sm);
-
   &:hover {
     background: var(--color-bg);
   }
@@ -69,10 +64,5 @@
 }
 
 .foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-sm);
   border-top: 1px solid var(--color-border);
 }

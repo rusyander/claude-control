@@ -15,16 +15,18 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
     return readScripts(ctx.location.paths.hooks, usedPaths);
   });
 
-  app.get<{ Params: { id: string } }>('/api/scripts/:id', (request) => ({
-    id: request.params.id,
-    content: readScriptContent(ctx.location.paths.hooks, request.params.id),
+  // Wildcard, а не `:id`: идентификатор скрипта может быть вложенным путём
+  // (файл в подпапке hooks/), а `:id` остановился бы на первом слэше.
+  app.get<{ Params: { '*': string } }>('/api/scripts/*', (request) => ({
+    id: request.params['*'],
+    content: readScriptContent(ctx.location.paths.hooks, request.params['*']),
   }));
 
-  app.put<{ Params: { id: string }; Body: { content: string } }>('/api/scripts/:id', (request) => ({
+  app.put<{ Params: { '*': string }; Body: { content: string } }>('/api/scripts/*', (request) => ({
     ok: true,
     backupPath: saveScript(
       ctx.location.paths.hooks,
-      request.params.id,
+      request.params['*'],
       request.body.content,
       ctx.backupDir,
     ),
@@ -42,8 +44,9 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
     needsRestart: true,
   }));
 
-  app.delete<{ Params: { id: string } }>('/api/scripts/:id', (request) => {
-    deleteScript(ctx.location.paths.hooks, request.params.id);
-    return { ok: true, needsRestart: true };
-  });
+  app.delete<{ Params: { '*': string } }>('/api/scripts/*', (request) => ({
+    ok: true,
+    backupPath: deleteScript(ctx.location.paths.hooks, request.params['*'], ctx.backupDir),
+    needsRestart: true,
+  }));
 }

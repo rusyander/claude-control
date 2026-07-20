@@ -95,15 +95,10 @@ export function HooksTopic() {
             tr('canAssistant'),
             tr('canProbe'),
             tr('canToggle'),
+            tr('canOrder'),
             tr('canTimeout'),
           ]}
-          cant={[
-            tr('cantBlockAll'),
-            tr('cantOrder'),
-            tr('cantStable'),
-            tr('cantLocal'),
-            tr('cantDebug'),
-          ]}
+          cant={[tr('cantBlockAll'), tr('cantStable'), tr('cantLocal'), tr('cantDebug')]}
         />
       </HelpSection>
 

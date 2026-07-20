@@ -5,4 +5,6 @@ export {
   useUninstallPlugin,
   useSetPluginEnabled,
   useUpdatePlugin,
+  useAddMarketplace,
+  useRemoveMarketplace,
 } from './api/PluginApi';

@@ -165,13 +165,6 @@
 }
 
 // Поле для имени нового файла или папки — прямо в дереве, как в редакторах кода.
-.newNode {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2xs);
-  padding: var(--spacing-3xs) var(--spacing-2xs);
-}
-
 .newNodeInput {
   flex: 1;
   min-width: 0;

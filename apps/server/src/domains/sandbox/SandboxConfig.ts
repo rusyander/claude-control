@@ -78,7 +78,17 @@ function sandboxRoot(): string {
 }
 
 export function sandboxPaths(id: string): { root: string; configDir: string; workDir: string } {
-  const root = join(sandboxRoot(), id.replace(/[^a-zA-Z0-9-]/g, ''));
+  // Оставляем только безопасные символы: так `../foo` не выберется за пределы
+  // корня. Но у чистки есть край — id из одних запрещённых символов (`..`,
+  // `///`, пустая строка) схлопывается в пустоту, и тогда `root` совпал бы с
+  // самим корнем песочниц. А по этому пути `createSandbox`/`removeSandbox`
+  // делают `rmSync(root, recursive)` — то есть снесли бы разом ВСЕ песочницы
+  // (в каждой лежит копия .credentials.json и env MCP-серверов). Поэтому
+  // вырожденный id — это ошибка, а не «корневая» песочница.
+  const safe = id.replace(/[^a-zA-Z0-9-]/g, '');
+  if (!safe) throw new Error(`Недопустимый идентификатор песочницы: ${JSON.stringify(id)}`);
+
+  const root = join(sandboxRoot(), safe);
   return { root, configDir: join(root, 'config'), workDir: join(root, 'work') };
 }
 
@@ -121,7 +131,7 @@ export function createSandbox(
 
   copyScripts(configDir, selection, location, description);
 
-  const settings = buildSettings(configDir, workDir, selection, location, store, description);
+  const settings = buildSettings(configDir, selection, location, store, description);
   writeFileSync(join(configDir, 'settings.json'), JSON.stringify(settings, null, 2), 'utf8');
 
   return {
@@ -130,8 +140,16 @@ export function createSandbox(
     workDir,
     description,
     credentials: { source: credentials.source, reason: credentials.reason },
-    // Ключ API файлом не кладётся: Claude Code читает его из окружения.
-    env: credentials.apiKey ? { ANTHROPIC_API_KEY: credentials.apiKey } : {},
+    // Окружение запуска этой песочницы. Рабочая папка едет здесь, а не через
+    // глобальный process.env: раньше collectHooks писал её в process.env сервера,
+    // и при параллельной сборке двух песочниц значение протекало во все
+    // последующие дочерние процессы (побеждала последняя). Здесь оно привязано к
+    // конкретной песочнице. Ключ API файлом не кладётся — Claude Code читает его
+    // из окружения.
+    env: {
+      CLAUDE_CONTROL_SANDBOX_WORKDIR: workDir,
+      ...(credentials.apiKey ? { ANTHROPIC_API_KEY: credentials.apiKey } : {}),
+    },
   };
 }
 
@@ -262,7 +280,6 @@ function copySkills(
  */
 function buildSettings(
   configDir: string,
-  workDir: string,
   selection: SandboxSelection,
   location: ClaudeLocation,
   store: AppStore,
@@ -272,7 +289,7 @@ function buildSettings(
     permissions: { deny: denyRules(location) },
   };
 
-  const hooks = collectHooks(configDir, workDir, selection, location, store, description);
+  const hooks = collectHooks(configDir, selection, location, store, description);
   if (Object.keys(hooks).length > 0) settings.hooks = hooks;
 
   const servers = collectMcpServers(selection, location, store, description);
@@ -302,7 +319,6 @@ function denyRules(location: ClaudeLocation): string[] {
 /** Хуки: их описания идут в настройки, а файлы скриптов — рядом. */
 function collectHooks(
   configDir: string,
-  workDir: string,
   selection: SandboxSelection,
   location: ClaudeLocation,
   store: AppStore,
@@ -335,10 +351,6 @@ function collectHooks(
     result[hook.event] = [...(result[hook.event] ?? []), entry];
     description.hooks.push(`${hook.event}${hook.matcher ? ` · ${hook.matcher}` : ''}`);
   }
-
-  // Рабочая папка в переменной окружения — скриптам бывает нужно знать, где
-  // они работают, а в песочнице это не настоящий проект.
-  process.env.CLAUDE_CONTROL_SANDBOX_WORKDIR = workDir;
 
   return result;
 }

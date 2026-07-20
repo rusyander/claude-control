@@ -13,3 +13,12 @@ export interface AgentsPanelProps {
   /** Открыть прогон в главном чате — видеть, что агент делает. */
   onView: (run: ActiveRunView) => void;
 }
+
+export interface AgentRowProps {
+  run: ActiveRunView;
+  costUnit: 'tokens' | 'money';
+  statusLabel: string;
+  chatLabel: string;
+  onOpen: () => void;
+  onStop: () => void;
+}

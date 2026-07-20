@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync, copyFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { backupEntry, removeEntry } from '../lib/safe-io.ts';
+import { backupEntry, removeEntry, copyRecursive } from '../lib/safe-io.ts';
 
 /**
  * Резервные копии и откат к ним.
@@ -19,12 +19,9 @@ export interface BackupEntry {
   createdAt: string;
   sizeBytes: number;
   /**
-   * Можно ли вернуть копию кнопкой.
-   *
-   * В каталоге лежат не только файлы конфигурации: удаление скилла кладёт туда
-   * целую папку. Вернуть её `copyFileSync` нельзя, и предлагать кнопку, которая
-   * заведомо ответит отказом, — обман. Такие копии показываются как есть, но
-   * без кнопки: их разворачивают руками.
+   * Можно ли вернуть копию кнопкой. Файл конфигурации возвращается по месту;
+   * папка (копия скилла) разворачивается рекурсивно в каталог skills/. Кнопки
+   * нет только у копий, чью цель некуда вернуть (посторонний файл).
    */
   canRestore: boolean;
 }
@@ -35,6 +32,7 @@ const BACKUP_NAME = /^(.+)\.(\d{4}-\d{2}-\d{2}T[\d-]+Z)\.bak$/;
 export function listBackups(
   backupDir: string,
   knownPaths: Record<string, string> = {},
+  skillsDir?: string,
 ): BackupEntry[] {
   if (!existsSync(backupDir)) return [];
 
@@ -53,9 +51,9 @@ export function listBackups(
       target,
       createdAt: stats.mtime.toISOString(),
       sizeBytes: stats.size,
-      // Папку (копию скилла) вернуть на место нечем, и цель должна быть
-      // известна: копия постороннего файла восстановлению не подлежит.
-      canRestore: !stats.isDirectory() && Boolean(resolveBackupTarget(target, knownPaths)),
+      // Цель должна быть известна: копия постороннего файла восстановлению не
+      // подлежит. Папку скилла возвращаем в skills/ (см. resolveBackupTarget).
+      canRestore: Boolean(resolveBackupTarget(target, stats.isDirectory(), knownPaths, skillsDir)),
     });
   }
 
@@ -64,14 +62,29 @@ export function listBackups(
 }
 
 /**
- * Куда возвращать копию. Восстанавливать по имени из самой копии нельзя:
- * имя пришло из запроса, и `../` в нём увёл бы запись куда угодно. Поэтому
- * цель ищется в известном списке путей, а не собирается из строки.
+ * Куда возвращать копию. Имя пришло из запроса, поэтому цель не собирается из
+ * строки, а выводится безопасно:
+ *
+ *   файл — ищется в известном списке путей по basename;
+ *   папка — это копия скилла с именем `<родитель>-<id>` (skills-… или
+ *     skills-disabled-…). Снимаем известный префикс и возвращаем в активный
+ *     каталог skills/<id>. `id` обязан быть одним безопасным сегментом — иначе
+ *     `../` увёл бы запись наружу.
  */
 export function resolveBackupTarget(
   target: string,
+  isDirectory: boolean,
   knownPaths: Record<string, string>,
+  skillsDir?: string,
 ): string | undefined {
+  if (isDirectory) {
+    if (!skillsDir) return undefined;
+    let id: string | undefined;
+    if (target.startsWith('skills-disabled-')) id = target.slice('skills-disabled-'.length);
+    else if (target.startsWith('skills-')) id = target.slice('skills-'.length);
+    if (!id || /[\\/]/.test(id) || id.includes('..')) return undefined;
+    return join(skillsDir, id);
+  }
   return Object.values(knownPaths).find((path) => basename(path) === target);
 }
 
@@ -94,18 +107,33 @@ export function restoreBackup(
   backupDir: string,
   name: string,
   knownPaths: Record<string, string>,
+  skillsDir?: string,
 ): RestoreResult {
-  const entry = listBackups(backupDir, knownPaths).find((item) => item.name === name);
+  const source = join(backupDir, name);
+  if (!BACKUP_NAME.test(name) || !existsSync(source))
+    return { ok: false, error: 'Копия не найдена' };
+
+  const entry = listBackups(backupDir, knownPaths, skillsDir).find((item) => item.name === name);
   if (!entry) return { ok: false, error: 'Копия не найдена' };
 
-  const target = resolveBackupTarget(entry.target, knownPaths);
+  const isDirectory = statSync(source).isDirectory();
+  const target = resolveBackupTarget(entry.target, isDirectory, knownPaths, skillsDir);
   if (!target) {
     return { ok: false, error: `Непонятно, куда возвращать копию «${entry.target}»` };
   }
 
-  const backupPath = existsSync(target) ? backupEntry(target, backupDir) : undefined;
+  // Перед заменой снимаем копию текущего состояния — откат тоже обратим.
+  const backupPath = existsSync(target) ? backupEntry(target, backupDir, entry.target) : undefined;
 
-  copyFileSync(join(backupDir, name), target);
+  if (isDirectory) {
+    // Папку разворачиваем целиком: сперва убираем прежнюю, чтобы не смешать
+    // старые и новые файлы, затем копируем рекурсивно.
+    removeEntry(target);
+    copyRecursive(source, target);
+  } else {
+    copyFileSync(source, target);
+  }
+
   return { ok: true, restoredTo: target, backupPath };
 }
 

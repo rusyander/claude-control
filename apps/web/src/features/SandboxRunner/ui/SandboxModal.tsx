@@ -6,15 +6,11 @@ import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
-import {
-  useCreateSandbox,
-  useDeleteSandbox,
-  type SandboxDescription,
-} from '@entities/Sandbox/api/SandboxApi';
+import { useCreateSandbox, useDeleteSandbox, type SandboxDescription } from '@entities/Sandbox';
 import { HookProbePanel } from './HookProbePanel';
 import { McpProbePanel } from './McpProbePanel';
 import { SandboxChat } from './SandboxChat';
-import type { SandboxModalProps } from './SandboxModal.types';
+import type { ContentsListProps, SandboxModalProps, TabButtonProps } from './SandboxModal.types';
 import styles from './SandboxModal.module.scss';
 
 type Tab = 'probe' | 'chat';
@@ -76,7 +72,7 @@ export function SandboxModal({
       footer={<Button onClick={() => onOpenChange(false)}>{t('common.close')}</Button>}
     >
       <div className={styles.layout}>
-        <div className={styles.main}>
+        <Stack gap="var(--spacing-sm)" minWidth={0}>
           {hasProbe && (
             <div className={styles.tabs}>
               <TabButton isActive={tab === 'probe'} onClick={() => setTab('probe')}>
@@ -97,7 +93,7 @@ export function SandboxModal({
           {tab === 'chat' && (
             <SandboxChat sandboxId={sandboxId} kind={kind} title={title} context={context} />
           )}
-        </div>
+        </Stack>
 
         <aside className={styles.aside}>
           <Stack gap="var(--spacing-xs)">
@@ -129,7 +125,7 @@ export function SandboxModal({
   );
 }
 
-function ContentsList({ description }: { description: SandboxDescription }) {
+function ContentsList({ description }: ContentsListProps) {
   const { t } = useTranslation();
 
   const groups: [string, string[]][] = [
@@ -170,15 +166,7 @@ function ContentsList({ description }: { description: SandboxDescription }) {
   );
 }
 
-function TabButton({
-  isActive,
-  onClick,
-  children,
-}: {
-  isActive: boolean;
-  onClick: () => void;
-  children: string;
-}) {
+function TabButton({ isActive, onClick, children }: TabButtonProps) {
   return (
     <button
       type="button"

@@ -4,22 +4,10 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import {
-  useResourceFile,
-  useSaveResourceFile,
-  type ResourceKind,
-} from '@entities/Resource/api/ResourceApi';
+import { useResourceFile, useSaveResourceFile } from '@entities/Resource';
 import { toast } from '@shared/lib/toast';
+import type { ResourceFileEditorProps } from './ResourceFileEditor.types';
 import styles from './ResourceFileTree.module.scss';
-
-interface ResourceFileEditorProps {
-  kind: ResourceKind;
-  id: string;
-  file: string;
-  /** У плагинов файлы чужие — показываем, но править не даём. */
-  isWritable: boolean;
-  onClose: () => void;
-}
 
 /**
  * Просмотр и правка одного файла ресурса. Кнопка сохранения активна только

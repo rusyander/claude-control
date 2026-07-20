@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
+import { Stack } from '@shared/ui/stack';
+import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
+import type { Question, QuestionCardProps } from './QuestionCard.types';
 import styles from './ChatMessages.module.scss';
 
 /**
@@ -15,18 +18,6 @@ import styles from './ChatMessages.module.scss';
  * передан (витрина, поток ещё идёт), варианты показываются просто списком.
  */
 
-interface Option {
-  label?: string;
-  description?: string;
-}
-
-interface Question {
-  question?: string;
-  header?: string;
-  multiSelect?: boolean;
-  options?: Option[];
-}
-
 /** Разбор input вызова: пришёл он строкой JSON, и формат нам не подконтролен. */
 export function parseQuestions(input: string): Question[] | undefined {
   try {
@@ -39,38 +30,50 @@ export function parseQuestions(input: string): Question[] | undefined {
   }
 }
 
-interface QuestionCardProps {
-  questions: Question[];
-  /** Ответить выбранным вариантом (отправка в тот же разговор). */
-  onPick?: (answer: string) => void;
-  /** Пока идёт прогон, отвечать нельзя — варианты недоступны. */
-  disabled?: boolean;
-}
-
 export function QuestionCard({ questions, onPick, disabled }: QuestionCardProps) {
   const { t } = useTranslation();
 
   return (
     <div className={styles.question}>
-      <div className={styles.questionHead}>
+      <Stack
+        direction="row"
+        align="center"
+        gap="var(--spacing-2xs)"
+        className={styles.questionHead}
+      >
         <Icon name="help" size={20} />
-        <span>{t('chat.questionTitle')}</span>
-      </div>
+        <Typography as="span" variant="body-sm" weight="semibold" color="accent">
+          {t('chat.questionTitle')}
+        </Typography>
+      </Stack>
 
       {questions.map((item, index) => (
         <div key={index} className={styles.questionItem}>
           {item.header && <span className={styles.questionBadge}>{item.header}</span>}
-          {item.question && <p className={styles.questionText}>{item.question}</p>}
-
-          {item.multiSelect && (
-            <span className={styles.questionHint}>{t('chat.questionMulti')}</span>
+          {item.question && (
+            <Typography variant="body" weight="medium" className={styles.questionText}>
+              {item.question}
+            </Typography>
           )}
 
-          <ul className={styles.options}>
+          {item.multiSelect && (
+            <Typography variant="caption" color="muted" className={styles.questionHint}>
+              {t('chat.questionMulti')}
+            </Typography>
+          )}
+
+          <Stack as="ul" gap="var(--spacing-2xs)" className={styles.options}>
             {(item.options ?? []).map((option, optionIndex) => {
               const content = (
                 <>
-                  <span className={styles.optionLabel}>{option.label}</span>
+                  <Typography
+                    as="span"
+                    variant="body-sm"
+                    weight="semibold"
+                    className={styles.optionLabel}
+                  >
+                    {option.label}
+                  </Typography>
                   {option.description && (
                     <span className={styles.optionText}>{option.description}</span>
                   )}
@@ -95,7 +98,7 @@ export function QuestionCard({ questions, onPick, disabled }: QuestionCardProps)
                 </li>
               );
             })}
-          </ul>
+          </Stack>
         </div>
       ))}
     </div>

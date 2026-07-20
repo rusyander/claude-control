@@ -1,9 +1,11 @@
-import type { EntityKind, Hook } from '@claude-control/contracts';
+import type { EntityKind, Hook, PermissionDecision } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import { readRules, saveRule } from './rules.ts';
 import { readHooks, writeHooks } from './hooks.ts';
 import { setSkillEnabled } from './skills.ts';
 import { setMcpServerEnabled } from './mcp.ts';
+import { savePermission, deletePermission } from './permissions.ts';
+import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 
 /**
  * Включение и выключение сущности — то, что происходит на диске.
@@ -61,6 +63,29 @@ export function applyEntityState(
   if (kind === 'rule') {
     const rule = readRules(paths.claudeMd, ctx.store).find((item) => item.id === id);
     if (rule) saveRule(paths.claudeMd, id, { ...rule, isEnabled }, ctx.store, ctx.backupDir);
+  }
+
+  // Право — паттерн в settings.json → permissions.<decision>. Гашение группой
+  // должно физически убирать его из списка, включение — возвращать: иначе
+  // группа лишь помечала бы право у себя, а Claude Code продолжал бы его
+  // применять. Всё нужное для реконструкции лежит в id (`[local:]decision:pattern`),
+  // поэтому выключенное право есть чем вернуть. Локальное право правим в
+  // settings.local.json, префикс `local:` файлу неизвестен — снимаем.
+  if (kind === 'permission') {
+    const target = isLocalId(id) ? paths.settingsLocal : paths.settings;
+    const bareId = stripLocalPrefix(id);
+
+    if (isEnabled) {
+      const [decision, ...rest] = bareId.split(':');
+      savePermission(
+        target,
+        null,
+        { decision: decision as PermissionDecision, pattern: rest.join(':'), groupIds: [] },
+        ctx.backupDir,
+      );
+    } else {
+      deletePermission(target, bareId, ctx.backupDir);
+    }
   }
 
   // Хук выключается удалением из settings.json, поэтому его команду надо

@@ -290,6 +290,9 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
   /** Идущие прогоны — клиент подхватывает их после перезагрузки страницы. */
   app.get('/api/chat/active', () => registry.active());
 
+  /** Накопленный за сеанс расход — счётчик в пульте переживает перезагрузку. */
+  app.get('/api/chat/spend', () => registry.spend());
+
   app.post<{ Params: { chatId: string } }>('/api/chat/:chatId/stop', (request) => {
     // Заодно отклоняем висящие запросы прав — иначе агент ждал бы решения зря.
     permissions.cancelRun(request.params.chatId);

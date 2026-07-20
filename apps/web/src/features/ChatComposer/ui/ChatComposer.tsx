@@ -65,7 +65,12 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
     return (
       <div className={styles.composer}>
         <div className={styles.box}>
-          <div className={styles.voice}>
+          <Stack
+            direction="row"
+            align="center"
+            gap="var(--spacing-sm)"
+            padding="var(--spacing-sm) var(--spacing-md)"
+          >
             <VoiceWave levels={levels} active={speech.listening} className={styles.wave} />
 
             <Stack direction="row" gap="var(--spacing-xs)">
@@ -90,7 +95,7 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
                 {t('assistant.applyVoice')}
               </Button>
             </Stack>
-          </div>
+          </Stack>
 
           <Typography variant="body-sm" color="muted" className={styles.hint}>
             {speech.finalizing
@@ -118,9 +123,21 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
         }}
       >
         {files.length > 0 && (
-          <div className={styles.files}>
+          <Stack
+            direction="row"
+            wrap
+            gap="var(--spacing-2xs)"
+            padding="var(--spacing-xs) var(--spacing-md) 0"
+          >
             {files.map((file) => (
-              <span key={file.name} className={styles.file}>
+              <Stack
+                as="span"
+                key={file.name}
+                direction="row"
+                align="center"
+                gap="var(--spacing-3xs)"
+                className={styles.file}
+              >
                 <Icon name="file" size={14} />
                 {file.name}
                 <Button
@@ -131,9 +148,9 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
                   aria-label={`${t('common.delete')}: ${file.name}`}
                   onClick={() => setFiles((current) => current.filter((item) => item !== file))}
                 />
-              </span>
+              </Stack>
             ))}
-          </div>
+          </Stack>
         )}
 
         <textarea
@@ -153,7 +170,13 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
           rows={3}
         />
 
-        <div className={styles.bar}>
+        <Stack
+          direction="row"
+          align="center"
+          justify="between"
+          gap="var(--spacing-xs)"
+          padding="var(--spacing-2xs) var(--spacing-xs) var(--spacing-xs)"
+        >
           <Stack direction="row" align="center" gap="var(--spacing-3xs)">
             <Button
               variant="ghost"
@@ -194,7 +217,7 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
               disabled={!value.trim()}
             />
           )}
-        </div>
+        </Stack>
       </div>
 
       <Typography variant="caption" color="subtle" className={styles.hint}>

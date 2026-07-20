@@ -3,6 +3,7 @@ import { MainLayout } from '@app/layouts/MainLayout/MainLayout';
 import { OverviewPage } from '@pages/Overview/OverviewPage';
 import { AnalyticsPage } from '@pages/Analytics/AnalyticsPage';
 import { RulesPage } from '@pages/Rules/RulesPage';
+import { ClaudeMdPage } from '@pages/ClaudeMd/ClaudeMdPage';
 import { HooksPage } from '@pages/Hooks/HooksPage';
 import { SkillsPage } from '@pages/Skills/SkillsPage';
 import { ScriptsPage } from '@pages/Scripts/ScriptsPage';
@@ -40,6 +41,7 @@ const routes = [
   { path: '/analytics', component: AnalyticsPage },
   { path: '/chat', component: ChatPage },
   { path: '/rules', component: RulesPage },
+  { path: '/claude-md', component: ClaudeMdPage },
   { path: '/hooks', component: HooksPage },
   { path: '/skills', component: SkillsPage },
   { path: '/scripts', component: ScriptsPage },

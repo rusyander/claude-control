@@ -3,17 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import { SPRING, DURATION, EASE, withReducedMotion } from '@shared/lib/motion';
 import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMotion';
+import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { useOverview } from '@entities/AppConfig';
 import { NAV_SECTIONS } from './Sidebar.constants';
 import { AppMark } from './AppMark';
+import type { SidebarProps } from './Sidebar.types';
 import styles from './MainLayout.module.scss';
-
-interface SidebarProps {
-  isCollapsed: boolean;
-  onToggle: () => void;
-}
 
 /**
  * Ширины держим числами: анимировать значение из CSS-переменной нельзя,
@@ -77,14 +74,19 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
       aria-label={t('nav.sectionMain')}
     >
       <div className={styles.sidebarInner}>
-        <div className={styles.brand}>
+        <Stack
+          direction="row"
+          align="center"
+          gap="var(--spacing-sm)"
+          padding="var(--spacing-xs) var(--spacing-2xs) var(--spacing-md)"
+        >
           <AppMark size={32} />
           {label(
             <Typography variant="heading-sm" as="span">
               {t('common.appName')}
             </Typography>,
           )}
-        </div>
+        </Stack>
 
         {/*
           Сворачивание — такая же строка, как пункты меню: значок всегда на
@@ -108,7 +110,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
         </button>
 
         {NAV_SECTIONS.map((section) => (
-          <div key={section.label} className={styles.navSection}>
+          <Stack key={section.label} gap="var(--spacing-3xs)">
             {label(t(section.label), styles.sectionLabel)}
 
             {section.items.map((item) => (
@@ -132,7 +134,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                 )}
               </Link>
             ))}
-          </div>
+          </Stack>
         ))}
       </div>
     </motion.nav>

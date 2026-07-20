@@ -7,8 +7,8 @@ import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { Card } from '@shared/ui/card';
-import { BulkPresets } from '@features/BulkPresets';
-import { useSaveScript, useScriptContent } from '@entities/Script/api/ScriptApi';
+import { BulkPresets } from '@shared/ui/bulk-presets';
+import { useSaveScript, useScriptContent } from '@entities/Script';
 import { NEW_SCRIPT_TEMPLATE, SCRIPT_TEMPLATES } from '../model/ScriptTemplate';
 import type { ScriptFormModalProps } from './ScriptFormModal.types';
 import styles from './ScriptFormModal.module.scss';
@@ -74,7 +74,7 @@ export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModa
       }
     >
       {!script && (
-        <div className={styles.modeTabs}>
+        <Stack direction="row" gap="var(--spacing-3xs)" className={styles.modeTabs}>
           {(['constructor', 'bulk'] as const).map((item) => (
             <Button
               key={item}
@@ -85,7 +85,7 @@ export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModa
               {t(`scripts.mode_${item}`)}
             </Button>
           ))}
-        </div>
+        </Stack>
       )}
 
       {mode === 'bulk' ? (

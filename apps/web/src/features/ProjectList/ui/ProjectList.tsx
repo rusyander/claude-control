@@ -11,9 +11,8 @@ import { EmptyState } from '@shared/ui/empty-state';
 import { StatusDot } from '@shared/ui/status-dot';
 import { formatDate } from '@shared/lib/format';
 import { normalizeProjectPath } from '@shared/lib/workspace';
-import { statusTone, type RunStatus } from '@shared/lib/agent-runs';
-import type { ProjectInfo } from '@entities/Project';
-import type { ProjectListProps } from './ProjectList.types';
+import { statusTone } from '@shared/lib/agent-runs';
+import type { ProjectListProps, ProjectRowProps } from './ProjectList.types';
 import styles from './ProjectList.module.scss';
 
 /**
@@ -111,14 +110,6 @@ export function ProjectList({
       </div>
     </Stack>
   );
-}
-
-interface ProjectRowProps {
-  project: ProjectInfo;
-  isActive: boolean;
-  status: RunStatus;
-  language: string;
-  onOpen: () => void;
 }
 
 function ProjectRow({ project, isActive, status, language, onOpen }: ProjectRowProps) {

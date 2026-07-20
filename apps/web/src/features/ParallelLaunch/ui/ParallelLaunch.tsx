@@ -61,7 +61,13 @@ export function ParallelLaunch({ isOpen, onOpenChange, projects, onLaunch }: Par
           gap="var(--spacing-sm)"
           width="100%"
         >
-          <label className={styles.editsToggle}>
+          <Stack
+            as="label"
+            direction="row"
+            align="center"
+            gap="var(--spacing-2xs)"
+            className={styles.editsToggle}
+          >
             <Toggle
               size="sm"
               checked={allowEdits}
@@ -71,7 +77,7 @@ export function ParallelLaunch({ isOpen, onOpenChange, projects, onLaunch }: Par
             <Typography variant="caption" color={allowEdits ? 'default' : 'subtle'} as="span">
               {allowEdits ? t('chat.editsAllowed') : t('chat.readOnly')}
             </Typography>
-          </label>
+          </Stack>
           <Stack direction="row" gap="var(--spacing-xs)">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               {t('common.cancel')}

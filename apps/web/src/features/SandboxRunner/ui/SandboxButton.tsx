@@ -3,11 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { SandboxModal } from './SandboxModal';
-import type { SandboxModalProps } from './SandboxModal.types';
-
-type SandboxButtonProps = Omit<SandboxModalProps, 'isOpen' | 'onOpenChange'> & {
-  size?: 'sm' | 'md';
-};
+import type { SandboxButtonProps } from './SandboxButton.types';
 
 /**
  * Кнопка «проверить в песочнице». Стоит рядом с каждым элементом настроек,

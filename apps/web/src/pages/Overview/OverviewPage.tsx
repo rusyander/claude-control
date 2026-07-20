@@ -1,7 +1,11 @@
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { SkeletonTiles } from '@shared/ui/skeleton';
 import { PageHeader } from '@shared/ui/page-header';
+import { apiClient } from '@shared/api/client';
+import { queryKeys } from '@shared/api/query-keys';
+import { formatDate } from '@shared/lib/format';
 import { useLocation, useOverview } from '@entities/AppConfig';
 import { LocationCard } from './LocationCard';
 import { StatTile } from './StatTile';
@@ -9,9 +13,16 @@ import styles from './OverviewPage.module.scss';
 
 /** Главный экран: где лежит конфигурация и что в ней есть. */
 export function OverviewPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: location } = useLocation();
   const { data: overview, isLoading } = useOverview();
+
+  // Копии: сколько и когда снимали последнюю — раньше это было видно только в
+  // настройках, а на обзоре к месту.
+  const { data: backups } = useQuery({
+    queryKey: queryKeys.backups,
+    queryFn: async () => (await apiClient.get<{ items: { createdAt: string }[] }>('/backups')).data,
+  });
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
@@ -68,7 +79,12 @@ export function OverviewPage() {
             icon="mcp"
             label={t('nav.mcp')}
             value={overview.mcp.total}
-            hint={`${overview.mcp.enabled} ${t('common.enabled').toLowerCase()}`}
+            hint={
+              overview.mcp.failed > 0
+                ? `${overview.mcp.failed} ${t('overview.mcpFailed')}`
+                : `${overview.mcp.enabled} ${t('common.enabled').toLowerCase()}`
+            }
+            tone={overview.mcp.failed > 0 ? 'danger' : undefined}
             to="/mcp"
           />
           <StatTile
@@ -94,6 +110,17 @@ export function OverviewPage() {
                 : t('overview.groupsEmpty')
             }
             to="/groups"
+          />
+          <StatTile
+            icon="file"
+            label={t('overview.backups')}
+            value={backups?.items.length ?? 0}
+            hint={
+              backups && backups.items.length > 0
+                ? `${t('overview.backupsLast')}: ${formatDate(backups.items[0]!.createdAt, i18n.language)}`
+                : t('overview.backupsNone')
+            }
+            to="/settings"
           />
         </div>
       )}

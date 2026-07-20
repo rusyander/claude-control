@@ -58,6 +58,30 @@ export function revealEnvValue(
   return parseEnvFile(readTextFile(secretsPath), false).find((item) => item.key === key)?.value;
 }
 
+/** Имена переменных, уже лежащих в settings.json → env. */
+export function existingEnvKeys(settingsPath: string): string[] {
+  return Object.keys(readJsonFile<RawSettings>(settingsPath, {}).env ?? {});
+}
+
+/**
+ * Применить и снять переменные группы в settings.json одним заходом. `set` —
+ * ключи со значениями, которые группа добавляет; `remove` — ключи, которые она
+ * снимает (когда их больше никто не держит). Возвращает путь резервной копии.
+ */
+export function applyGroupEnv(
+  settingsPath: string,
+  set: Record<string, string>,
+  remove: string[],
+  backupDir?: string,
+): string | undefined {
+  const settings = readJsonFile<RawSettings>(settingsPath, {});
+  const env = { ...settings.env };
+  for (const [key, value] of Object.entries(set)) env[key] = value;
+  for (const key of remove) delete env[key];
+  settings.env = env;
+  return writeJsonFile(settingsPath, settings, { backupDir });
+}
+
 /**
  * Запись переменной. Локальная уходит в свой файл: панель показывает оба и
  * правит каждый на месте — переезд в общий конфиг сделал бы личную настройку
@@ -84,7 +108,15 @@ export function saveEnvVar(
     return writeJsonFile(settingsPath, settings, { backupDir });
   }
 
-  return upsertEnvFileLine(secretsPath, draft.key, draft.value, draft.comment, backupDir);
+  if (draft.source === 'secrets') {
+    return upsertEnvFileLine(secretsPath, draft.key, draft.value, draft.comment, backupDir);
+  }
+
+  // source === 'group' — служебный: env групп применяется маршрутами групп
+  // (applyGroupEnv), а не через /api/env. Прямая запись сюда — ошибка вызова;
+  // молча свалить переменную в .mcp-secrets.env (ветка секретов по умолчанию)
+  // нельзя, поэтому ничего не пишем.
+  return undefined;
 }
 
 export function deleteEnvVar(
@@ -109,9 +141,32 @@ export function deleteEnvVar(
     return writeJsonFile(settingsPath, settings, { backupDir });
   }
 
-  const lines = readTextFile(secretsPath).split(/\r?\n/);
-  const kept = lines.filter((line) => !startsWithKey(line, key));
-  return writeTextFile(secretsPath, kept.join('\n'), { backupDir });
+  if (source === 'secrets') {
+    return deleteSecretLine(secretsPath, key, backupDir);
+  }
+
+  // source === 'group' — служебный, см. saveEnvVar: не наша забота.
+  return undefined;
+}
+
+/**
+ * Удаляет строку `KEY=…` из env-файла вместе с прилегающим сверху блоком
+ * комментариев: он привязан к переменной (см. parseEnvFile) и описывает, где
+ * брать именно этот токен. Осиротев, комментарий копит мусор и вводит в
+ * заблуждение, поэтому уходит вместе с переменной.
+ */
+function deleteSecretLine(path: string, key: string, backupDir?: string): string | undefined {
+  const lines = readTextFile(path).split(/\r?\n/);
+  const index = lines.findIndex((line) => startsWithKey(line, key));
+  if (index === -1) return writeTextFile(path, lines.join('\n'), { backupDir });
+
+  // Забираем и непрерывный блок комментариев прямо над переменной (до пустой
+  // строки или не-комментария) — ровно то, что parseEnvFile привязал к ней.
+  let start = index;
+  while (start > 0 && (lines[start - 1]?.trim().startsWith('#') ?? false)) start -= 1;
+
+  lines.splice(start, index - start + 1);
+  return writeTextFile(path, lines.join('\n'), { backupDir });
 }
 
 /**

@@ -46,11 +46,8 @@
 }
 
 // Структура файлов под полями SKILL.md: отделяем линией, чтобы конструктор
-// не сливался с формой самого файла.
+// не сливался с формой самого файла. Раскладка (flex-column + gap) — на Stack.
 .structure {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3xs);
   margin-top: var(--spacing-sm);
   padding-top: var(--spacing-md);
   border-top: 1px solid var(--color-border);

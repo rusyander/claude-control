@@ -24,7 +24,7 @@ import {
 import { toast } from '@shared/lib/toast';
 import { useChatPrefs, getChatPrefs } from '@shared/lib/chat-prefs';
 import { playNotification } from '@shared/lib/notify-sound';
-import { useDraft } from '@shared/lib/draft';
+import { useDraft, migrateDraft } from '@shared/lib/draft';
 import { formatSpend } from '@shared/lib/format';
 import { ChatList } from '@features/ChatList';
 import { ProjectList } from '@features/ProjectList';
@@ -36,14 +36,8 @@ import { FolderPicker } from '@features/FolderPicker';
 import { ChatMessages } from '@features/ChatMessages';
 import { ChatComposer } from '@features/ChatComposer';
 import { ArtifactPreview } from '@features/ArtifactPreview';
-import {
-  useChats,
-  useChatMessages,
-  useArtifacts,
-  useRefreshChat,
-  chatKeys,
-} from '@entities/Chat/api/ChatApi';
-import type { StreamState } from '@entities/Chat/model/useChatStream';
+import { useChats, useChatMessages, useArtifacts, useRefreshChat, chatKeys } from '@entities/Chat';
+import type { StreamState } from '@entities/Chat';
 import { useProjects, useOpenInEditor, type ProjectInfo } from '@entities/Project';
 import { useSettings } from '@entities/AppConfig';
 import { ResizeHandle } from '@shared/ui/resize-handle';
@@ -165,6 +159,12 @@ export function ChatPage() {
   const refresh = useRefreshChat(chatId);
 
   const finishedAt = useRef(0);
+  // Правка своего сообщения помечает следующую отправку как ветвление (форк).
+  const forkNextRef = useRef(false);
+  const editMessage = (text: string): void => {
+    forkNextRef.current = true;
+    setInput(text);
+  };
 
   // Любой завершившийся прогон освежает список чатов: там появляются новые
   // разговоры и обновляются заголовки — в том числе у фоновых агентов.
@@ -323,6 +323,14 @@ export function ChatPage() {
     const created = chats.data?.find((chat) => chat.id === sessionId);
     if (!created) return;
 
+    // Ключ контекста меняется с `home`/`project:…` на `chat:<id>`. Переносим на
+    // новый ключ пер-чат оверрайд модели/усилия и недописанный черновик — иначе
+    // следующее сообщение в этом же чате молча вернётся к дефолтам из настроек.
+    const nextKey = `chat:${created.id}`;
+    migrateDraft(draftKey, nextKey);
+    migrateDraft(`chat-model:${draftKey}`, `chat-model:${nextKey}`);
+    migrateDraft(`chat-effort:${draftKey}`, `chat-effort:${nextKey}`);
+
     setActiveChat(created);
     setDraftId(undefined);
     writeUrl(created.id);
@@ -452,13 +460,21 @@ export function ChatPage() {
       },
     ]);
 
+    const resumeSession = activeChat?.id ?? run.sessionId;
+    // Правка своего сообщения ветвит разговор: отправка после «изменить» уходит
+    // в форк сессии, а исходный разговор остаётся нетронутым. Форк осмыслен
+    // только при существующей сессии.
+    const fork = forkNextRef.current && Boolean(resumeSession);
+    forkNextRef.current = false;
+
     agentRuns.start({
       chatId: id,
       prompt,
       // Продолжаем существующую сессию; у нового чата её ещё нет.
-      sessionId: activeChat?.id ?? run.sessionId,
+      sessionId: resumeSession,
       files,
       allowEdits,
+      fork,
       // Модель и глубина: дефолт из настроек или локальный оверрайд чата.
       model: effectiveModel,
       effort: effectiveEffort,
@@ -506,7 +522,14 @@ export function ChatPage() {
       >
         <div className={styles.sidebar}>
           {ws.isHome && (
-            <div className={styles.segment} role="tablist" aria-label={t('projects.sidebarLabel')}>
+            <Stack
+              direction="row"
+              gap="var(--spacing-3xs)"
+              padding="var(--spacing-2xs)"
+              role="tablist"
+              aria-label={t('projects.sidebarLabel')}
+              className={styles.segment}
+            >
               <button
                 type="button"
                 role="tab"
@@ -525,7 +548,7 @@ export function ChatPage() {
               >
                 {t('projects.title')}
               </button>
-            </div>
+            </Stack>
           )}
 
           <div className={styles.sidebarList}>
@@ -554,7 +577,14 @@ export function ChatPage() {
         </div>
 
         <div className={styles.main}>
-          <div className={styles.header}>
+          <Stack
+            direction="row"
+            align="center"
+            justify="between"
+            gap="var(--spacing-sm)"
+            padding="var(--spacing-sm) var(--spacing-xl)"
+            className={styles.header}
+          >
             <Stack gap="var(--spacing-3xs)" className={styles.headerText}>
               <Typography variant="body" weight="medium" className={styles.title}>
                 {activeChat?.title ?? ws.activeProject?.name ?? t('chat.newChat')}
@@ -608,7 +638,14 @@ export function ChatPage() {
               )}
 
               {isProjectContext && (
-                <label className={styles.editsToggle}>
+                <Stack
+                  as="label"
+                  direction="row"
+                  align="center"
+                  gap="var(--spacing-2xs)"
+                  padding="var(--spacing-3xs) var(--spacing-xs)"
+                  className={styles.editsToggle}
+                >
                   <Toggle
                     size="sm"
                     checked={allowEdits}
@@ -618,7 +655,7 @@ export function ChatPage() {
                   <Typography variant="caption" color={allowEdits ? 'default' : 'subtle'} as="span">
                     {allowEdits ? t('chat.editsAllowed') : t('chat.readOnly')}
                   </Typography>
-                </label>
+                </Stack>
               )}
 
               {run.status === 'error' && chatId && (
@@ -666,10 +703,17 @@ export function ChatPage() {
                 onClick={() => refresh()}
               />
             </Stack>
-          </div>
+          </Stack>
 
           {(artifacts.data?.length ?? 0) > 0 && (
-            <div className={styles.artifacts} data-artifacts>
+            <Stack
+              direction="row"
+              wrap
+              gap="var(--spacing-2xs)"
+              padding="var(--spacing-2xs) var(--spacing-xl)"
+              data-artifacts
+              className={styles.artifacts}
+            >
               {artifacts.data?.map((artifact) => (
                 <Button
                   key={artifact.name}
@@ -681,7 +725,7 @@ export function ChatPage() {
                   {artifact.name}
                 </Button>
               ))}
-            </div>
+            </Stack>
           )}
 
           {hasContent ? (
@@ -689,7 +733,7 @@ export function ChatPage() {
               messages={[...(messages.data ?? []), ...pending]}
               stream={stream}
               isLoading={messages.isLoading}
-              onEdit={setInput}
+              onEdit={editMessage}
               onPickOption={answerQuestion}
               isRunning={isRunning}
               permissions={run.permissions}
@@ -698,7 +742,14 @@ export function ChatPage() {
               }
             />
           ) : (
-            <div className={styles.empty}>
+            <Stack
+              direction="row"
+              flex={1}
+              align="center"
+              justify="center"
+              padding="var(--spacing-xl)"
+              className={styles.empty}
+            >
               <Stack gap="var(--spacing-sm)" align="center" className={styles.emptyBox}>
                 <Icon name={isProjectContext ? 'folder' : 'chat'} size={40} />
                 <Typography variant="heading-sm">
@@ -715,7 +766,13 @@ export function ChatPage() {
                     <Typography color="muted" className={styles.emptyText}>
                       {t('projects.introHint')}
                     </Typography>
-                    <div className={styles.suggestions}>
+                    <Stack
+                      direction="row"
+                      wrap
+                      justify="center"
+                      gap="var(--spacing-2xs)"
+                      marginTop="var(--spacing-xs)"
+                    >
                       {projectPath && (
                         <button
                           type="button"
@@ -736,14 +793,20 @@ export function ChatPage() {
                           {t(`projects.actions.${key}`)}
                         </button>
                       ))}
-                    </div>
+                    </Stack>
                   </>
                 ) : (
                   <>
                     <Typography color="muted" className={styles.emptyText}>
                       {t('chat.emptyText')}
                     </Typography>
-                    <div className={styles.suggestions}>
+                    <Stack
+                      direction="row"
+                      wrap
+                      justify="center"
+                      gap="var(--spacing-2xs)"
+                      marginTop="var(--spacing-xs)"
+                    >
                       {SUGGESTIONS.map((key) => (
                         <button
                           key={key}
@@ -754,11 +817,11 @@ export function ChatPage() {
                           {t(`chat.suggestions.${key}`)}
                         </button>
                       ))}
-                    </div>
+                    </Stack>
                   </>
                 )}
               </Stack>
-            </div>
+            </Stack>
           )}
 
           <ChatComposer

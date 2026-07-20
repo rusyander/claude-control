@@ -43,6 +43,7 @@ export function SettingsTopic() {
             tr('canTheme'),
             tr('canSpendUnit'),
             tr('canBackup'),
+            tr('canTransfer'),
             tr('canWatch'),
           ]}
           cant={[tr('cantLogin'), tr('cantToken'), tr('cantChange'), tr('cantSync')]}

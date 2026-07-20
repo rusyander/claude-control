@@ -148,6 +148,27 @@ describe('getPricing', () => {
       expect(getPricing('claude-haiku-4-5', { overrides: { opus: own }, at: AT }).input).toBe(1);
       expect(getPricing('claude-haiku-4-5', { overrides: { opus: own }, at: AT })).not.toEqual(own);
     });
+
+    it('при нескольких подходящих фрагментах побеждает самый точный (длинный)', () => {
+      const broad: ModelPricing = { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 };
+      const exact: ModelPricing = { input: 9, output: 9, cacheRead: 9, cacheWrite: 9 };
+
+      // Точный фрагмент 'claude-opus-4-8' специфичнее общего 'opus' — берётся он.
+      expect(
+        getPricing('claude-opus-4-8', {
+          overrides: { opus: broad, 'claude-opus-4-8': exact },
+          at: AT,
+        }),
+      ).toEqual(exact);
+
+      // Порядок ключей на выбор не влияет — и в обратном порядке точный побеждает.
+      expect(
+        getPricing('claude-opus-4-8', {
+          overrides: { 'claude-opus-4-8': exact, opus: broad },
+          at: AT,
+        }),
+      ).toEqual(exact);
+    });
   });
 
   describe('подставленный прайс', () => {

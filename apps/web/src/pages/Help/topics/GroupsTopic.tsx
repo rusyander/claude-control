@@ -47,8 +47,10 @@ export function GroupsTopic() {
           can={[
             tr('canCollect'),
             tr('canToggleGroup'),
+            tr('canGroupEnv'),
             tr('canToggleAutomation'),
             tr('canBadge'),
+            tr('canConflict'),
             tr('canSandbox'),
             tr('canAutomation'),
             tr('canAssistant'),
@@ -56,10 +58,8 @@ export function GroupsTopic() {
           cant={[
             tr('cantOverride'),
             tr('cantRevive'),
-            tr('cantGroupEnv'),
             tr('cantKnow'),
             tr('cantMagic'),
-            tr('cantConflict'),
             tr('cantNest'),
           ]}
         />

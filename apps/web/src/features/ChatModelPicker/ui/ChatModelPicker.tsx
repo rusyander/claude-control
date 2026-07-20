@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
+import { Stack } from '@shared/ui/stack';
 import { MODEL_OPTIONS, EFFORT_LEVELS, modelLabel } from '@shared/lib/chat-model';
+import type { ChatModelPickerProps } from './ChatModelPicker.types';
 import styles from './ChatModelPicker.module.scss';
 
 /**
@@ -11,19 +13,6 @@ import styles from './ChatModelPicker.module.scss';
  * Намеренно нативные select: компактно в шапке, правильно работают с клавиатурой
  * и экранными дикторами, и их не нужно чинить при обновлении браузера.
  */
-
-interface ChatModelPickerProps {
-  /** Оверрайд модели для этого чата ('' = брать из настроек). */
-  model: string;
-  /** Оверрайд глубины для этого чата ('' = брать из настроек). */
-  effort: string;
-  /** Модель по умолчанию из настроек — чтобы подписать пункт «по умолчанию». */
-  defaultModel: string;
-  /** Глубина по умолчанию из настроек. */
-  defaultEffort: string;
-  onModelChange: (value: string) => void;
-  onEffortChange: (value: string) => void;
-}
 
 export function ChatModelPicker({
   model,
@@ -42,7 +31,7 @@ export function ChatModelPicker({
     : t('chat.effortAuto');
 
   return (
-    <div className={styles.picker}>
+    <Stack direction="row" align="center" gap="var(--spacing-3xs)">
       <select
         className={styles.select}
         value={model}
@@ -72,6 +61,6 @@ export function ChatModelPicker({
           </option>
         ))}
       </select>
-    </div>
+    </Stack>
   );
 }

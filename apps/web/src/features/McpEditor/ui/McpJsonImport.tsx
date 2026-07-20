@@ -7,11 +7,8 @@ import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
 import type { McpServerDraft } from '@agentdeck/contracts';
 import { mcpServerApi } from '@entities/McpServer';
+import type { McpJsonImportProps } from './McpJsonImport.types';
 import styles from './McpFormModal.module.scss';
-
-interface McpJsonImportProps {
-  onDone: () => void;
-}
 
 /**
  * Пакетное добавление MCP-серверов из JSON.

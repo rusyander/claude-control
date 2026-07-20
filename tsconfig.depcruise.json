@@ -1,0 +1,14 @@
+{
+  "//": "Только для dependency-cruiser: даёт ему алиасы фронта без extends монорепы.",
+  "//2": "Пути от корня репозитория (baseUrl='.'), чтобы depcruise резолвил @shared и т.д.",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@app/*": ["apps/web/src/app/*"],
+      "@pages/*": ["apps/web/src/pages/*"],
+      "@features/*": ["apps/web/src/features/*"],
+      "@entities/*": ["apps/web/src/entities/*"],
+      "@shared/*": ["apps/web/src/shared/*"]
+    }
+  }
+}

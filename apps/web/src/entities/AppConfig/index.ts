@@ -4,4 +4,6 @@ export {
   useOverview,
   useUpdateSettings,
   useSetLocation,
+  useClaudeMd,
+  useUpdateClaudeMd,
 } from './api/AppConfigApi';

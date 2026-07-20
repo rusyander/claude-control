@@ -168,6 +168,33 @@ async function runPluginCommand(args: string[]): Promise<CommandResult> {
 }
 
 /**
+ * Источник маркетплейса — репозиторий, URL или путь. Значение уходит в команду,
+ * а на Windows команда идёт через оболочку, поэтому метасимволы и пробел сюда не
+ * пускаем: разрешены только буквы, цифры и безопасные знаки адреса/пути.
+ */
+const MARKETPLACE_SOURCE = /^[A-Za-z0-9._~:/@\\-]{1,300}$/;
+
+/** Добавить маркетплейс: `claude plugin marketplace add <источник>`. */
+export function addMarketplace(source: string): Promise<CommandResult> {
+  if (!MARKETPLACE_SOURCE.test(source)) {
+    return Promise.resolve({
+      ok: false,
+      output: `Недопустимый источник: ${source}`,
+      needsRestart: false,
+    });
+  }
+  return runPluginCommand(['marketplace', 'add', source]);
+}
+
+/** Убрать маркетплейс по имени: `claude plugin marketplace remove <имя>`. */
+export function removeMarketplace(name: string): Promise<CommandResult> {
+  if (!MARKETPLACE_SOURCE.test(name)) {
+    return Promise.resolve({ ok: false, output: `Недопустимое имя: ${name}`, needsRestart: false });
+  }
+  return runPluginCommand(['marketplace', 'remove', name]);
+}
+
+/**
  * Идентификатор приходит из запроса, а на Windows команда уходит в оболочку —
  * поэтому он сверяется с допустимым видом до запуска. Отказ возвращается
  * обычным ответом: страница плагинов покажет его как результат операции.

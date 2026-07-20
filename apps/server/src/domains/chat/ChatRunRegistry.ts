@@ -62,6 +62,14 @@ interface RegisteredRun {
   sessionId?: string;
   subscribers: Set<RunSubscriber>;
   cleanupTimer?: ReturnType<typeof setTimeout>;
+  /** Момент завершения (мс) — окно grace, в котором прогон ещё в буфере. */
+  finishedAt?: number;
+  /**
+   * Расход, накопленный ИМЕННО этим прогоном. Нужен, чтобы при ретрае поверх
+   * упавшей попытки откатить её вклад из общего счётчика — иначе он задвоится.
+   */
+  spentCostUsd: number;
+  spentTokens: number;
 }
 
 /** Сколько держать завершённый прогон в буфере — на догон при переподключении. */
@@ -70,6 +78,10 @@ const GRACE_MS = 60_000;
 export class ChatRunRegistry {
   private runs = new Map<string, RegisteredRun>();
   private readonly createRun: RunFactory;
+
+  /** Накопленный за сеанс сервера расход — переживает перезагрузку вкладки. */
+  private totalCostUsd = 0;
+  private totalTokens = 0;
 
   /**
    * Фабрика прогона: по умолчанию — настоящий CLI, в тестах — управляемый фейк.
@@ -99,7 +111,17 @@ export class ChatRunRegistry {
     const existing = this.runs.get(chatId);
     if (existing && existing.status === 'running') return;
     // Перезапуск поверх завершённого (повтор упавшего) — чистим старый буфер.
-    if (existing) this.remove(chatId);
+    // Если прошлый прогон УПАЛ, его расход уже осел в общем счётчике, а ретрай
+    // посчитает всё заново — поэтому вклад упавшей попытки откатываем, чтобы он
+    // не задвоился. Успешный (done) прогон свой расход сохраняет: это
+    // состоявшийся ход разговора, а не отменённая попытка.
+    if (existing) {
+      if (existing.status === 'error') {
+        this.totalCostUsd -= existing.spentCostUsd;
+        this.totalTokens -= existing.spentTokens;
+      }
+      this.remove(chatId);
+    }
 
     const run = this.createRun();
     const registered: RegisteredRun = {
@@ -112,6 +134,8 @@ export class ChatRunRegistry {
       errored: false,
       sessionId: meta.sessionId,
       subscribers: new Set(),
+      spentCostUsd: 0,
+      spentTokens: 0,
     };
     this.runs.set(chatId, registered);
 
@@ -146,6 +170,20 @@ export class ChatRunRegistry {
     if (event.kind === 'done' && event.sessionId) run.sessionId = event.sessionId;
     if (event.kind === 'error') run.errored = true;
 
+    // Накопленный расход считаем здесь, на сервере: тогда счётчик за сеанс не
+    // обнуляется при перезагрузке вкладки, как и сами прогоны. Дублируем вклад в
+    // самом прогоне (spent*) — чтобы при ретрае упавшей попытки откатить именно
+    // её долю из общего счётчика, а не гадать.
+    if (event.kind === 'usage') {
+      const tokens = event.input + event.output + event.cacheRead + event.cacheCreation;
+      run.spentTokens += tokens;
+      this.totalTokens += tokens;
+    }
+    if (event.kind === 'done') {
+      run.spentCostUsd += event.costUsd;
+      this.totalCostUsd += event.costUsd;
+    }
+
     const buffered: BufferedEvent = { seq: ++run.seq, event };
     run.events.push(buffered);
     for (const subscriber of run.subscribers) subscriber.send(buffered);
@@ -155,6 +193,7 @@ export class ChatRunRegistry {
   private finish(run: RegisteredRun): void {
     if (run.status !== 'running') return;
     run.status = run.errored ? 'error' : 'done';
+    run.finishedAt = Date.now();
     // Закрываем текущих слушателей, но буфер держим ещё минуту — вдруг клиент
     // переподключается и хочет догнать хвост с терминальным событием.
     for (const subscriber of run.subscribers) subscriber.close();
@@ -198,11 +237,21 @@ export class ChatRunRegistry {
     for (const chatId of [...this.runs.keys()]) this.stop(chatId);
   }
 
-  /** Идущие прогоны — для восстановления просмотра после перезагрузки страницы. */
+  /**
+   * Прогоны для восстановления просмотра после перезагрузки страницы: идущие —
+   * чтобы дочитать живой поток; плюс недавно завершённые УСПЕШНО (в пределах
+   * grace) — чтобы лента догнала их терминальный хвост (done/расход/точку
+   * статуса), если прогон закончился, пока вкладка была закрыта, а не только
+   * перечитала историю. Упавшие сюда не берём: заново отдавать поток с ошибкой
+   * (и, возможно, ловить авто-ретрай) незачем.
+   */
   active(): { chatId: string; sessionId?: string; projectPath?: string; seq: number }[] {
+    const now = Date.now();
     const list: { chatId: string; sessionId?: string; projectPath?: string; seq: number }[] = [];
     for (const run of this.runs.values()) {
-      if (run.status !== 'running') continue;
+      const recentlyDone =
+        run.status === 'done' && run.finishedAt !== undefined && now - run.finishedAt <= GRACE_MS;
+      if (run.status !== 'running' && !recentlyDone) continue;
       list.push({
         chatId: run.chatId,
         sessionId: run.sessionId,
@@ -211,6 +260,11 @@ export class ChatRunRegistry {
       });
     }
     return list;
+  }
+
+  /** Накопленный за сеанс сервера расход — для счётчика в пульте агентов. */
+  spend(): { costUsd: number; tokens: number } {
+    return { costUsd: this.totalCostUsd, tokens: this.totalTokens };
   }
 
   private remove(chatId: string): void {

@@ -35,12 +35,6 @@
   font-weight: var(--font-weight-medium);
 }
 
-.item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2xs);
-}
-
 .bullet {
   color: var(--color-fg-subtle);
   flex-shrink: 0;

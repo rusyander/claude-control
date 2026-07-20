@@ -11,7 +11,7 @@ import { SearchField } from '@shared/ui/search-field';
 import { VirtualList } from '@shared/ui/virtual-list';
 import { useElementHeight } from '@shared/hooks/use-element-height';
 import { formatDate } from '@shared/lib/format';
-import type { ChatListProps } from './ChatList.types';
+import type { ChatListProps, ChatRowProps } from './ChatList.types';
 import styles from './ChatList.module.scss';
 
 /**
@@ -132,13 +132,6 @@ function timeGroup(iso: string): TimeGroup {
   const weekAgo = new Date(startOfToday);
   weekAgo.setDate(weekAgo.getDate() - 7);
   return date.getTime() >= weekAgo.getTime() ? 'thisWeek' : 'earlier';
-}
-
-interface ChatRowProps {
-  chat: ChatSummary;
-  isActive: boolean;
-  language: string;
-  onSelect: () => void;
 }
 
 function ChatRow({ chat, isActive, language, onSelect }: ChatRowProps) {

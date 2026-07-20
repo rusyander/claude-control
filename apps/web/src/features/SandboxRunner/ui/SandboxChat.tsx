@@ -6,11 +6,11 @@ import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
 import { TextField } from '@shared/ui/text-field';
-import { useSandboxRun } from '@entities/Sandbox/model/useSandboxRun';
-import type { SandboxKind } from '@entities/Sandbox/api/SandboxApi';
+import { useSandboxRun } from '@entities/Sandbox';
 import { toast } from '@shared/lib/toast';
 import { useDraft } from '@shared/lib/draft';
-import { buildTestPrompts, type TestContext } from '../model/buildTestPrompt';
+import { buildTestPrompts } from '../model/buildTestPrompt';
+import type { SandboxChatProps } from './SandboxChat.types';
 import styles from './SandboxModal.module.scss';
 
 /**
@@ -40,7 +40,7 @@ export function SandboxChat({ sandboxId, kind, title, context }: SandboxChatProp
 
       {/* Готовые запросы: нажатие подставляет текст, вторая кнопка копирует —
           тот же запрос бывает нужен снаружи, в терминале. */}
-      <div className={styles.chips}>
+      <Stack direction="row" gap="var(--spacing-2xs)" wrap>
         {suggestions.map((suggestion) => (
           <span key={suggestion.label} className={styles.chip} title={suggestion.prompt}>
             <button
@@ -64,7 +64,7 @@ export function SandboxChat({ sandboxId, kind, title, context }: SandboxChatProp
             </button>
           </span>
         ))}
-      </div>
+      </Stack>
 
       <TextField
         label={t('sandbox.prompt')}
@@ -98,13 +98,13 @@ export function SandboxChat({ sandboxId, kind, title, context }: SandboxChatProp
         {state.costUsd !== undefined && <Badge tone="neutral">${state.costUsd.toFixed(3)}</Badge>}
 
         {state.tools.length > 0 && (
-          <div className={styles.toolList}>
+          <Stack direction="row" gap="var(--spacing-3xs)" wrap>
             {[...new Set(state.tools)].map((tool) => (
               <Badge key={tool} tone="info">
                 {tool}
               </Badge>
             ))}
-          </div>
+          </Stack>
         )}
       </Stack>
 
@@ -123,11 +123,4 @@ export function SandboxChat({ sandboxId, kind, title, context }: SandboxChatProp
       </div>
     </Stack>
   );
-}
-
-interface SandboxChatProps {
-  sandboxId: string;
-  kind: SandboxKind;
-  title: string;
-  context?: Omit<TestContext, 'title'>;
 }

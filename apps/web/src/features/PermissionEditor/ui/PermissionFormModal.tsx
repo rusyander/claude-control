@@ -14,8 +14,9 @@ import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { permissionApi } from '@entities/Permission';
-import { BulkCreate } from '@features/BulkCreate';
+import { BulkCreate } from '@shared/ui/bulk-create';
 import type { PermissionFormModalProps } from './PermissionFormModal.types';
+import { looksLikePermission } from '../model/looksLikePermission';
 import styles from './PermissionFormModal.module.scss';
 
 const DECISIONS: PermissionDecision[] = ['allow', 'ask', 'deny'];
@@ -93,7 +94,7 @@ export function PermissionFormModal({
       }
     >
       {!rule && (
-        <div className={styles.modeTabs}>
+        <Stack direction="row" gap="var(--spacing-3xs)" className={styles.modeTabs}>
           <Button
             size="sm"
             variant={!isBulk ? 'primary' : 'ghost'}
@@ -104,7 +105,7 @@ export function PermissionFormModal({
           <Button size="sm" variant={isBulk ? 'primary' : 'ghost'} onClick={() => setIsBulk(true)}>
             {t('bulk.modeMany')}
           </Button>
-        </div>
+        </Stack>
       )}
 
       {isBulk ? (
@@ -243,6 +244,12 @@ export function PermissionFormModal({
               isMono
               autoFocus={Boolean(rule)}
             />
+
+            {!looksLikePermission(pattern) && (
+              <Typography variant="caption" color="warning" as="span">
+                {t('permissions.patternWarning')}
+              </Typography>
+            )}
 
             <Stack gap="var(--spacing-2xs)">
               <Typography variant="body-sm" weight="medium" as="span">

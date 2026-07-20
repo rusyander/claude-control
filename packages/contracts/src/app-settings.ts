@@ -65,6 +65,11 @@ export const appSettingsSchema = object({
   revealSecretsByDefault: boolean().default(false),
   /** Делать резервную копию файла перед каждой записью. */
   backupBeforeWrite: boolean().default(true),
+  /**
+   * Сколько резервных копий одного файла хранить (ротация). Больше — глубже
+   * история отката; меньше — меньше копий, в том числе секретов, на диске.
+   */
+  backupKeep: number().int().min(1).max(100).default(10),
   /** Следить за файлами и обновлять интерфейс при внешних изменениях. */
   watchFiles: boolean().default(true),
   /** Крупнее шрифт и заметнее фокус — для доступности. */

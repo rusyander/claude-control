@@ -10,6 +10,7 @@ export * from './permission-presets';
 export * from './env';
 export * from './groups';
 export * from './app-settings';
+export * from './app-state';
 export * from './analytics';
 export * from './plugins';
 export * from './chat';

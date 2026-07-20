@@ -6,7 +6,7 @@ import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
 import { Icon } from '@shared/ui/icon';
-import { useMcpTools, useCallMcpTool } from '@entities/Sandbox/api/SandboxApi';
+import { useMcpTools, useCallMcpTool } from '@entities/Sandbox';
 import styles from './SandboxModal.module.scss';
 
 /**

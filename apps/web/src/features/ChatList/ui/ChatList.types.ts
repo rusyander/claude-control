@@ -7,3 +7,10 @@ export interface ChatListProps {
   onSelect: (chat: ChatSummary) => void;
   onCreate: () => void;
 }
+
+export interface ChatRowProps {
+  chat: ChatSummary;
+  isActive: boolean;
+  language: string;
+  onSelect: () => void;
+}

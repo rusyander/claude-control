@@ -47,6 +47,11 @@ export const mcpServerSchema = object({
   groupIds: array(string()),
   /** Сколько инструментов отдаёт сервер — заполняется после проверки. */
   toolCount: number().optional(),
+  /**
+   * Есть ли сохранённый OAuth-токен. Только у сетевых серверов; по нему
+   * интерфейс решает, показать «Авторизоваться» или «Авторизован · Выйти».
+   */
+  hasOAuth: boolean().default(false),
 });
 
 export type McpServer = Infer<typeof mcpServerSchema>;

@@ -69,7 +69,7 @@ export function FolderPicker({ isOpen, onOpenChange, onPick }: FolderPickerProps
         </Stack>
       }
     >
-      <div className={styles.roots}>
+      <Stack direction="row" wrap gap="var(--spacing-2xs)" className={styles.roots}>
         {roots.data?.map((root) => (
           <button
             key={root.path}
@@ -85,7 +85,7 @@ export function FolderPicker({ isOpen, onOpenChange, onPick }: FolderPickerProps
             <Icon name="chevronLeft" size={14} /> {t('folderPicker.up')}
           </button>
         )}
-      </div>
+      </Stack>
 
       <div className={styles.list}>
         {isLoading && <SkeletonList rows={6} withActions={false} />}

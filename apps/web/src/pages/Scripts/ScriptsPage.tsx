@@ -14,7 +14,7 @@ import { ScriptFormModal } from '@features/ScriptEditor';
 import { DeleteButton } from '@features/EntityDelete';
 import { SandboxButton } from '@features/SandboxRunner';
 import { ResourceFileTree } from '@features/ResourceFiles';
-import { useScripts, useDeleteScript, type ScriptFile } from '@entities/Script/api/ScriptApi';
+import { useScripts, useDeleteScript, type ScriptFile } from '@entities/Script';
 import styles from './ScriptsPage.module.scss';
 
 /**

@@ -4,6 +4,7 @@ import { OverviewTopic } from '../topics/OverviewTopic';
 import { AnalyticsTopic } from '../topics/AnalyticsTopic';
 import { ChatTopic } from '../topics/ChatTopic';
 import { RulesTopic } from '../topics/RulesTopic';
+import { ClaudeMdTopic } from '../topics/ClaudeMdTopic';
 import { SkillsTopic } from '../topics/SkillsTopic';
 import { HooksTopic } from '../topics/HooksTopic';
 import { ScriptsTopic } from '../topics/ScriptsTopic';
@@ -53,6 +54,7 @@ export const HELP_GROUPS: HelpGroup[] = [
     labelKey: 'nav.sectionBehavior',
     topics: [
       { id: 'rules', icon: 'rules', pagePath: '/rules', Content: RulesTopic },
+      { id: 'claudeMd', icon: 'file', pagePath: '/claude-md', Content: ClaudeMdTopic },
       { id: 'skills', icon: 'skills', pagePath: '/skills', Content: SkillsTopic },
       { id: 'hooks', icon: 'hooks', pagePath: '/hooks', Content: HooksTopic },
       { id: 'scripts', icon: 'scripts', pagePath: '/scripts', Content: ScriptsTopic },

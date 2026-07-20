@@ -84,6 +84,7 @@ export function McpTopic() {
             tr('canImport'),
             tr('canTransport'),
             tr('canHeaders'),
+            tr('canOAuth'),
             tr('canAssistant'),
             tr('canHealth'),
             tr('canProbe'),

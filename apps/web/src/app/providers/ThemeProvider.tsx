@@ -1,10 +1,7 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSettings } from '@entities/AppConfig';
-
-interface ThemeProviderProps {
-  children: ReactNode;
-}
+import type { ThemeProviderProps } from './ThemeProvider.types';
 
 /**
  * Применяет настройки оформления к документу. Тема и режимы доступности

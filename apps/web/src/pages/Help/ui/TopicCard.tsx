@@ -3,7 +3,7 @@ import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
-import { HELP_ROUTE } from '../model/topics';
+import { HELP_ROUTE } from '@shared/config/routes';
 import styles from './help-kit.module.scss';
 import type { TopicCardProps } from './help-kit.types';
 

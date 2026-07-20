@@ -49,9 +49,11 @@ export function parsePricingTable(markdown: string): PricingEntry[] {
   const columnOf = new Map<keyof PricingEntry['price'], number>();
 
   for (const column of COLUMNS) {
-    // «output» встречается и в «Output Tokens», и внутри других заголовков —
-    // берём последнее совпадение, оно и есть колонка вывода.
-    const index = header.findIndex((cell) => cell.includes(column.matches));
+    // «output» встречается и в «Output Tokens», и внутри других заголовков
+    // (например, гипотетическая колонка «Batch Output» слева) — берём ПОСЛЕДНЕЕ
+    // совпадение, оно и есть колонка вывода. findIndex брал первое и уводил
+    // цену вывода в чужую колонку.
+    const index = lastIndexMatching(header, column.matches);
     if (index < 0) return [];
     columnOf.set(column.field, index);
   }
@@ -71,6 +73,14 @@ export function parsePricingTable(markdown: string): PricingEntry[] {
   }
 
   return entries;
+}
+
+/** Индекс ПОСЛЕДНЕЙ ячейки заголовка, содержащей подстроку. -1, если нет. */
+function lastIndexMatching(header: string[], needle: string): number {
+  for (let index = header.length - 1; index >= 0; index -= 1) {
+    if (header[index]!.includes(needle)) return index;
+  }
+  return -1;
 }
 
 /** `| a | b |` → `['a', 'b']`. Крайние пустые ячейки от обрамляющих палок. */

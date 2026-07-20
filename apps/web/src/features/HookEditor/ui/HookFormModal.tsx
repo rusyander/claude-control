@@ -10,7 +10,7 @@ import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
-import { BulkPresets } from '@features/BulkPresets';
+import { BulkPresets } from '@shared/ui/bulk-presets';
 import { hookApi } from '@entities/Hook';
 import { HOOK_PRESETS, type HookPreset } from '../model/hookPresets';
 import { MatcherPicker } from './MatcherPicker';
@@ -140,7 +140,7 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
       }
     >
       {!hook && (
-        <div className={styles.modeTabs}>
+        <Stack direction="row" gap="var(--spacing-3xs)" className={styles.modeTabs}>
           {(['constructor', 'bulk'] as const).map((item) => (
             <Button
               key={item}
@@ -151,7 +151,7 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
               {t(`hooks.mode_${item}`)}
             </Button>
           ))}
-        </div>
+        </Stack>
       )}
 
       {mode === 'bulk' ? (

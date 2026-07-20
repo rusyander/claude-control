@@ -8,6 +8,8 @@ import {
   enablePlugin,
   disablePlugin,
   updatePlugin,
+  addMarketplace,
+  removeMarketplace,
 } from '../domains/plugins.ts';
 
 /**
@@ -36,5 +38,14 @@ export function registerPluginRoutes(app: FastifyInstance, ctx: ServerContext): 
 
   app.post<{ Params: { id: string } }>('/api/plugins/:id/update', (request) =>
     updatePlugin(request.params.id),
+  );
+
+  // Маркетплейсы: раньше источник добавляли только командой claude в терминале.
+  app.post<{ Body: { source: string } }>('/api/plugins/marketplaces', (request) =>
+    addMarketplace(request.body.source ?? ''),
+  );
+
+  app.delete<{ Params: { name: string } }>('/api/plugins/marketplaces/:name', (request) =>
+    removeMarketplace(decodeURIComponent(request.params.name)),
   );
 }

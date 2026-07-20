@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
+import { queryKeys } from '@shared/api/query-keys';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
@@ -10,6 +12,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { DeleteButton } from '@features/EntityDelete';
 import { SandboxButton } from '@features/SandboxRunner';
+import { useStartOAuth, useClearOAuth } from '@entities/McpServer';
 import type { HealthResult, McpServerCardProps } from './McpServerCard.types';
 
 /**
@@ -24,8 +27,12 @@ export function McpServerCard({
   isDeleting,
 }: McpServerCardProps) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [health, setHealth] = useState<HealthResult | null>(null);
   const [isChecking, setIsChecking] = useState(false);
+
+  const startOAuth = useStartOAuth();
+  const clearOAuth = useClearOAuth();
 
   const checkHealth = async (): Promise<void> => {
     setIsChecking(true);
@@ -35,6 +42,36 @@ export function McpServerCard({
     } finally {
       setIsChecking(false);
     }
+  };
+
+  // OAuth есть только у сетевых серверов; у stdio авторизоваться негде.
+  const canOAuth = server.transport !== 'stdio';
+
+  const authorize = (): void => {
+    // Окно открываем синхронно по клику: если ждать ответа сервера, а потом
+    // открывать, блокировщик всплывающих окон успеет его срезать.
+    const popup = window.open('about:blank', 'mcp-oauth', 'width=600,height=760');
+
+    startOAuth.mutate(server.id, {
+      onSuccess: (result) => {
+        if (result.status === 'authorized') {
+          popup?.close();
+          void queryClient.invalidateQueries({ queryKey: queryKeys.mcp });
+          return;
+        }
+        if (result.authorizationUrl && popup) {
+          popup.location.href = result.authorizationUrl;
+          // Окно закрылось — вход, скорее всего, завершён: обновляем статус.
+          const timer = window.setInterval(() => {
+            if (popup.closed) {
+              window.clearInterval(timer);
+              void queryClient.invalidateQueries({ queryKey: queryKeys.mcp });
+            }
+          }, 1000);
+        }
+      },
+      onError: () => popup?.close(),
+    });
   };
 
   const status = health?.health ?? server.health;
@@ -59,6 +96,7 @@ export function McpServerCard({
                 {t('mcp.failed')}
               </Badge>
             )}
+            {canOAuth && server.hasOAuth && <Badge tone="success">{t('mcp.authorized')}</Badge>}
             {!server.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
           </Stack>
 
@@ -76,6 +114,26 @@ export function McpServerCard({
         </Stack>
 
         <Stack direction="row" align="center" gap="var(--spacing-xs)" flexShrink={0}>
+          {canOAuth &&
+            (server.hasOAuth ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => clearOAuth.mutate(server.id)}
+                isLoading={clearOAuth.isPending}
+              >
+                {t('mcp.signOut')}
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={authorize}
+                isLoading={startOAuth.isPending}
+              >
+                {t('mcp.authorize')}
+              </Button>
+            ))}
           <Button size="sm" onClick={checkHealth} isLoading={isChecking}>
             {t('mcp.checkHealth')}
           </Button>

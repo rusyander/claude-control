@@ -14,3 +14,11 @@ export interface ProjectListProps {
   /** Открыть окно параллельного запуска в нескольких проектах. */
   onParallelLaunch?: () => void;
 }
+
+export interface ProjectRowProps {
+  project: ProjectInfo;
+  isActive: boolean;
+  status: RunStatus;
+  language: string;
+  onOpen: () => void;
+}

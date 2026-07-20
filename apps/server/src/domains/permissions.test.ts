@@ -159,6 +159,18 @@ describe('permissions', () => {
       expect(saved.permissions.allow).toEqual(['Read(a)', 'Read(b)', 'Read(c)']);
     });
 
+    it('повторное сохранение существующего правила не переупорядочивает список', () => {
+      // Список в файле уже в непривычном порядке (правили руками). Повторное
+      // сохранение того же правила ничего не добавляет — значит и трогать чужой
+      // порядок незачем: сортируем только при реальном добавлении.
+      writeSettings({ permissions: { allow: ['Read(c)', 'Read(a)', 'Read(b)'] } });
+
+      savePermission(settingsPath, null, draft({ pattern: 'Read(a)', decision: 'allow' }));
+
+      const saved = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      expect(saved.permissions.allow).toEqual(['Read(c)', 'Read(a)', 'Read(b)']);
+    });
+
     it('перемещает правило между списками, убирая его из старого', () => {
       writeSettings({ permissions: { allow: ['Bash(ls:*)'] } });
 

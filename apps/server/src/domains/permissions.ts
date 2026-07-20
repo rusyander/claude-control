@@ -90,9 +90,14 @@ export function savePermission(
     }
   }
 
+  // Сортируем только когда реально добавили правило: список приложение и так
+  // держит отсортированным, поэтому повторное сохранение (переезд, дубль)
+  // не нужно переупорядочивать — незачем трогать порядок, который уже на месте.
   const target = (settings.permissions[draft.decision] ??= []);
-  if (!target.includes(draft.pattern)) target.push(draft.pattern);
-  target.sort();
+  if (!target.includes(draft.pattern)) {
+    target.push(draft.pattern);
+    target.sort();
+  }
 
   return writeJsonFile(settingsPath, settings, { backupDir });
 }

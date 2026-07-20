@@ -30,6 +30,15 @@ async function getOverview(): Promise<Overview> {
   return data;
 }
 
+async function getClaudeMd(): Promise<string> {
+  const { data } = await apiClient.get<{ content: string }>('/claude-md');
+  return data.content;
+}
+
+async function putClaudeMd(content: string): Promise<void> {
+  await apiClient.put('/claude-md', { content });
+}
+
 // Хуки: компоненты работают только с ними.
 
 export function useLocation() {
@@ -42,6 +51,24 @@ export function useSettings() {
 
 export function useOverview() {
   return useQuery({ queryKey: queryKeys.overview, queryFn: getOverview });
+}
+
+export function useClaudeMd() {
+  return useQuery({ queryKey: queryKeys.claudeMd, queryFn: getClaudeMd });
+}
+
+export function useUpdateClaudeMd() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: putClaudeMd,
+    onSuccess: () => {
+      // Правки CLAUDE.md меняют и разбор правил, и обзор.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.claudeMd });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rules });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.overview });
+    },
+    meta: { successMessage: 'claudeMd.saved' },
+  });
 }
 
 export function useUpdateSettings() {

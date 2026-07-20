@@ -115,16 +115,26 @@ export function ChatMessages({
               модель успевает подумать и сходить в инструменты.
             */}
             {stream.isRunning && !stream.text && (
-              <div className={styles.pending}>
+              <Stack
+                direction="row"
+                align="center"
+                gap="var(--spacing-xs)"
+                className={styles.pending}
+              >
                 <span className={styles.dots} aria-hidden="true">
                   <i />
                   <i />
                   <i />
                 </span>
-                <span className={styles.pendingLabel}>
+                <Typography
+                  as="span"
+                  variant="body-sm"
+                  color="muted"
+                  className={styles.pendingLabel}
+                >
                   {stream.tools.length > 0 ? t('chat.pendingTools') : t('chat.pending')}
-                </span>
-              </div>
+                </Typography>
+              </Stack>
             )}
 
             {stream.isRunning && stream.text && <span className={styles.caret} />}

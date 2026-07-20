@@ -7,7 +7,7 @@ import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
-import { BulkCreate } from '@features/BulkCreate';
+import { BulkCreate } from '@shared/ui/bulk-create';
 import { ruleApi } from '@entities/Rule';
 import { RuleBuilder } from './RuleBuilder';
 import {
@@ -94,7 +94,7 @@ export function RuleFormModal({ isOpen, onOpenChange, rule }: RuleFormModalProps
       }
     >
       {!rule && (
-        <div className={styles.modeTabs}>
+        <Stack direction="row" gap="var(--spacing-3xs)" className={styles.modeTabs}>
           {(['simple', 'builder', 'bulk'] as Mode[]).map((item) => (
             <Button
               key={item}
@@ -105,7 +105,7 @@ export function RuleFormModal({ isOpen, onOpenChange, rule }: RuleFormModalProps
               {t(`rules.mode_${item}`)}
             </Button>
           ))}
-        </div>
+        </Stack>
       )}
 
       {mode === 'bulk' ? (

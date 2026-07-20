@@ -78,16 +78,11 @@ export function SkillsTopic() {
             tr('canAssistant'),
             tr('canSearch'),
             tr('canToggle'),
+            tr('canRestore'),
             tr('canSandbox'),
             tr('canLink'),
           ]}
-          cant={[
-            tr('cantRename'),
-            tr('cantAutoRead'),
-            tr('cantGuarantee'),
-            tr('cantRestore'),
-            tr('cantVersions'),
-          ]}
+          cant={[tr('cantRename'), tr('cantAutoRead'), tr('cantGuarantee'), tr('cantVersions')]}
         />
       </HelpSection>
 

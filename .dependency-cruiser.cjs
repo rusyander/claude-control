@@ -1,36 +1,78 @@
-// Эталонный dependency-cruiser фронт-доктрины — усиление границ FSD.
-// npm i -D dependency-cruiser ; запуск: npx depcruise src --config .dependency-cruiser.cjs
+// Границы FSD фронта — усиление из фронт-доктрины, адаптированное под монорепу.
+//
+// Поправки против эталона доктрины (там `src` — корень пакета):
+//  1) правила запускаются из корня монорепы, цель — apps/web/src, поэтому якори
+//     путей — `^apps/web/src/…`, а не `^src/…` (иначе не совпадали бы ни с чем);
+//  2) алиасы @shared/@entities/@features/@pages/@app резолвятся из отдельного
+//     tsconfig без extends (обычный apps/web/tsconfig.json depcruise не грузит);
+//  3) barrel-правило разделено на «снаружи слоёв» и «между слайсами» и НЕ трогает
+//     импорты внутри одного слайса (компонент тянет свои `ui/model/*` — норма).
+//
+// Запуск: depcruise apps/web/src (см. корневой скрипт `depcruise`).
 module.exports = {
   forbidden: [
     { name: 'no-circular', severity: 'error', from: {}, to: { circular: true } },
     {
-      name: 'no-orphans', severity: 'warn',
-      from: { orphan: true, pathNot: '\\.(d\\.ts|test\\.tsx?|stories\\.tsx)$' }, to: {},
+      name: 'no-orphans',
+      severity: 'warn',
+      from: { orphan: true, pathNot: '\\.(d\\.ts|test\\.tsx?|stories\\.tsx)$' },
+      to: {},
     },
-    // Cross-feature запрещён: одна feature не тянет другую
+    // Cross-feature запрещён: одна feature не тянет другую.
+    // Исключение — ResourceFiles: переиспользуемый блок (дерево файлов ресурса),
+    // завязанный на entity Resource, поэтому в shared его не вынести. Его
+    // встраивают редакторы (SkillEditor и др.). Чистый путь на будущее —
+    // перенести его UI в entities/Resource/ui; пока разрешаем точечно.
     {
-      name: 'no-cross-feature', severity: 'error',
-      from: { path: '^src/features/([^/]+)/' },
-      to: { path: '^src/features/(?!$1)([^/]+)/' },
+      name: 'no-cross-feature',
+      severity: 'error',
+      from: { path: '^apps/web/src/features/([^/]+)/' },
+      to: {
+        path: '^apps/web/src/features/(?!$1)([^/]+)/',
+        pathNot: '^apps/web/src/features/ResourceFiles/',
+      },
     },
     // Слои только вниз: entities не тянет features/pages/app
     {
-      name: 'entities-downward-only', severity: 'error',
-      from: { path: '^src/entities/' },
-      to: { path: '^src/(features|pages|app)/' },
+      name: 'entities-downward-only',
+      severity: 'error',
+      from: { path: '^apps/web/src/entities/' },
+      to: { path: '^apps/web/src/(features|pages|app)/' },
     },
     // shared не тянет ничего выше себя
     {
-      name: 'shared-is-leaf', severity: 'error',
-      from: { path: '^src/shared/' },
-      to: { path: '^src/(entities|features|pages|app)/' },
+      name: 'shared-is-leaf',
+      severity: 'error',
+      from: { path: '^apps/web/src/shared/' },
+      to: { path: '^apps/web/src/(entities|features|pages|app)/' },
     },
-    // Deep-import мимо barrel: снаружи сегмента — только через index
+    // Снаружи слоёв (страница, приложение) в сегмент — только через его index,
+    // не в его внутренности.
     {
-      name: 'through-barrel', severity: 'error',
-      from: { pathNot: '^src/shared/' },
-      to: { path: '^src/(entities|features)/[^/]+/[^/]+/.+', pathNot: 'index\\.ts$' },
+      name: 'through-barrel-outer',
+      severity: 'error',
+      from: { path: '^apps/web/src/(?:app|pages)/' },
+      to: {
+        path: '^apps/web/src/(?:entities|features)/[^/]+/[^/]+/.+',
+        pathNot: 'index\\.(ts|tsx)$',
+      },
+    },
+    // Между слайсами: в ЧУЖОЙ сегмент — только через index; свой сегмент
+    // (тот же $1) тянуть можно как угодно — это внутренняя кухня слайса.
+    {
+      name: 'through-barrel-cross-slice',
+      severity: 'error',
+      from: { path: '^apps/web/src/(?:entities|features)/([^/]+)/' },
+      to: {
+        path: '^apps/web/src/(?:entities|features)/([^/]+)/[^/]+/.+',
+        pathNot: ['index\\.(ts|tsx)$', '^apps/web/src/(?:entities|features)/$1/'],
+      },
     },
   ],
-  options: { doNotFollow: { path: 'node_modules' }, tsPreCompilationDeps: true },
+  options: {
+    doNotFollow: { path: 'node_modules' },
+    tsPreCompilationDeps: true,
+    // Алиасы фронта берутся из отдельного tsconfig без extends монорепы.
+    tsConfig: { fileName: 'tsconfig.depcruise.json' },
+  },
 };

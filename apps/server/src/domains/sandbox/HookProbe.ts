@@ -225,6 +225,13 @@ export async function runHookProbe(
       stderr += chunk.toString();
     });
 
+    // Хук волен не читать stdin и выйти сразу (частый случай — SessionStart и
+    // Stop его игнорируют). Тогда запись ниже бьёт в закрытый канал, и поток
+    // stdin выбрасывает `error` (EPIPE на POSIX, EOF на Windows). Необработанное
+    // событие потока роняет весь процесс сервера — поэтому глушим его здесь:
+    // для прогона важен код выхода и вывод хука, а не судьба недописанного ввода.
+    child.stdin.on('error', () => undefined);
+
     child.on('error', (error) => {
       clearTimeout(timer);
       resolve({
@@ -262,8 +269,14 @@ export async function runHookProbe(
       });
     });
 
-    child.stdin.write(JSON.stringify(fixture.payload));
-    child.stdin.end();
+    // try — на случай, если процесс не поднялся и потока ввода нет вовсе:
+    // синхронный бросок здесь ушёл бы мимо обработчика `error` выше.
+    try {
+      child.stdin.write(JSON.stringify(fixture.payload));
+      child.stdin.end();
+    } catch {
+      // Записать вход не удалось — решение примем по коду выхода и выводу.
+    }
   });
 }
 
@@ -292,6 +305,10 @@ export function scriptCommand(scriptPath: string): string {
 
   const quoted = isWindows ? `"${scriptPath}"` : `'${scriptPath}'`;
   if (/\.(mjs|cjs|js)$/i.test(scriptPath)) return `node ${quoted}`;
+  // TypeScript исполняем без сборки: Node в проекте 22.6+, ему хватает
+  // --experimental-strip-types (типы срезаются, JS выполняется). Иначе `.ts`
+  // числился поддержанным, а по факту уходил в `bash script.ts` и не работал.
+  if (/\.(mts|cts|ts)$/i.test(scriptPath)) return `node --experimental-strip-types ${quoted}`;
   if (/\.ps1$/i.test(scriptPath)) {
     const shell = powershellCommand();
     return shell ? `${shell} -File ${quoted}` : '';
@@ -341,13 +358,46 @@ export function readDecision(
   return { decision: 'pass', reason, addedContext };
 }
 
-function tryParse(text: string): unknown {
-  const start = text.indexOf('{');
-  if (start < 0) return undefined;
-
+function parseJson(candidate: string): unknown {
   try {
-    return JSON.parse(text.slice(start, text.lastIndexOf('}') + 1));
+    return JSON.parse(candidate);
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Достаёт вердикт-JSON из вывода хука, не спотыкаясь о логи вокруг него.
+ *
+ * Хук волен печатать в stdout что угодно помимо решения: строку лога, баннер,
+ * прогресс. Раньше брался слепой срез от первого `{` до последнего `}` — и лог
+ * со скобками до/после JSON (`processing {foo}` … `done }`) делал срез невалидным,
+ * а вердикт терялся. Теперь по порядку: (1) весь вывод целиком (обычный случай —
+ * хук печатает только JSON, в т.ч. с отступами в несколько строк); (2) отдельная
+ * строка-JSON среди логов, начиная с ПОСЛЕДНЕЙ — итоговый вердикт хук печатает в
+ * конце; (3) как крайний фолбэк — прежний срез от первого `{` до последнего `}`
+ * (многострочный JSON, окружённый логами без фигурных скобок). Экспортируется
+ * ради тестов.
+ */
+export function tryParse(text: string): unknown {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+
+  const whole = parseJson(trimmed);
+  if (whole !== undefined) return whole;
+
+  const lines = trimmed.split(/\r?\n/);
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i]?.trim() ?? '';
+    if (line.startsWith('{') && line.endsWith('}')) {
+      const parsed = parseJson(line);
+      if (parsed !== undefined) return parsed;
+    }
+  }
+
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start >= 0 && end > start) return parseJson(trimmed.slice(start, end + 1));
+
+  return undefined;
 }

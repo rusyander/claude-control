@@ -100,3 +100,24 @@ export function useUpdatePlugin() {
     return data;
   }, 'toasts.pluginUpdated');
 }
+
+export function useAddMarketplace() {
+  return usePluginCommand(async (source: string) => {
+    const { data } = await apiClient.post<CommandResult>(
+      '/plugins/marketplaces',
+      { source },
+      { timeout: 300_000 },
+    );
+    return data;
+  }, 'toasts.marketplaceAdded');
+}
+
+export function useRemoveMarketplace() {
+  return usePluginCommand(async (name: string) => {
+    const { data } = await apiClient.delete<CommandResult>(
+      `/plugins/marketplaces/${encodeURIComponent(name)}`,
+      { timeout: 120_000 },
+    );
+    return data;
+  }, 'toasts.marketplaceRemoved');
+}

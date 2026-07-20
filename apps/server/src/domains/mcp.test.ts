@@ -86,6 +86,42 @@ describe('mcp', () => {
     });
   });
 
+  describe('дубли имён между секциями', () => {
+    it('имя есть и в active, и в disabled — активная запись побеждает, id не двоится', () => {
+      // Файл правят руками: одно имя может оказаться в обеих секциях. Тогда
+      // должна остаться ровно одна запись (включённая), иначе find/toggle
+      // получили бы два McpServer с одинаковым id.
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          mcpServers: { dup: { type: 'http', url: 'https://active.test/mcp' } },
+          mcpServersDisabled: { dup: { type: 'stdio', command: 'npx' } },
+        }),
+      );
+
+      const all = readMcpServers(configPath, store).filter((server) => server.id === 'dup');
+
+      expect(all).toHaveLength(1);
+      expect(all[0]?.isEnabled).toBe(true);
+      expect(all[0]?.transport).toBe('http');
+      expect(all[0]?.url).toBe('https://active.test/mcp');
+    });
+
+    it('разные имена в обеих секциях остаются обе', () => {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          mcpServers: { on: { type: 'http', url: 'https://a.test/mcp' } },
+          mcpServersDisabled: { off: { type: 'stdio', command: 'npx' } },
+        }),
+      );
+
+      const servers = readMcpServers(configPath, store);
+      expect(servers.find((s) => s.id === 'on')?.isEnabled).toBe(true);
+      expect(servers.find((s) => s.id === 'off')?.isEnabled).toBe(false);
+    });
+  });
+
   describe('заголовки', () => {
     it('читаются из конфига', () => {
       writeConfig({

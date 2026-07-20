@@ -25,7 +25,7 @@ import {
   useSaveAutomation,
   useDeleteAutomation,
 } from '@entities/Group';
-import type { SandboxSelection } from '@entities/Sandbox/api/SandboxApi';
+import type { SandboxSelection } from '@entities/Sandbox';
 import styles from './GroupsPage.module.scss';
 
 /**

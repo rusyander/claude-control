@@ -1,4 +1,4 @@
-import type { ScriptFile } from '@entities/Script/api/ScriptApi';
+import type { ScriptFile } from '@entities/Script';
 
 export interface ScriptFormModalProps {
   isOpen: boolean;

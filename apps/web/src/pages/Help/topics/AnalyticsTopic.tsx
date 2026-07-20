@@ -66,8 +66,15 @@ export function AnalyticsTopic() {
         <CapabilityGrid
           canTitle={t('help.common.canTitle')}
           cantTitle={t('help.common.cantTitle')}
-          can={[tr('canPeriod'), tr('canDetail'), tr('canLive'), tr('canTools'), tr('canSessions')]}
-          cant={[tr('cantLimits'), tr('cantBill'), tr('cantOther'), tr('cantExport')]}
+          can={[
+            tr('canPeriod'),
+            tr('canDetail'),
+            tr('canLive'),
+            tr('canTools'),
+            tr('canSessions'),
+            tr('canExport'),
+          ]}
+          cant={[tr('cantLimits'), tr('cantBill'), tr('cantOther')]}
         />
       </HelpSection>
 

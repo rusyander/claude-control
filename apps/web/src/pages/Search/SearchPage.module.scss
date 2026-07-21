@@ -1,0 +1,27 @@
+.page {
+  max-width: var(--layout-content-max);
+}
+
+.resultLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-lg);
+
+  // Карточки ведут на свои разделы — подсветка на наведении показывает, что по
+  // ним можно перейти (как в плитках обзора).
+  transition: transform var(--duration-fast);
+
+  &:hover > * {
+    border-color: var(--color-accent);
+  }
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.snippet {
+  white-space: pre-wrap;
+  max-width: var(--text-measure);
+}

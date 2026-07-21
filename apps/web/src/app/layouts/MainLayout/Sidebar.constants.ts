@@ -22,6 +22,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'nav.sectionMain',
     items: [
       { path: '/', label: 'nav.overview', icon: 'overview', key: 'overview' },
+      { path: '/search', label: 'nav.search', icon: 'search', key: 'search' },
       { path: '/analytics', label: 'nav.analytics', icon: 'analytics', key: 'analytics' },
       { path: '/chat', label: 'nav.chat', icon: 'chat', key: 'chat' },
     ],

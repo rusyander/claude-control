@@ -14,4 +14,5 @@ export * from './app-state';
 export * from './analytics';
 export * from './plugins';
 export * from './chat';
+export * from './search';
 export * from './api';

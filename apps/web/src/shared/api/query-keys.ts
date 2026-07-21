@@ -21,6 +21,8 @@ export const queryKeys = {
   backups: ['backups'] as const,
   /** Сырой глобальный CLAUDE.md — для страницы просмотра/правки целиком. */
   claudeMd: ['claude-md'] as const,
+  /** Глобальный поиск: ключ зависит от запроса, чтобы кешировать по строке. */
+  search: (query: string) => ['search', query] as const,
 };
 
 /** Какие ключи обновлять при изменении конкретного домена на диске. */

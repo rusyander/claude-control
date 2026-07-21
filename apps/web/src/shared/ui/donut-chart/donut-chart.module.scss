@@ -1,0 +1,107 @@
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.chart {
+  position: relative;
+  width: 168px;
+  flex-shrink: 0;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+}
+
+// Дорожка кольца под сегментами: задаёт круг целиком, чтобы состав читался
+// даже когда сумма долей близка к нулю.
+.track {
+  stroke: var(--color-surface-sunken);
+}
+
+.arc {
+  // Прямые торцы: со скруглёнными концы соседних дуг наезжали бы друг на друга
+  // и съедали зазор-разделитель.
+  stroke-linecap: butt;
+  cursor: pointer;
+  transition:
+    stroke-width var(--duration-fast) ease,
+    opacity var(--duration-fast) ease;
+}
+
+.arcDimmed {
+  stroke-linecap: butt;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-3xs);
+  text-align: center;
+  pointer-events: none;
+}
+
+.legend {
+  flex: 1;
+  min-width: 160px;
+}
+
+.legendRow,
+.legendRowActive {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+
+.legendRowActive {
+  background-color: var(--color-surface-sunken);
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.legendLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legendValue,
+.legendPercent {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.tooltip {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -100%);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}

@@ -1,0 +1,75 @@
+.root {
+  position: relative;
+  width: 100%;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+}
+
+// Пустая дорожка под каждой ячейкой: отделяет «ноль активности» от «нет данных»
+// и даёт зону захвата курсором даже там, где заливки нет.
+.track {
+  fill: var(--color-surface-sunken);
+  cursor: default;
+}
+
+// Один тон, насыщенность задаётся через fill-opacity в разметке — это
+// последовательная шкала величины, а не набор категорий.
+.cell {
+  fill: var(--series-1);
+  pointer-events: none;
+}
+
+// Обводка наведённой ячейки цветом текста: контур виден при любой заливке,
+// опознать ячейку можно не только по подсказке.
+.marker {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.axis {
+  display: grid;
+  margin-top: var(--spacing-2xs);
+}
+
+.axisLabel {
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.scale {
+  margin-top: var(--spacing-xs);
+}
+
+// Легенда шкалы: та же серия от слабой к насыщенной, чтобы цвет ячейки можно
+// было сопоставить с величиной.
+.scaleBar {
+  width: 96px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--series-1) 15%, transparent),
+    var(--series-1)
+  );
+}
+
+.tooltip {
+  position: absolute;
+  transform: translate(-50%, -110%);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}

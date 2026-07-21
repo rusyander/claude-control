@@ -71,6 +71,52 @@
   overflow: hidden;
 }
 
+// Совпадение в сниппете поиска по телу — подсветка теми же токенами акцента,
+// что и активная строка, чтобы найденное слово читалось с первого взгляда.
+.mark {
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+// Переключатель режима поиска: «по названию» | «по сообщениям». Сегмент во всю
+// ширину, активная половина подсвечена — как сегмент «Чаты | Проекты» в шапке.
+.modes {
+  padding: var(--spacing-3xs);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+
+.modeButton {
+  flex: 1;
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-subtle);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+
+  &:hover {
+    color: var(--color-fg);
+  }
+}
+
+.modeActive {
+  background: var(--color-surface);
+  color: var(--color-fg);
+  box-shadow: var(--shadow-sm);
+
+  &:hover {
+    color: var(--color-fg);
+  }
+}
+
 // Заголовок группы по дате: разделяет «Сегодня», «Вчера» и остальное, чтобы
 // порядок списка читался с первого взгляда.
 .group {

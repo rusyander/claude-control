@@ -3,6 +3,7 @@ import { statSync } from 'node:fs';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../context.ts';
 import { readChats, readChatMessages } from '../domains/chat/ChatHistory.ts';
+import { searchChats } from '../domains/chat/ChatSearch.ts';
 import { listProjects } from '../domains/chat/ChatProjects.ts';
 import { listRoots, listDirectory } from '../domains/fs/FileBrowser.ts';
 import { detectEditors, resolveEditorCommand, openInEditor } from '../domains/fs/EditorLauncher.ts';
@@ -105,6 +106,16 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
     });
 
   app.get('/api/chats', () => readChats(projectsDir));
+
+  /**
+   * Полнотекстовый поиск по телу переписки: в дополнение к фильтру списка по
+   * заголовку/проекту/превью ищет по самим сообщениям и возвращает разговоры со
+   * сниппетом вокруг совпадения. Читающий, без побочных эффектов; короткий
+   * запрос отдаёт пустой результат, не читая диск.
+   */
+  app.get<{ Querystring: { q?: string } }>('/api/chat/search', (request) =>
+    searchChats(projectsDir, request.query.q ?? ''),
+  );
 
   /** Проекты, с которыми работал Claude Code, — для таба «Проекты» в чате. */
   app.get('/api/chats/projects', () => listProjects(projectsDir));

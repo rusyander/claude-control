@@ -10,24 +10,39 @@ import { Icon } from '@shared/ui/icon';
 import { SearchField } from '@shared/ui/search-field';
 import { VirtualList } from '@shared/ui/virtual-list';
 import { useElementHeight } from '@shared/hooks/use-element-height';
+import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
 import { formatDate } from '@shared/lib/format';
-import type { ChatListProps, ChatRowProps } from './ChatList.types';
+import { useChatBodySearch, MIN_CHAT_SEARCH_LENGTH } from '@entities/Chat';
+import { highlightSnippet } from '../model/highlight';
+import type { ChatListProps, ChatRowProps, ChatSearchMode } from './ChatList.types';
 import styles from './ChatList.module.scss';
 
 /**
  * Список разговоров. Сюда попадает вся история Claude Code, включая работу из
- * терминала и редактора, поэтому чатов сотни — список виртуализирован, а искать
- * можно и по названию, и по проекту, и по последней реплике.
+ * терминала и редактора, поэтому чатов сотни — список виртуализирован. Искать
+ * можно двумя режимами: «по названию» (мгновенный фильтр по заголовку, проекту и
+ * превью) и «по сообщениям» (полнотекстовый поиск по телу переписки на сервере,
+ * со сниппетом вокруг совпадения). Результаты поиска по телу — те же строки
+ * списка, поэтому клик по ним открывает разговор ровно как обычно.
  */
 export function ChatList({ chats, isLoading, activeId, onSelect, onCreate }: ChatListProps) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
+  const [mode, setMode] = useState<ChatSearchMode>('title');
   // Список занимает всю оставшуюся высоту, а виртуализации нужно число.
   const { ref, height } = useElementHeight<HTMLDivElement>(560);
 
-  const found = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+  // Поиск по телу бьёт в сервер, поэтому ввод дебаунсим и запускаем только в
+  // режиме «по сообщениям» — в режиме названия хук отключён (пустой запрос).
+  const debounced = useDebouncedValue(query);
+  const bodyQuery = mode === 'messages' ? debounced.trim() : '';
+  const bodySearch = useChatBodySearch(bodyQuery);
+  const isBodyReady = bodyQuery.length >= MIN_CHAT_SEARCH_LENGTH;
 
+  const found = useMemo<ChatRowData[]>(() => {
+    if (mode === 'messages') return matchBodyHits(chats, bodySearch.data?.hits);
+
+    const needle = query.trim().toLowerCase();
     const matched = needle
       ? chats.filter(
           (chat) =>
@@ -39,12 +54,17 @@ export function ChatList({ chats, isLoading, activeId, onSelect, onCreate }: Cha
 
     // Порядок задаём и здесь, а не только на сервере: список всегда идёт от
     // свежего к старому, что бы ни пришло с бэкенда.
-    return [...matched].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [chats, query]);
+    return [...matched]
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map((chat) => ({ chat }));
+  }, [chats, query, mode, bodySearch.data]);
 
   // Заголовки групп идут строками того же списка — иначе виртуализация и
   // разбивка по датам мешали бы друг другу.
   const rows = useMemo(() => withGroupHeaders(found), [found]);
+
+  const showSkeleton = isLoading || (mode === 'messages' && isBodyReady && bodySearch.isLoading);
+  const searchNeedle = mode === 'messages' ? bodyQuery : '';
 
   return (
     <Stack className={styles.panel}>
@@ -57,22 +77,47 @@ export function ChatList({ chats, isLoading, activeId, onSelect, onCreate }: Cha
           label={t('chat.searchChats')}
           value={query}
           onChange={setQuery}
-          placeholder={t('chat.searchPlaceholder')}
+          placeholder={
+            mode === 'messages' ? t('chat.searchInMessages') : t('chat.searchPlaceholder')
+          }
         />
 
+        <Stack
+          direction="row"
+          gap="var(--spacing-3xs)"
+          role="tablist"
+          aria-label={t('chat.searchMode')}
+          className={styles.modes}
+        >
+          {(['title', 'messages'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={mode === value}
+              className={`${styles.modeButton} ${mode === value ? styles.modeActive : ''}`}
+              onClick={() => setMode(value)}
+            >
+              {t(value === 'title' ? 'chat.searchByTitle' : 'chat.searchByMessages')}
+            </button>
+          ))}
+        </Stack>
+
         <Typography variant="caption" color="subtle">
-          {t('plugins.catalogCount', { found: found.length, total: chats.length })}
+          {mode === 'messages' && !isBodyReady
+            ? t('chat.searchMessagesHint')
+            : t('plugins.catalogCount', { found: found.length, total: chats.length })}
         </Typography>
       </Stack>
 
       <div className={styles.items} ref={ref}>
-        {isLoading && <SkeletonList rows={6} withActions={false} />}
+        {showSkeleton && <SkeletonList rows={6} withActions={false} />}
 
         <VirtualList
           items={rows}
           rowHeight={(row) => (row.kind === 'header' ? GROUP_HEIGHT : ROW_HEIGHT)}
           height={height}
-          getKey={(row) => (row.kind === 'header' ? `group-${row.group}` : row.chat.id)}
+          getKey={(row) => (row.kind === 'header' ? `group-${row.group}` : row.data.chat.id)}
           renderRow={(row) =>
             row.kind === 'header' ? (
               <Typography variant="caption" color="subtle" className={styles.group} as="div">
@@ -80,10 +125,13 @@ export function ChatList({ chats, isLoading, activeId, onSelect, onCreate }: Cha
               </Typography>
             ) : (
               <ChatRow
-                chat={row.chat}
-                isActive={row.chat.id === activeId}
+                chat={row.data.chat}
+                isActive={row.data.chat.id === activeId}
                 language={i18n.language}
-                onSelect={() => onSelect(row.chat)}
+                snippet={row.data.snippet}
+                matchCount={row.data.matchCount}
+                query={searchNeedle}
+                onSelect={() => onSelect(row.data.chat)}
               />
             )
           }
@@ -96,23 +144,52 @@ export function ChatList({ chats, isLoading, activeId, onSelect, onCreate }: Cha
 const ROW_HEIGHT = 100;
 const GROUP_HEIGHT = 32;
 
+/** Строка списка: разговор и, для поиска по телу, его сниппет с числом совпадений. */
+interface ChatRowData {
+  chat: ChatSummary;
+  snippet?: string;
+  matchCount?: number;
+}
+
 type TimeGroup = 'today' | 'yesterday' | 'thisWeek' | 'earlier';
 
 type Row =
-  { kind: 'header'; group: TimeGroup } | { kind: 'chat'; chat: ChatSummary; group: TimeGroup };
+  { kind: 'header'; group: TimeGroup } | { kind: 'chat'; group: TimeGroup; data: ChatRowData };
+
+/**
+ * Совпадения по телу приходят глобально; показываем из них только те, что есть
+ * в видимом списке (он уже ограничен вкладкой), и переносим на строки сниппет с
+ * числом совпадений. Порядок — от свежего к старому, как и в обычном списке.
+ */
+function matchBodyHits(
+  chats: ChatSummary[],
+  hits: { sessionId: string; snippet: string; matchCount: number }[] | undefined,
+): ChatRowData[] {
+  if (!hits || hits.length === 0) return [];
+
+  const bySession = new Map(hits.map((hit) => [hit.sessionId, hit]));
+
+  return chats
+    .filter((chat) => bySession.has(chat.id))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map((chat) => {
+      const hit = bySession.get(chat.id);
+      return { chat, snippet: hit?.snippet, matchCount: hit?.matchCount };
+    });
+}
 
 /** Раскладывает отсортированный список по группам «Сегодня / Вчера / …». */
-function withGroupHeaders(chats: ChatSummary[]): Row[] {
+function withGroupHeaders(items: ChatRowData[]): Row[] {
   const rows: Row[] = [];
   let current: TimeGroup | undefined;
 
-  for (const chat of chats) {
-    const group = timeGroup(chat.updatedAt);
+  for (const data of items) {
+    const group = timeGroup(data.chat.updatedAt);
     if (group !== current) {
       rows.push({ kind: 'header', group });
       current = group;
     }
-    rows.push({ kind: 'chat', chat, group });
+    rows.push({ kind: 'chat', group, data });
   }
 
   return rows;
@@ -134,7 +211,7 @@ function timeGroup(iso: string): TimeGroup {
   return date.getTime() >= weekAgo.getTime() ? 'thisWeek' : 'earlier';
 }
 
-function ChatRow({ chat, isActive, language, onSelect }: ChatRowProps) {
+function ChatRow({ chat, isActive, language, onSelect, snippet, matchCount, query }: ChatRowProps) {
   const { t } = useTranslation();
 
   return (
@@ -149,9 +226,23 @@ function ChatRow({ chat, isActive, language, onSelect }: ChatRowProps) {
           {chat.title}
         </Typography>
 
-        <Typography variant="caption" color="subtle" className={styles.preview}>
-          {chat.isSandbox ? t('chat.sandboxLabel') : projectName(chat)}
-        </Typography>
+        {snippet ? (
+          <Typography variant="caption" color="subtle" className={styles.preview} as="div">
+            {highlightSnippet(snippet, query ?? '').map((part, index) =>
+              part.match ? (
+                <mark key={index} className={styles.mark}>
+                  {part.text}
+                </mark>
+              ) : (
+                <span key={index}>{part.text}</span>
+              ),
+            )}
+          </Typography>
+        ) : (
+          <Typography variant="caption" color="subtle" className={styles.preview}>
+            {chat.isSandbox ? t('chat.sandboxLabel') : projectName(chat)}
+          </Typography>
+        )}
 
         <Stack direction="row" align="center" gap="var(--spacing-3xs)">
           <Typography variant="caption" color="subtle" as="span">
@@ -163,6 +254,15 @@ function ChatRow({ chat, isActive, language, onSelect }: ChatRowProps) {
           <Typography variant="caption" color="subtle" as="span">
             {chat.messageCount}
           </Typography>
+          {matchCount !== undefined && (
+            <>
+              <span className={styles.dot}>·</span>
+              <Icon name="search" size={14} />
+              <Typography variant="caption" color="subtle" as="span">
+                {matchCount}
+              </Typography>
+            </>
+          )}
         </Stack>
       </Stack>
     </button>

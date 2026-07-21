@@ -58,6 +58,39 @@ export const chatMessageSchema = object({
 export type ChatMessage = Infer<typeof chatMessageSchema>;
 
 /**
+ * Совпадение полнотекстового поиска по телу переписки. В отличие от фильтра
+ * списка (заголовок/проект/превью), этот поиск сканирует сами сообщения и
+ * возвращает разговор с фрагментом вокруг найденного места и числом совпадений.
+ */
+export const chatSearchHitSchema = object({
+  /** Идентификатор сессии — он же id разговора в списке, по нему чат и открывается. */
+  sessionId: string(),
+  /** Каталог проекта (имя папки Claude Code), в котором шёл разговор. */
+  project: string(),
+  /** Абсолютный путь рабочей папки — как записан в транскрипте. */
+  projectPath: string(),
+  title: string(),
+  /** Фрагмент текста вокруг первого совпадения, с многоточиями по краям. */
+  snippet: string(),
+  /** Сколько раз запрос встретился в переписке (по всем репликам). */
+  matchCount: number(),
+  /** Чья реплика дала первый сниппет. */
+  role: union([literal('user'), literal('assistant')]),
+  /** Время последней активности, ISO — для сортировки и группировки в списке. */
+  updatedAt: string(),
+});
+
+export type ChatSearchHit = Infer<typeof chatSearchHitSchema>;
+
+export const chatSearchResponseSchema = object({
+  /** Нормализованный (обрезанный) запрос — эхом, чтобы клиент сверил актуальность. */
+  query: string(),
+  hits: array(chatSearchHitSchema),
+});
+
+export type ChatSearchResponse = Infer<typeof chatSearchResponseSchema>;
+
+/**
  * Файл, созданный Claude в рабочей папке чата. Тип определяет вид
  * предпросмотра: страница, размеченный текст, документ, картинка или код.
  */

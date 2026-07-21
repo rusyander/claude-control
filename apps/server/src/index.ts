@@ -13,6 +13,7 @@ import { registerChatRoutes } from './routes/chat-routes.ts';
 import { registerSandboxRoutes } from './routes/sandbox-routes.ts';
 import { registerResourceRoutes } from './routes/resource-routes.ts';
 import { registerBackupRoutes } from './routes/backup-routes.ts';
+import { registerSearchRoutes } from './routes/search-routes.ts';
 import { sweepAbandonedSandboxes } from './domains/sandbox/SandboxConfig.ts';
 
 const PORT = Number(process.env.PORT ?? 5178);
@@ -79,6 +80,7 @@ registerChatRoutes(app, ctx);
 registerSandboxRoutes(app, ctx);
 registerResourceRoutes(app, ctx);
 registerBackupRoutes(app, ctx);
+registerSearchRoutes(app, ctx);
 
 /**
  * Поток событий об изменениях файлов. Конфиги правит не только это приложение:

@@ -1,12 +1,22 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Artifact, ChatMessage, ChatSummary } from '@claude-control/contracts';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import type {
+  Artifact,
+  ChatMessage,
+  ChatSearchResponse,
+  ChatSummary,
+} from '@claude-control/contracts';
 import { apiClient } from '@shared/api/client';
 
 export const chatKeys = {
   list: ['chats'] as const,
   messages: (id: string) => ['chats', id, 'messages'] as const,
   artifacts: (id: string) => ['chats', id, 'artifacts'] as const,
+  /** Поиск по телу переписки: ключ зависит от запроса — кешируем по строке. */
+  search: (query: string) => ['chats', 'search', query] as const,
 };
+
+/** Ниже этого порога поиск по телу не запускаем — совпадает с порогом на сервере. */
+export const MIN_CHAT_SEARCH_LENGTH = 2;
 
 /** Список разговоров. Читается из транскриптов Claude Code. */
 export function useChats() {
@@ -16,6 +26,31 @@ export function useChats() {
       const { data } = await apiClient.get<ChatSummary[]>('/chats', { timeout: 120_000 });
       return data;
     },
+  });
+}
+
+/**
+ * Полнотекстовый поиск по телу переписки. Запрос уходит на сервер, который
+ * сканирует транскрипты и возвращает разговоры со сниппетом вокруг совпадения.
+ * Слишком короткий запрос на сервер не шлём — он всё равно вернул бы пусто.
+ */
+export function useChatBodySearch(query: string) {
+  const normalized = query.trim();
+  const enabled = normalized.length >= MIN_CHAT_SEARCH_LENGTH;
+
+  return useQuery({
+    queryKey: chatKeys.search(normalized),
+    queryFn: async () => {
+      const { data } = await apiClient.get<ChatSearchResponse>('/chat/search', {
+        params: { q: normalized },
+        timeout: 120_000,
+      });
+      return data;
+    },
+    enabled,
+    // Прежние совпадения держим на экране, пока грузятся новые — список не мигает
+    // пустотой на каждый набранный символ.
+    placeholderData: keepPreviousData,
   });
 }
 

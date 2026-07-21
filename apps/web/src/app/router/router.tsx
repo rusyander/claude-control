@@ -15,6 +15,7 @@ import { EnvPage } from '@pages/Env/EnvPage';
 import { GroupsPage } from '@pages/Groups/GroupsPage';
 import { SettingsPage } from '@pages/Settings/SettingsPage';
 import { HelpPage } from '@pages/Help/HelpPage';
+import { SearchPage } from '@pages/Search/SearchPage';
 
 const rootRoute = createRootRoute({ component: MainLayout });
 
@@ -38,6 +39,7 @@ function validateSearch(search: Record<string, unknown>): { id?: string; topic?:
 /** Маршруты объявлены кодом: страниц немного, генератор файловых роутов избыточен. */
 const routes = [
   { path: '/', component: OverviewPage },
+  { path: '/search', component: SearchPage },
   { path: '/analytics', component: AnalyticsPage },
   { path: '/chat', component: ChatPage },
   { path: '/rules', component: RulesPage },

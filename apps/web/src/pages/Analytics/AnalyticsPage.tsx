@@ -9,8 +9,11 @@ import { Button } from '@shared/ui/button';
 import { PageHeader } from '@shared/ui/page-header';
 import { BarChart } from '@shared/ui/bar-chart';
 import { TimeSeries } from '@shared/ui/time-series';
+import { Heatmap } from '@shared/ui/heatmap';
+import { DonutChart } from '@shared/ui/donut-chart';
 import { formatCompact, formatMoney, formatNumber, formatPercent } from '@shared/lib/format-number';
 import { useAnalytics } from '@entities/Analytics';
+import { useSettings } from '@entities/AppConfig';
 import { StatCard } from './StatCard';
 import { LiveAgentsCard } from './LiveAgentsCard';
 import { DetailModal } from './DetailModal';
@@ -27,8 +30,11 @@ export function AnalyticsPage() {
   const [days, setDays] = useState(30);
   const [detail, setDetail] = useState<{ kind: DetailKind; id: string } | null>(null);
   const { data, isLoading } = useAnalytics(days);
+  const { data: settings } = useSettings();
 
   const locale = i18n.language;
+  // Единицы расхода уважают настройку: те же токены или их денежная оценка.
+  const costUnit = settings?.costUnit ?? 'tokens';
 
   // Выгрузка: числа только на экране мешают собрать отчёт — отдаём файлом.
   const download = (filename: string, content: string, mime: string): void => {
@@ -156,8 +162,11 @@ export function AnalyticsPage() {
                 seriesName={t('analytics.byDay')}
                 points={data.byDay.map((day) => ({
                   label: day.date.slice(5),
-                  value: day.totals.total,
-                  valueLabel: `${formatCompact(day.totals.total, locale)} · ${formatNumber(day.totals.requests, locale)}`,
+                  value: costUnit === 'money' ? day.estimatedCost : day.totals.total,
+                  valueLabel:
+                    costUnit === 'money'
+                      ? formatMoney(day.estimatedCost, locale)
+                      : `${formatCompact(day.totals.total, locale)} · ${formatNumber(day.totals.requests, locale)}`,
                 }))}
               />
             </Stack>
@@ -208,6 +217,55 @@ export function AnalyticsPage() {
             <Stack gap="var(--spacing-sm)">
               <Stack gap="var(--spacing-3xs)">
                 <Typography variant="body" weight="medium">
+                  {t('analytics.cacheComposition')}
+                </Typography>
+                <Typography variant="caption" color="subtle">
+                  {t('analytics.cacheCompositionHint')}
+                </Typography>
+              </Stack>
+
+              <DonutChart
+                ariaLabel={t('analytics.cacheComposition')}
+                centerValue={formatPercent(data.cacheHitRatio, locale)}
+                centerLabel={t('analytics.cacheHit')}
+                segments={[
+                  {
+                    id: 'cacheRead',
+                    label: t('analytics.cacheRead'),
+                    value: data.overall.cacheRead,
+                    valueLabel: formatCompact(data.overall.cacheRead, locale),
+                    seriesIndex: 3,
+                  },
+                  {
+                    id: 'input',
+                    label: t('analytics.inputTokens'),
+                    value: data.overall.input,
+                    valueLabel: formatCompact(data.overall.input, locale),
+                    seriesIndex: 1,
+                  },
+                  {
+                    id: 'output',
+                    label: t('analytics.outputTokens'),
+                    value: data.overall.output,
+                    valueLabel: formatCompact(data.overall.output, locale),
+                    seriesIndex: 2,
+                  },
+                  {
+                    id: 'cacheCreation',
+                    label: t('analytics.cacheCreation'),
+                    value: data.overall.cacheCreation,
+                    valueLabel: formatCompact(data.overall.cacheCreation, locale),
+                    seriesIndex: 4,
+                  },
+                ]}
+              />
+            </Stack>
+          </Card>
+
+          <Card padding="md">
+            <Stack gap="var(--spacing-sm)">
+              <Stack gap="var(--spacing-3xs)">
+                <Typography variant="body" weight="medium">
                   {t('analytics.byHour')}
                 </Typography>
                 <Typography variant="caption" color="subtle">
@@ -215,13 +273,15 @@ export function AnalyticsPage() {
                 </Typography>
               </Stack>
 
-              <TimeSeries
-                seriesName={t('analytics.byHour')}
-                height={160}
-                points={data.byHour.map((hour) => ({
-                  label: `${hour.hour}`,
+              <Heatmap
+                ariaLabel={t('analytics.byHour')}
+                columns={24}
+                scale={{ min: t('analytics.activityLess'), max: t('analytics.activityMore') }}
+                cells={data.byHour.map((hour) => ({
+                  id: `${hour.hour}`,
+                  label: `${hour.hour}:00`,
                   value: hour.requests,
-                  valueLabel: `${formatNumber(hour.requests, locale)}`,
+                  valueLabel: `${formatNumber(hour.requests, locale)} · ${formatCompact(hour.tokens, locale)}`,
                 }))}
               />
             </Stack>

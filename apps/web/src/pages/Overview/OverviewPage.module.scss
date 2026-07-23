@@ -11,33 +11,74 @@
   gap: var(--spacing-md);
 }
 
-.tileLink {
+// Плитка целиком больше не ссылка: внутри основная область-ссылка ведёт в
+// раздел, а быстрые действия — отдельные ссылки-соседи. Растягиваем карточку
+// на всю высоту ячейки, чтобы ряд не выглядел рваным при разной длине подписей.
+.tile {
+  height: 100%;
+}
+
+.tileBody {
+  height: 100%;
+  justify-content: flex-start;
+}
+
+// Основная область — переход в раздел. Подсветка на наведении показывает, что
+// плитка кликабельна (раньше это давала обёртка-ссылка всей карточки).
+.tileMain {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-md);
+  min-height: 116px;
+  transition: transform var(--duration-fast);
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+// Быстрые действия под сводкой: маленькие ссылки-«таблетки». Отделены линией,
+// чтобы не сливались с числами и читались как отдельный ряд действий.
+.tileActions {
+  margin-top: auto;
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+}
+
+.tileAction {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-body-sm);
+  color: var(--color-fg-muted);
+  text-decoration: none;
+  transition:
+    color var(--duration-fast),
+    background-color var(--duration-fast);
+
+  &:hover {
+    color: var(--color-accent);
+    background-color: var(--color-accent-subtle);
+  }
+}
+
+// Сводка «изменилось за N дней»: отдельная карточка-ссылка над плитками. Ведёт
+// в историю изменений и переиспользует её ленту (см. ChangesSummary).
+.changesLink {
   display: block;
   text-decoration: none;
   color: inherit;
   border-radius: var(--radius-lg);
-
-  // Плитки ведут на свои разделы, но выглядели неподвижными карточками —
-  // подсветка на наведении показывает, что по ним можно перейти.
   transition: transform var(--duration-fast);
-
-  &:hover > * {
-    border-color: var(--color-accent);
-  }
 
   &:hover {
     transform: translateY(-2px);
   }
 
-  // Плитка без нижней подписи была ниже соседних, и ряд выглядел рваным —
-  // растягиваем карточку на всю высоту ячейки сетки.
-  > * {
-    height: 100%;
+  &:hover > * {
+    border-color: var(--color-accent);
   }
-}
-
-.tileBody {
-  height: 100%;
-  min-height: 116px;
-  justify-content: flex-start;
 }

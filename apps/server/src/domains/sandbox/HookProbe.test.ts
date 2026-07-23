@@ -6,8 +6,11 @@ import {
   readDecision,
   scriptCommand,
   runHookProbe,
+  runCustomHookProbe,
+  parseCustomEvent,
   tryParse,
   EVENT_FIXTURES,
+  CUSTOM_FIXTURE_ID,
   type EventFixture,
 } from './HookProbe.ts';
 
@@ -210,5 +213,99 @@ describe('HookProbe.runHookProbe', () => {
     );
     expect(result.decision).toBe('block');
     expect(result.reason).toBe('низзя');
+  });
+});
+
+/**
+ * Разбор произвольного пользовательского события. Кривой JSON и не-объект
+ * должны получать внятную причину, а не молчаливый провал.
+ */
+describe('HookProbe.parseCustomEvent', () => {
+  it('корректный JSON-объект — ok с payload', () => {
+    const result = parseCustomEvent('{"hook_event_name":"PreToolUse","tool_name":"Bash"}');
+    expect(result).toEqual({
+      ok: true,
+      payload: { hook_event_name: 'PreToolUse', tool_name: 'Bash' },
+    });
+  });
+
+  it('кривой JSON — ошибка с внятной причиной', () => {
+    const result = parseCustomEvent('{ not json ');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('JSON');
+  });
+
+  it('массив — не событие: JSON верный, но это не объект', () => {
+    const result = parseCustomEvent('[1, 2, 3]');
+    expect(result.ok).toBe(false);
+  });
+
+  it('строка и число — тоже не событие', () => {
+    expect(parseCustomEvent('"hello"').ok).toBe(false);
+    expect(parseCustomEvent('42').ok).toBe(false);
+    expect(parseCustomEvent('null').ok).toBe(false);
+  });
+});
+
+/**
+ * Прогон настоящего хука на произвольном событии. Важна и корректность
+ * (событие доходит до хука), и живучесть (хук, игнорирующий stdin, не роняет
+ * сервер — та же регрессия EPIPE, что и у заготовок).
+ */
+describe('HookProbe.runCustomHookProbe', () => {
+  let dir: string;
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'cc-customprobe-'));
+  });
+
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('корректный custom-payload даёт результат: хук читает stdin и решает', async () => {
+    // Хук читает событие со stdin и блокирует, увидев rm -rf.
+    const script = join(dir, 'guard.mjs');
+    writeFileSync(
+      script,
+      [
+        'let input = "";',
+        'process.stdin.on("data", (c) => { input += c; });',
+        'process.stdin.on("end", () => {',
+        '  const e = JSON.parse(input);',
+        '  if (String(e.tool_input?.command).includes("rm -rf")) process.exit(2);',
+        '  process.exit(0);',
+        '});',
+      ].join('\n'),
+    );
+
+    const result = await runCustomHookProbe(
+      `node "${script}"`,
+      {
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Bash',
+        tool_input: { command: 'rm -rf /tmp/x' },
+      },
+      dir,
+    );
+
+    expect(result.fixtureId).toBe(CUSTOM_FIXTURE_ID);
+    expect(result.exitCode).toBe(2);
+    expect(result.decision).toBe('block');
+    expect(result.timedOut).toBe(false);
+  });
+
+  it('хук, игнорирующий stdin, не роняет сервер (EPIPE) на большом событии', async () => {
+    const script = join(dir, 'ignore.mjs');
+    writeFileSync(script, 'process.stdin.destroy(); setTimeout(() => process.exit(0), 150);\n');
+
+    const result = await runCustomHookProbe(
+      `node "${script}"`,
+      { hook_event_name: 'PreToolUse', blob: 'y'.repeat(2_000_000) },
+      dir,
+    );
+
+    expect(result.timedOut).toBe(false);
+    expect(result.exitCode).toBe(0);
   });
 });

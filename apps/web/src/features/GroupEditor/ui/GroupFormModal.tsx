@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EntityRef } from '@claude-control/contracts';
+import type { GroupMember } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
@@ -22,7 +22,7 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [members, setMembers] = useState<EntityRef[]>([]);
+  const [members, setMembers] = useState<GroupMember[]>([]);
   const [envText, setEnvText] = useState('');
 
   const saveGroup = useSaveGroup();
@@ -129,7 +129,7 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
             <Typography variant="body-sm" weight="medium">
               {t('groups.membersTitle')}
             </Typography>
-            <MemberPicker value={members} onChange={setMembers} />
+            <MemberPicker value={members} onChange={setMembers} excludeGroupId={group?.id} />
             {conflicts.length > 0 && (
               <Typography variant="caption" color="warning" as="span">
                 {t('groups.conflict', { patterns: conflicts.join(', ') })}

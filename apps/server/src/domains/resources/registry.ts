@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaudeLocation } from '@claude-control/contracts';
 
@@ -32,6 +33,11 @@ export interface ResourceLayout {
   isWritable: boolean;
   /** Файл, который открывается первым. */
   entryFile?: string;
+  /**
+   * Папки, которые не показываем в дереве. У плагинов это служебные каталоги
+   * кэша (`.in_use` с pid-локами, `.git` клона) — не файлы плагина, а шум.
+   */
+  ignoreDirs?: string[];
 }
 
 export const RESOURCE_LAYOUTS: Record<ResourceKind, ResourceLayout> = {
@@ -61,14 +67,13 @@ export const RESOURCE_LAYOUTS: Record<ResourceKind, ResourceLayout> = {
   },
   plugin: {
     kind: 'plugin',
-    rootFor: (location, id) => {
-      const segment = safeSegment(id);
-      return segment ? join(location.paths.root, 'plugins', 'cache', segment) : undefined;
-    },
+    rootFor: (location, id) => resolvePluginRoot(location.paths.root, id),
     isDirectory: true,
     // Плагин ставится и обновляется через CLI: править его файлы у себя —
     // значит потерять правки при первом же обновлении.
     isWritable: false,
+    entryFile: '.claude-plugin/plugin.json',
+    ignoreDirs: ['.in_use', '.git', 'node_modules'],
   },
   rule: { kind: 'rule', isDirectory: false, isWritable: false },
   mcp: { kind: 'mcp', isDirectory: false, isWritable: false },
@@ -76,6 +81,42 @@ export const RESOURCE_LAYOUTS: Record<ResourceKind, ResourceLayout> = {
 
 export function layoutOf(kind: string): ResourceLayout | undefined {
   return RESOURCE_LAYOUTS[kind as ResourceKind];
+}
+
+/**
+ * Каталог установленного плагина на диске.
+ *
+ * CLI распаковывает плагин в `plugins/cache/<маркетплейс>/<имя>/<версия>`, а
+ * идентификатор приходит как `<имя>@<маркетплейс>` — без версии. Поэтому имя и
+ * маркетплейс берём из id, а версию читаем с диска: это единственный подкаталог,
+ * который CLI туда положил. Так путь не приходится угадывать и он совпадает с
+ * тем, что показывает `claude plugin list`.
+ */
+function resolvePluginRoot(claudeRoot: string, id: string): string | undefined {
+  const at = id.indexOf('@');
+  if (at <= 0) return undefined;
+
+  const name = safeSegment(id.slice(0, at));
+  const marketplace = safeSegment(id.slice(at + 1));
+  if (!name || !marketplace) return undefined;
+
+  const base = join(claudeRoot, 'plugins', 'cache', marketplace, name);
+
+  let versions: string[];
+  try {
+    versions = readdirSync(base, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
+      .map((entry) => entry.name)
+      // Отметки версий сортируемы лексикографически; при нескольких берём
+      // последнюю — CLI держит установленной именно её.
+      .sort();
+  } catch {
+    // Плагина нет на диске (не установлен) — просмотр вернёт пустое дерево.
+    return undefined;
+  }
+
+  const version = versions.at(-1);
+  return version ? join(base, version) : undefined;
 }
 
 /**

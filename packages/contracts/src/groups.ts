@@ -22,6 +22,32 @@ export const entityRefSchema = object({
 export type EntityRef = Infer<typeof entityRefSchema>;
 
 /**
+ * Виды участников группы. Помимо сущностей Claude Code участником может быть
+ * другая группа (`group`) — так собираются вложенные наборы, включаемые одним
+ * движением вместе с родителем.
+ */
+export const groupMemberKindSchema = zodEnum([
+  'rule',
+  'hook',
+  'skill',
+  'mcp',
+  'permission',
+  'group',
+]);
+export type GroupMemberKind = Infer<typeof groupMemberKindSchema>;
+
+/**
+ * Участник группы. Порядок участников в массиве значим: он задаёт порядок
+ * обхода при включении/выключении и сборке, и его можно менять в редакторе.
+ */
+export const groupMemberSchema = object({
+  kind: groupMemberKindSchema,
+  id: string(),
+});
+
+export type GroupMember = Infer<typeof groupMemberSchema>;
+
+/**
  * Группа — способ пользователя навести свой порядок поверх файлов Claude Code.
  * Сам Claude о группах не знает: они живут в данных приложения, а на конфиг
  * влияют через включение/выключение входящих сущностей и общие env-переменные.
@@ -33,7 +59,7 @@ export const groupSchema = object({
   /** Цвет метки в интерфейсе — токен темы, не сырой hex. */
   color: string().default('accent'),
   icon: string().default('folder'),
-  members: array(entityRefSchema).default([]),
+  members: array(groupMemberSchema).default([]),
   /**
    * Переменные окружения группы. Попадают в settings.json → env,
    * когда группа включена. Позволяет держать разные наборы окружения
@@ -52,7 +78,7 @@ export const groupDraftSchema = object({
   description: string().default(''),
   color: string().default('accent'),
   icon: string().default('folder'),
-  members: array(entityRefSchema).default([]),
+  members: array(groupMemberSchema).default([]),
   env: record(string(), string()).default({}),
   isEnabled: boolean().default(true),
 });

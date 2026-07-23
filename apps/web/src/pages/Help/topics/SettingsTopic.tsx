@@ -43,6 +43,8 @@ export function SettingsTopic() {
             tr('canTheme'),
             tr('canSpendUnit'),
             tr('canBackup'),
+            tr('canEncrypt'),
+            tr('canRevertHunk'),
             tr('canTransfer'),
             tr('canWatch'),
           ]}
@@ -86,6 +88,7 @@ export function SettingsTopic() {
             { name: 'claudeDirOverride', description: tr('fieldDir') },
             { name: 'revealSecretsByDefault', description: tr('fieldReveal') },
             { name: 'backupBeforeWrite', description: tr('fieldBackup') },
+            { name: 'encryptSecretBackups', description: tr('fieldEncrypt') },
             { name: 'watchFiles', description: tr('fieldWatch') },
             { name: 'largeText, reduceMotion, highContrast', description: tr('fieldA11y') },
             { name: 'editor', description: tr('fieldEditor') },

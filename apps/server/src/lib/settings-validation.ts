@@ -26,6 +26,8 @@ const modelPricingSchema = object({
 export const settingsPatchSchema = object({
   theme: zodEnum(['light', 'dark', 'system']),
   language: zodEnum(['ru', 'en']),
+  accent: zodEnum(['default', 'blue', 'green', 'purple', 'amber']),
+  onboardingDone: boolean(),
   claudeDirOverride: string(),
   revealSecretsByDefault: boolean(),
   backupBeforeWrite: boolean(),
@@ -36,9 +38,12 @@ export const settingsPatchSchema = object({
   highContrast: boolean(),
   editor: string(),
   costUnit: zodEnum(['tokens', 'money']),
+  mcpNetworkTimeoutMs: number().int().min(2_000).max(120_000),
+  mcpAutoCheck: boolean(),
   chatModel: string(),
   chatEffort: zodEnum(['', 'low', 'medium', 'high', 'xhigh', 'max']),
   modelPricing: record(string(), modelPricingSchema),
+  encryptSecretBackups: boolean(),
 }).partial();
 
 /**

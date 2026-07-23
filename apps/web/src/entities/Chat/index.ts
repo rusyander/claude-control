@@ -4,9 +4,12 @@ export {
   useChatBodySearch,
   useArtifacts,
   useArtifactSource,
+  useDeleteArtifact,
   useRefreshChat,
   artifactUrl,
+  chatExportUrl,
   chatKeys,
+  CHAT_PAGE_SIZE,
   MIN_CHAT_SEARCH_LENGTH,
 } from './api/ChatApi';
 // Тип состояния потока определён в shared (см. @shared/lib/chat-stream); entity

@@ -13,8 +13,10 @@ import {
   readArtifacts,
   readArtifactText,
   readArtifactBinary,
+  deleteArtifact,
   chatDirectory,
 } from '../domains/chat/ChatArtifacts.ts';
+import { buildChatExport, type ExportFormat } from '../domains/chat/ChatExport.ts';
 import { resolveWorkspace, permissionModeFor } from '../domains/chat/ChatWorkspace.ts';
 import {
   saveUpload,
@@ -174,8 +176,43 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
     },
   );
 
-  app.get<{ Params: { chatId: string } }>('/api/chats/:chatId/messages', (request) =>
-    readChatMessages(projectsDir, request.params.chatId),
+  /**
+   * Лента переписки окном. По умолчанию — последние сообщения; более ранние
+   * подгружаются увеличением `limit` («Загрузить ещё»). Читается порциями, без
+   * загрузки всего транскрипта в ответ.
+   */
+  app.get<{ Params: { chatId: string }; Querystring: { limit?: string; offset?: string } }>(
+    '/api/chats/:chatId/messages',
+    (request) => {
+      const limit = clampInt(request.query.limit, DEFAULT_MESSAGE_PAGE, 1, MAX_MESSAGE_PAGE);
+      const offset = clampInt(request.query.offset, 0, 0, Number.MAX_SAFE_INTEGER);
+      return readChatMessages(projectsDir, request.params.chatId, { limit, offset });
+    },
+  );
+
+  /**
+   * Выгрузка разговора файлом — Markdown или JSON. Собирается из всей переписки
+   * (роли, время, текст); служебное и вложения-картинки в файл не тащим.
+   */
+  app.get<{ Params: { chatId: string }; Querystring: { format?: string } }>(
+    '/api/chat/:chatId/export',
+    async (request, reply) => {
+      const { chatId } = request.params;
+      const format: ExportFormat = request.query.format === 'json' ? 'json' : 'md';
+
+      const page = await readChatMessages(projectsDir, chatId, { limit: Number.MAX_SAFE_INTEGER });
+      if (page.messages.length === 0)
+        return reply.code(404).send({ message: 'Разговор не найден' });
+
+      const title = readChats(projectsDir).find((chat) => chat.id === chatId)?.title;
+      const file = buildChatExport(page.messages, format, title);
+      const safeId = chatId.replace(/[^a-zA-Z0-9-]/g, '') || 'chat';
+
+      return reply
+        .header('Content-Disposition', `attachment; filename="chat-${safeId}.${file.ext}"`)
+        .type(file.mime)
+        .send(file.content);
+    },
   );
 
   app.post<{
@@ -402,4 +439,36 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
       return { name, content: readArtifactText(dir, name) };
     },
   );
+
+  /**
+   * Удаление артефакта. Разрешаем только у чатов песочницы: их файлы —
+   * результат работы в отдельной папке панели, и убрать лишнее там безопасно.
+   * У разговора из настоящего проекта `artifactDirectory` вернёт `undefined` —
+   * трогать рабочее дерево нельзя. Имя файла обезврежено на уровне домена
+   * (`deleteArtifact` берёт только basename), выйти за папку чата им не удастся.
+   */
+  app.delete<{ Params: { chatId: string }; Querystring: { name?: string } }>(
+    '/api/chat/:chatId/artifact',
+    (request, reply) => {
+      const dir = artifactDirectory(request.params.chatId);
+      const name = request.query.name;
+      if (!dir || !name) return reply.code(404).send({ message: 'Файл не найден' });
+
+      return deleteArtifact(dir, name)
+        ? { ok: true }
+        : reply.code(404).send({ message: 'Файл не найден' });
+    },
+  );
+}
+
+/** Размер окна ленты по умолчанию — последние N сообщений разговора. */
+const DEFAULT_MESSAGE_PAGE = 400;
+/** Верхняя граница окна: больше за один запрос отдавать незачем. */
+const MAX_MESSAGE_PAGE = 5000;
+
+/** Целое из строки запроса с зажимом в границы; мусор → значение по умолчанию. */
+function clampInt(raw: string | undefined, fallback: number, min: number, max: number): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(value)));
 }

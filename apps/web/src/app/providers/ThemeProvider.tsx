@@ -45,6 +45,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     root.dataset.highContrast = String(settings?.highContrast ?? false);
   }, [settings?.largeText, settings?.reduceMotion, settings?.highContrast]);
 
+  // Акцент — отдельным data-атрибутом поверх темы: пресет переопределяет только
+  // токены --color-accent*, поэтому применяется мгновенно и на светлой, и на тёмной.
+  useEffect(() => {
+    document.documentElement.dataset.accent = settings?.accent ?? 'default';
+  }, [settings?.accent]);
+
   useEffect(() => {
     if (i18n.language !== language) void i18n.changeLanguage(language);
     document.documentElement.lang = language;

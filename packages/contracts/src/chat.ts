@@ -58,6 +58,33 @@ export const chatMessageSchema = object({
 export type ChatMessage = Infer<typeof chatMessageSchema>;
 
 /**
+ * Страница переписки. Транскрипты бывают огромными, поэтому лента отдаётся
+ * окнами: по умолчанию — последние сообщения, а более ранние подгружаются
+ * кнопкой «Загрузить ещё». `total` — сколько всего реплик в разговоре,
+ * `hasMore` — есть ли ещё более старые сообщения до начала этого окна.
+ */
+export const chatMessagesPageSchema = object({
+  messages: array(chatMessageSchema),
+  total: number(),
+  hasMore: boolean(),
+});
+
+export type ChatMessagesPage = Infer<typeof chatMessagesPageSchema>;
+
+/**
+ * Одна реплика в выгрузке разговора. В экспорт идёт только суть — роль, время
+ * и текст: размышления, вызовы инструментов и вложения-картинки в файл не
+ * тащим, чтобы не выносить наружу служебное и возможные секреты.
+ */
+export const chatExportEntrySchema = object({
+  role: union([literal('user'), literal('assistant')]),
+  timestamp: string(),
+  text: string(),
+});
+
+export type ChatExportEntry = Infer<typeof chatExportEntrySchema>;
+
+/**
  * Совпадение полнотекстового поиска по телу переписки. В отличие от фильтра
  * списка (заголовок/проект/превью), этот поиск сканирует сами сообщения и
  * возвращает разговор с фрагментом вокруг найденного места и числом совпадений.

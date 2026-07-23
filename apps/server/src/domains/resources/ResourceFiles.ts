@@ -68,7 +68,9 @@ export function listResourceFiles(
     return existsSync(target) && statSync(target).isFile() ? [describe(root, name)] : [];
   }
 
-  return walk(root, root).sort((a, b) => a.path.localeCompare(b.path));
+  return walk(root, root, '', new Set(layout.ignoreDirs)).sort((a, b) =>
+    a.path.localeCompare(b.path),
+  );
 }
 
 export function readResourceFile(
@@ -191,13 +193,15 @@ function safePath(
 }
 
 /** Обход папки. Путь наружу отдаётся относительным, а stat берётся по полному. */
-function walk(root: string, dir: string, prefix = ''): ResourceFile[] {
+function walk(root: string, dir: string, prefix = '', ignore?: Set<string>): ResourceFile[] {
   const result: ResourceFile[] = [];
 
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && ignore?.has(entry.name)) continue;
+
     const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
 
-    if (entry.isDirectory()) result.push(...walk(root, join(dir, entry.name), relative));
+    if (entry.isDirectory()) result.push(...walk(root, join(dir, entry.name), relative, ignore));
     else result.push(describe(root, relative));
   }
 

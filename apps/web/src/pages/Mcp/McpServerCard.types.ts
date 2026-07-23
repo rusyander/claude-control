@@ -6,6 +6,8 @@ export interface McpServerCardProps {
   onEdit: () => void;
   onDelete: () => void;
   isDeleting?: boolean;
+  /** Проверить связь автоматически при появлении карточки (см. настройку mcpAutoCheck). */
+  autoCheck?: boolean;
 }
 
 /** Ответ проверки связи: сервер поднимается и опрашивается по протоколу MCP. */

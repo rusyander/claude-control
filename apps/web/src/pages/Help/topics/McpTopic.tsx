@@ -89,8 +89,9 @@ export function McpTopic() {
             tr('canHealth'),
             tr('canProbe'),
             tr('canToggle'),
+            tr('canAutoCheck'),
           ]}
-          cant={[tr('cantInstall'), tr('cantSecrets'), tr('cantPerTool'), tr('cantAuto')]}
+          cant={[tr('cantInstall'), tr('cantSecrets'), tr('cantPerTool')]}
         />
       </HelpSection>
 
@@ -183,8 +184,14 @@ export function McpTopic() {
           <Callout tone="info" title={tr('noteHealthTitle')}>
             {tr('noteHealthText')}
           </Callout>
+          <Callout tone="info" title={tr('noteTimeoutTitle')}>
+            {tr('noteTimeoutText')}
+          </Callout>
           <Callout tone="info" title={tr('noteWindowsTitle')}>
             {tr('noteWindowsText')}
+          </Callout>
+          <Callout tone="info" title={tr('noteProjectTitle')}>
+            {tr('noteProjectText')}
           </Callout>
         </Stack>
       </HelpSection>

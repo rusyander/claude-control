@@ -9,8 +9,20 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  margin: calc(-1 * var(--spacing-lg));
+  // Гасим padding области раздела не до нуля, а до ровной рамки в 8px. Значение
+  // margin следует за padding, который на узких экранах уменьшается
+  // (см. MainLayout `.content`): иначе на узком отрицательный отступ съедал
+  // больше, чем есть padding, и оболочка вылезала за край.
+  margin: calc(-1 * var(--spacing-lg)); // 32 padding − 8 рамка
   overflow: hidden;
+
+  @media (max-width: 900px) {
+    margin: calc(-1 * var(--spacing-xs)); // 16 padding − 8 рамка
+  }
+
+  @media (max-width: 480px) {
+    margin: calc(-1 * var(--spacing-2xs)); // 12 padding − 8 рамка
+  }
 }
 
 // Чат занимает всю оставшуюся высоту: лента прокручивается внутри, а поле ввода
@@ -27,6 +39,25 @@
   grid-template-columns: 300px minmax(0, 1fr) minmax(360px, 40%);
 }
 
+// Планшет: колонка списка ужимается, чтобы разговору осталось больше места.
+@media (max-width: 900px) {
+  .page,
+  .pageWithPreview {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+
+// Узкий экран: две колонки в 300px+ уже не помещаются и выезжали за край.
+// Складываем в одну колонку — список сверху отдельной прокручиваемой полосой,
+// разговор под ним. Так чат остаётся рабочим и на телефоне.
+@media (max-width: 640px) {
+  .page,
+  .pageWithPreview {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}
+
 // Левая колонка: сегмент «Чаты | Проекты» (на домашнем табе) над списком.
 .sidebar {
   display: flex;
@@ -34,6 +65,14 @@
   min-height: 0;
   border-right: 1px solid var(--color-border);
   background: var(--color-surface);
+
+  // В одноколоночной раскладке список едет наверх: разделитель снизу, а не
+  // справа, и высота ограничена, чтобы поле разговора не ушло за экран.
+  @media (max-width: 640px) {
+    max-height: 38vh;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
 }
 
 .sidebarList {
@@ -105,6 +144,13 @@
 .artifacts {
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface-sunken);
+}
+
+// Артефакт: имя-кнопка и кнопка удаления рядом. Обводка объединяет их в один
+// чип, чтобы удаление читалось как действие над этим файлом.
+.artifactChip {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
 }
 
 // Тумблер прав рядом с путём проекта: видно и где идёт разговор, и что там

@@ -12,6 +12,8 @@ import {
 import {
   EVENT_FIXTURES,
   runHookProbe,
+  runCustomHookProbe,
+  parseCustomEvent,
   scriptCommand,
   type ProbeResult,
 } from '../domains/sandbox/HookProbe.ts';
@@ -72,9 +74,16 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
    * ответ приходит за доли секунды и ничего не стоит.
    */
   app.post<{
-    Body: { id: string; hookId?: string; scriptName?: string; fixtureIds?: string[] };
+    Body: {
+      id: string;
+      hookId?: string;
+      scriptName?: string;
+      fixtureIds?: string[];
+      /** Произвольное событие, введённое руками: сырой JSON вместо заготовок. */
+      customEvent?: string;
+    };
   }>('/api/sandbox/probe-hook', async (request) => {
-    const { id, hookId, scriptName, fixtureIds } = request.body;
+    const { id, hookId, scriptName, fixtureIds, customEvent } = request.body;
     const { workDir, configDir } = sandboxPaths(id);
 
     let command = '';
@@ -109,6 +118,16 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
           ? 'Скрипты .ps1 запускаются через PowerShell — вне Windows нужен pwsh (PowerShell Core). Установите его или перепишите хук на .sh либо .mjs.'
           : 'Нечего запускать: команда не найдена',
       };
+    }
+
+    // Свой ввод: событие приходит сырым текстом — разбираем и проверяем, что
+    // это JSON-объект, затем прогоняем тем же механизмом, что и заготовки.
+    if (customEvent !== undefined) {
+      const parsed = parseCustomEvent(customEvent);
+      if (!parsed.ok) return { results: [], error: parsed.error, command };
+
+      const result = await runCustomHookProbe(command, parsed.payload, workDir);
+      return { results: [result], command };
     }
 
     const fixtures = EVENT_FIXTURES.filter(

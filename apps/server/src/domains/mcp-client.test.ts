@@ -10,7 +10,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { McpServer } from '@claude-control/contracts';
 import { openMcpSession } from './mcp-client.ts';
-import { checkMcpHealth } from './mcp.ts';
+import { checkMcpHealth, listMcpServerTools } from './mcp.ts';
 import { listMcpTools, callMcpTool } from './sandbox/McpProbe.ts';
 
 /**
@@ -437,6 +437,35 @@ describe('mcp-client', () => {
         BUDGET,
       );
       expect(result.health).toBe('failed');
+    });
+  });
+
+  describe('listMcpServerTools', () => {
+    it('stdio: маршрут списка инструментов отдаёт имена и описания', async () => {
+      const result = await listMcpServerTools(stdioServer(), BUDGET);
+      expect(result.error).toBeUndefined();
+      expect(result.tools.map((tool) => tool.name)).toEqual(['echo', 'ping']);
+      expect(result.tools[0]?.description).toBe('Возвращает текст');
+    });
+
+    it('http: имена доезжают и по сети', async () => {
+      const result = await listMcpServerTools(httpServer(), BUDGET);
+      expect(result.tools.map((tool) => tool.name)).toEqual(['echo', 'ping']);
+    });
+
+    it('выключенный сервер не опрашивается — отдаётся ошибка, а не список', async () => {
+      const result = await listMcpServerTools(makeServer({ isEnabled: false }), BUDGET);
+      expect(result.tools).toEqual([]);
+      expect(result.error?.length).toBeGreaterThan(0);
+    });
+
+    it('недоступный сервер — неудача значением, а не исключением', async () => {
+      const result = await listMcpServerTools(
+        makeServer({ transport: 'http', url: 'http://127.0.0.1:9/mcp' }),
+        BUDGET,
+      );
+      expect(result.tools).toEqual([]);
+      expect(result.error?.length).toBeGreaterThan(0);
     });
   });
 

@@ -12,8 +12,14 @@ import type {
 import type { ServerContext } from '../context.ts';
 import { readRules, saveRule, deleteRule } from '../domains/rules.ts';
 import { readHooks, upsertHook, deleteHook, moveHook } from '../domains/hooks.ts';
-import { readSkills, saveSkill, deleteSkill } from '../domains/skills.ts';
-import { readMcpServers, saveMcpServer, deleteMcpServer, checkMcpHealth } from '../domains/mcp.ts';
+import { readSkills, saveSkill, deleteSkill, renameSkill } from '../domains/skills.ts';
+import {
+  readMcpServers,
+  saveMcpServer,
+  deleteMcpServer,
+  checkMcpHealth,
+  listMcpServerTools,
+} from '../domains/mcp.ts';
 import {
   startOAuth,
   finishOAuth,
@@ -24,8 +30,19 @@ import {
 } from '../domains/mcp-oauth.ts';
 import { applyEntityState, rewriteHooks, findHook } from '../domains/entity-toggle.ts';
 import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
-import { readPermissions, savePermission, deletePermission } from '../domains/permissions.ts';
-import { readEnvVars, revealEnvValue, saveEnvVar, deleteEnvVar } from '../domains/env.ts';
+import {
+  readPermissions,
+  savePermission,
+  deletePermission,
+  movePermission,
+} from '../domains/permissions.ts';
+import {
+  readEnvVars,
+  revealEnvValue,
+  saveEnvVar,
+  deleteEnvVar,
+  moveEnvVar,
+} from '../domains/env.ts';
 import { readTextFile, writeTextFile } from '../lib/safe-io.ts';
 
 /**
@@ -159,6 +176,29 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     done(deleteSkill(paths().skills, request.params.id, ctx.backupDir)),
   );
 
+  // Переименование скилла: имя папки — это идентификатор, поэтому меняется папка,
+  // а отметки в state.json (выключение, группы) переезжают на новый id. Тело —
+  // {newId} (или синоним {newName}). Ошибки domain несут код: занятое/пустое имя
+  // → 400, несуществующий скилл → 404.
+  app.post<{ Params: { id: string }; Body: { newId?: string; newName?: string } }>(
+    '/api/skills/:id/rename',
+    (request, reply) => {
+      const newId = request.body?.newId ?? request.body?.newName ?? '';
+
+      try {
+        return done(
+          renameSkill(paths().skills, request.params.id, newId, ctx.store, ctx.backupDir),
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const code = (error as { code?: string }).code;
+        return reply
+          .code(code === 'not_found' ? 404 : 400)
+          .send({ error: 'rename_failed', message });
+      }
+    },
+  );
+
   // --- MCP-серверы (~/.claude.json) ---
   app.get('/api/mcp', () => readMcpServers(paths().mcpConfig, ctx.store, paths().appData));
 
@@ -189,7 +229,34 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
         ? oauthProviderFor(server, paths().appData)
         : undefined;
 
-    return checkMcpHealth(server, 30_000, authProvider);
+    return checkMcpHealth(
+      server,
+      30_000,
+      authProvider,
+      ctx.store.getSettings().mcpNetworkTimeoutMs,
+    );
+  });
+
+  /**
+   * Список инструментов сервера — имена и описания для помощника отбора прав.
+   * Тот же провайдер OAuth, что и у проверки связи: сервер с сохранёнными
+   * токенами опрашивается от его имени.
+   */
+  app.post<{ Params: { id: string } }>('/api/mcp/:id/tools', async (request, reply) => {
+    const server = findMcpServer(request.params.id);
+    if (!server) return reply.code(404).send({ error: 'not_found', message: 'Сервер не найден' });
+
+    const authProvider =
+      server.transport !== 'stdio' && hasOAuthTokens(paths().appData, server.id)
+        ? oauthProviderFor(server, paths().appData)
+        : undefined;
+
+    return listMcpServerTools(
+      server,
+      30_000,
+      authProvider,
+      ctx.store.getSettings().mcpNetworkTimeoutMs,
+    );
   });
 
   /**
@@ -263,6 +330,12 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     return done(deletePermission(targetOf(id).path, stripLocalPrefix(id), ctx.backupDir));
   });
 
+  // Перенос права в противоположный файл: из settings.json в settings.local.json
+  // и обратно. Файл-источник определяется префиксом id (см. targetOf/isLocalId).
+  app.post<{ Params: { id: string } }>('/api/permissions/:id/move', (request) =>
+    done(movePermission(paths().settings, paths().settingsLocal, request.params.id, ctx.backupDir)),
+  );
+
   // --- Переменные окружения ---
   app.get('/api/env', () =>
     readEnvVars(paths().settings, paths().secretsEnv, paths().settingsLocal),
@@ -303,6 +376,33 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
         paths().settingsLocal,
       ),
     ),
+  );
+
+  // Перенос переменной между settings.json и settings.local.json. Секреты из
+  // .mcp-secrets.env и env групп так не переносятся — их природа иная: отвечаем
+  // 400, кнопки для них в интерфейсе нет.
+  app.post<{ Params: { key: string }; Body: { source: EnvVar['source'] } }>(
+    '/api/env/:key/move',
+    (request, reply) => {
+      const { source } = request.body;
+      if (source !== 'settings' && source !== 'settings-local') {
+        return reply.code(400).send({
+          error: 'not_movable',
+          message: 'Переносить можно только переменные из settings.json / settings.local.json.',
+        });
+      }
+
+      return done(
+        moveEnvVar(
+          paths().settings,
+          paths().secretsEnv,
+          request.params.key,
+          source,
+          ctx.backupDir,
+          paths().settingsLocal,
+        ),
+      );
+    },
   );
 
   // --- Включение и выключение любой сущности ---

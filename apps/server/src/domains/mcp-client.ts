@@ -58,11 +58,20 @@ export interface McpSession {
  * адрес, не ответивший за десяток секунд, не ответит и за минуту, а держать
  * пользователя перед крутилкой всё это время незачем.
  */
-const CONNECT_CAP: Record<McpTransport, number> = {
-  stdio: 45_000,
-  http: 10_000,
-  sse: 10_000,
-};
+/** Потолок рукопожатия stdio — там в него входит запуск процесса. */
+const STDIO_CONNECT_CAP = 45_000;
+
+/** Дефолтный потолок подключения к сетевым серверам, если настройка не передана. */
+export const DEFAULT_NETWORK_TIMEOUT_MS = 10_000;
+
+/**
+ * Потолок рукопожатия для транспорта. У stdio он зашит (запуск процесса), у
+ * сетевых транспортов — настраиваемый: адрес за прокси/туннелем отвечает
+ * дольше десятка секунд, а быстрый стенд наоборот незачем ждать так долго.
+ */
+function connectCap(transport: McpTransport, networkTimeoutMs: number): number {
+  return transport === 'stdio' ? STDIO_CONNECT_CAP : networkTimeoutMs;
+}
 
 /**
  * Общий бюджет делится на рукопожатие и на сам запрос. Треть бюджета запросу
@@ -73,11 +82,12 @@ const CONNECT_CAP: Record<McpTransport, number> = {
 function splitBudget(
   transport: McpTransport,
   totalMs: number,
+  networkTimeoutMs: number,
 ): {
   connectMs: number;
   requestMs: number;
 } {
-  const connectMs = Math.min(CONNECT_CAP[transport], Math.round(totalMs * 0.67));
+  const connectMs = Math.min(connectCap(transport, networkTimeoutMs), Math.round(totalMs * 0.67));
   return { connectMs, requestMs: Math.max(totalMs - connectMs, 1_000) };
 }
 
@@ -93,8 +103,9 @@ export async function openMcpSession(
   server: McpServer,
   totalMs: number,
   authProvider?: OAuthClientProvider,
+  networkTimeoutMs: number = DEFAULT_NETWORK_TIMEOUT_MS,
 ): Promise<McpSession> {
-  const { connectMs, requestMs } = splitBudget(server.transport, totalMs);
+  const { connectMs, requestMs } = splitBudget(server.transport, totalMs, networkTimeoutMs);
 
   const { transport, readStderr } = createTransport(server, authProvider);
   const client = new Client({ name: 'claude-control', version: '0.1.0' }, { capabilities: {} });

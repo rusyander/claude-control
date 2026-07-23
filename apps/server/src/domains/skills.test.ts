@@ -172,6 +172,48 @@ describe('skills', () => {
       expect(existsSync(join(skillsDir, 'my-new-skill', 'SKILL.md'))).toBe(true);
     });
 
+    it('заготовка тела сохраняется как корректный SKILL.md (frontmatter + тело round-trip)', () => {
+      // Заготовки тела (пустой каркас / инструмент с шагами / правило / чеклист)
+      // живут на клиенте и заполняют поле «тело». Здесь проверяем контур создания:
+      // выбранная заготовка вместе с name/description даёт валидный SKILL.md,
+      // который readSkills разбирает обратно без потерь.
+      const templateBody = [
+        '# tool-skill',
+        '',
+        '## Когда применять',
+        '',
+        'Use КОГДА пользователь просит… — опишите триггер.',
+        '',
+        '## Шаги',
+        '',
+        '1. Первый шаг.',
+        '2. Второй шаг.',
+        '',
+        '## Как проверить результат',
+        '',
+        'Команда или тест.',
+      ].join('\n');
+
+      saveSkill(skillsDir, 'tool-skill', {
+        name: 'tool-skill',
+        description: 'Use КОГДА нужен инструмент со шагами',
+        body: templateBody,
+        groupIds: [],
+      });
+
+      // На диске: frontmatter в начале и тело заготовки целиком.
+      const raw = readFileSync(join(skillsDir, 'tool-skill', 'SKILL.md'), 'utf8');
+      expect(raw.startsWith('---\n')).toBe(true);
+      expect(raw).toContain('name: tool-skill');
+      expect(raw).toContain('## Шаги');
+
+      // Обратный разбор: name/description из шапки, тело — та же заготовка.
+      const skill = readSkills(skillsDir, store).find((s) => s.id === 'tool-skill');
+      expect(skill?.name).toBe('tool-skill');
+      expect(skill?.description).toBe('Use КОГДА нужен инструмент со шагами');
+      expect(skill?.body.trim()).toBe(templateBody.trim());
+    });
+
     it('slugifyName: не-латиница отбрасывается, латиница/цифры сохраняются', () => {
       // slugifyName НЕ транслитерирует кириллицу (в отличие от правил): любые
       // не [a-z0-9] схлопываются в дефис. «Скилл v2» → отбрасываем кириллицу,

@@ -88,6 +88,8 @@ export function useProbeHook() {
       hookId?: string;
       scriptName?: string;
       fixtureIds?: string[];
+      /** Свой ввод: сырой JSON события вместо заготовок. */
+      customEvent?: string;
     }) => {
       const { data } = await apiClient.post<{
         results: ProbeResult[];

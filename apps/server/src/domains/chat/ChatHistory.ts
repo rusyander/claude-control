@@ -9,7 +9,12 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
-import type { ChatSummary, ChatMessage, ChatBlock } from '@claude-control/contracts';
+import type {
+  ChatSummary,
+  ChatMessage,
+  ChatBlock,
+  ChatMessagesPage,
+} from '@claude-control/contracts';
 import { isSandboxPath } from './ChatArtifacts.ts';
 
 /**
@@ -98,21 +103,40 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
   return summary;
 }
 
+/** Параметры окна ленты: сколько сообщений отдать и сколько новых пропустить. */
+export interface MessagesWindow {
+  /** Размер окна — сколько реплик вернуть. */
+  limit?: number;
+  /** Сколько самых свежих реплик пропустить (0 — отдаём хвост ленты). */
+  offset?: number;
+}
+
 /**
- * Переписка одного чата. Здесь, в отличие от списка, нужен полный проход по
- * файлу — иначе выпадут реплики из середины. Файл читается построчно и сразу
- * превращается в сообщения, а в памяти остаётся только хвост ленты: держать
- * стомегабайтный транскрипт целиком незачем, дальше начала никто не листает.
+ * Переписка одного чата окном. Здесь, в отличие от списка, нужен полный проход
+ * по файлу — иначе выпадут реплики из середины. Файл читается построчно, а в
+ * памяти держится только нужное окно: транскрипт бывает стомегабайтным, и
+ * тащить его в память целиком незачем.
+ *
+ * По умолчанию отдаётся хвост ленты (последние `limit` реплик). Более ранние
+ * подгружаются увеличением `limit` («Загрузить ещё») либо сдвигом `offset` —
+ * оба варианта окном, без чтения всего транскрипта в ответ.
  */
 export async function readChatMessages(
   projectsDir: string,
   chatId: string,
-  limit = MESSAGE_LIMIT,
-): Promise<ChatMessage[]> {
+  window: MessagesWindow = {},
+): Promise<ChatMessagesPage> {
   const path = findTranscript(projectsDir, chatId);
-  if (!path) return [];
+  if (!path) return { messages: [], total: 0, hasMore: false };
 
-  const messages: ChatMessage[] = [];
+  const limit = Math.max(1, Math.floor(window.limit ?? MESSAGE_LIMIT));
+  const offset = Math.max(0, Math.floor(window.offset ?? 0));
+  // Держим только последние (offset + limit) реплик: этого хватает, чтобы
+  // вырезать нужное окно, а память не растёт с длиной транскрипта.
+  const cap = offset + limit;
+
+  const ring: ChatMessage[] = [];
+  let total = 0;
 
   for await (const line of streamLines(path)) {
     const trimmed = line.trim();
@@ -130,8 +154,9 @@ export async function readChatMessages(
     const blocks = toBlocks(record);
     if (blocks.length === 0) continue;
 
-    messages.push({
-      id: record.uuid ?? String(messages.length),
+    total += 1;
+    ring.push({
+      id: record.uuid ?? String(total - 1),
       role: record.type === 'user' ? 'user' : 'assistant',
       blocks,
       timestamp: record.timestamp ?? '',
@@ -139,10 +164,17 @@ export async function readChatMessages(
     });
 
     // Лишнее с начала выбрасываем сразу, не дожидаясь конца файла.
-    if (messages.length > limit) messages.shift();
+    if (ring.length > cap) ring.shift();
   }
 
-  return messages;
+  // Окно [start, endExcl) в абсолютных индексах ленты; `endExcl` отступает от
+  // конца на offset, `start` — ещё на limit назад.
+  const endExcl = Math.max(0, total - offset);
+  const start = Math.max(0, endExcl - limit);
+  const ringStart = total - ring.length;
+  const messages = ring.slice(start - ringStart, endExcl - ringStart);
+
+  return { messages, total, hasMore: start > 0 };
 }
 
 /**

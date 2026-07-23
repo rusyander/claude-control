@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Automation, EntityRef, Group } from '@claude-control/contracts';
+import type { Automation, Group, GroupMember } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { SkeletonList } from '@shared/ui/skeleton';
@@ -32,7 +32,7 @@ import styles from './GroupsPage.module.scss';
  * Состав группы для песочницы. Права в изолированный прогон не переносим:
  * там свои границы, и чужие разрешения их только запутали бы.
  */
-function selectionOfGroup(members: EntityRef[]): SandboxSelection {
+function selectionOfGroup(members: GroupMember[]): SandboxSelection {
   return {
     ruleIds: members.filter((item) => item.kind === 'rule').map((item) => item.id),
     skillIds: members.filter((item) => item.kind === 'skill').map((item) => item.id),

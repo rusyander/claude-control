@@ -1,0 +1,80 @@
+.page {
+  max-width: var(--layout-content-max);
+}
+
+// Мастер-деталь: слева реестр проектов, справа конфиг выбранного.
+.layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+
+// На узких экранах реестр уезжает наверх, панель — под него.
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.registry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+}
+
+.projectButton {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast);
+
+  &:hover {
+    background: var(--color-bg);
+    border-color: var(--color-border-strong);
+  }
+}
+
+.projectButtonActive {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-subtle);
+}
+
+.projectPath {
+  display: block;
+  font-size: 11px;
+}
+
+.tabs {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--spacing-2xs);
+}
+
+.editor {
+  width: 100%;
+  min-height: 420px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.editor:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

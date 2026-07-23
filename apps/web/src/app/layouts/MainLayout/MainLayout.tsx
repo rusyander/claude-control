@@ -3,8 +3,11 @@ import { Outlet, useRouterState } from '@tanstack/react-router';
 import { motion } from 'motion/react';
 import { DURATION, EASE, RISE, withReducedMotion } from '@shared/lib/motion';
 import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMotion';
+import { useMediaQuery } from '@shared/hooks/use-media-query/useMediaQuery';
 import { Stack } from '@shared/ui/stack';
+import { OnboardingWizard } from '@app/onboarding/OnboardingWizard';
 import { Sidebar } from './Sidebar';
+import { AppShortcuts } from './AppShortcuts';
 import styles from './MainLayout.module.scss';
 
 const STORAGE_KEY = 'claude-control:sidebar-collapsed';
@@ -28,9 +31,15 @@ export function MainLayout() {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const isReduced = useReducedMotion();
 
+  // На узких экранах панель не должна съедать ширину контента: до 900px её
+  // принудительно держим свёрнутой в рейку из значков (навигация остаётся
+  // доступной), сколько бы ни стояло в сохранённом состоянии.
+  const isNarrow = useMediaQuery('(max-width: 900px)');
+  const effectiveCollapsed = isCollapsed || isNarrow;
+
   return (
     <Stack direction="row" className={styles.root}>
-      <Sidebar isCollapsed={isCollapsed} onToggle={toggle} />
+      <Sidebar isCollapsed={effectiveCollapsed} onToggle={toggle} isNarrow={isNarrow} />
       <Stack as="main" className={styles.content}>
         <motion.div
           key={path}
@@ -45,6 +54,12 @@ export function MainLayout() {
           <Outlet />
         </motion.div>
       </Stack>
+
+      {/* Горячие клавиши и командная палитра — здесь есть контекст роутера. */}
+      <AppShortcuts />
+
+      {/* Приветственный мастер первого запуска — поверх всего, пока не пройден. */}
+      <OnboardingWizard />
     </Stack>
   );
 }

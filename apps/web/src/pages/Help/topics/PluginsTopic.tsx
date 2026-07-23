@@ -88,8 +88,10 @@ export function PluginsTopic() {
             tr('canUninstall'),
             tr('canMarketplaces'),
             tr('canSee'),
+            tr('canView'),
+            tr('canScaffold'),
           ]}
-          cant={[tr('cantEdit'), tr('cantPick'), tr('cantCreate'), tr('cantOffline')]}
+          cant={[tr('cantEdit'), tr('cantPick'), tr('cantOffline')]}
         />
       </HelpSection>
 

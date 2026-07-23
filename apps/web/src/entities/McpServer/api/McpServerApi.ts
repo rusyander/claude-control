@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { McpServer, McpServerDraft } from '@claude-control/contracts';
+import type { McpServer, McpServerDraft, McpToolsResult } from '@claude-control/contracts';
 import { createEntityApi } from '@shared/api/create-entity-api';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
@@ -28,6 +28,24 @@ export function useStartOAuth() {
     mutationFn: async (id: string): Promise<StartOAuthResult> => {
       const { data } = await apiClient.post<StartOAuthResult>(
         `/mcp/${encodeURIComponent(id)}/oauth/start`,
+      );
+      return data;
+    },
+  });
+}
+
+/**
+ * Список инструментов сервера для помощника отбора прав. Сервер поднимается и
+ * опрашивается по протоколу — как проверка связи, но возвращаются сами имена.
+ * Ждём дольше обычного: у stdio в рукопожатие входит запуск процесса.
+ */
+export function useMcpServerTools() {
+  return useMutation({
+    mutationFn: async (id: string): Promise<McpToolsResult> => {
+      const { data } = await apiClient.post<McpToolsResult>(
+        `/mcp/${encodeURIComponent(id)}/tools`,
+        undefined,
+        { timeout: 120_000 },
       );
       return data;
     },

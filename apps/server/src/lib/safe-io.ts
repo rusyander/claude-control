@@ -11,6 +11,7 @@ import {
   rmdirSync,
 } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
+import { encryptSecret } from './secret-crypto.ts';
 
 /**
  * Файловые операции с двумя страховками, потому что мы правим рабочий конфиг
@@ -73,9 +74,55 @@ export function writeJsonFile(
 }
 
 /**
+ * Опциональное шифрование копий файла секретов `.mcp-secrets.env`.
+ *
+ * Копия этого файла по умолчанию лежит открытым текстом рядом с токенами.
+ * Когда пользователь включает шифрование и вводит парольную фразу (держим её
+ * только в памяти процесса, не в state.json), копии секретов пишутся
+ * зашифрованными. Настройка и фраза приходят извне через сеттеры — так же,
+ * как глубина ротации (`setBackupKeep`), чтобы safe-io не тянул contracts и
+ * настройки в себя.
+ */
+let encryptSecretBackups = false;
+let secretsBasename = '.mcp-secrets.env';
+/** Парольная фраза — ТОЛЬКО в памяти, никогда на диск. Пусто — не задана. */
+let secretPassphrase: string | undefined;
+
+/** Включить/выключить шифрование копий файла секретов (из настроек панели). */
+export function setEncryptSecretBackups(enabled: boolean): void {
+  encryptSecretBackups = enabled;
+}
+
+/** Basename файла секретов — по нему backupEntry узнаёт, что копию надо шифровать. */
+export function setSecretsBasename(name: string): void {
+  if (name) secretsBasename = name;
+}
+
+/** Задать/сбросить парольную фразу шифрования копий секретов (память процесса). */
+export function setSecretPassphrase(passphrase: string | undefined): void {
+  secretPassphrase = passphrase;
+}
+
+/** Загружена ли парольная фраза в память сейчас (для подсказок в интерфейсе). */
+export function hasSecretPassphrase(): boolean {
+  return secretPassphrase !== undefined;
+}
+
+/** Эта копия — файла секретов? По basename исходного пути. */
+function isSecretsPath(path: string): boolean {
+  return basename(path) === secretsBasename;
+}
+
+/**
  * Копия с отметкой времени — файла или папки целиком. Timestamp без двоеточий:
  * иначе имя невалидно в Windows. `name` задаётся, когда одного basename мало,
  * чтобы различить копии (скилл лежит и в skills/, и в skills-disabled/).
+ *
+ * Копия файла секретов при включённом шифровании пишется зашифрованной. Если
+ * шифрование включено, а парольной фразы в памяти нет (например, после
+ * перезапуска сервера до повторного ввода) — копию НЕ делаем вовсе: писать
+ * секреты открытым текстом в этом режиме нельзя, а молча подменить шифр
+ * плейнтекстом — обман. Возвращаем undefined, как и при отсутствии исходника.
  */
 export function backupEntry(path: string, backupDir: string, name?: string): string | undefined {
   if (!existsSync(path)) return undefined;
@@ -84,7 +131,14 @@ export function backupEntry(path: string, backupDir: string, name?: string): str
   const base = name ?? basename(path);
   const target = join(backupDir, `${base}.${stamp}.bak`);
 
-  copyRecursive(path, target);
+  if (isSecretsPath(path) && encryptSecretBackups) {
+    if (secretPassphrase === undefined) return undefined;
+    const blob = encryptSecret(readFileSync(path, 'utf8'), secretPassphrase);
+    writeFileSync(target, blob);
+  } else {
+    copyRecursive(path, target);
+  }
+
   rotateBackups(backupDir, base);
   return target;
 }

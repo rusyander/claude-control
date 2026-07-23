@@ -1,11 +1,14 @@
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Artifact,
-  ChatMessage,
+  ChatMessagesPage,
   ChatSearchResponse,
   ChatSummary,
 } from '@claude-control/contracts';
 import { apiClient } from '@shared/api/client';
+
+/** Размер окна ленты и шаг подгрузки более ранних сообщений. */
+export const CHAT_PAGE_SIZE = 400;
 
 export const chatKeys = {
   list: ['chats'] as const,
@@ -54,16 +57,23 @@ export function useChatBodySearch(query: string) {
   });
 }
 
-export function useChatMessages(chatId: string | undefined) {
+/**
+ * Лента переписки окном. По умолчанию — последние `CHAT_PAGE_SIZE` сообщений;
+ * увеличивая `limit` кнопкой «Загрузить ещё», подтягиваем более ранние. Прежнее
+ * окно держим на экране, пока грузится расширенное, — лента не мигает пустотой.
+ */
+export function useChatMessages(chatId: string | undefined, limit = CHAT_PAGE_SIZE) {
   return useQuery({
-    queryKey: chatKeys.messages(chatId ?? ''),
+    queryKey: [...chatKeys.messages(chatId ?? ''), limit] as const,
     queryFn: async () => {
-      const { data } = await apiClient.get<ChatMessage[]>(`/chats/${chatId}/messages`, {
+      const { data } = await apiClient.get<ChatMessagesPage>(`/chats/${chatId}/messages`, {
+        params: { limit },
         timeout: 120_000,
       });
       return data;
     },
     enabled: Boolean(chatId),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -95,6 +105,29 @@ export function useArtifactSource(chatId: string | undefined, name: string | und
 /** Адрес файла для встроенного просмотра: картинки и документы браузер тянет сам. */
 export function artifactUrl(chatId: string, name: string): string {
   return `${apiClient.defaults.baseURL}/chat/${chatId}/artifact?name=${encodeURIComponent(name)}`;
+}
+
+/** Адрес выгрузки разговора файлом — по нему браузер скачивает Markdown/JSON. */
+export function chatExportUrl(chatId: string, format: 'md' | 'json'): string {
+  return `${apiClient.defaults.baseURL}/chat/${chatId}/export?format=${format}`;
+}
+
+/**
+ * Удалить артефакт из папки чата. Доступно только у чатов песочницы: их файлы
+ * лежат в отдельной папке панели, и убрать лишнее там безопасно. После удаления
+ * перечитываем список артефактов.
+ */
+export function useDeleteArtifact(chatId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (name: string) => {
+      await apiClient.delete(`/chat/${chatId}/artifact`, { params: { name } });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: chatKeys.artifacts(chatId ?? '') });
+    },
+  });
 }
 
 /**

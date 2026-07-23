@@ -1,1 +1,1 @@
-﻿export { skillApi } from './api/SkillApi';
+﻿export { skillApi, useRenameSkill } from './api/SkillApi';

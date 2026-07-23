@@ -1,5 +1,12 @@
 import { join } from 'node:path';
-import type { AppSettings, Automation, EntityKind, Group, Hook } from '@claude-control/contracts';
+import type {
+  AppSettings,
+  Automation,
+  EntityKind,
+  Group,
+  Hook,
+  Project,
+} from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from './safe-io.ts';
 
 /**
@@ -39,7 +46,28 @@ export interface AppState {
    * групп ключ остаётся, пока его держит хотя бы одна.
    */
   envByGroup: Record<string, string[]>;
+  /**
+   * Реестр проектов уровня конфигурации: запомненные пути к каталогам проектов,
+   * чьи `CLAUDE.md`, `.claude/settings.json` и `.mcp.json` панель показывает и
+   * правит. Хранится здесь, а не в конфигах Claude Code: это данные самой панели,
+   * а сами файлы проекта остаются в его каталоге и не дублируются.
+   */
+  projects: Project[];
+  /**
+   * Оверрайд команды запуска dev-сервера на проект: нормализованный путь →
+   * командная строка. Пусто/нет ключа — команда определяется автоматически по
+   * package.json проекта (скрипт dev/start и пакетный менеджер по lock-файлу).
+   */
+  runnerCommands: Record<string, string>;
   settings: AppSettings;
+  /**
+   * Verifier парольной фразы шифрования копий секретов. Не сама фраза, а её
+   * производная (scrypt-хэш с солью): по нему проверяется, та ли фраза введена,
+   * восстановить фразу по нему нельзя. Пусто — шифрование ещё не настраивали.
+   * Хранится тут, а не в settings: это не пользовательская настройка, а
+   * технический артефакт, и в схему настроек (contracts) ему попадать незачем.
+   */
+  secretBackupVerifier?: string;
 }
 
 const DEFAULT_STATE: AppState = {
@@ -49,9 +77,13 @@ const DEFAULT_STATE: AppState = {
   disabledByGroup: { rule: {}, hook: {}, skill: {}, mcp: {}, permission: {} },
   disabledHooks: {},
   envByGroup: {},
+  projects: [],
+  runnerCommands: {},
   settings: {
     theme: 'system',
     language: 'ru',
+    accent: 'default',
+    onboardingDone: false,
     claudeDirOverride: '',
     revealSecretsByDefault: false,
     backupBeforeWrite: true,
@@ -62,9 +94,12 @@ const DEFAULT_STATE: AppState = {
     highContrast: false,
     editor: '',
     costUnit: 'tokens',
+    mcpNetworkTimeoutMs: 10_000,
+    mcpAutoCheck: false,
     chatModel: '',
     chatEffort: 'xhigh',
     modelPricing: {},
+    encryptSecretBackups: false,
   },
 };
 
@@ -102,6 +137,8 @@ export class AppStore {
       disabledByGroup: { ...base.disabledByGroup, ...loaded.disabledByGroup },
       disabledHooks: { ...base.disabledHooks, ...loaded.disabledHooks },
       envByGroup: { ...base.envByGroup, ...loaded.envByGroup },
+      projects: loaded.projects ?? base.projects,
+      runnerCommands: { ...base.runnerCommands, ...loaded.runnerCommands },
       settings: { ...base.settings, ...loaded.settings },
     };
   }
@@ -134,6 +171,8 @@ export class AppStore {
       disabledByGroup: { ...base.disabledByGroup, ...loaded.disabledByGroup },
       disabledHooks: { ...base.disabledHooks, ...loaded.disabledHooks },
       envByGroup: { ...base.envByGroup, ...loaded.envByGroup },
+      projects: loaded.projects ?? base.projects,
+      runnerCommands: { ...base.runnerCommands, ...loaded.runnerCommands },
       settings: { ...base.settings, ...loaded.settings },
     };
     this.persist();
@@ -147,6 +186,18 @@ export class AppStore {
     this.state.settings = { ...this.state.settings, ...patch };
     this.persist();
     return this.state.settings;
+  }
+
+  /** Verifier парольной фразы шифрования копий секретов (или undefined, если не задан). */
+  getSecretBackupVerifier(): string | undefined {
+    return this.state.secretBackupVerifier;
+  }
+
+  /** Сохранить/очистить verifier парольной фразы. Сама фраза на диск не пишется. */
+  setSecretBackupVerifier(verifier: string | undefined): void {
+    if (verifier) this.state.secretBackupVerifier = verifier;
+    else delete this.state.secretBackupVerifier;
+    this.persist();
   }
 
   /**
@@ -192,6 +243,37 @@ export class AppStore {
     const index = list.indexOf(id);
     if (isEnabled && index >= 0) list.splice(index, 1);
     if (!isEnabled && index < 0) list.push(id);
+    this.persist();
+  }
+
+  /**
+   * Перенести все отметки сущности со старого идентификатора на новый — при
+   * переименовании (у скилла id = имя папки). Трогаем каждое место, где id
+   * участвует: ручное выключение, гашение группой и состав групп. Иначе после
+   * смены папки отметки остались бы висеть на несуществующем id.
+   */
+  renameEntity(kind: EntityKind, oldId: string, newId: string): void {
+    if (oldId === newId) return;
+
+    const disabled = this.state.disabled[kind];
+    const at = disabled.indexOf(oldId);
+    if (at >= 0) {
+      disabled.splice(at, 1);
+      if (!disabled.includes(newId)) disabled.push(newId);
+    }
+
+    const byGroup = this.state.disabledByGroup[kind];
+    if (byGroup[oldId]) {
+      byGroup[newId] = byGroup[oldId];
+      delete byGroup[oldId];
+    }
+
+    for (const group of this.state.groups) {
+      for (const member of group.members) {
+        if (member.kind === kind && member.id === oldId) member.id = newId;
+      }
+    }
+
     this.persist();
   }
 
@@ -305,4 +387,61 @@ export class AppStore {
     this.state.automations = this.state.automations.filter((item) => item.id !== id);
     this.persist();
   }
+
+  // --- Реестр проектов уровня конфигурации ---
+
+  getProjects(): Project[] {
+    return [...this.state.projects];
+  }
+
+  getProject(id: string): Project | undefined {
+    return this.state.projects.find((project) => project.id === id);
+  }
+
+  /**
+   * Добавить проект в реестр. Один и тот же каталог не заводим дважды: если он
+   * уже запомнен, возвращаем существующую запись (и обновляем имя, если задано),
+   * а не плодим дубликаты с разными id.
+   */
+  addProject(project: Project): Project {
+    const existing = this.state.projects.find(
+      (item) => normalizeProjectPath(item.path) === normalizeProjectPath(project.path),
+    );
+    if (existing) {
+      existing.name = project.name;
+      this.persist();
+      return existing;
+    }
+
+    this.state.projects.push(project);
+    this.persist();
+    return project;
+  }
+
+  /** Убрать проект из реестра. Файлы проекта при этом не трогаем — только путь. */
+  removeProject(id: string): void {
+    this.state.projects = this.state.projects.filter((project) => project.id !== id);
+    this.persist();
+  }
+
+  // --- Оверрайд команды запуска dev-сервера проекта ---
+
+  /** Оверрайд команды запуска для каталога проекта (или undefined, если не задан). */
+  getRunnerCommand(path: string): string | undefined {
+    return this.state.runnerCommands[normalizeProjectPath(path)] || undefined;
+  }
+
+  /** Сохранить/очистить оверрайд команды запуска для каталога проекта. */
+  setRunnerCommand(path: string, command: string | undefined): void {
+    const key = normalizeProjectPath(path);
+    if (command && command.trim()) this.state.runnerCommands[key] = command.trim();
+    else delete this.state.runnerCommands[key];
+    this.persist();
+  }
+}
+
+/** Нормализация пути для сравнения: Windows нечувствителен к регистру и слэшам. */
+function normalizeProjectPath(path: string): string {
+  const unified = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  return process.platform === 'win32' ? unified.toLowerCase() : unified;
 }

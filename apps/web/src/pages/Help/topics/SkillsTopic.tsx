@@ -74,6 +74,7 @@ export function SkillsTopic() {
           cantTitle={t('help.common.cantTitle')}
           can={[
             tr('canCreate'),
+            tr('canRename'),
             tr('canTree'),
             tr('canAssistant'),
             tr('canSearch'),
@@ -82,7 +83,7 @@ export function SkillsTopic() {
             tr('canSandbox'),
             tr('canLink'),
           ]}
-          cant={[tr('cantRename'), tr('cantAutoRead'), tr('cantGuarantee'), tr('cantVersions')]}
+          cant={[tr('cantAutoRead'), tr('cantGuarantee'), tr('cantVersions')]}
         />
       </HelpSection>
 

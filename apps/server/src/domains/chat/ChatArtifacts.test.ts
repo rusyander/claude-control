@@ -2,10 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, utimesSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
+import { existsSync } from 'node:fs';
 import {
   readArtifacts,
   readArtifactText,
   readArtifactBinary,
+  deleteArtifact,
   chatDirectory,
   sandboxRoot,
   isSandboxPath,
@@ -181,6 +183,39 @@ describe('ChatArtifacts', () => {
     it('вложенный обход ../../ тоже усекается до имени', () => {
       writeFileSync(join(root, 'deep.txt'), 'НАРУЖУ');
       expect(readArtifactText(chatDir, '../../deep.txt')).toBe('');
+    });
+  });
+
+  // ── Удаление артефакта ──
+  describe('удаление артефакта', () => {
+    it('удаляет файл из папки чата и возвращает true', () => {
+      writeFileSync(join(chatDir, 'draft.md'), 'черновик');
+      expect(deleteArtifact(chatDir, 'draft.md')).toBe(true);
+      expect(existsSync(join(chatDir, 'draft.md'))).toBe(false);
+    });
+
+    it('для несуществующего файла возвращает false', () => {
+      expect(deleteArtifact(chatDir, 'ghost.md')).toBe(false);
+    });
+
+    it('папку не удаляет', () => {
+      mkdirSync(join(chatDir, 'assets'));
+      expect(deleteArtifact(chatDir, 'assets')).toBe(false);
+      expect(existsSync(join(chatDir, 'assets'))).toBe(true);
+    });
+
+    it('обход ../ не даёт удалить файл за пределами папки чата', () => {
+      // Секрет — в родителе папки чата. Имя схлопывается до basename, поэтому
+      // удаление ищет secret.txt внутри chatDir (где его нет) и родителя не трогает.
+      writeFileSync(join(root, 'secret.txt'), 'СЕКРЕТ');
+      expect(deleteArtifact(chatDir, '../secret.txt')).toBe(false);
+      expect(existsSync(join(root, 'secret.txt'))).toBe(true);
+    });
+
+    it('вложенный обход ../../ тоже усекается до имени', () => {
+      writeFileSync(join(root, 'deep.txt'), 'НАРУЖУ');
+      expect(deleteArtifact(chatDir, '../../deep.txt')).toBe(false);
+      expect(existsSync(join(root, 'deep.txt'))).toBe(true);
     });
   });
 

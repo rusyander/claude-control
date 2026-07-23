@@ -8,6 +8,16 @@
   min-width: 0;
   overflow-y: auto;
   padding: var(--spacing-xl);
+
+  // На узких экранах крупный отступ раздела съедает и без того тесную ширину:
+  // ужимаем его, чтобы контенту досталось больше места и ряды не упирались в край.
+  @media (max-width: 900px) {
+    padding: var(--spacing-md);
+  }
+
+  @media (max-width: 480px) {
+    padding: var(--spacing-sm);
+  }
 }
 
 // Обёртка страницы для анимации перехода: раскладку не меняет, растёт
@@ -111,13 +121,16 @@
 .navCount {
   margin-left: auto;
   font-size: var(--font-size-caption);
-  color: var(--color-fg-subtle);
+  // Мелкий кегль (caption) на светлой панели: fg-subtle даёт ~3.4:1 и не
+  // проходит AA, поэтому счётчику и подписи секции берём более контрастный
+  // fg-muted (~6:1 на обеих темах).
+  color: var(--color-fg-muted);
 }
 
 .sectionLabel {
   display: block;
   padding: var(--spacing-md) var(--spacing-xs) var(--spacing-2xs);
-  color: var(--color-fg-subtle);
+  color: var(--color-fg-muted);
   font-size: var(--font-size-caption);
   white-space: nowrap;
 }

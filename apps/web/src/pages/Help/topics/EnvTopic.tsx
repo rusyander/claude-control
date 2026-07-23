@@ -90,14 +90,9 @@ export function EnvTopic() {
             tr('canBulkAdd'),
             tr('canComment'),
             tr('canAssistant'),
+            tr('canMove'),
           ]}
-          cant={[
-            tr('cantEdit'),
-            tr('cantEncrypt'),
-            tr('cantLocal'),
-            tr('cantScope'),
-            tr('cantSee'),
-          ]}
+          cant={[tr('cantEdit'), tr('cantEncrypt'), tr('cantScope'), tr('cantSee')]}
         />
       </HelpSection>
 

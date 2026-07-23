@@ -5,7 +5,7 @@ import type {
   SettingsSource,
 } from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
-import { LOCAL_ID_PREFIX } from '../lib/settings-source.ts';
+import { LOCAL_ID_PREFIX, isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 import type { AppStore } from '../lib/app-store.ts';
 
 /**
@@ -100,6 +100,35 @@ export function savePermission(
   }
 
   return writeJsonFile(settingsPath, settings, { backupDir });
+}
+
+/**
+ * Перенос права в противоположный файл настроек: удаляем из источника и пишем
+ * в другой. Источник определяется префиксом id (`local:` → settings.local.json,
+ * иначе settings.json). Переиспользует delete/save — своей логики записи нет.
+ * Возвращает путь резервной копии последней записи.
+ */
+export function movePermission(
+  settingsPath: string,
+  settingsLocalPath: string,
+  ruleId: string,
+  backupDir?: string,
+): string | undefined {
+  const fromLocal = isLocalId(ruleId);
+  const bareId = stripLocalPrefix(ruleId);
+  const [decision, ...rest] = bareId.split(':');
+  const pattern = rest.join(':');
+
+  const sourcePath = fromLocal ? settingsLocalPath : settingsPath;
+  const targetPath = fromLocal ? settingsPath : settingsLocalPath;
+
+  deletePermission(sourcePath, bareId, backupDir);
+  return savePermission(
+    targetPath,
+    null,
+    { pattern, decision: decision as PermissionDecision, groupIds: [] },
+    backupDir,
+  );
 }
 
 export function deletePermission(

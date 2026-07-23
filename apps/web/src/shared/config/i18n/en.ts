@@ -68,7 +68,9 @@ export const en: TranslationSchema = {
     mcp: 'MCP servers',
     permissions: 'Permissions',
     env: 'Environment',
+    projects: 'Projects',
     groups: 'Groups',
+    history: 'Change history',
     settings: 'Settings',
     help: 'Help',
     sectionMain: 'Main',
@@ -97,6 +99,44 @@ export const en: TranslationSchema = {
       env: 'Environment variables',
     },
   },
+  palette: {
+    title: 'Command palette',
+    placeholder: 'Jump to a section or search the configuration…',
+    hint: 'Start typing: a section to jump to, or a query across all sections.',
+    empty: 'Nothing found for “{{query}}”.',
+    footer: '↑↓ to move · ⏎ to open · g o overview · g c chat · ? help · Esc to close',
+  },
+  notifications: {
+    title: 'Notifications',
+    subtitle: 'Recent notifications — the ones shown as toasts',
+    clear: 'Clear',
+    emptyTitle: 'No notifications yet',
+    emptyText: 'Recent toasts will appear here: creations, errors, configuration changes.',
+  },
+  history: {
+    title: 'Change history',
+    subtitle: 'What changed in the configuration: a timeline of edits with diffs',
+    explainTitle: 'What this is',
+    explain:
+      'Before every write the panel backs up the file, so the copies are snapshots over time. The timeline is built from them: which file, when, and what changed. A copy is compared against the previous copy of the same file, and the freshest one against the current file on disk. The .mcp-secrets.env secrets file is left out of the timeline.',
+    empty: 'No changes yet',
+    emptyText:
+      'No edit has been backed up yet. As soon as the panel writes something to the configuration, the timeline will appear here.',
+    base_current: 'vs current file',
+    base_previous: 'vs previous copy',
+    base_initial: 'first known version',
+    noChanges: 'no changes',
+    loadingDiff: 'Loading diff…',
+    diffError: 'Failed to load the diff',
+    diffLabel: 'Diff of {{file}}',
+    skip_initial: 'This is the first known version — nothing to compare against.',
+    skip_binary: 'Binary file — diff is not shown.',
+    'skip_too-large': 'File is too large — diff is not shown.',
+    revertHunk: 'Revert this change',
+    revertHunkConfirmTitle: 'Revert only this change?',
+    revertHunkConfirmText:
+      'In {{file}} this one block will return to the copied state; the other changes stay as they are. The current state is saved as a separate copy — the revert is reversible too. The edit takes effect after Claude Code restarts.',
+  },
   overview: {
     title: 'Configuration overview',
     subtitle: 'What is currently wired into your Claude Code',
@@ -115,6 +155,13 @@ export const en: TranslationSchema = {
     backups: 'Backups',
     backupsLast: 'latest',
     backupsNone: 'no backups yet',
+    // Quick actions on tiles and the changes summary.
+    quickAdd: 'Add',
+    quickClaudeMd: 'CLAUDE.md',
+    quickHistory: 'Open history',
+    changesTitle: 'Changes in {{days}} days',
+    changesHint: 'Open change history',
+    changesNone: 'No changes',
   },
   rules: {
     title: 'Rules',
@@ -183,6 +230,14 @@ export const en: TranslationSchema = {
       'A hook receives an event and answers with a decision, so it can be tested directly — instantly and without calling the model. Pick cases or run them all.',
     runAll: 'Run all',
     runSelected: 'Run selected',
+    modeFixtures: 'Fixtures',
+    modeCustom: 'Custom input',
+    customLabel: 'JSON event',
+    customHint: 'A Claude Code hook event, for example: {"hook_event_name": "PreToolUse", …}',
+    customTitle: 'Custom input',
+    runCustom: 'Run',
+    customInvalidJson: 'Could not parse JSON — check the syntax.',
+    customNotObject: 'The event must be a JSON object like {"hook_event_name": "…"}.',
     timedOut: 'The hook did not answer in time and was stopped',
     decision: {
       block: 'stopped it',
@@ -237,7 +292,7 @@ export const en: TranslationSchema = {
     effort: 'Thinking effort',
     effortAuto: 'default',
     effortHint: 'How deeply the agent reasons about the answer. Empty — as set in Settings.',
-    fromSettings: 'Default: {{value}}',
+    fromSettings: '{{value}}',
     effort_low: 'Low',
     effort_medium: 'Medium',
     effort_high: 'High',
@@ -276,6 +331,14 @@ export const en: TranslationSchema = {
     minutesAgo: '{{count}} min ago',
     limitResets: 'limit until {{time}}',
     resizePreview: 'Resize the preview',
+    loadOlder: 'Load older',
+    export: 'Export',
+    exportHint: 'Download the conversation as a file (Markdown)',
+    deleteArtifact: 'Delete file “{{name}}”',
+    deleteArtifactTitle: 'Delete file?',
+    deleteArtifactConfirm:
+      'File “{{name}}” will be removed from the chat folder. This cannot be undone.',
+    artifactDeleted: 'File “{{name}}” deleted',
     kind: {
       html: 'page',
       markdown: 'markup',
@@ -408,6 +471,27 @@ export const en: TranslationSchema = {
     structureHint:
       'A skill can be a folder of modules. Build the structure from a template, the assistant, or by hand — SKILL.md already exists.',
     skillBodyHint: 'The body of SKILL.md: what exactly to do, step by step. Markdown.',
+    templates: {
+      title: 'SKILL.md template',
+      hint: 'Fills the instructions with a ready skeleton — tweak it afterwards.',
+      blankTitle: 'Empty skeleton',
+      blankBody:
+        '# {{name}}\n\n## When to apply\n\nDescribe the situation in which Claude should pull this skill in.\n\n## What to do\n\nSteps or rules.\n',
+      toolTitle: 'Tool skill with steps',
+      toolBody:
+        '# {{name}}\n\n## When to apply\n\nUse WHEN the user asks… — describe the trigger in the words they will come with.\n\n## Steps\n\n1. First step.\n2. Second step.\n3. What counts as the result.\n\n## What not to do\n\nExplicit prohibitions and common mistakes.\n\n## How to verify the result\n\nA command, test, or sign that the work is done.\n',
+      ruleTitle: 'Rule instruction',
+      ruleBody:
+        '# {{name}}\n\n## Rule\n\nState the rule in one or two sentences — what to always or never do.\n\n## Why\n\nWhy this rule exists and what it prevents.\n\n## Examples\n\n- Good: …\n- Bad: …\n',
+      checklistTitle: 'Check / checklist',
+      checklistBody:
+        '# {{name}}\n\n## When to apply\n\nBefore handing off work or during review … — describe the trigger moment.\n\n## Checklist\n\n- [ ] First check item\n- [ ] Second item\n- [ ] Third item\n\n## If something is off\n\nWhat to do when an item fails.\n',
+    },
+    rename: 'Rename',
+    renameLabel: 'New name (skill folder)',
+    renameHint:
+      'The folder name in skills/ — also the identifier. Renames the folder and moves its marks.',
+    renamePlaceholder: 'e.g. perf-audit',
   },
   mcp: {
     title: 'MCP servers',
@@ -448,6 +532,15 @@ export const en: TranslationSchema = {
     headers: 'Request headers',
     headersHint:
       'One Name=value per line. Needed by servers behind auth: without them the check stops at 401',
+    toolsButton: 'Tools',
+    toolsTitle: 'Server tools',
+    toolsLoading: 'Connecting and requesting the tool list…',
+    toolsEmpty: 'The server returned no tools',
+    toolsSelectAll: 'Select all',
+    toolsClear: 'Clear',
+    toolsSelected: 'Selected: {{count}}',
+    wholeServer: 'Whole server at once',
+    createPermissions: 'Create permissions ({{count}})',
   },
   permissions: {
     title: 'Permissions',
@@ -484,6 +577,8 @@ export const en: TranslationSchema = {
     risk_high: 'high risk',
     deletePermission:
       'The rule is removed from settings.json. The tool returns to the default behaviour — confirmation on every call.',
+    moveToLocal: 'To local (settings.local.json)',
+    moveToShared: 'To shared (settings.json)',
   },
   env: {
     title: 'Environment variables',
@@ -503,6 +598,8 @@ export const en: TranslationSchema = {
     secretRewrite: 'Leave empty if the value should stay as is',
     deleteVar:
       'The variable will be removed from the file. Servers using it will stop receiving this value.',
+    moveToLocal: 'To local (settings.local.json)',
+    moveToShared: 'To shared (settings.json)',
   },
   groups: {
     title: 'Groups',
@@ -525,11 +622,16 @@ export const en: TranslationSchema = {
     groupEnvHint:
       'Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole.',
     selectedCount: 'Selected: {{count}}',
+    orderTitle: 'Apply order',
+    moveUp: 'Move up',
+    moveDown: 'Move down',
+    removeMember: 'Remove from group',
     kind_rule: 'Rule',
     kind_skill: 'Skill',
     kind_hook: 'Hook',
     kind_mcp: 'Server',
     kind_permission: 'Permission',
+    kind_group: 'Group',
     automations: 'Automations',
     automationsExplain:
       'An automation describes "when — what": for example, run a check after a skill is invoked. On save it compiles into a regular hook, so it behaves exactly like a hand-written one.',
@@ -575,6 +677,13 @@ export const en: TranslationSchema = {
     themeLight: 'Light',
     themeDark: 'Dark',
     themeSystem: 'Match system',
+    accent: 'Accent',
+    accentHint: 'Applied on top of the current theme; presets come from the design-system palette.',
+    accent_default: 'Default',
+    accent_blue: 'Blue',
+    accent_green: 'Green',
+    accent_purple: 'Purple',
+    accent_amber: 'Amber',
     language: 'Language',
     claudeDir: '.claude directory',
     claudeDirHint:
@@ -601,6 +710,28 @@ export const en: TranslationSchema = {
     transferImport: 'Load snapshot',
     transferImported: 'Panel settings imported',
     transferImportError: 'Could not read the settings file',
+    bundleTitle: 'Configuration bundle',
+    bundleHint:
+      'Rules, skills and hooks in a single file to move to another machine or share. Unlike the panel-settings transfer above, this is your real Claude Code files: importing changes the live configuration.',
+    bundleExport: 'Download bundle',
+    bundleImport: 'Import bundle',
+    bundleParseError: 'Could not read the bundle file',
+    bundlePreviewTitle: 'Import configuration bundle',
+    bundlePreviewDesc: 'Review what is inside and pick a mode. Changes affect real files.',
+    bundleRulesCount: 'Rule lines: {{count}}',
+    bundleSkillsCount: 'Skills: {{count}}',
+    bundleHooksCount: 'Hooks: {{count}}',
+    bundleRulesModeLabel: 'What to do with rules',
+    bundleRulesModeHint:
+      'Append — add a block to the end of CLAUDE.md, leaving existing content intact. Replace — rewrite the whole file (with a backup). Skip — leave rules unchanged.',
+    bundleRulesMode_append: 'Append to the end',
+    bundleRulesMode_replace: 'Replace entirely',
+    bundleRulesMode_skip: 'Skip',
+    bundleOverwriteSkills: 'Overwrite existing skills',
+    bundleOverwriteSkillsHint:
+      'By default a skill with the same name is left untouched. Enable to replace it with the bundle files (with a backup).',
+    bundleApply: 'Apply',
+    bundleApplied: 'Bundle applied: {{skills}} skills, {{hooks}} hooks',
     watchFiles: 'Watch files for changes',
     watchHint: 'Refresh the interface when configs are edited outside the app',
     revealSecrets: 'Reveal secrets by default',
@@ -614,6 +745,13 @@ export const en: TranslationSchema = {
     spendTitle: 'Spend',
     spendMoney: 'Show in money',
     spendHint: 'Spend is shown in tokens by default',
+    mcpTitle: 'MCP servers',
+    mcpAutoCheck: 'Check connectivity when the section opens',
+    mcpAutoCheckHint:
+      'Automatically probe every enabled server when you open the MCP section. Otherwise only the card button does it.',
+    mcpTimeout: 'Network connect timeout, ms',
+    mcpTimeoutHint:
+      'How long to wait for a network server (http/sse) to respond. Launching local (stdio) servers is not limited by this. Range 2000–120000.',
     chatDefaultsTitle: 'Chat: default model and effort',
     chatDefaultsHint:
       'Apply to all chats. A single chat can override them locally — the global settings stay unchanged.',
@@ -651,6 +789,24 @@ export const en: TranslationSchema = {
     backupsConfirmTitle: 'Restore the file to this copy?',
     backupsConfirmText:
       'The file {{target}} will be replaced whole: anything changed after this copy disappears from it. The current state is saved as a separate copy. Changes apply after restarting Claude Code.',
+    encryptSecrets: 'Encrypt secret backups',
+    encryptSecretsHint:
+      'Backups of .mcp-secrets.env are written encrypted (AES-256-GCM). The passphrase is stored nowhere — kept in memory and asked for when you enable it.',
+    encryptSecretsNeedsPass:
+      'Encryption is on, but no passphrase was entered this session — new secret backups are not being created. Enter the passphrase to resume.',
+    encryptSecretsEnterPass: 'Enter passphrase',
+    encryptSecretsError: 'Could not save the passphrase',
+    encryptSecretsPassTitle: 'Encryption passphrase',
+    encryptSecretsPassNew:
+      'Set a passphrase — it will encrypt copies of the secrets file. Remember it: without it a copy cannot be restored, and the passphrase itself cannot be recovered.',
+    encryptSecretsPassExisting:
+      'Enter the same passphrase you set before: copies are encrypted with one passphrase.',
+    encryptSecretsPassLabel: 'Passphrase',
+    encryptSecretsPassHint: 'At least 8 characters',
+    backupsDecryptTitle: 'Decrypt the copy to restore',
+    backupsDecryptText:
+      'The copy of {{target}} is encrypted. Enter the passphrase it was encrypted with — otherwise it cannot be restored.',
+    backupsDecryptError: 'Could not decrypt the copy',
   },
   assistant: {
     title: 'Assistant',
@@ -701,6 +857,28 @@ export const en: TranslationSchema = {
     searchCatalogPlaceholder: 'name or description, for example: playwright',
     catalogCount: 'Showing {{found}} of {{total}}',
     installs: 'installs',
+    viewFiles: 'Plugin files',
+    filesHint: 'Files of the installed plugin — read-only',
+    scaffoldTitle: 'Create a plugin',
+    scaffoldHint:
+      'Generates a plugin skeleton in the Claude Code format inside the chosen folder: the .claude-plugin/plugin.json manifest and the selected parts. The plugin lands in a subfolder named after the plugin.',
+    scaffoldName: 'Plugin name',
+    scaffoldNameHint:
+      'Becomes the folder name and the manifest name field: lowercase letters, digits and hyphens.',
+    scaffoldDescription: 'Description',
+    scaffoldDescriptionPlaceholder: 'Briefly: what the plugin does',
+    scaffoldAuthor: 'Author',
+    scaffoldFolder: 'Destination folder',
+    scaffoldPickFolder: 'Choose folder',
+    scaffoldComponents: 'What to include',
+    scaffoldComponent: {
+      commands: 'Commands (commands/)',
+      agents: 'Subagents (agents/)',
+      skills: 'Skills (skills/)',
+      hooks: 'Hooks (hooks/hooks.json)',
+    },
+    scaffoldCreate: 'Create plugin',
+    scaffoldDone: 'Plugin skeleton created',
   },
   analytics: {
     title: 'Analytics',
@@ -769,6 +947,7 @@ export const en: TranslationSchema = {
     deleted: 'Deleted',
     updated: 'Updated',
     moved: 'Moved',
+    renamed: 'Renamed',
     backupSaved: 'backup: {{name}}',
     restored: 'File restored from a backup',
     copied: 'Copied',
@@ -779,6 +958,7 @@ export const en: TranslationSchema = {
     marketplaceAdded: 'Marketplace added',
     marketplaceRemoved: 'Marketplace removed',
     pluginUpdated: 'Plugin updated',
+    pluginScaffolded: 'Plugin skeleton created',
     openingEditor: 'Opening in VS Code',
   },
   workspace: {
@@ -818,6 +998,58 @@ export const en: TranslationSchema = {
       structure: 'Explain the project structure and main modules.',
       tests: 'Run the tests and show what fails.',
     },
+  },
+  runner: {
+    start: 'Run',
+    stop: 'Stop',
+    starting: 'Starting…',
+    open: 'Open',
+    notRunnable: 'No dev or start script and no run-command override set',
+    failed: 'Failed to start the project dev server',
+  },
+  projectConfig: {
+    title: 'Projects — configuration',
+    subtitle:
+      "A specific project's rules, permissions, hooks and MCP servers: its CLAUDE.md, .claude/settings.json and .mcp.json",
+    addProject: 'Add project',
+    explainTitle: 'What is this',
+    explain:
+      'Besides the user-level ~/.claude, the panel manages a specific project’s config. Rules come from the project’s CLAUDE.md, permissions and hooks from .claude/settings.json, MCP servers from the root .mcp.json. The .claude directory is created on first write. Changes apply after restarting Claude Code.',
+    emptyTitle: 'No projects yet',
+    emptyText: 'Add a project folder to manage its configuration separately from the user level.',
+    count: 'Projects: {{count}}',
+    removeDescription:
+      'The project will be removed from the panel registry. The project files (CLAUDE.md, .claude, .mcp.json) are NOT touched — only the path is forgotten.',
+    pickTitle: 'Pick a project',
+    pickText: 'On the left is the list of added projects. Select one to view and edit its config.',
+    levelBadge: 'project level',
+    tab_rules: 'Rules',
+    tab_mcp: 'MCP servers',
+    tab_permissions: 'Permissions',
+    rulesHint: "The project's root CLAUDE.md in full — as Claude reads it in this project.",
+    mcpHint: "The project's MCP servers from the root .mcp.json.",
+    mcpEmpty: "The project's .mcp.json has no servers yet.",
+    addMcp: 'Add server',
+    permissionsHint:
+      "The project's permissions from .claude/settings.json (and settings.local.json).",
+    permissionsEmpty: "The project's settings.json has no permission rules yet.",
+    addPermission: 'Add permission',
+  },
+  onboarding: {
+    introTitle: 'Welcome to Claude Control',
+    introSubtitle: 'A panel for your Claude Code configuration, all in one place.',
+    point1: 'View and edit rules, hooks, skills, MCP servers and permissions.',
+    point2:
+      'Everything reads and writes your local Claude Code files — nothing leaves your machine.',
+    point3: 'Backups are made before edits, so any change is easy to roll back.',
+    locationTitle: 'Configuration folder',
+    locationSubtitle: 'Point the panel at your .claude directory.',
+    locationHint:
+      'Usually detected automatically. If it is wrong or missing, choose the folder manually.',
+    chooseFolder: 'Choose folder',
+    next: 'Next',
+    back: 'Back',
+    done: 'Done',
   },
   folderPicker: {
     title: 'Choose a project folder',

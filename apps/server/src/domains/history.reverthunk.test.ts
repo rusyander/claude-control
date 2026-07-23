@@ -1,0 +1,88 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildDiff, revertHunk } from './history.ts';
+
+/**
+ * Выборочный откат ОДНОГО ханка из копии в текущий файл.
+ *
+ * Главная гарантия: откат выбранного блока возвращает ровно его к состоянию
+ * копии, а прочие блоки текущего файла не задевает. Плюс безопасность — имя
+ * копии из запроса не должно уводить запись наружу, а индексы ханков сервера
+ * совпадают с тем, что видно в диффе (buildDiff проставляет hunk строкам).
+ */
+describe('Выборочный откат ханка', () => {
+  let dir: string;
+  let backupDir: string;
+  let settingsPath: string;
+  let knownPaths: Record<string, string>;
+  // Копия и текущий файл различаются в двух местах, разделённых контекстом, —
+  // это два независимых ханка (0: b→B, 1: d→D).
+  const SNAPSHOT = 'a\nb\nc\nd\ne\n';
+  const CURRENT = 'a\nB\nc\nD\ne\n';
+  const NAME = 'settings.json.2026-07-19T10-00-00-000Z.bak';
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'cc-reverthunk-'));
+    backupDir = join(dir, 'backups');
+    settingsPath = join(dir, 'settings.json');
+    mkdirSync(backupDir, { recursive: true });
+
+    writeFileSync(settingsPath, CURRENT);
+    writeFileSync(join(backupDir, NAME), SNAPSHOT);
+    knownPaths = { settings: settingsPath };
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('дифф самой свежей копии нумерует ханки — два блока правок', () => {
+    const diff = buildDiff(backupDir, NAME, knownPaths)!;
+    expect(diff.label).toBe('current');
+    const hunks = new Set(
+      diff.lines.filter((line) => line.kind !== 'ctx').map((line) => line.hunk),
+    );
+    expect(hunks).toEqual(new Set([0, 1]));
+  });
+
+  it('откат ханка 0 возвращает только первый блок, второй не трогает', () => {
+    const result = revertHunk(backupDir, NAME, 0, knownPaths, backupDir);
+    expect(result.ok).toBe(true);
+    // b восстановлено из копии, D осталось текущим.
+    expect(readFileSync(settingsPath, 'utf8')).toBe('a\nb\nc\nD\ne\n');
+  });
+
+  it('откат ханка 1 возвращает только второй блок, первый не трогает', () => {
+    const result = revertHunk(backupDir, NAME, 1, knownPaths, backupDir);
+    expect(result.ok).toBe(true);
+    expect(readFileSync(settingsPath, 'utf8')).toBe('a\nB\nc\nd\ne\n');
+  });
+
+  it('откат обоих ханков по очереди приводит файл к состоянию копии', () => {
+    revertHunk(backupDir, NAME, 0, knownPaths, backupDir);
+    // После первого отката индексы ханков пересчитываются: остаётся один блок (0).
+    revertHunk(backupDir, NAME, 0, knownPaths, backupDir);
+    expect(readFileSync(settingsPath, 'utf8')).toBe(SNAPSHOT);
+  });
+
+  it('сам откат обратим: состояние до сохраняется копией', () => {
+    const result = revertHunk(backupDir, NAME, 0, knownPaths, backupDir);
+    expect(result.backupPath).toBeDefined();
+    expect(readFileSync(result.backupPath!, 'utf8')).toBe(CURRENT);
+  });
+
+  it('несуществующий индекс ханка — отказ, файл не тронут', () => {
+    const result = revertHunk(backupDir, NAME, 5, knownPaths, backupDir);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/не найдено/i);
+    expect(readFileSync(settingsPath, 'utf8')).toBe(CURRENT);
+  });
+
+  it('обход пути в имени копии отклоняется, ничего не пишется', () => {
+    const result = revertHunk(backupDir, '../../evil', 0, knownPaths, backupDir);
+    expect(result.ok).toBe(false);
+    expect(readFileSync(settingsPath, 'utf8')).toBe(CURRENT);
+  });
+});

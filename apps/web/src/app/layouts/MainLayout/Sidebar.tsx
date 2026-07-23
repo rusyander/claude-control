@@ -6,6 +6,7 @@ import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMot
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
+import { NotificationCenter } from '@shared/ui/notification-center';
 import { useOverview } from '@entities/AppConfig';
 import { NAV_SECTIONS } from './Sidebar.constants';
 import { AppMark } from './AppMark';
@@ -29,7 +30,7 @@ const COLLAPSED_WIDTH = 60;
  * (отступы, выравнивание) переключалась классом мгновенно — и всё это читалось
  * как рывок. Теперь внутри не двигается ничего: подписи гаснут на месте.
  */
-export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
+export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProps) {
   const { t } = useTranslation();
   const { data: overview } = useOverview();
 
@@ -90,24 +91,31 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
 
         {/*
           Сворачивание — такая же строка, как пункты меню: значок всегда на
-          одном месте, поэтому при смене ширины кнопке некуда прыгать.
+          одном месте, поэтому при смене ширины кнопке некуда прыгать. На узком
+          экране панель и так свёрнута принудительно, разворачивать некуда —
+          кнопку прячем, чтобы не была бесполезной.
         */}
-        <button
-          type="button"
-          className={styles.navLink}
-          onClick={onToggle}
-          data-sidebar-toggle
-          // Подпись рядом гаснет при сворачивании, поэтому имя кнопки задаём
-          // явно: иначе в свёрнутом виде она осталась бы без названия.
-          aria-label={t(isCollapsed ? 'common.expandSidebar' : 'common.collapseSidebar')}
-          aria-expanded={!isCollapsed}
-        >
-          <Icon name={isCollapsed ? 'chevronRight' : 'chevronLeft'} size={24} />
-          {label(
-            t(isCollapsed ? 'common.expandSidebar' : 'common.collapseSidebar'),
-            styles.navLabel,
-          )}
-        </button>
+        {!isNarrow && (
+          <button
+            type="button"
+            className={styles.navLink}
+            onClick={onToggle}
+            data-sidebar-toggle
+            // Подпись рядом гаснет при сворачивании, поэтому имя кнопки задаём
+            // явно: иначе в свёрнутом виде она осталась бы без названия.
+            aria-label={t(isCollapsed ? 'common.expandSidebar' : 'common.collapseSidebar')}
+            aria-expanded={!isCollapsed}
+          >
+            <Icon name={isCollapsed ? 'chevronRight' : 'chevronLeft'} size={24} />
+            {label(
+              t(isCollapsed ? 'common.expandSidebar' : 'common.collapseSidebar'),
+              styles.navLabel,
+            )}
+          </button>
+        )}
+
+        {/* Журнал уведомлений: колокольчик со счётчиком и списком последних тостов. */}
+        <NotificationCenter isCollapsed={isCollapsed} />
 
         {NAV_SECTIONS.map((section) => (
           <Stack key={section.label} gap="var(--spacing-3xs)">

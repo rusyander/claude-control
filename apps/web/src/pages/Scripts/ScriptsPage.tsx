@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
+import { useCreateParam } from '@shared/hooks/use-create-param';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
@@ -41,6 +42,8 @@ export function ScriptsPage() {
   // Ссылка /scripts?id=<имя файла> открывает этот скрипт в редакторе.
   const writeUrl = useEntityUrlWriter();
   useEntityUrl<ScriptFile>({ items: scripts, getId: (script) => script.id, onOpen: openForm });
+  // Быстрое действие «Добавить» с обзора: /scripts?create=1 открывает форму создания.
+  useCreateParam(() => openForm());
 
   const closeForm = (open: boolean): void => {
     setIsFormOpen(open);

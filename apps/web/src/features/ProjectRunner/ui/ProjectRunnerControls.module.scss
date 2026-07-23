@@ -1,0 +1,23 @@
+.row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+}
+
+// «Перейти»: внешняя ссылка target=_blank, оформленная как компактная кнопка-ghost
+// в тон соседним действиям шапки.
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-3xs) var(--spacing-xs);
+  border-radius: var(--radius-md);
+  color: var(--color-accent);
+  font-size: var(--font-size-body-sm);
+  text-decoration: none;
+  transition: background var(--duration-fast);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+  }
+}

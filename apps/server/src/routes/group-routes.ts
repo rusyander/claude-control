@@ -1,10 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import type { Automation, EntityRef, Group, GroupDraft } from '@claude-control/contracts';
+import type {
+  Automation,
+  EntityRef,
+  Group,
+  GroupDraft,
+  GroupMember,
+} from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import { readHooks, writeHooks } from '../domains/hooks.ts';
 import { applyEntityState, rewriteHooks } from '../domains/entity-toggle.ts';
 import { applyGroupEnv, existingEnvKeys } from '../domains/env.ts';
+import { collectLeafMembers, wouldCreateCycle } from '../domains/group-graph.ts';
 
 /**
  * Группы и сценарии — надстройка приложения. Claude Code про них не знает,
@@ -32,16 +39,27 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     isEnabled: body.isEnabled ?? true,
   });
 
-  app.post<{ Body: GroupDraft }>('/api/groups', (request) => {
+  app.post<{ Body: GroupDraft }>('/api/groups', (request, reply) => {
+    const id = randomUUID();
+    // Вложенная группа может замкнуть цикл (A→B→A) — тогда обход состава не
+    // завершился бы. Отвергаем ещё до сохранения, а не чиним на обходе.
+    if (wouldCreateCycle(ctx.store.getGroups(), id, request.body.members ?? [])) {
+      return reply.code(400).send({ error: 'Вложение групп образует цикл' });
+    }
     const group: Group = {
       ...withDefaults(request.body),
-      id: randomUUID(),
+      id,
       order: ctx.store.getGroups().length,
     };
     return ctx.store.saveGroup(group);
   });
 
-  app.put<{ Params: { id: string }; Body: Group }>('/api/groups/:id', (request) => {
+  app.put<{ Params: { id: string }; Body: Group }>('/api/groups/:id', (request, reply) => {
+    // Группа не может входить сама в себя ни напрямую, ни через цепочку вложенных
+    // — иначе включение/выключение зациклилось бы по ветке.
+    if (wouldCreateCycle(ctx.store.getGroups(), request.params.id, request.body.members ?? [])) {
+      return reply.code(400).send({ error: 'Вложение групп образует цикл' });
+    }
     // Клиент шлёт GroupDraft без поля order, поэтому при правке порядок нельзя
     // сбрасывать в 0 (иначе редактирование любой группы перекидывало бы её в
     // начало списка и сталкивало по order с уже существующей нулевой). Берём
@@ -91,7 +109,13 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
 
       let needsHookRewrite = false;
 
-      for (const member of group.members) {
+      // Разворачиваем вложенные группы: гасим/зажигаем и потомков по всей ветке,
+      // а не только прямых участников. Отметка «погашено этой группой» ставится
+      // от id переключаемой группы — так лист, входящий ещё и в другую группу,
+      // оживает лишь когда его отпустят все.
+      const leaves = collectLeafMembers(ctx.store.getGroups(), group.members);
+
+      for (const member of leaves) {
         ctx.store.setGroupDisabled(member.kind, member.id, group.id, !isEnabled);
 
         const effective = !ctx.store.isDisabled(member.kind, member.id);
@@ -109,7 +133,7 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
         ok: true,
         backupPath: hookBackup ?? envBackup,
         needsRestart: true,
-        affected: group.members.length,
+        affected: leaves.length,
       };
     },
   );
@@ -120,7 +144,7 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     const group = ctx.store.getGroups().find((item) => item.id === request.params.id);
 
     if (group && !group.isEnabled) {
-      for (const member of group.members) {
+      for (const member of collectLeafMembers(ctx.store.getGroups(), group.members)) {
         ctx.store.setGroupDisabled(member.kind, member.id, group.id, false);
 
         const effective = !ctx.store.isDisabled(member.kind, member.id);
@@ -223,13 +247,19 @@ function applyGroupEnvState(
  * включённой группы дёргала бы перезапись файлов и плодила резервные копии.
  * Хуки лежат в одном файле, поэтому перезапись одна на всю правку.
  */
-function reconcileMembers(ctx: ServerContext, group: Group, previousMembers: EntityRef[]): void {
+function reconcileMembers(ctx: ServerContext, group: Group, previousMembers: GroupMember[]): void {
   const keyOf = (member: EntityRef): string => `${member.kind} ${member.id}`;
-  const nextKeys = new Set(group.members.map(keyOf));
-  const prevKeys = new Set(previousMembers.map(keyOf));
+  // Сравниваем не прямой состав, а развёрнутые листья: правка вложенной группы
+  // добавляет/убирает всех её потомков, и отметки удержания должны идти за ними.
+  const groups = ctx.store.getGroups();
+  const nextLeaves = collectLeafMembers(groups, group.members);
+  const previousLeaves = collectLeafMembers(groups, previousMembers);
 
-  const removed = previousMembers.filter((member) => !nextKeys.has(keyOf(member)));
-  const added = group.members.filter((member) => !prevKeys.has(keyOf(member)));
+  const nextKeys = new Set(nextLeaves.map(keyOf));
+  const prevKeys = new Set(previousLeaves.map(keyOf));
+
+  const removed = previousLeaves.filter((member) => !nextKeys.has(keyOf(member)));
+  const added = nextLeaves.filter((member) => !prevKeys.has(keyOf(member)));
 
   let needsHookRewrite = false;
 

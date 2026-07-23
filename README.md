@@ -52,28 +52,33 @@ Claude Control answers all three. It gives the configuration a shape you can see
 **Configuration**
 
 - **Rules** — `## RULE:` sections of `CLAUDE.md`, individually searchable and toggleable; a separate page shows and edits the whole `CLAUDE.md`
-- **Skills** — the `skills/` folder, with a file tree and editor per skill
+- **Skills** — the `skills/` folder, with a file tree and editor per skill; rename and a `SKILL.md` template library
 - **Hooks** — grouped by lifecycle event, with the matcher shown plainly, reorderable within an event
 - **Scripts** — the files in `hooks/`, including nested folders, flagged when nothing calls them
-- **MCP servers** — with a real connection check over the MCP protocol: stdio, HTTP and SSE; interactive OAuth sign-in for network ones
-- **Permissions** — allow / ask / deny, including `mcp__*` patterns
-- **Environment** — from `settings.json` and `.mcp-secrets.env`, secrets masked
-- **Plugins** — installed set plus the marketplace catalogue, with sources you can add and remove
+- **MCP servers** — with a real connection check over the MCP protocol: stdio, HTTP and SSE; interactive OAuth sign-in for network ones; a helper lists a server's tools and creates `mcp__server__tool` permissions for them
+- **Permissions** — allow / ask / deny, including `mcp__*` patterns; an entry moves between `settings.json` and `settings.local.json`
+- **Environment** — from `settings.json` and `.mcp-secrets.env`, secrets masked; an entry moves between files
+- **Plugins** — installed set plus the marketplace catalogue, with sources you can add and remove; inspect an installed plugin's contents and scaffold your own
+- **Projects** — the project level: a chosen folder's own `CLAUDE.md`, MCP servers (`.mcp.json`) and permissions (`.claude/settings.json`), additive to the user level
 
 </td><td width="50%" valign="top">
 
 **Working with it**
 
-- **Sandbox** — try a rule, skill, hook or MCP server in isolation
-- **Chat** — talk to Claude Code from the panel: streaming, attachments, voice, artifact preview, model and effort picker, branching by editing a message, clickable answer options
-- **Several projects at once** — project tabs, with agents running in parallel and surviving tab switches
-- **Analytics** — token spend and estimated cost, read from your local transcripts, exportable to CSV and JSON
-- **Groups** — arbitrary sets of entities, switchable together
+- **Sandbox** — try a rule, skill, hook or MCP server in isolation; a hook against a prepared or arbitrary JSON event
+- **Chat** — talk to Claude Code from the panel: streaming, attachments, voice, artifact preview, model and effort picker, branching by editing a message, clickable answer options, search over the conversation body, feed pagination and conversation export to md/json
+- **Several projects at once** — project tabs, with agents running in parallel and surviving tab switches; a project's dev server starts right from its tab (free port, auto-opened browser, status on the button, stop)
+- **Search** — one global search line across rules, skills, hooks, scripts, permissions, variables, MCP and plugins (secret values are never revealed)
+- **Change history** — a feed of configuration edits with a line-by-line diff over the backups; revert a whole file or a single change out of a backup
+- **Analytics** — token spend and estimated cost, read from your local transcripts: an hourly heatmap, the cache share, export to CSV and JSON by model, project and session
+- **Groups** — arbitrary sets of entities, switchable together; they nest inside one another, and member order is settable
 - **Automations** — scenarios that compile down to ordinary hooks
 - **AI assistant** — describe a rule or skill in words, get the form filled in
+- **Command palette** — Ctrl/Cmd+K to jump into a section and run quick actions, keyboard shortcuts, a toast history; first-run onboarding and an accent colour of your choice
+- **Configuration bundle** — export and import a set of rules, skills and hooks as one file
 - **Help** — a walkthrough of every section with diagrams, in English and Russian
 - **Live reload** — the panel follows file changes, including ones Claude Code makes itself
-- **Backups** — every write is backed up and atomic
+- **Backups** — every write is backed up and atomic; optional encryption of `.mcp-secrets.env` copies
 
 </td></tr>
 </table>
@@ -91,7 +96,7 @@ There is no database. The panel is a view over the files Claude Code already rea
 ```mermaid
 flowchart LR
     subgraph browser["Browser · localhost:8888"]
-        UI["React UI<br/>15 sections"]
+        UI["React UI<br/>18 sections"]
     end
 
     subgraph server["Node server · 127.0.0.1:5178"]
@@ -337,7 +342,7 @@ The full section-by-section breakdown is in [LIMITATIONS.md](LIMITATIONS.md): wh
 - **Restart required.** Claude Code loads its configuration at startup, so most changes only take effect after you restart it. The UI marks these.
 - **Plugins depend on the CLI.** Everything on that page shells out to `claude plugin`; if the CLI cannot reach a marketplace, the panel shows you its raw output rather than inventing a friendlier error.
 - **Analytics costs are indicative.** On a subscription you are not billed per token, so treat the number as relative volume, not money owed. The price list is pulled from the Anthropic site and shown in Settings; it excludes discounts, batch rates and negotiated account terms.
-- **A restore rewrites the whole file.** Backups are listed in Settings and any of them applies with one click — but it replaces the entire file, not a single entry inside it. The state before the restore is itself saved as a fresh copy.
+- **A restore works by whole file or by single change.** Backups are listed in Settings: one click rewrites the entire file, or you can return just one change (a hunk) out of a backup. The state before the restore is itself saved as a fresh copy.
 - **Chat runs live in server memory.** Closing the tab or reloading the page does not touch the agent: the run belongs to the server, and on return the panel picks the running ones back up (one that finished while the tab was closed returns to the feed within a grace minute, and after that only in the transcript). The session's accumulated spend is likewise counted on the server and survives F5. The real boundary is restarting the server: the registry of running processes is held in its memory, so that ends everything.
 - **The list of created files exists only for chats outside a project.** Inside a real repository it is deliberately not shown.
 - **Editing a hook changes its id.** The id is derived from the content, so a rewritten command is a different hook: a saved link to it stops opening, and its group membership has to be set again.

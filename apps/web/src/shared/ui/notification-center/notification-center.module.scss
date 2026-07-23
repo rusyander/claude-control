@@ -1,0 +1,90 @@
+// Кнопка-колокольчик повторяет строку раздела боковой панели: тот же отступ,
+// скругление и поведение при наведении, чтобы встать в общий ряд.
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-xs);
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  color: var(--color-fg-muted);
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+
+  &:hover {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+}
+
+.iconWrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+// Счётчик непрочитанных сидит на значке — так виден и в свёрнутой панели, где
+// подписи нет, а колокольчик остаётся на виду.
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg, #fff);
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.entry {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-border);
+  background-color: var(--color-surface-sunken);
+}
+
+.entryIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+// Полоса слева окрашивается по тону — как и у самих тостов, узнаётся не только
+// по значку.
+.success {
+  border-left-color: var(--color-success, var(--color-accent));
+}
+.error {
+  border-left-color: var(--color-danger, var(--color-accent));
+}
+.warning {
+  border-left-color: var(--color-warning, var(--color-accent));
+}
+.info {
+  border-left-color: var(--color-info, var(--color-accent));
+}

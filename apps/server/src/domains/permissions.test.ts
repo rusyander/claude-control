@@ -4,7 +4,12 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { PermissionDraft } from '@claude-control/contracts';
 import { AppStore } from '../lib/app-store.ts';
-import { readPermissions, savePermission, deletePermission } from './permissions.ts';
+import {
+  readPermissions,
+  savePermission,
+  deletePermission,
+  movePermission,
+} from './permissions.ts';
 
 /**
  * Полный state.json со свежими массивами — изолирует AppStore от процесс-глобального
@@ -245,6 +250,49 @@ describe('permissions', () => {
 
       const saved = JSON.parse(readFileSync(settingsPath, 'utf8'));
       expect(saved.permissions.allow).toEqual(['Read(a)']);
+    });
+  });
+
+  describe('movePermission — перенос между settings.json и settings.local.json', () => {
+    let localPath: string;
+
+    beforeEach(() => {
+      localPath = join(dir, 'settings.local.json');
+      writeFileSync(localPath, '{}');
+    });
+
+    const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
+
+    it('переносит право в локальный файл и обратно, очищая источник', () => {
+      writeSettings({ permissions: { allow: ['Bash(ls:*)'] } });
+
+      // settings.json -> settings.local.json (id без префикса)
+      movePermission(settingsPath, localPath, 'allow:Bash(ls:*)');
+      expect(read(settingsPath).permissions.allow).toEqual([]);
+      expect(read(localPath).permissions.allow).toEqual(['Bash(ls:*)']);
+
+      // обратно: у локального права id с префиксом local:
+      movePermission(settingsPath, localPath, 'local:allow:Bash(ls:*)');
+      expect(read(localPath).permissions.allow).toEqual([]);
+      expect(read(settingsPath).permissions.allow).toEqual(['Bash(ls:*)']);
+    });
+
+    it('сохраняет решение и паттерн с двоеточиями при переносе', () => {
+      writeSettings({ permissions: { deny: ['Bash(git push:*)'] } });
+
+      movePermission(settingsPath, localPath, 'deny:Bash(git push:*)');
+
+      expect(read(settingsPath).permissions.deny).toEqual([]);
+      expect(read(localPath).permissions.deny).toEqual(['Bash(git push:*)']);
+    });
+
+    it('создаёт резервную копию, когда указан backupDir', () => {
+      writeSettings({ permissions: { allow: ['Read(a)'] } });
+
+      const backup = movePermission(settingsPath, localPath, 'allow:Read(a)', join(dir, 'backups'));
+
+      expect(backup).toBeTypeOf('string');
+      expect(existsSync(backup as string)).toBe(true);
     });
   });
 });

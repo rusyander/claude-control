@@ -19,7 +19,13 @@ import { readMcpServers } from '../domains/mcp.ts';
 import { readPermissions } from '../domains/permissions.ts';
 import { readAccount } from '../domains/account.ts';
 import { readScripts } from '../domains/scripts.ts';
-import { setBackupKeep, clampBackupKeep } from '../lib/safe-io.ts';
+import {
+  setBackupKeep,
+  clampBackupKeep,
+  setEncryptSecretBackups,
+  setSecretsBasename,
+} from '../lib/safe-io.ts';
+import { basename } from 'node:path';
 
 /** Разбор ошибки zod в список «поле → что не так» — для понятного ответа 400. */
 function issuesOf(error: ZodError): Array<{ path: string; message: string }> {
@@ -33,6 +39,11 @@ function issuesOf(error: ZodError): Array<{ path: string; message: string }> {
 export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): void {
   // Глубина ротации копий из настроек — сразу при старте.
   setBackupKeep(ctx.store.getSettings().backupKeep);
+  // Шифрование копий секретов: режим — из настроек, basename файла секретов —
+  // из расположения. Парольная фраза остаётся пустой до ручного ввода: после
+  // перезапуска зашифрованные копии секретов не делаются, пока её не введут.
+  setEncryptSecretBackups(ctx.store.getSettings().encryptSecretBackups);
+  setSecretsBasename(basename(ctx.location.paths.secretsEnv));
   app.get('/api/location', () => ctx.location);
 
   app.post<{ Body: { path: string } }>('/api/location', (request) => {
@@ -95,6 +106,12 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     if (patch.claudeDirOverride !== undefined) ctx.relocate(patch.claudeDirOverride);
     // Глубина ротации копий действует сразу для следующих записей.
     if (patch.backupKeep !== undefined) setBackupKeep(settings.backupKeep);
+    // Режим шифрования копий секретов — тоже сразу. Парольную фразу этим не
+    // трогаем: включение без фразы просто перестаёт делать копии секретов до
+    // её ввода (см. backupEntry), а UI задаёт фразу отдельным запросом.
+    if (patch.encryptSecretBackups !== undefined) {
+      setEncryptSecretBackups(settings.encryptSecretBackups);
+    }
     return settings;
   });
 

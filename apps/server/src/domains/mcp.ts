@@ -2,10 +2,16 @@ import {
   UnauthorizedError,
   type OAuthClientProvider,
 } from '@modelcontextprotocol/sdk/client/auth.js';
-import type { McpServer, McpServerDraft, McpHealth, McpTransport } from '@claude-control/contracts';
+import type {
+  McpServer,
+  McpServerDraft,
+  McpHealth,
+  McpTransport,
+  McpToolsResult,
+} from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
 import type { AppStore } from '../lib/app-store.ts';
-import { openMcpSession } from './mcp-client.ts';
+import { openMcpSession, DEFAULT_NETWORK_TIMEOUT_MS } from './mcp-client.ts';
 import { hasOAuthTokens } from './mcp-oauth.ts';
 
 /**
@@ -174,11 +180,19 @@ export async function checkMcpHealth(
   server: McpServer,
   timeoutMs = 30_000,
   authProvider?: OAuthClientProvider,
+  networkTimeoutMs: number = DEFAULT_NETWORK_TIMEOUT_MS,
 ): Promise<HealthResult> {
   if (!server.isEnabled) return { health: 'disabled' };
 
   try {
-    const session = await openMcpSession(server, timeoutMs, authProvider);
+    // Общий бюджет для сетевого сервера растягиваем под настроенный потолок
+    // подключения: иначе большой таймаут упёрся бы в фиксированные 30с и не
+    // подействовал. stdio живёт на своём (процессном) потолке — его не трогаем.
+    const totalMs =
+      server.transport === 'stdio'
+        ? timeoutMs
+        : Math.max(timeoutMs, Math.ceil(networkTimeoutMs / 0.67) + 1_000);
+    const session = await openMcpSession(server, totalMs, authProvider, networkTimeoutMs);
     try {
       return { health: 'connected', toolCount: (await session.listTools()).length };
     } finally {
@@ -192,6 +206,47 @@ export async function checkMcpHealth(
     }
     const detail = error instanceof Error ? error.message : String(error);
     return { health: 'failed', detail: detail.slice(0, 400) };
+  }
+}
+
+/**
+ * Список инструментов сервера — имена и описания для помощника отбора прав.
+ *
+ * Тот же путь, что и у проверки здоровья: рукопожатие и tools/list через общего
+ * клиента, тот же бюджет и тот же OAuth-провайдер. Отличие одно — вместо счётчика
+ * инструментов возвращаются сами имена, по которым интерфейс заводит права
+ * `mcp__<сервер>__<инструмент>`. Неудачу отдаём значением: помощник покажет её
+ * тем же блоком, что и список.
+ */
+export async function listMcpServerTools(
+  server: McpServer,
+  timeoutMs = 30_000,
+  authProvider?: OAuthClientProvider,
+  networkTimeoutMs: number = DEFAULT_NETWORK_TIMEOUT_MS,
+): Promise<McpToolsResult> {
+  if (!server.isEnabled)
+    return { tools: [], error: 'Сервер выключен — включите его, чтобы увидеть инструменты' };
+
+  try {
+    // Бюджет считаем так же, как в checkMcpHealth: сетевой потолок не должен
+    // упереться в фиксированные 30с, stdio живёт на своём процессном потолке.
+    const totalMs =
+      server.transport === 'stdio'
+        ? timeoutMs
+        : Math.max(timeoutMs, Math.ceil(networkTimeoutMs / 0.67) + 1_000);
+    const session = await openMcpSession(server, totalMs, authProvider, networkTimeoutMs);
+    try {
+      const tools = await session.listTools();
+      return { tools: tools.map((tool) => ({ name: tool.name, description: tool.description })) };
+    } finally {
+      await session.close();
+    }
+  } catch (error) {
+    if (error instanceof UnauthorizedError || isUnauthorized(error)) {
+      return { tools: [], error: 'Требуется авторизация OAuth — нажмите «Авторизоваться»' };
+    }
+    const detail = error instanceof Error ? error.message : String(error);
+    return { tools: [], error: detail.slice(0, 400) };
   }
 }
 

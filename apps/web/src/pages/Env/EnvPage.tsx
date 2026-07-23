@@ -39,6 +39,18 @@ export function EnvPage() {
     },
   });
 
+  // Перенос переменной между settings.json и settings.local.json. Секреты из
+  // .mcp-secrets.env так не переносятся — для них кнопки нет (см. ниже).
+  const moveVar = useMutation({
+    mutationFn: async (item: EnvVar) => {
+      await apiClient.post(`/env/${encodeURIComponent(item.key)}/move`, { source: item.source });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.env });
+    },
+    meta: { successMessage: 'toasts.moved' },
+  });
+
   const { data: vars = [], isLoading } = useQuery({
     queryKey: queryKeys.env,
     queryFn: async () => {
@@ -134,6 +146,23 @@ export function EnvPage() {
                     icon={<Icon name={revealed[item.id] ? 'eyeOff' : 'eye'} size={24} />}
                     aria-label={revealed[item.id] ? t('env.hideValue') : t('env.revealValue')}
                     onClick={() => void reveal(item)}
+                  />
+                )}
+                {/* Перенос общий ↔ локальный — только для переменных из файлов
+                    настроек. Секреты (.mcp-secrets.env) и env групп не переносим. */}
+                {(item.source === 'settings' || item.source === 'settings-local') && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    iconOnly
+                    icon={<Icon name="swap" size={24} />}
+                    aria-label={
+                      item.source === 'settings-local'
+                        ? t('env.moveToShared')
+                        : t('env.moveToLocal')
+                    }
+                    disabled={moveVar.isPending}
+                    onClick={() => moveVar.mutate(item)}
                   />
                 )}
                 <Button

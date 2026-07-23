@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
+import { useCreateParam } from '@shared/hooks/use-create-param';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { PageHeader } from '@shared/ui/page-header';
@@ -40,6 +41,8 @@ export function SkillsPage() {
   // Ссылка вида /skills?id=<имя> открывает этот скилл сразу в редакторе.
   const writeUrl = useEntityUrlWriter();
   useEntityUrl<Skill>({ items: skills, getId: (skill) => skill.id, onOpen: openEdit });
+  // Быстрое действие «Добавить» с обзора: /skills?create=1 сразу открывает форму.
+  useCreateParam(openCreate);
 
   const closeForm = (open: boolean): void => {
     setIsFormOpen(open);

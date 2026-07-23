@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { McpServer } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
+import { useCreateParam } from '@shared/hooks/use-create-param';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -11,6 +12,7 @@ import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { McpFormModal } from '@features/McpEditor';
 import { mcpServerApi } from '@entities/McpServer';
+import { useSettings } from '@entities/AppConfig';
 import { McpServerCard } from './McpServerCard';
 import styles from './McpPage.module.scss';
 
@@ -21,6 +23,7 @@ export function McpPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const { data: servers = [], isLoading } = mcpServerApi.useList();
+  const { data: settings } = useSettings();
   const setEnabled = mcpServerApi.useSetEnabled();
   const deleteServer = mcpServerApi.useDelete();
 
@@ -38,6 +41,8 @@ export function McpPage() {
   // Ссылка /mcp?id=<имя сервера> открывает его настройки.
   const writeUrl = useEntityUrlWriter();
   useEntityUrl<McpServer>({ items: servers, getId: (server) => server.id, onOpen: openEdit });
+  // Быстрое действие «Добавить» с обзора: /mcp?create=1 сразу открывает форму.
+  useCreateParam(openCreate);
 
   const closeForm = (open: boolean): void => {
     setIsFormOpen(open);
@@ -70,6 +75,7 @@ export function McpPage() {
             onEdit={() => openEdit(server)}
             onDelete={() => deleteServer.mutate(server.id)}
             isDeleting={deleteServer.isPending}
+            autoCheck={settings?.mcpAutoCheck ?? false}
           />
         ))}
       </Stack>

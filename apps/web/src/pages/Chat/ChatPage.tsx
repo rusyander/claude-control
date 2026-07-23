@@ -33,10 +33,21 @@ import { AgentsPanel } from '@features/AgentsPanel';
 import { ChatModelPicker } from '@features/ChatModelPicker';
 import { ParallelLaunch } from '@features/ParallelLaunch';
 import { FolderPicker } from '@features/FolderPicker';
+import { ProjectRunnerControls } from '@features/ProjectRunner';
+import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { ChatMessages } from '@features/ChatMessages';
 import { ChatComposer } from '@features/ChatComposer';
 import { ArtifactPreview } from '@features/ArtifactPreview';
-import { useChats, useChatMessages, useArtifacts, useRefreshChat, chatKeys } from '@entities/Chat';
+import {
+  useChats,
+  useChatMessages,
+  useArtifacts,
+  useDeleteArtifact,
+  useRefreshChat,
+  chatExportUrl,
+  chatKeys,
+  CHAT_PAGE_SIZE,
+} from '@entities/Chat';
 import type { StreamState } from '@entities/Chat';
 import { useProjects, useOpenInEditor, type ProjectInfo } from '@entities/Project';
 import { useSettings } from '@entities/AppConfig';
@@ -68,6 +79,7 @@ export function ChatPage() {
   const [activeChat, setActiveChat] = useState<ChatSummary | undefined>(undefined);
   const [draftId, setDraftId] = useState<string | undefined>(undefined);
   const [preview, setPreview] = useState<Artifact | undefined>(undefined);
+  const [artifactToDelete, setArtifactToDelete] = useState<Artifact | undefined>(undefined);
   const [pending, setPending] = useState<ChatMessage[]>([]);
   const [previewWidth, setPreviewWidth] = useState(
     () => Number(localStorage.getItem(PREVIEW_WIDTH_KEY)) || 520,
@@ -154,8 +166,17 @@ export function ChatPage() {
       setDraftId(undefined);
     },
   });
-  const messages = useChatMessages(activeChat?.id);
+  // Размер окна ленты. Растёт кнопкой «Загрузить ещё»: каждый шаг подтягивает
+  // более ранние сообщения. При смене разговора возвращаемся к последнему окну.
+  const [messagesLimit, setMessagesLimit] = useState(CHAT_PAGE_SIZE);
+  useEffect(() => {
+    setMessagesLimit(CHAT_PAGE_SIZE);
+  }, [activeChat?.id]);
+
+  const messages = useChatMessages(activeChat?.id, messagesLimit);
+  const messageList = messages.data?.messages ?? [];
   const artifacts = useArtifacts(chatId);
+  const deleteArtifact = useDeleteArtifact(chatId);
   const refresh = useRefreshChat(chatId);
 
   const finishedAt = useRef(0);
@@ -345,7 +366,7 @@ export function ChatPage() {
   useEffect(() => {
     if (isRunning || !run.text) return;
     if (!finishedAt.current || messages.dataUpdatedAt <= finishedAt.current) return;
-    if (!messages.data?.some((message) => message.role === 'assistant')) return;
+    if (!messages.data?.messages.some((message) => message.role === 'assistant')) return;
 
     if (run.status === 'idle') agentRuns.clear(chatId ?? '');
     else agentRuns.quiet(chatId ?? '');
@@ -354,7 +375,7 @@ export function ChatPage() {
   useEffect(() => {
     if (pending.length === 0 || !messages.data) return;
     const inHistory = new Set(
-      messages.data.filter((message) => message.role === 'user').map(plainTextOf),
+      messageList.filter((message) => message.role === 'user').map(plainTextOf),
     );
     setPending((current) => current.filter((message) => !inHistory.has(plainTextOf(message))));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -366,6 +387,32 @@ export function ChatPage() {
     setPreview(undefined);
     setPending([]);
     writeUrl(undefined);
+  };
+
+  // Выгрузка разговора файлом: браузер скачивает Markdown/JSON, собранный
+  // сервером из всей переписки. Осмысленно только у сохранённого разговора.
+  const exportChat = (format: 'md' | 'json'): void => {
+    if (!activeChat) return;
+    const link = document.createElement('a');
+    link.href = chatExportUrl(activeChat.id, format);
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  // Удаление артефакта: закрываем его предпросмотр, если открыт, и убираем файл
+  // из папки песочницы. Список артефактов перечитывается мутацией.
+  const confirmDeleteArtifact = (): void => {
+    const name = artifactToDelete?.name;
+    if (!name) return;
+    deleteArtifact.mutate(name, {
+      onSuccess: () => {
+        if (preview?.name === name) setPreview(undefined);
+        toast.success(t('chat.artifactDeleted', { name }));
+      },
+      onSettled: () => setArtifactToDelete(undefined),
+    });
   };
 
   const openChat = (chat: ChatSummary): void => {
@@ -434,7 +481,7 @@ export function ChatPage() {
   };
 
   const hasContent =
-    (messages.data?.length ?? 0) > 0 ||
+    messageList.length > 0 ||
     pending.length > 0 ||
     messages.isLoading ||
     isRunning ||
@@ -582,6 +629,7 @@ export function ChatPage() {
             align="center"
             justify="between"
             gap="var(--spacing-sm)"
+            wrap
             padding="var(--spacing-sm) var(--spacing-xl)"
             className={styles.header}
           >
@@ -594,7 +642,7 @@ export function ChatPage() {
               </Typography>
             </Stack>
 
-            <Stack direction="row" align="center" gap="var(--spacing-xs)">
+            <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap justify="end">
               {/* Шапки PageHeader здесь нет — ссылку на справку ставим рядом с пультом. */}
               <Link
                 to={HELP_ROUTE}
@@ -636,6 +684,10 @@ export function ChatPage() {
                   {t('projects.openInEditor')}
                 </Button>
               )}
+
+              {/* Запуск/остановка dev-сервера проекта + «Перейти» — в том же ряду,
+                  что и «Открыть в редакторе». */}
+              {isProjectContext && projectPath && <ProjectRunnerControls path={projectPath} />}
 
               {isProjectContext && (
                 <Stack
@@ -695,6 +747,17 @@ export function ChatPage() {
                   {t('chat.limitResets', { time: formatTime(run.limitResetsAt) })}
                 </Badge>
               )}
+              {activeChat && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Icon name="file" size={20} />}
+                  onClick={() => exportChat('md')}
+                  title={t('chat.exportHint')}
+                >
+                  {t('chat.export')}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 iconOnly
@@ -715,24 +778,45 @@ export function ChatPage() {
               className={styles.artifacts}
             >
               {artifacts.data?.map((artifact) => (
-                <Button
+                <Stack
                   key={artifact.name}
-                  size="sm"
-                  variant="ghost"
-                  leftIcon={<Icon name="file" size={20} />}
-                  onClick={() => setPreview(artifact)}
+                  direction="row"
+                  align="center"
+                  gap="var(--spacing-3xs)"
+                  className={styles.artifactChip}
                 >
-                  {artifact.name}
-                </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    leftIcon={<Icon name="file" size={20} />}
+                    onClick={() => setPreview(artifact)}
+                  >
+                    {artifact.name}
+                  </Button>
+                  {/* Удаление доступно только у чатов песочницы — их артефакты
+                      возвращает сервер; у проекта список пуст, и кнопки нет. */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    iconOnly
+                    icon={<Icon name="trash" size={18} />}
+                    aria-label={t('chat.deleteArtifact', { name: artifact.name })}
+                    onClick={() => setArtifactToDelete(artifact)}
+                  />
+                </Stack>
               ))}
             </Stack>
           )}
 
           {hasContent ? (
             <ChatMessages
-              messages={[...(messages.data ?? []), ...pending]}
+              messages={[...messageList, ...pending]}
+              conversationId={activeChat?.id}
               stream={stream}
               isLoading={messages.isLoading}
+              hasMore={messages.data?.hasMore}
+              isLoadingMore={messages.isFetching}
+              onLoadMore={() => setMessagesLimit((limit) => limit + CHAT_PAGE_SIZE)}
               onEdit={editMessage}
               onPickOption={answerQuestion}
               isRunning={isRunning}
@@ -858,6 +942,16 @@ export function ChatPage() {
         isOpen={isFolderPickerOpen}
         onOpenChange={setFolderPickerOpen}
         onPick={openProjectPath}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(artifactToDelete)}
+        onOpenChange={(open) => !open && setArtifactToDelete(undefined)}
+        onConfirm={confirmDeleteArtifact}
+        title={t('chat.deleteArtifactTitle')}
+        description={t('chat.deleteArtifactConfirm', { name: artifactToDelete?.name ?? '' })}
+        confirmLabel={t('common.delete')}
+        isPending={deleteArtifact.isPending}
       />
 
       <ParallelLaunch

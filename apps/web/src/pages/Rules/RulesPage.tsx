@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
+import { useCreateParam } from '@shared/hooks/use-create-param';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
@@ -44,6 +45,8 @@ export function RulesPage() {
   // Ссылка /rules?id=<id> открывает это правило сразу в редакторе.
   const writeUrl = useEntityUrlWriter();
   useEntityUrl<Rule>({ items: rules, getId: (rule) => rule.id, onOpen: openEdit });
+  // Быстрое действие «Добавить» с обзора: /rules?create=1 сразу открывает форму.
+  useCreateParam(openCreate);
 
   const closeForm = (open: boolean): void => {
     setIsFormOpen(open);

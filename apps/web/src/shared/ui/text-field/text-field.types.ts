@@ -14,4 +14,6 @@ export interface TextFieldProps {
   autoFocus?: boolean;
   /** Заблокировать ввод: например, имя папки у уже созданного скилла. */
   disabled?: boolean;
+  /** Тип однострочного поля: `password` скрывает ввод (парольная фраза). */
+  type?: 'text' | 'password';
 }

@@ -71,11 +71,12 @@ export function PermissionsTopic() {
             tr('canPreset'),
             tr('canBulk'),
             tr('canMcp'),
+            tr('canMove'),
             tr('canSee'),
             tr('canValidate'),
             tr('canAssistant'),
           ]}
-          cant={[tr('cantWhy'), tr('cantProject'), tr('cantLocal'), tr('cantOrderCustom')]}
+          cant={[tr('cantWhy'), tr('cantProject'), tr('cantOrderCustom')]}
         />
       </HelpSection>
 

@@ -13,6 +13,7 @@ import { SelectField } from '@shared/ui/select-field';
 import { apiClient } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
 import { MODEL_OPTIONS, EFFORT_LEVELS, modelLabel } from '@shared/lib/chat-model';
+import { ACCENT_OPTIONS, accentLabelKey } from '@shared/lib/accent';
 import { useSettings, useUpdateSettings } from '@entities/AppConfig';
 import { AccountCard } from './AccountCard';
 import { ClaudeDirField } from './ClaudeDirField';
@@ -20,6 +21,8 @@ import { CredentialsCard } from './CredentialsCard';
 import { EditorCard } from './EditorCard';
 import { PricingCard } from './PricingCard';
 import { BackupsCard } from './BackupsCard';
+import { ConfigBundleCard } from './ConfigBundleCard';
+import { SecretEncryptionCard } from './SecretEncryptionCard';
 import { SettingToggleRow } from './SettingToggleRow';
 import styles from './SettingsPage.module.scss';
 
@@ -106,6 +109,26 @@ export function SettingsPage() {
           </Stack>
 
           <Typography variant="body" weight="medium">
+            {t('settings.accent')}
+          </Typography>
+          <Typography variant="body-sm" color="subtle">
+            {t('settings.accentHint')}
+          </Typography>
+
+          <Stack direction="row" gap="var(--spacing-xs)" wrap>
+            {ACCENT_OPTIONS.map((accent) => (
+              <Button
+                key={accent}
+                variant={settings.accent === accent ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => patch({ accent })}
+              >
+                {t(accentLabelKey(accent))}
+              </Button>
+            ))}
+          </Stack>
+
+          <Typography variant="body" weight="medium">
             {t('settings.language')}
           </Typography>
 
@@ -164,6 +187,47 @@ export function SettingsPage() {
             options={effortOptions}
             hint={t('settings.chatEffortHint')}
           />
+        </Stack>
+      </Card>
+
+      {/* MCP: автопроверка связи при открытии раздела и потолок ожидания сети. */}
+      <Card padding="md">
+        <Stack gap="var(--spacing-sm)">
+          <Typography variant="body" weight="medium">
+            {t('settings.mcpTitle')}
+          </Typography>
+
+          <SettingToggleRow
+            label={t('settings.mcpAutoCheck')}
+            hint={t('settings.mcpAutoCheckHint')}
+            checked={settings.mcpAutoCheck}
+            onChange={(mcpAutoCheck) => patch({ mcpAutoCheck })}
+          />
+          <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
+            <Stack gap="var(--spacing-3xs)" flex={1} minWidth="200px">
+              <Typography variant="body-sm" weight="medium">
+                {t('settings.mcpTimeout')}
+              </Typography>
+              <Typography variant="caption" color="subtle">
+                {t('settings.mcpTimeoutHint')}
+              </Typography>
+            </Stack>
+            <input
+              type="number"
+              min={2000}
+              max={120000}
+              step={500}
+              value={settings.mcpNetworkTimeoutMs}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isFinite(next) && next >= 2000 && next <= 120000) {
+                  patch({ mcpNetworkTimeoutMs: Math.floor(next) });
+                }
+              }}
+              className={styles.numberInput}
+              aria-label={t('settings.mcpTimeout')}
+            />
+          </Stack>
         </Stack>
       </Card>
 
@@ -287,6 +351,13 @@ export function SettingsPage() {
           </Stack>
         </Stack>
       </Card>
+
+      {/* Бандл конфигурации: правила + скиллы + хуки одним файлом. Рядом с
+          переносом настроек панели, но это другое — реальные файлы Claude Code. */}
+      <ConfigBundleCard />
+
+      {/* Шифрование копий секретов: держим рядом с самими копиями. */}
+      <SecretEncryptionCard />
 
       {/* Сразу под тумблером резервных копий: там их включают, здесь — применяют. */}
       <BackupsCard />

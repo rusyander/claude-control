@@ -280,6 +280,70 @@ export async function runHookProbe(
   });
 }
 
+/** Синтетический id результата произвольного прогона — заготовки его не используют. */
+export const CUSTOM_FIXTURE_ID = 'custom';
+
+/**
+ * Пользовательское событие — это должен быть JSON-объект, а не массив, строка
+ * или число: хук Claude Code всегда получает на вход объект вида
+ * `{"hook_event_name": "…", …}`. Экспортируется ради тестов.
+ */
+export function isEventObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Разбор и проверка произвольного события, введённого руками. Кривой JSON и
+ * не-объект получают внятную причину отказа, а не молчаливый провал прогона.
+ * Экспортируется ради тестов.
+ */
+export function parseCustomEvent(
+  raw: string,
+): { ok: true; payload: Record<string, unknown> } | { ok: false; error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: 'Не удалось разобрать JSON: проверьте синтаксис события.' };
+  }
+
+  if (!isEventObject(parsed)) {
+    return {
+      ok: false,
+      error: 'Событие должно быть JSON-объектом вида {"hook_event_name": "…"}.',
+    };
+  }
+
+  return { ok: true, payload: parsed };
+}
+
+/**
+ * Прогон хука на произвольном пользовательском событии. Тот же механизм, что и
+ * заготовки: событие оборачивается в разовую заготовку без ожидания вердикта
+ * (проверяем не «угадал ли автор», а как хук ответит на конкретный ввод).
+ */
+export function runCustomHookProbe(
+  command: string,
+  payload: Record<string, unknown>,
+  cwd: string,
+): Promise<ProbeResult> {
+  const event = typeof payload.hook_event_name === 'string' ? payload.hook_event_name : 'custom';
+
+  return runHookProbe(
+    command,
+    {
+      id: CUSTOM_FIXTURE_ID,
+      event,
+      title: 'Свой ввод',
+      description: '',
+      // У произвольного ввода нет «правильного» ответа, поэтому и ожидания нет.
+      expectsBlock: false,
+      payload,
+    },
+    cwd,
+  );
+}
+
 /**
  * Чем запускать `.ps1` вне Windows.
  *

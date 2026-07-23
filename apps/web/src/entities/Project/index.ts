@@ -13,3 +13,21 @@ export type {
   DirListing,
   EditorInfo,
 } from './api/ProjectApi';
+
+// Реестр проектов уровня конфигурации.
+export { useProjectRegistry, useAddProject, useRemoveProject } from './api/ProjectRegistryApi';
+
+// Конфиги конкретного проекта: CLAUDE.md, MCP-серверы, права.
+export {
+  useProjectRules,
+  useUpdateProjectRules,
+  useProjectMcp,
+  useCreateProjectMcp,
+  useUpdateProjectMcp,
+  useDeleteProjectMcp,
+  useSetProjectMcpEnabled,
+  useProjectPermissions,
+  useCreateProjectPermission,
+  useUpdateProjectPermission,
+  useDeleteProjectPermission,
+} from './api/ProjectConfigApi';

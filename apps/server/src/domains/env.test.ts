@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readEnvVars, revealEnvValue, saveEnvVar, deleteEnvVar } from './env.ts';
+import { readEnvVars, revealEnvValue, saveEnvVar, deleteEnvVar, moveEnvVar } from './env.ts';
 
 /**
  * Тесты переменных окружения. Главное здесь — секреты: значение с виду
@@ -136,6 +136,49 @@ describe('env', () => {
       });
       deleteEnvVar(settingsPath, secretsPath, 'GITLAB_TOKEN', 'secrets');
       expect(readFileSync(secretsPath, 'utf8')).not.toContain('GITLAB_TOKEN');
+    });
+  });
+
+  describe('moveEnvVar — перенос между settings.json и settings.local.json', () => {
+    let localPath: string;
+
+    beforeEach(() => {
+      localPath = join(dir, 'settings.local.json');
+      writeFileSync(localPath, '{}');
+    });
+
+    const env = (path: string): Record<string, string> =>
+      JSON.parse(readFileSync(path, 'utf8')).env ?? {};
+
+    it('переносит переменную в локальный файл и обратно, очищая источник', () => {
+      writeFileSync(settingsPath, JSON.stringify({ env: { NODE_ENV: 'production' } }));
+
+      moveEnvVar(settingsPath, secretsPath, 'NODE_ENV', 'settings', undefined, localPath);
+      expect(env(settingsPath)).toEqual({});
+      expect(env(localPath).NODE_ENV).toBe('production');
+
+      moveEnvVar(settingsPath, secretsPath, 'NODE_ENV', 'settings-local', undefined, localPath);
+      expect(env(localPath)).toEqual({});
+      expect(env(settingsPath).NODE_ENV).toBe('production');
+    });
+
+    it('переносит реальное значение (в settings.json оно не замаскировано на диске)', () => {
+      // Имя секретное, но переменная лежит в settings.json — значение открытое.
+      writeFileSync(settingsPath, JSON.stringify({ env: { API_KEY: 'plain-value' } }));
+
+      moveEnvVar(settingsPath, secretsPath, 'API_KEY', 'settings', undefined, localPath);
+
+      expect(env(localPath).API_KEY).toBe('plain-value');
+      expect(env(settingsPath)).toEqual({});
+    });
+
+    it('секрет из .mcp-secrets.env перенести нельзя — источник не тронут', () => {
+      writeFileSync(secretsPath, 'GITLAB_TOKEN=glpat-x');
+
+      expect(() =>
+        moveEnvVar(settingsPath, secretsPath, 'GITLAB_TOKEN', 'secrets', undefined, localPath),
+      ).toThrow();
+      expect(readFileSync(secretsPath, 'utf8')).toContain('GITLAB_TOKEN=glpat-x');
     });
   });
 });

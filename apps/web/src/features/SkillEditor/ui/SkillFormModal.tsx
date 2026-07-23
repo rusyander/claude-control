@@ -9,7 +9,8 @@ import { Icon } from '@shared/ui/icon';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { ResourceFileTree } from '@features/ResourceFiles';
 import { useResourceTemplates, useApplyTemplate } from '@entities/Resource';
-import { skillApi } from '@entities/Skill';
+import { skillApi, useRenameSkill } from '@entities/Skill';
+import { SKILL_BODY_TEMPLATE_IDS, type SkillBodyTemplateId } from '../lib/skill-templates';
 import type { SkillFormModalProps } from './SkillFormModal.types';
 import styles from './SkillFormModal.module.scss';
 
@@ -42,9 +43,14 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
   const [isBuilder, setIsBuilder] = useState(false);
   // Заготовка структуры, выбранная до создания: применяется сразу после него.
   const [templateId, setTemplateId] = useState<string | undefined>(undefined);
+  // Выбранная заготовка тела SKILL.md — только для подсветки активной карточки.
+  const [bodyTemplateId, setBodyTemplateId] = useState<SkillBodyTemplateId | undefined>(undefined);
+  // Новое имя папки при переименовании существующего скилла.
+  const [renameId, setRenameId] = useState('');
 
   const create = skillApi.useCreate();
   const update = skillApi.useUpdate();
+  const rename = useRenameSkill();
   const templates = useResourceTemplates('skill');
   const applyTemplate = useApplyTemplate('skill', activeId ?? '');
 
@@ -57,6 +63,8 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
     // У скилла с вложенными файлами конструктор открываем сразу.
     setIsBuilder(Boolean(skill && skill.files.length > 0));
     setTemplateId(undefined);
+    setBodyTemplateId(undefined);
+    setRenameId(skill?.id ?? '');
   }, [isOpen, skill]);
 
   const isPending = create.isPending || update.isPending;
@@ -73,6 +81,34 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
     // После создания окно не закрываем: раскрываем дерево, чтобы собрать
     // структуру. Идентификатор совпадает со slug имени.
     create.mutate(draft, { onSuccess: () => setActiveId(slugify(draft.name)) });
+  };
+
+  // Заготовка тела заполняет поле «Инструкции» готовым каркасом. Имя скилла
+  // подставляется в заголовок; если его ещё не ввели — нейтральное new-skill.
+  const applyBodyTemplate = (id: SkillBodyTemplateId): void => {
+    setBody(t(`skills.templates.${id}Body`, { name: name.trim() || 'new-skill' }));
+    setBodyTemplateId(id);
+  };
+
+  // Переименование меняет папку скилла (его идентификатор) и переносит отметки.
+  const targetId = activeId ?? skill?.id;
+  const canRename =
+    Boolean(skill) &&
+    renameId.trim().length > 0 &&
+    renameId.trim() !== targetId &&
+    !rename.isPending;
+
+  const handleRename = (): void => {
+    if (!targetId) return;
+    const newId = renameId.trim();
+    rename.mutate(
+      { id: targetId, newId },
+      {
+        // Папка переехала — переключаем активный id, чтобы дерево файлов и
+        // последующее сохранение работали уже с новой папкой.
+        onSuccess: () => setActiveId(newId),
+      },
+    );
   };
 
   // Выбранную до создания заготовку разворачиваем, когда скилл уже на диске:
@@ -177,10 +213,31 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
             hint={t('skills.skillNameHint')}
             isMono
             autoFocus={!skill}
-            // Имя — это имя папки: у существующего скилла его смена создала бы
-            // новую папку и осиротила старую, поэтому правим только новый.
+            // Имя — это имя папки. У существующего скилла поле заблокировано:
+            // сменить папку можно отдельной кнопкой «Переименовать» ниже, которая
+            // и переносит отметки. Правка этого поля создала бы новую папку.
             disabled={Boolean(activeId)}
           />
+
+          {/* Переименование существующего скилла: меняет имя папки (его id) и
+              переносит отметки. Для нового скилла не нужно — там правится само поле. */}
+          {skill && (
+            <Stack direction="row" align="end" gap="var(--spacing-xs)" wrap>
+              <Stack flex={1} minWidth={0}>
+                <TextField
+                  label={t('skills.renameLabel')}
+                  value={renameId}
+                  onChange={setRenameId}
+                  placeholder={t('skills.renamePlaceholder')}
+                  hint={t('skills.renameHint')}
+                  isMono
+                />
+              </Stack>
+              <Button onClick={handleRename} disabled={!canRename} isLoading={rename.isPending}>
+                {t('skills.rename')}
+              </Button>
+            </Stack>
+          )}
 
           <TextField
             label={t('skills.description')}
@@ -191,6 +248,32 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
             placeholder="Use КОГДА пользователь просит…"
             hint={t('skills.descriptionHint')}
           />
+
+          {/* Библиотека заготовок тела SKILL.md: до создания простого скилла
+              можно заполнить инструкции готовым каркасом. У конструктора своя
+              заготовка структуры, поэтому здесь только простой режим. */}
+          {!activeId && !isBuilder && (
+            <Stack gap="var(--spacing-3xs)">
+              <Typography variant="body-sm" weight="medium">
+                {t('skills.templates.title')}
+              </Typography>
+              <Typography variant="caption" color="subtle">
+                {t('skills.templates.hint')}
+              </Typography>
+              <Stack direction="row" gap="var(--spacing-2xs)" wrap>
+                {SKILL_BODY_TEMPLATE_IDS.map((id) => (
+                  <Button
+                    key={id}
+                    size="sm"
+                    variant={bodyTemplateId === id ? 'primary' : 'ghost'}
+                    onClick={() => applyBodyTemplate(id)}
+                  >
+                    {t(`skills.templates.${id}Title`)}
+                  </Button>
+                ))}
+              </Stack>
+            </Stack>
+          )}
 
           <TextField
             label={t('skills.skillBody')}

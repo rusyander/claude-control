@@ -1,0 +1,26 @@
+.list {
+  max-height: 22rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-2xs);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--color-surface-sunken);
+  }
+
+  input {
+    margin-top: 0.15rem;
+    cursor: pointer;
+    accent-color: var(--color-accent);
+  }
+}

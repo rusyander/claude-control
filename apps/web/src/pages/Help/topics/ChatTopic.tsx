@@ -99,6 +99,10 @@ export function ChatTopic() {
             tr('canAnswerButtons'),
             tr('canModel'),
             tr('canApprove'),
+            tr('canSearchMessages'),
+            tr('canLoadMore'),
+            tr('canExport'),
+            tr('canRun'),
             tr('canOpenFolder'),
             tr('canAttach'),
             tr('canVoice'),
@@ -107,7 +111,7 @@ export function ChatTopic() {
             tr('canSpend'),
             tr('canEditor'),
           ]}
-          cant={[tr('cantApprove'), tr('cantDelete'), tr('cantSearchInside')]}
+          cant={[tr('cantApprove'), tr('cantDelete')]}
         />
       </HelpSection>
 

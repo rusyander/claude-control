@@ -1,4 +1,5 @@
 import type { ToastItem, ToastOptions, ToastTone } from './toast.types';
+import { recordToast } from './toastHistoryStore';
 
 /**
  * Стор тостов — модуль-синглтон, а не React-контекст. Так уведомление можно
@@ -68,6 +69,9 @@ function push(tone: ToastTone, message: string, options: ToastOptions = {}): str
   // Старейший вытесняется, если стопка переросла лимит.
   items = [...items, item].slice(-MAX_VISIBLE);
   emit();
+  // Показ на экране не меняем — только дублируем уведомление в журнал, чтобы к
+  // нему можно было вернуться после того, как тост исчез.
+  recordToast(item);
   return id;
 }
 

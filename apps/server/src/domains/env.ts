@@ -150,6 +150,46 @@ export function deleteEnvVar(
 }
 
 /**
+ * Перенос переменной между settings.json и settings.local.json. Секреты из
+ * .mcp-secrets.env и env групп так не переносятся — у них своя природа, вызов с
+ * таким источником отвергается. Значение берётся из файла-источника как есть: в
+ * settings оно лежит открытым текстом (маскировка — только в списке), поэтому
+ * переносим ровно то, что реально хранится. Переиспользует save/delete.
+ * Возвращает путь резервной копии.
+ */
+export function moveEnvVar(
+  settingsPath: string,
+  secretsPath: string,
+  key: string,
+  source: EnvVar['source'],
+  backupDir?: string,
+  settingsLocalPath?: string,
+): string | undefined {
+  if (source !== 'settings' && source !== 'settings-local') {
+    throw new Error(
+      'Переносить между файлами настроек можно только переменные settings.json / settings.local.json',
+    );
+  }
+  if (!settingsLocalPath) throw new Error('Не задан путь к settings.local.json');
+
+  const sourcePath = source === 'settings-local' ? settingsLocalPath : settingsPath;
+  const targetSource: EnvVar['source'] =
+    source === 'settings-local' ? 'settings' : 'settings-local';
+
+  const value = readJsonFile<RawSettings>(sourcePath, {}).env?.[key];
+  if (value === undefined) return undefined; // переносить нечего
+
+  saveEnvVar(
+    settingsPath,
+    secretsPath,
+    { key, value, source: targetSource, isSecret: SECRET_HINT.test(key) },
+    backupDir,
+    settingsLocalPath,
+  );
+  return deleteEnvVar(settingsPath, secretsPath, key, source, backupDir, settingsLocalPath);
+}
+
+/**
  * Удаляет строку `KEY=…` из env-файла вместе с прилегающим сверху блоком
  * комментариев: он привязан к переменной (см. parseEnvFile) и описывает, где
  * брать именно этот токен. Осиротев, комментарий копит мусор и вводит в

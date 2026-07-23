@@ -1,6 +1,11 @@
-import type { EntityRef } from '@agentdeck/contracts';
+import type { GroupMember } from '@agentdeck/contracts';
 
 export interface MemberPickerProps {
-  value: EntityRef[];
-  onChange: (members: EntityRef[]) => void;
+  value: GroupMember[];
+  onChange: (members: GroupMember[]) => void;
+  /**
+   * Правящаяся группа. Её нельзя добавить в саму себя, поэтому она исключается
+   * из списка выбираемых групп (цикл при этом всё равно отвергнет сервер).
+   */
+  excludeGroupId?: string;
 }

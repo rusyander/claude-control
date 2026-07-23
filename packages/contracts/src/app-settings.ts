@@ -52,10 +52,28 @@ export type Theme = Infer<typeof themeSchema>;
 export const languageSchema = zodEnum(['ru', 'en']);
 export type Language = Infer<typeof languageSchema>;
 
+/**
+ * Цветовой акцент интерфейса. Пресеты, а не произвольный hex: значения берутся
+ * из палитры дизайн-системы, поэтому акцент остаётся на токенах и согласуется с
+ * обеими темами. `default` — базовый индиго темы.
+ */
+export const accentSchema = zodEnum(['default', 'blue', 'green', 'purple', 'amber']);
+export type Accent = Infer<typeof accentSchema>;
+
 /** Настройки самого приложения — хранятся отдельно от конфигов Claude Code. */
 export const appSettingsSchema = object({
   theme: themeSchema.default('system'),
   language: languageSchema.default('ru'),
+  /**
+   * Цветовой акцент поверх темы — пресет палитры ДС (см. accentSchema).
+   * `default` — базовый индиго; остальные переопределяют токены --color-accent*.
+   */
+  accent: accentSchema.default('default'),
+  /**
+   * Пользователь прошёл приветственный мастер первого запуска. Пока false —
+   * при открытии панели показывается онбординг (или пока каталог .claude невалиден).
+   */
+  onboardingDone: boolean().default(false),
   /**
    * Ручной путь к каталогу .claude. Пустая строка — определять автоматически.
    * Заполняется, когда автоопределение не сработало или каталог нестандартный.
@@ -86,6 +104,18 @@ export const appSettingsSchema = object({
   /** Показывать расход в токенах или в деньгах. По умолчанию — токены. */
   costUnit: zodEnum(['tokens', 'money']).default('tokens'),
   /**
+   * Потолок ожидания подключения к сетевым MCP-серверам (http/sse), мс. stdio
+   * этим не управляется: там в рукопожатие входит запуск процесса, и у него
+   * свой потолок в 45с. Меньше — быстрее сдаётся на молчащем адресе; больше —
+   * терпит медленные серверы за прокси/туннелем.
+   */
+  mcpNetworkTimeoutMs: number().int().min(2_000).max(120_000).default(10_000),
+  /**
+   * Автоматически проверять связь всех включённых MCP-серверов при открытии
+   * раздела MCP. Выключено — проверка только по кнопке на карточке.
+   */
+  mcpAutoCheck: boolean().default(false),
+  /**
    * Модель по умолчанию для чата: алиас (opus/sonnet/haiku/fable) или полное имя.
    * Пустая строка — как выберет сам Claude (у этого аккаунта это Opus 4.8, 1M).
    * Централизованный дефолт; в конкретном чате его можно переопределить локально.
@@ -103,6 +133,13 @@ export const appSettingsSchema = object({
    * зная, что она посчитана по прошлогоднему прайсу.
    */
   modelPricing: record(string(), modelPricingSchema).default({}),
+  /**
+   * Шифровать резервные копии файла секретов `.mcp-secrets.env`. По умолчанию
+   * выключено — копии лежат открытым текстом. Когда включено, копии этого файла
+   * пишутся зашифрованными (AES-256-GCM, ключ из парольной фразы). Сама фраза
+   * НЕ хранится: её запрашивают при включении и при восстановлении.
+   */
+  encryptSecretBackups: boolean().default(false),
 });
 
 export type AppSettings = Infer<typeof appSettingsSchema>;

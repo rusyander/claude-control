@@ -17,6 +17,7 @@ export function TextField({
   error,
   autoFocus,
   disabled,
+  type = 'text',
 }: TextFieldProps) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -48,6 +49,7 @@ export function TextField({
       ) : (
         <input
           id={id}
+          type={type}
           className={className}
           value={value}
           onChange={(event) => onChange(event.target.value)}

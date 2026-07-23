@@ -1,4 +1,4 @@
-import { readdirSync, statSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
+import { readdirSync, statSync, existsSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, extname, basename, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -98,6 +98,19 @@ export function readArtifactText(chatDir: string, name: string): string {
 export function readArtifactBinary(chatDir: string, name: string): Buffer | undefined {
   const path = safePath(chatDir, name);
   return existsSync(path) ? readFileSync(path) : undefined;
+}
+
+/**
+ * Удалить артефакт из папки чата. Имя приходит из запроса, поэтому от него, как
+ * и при чтении, берётся только `basename`: выйти через `../` за пределы папки
+ * чата нельзя. Удаляем лишь обычный файл; папки не трогаем. Вызывающий сам
+ * ограничивает это песочницей — в настоящем проекте удалять ничего нельзя.
+ */
+export function deleteArtifact(chatDir: string, name: string): boolean {
+  const path = safePath(chatDir, name);
+  if (!existsSync(path) || !statSync(path).isFile()) return false;
+  rmSync(path);
+  return true;
 }
 
 /**

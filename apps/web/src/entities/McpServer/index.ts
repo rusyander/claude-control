@@ -1,2 +1,2 @@
-﻿export { mcpServerApi, useStartOAuth, useClearOAuth } from './api/McpServerApi';
+﻿export { mcpServerApi, useStartOAuth, useClearOAuth, useMcpServerTools } from './api/McpServerApi';
 export type { StartOAuthResult } from './api/McpServerApi';

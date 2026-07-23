@@ -15,6 +15,21 @@ export interface ToastItem {
   onClick?: () => void;
 }
 
+/**
+ * Запись журнала уведомлений. Тосты живут на экране секунды, а журнал хранит
+ * последние из них с отметкой времени — чтобы вернуться и прочитать то, что
+ * промелькнуло. Действие по клику и длительность в историю не переносим: журнал
+ * только показывает, что было.
+ */
+export interface ToastHistoryEntry {
+  id: string;
+  tone: ToastTone;
+  message: string;
+  title?: string;
+  /** Когда уведомление появилось, мс epoch. */
+  at: number;
+}
+
 /** Что можно задать при показе тоста, помимо самого текста. */
 export interface ToastOptions {
   title?: string;

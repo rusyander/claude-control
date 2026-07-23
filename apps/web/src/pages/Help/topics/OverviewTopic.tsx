@@ -49,9 +49,10 @@ export function OverviewTopic() {
             tr('canMissing'),
             tr('canBroken'),
             tr('canBackups'),
+            tr('canChanges'),
             tr('canJump'),
           ]}
-          cant={[tr('cantEdit'), tr('cantHistory'), tr('cantDeep')]}
+          cant={[tr('cantEdit'), tr('cantDeep')]}
         />
       </HelpSection>
 

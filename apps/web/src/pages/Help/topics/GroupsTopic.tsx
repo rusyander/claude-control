@@ -52,16 +52,12 @@ export function GroupsTopic() {
             tr('canBadge'),
             tr('canConflict'),
             tr('canSandbox'),
+            tr('canNest'),
+            tr('canOrder'),
             tr('canAutomation'),
             tr('canAssistant'),
           ]}
-          cant={[
-            tr('cantOverride'),
-            tr('cantRevive'),
-            tr('cantKnow'),
-            tr('cantMagic'),
-            tr('cantNest'),
-          ]}
+          cant={[tr('cantOverride'), tr('cantRevive'), tr('cantKnow'), tr('cantMagic')]}
         />
       </HelpSection>
 

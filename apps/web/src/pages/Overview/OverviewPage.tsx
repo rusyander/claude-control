@@ -9,6 +9,7 @@ import { formatDate } from '@shared/lib/format';
 import { useLocation, useOverview } from '@entities/AppConfig';
 import { LocationCard } from './LocationCard';
 import { StatTile } from './StatTile';
+import { ChangesSummary } from './ChangesSummary';
 import styles from './OverviewPage.module.scss';
 
 /** Главный экран: где лежит конфигурация и что в ней есть. */
@@ -34,6 +35,8 @@ export function OverviewPage() {
 
       {location && <LocationCard location={location} />}
 
+      <ChangesSummary />
+
       {isLoading && <SkeletonTiles count={7} />}
 
       {overview && (
@@ -44,6 +47,15 @@ export function OverviewPage() {
             value={overview.rules.total}
             hint={`${overview.rules.enabled} ${t('common.enabled').toLowerCase()}`}
             to="/rules"
+            actions={[
+              {
+                label: t('overview.quickAdd'),
+                to: '/rules',
+                search: { create: true },
+                icon: 'plus',
+              },
+              { label: t('overview.quickClaudeMd'), to: '/claude-md', icon: 'edit' },
+            ]}
           />
           <StatTile
             icon="skills"
@@ -51,6 +63,14 @@ export function OverviewPage() {
             value={overview.skills.total}
             hint={`${overview.skills.enabled} ${t('common.enabled').toLowerCase()}`}
             to="/skills"
+            actions={[
+              {
+                label: t('overview.quickAdd'),
+                to: '/skills',
+                search: { create: true },
+                icon: 'plus',
+              },
+            ]}
           />
           <StatTile
             icon="hooks"
@@ -63,6 +83,14 @@ export function OverviewPage() {
             }
             tone={overview.hooks.broken > 0 ? 'danger' : undefined}
             to="/hooks"
+            actions={[
+              {
+                label: t('overview.quickAdd'),
+                to: '/hooks',
+                search: { create: true },
+                icon: 'plus',
+              },
+            ]}
           />
           <StatTile
             icon="scripts"
@@ -74,6 +102,14 @@ export function OverviewPage() {
                 : t('overview.allScriptsUsed')
             }
             to="/scripts"
+            actions={[
+              {
+                label: t('overview.quickAdd'),
+                to: '/scripts',
+                search: { create: true },
+                icon: 'plus',
+              },
+            ]}
           />
           <StatTile
             icon="mcp"
@@ -86,6 +122,9 @@ export function OverviewPage() {
             }
             tone={overview.mcp.failed > 0 ? 'danger' : undefined}
             to="/mcp"
+            actions={[
+              { label: t('overview.quickAdd'), to: '/mcp', search: { create: true }, icon: 'plus' },
+            ]}
           />
           <StatTile
             icon="permissions"
@@ -121,6 +160,7 @@ export function OverviewPage() {
                 : t('overview.backupsNone')
             }
             to="/settings"
+            actions={[{ label: t('overview.quickHistory'), to: '/history', icon: 'history' }]}
           />
         </div>
       )}

@@ -68,3 +68,23 @@ export const mcpServerDraftSchema = object({
 });
 
 export type McpServerDraft = Infer<typeof mcpServerDraftSchema>;
+
+/** Инструмент MCP-сервера — имя и описание для помощника отбора прав. */
+export const mcpToolSchema = object({
+  name: string(),
+  description: string().optional(),
+});
+
+export type McpTool = Infer<typeof mcpToolSchema>;
+
+/**
+ * Ответ маршрута списка инструментов сервера. Неудачу отдаём значением, а не
+ * исключением: помощник отбора прав показывает текст ошибки тем же блоком, что и
+ * список, — недоступный сервер не должен ронять запрос.
+ */
+export const mcpToolsResultSchema = object({
+  tools: array(mcpToolSchema),
+  error: string().optional(),
+});
+
+export type McpToolsResult = Infer<typeof mcpToolsResultSchema>;

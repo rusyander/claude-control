@@ -22,6 +22,7 @@ import {
 } from '@entities/Plugin';
 import { PluginCard } from './PluginCard';
 import { PluginCatalog } from './PluginCatalog';
+import { PluginScaffold } from './PluginScaffold';
 import styles from './PluginsPage.module.scss';
 
 /** Плагины: что установлено, откуда и как этим управлять. */
@@ -148,6 +149,9 @@ export function PluginsPage() {
           )}
         </Stack>
       </details>
+
+      {/* Свой плагин с нуля: каркас по формату Claude Code в выбранной папке. */}
+      <PluginScaffold />
 
       <Stack gap="var(--spacing-sm)">
         <Typography variant="heading-sm">{t('plugins.marketplaces')}</Typography>

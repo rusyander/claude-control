@@ -52,3 +52,48 @@ export const commandResultSchema = object({
 });
 
 export type CommandResult = Infer<typeof commandResultSchema>;
+
+/**
+ * Какие части каркаса плагина создавать. Манифест и README пишутся всегда, а
+ * команды, агенты, скиллы и хуки — по выбору: пустые папки только мешают.
+ */
+export const pluginScaffoldComponentsSchema = object({
+  commands: boolean(),
+  agents: boolean(),
+  skills: boolean(),
+  hooks: boolean(),
+});
+
+export type PluginScaffoldComponents = Infer<typeof pluginScaffoldComponentsSchema>;
+
+/**
+ * Запрос на создание каркаса плагина. Плагин раскладывается в подпапку `<имя>`
+ * внутри выбранного каталога — так выбранная папка не смешивается с чужими
+ * файлами, а существующий плагин без явного `force` не перезаписывается.
+ */
+export const pluginScaffoldRequestSchema = object({
+  /** Абсолютный путь каталога, выбранного через FolderPicker. */
+  dir: string(),
+  /** Имя плагина: станет именем папки и полем `name` в манифесте. */
+  name: string(),
+  description: string().optional(),
+  author: string().optional(),
+  components: pluginScaffoldComponentsSchema,
+  /** Перезаписать, если папка плагина уже есть. */
+  force: boolean().optional(),
+});
+
+export type PluginScaffoldRequest = Infer<typeof pluginScaffoldRequestSchema>;
+
+/** Итог скаффолдинга: куда положили плагин и какие файлы создали. */
+export const pluginScaffoldResultSchema = object({
+  ok: boolean(),
+  /** Абсолютный путь созданного каталога плагина. */
+  path: string(),
+  /** Созданные файлы — путями от корня плагина. */
+  created: array(string()),
+  /** Причина отказа: папка уже существует, недопустимое имя и т. п. */
+  error: string().optional(),
+});
+
+export type PluginScaffoldResult = Infer<typeof pluginScaffoldResultSchema>;

@@ -7,4 +7,5 @@ export {
   useUpdatePlugin,
   useAddMarketplace,
   useRemoveMarketplace,
+  useScaffoldPlugin,
 } from './api/PluginApi';

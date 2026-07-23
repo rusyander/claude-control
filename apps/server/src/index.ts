@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { ServerContext } from './context.ts';
 import { registerConfigRoutes } from './routes/config-routes.ts';
+import { registerConfigBundleRoutes } from './routes/config-bundle-routes.ts';
 import { registerEntityRoutes } from './routes/entity-routes.ts';
 import { registerGroupRoutes } from './routes/group-routes.ts';
 import { registerAnalyticsRoutes } from './routes/analytics-routes.ts';
@@ -13,7 +14,11 @@ import { registerChatRoutes } from './routes/chat-routes.ts';
 import { registerSandboxRoutes } from './routes/sandbox-routes.ts';
 import { registerResourceRoutes } from './routes/resource-routes.ts';
 import { registerBackupRoutes } from './routes/backup-routes.ts';
+import { registerHistoryRoutes } from './routes/history-routes.ts';
 import { registerSearchRoutes } from './routes/search-routes.ts';
+import { registerProjectRoutes } from './routes/project-routes.ts';
+import { registerProjectRunnerRoutes } from './routes/project-runner-routes.ts';
+import { ProjectRunnerRegistry } from './domains/project-runner.ts';
 import { sweepAbandonedSandboxes } from './domains/sandbox/SandboxConfig.ts';
 
 const PORT = Number(process.env.PORT ?? 5178);
@@ -70,6 +75,7 @@ await app.register(cors, {
 });
 
 registerConfigRoutes(app, ctx);
+registerConfigBundleRoutes(app, ctx);
 registerEntityRoutes(app, ctx);
 registerGroupRoutes(app, ctx);
 registerAnalyticsRoutes(app, ctx);
@@ -80,7 +86,14 @@ registerChatRoutes(app, ctx);
 registerSandboxRoutes(app, ctx);
 registerResourceRoutes(app, ctx);
 registerBackupRoutes(app, ctx);
+registerHistoryRoutes(app, ctx);
 registerSearchRoutes(app, ctx);
+registerProjectRoutes(app, ctx);
+
+// Реестр dev-серверов проектов держим здесь, а не внутри маршрутов: при выходе
+// сервера панели их надо погасить (иначе спавненные процессы осиротеют).
+const projectRunner = new ProjectRunnerRegistry();
+registerProjectRunnerRoutes(app, ctx, projectRunner);
 
 /**
  * Поток событий об изменениях файлов. Конфиги правит не только это приложение:
@@ -163,6 +176,19 @@ startWatching();
 // внутри копия .credentials.json. Подметаем, не дожидаясь, пока человек
 // сделает это руками.
 const sweptSandboxes = sweepAbandonedSandboxes();
+
+// Спавненные dev-серверы проектов живут в памяти процесса. Гасим их при выходе,
+// чтобы дочерние процессы не осиротели и не держали занятыми порты.
+const shutdownRunners = (): void => projectRunner.stopAll();
+process.on('exit', shutdownRunners);
+process.on('SIGINT', () => {
+  shutdownRunners();
+  process.exit(0);
+});
+process.on('SIGTERM', () => {
+  shutdownRunners();
+  process.exit(0);
+});
 
 await app.listen({ port: PORT, host: HOST });
 

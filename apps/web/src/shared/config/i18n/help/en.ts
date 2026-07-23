@@ -115,12 +115,21 @@ export const helpEn: HelpSchema = {
       canAnswerButtons: 'Answer an agent question by clicking an option',
       canModel: 'Pick a model and thinking depth — for the whole panel or for one chat',
       canApprove: 'Allow or deny a specific action right in the conversation',
+      canSearchMessages:
+        'Search the body of a conversation, not just its title and preview: the ' +
+        '“By messages” switch in the chat list, with matches highlighted',
+      canLoadMore:
+        'Load earlier messages with the “Load more” button — a long conversation is ' +
+        'not cut off at the last window',
+      canExport: 'Export a conversation to a file — Markdown or JSON',
+      canRun:
+        'Start the project’s dev server right from its chat tab and jump to the opened ' +
+        'address — the panel picks up the command from package.json (dev or start), or you set your own',
 
       cantApprove:
         'Grant permissions in advance: the panel asks at the moment of the action, and ' +
         'the standing list of what is allowed lives in the Permissions section',
       cantDelete: 'Delete or rename conversations — transcripts are only ever read',
-      cantSearchInside: 'Search inside conversations — search covers titles and previews only',
 
       storageTranscripts: 'Transcripts',
       storageTranscriptsValue: '~/.claude/projects/<project-path>/<sessionId>.jsonl',
@@ -384,10 +393,11 @@ export const helpEn: HelpSchema = {
       canMissing: 'Find out which configuration files are missing',
       canBroken: 'Spot broken hooks, failed MCP servers and unused scripts',
       canBackups: 'See the number of backups and the date of the last one',
-      canJump: 'Jump into a section by clicking its tile',
+      canChanges: 'See a “changed in the last N days” summary that links into the change history',
+      canJump: 'Jump into a section or fire a quick action straight from a tile',
 
-      cantEdit: 'Change anything: the page only shows',
-      cantHistory: 'See what changed since yesterday — there is no history here',
+      cantEdit:
+        'Edit settings right here: a tile leads into a section rather than editing in place',
       cantDeep: 'Work out why one particular setting misbehaves: that lives in its own section',
 
       sourceTitle: 'Where the configuration directory comes from',
@@ -599,6 +609,10 @@ export const helpEn: HelpSchema = {
       canCreds: 'Set account access by hand when it is not found automatically',
       canSpendUnit: 'Choose how spending is shown: in tokens or in money',
       canBackup: 'Turn on a backup before every write and set how many to keep',
+      canEncrypt:
+        'Encrypt .mcp-secrets.env backups with the encryptSecretBackups setting: ' +
+        'AES-256-GCM under a passphrase, so token backups do not sit in plain text',
+      canRevertHunk: 'Revert a single change out of a backup without bringing back the whole file',
       canTransfer:
         'Move the panel settings to another machine: export and import the state.json file',
       canWatch: 'Watch the files and refresh the interface when they change outside the panel',
@@ -609,8 +623,8 @@ export const helpEn: HelpSchema = {
         'Sync settings between machines automatically: there is no live sync, only a ' +
         'manual file transfer',
       cantChange:
-        'Edit Claude Code settings field by field: this section is about the panel itself. ' +
-        'The exception is a restore: it brings back a configuration file whole',
+        'Edit Claude Code settings field by field: this section is about the panel itself, ' +
+        'while the configuration is edited in its own sections',
 
       storageApp: 'Panel settings',
       storageAppValue: 'stored apart from the Claude Code configuration',
@@ -660,6 +674,9 @@ export const helpEn: HelpSchema = {
       fieldDir: 'The path to the configuration directory. Empty means detect it automatically.',
       fieldReveal: 'Show secret values straight away, without clicking the eye.',
       fieldBackup: 'Make a backup of the file before every write.',
+      fieldEncrypt:
+        'Encrypt .mcp-secrets.env backups (AES-256-GCM under a passphrase). Off by ' +
+        'default, and then secret backups sit in plain text.',
       fieldWatch: 'Watch the files and refresh the interface on outside changes.',
       fieldA11y: 'Large text, less motion, higher contrast.',
       fieldEditor: 'The code editor command. Empty means the first one found on the system.',
@@ -722,6 +739,9 @@ export const helpEn: HelpSchema = {
         'See a warning about a conflict inside a group: two permission members with the ' +
         'same pattern and opposite decisions',
       canSandbox: 'Run a group’s entire contents in the sandbox at once',
+      canNest:
+        'Nest a group inside a group: a member can be another group, and the panel refuses to create cycles',
+      canOrder: 'Set the order of members with the ↑ and ↓ arrows',
       canAutomation: 'Describe a scenario in words and get a working hook',
       canAssistant: 'Fill the group or scenario form with the assistant',
 
@@ -733,7 +753,6 @@ export const helpEn: HelpSchema = {
       cantRevive:
         'Undo a manual switch-off by enabling the group: what you disabled ' +
         'individually stays disabled',
-      cantNest: 'Nest groups inside one another',
 
       storageWhere: 'Where they live',
       storageWhereValue: 'in the panel’s data, apart from the Claude Code configuration',
@@ -900,10 +919,12 @@ export const helpEn: HelpSchema = {
       canUninstall: 'Remove an installed plugin',
       canMarketplaces: 'Add and remove marketplace sources right from the panel and see their list',
       canSee: 'See where a plugin came from and when it was last updated',
+      canView: 'Inspect the contents of an installed plugin — its skills, hooks and servers',
+      canScaffold: 'Scaffold your own plugin and go on refining it in files',
 
-      cantEdit: 'Edit the contents of a plugin: its skills and hooks belong to the author',
+      cantEdit:
+        'Edit the contents of an installed plugin: its skills and hooks belong to the author',
       cantPick: 'Take only part of a plugin — it installs whole',
-      cantCreate: 'Build your own plugin in the panel: here they are only installed',
       cantOffline: 'Work offline: both the catalogue and installation reach the source',
 
       storageWhere: 'Who is in charge',
@@ -1001,6 +1022,7 @@ export const helpEn: HelpSchema = {
       canComment: 'Leave a comment: where the value comes from or what it is for',
       canAssistant: 'Fill the form with the assistant by describing the variable in words',
       canAuto: 'Rely on detection: a variable with TOKEN in its name goes to the secrets file',
+      canMove: 'Move a variable between settings.json and settings.local.json with a button',
 
       cantEncrypt:
         'Encrypt the values: the token file is protected by file permissions, not a cipher',
@@ -1009,9 +1031,6 @@ export const helpEn: HelpSchema = {
         'only ever received it masked',
       cantScope: 'Split variables per project — the set is shared',
       cantSee: 'See which variable actually reached a process: the panel only writes them',
-      cantLocal:
-        'Edit or delete variables from settings.local.json: they are listed with a ' +
-        '“local” badge, but the panel never writes to that file',
 
       storageSettings: 'Settings',
       storageSettingsValue: '~/.claude/settings.json → the env key',
@@ -1147,13 +1166,15 @@ export const helpEn: HelpSchema = {
       canOAuth:
         'Sign in interactively over OAuth to a network server: the panel opens the ' +
         'authorization window, stores the token and refreshes it on expiry',
+      canAutoCheck:
+        'Turn on an automatic connection check when the section opens — the mcpAutoCheck ' +
+        'setting in Settings (off by default, so servers are not started needlessly)',
 
       cantInstall:
         'Install the server itself: the panel configures a connection, it does not ' +
         'install software',
       cantSecrets:
         'Keep passwords here: values from this form land in the shared configuration file',
-      cantAuto: 'Check connections automatically on open — starting a server costs time',
       cantPerTool:
         'Enable individual tools of a server: a server connects whole, and limits are ' +
         'set through permissions',
@@ -1277,6 +1298,16 @@ export const helpEn: HelpSchema = {
       noteWindowsText:
         'The panel does that itself, and escapes the arguments itself too: a path with ' +
         'spaces would otherwise split into two arguments.',
+      noteProjectTitle: 'These are the global MCP servers; project ones live in Projects',
+      noteProjectText:
+        'This section manages the shared ~/.claude.json. A specific project’s MCP servers ' +
+        'live in its .mcp.json and are edited in the Projects section — but that is still ' +
+        'raw there: no connection check, no OAuth, no soft-disable toggle.',
+      noteTimeoutTitle: 'The connection timeout is configurable',
+      noteTimeoutText:
+        'The timeout for network servers (http/sse) is set in Settings via ' +
+        'mcpNetworkTimeoutMs (2000–120000 ms). Launching local stdio servers stays ' +
+        'hard-capped at 45 seconds.',
       noteHandshakeTitle: 'The connection check is a handshake, not a port ping',
       noteHandshakeText:
         'The panel greets the server over the MCP protocol using the official library ' +
@@ -1324,6 +1355,7 @@ export const helpEn: HelpSchema = {
         'Create a batch of rules as a list, one per line: one decision is chosen for ' +
         'the whole list',
       canMcp: 'Manage permissions for MCP server tools on a separate tab',
+      canMove: 'Move a permission between settings.json and settings.local.json with a button',
       canSee: 'See which common actions are still unconfigured',
       canValidate:
         'Get a warning when a pattern does not look like the known forms: ' +
@@ -1332,10 +1364,9 @@ export const helpEn: HelpSchema = {
 
       cantWhy: 'Find out why Claude asked for confirmation of a particular action',
       cantOrderCustom: 'Set your own resolution order: the priority of decisions is fixed',
-      cantProject: 'Split permissions per project — the panel keeps one shared set',
-      cantLocal:
-        'Edit or delete permissions from settings.local.json: they are listed with a ' +
-        '“local” badge, but the panel never writes to that file',
+      cantProject:
+        'Split permissions per project here: this set is user-level, ' +
+        'while project permissions live in the Projects section',
 
       storageFile: 'Where it is stored',
       storageFileValue: '~/.claude/settings.json → permissions.allow, .ask, .deny',
@@ -1643,7 +1674,9 @@ export const helpEn: HelpSchema = {
       canScript: 'Let the panel create the script file and fill in the launch command',
       canMatcher: 'Limit the event to specific tools with checkboxes',
       canAssistant: 'Fill the form with the assistant by describing the task in words',
-      canProbe: 'Run the hook against a prepared event — instantly, without using your limit',
+      canProbe:
+        'Run the hook against a prepared event or your own arbitrary JSON event — ' +
+        'instantly, without using your limit',
       canBulkPresets: 'Create several presets at once by ticking the ones you want',
       canToggle: 'Switch a hook off without losing its settings',
       canOrder: 'Reorder hooks within a single event with up and down buttons',
@@ -1858,7 +1891,10 @@ export const helpEn: HelpSchema = {
         'A skill is an ordinary directory with markdown inside. Copy it to another ' +
         'machine, put it in a repository, or link a folder that lives elsewhere.',
 
-      canCreate: 'Create a skill as one file or with a ready-made structure',
+      canCreate:
+        'Create a skill as one file, with a ready-made structure, or from a SKILL.md template',
+      canRename:
+        'Rename a skill: the panel moves the folder and updates references to it in groups',
       canTree: 'Edit any file of the skill right in its card, as a tree',
       canAssistant: 'Ask the assistant to build the structure from a description of the task',
       canSearch: 'Search by the name and description of a skill',
@@ -1869,9 +1905,6 @@ export const helpEn: HelpSchema = {
         'Keep a skill elsewhere: a symlink or junction inside skills/ is read by the ' +
         'panel as an ordinary folder',
 
-      cantRename:
-        'Rename an existing skill: the name is the folder name, and changing it would ' +
-        'create a new one',
       cantAutoRead:
         'Count on Claude reading nested files by itself — it only takes them through ' +
         'a link from SKILL.md',
@@ -2036,7 +2069,9 @@ export const helpEn: HelpSchema = {
       canGroup: 'Collect rules into groups and switch them on as sets',
       canEditByHand: 'Edit CLAUDE.md by hand — the panel picks the changes up',
 
-      cantProject: 'Project-level rules: the panel only manages your own ~/.claude/CLAUDE.md',
+      cantProject:
+        'Project-level rules here: this section manages your own ~/.claude/CLAUDE.md, ' +
+        'while a specific project’s CLAUDE.md is edited in the Projects section',
       cantPriority:
         'Priority between rules: Claude reads the whole file, and a contradiction ' +
         'between two rules is not resolved for you',
@@ -2309,6 +2344,168 @@ export const helpEn: HelpSchema = {
         'The Rules section shows any “## Heading” as a rule, and the “ПРАВИЛО:” prefix is ' +
         'optional — it is stripped on read and added back on write. For a subheading inside ' +
         'a rule use the third level, “### ”.',
+    },
+
+    search: {
+      title: 'Search',
+      summary: 'One line searches across every configuration section at once',
+      lead:
+        'Search answers the question “where did I configure this”, without walking the ' +
+        'sections one by one. A single line runs across rules, skills, hooks, scripts, ' +
+        'permissions, variables, MCP servers and plugins, and clicking a hit opens it ' +
+        'right in its own section.',
+
+      whyOne: 'One entry instead of walking sections',
+      whyOneText:
+        'No need to remember where a setting lives: the query runs across all sections ' +
+        'at once, and the results are grouped by type.',
+      whyCross: 'Finds by name and by content',
+      whyCrossText:
+        'It searches the heading and the body alike: a hook command, a permission ' +
+        'pattern, a variable name, an MCP server URL.',
+      whySafe: 'Never reveals secrets',
+      whySafeText:
+        'For environment variables it searches and shows the key name only — the value, ' +
+        'even masked, never reaches the result.',
+
+      storageWhere: 'What it searches',
+      storageWhereValue:
+        'the current configuration, not a separate store — search has no index of its own',
+      storageScope: 'Sections',
+      storageScopeValue: 'rules, skills, hooks, scripts, permissions, variables, MCP, plugins',
+      storageMin: 'Minimum',
+      storageMinValue: 'a query of two characters or more — shorter does not run',
+      storageSecrets: 'Secrets',
+      storageSecretsValue: 'for variables, key names only, no values',
+
+      canAll: 'Search all eight configuration sections at once with one line',
+      canGrouped: 'See results grouped by section, with a snippet around the match',
+      canOpen: 'Open a hit right in its section — with the entry highlighted',
+      canLive: 'Search the current state: it reads the same files the sections do',
+
+      cantBody: 'Search the body of a chat — that is a separate search in the chat list',
+      cantSecrets: 'Find a secret value: for variables only the key names are available',
+      cantEdit: 'Edit a hit straight from the results — editing lives in the section itself',
+
+      notesTitle: 'Things that trip people up',
+      noteSecretTitle: 'Secret values never reach this',
+      noteSecretText:
+        'For environment variables the search works with key names only. Even a masked ' +
+        'value does not go into the results.',
+      noteChatTitle: 'A different search covers chats',
+      noteChatText:
+        'This section searches the configuration. To find a conversation by what it ' +
+        'discussed, there is a search over message bodies in the chat list.',
+    },
+
+    history: {
+      title: 'Change history',
+      summary: 'A feed of configuration edits with a line-by-line diff over the backups',
+      lead:
+        'Before each write the panel keeps a backup of the file. The feed is built from ' +
+        'those backups: what changed and when, and how an edit differs from the previous ' +
+        'one. The diff reads chronologically forward, so “+N/−M” is how many lines this ' +
+        'edit added and removed.',
+
+      whyWhat: 'You can see what changed',
+      whyWhatText:
+        'The feed collects edits per configuration file: settings.json, CLAUDE.md, ' +
+        '.mcp.json and their local pairs.',
+      whyDiff: 'A line-by-line diff',
+      whyDiffText:
+        'For each edit you see the added and removed lines, not just the fact that ' +
+        'something changed.',
+      whyFree: 'It launches nothing',
+      whyFreeText:
+        'This is reading already-taken backups: the section does not call the CLI and ' +
+        'does not touch files, so it opens fast and without side effects.',
+
+      storageSource: 'Source',
+      storageTracked: 'Tracked',
+      storageTrackedValue: 'settings.json, settings.local.json, CLAUDE.md, .mcp.json',
+      storageSecrets: 'Excluded',
+      storageDir: 'When available',
+      storageDirValue: 'even when backup creation is off — the old backups are still there',
+
+      canFeed: 'Browse the feed of edits per configuration file',
+      canDiff: 'Open the line-by-line diff of a single edit',
+      canCounts: 'See “+N/−M” — how many lines an edit added and removed',
+      canOffline: 'Read the history even when creating new backups is off',
+
+      cantSecrets: 'See a diff of .mcp-secrets.env — secrets are deliberately not diffed',
+      cantRestore: 'Roll a version back from here — restoring lives in the Settings section',
+      cantBig: 'Get a diff of a very large or binary file — it is not parsed',
+
+      notesTitle: 'Things that trip people up',
+      noteSecretTitle: 'Secrets are not diffed',
+      noteSecretText:
+        'The .mcp-secrets.env file is not among the tracked ones: a line-by-line diff ' +
+        'would reveal token values right in the UI.',
+      noteRestoreTitle: 'Restore is in Settings',
+      noteRestoreText:
+        'History shows what changed. Bringing a whole file back to a past backup is done ' +
+        'from the Settings section.',
+      noteBigTitle: 'Large files are not parsed',
+      noteBigText:
+        'A file that is too large or binary does not go into a diff — the feed stays ' +
+        'cheap and does not drag junk into the UI.',
+    },
+
+    projects: {
+      title: 'Projects',
+      summary: 'The project level: a folder’s own CLAUDE.md, MCP servers and permissions',
+      lead:
+        'Beyond the user-level ~/.claude, the panel can manage a specific project’s ' +
+        'configuration. Register a folder and edit its own CLAUDE.md, .mcp.json and ' +
+        '.claude/settings.json. This is added on top of the user level, without ' +
+        'touching it.',
+
+      whyLevel: 'Settings next to the code',
+      whyLevelText:
+        'A project’s rules, MCP servers and permissions live in its directory and travel ' +
+        'with the repository.',
+      whyAdditive: 'On top of the user level',
+      whyAdditiveText:
+        'The project level is added to your own ~/.claude rather than replacing it: the ' +
+        'shared settings stay in place.',
+      whySame: 'The same forms',
+      whySameText:
+        'A project’s files use the same format as the user level, so rules, MCP and ' +
+        'permissions are edited with the familiar forms.',
+
+      storageRules: 'Rules',
+      storageMcp: 'MCP servers',
+      storagePerms: 'Permissions',
+      storageCreate: 'The .claude directory',
+      storageCreateValue: 'created on the first write if the project does not have it yet',
+
+      canRegister: 'Register a project folder by its absolute path',
+      canRules: 'Edit the project’s CLAUDE.md',
+      canMcp: 'Manage the project’s MCP servers in its .mcp.json',
+      canPerms: 'Configure the project’s permissions in .claude/settings.json',
+      canAdditive: 'Work with a project without touching the user level',
+
+      cantGroups:
+        'Groups, soft-disable, the health check, OAuth and the sandbox — not on projects yet',
+      cantHooks: 'Project hooks — they are not surfaced in the UI yet',
+      cantHealth:
+        'Check the connection to a project’s MCP server — health is available on the ' +
+        'user level only',
+
+      fieldsTitle: 'Fields',
+      fieldPath: 'The absolute path to the project directory',
+      fieldName: 'A short project name — the last path segment by default',
+
+      notesTitle: 'Things that trip people up',
+      noteRawTitle: 'The project level is still raw',
+      noteRawText:
+        'Here you edit a project’s rules, MCP servers and permissions. Groups, ' +
+        'soft-disable, the health check, OAuth and the sandbox are not on the project ' +
+        'level yet.',
+      noteUserTitle: 'The user level is separate',
+      noteUserText:
+        'The Rules, MCP and Permissions sections still manage ~/.claude. The project ' +
+        'level does not replace them, it complements them.',
     },
   },
 };

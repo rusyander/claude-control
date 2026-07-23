@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
+import { Button } from '@shared/ui/button';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { MessageBubble } from './MessageBubble';
 import { QuestionCard, parseQuestions } from './QuestionCard';
@@ -17,8 +18,12 @@ import styles from './ChatMessages.module.scss';
  */
 export function ChatMessages({
   messages,
+  conversationId,
   stream,
   isLoading,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
   onEdit,
   onPickOption,
   isRunning,
@@ -35,16 +40,40 @@ export function ChatMessages({
   // нельзя.
   const isPinned = useRef(true);
 
-  // Смена разговора — снова к последнему сообщению.
-  const conversationId = messages[0]?.id;
+  // Высота ленты в момент клика «Загрузить ещё»: подгруженные сверху сообщения
+  // сдвигают содержимое вниз, и без поправки прокрутки лента прыгала бы. После
+  // прибавки восстанавливаем позицию по приросту высоты.
+  const restoreScroll = useRef<number | undefined>(undefined);
+
+  // Смена разговора — снова к последнему сообщению. Ключ — id разговора, а не
+  // первого сообщения: при подгрузке более ранних первое сообщение меняется, но
+  // прокрутку к низу это запускать не должно.
   useEffect(() => {
     isPinned.current = true;
+    restoreScroll.current = undefined;
     bottomRef.current?.scrollIntoView({ block: 'end' });
   }, [conversationId]);
 
   useEffect(() => {
+    // Подгрузка более ранних не должна утягивать ленту вниз — её обрабатывает
+    // отдельный layout-эффект восстановления позиции.
+    if (restoreScroll.current !== undefined) return;
     if (isPinned.current) bottomRef.current?.scrollIntoView({ block: 'end' });
   }, [messages.length, stream.text, stream.tools.length, permissions?.length]);
+
+  // Восстановление позиции после подгрузки более ранних: держим на экране то же
+  // сообщение, что и было, компенсируя прокрутку приростом высоты сверху.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list || restoreScroll.current === undefined) return;
+    list.scrollTop += list.scrollHeight - restoreScroll.current;
+    restoreScroll.current = undefined;
+  }, [messages.length]);
+
+  const loadMore = (): void => {
+    if (listRef.current) restoreScroll.current = listRef.current.scrollHeight;
+    onLoadMore?.();
+  };
 
   return (
     <div
@@ -55,6 +84,20 @@ export function ChatMessages({
         isPinned.current = list.scrollHeight - list.scrollTop - list.clientHeight < 160;
       }}
     >
+      {hasMore && onLoadMore && (
+        <Stack align="center" padding="var(--spacing-2xs) 0">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={loadMore}
+            isLoading={isLoadingMore}
+            disabled={isLoadingMore}
+          >
+            {t('chat.loadOlder')}
+          </Button>
+        </Stack>
+      )}
+
       {isLoading && <SkeletonList rows={3} withActions={false} />}
 
       {messages.map((message) => (

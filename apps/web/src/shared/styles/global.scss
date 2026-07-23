@@ -68,7 +68,10 @@
 
   --color-fg: #16181d;
   --color-fg-muted: #5b616e;
-  --color-fg-subtle: #868c99;
+  // Затемнён с #868c99: тот давал ~3.0–3.4:1 на светлых поверхностях и не
+  // проходил WCAG AA для мелкого текста. #656b78 держит ≥4.5:1 на surface и
+  // sunken, оставаясь светлее muted.
+  --color-fg-subtle: #656b78;
   --color-fg-inverse: #ffffff;
 
   --color-accent: #4f46e5;
@@ -110,7 +113,9 @@
 
   --color-fg: #e8eaee;
   --color-fg-muted: #9aa2b1;
-  --color-fg-subtle: #6b7383;
+  // Осветлён с #6b7383 (давал ~3.4–4.0:1 и не проходил AA) до #8b93a3:
+  // ≥4.5:1 на всех тёмных поверхностях, оставаясь темнее muted.
+  --color-fg-subtle: #8b93a3;
   --color-fg-inverse: #0e1014;
 
   --color-accent: #818cf8;
@@ -139,6 +144,70 @@
   --series-4: #c98500;
   --series-5: #199e70;
   --chart-grid: #232830;
+}
+
+// Кастомный акцент поверх темы. Настройка `accent` ставит data-accent на <html>;
+// пресет переопределяет только семейство --color-accent*, всё остальное берётся
+// из активной темы. Значения — ступени той же палитры (Tailwind-линейка), что и
+// базовый индиго и семантические цвета ДС, а не подобраны «от балды»: под свет
+// это ступень 600/100, под тьму — 400/950, --color-accent-fg повторяет тему
+// (белый под свет, near-black под тьму). `default` не переопределяется — это
+// базовый акцент темы. Селекторы с двумя атрибутами перекрывают базовый блок
+// темы по специфичности.
+:root[data-theme='light'][data-accent='blue'] {
+  --color-accent: #0369a1;
+  --color-accent-hover: #075985;
+  --color-accent-subtle: #e0f2fe;
+  --color-accent-fg: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='blue'] {
+  --color-accent: #38bdf8;
+  --color-accent-hover: #7dd3fc;
+  --color-accent-subtle: #082f49;
+  --color-accent-fg: #0e1014;
+}
+
+:root[data-theme='light'][data-accent='green'] {
+  --color-accent: #15803d;
+  --color-accent-hover: #166534;
+  --color-accent-subtle: #dcfce7;
+  --color-accent-fg: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='green'] {
+  --color-accent: #4ade80;
+  --color-accent-hover: #86efac;
+  --color-accent-subtle: #052e16;
+  --color-accent-fg: #0e1014;
+}
+
+:root[data-theme='light'][data-accent='purple'] {
+  --color-accent: #9333ea;
+  --color-accent-hover: #7e22ce;
+  --color-accent-subtle: #f3e8ff;
+  --color-accent-fg: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='purple'] {
+  --color-accent: #c084fc;
+  --color-accent-hover: #d8b4fe;
+  --color-accent-subtle: #3b0764;
+  --color-accent-fg: #0e1014;
+}
+
+:root[data-theme='light'][data-accent='amber'] {
+  --color-accent: #b45309;
+  --color-accent-hover: #92400e;
+  --color-accent-subtle: #fef3c7;
+  --color-accent-fg: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='amber'] {
+  --color-accent: #fbbf24;
+  --color-accent-hover: #fcd34d;
+  --color-accent-subtle: #3b2a06;
+  --color-accent-fg: #0e1014;
 }
 
 // Крупный текст: увеличиваем шкалу целиком, а не отдельные места,

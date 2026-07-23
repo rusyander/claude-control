@@ -35,6 +35,18 @@ describe('ResourceFiles', () => {
     writeFileSync(join(root, 'skills', 'demo', 'references', 'rules.md'), 'rules');
     writeFileSync(join(root, 'hooks', 'guard.mjs'), 'script');
 
+    // Установленный плагин на диске: cache/<маркетплейс>/<имя>/<версия>.
+    const pluginRoot = join(root, 'plugins', 'cache', 'demo-mp', 'demo-plugin', '1.0.0');
+    mkdirSync(join(pluginRoot, '.claude-plugin'), { recursive: true });
+    mkdirSync(join(pluginRoot, 'commands'), { recursive: true });
+    // Служебная папка кэша с pid-локом — её в дереве быть не должно.
+    mkdirSync(join(pluginRoot, '.in_use'), { recursive: true });
+    writeFileSync(join(pluginRoot, '.claude-plugin', 'plugin.json'), '{"name":"demo-plugin"}');
+    writeFileSync(join(pluginRoot, 'commands', 'hello.md'), '# hello');
+    writeFileSync(join(pluginRoot, '.in_use', '12345'), 'lock');
+    // Секрет за пределами плагина — к нему обход пути дотянуться не должен.
+    writeFileSync(join(root, 'plugins', 'secret.txt'), 'SECRET');
+
     // Минимальный ClaudeLocation: тестам нужны только пути.
     location = {
       source: 'manual',
@@ -85,6 +97,40 @@ describe('ResourceFiles', () => {
 
     it('плагины доступны только на чтение', () => {
       expect(() => writeResourceFile('plugin', 'x', 'a.txt', 'x', location)).toThrow();
+    });
+  });
+
+  describe('просмотр плагина', () => {
+    const id = 'demo-plugin@demo-mp';
+
+    it('перечисляет файлы установленного плагина относительными путями', () => {
+      const files = listResourceFiles('plugin', id, location).map((f) => f.path);
+      expect(files).toContain('.claude-plugin/plugin.json');
+      expect(files).toContain('commands/hello.md');
+    });
+
+    it('прячет служебную папку кэша .in_use', () => {
+      const files = listResourceFiles('plugin', id, location).map((f) => f.path);
+      expect(files.some((path) => path.startsWith('.in_use'))).toBe(false);
+    });
+
+    it('читает содержимое файла плагина', () => {
+      const read = readResourceFile('plugin', id, 'commands/hello.md', location);
+      expect(read.content).toBe('# hello');
+    });
+
+    it('плагин доступен только на чтение', () => {
+      expect(() => writeResourceFile('plugin', id, 'commands/hello.md', 'x', location)).toThrow();
+    });
+
+    it('обход ../ не выдаёт файлы за пределами каталога плагина', () => {
+      // secret.txt лежит на два уровня выше версии плагина.
+      const read = readResourceFile('plugin', id, '../../../secret.txt', location);
+      expect(read.content).toBe('');
+    });
+
+    it('неизвестный плагин даёт пустое дерево, а не корень кэша', () => {
+      expect(listResourceFiles('plugin', 'нет@такого', location)).toHaveLength(0);
     });
   });
 

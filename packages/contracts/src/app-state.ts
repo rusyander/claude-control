@@ -1,6 +1,7 @@
 import { object, string, array, record, type infer as Infer } from 'zod';
 import { groupSchema, automationSchema } from './groups';
 import { hookSchema } from './hooks';
+import { projectSchema } from './projects';
 import { appSettingsSchema } from './app-settings';
 
 /**
@@ -26,6 +27,8 @@ export const importStateSchema = object({
   disabledHooks: record(string(), hookSchema).optional(),
   /** id группы → имена env-ключей, записанных ею в settings.json. */
   envByGroup: record(string(), array(string())).optional(),
+  /** Реестр проектов уровня конфигурации — запомненные пути к их каталогам. */
+  projects: array(projectSchema).optional(),
   /** Настройки самого приложения — проверяются контрактной схемой настроек. */
   settings: appSettingsSchema.partial().optional(),
 });

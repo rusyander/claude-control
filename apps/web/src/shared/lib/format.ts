@@ -14,6 +14,17 @@ export function formatDate(iso: string, locale: string): string {
   });
 }
 
+/** Дата и время: для ленты изменений важен ещё и час правки. */
+export function formatDateTime(iso: string, locale: string): string {
+  return new Date(iso).toLocaleString(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 /** Компактное число токенов: 1234 → «1.2k», 2_500_000 → «2.5M». */
 export function formatTokens(tokens: number): string {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;

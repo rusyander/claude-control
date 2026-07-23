@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import type { IconName } from '@shared/ui/icon';
 import { OverviewTopic } from '../topics/OverviewTopic';
+import { SearchTopic } from '../topics/SearchTopic';
 import { AnalyticsTopic } from '../topics/AnalyticsTopic';
 import { ChatTopic } from '../topics/ChatTopic';
 import { RulesTopic } from '../topics/RulesTopic';
@@ -12,7 +13,9 @@ import { PluginsTopic } from '../topics/PluginsTopic';
 import { McpTopic } from '../topics/McpTopic';
 import { PermissionsTopic } from '../topics/PermissionsTopic';
 import { EnvTopic } from '../topics/EnvTopic';
+import { ProjectsTopic } from '../topics/ProjectsTopic';
 import { GroupsTopic } from '../topics/GroupsTopic';
+import { HistoryTopic } from '../topics/HistoryTopic';
 import { SettingsTopic } from '../topics/SettingsTopic';
 
 export { HELP_ROUTE } from '@shared/config/routes';
@@ -46,6 +49,7 @@ export const HELP_GROUPS: HelpGroup[] = [
     labelKey: 'nav.sectionMain',
     topics: [
       { id: 'overview', icon: 'overview', pagePath: '/', Content: OverviewTopic },
+      { id: 'search', icon: 'search', pagePath: '/search', Content: SearchTopic },
       { id: 'analytics', icon: 'analytics', pagePath: '/analytics', Content: AnalyticsTopic },
       { id: 'chat', icon: 'chat', pagePath: '/chat', Content: ChatTopic },
     ],
@@ -72,12 +76,14 @@ export const HELP_GROUPS: HelpGroup[] = [
         Content: PermissionsTopic,
       },
       { id: 'env', icon: 'env', pagePath: '/env', Content: EnvTopic },
+      { id: 'projects', icon: 'folder', pagePath: '/projects', Content: ProjectsTopic },
     ],
   },
   {
     labelKey: 'nav.sectionApp',
     topics: [
       { id: 'groups', icon: 'groups', pagePath: '/groups', Content: GroupsTopic },
+      { id: 'history', icon: 'history', pagePath: '/history', Content: HistoryTopic },
       { id: 'settings', icon: 'settings', pagePath: '/settings', Content: SettingsTopic },
     ],
   },

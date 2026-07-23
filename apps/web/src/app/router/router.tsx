@@ -12,7 +12,9 @@ import { PluginsPage } from '@pages/Plugins/PluginsPage';
 import { McpPage } from '@pages/Mcp/McpPage';
 import { PermissionsPage } from '@pages/Permissions/PermissionsPage';
 import { EnvPage } from '@pages/Env/EnvPage';
+import { ProjectsPage } from '@pages/Projects/ProjectsPage';
 import { GroupsPage } from '@pages/Groups/GroupsPage';
+import { HistoryPage } from '@pages/History/HistoryPage';
 import { SettingsPage } from '@pages/Settings/SettingsPage';
 import { HelpPage } from '@pages/Help/HelpPage';
 import { SearchPage } from '@pages/Search/SearchPage';
@@ -29,10 +31,17 @@ const rootRoute = createRootRoute({ component: MainLayout });
  * `?topic=…` — раздел справки. Тем же способом: ссылка на объяснение
  * конкретного раздела открывается сразу на нужном документе.
  */
-function validateSearch(search: Record<string, unknown>): { id?: string; topic?: string } {
+function validateSearch(search: Record<string, unknown>): {
+  id?: string;
+  topic?: string;
+  create?: boolean;
+} {
   return {
     ...(typeof search.id === 'string' && search.id ? { id: search.id } : {}),
     ...(typeof search.topic === 'string' && search.topic ? { topic: search.topic } : {}),
+    // `?create=1` — быстрое действие «Добавить» с обзора: раздел открывает свою
+    // форму создания (см. useCreateParam). Держим булевым флагом, а не строкой.
+    ...(search.create ? { create: true } : {}),
   };
 }
 
@@ -51,7 +60,9 @@ const routes = [
   { path: '/mcp', component: McpPage },
   { path: '/permissions', component: PermissionsPage },
   { path: '/env', component: EnvPage },
+  { path: '/projects', component: ProjectsPage },
   { path: '/groups', component: GroupsPage },
+  { path: '/history', component: HistoryPage },
   { path: '/settings', component: SettingsPage },
   { path: '/help', component: HelpPage },
 ].map((route) => createRoute({ getParentRoute: () => rootRoute, validateSearch, ...route }));

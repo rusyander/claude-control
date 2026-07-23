@@ -22,7 +22,12 @@ export function PageHeader({ title, subtitle, actions, helpTopic }: PageHeaderPr
     >
       <Stack gap="var(--spacing-2xs)">
         <Stack direction="row" align="center" gap="var(--spacing-2xs)">
-          <Typography variant="heading">{title}</Typography>
+          {/* Заголовок раздела — единственный h1 страницы: секции внутри идут
+              h2/h3, так выстраивается иерархия для скринридеров. Вид (variant)
+              не меняем — меняется только тег. */}
+          <Typography variant="heading" as="h1">
+            {title}
+          </Typography>
 
           {helpTopic && (
             <Link

@@ -17,7 +17,7 @@ import { ExplainBox } from '@shared/ui/explain-box';
 import { SearchField } from '@shared/ui/search-field';
 import { VirtualList } from '@shared/ui/virtual-list';
 import { TruncatedText } from '@shared/ui/truncated-text';
-import { permissionApi } from '@entities/Permission';
+import { permissionApi, useMovePermission } from '@entities/Permission';
 import { SystemPermissions } from './SystemPermissions';
 import styles from './PermissionsPage.module.scss';
 
@@ -39,6 +39,7 @@ export function PermissionsPage() {
 
   const { data: rules = [], isLoading } = permissionApi.useList();
   const deleteRule = permissionApi.useDelete();
+  const moveRule = useMovePermission();
 
   const openCreate = (pattern?: string): void => {
     setEditing(undefined);
@@ -157,6 +158,21 @@ export function PermissionsPage() {
                     {t(`permissions.${rule.decision}`)}
                   </Badge>
                   <SourceBadge source={rule.source} />
+                  {/* Перенос в противоположный файл: общий ↔ локальный. Направление
+                      и подпись зависят от текущего источника права. */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    icon={<Icon name="swap" size={24} />}
+                    aria-label={
+                      rule.source === 'settings-local'
+                        ? t('permissions.moveToShared')
+                        : t('permissions.moveToLocal')
+                    }
+                    disabled={moveRule.isPending}
+                    onClick={() => moveRule.mutate(rule.id)}
+                  />
                   {/* Локальное право правится там же, где лежит: запись уходит
                       обратно в settings.local.json, а не в общий конфиг. */}
                   <Button

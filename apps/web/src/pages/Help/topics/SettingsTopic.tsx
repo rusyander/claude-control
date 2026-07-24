@@ -111,6 +111,9 @@ export function SettingsTopic() {
           <Callout tone="success" title={tr('noteBackupTitle')}>
             {tr('noteBackupText')}
           </Callout>
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

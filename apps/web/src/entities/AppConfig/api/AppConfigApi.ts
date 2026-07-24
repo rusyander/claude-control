@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AppSettings, ClaudeLocation, Overview } from '@claude-control/contracts';
+import type {
+  AppSettings,
+  ClaudeLocation,
+  InstructionsFileInfo,
+  Overview,
+} from '@claude-control/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 
@@ -30,9 +35,12 @@ async function getOverview(): Promise<Overview> {
   return data;
 }
 
-async function getClaudeMd(): Promise<string> {
-  const { data } = await apiClient.get<{ content: string }>('/claude-md');
-  return data.content;
+async function getClaudeMd(): Promise<InstructionsFileInfo> {
+  // Раздел универсален по активному провайдеру: сервер отдаёт содержимое файла
+  // инструкций (CLAUDE.md/AGENTS.md/GEMINI.md) вместе с метаданными — имя файла,
+  // путь, обнаружен ли CLI и данные провайдера, — по которым адаптируется страница.
+  const { data } = await apiClient.get<InstructionsFileInfo>('/claude-md');
+  return data;
 }
 
 async function putClaudeMd(content: string): Promise<void> {
@@ -75,10 +83,15 @@ export function useUpdateSettings() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: patchSettings,
-    onSuccess: (settings) => {
+    onSuccess: (settings, variables) => {
       // Настройки кладём в кеш напрямую: тема и язык должны примениться
       // мгновенно, без ожидания повторного запроса.
       queryClient.setQueryData(queryKeys.settings, settings);
+      // Смена провайдера меняет активный id и карту возможностей — перечитываем
+      // /providers, чтобы навигация перестроилась под нового провайдера.
+      if (variables.provider !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.providers });
+      }
     },
   });
 }

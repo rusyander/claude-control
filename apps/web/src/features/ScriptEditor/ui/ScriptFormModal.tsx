@@ -9,7 +9,8 @@ import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { Card } from '@shared/ui/card';
 import { BulkPresets } from '@shared/ui/bulk-presets';
 import { useSaveScript, useScriptContent } from '@entities/Script';
-import { NEW_SCRIPT_TEMPLATE, SCRIPT_TEMPLATES } from '../model/ScriptTemplate';
+import { useIsCapabilityReady } from '@entities/Provider';
+import { scriptTemplatesFor, newScriptTemplateFor } from '../model/ScriptTemplate';
 import type { ScriptFormModalProps } from './ScriptFormModal.types';
 import styles from './ScriptFormModal.module.scss';
 
@@ -27,12 +28,17 @@ export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModa
   const loaded = useScriptContent(isOpen ? script?.id : undefined);
   const save = useSaveScript();
 
+  // Сам редактор общий для всех провайдеров, а вот заготовки и подсказка
+  // помощнику говорят о хуках — их даём только там, где хуки есть (у Claude).
+  const hasHooks = useIsCapabilityReady('hooks');
+  const templates = scriptTemplatesFor(hasHooks);
+
   useEffect(() => {
     if (!isOpen) return;
     setName(script?.name ?? '');
-    setContent(script ? '' : NEW_SCRIPT_TEMPLATE);
+    setContent(script ? '' : newScriptTemplateFor(hasHooks));
     setMode('constructor');
-  }, [isOpen, script]);
+  }, [isOpen, script, hasHooks]);
 
   // Содержимое приезжает вторым запросом — подставляем, когда оно готово.
   useEffect(() => {
@@ -90,13 +96,13 @@ export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModa
 
       {mode === 'bulk' ? (
         <BulkPresets
-          items={SCRIPT_TEMPLATES.map((template) => ({
+          items={templates.map((template) => ({
             id: template.id,
             title: template.title,
             description: template.description,
           }))}
           createOne={(id) => {
-            const template = SCRIPT_TEMPLATES.find((item) => item.id === id);
+            const template = templates.find((item) => item.id === id);
             return template
               ? save.mutateAsync({ name: template.fileName, content: template.content })
               : Promise.resolve();
@@ -109,9 +115,11 @@ export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModa
           fields={{ name, content }}
           schema={{
             name: 'Имя файла скрипта с расширением, например notify.mjs',
-            content:
-              'Полный код скрипта. Хуки Claude Code получают JSON на stdin и могут вернуть JSON на stdout; ' +
-              'код выхода 2 блокирует действие. Пиши на Node.js (.mjs), комментарии по-русски',
+            content: hasHooks
+              ? 'Полный код скрипта. Хуки Claude Code получают JSON на stdin и могут вернуть JSON на stdout; ' +
+                'код выхода 2 блокирует действие. Пиши на Node.js (.mjs), комментарии по-русски'
+              : 'Полный код самостоятельного скрипта: аргументы из process.argv, вывод в stdout, ' +
+                'ненулевой код возврата при ошибке. Пиши на Node.js (.mjs), комментарии по-русски',
           }}
           onApply={(applied) => {
             if (typeof applied.name === 'string') setName(applied.name);
@@ -132,7 +140,7 @@ export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModa
                   </Typography>
 
                   <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-                    {SCRIPT_TEMPLATES.map((template) => (
+                    {templates.map((template) => (
                       <Button
                         key={template.id}
                         size="sm"

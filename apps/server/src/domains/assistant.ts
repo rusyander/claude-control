@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { safeSessionId } from '../lib/cli-args.ts';
+import { defaultCliCommand } from '../providers/cli.ts';
 
 /**
  * Помощник по заполнению форм. Работает через сам Claude Code в неинтерактивном
@@ -80,13 +81,13 @@ function extractJson(text: string): { reply: string; fields: Record<string, unkn
  * передавать нельзя: многострочный текст с кавычками рвётся оболочкой,
  * и до модели доходит обрывок.
  */
-function runClaude(prompt: string, sessionId?: string): Promise<string> {
+function runClaude(prompt: string, command: string, sessionId?: string): Promise<string> {
   const args = ['-p', '--output-format', 'json'];
   const safeId = safeSessionId(sessionId);
   if (safeId) args.push('--resume', safeId);
 
   return new Promise((resolve, reject) => {
-    const child = spawn(isWindows ? 'claude.cmd' : 'claude', args, {
+    const child = spawn(command, args, {
       shell: isWindows,
       windowsHide: true,
     });
@@ -121,9 +122,12 @@ function runClaude(prompt: string, sessionId?: string): Promise<string> {
   });
 }
 
-export async function askAssistant(request: AssistRequest): Promise<AssistResponse> {
+export async function askAssistant(
+  request: AssistRequest,
+  command: string = defaultCliCommand(),
+): Promise<AssistResponse> {
   try {
-    const stdout = await runClaude(buildPrompt(request), request.sessionId);
+    const stdout = await runClaude(buildPrompt(request), command, request.sessionId);
     const envelope = JSON.parse(stdout) as { result?: string; session_id?: string };
     const parsed = extractJson(envelope.result ?? '');
 

@@ -13,6 +13,10 @@ import styles from './HistoryPage.module.scss';
 /**
  * Запись ленты изменений: файл, время, против чего дифф и сводка ±строк. Клик по
  * шапке раскрывает полный дифф, который подгружается лениво.
+ *
+ * У файла активного провайдера рядом с именем стоит бейдж с его названием: копия
+ * такого файла лежит под именем `<id>-<basename>`, и без пометки правку
+ * `AGENTS.md` было бы не отличить от чужой.
  */
 export function HistoryItem({ entry }: HistoryItemProps) {
   const { t, i18n } = useTranslation();
@@ -32,6 +36,11 @@ export function HistoryItem({ entry }: HistoryItemProps) {
           <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap minWidth={0}>
             <Icon name={isOpen ? 'chevronLeft' : 'chevronRight'} size={24} />
             <Badge tone="neutral">{entry.file}</Badge>
+            {entry.providerName && (
+              <Badge tone="info">
+                {t('history.providerFile', { provider: entry.providerName })}
+              </Badge>
+            )}
             <Typography variant="body-sm" color="muted" as="span">
               {formatDateTime(entry.at, i18n.language)}
             </Typography>

@@ -14,6 +14,9 @@ export interface SearchGroup {
 /** Порядок разделов в выдаче — тот же, что и в боковой навигации. */
 export const SEARCH_KIND_ORDER: readonly SearchResultKind[] = [
   'rule',
+  // Глобальные инструкции провайдера (AGENTS.md/GEMINI.md) идут сразу за
+  // правилами — тот же порядок, что в навигации (Правила → инструкции → Скиллы).
+  'instructions',
   'skill',
   'hook',
   'script',

@@ -193,6 +193,9 @@ export function McpTopic() {
           <Callout tone="info" title={tr('noteProjectTitle')}>
             {tr('noteProjectText')}
           </Callout>
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

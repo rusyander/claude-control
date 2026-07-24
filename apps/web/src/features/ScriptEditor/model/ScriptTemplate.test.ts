@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { SCRIPT_TEMPLATES, NEW_SCRIPT_TEMPLATE } from './ScriptTemplate';
+import {
+  SCRIPT_TEMPLATES,
+  NEW_SCRIPT_TEMPLATE,
+  GENERIC_SCRIPT_TEMPLATE,
+  GENERIC_SCRIPT_TEMPLATES,
+  scriptTemplatesFor,
+  newScriptTemplateFor,
+} from './ScriptTemplate';
 
 /**
  * Заготовки скриптов хуков.
@@ -95,5 +102,40 @@ describe('набор заготовок', () => {
 
   it('заготовка пустого скрипта тоже готова к запуску', () => {
     expect(NEW_SCRIPT_TEMPLATE.startsWith('#!')).toBe(true);
+  });
+});
+
+/**
+ * COMMON-1: раздел скриптов открыт всем провайдерам, а заготовки выше говорят на
+ * языке хуков Claude Code. Там, где хуков нет, подсовывать их нельзя — набор
+ * подменяется общим.
+ */
+describe('заготовки без хуков', () => {
+  it('в общих заготовках нет ничего claude-специфичного', () => {
+    for (const template of [
+      GENERIC_SCRIPT_TEMPLATE,
+      ...GENERIC_SCRIPT_TEMPLATES.map((i) => i.content),
+    ]) {
+      expect(template).not.toContain('hookSpecificOutput');
+      expect(template).not.toContain('tool_input');
+      expect(template).not.toContain('Claude');
+    }
+  });
+
+  it('общие заготовки самодостаточны: шебанг, уникальные id, имя и содержимое', () => {
+    const ids = GENERIC_SCRIPT_TEMPLATES.map((item) => item.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const template of GENERIC_SCRIPT_TEMPLATES) {
+      expect(template.content.startsWith('#!'), template.id).toBe(true);
+      expect(template.fileName, template.id).toMatch(/\.\w+$/);
+      expect(template.title.trim(), template.id).not.toBe('');
+    }
+  });
+
+  it('выбор набора: с хуками — каркасы хуков, без хуков — общие', () => {
+    expect(scriptTemplatesFor(true)).toBe(SCRIPT_TEMPLATES);
+    expect(scriptTemplatesFor(false)).toBe(GENERIC_SCRIPT_TEMPLATES);
+    expect(newScriptTemplateFor(true)).toBe(NEW_SCRIPT_TEMPLATE);
+    expect(newScriptTemplateFor(false)).toBe(GENERIC_SCRIPT_TEMPLATE);
   });
 });

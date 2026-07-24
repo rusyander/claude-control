@@ -24,6 +24,8 @@ import { BackupsCard } from './BackupsCard';
 import { ConfigBundleCard } from './ConfigBundleCard';
 import { SecretEncryptionCard } from './SecretEncryptionCard';
 import { SettingToggleRow } from './SettingToggleRow';
+import { ProviderSelectorCard } from './ProviderSelectorCard';
+import { ProviderKeysCard } from './ProviderKeysCard';
 import styles from './SettingsPage.module.scss';
 
 /** Настройки приложения: оформление, доступность, путь к конфигурации, безопасность правок. */
@@ -82,6 +84,10 @@ export function SettingsPage() {
       />
 
       <AccountCard />
+
+      <ProviderSelectorCard />
+
+      <ProviderKeysCard />
 
       <ClaudeDirField />
 

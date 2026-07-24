@@ -28,6 +28,19 @@
   border-radius: var(--radius-sm);
 }
 
+// Предупреждение о выбранном экспериментальном провайдере: заметное, но не
+// алармирующее — та же логика, что у предупреждения о секрете.
+.providerNotice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  align-items: flex-start;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-left: 2px solid var(--color-warning);
+  background: var(--color-warning-subtle);
+  border-radius: var(--radius-sm);
+}
+
 .numberInput {
   width: 88px;
   padding: 6px var(--spacing-xs);

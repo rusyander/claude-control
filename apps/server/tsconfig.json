@@ -4,6 +4,11 @@
     "lib": ["ES2023"],
     "types": ["node"],
     "noEmit": true,
+    // Сервер запускается node --experimental-strip-types: типы только СТИРАЮТСЯ,
+    // не транспилируются. Синтаксис вроде parameter properties, enum и namespace
+    // валит старт процесса, хотя обычный tsc и vitest его пропускают. Флаг ловит
+    // это на type-check, а не на холодном старте.
+    "erasableSyntaxOnly": true,
     "allowImportingTsExtensions": true
   },
   "include": ["src"]

@@ -3,6 +3,7 @@ import type { ClaudeLocation } from '@claude-control/contracts';
 import { listResourceFiles, readResourceFile, isWritable } from './ResourceFiles.ts';
 import type { ResourceKind } from './registry.ts';
 import { safeSessionId } from '../../lib/cli-args.ts';
+import { defaultCliCommand } from '../../providers/cli.ts';
 
 /**
  * Помощник конструктора: по описанию задачи собирает или дополняет структуру
@@ -33,6 +34,7 @@ export async function assistStructure(
   id: string,
   prompt: string,
   location: ClaudeLocation,
+  command: string = defaultCliCommand(),
   sessionId?: string,
 ): Promise<StructureAssistResult> {
   if (!isWritable(kind)) {
@@ -40,7 +42,7 @@ export async function assistStructure(
   }
 
   try {
-    const stdout = await runClaude(buildPrompt(kind, id, prompt, location), sessionId);
+    const stdout = await runClaude(buildPrompt(kind, id, prompt, location), command, sessionId);
     const envelope = JSON.parse(stdout) as { result?: string; session_id?: string };
     const parsed = extractJson(envelope.result ?? '');
 
@@ -125,13 +127,13 @@ function extractJson(text: string): { reply: string; files: AssistFile[] } | nul
 }
 
 /** Запуск CLI по подписке — так же, как помощник форм. */
-function runClaude(prompt: string, sessionId?: string): Promise<string> {
+function runClaude(prompt: string, command: string, sessionId?: string): Promise<string> {
   const args = ['-p', '--output-format', 'json'];
   const safeId = safeSessionId(sessionId);
   if (safeId) args.push('--resume', safeId);
 
   return new Promise((resolve, reject) => {
-    const child = spawn(isWindows ? 'claude.cmd' : 'claude', args, {
+    const child = spawn(command, args, {
       shell: isWindows,
       windowsHide: true,
     });

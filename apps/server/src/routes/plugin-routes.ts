@@ -13,6 +13,7 @@ import {
   removeMarketplace,
   scaffoldPlugin,
 } from '../domains/plugins.ts';
+import { activeCliCommand } from '../providers/cli.ts';
 
 /**
  * Маршруты плагинов. Каждая операция — вызов CLI, а он ходит в сеть и клонирует
@@ -20,35 +21,37 @@ import {
  * ход выполнения, а не подвисать молча.
  */
 export function registerPluginRoutes(app: FastifyInstance, ctx: ServerContext): void {
-  app.get('/api/plugins', () => readPlugins(ctx.location.paths.root));
+  app.get('/api/plugins', () => readPlugins(ctx.location.paths.root, activeCliCommand(ctx.store)));
 
-  app.get('/api/plugins/available', () => readAvailablePlugins());
+  app.get('/api/plugins/available', () => readAvailablePlugins(activeCliCommand(ctx.store)));
 
   app.post<{ Body: { id: string } }>('/api/plugins/install', (request) =>
-    installPlugin(request.body.id),
+    installPlugin(request.body.id, activeCliCommand(ctx.store)),
   );
 
   app.post<{ Params: { id: string } }>('/api/plugins/:id/uninstall', (request) =>
-    uninstallPlugin(request.params.id),
+    uninstallPlugin(request.params.id, activeCliCommand(ctx.store)),
   );
 
   app.post<{ Params: { id: string }; Body: { isEnabled: boolean } }>(
     '/api/plugins/:id/enabled',
     (request) =>
-      request.body.isEnabled ? enablePlugin(request.params.id) : disablePlugin(request.params.id),
+      request.body.isEnabled
+        ? enablePlugin(request.params.id, activeCliCommand(ctx.store))
+        : disablePlugin(request.params.id, activeCliCommand(ctx.store)),
   );
 
   app.post<{ Params: { id: string } }>('/api/plugins/:id/update', (request) =>
-    updatePlugin(request.params.id),
+    updatePlugin(request.params.id, activeCliCommand(ctx.store)),
   );
 
   // Маркетплейсы: раньше источник добавляли только командой claude в терминале.
   app.post<{ Body: { source: string } }>('/api/plugins/marketplaces', (request) =>
-    addMarketplace(request.body.source ?? ''),
+    addMarketplace(request.body.source ?? '', activeCliCommand(ctx.store)),
   );
 
   app.delete<{ Params: { name: string } }>('/api/plugins/marketplaces/:name', (request) =>
-    removeMarketplace(decodeURIComponent(request.params.name)),
+    removeMarketplace(decodeURIComponent(request.params.name), activeCliCommand(ctx.store)),
   );
 
   // Скаффолдер: пишет файлы в выбранный пользователем каталог (не в ~/.claude),

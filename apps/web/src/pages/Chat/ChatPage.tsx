@@ -34,6 +34,7 @@ import { ChatModelPicker } from '@features/ChatModelPicker';
 import { ParallelLaunch } from '@features/ParallelLaunch';
 import { FolderPicker } from '@features/FolderPicker';
 import { ProjectRunnerControls } from '@features/ProjectRunner';
+import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { ChatMessages } from '@features/ChatMessages';
 import { ChatComposer } from '@features/ChatComposer';
@@ -549,6 +550,10 @@ export function ChatPage() {
 
   return (
     <div className={styles.shell}>
+      {/* Гейт ключа ассистента: модалка, если у активного провайдера раннер
+          `none` (нет ключа и CLI). Для Claude с CLI модалки нет (регресс-ноль). */}
+      <AssistantKeyGate />
+
       {ws.state.projectTabs.length > 0 && (
         <WorkspaceTabs
           projectTabs={ws.state.projectTabs}

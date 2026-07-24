@@ -11,6 +11,7 @@ import {
 import { layoutOf, type ResourceKind } from '../domains/resources/registry.ts';
 import { templatesFor, templateById } from '../domains/resources/templates.ts';
 import { assistStructure } from '../domains/resources/ResourceAssistant.ts';
+import { activeCliCommand } from '../providers/cli.ts';
 
 /**
  * Файлы ресурсов — общие маршруты для всех видов.
@@ -87,6 +88,7 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
         request.params.id,
         request.body.prompt,
         ctx.location,
+        activeCliCommand(ctx.store),
         request.body.sessionId,
       );
 

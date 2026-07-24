@@ -1,10 +1,12 @@
 import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
-import type { AppSettings, Overview } from '@claude-control/contracts';
+import type { AppSettings, Overview, ProviderDetectResponse } from '@claude-control/contracts';
 import type { ZodError } from 'zod';
 import { settingsPatchSchema, importStateSchema } from '../lib/settings-validation.ts';
 import type { ServerContext } from '../context.ts';
+import { describeProviders } from '../providers/registry.ts';
+import { detectProviders } from '../lib/provider-detect.ts';
 import {
   readClaudeCredentials,
   validatePanelCredentials,
@@ -53,6 +55,26 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
   });
 
   app.get('/api/settings', () => ctx.store.getSettings());
+
+  /**
+   * Провайдеры конфигурации: активный id и список известных с картой статусов
+   * возможностей. Дефолт — Claude (всё `ready`, `verified`); прочие объявлены
+   * как `experimental` с `planned`/`unsupported` разделами. Клиент по этой карте
+   * гейтит навигацию и показывает плейсхолдеры «в разработке».
+   */
+  app.get('/api/providers', () => describeProviders(ctx.store));
+
+  /**
+   * Детект установленных провайдер-CLI (Ф7): по каждому провайдеру — найден ли
+   * его бинарь в PATH (`cliInstalled`) и есть ли каталог/файл конфигурации
+   * (`configPresent`). Версия НЕ определяется — `--version` не спавним, чтобы
+   * исключить зависания на чужих CLI. Ответ — подсказка интерфейсу (бейджи в
+   * селекторе, список в онбординге); провайдер сам собой НЕ переключается.
+   */
+  app.get(
+    '/api/providers/detect',
+    () => detectProviders(ctx.store) satisfies ProviderDetectResponse,
+  );
 
   app.get('/api/account', () => readAccount(ctx.location.paths.mcpConfig));
 

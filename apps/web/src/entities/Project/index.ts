@@ -31,3 +31,19 @@ export {
   useUpdateProjectPermission,
   useDeleteProjectPermission,
 } from './api/ProjectConfigApi';
+
+// Проектный уровень НЕ-Claude провайдеров (COMMON-2 + GEMINI-2/3): инструкции,
+// MCP, а у Gemini ещё переменные окружения и права проекта.
+export {
+  useProviderProject,
+  useProviderProjectInstructions,
+  useUpdateProviderProjectInstructions,
+  useProviderProjectMcp,
+  useCreateProviderProjectMcp,
+  useUpdateProviderProjectMcp,
+  useDeleteProviderProjectMcp,
+  useProviderProjectEnv,
+  useSaveProviderProjectEnv,
+  useProviderProjectPermissions,
+  useSaveProviderProjectPermissions,
+} from './api/ProviderProjectApi';

@@ -6,6 +6,8 @@ A local web panel for the configuration of [Claude Code](https://claude.com/clau
 
 Runs entirely on your machine. No account, no server, no telemetry.
 
+By default the panel configures Claude Code, where everything is available. It can also edit the configuration of other agentic CLIs — Codex, Gemini, Cursor, OpenCode, Aider — each in its own native format: see [CLIs other than Claude](#clis-other-than-claude).
+
 🇷🇺 [Русская версия](README.ru.md) · 🔧 [Setup and troubleshooting](SETUP.md)
 
 > [!TIP]
@@ -24,6 +26,7 @@ Runs entirely on your machine. No account, no server, no telemetry.
 - [Where your data lives](#where-your-data-lives)
 - [The sandbox](#the-sandbox)
 - [Chat and parallel agents](#chat-and-parallel-agents)
+- [CLIs other than Claude](#clis-other-than-claude)
 - [Security](#security)
 - [Quick start](#quick-start)
 - [Platform support](#platform-support)
@@ -233,6 +236,77 @@ flowchart LR
 **Spending is visible as it happens** — in tokens by default, because on a subscription dollars mean nothing. Switch it to money in the settings if you prefer.
 
 The honest boundary: a run belongs to the server, not to the tab. Closing the tab or pressing F5 only detaches the listener — the agent keeps working, and on return the panel picks the running jobs back up; one that finished while the tab was closed comes back to the feed within a grace minute, and after that stays in the transcript. The session's spend counter is likewise counted on the server and survives a reload. The real boundary is restarting the server itself: the run registry lives in its memory. You answer an agent's question either in text or by clicking one of the offered options.
+
+## CLIs other than Claude
+
+The panel grew out of Claude Code and stays its tool: **the Claude provider is active by default, and with it everything is available.** But the neighbouring agentic CLIs keep their configuration the same way — an instructions file, MCP servers, environment variables, an approval policy — and the panel edits those files directly, each in its native format.
+
+What you get is one UI across several tools. You no longer have to remember that Codex keeps MCP in TOML, Gemini in JSON, OpenCode under a different key in a different shape, and that Aider writes environment variables as a YAML list. The panel shows the same forms it shows for Claude and writes what that CLI actually reads.
+
+### Choosing a provider
+
+**Settings → Configuration provider.** The panel also checks which CLIs are actually installed: each carries an "installed" / "config found" / "not found" badge plus a "recommended" hint. The same step appears in the first-run onboarding, and it is optional.
+
+Detection is **a hint, never a decision**: the provider never switches by itself, the default stays `claude`, and the panel writes only on an explicit action of yours. If the active provider's CLI is not on `PATH`, the panel says so without breaking the section: configuration is just files and can be edited before the CLI is installed. The assistant, however, needs either the CLI or a key — without both it offers a modal with instructions.
+
+After switching, the sidebar changes: exactly what that CLI supports remains.
+
+### The map: section × provider
+
+**✅ works** · **🛠 in development** — the section is visible with a badge, opens a placeholder and neither reads nor writes · **— unsupported** — the section is hidden entirely.
+
+|                                     | Claude<br>_verified_ | Codex | Gemini | Cursor | OpenCode | Aider |
+| ----------------------------------- | :------------------: | :---: | :----: | :----: | :------: | :---: |
+| Global instructions<sup>1</sup>     |          ✅          |  ✅   |   ✅   |  ✅ *  |    ✅    | ✅ *  |
+| MCP servers<sup>2</sup>             |          ✅          |  ✅   |   ✅   |   ✅   |    ✅    |   —   |
+| Environment variables<sup>3</sup>   |          ✅          |  ✅   |   ✅   |   —    |    🛠     |  ✅   |
+| Permissions / approvals<sup>4</sup> |          ✅          |  ✅   |   ✅   |   —    |    🛠     |   —   |
+| Chat / assistant<sup>5</sup>        |          ✅          |  🧪   |   🧪   |   —    |    🛠     |  🧪   |
+| Rules (`## RULE:` sections)         |          ✅          |   —   |   —    |   —    |    —     |   —   |
+| Skills                              |          ✅          |   —   |   —    |   —    |    🛠     |   —   |
+| Hooks                               |          ✅          |   —   |   —    |   —    |    🛠     |   —   |
+| Scripts<sup>6</sup>                 |          ✅          |  ✅   |   ✅   |   ✅   |    ✅    |  ✅   |
+| Plugins / marketplaces              |          ✅          |   —   |   —    |   —    |    🛠     |   —   |
+| Projects<sup>7</sup>                |          ✅          |  ✅   |   ✅   |   ✅   |    ✅    |  ✅   |
+| Analytics (tokens, cost)            |          ✅          |   —   |   —    |   —    |    —     |   —   |
+| Sandbox                             |          ✅          |   —   |   —    |   —    |    —     |   —   |
+
+**Overview, Search, Groups, History, Settings and Help are always there** — those are the panel's own sections and do not depend on the provider. History and search do follow the active provider's files: backups of a foreign config are stored under their own name and never mix with Claude's.
+
+What the footnotes stand for — and why each status is what it is:
+
+1. **Instructions** — `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, `~/.config/opencode/AGENTS.md`. Plain markdown, so the section ports one to one. For **Cursor** the model is different: the global rules are not a file but a **directory**, `~/.cursor/rules/*.mdc`, where every file is one rule with YAML frontmatter (`description`, `globs` — file patterns separated by commas, `alwaysApply` — attach to every conversation) and a markdown body; nested subdirectories are supported. The section became a manager for that directory: list, create, edit and delete rules; the three frontmatter fields are separate form fields, the rule text is its own field and is written back verbatim, while comments and your own frontmatter keys stay in place. A plain `.md` in the rules directory is ignored by Cursor — the panel lists such files separately and never edits them. A rule path must resolve inside the directory: `..`, absolute paths, a foreign extension and symlinks are rejected on read, write and delete alike. For **Aider** the model is different too: it has no single instructions file — context files are declared by the `read` option in `.aider.conf.yml` (`read: [CONVENTIONS.md, anotherfile.txt]`). The section therefore manages that **list of references**: add a file, remove one, change the attach order; the list is written through the `yaml` Document API, so comments and every other key of the config stay intact. On top of that you can open and edit the **contents** of an already listed file — but only if it exists: the panel never creates files that are not there, and never opens what the config does not reference.
+2. **MCP** — `~/.codex/config.toml` (`[mcp_servers]`), `~/.gemini/settings.json`, `~/.cursor/mcp.json`, `~/.config/opencode/opencode.json` (the `mcp` key, with its own `local`/`remote` shape). **Aider** has no MCP server setting in its options reference — this is not "we did not get to it" but nothing to configure.
+3. **Environment** — `[shell_environment_policy.set]` in Codex's `config.toml`, the `set-env` key in Aider's `.aider.conf.yml` (the global `~/.aider.conf.yml` and the per-project one in the repository root), and a plain `.env` file for Gemini (global `~/.gemini/.env` and per-project `<project>/.gemini/.env` — its `settings.json` indeed has no "set a variable" map). The `.env` file is edited line by line: only the lines of the affected variables change, while comments, blank lines and ordering stay as they were. **OpenCode** has no adapter yet.
+4. **Permissions** — for Codex these are two root keys of `config.toml`: `approval_policy` and `sandbox_mode`. **Gemini** uses a different model, kept in `settings.json`: the approval mode `general.defaultApprovalMode` (`default` — ask every time, `auto_edit` — file edits without prompts, `plan` — read-only) plus two tool lists, `coreTools` (what is allowed) and `excludeTools` (what is blocked, and it wins). The panel never writes the `yolo` mode: per Gemini's docs it is a command-line flag only, and in `settings.json` it makes the CLI fail on startup. **OpenCode** uses yet another model and has no adapter.
+5. **Chat** — with Claude this is the full chat: streaming, attachments, branching, parallel agents, history. The 🧪 for Codex, Gemini and Aider means a **basic experimental assistant**: one question, one answer, no streaming and no attachments (`codex exec`, `gemini -p`, `aider --message`). The prompt is always passed as a separate argv element, never interpolated into a shell string. Aider's assistant is **built from the documentation and has not been exercised live** — `aider` is not installed on the development machine, so the first real run is worth eyeballing. **OpenCode** has no documented non-interactive flag, so its section is a placeholder. **Cursor** has no model API of its own, so the assistant is unavailable.
+6. **Scripts** — this is a section of **the panel itself**: your own files (`.mjs`, `.sh`, `.ps1`, `.py`) in the `hooks/` folder of the panel directory. Neither the provider's CLI nor its config format is involved, so the section works everywhere. Exactly two things in it are Claude-specific and stay hidden for the rest: the **sandbox** (it boots an isolated Claude Code) and the **"called by a hook"** flag (other CLIs have no hooks). The code scaffolds are swapped too: without hooks you get plain standalone scripts instead of Claude hook skeletons.
+7. **Projects** — the project registry is shared, but the selected project's config differs per provider. For **Claude** it is the same rich set as before: `CLAUDE.md`, `.mcp.json` and permissions in `.claude/settings.json`. For the rest it is whatever their CLI documents: project instructions (`AGENTS.md` for Codex and OpenCode, `GEMINI.md` for Gemini) and the project's MCP servers (`.codex/config.toml`, `.gemini/settings.json`, `opencode.json`, `.cursor/mcp.json`); for **Gemini** the project's environment variables (`.gemini/.env`) and permissions (`.gemini/settings.json`) come on top. **Cursor**'s project level is the same rules directory, only inside the project: `<project>/.cursor/rules/*.mdc`, with the same path safety. **Aider**'s project level is `<project>/.aider.conf.yml`: per its docs the config is looked up in the home directory, **in the git repository root** and in the current directory (loaded in that order, later wins). Inside a project you get the same things as globally: the `read` list of attached files and the `set-env` variables. Edits go through the same adapters as the global level: other keys and comments stay intact, a backup is made before every write, and any path leaving the project directory is rejected.
+
+Claude is marked **verified** — its path has been exercised live and is covered by tests. The rest are **experimental**: the formats come from each CLI's documentation, are covered by round-trip tests and are never guessed, but for every foreign format the panel writes for the first time it is worth eyeballing that first real write (see [LIMITATIONS.md](LIMITATIONS.md)).
+
+### Your subscription outranks a paid API
+
+The panel's assistant picks what to run in a fixed order — **free-for-you first, paid last**:
+
+1. **The provider's CLI that you are already logged into.** If `claude`, `codex` or `gemini` is on `PATH`, the panel calls it. That is your subscription: nothing extra to pay, no key needed.
+2. **An API key only if there is no subscription.** The key is asked for when the CLI is not found, and it serves as the fallback path, not the main one.
+3. **Otherwise a modal with instructions**: how to log into that provider's CLI, and where to get a key if logging in is not an option.
+
+That order is exactly this way and is pinned by tests: a stored key does not override the CLI.
+
+Any key you do enter is stored encrypted (AES-256-GCM) in `claude-control/provider-keys.enc`; the passphrase is a machine-local file with `0600` permissions. Only a mask like `sk-…1234` ever leaves the server. Keys never reach the logs, the backups, the history feed, the global search or the bundle export — there is a dedicated test that walks every provider to prove it.
+
+### What protects a foreign config
+
+Somebody else's `config.toml` is not our file, and it is handled more carefully than our own:
+
+- **A backup before every write, and the write is atomic.** A provider's backups are stored under their own name (`<provider>-<file>`), so they never mix with Claude's and cannot be restored on top of them.
+- **Formats come from the documentation, not from memory.** Every adapter follows the official configuration reference of its CLI.
+- **Validation before writing, plus round-trip.** The file is read, changed and reassembled; the result is compared against what was read. If it does not match, nothing is written.
+- **Surgical edits.** In Codex only the region of `config.toml` that is being changed is touched: comments, profiles, key order and everything the edit does not concern stay byte for byte. Comments survive writes in Aider's YAML too. The file's shape is preserved: line endings (`CRLF`/`LF`) stay as they were, and a BOM is stripped on read and put back on write.
+- **Fail-closed.** An unfamiliar, broken or unexpectedly shaped file is not an invitation to "write something plausible": the section returns an error and stays read-only. The same rule covers an unsupported capability: the section simply is not there.
+- **Documented directory overrides are honoured** — `CODEX_HOME` moves all of Codex's paths, `XDG_CONFIG_HOME` moves OpenCode's. Undocumented variables are not invented.
 
 ## Security
 

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeSessionId, safeName, safeModel, safeEffort, shellArgs } from '../../lib/cli-args.ts';
+import { defaultCliCommand } from '../../providers/cli.ts';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
 const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs', import.meta.url));
@@ -78,6 +79,12 @@ export interface RunOptions {
    * полном доступе (bypassPermissions) не нужно — там всё и так разрешено.
    */
   permissionPrompt?: { runId: string; baseUrl: string };
+  /**
+   * Команда запуска CLI активного провайдера. Задаётся маршрутом чата через
+   * реестр провайдеров; по умолчанию — команда провайдера Claude. Имя больше не
+   * хардкодится здесь, но значение то же (claude / claude.cmd).
+   */
+  command?: string;
 }
 
 export class ChatRun {
@@ -144,7 +151,7 @@ export class ChatRun {
 
     // Имя чата — обычный текст с пробелами, а оболочка Windows разобрала бы
     // его как несколько аргументов, поэтому аргументы квотируются.
-    this.child = spawn(isWindows ? 'claude.cmd' : 'claude', shellArgs(args), {
+    this.child = spawn(options.command ?? defaultCliCommand(), shellArgs(args), {
       cwd: options.cwd,
       shell: isWindows,
       windowsHide: true,

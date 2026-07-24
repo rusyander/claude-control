@@ -181,6 +181,9 @@ export function PermissionsTopic() {
           <Callout tone="info" title={tr('noteIdTitle')}>
             {tr('noteIdText')}
           </Callout>
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

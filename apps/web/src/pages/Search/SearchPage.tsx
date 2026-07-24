@@ -27,6 +27,9 @@ const KIND_ICON: Record<SearchResultKind, IconName> = {
   mcp: 'mcp',
   permission: 'permissions',
   env: 'env',
+  // Файл глобальных инструкций провайдера (AGENTS.md/GEMINI.md) — та же иконка,
+  // что и у раздела инструкций в навигации.
+  instructions: 'file',
 };
 
 /** Глобальный поиск по всем разделам конфигурации. */

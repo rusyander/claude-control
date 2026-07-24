@@ -13,6 +13,7 @@ import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import type { IconName } from '@shared/ui/icon';
 import { useSearch, MIN_SEARCH_LENGTH } from '@entities/Search';
+import { useProviders, activeCapabilities, visibleNavItems } from '@entities/Provider';
 import { rankByFuzzy } from '../model/fuzzy';
 import type { CommandPaletteProps, PaletteOption } from './CommandPalette.types';
 import styles from './CommandPalette.module.scss';
@@ -27,6 +28,9 @@ const KIND_ICON: Record<SearchResultKind, IconName> = {
   mcp: 'mcp',
   permission: 'permissions',
   env: 'env',
+  // Файл глобальных инструкций провайдера (AGENTS.md/GEMINI.md) — та же иконка,
+  // что и у раздела инструкций в навигации.
+  instructions: 'file',
 };
 
 /** Сколько разделов показывать в быстром переходе, чтобы список не разрастался. */
@@ -53,6 +57,14 @@ export function CommandPalette({ isOpen, onOpenChange }: CommandPaletteProps) {
   const trimmed = debounced.trim();
   const isSearchReady = trimmed.length >= MIN_SEARCH_LENGTH;
   const { data: searchData } = useSearch(isSearchReady ? debounced : '');
+  const { data: providers } = useProviders();
+
+  // Разделы, скрытые у активного провайдера (`unsupported`), не предлагаем к
+  // переходу. Для Claude видимы все — набор быстрого перехода не меняется.
+  const reachable = useMemo(
+    () => visibleNavItems(NAV_ITEMS, activeCapabilities(providers)),
+    [providers],
+  );
 
   // Сброс при каждом открытии: палитра всегда открывается чистой, а фокус ведём
   // в поле сами — Radix мы попросили не забирать его на первый элемент.
@@ -74,7 +86,7 @@ export function CommandPalette({ isOpen, onOpenChange }: CommandPaletteProps) {
   };
 
   const navOptions = useMemo<PaletteOption[]>(() => {
-    const ranked = rankByFuzzy(NAV_ITEMS, query, (item) => t(item.label));
+    const ranked = rankByFuzzy(reachable, query, (item) => t(item.label));
     return ranked.slice(0, NAV_LIMIT).map(({ item }) => ({
       id: `nav:${item.path}`,
       icon: item.icon,
@@ -82,9 +94,9 @@ export function CommandPalette({ isOpen, onOpenChange }: CommandPaletteProps) {
       subtitle: item.path,
       run: () => go(item.path),
     }));
-    // t и navigate стабильны между рендерами; пересобираем на смену запроса.
+    // t и navigate стабильны между рендерами; пересобираем на смену запроса/набора.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  }, [query, reachable]);
 
   const searchOptions = useMemo<PaletteOption[]>(() => {
     if (!isSearchReady) return [];

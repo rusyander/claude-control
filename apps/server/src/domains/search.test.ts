@@ -9,7 +9,7 @@ import type {
   Skill,
 } from '@claude-control/contracts';
 import type { ScriptFile } from './scripts.ts';
-import { searchEntities, type SearchInputs } from './search.ts';
+import { searchEntities, type ProviderSearchInputs, type SearchInputs } from './search.ts';
 
 /**
  * Тесты чистой фильтрации глобального поиска. Данные собираются руками — так
@@ -276,6 +276,88 @@ describe('searchEntities', () => {
       // Поиск по значению секрета не находит ничего.
       const byValue = searchEntities(inputs({ envVars: [secret] }), 'glpat-super');
       expect(byValue).toEqual([]);
+    });
+  });
+
+  describe('разделы активного провайдера (Ф11a)', () => {
+    const providerInputs = (over: Partial<ProviderSearchInputs> = {}): ProviderSearchInputs => ({
+      providerId: 'codex',
+      providerName: 'Codex (OpenAI)',
+      mcpServers: [],
+      envKeys: [],
+      ...over,
+    });
+
+    it('файл инструкций провайдера ищется по имени и по тексту', () => {
+      const provider = providerInputs({
+        instructions: { fileName: 'AGENTS.md', content: 'Всегда отвечай по-русски и кратко.' },
+      });
+
+      const byName = searchEntities(inputs({ provider }), 'agents.md');
+      expect(byName).toHaveLength(1);
+      expect(byName[0]).toMatchObject({ kind: 'instructions', pagePath: 'claude-md' });
+
+      const byText = searchEntities(inputs({ provider }), 'по-русски');
+      expect(byText).toHaveLength(1);
+      expect(byText[0]?.snippet).toContain('по-русски');
+    });
+
+    it('MCP-серверы провайдера находятся и ведут на страницу MCP', () => {
+      const provider = providerInputs({
+        mcpServers: [
+          {
+            name: 'gitlab',
+            transport: 'stdio',
+            command: 'npx',
+            args: ['-y', 'gitlab-mcp'],
+            env: {},
+            headers: {},
+          },
+        ],
+      });
+
+      const found = searchEntities(inputs({ provider }), 'gitlab');
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatchObject({ kind: 'mcp', pagePath: 'mcp', title: 'gitlab' });
+    });
+
+    it('права провайдера находятся по имени ключа и по значению', () => {
+      const provider = providerInputs({
+        permissions: [
+          { key: 'approvalPolicy', value: 'on-request' },
+          { key: 'sandboxMode', value: 'workspace-write' },
+        ],
+      });
+
+      expect(searchEntities(inputs({ provider }), 'sandbox')).toHaveLength(1);
+      expect(searchEntities(inputs({ provider }), 'on-request')).toHaveLength(1);
+    });
+
+    it('права gemini ищутся по режиму аппрувов и по именам инструментов', () => {
+      const provider = providerInputs({
+        permissions: [
+          { key: 'defaultApprovalMode', value: 'auto_edit' },
+          { key: 'excludeTools', value: 'run_shell_command, web_fetch' },
+        ],
+      });
+
+      expect(searchEntities(inputs({ provider }), 'auto_edit')).toHaveLength(1);
+      expect(searchEntities(inputs({ provider }), 'run_shell_command')).toHaveLength(1);
+    });
+
+    it('переменные окружения провайдера ищутся ТОЛЬКО по имени ключа', () => {
+      // В inputs значений нет вовсе — они отбрасываются ещё у источника.
+      const provider = providerInputs({ envKeys: ['OPENAI_API_TYPE', 'AIDER_VOICE_LANGUAGE'] });
+
+      const found = searchEntities(inputs({ provider }), 'openai_api');
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatchObject({ kind: 'env', title: 'OPENAI_API_TYPE' });
+      expect(found[0]?.snippet).toBe('OPENAI_API_TYPE');
+    });
+
+    it('без блока провайдера (активен claude) провайдер-результатов нет', () => {
+      const found = searchEntities(inputs({ rules: [rule({ title: 'agents' })] }), 'agents');
+      expect(found.every((item) => item.kind !== 'instructions')).toBe(true);
     });
   });
 });

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { DiffLine, HistoryDiff, HistoryEntry } from '@claude-control/contracts';
 import { writeTextFile } from '../lib/safe-io.ts';
+import type { TrackedFile } from './tracked-files.ts';
 
 /**
  * История изменений конфигурации — лента правок с построчным диффом.
@@ -10,6 +11,14 @@ import { writeTextFile } from '../lib/safe-io.ts';
  * снимки файлов во времени. По ним строится лента: копии группируются по
  * целевому файлу и сортируются по времени, а для каждой считается, ЧТО в ней
  * изменилось.
+ *
+ * Отслеживаемые файлы приходят списком `TrackedFile[]` (см. `tracked-files.ts`):
+ * файлы Claude и файлы активного провайдера. Копии сопоставляются с целью по
+ * ИМЕНИ КОПИИ (`backupBase`), а не по basename файла — у провайдеров копия
+ * называется `<id>-<basename>`, иначе `gemini-settings.json` схлопнулся бы с
+ * `settings.json` Claude. У файлов провайдера `canRevert:false` — дифф
+ * показываем, поханочный откат не даём (нельзя записать чужой файл поверх
+ * конфигурации Claude).
  *
  * Направление диффа — хронологически вперёд (старое → новое), чтобы «+N/−M»
  * читались как «столько добавили/убрали этой правкой»:
@@ -55,13 +64,11 @@ interface Snapshot {
 
 /**
  * Копии одного целевого файла, отсортированные ПО ВОЗРАСТАНИЮ времени.
- * Ключ — basename целевого файла; в значении только известные конфиг-файлы.
+ * Ключ — `backupBase` цели (имя, под которым копия лежит на диске); в значении
+ * только копии известных конфиг-файлов.
  */
-function collectSnapshots(
-  backupDir: string,
-  knownPaths: Record<string, string>,
-): Map<string, Snapshot[]> {
-  const known = new Set(Object.values(knownPaths).map((path) => basename(path)));
+function collectSnapshots(backupDir: string, targets: TrackedFile[]): Map<string, Snapshot[]> {
+  const known = new Set(targets.map((target) => target.backupBase));
   const byFile = new Map<string, Snapshot[]>();
 
   if (!existsSync(backupDir)) return byFile;
@@ -331,25 +338,39 @@ export interface RevertHunkResult {
  * приходит из запроса и проверяется как в buildDiff; цели — только известные
  * конфиг-файлы (файл секретов сюда не входит). Перед записью снимается копия
  * текущего состояния — откат тоже обратим.
+ *
+ * Копии файлов ПРОВАЙДЕРОВ откату не подлежат (`canRevert:false`) — отказываем до
+ * любой записи. Это та же страховка, что и `canRestore:false` у полного отката
+ * (Ф9-10): цель копии выводится по имени, и ошибка здесь означала бы запись
+ * чужого конфига поверх файлов Claude.
  */
 export function revertHunk(
   backupDir: string,
   name: string,
   hunkIndex: number,
-  knownPaths: Record<string, string>,
+  targets: TrackedFile[],
   backupTargetDir?: string,
 ): RevertHunkResult {
   if (basename(name) !== name || !BACKUP_NAME.test(name)) {
     return { ok: false, error: 'Копия не найдена' };
   }
 
-  const byFile = collectSnapshots(backupDir, knownPaths);
+  const byFile = collectSnapshots(backupDir, targets);
   for (const [file, snapshots] of byFile) {
     const snapshot = snapshots.find((item) => item.name === name);
     if (!snapshot) continue;
 
-    const currentPath = Object.values(knownPaths).find((path) => basename(path) === file);
-    if (!currentPath || !existsSync(currentPath)) {
+    const target = targets.find((item) => item.backupBase === file);
+    if (!target) return { ok: false, error: 'Копия не найдена' };
+    if (!target.canRevert) {
+      return {
+        ok: false,
+        error: `Копия файла провайдера «${target.file}» доступна только для просмотра — откат отсюда не выполняется.`,
+      };
+    }
+
+    const currentPath = target.path;
+    if (!existsSync(currentPath)) {
       return { ok: false, error: 'Текущий файл не найден' };
     }
 
@@ -411,27 +432,29 @@ function diffSnapshot(
  * сверху. Для каждой записи — файл, время, метка базы и счётчики +N/−M. Строки
  * диффа в ленту не кладём — их отдаёт отдельный маршрут по имени копии.
  */
-export function buildHistory(
-  backupDir: string,
-  knownPaths: Record<string, string>,
-): HistoryEntry[] {
-  const byFile = collectSnapshots(backupDir, knownPaths);
+export function buildHistory(backupDir: string, targets: TrackedFile[]): HistoryEntry[] {
+  const byFile = collectSnapshots(backupDir, targets);
   const entries: HistoryEntry[] = [];
 
   for (const [file, snapshots] of byFile) {
-    const currentPath = Object.values(knownPaths).find((path) => basename(path) === file);
-    if (!currentPath) continue;
+    const target = targets.find((item) => item.backupBase === file);
+    if (!target) continue;
 
     snapshots.forEach((snapshot, index) => {
-      const base = resolveBase(snapshots, index, currentPath);
+      const base = resolveBase(snapshots, index, target.path);
       const { added, removed } = diffSnapshot(snapshot, base);
       entries.push({
         name: snapshot.name,
-        file,
+        // Показываем basename файла, а не имя копии: префикс провайдера — деталь
+        // хранения, в интерфейсе за неё отвечает отдельный бейдж.
+        file: target.file,
         label: base.label,
         at: snapshot.at,
         added,
         removed,
+        canRevert: target.canRevert,
+        providerId: target.providerId,
+        providerName: target.providerName,
       });
     });
   }
@@ -448,26 +471,38 @@ export function buildHistory(
 export function buildDiff(
   backupDir: string,
   name: string,
-  knownPaths: Record<string, string>,
+  targets: TrackedFile[],
 ): HistoryDiff | undefined {
   // Имя из запроса: без обхода каталога (только плоское имя копии нужной формы).
   if (basename(name) !== name || !BACKUP_NAME.test(name)) return undefined;
 
-  const byFile = collectSnapshots(backupDir, knownPaths);
+  const byFile = collectSnapshots(backupDir, targets);
   for (const [file, snapshots] of byFile) {
     const index = snapshots.findIndex((snapshot) => snapshot.name === name);
     if (index === -1) continue;
 
     const snapshot = snapshots[index]!;
-    const currentPath = Object.values(knownPaths).find((path) => basename(path) === file);
-    if (!currentPath) return undefined;
+    const target = targets.find((item) => item.backupBase === file);
+    if (!target) return undefined;
 
-    const base = resolveBase(snapshots, index, currentPath);
+    const base = resolveBase(snapshots, index, target.path);
     const { added, removed, lines, skipped, reason } = diffSnapshot(snapshot, base);
     // Нумеруем ханки, чтобы клиент мог предложить откат отдельного блока.
     assignHunks(lines);
 
-    return { file, label: base.label, at: snapshot.at, lines, added, removed, skipped, reason };
+    return {
+      file: target.file,
+      label: base.label,
+      at: snapshot.at,
+      lines,
+      added,
+      removed,
+      skipped,
+      reason,
+      canRevert: target.canRevert,
+      providerId: target.providerId,
+      providerName: target.providerName,
+    };
   }
 
   return undefined;

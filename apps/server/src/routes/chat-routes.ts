@@ -23,6 +23,7 @@ import {
   isSupportedUpload,
   buildPromptWithFiles,
 } from '../domains/chat/ChatUploads.ts';
+import { activeCliCommand } from '../providers/cli.ts';
 
 /** Заголовки SSE-ответа: держим поток открытым, ничего не кэшируем. */
 const SSE_HEADERS = {
@@ -294,6 +295,8 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
         name,
         fork,
         cwd,
+        // Команда запуска — из активного провайдера (Ф1: всегда Claude).
+        command: activeCliCommand(ctx.store),
         // Модель и глубина продумывания — выбор пользователя в шапке чата.
         model,
         effort,

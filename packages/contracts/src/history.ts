@@ -10,8 +10,16 @@ import { object, string, number, boolean, array, enum as zodEnum, type infer as 
  * того же файла, а у самой свежей копии — против ТЕКУЩЕГО файла на диске
  * (последняя, ещё не забэкапленная правка).
  *
- * Секреты в ленту не попадают: файл .mcp-secrets.env из истории исключён —
- * его построчный дифф раскрыл бы значения токенов в интерфейсе.
+ * Лента покрывает файлы Claude И файлы АКТИВНОГО провайдера (AGENTS.md/GEMINI.md,
+ * config.toml/settings.json/mcp.json/opencode.json/.aider.conf.yml) — то, что
+ * панель реально редактирует. Копии провайдеров именуются `<id>-<basename>`
+ * (см. safe-io/providerBackupName), поэтому не смешиваются с копиями Claude.
+ * Выборочный откат у файлов провайдеров ОТКЛЮЧЁН (`canRevert:false`): цель копии
+ * выводится по имени, и возвращать чужой файл поверх конфигурации Claude нельзя.
+ *
+ * Секреты в ленту не попадают: файл .mcp-secrets.env, хранилище ключей
+ * провайдеров (`provider-keys.enc`) и его машинный секрет (`provider-keys.key`)
+ * из истории исключены — их построчный дифф раскрыл бы значения токенов.
  */
 
 /** Тип строки диффа: добавлена, удалена или не изменилась (контекст). */
@@ -50,6 +58,16 @@ export const historyEntrySchema = object({
   added: number(),
   /** Сколько строк удалено относительно базы сравнения. */
   removed: number(),
+  /**
+   * Можно ли предлагать выборочный откат ханка в этот файл. У файлов Claude —
+   * да; у файлов провайдера — нет (только просмотр диффа): цель копии выводится
+   * по имени, и запись чужого файла поверх конфигурации Claude запрещена.
+   */
+  canRevert: boolean().default(true),
+  /** Id провайдера, если правка относится к его файлу (у файлов Claude не задан). */
+  providerId: string().optional(),
+  /** Человекочитаемое имя провайдера — для бейджа в ленте. */
+  providerName: string().optional(),
 });
 
 export type HistoryEntry = Infer<typeof historyEntrySchema>;
@@ -77,6 +95,12 @@ export const historyDiffSchema = object({
   skipped: boolean(),
   /** Причина, если skipped. */
   reason: string().optional(),
+  /** Разрешён ли выборочный откат ханка (см. `historyEntrySchema.canRevert`). */
+  canRevert: boolean().default(true),
+  /** Id провайдера, если дифф относится к его файлу (у файлов Claude не задан). */
+  providerId: string().optional(),
+  /** Человекочитаемое имя провайдера — для пометки «только просмотр». */
+  providerName: string().optional(),
 });
 
 export type HistoryDiff = Infer<typeof historyDiffSchema>;

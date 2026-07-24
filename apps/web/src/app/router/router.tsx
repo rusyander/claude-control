@@ -3,23 +3,41 @@ import { MainLayout } from '@app/layouts/MainLayout/MainLayout';
 import { OverviewPage } from '@pages/Overview/OverviewPage';
 import { AnalyticsPage } from '@pages/Analytics/AnalyticsPage';
 import { RulesPage } from '@pages/Rules/RulesPage';
-import { ClaudeMdPage } from '@pages/ClaudeMd/ClaudeMdPage';
+import { InstructionsSection } from '@pages/ClaudeMd/InstructionsSection';
 import { HooksPage } from '@pages/Hooks/HooksPage';
 import { SkillsPage } from '@pages/Skills/SkillsPage';
 import { ScriptsPage } from '@pages/Scripts/ScriptsPage';
-import { ChatPage } from '@pages/Chat/ChatPage';
+import { ChatSection } from '@pages/Chat/ChatSection';
 import { PluginsPage } from '@pages/Plugins/PluginsPage';
-import { McpPage } from '@pages/Mcp/McpPage';
-import { PermissionsPage } from '@pages/Permissions/PermissionsPage';
-import { EnvPage } from '@pages/Env/EnvPage';
+import { McpSection } from '@pages/Mcp/McpSection';
+import { PermissionsSection } from '@pages/Permissions/PermissionsSection';
+import { EnvSection } from '@pages/Env/EnvSection';
 import { ProjectsPage } from '@pages/Projects/ProjectsPage';
 import { GroupsPage } from '@pages/Groups/GroupsPage';
 import { HistoryPage } from '@pages/History/HistoryPage';
 import { SettingsPage } from '@pages/Settings/SettingsPage';
 import { HelpPage } from '@pages/Help/HelpPage';
 import { SearchPage } from '@pages/Search/SearchPage';
+import type { Capability } from '@claude-control/contracts';
+import type { ComponentType, ReactElement } from 'react';
+import { RouteGate } from './RouteGate';
 
 const rootRoute = createRootRoute({ component: MainLayout });
+
+/**
+ * Обернуть страницу гейтом возможности провайдера: у активного провайдера раздел
+ * либо работает (страница), либо «в разработке»/недоступен (заглушка). Для
+ * Claude гейт прозрачен — страница показывается как прежде.
+ */
+function gated(capability: Capability, Page: ComponentType) {
+  return function GatedRoute(): ReactElement {
+    return (
+      <RouteGate capability={capability}>
+        <Page />
+      </RouteGate>
+    );
+  };
+}
 
 /**
  * Адрес открытого элемента.
@@ -47,24 +65,26 @@ function validateSearch(search: Record<string, unknown>): {
 
 /** Маршруты объявлены кодом: страниц немного, генератор файловых роутов избыточен. */
 const routes = [
+  // Панель-level разделы — без гейта: видны и работают при любом провайдере.
   { path: '/', component: OverviewPage },
   { path: '/search', component: SearchPage },
-  { path: '/analytics', component: AnalyticsPage },
-  { path: '/chat', component: ChatPage },
-  { path: '/rules', component: RulesPage },
-  { path: '/claude-md', component: ClaudeMdPage },
-  { path: '/hooks', component: HooksPage },
-  { path: '/skills', component: SkillsPage },
-  { path: '/scripts', component: ScriptsPage },
-  { path: '/plugins', component: PluginsPage },
-  { path: '/mcp', component: McpPage },
-  { path: '/permissions', component: PermissionsPage },
-  { path: '/env', component: EnvPage },
-  { path: '/projects', component: ProjectsPage },
   { path: '/groups', component: GroupsPage },
   { path: '/history', component: HistoryPage },
   { path: '/settings', component: SettingsPage },
   { path: '/help', component: HelpPage },
+  // Разделы провайдера — под гейтом возможностей (для Claude всё `ready`).
+  { path: '/analytics', component: gated('analytics', AnalyticsPage) },
+  { path: '/chat', component: gated('chat', ChatSection) },
+  { path: '/rules', component: gated('rules', RulesPage) },
+  { path: '/claude-md', component: gated('globalInstructions', InstructionsSection) },
+  { path: '/hooks', component: gated('hooks', HooksPage) },
+  { path: '/skills', component: gated('skills', SkillsPage) },
+  { path: '/scripts', component: gated('scripts', ScriptsPage) },
+  { path: '/plugins', component: gated('plugins', PluginsPage) },
+  { path: '/mcp', component: gated('mcp', McpSection) },
+  { path: '/permissions', component: gated('permissions', PermissionsSection) },
+  { path: '/env', component: gated('env', EnvSection) },
+  { path: '/projects', component: gated('projects', ProjectsPage) },
 ].map((route) => createRoute({ getParentRoute: () => rootRoute, validateSearch, ...route }));
 
 export const router = createRouter({

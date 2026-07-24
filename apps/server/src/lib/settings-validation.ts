@@ -1,4 +1,5 @@
 import { object, string, boolean, number, record, array, unknown, enum as zodEnum } from 'zod';
+import { isKnownProviderId } from '../providers/registry.ts';
 
 /**
  * Серверная проверка тел `PATCH /api/settings` и `POST /api/settings/import`.
@@ -27,6 +28,9 @@ export const settingsPatchSchema = object({
   theme: zodEnum(['light', 'dark', 'system']),
   language: zodEnum(['ru', 'en']),
   accent: zodEnum(['default', 'blue', 'green', 'purple', 'amber']),
+  // Активный провайдер: принимаем только известный реестру id (пока лишь 'claude').
+  // Незнакомое значение отклоняем — оно не должно осесть в state.json.
+  provider: string().refine(isKnownProviderId, { message: 'Неизвестный провайдер' }),
   onboardingDone: boolean(),
   claudeDirOverride: string(),
   revealSecretsByDefault: boolean(),

@@ -10,8 +10,10 @@ import type {
   SearchResult,
   SearchResultKind,
   Skill,
+  UniversalMcpServer,
 } from '@claude-control/contracts';
 import type { AppStore } from '../lib/app-store.ts';
+import { getActiveProvider } from '../providers/registry.ts';
 import { readRules } from './rules.ts';
 import { readHooks } from './hooks.ts';
 import { readSkills } from './skills.ts';
@@ -20,6 +22,14 @@ import { readPermissions } from './permissions.ts';
 import { readEnvVars } from './env.ts';
 import { readScripts, type ScriptFile } from './scripts.ts';
 import { readPlugins } from './plugins.ts';
+import { readInstructionsInfo, resolveInstructionsTarget } from './instructions.ts';
+import { readProviderMcpServers, resolveProviderMcpTarget } from './provider-mcp.ts';
+import { readProviderEnvVars, resolveProviderEnvTarget } from './provider-env.ts';
+import {
+  readProviderPermissions,
+  resolveProviderPermissionsTarget,
+  type ProviderPermissionsValues,
+} from './provider-permissions.ts';
 
 /**
  * Глобальный поиск по разделам конфигурации. Логика фильтрации вынесена в чистую
@@ -27,8 +37,17 @@ import { readPlugins } from './plugins.ts';
  * диска и запуска CLI. `searchConfig` только собирает разделы их же читалками и
  * зовёт фильтр.
  *
- * Секреты сюда не попадают: по переменным окружения ищем и показываем ТОЛЬКО имя
- * ключа, значение (даже замаскированное) в результат не уходит.
+ * ПОИСК ИДЁТ ПО АКТИВНОМУ ПРОВАЙДЕРУ. Claude активен → всё ровно как раньше
+ * (правила, скиллы, хуки, скрипты, права, env, MCP, плагины). Выбран другой
+ * провайдер → его разделы: файл инструкций (AGENTS.md/GEMINI.md), MCP-серверы,
+ * переменные окружения, права — и только те, у кого статус `ready`. Иначе
+ * результат вёл бы на страницу, скрытую гейтингом, а читалки Claude показывали бы
+ * конфигурацию не того инструмента.
+ *
+ * СЕКРЕТЫ СЮДА НЕ ПОПАДАЮТ. По переменным окружения (и Claude, и провайдера) ищем
+ * и показываем ТОЛЬКО имя ключа — значение, даже замаскированное, в результат не
+ * уходит. Файл `.mcp-secrets.env`, хранилище ключей `provider-keys.enc` и его
+ * машинный секрет `provider-keys.key` не читаются поиском вовсе.
  */
 
 /** Короче двух символов запрос неинформативен — такой поиск не запускаем. */
@@ -44,7 +63,30 @@ const PAGE_PATH: Record<SearchResultKind, string> = {
   env: 'env',
   mcp: 'mcp',
   plugin: 'plugins',
+  // Раздел глобальных инструкций живёт на том же пути у всех провайдеров —
+  // страница сама роутится по активному (CLAUDE.md / AGENTS.md / GEMINI.md).
+  instructions: 'claude-md',
 };
+
+/**
+ * Разделы АКТИВНОГО провайдера (не Claude), которые панель реально редактирует.
+ * Значения переменных окружения сюда НЕ кладём — только имена ключей.
+ */
+export interface ProviderSearchInputs {
+  providerId: string;
+  providerName: string;
+  /** Файл глобальных инструкций: имя и содержимое (ищем по тексту). */
+  instructions?: { fileName: string; content: string };
+  mcpServers: UniversalMcpServer[];
+  /** ТОЛЬКО имена ключей: значения переменных в индекс поиска не попадают. */
+  envKeys: string[];
+  /**
+   * Права провайдера как плоские пары «ключ → значение»: модели у CLI разные
+   * (Codex — approval/sandbox, Gemini — режим аппрувов и списки инструментов),
+   * а поиску нужен один общий вид.
+   */
+  permissions?: Array<{ key: string; value: string }>;
+}
 
 /** Собранные разделы. Держим их отдельным типом, чтобы фильтр не зависел от источника данных. */
 export interface SearchInputs {
@@ -56,6 +98,8 @@ export interface SearchInputs {
   envVars: EnvVar[];
   mcpServers: McpServer[];
   plugins: Plugin[];
+  /** Разделы активного провайдера — задано, только когда активен НЕ Claude. */
+  provider?: ProviderSearchInputs;
 }
 
 /** Совпадает ли хоть одно из полей с запросом (без учёта регистра). */
@@ -171,6 +215,49 @@ export function searchEntities(inputs: SearchInputs, query: string): SearchResul
     }
   }
 
+  // Разделы активного провайдера (не Claude): те же виды результатов и те же
+  // страницы — страницы сами роутятся по провайдеру, поэтому ссылки рабочие.
+  const provider = inputs.provider;
+  if (provider) {
+    // Файл глобальных инструкций (AGENTS.md / GEMINI.md): ищем по имени и тексту.
+    const instructions = provider.instructions;
+    if (instructions && matchesAny([instructions.fileName, instructions.content], needle)) {
+      push(
+        'instructions',
+        instructions.fileName,
+        instructions.fileName,
+        buildSnippet([instructions.content, instructions.fileName], needle),
+      );
+    }
+
+    // MCP-серверы провайдера: имя, команда, адрес, аргументы, транспорт.
+    for (const server of provider.mcpServers) {
+      if (
+        matchesAny(
+          [server.name, server.command, server.url, server.transport, ...server.args],
+          needle,
+        )
+      ) {
+        push(
+          'mcp',
+          server.name,
+          server.name,
+          buildSnippet([server.command, server.url, server.name], needle),
+        );
+      }
+    }
+
+    // Переменные окружения провайдера: ТОЛЬКО имя ключа (значения нет и в inputs).
+    for (const key of provider.envKeys) {
+      if (matchesAny([key], needle)) push('env', key, key, key);
+    }
+
+    // Права провайдера: плоские пары — ищем и по имени ключа, и по значению.
+    for (const { key, value } of provider.permissions ?? []) {
+      if (matchesAny([key, value], needle)) push('permission', key, key, `${key}: ${value}`);
+    }
+  }
+
   return results;
 }
 
@@ -180,9 +267,108 @@ export interface SearchSources {
   store: AppStore;
 }
 
-/** Собирает все разделы их же читалками. Плагины идут через CLI и потому асинхронны. */
+/** Пустой набор разделов Claude — база для провайдер-ветки (его читалки там не зовём). */
+function emptyInputs(): SearchInputs {
+  return {
+    rules: [],
+    hooks: [],
+    skills: [],
+    scripts: [],
+    permissions: [],
+    envVars: [],
+    mcpServers: [],
+    plugins: [],
+  };
+}
+
+/**
+ * Прочитать раздел провайдера, погасив ошибку формата. Поиск — операция чтения по
+ * всей панели: битый чужой конфиг (fail-closed в своём разделе) не должен ронять
+ * поиск целиком. Не прочиталось → раздела в выдаче просто нет.
+ */
+function readOrSkip<T>(read: () => T): T | undefined {
+  try {
+    return read();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Разделы АКТИВНОГО провайдера для поиска. Берутся ровно те же резолверы, что и у
+ * боевых роутов, поэтому `planned`/`unsupported` разделы (и провайдер без
+ * задокументированного пути) сюда не попадают — fail-closed.
+ */
+function collectProviderInputs(sources: SearchSources): ProviderSearchInputs | undefined {
+  const { paths, store } = sources;
+  const provider = getActiveProvider(store);
+  if (provider.id === 'claude') return undefined;
+
+  const instructionsTarget = resolveInstructionsTarget(store, paths.claudeMd);
+  const instructions = instructionsTarget
+    ? readOrSkip(() => readInstructionsInfo(instructionsTarget))
+    : undefined;
+
+  const mcpTarget = resolveProviderMcpTarget(store);
+  const mcpServers = mcpTarget ? readOrSkip(() => readProviderMcpServers(mcpTarget)) : undefined;
+
+  const envTarget = resolveProviderEnvTarget(store);
+  const envVars = envTarget ? readOrSkip(() => readProviderEnvVars(envTarget)) : undefined;
+
+  const permissionsTarget = resolveProviderPermissionsTarget(store);
+  const permissions = permissionsTarget
+    ? readOrSkip(() => readProviderPermissions(permissionsTarget))
+    : undefined;
+
+  return {
+    providerId: provider.id,
+    providerName: provider.name,
+    instructions: instructions
+      ? { fileName: instructions.fileName, content: instructions.content }
+      : undefined,
+    mcpServers: mcpServers ?? [],
+    // Значения переменных отбрасываем ЗДЕСЬ, у источника: дальше по конвейеру их
+    // просто нет, и утечь в сниппет им неоткуда.
+    envKeys: (envVars ?? []).map((item) => item.key),
+    permissions: permissions ? providerPermissionEntries(permissions) : undefined,
+  };
+}
+
+/**
+ * Права провайдера в виде плоских пар для поиска. Модели разные, поэтому
+ * раскладку задаём здесь: Codex — два скаляра, Gemini — режим аппрувов и оба
+ * списка инструментов (их имена ищутся по подстроке в склейке).
+ */
+function providerPermissionEntries(
+  values: ProviderPermissionsValues,
+): Array<{ key: string; value: string }> {
+  if (values.kind === 'gemini') {
+    const entries: Array<{ key: string; value: string }> = [
+      { key: 'defaultApprovalMode', value: values.approvalMode },
+    ];
+    if (values.coreTools.length > 0)
+      entries.push({ key: 'coreTools', value: values.coreTools.join(', ') });
+    if (values.excludeTools.length > 0)
+      entries.push({ key: 'excludeTools', value: values.excludeTools.join(', ') });
+    return entries;
+  }
+  return [
+    { key: 'approvalPolicy', value: values.approvalPolicy },
+    { key: 'sandboxMode', value: values.sandboxMode },
+  ];
+}
+
+/**
+ * Собирает разделы АКТИВНОГО провайдера их же читалками. Плагины идут через CLI и
+ * потому асинхронны. Claude активен → прежний набор разделов без изменений;
+ * иначе читалки Claude не вызываются вовсе (его конфигурация не при чём).
+ */
 export async function collectSearchInputs(sources: SearchSources): Promise<SearchInputs> {
   const { paths, store } = sources;
+
+  if (getActiveProvider(store).id !== 'claude') {
+    return { ...emptyInputs(), provider: collectProviderInputs(sources) };
+  }
 
   const hooks = readHooks(paths.settings, store, paths.settingsLocal);
   const usedScriptPaths = hooks

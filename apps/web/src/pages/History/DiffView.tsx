@@ -21,6 +21,11 @@ const PREFIX: Record<DiffLineKind, string> = { add: '+', del: '-', ctx: ' ' };
  * с предыдущей копией (а не с текущим файлом), выборочный откат не предлагаем:
  * его блоки не ложатся однозначно на нынешний файл — там доступен откат целиком
  * на странице настроек.
+ *
+ * У файлов ПРОВАЙДЕРА (`canRevert:false`) откат не предлагается вовсе — только
+ * просмотр диффа: цель копии выводится по имени, и запись чужого файла поверх
+ * конфигурации Claude запрещена (та же страховка, что и `canRestore:false` у
+ * полного отката). Сервер откажет и без интерфейса — кнопки просто нет.
  */
 export function DiffView({ name }: DiffViewProps) {
   const { t } = useTranslation();
@@ -53,11 +58,18 @@ export function DiffView({ name }: DiffViewProps) {
     );
   }
 
-  // Выборочный откат — только когда дифф считался против текущего файла.
-  const canRevert = data.label === 'current';
+  // Выборочный откат — только когда дифф считался против текущего файла И файл
+  // вообще допускает откат (у файлов провайдера — нет).
+  const isProviderFile = data.canRevert === false;
+  const canRevert = data.label === 'current' && !isProviderFile;
 
   return (
     <>
+      {isProviderFile && (
+        <Typography variant="body-sm" color="subtle">
+          {t('history.readOnlyProvider')}
+        </Typography>
+      )}
       <div className={styles.diff} aria-label={t('history.diffLabel', { file: data.file })}>
         {data.lines.map((line, index) => {
           // Первая строка ханка — та, у которой номер ханка появился впервые

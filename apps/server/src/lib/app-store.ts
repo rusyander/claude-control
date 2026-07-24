@@ -83,6 +83,7 @@ const DEFAULT_STATE: AppState = {
     theme: 'system',
     language: 'ru',
     accent: 'default',
+    provider: 'claude',
     onboardingDone: false,
     claudeDirOverride: '',
     revealSecretsByDefault: false,

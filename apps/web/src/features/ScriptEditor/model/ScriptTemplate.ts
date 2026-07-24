@@ -30,6 +30,29 @@ process.stdin.on('end', () => {
 `;
 
 /**
+ * Каркас скрипта, когда хуков у активного провайдера нет (COMMON-1).
+ *
+ * Раздел «Скрипты» — это функция самой панели и доступен при любом CLI, а вот
+ * заготовки выше говорят на языке хуков Claude Code (событие JSON-ом на stdin,
+ * код выхода 2, `hookSpecificOutput`). Подсовывать их пользователю Codex или
+ * Aider было бы враньём, поэтому там показывается обычный самостоятельный
+ * скрипт: аргументы, вывод, код возврата.
+ */
+export const GENERIC_SCRIPT_TEMPLATE = `#!/usr/bin/env node
+/**
+ * Описание: что делает скрипт и как его запускают.
+ */
+
+// Аргументы командной строки: node script.mjs один два
+const args = process.argv.slice(2);
+
+process.stdout.write(\`Запущено с аргументами: \${args.join(' ') || '(нет)'}\\n\`);
+
+// Ненулевой код возврата сообщает вызывающей стороне об ошибке.
+process.exit(0);
+`;
+
+/**
  * Готовые скрипты под типовые задачи хуков. Пустой файл почти всегда
  * переписывают одним из этих каркасов, поэтому предлагаем их сразу — остаётся
  * поправить условие и текст.
@@ -146,3 +169,44 @@ process.exit(0);
 `,
   },
 ];
+
+/**
+ * Заготовки без привязки к хукам — для провайдеров, у которых хуков нет.
+ * Ничего claude-специфичного: обычные самостоятельные скрипты.
+ */
+export const GENERIC_SCRIPT_TEMPLATES: ScriptTemplate[] = [
+  {
+    id: 'generic-blank',
+    title: 'Пустой каркас',
+    description: 'Аргументы, вывод и код возврата — место под свою логику.',
+    fileName: 'new-script.mjs',
+    content: GENERIC_SCRIPT_TEMPLATE,
+  },
+  {
+    id: 'generic-command',
+    title: 'Запуск команды',
+    description: 'Вызывает внешнюю команду и передаёт наружу её код возврата.',
+    fileName: 'run-command.mjs',
+    content: `#!/usr/bin/env node
+/**
+ * Обёртка вокруг внешней команды: запускает её и отдаёт её код возврата.
+ */
+import { spawnSync } from 'node:child_process';
+
+// Что запускаем — замените на своё.
+const result = spawnSync('npm', ['--version'], { stdio: 'inherit' });
+
+process.exit(result.status ?? 1);
+`,
+  },
+];
+
+/** Набор заготовок под активного провайдера: с хуками — Claude-каркасы, без — общие. */
+export function scriptTemplatesFor(hasHooks: boolean): ScriptTemplate[] {
+  return hasHooks ? SCRIPT_TEMPLATES : GENERIC_SCRIPT_TEMPLATES;
+}
+
+/** Каркас нового скрипта под активного провайдера. */
+export function newScriptTemplateFor(hasHooks: boolean): string {
+  return hasHooks ? NEW_SCRIPT_TEMPLATE : GENERIC_SCRIPT_TEMPLATE;
+}

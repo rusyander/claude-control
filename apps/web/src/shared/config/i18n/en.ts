@@ -78,6 +78,19 @@ export const en: TranslationSchema = {
     sectionIntegrations: 'Integrations and access',
     sectionApp: 'Application',
   },
+  providers: {
+    inDevelopment: 'in development',
+    inDevelopmentShort: 'soon',
+    unsupported: 'unavailable',
+    unknownProvider: 'this provider',
+    sectionPlannedSubtitle: 'This section is still in development for the selected provider',
+    sectionPlannedTitle: 'The “{{provider}}” section is still in development',
+    sectionPlannedText:
+      'Support for this section with “{{provider}}” is planned, but the adapter is not ready yet. The panel does not read from or write to this provider’s configuration. This section works fully with the Claude Code provider.',
+    sectionUnsupportedTitle: 'This section is unavailable for “{{provider}}”',
+    sectionUnsupportedText:
+      'This CLI has no such section, so it is hidden from navigation. Choose a provider that supports it — for example, Claude Code.',
+  },
   search: {
     title: 'Search',
     subtitle:
@@ -97,6 +110,7 @@ export const en: TranslationSchema = {
       mcp: 'MCP servers',
       permission: 'Permissions',
       env: 'Environment variables',
+      instructions: 'Global instructions',
     },
   },
   palette: {
@@ -118,7 +132,7 @@ export const en: TranslationSchema = {
     subtitle: 'What changed in the configuration: a timeline of edits with diffs',
     explainTitle: 'What this is',
     explain:
-      'Before every write the panel backs up the file, so the copies are snapshots over time. The timeline is built from them: which file, when, and what changed. A copy is compared against the previous copy of the same file, and the freshest one against the current file on disk. The .mcp-secrets.env secrets file is left out of the timeline.',
+      'Before every write the panel backs up the file, so the copies are snapshots over time. The timeline is built from them: which file, when, and what changed. A copy is compared against the previous copy of the same file, and the freshest one against the current file on disk. The timeline covers Claude files and the active provider files (AGENTS.md/GEMINI.md, config.toml, mcp.json, opencode.json, .aider.conf.yml). Secrets never appear: neither .mcp-secrets.env nor the provider API key store.',
     empty: 'No changes yet',
     emptyText:
       'No edit has been backed up yet. As soon as the panel writes something to the configuration, the timeline will appear here.',
@@ -132,6 +146,9 @@ export const en: TranslationSchema = {
     skip_initial: 'This is the first known version — nothing to compare against.',
     skip_binary: 'Binary file — diff is not shown.',
     'skip_too-large': 'File is too large — diff is not shown.',
+    providerFile: '{{provider}} provider file',
+    readOnlyProvider:
+      'Provider file — view only: reverting from here is disabled so another CLI’s copy can never land in the Claude configuration.',
     revertHunk: 'Revert this change',
     revertHunkConfirmTitle: 'Revert only this change?',
     revertHunkConfirmText:
@@ -191,6 +208,14 @@ export const en: TranslationSchema = {
   claudeMd: {
     title: 'CLAUDE.md',
     subtitle: 'The whole global instructions file — exactly as Claude Code reads it',
+    // Per-provider adaptation (Codex→AGENTS.md, Gemini→GEMINI.md). Claude uses the
+    // keys above so its look and copy stay exactly as before.
+    titleFor: 'Global instructions — {{fileName}} ({{provider}})',
+    subtitleFor: 'The whole global instructions file — exactly as {{provider}} reads it',
+    explainFor:
+      'This is the active provider’s global instructions file ({{path}}). The Rules section turns it into cards; here it is open in full: preamble, arbitrary sections, order and formatting. Edit it by hand — a backup is made before writing. The directory is created on save if it does not exist yet.',
+    cliMissing:
+      '{{provider}} was not found on this system — the file will be created at {{path}} on save.',
     explainTitle: 'What this is',
     explain:
       'This is the same ~/.claude/CLAUDE.md the Rules section turns into cards. Here the file is open in full: preamble, arbitrary sections, order and formatting. Edit it by hand — a backup is made before writing.',
@@ -374,6 +399,9 @@ export const en: TranslationSchema = {
     explainTitle: 'What lives here',
     explain:
       'Every file in the hooks/ folder of your Claude Code configuration. Hooks on the neighbouring page decide when a script runs — here you edit the code itself. A script with no event bound to it simply sits in the folder and does nothing.',
+    subtitleNoHooks: 'Your own script files in the panel folder',
+    explainNoHooks:
+      'Every file in the hooks/ folder of the panel directory. This section belongs to the panel itself: your own scripts live and get edited here — Node.js, PowerShell, shell or Python. The selected provider has no hooks, so nothing binds them to events: you run them yourself.',
     addScript: 'Add script',
     mode_constructor: 'Builder',
     mode_bulk: 'Several at once',
@@ -492,6 +520,289 @@ export const en: TranslationSchema = {
     renameHint:
       'The folder name in skills/ — also the identifier. Renames the folder and moves its marks.',
     renamePlaceholder: 'e.g. perf-audit',
+  },
+  providerMcp: {
+    title: 'MCP servers · {{provider}}',
+    subtitle: 'External tool providers for {{provider}}',
+    explain:
+      'This provider stores its MCP servers in {{fileName}} ({{format}} format). The panel edits only the servers section and leaves the rest of the file untouched. New servers are picked up after the CLI restarts.',
+    transportHint:
+      'stdio — the server runs as a process; http — connect to an already running address',
+    cliMissing:
+      '{{provider}} CLI was not detected. Saving still works — the file will be created at {{path}}.',
+    readOnly:
+      'The format of {{path}} was not recognized — the section is read-only and writing is disabled for safety.',
+  },
+  // Instructions as a LIST OF REFERENCES (Aider): not a single-file editor but
+  // management of the list of files the CLI config attaches. Named honestly.
+  providerInstructions: {
+    title: 'Attached instruction files · {{provider}}',
+    subtitle: '{{provider}} reads these files as context',
+    explainTitle: 'How it works',
+    explain:
+      '{{provider}} has no single instructions file like CLAUDE.md. Context files are declared by the read option in the {{fileName}} config — the panel edits exactly that LIST OF REFERENCES: add a file, remove one, change the order (which is the order they are attached in). Comments and every other key of the config stay in place, and a backup is made before each write. The contents of a listed file can be opened and edited right here — but only if the file already exists: the panel never creates files for you. Changes apply after restarting the CLI.',
+    configPath: 'Config holding the list:',
+    configMissing: 'file does not exist yet — it will be created on save',
+    exists: 'file present',
+    missing: 'file missing',
+    reason_binary: 'Not a text file — the panel does not open it.',
+    reason_too_large: 'Too large to edit in the panel.',
+    reason_directory: 'This is a directory, not a file.',
+    editFile: 'Edit contents',
+    closeFile: 'Collapse',
+    moveUp: 'Move up',
+    moveDown: 'Move down',
+    addLabel: 'Path to the file',
+    addHint:
+      'An absolute path, or a relative one resolved against {{baseDir}}. The full path is shown in the list.',
+    addEntry: 'Add to the list',
+    duplicate: 'That path is already in the list.',
+    removeEntry:
+      'Remove the file from the read list? The file itself stays on disk — only the reference in the config disappears.',
+    empty: 'The list is empty: the config attaches no instruction files yet.',
+    readOnly:
+      'The format of {{path}} was not recognized — the section is read-only and writing is disabled for safety.',
+  },
+  // Instructions as a RULES DIRECTORY (Cursor, CURSOR-1): not a single file and
+  // not a list of references, but a directory of `.mdc` files with frontmatter.
+  providerRules: {
+    title: 'Rules · {{provider}}',
+    subtitle: '{{provider}} rules directory: .mdc files with frontmatter',
+    explainTitle: 'How it works',
+    explain:
+      '{{provider}} has no single instructions file like CLAUDE.md. Rules live in the {{rulesDir}} DIRECTORY: every .mdc file is one rule, opening with a frontmatter block of three fields (description, file globs and an "always apply" flag) followed by plain markdown with the rule text. Nested subdirectories are supported. The panel edits only those three fields and the rule text: comments and any other frontmatter keys stay in place, and a backup is made before each write. A plain .md file in this directory is ignored by Cursor - such files are listed separately and never edited. Changes apply after restarting the CLI.',
+    rulesDir: 'Rules directory:',
+    dirMissing: 'the directory does not exist yet - it will be created when a rule is saved',
+    dirUnreadable:
+      'The directory {{path}} cannot be read - the section is read-only and writing is disabled for safety.',
+    empty: 'No rules yet: create the first one and an .mdc file will appear in the directory.',
+    badgeAlwaysApply: 'always applied',
+    badgeMalformed: 'frontmatter not parsed',
+    badgeNoFrontmatter: 'no frontmatter',
+    globsPrefix: 'files:',
+    edit: 'Edit',
+    view: 'View',
+    close: 'Collapse',
+    deleteRule:
+      'Delete the rule file? The panel makes a backup before deleting; the directory itself stays.',
+    otherKeys: 'own frontmatter keys: {{keys}}',
+    readOnlyMalformed:
+      'The panel could not parse this frontmatter, so the file is shown in full and read-only: rewriting markup it does not understand would be unsafe. Fix the file in an editor and the rule becomes editable again.',
+    readOnlyNoFrontmatter:
+      'The file has no frontmatter block between "---" lines, so Cursor does not pick it up as a rule. The panel shows the file in full, read-only - it will not add frontmatter on your behalf.',
+    fieldPath: 'Rule path inside the directory',
+    hintPath:
+      'Relative to {{rulesDir}}. A subdirectory is allowed - frontend/react.mdc; it is created on save. The .mdc extension is appended automatically.',
+    fieldDescription: 'Description',
+    hintDescription:
+      'A short summary of the rule. The model uses it to decide whether to attach the rule when no globs are set.',
+    placeholderDescription: 'React component rules',
+    fieldGlobs: 'File globs',
+    hintGlobs:
+      'The rule attaches when a matching file is in play. Separate several patterns with commas. Empty - never attached by pattern.',
+    fieldAlwaysApply: 'Always apply',
+    hintAlwaysApply: 'The rule is added to every conversation regardless of globs.',
+    fieldBody: 'Rule text (markdown)',
+    createTitle: 'New rule',
+    createRule: 'Create rule',
+    duplicate: 'A rule with that path already exists.',
+    unsafePath: 'The path must stay inside the rules directory: no ".." and no absolute paths.',
+    ignoredTitle: 'Cursor does not read these files',
+    ignoredExplain:
+      'Only .mdc files with frontmatter count as rules. Everything else in the directory is ignored by Cursor - the panel lists them but never edits or deletes them.',
+  },
+  providerEnv: {
+    title: 'Environment variables · {{provider}}',
+    subtitle: 'Environment variables for {{provider}}',
+    explainTitle: 'How it works',
+    // The explanation depends on the provider's file format — the page picks one.
+    explain_toml:
+      '{{provider}} stores its environment variables in {{fileName}} (the shell_environment_policy.set table). The panel edits only these variables and leaves the rest of the environment policy (inherit, exclude, etc.) untouched. Changes are picked up after the CLI restarts.',
+    'explain_aider-yaml':
+      '{{provider}} stores its environment variables in {{fileName}} (the set-env key, entries shaped KEY=value). The panel edits only that key: comments and every other setting in the config stay in place. Changes are picked up after the CLI restarts.',
+    explain_dotenv:
+      '{{provider}} stores its environment variables in the plain {{fileName}} file. The panel edits it line by line: only the lines of the affected variables change, while comments, blank lines and ordering stay as they were; new variables are appended at the end. Changes are picked up after the CLI restarts.',
+    addVar: 'Add variable',
+    key: 'Variable name',
+    value: 'Value',
+    deleteVar: "Delete this variable from the provider's configuration?",
+    duplicateKey: 'Variable {{key}} already exists — choose another name.',
+    cliMissing:
+      '{{provider}} CLI was not detected. Saving still works — the file will be created at {{path}}.',
+    readOnly:
+      'The format of {{path}} was not recognized — the section is read-only and writing is disabled for safety.',
+  },
+  providerPermissions: {
+    title: 'Permissions & approvals · {{provider}}',
+    subtitle: 'Approval policy and sandbox mode for {{provider}}',
+    explainTitle: 'How it works',
+    explain:
+      '{{provider}} permissions are set by two keys at the root of {{fileName}}: the approval policy (when the CLI asks for confirmation) and the sandbox mode (file-system and network boundaries). The panel edits only these two root keys; it never touches profiles ([profiles.*]) or other settings. Changes take effect after the CLI is restarted.',
+    usingDefaults:
+      'The keys are not set in the file yet — Codex defaults are shown. They will be written only after you save.',
+    cliMissing:
+      '{{provider}} CLI was not detected. Saving still works — the file will be created at {{path}}.',
+    readOnly:
+      'The format of {{path}} was not recognized — the section is read-only and writing is disabled for safety.',
+    approval: {
+      label: 'Approval policy (approval_policy)',
+      untrusted: {
+        label: 'untrusted — ask almost always',
+        description:
+          'Most cautious: the CLI asks for confirmation for nearly every command except known-trusted ones. Safest, but many prompts.',
+      },
+      'on-request': {
+        label: 'on-request — when the model asks (default)',
+        description:
+          'The default: the model decides when to request confirmation or escalate. A sensible balance of control and convenience.',
+      },
+      never: {
+        label: 'never — never ask',
+        description:
+          'The CLI never asks for confirmation and never escalates. Convenient for automation, but removes manual control — use deliberately.',
+      },
+    },
+    sandbox: {
+      label: 'Sandbox mode (sandbox_mode)',
+      'read-only': {
+        label: 'read-only — read only',
+        description:
+          'The CLI can read files but cannot write to disk or access the network. The safest mode.',
+      },
+      'workspace-write': {
+        label: 'workspace-write — write inside the workspace (default)',
+        description:
+          'The default: writing is allowed within the workspace directory; network is restricted by default. A sensible balance for working on a project.',
+      },
+      'danger-full-access': {
+        label: 'danger-full-access — full access (dangerous)',
+        description:
+          'DANGEROUS: the sandbox is disabled — the CLI gets unrestricted access to the file system and network. Commands can modify any file and reach any resource. Enable only if you fully trust the task and environment.',
+      },
+    },
+    // Gemini permission model: approval mode + allowlist and blocklist of tools.
+    gemini: {
+      subtitle: 'Approval mode and allowed tools for {{provider}}',
+      explain:
+        '{{provider}} permissions live in {{fileName}}: the approval mode general.defaultApprovalMode plus two tool lists — coreTools (what is allowed) and excludeTools (what is blocked). The blocklist wins over the allowlist: a tool present in both is blocked. The panel edits only these three keys; MCP servers and every other setting in the file stay untouched. Changes are picked up after the CLI restarts.',
+      usingDefaults:
+        'The keys are not set in the file yet — Gemini defaults are shown. They will be written only after you save.',
+      yoloNote:
+        'The yolo mode (no confirmations at all) is never written by the panel: in Gemini it is a command-line flag only, and in settings.json it makes the CLI fail on startup. If you need it, run gemini with the --yolo flag.',
+      mode: {
+        label: 'Approval mode (general.defaultApprovalMode)',
+        default: {
+          label: 'default — ask every time (default)',
+          description:
+            'The default: the CLI asks for confirmation before every tool call — both file edits and shell commands. The most controlled mode.',
+        },
+        auto_edit: {
+          label: 'auto_edit — file edits without prompts',
+          description:
+            'File edits are applied automatically while shell commands still require confirmation. Faster to work with, but files change without your consent — keep the project under version control.',
+        },
+        plan: {
+          label: 'plan — read-only planning',
+          description:
+            'The CLI changes nothing: it only reads files and proposes a plan. The safest mode — good for exploring unfamiliar code.',
+        },
+      },
+      toolsPlaceholder: 'one tool name per line',
+      coreTools: {
+        label: 'Tool allowlist (coreTools)',
+        hint: 'One name per line, e.g. run_shell_command or ReadFile. When the list is not empty, only the listed tools are allowed — this is the safest way to restrict the CLI. An empty list means no restriction (the key is removed from the file).',
+      },
+      excludeTools: {
+        label: 'Tool blocklist (excludeTools)',
+        hint: 'One name per line. Listed tools are blocked; the blocklist wins over the allowlist. Blocking by list is less reliable than allowing: a tool added in a future CLI release becomes available automatically.',
+      },
+    },
+  },
+  providerDetect: {
+    installed: 'installed',
+    configOnly: 'config found',
+    missing: 'not found',
+    recommended: 'recommended',
+    activeMissing:
+      'The {{provider}} CLI ({{command}}) was not found on this system. Configuration sections still work with the config files, but the assistant and launching will require installing the CLI or an API key.',
+  },
+  providerKeys: {
+    title: 'Provider API keys',
+    hint: "The active provider's key is used by the panel assistant. Keys are stored encrypted in the panel and never returned — only a mask is shown here. If no key is set but the provider CLI is installed, the assistant runs via the CLI.",
+    apiKind: {
+      anthropic: 'Anthropic API',
+      openai: 'OpenAI API',
+      google: 'Google API',
+      'openai-compat': 'OpenAI-compatible',
+      none: 'no model API',
+    },
+    statusStored: 'set in panel: {{masked}}',
+    statusEnv: 'found in environment ({{envVar}}): {{masked}}',
+    statusNone: 'no key set',
+    inputLabel: '{{provider}} API key',
+    inputPlaceholder: 'paste the key',
+    envHint: 'If not set here, the key is picked up from environment variables: {{vars}}',
+    clear: 'Clear',
+  },
+  assistantKey: {
+    title: '{{provider}} assistant needs access',
+    description:
+      'Neither a CLI login (subscription) nor an API key was found for {{provider}}. Preferably sign in to the provider CLI — it works via your subscription, with no per-token billing. Otherwise, as a fallback, paste an API key (stored encrypted in the panel).',
+    unsupported:
+      '{{provider}} has no model API of its own, and running the assistant via CLI is not supported.',
+    unsupportedHint: 'Choose another provider in Settings — the assistant will work with it.',
+    subscriptionTitle: 'Option 1 (recommended): sign in to the CLI (subscription)',
+    subscriptionHint:
+      'Install the "{{command}}" CLI and sign in — the assistant will use your subscription, with no separate paid key.',
+    cliLoginGeneric:
+      'Run "{{command}}" in a terminal and complete the sign-in/subscription as the CLI prompts, then come back here.',
+    cliLogin: {
+      claude:
+        'Run "claude" and sign in to your Claude account when prompted — the panel picks up the subscription.',
+      codex:
+        'Install the Codex CLI and run "codex login" (sign in to your OpenAI account/subscription).',
+      gemini: 'Run "gemini" and complete the Google sign-in in the browser when prompted.',
+      opencode: 'Install OpenCode and configure sign-in/provider with "opencode auth login".',
+      aider: 'Install Aider and configure model access per its documentation.',
+    },
+    apiTitle: 'Option 2 (fallback): paid API key',
+    apiKeyHowGeneric: 'Get an API key from your provider dashboard and paste it below.',
+    apiKeyHow: {
+      anthropic: 'Anthropic key — in the console at console.anthropic.com → API Keys.',
+      openai: 'OpenAI key — at platform.openai.com/api-keys.',
+      google: 'Google (Gemini) key — in Google AI Studio (aistudio.google.com/apikey).',
+      'openai-compat': 'OpenAI-compatible key — in your model provider dashboard.',
+    },
+    inputLabel: '{{provider}} API key',
+    inputPlaceholder: 'paste the key',
+    cliMissing: 'The "{{command}}" CLI was not found in PATH — so a key is needed.',
+    openSettings: 'Open settings',
+  },
+  basicChat: {
+    title: '{{provider}} assistant',
+    experimental: 'Experimental',
+    experimentalHint:
+      'Basic mode for a non-Claude provider: a plain text reply via the provider CLI or its API. The rich chat with tools and streaming output is available only for Claude.',
+    empty: 'Type a message — the assistant will reply via the active provider.',
+    noneHint:
+      'First connect the CLI subscription or a provider API key (see the instructions dialog).',
+    placeholder: 'Message the assistant…',
+    send: 'Send',
+    you: 'You',
+    thinking: 'The assistant is thinking…',
+    failed: 'Failed to get an assistant reply.',
+    mode: {
+      cli: 'via CLI (subscription)',
+      api: 'via API',
+    },
+    reason: {
+      cli_error: 'The provider CLI exited with an error.',
+      api_error: 'The model API returned an error.',
+      cli_not_scriptable: 'This CLI has no non-interactive run mode.',
+      no_key_no_cli: 'Neither a CLI subscription nor an API key is available.',
+      unsupported: 'The provider does not support the assistant.',
+      ok: '',
+    },
   },
   mcp: {
     title: 'MCP servers',
@@ -685,6 +996,18 @@ export const en: TranslationSchema = {
     accent_purple: 'Purple',
     accent_amber: 'Amber',
     language: 'Language',
+    providerTitle: 'Configuration provider',
+    providerHint:
+      'Which CLI the panel manages. Claude Code is fully supported; the other providers are experimental — some sections are still in development.',
+    providerVerified: 'verified',
+    providerExperimental: 'experimental',
+    providerActive: 'Active',
+    providerChoose: 'Choose',
+    providerPreviewReady: 'Sections ready: {{ready}}',
+    providerPreviewMixed: 'Ready: {{ready}} · in development: {{planned}}',
+    providerExperimentalBadge: 'Experimental provider',
+    providerExperimentalNote:
+      'Some sections are still in development and marked accordingly. The panel does not write anything to this provider’s configuration yet.',
     claudeDir: '.claude directory',
     claudeDirHint:
       'Detected automatically. Fill this in if the directory is non-standard or detection failed.',
@@ -1035,6 +1358,28 @@ export const en: TranslationSchema = {
     permissionsEmpty: "The project's settings.json has no permission rules yet.",
     addPermission: 'Add permission',
   },
+  // Project level for non-Claude providers: their own project files (COMMON-2).
+  providerProject: {
+    subtitle: "A specific project's configuration — in the active provider's project files",
+    explain:
+      "Besides the global config, the panel manages a specific project's config in the active provider's files: project instructions (AGENTS.md for Codex and OpenCode, GEMINI.md for Gemini), the project's MCP servers (.codex/config.toml, .gemini/settings.json, opencode.json, .cursor/mcp.json), for Gemini the project's environment variables (.gemini/.env) and permissions (.gemini/settings.json), and for Aider the .aider.conf.yml in the repository root (the read list of attached files plus set-env variables). Only what is documented for that CLI is edited; other keys and comments in the file are preserved, and a backup is made before every write. Changes apply after restarting the CLI.",
+    unsupported:
+      'The active provider has no project-level configuration: no documented project files were found for it, so the panel neither reads nor writes anything.',
+    tab_instructions: 'Project instructions',
+    tab_instructionsList: 'Attached files',
+    tab_instructionsRules: 'Rules (.mdc)',
+    tab_env: 'Environment variables',
+    tab_permissions: 'Permissions & approvals',
+    instructionsHint:
+      "The project's root {{fileName}} in full — as the CLI reads it in this project.",
+    mcpHint: "The project's MCP servers from its file ({{format}} format).",
+    mcpEmpty: 'The project file has no MCP servers yet.',
+    envHint:
+      "This project's environment variables. The file is edited line by line: comments and ordering are preserved.",
+    envEmpty: 'The project file has no environment variables yet.',
+    permissionsHint:
+      "This project's permissions and approvals. The panel edits only the approval mode and the tool lists; every other setting in the file is left alone.",
+  },
   onboarding: {
     introTitle: 'Welcome to Claude Control',
     introSubtitle: 'A panel for your Claude Code configuration, all in one place.',
@@ -1047,6 +1392,15 @@ export const en: TranslationSchema = {
     locationHint:
       'Usually detected automatically. If it is wrong or missing, choose the folder manually.',
     chooseFolder: 'Choose folder',
+    providersTitle: 'Detected CLIs',
+    providersSubtitle: 'Which tool the panel will manage.',
+    providersHint:
+      'The panel checked which CLIs are installed on this system. This is a hint — you can pick any provider, or skip this step entirely.',
+    providersNone:
+      'No CLI was found in PATH. The panel still opens: its sections work with the configuration files.',
+    providersChoose: 'Choose',
+    providersDefaultNote:
+      'By default the panel works with Claude Code. You can always switch providers in Settings.',
     next: 'Next',
     back: 'Back',
     done: 'Done',

@@ -13,7 +13,9 @@ import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { FolderPicker } from '@features/FolderPicker';
 import { DeleteButton } from '@features/EntityDelete';
 import { useProjectRegistry, useAddProject, useRemoveProject } from '@entities/Project';
+import { useSettings } from '@entities/AppConfig';
 import { ProjectConfigPanel } from './ProjectConfigPanel';
+import { ProviderProjectPanel } from './ProviderProjectPanel';
 import styles from './ProjectsPage.module.scss';
 
 /**
@@ -21,9 +23,17 @@ import styles from './ProjectsPage.module.scss';
  * а этот раздел — конфиги КОНКРЕТНОГО проекта: его CLAUDE.md, права и хуки в
  * `.claude/settings.json` и MCP-серверы в корневом `.mcp.json`. Слева — реестр
  * запомненных проектов, справа — конфиг выбранного.
+ *
+ * Реестр проектов — раздел САМОЙ панели и от провайдера не зависит. А вот конфиг
+ * выбранного проекта у каждого провайдера свой: Claude — прежняя панель без
+ * изменений (правила/MCP/права), прочие — универсальная (инструкции проекта +
+ * MCP из его проектного файла, COMMON-2). До загрузки настроек считаем
+ * провайдера дефолтным (claude) — как в остальных гейтах.
  */
 export function ProjectsPage() {
   const { t } = useTranslation();
+  const { data: settings } = useSettings();
+  const providerId = settings?.provider ?? 'claude';
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
 
@@ -73,7 +83,11 @@ export function ProjectsPage() {
     <Stack gap="var(--spacing-lg)" className={styles.page}>
       <PageHeader
         title={t('projectConfig.title')}
-        subtitle={t('projectConfig.subtitle')}
+        // Тексты про CLAUDE.md/.claude уместны только у Claude — у остальных
+        // провайдеров раздел ведёт ИХ проектные файлы (см. providerProject.*).
+        subtitle={
+          providerId === 'claude' ? t('projectConfig.subtitle') : t('providerProject.subtitle')
+        }
         actions={
           <Button
             variant="primary"
@@ -85,7 +99,10 @@ export function ProjectsPage() {
         }
       />
 
-      <ExplainBox title={t('projectConfig.explainTitle')} text={t('projectConfig.explain')} />
+      <ExplainBox
+        title={t('projectConfig.explainTitle')}
+        text={providerId === 'claude' ? t('projectConfig.explain') : t('providerProject.explain')}
+      />
 
       {isLoading && <SkeletonList rows={4} />}
 
@@ -146,7 +163,11 @@ export function ProjectsPage() {
           </Stack>
 
           {selected ? (
-            <ProjectConfigPanel project={selected} />
+            providerId === 'claude' ? (
+              <ProjectConfigPanel project={selected} />
+            ) : (
+              <ProviderProjectPanel project={selected} />
+            )
           ) : (
             <EmptyState
               icon="settings"

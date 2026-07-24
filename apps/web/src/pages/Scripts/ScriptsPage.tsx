@@ -16,12 +16,18 @@ import { DeleteButton } from '@features/EntityDelete';
 import { SandboxButton } from '@features/SandboxRunner';
 import { ResourceFileTree } from '@features/ResourceFiles';
 import { useScripts, useDeleteScript, type ScriptFile } from '@entities/Script';
+import { useIsCapabilityReady } from '@entities/Provider';
 import styles from './ScriptsPage.module.scss';
 
 /**
  * Скрипты из каталога hooks/. Хуки на странице «Хуки» задают, когда скрипт
  * запускается; здесь правится сам код — включая файлы, которые пока ни к
  * какому событию не привязаны.
+ *
+ * Раздел работает при любом провайдере (COMMON-1): это файлы самой панели, а не
+ * чужой конфиг. Claude-специфичны здесь ровно две вещи — песочница и отметка
+ * «вызывается хуком»; они гейтятся по возможностям `sandbox` и `hooks`, поэтому
+ * у Claude страница выглядит и работает ровно как раньше.
  */
 export function ScriptsPage() {
   const { t } = useTranslation();
@@ -32,6 +38,9 @@ export function ScriptsPage() {
 
   const { data: scripts = [], isLoading } = useScripts();
   const removeScript = useDeleteScript();
+
+  const hasHooks = useIsCapabilityReady('hooks');
+  const hasSandbox = useIsCapabilityReady('sandbox');
 
   const openForm = (script?: ScriptFile): void => {
     setEditing(script);
@@ -54,7 +63,7 @@ export function ScriptsPage() {
     <Stack gap="var(--spacing-lg)" className={styles.page}>
       <PageHeader
         title={t('scripts.title')}
-        subtitle={t('scripts.subtitle')}
+        subtitle={hasHooks ? t('scripts.subtitle') : t('scripts.subtitleNoHooks')}
         helpTopic="scripts"
         actions={
           <Button
@@ -67,7 +76,10 @@ export function ScriptsPage() {
         }
       />
 
-      <ExplainBox title={t('scripts.explainTitle')} text={t('scripts.explain')} />
+      <ExplainBox
+        title={t('scripts.explainTitle')}
+        text={hasHooks ? t('scripts.explain') : t('scripts.explainNoHooks')}
+      />
 
       {isLoading && <SkeletonList rows={5} />}
 
@@ -100,9 +112,13 @@ export function ScriptsPage() {
                       {script.name}
                     </Typography>
                   </button>
-                  <Badge tone={script.isUsed ? 'success' : 'neutral'}>
-                    {script.isUsed ? t('scripts.used') : t('scripts.unused')}
-                  </Badge>
+                  {/* «Используется» — про привязку к хуку; без хуков отметке
+                      неоткуда взяться, поэтому у таких провайдеров её нет. */}
+                  {hasHooks && (
+                    <Badge tone={script.isUsed ? 'success' : 'neutral'}>
+                      {script.isUsed ? t('scripts.used') : t('scripts.unused')}
+                    </Badge>
+                  )}
                 </Stack>
 
                 {script.description && (
@@ -124,12 +140,16 @@ export function ScriptsPage() {
               </Stack>
 
               <Stack direction="row" align="center" gap="var(--spacing-2xs)" flexShrink={0}>
-                <SandboxButton
-                  kind="script"
-                  title={script.name}
-                  scriptName={script.name}
-                  selection={{ scriptNames: [script.name] }}
-                />
+                {/* Песочница поднимает изолированный Claude Code — у других
+                    провайдеров такой возможности нет, кнопку не показываем. */}
+                {hasSandbox && (
+                  <SandboxButton
+                    kind="script"
+                    title={script.name}
+                    scriptName={script.name}
+                    selection={{ scriptNames: [script.name] }}
+                  />
+                )}
                 <Button
                   size="sm"
                   variant="ghost"

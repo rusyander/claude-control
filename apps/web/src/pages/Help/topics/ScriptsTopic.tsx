@@ -180,6 +180,9 @@ export function ScriptsTopic() {
           <Callout tone="success" title={tr('noteRestartTitle')}>
             {tr('noteRestartText')}
           </Callout>
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

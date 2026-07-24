@@ -7,12 +7,34 @@ export const queryKeys = {
   /** Платформа, домашний каталог, оболочка — за сессию не меняются. */
   system: ['system'] as const,
   settings: ['settings'] as const,
+  /** Провайдеры конфигурации и их возможности — статичны за сессию. */
+  providers: ['providers'] as const,
+  /** Детект установленных провайдер-CLI (бинарь в PATH + каталог конфигурации). */
+  providerDetect: ['providers', 'detect'] as const,
   overview: ['overview'] as const,
   rules: ['rules'] as const,
   hooks: ['hooks'] as const,
   skills: ['skills'] as const,
   mcp: ['mcp'] as const,
   mcpHealth: (id: string) => ['mcp', id, 'health'] as const,
+  /** Универсальные MCP-серверы активного провайдера (Gemini/Codex). */
+  providerMcp: ['provider-mcp'] as const,
+  /** Универсальные переменные окружения активного провайдера (Codex). */
+  providerEnv: ['provider-env'] as const,
+  /** Список ссылок на файлы инструкций активного провайдера (Aider: ключ `read`). */
+  providerInstructions: ['provider-instructions'] as const,
+  /** Содержимое одного перечисленного файла инструкций. */
+  providerInstructionsFile: (path: string) => ['provider-instructions', 'file', path] as const,
+  /** Каталог правил активного провайдера (Cursor: `~/.cursor/rules/*.mdc`). */
+  providerRules: ['provider-rules'] as const,
+  /** Одно правило каталога — ключ по его пути относительно каталога. */
+  providerRule: (path: string) => ['provider-rules', 'rule', path] as const,
+  /** Универсальные права/аппрувы активного провайдера (Codex). */
+  providerPermissions: ['provider-permissions'] as const,
+  /** API-ключи провайдеров (маскированный статус) — раздел настроек. */
+  providerKeys: ['provider-keys'] as const,
+  /** Резолв раннера активного провайдера (api/cli/none) — модалка ассистента. */
+  providerRunner: ['provider-runner'] as const,
   permissions: ['permissions'] as const,
   env: ['env'] as const,
   groups: ['groups'] as const,
@@ -33,6 +55,28 @@ export const queryKeys = {
   projectMcp: (id: string) => ['projects', id, 'mcp'] as const,
   /** Права конкретного проекта (.claude/settings.json). */
   projectPermissions: (id: string) => ['projects', id, 'permissions'] as const,
+  /** Что активный провайдер умеет на уровне проекта (COMMON-2). */
+  projectProvider: (id: string) => ['projects', id, 'provider'] as const,
+  /** Инструкции проекта у активного провайдера (AGENTS.md / GEMINI.md). */
+  projectProviderInstructions: (id: string) =>
+    ['projects', id, 'provider', 'instructions'] as const,
+  /** Список ссылок на файлы инструкций проекта (Aider: `read` в `.aider.conf.yml`). */
+  projectProviderInstructionsList: (id: string) =>
+    ['projects', id, 'provider', 'instructions-list'] as const,
+  /** Содержимое одного перечисленного файла инструкций проекта. */
+  projectProviderInstructionsListFile: (id: string, path: string) =>
+    ['projects', id, 'provider', 'instructions-list', 'file', path] as const,
+  /** Каталог правил проекта у активного провайдера (`<проект>/.cursor/rules`). */
+  projectProviderRules: (id: string) => ['projects', id, 'provider', 'rules'] as const,
+  /** Одно правило каталога проекта — ключ по его относительному пути. */
+  projectProviderRule: (id: string, path: string) =>
+    ['projects', id, 'provider', 'rules', 'rule', path] as const,
+  /** MCP-серверы проекта у активного провайдера (его проектный файл). */
+  projectProviderMcp: (id: string) => ['projects', id, 'provider', 'mcp'] as const,
+  /** Переменные окружения проекта у активного провайдера (`.gemini/.env`). */
+  projectProviderEnv: (id: string) => ['projects', id, 'provider', 'env'] as const,
+  /** Права/аппрувы проекта у активного провайдера (`.gemini/settings.json`). */
+  projectProviderPermissions: (id: string) => ['projects', id, 'provider', 'permissions'] as const,
   /** Глобальный поиск: ключ зависит от запроса, чтобы кешировать по строке. */
   search: (query: string) => ['search', query] as const,
 };

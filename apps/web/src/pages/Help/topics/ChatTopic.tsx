@@ -314,6 +314,9 @@ export function ChatTopic() {
           <Callout tone="info" title={tr('noteHistoryTitle')}>
             {tr('noteHistoryText')}
           </Callout>
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

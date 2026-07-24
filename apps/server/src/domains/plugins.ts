@@ -12,6 +12,7 @@ import type {
 } from '@claude-control/contracts';
 import { safePluginId } from '../lib/cli-args.ts';
 import { writeTextFile } from '../lib/safe-io.ts';
+import { defaultCliCommand } from '../providers/cli.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -26,10 +27,10 @@ const execFileAsync = promisify(execFile);
 const isWindows = process.platform === 'win32';
 
 async function runClaude(
+  command: string,
   args: string[],
   timeoutMs = 180_000,
 ): Promise<{ stdout: string; stderr: string }> {
-  const command = isWindows ? 'claude.cmd' : 'claude';
   return execFileAsync(command, args, {
     timeout: timeoutMs,
     windowsHide: true,
@@ -85,19 +86,24 @@ function toPlugin(raw: RawPlugin, isInstalled: boolean): Plugin {
  * запрашивается отдельно, потому что CLI за ним ходит в сеть и обновляет
  * репозитории маркетплейсов — держать из-за этого весь раздел в загрузке нельзя.
  */
-export async function readPlugins(claudeRoot: string): Promise<PluginsState> {
-  const installed = await readInstalled();
+export async function readPlugins(
+  claudeRoot: string,
+  command: string = defaultCliCommand(),
+): Promise<PluginsState> {
+  const installed = await readInstalled(command);
   return { installed, available: [], marketplaces: readMarketplaces(claudeRoot) };
 }
 
 /** Каталог маркетплейсов: отдельный запрос, выполняется по требованию. */
-export async function readAvailablePlugins(): Promise<Plugin[]> {
-  return readAvailable(await readInstalled());
+export async function readAvailablePlugins(
+  command: string = defaultCliCommand(),
+): Promise<Plugin[]> {
+  return readAvailable(command, await readInstalled(command));
 }
 
-async function readInstalled(): Promise<Plugin[]> {
+async function readInstalled(command: string): Promise<Plugin[]> {
   try {
-    const { stdout } = await runClaude(['plugin', 'list', '--json'], 60_000);
+    const { stdout } = await runClaude(command, ['plugin', 'list', '--json'], 60_000);
     return parseList(stdout, 'installed').map((item) => toPlugin(item, true));
   } catch {
     // CLI недоступен или сменил формат — раздел покажет пустой список,
@@ -106,9 +112,13 @@ async function readInstalled(): Promise<Plugin[]> {
   }
 }
 
-async function readAvailable(installed: Plugin[]): Promise<Plugin[]> {
+async function readAvailable(command: string, installed: Plugin[]): Promise<Plugin[]> {
   try {
-    const { stdout } = await runClaude(['plugin', 'list', '--available', '--json'], 180_000);
+    const { stdout } = await runClaude(
+      command,
+      ['plugin', 'list', '--available', '--json'],
+      180_000,
+    );
     const installedIds = new Set(installed.map((plugin) => plugin.id));
 
     return parseList(stdout, 'available')
@@ -164,9 +174,9 @@ function readMarketplaces(claudeRoot: string): Marketplace[] {
   }
 }
 
-async function runPluginCommand(args: string[]): Promise<CommandResult> {
+async function runPluginCommand(command: string, args: string[]): Promise<CommandResult> {
   try {
-    const { stdout, stderr } = await runClaude(['plugin', ...args]);
+    const { stdout, stderr } = await runClaude(command, ['plugin', ...args]);
     return { ok: true, output: (stdout || stderr).trim(), needsRestart: true };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -183,7 +193,10 @@ async function runPluginCommand(args: string[]): Promise<CommandResult> {
 const MARKETPLACE_SOURCE = /^[A-Za-z0-9._~:/@\\-]{1,300}$/;
 
 /** Добавить маркетплейс: `claude plugin marketplace add <источник>`. */
-export function addMarketplace(source: string): Promise<CommandResult> {
+export function addMarketplace(
+  source: string,
+  command: string = defaultCliCommand(),
+): Promise<CommandResult> {
   if (!MARKETPLACE_SOURCE.test(source)) {
     return Promise.resolve({
       ok: false,
@@ -191,15 +204,18 @@ export function addMarketplace(source: string): Promise<CommandResult> {
       needsRestart: false,
     });
   }
-  return runPluginCommand(['marketplace', 'add', source]);
+  return runPluginCommand(command, ['marketplace', 'add', source]);
 }
 
 /** Убрать маркетплейс по имени: `claude plugin marketplace remove <имя>`. */
-export function removeMarketplace(name: string): Promise<CommandResult> {
+export function removeMarketplace(
+  name: string,
+  command: string = defaultCliCommand(),
+): Promise<CommandResult> {
   if (!MARKETPLACE_SOURCE.test(name)) {
     return Promise.resolve({ ok: false, output: `Недопустимое имя: ${name}`, needsRestart: false });
   }
-  return runPluginCommand(['marketplace', 'remove', name]);
+  return runPluginCommand(command, ['marketplace', 'remove', name]);
 }
 
 /**
@@ -207,7 +223,7 @@ export function removeMarketplace(name: string): Promise<CommandResult> {
  * поэтому он сверяется с допустимым видом до запуска. Отказ возвращается
  * обычным ответом: страница плагинов покажет его как результат операции.
  */
-function runPluginAction(action: string, id: string): Promise<CommandResult> {
+function runPluginAction(command: string, action: string, id: string): Promise<CommandResult> {
   let checked: string;
   try {
     checked = safePluginId(id);
@@ -219,19 +235,33 @@ function runPluginAction(action: string, id: string): Promise<CommandResult> {
     });
   }
 
-  return runPluginCommand([action, checked]);
+  return runPluginCommand(command, [action, checked]);
 }
 
-export const installPlugin = (id: string): Promise<CommandResult> => runPluginAction('install', id);
+export const installPlugin = (
+  id: string,
+  command: string = defaultCliCommand(),
+): Promise<CommandResult> => runPluginAction(command, 'install', id);
 
-export const uninstallPlugin = (id: string): Promise<CommandResult> =>
-  runPluginAction('uninstall', id);
+export const uninstallPlugin = (
+  id: string,
+  command: string = defaultCliCommand(),
+): Promise<CommandResult> => runPluginAction(command, 'uninstall', id);
 
-export const enablePlugin = (id: string): Promise<CommandResult> => runPluginAction('enable', id);
+export const enablePlugin = (
+  id: string,
+  command: string = defaultCliCommand(),
+): Promise<CommandResult> => runPluginAction(command, 'enable', id);
 
-export const disablePlugin = (id: string): Promise<CommandResult> => runPluginAction('disable', id);
+export const disablePlugin = (
+  id: string,
+  command: string = defaultCliCommand(),
+): Promise<CommandResult> => runPluginAction(command, 'disable', id);
 
-export const updatePlugin = (id: string): Promise<CommandResult> => runPluginAction('update', id);
+export const updatePlugin = (
+  id: string,
+  command: string = defaultCliCommand(),
+): Promise<CommandResult> => runPluginAction(command, 'update', id);
 
 /**
  * Имя плагина → безопасное имя папки и поле `name` манифеста.

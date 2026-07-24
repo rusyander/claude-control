@@ -5,3 +5,4 @@
  * типизированного дерева путей у роутера нет — литерал не прошёл бы проверку.
  */
 export const HELP_ROUTE: string = '/help';
+export const SETTINGS_ROUTE: string = '/settings';

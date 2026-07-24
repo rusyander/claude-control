@@ -43,7 +43,11 @@ import {
   deleteEnvVar,
   moveEnvVar,
 } from '../domains/env.ts';
-import { readTextFile, writeTextFile } from '../lib/safe-io.ts';
+import {
+  resolveInstructionsTarget,
+  readInstructionsInfo,
+  writeInstructions,
+} from '../domains/instructions.ts';
 
 /**
  * Маршруты сущностей. Ответ на изменение всегда содержит needsRestart:
@@ -85,16 +89,31 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     done(deleteRule(paths().claudeMd, request.params.id, ctx.store, ctx.backupDir)),
   );
 
-  // --- Глобальный CLAUDE.md целиком (сырой markdown) ---
-  // Раздел «Правила» разбирает CLAUDE.md на карточки, но там видно не всё: шапка,
+  // --- Глобальные инструкции целиком (универсальны по активному провайдеру) ---
+  // Раздел «Правила» разбирает файл на карточки, но там видно не всё: шапка,
   // произвольные секции и форматирование остаются за кадром. Здесь — файл целиком,
-  // как его читает сам Claude, с правкой и резервной копией перед записью.
-  app.get('/api/claude-md', () => ({ content: readTextFile(paths().claudeMd) }));
+  // как его читает сам CLI, с правкой и резервной копией перед записью. Файл
+  // берётся у активного провайдера: Claude→CLAUDE.md, Codex→AGENTS.md,
+  // Gemini→GEMINI.md. Провайдер без задокументированного файла инструкций
+  // (globalInstructions ≠ ready) → 4xx, путь не угадываем (fail-closed).
+  const SECTION_UNSUPPORTED = {
+    error: 'section_unsupported',
+    message: 'У активного провайдера нет раздела глобальных инструкций.',
+  } as const;
+
+  app.get('/api/claude-md', (_request, reply) => {
+    const target = resolveInstructionsTarget(ctx.store, paths().claudeMd);
+    if (!target) return reply.code(400).send(SECTION_UNSUPPORTED);
+    return readInstructionsInfo(target);
+  });
 
   app.put<{ Body: { content?: unknown } }>('/api/claude-md', (request, reply) => {
+    const target = resolveInstructionsTarget(ctx.store, paths().claudeMd);
+    if (!target) return reply.code(400).send(SECTION_UNSUPPORTED);
+
     const content = (request.body ?? {}).content;
     // Различаем «намеренно пустой файл» ('') и «поля content нет / оно не строка».
-    // Раньше писали `content ?? ''`: запрос без поля затирал CLAUDE.md пустотой.
+    // Раньше писали `content ?? ''`: запрос без поля затирал файл пустотой.
     // Пустая строка — валидна (осознанная очистка), всё нестроковое — отказ.
     if (typeof content !== 'string') {
       return reply.code(400).send({
@@ -103,7 +122,7 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
       });
     }
 
-    return done(writeTextFile(paths().claudeMd, content, { backupDir: ctx.backupDir }));
+    return done(writeInstructions(target, content, ctx.backupDir));
   });
 
   // --- Хуки (settings.json + settings.local.json) ---

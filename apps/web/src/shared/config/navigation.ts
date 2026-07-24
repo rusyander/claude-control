@@ -1,3 +1,4 @@
+import type { Capability } from '@claude-control/contracts';
 import type { IconName } from '@shared/ui/icon';
 
 /**
@@ -14,6 +15,14 @@ export interface NavItem {
   icon: IconName;
   /** Ключ счётчика в сводке — не у всех разделов он есть. */
   key: string;
+  /**
+   * К какой возможности провайдера привязан раздел. Задан — раздел гейтится по
+   * статусу возможности активного провайдера (ready → работает, planned → «в
+   * разработке», unsupported → скрыт). НЕ задан — раздел панель-level (Настройки,
+   * История, Поиск, Обзор, Группы, Справка): виден всегда, от провайдера не
+   * зависит.
+   */
+  capability?: Capability;
 }
 
 export interface NavSection {
@@ -24,7 +33,9 @@ export interface NavSection {
 
 /**
  * Навигация сгруппирована по смыслу: сначала то, что настраивает поведение
- * Claude, затем доступы и окружение, затем сам инструмент.
+ * провайдера, затем доступы и окружение, затем сам инструмент. Панель-level
+ * разделы (обзор, поиск, группы, история, настройки, справка) идут без
+ * `capability` — они не зависят от выбранного провайдера.
  */
 export const NAV_SECTIONS: NavSection[] = [
   {
@@ -32,28 +43,64 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { path: '/', label: 'nav.overview', icon: 'overview', key: 'overview' },
       { path: '/search', label: 'nav.search', icon: 'search', key: 'search' },
-      { path: '/analytics', label: 'nav.analytics', icon: 'analytics', key: 'analytics' },
-      { path: '/chat', label: 'nav.chat', icon: 'chat', key: 'chat' },
+      {
+        path: '/analytics',
+        label: 'nav.analytics',
+        icon: 'analytics',
+        key: 'analytics',
+        capability: 'analytics',
+      },
+      { path: '/chat', label: 'nav.chat', icon: 'chat', key: 'chat', capability: 'chat' },
     ],
   },
   {
     label: 'nav.sectionBehavior',
     items: [
-      { path: '/rules', label: 'nav.rules', icon: 'rules', key: 'rules' },
-      { path: '/claude-md', label: 'nav.claudeMd', icon: 'file', key: 'claudeMd' },
-      { path: '/skills', label: 'nav.skills', icon: 'skills', key: 'skills' },
-      { path: '/hooks', label: 'nav.hooks', icon: 'hooks', key: 'hooks' },
-      { path: '/scripts', label: 'nav.scripts', icon: 'scripts', key: 'scripts' },
-      { path: '/plugins', label: 'nav.plugins', icon: 'plugins', key: 'plugins' },
+      { path: '/rules', label: 'nav.rules', icon: 'rules', key: 'rules', capability: 'rules' },
+      {
+        path: '/claude-md',
+        label: 'nav.claudeMd',
+        icon: 'file',
+        key: 'claudeMd',
+        capability: 'globalInstructions',
+      },
+      { path: '/skills', label: 'nav.skills', icon: 'skills', key: 'skills', capability: 'skills' },
+      { path: '/hooks', label: 'nav.hooks', icon: 'hooks', key: 'hooks', capability: 'hooks' },
+      {
+        path: '/scripts',
+        label: 'nav.scripts',
+        icon: 'scripts',
+        key: 'scripts',
+        capability: 'scripts',
+      },
+      {
+        path: '/plugins',
+        label: 'nav.plugins',
+        icon: 'plugins',
+        key: 'plugins',
+        capability: 'plugins',
+      },
     ],
   },
   {
     label: 'nav.sectionIntegrations',
     items: [
-      { path: '/mcp', label: 'nav.mcp', icon: 'mcp', key: 'mcp' },
-      { path: '/permissions', label: 'nav.permissions', icon: 'permissions', key: 'permissions' },
-      { path: '/env', label: 'nav.env', icon: 'env', key: 'env' },
-      { path: '/projects', label: 'nav.projects', icon: 'folder', key: 'projects' },
+      { path: '/mcp', label: 'nav.mcp', icon: 'mcp', key: 'mcp', capability: 'mcp' },
+      {
+        path: '/permissions',
+        label: 'nav.permissions',
+        icon: 'permissions',
+        key: 'permissions',
+        capability: 'permissions',
+      },
+      { path: '/env', label: 'nav.env', icon: 'env', key: 'env', capability: 'env' },
+      {
+        path: '/projects',
+        label: 'nav.projects',
+        icon: 'folder',
+        key: 'projects',
+        capability: 'projects',
+      },
     ],
   },
   {
@@ -69,3 +116,12 @@ export const NAV_SECTIONS: NavSection[] = [
 
 /** Плоский список всех разделов — для палитры и горячих клавиш. */
 export const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((section) => section.items);
+
+/** Возможности, у которых есть раздел в навигации (у `sandbox` своего раздела нет). */
+export const NAV_CAPABILITIES: Capability[] = [
+  ...new Set(
+    NAV_ITEMS.map((item) => item.capability).filter((capability): capability is Capability =>
+      Boolean(capability),
+    ),
+  ),
+];

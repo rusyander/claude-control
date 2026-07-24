@@ -69,3 +69,30 @@ describe('settingsPatchSchema — акцент и онбординг', () => {
     expect(settingsPatchSchema.safeParse({ onboardingDone: 'yes' }).success).toBe(false);
   });
 });
+
+/**
+ * Провайдер конфигурации: валидное значение сверяется с реестром. Известны
+ * claude и объявленные экспериментальные (codex и др.); по-настоящему незнакомый
+ * id отклоняется, чтобы не осесть в state.json.
+ */
+describe('settingsPatchSchema — провайдер', () => {
+  it('пропускает известного провайдера claude', () => {
+    const parsed = settingsPatchSchema.safeParse({ provider: 'claude' });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.provider).toBe('claude');
+  });
+
+  it('пропускает объявленного экспериментального провайдера codex', () => {
+    const parsed = settingsPatchSchema.safeParse({ provider: 'codex' });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.provider).toBe('codex');
+  });
+
+  it('отклоняет по-настоящему неизвестного провайдера', () => {
+    expect(settingsPatchSchema.safeParse({ provider: 'nonexistent' }).success).toBe(false);
+  });
+
+  it('отклоняет провайдера неверного типа', () => {
+    expect(settingsPatchSchema.safeParse({ provider: 123 }).success).toBe(false);
+  });
+});

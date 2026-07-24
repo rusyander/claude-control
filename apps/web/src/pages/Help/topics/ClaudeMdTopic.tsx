@@ -135,6 +135,9 @@ export function ClaudeMdTopic() {
           <Callout tone="success" title={tr('noteHeadingTitle')}>
             {tr('noteHeadingText')}
           </Callout>
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

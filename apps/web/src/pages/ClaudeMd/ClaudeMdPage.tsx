@@ -9,13 +9,16 @@ import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useClaudeMd, useUpdateClaudeMd } from '@entities/AppConfig';
+import { instructionsView } from './model/instructionsView';
 import styles from './ClaudeMdPage.module.scss';
 
 /**
- * Глобальный CLAUDE.md целиком. Раздел «Правила» разбирает его на карточки, но
- * там видно не всё — шапка, произвольные секции, порядок и форматирование. Здесь
- * файл открыт как есть: посмотреть, что вообще в нём лежит, и поправить руками.
- * Перед записью сервер делает резервную копию.
+ * Глобальные инструкции целиком — универсальный по активному провайдеру раздел.
+ * У Claude это CLAUDE.md, у Codex — AGENTS.md, у Gemini — GEMINI.md; заголовок,
+ * подпись и пояснение подстраиваются под файл и провайдера. Раздел «Правила»
+ * разбирает файл на карточки, а здесь он открыт как есть: посмотреть, что вообще
+ * в нём лежит, и поправить руками. Перед записью сервер делает резервную копию.
+ * Для Claude вид и тексты остаются как раньше (регресс-ноль).
  */
 export function ClaudeMdPage() {
   const { t } = useTranslation();
@@ -25,22 +28,39 @@ export function ClaudeMdPage() {
 
   // Подхватываем содержимое, как только оно загрузилось.
   useEffect(() => {
-    if (data !== undefined && value === undefined) setValue(data);
+    if (data !== undefined && value === undefined) setValue(data.content);
   }, [data, value]);
 
-  if (isLoading || value === undefined) return <SkeletonList rows={6} withActions={false} />;
+  if (isLoading || value === undefined || data === undefined) {
+    return <SkeletonList rows={6} withActions={false} />;
+  }
 
-  const dirty = value !== data;
+  const view = instructionsView(data);
+  const dirty = value !== data.content;
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
       <PageHeader
-        title={t('claudeMd.title')}
-        subtitle={t('claudeMd.subtitle')}
+        title={t(view.title.key, view.title.params)}
+        subtitle={t(view.subtitle.key, view.subtitle.params)}
         helpTopic="claudeMd"
       />
 
-      <ExplainBox title={t('claudeMd.explainTitle')} text={t('claudeMd.explain')} />
+      <ExplainBox
+        title={t('claudeMd.explainTitle')}
+        text={t(view.explain.key, view.explain.params)}
+      />
+
+      {view.cliHint && (
+        <Card padding="sm">
+          <Stack direction="row" align="center" gap="var(--spacing-xs)">
+            <Icon name="info" size={18} />
+            <Typography variant="body-sm" color="muted">
+              {t(view.cliHint.key, view.cliHint.params)}
+            </Typography>
+          </Stack>
+        </Card>
+      )}
 
       <Card padding="md">
         <Stack gap="var(--spacing-sm)">
@@ -49,7 +69,7 @@ export function ClaudeMdPage() {
             value={value}
             onChange={(event) => setValue(event.target.value)}
             spellCheck={false}
-            aria-label={t('claudeMd.title')}
+            aria-label={t(view.title.key, view.title.params)}
           />
 
           <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
@@ -62,7 +82,7 @@ export function ClaudeMdPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setValue(data)}
+                onClick={() => setValue(data.content)}
                 disabled={!dirty || update.isPending}
               >
                 {t('claudeMd.revert')}

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { diffLines, buildHistory, buildDiff } from './history.ts';
+import { basename, join } from 'node:path';
+import { diffLines, buildHistory, buildDiff, revertHunk } from './history.ts';
+import type { TrackedFile } from './tracked-files.ts';
 
 /**
  * История изменений — лента правок из резервных копий с построчным диффом.
@@ -12,6 +13,12 @@ import { diffLines, buildHistory, buildDiff } from './history.ts';
  * безопасность — имя копии приходит из запроса, `../` не должен читать чужой
  * файл, а посторонние файлы в каталоге копий в ленту не попадают.
  */
+
+/** Отслеживаемый файл Claude: имя копии = basename, откат разрешён. */
+function claudeTarget(path: string): TrackedFile {
+  const file = basename(path);
+  return { backupBase: file, path, file, canRevert: true };
+}
 
 describe('История изменений', () => {
   describe('построчный дифф (diffLines)', () => {
@@ -69,7 +76,7 @@ describe('История изменений', () => {
     let dir: string;
     let backupDir: string;
     let settingsPath: string;
-    let knownPaths: Record<string, string>;
+    let knownPaths: TrackedFile[];
 
     beforeEach(() => {
       dir = mkdtempSync(join(tmpdir(), 'cc-history-'));
@@ -86,7 +93,7 @@ describe('История изменений', () => {
         'line1\nline2\n',
       );
 
-      knownPaths = { settings: settingsPath };
+      knownPaths = [claudeTarget(settingsPath)];
     });
 
     afterEach(() => {
@@ -143,7 +150,7 @@ describe('История изменений', () => {
   describe('безопасность', () => {
     let dir: string;
     let backupDir: string;
-    let knownPaths: Record<string, string>;
+    let knownPaths: TrackedFile[];
 
     beforeEach(() => {
       dir = mkdtempSync(join(tmpdir(), 'cc-history-sec-'));
@@ -151,7 +158,7 @@ describe('История изменений', () => {
       mkdirSync(backupDir, { recursive: true });
       writeFileSync(join(dir, 'settings.json'), 'x\n');
       writeFileSync(join(backupDir, 'settings.json.2026-07-19T10-00-00-000Z.bak'), 'y\n');
-      knownPaths = { settings: join(dir, 'settings.json') };
+      knownPaths = [claudeTarget(join(dir, 'settings.json'))];
     });
 
     afterEach(() => {
@@ -177,6 +184,92 @@ describe('История изменений', () => {
 
     it('нет каталога копий — пустая лента без исключения', () => {
       expect(buildHistory(join(dir, 'нет-такого'), knownPaths)).toEqual([]);
+    });
+  });
+
+  describe('файлы провайдера в ленте (Ф11a)', () => {
+    let dir: string;
+    let backupDir: string;
+    let claudeSettings: string;
+    let geminiSettings: string;
+    let targets: TrackedFile[];
+    const GEMINI_COPY = 'gemini-settings.json.2026-07-20T10-00-00-000Z.bak';
+    const CLAUDE_COPY = 'settings.json.2026-07-20T10-00-00-000Z.bak';
+
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), 'cc-history-prov-'));
+      backupDir = join(dir, 'backups');
+      mkdirSync(backupDir, { recursive: true });
+
+      // Одинаковый basename у обоих файлов — ровно тот случай, ради которого
+      // копии провайдеров получили префикс `<id>-` (Ф9-10).
+      claudeSettings = join(dir, 'claude', 'settings.json');
+      geminiSettings = join(dir, 'gemini', 'settings.json');
+      mkdirSync(join(dir, 'claude'));
+      mkdirSync(join(dir, 'gemini'));
+      writeFileSync(claudeSettings, 'claude-1\nclaude-2\n');
+      writeFileSync(geminiSettings, 'gemini-1\ngemini-2\n');
+      writeFileSync(join(backupDir, CLAUDE_COPY), 'claude-1\n');
+      writeFileSync(join(backupDir, GEMINI_COPY), 'gemini-1\n');
+
+      targets = [
+        claudeTarget(claudeSettings),
+        {
+          backupBase: 'gemini-settings.json',
+          path: geminiSettings,
+          file: 'settings.json',
+          canRevert: false,
+          providerId: 'gemini',
+          providerName: 'Gemini CLI',
+        },
+      ];
+    });
+
+    afterEach(() => {
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('правка файла провайдера видна в ленте с его пометкой', () => {
+      const items = buildHistory(backupDir, targets);
+      const gemini = items.find((item) => item.name === GEMINI_COPY)!;
+      expect(gemini.providerId).toBe('gemini');
+      expect(gemini.providerName).toBe('Gemini CLI');
+      // Показываем basename файла, а не имя копии с префиксом.
+      expect(gemini.file).toBe('settings.json');
+      expect(gemini.canRevert).toBe(false);
+    });
+
+    it('дифф копии провайдера считается против ЕГО файла, а не файла Claude', () => {
+      const diff = buildDiff(backupDir, GEMINI_COPY, targets)!;
+      expect(diff.label).toBe('current');
+      // Копия = gemini-1, текущий gemini-файл = gemini-1 + gemini-2.
+      expect(diff.lines.some((line) => line.kind === 'add' && line.text === 'gemini-2')).toBe(true);
+      // Ни одной строки из конфигурации Claude в дифф не попало.
+      expect(diff.lines.some((line) => line.text.startsWith('claude-'))).toBe(false);
+      expect(diff.canRevert).toBe(false);
+      expect(diff.providerId).toBe('gemini');
+    });
+
+    it('файл Claude в той же ленте сравнивается со своим файлом и откатываем', () => {
+      const claude = buildDiff(backupDir, CLAUDE_COPY, targets)!;
+      expect(claude.lines.some((line) => line.kind === 'add' && line.text === 'claude-2')).toBe(
+        true,
+      );
+      expect(claude.canRevert).toBe(true);
+      expect(claude.providerId).toBeUndefined();
+    });
+
+    it('ОТКАТ копии провайдера отклоняется — конфигурация Claude не тронута', () => {
+      const result = revertHunk(backupDir, GEMINI_COPY, 0, targets, backupDir);
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/только для просмотра/i);
+      expect(readFileSync(claudeSettings, 'utf8')).toBe('claude-1\nclaude-2\n');
+      expect(readFileSync(geminiSettings, 'utf8')).toBe('gemini-1\ngemini-2\n');
+    });
+
+    it('провайдер не активен — его копий в ленте нет вовсе', () => {
+      const items = buildHistory(backupDir, [claudeTarget(claudeSettings)]);
+      expect(items.map((item) => item.name)).toEqual([CLAUDE_COPY]);
     });
   });
 });

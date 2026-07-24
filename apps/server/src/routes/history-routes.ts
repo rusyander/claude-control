@@ -1,21 +1,21 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
 import { buildDiff, buildHistory, revertHunk } from '../domains/history.ts';
+import { trackedFiles } from '../domains/tracked-files.ts';
 
 /**
  * История изменений конфигурации: лента правок и полный дифф отдельной копии.
  *
  * Читающие маршруты без побочных эффектов — как поиск. Разбираются только копии
  * известных файлов конфигурации; имя копии из запроса за пределы каталога не
- * уводит (проверка в домене). Файл секретов .mcp-secrets.env в разрешённые
- * цели НЕ входит: его построчный дифф раскрыл бы значения токенов в интерфейсе.
+ * уводит (проверка в домене). Набор файлов — файлы Claude плюс файлы активного
+ * провайдера (см. `domains/tracked-files.ts`); секреты (`.mcp-secrets.env`,
+ * `provider-keys.enc`, `provider-keys.key`) в разрешённые цели НЕ входят: их
+ * построчный дифф раскрыл бы значения токенов в интерфейсе.
  */
 export function registerHistoryRoutes(app: FastifyInstance, ctx: ServerContext): void {
   /** Файлы, чьи изменения показываем. Секреты исключены намеренно. */
-  const trackedTargets = (): Record<string, string> => {
-    const { settings, settingsLocal, claudeMd, mcpConfig } = ctx.location.paths;
-    return { settings, settingsLocal, claudeMd, mcpConfig };
-  };
+  const trackedTargets = () => trackedFiles(ctx.location.paths, ctx.store);
 
   // store.backupDir, а не ctx.backupDir: историю показываем и тогда, когда
   // создание копий выключено, — старые копии никуда не делись.
@@ -38,6 +38,9 @@ export function registerHistoryRoutes(app: FastifyInstance, ctx: ServerContext):
    * маршрут — в отличие от чтений выше. Цели те же (секреты исключены), имя
    * копии проверяется в домене. Копию «состояния до» кладём в ctx.backupDir —
    * тот же каталог, что и прочие правки (если копии не выключены).
+   *
+   * Копия файла ПРОВАЙДЕРА откату не подлежит — домен отвечает отказом, маршрут
+   * отдаёт 400. Так копия чужого CLI не может попасть в конфигурацию Claude.
    */
   app.post<{ Body: { name?: string; hunk?: number } }>(
     '/api/history/revert-hunk',

@@ -64,6 +64,9 @@ export function ProjectsTopic() {
           <Callout tone="info" title={tr('noteUserTitle')}>
             {tr('noteUserText')}
           </Callout>
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

@@ -5,6 +5,12 @@ import { ServerContext } from './context.ts';
 import { registerConfigRoutes } from './routes/config-routes.ts';
 import { registerConfigBundleRoutes } from './routes/config-bundle-routes.ts';
 import { registerEntityRoutes } from './routes/entity-routes.ts';
+import { registerProviderMcpRoutes } from './routes/provider-mcp-routes.ts';
+import { registerProviderEnvRoutes } from './routes/provider-env-routes.ts';
+import { registerProviderInstructionsRoutes } from './routes/provider-instructions-routes.ts';
+import { registerProviderRulesRoutes } from './routes/provider-rules-routes.ts';
+import { registerProviderPermissionsRoutes } from './routes/provider-permissions-routes.ts';
+import { registerProviderKeysRoutes } from './routes/provider-keys-routes.ts';
 import { registerGroupRoutes } from './routes/group-routes.ts';
 import { registerAnalyticsRoutes } from './routes/analytics-routes.ts';
 import { registerPluginRoutes } from './routes/plugin-routes.ts';
@@ -17,6 +23,7 @@ import { registerBackupRoutes } from './routes/backup-routes.ts';
 import { registerHistoryRoutes } from './routes/history-routes.ts';
 import { registerSearchRoutes } from './routes/search-routes.ts';
 import { registerProjectRoutes } from './routes/project-routes.ts';
+import { registerProviderProjectRoutes } from './routes/provider-project-routes.ts';
 import { registerProjectRunnerRoutes } from './routes/project-runner-routes.ts';
 import { ProjectRunnerRegistry } from './domains/project-runner.ts';
 import { sweepAbandonedSandboxes } from './domains/sandbox/SandboxConfig.ts';
@@ -77,10 +84,16 @@ await app.register(cors, {
 registerConfigRoutes(app, ctx);
 registerConfigBundleRoutes(app, ctx);
 registerEntityRoutes(app, ctx);
+registerProviderMcpRoutes(app, ctx);
+registerProviderEnvRoutes(app, ctx);
+registerProviderInstructionsRoutes(app, ctx);
+registerProviderRulesRoutes(app, ctx);
+registerProviderPermissionsRoutes(app, ctx);
+registerProviderKeysRoutes(app, ctx);
 registerGroupRoutes(app, ctx);
 registerAnalyticsRoutes(app, ctx);
 registerPluginRoutes(app, ctx);
-registerAssistantRoutes(app);
+registerAssistantRoutes(app, ctx);
 registerScriptRoutes(app, ctx);
 registerChatRoutes(app, ctx);
 registerSandboxRoutes(app, ctx);
@@ -89,6 +102,7 @@ registerBackupRoutes(app, ctx);
 registerHistoryRoutes(app, ctx);
 registerSearchRoutes(app, ctx);
 registerProjectRoutes(app, ctx);
+registerProviderProjectRoutes(app, ctx);
 
 // Реестр dev-серверов проектов держим здесь, а не внутри маршрутов: при выходе
 // сервера панели их надо погасить (иначе спавненные процессы осиротеют).

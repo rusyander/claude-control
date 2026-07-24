@@ -159,6 +159,9 @@ export function EnvTopic() {
           <Callout tone="success" title={tr('noteCommentsTitle')}>
             {tr('noteCommentsText')}
           </Callout>
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

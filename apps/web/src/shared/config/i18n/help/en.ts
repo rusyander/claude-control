@@ -363,6 +363,14 @@ export const helpEn: HelpSchema = {
       noteHistoryText:
         'Very long conversations are trimmed from the top: transcripts run to hundreds ' +
         'of megabytes, and there is nothing to read them whole with in a browser.',
+      noteProviderTitle: 'The assistant is basic with other providers',
+      noteProviderText:
+        'Everything described here — streaming, attachments, branching, parallel agents, ' +
+        'history — works with the Claude provider. Codex and Gemini get a basic experimental ' +
+        'assistant instead: one question, one answer, no streaming and no attachments. Aider ' +
+        'gets the same basic assistant (aider --message), but it is built from the docs and ' +
+        'has not been exercised live — the CLI is not installed on the development machine. ' +
+        'For OpenCode the section is “in development”; Cursor has no model API of its own.',
     },
 
     overview: {
@@ -702,6 +710,12 @@ export const helpEn: HelpSchema = {
       noteBackupText:
         'The panel edits your real configuration. A copy before writing is the only way back ' +
         'if an edit turns out badly.',
+      noteProviderTitle: 'The configuration provider',
+      noteProviderText:
+        'This is also where you pick whose configuration the panel edits: Claude (the default, ' +
+        'everything works), Codex, Gemini, Cursor, OpenCode or Aider. After a switch the ' +
+        'sidebar rebuilds around that CLI’s capabilities. The breakdown is in the Providers ' +
+        'article.',
     },
 
     groups: {
@@ -1124,6 +1138,16 @@ export const helpEn: HelpSchema = {
       noteRevealText:
         'The full text of a secret does not travel with the list: it is fetched only on a ' +
         'click. The default behaviour can be changed in the application settings.',
+      noteProviderTitle: 'Other providers, other file',
+      noteProviderText:
+        'With the Codex provider the variables live in the shell_environment_policy.set table ' +
+        'of config.toml, with Aider in the set-env key of .aider.conf.yml (the global one ' +
+        'or the one in the repository root), with Gemini ' +
+        'in the plain ~/.gemini/.env file (and the per-project .gemini/.env). Comments, ' +
+        'blank lines and ordering survive the write: only the lines of the affected ' +
+        'variables change. For OpenCode the section is “in development”; for Cursor it is ' +
+        'hidden. Secrets in .mcp-secrets.env ' +
+        'and masking are Claude capabilities too.',
     },
 
     mcp: {
@@ -1324,6 +1348,12 @@ export const helpEn: HelpSchema = {
       noteRestartText:
         'Claude Code asks for the tool list when a session starts. A server connected just ' +
         'now is not there in an open conversation.',
+      noteProviderTitle: 'The shape is simpler with other providers',
+      noteProviderText:
+        'MCP exists for Codex (TOML), Gemini, Cursor and OpenCode, and the panel edits their ' +
+        'files directly. The connection check, OAuth, disabling a server and browsing its ' +
+        'tools stay Claude capabilities, though: for the others this is a plain list of ' +
+        'servers. Aider has no MCP setting at all and the section is hidden.',
     },
 
     permissions: {
@@ -1488,6 +1518,17 @@ export const helpEn: HelpSchema = {
       noteChatText:
         'The “ask” decision is meant for an interactive terminal. The panel chat has no ' +
         'confirmation buttons, so there the edit toggle does the job wholesale.',
+      noteProviderTitle: 'Codex uses a different model',
+      noteProviderText:
+        'With the Codex provider these are not allow/ask/deny lists but two config.toml keys: ' +
+        'approval_policy (when to ask) and sandbox_mode (what may be written). Gemini uses ' +
+        'a third model, kept in settings.json: the approval mode general.defaultApprovalMode ' +
+        'plus the tool lists coreTools (what is allowed) and excludeTools (what is blocked, ' +
+        'and it wins). Allowing by list is safer than blocking by list. The panel never ' +
+        'writes the yolo mode: in Gemini it is a command-line flag only and breaks CLI ' +
+        'startup from the settings file. Templates, mcp__* permissions and moving an entry ' +
+        'between files are Claude capabilities. For OpenCode the section is “in ' +
+        'development”; for Cursor and Aider it is hidden.',
     },
 
     scripts: {
@@ -1643,6 +1684,12 @@ export const helpEn: HelpSchema = {
       noteRestartText:
         'A script is read from disk when it runs, so new code takes effect on the next ' +
         'event. A restart is only needed when the hooks themselves change.',
+      noteProviderTitle: 'The section works with every provider',
+      noteProviderText:
+        'Scripts are the panel’s own files, not a foreign config, so the section is there ' +
+        'with Codex, Gemini, Cursor, OpenCode or Aider too. Claude alone keeps the ' +
+        'sandbox, the “called by a hook” flag and the hook scaffolds: the other CLIs have ' +
+        'no hooks, so plain standalone scripts are offered instead.',
     },
 
     hooks: {
@@ -2344,6 +2391,21 @@ export const helpEn: HelpSchema = {
         'The Rules section shows any “## Heading” as a rule, and the “ПРАВИЛО:” prefix is ' +
         'optional — it is stripped on read and added back on write. For a subheading inside ' +
         'a rule use the third level, “### ”.',
+      noteProviderTitle: 'Other providers, three different instruction models',
+      noteProviderText:
+        'The section is universal, but the CLIs organise instructions differently and the ' +
+        'panel shows the model that actually exists. ONE FILE: Claude (CLAUDE.md), Codex and ' +
+        'OpenCode (AGENTS.md), Gemini (GEMINI.md) — everything above is about them. LIST OF ' +
+        'REFERENCES: Aider has no single instructions file — context files are declared by ' +
+        'the read option in .aider.conf.yml, and the section edits exactly that list (add, ' +
+        'remove, reorder); the contents of a listed file can be opened separately, if that ' +
+        'file already exists. RULES DIRECTORY: Cursor keeps rules in ~/.cursor/rules (and ' +
+        '<project>/.cursor/rules), where every .mdc file is one rule: frontmatter on top ' +
+        'with a description, file globs and an "always apply" flag, markdown text below. ' +
+        'There the section becomes a manager for that directory: list, create, edit, delete; ' +
+        'subdirectories are supported, and a plain .md is ignored by Cursor — the panel ' +
+        'lists such files separately and never touches them. Details are in the Providers ' +
+        'article.',
     },
 
     search: {
@@ -2506,6 +2568,209 @@ export const helpEn: HelpSchema = {
       noteUserText:
         'The Rules, MCP and Permissions sections still manage ~/.claude. The project ' +
         'level does not replace them, it complements them.',
+      noteProviderTitle: 'Another provider means its own project files',
+      noteProviderText:
+        'Everything above describes Claude. With another CLI active the project registry ' +
+        'is the same, but you edit ITS project files: project instructions (AGENTS.md for ' +
+        'Codex and OpenCode, GEMINI.md for Gemini) and the project’s MCP servers ' +
+        '(.codex/config.toml, .gemini/settings.json, opencode.json, .cursor/mcp.json). ' +
+        'Gemini adds the project’s environment variables (.gemini/.env) and permissions. ' +
+        'Aider’s project level is the .aider.conf.yml in the repository root: the read list ' +
+        'of attached files and the set-env variables. Instead of a project instructions file ' +
+        'Cursor gets the rules directory <project>/.cursor/rules/*.mdc — the same one as ' +
+        'globally, with the same path safety. Nobody but Claude gets project hooks.',
+    },
+
+    providers: {
+      title: 'Providers',
+      summary: 'The panel configures more than Claude Code — what works with each CLI',
+      lead:
+        'The Claude provider is active by default, and with it everything is available. ' +
+        'But the neighbouring agentic CLIs keep their configuration the same way — an ' +
+        'instructions file, MCP servers, environment variables, an approval policy — and ' +
+        'the panel edits those files directly, each in its native format. Far from ' +
+        'everything is universal, though: every provider gets its own set of sections, ' +
+        'and below is an honest account of which.',
+
+      whyOne: 'One UI across several CLIs',
+      whyOneText:
+        'You no longer have to remember that Codex keeps MCP in TOML, Gemini in JSON, ' +
+        'OpenCode under a different key in a different shape, and that Aider writes ' +
+        'variables as a YAML list. The forms are the ones you know from Claude, and what ' +
+        'gets written is what that CLI actually reads.',
+      whyDefault: 'Claude stays the default',
+      whyDefaultText:
+        'The panel grew out of Claude Code and stays its tool. The provider never ' +
+        'switches by itself and nothing is automatic: changing it is your explicit act.',
+      whySafe: 'A foreign config does not get damaged',
+      whySafeText:
+        'A backup before the write, an atomic write, a format check before writing, and a ' +
+        'refusal instead of a guess. An unfamiliar file leaves the section read-only.',
+
+      chooseTitle: 'Choosing a provider',
+      chooseCaption: 'The switch lives in Settings; the same step appears in onboarding.',
+      chooseStep1: 'Open Settings → Configuration provider',
+      chooseStep1Text:
+        'A card with the list: Claude first as the verified one, then the experimental ones.',
+      chooseStep2: 'Look at the badges',
+      chooseStep2Text:
+        'Each provider shows whether its CLI is installed, whether its configuration ' +
+        'directory was found, and which one is recommended. Next to it: how many sections ' +
+        'are ready and how many are in development.',
+      chooseStep3: 'Press “Choose”',
+      chooseStep3Text:
+        'The provider setting is saved right away and the sidebar rebuilds around that ' +
+        'CLI’s capabilities. No restart of the panel is needed.',
+      chooseStep4: 'You can return to Claude at any time',
+      chooseStep4Text:
+        'Switching back brings every section along: Claude’s settings were never touched ' +
+        'while another provider was active.',
+
+      statusTitle: 'What the labels mean',
+      statusCaption:
+        'Two groups: how well the provider itself is proven, and what is going on with a ' +
+        'particular section.',
+      statusVerified: 'The provider is verified',
+      statusVerifiedText:
+        'Its path has been exercised live and is covered by tests. Right now only Claude ' +
+        'Code carries this status.',
+      statusVerifiedBadge: 'verified',
+      statusExperimental: 'The provider is experimental',
+      statusExperimentalText:
+        'The formats come from that CLI’s documentation and are covered by round-trip ' +
+        'tests, but there has been no live run on it. We do not guess — and we do not pass ' +
+        'it off as verified either.',
+      statusExperimentalBadge: 'experimental',
+      statusReady: 'The section works',
+      statusReadyText: 'That CLI’s real file is read and written, just like Claude’s.',
+      statusReadyBadge: 'ready',
+      statusPlanned: 'The section is in development',
+      statusPlannedText:
+        'Visible with a badge, but it opens a placeholder: the format adapter does not ' +
+        'exist yet, so the section neither reads nor writes anything. That is a safeguard, ' +
+        'not an unfinished screen.',
+      statusPlannedBadge: 'in development',
+      statusHidden: 'The section is not there at all',
+      statusHiddenText:
+        'That CLI has no such entity — there is nothing to port, so the item is removed ' +
+        'from the menu rather than shown empty.',
+      statusHiddenBadge: 'hidden',
+
+      mapTitle: 'The map: section × provider',
+      mapCaption:
+        'An honest snapshot as of today. Anything missing from a row is hidden for that ' +
+        'CLI: the entity simply does not exist there.',
+      mapSection: 'Section',
+      mapProviders: 'Who supports it',
+      mapInstructions: 'Global instructions',
+      mapInstructionsValue:
+        'Works everywhere, in three different models. ONE FILE: Claude (CLAUDE.md), Codex ' +
+        'and OpenCode (AGENTS.md), Gemini (GEMINI.md). LIST OF REFERENCES: Aider has no ' +
+        'single file — the panel edits the list of attached files (the read option in ' +
+        '.aider.conf.yml) and, separately, the contents of an already existing listed file. ' +
+        'RULES DIRECTORY: for Cursor it is ~/.cursor/rules (and the same directory inside a ' +
+        'project) with .mdc files — each has its own frontmatter (description, file globs, ' +
+        'an "always apply" flag) and a markdown body; nested subdirectories are supported. ' +
+        'A plain .md in the rules directory is ignored by Cursor — the panel lists such ' +
+        'files separately and never edits them.',
+      mapMcp: 'MCP servers',
+      mapMcpValue:
+        'Works: Claude, Codex (TOML), Gemini, Cursor, OpenCode (its own local/remote ' +
+        'shape). Aider has no MCP setting at all — the section is hidden.',
+      mapEnv: 'Environment variables',
+      mapEnvValue:
+        'Works: Claude, Codex (shell_environment_policy.set), Aider (set-env — the global ' +
+        '~/.aider.conf.yml and the per-project one in the repository root), Gemini ' +
+        '(a plain .env file — the global ~/.gemini/.env and the per-project one). In ' +
+        'development: OpenCode. Hidden for Cursor.',
+      mapPermissions: 'Permissions and approvals',
+      mapPermissionsValue:
+        'Works: Claude (allow/ask/deny), Codex (approval_policy and sandbox_mode), Gemini ' +
+        '(the approval mode general.defaultApprovalMode plus the coreTools and ' +
+        'excludeTools lists). In development: OpenCode — it uses its own model. Hidden ' +
+        'for Cursor and Aider.',
+      mapChat: 'Chat and assistant',
+      mapChatValue:
+        'The full chat with streaming, attachments and parallel agents is Claude only. ' +
+        'Codex, Gemini and Aider get a basic experimental assistant: one question, one ' +
+        'answer (codex exec, gemini -p, aider --message). Aider’s assistant is built from ' +
+        'the docs and has not been exercised live: the CLI is not installed on the ' +
+        'development machine. OpenCode is in development; Cursor has no model API of its own.',
+      mapScripts: 'Scripts',
+      mapScriptsValue:
+        'Works everywhere: this is the panel’s own section — your files in its hooks/ ' +
+        'folder, not a foreign config. Claude keeps the sandbox, the “called by a hook” ' +
+        'flag and the hook scaffolds; the rest get plain standalone scripts instead.',
+      mapProjects: 'Projects',
+      mapProjectsValue:
+        'Works everywhere, but differently. Claude gets the project’s rules, MCP servers ' +
+        'and permissions. Codex and OpenCode get project instructions (AGENTS.md) and MCP ' +
+        'servers from the project file. Gemini adds the project’s environment variables ' +
+        '(.gemini/.env) and permissions (.gemini/settings.json). Cursor gets the project MCP ' +
+        '(.cursor/mcp.json) and the project rules directory .cursor/rules/*.mdc. Aider gets the ' +
+        '.aider.conf.yml in the repository root (the config is looked up in the home ' +
+        'directory, the git repository root and the current directory): the read list of ' +
+        'attached files and the set-env variables.',
+      mapClaudeOnly: 'Claude only',
+      mapClaudeOnlyValue:
+        'Rules, skills, hooks, plugins, token analytics and the sandbox. This is not “we ' +
+        'did not get to it”: the other CLIs either have no such entity or build it on ' +
+        'different lines. Project hooks are part of Claude’s format too — the others do ' +
+        'not have them.',
+      mapPanel: 'Always available',
+      mapPanelValue:
+        'Overview, search, groups, history, settings and help are the panel’s own ' +
+        'sections and do not depend on the provider.',
+
+      filesCaption: 'Exactly where the panel writes for each provider.',
+      fileInstructions: 'Instructions',
+      fileMcp: 'MCP servers',
+      fileEnv: 'Environment',
+      fileRules: 'Rules',
+      fileRest: 'Everything else',
+      fileClaudeRest: '~/.claude/settings.json, ~/.claude.json',
+      fileOverride: 'Directory override',
+      fileProject: 'Project level',
+
+      runnerTitle: 'Your subscription outranks a paid API',
+      runnerCaption: 'The order is fixed: free-for-you first, a paid key only as the last resort.',
+      runnerTop: 'picked first',
+      runnerBottom: 'last resort',
+      runnerCli:
+        'The provider’s CLI on PATH that you are already logged into — it runs on your ' +
+        'subscription',
+      runnerApi: 'An API key — only if the CLI was not found; the fallback path, not the main one',
+      runnerNone:
+        'Neither one — the panel shows how to log in, or where to get a key if you cannot',
+      runnerKeyTitle: 'A stored key does not override the CLI',
+      runnerKeyText:
+        'Even with a key entered, the panel goes through the CLI when it finds one: there ' +
+        'is no reason to pay for what the subscription already covers. Keys are stored ' +
+        'encrypted, only a mask ever leaves the server, and they never reach the backups, ' +
+        'the history, the search or the export.',
+
+      notesTitle: 'Things that trip people up',
+      noteMissingTitle: 'A missing CLI is not a breakage',
+      noteMissingText:
+        'Configuration is just files: you can edit it before the CLI itself is installed. ' +
+        'Without the CLI only the assistant is limited — it will ask for a key or show you ' +
+        'how to log in. Check that the executable is on PATH and restart the panel.',
+      noteSafeTitle: 'A placeholder writes nothing',
+      noteSafeText:
+        'An “in development” section opens a placeholder and sends no changes. That is ' +
+        'deliberate: an empty screen beats a guess at somebody else’s format.',
+      noteHistoryTitle: 'History and search follow the provider',
+      noteHistoryText:
+        'The feed and the search cover Claude’s files plus the working sections of the ' +
+        'active provider. Backups of a foreign config are stored under their own name and ' +
+        'never mix with Claude’s, but nothing can be restored from them — neither the ' +
+        'whole file nor a single change.',
+      noteFirstRunTitle: 'Eyeball the first write',
+      noteFirstRunText:
+        'A foreign CLI’s format is taken from its documentation and checked by round-trip ' +
+        'tests, but the first real write into each newly touched file is worth opening and ' +
+        'looking at. The backup of the previous version is already taken, so there is ' +
+        'somewhere to roll back to.',
     },
   },
 };

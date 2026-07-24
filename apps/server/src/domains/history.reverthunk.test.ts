@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { buildDiff, revertHunk } from './history.ts';
+import type { TrackedFile } from './tracked-files.ts';
 
 /**
  * Выборочный откат ОДНОГО ханка из копии в текущий файл.
@@ -12,11 +13,18 @@ import { buildDiff, revertHunk } from './history.ts';
  * копии из запроса не должно уводить запись наружу, а индексы ханков сервера
  * совпадают с тем, что видно в диффе (buildDiff проставляет hunk строкам).
  */
+
+/** Отслеживаемый файл Claude: имя копии = basename, откат разрешён. */
+function claudeTarget(path: string): TrackedFile {
+  const file = basename(path);
+  return { backupBase: file, path, file, canRevert: true };
+}
+
 describe('Выборочный откат ханка', () => {
   let dir: string;
   let backupDir: string;
   let settingsPath: string;
-  let knownPaths: Record<string, string>;
+  let knownPaths: TrackedFile[];
   // Копия и текущий файл различаются в двух местах, разделённых контекстом, —
   // это два независимых ханка (0: b→B, 1: d→D).
   const SNAPSHOT = 'a\nb\nc\nd\ne\n';
@@ -31,7 +39,7 @@ describe('Выборочный откат ханка', () => {
 
     writeFileSync(settingsPath, CURRENT);
     writeFileSync(join(backupDir, NAME), SNAPSHOT);
-    knownPaths = { settings: settingsPath };
+    knownPaths = [claudeTarget(settingsPath)];
   });
 
   afterEach(() => {

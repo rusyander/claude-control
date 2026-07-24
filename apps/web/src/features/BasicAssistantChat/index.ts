@@ -1,0 +1,1 @@
+export { BasicAssistantChat } from './BasicAssistantChat';

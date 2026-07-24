@@ -17,6 +17,7 @@ import { ProjectsTopic } from '../topics/ProjectsTopic';
 import { GroupsTopic } from '../topics/GroupsTopic';
 import { HistoryTopic } from '../topics/HistoryTopic';
 import { SettingsTopic } from '../topics/SettingsTopic';
+import { ProvidersTopic } from '../topics/ProvidersTopic';
 
 export { HELP_ROUTE } from '@shared/config/routes';
 
@@ -85,6 +86,12 @@ export const HELP_GROUPS: HelpGroup[] = [
       { id: 'groups', icon: 'groups', pagePath: '/groups', Content: GroupsTopic },
       { id: 'history', icon: 'history', pagePath: '/history', Content: HistoryTopic },
       { id: 'settings', icon: 'settings', pagePath: '/settings', Content: SettingsTopic },
+      // Единственный сквозной документ: он объясняет не свой раздел, а почему
+      // набор разделов вообще меняется. Своей страницы у него нет, поэтому
+      // `pagePath` ведёт в «Настройки» — там стоит переключатель провайдера.
+      // Идёт ПОСЛЕ settings: кнопку «?» на самой странице настроек должен
+      // ловить документ настроек (findTopicByPagePath берёт первое совпадение).
+      { id: 'providers', icon: 'swap', pagePath: '/settings', Content: ProvidersTopic },
     ],
   },
 ];

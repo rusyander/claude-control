@@ -7,7 +7,9 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { NotificationCenter } from '@shared/ui/notification-center';
+import { Badge } from '@shared/ui/badge';
 import { useOverview } from '@entities/AppConfig';
+import { useProviders, activeCapabilities, gateNavSections } from '@entities/Provider';
 import { NAV_SECTIONS } from './Sidebar.constants';
 import { AppMark } from './AppMark';
 import type { SidebarProps } from './Sidebar.types';
@@ -33,6 +35,12 @@ const COLLAPSED_WIDTH = 60;
 export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProps) {
   const { t } = useTranslation();
   const { data: overview } = useOverview();
+  const { data: providers } = useProviders();
+
+  // Навигация гейтится возможностями активного провайдера: `unsupported`-разделы
+  // убраны, `planned` помечены. Пока данные не загружены — показываем всё (для
+  // дефолтного Claude всё `ready`, так что при Claude вид не меняется).
+  const sections = gateNavSections(NAV_SECTIONS, activeCapabilities(providers));
 
   const counts: Record<string, number | undefined> = {
     rules: overview?.rules.total,
@@ -117,7 +125,7 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
         {/* Журнал уведомлений: колокольчик со счётчиком и списком последних тостов. */}
         <NotificationCenter isCollapsed={isCollapsed} />
 
-        {NAV_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <Stack key={section.label} gap="var(--spacing-3xs)">
             {label(t(section.label), styles.sectionLabel)}
 
@@ -127,15 +135,27 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
                 to={item.path}
                 className={styles.navLink}
                 // В свёрнутом виде подписи не видно — подсказка браузера её заменяет.
-                title={isCollapsed ? t(item.label) : undefined}
+                title={
+                  isCollapsed
+                    ? item.access === 'inDevelopment'
+                      ? `${t(item.label)} — ${t('providers.inDevelopment')}`
+                      : t(item.label)
+                    : undefined
+                }
               >
                 <Icon name={item.icon} size={24} />
 
                 {label(
                   <>
                     {t(item.label)}
-                    {counts[item.key] !== undefined && (
-                      <span className={styles.navCount}>{counts[item.key]}</span>
+                    {item.access === 'inDevelopment' ? (
+                      // Раздел провайдера ещё в разработке: помечаем, счётчик не
+                      // показываем (за ним нет реальных данных).
+                      <Badge tone="warning">{t('providers.inDevelopmentShort')}</Badge>
+                    ) : (
+                      counts[item.key] !== undefined && (
+                        <span className={styles.navCount}>{counts[item.key]}</span>
+                      )
                     )}
                   </>,
                   styles.navLabel,

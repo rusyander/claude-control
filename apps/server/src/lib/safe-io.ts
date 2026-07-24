@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { encryptSecret } from './secret-crypto.ts';
+import { applyTextForm, detectTextForm, stripBom, type TextForm } from './text-form.ts';
 
 /**
  * Файловые операции с двумя страховками, потому что мы правим рабочий конфиг
@@ -29,16 +30,57 @@ export function readJsonFile<T>(path: string, fallback: T): T {
   if (!existsSync(path)) return fallback;
   const raw = readFileSync(path, 'utf8');
   if (!raw.trim()) return fallback;
-  return JSON.parse(raw) as T;
+  // BOM снимаем: с ним `JSON.parse` падает на совершенно валидном файле
+  // (Блокнот/PowerShell пишут settings.json именно так) — это уводило бы раздел
+  // в fail-closed на здоровом конфиге. Сам BOM при записи вернётся (см. writeTextFile).
+  return JSON.parse(stripBom(raw)) as T;
 }
 
 export function readTextFile(path: string, fallback = ''): string {
-  return existsSync(path) ? readFileSync(path, 'utf8') : fallback;
+  // Тоже без BOM: иначе он утекал бы в редактор инструкций как невидимый символ
+  // в начале текста и «прилипал» бы вторым при каждом сохранении.
+  return existsSync(path) ? stripBom(readFileSync(path, 'utf8')) : fallback;
 }
+
+/**
+ * Форма существующего файла (BOM + переводы строк) — или `undefined`, если файла
+ * нет либо он неправдоподобно велик (форму не гадаем и не читаем гигабайты).
+ */
+export function readTextForm(path: string): TextForm | undefined {
+  try {
+    if (!existsSync(path)) return undefined;
+    const stats = statSync(path);
+    if (!stats.isFile() || stats.size > MAX_FORM_PROBE_BYTES) return undefined;
+    return detectTextForm(readFileSync(path, 'utf8'));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Выше этого размера форму файла не определяем — запись идёт как есть. */
+const MAX_FORM_PROBE_BYTES = 4 * 1024 * 1024;
 
 export interface WriteOptions {
   /** Куда складывать резервные копии. Пусто — не делать копий. */
   backupDir?: string;
+  /**
+   * Под каким ИМЕНЕМ сохранять копию (по умолчанию — basename пути).
+   *
+   * Нужно, потому что каталог копий один на всю панель, а разные провайдеры имеют
+   * файлы с ОДИНАКОВЫМИ basename: `~/.claude/settings.json` и
+   * `~/.gemini/settings.json`, `~/.codex/AGENTS.md` и `~/.config/opencode/AGENTS.md`.
+   * Без разделения копии смешивались бы в одной ротации, а откат по basename вернул
+   * бы чужой файл поверх claude-конфига. Провайдер-разделы передают сюда
+   * `<id>-<basename>`.
+   */
+  backupName?: string;
+  /**
+   * Сохранять форму СУЩЕСТВУЮЩЕГО файла (BOM + стиль переводов строк). По
+   * умолчанию да: панель правит чужие рабочие файлы и не должна менять их вид.
+   * Явное `false` — для хирургических правок, где итог уже собран из исходного
+   * текста байт-в-байт (нормализация всего файла там как раз навредила бы).
+   */
+  preserveForm?: boolean;
 }
 
 /**
@@ -54,12 +96,21 @@ export function writeTextFile(
   content: string,
   options: WriteOptions = {},
 ): string | undefined {
-  const backupPath = options.backupDir ? makeBackup(path, options.backupDir) : undefined;
+  const backupPath = options.backupDir
+    ? makeBackup(path, options.backupDir, options.backupName)
+    : undefined;
+
+  // Форму берём ДО записи: был BOM — вернём BOM, был CRLF — приведём к CRLF.
+  // Иначе сгенерированный нами LF-текст оставил бы в чужом файле смешанные
+  // окончания строк. У нового файла формы нет — пишем содержимое как есть.
+  const form = options.preserveForm === false ? undefined : readTextForm(path);
+  const payload = form ? applyTextForm(content, form) : content;
+
   mkdirSync(dirname(path), { recursive: true });
 
   // Временный файл лежит рядом с целевым: переименование в пределах одного тома атомарно.
   const tmp = `${path}.tmp-${process.pid}-${(tmpCounter += 1)}`;
-  writeFileSync(tmp, content, 'utf8');
+  writeFileSync(tmp, payload, 'utf8');
   renameSync(tmp, path);
 
   return backupPath;
@@ -225,14 +276,43 @@ export function removeEntry(target: string): void {
   rmdirSync(target);
 }
 
-function makeBackup(path: string, backupDir: string): string | undefined {
-  return backupEntry(path, backupDir);
+function makeBackup(path: string, backupDir: string, name?: string): string | undefined {
+  return backupEntry(path, backupDir, name);
+}
+
+/**
+ * Имя резервной копии файла ПРОВАЙДЕРА — с префиксом его id.
+ *
+ * Каталог копий один на всю панель, а basename у файлов разных провайдеров
+ * совпадает: `~/.gemini/settings.json` и `~/.claude/settings.json`,
+ * `~/.codex/AGENTS.md` и `~/.config/opencode/AGENTS.md`. Без префикса их копии
+ * попадали бы в ОДНУ ротацию (десять копий на всех), лента истории показывала бы
+ * дифф чужого файла против claude-конфига, а откат (он ищет цель по basename)
+ * вернул бы настройки Gemini поверх `~/.claude/settings.json`. Префикс делает
+ * копии провайдеров различимыми и невосстановимыми по чужому пути (fail-closed).
+ */
+export function providerBackupName(providerId: string, filePath: string): string {
+  return `${providerId}-${basename(filePath)}`;
+}
+
+/**
+ * Имя резервной копии ПРОЕКТНОГО файла провайдера — `<id>-project-<basename>`.
+ *
+ * Отдельно от `providerBackupName`, потому что basename проектного файла
+ * совпадает с глобальным (`<проект>/.codex/config.toml` ↔ `~/.codex/config.toml`,
+ * `<проект>/AGENTS.md` ↔ `~/.codex/AGENTS.md`). Без своего префикса копии
+ * проектных и глобальных файлов делили бы одну ротацию (правки проекта вытесняли
+ * бы историю глобального конфига), а лента изменений показывала бы дифф проекта
+ * как правку глобального файла. Восстановление у них так же запрещено.
+ */
+export function providerProjectBackupName(providerId: string, filePath: string): string {
+  return `${providerId}-project-${basename(filePath)}`;
 }
 
 /** Проверка, что строка — валидный JSON. Используется до записи, чтобы не портить конфиг. */
 export function assertValidJson(raw: string): void {
   try {
-    JSON.parse(raw);
+    JSON.parse(stripBom(raw));
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`Невалидный JSON: ${detail}`, { cause: error });

@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from './types.ts';
 
 /**
@@ -13,7 +13,11 @@ import { buildCapabilities, type ConfigProvider } from './types.ts';
  *  - OpenCode — XDG: глобальный конфиг лежит в
  *    `$XDG_CONFIG_HOME/opencode`, и лишь при незаданной переменной — в
  *    `~/.config/opencode`. Для Linux это не косметика: у пользователя с
- *    заданным `XDG_CONFIG_HOME` путь `~/.config/opencode` попросту неверен.
+ *    заданным `XDG_CONFIG_HOME` путь `~/.config/opencode` попросту неверен;
+ *  - OpenCode — `OPENCODE_CONFIG`: задокументированный перенос САМОГО ФАЙЛА
+ *    конфигурации (не каталога) в произвольное место. Уважают его только разделы,
+ *    которые правят `opencode.json` (MCP и права); `AGENTS.md` остаётся в
+ *    каталоге конфигурации, потому что переменная задаёт именно файл конфига.
  *
  * У Gemini, Cursor и Aider задокументированного переопределения каталога нет →
  * ничего не выдумываем, пути остаются от `os.homedir()`.
@@ -35,6 +39,16 @@ export function codexHome(): string {
 /** Каталог конфигурации OpenCode: `$XDG_CONFIG_HOME/opencode`, иначе `~/.config/opencode`. */
 export function opencodeConfigDir(): string {
   return join(envDir('XDG_CONFIG_HOME') ?? join(homedir(), '.config'), 'opencode');
+}
+
+/**
+ * Файл конфигурации OpenCode: `OPENCODE_CONFIG` (задокументированный перенос
+ * самого файла), иначе `opencode.json` в каталоге конфигурации. Значение
+ * прогоняется через `path.resolve` — как у `CODEX_HOME`/`XDG_CONFIG_HOME`;
+ * пустая/пробельная переменная игнорируется.
+ */
+export function opencodeConfigFile(): string {
+  return envDir('OPENCODE_CONFIG') ?? join(opencodeConfigDir(), 'opencode.json');
 }
 
 /**
@@ -268,39 +282,140 @@ const opencodeProvider: ConfigProvider = {
   // model, agents, …) и неизвестные поля сервера (включая `enabled`) сохраняются.
   mcpConfig: {
     format: 'opencode-json',
-    path: () => join(opencodeConfigDir(), 'opencode.json'),
+    path: opencodeConfigFile,
   },
-  // Проектный уровень OpenCode (COMMON-2): задокументированы проектный AGENTS.md
-  // и `<проект>/opencode.json` (тот же формат `opencode-json`, что и глобальный).
+  // Права OpenCode (OPENCODE-1) — ключ `permission` того же opencode.json:
+  // уровень `allow` | `deny` | `ask` у задокументированных инструментов (`edit`,
+  // `bash`, `webfetch`), а у `bash` вместо уровня допустима КАРТА ШАБЛОНОВ команд
+  // (`{"*":"ask","git *":"allow","git push *":"deny"}`). Правится только ключ
+  // `permission`; прочие ключи файла и не ведомые панелью записи внутри
+  // `permission` сохраняются (см. lib/opencode-permission.ts).
+  permissionsConfig: {
+    format: 'opencode-json',
+    path: opencodeConfigFile,
+  },
+  // Хуки OpenCode (OPENCODE-3) — ключ `experimental.hook` того же opencode.json.
+  // Событий ровно два и оба задокументированы: `file_edited` (карта «шаблон
+  // файлов → массив действий») и `session_completed` (массив действий). Действие
+  // = argv-МАССИВ `command` (не shell-строка) + необязательные переменные
+  // `environment`. ЧЕСТНО: ключ лежит под `experimental`, и OpenCode сам называет
+  // такие настройки нестабильными — интерфейс это прямо говорит. Правится только
+  // `experimental.hook`; прочие ключи `experimental` и незнакомые события
+  // сохраняются и показываются для чтения (см. lib/opencode-hook.ts).
+  hooksConfig: {
+    format: 'opencode-json',
+    path: opencodeConfigFile,
+  },
+  // Плагины OpenCode (OPENCODE-4) — два задокументированных способа сразу:
+  // КАТАЛОГ файлов JS/TS `~/.config/opencode/plugins/`, которые CLI подхватывает
+  // при старте, и массив имён npm-пакетов `plugin` в opencode.json (ключ
+  // подтверждён и страницей плагинов, и опубликованной схемой конфигурации).
+  // Каталог ведётся файловым менеджером с той же защитой путей, что у правил
+  // Cursor; список npm правится с сохранением всех прочих ключей файла.
+  pluginsConfig: {
+    format: 'opencode-plugins',
+    dir: () => join(opencodeConfigDir(), 'plugins'),
+    configPath: opencodeConfigFile,
+  },
+  // Скиллы OpenCode (OPENCODE-5) — каталог `~/.config/opencode/skills/`, папка на
+  // скилл, внутри `SKILL.md` с YAML-шапкой. Понятие то же, что у Claude, но поля
+  // шапки свои: распознаются `name` (обязательное), `description` (обязательное),
+  // `license`, `compatibility`, `metadata`; всё прочее CLI игнорирует, а панель
+  // сохраняет. Путь каталога НЕ следует за `OPENCODE_CONFIG` — та переменная
+  // переносит только сам файл конфигурации.
+  // Каталоги `~/.claude/skills` и `~/.agents/skills` OpenCode тоже читает,
+  // поэтому уже готовые скиллы Claude в нём работают без переноса. Панель
+  // сообщает об этом и НИЧЕГО туда не пишет: ими ведает раздел скиллов Claude.
+  skillsConfig: {
+    format: 'opencode-skills',
+    dir: () => join(opencodeConfigDir(), 'skills'),
+    alsoLoadedFrom: () => [
+      join(homedir(), '.claude', 'skills'),
+      join(homedir(), '.agents', 'skills'),
+    ],
+  },
+  // Переменных окружения у OpenCode НЕТ (OPENCODE-2, `env = unsupported`): по
+  // документации он умеет только подстановку `{env:ПЕРЕМЕННАЯ}` внутри
+  // opencode.json, то есть ЧИТАЕТ уже заданное окружение процесса, и своего
+  // `.env` не загружает (это открытая просьба к разработчикам, а не готовая
+  // возможность). Файл, который никто не читает, панель создавать не станет →
+  // `envConfig` не задан, раздел скрыт.
+  // Проектный уровень OpenCode (COMMON-2 + OPENCODE-1): задокументированы
+  // проектный AGENTS.md и `<проект>/opencode.json` — тот же формат
+  // `opencode-json`, поэтому оба адаптера (MCP и права) переиспользуются целиком.
   projectConfig: {
     instructions: 'AGENTS.md',
     mcp: { format: 'opencode-json', relativePath: 'opencode.json' },
+    permissions: { format: 'opencode-json', relativePath: 'opencode.json' },
+    // Хуки проекта (OPENCODE-3): тот же ключ `experimental.hook` того же формата
+    // в проектном opencode.json — адаптер переиспользуется целиком.
+    hooks: { format: 'opencode-json', relativePath: 'opencode.json' },
+    // Плагины проекта (OPENCODE-4): задокументированный каталог
+    // `<проект>/.opencode/plugins/` плюс массив `plugin` в проектном конфиге.
+    plugins: {
+      format: 'opencode-plugins',
+      relativeDir: '.opencode/plugins',
+      relativePath: 'opencode.json',
+    },
+    // Скиллы проекта (OPENCODE-5): задокументированный каталог
+    // `<проект>/.opencode/skills/` — тот же формат, адаптер переиспользуется.
+    skills: { format: 'opencode-skills', relativeDir: '.opencode/skills' },
   },
   // Детект «конфиг найден» (Ф7): задокументированы оба варианта размещения —
   // XDG-каталог ~/.config/opencode и ~/.opencode. Достаточно любого из них.
   // NB: пишем ВСЕГДА в канонический XDG-путь (см. instructionsFile/mcpConfig) —
   // выбирать файл по факту существования значило бы угадывать, куда смотрит CLI.
-  configLocations: () => [opencodeConfigDir(), join(homedir(), '.opencode')],
+  // Плюс сам файл конфигурации, ЕСЛИ он перенесён `OPENCODE_CONFIG`: каталога
+  // `~/.config/opencode` у такого пользователя может не быть вовсе.
+  configLocations: () => {
+    const locations = [opencodeConfigDir(), join(homedir(), '.opencode')];
+    const file = opencodeConfigFile();
+    if (dirname(file) !== opencodeConfigDir()) locations.push(file);
+    return locations;
+  },
   // Ассистент OpenCode: OpenAI-совместимый API (ключ настраивается на стороне
   // самого OpenCode, стандартной единой env-переменной нет → apiKeyEnvVars пуст),
   // есть рабочий CLI (`opencode`) → раннер `cli`, пока ключ не задан в панели.
-  assistant: { apiKind: 'openai-compat', apiKeyEnvVars: [], cliRunnable: true },
+  // OPENCODE-7: задокументированный one-shot — подкоманда `run`, промпт идёт
+  // ПОЗИЦИОННЫМ аргументом в конце (`opencode run "<текст>"`); стандартный ввод
+  // CLI не поддерживает, поэтому передать промпт можно только так. Промпт —
+  // ОТДЕЛЬНЫЙ элемент argv, никакой сборки строки для оболочки.
+  assistant: {
+    apiKind: 'openai-compat',
+    apiKeyEnvVars: [],
+    cliRunnable: true,
+    oneShotArgs: (prompt) => ['run', prompt],
+  },
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
     mcp: 'ready',
-    permissions: 'planned',
-    env: 'planned',
-    // Чат остаётся planned: у OpenCode нет задокументированного one-shot-флага
-    // CLI и стандартной env-переменной ключа → надёжного basic-раннера пока нет.
-    chat: 'planned',
+    // OPENCODE-1: права — ключ `permission` в opencode.json (глобальном и проектном).
+    permissions: 'ready',
+    // OPENCODE-2: у OpenCode НЕТ места для переменных окружения — только
+    // подстановка `{env:ПЕРЕМЕННАЯ}` из уже заданного окружения процесса.
+    // Значит раздел не «в разработке», а неприменим → скрыт (unsupported).
+    env: 'unsupported',
+    // OPENCODE-7: one-shot задокументирован — `opencode run "<промпт>"`. Basic-чат
+    // работает через тот же раннер, что у codex/gemini/aider, и остаётся с
+    // пометкой «экспериментально»: `opencode` на этой машине не установлен.
+    chat: 'ready',
     // Проектный уровень (COMMON-2): проектные пути задокументированы, файлы
     // пишутся теми же адаптерами, что и глобальные (см. projectConfig).
     projects: 'ready',
     // Раздел самой панели — от провайдера не зависит (см. codex).
     scripts: 'ready',
-    skills: 'planned',
-    hooks: 'planned',
-    plugins: 'planned',
+    // OPENCODE-5: скиллы — каталог `skills/` (глобальный и проектный), папка на
+    // скилл со `SKILL.md`. Понятие то же, что у Claude; поля шапки и правила
+    // имени — свои, задокументированные.
+    skills: 'ready',
+    // OPENCODE-3: хуки — ключ `experimental.hook` в opencode.json (глобальном и
+    // проектном). Модель СВОЯ, не claude-овская: два события и argv-действия.
+    // Раздел честно помечен «экспериментально у самого OpenCode» — ключ лежит
+    // под `experimental`, который OpenCode объявляет нестабильным.
+    hooks: 'ready',
+    // OPENCODE-4: плагины — каталог файлов JS/TS (`plugins/`, глобальный и
+    // проектный) плюс массив npm-пакетов `plugin` в opencode.json.
+    plugins: 'ready',
     analytics: 'unsupported',
     sandbox: 'unsupported',
   }),

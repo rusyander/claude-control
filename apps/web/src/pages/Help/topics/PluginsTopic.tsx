@@ -136,6 +136,10 @@ export function PluginsTopic() {
           <Callout tone="info" title={tr('noteManualTitle')}>
             {tr('noteManualText')}
           </Callout>
+          {/* Плагины OpenCode — это плагины его CLI, а не расширения панели. */}
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

@@ -11,7 +11,7 @@ import {
 } from 'zod';
 
 /**
- * Универсальная модель прав/аппрувов провайдера. Моделей ДВЕ, потому что и у CLI
+ * Универсальная модель прав/аппрувов провайдера. Моделей ТРИ, потому что и у CLI
  * они принципиально разные — общего знаменателя нет, и выдумывать его нельзя:
  *
  * - **Codex** (`kind: 'codex'`, файл `~/.codex/config.toml`) — два СКАЛЯРНЫХ
@@ -20,11 +20,15 @@ import {
  * - **Gemini** (`kind: 'gemini'`, файл `~/.gemini/settings.json` и проектный
  *   `<проект>/.gemini/settings.json`) — режим аппрувов
  *   `general.defaultApprovalMode` плюс два списка инструментов: `coreTools`
- *   (белый список) и `excludeTools` (чёрный список, приоритетнее белого).
+ *   (белый список) и `excludeTools` (чёрный список, приоритетнее белого);
+ * - **OpenCode** (`kind: 'opencode'`, файл `~/.config/opencode/opencode.json` и
+ *   проектный `<проект>/opencode.json`) — ключ `permission`: у каждого
+ *   инструмента свой уровень `allow` | `deny` | `ask`, а у `bash` вместо уровня
+ *   может стоять КАРТА ШАБЛОНОВ команды («git push *» → `deny`).
  *
  * Раздел прав Claude остаётся на своей богатой модели (`settings.json`
  * permissions allow/deny/ask) БЕЗ изменений — эта модель им не пользуется.
- * Провайдеры без реализованного адаптера (opencode) сюда не попадают (fail-closed).
+ * Провайдеры без реализованного адаптера сюда не попадают (fail-closed).
  */
 
 /** Политика аппрувов Codex: когда запрашивать подтверждение. */
@@ -58,7 +62,59 @@ export type GeminiApprovalMode = (typeof geminiApprovalModes)[number];
 export const geminiForbiddenApprovalModes = ['yolo'] as const;
 export type GeminiForbiddenApprovalMode = (typeof geminiForbiddenApprovalModes)[number];
 
-/** Общие для обеих моделей метаданные раздела. */
+/**
+ * Уровни прав OpenCode (ключ `permission` в `opencode.json`):
+ * - `allow` — выполнять без вопроса;
+ * - `ask` — спрашивать подтверждение перед каждым вызовом;
+ * - `deny` — запретить полностью.
+ *
+ * Других значений у OpenCode нет: всё, что вне набора, сервер отклоняет до записи.
+ */
+export const opencodePermissionLevels = ['allow', 'deny', 'ask'] as const;
+export type OpencodePermissionLevel = (typeof opencodePermissionLevels)[number];
+
+/**
+ * Инструменты OpenCode, у которых уровень прав ЗАДОКУМЕНТИРОВАН: правка файлов,
+ * запуск команд оболочки и загрузка страниц из сети. Прочие ключи внутри
+ * `permission` панель не ведёт — они сохраняются как есть и показываются только
+ * для чтения (переопределения на уровне агента живут вне `permission` и не
+ * затрагиваются вовсе).
+ */
+export const opencodePermissionTools = ['edit', 'bash', 'webfetch'] as const;
+export type OpencodePermissionTool = (typeof opencodePermissionTools)[number];
+
+/** Строка карты шаблонов: шаблон команды → уровень (расширенная форма `bash`). */
+export const opencodePatternRuleSchema = object({
+  /** Шаблон команды (`*`, `git *`, `git push *`). */
+  pattern: string(),
+  level: zodEnum(opencodePermissionLevels),
+});
+export type OpencodePatternRule = Infer<typeof opencodePatternRuleSchema>;
+
+/**
+ * Права одного инструмента OpenCode: либо простой уровень (`mode: 'level'`),
+ * либо карта шаблонов (`mode: 'patterns'`, задокументирована для `bash`).
+ * Инструмента нет в списке → ограничение не задано, ключ в файле отсутствует.
+ */
+export const opencodePermissionEntrySchema = object({
+  tool: zodEnum(opencodePermissionTools),
+  mode: zodEnum(['level', 'patterns']),
+  /** Уровень простой формы (задан при `mode: 'level'`). */
+  level: zodEnum(opencodePermissionLevels).optional(),
+  /** Карта шаблонов в порядке файла (задана при `mode: 'patterns'`). */
+  patterns: array(opencodePatternRuleSchema).optional(),
+});
+export type OpencodePermissionEntry = Infer<typeof opencodePermissionEntrySchema>;
+
+/** Запись внутри `permission`, которую панель не ведёт: только для чтения. */
+export const opencodePreservedEntrySchema = object({
+  key: string(),
+  /** Значение в компактном JSON — показывается как есть, в файле не меняется. */
+  value: string(),
+});
+export type OpencodePreservedEntry = Infer<typeof opencodePreservedEntrySchema>;
+
+/** Общие для всех моделей метаданные раздела. */
 const permissionInfoBase = {
   /** Id активного провайдера (`codex` / `gemini`). */
   providerId: string(),
@@ -112,6 +168,26 @@ export const geminiPermissionInfoSchema = object({
 
 export type GeminiPermissionInfo = Infer<typeof geminiPermissionInfoSchema>;
 
+/** Права OpenCode: ключ `permission` в `opencode.json` (OPENCODE-1). */
+export const opencodePermissionInfoSchema = object({
+  kind: literal('opencode'),
+  /** Формат файла OpenCode (правится ТОЛЬКО ключ `permission`). */
+  format: literal('opencode-json'),
+  /** Допустимые уровни (для селектов). */
+  levels: array(zodEnum(opencodePermissionLevels)),
+  /** Задокументированные инструменты — по ним строится форма. */
+  tools: array(zodEnum(opencodePermissionTools)),
+  /** Инструменты, у которых панель умеет карту шаблонов (сейчас — `bash`). */
+  patternTools: array(zodEnum(opencodePermissionTools)),
+  /** Что реально задано в файле (инструменты без записи ограничений не имеют). */
+  entries: array(opencodePermissionEntrySchema),
+  /** Записи `permission`, которые панель не ведёт: сохраняются, только чтение. */
+  preserved: array(opencodePreservedEntrySchema),
+  ...permissionInfoBase,
+});
+
+export type OpencodePermissionInfo = Infer<typeof opencodePermissionInfoSchema>;
+
 /**
  * Ответ раздела прав провайдера — размеченное объединение по `kind`: интерфейс
  * рисует форму той модели, которую вернул сервер, и никогда не смешивает их.
@@ -119,6 +195,7 @@ export type GeminiPermissionInfo = Infer<typeof geminiPermissionInfoSchema>;
 export const providerPermissionInfoSchema = discriminatedUnion('kind', [
   codexPermissionInfoSchema,
   geminiPermissionInfoSchema,
+  opencodePermissionInfoSchema,
 ]);
 
 export type ProviderPermissionInfo = Infer<typeof providerPermissionInfoSchema>;
@@ -147,10 +224,23 @@ export const geminiPermissionDraftSchema = object({
 
 export type GeminiPermissionDraft = Infer<typeof geminiPermissionDraftSchema>;
 
+/**
+ * Тело запроса на сохранение прав OpenCode: полный набор ЗАДАННЫХ ограничений.
+ * Инструмента нет в списке → его ключ удаляется из `permission` (ограничение
+ * снято). Уровень вне набора, карта шаблонов у инструмента, для которого она не
+ * задокументирована, и пустая карта — сервер отклоняет ДО записи (400).
+ */
+export const opencodePermissionDraftSchema = object({
+  entries: array(opencodePermissionEntrySchema),
+});
+
+export type OpencodePermissionDraft = Infer<typeof opencodePermissionDraftSchema>;
+
 /** Черновик прав любой из поддержанных моделей — по формату файла провайдера. */
 export const providerPermissionDraftSchema = union([
   codexPermissionDraftSchema,
   geminiPermissionDraftSchema,
+  opencodePermissionDraftSchema,
 ]);
 
 export type ProviderPermissionDraft = Infer<typeof providerPermissionDraftSchema>;

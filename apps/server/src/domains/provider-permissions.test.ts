@@ -47,8 +47,12 @@ describe('resolveProviderPermissionsTarget: fail-closed по провайдер�
     expect(target?.filePath.endsWith('settings.json')).toBe(true);
   });
 
-  it('opencode (permissions=planned) → undefined', () => {
-    expect(resolveProviderPermissionsTarget(fakeStore('opencode'))).toBeUndefined();
+  // OPENCODE-1: раздел стал ready — цель резолвится в opencode.json (формат
+  // `opencode-json`), а не в undefined.
+  it('opencode (permissions=ready) → цель на opencode.json', () => {
+    const target = resolveProviderPermissionsTarget(fakeStore('opencode'));
+    expect(target?.format).toBe('opencode-json');
+    expect(target?.filePath.endsWith('opencode.json')).toBe(true);
   });
 
   it('cursor/aider → undefined', () => {

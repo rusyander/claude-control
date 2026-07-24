@@ -148,18 +148,30 @@ describe('runAssistant: CLI one-shot', () => {
     expect(res.reason).toBe('cli_error');
   });
 
-  it('opencode (CLI есть, но флаг не задокументирован) без ключа → none', async () => {
+  // OPENCODE-7: `opencode run "<промпт>"` — подкоманда `run`, промпт ПОЗИЦИОННЫМ
+  // аргументом в конце, отдельным элементом argv (без склейки для оболочки).
+  // NB: сам `opencode` на машине разработки не установлен — форму берём из
+  // документации, живым прогоном не проверено; здесь фиксируем argv.
+  it('opencode → argv [run, prompt] отдельным элементом', async () => {
     const opencode = getProvider('opencode');
-    const spawn = fakeSpawn({ stdout: 'не должно вызваться' });
-    const res = await runAssistant(opencode, [{ role: 'user', content: 'x' }], {
+    const spawn = fakeSpawn({ stdout: 'ответ opencode' });
+    const prompt = 'сделай что-то; rm -rf / && echo "PWNED"';
+    const res = await runAssistant(opencode, [{ role: 'user', content: prompt }], {
       appDataDir: dir,
       detect: yesCli,
       spawnImpl: spawn.fn,
     });
-    // oneShotArgs нет → CLI программно не запускаем, ключа нет → none.
-    expect(res.mode).toBe('none');
-    expect(res.reason).toBe('no_key_no_cli');
-    expect(spawn.calls.length).toBe(0);
+    expect(res.ok).toBe(true);
+    expect(res.mode).toBe('cli');
+    // Провайдер экспериментальный — бейдж «экспериментально» остаётся.
+    expect(res.experimental).toBe(true);
+    expect(res.reply).toBe('ответ opencode');
+    // `run` присутствует отдельным аргументом (на Windows перед ним ещё идёт
+    // обёртка cmd `/d /s /c`, поэтому проверяем вхождение, а не индекс 0).
+    expect(spawn.calls[0]!.args).toContain('run');
+    expect(argvHasDiscrete(spawn.calls[0]!.args, prompt)).toBe(true);
+    // Промпт НИКОГДА не склеивается со строкой команды в один аргумент.
+    expect(spawn.calls[0]!.args.some((arg) => arg.startsWith('run '))).toBe(false);
   });
 });
 

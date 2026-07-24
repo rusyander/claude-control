@@ -45,6 +45,8 @@ describe('resolveProviderEnvTarget: fail-closed по провайдеру', () =
     expect(target?.filePath.endsWith('.env')).toBe(true);
   });
 
+  // OPENCODE-2: у opencode env объявлен `unsupported` (хранить переменные негде),
+  // поэтому цель не резолвится — раздел скрыт, а не «в разработке».
   it('cursor/opencode → undefined', () => {
     for (const id of ['cursor', 'opencode'] as const) {
       expect(resolveProviderEnvTarget(fakeStore(id))).toBeUndefined();

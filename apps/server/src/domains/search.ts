@@ -337,11 +337,21 @@ function collectProviderInputs(sources: SearchSources): ProviderSearchInputs | u
 /**
  * Права провайдера в виде плоских пар для поиска. Модели разные, поэтому
  * раскладку задаём здесь: Codex — два скаляра, Gemini — режим аппрувов и оба
- * списка инструментов (их имена ищутся по подстроке в склейке).
+ * списка инструментов (их имена ищутся по подстроке в склейке), OpenCode — по
+ * паре на инструмент (у карты шаблонов значение — склейка «шаблон: уровень»).
  */
 function providerPermissionEntries(
   values: ProviderPermissionsValues,
 ): Array<{ key: string; value: string }> {
+  if (values.kind === 'opencode') {
+    return values.entries.map((entry) => ({
+      key: entry.tool,
+      value:
+        entry.mode === 'patterns'
+          ? (entry.patterns ?? []).map((rule) => `${rule.pattern}: ${rule.level}`).join(', ')
+          : (entry.level ?? ''),
+    }));
+  }
   if (values.kind === 'gemini') {
     const entries: Array<{ key: string; value: string }> = [
       { key: 'defaultApprovalMode', value: values.approvalMode },

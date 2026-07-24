@@ -115,6 +115,17 @@ export function providerTrackedFiles(store: TrackedFilesSettingsSource): Tracked
   if (capabilities.permissions === 'ready' && provider.permissionsConfig) {
     paths.push(provider.permissionsConfig.path(override));
   }
+  // Хуки (OPENCODE-3) и npm-список плагинов (OPENCODE-4) у OpenCode лежат в том
+  // же opencode.json, что MCP и права — путь дедуплицируется ниже. Каталог
+  // файлов-плагинов сюда НЕ попадает: `trackedFiles` ведёт ОДИНОЧНЫЕ файлы, а не
+  // каталоги произвольного размера (та же причина, по которой в истории нет
+  // каталога правил Cursor).
+  if (capabilities.hooks === 'ready' && provider.hooksConfig) {
+    paths.push(provider.hooksConfig.path(override));
+  }
+  if (capabilities.plugins === 'ready' && provider.pluginsConfig) {
+    paths.push(provider.pluginsConfig.configPath(override));
+  }
 
   return [...new Set(paths)].filter(not(isSecretFile)).map((path) => ({
     backupBase: providerBackupName(provider.id, path),

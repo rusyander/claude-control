@@ -181,6 +181,9 @@ export function SkillsTopic() {
           <Callout tone="info" title={tr('noteDescTitle')}>
             {tr('noteDescText')}
           </Callout>
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

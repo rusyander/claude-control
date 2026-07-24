@@ -29,6 +29,16 @@ export const queryKeys = {
   providerRules: ['provider-rules'] as const,
   /** Одно правило каталога — ключ по его пути относительно каталога. */
   providerRule: (path: string) => ['provider-rules', 'rule', path] as const,
+  /** Хуки активного провайдера ключом конфига (OpenCode: `experimental.hook`). */
+  providerHooks: ['provider-hooks'] as const,
+  /** Плагины активного CLI: каталог файлов + список npm-пакетов (OpenCode). */
+  providerPlugins: ['provider-plugins'] as const,
+  /** Содержимое одного файла плагина — ключ по его пути относительно каталога. */
+  providerPluginFile: (path: string) => ['provider-plugins', 'file', path] as const,
+  /** Каталог скиллов активного провайдера (OpenCode: `<каталог>/<имя>/SKILL.md`). */
+  providerSkills: ['provider-skills'] as const,
+  /** Один скилл каталога — ключ по его пути относительно каталога скиллов. */
+  providerSkill: (path: string) => ['provider-skills', 'skill', path] as const,
   /** Универсальные права/аппрувы активного провайдера (Codex). */
   providerPermissions: ['provider-permissions'] as const,
   /** API-ключи провайдеров (маскированный статус) — раздел настроек. */
@@ -77,6 +87,18 @@ export const queryKeys = {
   projectProviderEnv: (id: string) => ['projects', id, 'provider', 'env'] as const,
   /** Права/аппрувы проекта у активного провайдера (`.gemini/settings.json`). */
   projectProviderPermissions: (id: string) => ['projects', id, 'provider', 'permissions'] as const,
+  /** Хуки проекта у активного провайдера (`<проект>/opencode.json`). */
+  projectProviderHooks: (id: string) => ['projects', id, 'provider', 'hooks'] as const,
+  /** Плагины проекта у активного провайдера (`<проект>/.opencode/plugins`). */
+  projectProviderPlugins: (id: string) => ['projects', id, 'provider', 'plugins'] as const,
+  /** Содержимое одного файла плагина проекта — ключ по его относительному пути. */
+  projectProviderPluginFile: (id: string, path: string) =>
+    ['projects', id, 'provider', 'plugins', 'file', path] as const,
+  /** Скиллы проекта у активного провайдера (`<проект>/.opencode/skills`). */
+  projectProviderSkills: (id: string) => ['projects', id, 'provider', 'skills'] as const,
+  /** Содержимое одного скилла проекта — ключ по его относительному пути. */
+  projectProviderSkill: (id: string, path: string) =>
+    ['projects', id, 'provider', 'skills', 'skill', path] as const,
   /** Глобальный поиск: ключ зависит от запроса, чтобы кешировать по строке. */
   search: (query: string) => ['search', query] as const,
 };

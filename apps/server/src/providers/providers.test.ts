@@ -123,6 +123,18 @@ describe('реестр провайдеров', () => {
     expect(getProvider('opencode').projectConfig).toEqual({
       instructions: 'AGENTS.md',
       mcp: { format: 'opencode-json', relativePath: 'opencode.json' },
+      // OPENCODE-1: права проекта — ключ `permission` того же opencode.json.
+      permissions: { format: 'opencode-json', relativePath: 'opencode.json' },
+      // OPENCODE-3: хуки проекта — ключ `experimental.hook` того же файла.
+      hooks: { format: 'opencode-json', relativePath: 'opencode.json' },
+      // OPENCODE-4: плагины проекта — каталог `.opencode/plugins` + ключ `plugin`.
+      plugins: {
+        format: 'opencode-plugins',
+        relativeDir: '.opencode/plugins',
+        relativePath: 'opencode.json',
+      },
+      // OPENCODE-5: скиллы проекта — каталог `.opencode/skills`.
+      skills: { format: 'opencode-skills', relativeDir: '.opencode/skills' },
     });
     // AIDER-4: конфиг ищется в домашнем каталоге, в КОРНЕ GIT-РЕПОЗИТОРИЯ и в
     // текущем каталоге → `<проект>/.aider.conf.yml` задокументирован. Инструкции
@@ -142,6 +154,9 @@ describe('реестр провайдеров', () => {
         config?.mcp?.relativePath,
         config?.env?.relativePath,
         config?.permissions?.relativePath,
+        config?.hooks?.relativePath,
+        config?.plugins?.relativeDir,
+        config?.plugins?.relativePath,
       ]) {
         if (relative === undefined) continue;
         expect(relative.startsWith('/'), id).toBe(false);
@@ -169,7 +184,8 @@ describe('реестр провайдеров', () => {
       apiKeyEnvVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
       cliRunnable: true,
     });
-    // One-shot-флаг задан ТОЛЬКО у codex/gemini (задокументирован).
+    // One-shot-флаг задан у codex/gemini и (OPENCODE-7) у opencode — все
+    // задокументированы. Промпт всегда ОТДЕЛЬНЫМ элементом argv.
     expect(getProvider('codex').assistant?.oneShotArgs?.('P')).toEqual(['exec', 'P']);
     expect(getProvider('gemini').assistant?.oneShotArgs?.('P')).toEqual(['-p', 'P']);
     expect(getProvider('opencode').assistant).toMatchObject({
@@ -177,7 +193,8 @@ describe('реестр провайдеров', () => {
       apiKeyEnvVars: [],
       cliRunnable: true,
     });
-    expect(getProvider('opencode').assistant?.oneShotArgs).toBeUndefined();
+    // OPENCODE-7: `opencode run "<промпт>"` — подкоманда `run`, промпт позиционный.
+    expect(getProvider('opencode').assistant?.oneShotArgs?.('P')).toEqual(['run', 'P']);
     expect(getProvider('aider').assistant).toMatchObject({
       apiKind: 'openai-compat',
       apiKeyEnvVars: ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY'],
@@ -230,15 +247,31 @@ describe('реестр провайдеров', () => {
     });
   });
 
-  it('Ф8 opencode: рабочие MCP + глобальные инструкции (AGENTS.md)', () => {
+  it('OPENCODE-1/2 opencode: MCP + инструкции + ПРАВА; переменных окружения нет', () => {
     const { capabilities } = getProvider('opencode');
     expect(capabilities.mcp).toBe('ready');
     expect(capabilities.globalInstructions).toBe('ready');
+    // OPENCODE-1: ключ `permission` в opencode.json.
+    expect(capabilities.permissions).toBe('ready');
+    // OPENCODE-2: хранить переменные окружения OpenCode негде — он только
+    // подставляет `{env:ПЕРЕМЕННАЯ}` из уже заданного окружения процесса.
+    // Значит раздел неприменим (скрыт), а не «в разработке».
+    expect(capabilities.env).toBe('unsupported');
+    expect(getProvider('opencode').envConfig).toBeUndefined();
     expect(CAPABILITIES.filter((cap) => capabilities[cap] === 'ready').sort()).toEqual([
+      // OPENCODE-7: one-shot `opencode run "<промпт>"` — basic-чат стал рабочим.
+      'chat',
       'globalInstructions',
+      // OPENCODE-3: `experimental.hook` в opencode.json (глобальном и проектном).
+      'hooks',
       'mcp',
+      'permissions',
+      // OPENCODE-4: каталог файлов-плагинов + массив npm-пакетов `plugin`.
+      'plugins',
       'projects',
       'scripts',
+      // OPENCODE-5: каталог скиллов `skills/` (глобальный и проектный).
+      'skills',
     ]);
   });
 
@@ -304,7 +337,7 @@ describe('реестр провайдеров', () => {
     });
     expect(getProvider('gemini').envConfig?.path()).toBe(join(homedir(), '.gemini', '.env'));
     expect(getProvider('gemini').capabilities.env).toBe('ready');
-    // Прочие — тоже без envConfig (fail-closed).
+    // Прочие — тоже без envConfig (fail-closed; у opencode это OPENCODE-2).
     for (const id of ['cursor', 'opencode'] as const) {
       expect(getProvider(id).envConfig).toBeUndefined();
     }
@@ -329,9 +362,17 @@ describe('реестр провайдеров', () => {
       join(homedir(), '.gemini', 'settings.json'),
     );
     expect(getProvider('gemini').capabilities.permissions).toBe('ready');
-    // OpenCode (иная модель прав) остаётся planned, без permissionsConfig.
-    expect(getProvider('opencode').capabilities.permissions).toBe('planned');
-    for (const id of ['cursor', 'opencode', 'aider'] as const) {
+    // OpenCode (OPENCODE-1): ключ `permission` в opencode.json — третья модель.
+    expect(getProvider('opencode').permissionsConfig).toEqual({
+      format: 'opencode-json',
+      path: expect.any(Function),
+    });
+    expect(getProvider('opencode').permissionsConfig?.path()).toBe(
+      join(homedir(), '.config', 'opencode', 'opencode.json'),
+    );
+    expect(getProvider('opencode').capabilities.permissions).toBe('ready');
+    // У этих двоих задокументированного файла прав нет — fail-closed.
+    for (const id of ['cursor', 'aider'] as const) {
       expect(getProvider(id).permissionsConfig).toBeUndefined();
     }
   });
@@ -372,13 +413,56 @@ describe('реестр провайдеров', () => {
     });
   });
 
-  it('opencode: skills/hooks/plugins — planned, analytics/sandbox — unsupported', () => {
-    const { capabilities } = getProvider('opencode');
-    for (const cap of ['skills', 'hooks', 'plugins'] as const) {
-      expect(capabilities[cap]).toBe('planned');
-    }
+  it('OPENCODE-3/4/5 opencode: хуки, плагины и скиллы ready, analytics/sandbox — нет', () => {
+    const provider = getProvider('opencode');
+    const { capabilities } = provider;
+    // OPENCODE-5: скиллы — каталог `skills/` со `SKILL.md`, своя модель.
+    expect(capabilities.skills).toBe('ready');
+    expect(provider.skillsConfig).toEqual({
+      format: 'opencode-skills',
+      dir: expect.any(Function),
+      alsoLoadedFrom: expect.any(Function),
+    });
+    expect(provider.skillsConfig?.dir()).toBe(join(homedir(), '.config', 'opencode', 'skills'));
+    // ЧЕСТНАЯ ОГОВОРКА (surfaced in UI): те же скиллы OpenCode грузит из
+    // ~/.claude/skills и ~/.agents/skills — панель их только показывает.
+    expect(provider.skillsConfig?.alsoLoadedFrom?.()).toEqual([
+      join(homedir(), '.claude', 'skills'),
+      join(homedir(), '.agents', 'skills'),
+    ]);
+    // OPENCODE-3: ключ `experimental.hook` — своя модель, не claude-овская.
+    expect(capabilities.hooks).toBe('ready');
+    expect(provider.hooksConfig).toEqual({
+      format: 'opencode-json',
+      path: expect.any(Function),
+    });
+    // OPENCODE-4: каталог файлов JS/TS + массив `plugin` в том же конфиге.
+    expect(capabilities.plugins).toBe('ready');
+    expect(provider.pluginsConfig).toEqual({
+      format: 'opencode-plugins',
+      dir: expect.any(Function),
+      configPath: expect.any(Function),
+    });
     for (const cap of ['analytics', 'sandbox'] as const) {
       expect(capabilities[cap]).toBe('unsupported');
+    }
+  });
+
+  it('hooks/plugins/skillsConfig есть ТОЛЬКО у opencode: Claude на своих роутах', () => {
+    // У Claude все три модели свои и богатые (события settings.json / расширения
+    // самой панели / каталог скиллов с группами) — универсальные разделы не
+    // должны их даже видеть.
+    expect(claudeProvider.hooksConfig).toBeUndefined();
+    expect(claudeProvider.pluginsConfig).toBeUndefined();
+    expect(claudeProvider.skillsConfig).toBeUndefined();
+    for (const id of ['codex', 'gemini', 'cursor', 'aider']) {
+      expect(getProvider(id).hooksConfig, id).toBeUndefined();
+      expect(getProvider(id).pluginsConfig, id).toBeUndefined();
+      expect(getProvider(id).skillsConfig, id).toBeUndefined();
+      // Раздела нет → возможность обязана быть НЕ ready (fail-closed).
+      expect(getProvider(id).capabilities.hooks, id).not.toBe('ready');
+      expect(getProvider(id).capabilities.plugins, id).not.toBe('ready');
+      expect(getProvider(id).capabilities.skills, id).not.toBe('ready');
     }
   });
 

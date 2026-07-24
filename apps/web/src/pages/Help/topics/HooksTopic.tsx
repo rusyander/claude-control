@@ -199,6 +199,11 @@ export function HooksTopic() {
           <Callout tone="info" title={tr('noteScriptTitle')}>
             {tr('noteScriptText')}
           </Callout>
+          {/* Хуки OpenCode — принципиально другая модель; говорим об этом здесь,
+              чтобы страница не выглядела описанием «хуков вообще». */}
+          <Callout tone="info" title={tr('noteProviderTitle')}>
+            {tr('noteProviderText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

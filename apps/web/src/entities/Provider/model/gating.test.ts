@@ -49,6 +49,9 @@ function response(activeId: string): ProvidersResponse {
         status: 'verified',
         capabilities: ALL_READY,
         instructionsModel: 'file',
+        hooksModel: 'claude',
+        pluginsModel: 'panel',
+        skillsModel: 'claude',
       },
       {
         id: 'codex',
@@ -56,6 +59,9 @@ function response(activeId: string): ProvidersResponse {
         status: 'experimental',
         capabilities: CODEX,
         instructionsModel: 'file',
+        hooksModel: 'none',
+        pluginsModel: 'none',
+        skillsModel: 'none',
       },
     ],
   };
@@ -216,15 +222,22 @@ const CURSOR = caps({
 const OPENCODE = caps({
   globalInstructions: 'ready',
   mcp: 'ready',
-  permissions: 'planned',
-  env: 'planned',
-  chat: 'planned',
+  // OPENCODE-1: права — ключ `permission` в opencode.json.
+  permissions: 'ready',
+  // OPENCODE-2: переменные окружения у OpenCode хранить негде → раздел СКРЫТ,
+  // а не «в разработке» (он только подставляет `{env:X}` из окружения процесса).
+  env: 'unsupported',
+  // OPENCODE-7: one-shot `opencode run "<промпт>"` — basic-чат стал рабочим.
+  chat: 'ready',
   // COMMON-2: проектный AGENTS.md + <проект>/opencode.json.
   projects: 'ready',
   scripts: 'ready',
-  skills: 'planned',
-  hooks: 'planned',
-  plugins: 'planned',
+  // OPENCODE-5: скиллы — каталог `skills/` со `SKILL.md` (СВОЯ модель).
+  skills: 'ready',
+  // OPENCODE-3: хуки — ключ `experimental.hook` в opencode.json (СВОЯ модель).
+  hooks: 'ready',
+  // OPENCODE-4: плагины CLI — каталог файлов JS/TS + массив npm-пакетов `plugin`.
+  plugins: 'ready',
 });
 /** У aider из чужих форматов рабочих разделов нет — только скрипты самой панели. */
 const AIDER = caps({
@@ -248,15 +261,23 @@ describe('Ф8: гейтинг cursor / opencode / aider', () => {
     expect(summarizeNavCapabilities(CURSOR).ready).toBe(4);
   });
 
-  it('opencode: рабочие MCP + Инструкции, остальное — заглушки', () => {
+  it('opencode: рабочие MCP + Инструкции + Права + Хуки + Плагины + Скиллы + Чат; env скрыт', () => {
     const items = gateNavSections(NAV_SECTIONS, OPENCODE).flatMap((section) => section.items);
     expect(items.find((item) => item.path === '/mcp')?.access).toBe('ready');
     expect(items.find((item) => item.path === '/claude-md')?.access).toBe('ready');
-    expect(items.find((item) => item.path === '/permissions')?.access).toBe('inDevelopment');
-    expect(items.find((item) => item.path === '/env')?.access).toBe('inDevelopment');
+    // OPENCODE-1: раздел прав стал рабочим.
+    expect(items.find((item) => item.path === '/permissions')?.access).toBe('ready');
+    // OPENCODE-3/4/5: хуки, плагины CLI и скиллы стали рабочими (модели СВОИ).
+    expect(items.find((item) => item.path === '/hooks')?.access).toBe('ready');
+    expect(items.find((item) => item.path === '/plugins')?.access).toBe('ready');
+    expect(items.find((item) => item.path === '/skills')?.access).toBe('ready');
+    // OPENCODE-7: чат стал рабочим (one-shot `opencode run`).
+    expect(items.find((item) => item.path === '/chat')?.access).toBe('ready');
+    // OPENCODE-2: раздела переменных окружения у opencode нет вовсе — скрыт.
+    expect(items.map((item) => item.path)).not.toContain('/env');
     expect(items.find((item) => item.path === '/scripts')?.access).toBe('ready');
-    // COMMON-2: плюс проектный уровень → MCP + инструкции + проекты + скрипты.
-    expect(summarizeNavCapabilities(OPENCODE).ready).toBe(4);
+    // MCP + инструкции + права + хуки + плагины + скиллы + чат + проекты + скрипты.
+    expect(summarizeNavCapabilities(OPENCODE).ready).toBe(9);
   });
 
   it('aider: рабочий только раздел скриптов, остальное «в разработке» или скрыто', () => {

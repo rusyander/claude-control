@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parse as parseToml } from 'smol-toml';
@@ -49,18 +49,42 @@ describe('provider-permissions роуты: гейтинг по провайде�
     expect(res.json<{ error: string }>().error).toBe('section_unsupported');
   });
 
-  it('opencode (permissions=planned) → 400 section_unsupported на всех методах', async () => {
+  it('cursor и aider (permissions не заявлены) → 400 section_unsupported на всех методах', async () => {
+    for (const provider of ['cursor', 'aider']) {
+      await bootWith(provider);
+      for (const m of [
+        { method: 'GET' as const, url: '/api/provider-permissions' },
+        { method: 'PUT' as const, url: '/api/provider-permissions' },
+      ]) {
+        const res = await app.inject({
+          ...m,
+          payload: { approvalPolicy: 'never', sandboxMode: 'read-only' },
+        });
+        expect(res.statusCode).toBe(400);
+        expect(res.json<{ error: string }>().error).toBe('section_unsupported');
+      }
+      await app.close();
+    }
+  });
+
+  // OPENCODE-1: у opencode раздел стал ready, но модель ТРЕТЬЯ — ни codex-, ни
+  // gemini-черновик в неё не подходят и обязаны быть отклонены до записи.
+  it('opencode (permissions=ready) → GET 200 с моделью opencode; чужой черновик → 400', async () => {
     await bootWith('opencode');
-    for (const m of [
-      { method: 'GET' as const, url: '/api/provider-permissions' },
-      { method: 'PUT' as const, url: '/api/provider-permissions' },
+    const info = await app.inject({ method: 'GET', url: '/api/provider-permissions' });
+    expect(info.statusCode).toBe(200);
+    const body = info.json<{ kind: string; levels: string[]; tools: string[] }>();
+    expect(body.kind).toBe('opencode');
+    expect(body.levels).toEqual(['allow', 'deny', 'ask']);
+    expect(body.tools).toEqual(['edit', 'bash', 'webfetch']);
+
+    for (const payload of [
+      { approvalPolicy: 'never', sandboxMode: 'read-only' },
+      { approvalMode: 'plan', coreTools: [], excludeTools: [] },
     ]) {
-      const res = await app.inject({
-        ...m,
-        payload: { approvalPolicy: 'never', sandboxMode: 'read-only' },
-      });
+      const res = await app.inject({ method: 'PUT', url: '/api/provider-permissions', payload });
       expect(res.statusCode).toBe(400);
-      expect(res.json<{ error: string }>().error).toBe('section_unsupported');
+      expect(res.json<{ error: string }>().error).toBe('invalid_draft');
     }
   });
 
@@ -202,5 +226,181 @@ sandbox_mode = "read-only"
     expect(res.statusCode).toBe(422);
     expect(res.json<{ error: string }>().error).toBe('format_unrecognized');
     expect(readFileSync(cfgPath, 'utf8')).toBe(broken);
+  });
+});
+
+/**
+ * OPENCODE-1: полный цикл на подменённом `opencode.json` в tmp-HOME. GET читает
+ * ключ `permission` + наборы для селектов, PUT меняет ТОЛЬКО этот ключ (`$schema`,
+ * `model`, `mcp`, `agent` целы), незнакомая запись внутри `permission` переживает
+ * запись, битый JSON → 422. Настоящий ~ не трогаем.
+ */
+describe('provider-permissions роуты: opencode на tmp-HOME opencode.json', () => {
+  let home: string;
+  let root: string;
+  let app: FastifyInstance;
+  let prevHome: string | undefined;
+  let prevUserProfile: string | undefined;
+  let prevXdg: string | undefined;
+  let prevOpencodeConfig: string | undefined;
+  let cfgPath: string;
+
+  const boot = async (): Promise<void> => {
+    app = Fastify();
+    registerProviderPermissionsRoutes(app, makeCtx(root, 'opencode'));
+    await app.ready();
+  };
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), 'cc-home-'));
+    prevHome = process.env.HOME;
+    prevUserProfile = process.env.USERPROFILE;
+    prevXdg = process.env.XDG_CONFIG_HOME;
+    prevOpencodeConfig = process.env.OPENCODE_CONFIG;
+    process.env.HOME = home;
+    process.env.USERPROFILE = home;
+    delete process.env.XDG_CONFIG_HOME;
+    delete process.env.OPENCODE_CONFIG;
+    mkdirSync(join(home, '.config', 'opencode'), { recursive: true });
+    cfgPath = join(home, '.config', 'opencode', 'opencode.json');
+    root = mkdtempSync(join(tmpdir(), 'cc-pperm-oc-'));
+  });
+  afterEach(async () => {
+    await app?.close();
+    process.env.HOME = prevHome;
+    process.env.USERPROFILE = prevUserProfile;
+    if (prevXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = prevXdg;
+    if (prevOpencodeConfig === undefined) delete process.env.OPENCODE_CONFIG;
+    else process.env.OPENCODE_CONFIG = prevOpencodeConfig;
+    rmSync(home, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  const CONFIG = JSON.stringify(
+    {
+      $schema: 'https://opencode.ai/config.json',
+      model: 'anthropic/claude-sonnet-4',
+      mcp: { probe: { type: 'local', command: ['node', 'x.js'] } },
+      agent: { review: { permission: { edit: 'deny' } } },
+      permission: { edit: 'deny', bash: 'ask', deploy: 'ask' },
+    },
+    null,
+    2,
+  );
+
+  it('GET читает permission и наборы; PUT меняет только его, прочие ключи целы', async () => {
+    writeFileSync(cfgPath, CONFIG, 'utf8');
+    await boot();
+
+    const get = await app.inject({ method: 'GET', url: '/api/provider-permissions' });
+    expect(get.statusCode).toBe(200);
+    const body = get.json<{
+      providerId: string;
+      format: string;
+      entries: { tool: string; mode: string; level?: string }[];
+      preserved: { key: string; value: string }[];
+      patternTools: string[];
+      usingDefaults: boolean;
+    }>();
+    expect(body.providerId).toBe('opencode');
+    expect(body.format).toBe('opencode-json');
+    expect(body.entries).toEqual([
+      { tool: 'edit', mode: 'level', level: 'deny' },
+      { tool: 'bash', mode: 'level', level: 'ask' },
+    ]);
+    // Чужой инструмент показан отдельно и только для чтения.
+    expect(body.preserved).toEqual([{ key: 'deploy', value: '"ask"' }]);
+    expect(body.patternTools).toEqual(['bash']);
+    expect(body.usingDefaults).toBe(false);
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/provider-permissions',
+      payload: {
+        entries: [
+          { tool: 'edit', mode: 'level', level: 'allow' },
+          {
+            tool: 'bash',
+            mode: 'patterns',
+            patterns: [
+              { pattern: '*', level: 'ask' },
+              { pattern: 'git push *', level: 'deny' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const written = JSON.parse(readFileSync(cfgPath, 'utf8')) as Record<string, unknown>;
+    const before = JSON.parse(CONFIG) as Record<string, unknown>;
+    expect(written.$schema).toEqual(before.$schema);
+    expect(written.model).toEqual(before.model);
+    expect(written.mcp).toEqual(before.mcp);
+    expect(written.agent).toEqual(before.agent);
+    expect(written.permission).toEqual({
+      edit: 'allow',
+      bash: { '*': 'ask', 'git push *': 'deny' },
+      // Незнакомая запись сохранена как была.
+      deploy: 'ask',
+    });
+  });
+
+  it('уровень вне набора → 400 invalid_draft, файл не тронут', async () => {
+    writeFileSync(cfgPath, CONFIG, 'utf8');
+    await boot();
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/provider-permissions',
+      payload: { entries: [{ tool: 'bash', mode: 'level', level: 'sometimes' }] },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json<{ error: string }>().error).toBe('invalid_draft');
+    expect(readFileSync(cfgPath, 'utf8')).toBe(CONFIG);
+  });
+
+  it('битый opencode.json → GET readOnly, PUT 422 format_unrecognized, файл не тронут', async () => {
+    const broken = '{ "permission": { "edit": ';
+    writeFileSync(cfgPath, broken, 'utf8');
+    await boot();
+
+    const get = await app.inject({ method: 'GET', url: '/api/provider-permissions' });
+    expect(get.statusCode).toBe(200);
+    expect(get.json<{ readOnly: boolean }>().readOnly).toBe(true);
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/provider-permissions',
+      payload: { entries: [{ tool: 'edit', mode: 'level', level: 'ask' }] },
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json<{ error: string }>().error).toBe('format_unrecognized');
+    expect(readFileSync(cfgPath, 'utf8')).toBe(broken);
+  });
+
+  it('OPENCODE_CONFIG переносит файл прав целиком', async () => {
+    const moved = join(root, 'elsewhere', 'oc.json');
+    mkdirSync(join(root, 'elsewhere'), { recursive: true });
+    writeFileSync(moved, JSON.stringify({ permission: { webfetch: 'deny' } }), 'utf8');
+    process.env.OPENCODE_CONFIG = moved;
+    await boot();
+
+    const get = await app.inject({ method: 'GET', url: '/api/provider-permissions' });
+    expect(get.json<{ filePath: string }>().filePath).toBe(moved);
+    expect(get.json<{ entries: { tool: string }[] }>().entries).toEqual([
+      { tool: 'webfetch', mode: 'level', level: 'deny' },
+    ]);
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/provider-permissions',
+      payload: { entries: [{ tool: 'edit', mode: 'level', level: 'ask' }] },
+    });
+    expect(put.statusCode).toBe(200);
+    expect(JSON.parse(readFileSync(moved, 'utf8'))).toEqual({ permission: { edit: 'ask' } });
+    // Канонический путь при этом не создавался.
+    expect(existsSync(cfgPath)).toBe(false);
   });
 });

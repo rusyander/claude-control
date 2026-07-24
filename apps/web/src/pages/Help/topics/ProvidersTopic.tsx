@@ -88,6 +88,9 @@ export function ProvidersTopic() {
             { name: tr('mapEnv'), description: tr('mapEnvValue'), isMono: false },
             { name: tr('mapPermissions'), description: tr('mapPermissionsValue'), isMono: false },
             { name: tr('mapChat'), description: tr('mapChatValue'), isMono: false },
+            { name: tr('mapHooks'), description: tr('mapHooksValue'), isMono: false },
+            { name: tr('mapPlugins'), description: tr('mapPluginsValue'), isMono: false },
+            { name: tr('mapSkills'), description: tr('mapSkillsValue'), isMono: false },
             { name: tr('mapScripts'), description: tr('mapScriptsValue'), isMono: false },
             { name: tr('mapProjects'), description: tr('mapProjectsValue'), isMono: false },
             { name: tr('mapClaudeOnly'), description: tr('mapClaudeOnlyValue'), isMono: false },
@@ -138,8 +141,13 @@ export function ProvidersTopic() {
                 value: '~/.config/opencode/AGENTS.md',
                 isMono: true,
               },
+              // opencode.json обслуживает и MCP, и права (ключ `permission`, OPENCODE-1).
               { label: tr('fileMcp'), value: '~/.config/opencode/opencode.json', isMono: true },
-              { label: tr('fileOverride'), value: 'XDG_CONFIG_HOME', isMono: true },
+              {
+                label: tr('fileOverride'),
+                value: 'XDG_CONFIG_HOME, OPENCODE_CONFIG',
+                isMono: true,
+              },
             ]}
           />
           {/* У Aider один файл обслуживает и инструкции (СПИСОК ссылок `read`),

@@ -64,7 +64,37 @@ describe('provider-projects: резолв цели по провайдеру', (
     expect(sections('codex')).toEqual(['instructions', 'mcp']);
     // GEMINI-2/3: у Gemini задокументированы ещё .gemini/.env и .gemini/settings.json.
     expect(sections('gemini')).toEqual(['instructions', 'mcp', 'env', 'permissions']);
-    expect(sections('opencode')).toEqual(['instructions', 'mcp']);
+    // OPENCODE-1/3/4: у OpenCode проектные права и ХУКИ — ключи того же
+    // `<проект>/opencode.json`, что и MCP, а ПЛАГИНЫ — ещё и каталог
+    // `<проект>/.opencode/plugins` рядом с ним.
+    expect(sections('opencode')).toEqual([
+      'instructions',
+      'mcp',
+      'permissions',
+      'hooks',
+      'plugins',
+      // OPENCODE-5: скиллы проекта — каталог `<проект>/.opencode/skills`.
+      'skills',
+    ]);
+    const opencode = resolveProviderProjectTarget(fakeStore('opencode'), root)!;
+    expect(opencode.permissions).toMatchObject({
+      format: 'opencode-json',
+      filePath: join(resolve(root), 'opencode.json'),
+      backupName: 'opencode-project-opencode.json',
+    });
+    expect(opencode.hooks).toMatchObject({
+      format: 'opencode-json',
+      scope: 'project',
+      filePath: join(resolve(root), 'opencode.json'),
+      backupName: 'opencode-project-opencode.json',
+    });
+    expect(opencode.plugins).toMatchObject({
+      format: 'opencode-plugins',
+      scope: 'project',
+      pluginsDir: join(resolve(root), '.opencode', 'plugins'),
+      configPath: join(resolve(root), 'opencode.json'),
+      backupPrefix: 'opencode-project-',
+    });
     // CURSOR-1: у Cursor проектные правила — КАТАЛОГ `.cursor/rules/*.mdc`.
     expect(sections('cursor')).toEqual(['instructionsRules', 'mcp']);
     const cursor = resolveProviderProjectTarget(fakeStore('cursor'), root)!;

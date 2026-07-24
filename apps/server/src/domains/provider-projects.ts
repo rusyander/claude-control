@@ -14,6 +14,9 @@ import type { ProviderEnvTarget } from './provider-env.ts';
 import type { ProviderPermissionsTarget } from './provider-permissions.ts';
 import type { ProviderInstructionsTarget } from './provider-instructions.ts';
 import type { ProviderRulesTarget } from './provider-rules.ts';
+import type { ProviderHooksTarget } from './provider-hooks.ts';
+import type { ProviderPluginsTarget } from './provider-plugins.ts';
+import type { ProviderSkillsTarget } from './provider-skills.ts';
 
 /**
  * Проектный уровень конфигурации у НЕ-Claude провайдеров (COMMON-2).
@@ -94,6 +97,25 @@ export interface ProviderProjectTarget {
   env?: ProviderEnvTarget;
   /** Цель раздела прав/аппрувов проекта (та же структура, что у глобальной). */
   permissions?: ProviderPermissionsTarget;
+  /**
+   * Цель раздела ХУКОВ проекта (OPENCODE-3) — та же структура, что у глобального
+   * раздела, поэтому домен `provider-hooks` работает без изменений.
+   */
+  hooks?: ProviderHooksTarget;
+  /**
+   * Цель раздела ПЛАГИНОВ проекта (OPENCODE-4) — та же структура, что у
+   * глобального: каталог файлов `<проект>/.opencode/plugins` (он же корень
+   * безопасности путей, и сам он проверен `resolveProjectFile`) плюс конфиг с
+   * массивом `plugin`.
+   */
+  plugins?: ProviderPluginsTarget;
+  /**
+   * Цель раздела СКИЛЛОВ проекта (OPENCODE-5) — та же структура, что у
+   * глобального: каталог `<проект>/.opencode/skills` (он же корень безопасности
+   * путей, и сам он проверен `resolveProjectFile`). Список «прочих каталогов
+   * загрузки» здесь пуст: на проектном уровне таких не задокументировано.
+   */
+  skills?: ProviderSkillsTarget;
 }
 
 /**
@@ -202,6 +224,47 @@ export function resolveProviderProjectTarget(
     };
   }
 
+  // Хуки проекта (OPENCODE-3) — тот же адаптер и тот же файл, что у прав.
+  if (config.hooks) {
+    const filePath = resolveProjectFile(root, config.hooks.relativePath);
+    target.hooks = {
+      provider,
+      format: config.hooks.format,
+      scope: 'project',
+      filePath,
+      backupName: providerProjectBackupName(provider.id, filePath),
+    };
+  }
+
+  // Плагины проекта (OPENCODE-4): каталог файлов + конфиг с массивом `plugin`.
+  // Оба пути проверены `resolveProjectFile`; дальше границей служит сам каталог
+  // (домен `provider-plugins` не выпускает наружу ни `..`, ни ссылку в сегменте).
+  if (config.plugins) {
+    target.plugins = {
+      provider,
+      format: config.plugins.format,
+      scope: 'project',
+      pluginsDir: resolveProjectFile(root, config.plugins.relativeDir),
+      configPath: resolveProjectFile(root, config.plugins.relativePath),
+      backupPrefix: `${provider.id}-project-`,
+    };
+  }
+
+  // Скиллы проекта (OPENCODE-5): каталог `<проект>/.opencode/skills`. Дальше
+  // границей служит он сам — домен `provider-skills` не выпускает наружу ни
+  // `..`, ни ссылку в сегменте, ни путь формы, отличной от `<имя>/SKILL.md`.
+  if (config.skills) {
+    target.skills = {
+      provider,
+      format: config.skills.format,
+      scope: 'project',
+      skillsDir: resolveProjectFile(root, config.skills.relativeDir),
+      backupPrefix: `${provider.id}-project-`,
+      // Прочие каталоги загрузки — понятие ГЛОБАЛЬНОЕ (домашний каталог).
+      externalDirs: [],
+    };
+  }
+
   return target;
 }
 
@@ -214,6 +277,9 @@ export function providerProjectSections(target: ProviderProjectTarget): Provider
   if (target.mcp) sections.push('mcp');
   if (target.env) sections.push('env');
   if (target.permissions) sections.push('permissions');
+  if (target.hooks) sections.push('hooks');
+  if (target.plugins) sections.push('plugins');
+  if (target.skills) sections.push('skills');
   return sections;
 }
 
@@ -236,6 +302,13 @@ export function providerProjectInfo(target: ProviderProjectTarget): ProviderProj
     envPath: target.env?.filePath,
     permissionsFormat: target.permissions?.format,
     permissionsPath: target.permissions?.filePath,
+    hooksFormat: target.hooks?.format,
+    hooksPath: target.hooks?.filePath,
+    skillsFormat: target.skills?.format,
+    skillsDir: target.skills?.skillsDir,
+    pluginsFormat: target.plugins?.format,
+    pluginsDir: target.plugins?.pluginsDir,
+    pluginsConfigPath: target.plugins?.configPath,
   };
 }
 

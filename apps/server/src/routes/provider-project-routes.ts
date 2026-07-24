@@ -23,11 +23,10 @@ import {
   EnvKeyNotEncodableError,
 } from '../domains/provider-env.ts';
 import {
-  readProviderPermissions,
   saveProviderPermissions,
   parseProviderPermissionsDraft,
   isCliOnlyGeminiApprovalMode,
-  GEMINI_APPROVAL_MODES,
+  buildProviderPermissionInfo,
 } from '../domains/provider-permissions.ts';
 import {
   readProviderInstructionsInfo,
@@ -45,6 +44,29 @@ import {
   deleteProviderRule,
   describeRuleError,
 } from '../domains/provider-rules.ts';
+import {
+  readProviderHooksInfo,
+  parseProviderHooksDraft,
+  saveProviderHooks,
+} from '../domains/provider-hooks.ts';
+import {
+  readProviderPluginsInfo,
+  readProviderPluginFile,
+  parseProviderPluginFileDraft,
+  saveProviderPluginFile,
+  deleteProviderPluginFile,
+  parseProviderPluginPackagesDraft,
+  saveProviderPluginPackages,
+  describePluginError,
+} from '../domains/provider-plugins.ts';
+import {
+  readProviderSkillsInfo,
+  readProviderSkill,
+  parseProviderSkillDraft,
+  saveProviderSkill,
+  deleteProviderSkill,
+  describeSkillError,
+} from '../domains/provider-skills.ts';
 import { checkProjectDir } from '../domains/projects.ts';
 
 /**
@@ -114,6 +136,45 @@ export function registerProviderProjectRoutes(app: FastifyInstance, ctx: ServerC
   const INVALID_ENV_DRAFT = {
     error: 'invalid_draft',
     message: 'Набор переменных не прошёл проверку: у каждой нужны непустой ключ и значение.',
+  } as const;
+
+  const HOOKS_UNSUPPORTED = {
+    error: 'section_unsupported',
+    message: 'У активного провайдера нет проектных хуков.',
+  } as const;
+
+  const INVALID_HOOKS_DRAFT = {
+    error: 'invalid_draft',
+    message:
+      'Хуки не прошли проверку: команда — непустой список непустых аргументов, шаблон файлов непустой и не повторяется, имена переменных окружения непустые и уникальные.',
+  } as const;
+
+  const PLUGINS_UNSUPPORTED = {
+    error: 'section_unsupported',
+    message: 'У активного провайдера нет проектных плагинов.',
+  } as const;
+
+  const INVALID_PLUGIN_FILE_DRAFT = {
+    error: 'invalid_draft',
+    message:
+      'Файл плагина не прошёл проверку: нужен путь внутри каталога плагинов (.js, .ts или .mjs) и текстовое содержимое.',
+  } as const;
+
+  const INVALID_PLUGIN_PACKAGES_DRAFT = {
+    error: 'invalid_draft',
+    message:
+      'Список npm-плагинов не прошёл проверку: каждое имя — непустая строка без пробелов и кавычек, повторы недопустимы.',
+  } as const;
+
+  const SKILLS_UNSUPPORTED = {
+    error: 'section_unsupported',
+    message: 'У активного провайдера нет проектных скиллов.',
+  } as const;
+
+  const INVALID_SKILL_DRAFT = {
+    error: 'invalid_draft',
+    message:
+      'Скилл не прошёл проверку: нужен путь вида «<имя>/SKILL.md», однострочные имя и описание и текстовое тело.',
   } as const;
 
   const INVALID_PERMISSIONS_DRAFT = {
@@ -541,44 +602,9 @@ export function registerProviderProjectRoutes(app: FastifyInstance, ctx: ServerC
       const target = requireTarget(request.params.id, reply);
       if (!target) return reply;
       if (!target.permissions) return reply.code(400).send(PERMISSIONS_UNSUPPORTED);
-
-      const base = {
-        providerId: target.provider.id,
-        providerName: target.provider.name,
-        kind: 'gemini' as const,
-        format: target.permissions.format,
-        filePath: target.permissions.filePath,
-        cliDetected: target.permissions.cliDetected,
-        approvalModes: [...GEMINI_APPROVAL_MODES],
-      };
-
-      try {
-        const values = readProviderPermissions(target.permissions);
-        // Проектный уровень объявлен только для формата gemini-json; codex-модель
-        // сюда не приходит, но проверяем явно — fail-closed вместо приведения типа.
-        if (values.kind !== 'gemini') return reply.code(400).send(PERMISSIONS_UNSUPPORTED);
-        return {
-          ...base,
-          approvalMode: values.approvalMode,
-          coreTools: values.coreTools,
-          excludeTools: values.excludeTools,
-          usingDefaults: values.usingDefaults,
-          readOnly: false,
-        };
-      } catch (error) {
-        if (error instanceof UnrecognizedFormatError) {
-          return {
-            ...base,
-            approvalMode: 'default' as const,
-            coreTools: [],
-            excludeTools: [],
-            usingDefaults: true,
-            readOnly: true,
-            error: error.message,
-          };
-        }
-        throw error;
-      }
+      // Сводку строит ТА ЖЕ функция, что и глобальный маршрут (`gemini-json` у
+      // Gemini, `opencode-json` у OpenCode) — модели не могут разъехаться.
+      return buildProviderPermissionInfo(target.permissions);
     },
   );
 
@@ -609,6 +635,201 @@ export function registerProviderProjectRoutes(app: FastifyInstance, ctx: ServerC
           return reply.code(422).send(FORMAT_UNRECOGNIZED);
         throw error;
       }
+    },
+  );
+
+  // --- Хуки проекта: `experimental.hook` в <проект>/opencode.json (OPENCODE-3) ---
+  // Тот же домен и тот же адаптер, что у глобального раздела; отличие одно —
+  // файл лежит в проекте (и он уже проверен `resolveProjectFile` на выход за него).
+
+  app.get<{ Params: { id: string } }>('/api/projects/:id/provider/hooks', (request, reply) => {
+    const target = requireTarget(request.params.id, reply);
+    if (!target) return reply;
+    if (!target.hooks) return reply.code(400).send(HOOKS_UNSUPPORTED);
+
+    return readProviderHooksInfo(target.hooks);
+  });
+
+  app.put<{ Params: { id: string }; Body: unknown }>(
+    '/api/projects/:id/provider/hooks',
+    (request, reply) => {
+      const target = requireTarget(request.params.id, reply);
+      if (!target) return reply;
+      if (!target.hooks) return reply.code(400).send(HOOKS_UNSUPPORTED);
+
+      const draft = parseProviderHooksDraft(request.body);
+      if (!draft) return reply.code(400).send(INVALID_HOOKS_DRAFT);
+
+      try {
+        return done(saveProviderHooks(target.hooks, draft, ctx.backupDir));
+      } catch (error) {
+        if (error instanceof UnrecognizedFormatError)
+          return reply.code(422).send(FORMAT_UNRECOGNIZED);
+        throw error;
+      }
+    },
+  );
+
+  // --- Плагины проекта: каталог `.opencode/plugins` + `plugin` (OPENCODE-4) ---
+  // Защита путей та же, что у глобального каталога: корнем служит уже проверенный
+  // каталог проекта, наружу него ни `..`, ни ссылка в сегменте не выпускают.
+
+  /** Выполнить операцию домена плагинов, разложив её отказы в коды ответа. */
+  const guardedPlugin = <T>(reply: FastifyReply, run: () => T): T | FastifyReply => {
+    try {
+      return run();
+    } catch (error) {
+      const described = describePluginError(error);
+      if (!described) throw error;
+      return reply.code(described.status).send(described.body);
+    }
+  };
+
+  app.get<{ Params: { id: string } }>('/api/projects/:id/provider/plugins', (request, reply) => {
+    const target = requireTarget(request.params.id, reply);
+    if (!target) return reply;
+    if (!target.plugins) return reply.code(400).send(PLUGINS_UNSUPPORTED);
+
+    return readProviderPluginsInfo(target.plugins);
+  });
+
+  app.get<{ Params: { id: string }; Querystring: { path?: string } }>(
+    '/api/projects/:id/provider/plugins/file',
+    (request, reply) => {
+      const target = requireTarget(request.params.id, reply);
+      if (!target) return reply;
+      if (!target.plugins) return reply.code(400).send(PLUGINS_UNSUPPORTED);
+
+      const raw = request.query.path;
+      if (typeof raw !== 'string' || !raw) return reply.code(400).send(INVALID_PLUGIN_FILE_DRAFT);
+
+      return guardedPlugin(reply, () => readProviderPluginFile(target.plugins!, raw));
+    },
+  );
+
+  app.put<{ Params: { id: string }; Body: unknown }>(
+    '/api/projects/:id/provider/plugins/file',
+    (request, reply) => {
+      const target = requireTarget(request.params.id, reply);
+      if (!target) return reply;
+      if (!target.plugins) return reply.code(400).send(PLUGINS_UNSUPPORTED);
+
+      const draft = parseProviderPluginFileDraft(request.body);
+      if (!draft) return reply.code(400).send(INVALID_PLUGIN_FILE_DRAFT);
+
+      return guardedPlugin(reply, () => {
+        const saved = saveProviderPluginFile(target.plugins!, draft, ctx.backupDir);
+        return { ...done(saved.backupPath), path: saved.path, fullPath: saved.fullPath };
+      });
+    },
+  );
+
+  app.delete<{ Params: { id: string }; Querystring: { path?: string } }>(
+    '/api/projects/:id/provider/plugins/file',
+    (request, reply) => {
+      const target = requireTarget(request.params.id, reply);
+      if (!target) return reply;
+      if (!target.plugins) return reply.code(400).send(PLUGINS_UNSUPPORTED);
+
+      const raw = request.query.path;
+      if (typeof raw !== 'string' || !raw) return reply.code(400).send(INVALID_PLUGIN_FILE_DRAFT);
+
+      return guardedPlugin(reply, () => {
+        const removed = deleteProviderPluginFile(target.plugins!, raw, ctx.backupDir);
+        return { ...done(removed.backupPath), path: removed.path };
+      });
+    },
+  );
+
+  app.put<{ Params: { id: string }; Body: unknown }>(
+    '/api/projects/:id/provider/plugins/packages',
+    (request, reply) => {
+      const target = requireTarget(request.params.id, reply);
+      if (!target) return reply;
+      if (!target.plugins) return reply.code(400).send(PLUGINS_UNSUPPORTED);
+
+      const packages = parseProviderPluginPackagesDraft(request.body);
+      if (!packages) return reply.code(400).send(INVALID_PLUGIN_PACKAGES_DRAFT);
+
+      try {
+        return done(saveProviderPluginPackages(target.plugins, packages, ctx.backupDir));
+      } catch (error) {
+        if (error instanceof UnrecognizedFormatError)
+          return reply.code(422).send(FORMAT_UNRECOGNIZED);
+        throw error;
+      }
+    },
+  );
+
+  // --- Скиллы проекта: каталог `.opencode/skills` (OPENCODE-5) ---
+  // Тот же домен и та же защита путей, что у глобального каталога: корнем служит
+  // уже проверенный каталог проекта, наружу него ни `..`, ни ссылка в сегменте,
+  // ни путь иной формы, чем `<имя>/SKILL.md`, не выпускают.
+
+  /** Выполнить операцию домена скиллов, разложив её отказы в коды ответа. */
+  const guardedSkill = <T>(reply: FastifyReply, run: () => T): T | FastifyReply => {
+    try {
+      return run();
+    } catch (error) {
+      const described = describeSkillError(error);
+      if (!described) throw error;
+      return reply.code(described.status).send(described.body);
+    }
+  };
+
+  app.get<{ Params: { id: string } }>('/api/projects/:id/provider/skills', (request, reply) => {
+    const target = requireTarget(request.params.id, reply);
+    if (!target) return reply;
+    if (!target.skills) return reply.code(400).send(SKILLS_UNSUPPORTED);
+
+    return readProviderSkillsInfo(target.skills);
+  });
+
+  app.get<{ Params: { id: string }; Querystring: { path?: string } }>(
+    '/api/projects/:id/provider/skills/skill',
+    (request, reply) => {
+      const target = requireTarget(request.params.id, reply);
+      if (!target) return reply;
+      if (!target.skills) return reply.code(400).send(SKILLS_UNSUPPORTED);
+
+      const raw = request.query.path;
+      if (typeof raw !== 'string' || !raw) return reply.code(400).send(INVALID_SKILL_DRAFT);
+
+      return guardedSkill(reply, () => readProviderSkill(target.skills!, raw));
+    },
+  );
+
+  app.put<{ Params: { id: string }; Body: unknown }>(
+    '/api/projects/:id/provider/skills/skill',
+    (request, reply) => {
+      const target = requireTarget(request.params.id, reply);
+      if (!target) return reply;
+      if (!target.skills) return reply.code(400).send(SKILLS_UNSUPPORTED);
+
+      const draft = parseProviderSkillDraft(request.body);
+      if (!draft) return reply.code(400).send(INVALID_SKILL_DRAFT);
+
+      return guardedSkill(reply, () => {
+        const saved = saveProviderSkill(target.skills!, draft, ctx.backupDir);
+        return { ...done(saved.backupPath), path: saved.path, fullPath: saved.fullPath };
+      });
+    },
+  );
+
+  app.delete<{ Params: { id: string }; Querystring: { path?: string } }>(
+    '/api/projects/:id/provider/skills/skill',
+    (request, reply) => {
+      const target = requireTarget(request.params.id, reply);
+      if (!target) return reply;
+      if (!target.skills) return reply.code(400).send(SKILLS_UNSUPPORTED);
+
+      const raw = request.query.path;
+      if (typeof raw !== 'string' || !raw) return reply.code(400).send(INVALID_SKILL_DRAFT);
+
+      return guardedSkill(reply, () => {
+        const removed = deleteProviderSkill(target.skills!, raw, ctx.backupDir);
+        return { ...done(removed.backupPath), path: removed.path };
+      });
     },
   );
 }

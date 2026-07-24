@@ -72,6 +72,16 @@ export function describeProviders(store: SettingsSource): ProvidersResponse {
           : provider.instructionsFile
             ? 'file'
             : 'none',
+      // Хуки и плагины — тоже МОДЕЛЬЮ, а не id провайдера. У Claude обе модели
+      // свои и богатые (события settings.json / расширения самой панели), у
+      // OpenCode — ключ конфига `experimental.hook` и каталог файлов + список
+      // npm. Провайдер без адаптера получает `none` и до страницы не доходит
+      // вовсе: его гейт всё равно вернёт заглушку (fail-closed).
+      hooksModel: provider.hooksConfig ? 'config' : provider.id === 'claude' ? 'claude' : 'none',
+      pluginsModel: provider.pluginsConfig ? 'files' : provider.id === 'claude' ? 'panel' : 'none',
+      // Скиллы (OPENCODE-5) — тем же правилом: у Claude раздел свой и богатый, у
+      // OpenCode каталог `skills/` со `SKILL.md`, у остальных раздела нет.
+      skillsModel: provider.skillsConfig ? 'files' : provider.id === 'claude' ? 'claude' : 'none',
     })),
   };
 }

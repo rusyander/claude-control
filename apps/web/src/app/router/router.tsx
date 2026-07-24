@@ -4,11 +4,11 @@ import { OverviewPage } from '@pages/Overview/OverviewPage';
 import { AnalyticsPage } from '@pages/Analytics/AnalyticsPage';
 import { RulesPage } from '@pages/Rules/RulesPage';
 import { InstructionsSection } from '@pages/ClaudeMd/InstructionsSection';
-import { HooksPage } from '@pages/Hooks/HooksPage';
-import { SkillsPage } from '@pages/Skills/SkillsPage';
+import { HooksSection } from '@pages/Hooks/HooksSection';
+import { SkillsSection } from '@pages/Skills/SkillsSection';
 import { ScriptsPage } from '@pages/Scripts/ScriptsPage';
 import { ChatSection } from '@pages/Chat/ChatSection';
-import { PluginsPage } from '@pages/Plugins/PluginsPage';
+import { PluginsSection } from '@pages/Plugins/PluginsSection';
 import { McpSection } from '@pages/Mcp/McpSection';
 import { PermissionsSection } from '@pages/Permissions/PermissionsSection';
 import { EnvSection } from '@pages/Env/EnvSection';
@@ -77,10 +77,10 @@ const routes = [
   { path: '/chat', component: gated('chat', ChatSection) },
   { path: '/rules', component: gated('rules', RulesPage) },
   { path: '/claude-md', component: gated('globalInstructions', InstructionsSection) },
-  { path: '/hooks', component: gated('hooks', HooksPage) },
-  { path: '/skills', component: gated('skills', SkillsPage) },
+  { path: '/hooks', component: gated('hooks', HooksSection) },
+  { path: '/skills', component: gated('skills', SkillsSection) },
   { path: '/scripts', component: gated('scripts', ScriptsPage) },
-  { path: '/plugins', component: gated('plugins', PluginsPage) },
+  { path: '/plugins', component: gated('plugins', PluginsSection) },
   { path: '/mcp', component: gated('mcp', McpSection) },
   { path: '/permissions', component: gated('permissions', PermissionsSection) },
   { path: '/env', component: gated('env', EnvSection) },

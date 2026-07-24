@@ -214,22 +214,95 @@ export interface ProviderInstructionsRulesLocation {
  * Задаётся ТОЛЬКО у провайдеров с реализованным адаптером прав (Codex — скалярные
  * ключи корня `approval_policy` / `sandbox_mode` в config.toml; Gemini —
  * `general.defaultApprovalMode` + списки `coreTools`/`excludeTools` в
- * settings.json) — у них же `permissions` = `ready`. У Claude права живут в
- * settings.json (allow/deny/ask) и обслуживаются собственными богатыми роутами,
- * поэтому `permissionsConfig` у него НЕ задан. OpenCode (иная модель) сюда пока не
- * входит — его `permissions` остаётся `planned` (fail-closed). Провайдер без
- * `permissionsConfig` → универсальный раздел прав fail-closed (сервер отвечает 4xx).
+ * settings.json; OpenCode — ключ `permission` в opencode.json) — у них же
+ * `permissions` = `ready`. У Claude права живут в settings.json (allow/deny/ask) и
+ * обслуживаются собственными богатыми роутами, поэтому `permissionsConfig` у него
+ * НЕ задан. Провайдер без `permissionsConfig` → универсальный раздел прав
+ * fail-closed (сервер отвечает 4xx).
  */
 export interface ProviderPermissionsConfigLocation {
   /**
    * Формат файла:
    * - `toml` — скалярные ключи корня (Codex `config.toml`);
    * - `gemini-json` — `general.defaultApprovalMode` + `coreTools`/`excludeTools`
-   *   (Gemini `settings.json`), правятся точечно, прочие ключи сохраняются.
+   *   (Gemini `settings.json`), правятся точечно, прочие ключи сохраняются;
+   * - `opencode-json` — ключ `permission` (OpenCode `opencode.json`): уровень
+   *   `allow`/`deny`/`ask` у инструмента, у `bash` — ещё и карта шаблонов
+   *   команд. Правится только `permission`, прочие ключи сохраняются.
    */
-  format: 'toml' | 'gemini-json';
+  format: 'toml' | 'gemini-json' | 'opencode-json';
   /** Абсолютный путь к файлу конфигурации с правами/аппрувами. */
   path: (override?: string) => string;
+}
+
+/**
+ * Расположение и формат ХУКОВ провайдера (OPENCODE-3).
+ *
+ * Задаётся ТОЛЬКО у провайдеров с реализованным адаптером хуков — у них же
+ * `hooks` = `ready`. У Claude хуки живут в settings.json событиями
+ * `PreToolUse`/`PostToolUse` и обслуживаются собственными богатыми роутами
+ * `/api/hooks`, поэтому `hooksConfig` у него НЕ задан: универсальный раздел его
+ * не трогает (модель принципиально другая). Провайдер без `hooksConfig` →
+ * универсальный раздел хуков fail-closed (сервер отвечает 4xx).
+ */
+export interface ProviderHooksConfigLocation {
+  /**
+   * Формат хранилища:
+   * - `opencode-json` — ключ `experimental.hook` в `opencode.json`: два
+   *   задокументированных события (`file_edited` — карта «шаблон → действия»,
+   *   `session_completed` — массив действий), действие = argv-массив `command` +
+   *   необязательные переменные `environment`. Правится только `experimental.hook`;
+   *   прочие ключи `experimental` и незнакомые события сохраняются.
+   */
+  format: 'opencode-json';
+  /** Абсолютный путь к файлу конфигурации с хуками. */
+  path: (override?: string) => string;
+}
+
+/**
+ * Расположение ПЛАГИНОВ провайдера (OPENCODE-4).
+ *
+ * Задаётся ТОЛЬКО у провайдеров с реализованным адаптером — у них же `plugins` =
+ * `ready`. Раздел «Плагины» Claude — это расширения САМОЙ панели, у него своя
+ * модель и свои роуты; `pluginsConfig` у Claude НЕ задан.
+ *
+ * У OpenCode способа два, и оба задокументированы: КАТАЛОГ файлов JS/TS,
+ * загружаемых при старте, и МАССИВ `plugin` с именами npm-пакетов в конфиге.
+ * Поэтому здесь два пути сразу.
+ */
+export interface ProviderPluginsConfigLocation {
+  /** Формат раздела: `opencode-plugins` — каталог файлов + массив `plugin`. */
+  format: 'opencode-plugins';
+  /** Абсолютный путь КАТАЛОГА файлов-плагинов (`~/.config/opencode/plugins`). */
+  dir: (override?: string) => string;
+  /** Абсолютный путь конфигурации, в которой лежит массив `plugin`. */
+  configPath: (override?: string) => string;
+}
+
+/**
+ * Расположение СКИЛЛОВ провайдера (OPENCODE-5).
+ *
+ * Задаётся ТОЛЬКО у провайдеров с реализованным адаптером — у них же `skills` =
+ * `ready`. У Claude скиллы свои и богаче (включение переносом в
+ * `skills-disabled/`, группы, вложенные файлы скилла) и живут на собственных
+ * маршрутах `/api/skills`, поэтому `skillsConfig` у него НЕ задан. Провайдер без
+ * `skillsConfig` → универсальный раздел скиллов fail-closed (сервер 4xx).
+ */
+export interface ProviderSkillsConfigLocation {
+  /**
+   * Формат каталога: `opencode-skills` — папка на скилл, внутри `SKILL.md` с
+   * YAML-шапкой (`name` и `description` обязательны).
+   */
+  format: 'opencode-skills';
+  /** Абсолютный путь КАТАЛОГА скиллов (`~/.config/opencode/skills`). */
+  dir: (override?: string) => string;
+  /**
+   * Каталоги, из которых CLI грузит скиллы ПОМИМО собственного — только чтобы
+   * сообщить об этом в интерфейсе. Панель туда НИЧЕГО не пишет: у OpenCode это
+   * `~/.claude/skills` и `~/.agents/skills`, и скиллами Claude управляет
+   * собственный раздел Claude.
+   */
+  alsoLoadedFrom?: () => string[];
 }
 
 /**
@@ -308,6 +381,37 @@ export interface ProviderProjectConfigLocation {
     /** Относительный путь от корня проекта, разделитель — `/`. */
     relativePath: string;
   };
+  /**
+   * Проектные ХУКИ (OPENCODE-3): тот же адаптер, что у глобального раздела.
+   * У OpenCode это `<проект>/opencode.json` — задокументированный проектный
+   * конфиг, а ключ `experimental.hook` в нём тот же самый.
+   */
+  hooks?: {
+    format: ProviderHooksConfigLocation['format'];
+    /** Относительный путь от корня проекта, разделитель — `/`. */
+    relativePath: string;
+  };
+  /**
+   * Проектные ПЛАГИНЫ (OPENCODE-4): каталог файлов + конфиг с массивом `plugin`.
+   * У OpenCode это `<проект>/.opencode/plugins/` и `<проект>/opencode.json`.
+   */
+  plugins?: {
+    format: ProviderPluginsConfigLocation['format'];
+    /** Относительный путь КАТАЛОГА файлов от корня проекта, разделитель — `/`. */
+    relativeDir: string;
+    /** Относительный путь конфига с массивом `plugin`, разделитель — `/`. */
+    relativePath: string;
+  };
+  /**
+   * Проектные СКИЛЛЫ (OPENCODE-5): каталог папок со `SKILL.md`. У OpenCode это
+   * `<проект>/.opencode/skills/` — тот же формат, что и глобальный каталог,
+   * поэтому домен и адаптер переиспользуются целиком.
+   */
+  skills?: {
+    format: ProviderSkillsConfigLocation['format'];
+    /** Относительный путь КАТАЛОГА от корня проекта, разделитель — `/`. */
+    relativeDir: string;
+  };
 }
 
 export interface ConfigProvider {
@@ -379,6 +483,30 @@ export interface ConfigProvider {
    * gemini/opencode остаются `planned`.
    */
   permissionsConfig?: ProviderPermissionsConfigLocation;
+  /**
+   * Расположение и формат ХУКОВ (OPENCODE-3) — задан только у провайдеров с
+   * реализованным адаптером (OpenCode: ключ `experimental.hook` в opencode.json),
+   * у них же `hooks` = `ready`. Отсутствует → универсальный раздел хуков
+   * провайдер не поддерживает (fail-closed). У Claude своя, принципиально иная
+   * модель хуков на собственных маршрутах — `hooksConfig` здесь он не имеет.
+   */
+  hooksConfig?: ProviderHooksConfigLocation;
+  /**
+   * Расположение ПЛАГИНОВ (OPENCODE-4) — задан только у провайдеров с
+   * реализованным адаптером (OpenCode: каталог `plugins/` + массив `plugin` в
+   * opencode.json), у них же `plugins` = `ready`. Отсутствует → универсальный
+   * раздел плагинов провайдер не поддерживает (fail-closed). Раздел «Плагины» у
+   * Claude — расширения самой панели, `pluginsConfig` здесь он не имеет.
+   */
+  pluginsConfig?: ProviderPluginsConfigLocation;
+  /**
+   * Расположение СКИЛЛОВ (OPENCODE-5) — задан только у провайдеров с
+   * реализованным адаптером (OpenCode: каталог `skills/` с папками `SKILL.md`),
+   * у них же `skills` = `ready`. Отсутствует → универсальный раздел скиллов
+   * провайдер не поддерживает (fail-closed). У Claude свой богатый раздел
+   * скиллов на собственных маршрутах — `skillsConfig` здесь он не имеет.
+   */
+  skillsConfig?: ProviderSkillsConfigLocation;
   /**
    * Проектный уровень конфигурации — задан только у провайдеров с
    * задокументированными проектными путями (Codex/Gemini/OpenCode/Cursor), у них

@@ -16,7 +16,8 @@ import { object, string, array, boolean, enum as zodEnum, type infer as Infer } 
  *  - **переменные окружения проекта** — у Gemini задокументирован проектный
  *    `<проект>/.gemini/.env` (GEMINI-3);
  *  - **права/аппрувы проекта** — у Gemini задокументирован проектный
- *    `<проект>/.gemini/settings.json` (GEMINI-2).
+ *    `<проект>/.gemini/settings.json` (GEMINI-2), у OpenCode — ключ `permission`
+ *    в проектном `<проект>/opencode.json` (OPENCODE-1).
  *
  * Чего у провайдера нет в документации — того здесь нет: раздел не показывается,
  * сервер отвечает 4xx (fail-closed). Пути внутри проекта строятся панелью и
@@ -38,6 +39,22 @@ export const providerProjectSectionSchema = zodEnum([
   'mcp',
   'env',
   'permissions',
+  /**
+   * ХУКИ проекта (OPENCODE-3): ключ `experimental.hook` в проектном
+   * `<проект>/opencode.json` — та же модель, что у глобального раздела. К хукам
+   * Claude отношения не имеет: у него своя модель на своих маршрутах.
+   */
+  'hooks',
+  /**
+   * ПЛАГИНЫ проекта (OPENCODE-4): каталог файлов `<проект>/.opencode/plugins/`
+   * плюс массив npm-пакетов `plugin` в проектном `<проект>/opencode.json`.
+   */
+  'plugins',
+  /**
+   * СКИЛЛЫ проекта (OPENCODE-5): каталог `<проект>/.opencode/skills/`, папка на
+   * скилл со `SKILL.md`. У Claude скиллы только глобальные и на своих маршрутах.
+   */
+  'skills',
 ]);
 export type ProviderProjectSection = Infer<typeof providerProjectSectionSchema>;
 
@@ -72,9 +89,23 @@ export const providerProjectInfoSchema = object({
   /** Абсолютный путь проектного файла переменных окружения. */
   envPath: string().optional(),
   /** Формат проектного файла прав/аппрувов, если раздел есть. */
-  permissionsFormat: zodEnum(['toml', 'gemini-json']).optional(),
+  permissionsFormat: zodEnum(['toml', 'gemini-json', 'opencode-json']).optional(),
   /** Абсолютный путь проектного файла прав/аппрувов. */
   permissionsPath: string().optional(),
+  /** Формат проектных хуков, если раздел есть (OpenCode: `opencode-json`). */
+  hooksFormat: zodEnum(['opencode-json']).optional(),
+  /** Абсолютный путь проектного файла с хуками. */
+  hooksPath: string().optional(),
+  /** Формат проектных плагинов, если раздел есть (OpenCode: `opencode-plugins`). */
+  pluginsFormat: zodEnum(['opencode-plugins']).optional(),
+  /** Абсолютный путь проектного КАТАЛОГА файлов-плагинов. */
+  pluginsDir: string().optional(),
+  /** Абсолютный путь проектного конфига с массивом `plugin`. */
+  pluginsConfigPath: string().optional(),
+  /** Формат проектных скиллов, если раздел есть (OpenCode: `opencode-skills`). */
+  skillsFormat: zodEnum(['opencode-skills']).optional(),
+  /** Абсолютный путь проектного КАТАЛОГА скиллов. */
+  skillsDir: string().optional(),
 });
 
 export type ProviderProjectInfo = Infer<typeof providerProjectInfoSchema>;

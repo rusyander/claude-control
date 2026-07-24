@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  GeminiPermissionDraft,
-  GeminiPermissionInfo,
+  ProviderPermissionDraft,
+  ProviderPermissionInfo,
   ProviderEnvInfo,
   ProviderEnvVar,
   ProviderMcpInfo,
@@ -161,13 +161,16 @@ export function useSaveProviderProjectEnv(projectId: string) {
   });
 }
 
-// --- Права/аппрувы проекта (GEMINI-2: <проект>/.gemini/settings.json) ---
+// --- Права/аппрувы проекта -------------------------------------------------
+// GEMINI-2: `<проект>/.gemini/settings.json`; OPENCODE-1: ключ `permission` в
+// `<проект>/opencode.json`. Модель выбирает СЕРВЕР (поле `kind`), клиент только
+// рисует нужную форму — поэтому тип ответа общий (`ProviderPermissionInfo`).
 
 export function useProviderProjectPermissions(projectId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.projectProviderPermissions(projectId),
     queryFn: async () => {
-      const { data } = await apiClient.get<GeminiPermissionInfo>(
+      const { data } = await apiClient.get<ProviderPermissionInfo>(
         `/projects/${projectId}/provider/permissions`,
       );
       return data;
@@ -179,7 +182,7 @@ export function useProviderProjectPermissions(projectId: string, enabled: boolea
 export function useSaveProviderProjectPermissions(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (draft: GeminiPermissionDraft) => {
+    mutationFn: async (draft: ProviderPermissionDraft) => {
       const { data } = await apiClient.put<WriteResult>(
         `/projects/${projectId}/provider/permissions`,
         draft,

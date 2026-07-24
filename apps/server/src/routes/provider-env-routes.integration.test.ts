@@ -49,6 +49,22 @@ describe('provider-env роуты: гейтинг по провайдеру (fai
     expect(res.json<{ error: string }>().error).toBe('section_unsupported');
   });
 
+  // OPENCODE-2: у OpenCode хранить переменные окружения негде — он только
+  // подставляет `{env:ПЕРЕМЕННАЯ}` из уже заданного окружения процесса, своего
+  // `.env` не читает. Возможность объявлена `unsupported`, роуты обязаны
+  // отказывать так же, как у cursor: файл, который никто не прочтёт, не создаём.
+  it('opencode (env=unsupported, OPENCODE-2) → 400 section_unsupported на всех методах', async () => {
+    await bootWith('opencode');
+    for (const m of [
+      { method: 'GET' as const, url: '/api/provider-env' },
+      { method: 'PUT' as const, url: '/api/provider-env' },
+    ]) {
+      const res = await app.inject({ ...m, payload: { vars: [{ key: 'A', value: '1' }] } });
+      expect(res.statusCode).toBe(400);
+      expect(res.json<{ error: string }>().error).toBe('section_unsupported');
+    }
+  });
+
   it('cursor (env≠ready) → 400 section_unsupported на всех методах', async () => {
     await bootWith('cursor');
     for (const m of [

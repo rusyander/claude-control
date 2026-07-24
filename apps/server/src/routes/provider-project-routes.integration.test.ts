@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  readdirSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Project, ProviderProjectInfo, UniversalMcpServer } from '@claude-control/contracts';
@@ -68,10 +76,12 @@ describe('provider-project-routes: проектный уровень прова�
         mcp: ['.gemini', 'settings.json'],
         sections: ['instructions', 'mcp', 'env', 'permissions'],
       },
+      // OPENCODE-1/3/4: права и хуки проекта — ключи того же opencode.json,
+      // плагины — ещё и каталог `.opencode/plugins`.
       opencode: {
         instructions: 'AGENTS.md',
         mcp: ['opencode.json'],
-        sections: ['instructions', 'mcp'],
+        sections: ['instructions', 'mcp', 'permissions', 'hooks', 'plugins', 'skills'],
       },
       // CURSOR-1: у Cursor вместо файла инструкций — КАТАЛОГ правил `.mdc`.
       cursor: { mcp: ['.cursor', 'mcp.json'], sections: ['instructionsRules', 'mcp'] },
@@ -245,6 +255,115 @@ describe('provider-project-routes: проектный уровень прова�
     expect(raw.coreTools).toEqual(['ReadFile']);
   });
 
+  // OPENCODE-1: проектные права OpenCode — ключ `permission` в `<проект>/opencode.json`.
+  it('opencode: проектные права правят только permission, MCP и модель целы', async () => {
+    const id = await boot('opencode');
+    const file = join(projectDir, 'opencode.json');
+    writeFileSync(
+      file,
+      JSON.stringify(
+        {
+          $schema: 'https://opencode.ai/config.json',
+          model: 'anthropic/claude-sonnet-4',
+          mcp: { probe: { type: 'local', command: ['node', 'x.js'] } },
+          permission: { edit: 'deny', deploy: 'ask' },
+        },
+        null,
+        2,
+      ),
+      'utf8',
+    );
+
+    const get = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${id}/provider/permissions`,
+    });
+    expect(get.statusCode).toBe(200);
+    const info = get.json<{
+      kind: string;
+      filePath: string;
+      entries: { tool: string; level?: string }[];
+      preserved: { key: string }[];
+    }>();
+    expect(info.kind).toBe('opencode');
+    expect(info.filePath).toBe(file);
+    expect(info.entries).toEqual([{ tool: 'edit', mode: 'level', level: 'deny' }]);
+    expect(info.preserved).toEqual([{ key: 'deploy', value: '"ask"' }]);
+
+    // Чужая модель черновика (gemini) в файл OpenCode не проходит.
+    const wrong = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/provider/permissions`,
+      payload: { approvalMode: 'plan', coreTools: [], excludeTools: [] },
+    });
+    expect(wrong.statusCode).toBe(400);
+    expect(wrong.json<{ error: string }>().error).toBe('invalid_draft');
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/provider/permissions`,
+      payload: {
+        entries: [
+          {
+            tool: 'bash',
+            mode: 'patterns',
+            patterns: [
+              { pattern: '*', level: 'ask' },
+              { pattern: 'git push *', level: 'deny' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+    expect(raw.model).toBe('anthropic/claude-sonnet-4');
+    expect(raw.mcp).toEqual({ probe: { type: 'local', command: ['node', 'x.js'] } });
+    expect(raw.permission).toEqual({
+      // `edit` в черновике не было → ключ снят; незнакомый `deploy` сохранён.
+      deploy: 'ask',
+      bash: { '*': 'ask', 'git push *': 'deny' },
+    });
+
+    // Копия проекта отделена от глобальной ротации префиксом `-project-`.
+    expect(
+      readdirSync(join(appDataRoot, 'backups')).some((name) =>
+        name.startsWith('opencode-project-opencode.json'),
+      ),
+    ).toBe(true);
+  });
+
+  it('opencode: битый проектный opencode.json → readOnly на чтении и 422 на записи', async () => {
+    const id = await boot('opencode');
+    const file = join(projectDir, 'opencode.json');
+    const broken = '{ "permission": { "edit": ';
+    writeFileSync(file, broken, 'utf8');
+
+    const get = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${id}/provider/permissions`,
+    });
+    expect(get.statusCode).toBe(200);
+    expect(get.json<{ readOnly: boolean }>().readOnly).toBe(true);
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/provider/permissions`,
+      payload: { entries: [{ tool: 'edit', mode: 'level', level: 'ask' }] },
+    });
+    expect(put.statusCode).toBe(422);
+    expect(put.json<{ error: string }>().error).toBe('format_unrecognized');
+    expect(readFileSync(file, 'utf8')).toBe(broken);
+  });
+
+  it('opencode: проектные env → 400 (OPENCODE-2: хранить переменные негде)', async () => {
+    const id = await boot('opencode');
+    const res = await app.inject({ method: 'GET', url: `/api/projects/${id}/provider/env` });
+    expect(res.statusCode).toBe(400);
+    expect(res.json<{ error: string }>().error).toBe('section_unsupported');
+  });
+
   // У прочих провайдеров проектных env/прав НЕТ — раздел fail-closed.
   it('codex: проектные env и права → 400 section_unsupported', async () => {
     const id = await boot('codex');
@@ -398,6 +517,205 @@ describe('provider-project-routes: проектный уровень прова�
     });
     expect(res.statusCode).toBe(400);
     expect(readFileSync(join(projectDir, 'AGENTS.md'), 'utf8')).toBe('исходный текст\n');
+  });
+
+  // --- OPENCODE-3/4: хуки и плагины проекта -----------------------------------
+
+  it('opencode: хуки проекта round-trip в <проект>/opencode.json, чужие ключи целы', async () => {
+    const id = await boot('opencode');
+    const file = join(projectDir, 'opencode.json');
+    writeFileSync(
+      file,
+      JSON.stringify(
+        {
+          $schema: 'https://opencode.ai/config.json',
+          permission: { edit: 'deny' },
+          experimental: { policies: [{ effect: 'deny' }], hook: { tool_called: [{ x: 1 }] } },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/provider/hooks`,
+      payload: {
+        fileEdited: [{ pattern: '*.ts', actions: [{ command: ['prettier', '--write'] }] }],
+        sessionCompleted: [],
+      },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const written = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+    expect(written.$schema).toBe('https://opencode.ai/config.json');
+    expect(written.permission).toEqual({ edit: 'deny' });
+    const experimental = written.experimental as Record<string, unknown>;
+    // Чужой ключ `experimental` и незнакомое событие целы.
+    expect(experimental.policies).toEqual([{ effect: 'deny' }]);
+    expect(experimental.hook).toEqual({
+      tool_called: [{ x: 1 }],
+      file_edited: { '*.ts': [{ command: ['prettier', '--write'] }] },
+    });
+
+    const get = await app.inject({ method: 'GET', url: `/api/projects/${id}/provider/hooks` });
+    expect(get.statusCode).toBe(200);
+    const info = get.json<{
+      scope: string;
+      fileEdited: unknown[];
+      preservedEvents: { key: string }[];
+    }>();
+    expect(info.scope).toBe('project');
+    expect(info.fileEdited).toEqual([
+      { pattern: '*.ts', actions: [{ command: ['prettier', '--write'] }] },
+    ]);
+    expect(info.preservedEvents.map((entry) => entry.key)).toEqual(['tool_called']);
+
+    // Резервная копия проекта отделена от глобальной префиксом `-project-`.
+    const backups = readdirSync(join(appDataRoot, 'backups'));
+    expect(backups.some((name) => name.startsWith('opencode-project-opencode.json'))).toBe(true);
+  });
+
+  it('opencode: плагины проекта — каталог .opencode/plugins и ключ plugin', async () => {
+    const id = await boot('opencode');
+
+    const info = await app.inject({ method: 'GET', url: `/api/projects/${id}/provider/plugins` });
+    expect(info.statusCode).toBe(200);
+    const body = info.json<{ pluginsDir: string; configPath: string; dirExists: boolean }>();
+    expect(body.pluginsDir).toBe(join(projectDir, '.opencode', 'plugins'));
+    expect(body.configPath).toBe(join(projectDir, 'opencode.json'));
+    // Каталог создаётся только при явном сохранении файла.
+    expect(body.dirExists).toBe(false);
+
+    const created = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/provider/plugins/file`,
+      payload: { path: 'notify.ts', content: 'export const plugin = () => {};\n' },
+    });
+    expect(created.statusCode).toBe(200);
+    expect(readFileSync(join(projectDir, '.opencode', 'plugins', 'notify.ts'), 'utf8')).toBe(
+      'export const plugin = () => {};\n',
+    );
+
+    const packages = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/provider/plugins/packages`,
+      payload: { packages: ['@org/p'] },
+    });
+    expect(packages.statusCode).toBe(200);
+    expect(
+      (JSON.parse(readFileSync(join(projectDir, 'opencode.json'), 'utf8')) as { plugin: unknown })
+        .plugin,
+    ).toEqual(['@org/p']);
+  });
+
+  it('проектный уровень: защита путей плагинов та же — 400 unsafe_path, не 404', async () => {
+    const id = await boot('opencode');
+    // Файл за пределами проекта: существует, но панель о нём не сообщает.
+    const outside = join(appDataRoot, 'outside.ts');
+    writeFileSync(outside, 'secret');
+
+    for (const path of ['../outside.ts', '../../outside.ts', '/etc/evil.ts', 'note.md']) {
+      const encoded = encodeURIComponent(path);
+      for (const request of [
+        {
+          method: 'GET' as const,
+          url: `/api/projects/${id}/provider/plugins/file?path=${encoded}`,
+        },
+        {
+          method: 'DELETE' as const,
+          url: `/api/projects/${id}/provider/plugins/file?path=${encoded}`,
+        },
+      ]) {
+        const res = await app.inject(request);
+        expect(res.statusCode, `${request.method} ${path}`).toBe(400);
+        expect(res.json<{ error: string }>().error).toBe('unsafe_path');
+      }
+
+      const write = await app.inject({
+        method: 'PUT',
+        url: `/api/projects/${id}/provider/plugins/file`,
+        payload: { path, content: 'x' },
+      });
+      expect(write.statusCode, `PUT ${path}`).toBe(400);
+      expect(write.json<{ error: string }>().error).toBe('unsafe_path');
+    }
+
+    expect(readFileSync(outside, 'utf8')).toBe('secret');
+    expect(existsSync(join(projectDir, '.opencode'))).toBe(false);
+  });
+
+  it('opencode: скиллы проекта — каталог .opencode/skills, round-trip + удаление', async () => {
+    const id = await boot('opencode');
+
+    const info = await app.inject({ method: 'GET', url: `/api/projects/${id}/provider/skills` });
+    expect(info.statusCode).toBe(200);
+    const body = info.json<{ skillsDir: string; dirExists: boolean; externalDirs: unknown[] }>();
+    expect(body.skillsDir).toBe(join(projectDir, '.opencode', 'skills'));
+    // Каталог создаётся только при явном сохранении; в проекте прочих каталогов нет.
+    expect(body.dirExists).toBe(false);
+    expect(body.externalDirs).toEqual([]);
+
+    const created = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/provider/skills/skill`,
+      payload: { path: 'demo/SKILL.md', name: 'demo', description: 'делает X', body: '# H\n' },
+    });
+    expect(created.statusCode).toBe(200);
+    expect(readFileSync(join(projectDir, '.opencode', 'skills', 'demo', 'SKILL.md'), 'utf8')).toBe(
+      '---\nname: demo\ndescription: делает X\n---\n# H\n',
+    );
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/projects/${id}/provider/skills/skill?path=demo/SKILL.md`,
+    });
+    expect(del.statusCode).toBe(200);
+    expect(existsSync(join(projectDir, '.opencode', 'skills', 'demo'))).toBe(false);
+  });
+
+  it('проектный уровень: защита путей скиллов та же — 400 unsafe_path, не 404', async () => {
+    const id = await boot('opencode');
+    const outside = join(appDataRoot, 'outside', 'SKILL.md');
+    mkdirSync(join(appDataRoot, 'outside'), { recursive: true });
+    writeFileSync(outside, 'secret');
+
+    for (const path of ['../outside/SKILL.md', '/etc/SKILL.md', 'a/b/SKILL.md', 'x/README.md']) {
+      const encoded = encodeURIComponent(path);
+      const get = await app.inject({
+        method: 'GET',
+        url: `/api/projects/${id}/provider/skills/skill?path=${encoded}`,
+      });
+      expect(get.statusCode, `GET ${path}`).toBe(400);
+      expect(get.json<{ error: string }>().error).toBe('unsafe_path');
+
+      const write = await app.inject({
+        method: 'PUT',
+        url: `/api/projects/${id}/provider/skills/skill`,
+        payload: { path, name: 'x', description: 'd', body: '' },
+      });
+      expect(write.statusCode, `PUT ${path}`).toBe(400);
+      expect(write.json<{ error: string }>().error).toBe('unsafe_path');
+    }
+    expect(readFileSync(outside, 'utf8')).toBe('secret');
+    expect(existsSync(join(projectDir, '.opencode'))).toBe(false);
+  });
+
+  it('хуки, плагины и скиллы проекта закрыты у провайдеров без них (включая claude)', async () => {
+    for (const provider of ['claude', 'codex', 'gemini', 'cursor', 'aider']) {
+      const id = await boot(provider);
+      for (const url of [
+        `/api/projects/${id}/provider/hooks`,
+        `/api/projects/${id}/provider/plugins`,
+        `/api/projects/${id}/provider/skills`,
+      ]) {
+        const res = await app.inject({ method: 'GET', url });
+        expect(res.statusCode, `${provider} ${url}`).toBe(400);
+        expect(res.json<{ error: string }>().error).toBe('section_unsupported');
+      }
+      await app.close();
+      rmSync(join(appDataRoot, 'state.json'), { force: true });
+    }
   });
 
   it('регресс-ноль Claude: его проектные роуты работают при claude и закрыты при codex', async () => {

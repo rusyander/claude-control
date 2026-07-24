@@ -15,6 +15,9 @@ import { ProviderProjectRulesTab } from './ProviderProjectRulesTab';
 import { ProviderProjectMcpTab } from './ProviderProjectMcpTab';
 import { ProviderProjectEnvTab } from './ProviderProjectEnvTab';
 import { ProviderProjectPermissionsTab } from './ProviderProjectPermissionsTab';
+import { ProviderProjectHooksTab } from './ProviderProjectHooksTab';
+import { ProviderProjectPluginsTab } from './ProviderProjectPluginsTab';
+import { ProviderProjectSkillsTab } from './ProviderProjectSkillsTab';
 import type { ProjectConfigPanelProps } from './ProjectConfigPanel.types';
 import styles from './ProjectsPage.module.scss';
 
@@ -53,6 +56,26 @@ export function ProviderProjectPanel({ project }: ProjectConfigPanelProps) {
 
   const active = tab && data.sections.includes(tab) ? tab : data.sections[0]!;
 
+  /**
+   * Подпись таба. Раньше это была лестница тернарников; с добавлением хуков и
+   * плагинов она перестала читаться, поэтому — таблица. Имя файла инструкций
+   * приходит с сервера и заменяет общую подпись, если оно известно.
+   */
+  const tabLabel = (section: ProviderProjectSection): string => {
+    const labels: Record<ProviderProjectSection, string> = {
+      instructions: data.instructionsFileName ?? t('providerProject.tab_instructions'),
+      instructionsList: t('providerProject.tab_instructionsList'),
+      instructionsRules: t('providerProject.tab_instructionsRules'),
+      mcp: t('projectConfig.tab_mcp'),
+      env: t('providerProject.tab_env'),
+      permissions: t('providerProject.tab_permissions'),
+      hooks: t('providerProject.tab_hooks'),
+      plugins: t('providerProject.tab_plugins'),
+      skills: t('providerProject.tab_skills'),
+    };
+    return labels[section];
+  };
+
   return (
     <Stack gap="var(--spacing-md)">
       <Stack gap="var(--spacing-2xs)">
@@ -76,17 +99,7 @@ export function ProviderProjectPanel({ project }: ProjectConfigPanelProps) {
             variant={active === section ? 'primary' : 'secondary'}
             onClick={() => setTab(section)}
           >
-            {section === 'instructions'
-              ? (data.instructionsFileName ?? t('providerProject.tab_instructions'))
-              : section === 'instructionsList'
-                ? t('providerProject.tab_instructionsList')
-                : section === 'instructionsRules'
-                  ? t('providerProject.tab_instructionsRules')
-                  : section === 'mcp'
-                    ? t('projectConfig.tab_mcp')
-                    : section === 'env'
-                      ? t('providerProject.tab_env')
-                      : t('providerProject.tab_permissions')}
+            {tabLabel(section)}
           </Button>
         ))}
       </Stack>
@@ -99,6 +112,9 @@ export function ProviderProjectPanel({ project }: ProjectConfigPanelProps) {
       {active === 'mcp' && <ProviderProjectMcpTab projectId={project.id} />}
       {active === 'env' && <ProviderProjectEnvTab projectId={project.id} />}
       {active === 'permissions' && <ProviderProjectPermissionsTab projectId={project.id} />}
+      {active === 'hooks' && <ProviderProjectHooksTab projectId={project.id} />}
+      {active === 'plugins' && <ProviderProjectPluginsTab projectId={project.id} />}
+      {active === 'skills' && <ProviderProjectSkillsTab projectId={project.id} />}
     </Stack>
   );
 }

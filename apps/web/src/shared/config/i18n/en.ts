@@ -611,6 +611,154 @@ export const en: TranslationSchema = {
     ignoredExplain:
       'Only .mdc files with frontmatter count as rules. Everything else in the directory is ignored by Cursor - the panel lists them but never edits or deletes them.',
   },
+  providerHooks: {
+    title: 'Hooks · {{provider}}',
+    subtitle: '{{provider}} hooks: the experimental.hook key in opencode.json',
+    explainTitle: 'How it works',
+    explain:
+      '{{provider}} organises hooks differently from Claude: they live in the experimental.hook key of {{filePath}}. There are exactly two events. "File edited" (file_edited) maps a file pattern to a list of actions: edit a file matching the pattern and the actions run. "Session completed" (session_completed) is simply a list of actions to run when work finishes. A command is given as a LIST OF ARGUMENTS, not a shell string: the program first, then its arguments one per field - so spaces inside an argument are safe. The panel edits only this key: the rest of the file, other experimental keys and unknown events stay put, and a backup is made before writing. Changes take effect after the CLI restarts.',
+    experimentalNote:
+      'This is an experimental feature of {{provider}} itself, not of the panel: the key lives under experimental, which OpenCode declares unstable - it may change or be removed without notice. On top of that, the current configuration documentation page does not mention hooks at all, and the published configuration schema has no hook key. The format comes from the hooks documentation; verify it against your CLI version.',
+    filePath: 'Configuration file:',
+    absent: 'no hooks in the file yet',
+    readOnly:
+      'The format of {{path}} was not recognised - the section is read-only, writing is disabled for safety.',
+    eventLocked:
+      'The panel did not recognise the shape of this event, so it leaves it alone: it is shown read-only and stays in the file as is.',
+    fileEdited: {
+      title: 'File edited (file_edited)',
+      hint: 'A file pattern plus the actions that run after a matching file is edited. For example "*.ts" and prettier --write.',
+      pattern: 'File pattern',
+      addPattern: 'Add pattern',
+      addAction: 'Add action',
+      empty: 'No patterns yet: add the first one and actions will run after matching files change.',
+    },
+    sessionCompleted: {
+      title: 'Session completed (session_completed)',
+      hint: 'Actions that run once the session ends. No patterns here - just a list.',
+      addAction: 'Add action',
+      empty: 'No actions yet.',
+    },
+    action: {
+      title: 'Action',
+      remove: 'Remove action',
+      command: 'Command',
+      commandHint:
+        'One argument per field: the first field is the program itself, the rest are its arguments. No shell is involved, so "prettier --write" as a single string will not work - that is two fields.',
+      argvFirst: 'Program',
+      argvNth: 'Argument {{index}}',
+      addArg: 'Add argument',
+      environment: 'Environment variables',
+      environmentHint:
+        "Optional. Passed to the action's process; they do not affect the CLI's own environment.",
+      envKey: 'Name',
+      envValue: 'Value',
+      addEnv: 'Add variable',
+    },
+    preserved: {
+      title: 'The panel does not touch these',
+      text: 'Entries the panel does not manage: unknown events inside hook and other experimental keys. They stay in the file as is and are shown read-only.',
+    },
+  },
+  providerPlugins: {
+    title: 'Plugins · {{provider}}',
+    subtitle: '{{provider}} plugins: files in the plugins directory and npm packages in the config',
+    explainTitle: 'How it works',
+    explain:
+      'These are plugins of {{provider}} itself, not extensions of the panel. There are two documented ways to add one. First, drop a JS or TS file into {{pluginsDir}}: everything there is loaded by the CLI at startup. Second, list npm package names in {{configPath}} under the plugin key; both plain and scoped packages such as @org/name are supported. The panel manages both: files can be created, edited and deleted (a backup is made before writing and before deleting), and the package list can be edited as a whole. A file path must stay inside the plugins directory: "..", absolute paths and foreign extensions are rejected. Changes take effect after the CLI restarts.',
+    pluginsDir: 'Plugins directory:',
+    dirMissing: 'the directory does not exist yet - it will be created when a file is saved',
+    dirUnreadable:
+      'Directory {{path}} cannot be read - file management is unavailable, writing is disabled for safety.',
+    ignoredTitle: 'The panel does not manage these files',
+    ignoredExplain:
+      'The panel edits only .js, .ts and .mjs. Anything else in the directory is listed but never touched.',
+    file: {
+      edit: 'Edit',
+      content: 'File contents',
+      delete:
+        'Delete this plugin file? The panel makes a backup first; the directory itself stays in place.',
+      empty: 'No plugin files yet: create the first one and it will appear in the directory.',
+      createTitle: 'New plugin file',
+      fieldPath: 'File path inside the directory',
+      hintPath:
+        'Relative to {{pluginsDir}}. A subdirectory is allowed - git/notify.ts; it is created on disk when you save. The .ts extension is appended automatically unless you give your own (.js, .ts or .mjs).',
+      create: 'Create file',
+      duplicate: 'A file with that path already exists.',
+      unsafePath: 'The path must stay inside the plugins directory: no ".." and no absolute paths.',
+    },
+    packages: {
+      title: 'Plugins from npm',
+      hint: 'Package names from the plugin key. Plain and scoped (@org/name) packages work the same. The panel edits only this key; it cannot install packages - the CLI does that.',
+      field: 'Package name',
+      add: 'Add to the list',
+      empty: 'The list is empty: no npm plugins are attached.',
+      duplicate: 'That package is already in the list.',
+      invalid: 'A package name must not contain spaces or quotes.',
+      readOnly:
+        'The format of {{path}} was not recognised - the list is read-only, writing is disabled for safety.',
+      preservedTitle: 'The panel does not touch these',
+      preservedText:
+        'Entries of the "name + options" form: the documentation does not describe their shape, so the panel keeps them as is and never rewrites them.',
+    },
+  },
+  // Skills of the CLI itself (OpenCode, OPENCODE-5): a directory of folders with
+  // SKILL.md. Not the Claude skills section — that has its own model and routes.
+  providerSkills: {
+    title: 'Skills · {{provider}}',
+    subtitle: '{{provider}} skills: folders with SKILL.md in the skills directory',
+    explainTitle: 'How it works',
+    explain:
+      'These are the skills of {{provider}} itself. A skill is a folder in {{skillsDir}}, with a SKILL.md file inside carrying a YAML front matter. The panel recognizes and edits two required front-matter fields — name and description; the license, compatibility, metadata and any other fields it keeps as is and shows read-only. The skill name must equal the folder name and follow the rules: 1–64 characters, lowercase letters, digits and single hyphens, no leading or trailing hyphen and no double hyphen. The CLI decides when to load a skill from its description, so it is required. The panel creates, edits and deletes skills; a backup is made before every write and delete. Changes take effect after the CLI restarts.',
+    skillsDir: 'Skills directory:',
+    dirMissing: 'the directory does not exist yet — it is created when you save a skill',
+    dirUnreadable:
+      'The directory {{path}} cannot be read — skills cannot be managed, writing is disabled for safety.',
+    externalTitle: 'Your Claude skills already work in {{provider}}',
+    externalExplain:
+      'Besides its own directory, {{provider}} also loads skills from these folders, so your already configured Claude skills work in it without moving anything. This section does not manage them — the Claude skills section does; nothing is written here.',
+    externalMissing: 'folder missing',
+    ignoredTitle: 'The CLI will not pick up these folders',
+    ignoredExplain:
+      'These folders have no SKILL.md file, so the CLI does not treat them as skills. The panel shows them but never touches them.',
+    empty: 'No skills yet: create the first one — a folder with SKILL.md will appear.',
+    edit: 'Edit',
+    view: 'Open',
+    createTitle: 'New skill',
+    createSkill: 'Create skill',
+    fieldName: 'Skill name',
+    hintName:
+      'Becomes the folder name and the path <name>/SKILL.md in {{skillsDir}}. Lowercase letters, digits and single hyphens are allowed (1–64 characters).',
+    nameInvalid:
+      'Name: only lowercase letters, digits and single hyphens, no hyphen at the edges and no "--" (up to 64 characters).',
+    nameLocked:
+      'A skill name is its folder name. To rename a skill, create a new one and delete the old one.',
+    duplicate: 'A skill with this name already exists.',
+    fieldDescription: 'Description',
+    hintDescription:
+      'The CLI decides when to load the skill from this. Required, up to 1024 characters.',
+    placeholderDescription: 'When and why to use this skill',
+    descriptionRequired: 'Description is required.',
+    fieldBody: 'Skill instructions (markdown)',
+    otherKeys: 'Front-matter fields the panel keeps as is: {{keys}}',
+    badge: {
+      no_frontmatter: 'no front matter',
+      malformed: 'front matter unparsed',
+      missing_name: 'no name',
+      missing_description: 'no description',
+    },
+    badgeNameMismatch: 'name ≠ folder',
+    readOnly: {
+      no_frontmatter:
+        'The file has no YAML front matter between "---" lines — OpenCode will not load such a skill, and the panel does not rewrite it. Read-only.',
+      malformed:
+        'The skill front matter could not be parsed — the panel does not rewrite such a file. Read-only.',
+      missing_name:
+        'The skill front matter has no required name field — the panel does not rewrite such a file. Read-only.',
+      missing_description:
+        'The skill front matter has no required description field — the panel does not rewrite such a file. Read-only.',
+    },
+  },
   providerEnv: {
     title: 'Environment variables · {{provider}}',
     subtitle: 'Environment variables for {{provider}}',
@@ -715,6 +863,64 @@ export const en: TranslationSchema = {
       excludeTools: {
         label: 'Tool blocklist (excludeTools)',
         hint: 'One name per line. Listed tools are blocked; the blocklist wins over the allowlist. Blocking by list is less reliable than allowing: a tool added in a future CLI release becomes available automatically.',
+      },
+    },
+    // OpenCode permission model: the `permission` key — a level per tool, plus a
+    // command pattern list for bash.
+    opencode: {
+      subtitle: '{{provider}} tool permissions: file edits, shell commands, network',
+      explain:
+        '{{provider}} permissions live under the permission key of {{fileName}}. Every tool gets its own level: allow — run without asking, ask — confirm every call, deny — block completely. For the bash tool a list of command patterns can be used instead of a single level: allow "git *" while denying "git push *". The panel edits the permission key only — the model, MCP servers, agent settings and every other key of the file stay untouched, and a backup is made before each write. Changes apply after restarting the CLI.',
+      usingDefaults:
+        'The permission key is not set in the file — OpenCode restricts nothing. The panel writes nothing until you pick a level and save.',
+      unset: {
+        label: 'not set — no restriction',
+        description:
+          'There is no key for this tool in the file: OpenCode does not restrict it. Choosing "not set" removes the key on save.',
+      },
+      level: {
+        allow: {
+          label: 'allow — run without asking',
+          description:
+            'The tool runs immediately, with no confirmation. Fast, but manual control is gone — use deliberately.',
+        },
+        ask: {
+          label: 'ask — confirm every call',
+          description:
+            'The CLI asks for confirmation before every call. The most controlled option.',
+        },
+        deny: {
+          label: 'deny — block',
+          description: 'The tool is blocked entirely: the CLI cannot use it.',
+        },
+      },
+      patterns: {
+        label: 'by command patterns (advanced form)',
+        description:
+          'Instead of a single level, a list of command pattern → level. Safe commands can be allowed while dangerous ones stay blocked.',
+        pattern: 'Command pattern',
+        level: 'Level',
+        placeholder: 'e.g. git push *',
+        add: 'Add pattern',
+        hint: 'The "*" pattern is the rule for every other command. Documented example: "*" — ask, "git *" — allow, "git push *" — deny. Empty patterns are dropped on save; if none is left, the tool key is removed from the file.',
+      },
+      tool: {
+        edit: {
+          label: 'File edits (edit)',
+          hint: 'Creating and changing files on disk.',
+        },
+        bash: {
+          label: 'Shell commands (bash)',
+          hint: 'Running commands on the system — the most sensitive tool.',
+        },
+        webfetch: {
+          label: 'Network fetches (webfetch)',
+          hint: 'Downloading pages and files by URL.',
+        },
+      },
+      preserved: {
+        title: 'Entries the panel never changes',
+        text: 'The permission key contains entries whose shape the panel does not manage: other tool names, or the advanced form where the panel does not support it. They are kept in the file as they are — the panel never rewrites or deletes them; edit those by hand.',
       },
     },
   },
@@ -1362,7 +1568,7 @@ export const en: TranslationSchema = {
   providerProject: {
     subtitle: "A specific project's configuration — in the active provider's project files",
     explain:
-      "Besides the global config, the panel manages a specific project's config in the active provider's files: project instructions (AGENTS.md for Codex and OpenCode, GEMINI.md for Gemini), the project's MCP servers (.codex/config.toml, .gemini/settings.json, opencode.json, .cursor/mcp.json), for Gemini the project's environment variables (.gemini/.env) and permissions (.gemini/settings.json), and for Aider the .aider.conf.yml in the repository root (the read list of attached files plus set-env variables). Only what is documented for that CLI is edited; other keys and comments in the file are preserved, and a backup is made before every write. Changes apply after restarting the CLI.",
+      "Besides the global config, the panel manages a specific project's config in the active provider's files: project instructions (AGENTS.md for Codex and OpenCode, GEMINI.md for Gemini), the project's MCP servers (.codex/config.toml, .gemini/settings.json, opencode.json, .cursor/mcp.json), for Gemini the project's environment variables (.gemini/.env) and permissions (.gemini/settings.json), for OpenCode the project's permissions in the same opencode.json, and for Aider the .aider.conf.yml in the repository root (the read list of attached files plus set-env variables). Only what is documented for that CLI is edited; other keys and comments in the file are preserved, and a backup is made before every write. Changes apply after restarting the CLI.",
     unsupported:
       'The active provider has no project-level configuration: no documented project files were found for it, so the panel neither reads nor writes anything.',
     tab_instructions: 'Project instructions',
@@ -1370,6 +1576,9 @@ export const en: TranslationSchema = {
     tab_instructionsRules: 'Rules (.mdc)',
     tab_env: 'Environment variables',
     tab_permissions: 'Permissions & approvals',
+    tab_hooks: 'Hooks',
+    tab_plugins: 'CLI plugins',
+    tab_skills: 'Skills',
     instructionsHint:
       "The project's root {{fileName}} in full — as the CLI reads it in this project.",
     mcpHint: "The project's MCP servers from its file ({{format}} format).",

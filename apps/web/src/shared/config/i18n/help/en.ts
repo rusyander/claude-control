@@ -368,9 +368,10 @@ export const helpEn: HelpSchema = {
         'Everything described here — streaming, attachments, branching, parallel agents, ' +
         'history — works with the Claude provider. Codex and Gemini get a basic experimental ' +
         'assistant instead: one question, one answer, no streaming and no attachments. Aider ' +
-        'gets the same basic assistant (aider --message), but it is built from the docs and ' +
-        'has not been exercised live — the CLI is not installed on the development machine. ' +
-        'For OpenCode the section is “in development”; Cursor has no model API of its own.',
+        'and OpenCode get the same basic assistant (aider --message, opencode run "<prompt>" — ' +
+        'prompt as a positional argument, the CLI accepts no stdin), but it is built from the ' +
+        'docs and has not been exercised live — those CLIs are not installed on the development ' +
+        'machine. Cursor has no model API of its own.',
     },
 
     overview: {
@@ -1005,6 +1006,18 @@ export const helpEn: HelpSchema = {
       noteManualText:
         'Installing by identifier is collapsed and sits after the catalogue: it is worth ' +
         'checking the list first.',
+      noteProviderTitle: "OpenCode's plugins are its own",
+      noteProviderText:
+        "Everything described here is about Claude Code's plugins and marketplaces. With " +
+        'the OpenCode provider the section opens a different screen: there it is about ' +
+        'plugins of the CLI itself, and there are two ways to attach one. First, drop a JS ' +
+        'or TS file into the plugins directory (global ~/.config/opencode/plugins/, ' +
+        'per-project <project>/.opencode/plugins/): everything there is loaded by OpenCode ' +
+        'at startup, and the panel manages those files as a plain file manager — create, ' +
+        'open, edit, delete. Second, list npm package names under the plugin key of ' +
+        'opencode.json; both plain and scoped packages such as @org/name are supported. ' +
+        'The panel cannot install packages — the CLI does that, it only edits the list. ' +
+        'OpenCode has no catalogue, no marketplaces and no one-click update.',
     },
 
     env: {
@@ -1526,9 +1539,15 @@ export const helpEn: HelpSchema = {
         'plus the tool lists coreTools (what is allowed) and excludeTools (what is blocked, ' +
         'and it wins). Allowing by list is safer than blocking by list. The panel never ' +
         'writes the yolo mode: in Gemini it is a command-line flag only and breaks CLI ' +
-        'startup from the settings file. Templates, mcp__* permissions and moving an entry ' +
-        'between files are Claude capabilities. For OpenCode the section is “in ' +
-        'development”; for Cursor and Aider it is hidden.',
+        'startup from the settings file. OpenCode uses a fourth model — the permission key ' +
+        'of opencode.json (global and per-project): the edit (file edits), bash (shell ' +
+        'commands) and webfetch (network fetches) tools each get an allow, ask or deny ' +
+        'level, and bash may take a list of command patterns instead — e.g. “*” ask, ' +
+        '“git *” allow, “git push *” deny. Entries inside permission that the panel does ' +
+        'not manage are kept as they are and shown read-only; per-agent permissions ' +
+        '(agent.*) are not touched at all. Templates, mcp__* permissions and moving an ' +
+        'entry between files are Claude capabilities. For Cursor and Aider the section is ' +
+        'hidden.',
     },
 
     scripts: {
@@ -1912,6 +1931,20 @@ export const helpEn: HelpSchema = {
       noteExitText:
         'On PreToolUse and UserPromptSubmit it stops the action, and the text from ' +
         'stderr explains why. On the other events nothing is blocked.',
+      noteProviderTitle: "OpenCode's hook model is different",
+      noteProviderText:
+        'Everything described here is about Claude Code. With the OpenCode provider the ' +
+        'section opens a different screen, because its hooks are built differently: they ' +
+        'are the experimental.hook key of opencode.json (global and per-project), and ' +
+        'there are exactly two events. "File edited" (file_edited) maps a file pattern to ' +
+        'a list of actions — edit a file matching *.ts and prettier --write runs. ' +
+        '"Session completed" (session_completed) is simply a list of actions to run when ' +
+        'work finishes. A command is given as a list of arguments, not a shell string: ' +
+        'the program first, then its arguments one per field, so no pipes and no && ' +
+        'there. OpenCode has no blocking, no tool matchers and no nine events. Note: the ' +
+        'key lives under experimental, which OpenCode itself declares unstable, and it is ' +
+        'not in the published configuration schema yet — the panel says so plainly on the ' +
+        "section's own screen.",
     },
 
     skills: {
@@ -2083,6 +2116,18 @@ export const helpEn: HelpSchema = {
       noteDescText:
         'If the instruction is good but Claude keeps ignoring it, rewrite the ' +
         'description rather than the body: that is what the decision is made on.',
+      noteProviderTitle: 'With OpenCode the skills are its own',
+      noteProviderText:
+        'Everything here is about the Claude skills section (a folder with SKILL.md, enable by ' +
+        'moving into skills-disabled, groups, templates). With the OpenCode provider the section ' +
+        'opens a different screen: its CLI skills live in ~/.config/opencode/skills/<name>/SKILL.md ' +
+        '(and <project>/.opencode/skills/ per project). The concept is the same, but the panel ' +
+        'edits only the two required front-matter fields — name and description; license, ' +
+        'compatibility, metadata and any foreign fields it keeps and shows read-only. The name ' +
+        'must equal the folder name and follow the rules (lowercase letters, digits and single ' +
+        'hyphens, 1–64 characters). Worth knowing: OpenCode also loads skills from ~/.claude/skills ' +
+        'and ~/.agents/skills, so your Claude skills already work in it — the panel says so and ' +
+        'writes nothing into those directories.',
     },
 
     rules: {
@@ -2574,8 +2619,9 @@ export const helpEn: HelpSchema = {
         'is the same, but you edit ITS project files: project instructions (AGENTS.md for ' +
         'Codex and OpenCode, GEMINI.md for Gemini) and the project’s MCP servers ' +
         '(.codex/config.toml, .gemini/settings.json, opencode.json, .cursor/mcp.json). ' +
-        'Gemini adds the project’s environment variables (.gemini/.env) and permissions. ' +
-        'Aider’s project level is the .aider.conf.yml in the repository root: the read list ' +
+        'Gemini adds the project’s environment variables (.gemini/.env) and permissions; ' +
+        'OpenCode adds the project’s permissions in the same opencode.json (the permission ' +
+        'key). Aider’s project level is the .aider.conf.yml in the repository root: the read list ' +
         'of attached files and the set-env variables. Instead of a project instructions file ' +
         'Cursor gets the rules directory <project>/.cursor/rules/*.mdc — the same one as ' +
         'globally, with the same path safety. Nobody but Claude gets project hooks.',
@@ -2681,21 +2727,57 @@ export const helpEn: HelpSchema = {
       mapEnvValue:
         'Works: Claude, Codex (shell_environment_policy.set), Aider (set-env — the global ' +
         '~/.aider.conf.yml and the per-project one in the repository root), Gemini ' +
-        '(a plain .env file — the global ~/.gemini/.env and the per-project one). In ' +
-        'development: OpenCode. Hidden for Cursor.',
+        '(a plain .env file — the global ~/.gemini/.env and the per-project one). Hidden ' +
+        'for Cursor and OpenCode: OpenCode has nowhere to store variables — it only ' +
+        'substitutes {env:VARIABLE} inside opencode.json, i.e. reads the process ' +
+        'environment that is already set, and loads no .env of its own. The panel will ' +
+        'not create a file nobody reads.',
       mapPermissions: 'Permissions and approvals',
       mapPermissionsValue:
         'Works: Claude (allow/ask/deny), Codex (approval_policy and sandbox_mode), Gemini ' +
         '(the approval mode general.defaultApprovalMode plus the coreTools and ' +
-        'excludeTools lists). In development: OpenCode — it uses its own model. Hidden ' +
-        'for Cursor and Aider.',
+        'excludeTools lists), OpenCode (the permission key of opencode.json: an ' +
+        'allow / ask / deny level for the edit, bash and webfetch tools, and for bash a ' +
+        'list of command patterns instead of a single level). Hidden for Cursor and Aider.',
       mapChat: 'Chat and assistant',
       mapChatValue:
         'The full chat with streaming, attachments and parallel agents is Claude only. ' +
-        'Codex, Gemini and Aider get a basic experimental assistant: one question, one ' +
-        'answer (codex exec, gemini -p, aider --message). Aider’s assistant is built from ' +
-        'the docs and has not been exercised live: the CLI is not installed on the ' +
-        'development machine. OpenCode is in development; Cursor has no model API of its own.',
+        'Codex, Gemini, OpenCode and Aider get a basic experimental assistant: one question, ' +
+        'one answer (codex exec, gemini -p, opencode run "<prompt>", aider --message). ' +
+        'Aider’s and OpenCode’s assistants are built from the docs and have not been exercised ' +
+        'live: those CLIs are not installed on the development machine. Cursor has no model ' +
+        'API of its own.',
+      mapHooks: 'Hooks',
+      mapHooksValue:
+        'Works for Claude and OpenCode, but the models do not match. Claude has nine ' +
+        'events (PreToolUse, PostToolUse and others) with tool matchers and shell commands ' +
+        'in settings.json; two of them can block the action. OpenCode has the ' +
+        'experimental.hook key of opencode.json (global and per-project) and exactly two ' +
+        'events: "file edited" (file pattern → list of actions) and "session completed" ' +
+        '(just a list of actions). A command there is an argument list rather than a shell ' +
+        'string, and blocking is not possible. Note: for OpenCode this is an experimental ' +
+        'feature of the CLI itself — the key lives under experimental, which it declares ' +
+        'unstable. Codex, Gemini, Cursor and Aider have no hooks.',
+      mapPlugins: 'Plugins',
+      mapPluginsValue:
+        'Works for Claude and OpenCode, and they are different things. Claude gets the ' +
+        'panel’s own extensions and marketplaces (a wrapper around claude plugin). ' +
+        'OpenCode gets plugins of its own CLI: JS/TS files in the plugins directory ' +
+        '(global ~/.config/opencode/plugins/ and per-project ' +
+        '<project>/.opencode/plugins/) which it loads at startup, plus a list of npm ' +
+        'package names under the plugin key of opencode.json. The panel cannot install ' +
+        'packages — the CLI does that. The others have no such section.',
+      mapSkills: 'Skills',
+      mapSkillsValue:
+        'Works for Claude and OpenCode, and the concept is the same — a folder with a ' +
+        'SKILL.md and YAML front matter — but the directories and fields differ. Claude has ' +
+        'its rich section (file tree per skill, enable by moving into skills-disabled, groups, ' +
+        'templates). OpenCode keeps skills in ~/.config/opencode/skills/<name>/SKILL.md (and ' +
+        '<project>/.opencode/skills/); the panel edits the two required fields name and ' +
+        'description, keeps license/compatibility/metadata and any foreign fields read-only, ' +
+        'and requires the name to equal the folder name. OpenCode also loads skills from ' +
+        '~/.claude/skills and ~/.agents/skills, so Claude skills already work in it — the panel ' +
+        'writes nothing there. The other CLIs have no such section.',
       mapScripts: 'Scripts',
       mapScriptsValue:
         'Works everywhere: this is the panel’s own section — your files in its hooks/ ' +
@@ -2705,18 +2787,21 @@ export const helpEn: HelpSchema = {
       mapProjectsValue:
         'Works everywhere, but differently. Claude gets the project’s rules, MCP servers ' +
         'and permissions. Codex and OpenCode get project instructions (AGENTS.md) and MCP ' +
-        'servers from the project file. Gemini adds the project’s environment variables ' +
-        '(.gemini/.env) and permissions (.gemini/settings.json). Cursor gets the project MCP ' +
+        'servers from the project file; after Claude, OpenCode has the widest project ' +
+        'level — instructions (AGENTS.md), MCP, permissions and hooks all in ' +
+        '<project>/opencode.json, plus plugins (the <project>/.opencode/plugins/ ' +
+        'directory and the plugin key). Gemini adds the project’s environment ' +
+        'variables (.gemini/.env) and permissions (.gemini/settings.json). Cursor gets the project MCP ' +
         '(.cursor/mcp.json) and the project rules directory .cursor/rules/*.mdc. Aider gets the ' +
         '.aider.conf.yml in the repository root (the config is looked up in the home ' +
         'directory, the git repository root and the current directory): the read list of ' +
         'attached files and the set-env variables.',
       mapClaudeOnly: 'Claude only',
       mapClaudeOnlyValue:
-        'Rules, skills, hooks, plugins, token analytics and the sandbox. This is not “we ' +
-        'did not get to it”: the other CLIs either have no such entity or build it on ' +
-        'different lines. Project hooks are part of Claude’s format too — the others do ' +
-        'not have them.',
+        'Rules, token analytics, the sandbox and plugin marketplaces. This is not ' +
+        '“we did not get to it”: the other CLIs either have no such entity or build it on ' +
+        'different lines. Hooks, plugins and skills are the exception: OpenCode has all three, ' +
+        'in its own model, and the panel opens dedicated screens for them.',
       mapPanel: 'Always available',
       mapPanelValue:
         'Overview, search, groups, history, settings and help are the panel’s own ' +

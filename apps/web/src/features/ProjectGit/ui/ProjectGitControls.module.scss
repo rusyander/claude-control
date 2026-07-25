@@ -1,0 +1,74 @@
+// Пульт git во вкладке проекта: кнопка в ряду + поповер под ней. Раскладка
+// повторяет пульт агентов рядом — одинаковые всплывающие панели в одном ряду
+// не должны выглядеть по-разному.
+.wrap {
+  position: relative;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + var(--spacing-2xs));
+  right: 0;
+  z-index: 61;
+  width: min(320px, calc(100vw - var(--spacing-xl)));
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+// Имя ветки в кнопке: длинное не должно распирать ряд.
+.branch {
+  display: inline-block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+}
+
+.select,
+.input {
+  width: 100%;
+  min-width: 0;
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: var(--font-size-body-sm);
+}
+
+.select {
+  cursor: pointer;
+}
+
+.select:hover:not(:disabled),
+.input:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.select:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.select:disabled,
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

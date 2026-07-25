@@ -51,6 +51,23 @@ export function getActiveProvider(store: SettingsSource): ConfigProvider {
   return getProvider(getActiveProviderId(store));
 }
 
+/**
+ * Источник настроек ДЛЯ КОНКРЕТНОГО провайдера, а не активного.
+ *
+ * Резолверы разделов (`resolveProvider*Target`) работают от активного провайдера
+ * панели — так устроены все страницы. Но проверке, сравнению и переносу нужен
+ * любой провайдер из списка, поэтому им подставляется тот же интерфейс с
+ * подменённым id. Своего состояния переходник не имеет и ничего не пишет.
+ */
+export function providerSettingsSource(
+  providerId: string,
+  claudeDirOverride: string | undefined,
+): { getSettings(): Pick<AppSettings, 'provider' | 'claudeDirOverride'> } {
+  return {
+    getSettings: () => ({ provider: providerId, claudeDirOverride: claudeDirOverride ?? '' }),
+  };
+}
+
 /** Полезная нагрузка `GET /api/providers`: активный id и карточки провайдеров. */
 export function describeProviders(store: SettingsSource): ProvidersResponse {
   return {

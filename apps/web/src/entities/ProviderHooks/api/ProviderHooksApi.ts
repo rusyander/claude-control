@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ProviderHooksDraft, ProviderHooksInfo, WriteResult } from '@claude-control/contracts';
+import type {
+  ProviderHookRulesDraft,
+  ProviderHooksDraft,
+  ProviderHooksInfo,
+  WriteResult,
+} from '@claude-control/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 
@@ -7,8 +12,11 @@ import { queryKeys } from '@shared/api/query-keys';
  * Хуки активного провайдера в модели «ключ конфига» (OpenCode, OPENCODE-3).
  *
  * Это НЕ хуки Claude: у них своя богатая модель и свои маршруты (`entities/Hook`,
- * `/api/hooks`) — они не тронуты. Здесь ключ `experimental.hook` в
- * `opencode.json`: два задокументированных события, действия-argv.
+ * `/api/hooks`) — они не тронуты. Здесь форм две, и какую рисовать, говорит поле
+ * `shape` ответа: `opencode-events` (ключ `experimental.hook`, два события,
+ * действия-argv, только чтение) либо `event-rules` (плоский список правил
+ * «событие → команда»: `hooks` в settings.json у Qwen, `[[hooks]]` в config.toml
+ * у Kimi).
  *
  * Проектный уровень — те же данные по другому адресу: `projectId` переключает
  * набор роутов, модель ответа одна и та же.
@@ -45,7 +53,7 @@ export function useProviderHooks({ projectId }: Scope = {}) {
 export function useSaveProviderHooks({ projectId }: Scope = {}) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (draft: ProviderHooksDraft): Promise<WriteResult> => {
+    mutationFn: async (draft: ProviderHooksDraft | ProviderHookRulesDraft): Promise<WriteResult> => {
       const { data } = await apiClient.put<WriteResult>(basePath(projectId), draft);
       return data;
     },

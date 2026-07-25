@@ -14,6 +14,8 @@ import { homedir } from 'node:os';
 export interface DirEntry {
   name: string;
   path: string;
+  /** Задано только у файлов: каталоги остаются такими же, как были (регресс-ноль). */
+  isFile?: boolean;
 }
 
 export interface DirListing {
@@ -39,12 +41,26 @@ export function listRoots(): DirEntry[] {
   return roots;
 }
 
+/** Настройки обзора: по умолчанию — только каталоги, как было всегда. */
+export interface ListOptions {
+  /**
+   * Расширения файлов, которые показывать вместе с каталогами (`.zip`). Пусто —
+   * файлов не показываем вовсе: обзор задуман для выбора папки проекта, и
+   * вываливать в него всё содержимое диска незачем.
+   */
+  fileExtensions?: string[];
+}
+
 /**
  * Подкаталоги указанной папки, по алфавиту. Скрытые (начинающиеся с точки) не
  * показываем — это шум вроде .git и .cache, а не проекты. Недоступные записи
  * пропускаем, чтобы одна закрытая папка не роняла весь список.
+ *
+ * С `fileExtensions` в список добавляются ещё и файлы с этими расширениями —
+ * так выбирается архив переноса окружения. Каталоги при этом идут первыми.
  */
-export function listDirectory(path: string): DirListing {
+export function listDirectory(path: string, options: ListOptions = {}): DirListing {
+  const extensions = (options.fileExtensions ?? []).map((value) => value.toLowerCase());
   const entries: DirEntry[] = [];
 
   for (const entry of readdirSync(path, { withFileTypes: true })) {
@@ -53,14 +69,23 @@ export function listDirectory(path: string): DirListing {
     const full = join(path, entry.name);
     try {
       // Симлинки и мусор пропускаем: интересуют настоящие каталоги.
-      if (!entry.isDirectory() && !statSync(full).isDirectory()) continue;
+      if (!entry.isDirectory() && !statSync(full).isDirectory()) {
+        const lower = entry.name.toLowerCase();
+        if (extensions.length > 0 && extensions.some((extension) => lower.endsWith(extension))) {
+          entries.push({ name: entry.name, path: full, isFile: true });
+        }
+        continue;
+      }
     } catch {
       continue;
     }
     entries.push({ name: entry.name, path: full });
   }
 
-  entries.sort((a, b) => a.name.localeCompare(b.name));
+  // Каталоги первыми: по ним ходят, файлы только выбирают.
+  entries.sort(
+    (a, b) => Number(a.isFile ?? false) - Number(b.isFile ?? false) || a.name.localeCompare(b.name),
+  );
 
   const parent = dirname(path);
   return { path, parent: parent !== path ? parent : undefined, entries };

@@ -6,8 +6,39 @@ import type {
   Group,
   Hook,
   Project,
+  ProviderCheckResult,
 } from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from './safe-io.ts';
+
+/**
+ * Память панели об одной ЦЕЛИ запуска: см. `AppState.runnerPrefs`.
+ *
+ * Ключ карты — нормализованный абсолютный каталог запуска. У проекта без
+ * монорепы это сам корень, поэтому записи, сделанные до появления подпапок,
+ * читаются как есть: `projectPath`/`dir` у них пусты и означают «корень».
+ */
+export interface RunnerPrefs {
+  /** Абсолютный каталог запуска (ключ карты — его нормализованный вид). */
+  path: string;
+  /** Корень проекта. Пусто у старых записей — тогда это сам `path`. */
+  projectPath?: string;
+  /** Подпапка относительно корня; пусто — сам корень. */
+  dir?: string;
+  /** Поднимать dev-сервер при старте сервера панели. */
+  autostart?: boolean;
+  /** Порт прошлого удачного запуска — подсказка в интерфейсе. */
+  port?: number;
+  /** Порт, закреплённый пользователем: уходит в `PORT` и ожидается именно он. */
+  pinnedPort?: number;
+  /** Оверрайд команды запуска. */
+  command?: string;
+}
+
+/** Чем цель отличается от голого пути: корень проекта и подпапка внутри него. */
+export interface RunnerTargetMeta {
+  projectPath?: string;
+  dir?: string;
+}
 
 /**
  * Данные, которых нет в конфигах Claude Code: группы, сценарии, отметки
@@ -59,7 +90,25 @@ export interface AppState {
    * package.json проекта (скрипт dev/start и пакетный менеджер по lock-файлу).
    */
   runnerCommands: Record<string, string>;
+  /**
+   * Что панель помнит о dev-сервере проекта между запусками: нормализованный
+   * путь → {исходный путь, автозапуск, порт прошлого запуска}.
+   *
+   * Исходный путь хранится вместе с ключом намеренно: ключ нормализован (на
+   * Windows ещё и в нижнем регистре), а запускать процесс надо в каталоге,
+   * который написал пользователь. Порт помнится и без автозапуска — тогда
+   * адрес проекта не скачет от запуска к запуску.
+   */
+  runnerPrefs: Record<string, RunnerPrefs>;
   settings: AppSettings;
+  /**
+   * Итоги проверки провайдеров: id провайдера → последний результат.
+   *
+   * Хранится здесь, а не в настройках: это не выбор пользователя, а факт о его
+   * машине («здесь круг чтения-записи сошёлся, ассистент ответил»). Из него
+   * берётся бейдж «проверен» вместо вечного «экспериментальный».
+   */
+  providerChecks: Record<string, ProviderCheckResult>;
   /**
    * Verifier парольной фразы шифрования копий секретов. Не сама фраза, а её
    * производная (scrypt-хэш с солью): по нему проверяется, та ли фраза введена,
@@ -79,6 +128,8 @@ const DEFAULT_STATE: AppState = {
   envByGroup: {},
   projects: [],
   runnerCommands: {},
+  runnerPrefs: {},
+  providerChecks: {},
   settings: {
     theme: 'system',
     language: 'ru',
@@ -101,6 +152,8 @@ const DEFAULT_STATE: AppState = {
     chatEffort: 'xhigh',
     modelPricing: {},
     encryptSecretBackups: false,
+    autoUpdateModels: true,
+    previewProviderWrites: true,
   },
 };
 
@@ -140,6 +193,8 @@ export class AppStore {
       envByGroup: { ...base.envByGroup, ...loaded.envByGroup },
       projects: loaded.projects ?? base.projects,
       runnerCommands: { ...base.runnerCommands, ...loaded.runnerCommands },
+      runnerPrefs: { ...base.runnerPrefs, ...loaded.runnerPrefs },
+      providerChecks: { ...base.providerChecks, ...loaded.providerChecks },
       settings: { ...base.settings, ...loaded.settings },
     };
   }
@@ -174,6 +229,8 @@ export class AppStore {
       envByGroup: { ...base.envByGroup, ...loaded.envByGroup },
       projects: loaded.projects ?? base.projects,
       runnerCommands: { ...base.runnerCommands, ...loaded.runnerCommands },
+      runnerPrefs: { ...base.runnerPrefs, ...loaded.runnerPrefs },
+      providerChecks: { ...base.providerChecks, ...loaded.providerChecks },
       settings: { ...base.settings, ...loaded.settings },
     };
     this.persist();
@@ -187,6 +244,17 @@ export class AppStore {
     this.state.settings = { ...this.state.settings, ...patch };
     this.persist();
     return this.state.settings;
+  }
+
+  /** Итоги проверки провайдеров: id → последний результат (копия, не внутренний объект). */
+  getProviderChecks(): Record<string, ProviderCheckResult> {
+    return structuredClone(this.state.providerChecks);
+  }
+
+  /** Запомнить итог проверки провайдера, заменив предыдущий. */
+  saveProviderCheck(result: ProviderCheckResult): void {
+    this.state.providerChecks[result.provider] = result;
+    this.persist();
   }
 
   /** Verifier парольной фразы шифрования копий секретов (или undefined, если не задан). */
@@ -425,19 +493,108 @@ export class AppStore {
     this.persist();
   }
 
-  // --- Оверрайд команды запуска dev-сервера проекта ---
+  // --- Что панель помнит про цели запуска dev-серверов ---
 
-  /** Оверрайд команды запуска для каталога проекта (или undefined, если не задан). */
+  /**
+   * Оверрайд команды запуска для каталога цели (или undefined, если не задан).
+   *
+   * Читается и из старой карты `runnerCommands`: до появления подпапок оверрайд
+   * жил там, и терять его при обновлении панели незачем. Запись всегда идёт
+   * в `runnerPrefs` — старая карта только дочитывается.
+   */
   getRunnerCommand(path: string): string | undefined {
-    return this.state.runnerCommands[normalizeProjectPath(path)] || undefined;
+    const key = normalizeProjectPath(path);
+    return this.state.runnerPrefs[key]?.command || this.state.runnerCommands[key] || undefined;
   }
 
-  /** Сохранить/очистить оверрайд команды запуска для каталога проекта. */
-  setRunnerCommand(path: string, command: string | undefined): void {
-    const key = normalizeProjectPath(path);
-    if (command && command.trim()) this.state.runnerCommands[key] = command.trim();
-    else delete this.state.runnerCommands[key];
+  /** Сохранить/очистить оверрайд команды запуска для каталога цели. */
+  setRunnerCommand(path: string, command: string | undefined, meta: RunnerTargetMeta = {}): void {
+    const trimmed = command?.trim();
+    this.updateRunnerPrefs(path, meta, (prefs) => {
+      if (trimmed) prefs.command = trimmed;
+      else delete prefs.command;
+    });
+    // Старая запись больше не нужна: значение переехало в runnerPrefs.
+    delete this.state.runnerCommands[normalizeProjectPath(path)];
     this.persist();
+  }
+
+  /** Что панель помнит о запуске этой цели (пусто — ничего). */
+  getRunnerPrefs(path: string): RunnerPrefs | undefined {
+    return this.state.runnerPrefs[normalizeProjectPath(path)];
+  }
+
+  /**
+   * Включить/выключить автозапуск цели. Выключение НЕ забывает ни порт, ни
+   * команду: тумблер вернут — всё останется прежним.
+   */
+  setRunnerAutostart(path: string, autostart: boolean, meta: RunnerTargetMeta = {}): void {
+    this.updateRunnerPrefs(path, meta, (prefs) => {
+      if (autostart) prefs.autostart = true;
+      else delete prefs.autostart;
+    });
+    this.persist();
+  }
+
+  /**
+   * Снять автозапуск со ВСЕХ целей проекта — закрытая вкладка не должна
+   * оставлять после себя обещание что-то поднять при следующем старте.
+   */
+  clearRunnerAutostart(projectPath: string): void {
+    const root = normalizeProjectPath(projectPath);
+    for (const [key, prefs] of Object.entries(this.state.runnerPrefs)) {
+      const owner = normalizeProjectPath(prefs.projectPath ?? prefs.path);
+      if (owner !== root && key !== root) continue;
+      this.updateRunnerPrefs(prefs.path, prefs, (next) => delete next.autostart);
+    }
+    this.persist();
+  }
+
+  /** Закрепить порт цели (или снять закрепление). */
+  setRunnerPort(path: string, port: number | undefined, meta: RunnerTargetMeta = {}): void {
+    this.updateRunnerPrefs(path, meta, (prefs) => {
+      if (port && Number.isInteger(port) && port > 0 && port < 65_536) prefs.pinnedPort = port;
+      else delete prefs.pinnedPort;
+    });
+    this.persist();
+  }
+
+  /** Запомнить порт удачного запуска — он показывается как подсказка. */
+  rememberRunnerPort(path: string, port: number, meta: RunnerTargetMeta = {}): void {
+    const current = this.getRunnerPrefs(path);
+    if (current?.port === port) return;
+    this.updateRunnerPrefs(path, meta, (prefs) => {
+      prefs.port = port;
+    });
+    this.persist();
+  }
+
+  /** Цели с включённым автозапуском — их поднимает старт сервера панели. */
+  listAutostartProjects(): RunnerPrefs[] {
+    return Object.values(this.state.runnerPrefs).filter((prefs) => prefs.autostart);
+  }
+
+  /**
+   * Общая правка записи о цели: запись без единого осмысленного поля удаляется
+   * целиком, иначе `state.json` копил бы пустышки от каждого касания.
+   * Персист вызывает вызывающий — иначе массовые правки писали бы файл по разу
+   * на цель.
+   */
+  private updateRunnerPrefs(
+    path: string,
+    meta: RunnerTargetMeta,
+    mutate: (prefs: RunnerPrefs) => void,
+  ): void {
+    const key = normalizeProjectPath(path);
+    const next: RunnerPrefs = { ...this.state.runnerPrefs[key], path };
+    if (meta.projectPath) next.projectPath = meta.projectPath;
+    if (meta.dir) next.dir = meta.dir;
+    mutate(next);
+
+    const isEmpty =
+      !next.autostart && next.port === undefined && next.pinnedPort === undefined && !next.command;
+    if (isEmpty) delete this.state.runnerPrefs[key];
+    else this.state.runnerPrefs[key] = next;
   }
 }
 

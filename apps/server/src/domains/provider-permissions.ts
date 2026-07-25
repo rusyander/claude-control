@@ -11,8 +11,15 @@ import type {
   OpencodePermissionEntry,
   OpencodePermissionLevel,
   OpencodePermissionTool,
+  ContinuePermissionDraft,
+  CursorPermissionDraft,
+  CursorPermissionKind,
+  GoosePermissionDraft,
+  KimiPermissionDraft,
   ProviderPermissionDraft,
   ProviderPermissionInfo,
+  QwenApprovalMode,
+  QwenPermissionDraft,
 } from '@claude-control/contracts';
 import { getActiveProvider } from '../providers/registry.ts';
 import type { ConfigProvider } from '../providers/types.ts';
@@ -23,6 +30,30 @@ import {
   upsertCodexRootScalar,
 } from '../lib/codex-toml.ts';
 import { parseProviderJsonObject, stableJson } from '../lib/provider-json.ts';
+import {
+  CONTINUE_PERMISSION_KEYS,
+  hasContinuePermissionKeys,
+  readContinuePermissions,
+  writeContinuePermissions,
+} from '../lib/continue-yaml.ts';
+import {
+  GOOSE_DEFAULT_MODE,
+  GOOSE_MODES,
+  readGooseMode,
+  writeGooseMode,
+  type GooseMode,
+} from '../lib/goose-yaml.ts';
+import {
+  KIMI_DECISIONS,
+  KIMI_DEFAULT_MODE,
+  KIMI_MODES,
+  readKimiMode,
+  readKimiRules,
+  writeKimiPermissions,
+  type KimiDecision,
+  type KimiMode,
+  type KimiPermissionRule,
+} from '../lib/kimi-toml.ts';
 import {
   OPENCODE_PATTERN_TOOLS,
   OPENCODE_PERMISSION_LEVELS,
@@ -65,6 +96,35 @@ import {
  * enum. Значение отсекается на разборе черновика (маршрут отвечает 400) и ещё раз
  * проверяется перед самой записью — двойная страховка.
  *
+ * QWEN CODE (`qwen-json`) — ключи `settings.json` (глобального
+ * `<QWEN_HOME>/settings.json` и проектного `<проект>/.qwen/settings.json`):
+ *  - `tools.approvalMode` — `default` | `plan` | `auto-edit` | `auto` | `yolo`;
+ *  - `permissions.allow` / `permissions.ask` / `permissions.deny` — списки ПРАВИЛ
+ *    (`Bash(git push *)`, `Read(/src/**)`); `deny` приоритетнее прочих.
+ * Qwen — форк Gemini CLI, но ключи прав у него ДРУГИЕ: писать сюда gemini-форму
+ * значило бы писать не туда. Устаревшие `tools.core` / `tools.allowed` /
+ * `tools.exclude` панель НЕ пишет (документация мигрирует их в `permissions.*`) —
+ * они сохраняются как чужие ключи, если уже есть в файле.
+ * `yolo` здесь РАЗРЕШЁН, в отличие от Gemini: у Qwen это задокументированное
+ * значение файла настроек, а не только флаг CLI.
+ * Пустой список УДАЛЯЕТ свой ключ, пустые все три — весь объект `permissions`.
+ *
+ * CONTINUE (`continue-yaml`) — ОТДЕЛЬНЫЙ файл `~/.continue/permissions.yaml`, а
+ * не секция общего конфига. Модель прав у Continue проще всех: НИКАКОГО режима,
+ * ровно три списка верхнего уровня — `allow` (выполнять сразу), `ask`
+ * (спрашивать), `exclude` (спрятать инструмент от агента). Элементы —
+ * задокументированные строки-правила (`Read(*)`, `Bash`, инструмент с шаблоном
+ * путей). Правка идёт Document API пакета `yaml`: комментарии и прочие ключи
+ * файла целы, пустой список УДАЛЯЕТ свой ключ, а не пишет `[]`.
+ *
+ * GOOSE (`goose-yaml`) — ОДИН скалярный ключ КОРНЯ `config.yaml`: `GOOSE_MODE`
+ * (`auto` — выполнять всё без вопросов, `approve` — только по заданным
+ * разрешениям, `smart_approve` — авто-одобрение безопасных вызовов, `chat` — без
+ * запуска инструментов вовсе). Ни списков, ни второго ключа у этой модели нет.
+ * Пофайловые разрешения инструментов Goose держит в `permission.yaml` — панель
+ * его НЕ ведёт (формат не разбирался), правится ровно `GOOSE_MODE`, соседние
+ * ключи и расширения того же файла целы.
+ *
  * OPENCODE (`opencode-json`, OPENCODE-1) — ключ `permission` файла
  * `~/.config/opencode/opencode.json` (и проектного `<проект>/opencode.json`):
  *  - уровень у инструмента — РОВНО `allow` | `deny` | `ask`;
@@ -78,6 +138,18 @@ import {
  * попытка перезаписать такую запись → fail-closed. Переопределения прав на уровне
  * АГЕНТА (`agent.<имя>.permission`) вне области задачи и не затрагиваются.
  * Пустой результат УДАЛЯЕТ ключ `permission`, а не пишет `{}`.
+ *
+ * CURSOR (`cursor-json`, CURSOR-2) — ключ `permissions` файла
+ * `~/.cursor/cli-config.json` (и проектного `<проект>/.cursor/cli.json`, у
+ * которого имя ДРУГОЕ и который держит только права):
+ *  - `permissions.allow` — выполнять без вопроса;
+ *  - `permissions.deny` — запретить; по документации `deny` ПРИОРИТЕТНЕЕ `allow`.
+ * Ни режима-переключателя, ни третьего списка (`ask`) у Cursor нет — это вся
+ * модель целиком. Правила (`Shell(git status)`, `Read(src\**)`, `Write(...)`,
+ * `WebFetch(домен)`, `Mcp(сервер:инструмент)`) панель НЕ толкует и хранит как есть.
+ * Правится ТОЛЬКО ключ `permissions`: `version`, `editor` и прочие настройки CLI
+ * в том же файле сохраняются по значениям (проверяется проекцией до записи).
+ * Пустой список УДАЛЯЕТ свой ключ, пустые оба — весь объект `permissions`.
  *
  * ВАЛИДАЦИЯ ENUM ДО ЗАПИСИ: значение вне разрешённого набора отклоняется на разборе
  * черновика (маршрут отвечает 400) — в файл не пишется.
@@ -118,12 +190,36 @@ const DEFAULT_SANDBOX: CodexSandboxMode = 'workspace-write';
 /** Дефолт Gemini: спрашивать подтверждение перед каждым вызовом инструмента. */
 const DEFAULT_GEMINI_APPROVAL: GeminiApprovalMode = 'default';
 
+/**
+ * Режимы аппрувов Qwen Code, допустимые в `settings.json` (`tools.approvalMode`).
+ * `yolo` входит СОЗНАТЕЛЬНО: у Qwen он задокументирован как значение файла (в
+ * отличие от Gemini, где это только флаг командной строки).
+ */
+export const QWEN_APPROVAL_MODES: readonly QwenApprovalMode[] = [
+  'default',
+  'plan',
+  'auto-edit',
+  'auto',
+  'yolo',
+];
+
+/** Дефолт Qwen: спрашивать подтверждение перед каждым действием. */
+const DEFAULT_QWEN_APPROVAL: QwenApprovalMode = 'default';
+
 interface ProviderPermissionsSettingsSource {
   getSettings(): Pick<AppSettings, 'provider' | 'claudeDirOverride'>;
 }
 
 /** Формат файла прав, поддержанный универсальным разделом. */
-export type ProviderPermissionsFormat = 'toml' | 'gemini-json' | 'opencode-json';
+export type ProviderPermissionsFormat =
+  | 'toml'
+  | 'gemini-json'
+  | 'qwen-json'
+  | 'opencode-json'
+  | 'continue-yaml'
+  | 'goose-yaml'
+  | 'kimi-toml'
+  | 'cursor-json';
 
 /** Разрешённая цель раздела: провайдер + формат + путь к файлу. */
 export interface ProviderPermissionsTarget {
@@ -193,6 +289,11 @@ export function parseProviderPermissionsDraft(
   if (!body || typeof body !== 'object') return undefined;
   const rec = body as Record<string, unknown>;
   if (format === 'gemini-json') return parseGeminiDraft(rec);
+  if (format === 'qwen-json') return parseQwenDraft(rec);
+  if (format === 'continue-yaml') return parseContinueDraft(rec);
+  if (format === 'cursor-json') return parseCursorDraft(rec);
+  if (format === 'goose-yaml') return parseGooseDraft(rec);
+  if (format === 'kimi-toml') return parseKimiDraft(rec);
   if (format === 'opencode-json') return parseOpencodeDraft(rec);
   return parseCodexDraft(rec);
 }
@@ -245,6 +346,102 @@ function parseGeminiDraft(rec: Record<string, unknown>): GeminiPermissionDraft |
   if (!coreTools || !excludeTools) return undefined;
 
   return { approvalMode: approvalMode as GeminiApprovalMode, coreTools, excludeTools };
+}
+
+/**
+ * Разобрать черновик прав Qwen Code: режим аппрувов + три списка правил. Правила
+ * — непрозрачные строки (панель их синтаксис не толкует, только хранит), поэтому
+ * проверяем ровно форму: массив непустых строк без повторов (`parseToolList`).
+ */
+function parseQwenDraft(rec: Record<string, unknown>): QwenPermissionDraft | undefined {
+  const approvalMode = rec.approvalMode;
+  if (
+    typeof approvalMode !== 'string' ||
+    !QWEN_APPROVAL_MODES.includes(approvalMode as QwenApprovalMode)
+  )
+    return undefined;
+
+  const allow = parseToolList(rec.allow);
+  const ask = parseToolList(rec.ask);
+  const deny = parseToolList(rec.deny);
+  if (!allow || !ask || !deny) return undefined;
+
+  return { approvalMode: approvalMode as QwenApprovalMode, allow, ask, deny };
+}
+
+/**
+ * Разобрать черновик прав Continue: три списка правил и НИКАКОГО режима. Правила
+ * — непрозрачные строки (панель их синтаксис не толкует, только хранит), поэтому
+ * проверяем ровно форму: массив непустых строк без повторов (`parseToolList`).
+ */
+function parseContinueDraft(rec: Record<string, unknown>): ContinuePermissionDraft | undefined {
+  const allow = parseToolList(rec.allow);
+  const ask = parseToolList(rec.ask);
+  const exclude = parseToolList(rec.exclude);
+  if (!allow || !ask || !exclude) return undefined;
+  return { allow, ask, exclude };
+}
+
+/**
+ * Разобрать черновик прав Cursor: ровно два списка правил. Формы правил
+ * (`Shell(...)`, `Read(...)`, …) панель НЕ проверяет: документация допускает
+ * шаблоны и синтаксис `команда:аргументы`, и отсев «непонятного» вырезал бы
+ * рабочие правила пользователя. Проверяется ровно то, что можно проверить не
+ * гадая, — что это непустые однострочные строки (см. `parseToolList`).
+ */
+function parseCursorDraft(rec: Record<string, unknown>): CursorPermissionDraft | undefined {
+  const allow = parseToolList(rec.allow);
+  const deny = parseToolList(rec.deny);
+  if (!allow || !deny) return undefined;
+  return { allow, deny };
+}
+
+/**
+ * Разобрать черновик прав Goose: ОДИН ключ `mode` из задокументированного
+ * набора (`auto`, `approve`, `smart_approve`, `chat`). Списков у Goose нет.
+ */
+function parseGooseDraft(rec: Record<string, unknown>): GoosePermissionDraft | undefined {
+  const mode = rec.mode;
+  if (typeof mode !== 'string' || !(GOOSE_MODES as readonly string[]).includes(mode)) {
+    return undefined;
+  }
+  return { mode: mode as GooseMode };
+}
+
+/**
+ * Разобрать черновик прав Kimi: режим `default_permission_mode` + ВЕСЬ список
+ * правил. Правило — ровно два поля: `decision` из набора и непустой `pattern`
+ * (синтаксис шаблона панель не толкует, только хранит). Порядок правил значим и
+ * сохраняется как прислали; полный повтор (то же решение с тем же шаблоном)
+ * отбрасывается — две одинаковые строки в файле пользы не несут.
+ */
+function parseKimiDraft(rec: Record<string, unknown>): KimiPermissionDraft | undefined {
+  const mode = rec.mode;
+  if (typeof mode !== 'string' || !(KIMI_MODES as readonly string[]).includes(mode)) {
+    return undefined;
+  }
+  if (!Array.isArray(rec.rules)) return undefined;
+
+  const rules: KimiPermissionRule[] = [];
+  const seen = new Set<string>();
+  for (const item of rec.rules) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined;
+    const { decision, pattern } = item as Record<string, unknown>;
+    if (typeof decision !== 'string' || !(KIMI_DECISIONS as readonly string[]).includes(decision)) {
+      return undefined;
+    }
+    if (typeof pattern !== 'string') return undefined;
+    // Пустая строка — это пустая строка формы, а не ошибка: как в списках
+    // Qwen/Continue, такую запись молча выбрасываем.
+    const trimmed = pattern.trim();
+    if (!trimmed) continue;
+    const key = `${decision}\u0000${trimmed}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rules.push({ decision: decision as KimiDecision, pattern: trimmed });
+  }
+
+  return { mode: mode as KimiMode, rules };
 }
 
 /** Уровень прав OpenCode из тела запроса: строка строго из набора. */
@@ -332,6 +529,36 @@ export interface GeminiPermissionsValues {
   usingDefaults: boolean;
 }
 
+/** Значения прав Qwen Code: режим аппрувов + три списка правил `permissions.*`. */
+export interface QwenPermissionsValues {
+  kind: 'qwen';
+  approvalMode: QwenApprovalMode;
+  allow: string[];
+  ask: string[];
+  deny: string[];
+  /** Ни один из ведомых панелью ключей не задан в файле; дефолт не записан. */
+  usingDefaults: boolean;
+}
+
+/** Значения прав Cursor: два списка внутри `permissions`, без режима. */
+export interface CursorPermissionsValues {
+  kind: 'cursor';
+  allow: string[];
+  deny: string[];
+  /** Ключа `permissions` в файле нет; дефолты CLI не записаны. */
+  usingDefaults: boolean;
+}
+
+/** Значения прав Continue: три списка `permissions.yaml`, без режима. */
+export interface ContinuePermissionsValues {
+  kind: 'continue';
+  allow: string[];
+  ask: string[];
+  exclude: string[];
+  /** Ни одного из трёх ключей в файле нет; дефолты CLI не записаны. */
+  usingDefaults: boolean;
+}
+
 /** Значения прав OpenCode: ключ `permission` файла opencode.json. */
 export interface OpencodePermissionsValues {
   kind: 'opencode';
@@ -343,8 +570,32 @@ export interface OpencodePermissionsValues {
   usingDefaults: boolean;
 }
 
+/** Значения прав Goose: один режим `GOOSE_MODE` в корне config.yaml. */
+export interface GoosePermissionsValues {
+  kind: 'goose';
+  mode: GooseMode;
+  /** Ключа `GOOSE_MODE` в файле нет; дефолт CLI не записан. */
+  usingDefaults: boolean;
+}
+
+/** Значения прав Kimi Code: режим корня + упорядоченные правила config.toml. */
+export interface KimiPermissionsValues {
+  kind: 'kimi';
+  mode: KimiMode;
+  rules: KimiPermissionRule[];
+  /** Ни режима, ни правил в файле нет; дефолт CLI не записан. */
+  usingDefaults: boolean;
+}
+
 export type ProviderPermissionsValues =
-  CodexPermissionsValues | GeminiPermissionsValues | OpencodePermissionsValues;
+  | CodexPermissionsValues
+  | GeminiPermissionsValues
+  | QwenPermissionsValues
+  | ContinuePermissionsValues
+  | CursorPermissionsValues
+  | GoosePermissionsValues
+  | KimiPermissionsValues
+  | OpencodePermissionsValues;
 
 /**
  * Прочитать текущие права по формату цели. Отсутствующий ключ → дефолт CLI (НЕ
@@ -355,6 +606,11 @@ export function readProviderPermissions(
 ): ProviderPermissionsValues {
   const text = readTextFile(target.filePath);
   if (target.format === 'gemini-json') return readGeminiPermissions(text);
+  if (target.format === 'qwen-json') return readQwenPermissions(text);
+  if (target.format === 'continue-yaml') return readContinuePermissionsValues(text);
+  if (target.format === 'cursor-json') return readCursorPermissions(text);
+  if (target.format === 'goose-yaml') return readGoosePermissionsValues(text);
+  if (target.format === 'kimi-toml') return readKimiPermissionsValues(text);
   if (target.format === 'opencode-json') return readOpencodePermissions(text);
   return readCodexPermissions(text);
 }
@@ -370,6 +626,16 @@ export function saveProviderPermissions(
 ): string | undefined {
   if (target.format === 'gemini-json')
     return saveGeminiPermissions(target, draft as GeminiPermissionDraft, backupDir);
+  if (target.format === 'qwen-json')
+    return saveQwenPermissions(target, draft as QwenPermissionDraft, backupDir);
+  if (target.format === 'continue-yaml')
+    return saveContinuePermissions(target, draft as ContinuePermissionDraft, backupDir);
+  if (target.format === 'cursor-json')
+    return saveCursorPermissions(target, draft as CursorPermissionDraft, backupDir);
+  if (target.format === 'goose-yaml')
+    return saveGoosePermissions(target, draft as GoosePermissionDraft, backupDir);
+  if (target.format === 'kimi-toml')
+    return saveKimiPermissions(target, draft as KimiPermissionDraft, backupDir);
   if (target.format === 'opencode-json')
     return saveOpencodePermissions(target, draft as OpencodePermissionDraft, backupDir);
   return saveCodexPermissions(target, draft as CodexPermissionDraft, backupDir);
@@ -413,6 +679,83 @@ export function buildProviderPermissionInfo(
       coreTools: gemini?.coreTools ?? [],
       excludeTools: gemini?.excludeTools ?? [],
       usingDefaults: gemini?.usingDefaults ?? true,
+      readOnly,
+      error,
+    };
+  }
+
+  if (target.format === 'qwen-json') {
+    const qwen = values?.kind === 'qwen' ? values : undefined;
+    return {
+      ...base,
+      kind: 'qwen',
+      format: 'qwen-json',
+      approvalMode: qwen?.approvalMode ?? DEFAULT_QWEN_APPROVAL,
+      approvalModes: [...QWEN_APPROVAL_MODES],
+      allow: qwen?.allow ?? [],
+      ask: qwen?.ask ?? [],
+      deny: qwen?.deny ?? [],
+      usingDefaults: qwen?.usingDefaults ?? true,
+      readOnly,
+      error,
+    };
+  }
+
+  if (target.format === 'continue-yaml') {
+    const cont = values?.kind === 'continue' ? values : undefined;
+    return {
+      ...base,
+      kind: 'continue',
+      format: 'continue-yaml',
+      allow: cont?.allow ?? [],
+      ask: cont?.ask ?? [],
+      exclude: cont?.exclude ?? [],
+      usingDefaults: cont?.usingDefaults ?? true,
+      readOnly,
+      error,
+    };
+  }
+
+  if (target.format === 'cursor-json') {
+    const cursor = values?.kind === 'cursor' ? values : undefined;
+    return {
+      ...base,
+      kind: 'cursor',
+      format: 'cursor-json',
+      allow: cursor?.allow ?? [],
+      deny: cursor?.deny ?? [],
+      ruleKinds: [...CURSOR_RULE_KINDS],
+      usingDefaults: cursor?.usingDefaults ?? true,
+      readOnly,
+      error,
+    };
+  }
+
+  if (target.format === 'goose-yaml') {
+    const goose = values?.kind === 'goose' ? values : undefined;
+    return {
+      ...base,
+      kind: 'goose',
+      format: 'goose-yaml',
+      mode: goose?.mode ?? GOOSE_DEFAULT_MODE,
+      modes: [...GOOSE_MODES],
+      usingDefaults: goose?.usingDefaults ?? true,
+      readOnly,
+      error,
+    };
+  }
+
+  if (target.format === 'kimi-toml') {
+    const kimi = values?.kind === 'kimi' ? values : undefined;
+    return {
+      ...base,
+      kind: 'kimi',
+      format: 'kimi-toml',
+      mode: kimi?.mode ?? KIMI_DEFAULT_MODE,
+      modes: [...KIMI_MODES],
+      rules: kimi?.rules ?? [],
+      decisions: [...KIMI_DECISIONS],
+      usingDefaults: kimi?.usingDefaults ?? true,
       readOnly,
       error,
     };
@@ -663,6 +1006,448 @@ function saveGeminiPermissions(
   return writeTextFile(target.filePath, next, {
     backupDir,
     backupName: backupNameOf(target),
+  });
+}
+
+// --- Qwen Code (settings.json: tools.approvalMode + permissions.*) -----------
+
+/**
+ * Форма файла Qwen Code. Панель ведёт РОВНО `tools.approvalMode` и три списка
+ * внутри `permissions`; всё прочее (в том числе соседи внутри тех же секций,
+ * `mcpServers`, устаревшие `tools.core`/`allowed`/`exclude`) — чужое.
+ */
+interface RawQwenSettings {
+  tools?: unknown;
+  permissions?: unknown;
+  [key: string]: unknown;
+}
+
+/** Секция файла как объект. Не объект (строка/массив/число) → fail-closed. */
+function qwenSection(config: RawQwenSettings, key: string): Record<string, unknown> | undefined {
+  const section = config[key];
+  if (section === undefined || section === null) return undefined;
+  if (typeof section !== 'object' || Array.isArray(section)) throw new UnrecognizedFormatError();
+  return section as Record<string, unknown>;
+}
+
+/** Список правил из файла. Не массив строк → fail-closed (форма не наша). */
+function qwenRuleList(value: unknown): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) throw new UnrecognizedFormatError();
+  if (!value.every((item) => typeof item === 'string')) throw new UnrecognizedFormatError();
+  return value as string[];
+}
+
+/**
+ * Прочитать права Qwen Code. Отсутствующий режим → дефолт `default`. Режим вне
+ * набора показываем как дефолт, но раздел при этом НЕ считается «на дефолтах»:
+ * интерфейс подскажет, что значение из файла панель не поддерживает и сохранение
+ * его заменит.
+ */
+function readQwenPermissions(text: string): QwenPermissionsValues {
+  if (!text.trim()) {
+    return {
+      kind: 'qwen',
+      approvalMode: DEFAULT_QWEN_APPROVAL,
+      allow: [],
+      ask: [],
+      deny: [],
+      usingDefaults: true,
+    };
+  }
+
+  const config = parseProviderJsonObject<RawQwenSettings>(text);
+  const rawMode = qwenSection(config, 'tools')?.approvalMode;
+  const permissions = qwenSection(config, 'permissions');
+  const allow = qwenRuleList(permissions?.allow);
+  const ask = qwenRuleList(permissions?.ask);
+  const deny = qwenRuleList(permissions?.deny);
+
+  const known =
+    typeof rawMode === 'string' && QWEN_APPROVAL_MODES.includes(rawMode as QwenApprovalMode);
+
+  return {
+    kind: 'qwen',
+    approvalMode: known ? (rawMode as QwenApprovalMode) : DEFAULT_QWEN_APPROVAL,
+    allow: allow ?? [],
+    ask: ask ?? [],
+    deny: deny ?? [],
+    usingDefaults:
+      rawMode === undefined && allow === undefined && ask === undefined && deny === undefined,
+  };
+}
+
+/**
+ * Проекция «всё, кроме ведомых панелью ключей»: по ней результат сверяется с
+ * оригиналом до записи. Секция, оставшаяся пустой после вычитания своих ключей,
+ * из проекции убирается — иначе `{}` и «ключа не было» считались бы разными.
+ * Сортировка ключей РЕКУРСИВНАЯ (`stableJson`): сравнивается содержимое, а не
+ * порядок обхода, и вложенные объекты тоже.
+ */
+function qwenOtherKeysProjection(config: RawQwenSettings): string {
+  const rest: Record<string, unknown> = { ...config };
+
+  const strip = (key: string, managed: string[]): void => {
+    const section = rest[key];
+    if (!section || typeof section !== 'object' || Array.isArray(section)) return;
+    const sectionRest: Record<string, unknown> = { ...(section as Record<string, unknown>) };
+    for (const name of managed) delete sectionRest[name];
+    if (Object.keys(sectionRest).length > 0) rest[key] = sectionRest;
+    else delete rest[key];
+  };
+
+  strip('tools', ['approvalMode']);
+  strip('permissions', ['allow', 'ask', 'deny']);
+
+  return stableJson(rest);
+}
+
+/**
+ * Записать права Qwen Code в settings.json, поменяв ТОЛЬКО `tools.approvalMode` и
+ * три списка внутри `permissions`. Пустой список удаляет свой ключ; пустые все
+ * три — весь объект `permissions` (писать `{}` панель не станет). Нет файла →
+ * создаётся с одним `tools.approvalMode`.
+ */
+function saveQwenPermissions(
+  target: ProviderPermissionsTarget,
+  draft: QwenPermissionDraft,
+  backupDir: string | undefined,
+): string | undefined {
+  // Двойная страховка: значение вне набора в файл не уйдёт даже в обход разбора.
+  if (!QWEN_APPROVAL_MODES.includes(draft.approvalMode)) throw new UnrecognizedFormatError();
+
+  const text = readTextFile(target.filePath);
+  const original: RawQwenSettings = text.trim()
+    ? parseProviderJsonObject<RawQwenSettings>(text)
+    : {};
+
+  // Второй разбор — рабочее дерево (первый остаётся эталоном «как было»).
+  const config: RawQwenSettings = text.trim() ? parseProviderJsonObject<RawQwenSettings>(text) : {};
+
+  const tools = qwenSection(config, 'tools') ?? {};
+  tools.approvalMode = draft.approvalMode;
+  config.tools = tools;
+
+  const permissions = qwenSection(config, 'permissions') ?? {};
+  const lists: [keyof QwenPermissionDraft & ('allow' | 'ask' | 'deny'), string[]][] = [
+    ['allow', draft.allow],
+    ['ask', draft.ask],
+    ['deny', draft.deny],
+  ];
+  for (const [key, list] of lists) {
+    if (list.length > 0) permissions[key] = list;
+    else delete permissions[key];
+  }
+  if (Object.keys(permissions).length > 0) config.permissions = permissions;
+  else delete config.permissions;
+
+  const next = `${JSON.stringify(config, null, 2)}\n`;
+
+  // Контроль ДО записи: итог разбирается, ведомые ключи совпали с намерением, а
+  // все прочие ключи файла (включая mcpServers и соседей внутри секций) целы.
+  const check = readQwenPermissions(next);
+  if (
+    check.approvalMode !== draft.approvalMode ||
+    JSON.stringify(check.allow) !== JSON.stringify(draft.allow) ||
+    JSON.stringify(check.ask) !== JSON.stringify(draft.ask) ||
+    JSON.stringify(check.deny) !== JSON.stringify(draft.deny)
+  ) {
+    throw new UnrecognizedFormatError();
+  }
+  if (
+    qwenOtherKeysProjection(original) !==
+    qwenOtherKeysProjection(parseProviderJsonObject<RawQwenSettings>(next))
+  ) {
+    throw new UnrecognizedFormatError();
+  }
+
+  return writeTextFile(target.filePath, next, {
+    backupDir,
+    backupName: backupNameOf(target),
+  });
+}
+
+// --- Continue (permissions.yaml: три списка allow/ask/exclude) ---------------
+
+/**
+ * Прочитать права Continue. Файла нет → дефолты CLI (чтение разрешено, запись
+ * инструментов спрашивается) — их панель НЕ пишет, только показывает пустые
+ * списки. Файл есть, но все три ключа отсутствуют → тоже «на дефолтах».
+ */
+function readContinuePermissionsValues(text: string): ContinuePermissionsValues {
+  if (!text.trim()) {
+    return { kind: 'continue', allow: [], ask: [], exclude: [], usingDefaults: true };
+  }
+
+  const lists = readContinuePermissions(text);
+  return {
+    kind: 'continue',
+    ...lists,
+    // Пустой `exclude: []`, написанный пользователем, — это НЕ дефолт: ключ в
+    // файле есть, и раздел обязан показать себя настроенным.
+    usingDefaults: !hasContinuePermissionKeys(text),
+  };
+}
+
+/**
+ * Записать три списка в `permissions.yaml`. Пустой список удаляет свой ключ;
+ * комментарии и прочие ключи файла сохраняются (Document API). Нет файла →
+ * создаётся с теми списками, которые непусты; все три пустые — файл создаётся
+ * пустым (записать «ничего» безопаснее, чем придумывать дефолты CLI).
+ */
+function saveContinuePermissions(
+  target: ProviderPermissionsTarget,
+  draft: ContinuePermissionDraft,
+  backupDir: string | undefined,
+): string | undefined {
+  const text = readTextFile(target.filePath);
+  const next = writeContinuePermissions(text, {
+    allow: draft.allow,
+    ask: draft.ask,
+    exclude: draft.exclude,
+  });
+
+  // Контроль ДО записи: итог читается нашей же моделью и совпал с намерением.
+  const check = readContinuePermissions(next);
+  for (const key of CONTINUE_PERMISSION_KEYS) {
+    if (JSON.stringify(check[key]) !== JSON.stringify(draft[key])) {
+      throw new UnrecognizedFormatError();
+    }
+  }
+
+  return writeTextFile(target.filePath, next, {
+    backupDir,
+    backupName: backupNameOf(target),
+  });
+}
+
+// --- Cursor (cli-config.json / cli.json: permissions.allow + permissions.deny) ---
+
+/**
+ * Задокументированные формы правил Cursor. Список идёт КЛИЕНТУ как подсказка и
+ * НЕ используется как фильтр: панель правила не толкует (см. `parseCursorDraft`).
+ */
+const CURSOR_RULE_KINDS: readonly CursorPermissionKind[] = [
+  'Shell',
+  'Read',
+  'Write',
+  'WebFetch',
+  'Mcp',
+];
+
+/**
+ * Форма файла Cursor. Панель ведёт РОВНО два списка внутри `permissions`; всё
+ * прочее (`version`, `editor`, любые будущие ключи CLI) — чужое и сохраняется.
+ */
+interface RawCursorConfig {
+  permissions?: unknown;
+  [key: string]: unknown;
+}
+
+/**
+ * Прочитать права Cursor. Файла нет или он пуст → дефолты CLI (панель их НЕ
+ * пишет, показывает пустые списки). Ключ `permissions` есть, но не объект, или
+ * список не массив строк → fail-closed: форма не наша, править вслепую нельзя.
+ */
+function readCursorPermissions(text: string): CursorPermissionsValues {
+  if (!text.trim()) return { kind: 'cursor', allow: [], deny: [], usingDefaults: true };
+
+  const config = parseProviderJsonObject<RawCursorConfig>(text);
+  const section = config.permissions;
+  if (section === undefined || section === null) {
+    return { kind: 'cursor', allow: [], deny: [], usingDefaults: true };
+  }
+  if (typeof section !== 'object' || Array.isArray(section)) throw new UnrecognizedFormatError();
+
+  const permissions = section as Record<string, unknown>;
+  // Разбор списка тот же, что у Qwen: не массив строк → форма чужая.
+  const allow = qwenRuleList(permissions.allow);
+  const deny = qwenRuleList(permissions.deny);
+
+  return {
+    kind: 'cursor',
+    allow: allow ?? [],
+    deny: deny ?? [],
+    // Ключ `permissions` в файле ЕСТЬ — раздел настроен, даже если оба списка
+    // пусты: пустой `"allow": []` пользователь написал сам.
+    usingDefaults: false,
+  };
+}
+
+/**
+ * Проекция «всё, кроме ведомых панелью ключей». Опустевший после вычитания
+ * `permissions` объект из проекции убирается — иначе `{}` и «ключа не было»
+ * считались бы разными и запись падала бы на здоровом файле.
+ */
+function cursorOtherKeysProjection(config: RawCursorConfig): string {
+  const rest: Record<string, unknown> = { ...config };
+  const section = rest.permissions;
+  if (section && typeof section === 'object' && !Array.isArray(section)) {
+    const sectionRest: Record<string, unknown> = { ...(section as Record<string, unknown>) };
+    delete sectionRest.allow;
+    delete sectionRest.deny;
+    if (Object.keys(sectionRest).length > 0) rest.permissions = sectionRest;
+    else delete rest.permissions;
+  } else if (section !== undefined) {
+    delete rest.permissions;
+  }
+  return stableJson(rest);
+}
+
+/**
+ * Записать права Cursor, поменяв ТОЛЬКО `permissions.allow` и `permissions.deny`.
+ * Пустой список удаляет свой ключ; пустые оба — весь объект `permissions` (писать
+ * `{}` панель не станет). Нет файла → создаётся с одним ключом `permissions`;
+ * `version` и прочие настройки CLI панель не выдумывает.
+ */
+function saveCursorPermissions(
+  target: ProviderPermissionsTarget,
+  draft: CursorPermissionDraft,
+  backupDir: string | undefined,
+): string | undefined {
+  const text = readTextFile(target.filePath);
+  // Fail-closed на ВХОДЕ: существующий файл обязан читаться нашей моделью.
+  readCursorPermissions(text);
+
+  const original: RawCursorConfig = text.trim()
+    ? parseProviderJsonObject<RawCursorConfig>(text)
+    : {};
+  // Второй разбор — рабочее дерево (первый остаётся эталоном «как было»).
+  const config: RawCursorConfig = text.trim() ? parseProviderJsonObject<RawCursorConfig>(text) : {};
+
+  const section = config.permissions;
+  const permissions: Record<string, unknown> =
+    section && typeof section === 'object' && !Array.isArray(section)
+      ? { ...(section as Record<string, unknown>) }
+      : {};
+
+  if (draft.allow.length > 0) permissions.allow = draft.allow;
+  else delete permissions.allow;
+  if (draft.deny.length > 0) permissions.deny = draft.deny;
+  else delete permissions.deny;
+
+  if (Object.keys(permissions).length > 0) config.permissions = permissions;
+  else delete config.permissions;
+
+  const next = `${JSON.stringify(config, null, 2)}\n`;
+
+  // Контроль ДО записи: итог читается нашей же моделью, совпал с намерением, а
+  // прочие ключи файла (`version`, `editor`, соседи внутри `permissions`) целы.
+  const check = readCursorPermissions(next);
+  if (
+    JSON.stringify(check.allow) !== JSON.stringify(draft.allow) ||
+    JSON.stringify(check.deny) !== JSON.stringify(draft.deny)
+  ) {
+    throw new UnrecognizedFormatError();
+  }
+  if (
+    cursorOtherKeysProjection(original) !==
+    cursorOtherKeysProjection(parseProviderJsonObject<RawCursorConfig>(next))
+  ) {
+    throw new UnrecognizedFormatError();
+  }
+
+  return writeTextFile(target.filePath, next, {
+    backupDir,
+    backupName: backupNameOf(target),
+  });
+}
+
+// --- Goose (config.yaml: скалярный ключ корня GOOSE_MODE) --------------------
+
+/**
+ * Прочитать режим Goose. Ключа нет → дефолт CLI (`auto`: именно в нём идут
+ * неинтерактивные сессии), и панель его НЕ пишет. Значение вне набора показываем
+ * дефолтом, но раздел НЕ считается «на дефолтах»: в файле что-то задано, и
+ * пользователь должен это видеть.
+ */
+function readGoosePermissionsValues(text: string): GoosePermissionsValues {
+  if (!text.trim()) return { kind: 'goose', mode: GOOSE_DEFAULT_MODE, usingDefaults: true };
+
+  const raw = readGooseMode(text);
+  if (raw === undefined) return { kind: 'goose', mode: GOOSE_DEFAULT_MODE, usingDefaults: true };
+  const known = (GOOSE_MODES as readonly string[]).includes(raw);
+  return {
+    kind: 'goose',
+    mode: known ? (raw as GooseMode) : GOOSE_DEFAULT_MODE,
+    usingDefaults: false,
+  };
+}
+
+/**
+ * Записать `GOOSE_MODE`, сохранив расширения, прочие ключи и комментарии файла.
+ * Контроль до записи: итог читается нашей же моделью и совпал с намерением.
+ */
+function saveGoosePermissions(
+  target: ProviderPermissionsTarget,
+  draft: GoosePermissionDraft,
+  backupDir: string | undefined,
+): string | undefined {
+  const text = readTextFile(target.filePath);
+  const next = writeGooseMode(text, draft.mode as GooseMode);
+  if (readGooseMode(next) !== draft.mode) throw new UnrecognizedFormatError();
+
+  return writeTextFile(target.filePath, next, {
+    backupDir,
+    backupName: backupNameOf(target),
+  });
+}
+
+// --- Kimi Code (config.toml: default_permission_mode + [[permission.rules]]) --
+
+/**
+ * Прочитать права Kimi. Ни режима, ни правил → дефолт CLI (`manual`: без ключа
+ * Kimi спрашивает подтверждение), и панель его НЕ пишет. Значение режима вне
+ * набора показываем дефолтом, но «на дефолтах» раздел уже не считается: в файле
+ * что-то задано. Чужая форма блока правил → fail-closed (бросает).
+ */
+function readKimiPermissionsValues(text: string): KimiPermissionsValues {
+  if (!text.trim()) {
+    return { kind: 'kimi', mode: KIMI_DEFAULT_MODE, rules: [], usingDefaults: true };
+  }
+
+  const raw = readKimiMode(text);
+  const rules = readKimiRules(text);
+  if (raw === undefined && rules.length === 0) {
+    return { kind: 'kimi', mode: KIMI_DEFAULT_MODE, rules: [], usingDefaults: true };
+  }
+  const known = raw !== undefined && (KIMI_MODES as readonly string[]).includes(raw);
+  return {
+    kind: 'kimi',
+    mode: known ? (raw as KimiMode) : KIMI_DEFAULT_MODE,
+    rules,
+    usingDefaults: false,
+  };
+}
+
+/**
+ * Записать режим и правила Kimi. Хирургия внутри `lib/kimi-toml.ts`: прочие
+ * ключи `config.toml` (провайдеры, модели, хуки) остаются байт-в-байт. Контроль
+ * до записи: итог читается нашей же моделью и совпал с намерением.
+ */
+function saveKimiPermissions(
+  target: ProviderPermissionsTarget,
+  draft: KimiPermissionDraft,
+  backupDir: string | undefined,
+): string | undefined {
+  const text = readTextFile(target.filePath);
+  const rules = draft.rules.map((rule) => ({
+    decision: rule.decision as KimiDecision,
+    pattern: rule.pattern,
+  }));
+  const next = writeKimiPermissions(text, draft.mode as KimiMode, rules);
+
+  if (readKimiMode(next) !== draft.mode) throw new UnrecognizedFormatError();
+  if (JSON.stringify(readKimiRules(next)) !== JSON.stringify(rules)) {
+    throw new UnrecognizedFormatError();
+  }
+
+  return writeTextFile(target.filePath, next, {
+    backupDir,
+    backupName: backupNameOf(target),
+    // Итог собран ИЗ ИСХОДНОГО текста хирургией (как у codex): общая нормализация
+    // формы сломала бы байт-в-байт на файле со смешанными окончаниями строк.
+    preserveForm: false,
   });
 }
 

@@ -15,6 +15,7 @@ import {
   useProviderInstructions,
   useSaveProviderInstructions,
 } from '@entities/ProviderInstructions';
+import { useWritePreview } from '@features/WritePreview';
 import { ProviderInstructionsFileEditor } from './ProviderInstructionsFileEditor';
 
 /**
@@ -33,6 +34,7 @@ export function ProviderInstructionsPanel({ projectId }: { projectId?: string })
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderInstructions(scope);
   const save = useSaveProviderInstructions(scope);
+  const { ask, dialog } = useWritePreview();
 
   const [draft, setDraft] = useState('');
   const [openEntry, setOpenEntry] = useState<string | undefined>(undefined);
@@ -43,8 +45,15 @@ export function ProviderInstructionsPanel({ projectId }: { projectId?: string })
   const readOnly = data.readOnly;
   const rawList = entries.map((entry) => entry.raw);
 
+  // Предпросмотр считается по ГЛОБАЛЬНОЙ конфигурации провайдера, поэтому в
+  // проектной вкладке он не предлагается: показывать дифф чужого файла вместо
+  // правимого — хуже, чем не показывать ничего.
   const commit = (next: string[]): void => {
-    save.mutate(next);
+    if (projectId) {
+      save.mutate(next);
+      return;
+    }
+    ask({ section: 'instructions', draft: { entries: next } }, () => save.mutate(next));
   };
 
   const add = (): void => {
@@ -216,6 +225,8 @@ export function ProviderInstructionsPanel({ projectId }: { projectId?: string })
       <Typography variant="caption" color="subtle">
         {t('common.needsRestart')}
       </Typography>
+
+      {dialog}
     </Stack>
   );
 }

@@ -17,6 +17,7 @@ import { ProjectsTopic } from '../topics/ProjectsTopic';
 import { GroupsTopic } from '../topics/GroupsTopic';
 import { HistoryTopic } from '../topics/HistoryTopic';
 import { SettingsTopic } from '../topics/SettingsTopic';
+import { CompareTopic } from '../topics/CompareTopic';
 import { ProvidersTopic } from '../topics/ProvidersTopic';
 
 export { HELP_ROUTE } from '@shared/config/routes';
@@ -85,6 +86,7 @@ export const HELP_GROUPS: HelpGroup[] = [
     topics: [
       { id: 'groups', icon: 'groups', pagePath: '/groups', Content: GroupsTopic },
       { id: 'history', icon: 'history', pagePath: '/history', Content: HistoryTopic },
+      { id: 'compare', icon: 'swap', pagePath: '/compare', Content: CompareTopic },
       { id: 'settings', icon: 'settings', pagePath: '/settings', Content: SettingsTopic },
       // Единственный сквозной документ: он объясняет не свой раздел, а почему
       // набор разделов вообще меняется. Своей страницы у него нет, поэтому

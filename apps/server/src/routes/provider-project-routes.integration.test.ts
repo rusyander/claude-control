@@ -84,7 +84,12 @@ describe('provider-project-routes: проектный уровень прова�
         sections: ['instructions', 'mcp', 'permissions', 'hooks', 'plugins', 'skills'],
       },
       // CURSOR-1: у Cursor вместо файла инструкций — КАТАЛОГ правил `.mdc`.
-      cursor: { mcp: ['.cursor', 'mcp.json'], sections: ['instructionsRules', 'mcp'] },
+      // CURSOR-2: плюс проектные права `.cursor/cli.json` (имя ДРУГОЕ, чем у
+      // глобального `cli-config.json`).
+      cursor: {
+        mcp: ['.cursor', 'mcp.json'],
+        sections: ['instructionsRules', 'mcp', 'permissions'],
+      },
     };
 
     for (const [provider, paths] of Object.entries(expected)) {
@@ -253,6 +258,63 @@ describe('provider-project-routes: проектный уровень прова�
     expect(raw.mcpServers).toEqual({ old: { command: 'node' } });
     expect(raw.general).toEqual({ defaultApprovalMode: 'plan' });
     expect(raw.coreTools).toEqual(['ReadFile']);
+  });
+
+  // CURSOR-2: проектные права Cursor — ключ `permissions` в `<проект>/.cursor/cli.json`.
+  // Имя файла отличается от глобального (`cli-config.json`) — путь из документации.
+  it('cursor: проектные права правят только permissions в .cursor/cli.json', async () => {
+    const id = await boot('cursor');
+    const file = join(projectDir, '.cursor', 'cli.json');
+    mkdirSync(join(projectDir, '.cursor'), { recursive: true });
+    writeFileSync(
+      file,
+      JSON.stringify({ version: 1, permissions: { allow: ['Read(**)'] } }, null, 2),
+      'utf8',
+    );
+
+    const get = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${id}/provider/permissions`,
+    });
+    expect(get.statusCode).toBe(200);
+    const info = get.json<{ kind: string; filePath: string; allow: string[]; deny: string[] }>();
+    expect(info.kind).toBe('cursor');
+    expect(info.filePath).toBe(file);
+    expect(info.allow).toEqual(['Read(**)']);
+    expect(info.deny).toEqual([]);
+
+    // Список СТРОКОЙ вместо массива отклоняется до записи. ЧЕСТНО: черновик
+    // чужой модели (например gemini) панель здесь не распознает — у Cursor нет
+    // ни одного обязательного поля, и запрос без `allow`/`deny` законно значит
+    // «снять все правила». Отсекается то, что отсечь можно не гадая.
+    const wrong = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/provider/permissions`,
+      payload: { allow: 'Read(**)', deny: [] },
+    });
+    expect(wrong.statusCode).toBe(400);
+    expect(wrong.json<{ error: string }>().error).toBe('invalid_draft');
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/provider/permissions`,
+      payload: { allow: ['Shell(git status)'], deny: ['Shell(rm -rf*)'] },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+    expect(raw.version).toBe(1);
+    expect(raw.permissions).toEqual({
+      allow: ['Shell(git status)'],
+      deny: ['Shell(rm -rf*)'],
+    });
+
+    // Копия проекта отделена от глобальной ротации префиксом `-project-`.
+    expect(
+      readdirSync(join(appDataRoot, 'backups')).some((name) =>
+        name.startsWith('cursor-project-cli.json'),
+      ),
+    ).toBe(true);
   });
 
   // OPENCODE-1: проектные права OpenCode — ключ `permission` в `<проект>/opencode.json`.
@@ -521,42 +583,27 @@ describe('provider-project-routes: проектный уровень прова�
 
   // --- OPENCODE-3/4: хуки и плагины проекта -----------------------------------
 
-  it('opencode: хуки проекта round-trip в <проект>/opencode.json, чужие ключи целы', async () => {
+  it('opencode: хуки проекта читаются, но запись запрещена — 409, файл не тронут', async () => {
+    // Снятие ключа с записи — свойство ФОРМАТА: если панель не пишет
+    // `experimental.hook` глобально, то и в проекте не пишет.
     const id = await boot('opencode');
     const file = join(projectDir, 'opencode.json');
-    writeFileSync(
-      file,
-      JSON.stringify(
-        {
-          $schema: 'https://opencode.ai/config.json',
-          permission: { edit: 'deny' },
-          experimental: { policies: [{ effect: 'deny' }], hook: { tool_called: [{ x: 1 }] } },
+    const before = JSON.stringify(
+      {
+        $schema: 'https://opencode.ai/config.json',
+        permission: { edit: 'deny' },
+        experimental: {
+          policies: [{ effect: 'deny' }],
+          hook: {
+            tool_called: [{ x: 1 }],
+            file_edited: { '*.ts': [{ command: ['prettier', '--write'] }] },
+          },
         },
-        null,
-        2,
-      ),
-    );
-
-    const put = await app.inject({
-      method: 'PUT',
-      url: `/api/projects/${id}/provider/hooks`,
-      payload: {
-        fileEdited: [{ pattern: '*.ts', actions: [{ command: ['prettier', '--write'] }] }],
-        sessionCompleted: [],
       },
-    });
-    expect(put.statusCode).toBe(200);
-
-    const written = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
-    expect(written.$schema).toBe('https://opencode.ai/config.json');
-    expect(written.permission).toEqual({ edit: 'deny' });
-    const experimental = written.experimental as Record<string, unknown>;
-    // Чужой ключ `experimental` и незнакомое событие целы.
-    expect(experimental.policies).toEqual([{ effect: 'deny' }]);
-    expect(experimental.hook).toEqual({
-      tool_called: [{ x: 1 }],
-      file_edited: { '*.ts': [{ command: ['prettier', '--write'] }] },
-    });
+      null,
+      2,
+    );
+    writeFileSync(file, before);
 
     const get = await app.inject({ method: 'GET', url: `/api/projects/${id}/provider/hooks` });
     expect(get.statusCode).toBe(200);
@@ -564,16 +611,29 @@ describe('provider-project-routes: проектный уровень прова�
       scope: string;
       fileEdited: unknown[];
       preservedEvents: { key: string }[];
+      readOnly: boolean;
+      writeDisabledReason?: string;
     }>();
     expect(info.scope).toBe('project');
+    expect(info.readOnly).toBe(true);
+    expect(info.writeDisabledReason).toContain('experimental.hook');
+    // Уже записанное видно целиком, незнакомое событие — тоже.
     expect(info.fileEdited).toEqual([
       { pattern: '*.ts', actions: [{ command: ['prettier', '--write'] }] },
     ]);
     expect(info.preservedEvents.map((entry) => entry.key)).toEqual(['tool_called']);
 
-    // Резервная копия проекта отделена от глобальной префиксом `-project-`.
-    const backups = readdirSync(join(appDataRoot, 'backups'));
-    expect(backups.some((name) => name.startsWith('opencode-project-opencode.json'))).toBe(true);
+    const put = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/provider/hooks`,
+      payload: {
+        fileEdited: [{ pattern: '*.js', actions: [{ command: ['eslint'] }] }],
+        sessionCompleted: [],
+      },
+    });
+    expect(put.statusCode).toBe(409);
+    expect(put.json<{ error: string }>().error).toBe('write_disabled');
+    expect(readFileSync(file, 'utf8')).toBe(before);
   });
 
   it('opencode: плагины проекта — каталог .opencode/plugins и ключ plugin', async () => {

@@ -48,6 +48,8 @@ export const settingsPatchSchema = object({
   chatEffort: zodEnum(['', 'low', 'medium', 'high', 'xhigh', 'max']),
   modelPricing: record(string(), modelPricingSchema),
   encryptSecretBackups: boolean(),
+  autoUpdateModels: boolean(),
+  previewProviderWrites: boolean(),
 }).partial();
 
 /**

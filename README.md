@@ -2,50 +2,26 @@
 
 **Every Claude Code setting in one place.**
 
-A local web panel for the configuration of [Claude Code](https://claude.com/claude-code). It reads and edits the real files on your disk — `CLAUDE.md`, `settings.json`, skills, hooks, MCP servers — through a UI instead of hand-editing JSON and Markdown. It also ships a sandbox for trying a setting out before it touches your everyday setup.
+A local web panel for [Claude Code](https://claude.com/claude-code): it reads and edits the real files on disk — `CLAUDE.md`, `settings.json`, skills, hooks, MCP servers — through a UI instead of by hand in JSON and Markdown. Plus a sandbox, where a change is tested before it becomes your daily setup.
 
-Runs entirely on your machine. No account, no server, no telemetry.
+Runs entirely on your machine: no account, no server, no telemetry.
 
-By default the panel configures Claude Code, where everything is available. It can also edit the configuration of other agentic CLIs — Codex, Gemini, Cursor, OpenCode, Aider — each in its own native format: see [CLIs other than Claude](#clis-other-than-claude).
+By default the panel configures Claude Code, where everything is available; it also edits the configuration of Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, Cursor, OpenCode and Aider — each in its native format, see [CLIs other than Claude](#clis-other-than-claude).
 
-🇷🇺 [Русская версия](README.ru.md) · 🔧 [Setup and troubleshooting](SETUP.md)
+🇷🇺 [Русская версия](README.ru.md) · 🔧 [Setup and troubleshooting](docs/SETUP.md) · 🚫 [What the panel does not do](docs/LIMITATIONS.md)
 
 > [!TIP]
-> **Not starting?** Run `pnpm doctor` — the environment check explains every finding.
-> If that does not help, open Claude Code in this folder and say "it won't start, figure it out".
-> The root holds [CLAUDE.md](CLAUDE.md), a map of the project written for the agent: it reads
-> that automatically and begins with diagnostics rather than with reading the source.
-
----
-
-## Contents
-
-- [Why](#why)
-- [What it does](#what-it-does)
-- [How it works](#how-it-works)
-- [Where your data lives](#where-your-data-lives)
-- [The sandbox](#the-sandbox)
-- [Chat and parallel agents](#chat-and-parallel-agents)
-- [CLIs other than Claude](#clis-other-than-claude)
-- [Security](#security)
-- [Quick start](#quick-start)
-- [Platform support](#platform-support)
-- [Development](#development)
-- [Known limitations](#known-limitations)
+> **Won't start?** `pnpm doctor` explains every finding. Still stuck — open Claude Code in this
+> folder and say "it won't start, figure it out": it reads [CLAUDE.md](CLAUDE.md), the map of this
+> project written for the agent, and starts with diagnostics rather than with the code.
 
 ---
 
 ## Why
 
-Claude Code keeps its configuration as loose files in `~/.claude`. That is a good design — it is greppable, diffable and scriptable — but it grows. A mature setup has a thousand-line `CLAUDE.md`, a couple of dozen skill folders, hooks buried three levels deep in `settings.json`, MCP servers in a different file entirely, and permission rules nobody remembers writing.
+Claude Code's configuration is plain files, which is a good decision while there are few of them. Then comes a thousand-line `CLAUDE.md`, dozens of skill folders, hooks three levels deep in `settings.json`, MCP servers in a different file altogether, permissions nobody remembers adding. Three simple questions get hard: **what is actually active right now, what does this hook fire on, what breaks if I add this rule.**
 
-At that point three ordinary questions get hard to answer:
-
-- _Which rules and skills are actually active right now?_
-- _This hook — what does it match, and does it still work?_
-- _If I add this rule, what breaks?_
-
-Claude Control answers all three. It gives the configuration a shape you can see, an off switch that does not destroy anything, and a sandbox where you can test a change against the real Claude Code before it becomes your daily setup.
+The panel answers them: a visible shape, a switch that deletes nothing, and a sandbox where a change is tested against real Claude Code before it becomes permanent.
 
 ## What it does
 
@@ -54,43 +30,46 @@ Claude Control answers all three. It gives the configuration a shape you can see
 
 **Configuration**
 
-- **Rules** — `## RULE:` sections of `CLAUDE.md`, individually searchable and toggleable; a separate page shows and edits the whole `CLAUDE.md`
-- **Skills** — the `skills/` folder, with a file tree and editor per skill; rename and a `SKILL.md` template library
-- **Hooks** — grouped by lifecycle event, with the matcher shown plainly, reorderable within an event
-- **Scripts** — the files in `hooks/`, including nested folders, flagged when nothing calls them
-- **MCP servers** — with a real connection check over the MCP protocol: stdio, HTTP and SSE; interactive OAuth sign-in for network ones; a helper lists a server's tools and creates `mcp__server__tool` permissions for them
-- **Permissions** — allow / ask / deny, including `mcp__*` patterns; an entry moves between `settings.json` and `settings.local.json`
-- **Environment** — from `settings.json` and `.mcp-secrets.env`, secrets masked; an entry moves between files
-- **Plugins** — installed set plus the marketplace catalogue, with sources you can add and remove; inspect an installed plugin's contents and scaffold your own
-- **Projects** — the project level: a chosen folder's own `CLAUDE.md`, MCP servers (`.mcp.json`) and permissions (`.claude/settings.json`), additive to the user level
+- **Rules** — the `## ПРАВИЛО:` sections of `CLAUDE.md`, each with search and its own switch; a separate page edits the whole file
+- **Skills** — the `skills/` folder: file tree, editor, rename, a library of `SKILL.md` templates
+- **Hooks** — grouped by event, matcher shown explicitly, order within an event rearranged by hand
+- **Scripts** — files from `hooks/`, nested folders included, with a flag on the ones nothing calls
+- **MCP servers** — a real protocol-level connection check (stdio, HTTP, SSE), interactive OAuth login, a tool listing, and `mcp__server__tool` permissions generated from it
+- **Permissions** — allow / ask / deny, `mcp__*` patterns included; entries move between `settings.json` and `settings.local.json`
+- **Environment** — from `settings.json` and `.mcp-secrets.env`, secrets masked
+- **Plugins** — installed ones and the marketplace catalog, source management, a scaffolder for your own
+- **Projects** — the project level of a chosen folder (`CLAUDE.md`, `.mcp.json`, `.claude/settings.json`), additive to the user level
 
 </td><td width="50%" valign="top">
 
 **Working with it**
 
-- **Sandbox** — try a rule, skill, hook or MCP server in isolation; a hook against a prepared or arbitrary JSON event
-- **Chat** — talk to Claude Code from the panel: streaming, attachments, voice, artifact preview, model and effort picker, branching by editing a message, clickable answer options, search over the conversation body, feed pagination and conversation export to md/json
-- **Several projects at once** — project tabs, with agents running in parallel and surviving tab switches; a project's dev server starts right from its tab (free port, auto-opened browser, status on the button, stop)
-- **Search** — one global search line across rules, skills, hooks, scripts, permissions, variables, MCP and plugins (secret values are never revealed)
-- **Change history** — a feed of configuration edits with a line-by-line diff over the backups; revert a whole file or a single change out of a backup
-- **Analytics** — token spend and estimated cost, read from your local transcripts: an hourly heatmap, the cache share, export to CSV and JSON by model, project and session
-- **Groups** — arbitrary sets of entities, switchable together; they nest inside one another, and member order is settable
-- **Automations** — scenarios that compile down to ordinary hooks
-- **AI assistant** — describe a rule or skill in words, get the form filled in
-- **Command palette** — Ctrl/Cmd+K to jump into a section and run quick actions, keyboard shortcuts, a toast history; first-run onboarding and an accent colour of your choice
-- **Configuration bundle** — export and import a set of rules, skills and hooks as one file
-- **Help** — a walkthrough of every section with diagrams, in English and Russian
-- **Live reload** — the panel follows file changes, including ones Claude Code makes itself
-- **Backups** — every write is backed up and atomic; optional encryption of `.mcp-secrets.env` copies
+- **Sandbox** — test a rule, skill, hook or MCP server in isolation; a hook against a prepared or hand-written JSON event
+- **Chat** — a conversation with Claude Code inside the panel: streaming, attachments, voice, artifact preview, model and thinking depth, branching by editing a message, full-text search, export to md/json
+- **Several projects at once** — tabs, parallel agents, dev servers launched from the tab: one target per package in a monorepo, each on its own port, autostarted when the panel boots
+- **Project git** — current branch, switching, creating a branch and committing right from the tab; the section shows up only when the project has a `.git`
+- **Search** — one query across rules, skills, hooks, scripts, permissions, env, MCP and plugins (secret values are never revealed)
+- **History** — a line-by-line diff over the backups, rollback of a whole file or of a single hunk
+- **Analytics** — token spend and estimated cost from local transcripts: hour heatmap, cache share, CSV/JSON export
+- **Groups** — arbitrary sets of entities toggled together, nestable
+- **Automations** — compiled down to ordinary hooks
+- **AI assistant** — describe a rule or skill in words, get a filled-in form
+- **Command palette** — Ctrl/Cmd+K, keyboard shortcuts, first-run onboarding
+- **Environment transfer** — pack any provider's environment (instructions, MCP, permissions, hooks, skills, plugins) into an archive and unpack it on another machine with a new / identical / will-overwrite plan
+- **Provider comparison** — two CLIs side by side, row by row per section, with MCP servers and instructions carried from one into the other
+- **Model catalog** — the panel finds out which models the active provider has released and moves the default onto the newer generation of the same family
+- **Help** — every section explained with diagrams and examples, in Russian and English
+- **Live updates** — the panel watches the files, including edits made by Claude Code itself
+- **Backups** — before every write, and every write is atomic
 
 </td></tr>
 </table>
 
-### Soft disable
+### Disabling is soft
 
-Turning something off never deletes it. A disabled rule moves to a holding section of `CLAUDE.md`, a disabled skill moves to `skills-disabled/`, a disabled MCP server moves to an `mcpServersDisabled` key, and a disabled hook's command is kept in the panel's own state (it must not stay in `settings.json`, or Claude Code would keep running it). The text survives; only Claude Code's view of it changes. That is what makes bisecting a misbehaving setup practical.
+Disabling never deletes: a rule moves into a service section of `CLAUDE.md`, a skill into `skills-disabled/`, an MCP server under the `mcpServersDisabled` key, a hook's command into the panel's own state (it must not stay in `settings.json`, or Claude Code would keep running it). The text stays where it was; only what Claude Code sees changes — which is exactly what makes bisecting for the culprit possible.
 
-A group switches off as a whole: every member goes dark at once and comes back when you switch it on. The group's mark is kept separately from the manual one, so a member you disabled individually will not spring back when the group returns, and a member of two groups only comes back once both have let go of it.
+A group toggles as a whole. The group mark is stored separately from the manual one: a member you disabled by hand does not come back when the group is enabled, and a member of two groups returns only when both release it.
 
 ## How it works
 
@@ -99,7 +78,7 @@ There is no database. The panel is a view over the files Claude Code already rea
 ```mermaid
 flowchart LR
     subgraph browser["Browser · localhost:8888"]
-        UI["React UI<br/>18 sections"]
+        UI["React UI<br/>19 sections"]
     end
 
     subgraph server["Node server · 127.0.0.1:5178"]
@@ -130,17 +109,13 @@ flowchart LR
     style disk fill:#fef7e0,stroke:#fbbc04
 ```
 
-Three things follow from that shape:
+Three things follow:
 
-**Nothing is cached behind your back.** The panel is not the owner of the configuration — you and Claude Code edit those files too. A watcher (chokidar) sees changes and pushes them to the UI over SSE, so an edit made in your editor shows up in the panel without a refresh.
+- **Nothing is cached behind your back.** You and Claude Code edit those same files; a watcher (chokidar) pushes changes to the UI over SSE, so an edit made in your editor shows up without a refresh.
+- **Writes are defensive.** A backup into `~/.claude/claude-control/backups/`, then an atomic write through a temp file — an interrupted save cannot leave a half-written `settings.json`.
+- **Restart is honest.** Claude Code reads its configuration at startup, so almost every mutation returns `needsRestart: true` and the UI says so.
 
-**Writes are defensive.** Every write goes through a backup into `~/.claude/claude-control/backups/` and lands atomically (write to a temp file, then rename), so an interrupted save cannot leave you with a half-written `settings.json`.
-
-**Restart is honest.** Claude Code reads its configuration at startup. Almost every mutation returns `needsRestart: true`, and the UI says so, rather than pretending the change is already live.
-
-### The AI features use your own subscription
-
-The form assistant, the skill-structure generator and the chat all shell out to the `claude` CLI you already have installed and logged in. There is no API key to configure, and no key is stored anywhere — Claude Code's own credentials are used, by Claude Code.
+The AI features (form assistant, skill generator, chat) shell out to the `claude` CLI you already have installed and logged in. No API key to configure, none stored anywhere.
 
 ## Where your data lives
 
@@ -150,7 +125,7 @@ Everything is under your home directory. The panel creates no files inside the r
 | ------------------------------------- | ------------- | ----------------------------------------------------------- |
 | `~/.claude/CLAUDE.md`                 | read / write  | Rules                                                       |
 | `~/.claude/settings.json`             | read / write  | Hooks, permissions, env                                     |
-| `~/.claude/settings.local.json`       | read / write  | Personal hooks, permissions and vars — tagged "local"       |
+| `~/.claude/settings.local.json`       | read / write  | The same, personal — tagged "local"                         |
 | `~/.claude/skills/`                   | read / write  | Skills                                                      |
 | `~/.claude/skills-disabled/`          | read / write  | Disabled skills                                             |
 | `~/.claude/hooks/`                    | read / write  | Hook scripts                                                |
@@ -165,11 +140,11 @@ Everything is under your home directory. The panel creates no files inside the r
 
 The last two sit outside `~/.claude` deliberately: Claude Code treats its own directory as protected and refuses to write there, so artifacts created during a chat would silently fail to appear.
 
-Configuration root discovery, in order: the path set in the panel's Settings → the `CLAUDE_CONFIG_DIR` environment variable → `~/.claude`. If none resolves, the UI asks you for the path instead of guessing.
+Configuration root discovery, in order: the path set in the panel's Settings → `CLAUDE_CONFIG_DIR` → `~/.claude`. If none resolves, the UI asks instead of guessing.
 
 ## The sandbox
 
-The point of the sandbox is to answer "what does this rule actually do?" without making it your daily setup.
+Answering "what does this rule actually do?" without making it your daily setup.
 
 Claude Code reads everything from the directory named by `CLAUDE_CONFIG_DIR`. The sandbox builds a temporary directory, puts **only the thing under test** into it, and launches the CLI pointed at that directory.
 
@@ -190,172 +165,95 @@ flowchart TD
     style DROP fill:#e6f4ea,stroke:#34a853
 ```
 
-Measured in such a run: **30 tools instead of 165, zero MCP servers, and not one third-party hook fires.** The only thing carried over from the real directory is `.credentials.json` — without it the CLI answers "Not logged in". `.mcp-secrets.env` is never copied.
+Measured in such a run: **30 tools instead of 165, zero MCP servers, and not one third-party hook fires.** The only thing carried over from the real directory is `.credentials.json` — without it the CLI answers "Not logged in"; `.mcp-secrets.env` is never copied.
 
-A second line of defence is written into the sandbox's own `settings.json`: `~/.claude/**` is denied for writing and the token files are denied for reading. Verified in practice — a prompt asking Claude to read `settings.json` and write `PROBE.txt` into `~/.claude` was refused on both counts, and no file appeared.
+A second line of defence is the sandbox's own `settings.json`: `~/.claude/**` denied for writing, token files denied for reading. Verified in practice — a prompt asking Claude to read `settings.json` and write `PROBE.txt` into `~/.claude` was refused on both counts, and no file appeared.
 
-Hook and script testing needs no model at all. Nine prepared events (a harmless command, `rm -rf`, `git push`, a secret being written, a placeholder key, and so on) are replayed straight at the script, and the verdict is compared against what the fixture expects. It costs nothing and takes under a tenth of a second, so it is practical to run on every edit.
+Hooks and scripts are tested with no model at all: nine prepared events (a harmless command, `rm -rf`, `git push`, a secret being written, a placeholder key, and so on) are replayed straight at the script and the verdict compared against what the fixture expects. Free, under a tenth of a second — practical to run on every edit.
 
 ## Chat and parallel agents
 
-Chat in the panel is not a separate bot and not a wrapper around the API. It launches the very same `claude` you use in the terminal, and the conversation stays in ordinary Claude Code transcripts. A conversation started in the terminal shows up in the panel, and the other way around.
+Not a separate bot and not an API wrapper: the same `claude` you run in the terminal, with the conversation kept in ordinary Claude Code transcripts. A chat started in the terminal shows up in the panel, and the other way round.
 
-What the panel adds on top of the CLI is concurrency. Each project opens in its own tab and runs its own process; switching tabs does not stop an agent.
+What the panel adds is concurrency: each project gets its own tab and its own process, and switching tabs does not stop an agent.
 
-```mermaid
-flowchart LR
-    subgraph tabs["Panel tabs"]
-        HOME["Chats<br/>no project"]
-        P1["Project A 🟢"]
-        P2["Project B 🟡"]
-        P3["Project C 🔴"]
-    end
-
-    subgraph runs["A process each"]
-        R1["claude<br/>working"]
-        R2["claude<br/>waiting for a reply"]
-        R3["claude<br/>error"]
-    end
-
-    PANEL["Agents panel<br/>status · spend · stop"]
-
-    P1 --> R1 --> PANEL
-    P2 --> R2 --> PANEL
-    P3 --> R3 --> PANEL
-    PANEL -.->|"click a row"| P2
-
-    style P1 fill:#e6f4ea,stroke:#34a853
-    style P2 fill:#fef7e0,stroke:#fbbc04
-    style P3 fill:#fce8e6,stroke:#ea4335
-```
-
-**The dot on a tab says what is happening.** Green — the agent is working; yellow — it asked a question and is waiting; red — an error, a rate limit, or a stall: if no events arrive for two minutes the run is treated as broken. A background agent that finishes or gets stuck on a question sends a notification, and clicking it opens that project.
-
-**Edits are allowed by default, and the toggle remembers where you left it.** It used to reset on every reload, which made agents stall over nothing — so now it sticks, and switching to read-only is a deliberate act. Worth checking before you hand a task to an unfamiliar repository. If a run does stall, the header offers **Retry** and **Allow and continue**; the second one re-runs the same request with full access, bypassing both the toggle and the rules in the Permissions section.
-
-**Spending is visible as it happens** — in tokens by default, because on a subscription dollars mean nothing. Switch it to money in the settings if you prefer.
-
-The honest boundary: a run belongs to the server, not to the tab. Closing the tab or pressing F5 only detaches the listener — the agent keeps working, and on return the panel picks the running jobs back up; one that finished while the tab was closed comes back to the feed within a grace minute, and after that stays in the transcript. The session's spend counter is likewise counted on the server and survives a reload. The real boundary is restarting the server itself: the run registry lives in its memory. You answer an agent's question either in text or by clicking one of the offered options.
+- **The dot on the tab.** Green — working, yellow — asked a question and waiting, red — an error, a limit, or a stall (no events for two minutes). A background agent that finished or hit a question sends a notification; clicking it opens that project.
+- **Edits are allowed by default,** and the toggle remembers its position — check it before handing a task to an unfamiliar repository. If a run does stall, the header offers "Retry" and "Allow and continue"; the second replays the same request with full access, bypassing both the toggle and the Permissions section.
+- **Spend is visible immediately** — in tokens by default, because on a subscription dollars mean nothing; switch to money in Settings.
+- **A project tab is its dev server too.** "Start" takes the command from `package.json` (`dev`, otherwise `start`) or your own and runs it **with the package manager the project actually uses** — pnpm, yarn or npm (from `packageManager` and the lock file). **The panel does not assign the port:** the app comes up on the one written in its own config, and the panel reads the address from the output ("Local: http://localhost:5173"), opening the browser once the port answers. A monorepo has several targets — the gear lists the root and the packages, and they can run at the same time. If a port is taken, the panel shows who holds it (name and PID) and offers to free it and start; it kills nothing on its own. The "Autostart" toggle is about the panel's _next_ start: a ticked target comes up by itself, **with no browser window and no navigation**. Close the tab and the toggle clears on all of its targets.
+- **Branch and commit right there,** whenever the project has a `.git` (no `.git`, no section at all): the current branch on the button, the list of local branches to switch to, a new-branch field, a commit message field and a counter of changed files. No `push`, no `merge`, no branch deletion — deliberately: this is not a git client, it is what you need while an agent works in the repository. Under the hood: `git` with no shell, branch names validated by `git check-ref-format` itself, and a checkout limited to the branches on the list, so a stray ref cannot walk HEAD into detached state.
+- **A run belongs to the server, not to the tab.** Closing the tab or hitting F5 only detaches a listener; on return the panel re-attaches to live runs, and a run that finished while the tab was closed makes it back into the feed within a grace minute, after which it lives only in the transcript. Session spend is counted server-side too. The real boundary is a server restart: the run registry lives in its memory.
 
 ## CLIs other than Claude
 
-The panel grew out of Claude Code and stays its tool: **the Claude provider is active by default, and with it everything is available.** But the neighbouring agentic CLIs keep their configuration the same way — an instructions file, MCP servers, environment variables, an approval policy — and the panel edits those files directly, each in its native format.
-
-What you get is one UI across several tools. You no longer have to remember that Codex keeps MCP in TOML, Gemini in JSON, OpenCode under a different key in a different shape, and that Aider writes environment variables as a YAML list. The panel shows the same forms it shows for Claude and writes what that CLI actually reads.
+The panel grew out of Claude Code and stays its tool: **the Claude provider is active by default, and everything is available for it.** But neighbouring agent CLIs are configured the same way — an instructions file, MCP servers, environment variables, an approval policy — and the panel edits those files directly, each in its native format. One UI instead of remembering that Codex keeps MCP in TOML, Gemini in JSON, OpenCode under a different key, and Aider writes env as a YAML list.
 
 ### Choosing a provider
 
-**Settings → Configuration provider.** The panel also checks which CLIs are actually installed: each carries an "installed" / "config found" / "not found" badge plus a "recommended" hint. The same step appears in the first-run onboarding, and it is optional.
+**Settings → Configuration provider.** The panel also shows which CLIs are actually installed: an "installed" / "config found" / "not found" badge and a "recommended" hint. The same optional step exists in first-run onboarding.
 
-Detection is **a hint, never a decision**: the provider never switches by itself, the default stays `claude`, and the panel writes only on an explicit action of yours. If the active provider's CLI is not on `PATH`, the panel says so without breaking the section: configuration is just files and can be edited before the CLI is installed. The assistant, however, needs either the CLI or a key — without both it offers a modal with instructions.
-
-After switching, the sidebar changes: exactly what that CLI supports remains.
+Detection is a hint, never coercion: the provider never switches on its own, the default stays `claude`, and writes happen only on your explicit action. If the CLI is missing from `PATH` the panel says so but does not break the section — configuration is just files and can be edited before the CLI is installed; the assistant, however, with neither CLI nor key, offers a modal with instructions. After a switch the menu keeps exactly what that CLI supports.
 
 ### The map: section × provider
 
-**✅ works** · **🛠 in development** — the section is visible with a badge, opens a placeholder and neither reads nor writes · **— unsupported** — the section is hidden entirely.
+**✅ works** · **👁 read-only** — the section is there, but the panel never writes into it (why — in the footnote) · **🧪 experimental** · **— unsupported**, section hidden.
 
-|                                     | Claude<br>_verified_ | Codex | Gemini | Cursor | OpenCode | Aider |
-| ----------------------------------- | :------------------: | :---: | :----: | :----: | :------: | :---: |
-| Global instructions<sup>1</sup>     |          ✅          |  ✅   |   ✅   |  ✅ *  |    ✅    | ✅ *  |
-| MCP servers<sup>2</sup>             |          ✅          |  ✅   |   ✅   |   ✅   |    ✅    |   —   |
-| Environment variables<sup>3</sup>   |          ✅          |  ✅   |   ✅   |   —    |    —     |  ✅   |
-| Permissions / approvals<sup>4</sup> |          ✅          |  ✅   |   ✅   |   —    |    ✅    |   —   |
-| Chat / assistant<sup>5</sup>        |          ✅          |  🧪   |   🧪   |   —    |    🧪    |  🧪   |
-| Rules (`## RULE:` sections)         |          ✅          |   —   |   —    |   —    |    —     |   —   |
-| Skills<sup>10</sup>                 |          ✅          |   —   |   —    |   —    |    ✅    |   —   |
-| Hooks<sup>8</sup>                   |          ✅          |   —   |   —    |   —    |    ✅    |   —   |
-| Scripts<sup>6</sup>                 |          ✅          |  ✅   |   ✅   |   ✅   |    ✅    |  ✅   |
-| Plugins<sup>9</sup>                 |          ✅          |   —   |   —    |   —    |    ✅    |   —   |
-| Projects<sup>7</sup>                |          ✅          |  ✅   |   ✅   |   ✅   |    ✅    |  ✅   |
-| Analytics (tokens, cost)            |          ✅          |   —   |   —    |   —    |    —     |   —   |
-| Sandbox                             |          ✅          |   —   |   —    |   —    |    —     |   —   |
+|                                     | Claude<br>_verified_ | Codex | Gemini | Qwen Code | Continue | Goose | Kimi Code | Cursor | OpenCode | Aider |
+| ----------------------------------- | :------------------: | :---: | :----: | :-------: | :------: | :---: | :-------: | :----: | :------: | :---: |
+| Global instructions<sup>1</sup>     |          ✅          |  ✅   |   ✅   |    ✅     |    —     |  ✅   |    ✅     |  ✅ *  |    ✅    | ✅ *  |
+| MCP servers<sup>2</sup>             |          ✅          |  ✅   |   ✅   |    ✅     |    ✅    |  ✅   |    ✅     |   ✅   |    ✅    |   —   |
+| Environment<sup>3</sup>             |          ✅          |  ✅   |   ✅   |    ✅     |    ✅    |   —   |     —     |   —    |    —     |  ✅   |
+| Permissions / approvals<sup>4</sup> |          ✅          |  ✅   |   ✅   |    ✅     |    ✅    |  ✅   |    ✅     |   ✅   |    ✅    |   —   |
+| Chat / assistant<sup>5</sup>        |          ✅          |  🧪   |   🧪   |    🧪     |    🧪    |  🧪   |    🧪     |   —    |    🧪    |  🧪   |
+| Rules (`## ПРАВИЛО:`)               |          ✅          |   —   |   —    |     —     |    —     |   —   |     —     |   —    |    —     |   —   |
+| Skills<sup>10</sup>                 |          ✅          |   —   |   —    |    ✅     |    —     |   —   |    ✅     |   —    |    ✅    |   —   |
+| Hooks<sup>8</sup>                   |          ✅          |   —   |   —    |    ✅     |    —     |   —   |    ✅     |   —    |    👁     |   —   |
+| Scripts<sup>6</sup>                 |          ✅          |  ✅   |   ✅   |    ✅     |    ✅    |  ✅   |    ✅     |   ✅   |    ✅    |  ✅   |
+| Plugins<sup>9</sup>                 |          ✅          |   —   |   —    |     —     |    —     |   —   |     👁     |   —    |    ✅    |   —   |
+| Projects<sup>7</sup>                |          ✅          |  ✅   |   ✅   |    ✅     |    ✅    |  ✅   |    ✅     |   ✅   |    ✅    |  ✅   |
+| Analytics (tokens, cost)            |          ✅          |   —   |   —    |     —     |    —     |   —   |     —     |   —    |    —     |   —   |
+| Sandbox                             |          ✅          |   —   |   —    |     —     |    —     |   —   |     —     |   —    |    —     |   —   |
 
-**Overview, Search, Groups, History, Settings and Help are always there** — those are the panel's own sections and do not depend on the provider. History and search do follow the active provider's files: backups of a foreign config are stored under their own name and never mix with Claude's.
+**Overview, Search, Groups, History, Settings and Help are always there** — those are the panel's own sections. History and search do follow the active provider's files: foreign backups are named separately and never mix with Claude's.
 
-What the footnotes stand for — and why each status is what it is:
+What each footnote stands for — the file path, the keys the panel edits, the reason behind the status — is in [Providers: format details](docs/PROVIDERS.md).
 
-1. **Instructions** — `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, `~/.config/opencode/AGENTS.md`. Plain markdown, so the section ports one to one. For **Cursor** the model is different: the global rules are not a file but a **directory**, `~/.cursor/rules/*.mdc`, where every file is one rule with YAML frontmatter (`description`, `globs` — file patterns separated by commas, `alwaysApply` — attach to every conversation) and a markdown body; nested subdirectories are supported. The section became a manager for that directory: list, create, edit and delete rules; the three frontmatter fields are separate form fields, the rule text is its own field and is written back verbatim, while comments and your own frontmatter keys stay in place. A plain `.md` in the rules directory is ignored by Cursor — the panel lists such files separately and never edits them. A rule path must resolve inside the directory: `..`, absolute paths, a foreign extension and symlinks are rejected on read, write and delete alike. For **Aider** the model is different too: it has no single instructions file — context files are declared by the `read` option in `.aider.conf.yml` (`read: [CONVENTIONS.md, anotherfile.txt]`). The section therefore manages that **list of references**: add a file, remove one, change the attach order; the list is written through the `yaml` Document API, so comments and every other key of the config stay intact. On top of that you can open and edit the **contents** of an already listed file — but only if it exists: the panel never creates files that are not there, and never opens what the config does not reference.
-2. **MCP** — `~/.codex/config.toml` (`[mcp_servers]`), `~/.gemini/settings.json`, `~/.cursor/mcp.json`, `~/.config/opencode/opencode.json` (the `mcp` key, with its own `local`/`remote` shape). **Aider** has no MCP server setting in its options reference — this is not "we did not get to it" but nothing to configure.
-3. **Environment** — `[shell_environment_policy.set]` in Codex's `config.toml`, the `set-env` key in Aider's `.aider.conf.yml` (the global `~/.aider.conf.yml` and the per-project one in the repository root), and a plain `.env` file for Gemini (global `~/.gemini/.env` and per-project `<project>/.gemini/.env` — its `settings.json` indeed has no "set a variable" map). The `.env` file is edited line by line: only the lines of the affected variables change, while comments, blank lines and ordering stay as they were. **OpenCode** has no such section and will not get one: per its documentation it only substitutes `{env:VARIABLE}` inside `opencode.json`, i.e. reads the process environment that is already set, and it does not load a `.env` file of its own (that is an open feature request upstream, not a shipped feature). The panel will not create a file nobody reads — hence the section is hidden rather than marked "in development".
-4. **Permissions** — for Codex these are two root keys of `config.toml`: `approval_policy` and `sandbox_mode`. **Gemini** uses a different model, kept in `settings.json`: the approval mode `general.defaultApprovalMode` (`default` — ask every time, `auto_edit` — file edits without prompts, `plan` — read-only) plus two tool lists, `coreTools` (what is allowed) and `excludeTools` (what is blocked, and it wins). The panel never writes the `yolo` mode: per Gemini's docs it is a command-line flag only, and in `settings.json` it makes the CLI fail on startup. **OpenCode** uses a third model — the `permission` key of `opencode.json` (global and per-project): every tool gets its own level, `allow` (no prompt), `ask` (confirm) or `deny` (block); the documented tools are `edit` (file edits), `bash` (shell commands) and `webfetch` (network fetches). For `bash`, a **list of command patterns** can replace the single level — e.g. `*` → `ask`, `git *` → `allow`, `git push *` → `deny`; the panel shows that list as "pattern + level" rows and can edit it. Anything inside `permission` the panel does not manage (other tool names, or the advanced form where it is not supported) is **kept as is** and shown read-only. Per-agent permission overrides (`agent.*`) are not touched at all.
-5. **Chat** — with Claude this is the full chat: streaming, attachments, branching, parallel agents, history. The 🧪 for Codex, Gemini, OpenCode and Aider means a **basic experimental assistant**: one question, one answer, no streaming and no attachments (`codex exec`, `gemini -p`, `opencode run "<prompt>"`, `aider --message`). The prompt is always passed as a separate argv element, never interpolated into a shell string; for OpenCode it is a positional argument of the `run` subcommand (this CLI accepts no stdin). Aider's and OpenCode's assistants are **built from the documentation and have not been exercised live** — those CLIs are not installed on the development machine, so the first real run is worth eyeballing. **Cursor** has no model API of its own, so the assistant is unavailable.
-6. **Scripts** — this is a section of **the panel itself**: your own files (`.mjs`, `.sh`, `.ps1`, `.py`) in the `hooks/` folder of the panel directory. Neither the provider's CLI nor its config format is involved, so the section works everywhere. Exactly two things in it are Claude-specific and stay hidden for the rest: the **sandbox** (it boots an isolated Claude Code) and the **"called by a hook"** flag (other CLIs have no hooks). The code scaffolds are swapped too: without hooks you get plain standalone scripts instead of Claude hook skeletons.
-7. **Projects** — the project registry is shared, but the selected project's config differs per provider. For **Claude** it is the same rich set as before: `CLAUDE.md`, `.mcp.json` and permissions in `.claude/settings.json`. For the rest it is whatever their CLI documents: project instructions (`AGENTS.md` for Codex and OpenCode, `GEMINI.md` for Gemini) and the project's MCP servers (`.codex/config.toml`, `.gemini/settings.json`, `opencode.json`, `.cursor/mcp.json`); for **Gemini** the project's environment variables (`.gemini/.env`) and permissions (`.gemini/settings.json`) come on top, and for **OpenCode** the project's permissions live in the same `opencode.json` (the `permission` key). **Cursor**'s project level is the same rules directory, only inside the project: `<project>/.cursor/rules/*.mdc`, with the same path safety. **Aider**'s project level is `<project>/.aider.conf.yml`: per its docs the config is looked up in the home directory, **in the git repository root** and in the current directory (loaded in that order, later wins). Inside a project you get the same things as globally: the `read` list of attached files and the `set-env` variables. Edits go through the same adapters as the global level: other keys and comments stay intact, a backup is made before every write, and any path leaving the project directory is rejected.
+Claude is marked **verified**: its path has been exercised live and is covered by tests. The rest are **experimental**: formats come from each CLI's documentation and are covered by round-trip tests, but the first real write of a foreign format is worth eyeballing. Which is exactly why four tools are built around foreign formats — all of them in [Providers: panel-side tools](docs/PROVIDER-TOOLS.md):
 
-8. **Hooks** — for **Claude** this is its own model: `PreToolUse`/`PostToolUse` events with tool matchers and shell commands in `settings.json`. **OpenCode** organises them fundamentally differently, and the section is built for its model: the `experimental.hook` key of `opencode.json` (global and per-project). There are exactly two events. **"File edited"** (`file_edited`) maps a file pattern to a list of actions — edit a file matching `*.ts` and `prettier --write` runs. **"Session completed"** (`session_completed`) is simply a list of actions to run when work finishes. A command is given as a **list of arguments**, not a shell string: the program first, then its arguments one per field, so a space inside an argument is safe while "`prettier --write`" as one string will not work — the panel shows it as separate fields precisely so this cannot be confused. Only that key is edited: the rest of the file, other `experimental` keys and unknown events are preserved and shown read-only. **Important caveat:** the key lives under `experimental`, which OpenCode itself declares unstable ("may change or be removed without notice"), and on top of that the current configuration documentation page does not mention hooks at all while the published configuration schema has no `hook` key. The panel says so plainly in the UI and does not present the section as a settled feature — verify it against your CLI version.
-9. **Plugins** — for **Claude** these are the panel's own extensions and marketplaces (a wrapper around `claude plugin`). For **OpenCode** these are plugins of its own CLI, and there are two documented ways, both supported. First, **files** in JS/TS inside the directory OpenCode loads at startup: `~/.config/opencode/plugins/` globally and `<project>/.opencode/plugins/` per project. The panel manages them as a file manager: list (including subdirectories), read, create, edit, delete; a backup is made before every write and before every delete, and the directory is created only on an explicit save. A path must resolve inside the directory: `..`, absolute and UNC paths, foreign extensions and symlinks are rejected on read, write and delete alike. Second, the **list of npm packages** under the `plugin` key of `opencode.json`; both plain and scoped packages such as `@org/name` are supported. The panel cannot install packages — the CLI does that; it only edits the list. Entries of the "name + options object" form are allowed by the configuration schema, but their shape is undocumented — the panel keeps such entries as is and shows them read-only.
-10. **Skills** — for **Claude** this is its rich section: a folder per skill with a file tree, enable/disable by moving into `skills-disabled/`, groups, a template library. For **OpenCode** the concept is the same — a folder with a `SKILL.md` and YAML front matter — but the directories and field set are its own: `~/.config/opencode/skills/<name>/SKILL.md` globally, `<project>/.opencode/skills/<name>/SKILL.md` per project. The panel edits the two required front-matter fields — `name` and `description`; the `license`, `compatibility`, `metadata` and any foreign fields it keeps as is and shows read-only. The name must equal the folder name and follow the rules (1–64 characters, lowercase letters, digits and single hyphens, no hyphen at the edges and no `--`); this is checked before writing. A path must have the form `<name>/SKILL.md` inside the directory — `..`, absolute paths and symlinks are rejected on read, write and delete alike; the directory and folders are created only on an explicit save. Worth knowing: OpenCode also loads skills from `~/.claude/skills` and `~/.agents/skills`, so your already configured Claude skills work in it without moving anything — the panel says so and never writes into those directories (the Claude skills section manages them).
-
-Claude is marked **verified** — its path has been exercised live and is covered by tests. The rest are **experimental**: the formats come from each CLI's documentation, are covered by round-trip tests and are never guessed, but for every foreign format the panel writes for the first time it is worth eyeballing that first real write (see [LIMITATIONS.md](LIMITATIONS.md)).
+- **Write preview.** A diff stands between "Save" and a foreign file, and it is not a prediction: the panel copies the file into a temp dir, performs the **real** write there with the same adapter, reads the result back and shows the difference. The preview runs exactly the write's validation — it cannot turn out to be kinder.
+- **Provider check on your machine.** CLI → config → a read-write-read round trip per section → one real assistant run. Every write goes into a copy of the directory, the real files are untouched, and the verdict (verified / partial / failed) outranks the catalog status in both directions.
+- **Format check against published schemas.** Once a day the panel downloads the CLI's official JSON schema and compares it with the keys it writes itself. The very first real run found a genuine drift: `experimental.hook` is gone from the OpenCode schema — so hooks there are read-only now, as a fact rather than a guess.
+- **Migration between providers.** Narrower than comparison, deliberately: MCP servers and instructions yes; environment variables never (their values _are_ the keys), permissions never (eight different approval models, no shared vocabulary).
 
 ### Your subscription outranks a paid API
 
-The panel's assistant picks what to run in a fixed order — **free-for-you first, paid last**:
+The assistant picks what to run in a hard order, locked by tests: **the provider's CLI on `PATH`** (your subscription, nothing extra to pay) → **an API key, only if no CLI was found** → **a modal explaining how to log in**. A stored key never overrides the CLI.
 
-1. **The provider's CLI that you are already logged into.** If `claude`, `codex` or `gemini` is on `PATH`, the panel calls it. That is your subscription: nothing extra to pay, no key needed.
-2. **An API key only if there is no subscription.** The key is asked for when the CLI is not found, and it serves as the fallback path, not the main one.
-3. **Otherwise a modal with instructions**: how to log into that provider's CLI, and where to get a key if logging in is not an option.
-
-That order is exactly this way and is pinned by tests: a stored key does not override the CLI.
-
-Any key you do enter is stored encrypted (AES-256-GCM) in `claude-control/provider-keys.enc`; the passphrase is a machine-local file with `0600` permissions. Only a mask like `sk-…1234` ever leaves the server. Keys never reach the logs, the backups, the history feed, the global search or the bundle export — there is a dedicated test that walks every provider to prove it.
+Keys you do enter are stored encrypted (AES-256-GCM) in `claude-control/provider-keys.enc`, with the passphrase in a machine-local `0600` file. Only an `sk-…1234` mask leaves the server. Keys never reach logs, backups, history, search or the exported environment archive — there is a test iterating every provider for that.
 
 ### What protects a foreign config
 
-Somebody else's `config.toml` is not our file, and it is handled more carefully than our own:
-
-- **A backup before every write, and the write is atomic.** A provider's backups are stored under their own name (`<provider>-<file>`), so they never mix with Claude's and cannot be restored on top of them.
-- **Formats come from the documentation, not from memory.** Every adapter follows the official configuration reference of its CLI.
-- **Validation before writing, plus round-trip.** The file is read, changed and reassembled; the result is compared against what was read. If it does not match, nothing is written.
-- **Surgical edits.** In Codex only the region of `config.toml` that is being changed is touched: comments, profiles, key order and everything the edit does not concern stay byte for byte. Comments survive writes in Aider's YAML too. The file's shape is preserved: line endings (`CRLF`/`LF`) stay as they were, and a BOM is stripped on read and put back on write.
-- **Fail-closed.** An unfamiliar, broken or unexpectedly shaped file is not an invitation to "write something plausible": the section returns an error and stays read-only. The same rule covers an unsupported capability: the section simply is not there.
-- **Documented directory overrides are honoured** — `CODEX_HOME` moves all of Codex's paths, `XDG_CONFIG_HOME` moves OpenCode's config directory, and `OPENCODE_CONFIG` moves the `opencode.json` file itself (MCP and permissions follow it). Undocumented variables are not invented.
+- **A backup before every write, and the write is atomic.** Provider backups are named `<provider>-<file>` and can never roll back over Claude's.
+- **Formats come from documentation, not from memory.**
+- **Validation before write, plus round-trip:** the file is read, changed, serialized back and compared with what was read. Mismatch — no write.
+- **Surgical edits.** Codex: only the relevant region of `config.toml` changes, comments, profiles and key order stay byte-for-byte; Aider's YAML keeps its comments; `CRLF`/`LF` is preserved and a BOM is stripped on read and restored on write.
+- **Fail-closed.** An unfamiliar or broken file is no reason to guess: the section returns an error and stays read-only. An unsupported capability simply has no section.
+- **Directory overrides are honoured where documented:** `CODEX_HOME`, `XDG_CONFIG_HOME` (OpenCode's directory), `OPENCODE_CONFIG` (the file itself), `QWEN_HOME` (Qwen Code's directory). Undocumented variables are not invented.
 
 ## Security
 
-The threat model is worth stating plainly, because this tool sits on sensitive files by design: it has full read and write access to `~/.claude`, including `.credentials.json` and `.mcp-secrets.env`, and it can start processes. It is a single-user tool for your own machine — not a multi-user service, and not something to expose.
+The tool sits on sensitive files by construction: full access to `~/.claude`, including `.credentials.json` and `.mcp-secrets.env`, plus the ability to spawn processes. It is a single-user tool for your own machine — not a service, not something you expose. Within that model, here is what has been verified.
 
-Within that model, here is what was verified rather than assumed.
+**Your keys do not reach git.** A dry run of exactly the commit a contributor would make: `git add -An --all` picks up sources only, the history is clean, and the app writes nothing inside the repository at all — every write path leads to `~/.claude` or `~/.claude-control`. One consequence: chat attachments live in the panel's own folder, not in your working tree, so `git add -A` will not sweep them up.
 
-### Your keys do not reach git
+**Nothing is sent anywhere.** No telemetry, no analytics, no error reporting — zero mentions of Sentry, PostHog, GA, Mixpanel or Segment in the code and the lock file; no CDN, no external font, no third-party script on the page. Analytics reads your local transcripts and computes in memory. The server's only outbound requests are the MCP handshake with a server you configured yourself. Secrets never reach command-line arguments (the prompt goes through stdin, tokens through the environment), so they are invisible in `ps`. Indirect traffic is expected: `claude` talks to the Anthropic API, `claude plugin` fetches marketplaces, MCP servers do what they do.
 
-Checked by dry-running the commit that a contributor would actually make:
-
-- `git add -An --all` stages only source files and notes — no configuration, no credentials.
-- History is clean: no `.env`, credential, key or token file has ever been added.
-- **The application writes nothing inside the repository.** Every write path resolves under `~/.claude` or `~/.claude-control`; there are no writes relative to `process.cwd()` in the server at all.
-
-One consequence worth knowing: chat attachments now land in the panel's own folder rather than the conversation's working directory. Before, a chat started inside a project could drop an uploaded file straight into your working tree, where the next `git add -A` would pick it up.
-
-### Nothing is sent anywhere
-
-- **No telemetry, no analytics, no error reporting.** Zero references to Sentry, PostHog, Google Analytics, Mixpanel, Segment and the rest — in the code and in the lockfile alike. No external CDN, font or script in the page.
-- The **Analytics** section reads your local transcripts and computes everything in memory. It is a log parser, not a reporting client.
-- The only outbound requests the server makes go to an MCP server's URL that you configured yourself: an MCP protocol handshake, to see whether it answers and what tools it offers.
-- The frontend talks only to its own API on a relative `/api` path.
-- Secrets never appear in command-line arguments — prompts go in over stdin, tokens through the environment — so they are not visible in `ps` or Task Manager. There is no logging of secrets anywhere.
-
-Indirect traffic exists and is expected: the `claude` CLI talks to the Anthropic API, `claude plugin` fetches marketplace repositories, and MCP servers do whatever they do. Those are the tools you are already running; the panel just launches them.
-
-### The API is locked to your own UI
-
-The server binds to `127.0.0.1` only, so nothing on your network can reach it. That alone is not enough, though — a request from a page open in _your_ browser already comes from inside the loopback interface. So:
-
-- **CORS is restricted to the panel's own origin** (`localhost:8888` / `127.0.0.1:8888`). Any other origin gets a 403 before the request reaches a route handler.
-- A `Sec-Fetch-Site: cross-site` request is rejected too, which covers the forms and image tags that can be sent cross-origin without CORS permission at all.
-- Values that end up as CLI arguments (session id, model, chat name, plugin id) are validated against an allowlist rather than escaped, because quoting rules under `cmd.exe` cannot be relied on.
-
-Verified against a live server: a request carrying `Origin: https://evil.example.com` is refused for reading configuration, for reading secrets, and for installing a hook, while the panel itself continues to work normally.
+**The API is closed to everything but your own UI.** The server listens on `127.0.0.1` only, but that alone is not enough — a request from a page in your browser already comes from inside the loopback. So CORS is restricted to the panel's own origin (`localhost:8888` / `127.0.0.1:8888`, anything else gets 403 before the handler), requests marked `Sec-Fetch-Site: cross-site` are rejected (that covers forms and `<img>` tags aimed at foreign addresses), and values that end up in CLI arguments (session id, model, chat name, plugin id) are checked against an allowlist rather than escaped — `cmd.exe` quoting rules cannot be trusted. Verified against a live server: with `Origin: https://evil.example.com`, reading configuration, reading secrets and installing a hook are all refused.
 
 > [!IMPORTANT]
-> Do not change the bind address to `0.0.0.0`, put the API behind a reverse proxy or tunnel, or publish the port out of a container. The API has no authentication by design — anyone who can reach it can read your tokens and register a hook, and a hook is a command Claude Code will run.
+> Do not change the listen address to `0.0.0.0`, do not put the API behind a reverse proxy or tunnel, do not publish the port from a container. The API has no authentication by design: whoever reaches it reads your tokens and installs a hook — and a hook is a command Claude Code will run itself.
 
-### Things to know
-
-- Sandboxes under `~/.claude-control/sandboxes/` contain a copy of `.credentials.json` and any MCP server `env` values in plain text. They are removed when you close the sandbox, and any left behind by a crash are swept on the next server start: the sandbox registry lives in memory, so whatever is still on disk at startup belongs to nobody. Folders younger than a minute are left alone, so two servers starting at once do not clear each other's work.
-- Backups in `~/.claude/claude-control/backups/` include copies of `.mcp-secrets.env` in plain text. Same directory permissions as the original, no encryption.
-- `HookProbe.ts` contains a synthetic, non-functional `glpat-…` string. It is bait used to check that a secret-blocking hook actually fires. It is not a leak, but GitHub secret scanning will flag it.
+**Worth knowing.** Sandboxes under `~/.claude-control/sandboxes/` hold a copy of `.credentials.json` and MCP `env` values in plain text; they are deleted on close, and ones abandoned after a crash are swept at the next server start (folders younger than a minute are left alone so two servers starting at once do not fight). Backups of `.mcp-secrets.env` are plain text too, with the original's permissions. `HookProbe.ts` contains a synthetic, non-working `glpat-…` string — bait for verifying that the secret-blocking hook fires. It is not a leak, but GitHub secret scanning will react to it.
 
 ## Quick start
 
@@ -366,9 +264,9 @@ pnpm install
 pnpm dev
 ```
 
-The panel opens at **http://localhost:8888**. The API runs on **127.0.0.1:5178**.
+The panel opens at **http://localhost:8888**, the API runs on **127.0.0.1:5178**.
 
-Anything unexpected — a port in use, an empty configuration directory, plugins not listing — is covered in **[SETUP.md](SETUP.md)**, along with where `.claude` lives on each OS and how to get the panel working again.
+Anything unexpected — a port in use, an empty configuration directory, plugins not listing — is covered in **[SETUP.md](docs/SETUP.md)**, along with where `.claude` lives on each OS.
 
 ## Platform support
 
@@ -383,9 +281,7 @@ The core is portable: the home directory is always resolved through `os.homedir(
 | `.ps1` hook scripts in sandbox | ✅                | ⚠️ needs pwsh | ⚠️ needs pwsh |
 | `.sh` hook scripts in sandbox  | ⚠️ needs Git Bash | ✅            | ✅            |
 
-⚠️ **Running agents** is a best-effort panel: agents are matched by their command line, because a CLI installed through npm runs under the name `node`, not `claude`. If listing processes is not permitted, the section simply stays empty.
-
-Sandbox fixtures use example paths in the style of whichever system the panel runs on, and the filesystem MCP preset fills in your home directory.
+⚠️ **Running agents** is best-effort: agents are matched by their command line, because a CLI installed through npm runs under the name `node`, not `claude`. If listing processes is not permitted, the section stays empty.
 
 ## Development
 
@@ -407,24 +303,18 @@ tools/qa/     Playwright scripts — screenshots, layout audit, flow checks
 | `pnpm depcruise`  | FSD layer boundaries                                         |
 | `pnpm qa:setup`   | Install the Chromium build the QA scripts need (once)        |
 
-QA scripts run against a live panel: `node tools/qa/screenshot.mjs light`, `node tools/qa/audit-layout.mjs`, and so on. Point them elsewhere with `APP_URL`.
-
-The frontend follows Feature-Sliced Design, and the layer boundaries are machine-enforced by dependency-cruiser — imports may only go downward, and cross-feature imports are rejected.
-
-The server has no build step: Node runs the TypeScript sources directly via `--experimental-strip-types`. That is why the Node floor is 22.6 and why constructs needing real compilation (parameter properties, enums) are avoided.
+QA scripts run against a live panel (`node tools/qa/audit-layout.mjs` and friends); point them elsewhere with `APP_URL`. FSD layer boundaries are machine-enforced by dependency-cruiser: imports only go downward, cross-feature imports are rejected. The server has no build step — Node runs TypeScript via `--experimental-strip-types`, which is why the Node floor is 22.6 and constructs needing real compilation (parameter properties, enums) are avoided.
 
 ## Known limitations
 
-The full section-by-section breakdown is in [LIMITATIONS.md](LIMITATIONS.md): what is limited, why, and whether it is worth waiting for.
+The full section-by-section breakdown is in [LIMITATIONS.md](docs/LIMITATIONS.md).
 
-- **Restart required.** Claude Code loads its configuration at startup, so most changes only take effect after you restart it. The UI marks these.
-- **Plugins depend on the CLI.** Everything on that page shells out to `claude plugin`; if the CLI cannot reach a marketplace, the panel shows you its raw output rather than inventing a friendlier error.
-- **Analytics costs are indicative.** On a subscription you are not billed per token, so treat the number as relative volume, not money owed. The price list is pulled from the Anthropic site and shown in Settings; it excludes discounts, batch rates and negotiated account terms.
-- **A restore works by whole file or by single change.** Backups are listed in Settings: one click rewrites the entire file, or you can return just one change (a hunk) out of a backup. The state before the restore is itself saved as a fresh copy.
-- **Chat runs live in server memory.** Closing the tab or reloading the page does not touch the agent: the run belongs to the server, and on return the panel picks the running ones back up (one that finished while the tab was closed returns to the feed within a grace minute, and after that only in the transcript). The session's accumulated spend is likewise counted on the server and survives F5. The real boundary is restarting the server: the registry of running processes is held in its memory, so that ends everything.
-- **The list of created files exists only for chats outside a project.** Inside a real repository it is deliberately not shown.
-- **Editing a hook changes its id.** The id is derived from the content, so a rewritten command is a different hook: a saved link to it stops opening, and its group membership has to be set again.
+- **A restart is needed.** Claude Code loads its configuration at startup; the UI marks such changes.
+- **Plugins depend on the CLI.** The page wraps `claude plugin`: if the CLI cannot reach a marketplace, the panel shows its raw output.
+- **Cost is indicative.** A subscription is not billed per token, so read the number as volume of work. Pricing is fetched from Anthropic's site; discounts, batch rates and account-specific terms are not in it.
+- **Chat runs live in the server's memory** — restarting it ends them (details above).
+- **Editing a hook changes its id:** the id is derived from its content, so a saved link stops resolving and group membership has to be set again.
 
 ## License
 
-Not yet specified.
+Not decided yet.

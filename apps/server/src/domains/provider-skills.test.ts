@@ -34,11 +34,11 @@ describe('OpenCode: скиллы (каталог skills/ со SKILL.md)', () => 
   let target: ProviderSkillsTarget;
 
   beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'cc-opencode-skills-'));
+    root = mkdtempSync(join(tmpdir(), 'cc-skill-md-dir-'));
     backupDir = join(root, 'backups');
     target = {
       provider: getProvider('opencode'),
-      format: 'opencode-skills',
+      format: 'skill-md-dir',
       scope: 'global',
       skillsDir: join(root, 'skills'),
       backupPrefix: 'opencode-',

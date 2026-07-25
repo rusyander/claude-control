@@ -1,0 +1,45 @@
+// Дифф предпросмотра: те же цвета и моноширина, что в ленте изменений — один
+// язык для одной сущности, где бы она ни показывалась.
+.diff {
+  max-height: 50vh;
+  overflow: auto;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  scrollbar-width: thin;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  padding: 0 var(--spacing-sm);
+
+  &[data-kind='add'] {
+    background: var(--color-success-subtle);
+    color: var(--color-success);
+  }
+
+  &[data-kind='del'] {
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+  }
+
+  &[data-kind='ctx'] {
+    color: var(--color-fg-muted);
+  }
+}
+
+.sign {
+  flex: none;
+  width: 1.5ch;
+  user-select: none;
+  opacity: 0.7;
+}
+
+// Длинные строки конфига не переносим: перенос в дифе сбивает чтение колонок.
+.text {
+  white-space: pre;
+}

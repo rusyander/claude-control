@@ -55,10 +55,16 @@ describe('resolveProviderPermissionsTarget: fail-closed по провайдер�
     expect(target?.filePath.endsWith('opencode.json')).toBe(true);
   });
 
-  it('cursor/aider → undefined', () => {
-    for (const id of ['cursor', 'aider'] as const) {
-      expect(resolveProviderPermissionsTarget(fakeStore(id))).toBeUndefined();
-    }
+  // CURSOR-2: раздел стал ready — цель резолвится в cli-config.json (формат
+  // `cursor-json`), а не в undefined.
+  it('cursor (permissions=ready) → цель на cli-config.json', () => {
+    const target = resolveProviderPermissionsTarget(fakeStore('cursor'));
+    expect(target?.format).toBe('cursor-json');
+    expect(target?.filePath.endsWith('cli-config.json')).toBe(true);
+  });
+
+  it('aider → undefined (задокументированного файла прав нет)', () => {
+    expect(resolveProviderPermissionsTarget(fakeStore('aider'))).toBeUndefined();
   });
 
   it('незнакомый провайдер откатывается на claude → undefined', () => {

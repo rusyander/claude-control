@@ -1,0 +1,27 @@
+// Строка чек-листа: значок итога слева, название и пояснение справа.
+.row {
+  padding: var(--spacing-2xs) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.text {
+  min-width: 0;
+  max-width: var(--text-measure);
+}
+
+// Путь к файлу копируют целиком — переносить по словам нельзя.
+.path {
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-muted);
+}
+
+.list {
+  max-height: 40vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}

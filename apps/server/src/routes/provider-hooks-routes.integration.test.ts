@@ -71,7 +71,9 @@ describe('provider-hooks-routes: хуки провайдера ключом ко
     expect(existsSync(configFile)).toBe(false);
   });
 
-  it('opencode: полный цикл чтения и записи, чужие ключи файла целы', async () => {
+  it('opencode: уже записанные хуки читаются целиком, чужие ключи видны', async () => {
+    // Ключ снят с записи (см. ниже), но ЧТЕНИЕ обязано работать полностью: у
+    // человека хуки могли остаться от прежних версий, и прятать их нельзя.
     writeFileSync(
       configFile,
       JSON.stringify(
@@ -79,7 +81,15 @@ describe('provider-hooks-routes: хуки провайдера ключом ко
           $schema: 'https://opencode.ai/config.json',
           model: 'anthropic/claude-sonnet-4',
           permission: { edit: 'deny' },
-          experimental: { policies: [{ effect: 'deny' }] },
+          experimental: {
+            policies: [{ effect: 'deny' }],
+            hook: {
+              file_edited: {
+                '*.ts': [{ command: ['prettier', '--write'], environment: { NODE_ENV: 'dev' } }],
+              },
+              session_completed: [{ command: ['notify-send', 'done'] }],
+            },
+          },
         },
         null,
         2,
@@ -88,51 +98,13 @@ describe('provider-hooks-routes: хуки провайдера ключом ко
 
     await boot('opencode');
 
-    const before = await app.inject({ method: 'GET', url: '/api/provider-hooks' });
-    expect(before.statusCode).toBe(200);
-    const info = before.json<ProviderHooksInfo>();
+    const response = await app.inject({ method: 'GET', url: '/api/provider-hooks' });
+    expect(response.statusCode).toBe(200);
+    const info = response.json<ProviderHooksInfo>();
     expect(info.providerId).toBe('opencode');
     expect(info.filePath).toBe(configFile);
-    expect(info.present).toBe(false);
-    expect(info.readOnly).toBe(false);
-    expect(info.preservedExperimental.map((entry) => entry.key)).toEqual(['policies']);
-
-    const put = await app.inject({
-      method: 'PUT',
-      url: '/api/provider-hooks',
-      payload: {
-        fileEdited: [
-          {
-            pattern: '*.ts',
-            actions: [
-              {
-                command: ['prettier', '--write'],
-                environment: [{ key: 'NODE_ENV', value: 'dev' }],
-              },
-            ],
-          },
-        ],
-        sessionCompleted: [{ command: ['notify-send', 'done'] }],
-      },
-    });
-    expect(put.statusCode).toBe(200);
-    expect(put.json<{ ok: boolean; needsRestart: boolean }>()).toMatchObject({
-      ok: true,
-      needsRestart: true,
-    });
-
-    const written = JSON.parse(readFileSync(configFile, 'utf8')) as Record<string, unknown>;
-    expect(written.$schema).toBe('https://opencode.ai/config.json');
-    expect(written.model).toBe('anthropic/claude-sonnet-4');
-    expect(written.permission).toEqual({ edit: 'deny' });
-    expect((written.experimental as Record<string, unknown>).policies).toEqual([
-      { effect: 'deny' },
-    ]);
-
-    const after = await app.inject({ method: 'GET', url: '/api/provider-hooks' });
-    const next = after.json<ProviderHooksInfo>();
-    expect(next.present).toBe(true);
-    expect(next.fileEdited).toEqual([
+    expect(info.present).toBe(true);
+    expect(info.fileEdited).toEqual([
       {
         pattern: '*.ts',
         actions: [
@@ -140,7 +112,33 @@ describe('provider-hooks-routes: хуки провайдера ключом ко
         ],
       },
     ]);
-    expect(next.sessionCompleted).toEqual([{ command: ['notify-send', 'done'] }]);
+    expect(info.sessionCompleted).toEqual([{ command: ['notify-send', 'done'] }]);
+    expect(info.preservedExperimental.map((entry) => entry.key)).toEqual(['policies']);
+  });
+
+  it('запись запрещена: 409 write_disabled с причиной, файл байт-в-байт', async () => {
+    // `experimental.hook` исчез из справочника конфигурации OpenCode и из
+    // опубликованной схемы (2026-07-25) — панель перестала его писать. Это НЕ
+    // ошибка формата: файл в полном порядке, поэтому 409, а не 422.
+    const before = JSON.stringify({ model: 'anthropic/claude-sonnet-4' }, null, 2);
+    writeFileSync(configFile, before);
+    await boot('opencode');
+
+    const get = await app.inject({ method: 'GET', url: '/api/provider-hooks' });
+    const info = get.json<ProviderHooksInfo>();
+    expect(info.readOnly).toBe(true);
+    expect(info.writeDisabledReason).toContain('experimental.hook');
+    // Причина — не поломка файла, `error` обязан остаться пустым.
+    expect(info.error).toBeUndefined();
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/provider-hooks',
+      payload: { fileEdited: [], sessionCompleted: [{ command: ['notify-send', 'done'] }] },
+    });
+    expect(put.statusCode).toBe(409);
+    expect(put.json<{ error: string }>().error).toBe('write_disabled');
+    expect(readFileSync(configFile, 'utf8')).toBe(before);
   });
 
   it('кривой черновик → 400, файл не тронут', async () => {
@@ -161,22 +159,28 @@ describe('provider-hooks-routes: хуки провайдера ключом ко
     expect(readFileSync(configFile, 'utf8')).toBe(before);
   });
 
-  it('битый JSON: GET отдаёт readOnly, PUT 422, файл байт-в-байт', async () => {
+  it('битый JSON: GET отдаёт readOnly и ошибку файла, файл байт-в-байт', async () => {
     const before = '{ "experimental": ';
     writeFileSync(configFile, before);
     await boot('opencode');
 
     const get = await app.inject({ method: 'GET', url: '/api/provider-hooks' });
     expect(get.statusCode).toBe(200);
-    expect(get.json<ProviderHooksInfo>().readOnly).toBe(true);
+    const info = get.json<ProviderHooksInfo>();
+    expect(info.readOnly).toBe(true);
+    // Здесь причин две сразу: ключ снят с записи И файл не разобран. Обе честно
+    // видны, одна другую не подменяет.
+    expect(info.error).toBeTruthy();
+    expect(info.writeDisabledReason).toBeTruthy();
 
     const put = await app.inject({
       method: 'PUT',
       url: '/api/provider-hooks',
       payload: { fileEdited: [], sessionCompleted: [{ command: ['x'] }] },
     });
-    expect(put.statusCode).toBe(422);
-    expect(put.json<{ error: string }>().error).toBe('format_unrecognized');
+    // Отказ по снятому ключу срабатывает ДО чтения файла — 409 (422 на непонятом
+    // файле по-прежнему проверен в тестах домена, где ключ не заперт).
+    expect(put.statusCode).toBe(409);
     expect(readFileSync(configFile, 'utf8')).toBe(before);
   });
 });

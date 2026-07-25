@@ -96,13 +96,19 @@ describe('provider-projects: резолв цели по провайдеру', (
       backupPrefix: 'opencode-project-',
     });
     // CURSOR-1: у Cursor проектные правила — КАТАЛОГ `.cursor/rules/*.mdc`.
-    expect(sections('cursor')).toEqual(['instructionsRules', 'mcp']);
+    // CURSOR-2: плюс проектные права `<проект>/.cursor/cli.json` (имя файла
+    // ДРУГОЕ, чем у глобального `cli-config.json`).
+    expect(sections('cursor')).toEqual(['instructionsRules', 'mcp', 'permissions']);
     const cursor = resolveProviderProjectTarget(fakeStore('cursor'), root)!;
     expect(cursor.instructionsRules).toMatchObject({
       format: 'cursor-mdc',
       scope: 'project',
       rulesDir: join(resolve(root), '.cursor', 'rules'),
       backupPrefix: 'cursor-project-',
+    });
+    expect(cursor.permissions).toMatchObject({
+      format: 'cursor-json',
+      filePath: join(resolve(root), '.cursor', 'cli.json'),
     });
     // AIDER-4: у Aider инструкции — СПИСОК ссылок `read`, плюс `set-env`; оба
     // раздела живут в одном `<проект>/.aider.conf.yml`.

@@ -71,12 +71,43 @@ export const en: TranslationSchema = {
     projects: 'Projects',
     groups: 'Groups',
     history: 'Change history',
+    compare: 'Comparison',
     settings: 'Settings',
     help: 'Help',
     sectionMain: 'Main',
     sectionBehavior: 'Claude behaviour',
     sectionIntegrations: 'Integrations and access',
     sectionApp: 'Application',
+  },
+  providerCompare: {
+    title: 'Configuration comparison',
+    subtitle: 'What one CLI has and the other does not — and how to move it across',
+    left: 'Left',
+    right: 'Right',
+    swap: 'Swap the sides',
+    samePair: 'Pick two different providers',
+    empty: 'Neither side has anything here',
+    incomparable: 'different models',
+    opaque: 'The value is secret — only presence was checked',
+    loadError: 'The comparison failed to load',
+    loadErrorText: 'The panel could not read the configurations. Check that the server is running.',
+    toRight: 'Move into {{name}}',
+    toLeft: 'Move into {{name}}',
+    migrateDone: 'Entries moved: {{count}}',
+    migrateNothing: 'There turned out to be nothing to move',
+    migrateError: 'The transfer failed',
+    section: {
+      mcp: 'MCP servers',
+      env: 'Environment variables',
+      permissions: 'Permissions',
+      instructions: 'Global instructions',
+    },
+    state: {
+      same: 'identical',
+      differs: 'differs',
+      'left-only': 'left only',
+      'right-only': 'right only',
+    },
   },
   providers: {
     inDevelopment: 'in development',
@@ -618,7 +649,9 @@ export const en: TranslationSchema = {
     explain:
       '{{provider}} organises hooks differently from Claude: they live in the experimental.hook key of {{filePath}}. There are exactly two events. "File edited" (file_edited) maps a file pattern to a list of actions: edit a file matching the pattern and the actions run. "Session completed" (session_completed) is simply a list of actions to run when work finishes. A command is given as a LIST OF ARGUMENTS, not a shell string: the program first, then its arguments one per field - so spaces inside an argument are safe. The panel edits only this key: the rest of the file, other experimental keys and unknown events stay put, and a backup is made before writing. Changes take effect after the CLI restarts.',
     experimentalNote:
-      'This is an experimental feature of {{provider}} itself, not of the panel: the key lives under experimental, which OpenCode declares unstable - it may change or be removed without notice. On top of that, the current configuration documentation page does not mention hooks at all, and the published configuration schema has no hook key. The format comes from the hooks documentation; verify it against your CLI version.',
+      'The key lived under experimental, which {{provider}} declares unstable - and that is exactly what happened: as of 25 July 2026 experimental.hook is gone from both the configuration reference and the published schema, and experimental itself is closed to unknown keys there. The panel no longer writes it and only shows what is already in the file.',
+    writeDisabledHint:
+      'The documented way to attach an action to an event is now plugins alone: the "Plugins" section manages both the file directory and the npm package list. Hooks already written are left alone - they stay in the file as they are and can still be edited by hand.',
     filePath: 'Configuration file:',
     absent: 'no hooks in the file yet',
     readOnly:
@@ -659,6 +692,23 @@ export const en: TranslationSchema = {
       title: 'The panel does not touch these',
       text: 'Entries the panel does not manage: unknown events inside hook and other experimental keys. They stay in the file as is and are shown read-only.',
     },
+    rules: {
+      explain:
+        'For {{provider}} a hook is a rule: an event, an optional matcher, a shell command and a timeout. The rules live in {{filePath}}; the event list comes from the CLI documentation and is offered in the dropdown. The matcher is a regular expression over the event target (a tool name, for instance) and exists only for events that support one - the others would silently ignore it, so the panel does not show the field there. The command is run by a shell, as a single line. The panel manages only rules of the shape it knows: an event it could not parse is shown separately and stays in the file untouched. A backup is made before writing, and changes take effect after the CLI restarts.',
+      title: 'Rules',
+      hint: 'Event, optional matcher, command and timeout. An empty list removes the hooks section from the file entirely.',
+      event: 'Event',
+      matcher: 'Matcher (regular expression)',
+      command: 'Shell command',
+      timeoutMs: 'Timeout, ms (default {{default}})',
+      timeoutSec: 'Timeout, s ({{min}}-{{max}}, default {{default}})',
+      add: 'Add rule',
+      empty: 'No rules yet: add the first one and the command will run on the chosen event.',
+      disabledAll:
+        'The file has disableAllHooks: true - the CLI will run no hook at all while that key is on. The panel does not change it: it is the master switch for the whole section and turning it off should be a deliberate act.',
+      preservedText:
+        'Events whose shape the panel could not parse (several actions in a group, an action that is not of type command, foreign fields). They stay in the file as is and are shown read-only.',
+    },
   },
   providerPlugins: {
     title: 'Plugins · {{provider}}',
@@ -670,6 +720,20 @@ export const en: TranslationSchema = {
     dirMissing: 'the directory does not exist yet - it will be created when a file is saved',
     dirUnreadable:
       'Directory {{path}} cannot be read - file management is unavailable, writing is disabled for safety.',
+    installed: {
+      explain:
+        'For {{provider}} a plugin is a ready-made package: it brings skills, MCP servers, hooks and slash commands. What is installed lives in {{pluginsDir}}, each plugin with its own JSON manifest. The panel shows the list and what each plugin brings, but changes NOTHING there: plugins are installed, enabled and disabled with the /plugins command inside the CLI itself, and the shape of the installed-plugins registry is not documented - the panel will not write into it blind.',
+      readOnly:
+        'This section is for viewing only: install, enable and disable plugins with the /plugins command inside the CLI.',
+      empty: 'No plugins installed.',
+      broken: 'manifest unreadable',
+      skills: 'brings skills',
+      sessionSkill: 'session-start skill: {{skill}}',
+      mcp: 'MCP servers: {{list}}',
+      hooks: 'hook rules: {{count}}',
+      commands: 'adds commands',
+      registry: 'Installed-plugins registry: {{path}} - the panel never writes it.',
+    },
     ignoredTitle: 'The panel does not manage these files',
     ignoredExplain:
       'The panel edits only .js, .ts and .mjs. Anything else in the directory is listed but never touched.',
@@ -865,6 +929,168 @@ export const en: TranslationSchema = {
         hint: 'One name per line. Listed tools are blocked; the blocklist wins over the allowlist. Blocking by list is less reliable than allowing: a tool added in a future CLI release becomes available automatically.',
       },
     },
+    // Qwen Code permission model: tools.approvalMode plus three rule lists —
+    // permissions.allow / ask / deny.
+    qwen: {
+      subtitle: '{{provider}} approval mode and access rules',
+      explain:
+        '{{provider}} permissions live in {{fileName}}: the approval mode tools.approvalMode and three rule lists — permissions.allow (run without asking), permissions.ask (always confirm) and permissions.deny (block). Deny wins over the rest: a deny rule holds even in autonomous modes. A rule is written as a tool with an optional specifier in parentheses, e.g. Bash(git push *) or Read(/src/**). The panel edits these keys only; MCP servers, the model and every other setting in the file stay untouched. Changes apply after restarting the CLI.',
+      usingDefaults:
+        'The keys are not set in the file yet — Qwen Code defaults are shown. They are written only after you save.',
+      mode: {
+        label: 'Approval mode (tools.approvalMode)',
+        default: {
+          label: 'default — ask every time (default)',
+          description:
+            'The default: the CLI asks for confirmation before every action — both file edits and shell commands. The most controlled mode.',
+        },
+        plan: {
+          label: 'plan — read and plan only',
+          description:
+            'The CLI executes nothing: it only analyses the code and proposes a plan. The safest mode — good for exploring an unfamiliar codebase.',
+        },
+        'auto-edit': {
+          label: 'auto-edit — file edits without asking',
+          description:
+            'File edits are applied automatically, shell commands still require confirmation. Faster to work with, but files change without your consent — keep the project under version control.',
+        },
+        auto: {
+          label: 'auto — autonomous mode',
+          description:
+            'The CLI works autonomously and decides what to run. Hard rules from the deny list still apply — they are your safety net in this mode.',
+        },
+        yolo: {
+          label: 'yolo — approve everything (dangerous)',
+          description:
+            'DANGEROUS: EVERYTHING is approved, including shell commands and edits to any file. The model can run any command with your privileges. Enable it only in an isolated environment and for a task you fully trust.',
+        },
+      },
+      rulesPlaceholder: 'one rule per line, e.g. Bash(git status)',
+      allow: {
+        label: 'Allow without confirmation (permissions.allow)',
+        hint: 'One rule per line: Bash(git status), Read(/src/**). Listed rules run without asking. An overly broad rule (plain Bash, say) defeats the approval mode — narrow it down in parentheses. An empty list removes the key from the file.',
+      },
+      ask: {
+        label: 'Always ask (permissions.ask)',
+        hint: 'One rule per line. The CLI asks for confirmation for these, even when the mode is otherwise automatic. An empty list removes the key from the file.',
+      },
+      deny: {
+        label: 'Deny (permissions.deny)',
+        hint: 'One rule per line. Deny wins over the other lists and holds in every mode, including auto and yolo. An empty list removes the key from the file.',
+      },
+    },
+    // Continue permission model: three lists (allow / ask / exclude) in a separate
+    // permissions.yaml. Continue has no approval-mode switch at all.
+    continue: {
+      subtitle: '{{provider}} tool permission rules',
+      explain:
+        '{{provider}} permissions live in a separate file, {{fileName}}, and consist of three lists: allow — the tool runs straight away, ask — the CLI asks for confirmation, exclude — the tool is hidden from the agent entirely. There is no approval-mode switch like other CLIs have: the lists are the whole model. A rule is a tool name, optionally narrowed in parentheses: Bash, Read(*), Write and so on. By default reads are allowed while writes and shell commands are asked about; in headless mode (cn -p) tools under ask are unavailable — there is nobody to confirm. The panel edits these three keys only; comments and the rest of the file are preserved.',
+      usingDefaults:
+        'The permissions file does not exist yet — Continue defaults are shown. It is created only when you save.',
+      rulesPlaceholder: 'one rule per line, e.g. Read(*)',
+      allow: {
+        label: 'Allow without confirmation (allow)',
+        hint: 'One rule per line: Bash, Read(*), Write. Listed tools run straight away. An empty list removes the key from the file.',
+      },
+      ask: {
+        label: 'Ask for confirmation (ask)',
+        hint: 'One rule per line. The CLI asks before every call. Note: in headless mode (cn -p) such tools are unavailable altogether — there is nobody to confirm.',
+      },
+      exclude: {
+        label: 'Hide the tool (exclude)',
+        hint: 'One rule per line. The tool is not shown to the agent at all — it does not know it exists. The strictest of the three lists.',
+      },
+    },
+    // Cursor permission model: two lists allow/deny under permissions, no mode.
+    cursor: {
+      subtitle: '{{provider}} allow and deny rules',
+      explain:
+        '{{provider}} permissions are the permissions key in {{fileName}} and exactly two lists: allow — the action runs without asking, deny — it is blocked. Cursor has no mode switch and no "ask" list: anything in neither list the CLI asks about itself. Deny beats allow: a rule present in both lists is denied. Rule forms are Shell(command), Read(path), Write(path), WebFetch(domain), Mcp(server:tool); globs *, ** and ? are allowed inside. The panel edits only the permissions key — the version, editor settings and everything else in the same file stay untouched.',
+      usingDefaults:
+        'The permissions key is not set in the file — Cursor asks for confirmation on its own. The panel writes nothing until you save the lists.',
+      rulesPlaceholder: 'one rule per line, e.g. Shell(git status)',
+      ruleKinds: 'Documented rule forms: {{kinds}}',
+      allow: {
+        label: 'Allow without confirmation (allow)',
+        hint: 'One rule per line: Shell(git status), Read(src/**), Write(docs/**). Listed actions run immediately. An empty list removes the key from the file.',
+      },
+      deny: {
+        label: 'Deny (deny)',
+        hint: 'One rule per line. Deny beats allow: a rule present in both lists counts as denied. This is the place for the irreversible — Shell(rm -rf*), Write(.env).',
+      },
+    },
+    // Goose permission model: a single root key GOOSE_MODE, no lists at all.
+    goose: {
+      subtitle: '{{provider}} approval mode',
+      explain:
+        '{{provider}} permissions are a single GOOSE_MODE key in {{fileName}}. Goose has no rule lists: the mode alone decides what the CLI does with tool calls. auto — run everything without asking (this is how non-interactive and scheduled sessions go), approve — decide by the configured tool permissions, smart_approve — auto-approve calls judged safe and ask about the rest, chat — never run tools at all, conversation only. The panel edits exactly that key: extensions, provider, model and comments of the same file stay untouched. Per-tool permissions live separately (permission.yaml) and the panel does not manage them. Changes take effect after the CLI restarts.',
+      usingDefaults:
+        'The GOOSE_MODE key is not set in the file — the default mode is shown. The panel writes nothing until you pick a mode and save.',
+      mode: {
+        label: 'Approval mode (GOOSE_MODE)',
+        auto: {
+          label: 'auto — no questions',
+          description:
+            'Goose runs commands and edits files without asking. Fast and dangerous: in this mode the agent can run any command as you.',
+        },
+        approve: {
+          label: 'approve — configured permissions only',
+          description:
+            'Decisions come from the configured tool permissions; automatic "is this safe" detection is not used.',
+        },
+        smart_approve: {
+          label: 'smart_approve — smart approval',
+          description:
+            'Calls judged safe (read-only) are approved automatically; everything else goes to confirmation.',
+        },
+        chat: {
+          label: 'chat — no tools',
+          description: 'Tools are never run: plain conversation only. The strictest mode.',
+        },
+      },
+    },
+    // Kimi Code permission model: the default_permission_mode key plus an ORDERED
+    // array of [[permission.rules]] (decision + pattern) in config.toml.
+    kimi: {
+      subtitle: '{{provider}} approval mode and tool rules',
+      explain:
+        '{{provider}} permissions live in {{fileName}} and have two parts. The default_permission_mode key sets the baseline: manual — ask before every action, auto — the agent decides by the rules, yolo — never ask. The [[permission.rules]] entries refine the mode for individual tools: a pattern (Read, Bash(git push*), mcp__server__tool) and a decision of allow / ask / deny. Rule order matters — they are checked top to bottom, so keep specific rules above general ones. The panel edits only those two places: models, providers, hooks and MCP timeouts of the same file stay untouched, and a backup is made before each write. Changes apply after restarting the CLI.',
+      usingDefaults:
+        'Neither a mode nor any rules are set in the file — the default mode (manual) is shown. The panel writes nothing until you save.',
+      mode: {
+        label: 'Approval mode (default_permission_mode)',
+        manual: {
+          label: 'manual — always ask',
+          description:
+            'Kimi asks for confirmation before every action. The strictest and most predictable mode — a good place to start.',
+        },
+        auto: {
+          label: 'auto — the agent decides',
+          description:
+            'The agent acts on its own, guided by the rules below: whatever no rule blocks runs without asking. A reasonable trade-off if the rules are set carefully.',
+        },
+        yolo: {
+          label: 'yolo — never ask (dangerous)',
+          description:
+            'DANGEROUS: nothing is confirmed, including shell commands and edits to any file. The agent can run any command as you. Isolated environments only.',
+        },
+      },
+      rules: {
+        title: 'Tool rules ([[permission.rules]])',
+        hint: 'Checked top to bottom: the first matching rule wins. Keep specific rules above general ones. A pattern is a tool name, optionally narrowed by an argument in brackets: Read, Bash(git push*), mcp__server__tool. Empty rows are dropped on save; an empty list removes the whole rules block from the file.',
+        pattern: 'Tool pattern',
+        placeholder: 'e.g. Bash(rm -rf*)',
+        decision: 'Decision',
+        add: 'Add rule',
+        moveUp: 'Move up',
+        moveDown: 'Move down',
+      },
+      decision: {
+        allow: { label: 'allow — permit' },
+        ask: { label: 'ask — confirm' },
+        deny: { label: 'deny — block' },
+      },
+    },
     // OpenCode permission model: the `permission` key — a level per tool, plus a
     // command pattern list for bash.
     opencode: {
@@ -968,6 +1194,12 @@ export const en: TranslationSchema = {
       codex:
         'Install the Codex CLI and run "codex login" (sign in to your OpenAI account/subscription).',
       gemini: 'Run "gemini" and complete the Google sign-in in the browser when prompted.',
+      qwen: 'Run "qwen" and pick a sign-in method when prompted (Alibaba ModelStudio via OAuth, or a third-party API key).',
+      continue:
+        'Install the Continue CLI ("npm i -g @continuedev/cli") and run "cn login" to sign in to your Continue account; an Anthropic key works as a fallback.',
+      goose:
+        'Install Goose ("goose" in PATH) and run "goose configure" — the provider and its key are set up inside Goose itself.',
+      kimi: 'Install Kimi Code ("kimi" in PATH) and run "kimi login", or set a Moonshot key (KIMI_API_KEY / MOONSHOT_API_KEY).',
       opencode: 'Install OpenCode and configure sign-in/provider with "opencode auth login".',
       aider: 'Install Aider and configure model access per its documentation.',
     },
@@ -1000,6 +1232,11 @@ export const en: TranslationSchema = {
     mode: {
       cli: 'via CLI (subscription)',
       api: 'via API',
+    },
+    // How the CLI ran: a process per question, or a local server session.
+    transport: {
+      'one-shot': 'one-shot run',
+      session: 'CLI session',
     },
     reason: {
       cli_error: 'The provider CLI exited with an error.',
@@ -1229,6 +1466,10 @@ export const en: TranslationSchema = {
     safety: 'Edit safety',
     backupBeforeWrite: 'Back up before writing',
     backupHint: 'A copy is stored in claude-control/backups',
+    previewProviderWrites: 'Show a diff before writing to another CLI',
+    previewProviderWritesHint:
+      'Before saving into a Codex, Gemini or other config the panel shows exactly what ' +
+      'will land in the file. Claude has no preview: its sections are the panel’s own and verified.',
     backupKeep: 'How many copies to keep',
     backupKeepHint:
       'Rotation depth: more means further rollback, fewer means fewer copies (incl. secrets) on disk',
@@ -1239,28 +1480,6 @@ export const en: TranslationSchema = {
     transferImport: 'Load snapshot',
     transferImported: 'Panel settings imported',
     transferImportError: 'Could not read the settings file',
-    bundleTitle: 'Configuration bundle',
-    bundleHint:
-      'Rules, skills and hooks in a single file to move to another machine or share. Unlike the panel-settings transfer above, this is your real Claude Code files: importing changes the live configuration.',
-    bundleExport: 'Download bundle',
-    bundleImport: 'Import bundle',
-    bundleParseError: 'Could not read the bundle file',
-    bundlePreviewTitle: 'Import configuration bundle',
-    bundlePreviewDesc: 'Review what is inside and pick a mode. Changes affect real files.',
-    bundleRulesCount: 'Rule lines: {{count}}',
-    bundleSkillsCount: 'Skills: {{count}}',
-    bundleHooksCount: 'Hooks: {{count}}',
-    bundleRulesModeLabel: 'What to do with rules',
-    bundleRulesModeHint:
-      'Append — add a block to the end of CLAUDE.md, leaving existing content intact. Replace — rewrite the whole file (with a backup). Skip — leave rules unchanged.',
-    bundleRulesMode_append: 'Append to the end',
-    bundleRulesMode_replace: 'Replace entirely',
-    bundleRulesMode_skip: 'Skip',
-    bundleOverwriteSkills: 'Overwrite existing skills',
-    bundleOverwriteSkillsHint:
-      'By default a skill with the same name is left untouched. Enable to replace it with the bundle files (with a backup).',
-    bundleApply: 'Apply',
-    bundleApplied: 'Bundle applied: {{skills}} skills, {{hooks}} hooks',
     watchFiles: 'Watch files for changes',
     watchHint: 'Refresh the interface when configs are edited outside the app',
     revealSecrets: 'Reveal secrets by default',
@@ -1409,6 +1628,107 @@ export const en: TranslationSchema = {
     scaffoldCreate: 'Create plugin',
     scaffoldDone: 'Plugin skeleton created',
   },
+  models: {
+    title: 'Provider models',
+    hint:
+      'The panel asks the provider what models it has — no more than once a day. ' +
+      'A newly released one shows up here and in the model picker without updating ' +
+      'the panel itself.',
+    refresh: 'Refresh',
+    unsupported:
+      'This provider has no model catalog: it runs on top of any model, and the ' +
+      'panel will not decide for you whose list to show.',
+    autoUpdate: 'Update the model list automatically',
+    autoUpdateHint:
+      'Ask the catalog once a day and, when a concrete model is set as the default, ' +
+      'move it to the newer generation of the same family.',
+    source: 'Source: models.dev ({{vendors}}), updated {{date}}',
+    noSource: 'The catalog has never been downloaded — press “Refresh”.',
+    stale: 'older than a day',
+    new: 'new',
+    context: 'context {{value}}',
+    isDefault: 'default',
+    makeDefault: 'Make default',
+    showAll: 'Show all ({{count}})',
+    empty: 'The catalog is empty: the source did not answer and there is no earlier data.',
+    promoted: 'Default model updated: {{from}} → {{to}}',
+  },
+  formatCheck: {
+    title: 'Format check against schemas',
+    hint:
+      'The panel writes other CLIs’ configuration from their documentation, and ' +
+      'documentation drifts with releases. This check asks the reverse question: are the ' +
+      'keys the panel actually edits still present in that CLI’s officially published ' +
+      'schema? A mismatch breaks nothing — it is a reason to look with your own eyes.',
+    run: 'Check now',
+    checkedAt: 'Checked {{date}}',
+    stale: 'data older than a week',
+    never: 'The check has never run — press “Check now”.',
+    drifted: 'mismatches: {{count}}',
+    doneOk: 'Every managed key is in place.',
+    doneDrift: 'Mismatches against the schema: {{count}} — see the list.',
+    error: 'The check failed: schemas could not be downloaded.',
+    keyPresent: '{{path}} — present in the schema',
+    keyMissing: '{{path}} — NOT found in the schema',
+    state: {
+      ok: 'matches',
+      drift: 'mismatch',
+      'no-schema': 'no schema',
+      unavailable: 'not checked',
+    },
+  },
+  writePreview: {
+    title: 'What will be written',
+    loading: 'Computing the changes…',
+    error:
+      'The server refused the preview — it would refuse the write for the same reason. ' +
+      'The write was cancelled and the file is untouched.',
+    summary: 'Changes: +{{added}} / −{{removed}}',
+    willCreate: 'The file does not exist yet — the write will create it.',
+    unchanged: 'Nothing will change: the file already holds exactly this.',
+    truncated: 'The file is too large for a line-by-line comparison — no diff was built.',
+    confirm: 'Write',
+  },
+  providerCheck: {
+    title: 'Provider check: {{name}}',
+    hint:
+      'The panel runs a short checklist right here: finds the CLI and the config ' +
+      'files, performs a read-write-read round trip for every supported section ' +
+      'and asks the assistant for one reply. Writing happens on a TEMPORARY COPY ' +
+      'of the configuration — your files are not modified.',
+    run: 'Run check',
+    withAssistant: 'Launch the assistant',
+    withAssistantHint:
+      'One short request to the provider model: spends your subscription or key. ' +
+      'Without it the check stays partial — the channel to the model is unconfirmed.',
+    never: 'This provider has not been checked here yet.',
+    lastRun: 'Last check {{date}} — {{passed}} of {{total}} passed',
+    doneVerified: 'Check passed: the provider works on this machine.',
+    donePartial: 'Check passed partially — see the step list.',
+    doneFailed: 'Check failed: some steps did not pass.',
+    error: 'The check could not be run.',
+    badgeWithName: '{{name}}: {{state}}',
+    badge: {
+      verified: 'verified here',
+      partial: 'partially verified',
+      failed: 'check failed',
+    },
+    status: {
+      pass: 'ok',
+      warn: 'warning',
+      fail: 'failed',
+      skipped: 'skipped',
+    },
+    step: {
+      cli: 'CLI in PATH',
+      config: 'Configuration files',
+      mcp: 'Round trip: MCP servers',
+      permissions: 'Round trip: permissions',
+      env: 'Round trip: environment variables',
+      instructions: 'Round trip: global instructions',
+      assistant: 'Assistant launch',
+    },
+  },
   analytics: {
     title: 'Analytics',
     subtitle: 'Token spend, sessions and running agents — from local transcripts',
@@ -1533,8 +1853,50 @@ export const en: TranslationSchema = {
     stop: 'Stop',
     starting: 'Starting…',
     open: 'Open',
-    notRunnable: 'No dev or start script and no run-command override set',
+    notRunnable: 'No dev or start script and no run command set',
     failed: 'Failed to start the project dev server',
+    autostart: 'Autostart',
+    settings: 'Run settings',
+    targets: 'What to run',
+    root: 'root',
+    chooseTarget: 'Pick what to run',
+    sourceSingle: 'A single package: the project root itself is what runs',
+    sourcePnpm: 'Packages taken from pnpm-workspace.yaml',
+    sourceNpm: 'Packages taken from workspaces in package.json',
+    sourceScan: 'No workspace file — the panel looked into apps/, packages/ and services/',
+    skipped: 'Not all of them fit the list: {{count}} more are hidden',
+    command: 'Command',
+    port: 'Port',
+    portAuto: 'from output',
+    portHint:
+      "Empty — the panel reads the port from the server's output, i.e. the one configured in the project. Fill it in if the server never prints an address",
+    portHintLast: 'Last run: port {{port}}. Empty — the panel reads the port from output again',
+    output: 'Process output',
+    saved: 'Run settings saved',
+    noAddress: 'address unknown',
+    noAddressHint:
+      'The server is running but never printed an address. Pin a port in the run settings and the link will appear',
+    portBusy: 'Port {{port}} is busy',
+    portOurs: 'started by the panel',
+    freePort: 'Free it and start',
+    portStillBusy: 'Port {{port}} is still busy — the process survived. Close it by hand',
+    note: "The panel does not assign the port: the app comes up on its own port and the panel reads the address from the output. Autostart is about the panel's NEXT start, and it opens no browser window",
+  },
+  git: {
+    title: 'Project git',
+    hint: 'Project git: currently {{branch}}',
+    branch: 'Branch',
+    detached: 'Detached HEAD',
+    noBranch: 'No branch',
+    clean: 'No changes',
+    dirty: 'Changed files: {{count}}',
+    newBranch: 'New branch',
+    newBranchPlaceholder: 'feature/name',
+    create: 'Create',
+    commit: 'Commit message',
+    commitPlaceholder: 'What was done',
+    commitAction: 'Commit',
+    note: 'A commit takes every change in the working tree. The panel does no merges, pushes or branch deletions',
   },
   projectConfig: {
     title: 'Projects — configuration',
@@ -1613,6 +1975,47 @@ export const en: TranslationSchema = {
     next: 'Next',
     back: 'Back',
     done: 'Done',
+  },
+  envTransfer: {
+    title: 'Environment transfer',
+    hint: "Any provider's configuration — instructions, rules, skills, hooks, MCP and permissions — leaves as a single archive and unpacks on another machine. Secrets are never packed: instead the panel lists what has to be entered by hand.",
+    activeBadge: 'active',
+    export: 'Export',
+    import: 'Import',
+    pickFolder: 'Where to save the archive',
+    pickFolderHint: 'Pick a folder — the archive lands there and the panel shows the full path.',
+    pickArchive: 'Choose an environment archive',
+    pickArchiveHint: 'Find the zip built by the panel on the other machine.',
+    previewTitle: 'What will leave: {{provider}}',
+    previewDesc: 'Before the archive is built you can see which files go in and what stays out.',
+    previewCount: 'Files: {{count}}, size before compression: {{size}}',
+    previewEmpty: 'Nothing to transfer: this provider has no configuration on disk.',
+    previewLocations: 'Taken from:',
+    locationMissing: 'not on disk',
+    chooseFolder: 'Pick a folder and save',
+    doneTitle: 'Archive built',
+    doneDesc: 'Files inside: {{count}}',
+    donePath: 'The archive is here:',
+    checklistTitle: 'What you will have to enter by hand',
+    checklistHint:
+      'Tokens and keys are never packed. The archive contains a README you can hand to the assistant on the new machine so it lays everything out itself.',
+    checklistEmpty: 'Nothing: no secrets were found in the configuration.',
+    checklistReason_redacted: 'values replaced with the __REDACTED__ marker',
+    'checklistReason_env-file': 'environment variables',
+    'checklistReason_secret-file': 'a secrets file was not transferred',
+    planTitle: 'Unpack environment: {{provider}}',
+    planDesc:
+      'Built {{date}} on {{platform}}. Checked entries will be written, the rest stays as it is.',
+    planCounts: 'New: {{added}} · identical: {{same}} · will overwrite: {{differs}}',
+    planUnresolved: 'nowhere to put: {{count}}',
+    selectAll: 'Check all',
+    selectNone: 'Uncheck all',
+    applySelected: 'Write checked ({{count}})',
+    status_new: 'new',
+    status_same: 'identical',
+    status_differs: 'overwrites',
+    status_unresolved: 'no target',
+    importDone: 'Files written: {{count}}. Everything overwritten went into backups.',
   },
   folderPicker: {
     title: 'Choose a project folder',

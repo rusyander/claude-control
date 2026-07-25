@@ -49,8 +49,8 @@ describe('provider-permissions роуты: гейтинг по провайде�
     expect(res.json<{ error: string }>().error).toBe('section_unsupported');
   });
 
-  it('cursor и aider (permissions не заявлены) → 400 section_unsupported на всех методах', async () => {
-    for (const provider of ['cursor', 'aider']) {
+  it('aider (permissions не заявлены) → 400 section_unsupported на всех методах', async () => {
+    for (const provider of ['aider']) {
       await bootWith(provider);
       for (const m of [
         { method: 'GET' as const, url: '/api/provider-permissions' },
@@ -82,6 +82,28 @@ describe('provider-permissions роуты: гейтинг по провайде�
       { approvalPolicy: 'never', sandboxMode: 'read-only' },
       { approvalMode: 'plan', coreTools: [], excludeTools: [] },
     ]) {
+      const res = await app.inject({ method: 'PUT', url: '/api/provider-permissions', payload });
+      expect(res.statusCode).toBe(400);
+      expect(res.json<{ error: string }>().error).toBe('invalid_draft');
+    }
+  });
+
+  // CURSOR-2: у cursor раздел стал ready, модель ВОСЬМАЯ — два списка без режима;
+  // codex- и gemini-черновики в неё не подходят и обязаны быть отклонены до записи.
+  it('cursor (permissions=ready) → GET 200 с моделью cursor; чужой черновик → 400', async () => {
+    await bootWith('cursor');
+    const info = await app.inject({ method: 'GET', url: '/api/provider-permissions' });
+    expect(info.statusCode).toBe(200);
+    const body = info.json<{ kind: string; ruleKinds: string[]; filePath: string }>();
+    expect(body.kind).toBe('cursor');
+    expect(body.ruleKinds).toEqual(['Shell', 'Read', 'Write', 'WebFetch', 'Mcp']);
+    expect(body.filePath.endsWith('cli-config.json')).toBe(true);
+
+    // Черновик со списком-СТРОКОЙ (а не массивом) отклоняется до записи. Payload
+    // без списков вовсе сюда не годится: у модели Cursor нет обязательных полей,
+    // и пустой черновик — законное «снять все правила», то есть НАСТОЯЩАЯ запись
+    // в файл пользователя (файл провайдера глобален, HOME здесь не подменён).
+    for (const payload of [{ allow: 'Shell(ls)' }, { deny: [42] }]) {
       const res = await app.inject({ method: 'PUT', url: '/api/provider-permissions', payload });
       expect(res.statusCode).toBe(400);
       expect(res.json<{ error: string }>().error).toBe('invalid_draft');

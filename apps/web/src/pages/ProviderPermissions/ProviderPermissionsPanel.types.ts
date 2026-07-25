@@ -1,7 +1,12 @@
 import type {
   CodexPermissionInfo,
+  ContinuePermissionInfo,
+  CursorPermissionInfo,
   GeminiPermissionInfo,
+  GoosePermissionInfo,
+  KimiPermissionInfo,
   OpencodePermissionInfo,
+  QwenPermissionInfo,
 } from '@claude-control/contracts';
 import type { useSaveProviderPermissions } from '@entities/ProviderPermissions';
 
@@ -17,6 +22,36 @@ export interface CodexPermissionsPanelProps {
 /** Панель прав Gemini: режим аппрувов + белый и чёрный списки инструментов. */
 export interface GeminiPermissionsPanelProps {
   data: GeminiPermissionInfo;
+  save: SavePermissionsMutation;
+}
+
+/** Панель прав Qwen Code: режим аппрувов + три списка правил `permissions.*`. */
+export interface QwenPermissionsPanelProps {
+  data: QwenPermissionInfo;
+  save: SavePermissionsMutation;
+}
+
+/** Панель прав Continue: три списка `permissions.yaml`, режима нет. */
+export interface ContinuePermissionsPanelProps {
+  data: ContinuePermissionInfo;
+  save: SavePermissionsMutation;
+}
+
+/** Панель прав Cursor: два списка `permissions.allow`/`deny`, режима нет. */
+export interface CursorPermissionsPanelProps {
+  data: CursorPermissionInfo;
+  save: SavePermissionsMutation;
+}
+
+/** Панель прав Goose: один режим `GOOSE_MODE` в config.yaml, списков нет. */
+export interface GoosePermissionsPanelProps {
+  data: GoosePermissionInfo;
+  save: SavePermissionsMutation;
+}
+
+/** Панель прав Kimi Code: режим `default_permission_mode` + правила `[[permission.rules]]`. */
+export interface KimiPermissionsPanelProps {
+  data: KimiPermissionInfo;
   save: SavePermissionsMutation;
 }
 

@@ -11,6 +11,7 @@ import { ExplainBox } from '@shared/ui/explain-box';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { DeleteButton } from '@features/EntityDelete';
 import { useProviderEnv, useSaveProviderEnv } from '@entities/ProviderEnv';
+import { useWritePreview } from '@features/WritePreview';
 import { ProviderEnvForm } from './ProviderEnvForm';
 
 /**
@@ -25,6 +26,16 @@ export function ProviderEnvPage() {
   const { t } = useTranslation();
   const { data, isLoading } = useProviderEnv();
   const save = useSaveProviderEnv();
+  const { ask, dialog } = useWritePreview();
+
+  // Запись в чужой .env/TOML/YAML идёт через предпросмотр: показываем дифф и
+  // пишем только после подтверждения (для Claude и при выключенной настройке
+  // обёртка вызывает запись сразу).
+  const saveWithPreview = (next: ProviderEnvVar[], onDone?: () => void): void => {
+    ask({ section: 'env', draft: { vars: next } }, () =>
+      save.mutate(next, onDone ? { onSuccess: onDone } : undefined),
+    );
+  };
 
   const [editing, setEditing] = useState<ProviderEnvVar | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -50,11 +61,11 @@ export function ProviderEnvPage() {
     const next = editing
       ? vars.map((item) => (item.key === editing.key ? draft : item))
       : [...vars, draft];
-    save.mutate(next, { onSuccess: () => setIsFormOpen(false) });
+    saveWithPreview(next, () => setIsFormOpen(false));
   };
 
   const remove = (item: ProviderEnvVar): void => {
-    save.mutate(vars.filter((v) => v.key !== item.key));
+    saveWithPreview(vars.filter((v) => v.key !== item.key));
   };
 
   return (
@@ -161,6 +172,8 @@ export function ProviderEnvPage() {
         onSubmit={submit}
         isPending={save.isPending}
       />
+
+      {dialog}
     </Stack>
   );
 }

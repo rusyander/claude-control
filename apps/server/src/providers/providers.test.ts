@@ -24,7 +24,18 @@ function fakeStore(provider: string): SettingsSource {
 const expectedClaudeCommand = process.platform === 'win32' ? 'claude.cmd' : 'claude';
 
 /** Провайдеры, которые обязаны быть в реестре на этой фазе. */
-const EXPECTED_IDS = ['claude', 'codex', 'gemini', 'cursor', 'opencode', 'aider'];
+const EXPECTED_IDS = [
+  'claude',
+  'codex',
+  'gemini',
+  'qwen',
+  'continue',
+  'goose',
+  'kimi',
+  'cursor',
+  'opencode',
+  'aider',
+];
 
 /** Все ли ключи карты имеют один статус. */
 function allStatus(map: CapabilityMap, status: string): boolean {
@@ -32,7 +43,7 @@ function allStatus(map: CapabilityMap, status: string): boolean {
 }
 
 describe('реестр провайдеров', () => {
-  it('содержит 6 провайдеров, claude первым', () => {
+  it('содержит 10 провайдеров, claude первым', () => {
     const ids = listProviders().map((provider) => provider.id);
     expect(ids).toEqual(EXPECTED_IDS);
     expect(ids[0]).toBe('claude');
@@ -134,7 +145,7 @@ describe('реестр провайдеров', () => {
         relativePath: 'opencode.json',
       },
       // OPENCODE-5: скиллы проекта — каталог `.opencode/skills`.
-      skills: { format: 'opencode-skills', relativeDir: '.opencode/skills' },
+      skills: { format: 'skill-md-dir', relativeDir: '.opencode/skills' },
     });
     // AIDER-4: конфиг ищется в домашнем каталоге, в КОРНЕ GIT-РЕПОЗИТОРИЯ и в
     // текущем каталоге → `<проект>/.aider.conf.yml` задокументирован. Инструкции
@@ -145,12 +156,23 @@ describe('реестр провайдеров', () => {
     });
     expect(claudeProvider.projectConfig).toBeUndefined();
     // Все проектные пути — относительные и без выхода за пределы проекта.
-    for (const id of ['codex', 'gemini', 'cursor', 'opencode', 'aider']) {
+    for (const id of [
+      'codex',
+      'gemini',
+      'qwen',
+      'continue',
+      'goose',
+      'kimi',
+      'cursor',
+      'opencode',
+      'aider',
+    ]) {
       const config = getProvider(id).projectConfig;
       expect(getProvider(id).capabilities.projects, id).toBe('ready');
       for (const relative of [
         config?.instructions,
         config?.instructionsList?.relativePath,
+        config?.instructionsRules?.relativeDir,
         config?.mcp?.relativePath,
         config?.env?.relativePath,
         config?.permissions?.relativePath,
@@ -163,6 +185,216 @@ describe('реестр провайдеров', () => {
         expect(relative.includes('..'), id).toBe(false);
       }
     }
+  });
+
+  // Qwen Code — форк Gemini CLI. Тест фиксирует ровно то, что подтверждено
+  // документацией: совпадающую структуру каталога и РАЗОШЕДШИЙСЯ формат прав.
+  it('qwen: пути и возможности форка Gemini, права — свой формат qwen-json', () => {
+    const provider = getProvider('qwen');
+    expect(provider.name).toBe('Qwen Code');
+    expect(provider.status).toBe('experimental');
+    expect(provider.cli.command).toBe('qwen');
+
+    const home = join(homedir(), '.qwen');
+    expect(provider.instructionsFile?.()).toBe(join(home, 'QWEN.md'));
+    expect(provider.mcpConfig).toMatchObject({ format: 'json' });
+    expect(provider.mcpConfig?.path()).toBe(join(home, 'settings.json'));
+    // Адрес удалённого сервера — как у Gemini, ключ по умолчанию (httpUrl).
+    expect(provider.mcpConfig?.jsonHttpUrlKey).toBeUndefined();
+    expect(provider.envConfig).toMatchObject({ format: 'dotenv' });
+    expect(provider.envConfig?.path()).toBe(join(home, '.env'));
+    // Права НЕ gemini-json: у форка другие ключи (tools.approvalMode + permissions.*).
+    expect(provider.permissionsConfig).toMatchObject({ format: 'qwen-json' });
+    expect(provider.permissionsConfig?.path()).toBe(join(home, 'settings.json'));
+
+    // Хуки (QWEN-1) — ключ `hooks` В ТОМ ЖЕ settings.json, что права и MCP.
+    expect(provider.hooksConfig).toMatchObject({ format: 'qwen-json' });
+    expect(provider.hooksConfig?.path()).toBe(join(home, 'settings.json'));
+    // Ключ живой: снятия с записи, как у OpenCode, здесь нет.
+    expect(provider.hooksConfig?.writeDisabledReason).toBeUndefined();
+    // Скиллы (QWEN-2) — каталог папок со SKILL.md.
+    expect(provider.skillsConfig).toMatchObject({ format: 'skill-md-dir' });
+    expect(provider.skillsConfig?.dir()).toBe(join(home, 'skills'));
+    // Плагинов у Qwen документация не описывает → раздела нет.
+    expect(provider.pluginsConfig).toBeUndefined();
+
+    expect(provider.projectConfig).toEqual({
+      instructions: 'QWEN.md',
+      mcp: { format: 'json', relativePath: '.qwen/settings.json' },
+      env: { format: 'dotenv', relativePath: '.qwen/.env' },
+      permissions: { format: 'qwen-json', relativePath: '.qwen/settings.json' },
+      hooks: { format: 'qwen-json', relativePath: '.qwen/settings.json' },
+      skills: { format: 'skill-md-dir', relativeDir: '.qwen/skills' },
+    });
+    expect(provider.configLocations?.()).toEqual([home]);
+
+    expect(CAPABILITIES.filter((cap) => provider.capabilities[cap] === 'ready').sort()).toEqual([
+      'chat',
+      'env',
+      'globalInstructions',
+      'hooks',
+      'mcp',
+      'permissions',
+      'projects',
+      'scripts',
+      'skills',
+    ]);
+  });
+
+  // Continue — единственный, у кого MCP и права лежат в РАЗНЫХ файлах одного
+  // каталога, а глобальных инструкций нет вовсе. Тест фиксирует и это отличие,
+  // и форматы, которых больше ни у кого нет (`continue-yaml`, `continue-md`).
+  it('continue: MCP и права в разных файлах, глобальных инструкций нет', () => {
+    const provider = getProvider('continue');
+    expect(provider.name).toBe('Continue');
+    expect(provider.status).toBe('experimental');
+    expect(provider.cli.command).toBe('cn');
+
+    const home = join(homedir(), '.continue');
+    // Глобальных инструкций нет ни в одной из трёх моделей — fail-closed.
+    expect(provider.instructionsFile).toBeUndefined();
+    expect(provider.instructionsList).toBeUndefined();
+    expect(provider.instructionsRules).toBeUndefined();
+    expect(provider.capabilities.globalInstructions).toBe('unsupported');
+
+    expect(provider.mcpConfig).toMatchObject({ format: 'continue-yaml' });
+    expect(provider.mcpConfig?.path()).toBe(join(home, 'config.yaml'));
+    // Права — ОТДЕЛЬНЫЙ файл, а не секция config.yaml.
+    expect(provider.permissionsConfig).toMatchObject({ format: 'continue-yaml' });
+    expect(provider.permissionsConfig?.path()).toBe(join(home, 'permissions.yaml'));
+    expect(provider.envConfig?.path()).toBe(join(home, '.env'));
+
+    expect(provider.projectConfig).toEqual({
+      // Правила проекта — каталог `.md`-файлов (у Cursor тот же раздел, но `.mdc`).
+      instructionsRules: { format: 'continue-md', relativeDir: '.continue/rules' },
+      mcp: { format: 'json', relativePath: '.continue/mcpServers/mcp.json' },
+      env: { format: 'dotenv', relativePath: '.continue/.env' },
+    });
+    expect(provider.configLocations?.()).toEqual([home]);
+
+    expect(CAPABILITIES.filter((cap) => provider.capabilities[cap] === 'ready').sort()).toEqual([
+      'chat',
+      'env',
+      'mcp',
+      'permissions',
+      'projects',
+      'scripts',
+    ]);
+  });
+
+  // Goose — единственный, у кого ОДИН файл держит и MCP, и права, а путь под
+  // Windows отличается не только разделителями (`%APPDATA%\Block\goose\config`).
+  // Переменных окружения панель ему не ведёт: секреты Goose держит в связке
+  // ключей ОС и `secrets.yaml`, вести их панелью нельзя.
+  it('goose: один config.yaml на MCP и права, env — unsupported', () => {
+    const provider = getProvider('goose');
+    expect(provider.name).toBe('Goose');
+    expect(provider.status).toBe('experimental');
+    expect(provider.cli.command).toBe('goose');
+
+    // Путь считается по ОС: тест проверяет ту ветку, на которой идёт прогон.
+    const home =
+      process.platform === 'win32'
+        ? join(
+            process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'),
+            'Block',
+            'goose',
+            'config',
+          )
+        : join(homedir(), '.config', 'goose');
+
+    expect(provider.instructionsFile?.()).toBe(join(home, '.goosehints'));
+    expect(provider.instructionsList).toBeUndefined();
+    expect(provider.instructionsRules).toBeUndefined();
+
+    // ОДИН файл в двух разделах — у остальных провайдеров так не бывает.
+    expect(provider.mcpConfig).toMatchObject({ format: 'goose-yaml' });
+    expect(provider.permissionsConfig).toMatchObject({ format: 'goose-yaml' });
+    expect(provider.mcpConfig?.path()).toBe(join(home, 'config.yaml'));
+    expect(provider.permissionsConfig?.path()).toBe(provider.mcpConfig?.path());
+
+    // Своего .env у Goose нет — раздел закрыт, а не «пустой».
+    expect(provider.envConfig).toBeUndefined();
+    expect(provider.capabilities.env).toBe('unsupported');
+
+    // В проекте — только подсказки: своего проектного config.yaml Goose не читает.
+    expect(provider.projectConfig).toEqual({ instructions: '.goosehints' });
+    expect(provider.configLocations?.()).toEqual([home]);
+
+    expect(CAPABILITIES.filter((cap) => provider.capabilities[cap] === 'ready').sort()).toEqual([
+      'chat',
+      'globalInstructions',
+      'mcp',
+      'permissions',
+      'projects',
+      'scripts',
+    ]);
+  });
+
+  // Kimi Code — единственный, кто держит MCP и права в РАЗНЫХ файлах одного
+  // каталога `$KIMI_CODE_HOME` (mcp.json и config.toml), и вторая после Codex
+  // TOML-модель прав. Проектного config.toml у него нет: CLI читает ровно один
+  // пользовательский файл, изоляция под проект — подменой KIMI_CODE_HOME.
+  it('kimi: mcp.json и config.toml в одном каталоге, env — unsupported', () => {
+    const provider = getProvider('kimi');
+    expect(provider.name).toBe('Kimi Code');
+    expect(provider.status).toBe('experimental');
+    expect(provider.cli.command).toBe('kimi');
+
+    const home = join(homedir(), '.kimi-code');
+    expect(provider.instructionsFile?.()).toBe(join(home, 'AGENTS.md'));
+    expect(provider.instructionsList).toBeUndefined();
+    expect(provider.instructionsRules).toBeUndefined();
+
+    expect(provider.mcpConfig).toMatchObject({ format: 'json', jsonHttpUrlKey: 'url' });
+    expect(provider.mcpConfig?.path()).toBe(join(home, 'mcp.json'));
+    expect(provider.permissionsConfig).toMatchObject({ format: 'kimi-toml' });
+    expect(provider.permissionsConfig?.path()).toBe(join(home, 'config.toml'));
+
+    // Своего файла переменных у Kimi нет: ключи провайдеров лежат в config.toml,
+    // а секреты панель в чужие конфиги не пишет → раздел закрыт.
+    expect(provider.envConfig).toBeUndefined();
+    expect(provider.capabilities.env).toBe('unsupported');
+
+    // Хуки (KIMI-1) — `[[hooks]]` в том же config.toml, что и права.
+    expect(provider.hooksConfig).toMatchObject({ format: 'kimi-toml' });
+    expect(provider.hooksConfig?.path()).toBe(join(home, 'config.toml'));
+    // Скиллы (KIMI-2): свой каталог + чужой `~/.agents/skills` только на показ,
+    // описание ограничено 240 знаками — так сказано в документации Kimi.
+    expect(provider.skillsConfig).toMatchObject({ format: 'skill-md-dir', descriptionMax: 240 });
+    expect(provider.skillsConfig?.dir()).toBe(join(home, 'skills'));
+    expect(provider.skillsConfig?.alsoLoadedFrom?.()).toEqual([
+      join(homedir(), '.agents', 'skills'),
+    ]);
+    // Плагины (KIMI-3) — только показ: каталог установленного + реестр, в
+    // который панель не пишет. Конфига со списком у этого формата нет вовсе.
+    expect(provider.pluginsConfig).toMatchObject({ format: 'kimi-plugins' });
+    expect(provider.pluginsConfig?.dir()).toBe(join(home, 'plugins', 'managed'));
+    expect(provider.pluginsConfig?.registryPath?.()).toBe(
+      join(home, 'plugins', 'installed.json'),
+    );
+    expect(provider.pluginsConfig?.configPath).toBeUndefined();
+
+    // В проекте — инструкции, MCP и скиллы; проектных прав и хуков нет (нет
+    // проектного config.toml).
+    expect(provider.projectConfig).toEqual({
+      instructions: 'AGENTS.md',
+      mcp: { format: 'json', relativePath: '.kimi-code/mcp.json', jsonHttpUrlKey: 'url' },
+      skills: { format: 'skill-md-dir', relativeDir: '.kimi-code/skills' },
+    });
+    expect(provider.configLocations?.()).toEqual([home]);
+
+    expect(CAPABILITIES.filter((cap) => provider.capabilities[cap] === 'ready').sort()).toEqual([
+      'chat',
+      'globalInstructions',
+      'hooks',
+      'mcp',
+      'permissions',
+      'plugins',
+      'projects',
+      'scripts',
+      'skills',
+    ]);
   });
 
   it('assistant-метаданные заданы у всех провайдеров по карте Ф6a', () => {
@@ -188,6 +420,21 @@ describe('реестр провайдеров', () => {
     // задокументированы. Промпт всегда ОТДЕЛЬНЫМ элементом argv.
     expect(getProvider('codex').assistant?.oneShotArgs?.('P')).toEqual(['exec', 'P']);
     expect(getProvider('gemini').assistant?.oneShotArgs?.('P')).toEqual(['-p', 'P']);
+    // Qwen Code: OpenAI-совместимое API (OPENAI_API_KEY / DASHSCOPE_API_KEY),
+    // one-shot `qwen -p <промпт>` — задокументированный headless-режим.
+    expect(getProvider('qwen').assistant).toMatchObject({
+      apiKind: 'openai-compat',
+      apiKeyEnvVars: ['OPENAI_API_KEY', 'DASHSCOPE_API_KEY'],
+      cliRunnable: true,
+    });
+    expect(getProvider('qwen').assistant?.oneShotArgs?.('P')).toEqual(['-p', 'P']);
+    // Kimi Code: OpenAI-совместимое API Moonshot, one-shot `kimi -p <промпт>`.
+    expect(getProvider('kimi').assistant).toMatchObject({
+      apiKind: 'openai-compat',
+      apiKeyEnvVars: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
+      cliRunnable: true,
+    });
+    expect(getProvider('kimi').assistant?.oneShotArgs?.('P')).toEqual(['-p', 'P']);
     expect(getProvider('opencode').assistant).toMatchObject({
       apiKind: 'openai-compat',
       apiKeyEnvVars: [],
@@ -214,17 +461,21 @@ describe('реестр провайдеров', () => {
     });
   });
 
-  it('CURSOR-1 cursor: рабочий MCP + правила КАТАЛОГОМ .mdc (третья модель)', () => {
+  it('CURSOR-1/2 cursor: MCP + правила КАТАЛОГОМ .mdc + права allow/deny', () => {
     const provider = getProvider('cursor');
     const { capabilities } = provider;
     expect(capabilities.mcp).toBe('ready');
     expect(capabilities.globalInstructions).toBe('ready');
+    // CURSOR-2: права — ключ `permissions` в cli-config.json.
+    expect(capabilities.permissions).toBe('ready');
     // COMMON-1: скрипты — раздел самой панели, ready у всех провайдеров.
-    // COMMON-2 + CURSOR-1: проектный уровень Cursor — `.cursor/mcp.json` (тот же
-    // json-адаптер) и каталог правил `.cursor/rules` (тот же адаптер `.mdc`).
+    // COMMON-2 + CURSOR-1 + CURSOR-2: проектный уровень Cursor — `.cursor/mcp.json`
+    // (тот же json-адаптер), каталог правил `.cursor/rules` (тот же адаптер `.mdc`)
+    // и права `.cursor/cli.json` (тот же адаптер `cursor-json`).
     expect(CAPABILITIES.filter((cap) => capabilities[cap] === 'ready').sort()).toEqual([
       'globalInstructions',
       'mcp',
+      'permissions',
       'projects',
       'scripts',
     ]);
@@ -244,6 +495,11 @@ describe('реестр провайдеров', () => {
       format: 'json',
       relativePath: '.cursor/mcp.json',
       jsonHttpUrlKey: 'url',
+    });
+    // Имя проектного файла прав ДРУГОЕ: `cli.json`, не `cli-config.json`.
+    expect(provider.projectConfig?.permissions).toEqual({
+      format: 'cursor-json',
+      relativePath: '.cursor/cli.json',
     });
   });
 
@@ -371,10 +627,18 @@ describe('реестр провайдеров', () => {
       join(homedir(), '.config', 'opencode', 'opencode.json'),
     );
     expect(getProvider('opencode').capabilities.permissions).toBe('ready');
-    // У этих двоих задокументированного файла прав нет — fail-closed.
-    for (const id of ['cursor', 'aider'] as const) {
-      expect(getProvider(id).permissionsConfig).toBeUndefined();
-    }
+    // Cursor (CURSOR-2): ключ `permissions` в ~/.cursor/cli-config.json — восьмая
+    // модель (два списка allow/deny, ни режима, ни `ask`).
+    expect(getProvider('cursor').permissionsConfig).toEqual({
+      format: 'cursor-json',
+      path: expect.any(Function),
+    });
+    expect(getProvider('cursor').permissionsConfig?.path()).toBe(
+      join(homedir(), '.cursor', 'cli-config.json'),
+    );
+    expect(getProvider('cursor').capabilities.permissions).toBe('ready');
+    // У Aider задокументированного файла прав нет — fail-closed.
+    expect(getProvider('aider').permissionsConfig).toBeUndefined();
   });
 
   it('instructionsFile задан у claude/codex/gemini/opencode и указывает на верный файл', () => {
@@ -405,11 +669,21 @@ describe('реестр провайдеров', () => {
       claude: 'file',
       codex: 'file',
       gemini: 'file',
+      // Qwen Code — контекстный файл QWEN.md, та же модель «один файл».
+      qwen: 'file',
       // CURSOR-1: каталог `~/.cursor/rules/*.mdc` — третья модель.
       cursor: 'rules',
       opencode: 'file',
       // AIDER-1: список ссылок `read` в `.aider.conf.yml`.
       aider: 'list',
+      // CONTINUE: глобальных инструкций нет вовсе — задокументирован только
+      // проектный каталог правил `.continue/rules`, ключ `rules:` конфига
+      // неоднороден (строки вперемешку со ссылками `uses:`) → fail-closed.
+      continue: 'none',
+      // GOOSE: `.goosehints` — обычный файл подсказок в каталоге конфигурации.
+      goose: 'file',
+      // KIMI: `<KIMI_CODE_HOME>/AGENTS.md` — тот же обычный markdown.
+      kimi: 'file',
     });
   });
 
@@ -419,7 +693,7 @@ describe('реестр провайдеров', () => {
     // OPENCODE-5: скиллы — каталог `skills/` со `SKILL.md`, своя модель.
     expect(capabilities.skills).toBe('ready');
     expect(provider.skillsConfig).toEqual({
-      format: 'opencode-skills',
+      format: 'skill-md-dir',
       dir: expect.any(Function),
       alsoLoadedFrom: expect.any(Function),
     });
@@ -431,10 +705,14 @@ describe('реестр провайдеров', () => {
       join(homedir(), '.agents', 'skills'),
     ]);
     // OPENCODE-3: ключ `experimental.hook` — своя модель, не claude-овская.
+    // С 2026-07-25 раздел ТОЛЬКО ДЛЯ ЧТЕНИЯ: ключ исчез из справочника
+    // конфигурации OpenCode и из опубликованной схемы, поэтому панель его больше
+    // не пишет (но продолжает показывать уже записанное).
     expect(capabilities.hooks).toBe('ready');
     expect(provider.hooksConfig).toEqual({
       format: 'opencode-json',
       path: expect.any(Function),
+      writeDisabledReason: expect.stringContaining('experimental.hook'),
     });
     // OPENCODE-4: каталог файлов JS/TS + массив `plugin` в том же конфиге.
     expect(capabilities.plugins).toBe('ready');

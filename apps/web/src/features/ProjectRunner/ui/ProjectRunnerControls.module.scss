@@ -1,7 +1,25 @@
+// Поповер настроек запуска позиционируется от этого контейнера — так же, как
+// у git-веток по соседству.
+.wrap {
+  position: relative;
+  display: inline-flex;
+}
+
 .row {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-2xs);
+}
+
+// Один поднятый сервер: ссылка на адрес плюс кнопка остановки. В монорепе таких
+// «чипов» столько же, сколько запущено целей.
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding-left: var(--spacing-3xs);
 }
 
 // «Перейти»: внешняя ссылка target=_blank, оформленная как компактная кнопка-ghost
@@ -10,7 +28,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-3xs);
-  padding: var(--spacing-3xs) var(--spacing-xs);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
   border-radius: var(--radius-md);
   color: var(--color-accent);
   font-size: var(--font-size-body-sm);
@@ -19,5 +37,185 @@
 
   &:hover {
     background: var(--color-accent-subtle);
+  }
+}
+
+// Порт рядом с именем: приглушён, чтобы не спорить с ним за внимание.
+.port {
+  color: var(--color-fg-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+}
+
+// Сервер поднимается или работает без известного адреса — ссылки нет, и вид
+// это показывает: ничего кликабельного.
+.pending {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+  cursor: default;
+}
+
+// «Порт занят»: предупреждение с именем держателя и кнопкой освобождения.
+// Тон предупреждающий, но не ошибочный — это состояние, из которого есть выход
+// в один клик.
+.busy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border: 1px solid var(--color-warning-border, var(--color-border));
+  border-radius: var(--radius-md);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+}
+
+.busyText {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+}
+
+// Имя чужого процесса — деталь: усечено, целиком видно в title.
+.busyWho {
+  max-width: 22ch;
+  overflow: hidden;
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dropdown);
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + var(--spacing-3xs));
+  right: 0;
+  z-index: calc(var(--z-dropdown) + 1);
+  width: 420px;
+  max-width: calc(100vw - var(--spacing-lg));
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+// Целей в монорепе бывает много: список прокручивается, а поповер остаётся
+// на экране целиком.
+.targets {
+  display: flex;
+  flex-direction: column;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.target {
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--spacing-2xs);
+
+  &:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+}
+
+.targetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2xs);
+}
+
+.disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  padding: var(--spacing-3xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-fg);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface-sunken);
+  }
+}
+
+.targetName {
+  overflow: hidden;
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  color: var(--color-fg-subtle);
+  transition: transform var(--duration-fast);
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 var(--spacing-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+.inputNarrow {
+  flex: 0 0 96px;
+}
+
+// Хвост вывода процесса: нужен ровно тогда, когда что-то пошло не так, поэтому
+// свёрнут и моноширинный.
+.output {
+  font-size: var(--font-size-caption);
+
+  summary {
+    color: var(--color-fg-subtle);
+    cursor: pointer;
+  }
+
+  pre {
+    max-height: 180px;
+    margin: var(--spacing-3xs) 0 0;
+    overflow: auto;
+    padding: var(--spacing-2xs);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-sunken);
+    font-family: var(--font-mono);
+    white-space: pre-wrap;
+    word-break: break-word;
   }
 }

@@ -5,6 +5,7 @@ import type {
   ProviderPluginFile,
   ProviderPluginFileContent,
   ProviderPluginFileDraft,
+  ProviderInstalledPlugin,
   ProviderPluginsInfo,
   ProviderPluginsScope,
 } from '@claude-control/contracts';
@@ -66,12 +67,14 @@ export const OPENCODE_PLUGIN_EXTENSIONS = ['.js', '.ts', '.mjs'] as const;
 /** Разрешённая цель раздела: провайдер + каталог файлов + конфиг npm-списка. */
 export interface ProviderPluginsTarget {
   provider: ConfigProvider;
-  format: 'opencode-plugins';
+  format: 'opencode-plugins' | 'kimi-plugins';
   scope: ProviderPluginsScope;
-  /** Абсолютный путь каталога файлов-плагинов. */
+  /** Абсолютный путь каталога плагинов (у Kimi — `plugins/managed`). */
   pluginsDir: string;
-  /** Абсолютный путь конфигурации с массивом `plugin`. */
-  configPath: string;
+  /** Абсолютный путь конфигурации с массивом `plugin` — только у OpenCode. */
+  configPath?: string;
+  /** Абсолютный путь реестра `installed.json` — только у Kimi. */
+  registryPath?: string;
   /** Префикс имени резервной копии: `<id>-` глобально, `<id>-project-` в проекте. */
   backupPrefix: string;
 }
@@ -149,12 +152,14 @@ export function resolveProviderPluginsTarget(
   if (provider.capabilities.plugins !== 'ready' || !provider.pluginsConfig) return undefined;
 
   const override = store.getSettings().claudeDirOverride;
+  const config = provider.pluginsConfig;
   return {
     provider,
-    format: provider.pluginsConfig.format,
+    format: config.format,
     scope: 'global',
-    pluginsDir: provider.pluginsConfig.dir(override),
-    configPath: provider.pluginsConfig.configPath(override),
+    pluginsDir: config.dir(override),
+    ...(config.configPath ? { configPath: config.configPath(override) } : {}),
+    ...(config.registryPath ? { registryPath: config.registryPath(override) } : {}),
     backupPrefix: `${provider.id}-`,
   };
 }
@@ -289,6 +294,125 @@ interface RawOpencodeConfig {
   [key: string]: unknown;
 }
 
+// --- Установленные плагины Kimi (только чтение, KIMI-3) ----------------------
+
+/**
+ * Манифест плагина Kimi. Имя файла задокументировано в двух вариантах, первый
+ * приоритетнее: `<корень>/kimi.plugin.json`, затем `<корень>/.kimi-plugin/plugin.json`.
+ */
+const KIMI_MANIFEST_NAMES = ['kimi.plugin.json', join('.kimi-plugin', 'plugin.json')] as const;
+
+/** Конфигурация с массивом `plugin` есть только у OpenCode — иначе это ошибка вызова. */
+function requireConfigPath(target: ProviderPluginsTarget): string {
+  if (!target.configPath) throw new UnrecognizedFormatError();
+  return target.configPath;
+}
+
+/** Прочитать один манифест. Не найден или не разобран → плагин с `error`. */
+function readInstalledPlugin(pluginsDir: string, id: string): ProviderInstalledPlugin {
+  const root = join(pluginsDir, id);
+  const manifestPath = KIMI_MANIFEST_NAMES.map((name) => join(root, name)).find((path) =>
+    existsSync(path),
+  );
+  if (!manifestPath) {
+    return {
+      id,
+      manifestPath: root,
+      hasSkills: false,
+      mcpServers: [],
+      hookCount: 0,
+      hasCommands: false,
+      error: 'Манифест плагина не найден.',
+    };
+  }
+
+  try {
+    const raw = parseProviderJsonObject<Record<string, unknown>>(readTextFile(manifestPath));
+    const ui = raw.interface;
+    const sessionStart = raw.sessionStart;
+    const servers = raw.mcpServers;
+    const hooks = raw.hooks;
+
+    const asString = (value: unknown): string | undefined =>
+      typeof value === 'string' && value.trim() ? value : undefined;
+
+    return {
+      id,
+      manifestPath,
+      ...(asString(raw.name) ? { name: asString(raw.name)! } : {}),
+      ...(asString(raw.version) ? { version: asString(raw.version)! } : {}),
+      ...(asString(raw.description) ? { description: asString(raw.description)! } : {}),
+      ...(ui && typeof ui === 'object' && asString((ui as Record<string, unknown>).displayName)
+        ? { displayName: asString((ui as Record<string, unknown>).displayName)! }
+        : {}),
+      hasSkills: raw.skills !== undefined,
+      ...(sessionStart &&
+      typeof sessionStart === 'object' &&
+      asString((sessionStart as Record<string, unknown>).skill)
+        ? { sessionStartSkill: asString((sessionStart as Record<string, unknown>).skill)! }
+        : {}),
+      mcpServers:
+        servers && typeof servers === 'object' && !Array.isArray(servers)
+          ? Object.keys(servers as Record<string, unknown>)
+          : [],
+      hookCount: Array.isArray(hooks) ? hooks.length : 0,
+      hasCommands: raw.commands !== undefined,
+    };
+  } catch (error) {
+    return {
+      id,
+      manifestPath,
+      hasSkills: false,
+      mcpServers: [],
+      hookCount: 0,
+      hasCommands: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Сводка раздела для Kimi: список установленного из `plugins/managed/`. Панель
+ * НИЧЕГО здесь не пишет — ставят, включают и выключают плагины командой
+ * `/plugins` внутри CLI, а форма реестра `installed.json` не задокументирована.
+ */
+function readInstalledPluginsInfo(
+  target: ProviderPluginsTarget,
+  base: Pick<
+    ProviderPluginsInfo,
+    'providerId' | 'providerName' | 'format' | 'scope' | 'pluginsDir' | 'dirExists'
+  >,
+): ProviderPluginsInfo {
+  let installed: ProviderInstalledPlugin[] = [];
+  let installedError: string | undefined;
+
+  if (base.dirExists) {
+    try {
+      installed = readdirSync(target.pluginsDir, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => readInstalledPlugin(target.pluginsDir, entry.name))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    } catch (error) {
+      installedError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  return {
+    ...base,
+    sections: ['installed'],
+    files: [],
+    ignored: [],
+    filesReadOnly: true,
+    packagesPresent: false,
+    packages: [],
+    preservedPackages: [],
+    packagesReadOnly: true,
+    installed,
+    ...(target.registryPath ? { installedRegistryPath: target.registryPath } : {}),
+    ...(installedError ? { installedError } : {}),
+  };
+}
+
 /**
  * Сводка раздела: файлы каталога + список npm-пакетов. Половины независимы:
  * сломанный конфиг не мешает управлять файлами, и наоборот.
@@ -301,8 +425,10 @@ export function readProviderPluginsInfo(target: ProviderPluginsTarget): Provider
     scope: target.scope,
     pluginsDir: target.pluginsDir,
     dirExists: existsSync(target.pluginsDir),
-    configPath: target.configPath,
+    ...(target.configPath ? { configPath: target.configPath } : {}),
   };
+
+  if (target.format === 'kimi-plugins') return readInstalledPluginsInfo(target, base);
 
   // --- половина 1: файлы каталога
   let files: ProviderPluginFile[] = [];
@@ -327,7 +453,7 @@ export function readProviderPluginsInfo(target: ProviderPluginsTarget): Provider
   }
 
   // --- половина 2: массив `plugin` в конфиге
-  const text = readTextFile(target.configPath);
+  const text = readTextFile(requireConfigPath(target));
   let packagesPresent = false;
   let packages: string[] = [];
   let preservedPackages: ProviderPluginsInfo['preservedPackages'] = [];
@@ -349,6 +475,7 @@ export function readProviderPluginsInfo(target: ProviderPluginsTarget): Provider
 
   return {
     ...base,
+    sections: ['files', 'packages'],
     files,
     ignored,
     filesReadOnly,
@@ -358,6 +485,7 @@ export function readProviderPluginsInfo(target: ProviderPluginsTarget): Provider
     preservedPackages,
     packagesReadOnly,
     ...(packagesError ? { packagesError } : {}),
+    installed: [],
   };
 }
 
@@ -511,7 +639,8 @@ export function saveProviderPluginPackages(
     if (!isOpencodePluginPackage(name)) throw new UnrecognizedFormatError();
   }
 
-  const text = readTextFile(target.configPath);
+  const configPath = requireConfigPath(target);
+  const text = readTextFile(configPath);
   const original: RawOpencodeConfig = text.trim()
     ? parseProviderJsonObject<RawOpencodeConfig>(text)
     : {};
@@ -535,8 +664,8 @@ export function saveProviderPluginPackages(
     throw new UnrecognizedFormatError();
   }
 
-  return writeTextFile(target.configPath, serialized, {
+  return writeTextFile(configPath, serialized, {
     backupDir,
-    backupName: `${target.backupPrefix}${basename(target.configPath)}`,
+    backupName: `${target.backupPrefix}${basename(configPath)}`,
   });
 }

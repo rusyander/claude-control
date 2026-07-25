@@ -42,16 +42,20 @@ describe('OpenCode: плагины (каталог файлов + массив p
   let root: string;
   let backupDir: string;
   let target: ProviderPluginsTarget;
+  // Путь конфига у цели необязателен (у Kimi его нет вовсе), а тестам OpenCode
+  // он нужен строкой — держим его отдельно, чтобы не сыпать `!` по всему файлу.
+  let configPath: string;
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'cc-opencode-plugins-'));
     backupDir = join(root, 'backups');
+    configPath = join(root, 'opencode.json');
     target = {
       provider: getProvider('opencode'),
       format: 'opencode-plugins',
       scope: 'global',
       pluginsDir: join(root, 'plugins'),
-      configPath: join(root, 'opencode.json'),
+      configPath,
       backupPrefix: 'opencode-',
     };
   });
@@ -236,7 +240,7 @@ describe('OpenCode: плагины (каталог файлов + массив p
   );
 
   it('читает npm-список; расширенная форма уходит в «сохранённые»', () => {
-    writeFileSync(target.configPath, CONFIG);
+    writeFileSync(configPath, CONFIG);
 
     const info = readProviderPluginsInfo(target);
     expect(info.packagesPresent).toBe(true);
@@ -248,7 +252,7 @@ describe('OpenCode: плагины (каталог файлов + массив p
   });
 
   it('пишет npm-список, сохраняя прочие ключи файла и расширенные записи', () => {
-    writeFileSync(target.configPath, CONFIG);
+    writeFileSync(configPath, CONFIG);
 
     const backupPath = saveProviderPluginPackages(
       target,
@@ -257,7 +261,7 @@ describe('OpenCode: плагины (каталог файлов + массив p
     );
     expect(backupPath).toBeTruthy();
 
-    const written = JSON.parse(readFileSync(target.configPath, 'utf8')) as Record<string, unknown>;
+    const written = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>;
     expect(written.$schema).toBe('https://opencode.ai/config.json');
     expect(written.model).toBe('anthropic/claude-sonnet-4');
     expect(written.permission).toEqual({ edit: 'deny' });
@@ -270,25 +274,25 @@ describe('OpenCode: плагины (каталог файлов + массив p
   });
 
   it('пустой список УДАЛЯЕТ ключ plugin, а не пишет []', () => {
-    writeFileSync(target.configPath, JSON.stringify({ model: 'x', plugin: ['a'] }));
+    writeFileSync(configPath, JSON.stringify({ model: 'x', plugin: ['a'] }));
     saveProviderPluginPackages(target, [], backupDir);
 
-    const written = JSON.parse(readFileSync(target.configPath, 'utf8')) as Record<string, unknown>;
+    const written = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>;
     expect(written.model).toBe('x');
     expect('plugin' in written).toBe(false);
   });
 
   it('пустой список при сохранённых записях ключ НЕ удаляет', () => {
-    writeFileSync(target.configPath, JSON.stringify({ plugin: [['a', {}], 'b'] }));
+    writeFileSync(configPath, JSON.stringify({ plugin: [['a', {}], 'b'] }));
     saveProviderPluginPackages(target, [], backupDir);
     expect(
-      (JSON.parse(readFileSync(target.configPath, 'utf8')) as { plugin: unknown }).plugin,
+      (JSON.parse(readFileSync(configPath, 'utf8')) as { plugin: unknown }).plugin,
     ).toEqual([['a', {}]]);
   });
 
   it('битый JSON и не-массив plugin: список только для чтения, файл не тронут', () => {
     const before = '{ "plugin": ';
-    writeFileSync(target.configPath, before);
+    writeFileSync(configPath, before);
 
     const info = readProviderPluginsInfo(target);
     expect(info.packagesReadOnly).toBe(true);
@@ -299,10 +303,10 @@ describe('OpenCode: плагины (каталог файлов + массив p
     expect(() => saveProviderPluginPackages(target, ['a'], backupDir)).toThrow(
       UnrecognizedFormatError,
     );
-    expect(readFileSync(target.configPath, 'utf8')).toBe(before);
+    expect(readFileSync(configPath, 'utf8')).toBe(before);
     expect(existsSync(backupDir)).toBe(false);
 
-    writeFileSync(target.configPath, JSON.stringify({ plugin: { a: 1 } }));
+    writeFileSync(configPath, JSON.stringify({ plugin: { a: 1 } }));
     expect(readProviderPluginsInfo(target).packagesReadOnly).toBe(true);
   });
 
@@ -335,6 +339,6 @@ describe('OpenCode: плагины (каталог файлов + массив p
     const info = readProviderPluginsInfo(target);
     expect(info.packagesPresent).toBe(false);
     expect(info.packages).toEqual([]);
-    expect(existsSync(target.configPath)).toBe(false);
+    expect(existsSync(configPath)).toBe(false);
   });
 });

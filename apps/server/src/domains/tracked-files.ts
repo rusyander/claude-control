@@ -123,7 +123,7 @@ export function providerTrackedFiles(store: TrackedFilesSettingsSource): Tracked
   if (capabilities.hooks === 'ready' && provider.hooksConfig) {
     paths.push(provider.hooksConfig.path(override));
   }
-  if (capabilities.plugins === 'ready' && provider.pluginsConfig) {
+  if (capabilities.plugins === 'ready' && provider.pluginsConfig?.configPath) {
     paths.push(provider.pluginsConfig.configPath(override));
   }
 

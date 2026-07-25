@@ -23,7 +23,7 @@ import { object, string, array, boolean, number, enum as zodEnum, type infer as 
  */
 
 /** Формат каталога скиллов (пока только OpenCode). */
-export const providerSkillsFormats = ['opencode-skills'] as const;
+export const providerSkillsFormats = ['skill-md-dir'] as const;
 export type ProviderSkillsFormat = (typeof providerSkillsFormats)[number];
 
 /** Уровень каталога скиллов: глобальный (`~`) или каталог проекта. */

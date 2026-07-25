@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AssistantRunResult } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
@@ -26,6 +26,12 @@ interface ChatTurn {
  *
  * При режиме `none` (нет подписки/CLI и нет ключа) модалка `AssistantKeyGate`
  * покажет инструкцию: сперва вход в CLI провайдера (подписка), затем API-ключ.
+ *
+ * IDEA-8: наружу уходит ещё и `conversationId` — устойчивый id ЭТОГО диалога.
+ * Он включает сессионный режим у тех CLI, кто его заявил (сейчас OpenCode с
+ * `opencode serve`): контекст держит сам CLI, панель шлёт только новое сообщение.
+ * Провайдеры без сессии его просто игнорируют — история по-прежнему уезжает
+ * одним промптом. Что сработало на самом деле, видно по метке в шапке.
  */
 export function BasicAssistantChat() {
   const { t } = useTranslation();
@@ -33,7 +39,16 @@ export function BasicAssistantChat() {
   const run = useRunAssistant();
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState('');
+  const [transport, setTransport] = useState<AssistantRunResult['transport']>();
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Id живёт столько же, сколько смонтированный чат: перезагрузили страницу —
+  // начали новый диалог, и сессия CLI начинается заново. Придумывать ему
+  // «вечное» хранилище нельзя: на той стороне сессия умирает вместе с сервером.
+  const conversationId = useMemo(
+    () => `cc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+    [],
+  );
 
   const providerName = runner?.providerName ?? '';
   const isNone = runner?.mode === 'none';
@@ -54,11 +69,12 @@ export function BasicAssistantChat() {
     scrollDown();
 
     run.mutate(
-      { messages: history },
+      { messages: history, conversationId },
       {
         onSuccess: (result: AssistantRunResult) => {
           if (result.ok) {
             setTurns((prev) => [...prev, { role: 'assistant', content: result.reply }]);
+            setTransport(result.transport);
           } else {
             toast.error(
               result.error ?? t(`basicChat.reason.${result.reason}`, t('basicChat.failed')),
@@ -99,6 +115,7 @@ export function BasicAssistantChat() {
           {runner && runner.mode !== 'none' && (
             <Badge tone="neutral">{t(`basicChat.mode.${runner.mode}`)}</Badge>
           )}
+          {transport && <Badge tone="neutral">{t(`basicChat.transport.${transport}`)}</Badge>}
         </Stack>
       </Stack>
 

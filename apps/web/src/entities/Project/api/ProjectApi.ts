@@ -46,6 +46,8 @@ export function useProjects() {
 export interface DirEntry {
   name: string;
   path: string;
+  /** Есть только у файлов — их показывают, лишь когда запрошены расширения. */
+  isFile?: boolean;
 }
 
 export interface DirListing {
@@ -66,12 +68,19 @@ export function useFsRoots() {
   });
 }
 
-/** Подкаталоги выбранной папки. Запрос идёт, только когда путь задан. */
-export function useFsList(path: string | undefined) {
+/**
+ * Подкаталоги выбранной папки. Запрос идёт, только когда путь задан.
+ *
+ * `fileExtensions` добавляет в список ещё и файлы с этими расширениями — так
+ * выбирают архив переноса окружения. Без параметра поведение прежнее: только
+ * каталоги (выбор папки проекта).
+ */
+export function useFsList(path: string | undefined, fileExtensions?: string[]) {
+  const files = fileExtensions?.join(',');
   return useQuery({
-    queryKey: ['fs', 'list', path],
+    queryKey: ['fs', 'list', path, files ?? ''],
     queryFn: async () => {
-      const { data } = await apiClient.get<DirListing>('/fs/list', { params: { path } });
+      const { data } = await apiClient.get<DirListing>('/fs/list', { params: { path, files } });
       return data;
     },
     enabled: Boolean(path),

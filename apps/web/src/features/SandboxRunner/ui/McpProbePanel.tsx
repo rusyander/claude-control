@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -24,8 +24,14 @@ export function McpProbePanel({ mcpId }: { mcpId: string }) {
   const [tool, setTool] = useState('');
   const [args, setArgs] = useState('{}');
 
+  // Список инструментов тянем ровно на смену сервера. Сама мутация меняет
+  // идентичность на каждом рендере, поэтому держим её в ref — иначе эффект
+  // зациклился бы на собственном результате.
+  const loadTools = useRef(tools.mutate);
+  loadTools.current = tools.mutate;
+
   useEffect(() => {
-    tools.mutate(mcpId);
+    loadTools.current(mcpId);
   }, [mcpId]);
 
   const list = tools.data?.tools ?? [];

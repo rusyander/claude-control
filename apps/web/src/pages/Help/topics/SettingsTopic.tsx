@@ -46,6 +46,10 @@ export function SettingsTopic() {
             tr('canEncrypt'),
             tr('canRevertHunk'),
             tr('canTransfer'),
+            tr('canEnvTransfer'),
+            tr('canModels'),
+            tr('canCheck'),
+            tr('canPreview'),
             tr('canWatch'),
           ]}
           cant={[tr('cantLogin'), tr('cantToken'), tr('cantChange'), tr('cantSync')]}
@@ -75,6 +79,71 @@ export function SettingsTopic() {
           ]}
         />
         <Callout tone="info" title={tr('credsNote')} />
+      </HelpSection>
+
+      <HelpSection title={tr('modelsTitle')} caption={tr('modelsCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('modelsWhere'), text: tr('modelsWhereText') },
+            { title: tr('modelsAuto'), text: tr('modelsAutoText') },
+            { title: tr('modelsWho'), text: tr('modelsWhoText') },
+            { title: tr('modelsOff'), text: tr('modelsOffText') },
+          ]}
+        />
+      </HelpSection>
+
+      <HelpSection title={tr('checkTitle')} caption={tr('checkCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('checkWhat'), text: tr('checkWhatText') },
+            { title: tr('checkSafe'), text: tr('checkSafeText') },
+            { title: tr('checkResult'), text: tr('checkResultText') },
+            { title: tr('checkBadge'), text: tr('checkBadgeText') },
+          ]}
+        />
+      </HelpSection>
+
+      <HelpSection title={tr('formatTitle')} caption={tr('formatCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('formatWhat'), text: tr('formatWhatText') },
+            { title: tr('formatWho'), text: tr('formatWhoText') },
+            { title: tr('formatDrift'), text: tr('formatDriftText') },
+            { title: tr('formatWhen'), text: tr('formatWhenText') },
+          ]}
+        />
+      </HelpSection>
+
+      <HelpSection title={tr('previewTitle')} caption={tr('previewCaption')}>
+        <Stack gap="var(--spacing-xs)">
+          <OptionCards
+            items={[
+              { title: tr('previewWhen'), text: tr('previewWhenText') },
+              { title: tr('previewHow'), text: tr('previewHowText') },
+              { title: tr('previewRead'), text: tr('previewReadText') },
+              { title: tr('previewOff'), text: tr('previewOffText') },
+            ]}
+          />
+          <Callout tone="info" title={tr('previewNoise')}>
+            {tr('previewNoiseText')}
+          </Callout>
+        </Stack>
+      </HelpSection>
+
+      <HelpSection title={tr('transferTitle')} caption={tr('transferCaption')}>
+        <Stack gap="var(--spacing-xs)">
+          <OptionCards
+            items={[
+              { title: tr('transferExport'), text: tr('transferExportText') },
+              { title: tr('transferImport'), text: tr('transferImportText') },
+              { title: tr('transferContent'), text: tr('transferContentText') },
+              { title: tr('transferPaths'), text: tr('transferPathsText') },
+            ]}
+          />
+          <Callout tone="warning" title={tr('transferSecretsTitle')}>
+            {tr('transferSecretsText')}
+          </Callout>
+        </Stack>
       </HelpSection>
 
       <HelpSection title={tr('fieldsTitle')}>

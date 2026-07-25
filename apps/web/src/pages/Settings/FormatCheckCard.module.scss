@@ -1,0 +1,28 @@
+// Строка провайдера: итог слева, имя и пояснение справа.
+.row {
+  padding: var(--spacing-2xs) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.text {
+  min-width: 0;
+  max-width: var(--text-measure);
+}
+
+// Путь ключа читают как код — переносить по словам нельзя.
+.key {
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-muted);
+}
+
+.list {
+  max-height: 40vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}

@@ -50,6 +50,8 @@ export const ICON_PATHS = {
   history: 'M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4M12 8v4l3 2',
   swap: 'M7 8h13l-4-4M17 16H4l4 4',
   bell: 'M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  branch:
+    'M6 3v12M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6ZM18 9c0 4-3 5.5-6 6',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

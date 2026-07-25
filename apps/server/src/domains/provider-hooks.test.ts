@@ -9,6 +9,8 @@ import {
   readProviderHooksInfo,
   saveProviderHooks,
   parseProviderHooksDraft,
+  resolveProviderHooksTarget,
+  WriteDisabledError,
   type ProviderHooksTarget,
 } from './provider-hooks.ts';
 
@@ -420,5 +422,89 @@ describe('OpenCode opencode.json: хуки в ключе experimental.hook', () 
     expect(JSON.parse(readFileSync(filePath, 'utf8'))).toEqual({
       experimental: { hook: { session_completed: [{ command: ['a'] }] } },
     });
+  });
+});
+
+/**
+ * Ключ снят с записи (2026-07-25). Сверка форматов нашла, а документация
+ * подтвердила: `experimental.hook` исчез и из справочника конфигурации OpenCode,
+ * и из опубликованной схемы, где `experimental` вдобавок закрыт для чужих
+ * ключей. Панель обязана ПЕРЕСТАТЬ его писать, но продолжать показывать то, что
+ * уже лежит у человека в файле, — иначе его хуки просто исчезнут с глаз.
+ */
+describe('OpenCode: хуки только для чтения, пока ключа нет в документации CLI', () => {
+  let root: string;
+
+  const lockedTarget = (filePath: string): ProviderHooksTarget => ({
+    provider: getProvider('opencode'),
+    format: 'opencode-json',
+    scope: 'global',
+    filePath,
+    writeDisabledReason: getProvider('opencode').hooksConfig?.writeDisabledReason ?? '',
+  });
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-opencode-hooks-locked-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('каталог объявляет причину, и она непустая', () => {
+    const reason = getProvider('opencode').hooksConfig?.writeDisabledReason;
+    expect(reason).toBeTruthy();
+    expect(reason).toContain('experimental.hook');
+  });
+
+  it('резолвер глобальной цели переносит причину из каталога', () => {
+    const target = resolveProviderHooksTarget({
+      getSettings: () => ({ provider: 'opencode', claudeDirOverride: '' }),
+    });
+    expect(target?.writeDisabledReason).toBeTruthy();
+  });
+
+  it('чтение: раздел только для чтения, причина видна, ошибки файла НЕТ', () => {
+    const filePath = join(root, 'opencode.json');
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        model: 'x',
+        experimental: { hook: { session_completed: [{ command: ['notify'] }] } },
+      }),
+    );
+
+    const info = readProviderHooksInfo(lockedTarget(filePath));
+
+    expect(info.readOnly).toBe(true);
+    expect(info.writeDisabledReason).toBeTruthy();
+    // Файл в порядке — это не поломка формата, и путать одно с другим нельзя.
+    expect(info.error).toBeUndefined();
+    // Главное: то, что человек уже записал, по-прежнему видно.
+    expect(info.present).toBe(true);
+    expect(info.sessionCompleted).toEqual([{ command: ['notify'] }]);
+  });
+
+  it('запись отклонена, и файл остаётся байт в байт прежним', () => {
+    const filePath = join(root, 'opencode.json');
+    const before = JSON.stringify({ model: 'x' }, null, 2);
+    writeFileSync(filePath, before);
+
+    const draft = parseProviderHooksDraft({
+      fileEdited: [],
+      sessionCompleted: [{ command: ['a'] }],
+    });
+    expect(draft).toBeTruthy();
+    expect(() => saveProviderHooks(lockedTarget(filePath), draft!, undefined)).toThrow(
+      WriteDisabledError,
+    );
+
+    expect(readFileSync(filePath, 'utf8')).toBe(before);
+  });
+
+  it('файла не было — отказ не создаёт его', () => {
+    const filePath = join(root, 'fresh.json');
+    const draft = parseProviderHooksDraft({ fileEdited: [], sessionCompleted: [] });
+    expect(() => saveProviderHooks(lockedTarget(filePath), draft!, undefined)).toThrow(
+      WriteDisabledError,
+    );
+    expect(existsSync(filePath)).toBe(false);
   });
 });

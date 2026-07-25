@@ -1,356 +1,127 @@
-# Claude Control — карта для агента
+# claude-control — agent map
 
-Этот файл читается автоматически при старте сессии в проекте. Он для агента,
-а не для человека: людям — [SETUP.ru.md](SETUP.ru.md) / [SETUP.md](SETUP.md).
+Auto-loaded every session → tight and English. Humans read [docs/SETUP.ru.md](docs/SETUP.ru.md);
+answers to the user stay Russian.
 
-**Если пользователь пришёл со словами «не запускается» или «не работает на моей
-системе» — начни с раздела [Диагностика за 60 секунд](#диагностика-за-60-секунд),
-а не с чтения кода.**
+**Read on demand, not loaded here:** [.claude/gotchas.md](.claude/gotchas.md) — traps already paid
+for; read the relevant entry BEFORE touching pricing/analytics, enable-disable of
+hooks/rules/groups, sessions & chat resume, MCP OAuth, secrets, help texts, Windows file ops.
+[.agent/universal-providers.agent.md](.agent/universal-providers.agent.md) — capability map and
+IMMUTABLE RULES; read BEFORE any provider-layer edit.
+[.agent/provider-tools.agent.md](.agent/provider-tools.agent.md) — model catalog, environment
+transfer, format check vs published schemas.
 
----
+**"Doesn't start" / "doesn't work on my system" → start at Triage, not at the code.**
 
-## Что это
+## What it is
 
-Локальная веб-панель управления конфигурацией Claude Code. Читает и правит
-`~/.claude` (правила, скиллы, хуки, права, MCP, переменные), показывает
-аналитику по транскриптам, даёт полноценный чат с CLI и песочницу для проверки
-настроек в изоляции.
+Local web panel over Claude Code's own configuration: reads and edits `~/.claude` (rules, skills,
+hooks, permissions, MCP, env), transcript analytics, full CLI chat, isolated sandbox. Nine more
+CLIs (codex/gemini/qwen/continue/goose/kimi/cursor/opencode/aider) are configurable, Claude is the
+default and the only verified one. No database — **source of truth = Claude Code's files**; most behaviour follows.
 
-Своей базы данных нет: **источник правды — файлы самого Claude Code**. Отсюда
-почти все особенности поведения.
+- `apps/server` — Fastify, port 5178; reads/writes `~/.claude`, spawns `claude`
+- `apps/web` — React + Vite, port 8888; proxies `/api`
+- `packages/contracts` — shared types + zod schemas
+- `tools/` — `doctor.mjs` (environment check), `qa/*.mjs` (Playwright runs)
 
-```
-apps/server   Fastify, порт 5178. Читает и пишет ~/.claude, запускает `claude`
-apps/web      React + Vite, порт 8888. Проксирует /api на сервер
-packages/contracts   Общие типы и zod-схемы
-tools/        doctor.mjs (проверка окружения) и qa/*.mjs (прогоны через Playwright)
-```
+Needs **Node 22.6+** (server runs with `--experimental-strip-types`), pnpm 10, `claude` in PATH.
 
-Требуется **Node 22.6+** (сервер запускается с `--experimental-strip-types`),
-pnpm 10 и установленный `claude` в `PATH`.
-
----
-
-## Порядок действий при жалобе «не работает»
-
-1. `pnpm doctor` — почти всегда называет причину сразу.
-2. Нашёл симптом в таблице ниже → примени описанное решение.
-3. Не нашёл — сузь: сервер это или фронт (`curl` по API), панель или сам CLI
-   (`claude --version` в том же терминале).
-4. Починил — **проверь прогоном**, а не рассуждением (список ниже).
-5. Отчитайся честно: что проверено, что осталось непроверенным и почему.
-
-**Чини сам, не спрашивая:** код проекта, зависимости, конфигурацию сборки,
-переменные окружения для запуска.
-
-**Спроси перед тем, как трогать:** файлы в `~/.claude` — это настоящая рабочая
-конфигурация пользователя, а не тестовые данные. Панель делает резервные копии
-сама, но ручные правки чужого конфига ради диагностики — плохая идея. Читать
-можно свободно.
-
-## Диагностика за 60 секунд
-
-**Шаг 1. Всегда начинай отсюда:**
+## Triage in 60 seconds
 
 ```bash
-pnpm doctor
+pnpm doctor                                # node, claude in PATH, config dir, account access
+                                           # (incl. macOS keychain), ports, deps — exit 1 = blocking
+curl http://127.0.0.1:5178/api/location    # which dir, which rule chose it, what's missing
+curl http://127.0.0.1:5178/api/system      # platform, home, shell
+curl http://127.0.0.1:5178/api/credentials # access source (token is NEVER returned)
 ```
 
-Проверяет версию Node, `claude` в `PATH`, каталог конфигурации, доступ к
-аккаунту (включая связку ключей macOS), занятость портов, зависимости.
-Каждую находку объясняет. Код возврата 1 — есть блокирующие.
-
-**Шаг 2. Если doctor чист, а проблема есть:**
-
-```bash
-curl http://127.0.0.1:5178/api/location   # какой каталог найден, чем определён, чего не хватает
-curl http://127.0.0.1:5178/api/system     # платформа, домашний каталог, оболочка
-curl http://127.0.0.1:5178/api/credentials # источник доступа к аккаунту (токен НЕ отдаётся)
-```
-
-`/api/location` решает большинство вопросов: он говорит путь, правило выбора,
-валидность и список недостающих файлов.
-
-**Шаг 3. Прогоны, если сломано что-то конкретное:**
-
-```bash
-node tools/qa/audit-layout.mjs           # вёрстка всех страниц
-node tools/qa/check-motion.mjs           # плавность анимаций, замер геометрии
-node tools/qa/check-chat-regressions.mjs # сквозной чат: отправка, сессия, перезагрузка
-node tools/qa/check-all-forms.mjs        # девять форм с помощником
-node tools/qa/check-sandbox.mjs          # песочница
-```
-
-Прогоны требуют поднятого стенда (`pnpm dev`) и браузеров (`pnpm qa:setup`).
-
----
-
-## Симптом → причина → что делать
-
-### «Сервер падает: bad option --experimental-strip-types»
-
-Node старше 22.6. Проверь `node --version`. В проекте есть `.nvmrc` (22).
-Это единственная жёстко блокирующая причина — всё остальное чинится.
-
-### «Панель открылась, но везде нули»
-
-Найден не тот каталог конфигурации. Смотри `/api/location` → поле `source`:
-оно прямо говорит, каким правилом путь выбран.
-
-Порядок поиска (`claude-paths.ts`), первый подошедший побеждает:
-
-1. `manual` — путь, заданный в **Настройки → каталог конфигурации** (запоминается)
-2. `env` — переменная `CLAUDE_CONFIG_DIR`
-3. `home` — `~/.claude`
-
-То есть однажды заданный вручную путь перебивает переменную окружения. Если
-пользователь менял его и забыл — это первое, что стоит проверить.
-
-### «Песочница отвечает Not logged in», а обычный чат работает
-
-**Самая частая проблема на macOS.** Причина не в аккаунте: песочница запускает
-Claude с подменённым `CLAUDE_CONFIG_DIR`, и доступ туда надо перенести отдельно.
-
-На Windows и Linux доступ лежит файлом `~/.claude/.credentials.json`.
-**На macOS файла нет** — Claude Code держит токен в связке ключей.
-
-Цепочка источников (`apps/server/src/lib/credentials.ts`), первый найденный побеждает:
-
-1. `~/.claude-control/credentials.json` — заданное вручную (перебивает всё)
-2. `<конфиг>/.credentials.json` — файл системы
-3. связка ключей macOS (`security find-generic-password`)
-4. переменная `ANTHROPIC_API_KEY`
-
-Что делать по порядку:
-
-1. `pnpm doctor` — строка «Доступ» скажет, что нашлось.
-2. На macOS первое обращение к связке вызывает окно разрешения — нужно нажать
-   «Всегда разрешать». Если запись переименована, её имя задаётся переменной
-   `CLAUDE_CONTROL_KEYCHAIN_SERVICE`.
-3. Универсальный путь: **Настройки → Доступ Claude Code → Задать вручную**.
-   Принимает три формы — `claudeAiOauth` (токен), `apiKey` (ключ API),
-   `readFrom` (путь к своему файлу). Ввод проверяется на месте.
-
-Подробности с пошаговой инструкцией — SETUP, раздел «Различия между системами».
-
-### «claude не найден»
-
-Панель запускает `claude.cmd` на Windows и `claude` на остальных. Должен быть
-в `PATH` **того процесса, что запустил сервер**. Проверь `claude --version`
-в том же терминале.
-
-### «MCP-сервер не подключается»
-
-На Windows `npx` требует запуска через оболочку — включено в `mcp.ts` и
-`McpProbe.ts`. Аргументы с пробелами экранируются через `shellArgs` из
-`cli-args.ts`; без этого `C:\Program Files\…` разваливается на два аргумента.
-
-### «Запросы возвращают 403»
-
-Защита от чужих сайтов: белый список origin + проверка `Sec-Fetch-Site`
-(`apps/server/src/index.ts`). Разрешены только `localhost:WEB_PORT` и
-`127.0.0.1:WEB_PORT`. Сменил порт фронта — задай `WEB_PORT` серверу тоже.
-
-### «127.0.0.1:8888 не отвечает, а localhost:8888 открывается»
-
-Vite слушает `127.0.0.1` явно (`vite.config.ts`). Обратный случай означает,
-что `localhost` резолвится в `::1`.
-
----
-
-## Грабли, на которые уже наступали
-
-Здесь то, что стоило времени. Не переоткрывай.
-
-**Сессия Claude Code привязана к каталогу.** `--resume <id>` находит сессию
-только среди сессий текущего `cwd`. Поэтому папку чата нельзя переименовывать,
-а рабочий каталог для продолжения берётся из самого транскрипта
-(`findSessionCwd` в `ChatHistory.ts`). Проверено на CLI напрямую.
-
-**`packages/contracts` в сервер импортируется только как `import type`.**
-Реэкспорты идут без расширений, и Node ESM их не резолвит — значением упадёт
-в рантайме, хотя типы соберутся.
-
-**`overflow-x: clip` рядом с `overflow-y: auto` вырождается в `hidden`** по
-спецификации. Из-за этого сайдбар оставался горизонтально прокручиваемым и
-уезжал вбок вслед за фокусом. Решение — прокрутка на вложенном блоке,
-а панель целиком `overflow: clip` (`MainLayout.module.scss`).
-
-**Цена модели привязана к её версии, а не к семейству.** Раньше таблица знала
-только `opus`/`sonnet`/`haiku` — и все opus считались по $15/$75, тогда как у
-Opus 4.8 цена $5/$25: панель завышала стоимость втрое и молчала об этом. Теперь
-прайс тянется с сайта (`pricing-source.ts`), а подбор идёт от самого длинного
-идентификатора: `claude-opus-4` — подстрока `claude-opus-4-8`, и при обходе в
-произвольном порядке 4.8 посчитался бы по цене 4. Цена берётся на МОМЕНТ записи
-в транскрипте, потому что часть тарифов меняется по расписанию (вводная цена
-Sonnet 5 действует по 31.08.2026).
-
-**`Date.parse('August 31, 2026')` — это локальная полночь.** Прогнать её через
-`toISOString().slice(0, 10)` значит получить 30 августа при любом положительном
-смещении пояса, то есть закончить действие цены на сутки раньше срока. Дата
-собирается из локальных полей (`getFullYear`/`getMonth`/`getDate`) — поймано
-тестом, а не глазами.
-
-**Разбор чужой разметки обязан уметь отказываться.** Прайс — это markdown-
-страница Anthropic: колонки ищутся по заголовкам, а не по номерам (между
-записью и чтением кэша стоит колонка «1h Cache Writes» — по номерам она уехала
-бы в чтение), и любая неожиданность прекращает разбор целиком. Показать
-вчерашнюю цену не страшно, показать выдуманную — страшно.
-
-**Секреты пишутся только через `writeSecretFile`** (`credentials.ts`):
-права `0600` задаются созданием, а не последующим `chmod` — между ними файл
-успевает полежать открытым.
-
-**`shell: true` с массивом аргументов** даёт предупреждение Node DEP0190 и не
-экранирует аргументы. На Windows — либо одна строка, либо `shellArgs`.
-
-**Плавность анимации — это отсутствие перевёрстки**, а не постепенная смена
-числа. Меряй геометрию внутренностей (`check-motion.mjs`), а не только внешний
-размер: значок, который «едет» во время анимации, читается рывком.
-
-**`fs.cpSync` и `fs.rmSync` ломаются на нелатинских путях** (Node 24, Windows).
-`cpSync` убивает процесс молча: без исключения, без сообщения, с нулевым кодом
-выхода — тест не падает, а исчезает вместе с воркером. `rmSync` с `force: true`
-рапортует об успехе, оставив папку на диске. Поштучные операции
-(`copyFileSync`, `unlinkSync`, `rmdirSync`, `readdirSync`) те же пути
-обрабатывают правильно, поэтому в `safe-io.ts` есть свои `backupEntry` и
-`removeEntry` — пользуйся ими, а не рекурсивными API напрямую. Имена скиллов и
-их файлов приходят от пользователя, так что кириллица здесь ожидаема.
-
-**Выключение не должно быть удалением — проверяй это по кругу.** Выключенный
-хук исчезает из `settings.json` (иначе Claude Code его выполнит), поэтому его
-команда хранится снимком в `state.json` и подмешивается обратно при чтении.
-Выключенное правило уезжает в служебный раздел `CLAUDE.md`, и разбор обязан
-читать этот раздел: когда он его пропускал, правило пропадало из списка, а
-следующая перезапись файла стирала текст насовсем — потеря поймана на живом
-конфиге. Тесты на оба случая: `rules.disabled.test.ts`,
-`group-routes.integration.test.ts`.
-
-**Состояние сущности складывается из двух отметок**, ручной и групповой
-(`disabled` и `disabledByGroup` в `app-store.ts`). Применять на диск нужно итог
-`store.isDisabled()`, а не то, что попросили: иначе одиночный тумблер включит
-то, что гасит группа, и панель разойдётся с файлами.
-
-**Идентификатор хука считается от содержимого**, а не от места в файле
-(`hookId` в `hooks.ts`). Позиционный id (`Stop:0:0`) сдвигался при удалении
-соседа, и вместе с ним уезжали отметка «выключено», участие в группе и снимок
-команды. Прежний id продолжает жить рядом как `legacyId` — по нему находятся
-настройки, сделанные до перехода; `store.isDisabled` и `getGroupIdsFor`
-принимают его вторым аргументом, а маршруты приводят входящий id через
-`findHook`. Убирать эту совместимость нельзя, пока у пользователей есть
-state.json со старыми записями.
-
-**У каждой записи настроек есть `source`** — из какого файла она прочитана
-(`settings.json` или `settings.local.json`). Писать нужно туда же, откуда
-пришло: `writeHooks` фильтрует список по источнику, а маршруты выбирают путь
-через `targetOf`. Стоит перепутать — и личная настройка уедет в общий конфиг
-или наоборот.
-
-**OAuth-callback MCP намеренно пропущен мимо origin-guard** (`index.ts`).
-Возврат с сервера авторизации — это переход по адресу в отдельном окне с чужого
-домена, то есть заведомо `Sec-Fetch-Site: cross-site`; общий запрет его бы
-отклонил. Исключение узкое: только `GET /api/mcp/oauth/callback`, без побочных
-эффектов, а сам вход защищён параметром `state`, который генерирует панель и по
-нему же ищет незавершённый вход (`domains/mcp-oauth.ts`). Убирать исключение
-нельзя — сломается вход; расширять на другие маршруты тоже нельзя. Токены лежат
-отдельным файлом с правами 600, а не в общем `~/.claude.json`.
-
----
-
-**Справка — часть кода, а не отдельный документ.** Разделы описаны в
-`pages/Help/topics/*.tsx`, тексты — в `shared/config/i18n/help/{ru,en}.ts`.
-Меняешь поведение раздела — правь и его документ: расхождение здесь опаснее
-устаревшего README, потому что пользователь читает справку прямо в панели.
-Добавить документ — запись в `HELP_GROUPS` плюс компонент рядом; индекс, адрес
-`?topic=`, кнопка «?» и переход к соседнему разделу подхватятся сами.
-
-**Английский словарь типизирован по русскому.** Забытый ключ не соберётся —
-это ловит пропуски при переводе. Обратная сторона: правя `ru.ts`, сразу правь
-`en.ts`, иначе `tsc` красный.
-
-**Тумблер правок в чате включён по умолчанию и запоминается**
-(`shared/lib/chat-prefs/`). Раньше он жил в состоянии React и слетал при каждой
-перезагрузке — агент вставал на ровном месте. Если меняешь это поведение, поправь
-и справку: там оно описано в четырёх местах.
-
-## Правила работы с этим проектом
-
-**Конфигурация пользователя — чужие данные.** Панель правит настоящий
-`~/.claude`. Перед записью делается резервная копия в
-`~/.claude/claude-control/backups/`. Не трогай конфигурацию пользователя
-руками ради диагностики — пользуйся API панели.
-
-**Не запускай неудачные входы подряд.** У сервисов есть защита от перебора.
-
-**Проверяй правки прогоном, а не рассуждением.** В `tools/qa/` есть скрипты
-под каждую область; они гоняют настоящий интерфейс через Playwright.
-
-**Порядок проверки перед тем, как сказать «готово»:**
-
-```bash
-pnpm type-check      # tsc в обоих приложениях
-pnpm lint
-pnpm test            # тесты сервера
-node tools/qa/audit-layout.mjs
-```
-
-Если правил справку — прогони её отдельно: скрипт обходит все разделы в обеих
-темах и ищет на странице строки вида `help.…`. Такая строка означает, что ключ
-словаря забыт, а `tsc` этого не покажет — он проверяет полноту словаря, но не
-то, что ключ существует под именем, которым его зовут из компонента.
-
----
-
-## Где что лежит
-
-**Сервер** (`apps/server/src/`)
-
-| Что                                | Где                                   |
-| ---------------------------------- | ------------------------------------- |
-| Поиск каталога конфигурации        | `lib/claude-paths.ts`                 |
-| Доступ к аккаунту, различия ОС     | `lib/credentials.ts`                  |
-| Экранирование аргументов CLI       | `lib/cli-args.ts`                     |
-| Безопасная запись с бэкапом        | `lib/safe-io.ts`                      |
-| Копии и откат к ним                | `domains/backups.ts`                  |
-| Прайс Anthropic: загрузка и кэш    | `domains/analytics/pricing-source.ts` |
-| Тарифы и подбор цены по модели     | `domains/analytics/pricing.ts`        |
-| Включение и выключение на диске    | `domains/entity-toggle.ts`            |
-| Клиент MCP: stdio, HTTP, SSE       | `domains/mcp-client.ts`               |
-| OAuth у MCP: вход, токены, refresh | `domains/mcp-oauth.ts`                |
-| Признак локальных настроек         | `lib/settings-source.ts`              |
-| Запуск `claude`, разбор потока     | `domains/chat/ChatRunner.ts`          |
-| Чтение транскриптов                | `domains/chat/ChatHistory.ts`         |
-| Рабочая папка разговора            | `domains/chat/ChatWorkspace.ts`       |
-| Список проектов из транскриптов    | `domains/chat/ChatProjects.ts`        |
-| Обзор диска, открытие в редакторе  | `domains/fs/`                         |
-| Сборка песочницы                   | `domains/sandbox/SandboxConfig.ts`    |
-| Маршруты                           | `routes/*.ts`                         |
-
-**Фронт** (`apps/web/src/`) — слои FSD: `app` → `pages` → `features` →
-`entities` → `shared`.
-
-| Что                   | Где                                                        |
-| --------------------- | ---------------------------------------------------------- |
-| UI-кит                | `shared/ui/` (у каждого компонента есть `*.stories.tsx`)   |
-| Параллельные прогоны  | `shared/lib/agent-runs/` — стор, статусы, селекторы        |
-| Вкладки проектов      | `shared/lib/workspace/`                                    |
-| Липкие настройки чата | `shared/lib/chat-prefs/`                                   |
-| Язык движения         | `shared/lib/motion/`                                       |
-| Данные для витрины    | `shared/lib/mocks/`                                        |
-| Словари               | `shared/config/i18n/` — `en.ts` типизирован по `ru.ts`     |
-| Тексты справки        | `shared/config/i18n/help/` — отдельно, там их много        |
-| Документы справки     | `pages/Help/topics/` + реестр `pages/Help/model/topics.ts` |
-| Схемы для справки     | `shared/ui/diagram/` — `FlowDiagram`, `PriorityLadder`     |
-
-**Витрина компонентов:** `pnpm --filter @claude-control/web storybook`
-(120 историй, 30 страниц документации). Порт 6006 бывает занят — тогда `-p 6019`.
-
----
-
-## Чего в проекте намеренно нет
-
-- **Своей базы данных** — источник правды всегда файлы Claude Code.
-- **Своего механизма входа** — авторизацией занимается сам CLI.
-- **Раздачи собранного фронта сервером** — `pnpm start` поднимает только API,
-  фронт в разработке живёт на Vite. Для продакшен-запуска `dist` нужно отдать
-  отдельно.
+`/api/location` answers most questions on its own. No match below → narrow: server vs front (`curl`
+the API), panel vs CLI (`claude --version` in the terminal that started the server). Fixed →
+**verify by running**, then report what was verified and what stayed unverified.
+
+Fix without asking: project code, deps, build config, launch env. Ask first: files in `~/.claude` —
+the user's real config, not test data (reading is free; hand-editing for diagnosis is not, go
+through the panel's API).
+
+QA runs (need `pnpm dev` up + `pnpm qa:setup`): `tools/qa/audit-layout.mjs` (layout, all pages),
+`check-motion.mjs` (animation + geometry), `check-chat-regressions.mjs` (end-to-end chat),
+`check-all-forms.mjs` (9 forms), `check-sandbox.mjs`.
+
+## Symptom → cause → fix
+
+**`bad option --experimental-strip-types`** — Node < 22.6 (`.nvmrc` = 22). The only hard blocker.
+
+**Panel opens, everything zero** — wrong config dir. `/api/location` → `source` names the rule that
+picked it. Order in `claude-paths.ts`, first match wins: `manual` (Settings → config dir,
+remembered) → `env` (`CLAUDE_CONFIG_DIR`) → `home` (`~/.claude`). A once-set manual path beats the
+env var — if the user changed it and forgot, that's the answer.
+
+**Sandbox says `Not logged in` while normal chat works** — most common on macOS, not an account
+problem: the sandbox runs Claude with a substituted `CLAUDE_CONFIG_DIR`, so access must be carried
+over separately. Windows/Linux keep it in `~/.claude/.credentials.json`; macOS has no such file
+(keychain). Chain in `lib/credentials.ts`, first hit wins: `~/.claude-control/credentials.json`
+(manual, beats all) → `<config>/.credentials.json` → macOS keychain → `ANTHROPIC_API_KEY`. Fix:
+`pnpm doctor` "Доступ" line → on macOS accept the keychain dialog with "Always Allow" (renamed
+entry → `CLAUDE_CONTROL_KEYCHAIN_SERVICE`) → universal route is Settings → Claude Code access → set
+manually (`claudeAiOauth` | `apiKey` | `readFrom`), validated on the spot.
+
+**`claude not found`** — panel spawns `claude.cmd` on Windows, `claude` elsewhere; must be in the
+PATH of the process that started the server.
+
+**MCP server won't connect** — on Windows `npx` needs a shell (`mcp.ts`, `McpProbe.ts`); args with
+spaces are escaped via `shellArgs` (`cli-args.ts`), else `C:\Program Files\…` splits in two.
+
+**403 on requests** — origin allowlist + `Sec-Fetch-Site` (`index.ts`); only `localhost:WEB_PORT`
+and `127.0.0.1:WEB_PORT`. Changed the front port → set `WEB_PORT` for the server too.
+
+**`127.0.0.1:8888` dead but `localhost:8888` works** — Vite binds `127.0.0.1` explicitly
+(`vite.config.ts`). Reverse case = `localhost` resolves to `::1`.
+
+## Working rules
+
+- Verify by running, not by reasoning — `tools/qa/` drives the real UI per area.
+- Never repeat failed logins (brute-force lockouts).
+- Help is part of the code: sections `pages/Help/topics/*.tsx`, texts
+  `shared/config/i18n/help/{ru,en}.ts`. Change a section's behaviour → change its help document
+  (the user reads help inside the panel; drift here beats a stale README in damage). New document =
+  entry in `HELP_GROUPS` + component beside it; index, `?topic=`, "?" button and next-section link
+  follow automatically.
+- `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
+
+Gate before "done": `pnpm type-check && pnpm lint && pnpm test && node tools/qa/audit-layout.mjs`.
+Touched help → also run the help sweep: it walks every section in both themes looking for on-page
+`help.…` strings, i.e. a key called under a name that doesn't exist (`tsc` checks dictionary
+completeness, not call sites).
+
+## Where things live
+
+**Server** `apps/server/src/` — config-dir discovery `lib/claude-paths.ts` · account access & OS
+differences `lib/credentials.ts` · CLI arg escaping `lib/cli-args.ts` · safe write with backup
+`lib/safe-io.ts` · backups/rollback `domains/backups.ts` · pricing fetch+cache
+`domains/analytics/pricing-source.ts` · rates & per-model match `domains/analytics/pricing.ts` ·
+enable/disable on disk `domains/entity-toggle.ts` · MCP client (stdio/HTTP/SSE)
+`domains/mcp-client.ts` · MCP OAuth `domains/mcp-oauth.ts` · local-settings flag
+`lib/settings-source.ts` · spawn `claude` + stream parsing `domains/chat/ChatRunner.ts` ·
+transcripts `domains/chat/ChatHistory.ts` · conversation workdir `domains/chat/ChatWorkspace.ts` ·
+project list `domains/chat/ChatProjects.ts` · disk browse & open-in-editor `domains/fs/` · sandbox
+assembly `domains/sandbox/SandboxConfig.ts` · provider catalog & capabilities `providers/` ·
+foreign-format check vs published schemas `domains/format-check.ts` · opencode session server
+`domains/opencode-serve.ts` · routes `routes/*.ts`.
+
+**Web** `apps/web/src/`, FSD layers `app` → `pages` → `features` → `entities` → `shared` — UI kit
+`shared/ui/` (each component has `*.stories.tsx`) · parallel agent runs `shared/lib/agent-runs/` ·
+project tabs `shared/lib/workspace/` · sticky chat prefs `shared/lib/chat-prefs/` · motion
+`shared/lib/motion/` · showcase data `shared/lib/mocks/` · dictionaries `shared/config/i18n/` ·
+help texts `shared/config/i18n/help/` · help documents `pages/Help/topics/` + registry
+`pages/Help/model/topics.ts` · diagrams `shared/ui/diagram/`.
+
+Storybook: `pnpm --filter @claude-control/web storybook` (120 stories, 30 doc pages); port 6006
+often taken → `-p 6019`.
+
+## Deliberately absent
+
+Own database (source of truth is Claude Code's files) · own login (the CLI authenticates) ·
+serving the built front from the server (`pnpm start` = API only; dev front lives on Vite,
+production must serve `dist` separately).

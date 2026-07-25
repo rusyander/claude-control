@@ -3,9 +3,12 @@ import {
   spawnSync,
   type ChildProcessWithoutNullStreams,
 } from 'node:child_process';
+import type { ModelInfo } from '@claude-control/contracts';
 import type { ConfigProvider } from '../providers/types.ts';
 import { providerCliCommand } from '../providers/cli.ts';
 import { resolveRunner, getRawKey, type RunnerMode } from './provider-keys.ts';
+import { resolveAssistantModel } from './models/model-defaults.ts';
+import { opencodeServe, type OpencodeServe } from './opencode-serve.ts';
 
 /**
  * Реальный запуск ассистента активного провайдера (Ф6b) — мультимодельная ветка
@@ -43,6 +46,10 @@ export interface AssistantRunResult {
   experimental: boolean;
   reason: AssistantRunReason;
   error?: string;
+  /** Как отработал CLI: отдельный процесс на вопрос или сессия локального сервера. */
+  transport?: 'one-shot' | 'session';
+  /** Id сессии CLI, если диалог шёл сессией. */
+  sessionId?: string;
 }
 
 /** Внедряемые зависимости (для тестов: без реальной сети и без реального spawn). */
@@ -53,6 +60,22 @@ export interface RunAssistantDeps {
   spawnImpl?: typeof nodeSpawn;
   /** Таймаут CLI one-shot, мс (по умолчанию 180000). */
   timeoutMs?: number;
+  /**
+   * Каталог моделей провайдера (из кэша, без похода в сеть). Нужен ровно затем,
+   * чтобы зашитая в код модель ассистента не устаревала молча: при совпадении
+   * семейства берётся её актуальное поколение. Пусто — остаёмся на зашитой.
+   */
+  models?: ModelInfo[];
+  /**
+   * Идентификатор диалога панели. Нужен ровно сессионному режиму (IDEA-8): по
+   * нему находится уже открытая сессия CLI. Не задан → сессионный режим не
+   * пробуется вовсе, всё идёт one-shot как раньше.
+   */
+  conversationId?: string;
+  /** Локальный сервер CLI (подменяется в тестах, чтобы ничего не запускалось). */
+  sessionServe?: OpencodeServe;
+  /** Сколько ждать готовности локального сервера CLI, мс. */
+  serveReadyTimeoutMs?: number;
 }
 
 const DEFAULT_TIMEOUT = 180_000;
@@ -222,7 +245,15 @@ function outcomeToResult(
       error: outcome.stderr.trim().slice(0, 500) || `CLI завершился с кодом ${outcome.code}`,
     };
   }
-  return { ok: true, providerId, mode: 'cli', reply, experimental, reason: 'ok' };
+  return {
+    ok: true,
+    providerId,
+    mode: 'cli',
+    reply,
+    experimental,
+    reason: 'ok',
+    transport: 'one-shot',
+  };
 }
 
 /**
@@ -270,17 +301,75 @@ async function runProviderCli(
   return outcomeToResult(provider.id, outcome, true);
 }
 
+// --- Сессионный режим CLI (IDEA-8) -------------------------------------------
+
+/**
+ * Сессионный запуск через локальный сервер CLI. Отличие от one-shot одно, но
+ * важное: контекст диалога держит САМ CLI, поэтому наружу уходит только
+ * последнее сообщение пользователя, а не склеенная история.
+ *
+ * `undefined` = «не получилось, иди дальше»: вызывающий молча падает на one-shot.
+ * Своих ошибок наружу этот путь не даёт — он не должен уметь сломать то, что
+ * работало до него.
+ */
+async function runSessionServer(
+  provider: ConfigProvider,
+  messages: AssistantMessage[],
+  deps: RunAssistantDeps,
+  cliCommand?: string,
+): Promise<AssistantRunResult | undefined> {
+  const conversationId = deps.conversationId;
+  if (!conversationId || provider.assistant?.sessionServer !== 'opencode') return undefined;
+
+  const lastUser = [...messages].reverse().find((message) => message.role === 'user');
+  const text = lastUser?.content.trim();
+  if (!text) return undefined;
+
+  const serve = deps.sessionServe ?? opencodeServe;
+  const result = await serve.ask(conversationId, text, {
+    command: cliCommand ?? providerCliCommand(provider),
+    spawnImpl: deps.spawnImpl,
+    fetchImpl: deps.fetchImpl,
+    readyTimeoutMs: deps.serveReadyTimeoutMs,
+    requestTimeoutMs: deps.timeoutMs,
+  });
+  if (!result) return undefined;
+
+  return {
+    ok: true,
+    providerId: provider.id,
+    mode: 'cli',
+    reply: result.reply,
+    // Путь всё ещё экспериментальный: живым прогоном не проверен (CLI здесь не
+    // установлен), форма запросов — из документации.
+    experimental: true,
+    reason: 'ok',
+    transport: 'session',
+    sessionId: result.sessionId,
+  };
+}
+
 // --- API fetch ---------------------------------------------------------------
 
 const OPENAI_BASE = 'https://api.openai.com/v1';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const GOOGLE_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+/**
+ * Зашитый минимум: скромные модели, которых хватает на заполнение формы.
+ * Каталог поколений (`deps.models`) поднимает каждую до её актуальной версии
+ * ВНУТРИ семейства — класс модели и порядок цены остаются те же.
+ */
 const MODELS = {
   anthropic: 'claude-3-5-sonnet-latest',
   openai: 'gpt-4o-mini',
   google: 'gemini-1.5-flash',
 } as const;
+
+/** Актуальное поколение зашитой модели — или она сама, если каталога нет. */
+function assistantModel(deps: RunAssistantDeps, fallback: string): string {
+  return resolveAssistantModel(deps.models ?? [], fallback);
+}
 
 function apiError(providerId: string, message: string): AssistantRunResult {
   return {
@@ -318,7 +407,7 @@ async function runProviderApi(
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: MODELS.anthropic,
+          model: assistantModel(deps, MODELS.anthropic),
           max_tokens: 2048,
           messages: messages.map((m) => ({ role: m.role, content: m.content })),
         }),
@@ -334,7 +423,8 @@ async function runProviderApi(
 
     if (apiKind === 'google') {
       // Ключ — в квери; URL с ключом в ошибки/логи НЕ включаем.
-      const url = `${GOOGLE_BASE}/${MODELS.google}:generateContent?key=${encodeURIComponent(key)}`;
+      const model = assistantModel(deps, MODELS.google);
+      const url = `${GOOGLE_BASE}/${model}:generateContent?key=${encodeURIComponent(key)}`;
       const res = await fetchImpl(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -366,7 +456,7 @@ async function runProviderApi(
         authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL ?? MODELS.openai,
+        model: process.env.OPENAI_MODEL ?? assistantModel(deps, MODELS.openai),
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
       }),
     });
@@ -424,6 +514,11 @@ export async function runAssistant(
   }
 
   if (resolution.mode === 'cli') {
+    // IDEA-8: сначала сессионный режим (если провайдер его заявил и диалог
+    // опознан), при любой заминке — привычный one-shot.
+    const session = await runSessionServer(provider, messages, deps, resolution.cliCommandFound);
+    if (session) return session;
+
     const cliResult = await runProviderCli(
       provider,
       flattenPrompt(messages),

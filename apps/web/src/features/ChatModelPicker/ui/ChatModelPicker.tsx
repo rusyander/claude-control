@@ -1,6 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { MODEL_OPTIONS, EFFORT_LEVELS, modelLabel } from '@shared/lib/chat-model';
+import {
+  MODEL_OPTIONS,
+  EFFORT_LEVELS,
+  modelLabel,
+  modelSelectOptions,
+  withCurrentValue,
+} from '@shared/lib/chat-model';
 import type { ChatModelPickerProps } from './ChatModelPicker.types';
 import styles from './ChatModelPicker.module.scss';
 
@@ -19,6 +25,7 @@ export function ChatModelPicker({
   effort,
   defaultModel,
   defaultEffort,
+  models,
   onModelChange,
   onEffortChange,
 }: ChatModelPickerProps) {
@@ -30,6 +37,15 @@ export function ChatModelPicker({
     ? t(`chat.effort_${defaultEffort}`)
     : t('chat.effortAuto');
 
+  // Алиасы + конкретные модели каталога; выбранное значение остаётся в списке,
+  // даже если каталог не скачался.
+  const modelOptions = withCurrentValue(
+    modelSelectOptions(models ?? [], MODEL_OPTIONS, (value) =>
+      value ? modelLabel(value) : t('chat.fromSettings', { value: defaultModelName }),
+    ),
+    model,
+  );
+
   return (
     <Stack direction="row" align="center" gap="var(--spacing-3xs)">
       <select
@@ -39,9 +55,9 @@ export function ChatModelPicker({
         aria-label={t('chat.model')}
         title={t('chat.modelHint')}
       >
-        {MODEL_OPTIONS.map((value) => (
-          <option key={value || 'default'} value={value}>
-            {value ? modelLabel(value) : t('chat.fromSettings', { value: defaultModelName })}
+        {modelOptions.map((option) => (
+          <option key={option.value || 'default'} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>

@@ -15,8 +15,12 @@ import { registerConfigRoutes } from './config-routes.ts';
  * пишет и не спавнит `--version`. Поэтому проверяем его на живом Fastify как
  * есть, с настоящим детектом: результат зависит от машины, но ФОРМА ответа и
  * инварианты (200, все провайдеры, никакой версии) — нет.
+ *
+ * Срок увеличен: детект дёргает `where`/`which` по десяти CLI, и на Windows под
+ * параллельным прогоном всей сюиты это уходит за стандартные 5 секунд. Медленно
+ * здесь — свойство диска, а не признак поломки.
  */
-describe('config-routes: GET /api/providers/detect', () => {
+describe('config-routes: GET /api/providers/detect', { timeout: 30_000 }, () => {
   let root: string;
   let app: FastifyInstance;
 
@@ -63,7 +67,7 @@ describe('config-routes: GET /api/providers/detect', () => {
 
     const body = res.json<ProviderDetectResponse>();
     expect(body.active).toBe('claude');
-    expect(body.providers).toHaveLength(6);
+    expect(body.providers).toHaveLength(10);
     for (const item of body.providers) {
       expect(typeof item.cliInstalled).toBe('boolean');
       expect(typeof item.configPresent).toBe('boolean');

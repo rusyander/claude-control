@@ -1,0 +1,31 @@
+// Строка модели: имя и бейджи слева, кнопка «по умолчанию» прижата вправо.
+.row {
+  padding: var(--spacing-2xs) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.name {
+  min-width: 0;
+}
+
+// Идентификатор копируют целиком — переносить по словам нельзя.
+.id {
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-muted);
+}
+
+.actions {
+  margin-left: auto;
+}
+
+// Список длинный (у OpenAI это полсотни моделей) — прокручиваем внутри карточки.
+.list {
+  max-height: 40vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}

@@ -183,10 +183,17 @@ export function checkSkillName(value: string): SkillNameProblem | undefined {
   return undefined;
 }
 
-/** Годится ли описание: обязательное, 1–1024 символа. */
-export function checkSkillDescription(value: string): 'empty' | 'too_long' | undefined {
+/**
+ * Годится ли описание: обязательное, не длиннее предела ЭТОГО CLI. Предел
+ * приходит из каталога: у OpenCode и Qwen он не назван (берём 1024), у Kimi
+ * документация говорит «однострочная сводка до 240 символов».
+ */
+export function checkSkillDescription(
+  value: string,
+  max: number = SKILL_DESCRIPTION_MAX,
+): 'empty' | 'too_long' | undefined {
   if (!value.trim()) return 'empty';
-  if (value.length > SKILL_DESCRIPTION_MAX) return 'too_long';
+  if (value.length > max) return 'too_long';
   return undefined;
 }
 

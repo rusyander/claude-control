@@ -104,6 +104,16 @@ export interface ProviderAssistant {
   apiKeyEnvVars: string[];
   cliRunnable: boolean;
   oneShotArgs?: (prompt: string) => string[];
+  /**
+   * ПРОТОКОЛ локального сервера CLI, дающего СЕССИОННЫЙ (богатый) режим ассистента
+   * вместо one-shot: диалог держит сам CLI, панель шлёт только новое сообщение.
+   *
+   * Значение называет протокол, а не просто «умеет сервер»: реализация под него
+   * лежит в отдельном домене (`domains/opencode-serve.ts`). Не задан → сессионного
+   * режима у провайдера нет, и панель его не выдумывает (fail-closed). Сейчас
+   * задокументирован ровно один — `opencode serve`.
+   */
+  sessionServer?: 'opencode';
 }
 
 /**
@@ -126,9 +136,15 @@ export interface ProviderMcpConfigLocation {
    * - `json` — объект `mcpServers` (Gemini `settings.json`, Cursor `mcp.json`);
    * - `toml` — таблицы `[mcp_servers.<name>]` (Codex `config.toml`);
    * - `opencode-json` — объект `mcp` с формой `{ type: 'local'|'remote' }`
-   *   (OpenCode `opencode.json`).
+   *   (OpenCode `opencode.json`);
+   * - `continue-yaml` — СПИСОК `mcpServers`, имя записи лежит внутри неё полем
+   *   `name` (Continue `config.yaml`); правится Document API пакета `yaml`.
+   * - `goose-yaml` — ОТОБРАЖЕНИЕ `extensions` «имя → запись» (Goose
+   *   `config.yaml`): тип задаёт `type`, внешние серверы — только `stdio` / `sse`
+   *   / `streamable_http`, встроенные расширения (`builtin` и прочие) не
+   *   показываются и не правятся.
    */
-  format: 'json' | 'toml' | 'opencode-json';
+  format: 'json' | 'toml' | 'opencode-json' | 'continue-yaml' | 'goose-yaml';
   /** Абсолютный путь к файлу MCP-конфигурации. */
   path: (override?: string) => string;
   /**
@@ -202,8 +218,12 @@ export interface ProviderInstructionsListLocation {
  * ни одной → раздел инструкций fail-closed (сервер отвечает 4xx).
  */
 export interface ProviderInstructionsRulesLocation {
-  /** Формат каталога: `cursor-mdc` — файлы `.mdc` с YAML-frontmatter. */
-  format: 'cursor-mdc';
+  /**
+   * Формат каталога: `cursor-mdc` — файлы `.mdc` с YAML-frontmatter (Cursor);
+   * `continue-md` — файлы `.md` с тем же frontmatter (Continue,
+   * `<проект>/.continue/rules`).
+   */
+  format: 'cursor-mdc' | 'continue-md';
   /** Абсолютный путь КАТАЛОГА правил (`~/.cursor/rules`). */
   dir: (override?: string) => string;
 }
@@ -226,11 +246,31 @@ export interface ProviderPermissionsConfigLocation {
    * - `toml` — скалярные ключи корня (Codex `config.toml`);
    * - `gemini-json` — `general.defaultApprovalMode` + `coreTools`/`excludeTools`
    *   (Gemini `settings.json`), правятся точечно, прочие ключи сохраняются;
+   * - `qwen-json` — `tools.approvalMode` + списки правил `permissions.allow` /
+   *   `ask` / `deny` (Qwen Code `settings.json`). Форк Gemini, но ключи прав у
+   *   него ДРУГИЕ — общий формат с `gemini-json` был бы записью не туда;
    * - `opencode-json` — ключ `permission` (OpenCode `opencode.json`): уровень
    *   `allow`/`deny`/`ask` у инструмента, у `bash` — ещё и карта шаблонов
-   *   команд. Правится только `permission`, прочие ключи сохраняются.
+   *   команд. Правится только `permission`, прочие ключи сохраняются;
+   * - `continue-yaml` — ОТДЕЛЬНЫЙ файл `~/.continue/permissions.yaml` с тремя
+   *   списками `allow` / `ask` / `exclude` и без режима-переключателя;
+   * - `goose-yaml` — скалярный ключ КОРНЯ `GOOSE_MODE` (Goose `config.yaml`):
+   *   `auto` / `approve` / `smart_approve` / `chat`, списков нет вовсе;
+   * - `kimi-toml` — режим `default_permission_mode` + МАССИВ ТАБЛИЦ
+   *   `[[permission.rules]]` (`decision` + `pattern`) в Kimi `config.toml`;
+   * - `cursor-json` — ключ `permissions` с двумя списками `allow`/`deny`
+   *   (Cursor `cli-config.json` глобально, `.cursor/cli.json` в проекте);
+   *   режима нет, `deny` приоритетнее, прочие ключи файла сохраняются.
    */
-  format: 'toml' | 'gemini-json' | 'opencode-json';
+  format:
+    | 'toml'
+    | 'gemini-json'
+    | 'qwen-json'
+    | 'opencode-json'
+    | 'continue-yaml'
+    | 'goose-yaml'
+    | 'kimi-toml'
+    | 'cursor-json';
   /** Абсолютный путь к файлу конфигурации с правами/аппрувами. */
   path: (override?: string) => string;
 }
@@ -252,11 +292,31 @@ export interface ProviderHooksConfigLocation {
    *   задокументированных события (`file_edited` — карта «шаблон → действия»,
    *   `session_completed` — массив действий), действие = argv-массив `command` +
    *   необязательные переменные `environment`. Правится только `experimental.hook`;
-   *   прочие ключи `experimental` и незнакомые события сохраняются.
+   *   прочие ключи `experimental` и незнакомые события сохраняются. С 25 июля
+   *   2026 — только чтение (см. `writeDisabledReason` ниже);
+   * - `qwen-json` — ключ КОРНЯ `hooks` в `settings.json` Qwen Code: событие →
+   *   массив групп `{ matcher, hooks: [{ type: "command", command, timeout }] }`,
+   *   таймаут в МИЛЛИСЕКУНДАХ. Панель ведёт группы ровно с одним действием типа
+   *   `command`; событие любой другой формы сохраняется целиком и не правится;
+   * - `kimi-toml` — МАССИВ ТАБЛИЦ `[[hooks]]` в `config.toml` Kimi Code: поля
+   *   `event` / `matcher` / `command` / `timeout` (СЕКУНДЫ, 1–600). Плоский
+   *   массив нельзя переписать частично, поэтому любое отклонение от формы
+   *   переводит весь раздел в чтение.
    */
-  format: 'opencode-json';
+  format: 'opencode-json' | 'qwen-json' | 'kimi-toml';
   /** Абсолютный путь к файлу конфигурации с хуками. */
   path: (override?: string) => string;
+  /**
+   * Ключ ИСЧЕЗ из документации и опубликованной схемы CLI → раздел только для
+   * чтения: панель по-прежнему показывает то, что уже лежит в файле, но писать
+   * туда перестаёт. Текст — причина, её видит пользователь.
+   *
+   * Заведено ради `experimental.hook` у OpenCode (см. `catalog.ts`): писать
+   * ключ, которого нет ни в справочнике, ни в схеме, — это гадание о чужом
+   * формате, а оно запрещено. Опишут ключ обратно — поле убирается, и раздел
+   * оживает без единой правки адаптера.
+   */
+  writeDisabledReason?: string;
 }
 
 /**
@@ -271,12 +331,20 @@ export interface ProviderHooksConfigLocation {
  * Поэтому здесь два пути сразу.
  */
 export interface ProviderPluginsConfigLocation {
-  /** Формат раздела: `opencode-plugins` — каталог файлов + массив `plugin`. */
-  format: 'opencode-plugins';
-  /** Абсолютный путь КАТАЛОГА файлов-плагинов (`~/.config/opencode/plugins`). */
+  /**
+   * Формат раздела:
+   * - `opencode-plugins` — каталог файлов + массив `plugin` (правится);
+   * - `kimi-plugins` — каталог `plugins/managed/<id>/` с JSON-манифестами
+   *   (ТОЛЬКО ЧТЕНИЕ: форма реестра `installed.json` не задокументирована, а
+   *   ставят и включают плагины командой `/plugins` внутри CLI).
+   */
+  format: 'opencode-plugins' | 'kimi-plugins';
+  /** Абсолютный путь КАТАЛОГА плагинов (`~/.config/opencode/plugins`). */
   dir: (override?: string) => string;
-  /** Абсолютный путь конфигурации, в которой лежит массив `plugin`. */
-  configPath: (override?: string) => string;
+  /** Абсолютный путь конфигурации с массивом `plugin` — только у OpenCode. */
+  configPath?: (override?: string) => string;
+  /** Абсолютный путь реестра установленного (`plugins/installed.json`) — Kimi. */
+  registryPath?: (override?: string) => string;
 }
 
 /**
@@ -290,10 +358,10 @@ export interface ProviderPluginsConfigLocation {
  */
 export interface ProviderSkillsConfigLocation {
   /**
-   * Формат каталога: `opencode-skills` — папка на скилл, внутри `SKILL.md` с
+   * Формат каталога: `skill-md-dir` — папка на скилл, внутри `SKILL.md` с
    * YAML-шапкой (`name` и `description` обязательны).
    */
-  format: 'opencode-skills';
+  format: 'skill-md-dir';
   /** Абсолютный путь КАТАЛОГА скиллов (`~/.config/opencode/skills`). */
   dir: (override?: string) => string;
   /**
@@ -303,6 +371,12 @@ export interface ProviderSkillsConfigLocation {
    * собственный раздел Claude.
    */
   alsoLoadedFrom?: () => string[];
+  /**
+   * Предел длины `description` В ЭТОМ CLI. Не задан → 1024 (OpenCode, Qwen: там
+   * потолок не назван). У Kimi Code документация говорит прямо — «однострочная
+   * сводка до 240 символов», и писать длиннее панель не станет.
+   */
+  descriptionMax?: number;
 }
 
 /**
@@ -396,7 +470,9 @@ export interface ProviderProjectConfigLocation {
    * У OpenCode это `<проект>/.opencode/plugins/` и `<проект>/opencode.json`.
    */
   plugins?: {
-    format: ProviderPluginsConfigLocation['format'];
+    // Проектных плагинов из всех провайдеров бывает только у OpenCode: у Kimi
+    // плагины лежат в домашнем каталоге и проектного уровня не имеют.
+    format: 'opencode-plugins';
     /** Относительный путь КАТАЛОГА файлов от корня проекта, разделитель — `/`. */
     relativeDir: string;
     /** Относительный путь конфига с массивом `plugin`, разделитель — `/`. */
@@ -537,4 +613,14 @@ export interface ConfigProvider {
    * Cursor `apiKind='none'` + `cliRunnable=false` — ассистент unsupported.
    */
   assistant?: ProviderAssistant;
+  /**
+   * Вендоры каталога моделей (models.dev), чьи модели относятся к этому CLI:
+   * claude → `anthropic`, codex → `openai`, gemini → `google`, qwen →
+   * `alibaba`, kimi → `moonshotai`, opencode → его собственный шлюз `opencode`.
+   *
+   * Не задан — раздел моделей у провайдера fail-closed: Continue, Goose, Aider
+   * и Cursor это оболочки поверх любых моделей, и решать за пользователя, чей
+   * список ему показать, панель не станет.
+   */
+  modelVendors?: string[];
 }

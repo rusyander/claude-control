@@ -26,4 +26,8 @@ export const claudeProvider: ConfigProvider = {
   // рабочий CLI-путь (`claude`), поэтому при отсутствии ключа, но найденном CLI
   // раннер = `cli` — текущее поведение чата сохраняется (регресс-ноль).
   assistant: { apiKind: 'anthropic', apiKeyEnvVars: ['ANTHROPIC_API_KEY'], cliRunnable: true },
+  // Модели: каталог Anthropic (models.dev). Алиасы (`opus`, `sonnet`, `haiku`)
+  // CLI разворачивает сам, поэтому каталог нужен ровно для двух вещей — видеть
+  // вышедшие модели и заметить смену поколения у пришпиленного дефолта.
+  modelVendors: ['anthropic'],
 };

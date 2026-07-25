@@ -123,8 +123,17 @@ export const helpEn: HelpSchema = {
         'not cut off at the last window',
       canExport: 'Export a conversation to a file — Markdown or JSON',
       canRun:
-        'Start the project’s dev server right from its chat tab and jump to the opened ' +
-        'address — the panel picks up the command from package.json (dev or start), or you set your own',
+        'Start the project’s dev server right from its chat tab and jump to the address the ' +
+        'server printed itself; in a monorepo — one target per package, several at once',
+      canFreePort:
+        'See who is holding the port you need (process name and PID) and free it with one ' +
+        'button, together with a retry',
+      canAutostart:
+        'Tick the “Autostart” toggle on a target — its dev server comes up by itself on the ' +
+        'panel’s next start, without opening a browser window',
+      canGit:
+        'See the current branch, switch branches, create a new one and commit changes right ' +
+        'from the tab — whenever the project has a .git',
 
       cantApprove:
         'Grant permissions in advance: the panel asks at the moment of the action, and ' +
@@ -176,6 +185,39 @@ export const helpEn: HelpSchema = {
       tabsNote:
         'Tabs survive a page reload, and closing a tab closes only the tab — neither ' +
         'chats nor files are touched.',
+
+      toolsTitle: 'The project row: dev server and git',
+      toolsCaption:
+        'All of it lives in the project tab header and works against the real directory ' +
+        'on disk — the panel keeps no copy of the state.',
+      toolsRun: 'Starting the dev server',
+      toolsRunText:
+        'The “Start” button runs the command from package.json (dev, otherwise start) or ' +
+        'your own — with the package manager the project actually uses: pnpm, yarn or npm. ' +
+        'The panel does NOT assign the port: the app comes up on its own, the panel reads ' +
+        'the address from its output and opens the browser once the port answers. A ' +
+        'monorepo has several targets — the gear next to the button lists the packages, and ' +
+        'they can run at the same time.',
+      toolsPort: 'Port already taken',
+      toolsPortText:
+        'When the server refuses to start (“Port 5173 is already in use”), the panel shows ' +
+        'who holds the port — process name and PID — and a “Free it and start” button. It ' +
+        'kills nothing on its own: a database or a neighbouring project may live there, so ' +
+        'the call stays yours. A port can also be pinned in the target’s settings — then the ' +
+        'panel passes PORT and waits for exactly that one.',
+      toolsAutostart: 'The “Autostart” toggle',
+      toolsAutostartText:
+        'It is not about now but about the panel’s next start: a ticked target comes up ' +
+        'by itself, with no browser window and no navigation. Close the project tab and the ' +
+        'toggle clears on all of its targets.',
+      toolsGit: 'Branch and commit',
+      toolsGitText:
+        'The button with the current branch name shows up only when the project has a ' +
+        '.git. Under it: the list of local branches to switch to, a “new branch” field and ' +
+        'a commit message field; the counter next to it shows how many files changed.',
+      toolsNote:
+        'A commit takes every change (git add -A) and lands on the current branch. The ' +
+        'panel never pushes, merges or deletes branches — that is deliberately left to you.',
 
       dotsTitle: 'Coloured dots: what the agent is doing',
       dotsCaption:
@@ -624,6 +666,13 @@ export const helpEn: HelpSchema = {
       canRevertHunk: 'Revert a single change out of a backup without bringing back the whole file',
       canTransfer:
         'Move the panel settings to another machine: export and import the state.json file',
+      canEnvTransfer:
+        'Pack any provider’s environment into an archive and unpack it on another machine',
+      canModels: 'Refresh the provider’s model list and move the default onto a newer model',
+      canCheck:
+        'Check a provider on this machine: a read-write round trip on a config copy plus ' +
+        'one assistant launch',
+      canPreview: 'Show a diff before writing into another CLI’s configuration',
       canWatch: 'Watch the files and refresh the interface when they change outside the panel',
 
       cantLogin: 'Sign in to a Claude account: authentication is the CLI’s job',
@@ -694,6 +743,143 @@ export const helpEn: HelpSchema = {
         'always visible, while the dollar figure is an estimate at API rates and is ' +
         'never charged on a subscription.',
 
+      modelsTitle: 'Provider models',
+      modelsCaption:
+        'The model list used to be hard-coded into the panel and went stale silently: ' +
+        'a model shipped, and there was nowhere to pick it. Now the panel asks a catalog.',
+      modelsWhere: 'Where the list comes from',
+      modelsWhereText:
+        'The open models.dev catalog — the same one OpenCode runs on. The request goes ' +
+        'out no more than once a day, everything else comes from the cache; with no ' +
+        'network the previous list is shown with its age.',
+      modelsAuto: 'A new model as the default',
+      modelsAutoText:
+        'When a CONCRETE model is set in the settings and a newer generation of the same ' +
+        'family ships, the panel moves the default itself and says so. An alias (opus) is ' +
+        'left alone: the CLI already expands it to the latest model.',
+      modelsWho: 'Who has one',
+      modelsWhoText:
+        'Claude, Codex, Gemini, Qwen Code, Kimi Code and OpenCode — their vendor is known. ' +
+        'Continue, Goose, Aider and Cursor run on top of any model, so no catalog is shown ' +
+        'for them: the panel will not guess whose list to use.',
+      modelsOff: 'How to turn it off',
+      modelsOffText:
+        'The “update the model list automatically” toggle in the same card. Off — no network ' +
+        'requests at all, the list refreshes only by button, and the default never changes.',
+
+      checkTitle: 'Provider check',
+      checkCaption:
+        'Nine of the ten CLIs are marked experimental: their formats come from the docs, ' +
+        'but the panel has never executed them on your machine. The button turns that ' +
+        'promise into a fact.',
+      checkWhat: 'What it does',
+      checkWhatText:
+        'Looks for the CLI in PATH, checks the configuration files, performs a ' +
+        'read-write-read round trip for every supported section and asks the assistant ' +
+        'for one short reply.',
+      checkSafe: 'What it does NOT do',
+      checkSafeText:
+        'It does not write to your files. The round trip runs on a temporary copy of the ' +
+        'configuration, and the copy is deleted right after — the original stays byte for byte.',
+      checkResult: 'What the result means',
+      checkResultText:
+        '“Verified here” — every step passed, including the model reply. “Partial” — no ' +
+        'failures, but something was skipped: no CLI, or the assistant launch was off. ' +
+        '“Check failed” — a step failed, and its reason is spelled out.',
+      checkBadge: 'Where the result shows',
+      checkBadgeText:
+        'In the provider selector card and as a strip above EVERY section: another CLI’s ' +
+        'settings are edited outside the selector page, and knowing whose format is being ' +
+        'written matters there. Claude has no strip — it is the default and stays quiet.',
+
+      formatTitle: 'Format check against schemas',
+      formatCaption:
+        'The panel writes other CLIs’ configuration from their documentation, and ' +
+        'documentation drifts with releases. This check asks the same question in advance — ' +
+        'before a broken CLI asks it for you.',
+      formatWhat: 'What it does',
+      formatWhatText:
+        'Downloads the CLI’s officially published schema and verifies that every key the ' +
+        'panel actually edits is present in it. OUR keys are compared against the schema — ' +
+        'your own config is neither read nor touched.',
+      formatWho: 'Why not everyone is checked',
+      formatWhoText:
+        'The check is possible where a schema is published at a documented address. Today ' +
+        'that is OpenCode only. The rest say “no schema” — an honest answer rather than ' +
+        '“all good”: an invented schema URL would be worse than a missing one.',
+      formatDrift: 'What to do about a mismatch',
+      formatDriftText:
+        'Nothing urgent: a mismatch blocks nothing and fixes nothing. It means the key is ' +
+        'no longer listed in the schema — worth checking the CLI’s documentation before the ' +
+        'next write into that section.',
+      formatWhen: 'How often',
+      formatWhenText:
+        'At most once a week and never on your path: the section opens from cache and a ' +
+        'stale result refreshes in the background. “Check now” is the only place where the ' +
+        'answer waits for the network.',
+
+      previewTitle: 'Preview of a write into another CLI’s config',
+      previewCaption:
+        'Another CLI’s configuration was written by hand, and “Save” used to show nothing ' +
+        'until it was too late. A diff now stands between the button and the file.',
+      previewWhen: 'When it appears',
+      previewWhenText:
+        'On any write into a foreign provider’s sections: MCP, permissions, variables, ' +
+        'instructions. Claude has no preview — it is the panel’s default, its formats are ' +
+        'verified, and an extra question would be noise.',
+      previewHow: 'Where the diff comes from',
+      previewHowText:
+        'Not a prediction: the panel copies your file into a temporary directory, performs ' +
+        'the REAL write on the copy with the same code, reads the result and deletes the ' +
+        'copy. What you see is exactly what lands in the file.',
+      previewRead: 'How to read it',
+      previewReadText:
+        'Green with “+” will appear, red with “−” will disappear, grey is the surrounding ' +
+        'context. The file path and a line counter sit on top; if the file does not exist ' +
+        'yet, it says so.',
+      previewOff: 'How to turn it off',
+      previewOffText:
+        'The “show a diff before writing” toggle in the safety card. Off — the write goes ' +
+        'straight through, as before. A backup is still made either way: that is a separate ' +
+        'setting.',
+      previewNoise: 'The diff is wider than your edit',
+      previewNoiseText:
+        'Sometimes lines you never touched change: the panel re-serialises a whole TOML or ' +
+        'JSON region, so a neighbouring entry may come back spelled differently with the ' +
+        'same meaning. That is not a bug — but it is better seen BEFORE the write.',
+
+      transferTitle: 'Moving an environment to another machine',
+      transferCaption:
+        'Every provider has its own buttons, and each one packs only that provider. ' +
+        'The point is to sit down at another computer and work with the same agent ' +
+        'under the same settings instead of rebuilding them.',
+      transferExport: 'Export',
+      transferExportText:
+        'A preview first: how many files will travel, from which directories and what ' +
+        'will not be in the archive. Then a folder picker — and the panel shows the ' +
+        'finished path, so the archive does not have to be hunted for.',
+      transferImport: 'Import',
+      transferImportText:
+        'The panel reads the archive and says, for every file, whether it is new, ' +
+        'already identical or about to overwrite yours. Only new files are ticked by ' +
+        'default: overwriting your own configuration is a human decision.',
+      transferContent: 'What is inside',
+      transferContentText:
+        'Instructions, MCP servers, permissions, hooks, skills, agents, commands, ' +
+        'plugins and rules — everything that makes the agent the same one. Plus a ' +
+        'README and a manifest: the archive can simply be handed to the model with ' +
+        '“I worked with you on another computer, pick these settings up”.',
+      transferPaths: 'Paths are recomputed',
+      transferPathsText:
+        'The manifest stores configuration locations and relative names inside them, ' +
+        'not absolute paths. That is why an archive made on Windows unpacks on macOS ' +
+        'or Linux at their own paths.',
+      transferSecretsTitle: 'No secrets in the archive — deliberately',
+      transferSecretsText:
+        'Credential and token files never enter the archive, and values that look like ' +
+        'keys are replaced with a __REDACTED__ marker. In their place the archive ' +
+        'carries a checklist of what to enter by hand on the new machine.',
+
       notesTitle: 'Things people trip over',
       noteManualTitle: 'A manually set path overrides the environment variable',
       noteManualText:
@@ -714,8 +900,8 @@ export const helpEn: HelpSchema = {
       noteProviderTitle: 'The configuration provider',
       noteProviderText:
         'This is also where you pick whose configuration the panel edits: Claude (the default, ' +
-        'everything works), Codex, Gemini, Cursor, OpenCode or Aider. After a switch the ' +
-        'sidebar rebuilds around that CLI’s capabilities. The breakdown is in the Providers ' +
+        'everything works), Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, Cursor, OpenCode or Aider. After a ' +
+        'switch the sidebar rebuilds around that CLI’s capabilities. The breakdown is in the Providers ' +
         'article.',
     },
 
@@ -865,17 +1051,25 @@ export const helpEn: HelpSchema = {
 
       recipesTitle: 'Assembling a bundle for a job',
       recipe1: 'Create a group and say what it is for',
-      recipe1Text: 'A name and one sentence about the purpose of the bundle is enough.',
+      recipe1Text:
+        'The “New group” button, a name and one sentence about the purpose. A worked ' +
+        'example for this whole recipe: a “Frontend review” group.',
       recipe2: 'Add the contents',
       recipe2Text:
         'You pick rules, skills, hooks and servers that already exist. Nothing is recreated; ' +
-        'the group only refers to them.',
+        'the group only refers to them. In our example: an “answer with a diff” rule, a ' +
+        'before/after screenshot skill, a hook that forbids git push, and the design-mockup ' +
+        'MCP server.',
       recipe3: 'Set variables if you need them',
-      recipe3Text: 'They take effect while the group is on and go away when it is switched off.',
+      recipe3Text:
+        'They take effect while the group is on and go away when it is switched off — ' +
+        'REVIEW_STRICT=1 for that same hook, say.',
       recipe4: 'Check the bundle in the sandbox',
       recipe4Text:
         'The sandbox button runs the whole set at once — you can see whether the settings ' +
-        'argue with each other.',
+        'argue with each other. After that the group goes on and off with one toggle: on ' +
+        'when you sit down to review, off when you go back to normal work, and not a single ' +
+        'file is deleted in the process.',
 
       notesTitle: 'Things people trip over',
       notePermTitle: 'Permissions are not carried into the sandbox',
@@ -1006,7 +1200,7 @@ export const helpEn: HelpSchema = {
       noteManualText:
         'Installing by identifier is collapsed and sits after the catalogue: it is worth ' +
         'checking the list first.',
-      noteProviderTitle: "OpenCode's plugins are its own",
+      noteProviderTitle: "Other providers' plugins are their own",
       noteProviderText:
         "Everything described here is about Claude Code's plugins and marketplaces. With " +
         'the OpenCode provider the section opens a different screen: there it is about ' +
@@ -1017,7 +1211,14 @@ export const helpEn: HelpSchema = {
         'open, edit, delete. Second, list npm package names under the plugin key of ' +
         'opencode.json; both plain and scoped packages such as @org/name are supported. ' +
         'The panel cannot install packages — the CLI does that, it only edits the list. ' +
-        'OpenCode has no catalogue, no marketplaces and no one-click update.',
+        'OpenCode has no catalogue, no marketplaces and no one-click update. ' +
+        'With the Kimi Code provider the section is read-only: the panel reads the ' +
+        '~/.kimi-code/plugins/managed/ directory and each plugin’s manifest and lists them — ' +
+        'name, version, description and what the plugin brings (skills, a session-start ' +
+        'skill, MCP servers, how many hooks it declares, whether it has commands). ' +
+        'Installing, enabling and disabling happen in the CLI itself via /plugins: the shape ' +
+        'of its installed.json registry is undocumented, and editing that state behind its ' +
+        'back would be guesswork, so a write is refused.',
     },
 
     env: {
@@ -1156,11 +1357,17 @@ export const helpEn: HelpSchema = {
         'With the Codex provider the variables live in the shell_environment_policy.set table ' +
         'of config.toml, with Aider in the set-env key of .aider.conf.yml (the global one ' +
         'or the one in the repository root), with Gemini ' +
-        'in the plain ~/.gemini/.env file (and the per-project .gemini/.env). Comments, ' +
+        'in the plain ~/.gemini/.env file (and the per-project .gemini/.env), with Qwen Code ' +
+        'in ~/.qwen/.env (and the per-project .qwen/.env), with Continue in ~/.continue/.env ' +
+        '(and the per-project .continue/.env, the source of ${{ secrets.NAME }} values). Comments, ' +
         'blank lines and ordering survive the write: only the lines of the affected ' +
         'variables change. For OpenCode the section is “in development”; for Cursor it is ' +
         'hidden. Secrets in .mcp-secrets.env ' +
-        'and masking are Claude capabilities too.',
+        'and masking are Claude capabilities too. For Goose the section is hidden as well: it ' +
+        'loads no .env of its own — values come from the process environment and secrets from ' +
+        'the OS keyring. Kimi Code is hidden for the same reason: it reads no .env of its ' +
+        'own, provider keys sit right in config.toml, and the panel never writes secrets ' +
+        'into a foreign config.',
     },
 
     mcp: {
@@ -1363,8 +1570,14 @@ export const helpEn: HelpSchema = {
         'now is not there in an open conversation.',
       noteProviderTitle: 'The shape is simpler with other providers',
       noteProviderText:
-        'MCP exists for Codex (TOML), Gemini, Cursor and OpenCode, and the panel edits their ' +
-        'files directly. The connection check, OAuth, disabling a server and browsing its ' +
+        'MCP exists for Codex (TOML), Gemini, Qwen Code, Cursor, OpenCode, Continue, Goose and Kimi Code, and the panel edits ' +
+        'their ' +
+        'files directly. Continue has its own shape: not “name → entry” but a mcpServers ' +
+        'LIST in config.yaml, with the name inside each entry. With Goose the servers live among ' +
+        'the extensions of config.yaml: the CLI’s own built-in extensions (developer, memory) ' +
+        'are neither shown nor ever touched. Kimi Code keeps its servers in a SEPARATE ' +
+        'mcp.json in the same directory (config.toml only holds timeouts): the usual ' +
+        'name-to-entry shape, with the remote address in url. The connection check, OAuth, disabling a server and browsing its ' +
         'tools stay Claude capabilities, though: for the others this is a plain list of ' +
         'servers. Aider has no MCP setting at all and the section is hidden.',
     },
@@ -1539,14 +1752,39 @@ export const helpEn: HelpSchema = {
         'plus the tool lists coreTools (what is allowed) and excludeTools (what is blocked, ' +
         'and it wins). Allowing by list is safer than blocking by list. The panel never ' +
         'writes the yolo mode: in Gemini it is a command-line flag only and breaks CLI ' +
-        'startup from the settings file. OpenCode uses a fourth model — the permission key ' +
+        'startup from the settings file. Qwen Code has its own model despite being a Gemini ' +
+        'fork: the tools.approvalMode mode (default, plan, auto-edit, auto, yolo — here ' +
+        'yolo is documented as a settings-file value, so the panel does write it) plus ' +
+        'three rule lists permissions.allow, permissions.ask and permissions.deny, where a ' +
+        'rule looks like Bash(git push *) or Read(/src/**); deny wins over the rest and ' +
+        'holds even in autonomous modes. Continue has the simplest model of all, and it ' +
+        'lives in a SEPARATE file, ~/.continue/permissions.yaml: no mode at all, just three ' +
+        'lists — allow (run straight away), ask (confirm) and exclude (hide the tool from ' +
+        'the agent). In headless mode (cn -p) tools under ask are unavailable: there is ' +
+        'nobody to confirm. Goose boils down to ONE key, GOOSE_MODE in config.yaml: auto (run ' +
+        'without asking), approve (by the configured permissions), smart_approve (auto-approve ' +
+        'the safe calls) and chat (never run tools at all). Goose has no rule lists. ' +
+        'Kimi Code has two models at once: the default_permission_mode key of config.toml ' +
+        '(manual — always ask, auto — the agent decides, yolo — never ask) and an ORDERED ' +
+        'array of [[permission.rules]], each with a pattern (Read, Bash(git push*), ' +
+        'mcp__server__tool) and an allow / ask / deny decision. Order matters: the rules are ' +
+        'checked top to bottom. An unknown field inside the permission block makes the ' +
+        'section read-only — the panel does not edit blindly. ' +
+        'OpenCode uses yet another model — the permission key ' +
         'of opencode.json (global and per-project): the edit (file edits), bash (shell ' +
         'commands) and webfetch (network fetches) tools each get an allow, ask or deny ' +
         'level, and bash may take a list of command patterns instead — e.g. “*” ask, ' +
         '“git *” allow, “git push *” deny. Entries inside permission that the panel does ' +
         'not manage are kept as they are and shown read-only; per-agent permissions ' +
-        '(agent.*) are not touched at all. Templates, mcp__* permissions and moving an ' +
-        'entry between files are Claude capabilities. For Cursor and Aider the section is ' +
+        '(agent.*) are not touched at all. ' +
+        'Cursor has the shortest list-based model: the permissions key in ' +
+        '~/.cursor/cli-config.json (in a project the file is named .cursor/cli.json and holds ' +
+        'permissions only) and exactly two lists — allow (run without asking) and deny ' +
+        '(blocked). There is neither a mode nor an “ask” list: anything in neither list the ' +
+        'CLI asks about itself, and deny beats allow. A rule reads as Shell(git status), ' +
+        'Read(src/**), Write(docs/**), WebFetch(domain) or Mcp(server:tool). ' +
+        'Templates, mcp__* permissions and moving an ' +
+        'entry between files are Claude capabilities. For Aider the section is ' +
         'hidden.',
     },
 
@@ -1706,7 +1944,7 @@ export const helpEn: HelpSchema = {
       noteProviderTitle: 'The section works with every provider',
       noteProviderText:
         'Scripts are the panel’s own files, not a foreign config, so the section is there ' +
-        'with Codex, Gemini, Cursor, OpenCode or Aider too. Claude alone keeps the ' +
+        'with Codex, Gemini, Qwen Code, Cursor, OpenCode or Aider too. Claude alone keeps the ' +
         'sandbox, the “called by a hook” flag and the hook scaffolds: the other CLIs have ' +
         'no hooks, so plain standalone scripts are offered instead.',
     },
@@ -1931,9 +2169,24 @@ export const helpEn: HelpSchema = {
       noteExitText:
         'On PreToolUse and UserPromptSubmit it stops the action, and the text from ' +
         'stderr explains why. On the other events nothing is blocked.',
-      noteProviderTitle: "OpenCode's hook model is different",
+      noteProviderTitle: 'Other providers have a different hook model',
       noteProviderText:
-        'Everything described here is about Claude Code. With the OpenCode provider the ' +
+        'Everything described here is about Claude Code. With the Qwen Code provider the ' +
+        'section opens a list of rules: an event, an optional matcher, a command and a ' +
+        'timeout in MILLISECONDS. They live under the root hooks key of settings.json — the ' +
+        'same file where the panel edits permissions; there are eighteen events, and six of ' +
+        'them (UserPromptSubmit, MessageDisplay, Stop, StopFailure, TodoCreated, ' +
+        'TodoCompleted) take no matcher per the docs, so the field is simply hidden. An ' +
+        'unfamiliar shape is preserved per event: an event whose group carries two actions ' +
+        'or a foreign field turns read-only as a whole, while the rest stay editable. The ' +
+        'disableAllHooks key is shown as a warning: while it is on, the CLI runs no hook at ' +
+        'all. With the Kimi Code provider it is the same list of rules, but stored as an ' +
+        'array of [[hooks]] tables in config.toml, with the timeout in SECONDS (1–600), ' +
+        'sixteen events, and the first three (UserPromptSubmit, PreToolUse, Stop) able to ' +
+        'block the action with exit code 2. Kimi has no project hooks at all. The guard is ' +
+        'stricter than Qwen’s: a flat TOML array cannot be rewritten partially without ' +
+        'losing foreign entries, so any deviation from the documented shape turns THE WHOLE ' +
+        'section read-only. With the OpenCode provider the ' +
         'section opens a different screen, because its hooks are built differently: they ' +
         'are the experimental.hook key of opencode.json (global and per-project), and ' +
         'there are exactly two events. "File edited" (file_edited) maps a file pattern to ' +
@@ -1941,10 +2194,13 @@ export const helpEn: HelpSchema = {
         '"Session completed" (session_completed) is simply a list of actions to run when ' +
         'work finishes. A command is given as a list of arguments, not a shell string: ' +
         'the program first, then its arguments one per field, so no pipes and no && ' +
-        'there. OpenCode has no blocking, no tool matchers and no nine events. Note: the ' +
-        'key lives under experimental, which OpenCode itself declares unstable, and it is ' +
-        'not in the published configuration schema yet — the panel says so plainly on the ' +
-        "section's own screen.",
+        'there. OpenCode has no blocking, no tool matchers and no nine events. Note: as of ' +
+        '25 July 2026 the section is READ-ONLY for OpenCode. The key lived under ' +
+        'experimental, which OpenCode declares unstable, and it is gone from there: neither ' +
+        'the configuration reference nor the published schema mentions it any more, and ' +
+        'experimental itself is closed to unknown keys in the schema. The panel shows what ' +
+        'is already in the file but has stopped writing — the documented way to attach an ' +
+        'action to an event is now plugins alone.',
     },
 
     skills: {
@@ -2116,7 +2372,7 @@ export const helpEn: HelpSchema = {
       noteDescText:
         'If the instruction is good but Claude keeps ignoring it, rewrite the ' +
         'description rather than the body: that is what the decision is made on.',
-      noteProviderTitle: 'With OpenCode the skills are its own',
+      noteProviderTitle: 'With other providers the skills are their own',
       noteProviderText:
         'Everything here is about the Claude skills section (a folder with SKILL.md, enable by ' +
         'moving into skills-disabled, groups, templates). With the OpenCode provider the section ' +
@@ -2127,7 +2383,12 @@ export const helpEn: HelpSchema = {
         'must equal the folder name and follow the rules (lowercase letters, digits and single ' +
         'hyphens, 1–64 characters). Worth knowing: OpenCode also loads skills from ~/.claude/skills ' +
         'and ~/.agents/skills, so your Claude skills already work in it — the panel says so and ' +
-        'writes nothing into those directories.',
+        'writes nothing into those directories. With Qwen Code and Kimi Code the screen is ' +
+        'the same, only the directories differ: ~/.qwen/skills/ and <project>/.qwen/skills/ ' +
+        'for Qwen, ~/.kimi-code/skills/ and <project>/.kimi-code/skills/ for Kimi — which, ' +
+        'like OpenCode, also picks up the shared ~/.agents/skills, and the panel writes ' +
+        'nothing there either. One difference: Kimi’s docs cap description at 240 ' +
+        'characters, and the panel checks exactly that bound.',
     },
 
     rules: {
@@ -2440,7 +2701,8 @@ export const helpEn: HelpSchema = {
       noteProviderText:
         'The section is universal, but the CLIs organise instructions differently and the ' +
         'panel shows the model that actually exists. ONE FILE: Claude (CLAUDE.md), Codex and ' +
-        'OpenCode (AGENTS.md), Gemini (GEMINI.md) — everything above is about them. LIST OF ' +
+        'OpenCode (AGENTS.md), Gemini (GEMINI.md), Qwen Code (QWEN.md) — everything above is ' +
+        'about them. LIST OF ' +
         'REFERENCES: Aider has no single instructions file — context files are declared by ' +
         'the read option in .aider.conf.yml, and the section edits exactly that list (add, ' +
         'remove, reorder); the contents of a listed file can be opened separately, if that ' +
@@ -2505,6 +2767,72 @@ export const helpEn: HelpSchema = {
         'discussed, there is a search over message bodies in the chat list.',
     },
 
+    compare: {
+      title: 'Configuration comparison',
+      summary: 'What one CLI has and the other does not — and how to move it across',
+      lead:
+        'The section is about TWO providers at once, so it does not depend on the active one. ' +
+        'The left side defaults to the active CLI, the right side is any other. The panel reads ' +
+        'both sides and shows the difference per section; opening the page changes nothing.',
+
+      whyMemory: 'Otherwise it lives in your head',
+      whyMemoryText:
+        'Finding out which MCP servers Claude has and Codex does not meant opening sections one ' +
+        'by one and comparing by eye. Here both sides are on one screen.',
+      whyMeaning: 'Compared by meaning, not by text',
+      whyMeaningText:
+        'The same server is written differently in TOML and in JSON. The panel compares parsed ' +
+        'values rather than file lines — otherwise everything would come out as different.',
+      whyMove: 'The transfer sits where the difference is visible',
+      whyMoveText:
+        'Tick the entries and press the button for the direction you need. Copying by hand ' +
+        'between formats is the easiest way to lose a server to a stray quote.',
+
+      readTitle: 'How to read the columns',
+      readCaption: 'The label on the right says what is wrong with the entry — or that nothing is.',
+      readSame: 'identical',
+      readSameText: 'The entry exists on both sides and the values match in meaning.',
+      readDiffers: 'differs',
+      readDiffersText:
+        'Same name, different parameters: another command, another address, other variables. ' +
+        'Such a row is marked with a stripe on the left.',
+      readOnly: 'left only / right only',
+      readOnlyText: 'The other side has no such entry at all — a candidate for the transfer.',
+      readSecret: 'secret values',
+      readSecretText:
+        'Variables that look like keys and tokens are shown masked and checked by presence only. ' +
+        'The panel neither shows nor compares a secret value.',
+
+      moveTitle: 'How to move an entry',
+      moveCaption: 'The write is always the second step — after the diff of the target file.',
+      moveStep1: 'Tick the entries',
+      moveStep1Text:
+        'Blocked ones cannot be ticked: the line underneath says why they cannot be moved.',
+      moveStep2: 'Press the button for the direction',
+      moveStep2Text:
+        'The panel computes the diff on a temporary copy of the target file and shows all of it.',
+      moveStep3: 'Confirm with the write button',
+      moveStep3Text:
+        'Only now does the real file change — with a backup, if backups are on in the settings. ' +
+        'Cancel writes nothing.',
+
+      canCompare: 'Compare MCP servers, variables, permissions and global instructions',
+      canMcp: 'Move MCP servers both ways, Claude included',
+      canInstructions: 'Copy the global instructions text (CLAUDE.md into AGENTS.md and back)',
+      canPreview: 'Show the real diff of the target file before writing',
+      cantEnv:
+        'Move environment variables: they hold keys, and the panel writes no secrets into ' +
+        'foreign configurations',
+      cantPermissions:
+        'Move permissions: the CLIs have different approval models, and a translation would be ' +
+        'a guess',
+      cantDisabled: 'Move disabled servers or the sse transport, which other CLIs do not have',
+
+      noteTitle: 'Moving instructions overwrites the whole file',
+      noteText:
+        'It is a copy, not a merge: the source text replaces the target text. The diff before the ' +
+        'write says so plainly — read it if the target file had something of its own.',
+    },
     history: {
       title: 'Change history',
       summary: 'A feed of configuration edits with a line-by-line diff over the backups',
@@ -2618,13 +2946,22 @@ export const helpEn: HelpSchema = {
         'Everything above describes Claude. With another CLI active the project registry ' +
         'is the same, but you edit ITS project files: project instructions (AGENTS.md for ' +
         'Codex and OpenCode, GEMINI.md for Gemini) and the project’s MCP servers ' +
-        '(.codex/config.toml, .gemini/settings.json, opencode.json, .cursor/mcp.json). ' +
-        'Gemini adds the project’s environment variables (.gemini/.env) and permissions; ' +
+        '(.codex/config.toml, .gemini/settings.json, .qwen/settings.json, opencode.json, ' +
+        '.cursor/mcp.json, .continue/mcpServers/mcp.json). ' +
+        'Gemini adds the project’s environment variables (.gemini/.env) and permissions, ' +
+        'and Qwen Code does exactly the same in its own files (QWEN.md, ' +
+        '.qwen/settings.json, .qwen/.env); ' +
         'OpenCode adds the project’s permissions in the same opencode.json (the permission ' +
         'key). Aider’s project level is the .aider.conf.yml in the repository root: the read list ' +
         'of attached files and the set-env variables. Instead of a project instructions file ' +
         'Cursor gets the rules directory <project>/.cursor/rules/*.mdc — the same one as ' +
-        'globally, with the same path safety. Nobody but Claude gets project hooks.',
+        'globally, with the same path safety. For Continue the project level is the only ' +
+        'one it has: the rules directory <project>/.continue/rules/*.md, the MCP file ' +
+        '.continue/mcpServers/mcp.json and the .continue/.env variables. Goose’s project level ' +
+        'is a single <project>/.goosehints file next to the global one. Kimi Code gets ' +
+        'AGENTS.md and the MCP file <project>/.kimi-code/mcp.json in the project; it has no ' +
+        'project permissions, since the CLI reads exactly one user-level config.toml. Nobody but Claude ' +
+        'gets project hooks.',
     },
 
     providers: {
@@ -2711,62 +3048,100 @@ export const helpEn: HelpSchema = {
       mapInstructions: 'Global instructions',
       mapInstructionsValue:
         'Works everywhere, in three different models. ONE FILE: Claude (CLAUDE.md), Codex ' +
-        'and OpenCode (AGENTS.md), Gemini (GEMINI.md). LIST OF REFERENCES: Aider has no ' +
+        'and OpenCode (AGENTS.md), Gemini (GEMINI.md), Qwen Code (QWEN.md). LIST OF ' +
+        'REFERENCES: Aider has no ' +
         'single file — the panel edits the list of attached files (the read option in ' +
         '.aider.conf.yml) and, separately, the contents of an already existing listed file. ' +
         'RULES DIRECTORY: for Cursor it is ~/.cursor/rules (and the same directory inside a ' +
         'project) with .mdc files — each has its own frontmatter (description, file globs, ' +
         'an "always apply" flag) and a markdown body; nested subdirectories are supported. ' +
         'A plain .md in the rules directory is ignored by Cursor — the panel lists such ' +
-        'files separately and never edits them.',
+        'files separately and never edits them. Continue has no global instructions at all: ' +
+        'only the PROJECT rules directory <project>/.continue/rules with .md files is ' +
+        'documented, so it lives on the project tab and the global section stays hidden. Goose ' +
+        'uses a .goosehints file: the global one sits in its config directory and applies to ' +
+        'every session, while <project>/.goosehints overrides it. For Kimi Code it is ' +
+        'AGENTS.md in $KIMI_CODE_HOME, and a plain AGENTS.md in the project root.',
       mapMcp: 'MCP servers',
       mapMcpValue:
-        'Works: Claude, Codex (TOML), Gemini, Cursor, OpenCode (its own local/remote ' +
-        'shape). Aider has no MCP setting at all — the section is hidden.',
+        'Works: Claude, Codex (TOML), Gemini, Qwen Code, Cursor, OpenCode (its own local/remote ' +
+        'shape), Continue (the mcpServers list in config.yaml — the name sits inside the ' +
+        'entry and the transport comes from the type field), Goose (the extensions of config.yaml ' +
+        '— the panel manages external stdio / sse / streamable_http servers only and never ' +
+        'touches built-in extensions), Kimi Code (a separate ~/.kimi-code/mcp.json file, with ' +
+        'the remote address in url). Aider has no MCP setting at ' +
+        'all — the section is hidden.',
       mapEnv: 'Environment variables',
       mapEnvValue:
         'Works: Claude, Codex (shell_environment_policy.set), Aider (set-env — the global ' +
         '~/.aider.conf.yml and the per-project one in the repository root), Gemini ' +
-        '(a plain .env file — the global ~/.gemini/.env and the per-project one). Hidden ' +
+        '(a plain .env file — the global ~/.gemini/.env and the per-project one), Qwen Code ' +
+        '(the same thing: ~/.qwen/.env and the per-project .qwen/.env), Continue ' +
+        '(~/.continue/.env and the per-project .continue/.env — the source of ' +
+        '${{ secrets.NAME }} values). Hidden ' +
         'for Cursor and OpenCode: OpenCode has nowhere to store variables — it only ' +
         'substitutes {env:VARIABLE} inside opencode.json, i.e. reads the process ' +
         'environment that is already set, and loads no .env of its own. The panel will ' +
-        'not create a file nobody reads.',
+        'not create a file nobody reads. Goose is hidden for the same reason: no .env of its ' +
+        'own, and its secrets live in the OS keyring. Kimi Code likewise: provider keys sit ' +
+        'in config.toml, and the panel writes no secrets there.',
       mapPermissions: 'Permissions and approvals',
       mapPermissionsValue:
         'Works: Claude (allow/ask/deny), Codex (approval_policy and sandbox_mode), Gemini ' +
         '(the approval mode general.defaultApprovalMode plus the coreTools and ' +
-        'excludeTools lists), OpenCode (the permission key of opencode.json: an ' +
+        'excludeTools lists), Qwen Code (the tools.approvalMode mode plus the ' +
+        'permissions.allow / ask / deny rule lists), Continue (a separate permissions.yaml ' +
+        'with three lists allow / ask / exclude and no mode at all), OpenCode (the permission key of ' +
+        'opencode.json: an ' +
         'allow / ask / deny level for the edit, bash and webfetch tools, and for bash a ' +
-        'list of command patterns instead of a single level). Hidden for Cursor and Aider.',
+        'list of command patterns instead of a single level), Goose (a single GOOSE_MODE key: ' +
+        'auto / approve / smart_approve / chat, no lists at all), Kimi Code (the ' +
+        'default_permission_mode key: manual / auto / yolo, plus ordered ' +
+        '[[permission.rules]] — a pattern and an allow / ask / deny decision), Cursor (the ' +
+        'permissions key of cli-config.json: two lists allow and deny, no mode, deny beats ' +
+        'allow). Hidden for Aider.',
       mapChat: 'Chat and assistant',
       mapChatValue:
         'The full chat with streaming, attachments and parallel agents is Claude only. ' +
-        'Codex, Gemini, OpenCode and Aider get a basic experimental assistant: one question, ' +
-        'one answer (codex exec, gemini -p, opencode run "<prompt>", aider --message). ' +
-        'Aider’s and OpenCode’s assistants are built from the docs and have not been exercised ' +
+        'Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, OpenCode and Aider get a basic experimental assistant: one ' +
+        'question, one answer (codex exec, gemini -p, qwen -p, cn -p, opencode run "<prompt>", ' +
+        'aider --message, goose run --no-session -t "<prompt>", kimi -p). ' +
+        'The Aider, OpenCode, Continue, Goose and Kimi Code assistants are built from the docs and have not been exercised ' +
         'live: those CLIs are not installed on the development machine. Cursor has no model ' +
         'API of its own.',
       mapHooks: 'Hooks',
       mapHooksValue:
-        'Works for Claude and OpenCode, but the models do not match. Claude has nine ' +
-        'events (PreToolUse, PostToolUse and others) with tool matchers and shell commands ' +
-        'in settings.json; two of them can block the action. OpenCode has the ' +
-        'experimental.hook key of opencode.json (global and per-project) and exactly two ' +
-        'events: "file edited" (file pattern → list of actions) and "session completed" ' +
-        '(just a list of actions). A command there is an argument list rather than a shell ' +
-        'string, and blocking is not possible. Note: for OpenCode this is an experimental ' +
-        'feature of the CLI itself — the key lives under experimental, which it declares ' +
-        'unstable. Codex, Gemini, Cursor and Aider have no hooks.',
+        'Works for Claude, Qwen Code, Kimi Code and OpenCode, but the models do not match. ' +
+        'Claude has nine events (PreToolUse, PostToolUse and others) with tool matchers and ' +
+        'shell commands in settings.json; two of them can block the action. Qwen Code has ' +
+        'the root hooks key of settings.json (global and per-project), eighteen events, an ' +
+        'optional matcher and a single command action per group, with the timeout in ' +
+        'milliseconds; an unfamiliar shape is preserved per event — that whole event turns ' +
+        'read-only while the rest stay editable. Kimi Code has an array of [[hooks]] tables ' +
+        'in config.toml, sixteen events, a regular-expression matcher and the timeout in ' +
+        'seconds (1–600); it has no project hooks, and any deviation from the documented ' +
+        'shape turns the whole section read-only — a flat TOML array cannot be rewritten ' +
+        'partially without losing foreign entries. OpenCode has the experimental.hook key of ' +
+        'opencode.json and exactly two events: "file edited" and "session completed", with a ' +
+        'command as an argument list. Since 25 July 2026 that section is read-only: the key ' +
+        'disappeared from both the reference and the published schema, and experimental ' +
+        'itself is closed to unknown keys — the panel shows what is already in the file but ' +
+        'does not write; the documented way to attach an action to an event in OpenCode is ' +
+        'now plugins alone. Codex, Gemini, Continue, Goose, Cursor and Aider have no hooks.',
       mapPlugins: 'Plugins',
       mapPluginsValue:
-        'Works for Claude and OpenCode, and they are different things. Claude gets the ' +
-        'panel’s own extensions and marketplaces (a wrapper around claude plugin). ' +
+        'Works for Claude, OpenCode and Kimi Code, and they are different things. Claude ' +
+        'gets the panel’s own extensions and marketplaces (a wrapper around claude plugin). ' +
         'OpenCode gets plugins of its own CLI: JS/TS files in the plugins directory ' +
         '(global ~/.config/opencode/plugins/ and per-project ' +
         '<project>/.opencode/plugins/) which it loads at startup, plus a list of npm ' +
         'package names under the plugin key of opencode.json. The panel cannot install ' +
-        'packages — the CLI does that. The others have no such section.',
+        'packages — the CLI does that. For Kimi Code the section is read-only: the panel ' +
+        'reads the manifests in ~/.kimi-code/plugins/managed/ and shows what each plugin ' +
+        'brings (skills, a session-start skill, MCP servers, how many hooks, whether it has ' +
+        'commands), while installing and enabling happens in the CLI itself via /plugins — ' +
+        'the shape of its installed.json registry is undocumented. The others have no such ' +
+        'section.',
       mapSkills: 'Skills',
       mapSkillsValue:
         'Works for Claude and OpenCode, and the concept is the same — a folder with a ' +
@@ -2777,7 +3152,12 @@ export const helpEn: HelpSchema = {
         'description, keeps license/compatibility/metadata and any foreign fields read-only, ' +
         'and requires the name to equal the folder name. OpenCode also loads skills from ' +
         '~/.claude/skills and ~/.agents/skills, so Claude skills already work in it — the panel ' +
-        'writes nothing there. The other CLIs have no such section.',
+        'writes nothing there. Qwen Code and Kimi Code use the same format, only the ' +
+        'directories differ: ~/.qwen/skills/ and <project>/.qwen/skills/ for Qwen, ' +
+        '~/.kimi-code/skills/ and <project>/.kimi-code/skills/ for Kimi (which also picks up ' +
+        'the shared ~/.agents/skills). One difference: Kimi’s docs cap description at 240 ' +
+        'characters. The panel holds skill names to the strictest of the rules, so the same ' +
+        'skill is valid in any of these CLIs. The other CLIs have no such section.',
       mapScripts: 'Scripts',
       mapScriptsValue:
         'Works everywhere: this is the panel’s own section — your files in its hooks/ ' +
@@ -2791,7 +3171,16 @@ export const helpEn: HelpSchema = {
         'level — instructions (AGENTS.md), MCP, permissions and hooks all in ' +
         '<project>/opencode.json, plus plugins (the <project>/.opencode/plugins/ ' +
         'directory and the plugin key). Gemini adds the project’s environment ' +
-        'variables (.gemini/.env) and permissions (.gemini/settings.json). Cursor gets the project MCP ' +
+        'variables (.gemini/.env) and permissions (.gemini/settings.json); Qwen Code does ' +
+        'the same in its own files (QWEN.md, .qwen/settings.json, .qwen/.env) plus hooks in ' +
+        'that same .qwen/settings.json and skills in .qwen/skills/. ' +
+        'Continue lives at the project level only: the rules directory ' +
+        '<project>/.continue/rules/*.md, the MCP file .continue/mcpServers/mcp.json and the ' +
+        '.continue/.env variables. Goose’s project level is the <project>/.goosehints file. ' +
+        'Kimi Code gets AGENTS.md, the MCP file <project>/.kimi-code/mcp.json and skills in ' +
+        '<project>/.kimi-code/skills/; it has no project permissions or hooks — the CLI ' +
+        'reads those from a single config.toml. ' +
+        'Cursor gets the project MCP ' +
         '(.cursor/mcp.json) and the project rules directory .cursor/rules/*.mdc. Aider gets the ' +
         '.aider.conf.yml in the repository root (the config is looked up in the home ' +
         'directory, the git repository root and the current directory): the read list of ' +
@@ -2800,12 +3189,43 @@ export const helpEn: HelpSchema = {
       mapClaudeOnlyValue:
         'Rules, token analytics, the sandbox and plugin marketplaces. This is not ' +
         '“we did not get to it”: the other CLIs either have no such entity or build it on ' +
-        'different lines. Hooks, plugins and skills are the exception: OpenCode has all three, ' +
-        'in its own model, and the panel opens dedicated screens for them.',
+        'different lines. Hooks, skills and plugins are the exception: Qwen Code, Kimi Code ' +
+        'and OpenCode have them, each in its own model, and the panel opens dedicated ' +
+        'screens for them.',
       mapPanel: 'Always available',
       mapPanelValue:
         'Overview, search, groups, history, settings and help are the panel’s own ' +
         'sections and do not depend on the provider.',
+
+      gapTitle: 'Why a section exists for one CLI and not for another',
+      gapCaption:
+        'There is a single rule: the panel writes only what that CLI’s documentation ' +
+        'describes. Four live examples of what the rule looks like in practice.',
+      gapNone: 'The entity does not exist at all',
+      gapNoneText:
+        'Codex and Gemini have no notion of a “skill”: there is nowhere to put a SKILL.md ' +
+        'folder for the CLI to read. The section is not hidden “for now” — there would ' +
+        'literally be nowhere to write. Qwen Code, Kimi Code and OpenCode do document such a ' +
+        'folder, so the skills section is there and runs on the same code as Claude’s.',
+      gapNoFile: 'The entity exists, but has no place to live',
+      gapNoFileText:
+        'OpenCode takes environment variables from the shell; the documentation describes no ' +
+        'file of its own for them. The panel invents no file and writes nothing on a guess — ' +
+        'OpenCode simply has no “Environment” section. Same for the config directory: only ' +
+        'documented overrides are honoured (CODEX_HOME, QWEN_HOME, XDG_CONFIG_HOME, ' +
+        'OPENCODE_CONFIG), never an invented one.',
+      gapReadOnly: 'The format stopped being reliable',
+      gapReadOnlyText:
+        'OpenCode hooks used to live under the experimental.hook key. The daily check against ' +
+        'the published schema showed the key is gone and experimental accepts no extra ' +
+        'properties. The section stayed — read-only: showing what is there is fine, writing ' +
+        'into a shape the schema does not know is not.',
+      gapOwned: 'The CLI owns the state',
+      gapOwnedText:
+        'Kimi Code plugins are visible to the panel (the manifests are documented), but the ' +
+        'list of installed ones is kept by the CLI’s own /plugins command, and the shape of ' +
+        'its file is documented nowhere. The panel shows what is installed and never touches ' +
+        'the file — an edit would silently drift from what the CLI treats as the truth.',
 
       filesCaption: 'Exactly where the panel writes for each provider.',
       fileInstructions: 'Instructions',
@@ -2816,6 +3236,7 @@ export const helpEn: HelpSchema = {
       fileClaudeRest: '~/.claude/settings.json, ~/.claude.json',
       fileOverride: 'Directory override',
       fileProject: 'Project level',
+      fileWindows: 'Path on Windows',
 
       runnerTitle: 'Your subscription outranks a paid API',
       runnerCaption: 'The order is fixed: free-for-you first, a paid key only as the last resort.',

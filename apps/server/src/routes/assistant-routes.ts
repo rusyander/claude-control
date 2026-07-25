@@ -29,6 +29,14 @@ export function registerAssistantRoutes(app: FastifyInstance, ctx: ServerContext
       : [];
     const result = await runAssistant(provider, messages, {
       appDataDir: ctx.location.paths.appData,
+      // Только кэш: ассистент не должен ждать сеть ради имени модели.
+      models: ctx.models.current(provider.modelVendors ?? []).models,
+      // IDEA-8: id диалога включает сессионный режим у тех CLI, кто его заявил
+      // (сейчас OpenCode). Не прислали — всё идёт one-shot, как и раньше.
+      conversationId:
+        typeof request.body?.conversationId === 'string' && request.body.conversationId.trim()
+          ? request.body.conversationId.trim().slice(0, 120)
+          : undefined,
     });
     return result satisfies AssistantRunResult;
   });

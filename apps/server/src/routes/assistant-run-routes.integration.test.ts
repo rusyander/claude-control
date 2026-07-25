@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../lib/app-store.ts';
+import { ModelCatalogStore } from '../domains/models/model-store.ts';
 import type { ServerContext } from '../context.ts';
 import type { AssistantRunResult } from '@claude-control/contracts';
 import { registerAssistantRoutes } from './assistant-routes.ts';
@@ -21,6 +22,9 @@ function makeCtx(root: string, provider: string): ServerContext {
   return {
     location: { paths: { root, appData } },
     store,
+    // Каталог моделей пуст и в сеть не ходит: ассистент читает только кэш, а его
+    // здесь нет — значит, останется на зашитой модели, как и задумано.
+    models: new ModelCatalogStore(appData),
     backupDir: join(appData, 'backups'),
   } as unknown as ServerContext;
 }

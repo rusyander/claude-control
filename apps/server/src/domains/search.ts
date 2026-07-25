@@ -337,7 +337,8 @@ function collectProviderInputs(sources: SearchSources): ProviderSearchInputs | u
 /**
  * Права провайдера в виде плоских пар для поиска. Модели разные, поэтому
  * раскладку задаём здесь: Codex — два скаляра, Gemini — режим аппрувов и оба
- * списка инструментов (их имена ищутся по подстроке в склейке), OpenCode — по
+ * списка инструментов (их имена ищутся по подстроке в склейке), Qwen Code — режим
+ * аппрувов и три списка правил `permissions.*` (тоже склейкой), OpenCode — по
  * паре на инструмент (у карты шаблонов значение — склейка «шаблон: уровень»).
  */
 function providerPermissionEntries(
@@ -360,6 +361,43 @@ function providerPermissionEntries(
       entries.push({ key: 'coreTools', value: values.coreTools.join(', ') });
     if (values.excludeTools.length > 0)
       entries.push({ key: 'excludeTools', value: values.excludeTools.join(', ') });
+    return entries;
+  }
+  if (values.kind === 'qwen') {
+    const entries: Array<{ key: string; value: string }> = [
+      { key: 'approvalMode', value: values.approvalMode },
+    ];
+    for (const list of ['allow', 'ask', 'deny'] as const) {
+      if (values[list].length > 0) entries.push({ key: list, value: values[list].join(', ') });
+    }
+    return entries;
+  }
+  if (values.kind === 'continue') {
+    // У Continue режима нет — только три списка правил.
+    const entries: Array<{ key: string; value: string }> = [];
+    for (const list of ['allow', 'ask', 'exclude'] as const) {
+      if (values[list].length > 0) entries.push({ key: list, value: values[list].join(', ') });
+    }
+    return entries;
+  }
+  if (values.kind === 'cursor') {
+    // У Cursor режима нет — ровно два списка правил, `deny` сильнее `allow`.
+    const entries: Array<{ key: string; value: string }> = [];
+    for (const list of ['allow', 'deny'] as const) {
+      if (values[list].length > 0) entries.push({ key: list, value: values[list].join(', ') });
+    }
+    return entries;
+  }
+  // У Goose, наоборот, списков нет вовсе — только один режим.
+  if (values.kind === 'goose') return [{ key: 'GOOSE_MODE', value: values.mode }];
+  if (values.kind === 'kimi') {
+    // У Kimi правило несёт решение внутри себя — индексируем «решение: шаблон».
+    const entries: Array<{ key: string; value: string }> = [
+      { key: 'default_permission_mode', value: values.mode },
+    ];
+    for (const rule of values.rules) {
+      entries.push({ key: 'permission.rules', value: `${rule.decision}: ${rule.pattern}` });
+    }
     return entries;
   }
   return [

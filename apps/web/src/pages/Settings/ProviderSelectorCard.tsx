@@ -16,6 +16,7 @@ import {
   recommendedProviderId,
   activeCliHint,
 } from '@entities/Provider';
+import { useProviderChecks, findCheck, trustBadge } from '@entities/ProviderCheck';
 import styles from './SettingsPage.module.scss';
 
 /**
@@ -34,6 +35,7 @@ export function ProviderSelectorCard() {
   const { data: settings } = useSettings();
   const { data } = useProviders();
   const { data: detect } = useProviderDetect();
+  const { data: checks } = useProviderChecks();
   const updateSettings = useUpdateSettings();
 
   if (!data || !settings) return <SkeletonList rows={3} withActions={false} />;
@@ -57,7 +59,7 @@ export function ProviderSelectorCard() {
           <Typography variant="body" weight="medium">
             {t('settings.providerTitle')}
           </Typography>
-          <Typography variant="body-sm" color="subtle">
+          <Typography variant="body-sm" color="subtle" className={styles.hint}>
             {t('settings.providerHint')}
           </Typography>
         </Stack>
@@ -93,6 +95,7 @@ export function ProviderSelectorCard() {
             const isActive = provider.id === activeId;
             const badge = detectionBadge(findDetection(detect, provider.id));
             const isRecommended = provider.id === recommendedId;
+            const trust = trustBadge(provider.status, findCheck(checks, provider.id));
             return (
               <Card key={provider.id} padding="sm" isInteractive={!isActive}>
                 <Stack
@@ -107,11 +110,9 @@ export function ProviderSelectorCard() {
                       <Typography variant="body" weight="medium" as="span">
                         {provider.name}
                       </Typography>
-                      {provider.status === 'verified' ? (
-                        <Badge tone="success">{t('settings.providerVerified')}</Badge>
-                      ) : (
-                        <Badge tone="warning">{t('settings.providerExperimental')}</Badge>
-                      )}
+                      {/* Проверка на этой машине важнее объявленного статуса:
+                          она факт, а статус в каталоге — обещание. */}
+                      <Badge tone={trust.tone}>{t(trust.key)}</Badge>
                       {/* Бейдж детекта появляется только когда детект загружен. */}
                       {badge && <Badge tone={badge.tone}>{t(badge.key)}</Badge>}
                       {isRecommended && (

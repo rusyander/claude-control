@@ -67,7 +67,7 @@ interface ProviderSkillsSettingsSource {
 /** Разрешённая цель раздела: провайдер + каталог скиллов. */
 export interface ProviderSkillsTarget {
   provider: ConfigProvider;
-  format: 'opencode-skills';
+  format: 'skill-md-dir';
   scope: ProviderSkillsScope;
   /** Абсолютный путь каталога скиллов. */
   skillsDir: string;
@@ -78,6 +78,8 @@ export interface ProviderSkillsTarget {
    * управляет (только показывает). Задаются лишь на глобальном уровне.
    */
   externalDirs: string[];
+  /** Предел длины описания у ЭТОГО CLI (у Kimi — 240, у остальных 1024). */
+  descriptionMax?: number;
 }
 
 /** Путь скилла выходит за пределы каталога скиллов — операция запрещена. */
@@ -191,6 +193,9 @@ export function resolveProviderSkillsTarget(
     skillsDir: provider.skillsConfig.dir(override),
     backupPrefix: `${provider.id}-`,
     externalDirs: provider.skillsConfig.alsoLoadedFrom?.() ?? [],
+    ...(provider.skillsConfig.descriptionMax
+      ? { descriptionMax: provider.skillsConfig.descriptionMax }
+      : {}),
   };
 }
 
@@ -445,11 +450,21 @@ export function parseProviderSkillDraft(body: unknown): ProviderSkillDraft | und
 }
 
 /**
- * Проверить черновик по ЗАДОКУМЕНТИРОВАННЫМ правилам OpenCode — до любой записи.
+ * Проверить черновик по ЗАДОКУМЕНТИРОВАННЫМ правилам — до любой записи.
  * `dirName` — имя папки из уже проверенного пути: `name` обязано ему совпадать,
- * иначе CLI скилл не подхватит.
+ * иначе CLI скилл не подхватит. `descriptionMax` приходит из каталога: у Kimi
+ * документация ограничивает описание 240 знаками, у прочих потолка нет (1024).
+ *
+ * Грамматика ИМЕНИ намеренно одна и самая узкая из трёх (строчная латиница,
+ * цифры и одиночные дефисы): она допустима у всех — и у OpenCode, и у Qwen
+ * (`[\p{L}\p{N}_:.-]+`), и у Kimi. Панель пишет заведомо совместимое имя, а
+ * читает любые уже существующие папки как есть.
  */
-export function assertSkillDraft(draft: ProviderSkillDraft, dirName: string): void {
+export function assertSkillDraft(
+  draft: ProviderSkillDraft,
+  dirName: string,
+  descriptionMax: number = SKILL_DESCRIPTION_MAX,
+): void {
   const nameProblem = checkSkillName(draft.name);
   if (nameProblem) {
     const detail: Record<string, string> = {
@@ -473,13 +488,13 @@ export function assertSkillDraft(draft: ProviderSkillDraft, dirName: string): vo
     );
   }
 
-  const descriptionProblem = checkSkillDescription(draft.description);
+  const descriptionProblem = checkSkillDescription(draft.description, descriptionMax);
   if (descriptionProblem) {
     throw new InvalidSkillDraftError(
       `description_${descriptionProblem}`,
       descriptionProblem === 'empty'
         ? 'Описание скилла обязательно: по нему CLI решает, когда его подключать.'
-        : `Описание скилла длиннее ${SKILL_DESCRIPTION_MAX} символов.`,
+        : `Описание скилла длиннее ${descriptionMax} символов.`,
     );
   }
 }
@@ -506,7 +521,7 @@ export function saveProviderSkill(
 ): { path: string; fullPath: string; backupPath?: string } {
   const fullPath = resolveSkillPath(target, draft.path);
   const dirName = basename(dirname(fullPath));
-  assertSkillDraft(draft, dirName);
+  assertSkillDraft(draft, dirName, target.descriptionMax ?? SKILL_DESCRIPTION_MAX);
 
   const exists = existsSync(fullPath);
   if (exists && !statSync(fullPath).isFile()) {

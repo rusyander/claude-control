@@ -776,3 +776,128 @@ describe('OpenCode JSON (ключ mcp): local/remote ↔ stdio/http, чужие 
     );
   });
 });
+
+describe('Kimi JSON (~/.kimi-code/mcp.json): mcpServers с адресом в url', () => {
+  let root: string;
+  let backupDir: string;
+  const targetFor = (filePath: string): ProviderMcpTarget => ({
+    provider: getProvider('kimi'),
+    format: 'json',
+    filePath,
+    cliDetected: false,
+    jsonHttpUrlKey: 'url',
+  });
+  const stdioDraft = (name: string) => ({
+    name,
+    transport: 'stdio' as const,
+    command: 'npx',
+    args: ['-y', 'pkg'],
+    env: { TOKEN: 'abc' },
+    url: undefined,
+    headers: {},
+  });
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-kimi-mcp-'));
+    backupDir = join(root, 'backups');
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  // Живой mcp.json Kimi: у записей есть свои ключи (`enabled`, таймауты,
+  // фильтры инструментов), которых нет в переносимом субсете панели.
+  const KIMI_MCP = {
+    mcpServers: {
+      local: {
+        command: 'node',
+        args: ['s.js'],
+        env: { A: 'b' },
+        enabled: true,
+        startupTimeoutMs: 15000,
+        allowedTools: ['read_file'],
+      },
+      remote: { url: 'https://example.com/mcp', headers: { Authorization: 'Bearer x' } },
+    },
+  };
+
+  it('чтение: stdio и http (url) распознаны', () => {
+    const filePath = join(root, 'mcp.json');
+    writeFileSync(filePath, JSON.stringify(KIMI_MCP, null, 2), 'utf8');
+    const servers = readProviderMcpServers(targetFor(filePath));
+    expect(servers.map((s) => s.name)).toEqual(['local', 'remote']);
+    expect(servers[0]).toMatchObject({ transport: 'stdio', command: 'node', env: { A: 'b' } });
+    expect(servers[1]).toMatchObject({ transport: 'http', url: 'https://example.com/mcp' });
+  });
+
+  it('правка существующего сервера СОХРАНЯЕТ enabled, таймаут и фильтр инструментов', () => {
+    const filePath = join(root, 'mcp.json');
+    writeFileSync(filePath, JSON.stringify(KIMI_MCP, null, 2), 'utf8');
+
+    upsertProviderMcpServer(
+      targetFor(filePath),
+      'local',
+      { ...stdioDraft('local'), command: 'node', args: ['other.js'] },
+      backupDir,
+    );
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8'));
+    expect(parsed.mcpServers.local).toEqual({
+      enabled: true,
+      startupTimeoutMs: 15000,
+      allowedTools: ['read_file'],
+      command: 'node',
+      args: ['other.js'],
+      env: { TOKEN: 'abc' },
+    });
+    // Второй сервер не тронут.
+    expect(parsed.mcpServers.remote).toEqual(KIMI_MCP.mcpServers.remote);
+  });
+
+  it('переименование переносит чужие ключи записи на новое имя', () => {
+    const filePath = join(root, 'mcp.json');
+    writeFileSync(filePath, JSON.stringify(KIMI_MCP, null, 2), 'utf8');
+    upsertProviderMcpServer(
+      targetFor(filePath),
+      'local',
+      { ...stdioDraft('renamed'), command: 'node', args: ['s.js'], env: {} },
+      backupDir,
+    );
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8'));
+    expect(parsed.mcpServers.local).toBeUndefined();
+    expect(parsed.mcpServers.renamed).toMatchObject({
+      enabled: true,
+      startupTimeoutMs: 15000,
+      command: 'node',
+    });
+  });
+
+  it('http пишется в url (не httpUrl); нет файла → создаётся только с mcpServers', () => {
+    const filePath = join(root, '.kimi-code', 'mcp.json');
+    upsertProviderMcpServer(
+      targetFor(filePath),
+      null,
+      {
+        name: 'r',
+        transport: 'http',
+        command: undefined,
+        args: [],
+        env: {},
+        url: 'https://e/mcp',
+        headers: { A: 'b' },
+      },
+      backupDir,
+    );
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8'));
+    expect(Object.keys(parsed)).toEqual(['mcpServers']);
+    expect(parsed.mcpServers.r).toEqual({ url: 'https://e/mcp', headers: { A: 'b' } });
+  });
+
+  it('битый JSON → fail-closed: чтение бросает, запись отказывает, файл не тронут', () => {
+    const filePath = join(root, 'mcp.json');
+    const broken = '{ "mcpServers": ';
+    writeFileSync(filePath, broken, 'utf8');
+    expect(() => readProviderMcpServers(targetFor(filePath))).toThrow(UnrecognizedFormatError);
+    expect(() =>
+      upsertProviderMcpServer(targetFor(filePath), null, stdioDraft('a'), backupDir),
+    ).toThrow(UnrecognizedFormatError);
+    expect(readFileSync(filePath, 'utf8')).toBe(broken);
+  });
+});

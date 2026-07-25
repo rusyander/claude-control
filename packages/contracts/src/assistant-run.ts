@@ -25,9 +25,18 @@ export const assistantRunMessageSchema = object({
 });
 export type AssistantRunMessage = Infer<typeof assistantRunMessageSchema>;
 
-/** Тело `POST /api/assistant/run`: история сообщений (последнее — новый запрос). */
+/**
+ * Тело `POST /api/assistant/run`: история сообщений (последнее — новый запрос).
+ *
+ * `conversationId` — устойчивый идентификатор ОДНОГО диалога панели. Нужен
+ * ровно одному раннеру: сессионному режиму OpenCode (`opencode serve`), где
+ * контекст держит сам CLI, а панель шлёт только новое сообщение. Прочие раннеры
+ * его игнорируют: у one-shot CLI памяти между вызовами нет по построению, и вся
+ * история по-прежнему уезжает одним промптом.
+ */
 export const assistantRunRequestSchema = object({
   messages: array(assistantRunMessageSchema),
+  conversationId: string().optional(),
 });
 export type AssistantRunRequest = Infer<typeof assistantRunRequestSchema>;
 
@@ -62,5 +71,16 @@ export const assistantRunResultSchema = object({
   reason: zodEnum(assistantRunReasons),
   /** Текст ошибки для показа (без секретов), если `ok=false`. */
   error: string().optional(),
+  /**
+   * Как именно отработал CLI-раннер:
+   * - `one-shot` — отдельный процесс на каждый вопрос, памяти между вызовами нет
+   *   (вся история уезжает одним промптом);
+   * - `session` — локальный сервер CLI держит диалог, панель шлёт только новое
+   *   сообщение. Сейчас так умеет ровно OpenCode (`opencode serve`).
+   * Не задано — режим `api`/`none`, к которому это понятие не относится.
+   */
+  transport: zodEnum(['one-shot', 'session']).optional(),
+  /** Идентификатор сессии CLI, если диалог идёт сессией (для показа и отладки). */
+  sessionId: string().optional(),
 });
 export type AssistantRunResult = Infer<typeof assistantRunResultSchema>;

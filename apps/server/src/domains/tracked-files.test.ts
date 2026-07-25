@@ -95,10 +95,12 @@ describe('Файлы активного провайдера', () => {
   // ведёт отдельные ФАЙЛЫ конфигурации. Каталог в неё осознанно не попадает
   // (иначе пришлось бы индексировать произвольное число пользовательских
   // файлов); резервные копии у правок правил при этом делаются как обычно.
-  it('cursor: в ленте только mcp.json — каталог правил .mdc туда не попадает', () => {
-    expect(providerTrackedFiles(fakeStore('cursor')).map((item) => item.file)).toEqual([
-      'mcp.json',
-    ]);
+  it('cursor: mcp.json + cli-config.json — каталог правил .mdc в ленту не попадает', () => {
+    expect(
+      providerTrackedFiles(fakeStore('cursor'))
+        .map((item) => item.file)
+        .sort(),
+    ).toEqual(['cli-config.json', 'mcp.json']);
   });
 
   it('opencode: AGENTS.md + opencode.json', () => {

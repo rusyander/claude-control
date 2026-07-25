@@ -1,4 +1,5 @@
 import { object, string, array, boolean, enum as zodEnum, type infer as Infer } from 'zod';
+import { providerHooksFormats } from './provider-hooks';
 
 /**
  * Проектный уровень конфигурации у НЕ-Claude провайдеров (COMMON-2).
@@ -76,12 +77,15 @@ export const providerProjectInfoSchema = object({
   instructionsListFormat: zodEnum(['aider-yaml']).optional(),
   /** Абсолютный путь проектной конфигурации со списком ссылок (`.aider.conf.yml`). */
   instructionsListPath: string().optional(),
-  /** Формат проектного каталога правил, если раздел есть (Cursor: `cursor-mdc`). */
-  instructionsRulesFormat: zodEnum(['cursor-mdc']).optional(),
+  /**
+   * Формат проектного каталога правил, если раздел есть: `cursor-mdc` (Cursor,
+   * файлы `.mdc`) или `continue-md` (Continue, файлы `.md` в `.continue/rules`).
+   */
+  instructionsRulesFormat: zodEnum(['cursor-mdc', 'continue-md']).optional(),
   /** Абсолютный путь проектного каталога правил (`<проект>/.cursor/rules`). */
   instructionsRulesDir: string().optional(),
   /** Формат проектного файла MCP, если раздел есть. */
-  mcpFormat: zodEnum(['json', 'toml', 'opencode-json']).optional(),
+  mcpFormat: zodEnum(['json', 'toml', 'opencode-json', 'continue-yaml', 'goose-yaml']).optional(),
   /** Абсолютный путь проектного файла MCP. */
   mcpPath: string().optional(),
   /** Формат проектного файла переменных окружения, если раздел есть. */
@@ -89,11 +93,20 @@ export const providerProjectInfoSchema = object({
   /** Абсолютный путь проектного файла переменных окружения. */
   envPath: string().optional(),
   /** Формат проектного файла прав/аппрувов, если раздел есть. */
-  permissionsFormat: zodEnum(['toml', 'gemini-json', 'opencode-json']).optional(),
+  permissionsFormat: zodEnum([
+    'toml',
+    'gemini-json',
+    'qwen-json',
+    'opencode-json',
+    'continue-yaml',
+    'goose-yaml',
+    'kimi-toml',
+    'cursor-json',
+  ]).optional(),
   /** Абсолютный путь проектного файла прав/аппрувов. */
   permissionsPath: string().optional(),
   /** Формат проектных хуков, если раздел есть (OpenCode: `opencode-json`). */
-  hooksFormat: zodEnum(['opencode-json']).optional(),
+  hooksFormat: zodEnum(providerHooksFormats).optional(),
   /** Абсолютный путь проектного файла с хуками. */
   hooksPath: string().optional(),
   /** Формат проектных плагинов, если раздел есть (OpenCode: `opencode-plugins`). */
@@ -102,8 +115,8 @@ export const providerProjectInfoSchema = object({
   pluginsDir: string().optional(),
   /** Абсолютный путь проектного конфига с массивом `plugin`. */
   pluginsConfigPath: string().optional(),
-  /** Формат проектных скиллов, если раздел есть (OpenCode: `opencode-skills`). */
-  skillsFormat: zodEnum(['opencode-skills']).optional(),
+  /** Формат проектных скиллов, если раздел есть (OpenCode: `skill-md-dir`). */
+  skillsFormat: zodEnum(['skill-md-dir']).optional(),
   /** Абсолютный путь проектного КАТАЛОГА скиллов. */
   skillsDir: string().optional(),
 });

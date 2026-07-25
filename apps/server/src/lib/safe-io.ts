@@ -125,6 +125,29 @@ export function writeJsonFile(
 }
 
 /**
+ * Двоичная запись — тем же атомарным приёмом, но без разговоров о форме текста:
+ * у картинки в папке скилла нет ни BOM, ни переводов строк, а перегон через
+ * utf8 её бы испортил. Нужна там, где содержимое приходит буфером (архив
+ * переноса окружения).
+ */
+export function writeBinaryFile(
+  path: string,
+  data: Buffer,
+  options: WriteOptions = {},
+): string | undefined {
+  const backupPath = options.backupDir
+    ? makeBackup(path, options.backupDir, options.backupName)
+    : undefined;
+
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.tmp-${process.pid}-${(tmpCounter += 1)}`;
+  writeFileSync(tmp, data);
+  renameSync(tmp, path);
+
+  return backupPath;
+}
+
+/**
  * Опциональное шифрование копий файла секретов `.mcp-secrets.env`.
  *
  * Копия этого файла по умолчанию лежит открытым текстом рядом с токенами.

@@ -17,6 +17,7 @@ import {
   useCreateProviderMcp,
   useUpdateProviderMcp,
 } from '@entities/ProviderMcp';
+import { useWritePreview } from '@features/WritePreview';
 import { ProviderMcpForm } from './ProviderMcpForm';
 
 /**
@@ -32,6 +33,7 @@ export function ProviderMcpPage() {
   const deleteServer = useDeleteProviderMcp();
   const createServer = useCreateProviderMcp();
   const updateServer = useUpdateProviderMcp();
+  const { ask, dialog } = useWritePreview();
 
   const [editing, setEditing] = useState<UniversalMcpServer | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -135,7 +137,11 @@ export function ProviderMcpPage() {
                   <DeleteButton
                     entityName={server.name}
                     description={t('common.deleteMcp')}
-                    onDelete={() => deleteServer.mutate(server.name)}
+                    onDelete={() =>
+                      ask({ section: 'mcp', action: 'delete', serverId: server.name }, () =>
+                        deleteServer.mutate(server.name),
+                      )
+                    }
                     isPending={deleteServer.isPending}
                   />
                 </Stack>
@@ -152,12 +158,19 @@ export function ProviderMcpPage() {
         onOpenChange={setIsFormOpen}
         server={editing}
         onSave={(draft, serverId, onDone) => {
-          if (serverId) updateServer.mutate({ id: serverId, draft }, { onSuccess: onDone });
-          else createServer.mutate(draft, { onSuccess: onDone });
+          // Переименование сервера тоже проходит предпросмотром: в чужом файле
+          // это удаление одной записи и появление другой, и увидеть это заранее
+          // важнее всего.
+          ask({ section: 'mcp', action: 'upsert', serverId, draft }, () => {
+            if (serverId) updateServer.mutate({ id: serverId, draft }, { onSuccess: onDone });
+            else createServer.mutate(draft, { onSuccess: onDone });
+          });
         }}
         isPending={createServer.isPending || updateServer.isPending}
         isError={createServer.isError || updateServer.isError}
       />
+
+      {dialog}
     </Stack>
   );
 }

@@ -24,8 +24,15 @@ import { object, string, array, boolean, number, enum as zodEnum, type infer as 
  * обманом.
  */
 
-/** Формат каталога правил (пока только Cursor: файлы `.mdc` с frontmatter). */
-export const providerRulesFormats = ['cursor-mdc'] as const;
+/**
+ * Формат каталога правил:
+ * - `cursor-mdc` — Cursor, файлы `.mdc` (обычный `.md` в каталоге правил Cursor
+ *   ИГНОРИРУЕТ);
+ * - `continue-md` — Continue, файлы `.md` в `<проект>/.continue/rules`. Тот же
+ *   frontmatter (`globs`, `alwaysApply`, `description`) плюс СВОЙ ключ `name`,
+ *   которым панель не управляет: он сохраняется как чужой ключ.
+ */
+export const providerRulesFormats = ['cursor-mdc', 'continue-md'] as const;
 export type ProviderRulesFormat = (typeof providerRulesFormats)[number];
 
 /** Уровень каталога правил: глобальный (`~`) или каталог проекта. */

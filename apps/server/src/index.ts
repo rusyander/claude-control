@@ -1,9 +1,10 @@
+import { join } from 'node:path';
 import { watch, type FSWatcher } from 'chokidar';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { ServerContext } from './context.ts';
 import { registerConfigRoutes } from './routes/config-routes.ts';
-import { registerConfigBundleRoutes } from './routes/config-bundle-routes.ts';
+import { registerEnvTransferRoutes } from './routes/env-transfer-routes.ts';
 import { registerEntityRoutes } from './routes/entity-routes.ts';
 import { registerProviderMcpRoutes } from './routes/provider-mcp-routes.ts';
 import { registerProviderEnvRoutes } from './routes/provider-env-routes.ts';
@@ -16,6 +17,11 @@ import { registerProviderPermissionsRoutes } from './routes/provider-permissions
 import { registerProviderKeysRoutes } from './routes/provider-keys-routes.ts';
 import { registerGroupRoutes } from './routes/group-routes.ts';
 import { registerAnalyticsRoutes } from './routes/analytics-routes.ts';
+import { registerModelRoutes } from './routes/model-routes.ts';
+import { registerProviderCheckRoutes } from './routes/provider-check-routes.ts';
+import { registerProviderPreviewRoutes } from './routes/provider-preview-routes.ts';
+import { registerProviderCompareRoutes } from './routes/provider-compare-routes.ts';
+import { registerFormatCheckRoutes } from './routes/format-check-routes.ts';
 import { registerPluginRoutes } from './routes/plugin-routes.ts';
 import { registerAssistantRoutes } from './routes/assistant-routes.ts';
 import { registerScriptRoutes } from './routes/script-routes.ts';
@@ -28,7 +34,8 @@ import { registerSearchRoutes } from './routes/search-routes.ts';
 import { registerProjectRoutes } from './routes/project-routes.ts';
 import { registerProviderProjectRoutes } from './routes/provider-project-routes.ts';
 import { registerProjectRunnerRoutes } from './routes/project-runner-routes.ts';
-import { ProjectRunnerRegistry } from './domains/project-runner.ts';
+import { registerProjectGitRoutes } from './routes/project-git-routes.ts';
+import { ProjectRunnerRegistry, autostartProjects } from './domains/project-runner.ts';
 import { sweepAbandonedSandboxes } from './domains/sandbox/SandboxConfig.ts';
 
 const PORT = Number(process.env.PORT ?? 5178);
@@ -85,7 +92,7 @@ await app.register(cors, {
 });
 
 registerConfigRoutes(app, ctx);
-registerConfigBundleRoutes(app, ctx);
+registerEnvTransferRoutes(app, ctx);
 registerEntityRoutes(app, ctx);
 registerProviderMcpRoutes(app, ctx);
 registerProviderEnvRoutes(app, ctx);
@@ -98,6 +105,11 @@ registerProviderPermissionsRoutes(app, ctx);
 registerProviderKeysRoutes(app, ctx);
 registerGroupRoutes(app, ctx);
 registerAnalyticsRoutes(app, ctx);
+registerModelRoutes(app, ctx);
+registerProviderCheckRoutes(app, ctx);
+registerProviderPreviewRoutes(app, ctx);
+registerProviderCompareRoutes(app, ctx);
+registerFormatCheckRoutes(app, ctx);
 registerPluginRoutes(app, ctx);
 registerAssistantRoutes(app, ctx);
 registerScriptRoutes(app, ctx);
@@ -112,8 +124,17 @@ registerProviderProjectRoutes(app, ctx);
 
 // Реестр dev-серверов проектов держим здесь, а не внутри маршрутов: при выходе
 // сервера панели их надо погасить (иначе спавненные процессы осиротеют).
-const projectRunner = new ProjectRunnerRegistry();
+// Порт становится известен уже после ответа на запуск (его печатает сам
+// dev-сервер), поэтому запоминает его реестр — через узкий колбэк, а не зная
+// про состояние панели.
+const projectRunner = new ProjectRunnerRegistry({
+  onPortDiscovered: ({ projectPath, dir, port }) => {
+    const target = dir ? join(projectPath, dir) : projectPath;
+    ctx.store.rememberRunnerPort(target, port, { projectPath, dir });
+  },
+});
 registerProjectRunnerRoutes(app, ctx, projectRunner);
+registerProjectGitRoutes(app);
 
 /**
  * Поток событий об изменениях файлов. Конфиги правит не только это приложение:
@@ -212,6 +233,12 @@ process.on('SIGTERM', () => {
 
 await app.listen({ port: PORT, host: HOST });
 
+// Цели с включённым тумблером автозапуска поднимаются сами и БЕЗ браузера —
+// панель уже открыта там, где нужно.
+// Слушатель к этому моменту принят, так что медленный dev-сервер не задержит
+// готовность API.
+const autostarted = await autostartProjects(projectRunner, ctx.store);
+
 const { location } = ctx;
 process.stdout.write(
   [
@@ -222,6 +249,12 @@ process.stdout.write(
     sweptSandboxes.length > 0
       ? `Убрано брошенных песочниц: ${sweptSandboxes.length} (в них лежала копия учётных данных)`
       : '',
+    // Порт печатает сам dev-сервер, и к этому моменту он обычно ещё не назвался —
+    // поэтому в строке либо уже известный порт, либо честное «адрес будет в панели».
+    ...autostarted.started.map(
+      (run) => `Автозапуск: ${run.path}${run.port ? ` → порт ${run.port}` : ' (адрес — в панели)'}`,
+    ),
+    ...autostarted.failed.map((run) => `Автозапуск не удался: ${run.path} — ${run.message}`),
     '',
   ]
     .filter(Boolean)

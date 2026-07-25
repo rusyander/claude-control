@@ -19,8 +19,13 @@ import { buildCapabilities, type ConfigProvider } from './types.ts';
  *    которые правят `opencode.json` (MCP и права); `AGENTS.md` остаётся в
  *    каталоге конфигурации, потому что переменная задаёт именно файл конфига.
  *
- * У Gemini, Cursor и Aider задокументированного переопределения каталога нет →
- * ничего не выдумываем, пути остаются от `os.homedir()`.
+ *  - Qwen Code — `QWEN_HOME`: задокументированный перенос каталога `~/.qwen`
+ *    целиком (settings.json, QWEN.md, `.env`). Форк Gemini CLI переменную ДОБАВИЛ,
+ *    у оригинала её нет.
+ *
+ * У Gemini, Continue, Goose, Cursor и Aider задокументированного переопределения
+ * каталога нет → ничего не выдумываем, пути остаются от `os.homedir()` (у Goose
+ * под Windows — от `%APPDATA%`, см. `gooseConfigDir`).
  *
  * Значение переменной прогоняется через `path.resolve`: относительный путь
  * становится абсолютным, а пустая/пробельная переменная игнорируется (иначе
@@ -34,6 +39,61 @@ function envDir(name: string): string | undefined {
 /** Каталог конфигурации Codex: `CODEX_HOME`, иначе `~/.codex`. */
 export function codexHome(): string {
   return envDir('CODEX_HOME') ?? join(homedir(), '.codex');
+}
+
+/**
+ * Каталог конфигурации Qwen Code: `QWEN_HOME`, иначе `~/.qwen`.
+ *
+ * Переменная ЗАДОКУМЕНТИРОВАНА (docs/users/configuration/settings.md: «QWEN_HOME —
+ * changes global configuration directory, default `~/.qwen`») и переносит каталог
+ * целиком: settings.json, QWEN.md, `.env`. Это отличие форка от Gemini CLI, у
+ * которого переопределения каталога нет вовсе.
+ */
+export function qwenHome(): string {
+  return envDir('QWEN_HOME') ?? join(homedir(), '.qwen');
+}
+
+/**
+ * Каталог данных Kimi Code: `KIMI_CODE_HOME`, иначе `~/.kimi-code`.
+ *
+ * Переменная ЗАДОКУМЕНТИРОВАНА («data locations»: `KIMI_CODE_HOME` переносит ВСЕ
+ * данные Kimi — config.toml, AGENTS.md, mcp.json, сессии) и одинакова на всех ОС:
+ * на Windows это `C:\Users\<имя>\.kimi-code`, отдельного пути под `%APPDATA%` у
+ * этого CLI нет.
+ */
+export function kimiCodeHome(): string {
+  return envDir('KIMI_CODE_HOME') ?? join(homedir(), '.kimi-code');
+}
+
+/**
+ * Каталог конфигурации Continue — `~/.continue` (на Windows `%USERPROFILE%\.continue`).
+ *
+ * Задокументированного переопределения каталога у Continue НЕТ (в FAQ описан
+ * только сам путь), поэтому переменных окружения здесь не выдумываем.
+ */
+export function continueHome(): string {
+  return join(homedir(), '.continue');
+}
+
+/**
+ * Каталог конфигурации Goose. Единственный провайдер, у которого путь под
+ * Windows отличается НЕ ТОЛЬКО разделителями: документация задаёт
+ * `~/.config/goose` на macOS/Linux и `%APPDATA%\Block\goose\config` на Windows.
+ *
+ * Платформа проверяется ФУНКЦИЕЙ, а не константой модуля: константа посчиталась
+ * бы один раз при импорте, и проверить второй путь в тесте (без macOS/Linux под
+ * рукой) было бы нечем. `APPDATA` не задана — падаем на её стандартное место,
+ * иначе панель искала бы конфиг в корне диска.
+ *
+ * Задокументированного переопределения каталога у Goose нет (XDG в справочнике
+ * конфигурации не заявлен), поэтому переменных здесь не выдумываем.
+ */
+export function gooseConfigDir(): string {
+  if (process.platform === 'win32') {
+    const appData = envDir('APPDATA') ?? join(homedir(), 'AppData', 'Roaming');
+    return join(appData, 'Block', 'goose', 'config');
+  }
+  return join(homedir(), '.config', 'goose');
 }
 
 /** Каталог конфигурации OpenCode: `$XDG_CONFIG_HOME/opencode`, иначе `~/.config/opencode`. */
@@ -131,6 +191,8 @@ const codexProvider: ConfigProvider = {
     analytics: 'unsupported',
     sandbox: 'unsupported',
   }),
+  // Модели: каталог OpenAI (models.dev). Codex CLI работает с моделями OpenAI.
+  modelVendors: ['openai'],
 };
 
 /** Gemini CLI: GEMINI.md + ~/.gemini/settings.json. */
@@ -199,6 +261,350 @@ const geminiProvider: ConfigProvider = {
     analytics: 'unsupported',
     sandbox: 'unsupported',
   }),
+  // Модели: каталог Google (models.dev).
+  modelVendors: ['google'],
+};
+
+/**
+ * Qwen Code: QWEN.md + `~/.qwen/settings.json` (форк Gemini CLI).
+ *
+ * ФОРК, НО НЕ КОПИЯ. Структура каталога и ключ `mcpServers` совпадают с Gemini —
+ * эти адаптеры (`json`, `dotenv`, файл инструкций) переиспользуются целиком. А вот
+ * ПРАВА разъехались, и брать у Gemini их нельзя:
+ *  - режим аппрувов у Qwen — `tools.approvalMode` (у Gemini `general.defaultApprovalMode`);
+ *  - списки инструментов — `permissions.allow` / `ask` / `deny` (у Gemini
+ *    `coreTools`/`excludeTools`; у Qwen старые `tools.core`/`allowed`/`exclude`
+ *    ПОМЕЧЕНЫ УСТАРЕВШИМИ и мигрируются в `permissions.*` — панель их не пишет).
+ * Отсюда собственный формат `qwen-json`.
+ *
+ * Каталог конфигурации переносится переменной `QWEN_HOME` (см. `qwenHome()`).
+ */
+const qwenProvider: ConfigProvider = {
+  id: 'qwen',
+  name: 'Qwen Code',
+  status: 'experimental',
+  paths: unimplementedPaths('qwen'),
+  cli: { command: 'qwen', windowsCommand: 'qwen.cmd' },
+  // Глобальный файл инструкций (контекстный файл) задокументирован:
+  // `~/.qwen/QWEN.md` — «you, across all your projects»; проектный — QWEN.md в
+  // корне репозитория.
+  instructionsFile: () => join(qwenHome(), 'QWEN.md'),
+  // MCP-серверы Qwen — объект `mcpServers` в settings.json, форма как у Gemini
+  // (command/args/env/cwd, url для SSE, httpUrl для streamable HTTP) → общий
+  // JSON-адаптер без изменений.
+  mcpConfig: { format: 'json', path: () => join(qwenHome(), 'settings.json') },
+  // Переменные окружения — задокументированный `.env`: глобальный
+  // `<QWEN_HOME>/.env`, проектный `<проект>/.qwen/.env` (он в порядке загрузки
+  // ПЕРВЫЙ и рекомендован докой). Правка построчная, как у Gemini.
+  envConfig: { format: 'dotenv', path: () => join(qwenHome(), '.env') },
+  // Права/аппрувы — свой формат (см. комментарий выше): `tools.approvalMode` +
+  // списки правил `permissions.allow` / `ask` / `deny`.
+  permissionsConfig: {
+    format: 'qwen-json',
+    path: () => join(qwenHome(), 'settings.json'),
+  },
+  // Хуки Qwen (QWEN-1) — ключ КОРНЯ `hooks` в том же settings.json: событие →
+  // массив групп с матчером и действиями. Панель ведёт действия типа `command`
+  // (см. lib/qwen-hook.ts); таймаут там в МИЛЛИСЕКУНДАХ.
+  hooksConfig: { format: 'qwen-json', path: () => join(qwenHome(), 'settings.json') },
+  // Скиллы Qwen (QWEN-2) — папка на скилл со `SKILL.md`: личные
+  // `~/.qwen/skills/`, проектные `<проект>/.qwen/skills/`. Обязательные поля
+  // шапки те же два (`name`, `description`), прочие (`priority`, `paths`,
+  // `user-invocable`, `disable-model-invocation`) панель сохраняет как чужие.
+  skillsConfig: { format: 'skill-md-dir', dir: () => join(qwenHome(), 'skills') },
+  // Проектный уровень: проектный QWEN.md в корне, `<проект>/.qwen/settings.json`
+  // (MCP и права; проектные настройки перекрывают пользовательские) и
+  // `<проект>/.qwen/.env`. Форматы те же, что у глобальных разделов.
+  projectConfig: {
+    instructions: 'QWEN.md',
+    mcp: { format: 'json', relativePath: '.qwen/settings.json' },
+    env: { format: 'dotenv', relativePath: '.qwen/.env' },
+    permissions: { format: 'qwen-json', relativePath: '.qwen/settings.json' },
+    // Проектные хуки и скиллы задокументированы ровно там же, где проектные
+    // настройки: `hooks` в `.qwen/settings.json` (док прямо говорит, что
+    // проектные хуки требуют доверенной папки) и каталог `.qwen/skills/`.
+    hooks: { format: 'qwen-json', relativePath: '.qwen/settings.json' },
+    skills: { format: 'skill-md-dir', relativeDir: '.qwen/skills' },
+  },
+  // Детект «конфиг найден» (Ф7): каталог конфигурации. Только проверка существования.
+  configLocations: () => [qwenHome()],
+  // Ассистент Qwen: модельное API — OpenAI-совместимое (OPENAI_API_KEY +
+  // OPENAI_BASE_URL/OPENAI_MODEL), у ModelStudio/DashScope — DASHSCOPE_API_KEY.
+  // One-shot: `qwen -p <промпт>` — задокументированный headless-режим.
+  assistant: {
+    apiKind: 'openai-compat',
+    apiKeyEnvVars: ['OPENAI_API_KEY', 'DASHSCOPE_API_KEY'],
+    cliRunnable: true,
+    oneShotArgs: (prompt) => ['-p', prompt],
+  },
+  capabilities: buildCapabilities({
+    globalInstructions: 'ready',
+    mcp: 'ready',
+    // Права: `tools.approvalMode` + `permissions.allow/ask/deny` (формат qwen-json).
+    permissions: 'ready',
+    // Переменные окружения — файл `.env` (глобальный и проектный).
+    env: 'ready',
+    chat: 'ready',
+    // Проектный уровень: QWEN.md + `.qwen/settings.json` + `.qwen/.env`.
+    projects: 'ready',
+    // Раздел самой панели — от провайдера не зависит (см. codex).
+    scripts: 'ready',
+    // Хуки (QWEN-1) — ключ `hooks` в settings.json; скиллы (QWEN-2) — каталог
+    // `skills/` с папками SKILL.md. Оба формата разобраны по документации.
+    skills: 'ready',
+    hooks: 'ready',
+    // Плагинов у Qwen Code документация не описывает → раздел скрыт.
+    plugins: 'unsupported',
+    analytics: 'unsupported',
+    sandbox: 'unsupported',
+  }),
+  // Модели: каталог Alibaba (models.dev) — семейство Qwen.
+  modelVendors: ['alibaba'],
+};
+
+/**
+ * Continue: `~/.continue/config.yaml` (MCP) + `~/.continue/permissions.yaml` (права).
+ *
+ * ЧТО ВКЛЮЧЕНО — только подтверждённое документацией:
+ *  - **MCP** (`mcp = ready`): ключ `mcpServers` в `config.yaml`. Форма СВОЯ и ни
+ *    на кого не похожа — не «имя → запись», а СПИСОК записей с полем `name`
+ *    внутри; транспорт задаётся `type` (`stdio` | `sse` | `streamable-http`),
+ *    заголовки — в `requestOptions.headers`. Отсюда собственный формат
+ *    `continue-yaml` (см. lib/continue-yaml.ts);
+ *  - **права** (`permissions = ready`): ОТДЕЛЬНЫЙ файл `permissions.yaml` с тремя
+ *    списками `allow` / `ask` / `exclude`. Режима-переключателя у Continue нет —
+ *    это пятая модель раздела прав;
+ *  - **переменные окружения** (`env = ready`): задокументированный `~/.continue/.env`
+ *    (обычный dotenv), из которого берутся секреты `${{ secrets.ИМЯ }}`. Порядок
+ *    поиска по документации: `<проект>/.env` → `<проект>/.continue/.env` →
+ *    `~/.continue/.env` → окружение процесса; панель ведёт глобальный и проектный
+ *    `.continue/.env`;
+ *  - **чат** (`chat = ready`): задокументированный headless-режим `cn -p "<промпт>"`;
+ *  - **проектный уровень** (`projects = ready`): `<проект>/.continue/rules/*.md`
+ *    (каталог правил), `<проект>/.continue/mcpServers/mcp.json` (JSON-файл MCP в
+ *    задокументированном каталоге блоков — форма `mcpServers` как у Claude
+ *    Desktop/Cursor, её Continue подхватывает как есть) и `<проект>/.continue/.env`.
+ *
+ * ЧЕГО НЕТ: **глобальных инструкций** (`globalInstructions = unsupported`). У
+ * Continue задокументирован ТОЛЬКО проектный каталог правил `.continue/rules`;
+ * глобального файла инструкций нет, а ключ `rules` в config.yaml — разнородный
+ * список (строка правила ИЛИ ссылка `uses:`), под который модели раздела нет.
+ * Угадывать не станем. Каталоги блоков `~/.continue/mcpServers/*.yaml` панель
+ * тоже не трогает: она ведёт основной `config.yaml`.
+ */
+const continueProvider: ConfigProvider = {
+  id: 'continue',
+  name: 'Continue',
+  status: 'experimental',
+  paths: unimplementedPaths('continue'),
+  // Бинарь CLI — `cn` (пакет @continuedev/cli).
+  cli: { command: 'cn', windowsCommand: 'cn.cmd' },
+  mcpConfig: { format: 'continue-yaml', path: () => join(continueHome(), 'config.yaml') },
+  envConfig: { format: 'dotenv', path: () => join(continueHome(), '.env') },
+  permissionsConfig: {
+    format: 'continue-yaml',
+    path: () => join(continueHome(), 'permissions.yaml'),
+  },
+  projectConfig: {
+    instructionsRules: { format: 'continue-md', relativeDir: '.continue/rules' },
+    mcp: { format: 'json', relativePath: '.continue/mcpServers/mcp.json' },
+    env: { format: 'dotenv', relativePath: '.continue/.env' },
+  },
+  // Детект «конфиг найден» (Ф7): каталог ~/.continue. Только проверка существования.
+  configLocations: () => [continueHome()],
+  // Ассистент Continue: CLI логинится в аккаунт Continue либо работает по ключу
+  // Anthropic; своего единого модельного API у панели тут нет → раннер `cli`.
+  // One-shot: `cn -p "<промпт>"` — задокументированный headless-режим.
+  assistant: {
+    apiKind: 'anthropic',
+    apiKeyEnvVars: ['ANTHROPIC_API_KEY', 'CONTINUE_API_KEY'],
+    cliRunnable: true,
+    oneShotArgs: (prompt) => ['-p', prompt],
+  },
+  capabilities: buildCapabilities({
+    // Глобального файла/каталога инструкций у Continue не задокументировано (см.
+    // комментарий выше) → раздел скрыт, а не «в разработке».
+    globalInstructions: 'unsupported',
+    mcp: 'ready',
+    permissions: 'ready',
+    env: 'ready',
+    chat: 'ready',
+    // Проектный уровень: каталог правил `.md` + JSON-файл MCP + `.env`.
+    projects: 'ready',
+    // Раздел самой панели — от провайдера не зависит (см. codex).
+    scripts: 'ready',
+    skills: 'unsupported',
+    hooks: 'unsupported',
+    plugins: 'unsupported',
+    analytics: 'unsupported',
+    sandbox: 'unsupported',
+  }),
+};
+
+/**
+ * Goose (Block): ОДИН файл `config.yaml` держит и MCP-серверы, и режим аппрувов,
+ * а инструкции лежат рядом отдельным файлом `.goosehints`.
+ *
+ * ЧТО ЗАДОКУМЕНТИРОВАНО и потому реализовано:
+ *  - каталог: `~/.config/goose` (macOS/Linux), `%APPDATA%\Block\goose\config`
+ *    (Windows) — считает `gooseConfigDir()`;
+ *  - MCP: ключ `extensions` — ОТОБРАЖЕНИЕ «имя → запись», тип задаёт `type`
+ *    (`stdio` / `sse` / `streamable_http` — внешние серверы; `builtin` и прочие —
+ *    встроенные расширения Goose, панель их не показывает и не трогает);
+ *  - права: скалярный ключ КОРНЯ `GOOSE_MODE` (`auto`, `approve`,
+ *    `smart_approve`, `chat`) — модель «один режим», как у Codex, без списков;
+ *  - инструкции: `.goosehints` в каталоге конфигурации (глобальные, действуют во
+ *    всех сессиях) и `<проект>/.goosehints` (проектные, перекрывают глобальные);
+ *  - чат: `goose run --no-session -t "<промпт>"` — задокументированный
+ *    неинтерактивный запуск (`--no-session` не плодит файлы сессий).
+ *
+ * ЧЕГО НЕТ: **переменных окружения** (`env = unsupported`). Своего `.env` Goose
+ * не загружает: значения берутся из окружения процесса, а секреты — из связки
+ * ключей ОС либо `secrets.yaml`, который панель вести не станет. Пофайловые
+ * разрешения инструментов (`permission.yaml`) под панель не разбирались.
+ */
+const gooseProvider: ConfigProvider = {
+  id: 'goose',
+  name: 'Goose',
+  status: 'experimental',
+  paths: unimplementedPaths('goose'),
+  cli: { command: 'goose', windowsCommand: 'goose.cmd' },
+  instructionsFile: () => join(gooseConfigDir(), '.goosehints'),
+  mcpConfig: { format: 'goose-yaml', path: () => join(gooseConfigDir(), 'config.yaml') },
+  permissionsConfig: { format: 'goose-yaml', path: () => join(gooseConfigDir(), 'config.yaml') },
+  projectConfig: { instructions: '.goosehints' },
+  configLocations: () => [gooseConfigDir()],
+  // Своего модельного API у Goose нет: модель даёт провайдер, который настроен
+  // внутри самого Goose, а ключ лежит в его связке ключей. Поэтому `none` +
+  // запуск через CLI (подписка/настройка пользователя), без ключа в панели.
+  assistant: {
+    apiKind: 'none',
+    apiKeyEnvVars: [],
+    cliRunnable: true,
+    oneShotArgs: (prompt) => ['run', '--no-session', '-t', prompt],
+  },
+  capabilities: buildCapabilities({
+    globalInstructions: 'ready',
+    mcp: 'ready',
+    permissions: 'ready',
+    chat: 'ready',
+    // Проектный уровень: только `<проект>/.goosehints` — проектного config.yaml
+    // документация не описывает, выдумывать его не станем.
+    projects: 'ready',
+    // Раздел самой панели — от провайдера не зависит (см. codex).
+    scripts: 'ready',
+    // Своего `.env` у Goose нет (см. комментарий выше) → раздел скрыт.
+    env: 'unsupported',
+    skills: 'unsupported',
+    hooks: 'unsupported',
+    plugins: 'unsupported',
+    analytics: 'unsupported',
+    sandbox: 'unsupported',
+  }),
+};
+
+/**
+ * Kimi Code (Moonshot): всё лежит в одном каталоге данных `~/.kimi-code`
+ * (переносится `KIMI_CODE_HOME`), но РАЗНЫМИ файлами — конфиг отдельно, MCP
+ * отдельно, инструкции отдельно.
+ *
+ * ЧТО ЗАДОКУМЕНТИРОВАНО и потому реализовано:
+ *  - инструкции: `<home>/AGENTS.md` (глобальные) и `<проект>/AGENTS.md` (его
+ *    создаёт команда `/init` в корне проекта);
+ *  - MCP: `<home>/mcp.json` и проектный `<проект>/.kimi-code/mcp.json` — обычный
+ *    ключ `mcpServers` (`command`/`args`/`env`/`cwd`, у удалённого `url` +
+ *    `headers`) → общий JSON-адаптер, адрес в `url`;
+ *  - права: `config.toml` — режим `default_permission_mode` + массив таблиц
+ *    `[[permission.rules]]` (`decision` + `pattern`), см. `lib/kimi-toml.ts`;
+ *  - чат: `kimi -p "<промпт>"` — задокументированный неинтерактивный запуск
+ *    (TUI не открывается, ответ идёт в stdout).
+ *
+ * ЧЕГО НЕТ: **переменных окружения** (`env = unsupported`). Своего `.env` Kimi не
+ * загружает, а документированная карта `[providers.<имя>.env]` — это КЛЮЧИ
+ * доступа к моделям; секреты панель в чужой конфиг не пишет (свои ключи она
+ * держит в шифрованном хранилище). Хуки (`[[hooks]]`), скиллы (`skills/`) и
+ * плагины (`plugins/`) у CLI есть, но их формат под панель не разбирался →
+ * fail-closed, разделы скрыты.
+ */
+const kimiProvider: ConfigProvider = {
+  id: 'kimi',
+  name: 'Kimi Code',
+  status: 'experimental',
+  paths: unimplementedPaths('kimi'),
+  cli: { command: 'kimi', windowsCommand: 'kimi.cmd' },
+  instructionsFile: () => join(kimiCodeHome(), 'AGENTS.md'),
+  // MCP — ОТДЕЛЬНЫЙ файл mcp.json (в config.toml лежат только таймауты `[mcp]`,
+  // а не серверы). Форма стандартная, адрес удалённого сервера — `url`.
+  mcpConfig: {
+    format: 'json',
+    jsonHttpUrlKey: 'url',
+    path: () => join(kimiCodeHome(), 'mcp.json'),
+  },
+  permissionsConfig: { format: 'kimi-toml', path: () => join(kimiCodeHome(), 'config.toml') },
+  // Хуки Kimi (KIMI-1) — массив таблиц `[[hooks]]` в том же config.toml:
+  // событие + матчер + команда оболочки + таймаут В СЕКУНДАХ (1–600).
+  hooksConfig: { format: 'kimi-toml', path: () => join(kimiCodeHome(), 'config.toml') },
+  // Скиллы Kimi (KIMI-2) — папка на скилл со `SKILL.md`: `~/.kimi-code/skills/`.
+  // CLI грузит их ещё и из `~/.agents/skills` (и из проектных `.kimi-code/skills`,
+  // `.agents/skills`) — панель об этом сообщает, но туда ничего не пишет.
+  // `description` у Kimi задокументирован как однострочная сводка до 240 знаков.
+  skillsConfig: {
+    format: 'skill-md-dir',
+    dir: () => join(kimiCodeHome(), 'skills'),
+    alsoLoadedFrom: () => [join(homedir(), '.agents', 'skills')],
+    descriptionMax: 240,
+  },
+  // Плагины Kimi (KIMI-3) — ТОЛЬКО ЧТЕНИЕ: каталог `plugins/managed/<id>/` с
+  // JSON-манифестом. Реестр `plugins/installed.json` в дереве каталогов
+  // задокументирован, а его ФОРМА — нет; ставят и включают плагины командой
+  // `/plugins` внутри CLI. Панель показывает установленное и не пишет ничего.
+  pluginsConfig: {
+    format: 'kimi-plugins',
+    dir: () => join(kimiCodeHome(), 'plugins', 'managed'),
+    registryPath: () => join(kimiCodeHome(), 'plugins', 'installed.json'),
+  },
+  // Проектный уровень: AGENTS.md в корне + `.kimi-code/mcp.json` (он сливается с
+  // пользовательским, при совпадении имён побеждает проектный). Проектного
+  // config.toml у Kimi НЕТ — документация говорит об этом прямо, поэтому и прав
+  // на уровне проекта здесь не бывает.
+  projectConfig: {
+    instructions: 'AGENTS.md',
+    mcp: { format: 'json', relativePath: '.kimi-code/mcp.json', jsonHttpUrlKey: 'url' },
+    // Проектные скиллы задокументированы (`.kimi-code/skills/`); проектных хуков
+    // не бывает — config.toml у Kimi ровно один, пользовательский.
+    skills: { format: 'skill-md-dir', relativeDir: '.kimi-code/skills' },
+  },
+  configLocations: () => [kimiCodeHome()],
+  // Ассистент: модельное API Kimi — OpenAI-совместимое (`base_url` вида
+  // `https://api.kimi.com/coding/v1`), ключ в `KIMI_API_KEY`/`MOONSHOT_API_KEY`.
+  // One-shot: `kimi -p <промпт>`.
+  assistant: {
+    apiKind: 'openai-compat',
+    apiKeyEnvVars: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
+    cliRunnable: true,
+    oneShotArgs: (prompt) => ['-p', prompt],
+  },
+  capabilities: buildCapabilities({
+    globalInstructions: 'ready',
+    mcp: 'ready',
+    permissions: 'ready',
+    chat: 'ready',
+    // Проектный уровень: AGENTS.md + `.kimi-code/mcp.json`.
+    projects: 'ready',
+    // Раздел самой панели — от провайдера не зависит (см. codex).
+    scripts: 'ready',
+    // Своего `.env` у Kimi нет (см. комментарий выше) → раздел скрыт.
+    env: 'unsupported',
+    // Хуки (KIMI-1) — `[[hooks]]` в config.toml; скиллы (KIMI-2) — каталог
+    // `skills/`; плагины (KIMI-3) — список установленного, только чтение.
+    skills: 'ready',
+    hooks: 'ready',
+    plugins: 'ready',
+    analytics: 'unsupported',
+    sandbox: 'unsupported',
+  }),
+  // Модели: каталог Moonshot AI (models.dev) — семейство Kimi.
+  modelVendors: ['moonshotai'],
 };
 
 /**
@@ -236,14 +642,28 @@ const cursorProvider: ConfigProvider = {
     jsonHttpUrlKey: 'url',
     path: () => join(homedir(), '.cursor', 'mcp.json'),
   },
-  // Проектный уровень Cursor (COMMON-2 + CURSOR-1): задокументированы проектный
-  // MCP `<проект>/.cursor/mcp.json` (та же форма, адрес удалённого сервера в
-  // `url`) и проектный КАТАЛОГ ПРАВИЛ `<проект>/.cursor/rules/*.mdc` — тот же
-  // формат `.mdc`, что и у глобального каталога, поэтому адаптер переиспользуется
-  // целиком, меняется только корень (и он перепроверяется `isInsideProject`).
+  // Права Cursor (CURSOR-2) — ключ `permissions` файла `~/.cursor/cli-config.json`:
+  // ДВА списка правил (`allow` и `deny`, deny приоритетнее), режима-переключателя
+  // нет. Файл общий с прочими настройками CLI (`version`, `editor`, …), поэтому
+  // правится ТОЛЬКО ключ `permissions`, остальное сохраняется по значениям.
+  // Переопределения каталога через переменную окружения документация раздела прав
+  // НЕ заявляет → не выдумываем, путь от `os.homedir()` (как у mcp.json и rules).
+  permissionsConfig: {
+    format: 'cursor-json',
+    path: () => join(homedir(), '.cursor', 'cli-config.json'),
+  },
+  // Проектный уровень Cursor (COMMON-2 + CURSOR-1 + CURSOR-2): задокументированы
+  // проектный MCP `<проект>/.cursor/mcp.json` (та же форма, адрес удалённого
+  // сервера в `url`), проектный КАТАЛОГ ПРАВИЛ `<проект>/.cursor/rules/*.mdc` —
+  // тот же формат `.mdc`, что и у глобального каталога, поэтому адаптер
+  // переиспользуется целиком, меняется только корень (и он перепроверяется
+  // `isInsideProject`), — и проектные ПРАВА `<проект>/.cursor/cli.json`. Имя файла
+  // прав в проекте ДРУГОЕ (`cli.json`, не `cli-config.json`), и держит он по
+  // документации только права: путь взят из документации дословно.
   projectConfig: {
     instructionsRules: { format: 'cursor-mdc', relativeDir: '.cursor/rules' },
     mcp: { format: 'json', relativePath: '.cursor/mcp.json', jsonHttpUrlKey: 'url' },
+    permissions: { format: 'cursor-json', relativePath: '.cursor/cli.json' },
   },
   // Детект «конфиг найден» (Ф7): каталог ~/.cursor. Только проверка существования.
   configLocations: () => [join(homedir(), '.cursor')],
@@ -256,9 +676,13 @@ const cursorProvider: ConfigProvider = {
     // ТРЕТЬЕЙ моделью раздела (`instructionsRules`), а не редактором «один файл».
     globalInstructions: 'ready',
     mcp: 'ready',
-    // Проектный уровень (COMMON-2 + CURSOR-1): проектный MCP `.cursor/mcp.json`
-    // тем же json-адаптером и проектный каталог правил `.cursor/rules/*.mdc` тем
-    // же адаптером `.mdc`, что и глобальный.
+    // CURSOR-2: права Cursor — ключ `permissions` (`allow`/`deny`) в
+    // `cli-config.json`; восьмая модель раздела, без режима и без списка `ask`.
+    permissions: 'ready',
+    // Проектный уровень (COMMON-2 + CURSOR-1 + CURSOR-2): проектный MCP
+    // `.cursor/mcp.json` тем же json-адаптером, проектный каталог правил
+    // `.cursor/rules/*.mdc` тем же адаптером `.mdc`, что и глобальный, и
+    // проектные права `.cursor/cli.json` тем же адаптером `cursor-json`.
     projects: 'ready',
     // Раздел самой панели — от провайдера не зависит (см. codex).
     scripts: 'ready',
@@ -294,17 +718,27 @@ const opencodeProvider: ConfigProvider = {
     format: 'opencode-json',
     path: opencodeConfigFile,
   },
-  // Хуки OpenCode (OPENCODE-3) — ключ `experimental.hook` того же opencode.json.
-  // Событий ровно два и оба задокументированы: `file_edited` (карта «шаблон
-  // файлов → массив действий») и `session_completed` (массив действий). Действие
-  // = argv-МАССИВ `command` (не shell-строка) + необязательные переменные
-  // `environment`. ЧЕСТНО: ключ лежит под `experimental`, и OpenCode сам называет
-  // такие настройки нестабильными — интерфейс это прямо говорит. Правится только
-  // `experimental.hook`; прочие ключи `experimental` и незнакомые события
-  // сохраняются и показываются для чтения (см. lib/opencode-hook.ts).
+  // Хуки OpenCode (OPENCODE-3) — ключ `experimental.hook` того же opencode.json:
+  // два события (`file_edited` — карта «шаблон файлов → действия»,
+  // `session_completed` — массив действий), действие = argv-МАССИВ `command` +
+  // необязательные `environment`.
+  //
+  // РАЗДЕЛ ТОЛЬКО ДЛЯ ЧТЕНИЯ с 2026-07-25. Сверка форматов (IDEA-3) поймала, а
+  // проверка по документации подтвердила: ключа `experimental.hook` больше нет ни
+  // в справочнике конфигурации OpenCode, ни в опубликованной схеме
+  // `https://opencode.ai/config.json`, причём у `experimental` там
+  // `additionalProperties: false` — то есть схема такой ключ ОТВЕРГАЕТ.
+  // Задокументированный способ повесить действие на событие теперь один —
+  // ПЛАГИНЫ (`plugin` + каталог `plugins/`), и он у панели уже есть отдельным
+  // разделом. Писать ключ, которого нет ни в документации, ни в схеме, — гадание
+  // о чужом формате, а оно запрещено. Читать продолжаем: у человека такой ключ
+  // мог остаться от прежних версий, и прятать его было бы хуже.
+  // Опишут ключ обратно → снять `writeDisabledReason`, адаптер трогать не нужно.
   hooksConfig: {
     format: 'opencode-json',
     path: opencodeConfigFile,
+    writeDisabledReason:
+      'Ключ experimental.hook исчез из справочника конфигурации OpenCode и из опубликованной схемы (проверено 25 июля 2026), а `experimental` в схеме закрыт для чужих ключей. Панель больше не пишет его: задокументированный способ повесить действие на событие — плагины.',
   },
   // Плагины OpenCode (OPENCODE-4) — два задокументированных способа сразу:
   // КАТАЛОГ файлов JS/TS `~/.config/opencode/plugins/`, которые CLI подхватывает
@@ -327,7 +761,7 @@ const opencodeProvider: ConfigProvider = {
   // поэтому уже готовые скиллы Claude в нём работают без переноса. Панель
   // сообщает об этом и НИЧЕГО туда не пишет: ими ведает раздел скиллов Claude.
   skillsConfig: {
-    format: 'opencode-skills',
+    format: 'skill-md-dir',
     dir: () => join(opencodeConfigDir(), 'skills'),
     alsoLoadedFrom: () => [
       join(homedir(), '.claude', 'skills'),
@@ -359,7 +793,7 @@ const opencodeProvider: ConfigProvider = {
     },
     // Скиллы проекта (OPENCODE-5): задокументированный каталог
     // `<проект>/.opencode/skills/` — тот же формат, адаптер переиспользуется.
-    skills: { format: 'opencode-skills', relativeDir: '.opencode/skills' },
+    skills: { format: 'skill-md-dir', relativeDir: '.opencode/skills' },
   },
   // Детект «конфиг найден» (Ф7): задокументированы оба варианта размещения —
   // XDG-каталог ~/.config/opencode и ~/.opencode. Достаточно любого из них.
@@ -380,11 +814,16 @@ const opencodeProvider: ConfigProvider = {
   // ПОЗИЦИОННЫМ аргументом в конце (`opencode run "<текст>"`); стандартный ввод
   // CLI не поддерживает, поэтому передать промпт можно только так. Промпт —
   // ОТДЕЛЬНЫЙ элемент argv, никакой сборки строки для оболочки.
+  // IDEA-8: у OpenCode есть и ЗАДОКУМЕНТИРОВАННЫЙ локальный сервер
+  // (`opencode serve --port <n> --hostname <адрес>`) с сессиями — диалог держит
+  // сам CLI, панель шлёт только новое сообщение. Панель пробует его ПЕРВЫМ и при
+  // любой заминке молча возвращается к one-shot (см. domains/opencode-serve.ts).
   assistant: {
     apiKind: 'openai-compat',
     apiKeyEnvVars: [],
     cliRunnable: true,
     oneShotArgs: (prompt) => ['run', prompt],
+    sessionServer: 'opencode',
   },
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
@@ -419,6 +858,8 @@ const opencodeProvider: ConfigProvider = {
     analytics: 'unsupported',
     sandbox: 'unsupported',
   }),
+  // Модели: собственный шлюз OpenCode Zen (models.dev, вендор `opencode`).
+  modelVendors: ['opencode'],
 };
 
 /** Глобальный конфиг Aider — задокументированный `~/.aider.conf.yml` в домашнем каталоге. */
@@ -516,6 +957,10 @@ const aiderProvider: ConfigProvider = {
 export const CATALOG_PROVIDERS: ConfigProvider[] = [
   codexProvider,
   geminiProvider,
+  qwenProvider,
+  continueProvider,
+  gooseProvider,
+  kimiProvider,
   cursorProvider,
   opencodeProvider,
   aiderProvider,

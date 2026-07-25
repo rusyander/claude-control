@@ -34,6 +34,7 @@ import { ChatModelPicker } from '@features/ChatModelPicker';
 import { ParallelLaunch } from '@features/ParallelLaunch';
 import { FolderPicker } from '@features/FolderPicker';
 import { ProjectRunnerControls } from '@features/ProjectRunner';
+import { ProjectGitControls } from '@features/ProjectGit';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { ChatMessages } from '@features/ChatMessages';
@@ -51,7 +52,9 @@ import {
 } from '@entities/Chat';
 import type { StreamState } from '@entities/Chat';
 import { useProjects, useOpenInEditor, type ProjectInfo } from '@entities/Project';
+import { useClearRunnerAutostart } from '@entities/ProjectRunner';
 import { useSettings } from '@entities/AppConfig';
+import { useModelCatalog } from '@entities/ModelCatalog';
 import { ResizeHandle } from '@shared/ui/resize-handle';
 import styles from './ChatPage.module.scss';
 
@@ -93,6 +96,7 @@ export function ChatPage() {
   const [isParallelOpen, setParallelOpen] = useState(false);
   const openEditor = useOpenInEditor();
   const { data: settings } = useSettings();
+  const { data: modelCatalog } = useModelCatalog();
   const costUnit = settings?.costUnit ?? 'tokens';
 
   const chatId = activeChat?.id ?? draftId;
@@ -100,6 +104,7 @@ export function ChatPage() {
   const chats = useChats();
   const projects = useProjects();
   const ws = useWorkspace();
+  const clearRunnerAutostart = useClearRunnerAutostart();
   const projectStatuses = useProjectStatuses();
   const activeRuns = useActiveRuns();
   const totalCost = useTotalCost();
@@ -539,6 +544,19 @@ export function ChatPage() {
     dispatch(prompt, files);
   };
 
+  /**
+   * Закрыть вкладку проекта. Заодно снимаем автозапуск со ВСЕХ его целей: у
+   * монорепы их несколько, а вкладку закрыли — значит, при старте панели ничего
+   * из этого проекта подниматься не должно. Отказ сервера здесь не мешает
+   * закрыть вкладку: тумблеры видны в самой вкладке, и человек поправит их,
+   * когда откроет проект снова.
+   */
+  const closeProjectTab = (id: string): void => {
+    const tab = ws.state.projectTabs.find((item) => item.id === id);
+    if (tab) clearRunnerAutostart.mutate({ path: tab.path });
+    ws.closeProject(id);
+  };
+
   // Клик по варианту в карточке вопроса: отвечаем этим вариантом, продолжая тот
   // же разговор — выбрать можно прямо в чате, не уходя в терминал. Пока агент
   // занят, отвечать нельзя (кнопки уже недоступны, но подстрахуемся).
@@ -560,7 +578,7 @@ export function ChatPage() {
           activeTabId={ws.state.activeTabId}
           statuses={projectStatuses}
           onActivate={ws.activate}
-          onClose={ws.closeProject}
+          onClose={closeProjectTab}
         />
       )}
 
@@ -674,6 +692,7 @@ export function ChatPage() {
                 effort={effortOverride}
                 defaultModel={defaultModel}
                 defaultEffort={defaultEffort}
+                models={modelCatalog?.models}
                 onModelChange={setModelOverride}
                 onEffortChange={setEffortOverride}
               />
@@ -693,6 +712,10 @@ export function ChatPage() {
               {/* Запуск/остановка dev-сервера проекта + «Перейти» — в том же ряду,
                   что и «Открыть в редакторе». */}
               {isProjectContext && projectPath && <ProjectRunnerControls path={projectPath} />}
+
+              {/* Git проекта — тут же, но только если в каталоге есть .git:
+                  сам компонент вернёт null, когда репозитория нет. */}
+              {isProjectContext && projectPath && <ProjectGitControls path={projectPath} />}
 
               {isProjectContext && (
                 <Stack

@@ -65,9 +65,11 @@ export const providerMcpInfoSchema = object({
    * Формат файла конфигурации: `json` — объект `mcpServers` (Gemini
    * settings.json, Cursor mcp.json), `toml` — таблицы `[mcp_servers.<name>]`
    * (Codex config.toml), `opencode-json` — объект `mcp` с формой
-   * `{type:'local'|'remote'}` (OpenCode opencode.json).
+   * `{type:'local'|'remote'}` (OpenCode opencode.json), `continue-yaml` — СПИСОК
+   * `mcpServers` с именем внутри записи (Continue config.yaml), `goose-yaml` —
+   * ОТОБРАЖЕНИЕ `extensions` «имя → запись» (Goose config.yaml).
    */
-  format: zodEnum(['json', 'toml', 'opencode-json']),
+  format: zodEnum(['json', 'toml', 'opencode-json', 'continue-yaml', 'goose-yaml']),
   /** Абсолютный путь к файлу конфигурации MCP активного провайдера. */
   filePath: string(),
   /** Обнаружен ли CLI провайдера (по наличию его каталога конфигурации). */

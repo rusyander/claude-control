@@ -103,6 +103,9 @@ export function ChatTopic() {
             tr('canLoadMore'),
             tr('canExport'),
             tr('canRun'),
+            tr('canFreePort'),
+            tr('canAutostart'),
+            tr('canGit'),
             tr('canOpenFolder'),
             tr('canAttach'),
             tr('canVoice'),
@@ -124,6 +127,19 @@ export function ChatTopic() {
           ]}
         />
         <Callout tone="info" title={tr('tabsNote')} />
+      </HelpSection>
+
+      <HelpSection title={tr('toolsTitle')} caption={tr('toolsCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('toolsRun'), text: tr('toolsRunText') },
+            { title: tr('toolsPort'), text: tr('toolsPortText') },
+            { title: tr('toolsAutostart'), text: tr('toolsAutostartText') },
+            { title: tr('toolsGit'), text: tr('toolsGitText') },
+          ]}
+        />
+        <Callout tone="info" title={tr('toolsNote')} />
       </HelpSection>
 
       <HelpSection title={tr('dotsTitle')} caption={tr('dotsCaption')}>

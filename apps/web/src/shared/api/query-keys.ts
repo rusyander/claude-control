@@ -11,6 +11,10 @@ export const queryKeys = {
   providers: ['providers'] as const,
   /** Детект установленных провайдер-CLI (бинарь в PATH + каталог конфигурации). */
   providerDetect: ['providers', 'detect'] as const,
+  /** Итоги проверки провайдеров на этой машине (круг записи + запуск ассистента). */
+  providerChecks: ['providers', 'checks'] as const,
+  /** Сравнение конфигураций двух провайдеров — ключ зависит от обеих сторон. */
+  providerCompare: (left: string, right: string) => ['providers', 'compare', left, right] as const,
   overview: ['overview'] as const,
   rules: ['rules'] as const,
   hooks: ['hooks'] as const,
@@ -43,6 +47,10 @@ export const queryKeys = {
   providerPermissions: ['provider-permissions'] as const,
   /** API-ключи провайдеров (маскированный статус) — раздел настроек. */
   providerKeys: ['provider-keys'] as const,
+  /** Каталог моделей активного провайдера: список обновляется не чаще раза в сутки. */
+  models: ['models'] as const,
+  /** Сверка форматов чужих CLI с их официальными схемами: кэш на неделю. */
+  formatCheck: ['format-check'] as const,
   /** Резолв раннера активного провайдера (api/cli/none) — модалка ассистента. */
   providerRunner: ['provider-runner'] as const,
   permissions: ['permissions'] as const,

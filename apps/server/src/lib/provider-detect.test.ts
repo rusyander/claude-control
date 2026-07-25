@@ -92,7 +92,7 @@ describe('detectProviders: все провайдеры + активный', () =
   it('возвращает детект по каждому известному провайдеру, claude первым', () => {
     const data = detectProviders(fakeStore('claude'), scenario);
     expect(data.active).toBe('claude');
-    expect(data.providers).toHaveLength(6);
+    expect(data.providers).toHaveLength(10);
     expect(data.providers[0]?.id).toBe('claude');
 
     const byId = new Map(data.providers.map((item) => [item.id, item]));

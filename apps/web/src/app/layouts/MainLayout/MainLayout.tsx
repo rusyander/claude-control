@@ -6,6 +6,7 @@ import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMot
 import { useMediaQuery } from '@shared/hooks/use-media-query/useMediaQuery';
 import { Stack } from '@shared/ui/stack';
 import { OnboardingWizard } from '@app/onboarding/OnboardingWizard';
+import { ProviderTrustBadge } from '@features/ProviderTrust';
 import { Sidebar } from './Sidebar';
 import { AppShortcuts } from './AppShortcuts';
 import styles from './MainLayout.module.scss';
@@ -41,6 +42,13 @@ export function MainLayout() {
     <Stack direction="row" className={styles.root}>
       <Sidebar isCollapsed={effectiveCollapsed} onToggle={toggle} isNarrow={isNarrow} />
       <Stack as="main" className={styles.content}>
+        {/* Бейдж доверия виден в КАЖДОМ разделе, а не только на странице выбора
+            (IDEA-9): настройки чужого CLI правятся здесь, и знать, чей формат
+            панель пишет и проверялся ли он на этой машине, нужно именно здесь.
+            Для Claude компонент возвращает null — постоянная плашка у дефолтного
+            провайдера была бы шумом. */}
+        <ProviderTrustBadge />
+
         <motion.div
           key={path}
           // Обёртка не должна менять раскладку: страницы вроде чата занимают

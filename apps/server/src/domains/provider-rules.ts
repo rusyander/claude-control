@@ -5,6 +5,7 @@ import type {
   ProviderRule,
   ProviderRuleDraft,
   ProviderRuleSummary,
+  ProviderRulesFormat,
   ProviderRulesIgnoredFile,
   ProviderRulesInfo,
   ProviderRulesScope,
@@ -29,6 +30,13 @@ import {
  * это КАТАЛОГ файлов `.mdc` (глобальный `~/.cursor/rules/`, проектный
  * `<проект>/.cursor/rules/`, вложенные подкаталоги поддерживаются), где каждый
  * файл несёт свой frontmatter с полями `description` / `globs` / `alwaysApply`.
+ *
+ * ТА ЖЕ МОДЕЛЬ У CONTINUE (формат `continue-md`), только расширение другое:
+ * правила проекта лежат в `<проект>/.continue/rules/` файлами `.md` с тем же
+ * frontmatter (`globs`, `alwaysApply`, `description`) плюс своим ключом `name` —
+ * им панель не управляет, но сохраняет. Файл без frontmatter Continue правилом
+ * СЧИТАЕТ, а панель его не переписывает (только показывает): переписывать вслепую
+ * то, форму чего не разобрали, нельзя.
  *
  * ЧТО ДЕЛАЕТ РАЗДЕЛ:
  *  1. перечисляет все `*.mdc` рекурсивно, показывая по каждому относительный
@@ -63,7 +71,7 @@ interface ProviderRulesSettingsSource {
 /** Разрешённая цель раздела: провайдер + каталог правил. */
 export interface ProviderRulesTarget {
   provider: ConfigProvider;
-  format: 'cursor-mdc';
+  format: ProviderRulesFormat;
   scope: ProviderRulesScope;
   /** Абсолютный путь каталога правил (`~/.cursor/rules`). */
   rulesDir: string;
@@ -132,6 +140,15 @@ export function describeRuleError(
   return undefined;
 }
 
+/**
+ * Расширение файла правила у формата каталога. У Cursor это `.mdc` (обычный
+ * `.md` он игнорирует), у Continue правила — обыкновенные `.md`. Расширение
+ * решает и что считать правилом при обходе каталога, и что принимать на запись.
+ */
+function ruleExtension(format: ProviderRulesFormat): string {
+  return format === 'continue-md' ? '.md' : MDC_EXTENSION;
+}
+
 /** Больше этого панель не открывает: раздел — редактор правил, а не просмотр дампов. */
 const MAX_RULE_BYTES = 1_000_000;
 
@@ -190,11 +207,12 @@ export function resolveRulePath(target: ProviderRulesTarget, rawPath: string): s
     }
   }
 
+  const extension = ruleExtension(target.format);
   const name = segments[segments.length - 1]!;
-  if (!name.toLowerCase().endsWith(MDC_EXTENSION)) {
-    throw new UnsafeRulePathError(value, `правило обязано оканчиваться на ${MDC_EXTENSION}.`);
+  if (!name.toLowerCase().endsWith(extension)) {
+    throw new UnsafeRulePathError(value, `правило обязано оканчиваться на ${extension}.`);
   }
-  if (name.length === MDC_EXTENSION.length) {
+  if (name.length === extension.length) {
     throw new UnsafeRulePathError(value, 'имя правила пустое.');
   }
 
@@ -245,6 +263,7 @@ function walkRulesDir(target: ProviderRulesTarget): {
 } {
   const rules: string[] = [];
   const ignored: string[] = [];
+  const extension = ruleExtension(target.format);
   let seen = 0;
 
   const visit = (dir: string, depth: number): void => {
@@ -261,7 +280,7 @@ function walkRulesDir(target: ProviderRulesTarget): {
       }
       if (!entry.isFile()) continue;
       seen += 1;
-      if (entry.name.toLowerCase().endsWith(MDC_EXTENSION)) rules.push(full);
+      if (entry.name.toLowerCase().endsWith(extension)) rules.push(full);
       else ignored.push(full);
     }
   };

@@ -17,6 +17,7 @@ import {
   useSaveProviderPluginPackages,
 } from '@entities/ProviderPlugins';
 import { ProviderPluginFileEditor } from './ProviderPluginFileEditor';
+import { ProviderInstalledPlugins } from './ProviderInstalledPlugins';
 
 /**
  * Плагины CLI (OPENCODE-4) — общая начинка для глобального раздела и вкладки
@@ -50,6 +51,10 @@ export function ProviderPluginsPanel({ projectId }: { projectId?: string }) {
   }, [data]);
 
   if (isLoading || !data) return <SkeletonList rows={5} />;
+
+  // У Kimi половина одна и она только для чтения: список установленного.
+  // Ветка стоит ПОСЛЕ хуков React намеренно — состояние объявляется безусловно.
+  if (data.sections.includes('installed')) return <ProviderInstalledPlugins data={data} />;
 
   // --- файлы ---
   const trimmedName = newFile.trim().replace(/^[/\\]+/, '');

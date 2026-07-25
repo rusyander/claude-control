@@ -36,8 +36,14 @@ export function ResizeHandle({ width, onResize, min = 320, max = 900, label }: R
     document.addEventListener('pointerup', onUp);
   };
 
+  // Текущая ширина и колбэк родителя меняются на каждом движении мыши: попади
+  // они в зависимости — эффект гонялся бы за собственным результатом.
+  const latest = useRef({ width, onResize, clamp });
+  latest.current = { width, onResize, clamp };
+
   useEffect(() => {
-    onResize(clamp(width));
+    const { width: current, onResize: emit, clamp: fit } = latest.current;
+    emit(fit(current));
     // Пересчитываем только при смене границ: например, когда окно уменьшилось.
   }, [min, max]);
 

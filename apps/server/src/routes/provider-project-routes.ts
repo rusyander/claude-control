@@ -48,6 +48,7 @@ import {
   readProviderHooksInfo,
   parseProviderHooksDraft,
   saveProviderHooks,
+  WriteDisabledError,
 } from '../domains/provider-hooks.ts';
 import {
   readProviderPluginsInfo,
@@ -603,7 +604,8 @@ export function registerProviderProjectRoutes(app: FastifyInstance, ctx: ServerC
       if (!target) return reply;
       if (!target.permissions) return reply.code(400).send(PERMISSIONS_UNSUPPORTED);
       // Сводку строит ТА ЖЕ функция, что и глобальный маршрут (`gemini-json` у
-      // Gemini, `opencode-json` у OpenCode) — модели не могут разъехаться.
+      // Gemini, `qwen-json` у Qwen Code, `opencode-json` у OpenCode) — модели не
+      // могут разъехаться.
       return buildProviderPermissionInfo(target.permissions);
     },
   );
@@ -663,6 +665,10 @@ export function registerProviderProjectRoutes(app: FastifyInstance, ctx: ServerC
       try {
         return done(saveProviderHooks(target.hooks, draft, ctx.backupDir));
       } catch (error) {
+        // Ключ снят с записи (у OpenCode `experimental.hook` исчез из документации
+        // и схемы) — файл в порядке, поэтому это 409, а не 422.
+        if (error instanceof WriteDisabledError)
+          return reply.code(409).send({ error: 'write_disabled', message: error.reason });
         if (error instanceof UnrecognizedFormatError)
           return reply.code(422).send(FORMAT_UNRECOGNIZED);
         throw error;

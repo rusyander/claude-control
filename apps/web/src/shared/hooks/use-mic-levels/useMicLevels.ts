@@ -23,9 +23,9 @@ export function useMicLevels(active: boolean, bars = 40): number[] {
     if (!active) {
       return undefined;
     }
-    // eslint-disable-next-line no-restricted-syntax -- DOM feature-detection: navigator.mediaDevices вне базовых типов
+    // DOM feature-detection: navigator.mediaDevices вне базовых типов.
     const media = (navigator as unknown as { mediaDevices?: MediaDevices }).mediaDevices;
-    // eslint-disable-next-line no-restricted-syntax -- DOM feature-detection: webkitAudioContext вне стандартных типов
+    // DOM feature-detection: webkitAudioContext вне стандартных типов.
     const scope = window as unknown as {
       AudioContext?: typeof AudioContext;
       webkitAudioContext?: typeof AudioContext;

@@ -12,6 +12,7 @@ import { ExplainBox } from '@shared/ui/explain-box';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useProviderHooks, useSaveProviderHooks } from '@entities/ProviderHooks';
 import { ProviderHookActionEditor } from './ProviderHookActionEditor';
+import { ProviderHookRulesEditor } from './ProviderHookRulesEditor';
 import {
   emptyActionRow,
   nextRowId,
@@ -26,8 +27,12 @@ import {
 } from './ProviderHooks.types';
 
 /**
- * Хуки в модели «ключ конфига» (OPENCODE-3) — общая начинка для глобального
- * раздела и для вкладки проекта: отличается только `projectId`.
+ * Хуки НЕ-Claude провайдера — общая начинка для глобального раздела и для
+ * вкладки проекта: отличается только `projectId`.
+ *
+ * ФОРМ ДВЕ, и выбирает их сервер полем `shape`: плоский список правил
+ * «событие → команда» (Qwen, Kimi — `ProviderHookRulesEditor`) либо два события
+ * OpenCode с действиями-argv (ниже в этом файле).
  *
  * ЧЕСТНО О МОДЕЛИ. Это НЕ хуки Claude. У OpenCode хуки живут ключом
  * `experimental.hook` в `opencode.json`, событий ровно два (`file_edited` и
@@ -57,6 +62,12 @@ export function ProviderHooksPanel({ projectId }: { projectId?: string }) {
   }, [data]);
 
   if (isLoading || !data) return <SkeletonList rows={5} />;
+
+  // Другая модель — другой редактор. Ветка стоит ПОСЛЕ хуков React намеренно:
+  // состояние выше нужно объявить безусловно, а рисуем мы уже по данным.
+  if (data.shape === 'event-rules') {
+    return <ProviderHookRulesEditor data={data} projectId={projectId} />;
+  }
 
   const readOnly = data.readOnly;
   // Событие, форму которого панель не разобрала, редактировать нельзя вовсе:
@@ -123,15 +134,34 @@ export function ProviderHooksPanel({ projectId }: { projectId?: string }) {
         </Stack>
       </Card>
 
-      {readOnly && (
+      {/* Ключ снят с записи самим CLI (у OpenCode `experimental.hook` исчез из
+          документации и схемы). Это НЕ поломка файла: показываем причину и куда
+          идти вместо этого, а не общее «только для чтения». */}
+      {data.writeDisabledReason ? (
         <Card padding="sm">
-          <Stack direction="row" align="center" gap="var(--spacing-xs)">
-            <Icon name="warning" size={18} />
-            <Typography variant="body-sm" color="warning">
-              {t('providerHooks.readOnly', { path: data.filePath })}
+          <Stack gap="var(--spacing-2xs)">
+            <Stack direction="row" align="center" gap="var(--spacing-xs)">
+              <Icon name="warning" size={18} />
+              <Typography variant="body-sm" color="warning">
+                {data.writeDisabledReason}
+              </Typography>
+            </Stack>
+            <Typography variant="body-sm" color="subtle">
+              {t('providerHooks.writeDisabledHint')}
             </Typography>
           </Stack>
         </Card>
+      ) : (
+        readOnly && (
+          <Card padding="sm">
+            <Stack direction="row" align="center" gap="var(--spacing-xs)">
+              <Icon name="warning" size={18} />
+              <Typography variant="body-sm" color="warning">
+                {t('providerHooks.readOnly', { path: data.filePath })}
+              </Typography>
+            </Stack>
+          </Card>
+        )
       )}
 
       {/* --- Событие file_edited: карта «шаблон файлов → действия» --- */}

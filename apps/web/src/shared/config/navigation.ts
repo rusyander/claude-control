@@ -108,6 +108,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { path: '/groups', label: 'nav.groups', icon: 'groups', key: 'groups' },
       { path: '/history', label: 'nav.history', icon: 'history', key: 'history' },
+      { path: '/compare', label: 'nav.compare', icon: 'swap', key: 'compare' },
       { path: '/settings', label: 'nav.settings', icon: 'settings', key: 'settings' },
       { path: '/help', label: 'nav.help', icon: 'help', key: 'help' },
     ],

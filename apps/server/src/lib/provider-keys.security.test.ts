@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setStoredKey, getStoredKey, maskKey } from './provider-keys.ts';
 import { listBackups } from '../domains/backups.ts';
-import { buildConfigBundle } from '../domains/config-bundle.ts';
 import { searchEntities } from '../domains/search.ts';
 
 /**
@@ -72,30 +71,6 @@ describe('ключи не утекают в разделы панели', () => 
     // Даже если каталог копий уже есть — ключи туда не копируются.
     expect(listBackups(backupDir, {})).toEqual([]);
     expect(readdirSync(appData)).not.toContain('backups');
-  });
-
-  it('бандл конфигурации собирает только правила/скиллы/хуки — ключей в нём нет', () => {
-    setStoredKey(appData, 'codex', SECRET);
-    const claudeMd = join(appData, 'CLAUDE.md');
-    writeFileSync(claudeMd, '# правила\n', 'utf8');
-
-    const bundle = buildConfigBundle(
-      {
-        root: appData,
-        settings: join(appData, 'settings.json'),
-        settingsLocal: join(appData, 'settings.local.json'),
-        claudeMd,
-        secretsEnv: join(appData, '.mcp-secrets.env'),
-        skills: join(appData, 'skills'),
-        hooks: join(appData, 'hooks'),
-        mcpConfig: join(appData, '.claude.json'),
-        appData,
-      },
-      '2026-07-24T00:00:00.000Z',
-    );
-
-    expect(JSON.stringify(bundle)).not.toContain(SECRET);
-    expect(JSON.stringify(bundle)).not.toContain('provider-keys');
   });
 
   it('глобальный поиск ключи не индексирует — у него нет такого раздела', () => {

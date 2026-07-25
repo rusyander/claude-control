@@ -12,20 +12,30 @@ import { PageHeader } from '@shared/ui/page-header';
 import { SelectField } from '@shared/ui/select-field';
 import { apiClient } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
-import { MODEL_OPTIONS, EFFORT_LEVELS, modelLabel } from '@shared/lib/chat-model';
+import {
+  MODEL_OPTIONS,
+  EFFORT_LEVELS,
+  modelLabel,
+  modelSelectOptions,
+  withCurrentValue,
+} from '@shared/lib/chat-model';
 import { ACCENT_OPTIONS, accentLabelKey } from '@shared/lib/accent';
 import { useSettings, useUpdateSettings } from '@entities/AppConfig';
+import { useModelCatalog } from '@entities/ModelCatalog';
 import { AccountCard } from './AccountCard';
 import { ClaudeDirField } from './ClaudeDirField';
 import { CredentialsCard } from './CredentialsCard';
 import { EditorCard } from './EditorCard';
 import { PricingCard } from './PricingCard';
 import { BackupsCard } from './BackupsCard';
-import { ConfigBundleCard } from './ConfigBundleCard';
+import { EnvTransferCard } from './EnvTransferCard';
 import { SecretEncryptionCard } from './SecretEncryptionCard';
 import { SettingToggleRow } from './SettingToggleRow';
 import { ProviderSelectorCard } from './ProviderSelectorCard';
+import { ProviderCheckCard } from './ProviderCheckCard';
 import { ProviderKeysCard } from './ProviderKeysCard';
+import { ModelCatalogCard } from './ModelCatalogCard';
+import { FormatCheckCard } from './FormatCheckCard';
 import styles from './SettingsPage.module.scss';
 
 /** Настройки приложения: оформление, доступность, путь к конфигурации, безопасность правок. */
@@ -33,6 +43,7 @@ export function SettingsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
+  const { data: modelCatalog } = useModelCatalog();
   const updateSettings = useUpdateSettings();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -42,10 +53,14 @@ export function SettingsPage() {
     updateSettings.mutate(change);
   };
 
-  const modelOptions = MODEL_OPTIONS.map((value) => ({
-    value,
-    label: value ? modelLabel(value) : t('settings.chatModelAuto'),
-  }));
+  // Алиасы CLI плюс конкретные модели из каталога провайдера: зашитый список
+  // устаревал молча, а каталог знает и о вышедших вчера.
+  const modelOptions = withCurrentValue(
+    modelSelectOptions(modelCatalog?.models ?? [], MODEL_OPTIONS, (value) =>
+      value ? modelLabel(value) : t('settings.chatModelAuto'),
+    ),
+    settings.chatModel,
+  );
   const effortOptions = EFFORT_LEVELS.map((level) => ({
     value: level,
     label: level ? t(`chat.effort_${level}`) : t('settings.chatEffortAuto'),
@@ -87,7 +102,13 @@ export function SettingsPage() {
 
       <ProviderSelectorCard />
 
+      <ProviderCheckCard />
+
       <ProviderKeysCard />
+
+      {/* Сверка форматов чужих CLI со схемами: рядом с проверкой провайдера —
+          оба отвечают на вопрос «можно ли доверять записи в чужой конфиг». */}
+      <FormatCheckCard />
 
       <ClaudeDirField />
 
@@ -196,6 +217,9 @@ export function SettingsPage() {
         </Stack>
       </Card>
 
+      {/* Каталог моделей провайдера: он же питает выпадающий список выше. */}
+      <ModelCatalogCard />
+
       {/* MCP: автопроверка связи при открытии раздела и потолок ожидания сети. */}
       <Card padding="md">
         <Stack gap="var(--spacing-sm)">
@@ -214,7 +238,7 @@ export function SettingsPage() {
               <Typography variant="body-sm" weight="medium">
                 {t('settings.mcpTimeout')}
               </Typography>
-              <Typography variant="caption" color="subtle">
+              <Typography variant="caption" color="subtle" className={styles.hint}>
                 {t('settings.mcpTimeoutHint')}
               </Typography>
             </Stack>
@@ -279,6 +303,12 @@ export function SettingsPage() {
             checked={settings.backupBeforeWrite}
             onChange={(backupBeforeWrite) => patch({ backupBeforeWrite })}
           />
+          <SettingToggleRow
+            label={t('settings.previewProviderWrites')}
+            hint={t('settings.previewProviderWritesHint')}
+            checked={settings.previewProviderWrites}
+            onChange={(previewProviderWrites) => patch({ previewProviderWrites })}
+          />
           <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
             <Stack gap="var(--spacing-3xs)" flex={1} minWidth="200px">
               <Typography variant="body-sm" weight="medium">
@@ -323,7 +353,7 @@ export function SettingsPage() {
           <Typography variant="body" weight="medium">
             {t('settings.transferTitle')}
           </Typography>
-          <Typography variant="body-sm" color="subtle">
+          <Typography variant="body-sm" color="subtle" className={styles.hint}>
             {t('settings.transferHint')}
           </Typography>
           <Stack direction="row" gap="var(--spacing-xs)" wrap>
@@ -358,9 +388,13 @@ export function SettingsPage() {
         </Stack>
       </Card>
 
+      {/* Перенос окружения: конфигурация ЛЮБОГО провайдера архивом на другую
+          машину. Шире бандла ниже (тот про правила/скиллы/хуки Claude), поэтому
+          стоит первым — обычно нужен именно он. */}
+      <EnvTransferCard />
+
       {/* Бандл конфигурации: правила + скиллы + хуки одним файлом. Рядом с
           переносом настроек панели, но это другое — реальные файлы Claude Code. */}
-      <ConfigBundleCard />
 
       {/* Шифрование копий секретов: держим рядом с самими копиями. */}
       <SecretEncryptionCard />

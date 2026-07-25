@@ -3,6 +3,7 @@ import { groupSchema, automationSchema } from './groups';
 import { hookSchema } from './hooks';
 import { projectSchema } from './projects';
 import { appSettingsSchema } from './app-settings';
+import { providerChecksSchema } from './provider-check';
 
 /**
  * Схема состояния панели (`state.json`) для проверки импорта.
@@ -31,6 +32,8 @@ export const importStateSchema = object({
   projects: array(projectSchema).optional(),
   /** Настройки самого приложения — проверяются контрактной схемой настроек. */
   settings: appSettingsSchema.partial().optional(),
+  /** Итоги проверки провайдеров: id провайдера → последний результат. */
+  providerChecks: providerChecksSchema.optional(),
 });
 
 export type ImportState = Infer<typeof importStateSchema>;

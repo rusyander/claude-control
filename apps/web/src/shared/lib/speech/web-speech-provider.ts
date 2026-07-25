@@ -30,7 +30,7 @@ function getCtor(): SpeechRecognitionCtor | undefined {
   if (typeof window === 'undefined') {
     return undefined;
   }
-  // eslint-disable-next-line no-restricted-syntax -- DOM feature-detection: webkitSpeechRecognition вне стандартных типов
+  // DOM feature-detection: webkitSpeechRecognition вне стандартных типов.
   const scope = window as unknown as {
     SpeechRecognition?: SpeechRecognitionCtor;
     webkitSpeechRecognition?: SpeechRecognitionCtor;

@@ -21,9 +21,59 @@ import { object, string, array, boolean, number, enum as zodEnum, type infer as 
  * чтения.
  */
 
-/** Формат раздела плагинов (пока только OpenCode). */
-export const providerPluginsFormats = ['opencode-plugins'] as const;
+/**
+ * У Kimi Code плагины устроены ТРЕТЬИМ способом, и он только для чтения
+ * (KIMI-3). Задокументировано: плагин ставится в
+ * `$KIMI_CODE_HOME/plugins/managed/<id>/`, его манифест — JSON
+ * (`kimi.plugin.json` либо `.kimi-plugin/plugin.json`), а СПИСОК установленного
+ * и признак «включён» лежат в `plugins/installed.json`, форма которого
+ * документацией НЕ описана. Ставят, включают и выключают плагины командой
+ * `/plugins` в самом CLI.
+ *
+ * Поэтому панель показывает установленные плагины (что это, что они приносят —
+ * скиллы, MCP-серверы, хуки, команды) и НИЧЕГО в них не пишет: угадывать форму
+ * реестра запрещено тем же правилом, по которому панель перестала писать
+ * `experimental.hook` у OpenCode.
+ */
+
+/** Формат раздела плагинов: файлы+npm у OpenCode, список установленного у Kimi. */
+export const providerPluginsFormats = ['opencode-plugins', 'kimi-plugins'] as const;
 export type ProviderPluginsFormat = (typeof providerPluginsFormats)[number];
+
+/**
+ * Половины раздела. У OpenCode их две (`files` + `packages`), у Kimi одна
+ * (`installed`) — интерфейс рисует ровно то, что назвал сервер.
+ */
+export const providerPluginsSections = ['files', 'packages', 'installed'] as const;
+export type ProviderPluginsSection = (typeof providerPluginsSections)[number];
+
+/** Установленный плагин Kimi: манифест, прочитанный только для показа. */
+export const providerInstalledPluginSchema = object({
+  /** Имя каталога в `plugins/managed/` — оно же id для команд `/plugins`. */
+  id: string(),
+  /** Абсолютный путь манифеста (или каталога, если манифест не найден). */
+  manifestPath: string(),
+  /** Поле `name` манифеста. */
+  name: string().optional(),
+  version: string().optional(),
+  description: string().optional(),
+  /** `interface.displayName` — как плагин называется в списке `/plugins`. */
+  displayName: string().optional(),
+  /** Манифест объявляет каталог скиллов. */
+  hasSkills: boolean(),
+  /** Скилл, который плагин подгружает в начале сессии (`sessionStart.skill`). */
+  sessionStartSkill: string().optional(),
+  /** Имена MCP-серверов из манифеста. */
+  mcpServers: array(string()),
+  /** Сколько правил-хуков объявляет манифест. */
+  hookCount: number(),
+  /** Манифест регистрирует слэш-команды. */
+  hasCommands: boolean(),
+  /** Манифест не найден или не разобран — плагин показан одним именем каталога. */
+  error: string().optional(),
+});
+
+export type ProviderInstalledPlugin = Infer<typeof providerInstalledPluginSchema>;
 
 /** Уровень: глобальный каталог/конфиг или проектный. */
 export const providerPluginsScopes = ['global', 'project'] as const;
@@ -62,8 +112,10 @@ export const providerPluginsInfoSchema = object({
   providerName: string(),
   format: zodEnum(providerPluginsFormats),
   scope: zodEnum(providerPluginsScopes),
+  /** Какие половины раздела вообще есть у этого формата. */
+  sections: array(zodEnum(providerPluginsSections)).default(['files', 'packages']),
 
-  /** Абсолютный путь каталога файлов-плагинов. */
+  /** Абсолютный путь каталога файлов-плагинов (у Kimi — `plugins/managed`). */
   pluginsDir: string(),
   /** Каталог уже существует на диске. */
   dirExists: boolean(),
@@ -77,7 +129,7 @@ export const providerPluginsInfoSchema = object({
   filesError: string().optional(),
 
   /** Абсолютный путь конфигурации, в которой лежит массив `plugin`. */
-  configPath: string(),
+  configPath: string().optional(),
   /** Ключ `plugin` в файле есть. */
   packagesPresent: boolean(),
   /** Имена npm-пакетов простой формы, в порядке файла. */
@@ -88,6 +140,13 @@ export const providerPluginsInfoSchema = object({
   packagesReadOnly: boolean().default(false),
   /** Текст ошибки, если конфиг не разобран. */
   packagesError: string().optional(),
+
+  /** Установленные плагины (Kimi) — только показ, панель их не меняет. */
+  installed: array(providerInstalledPluginSchema).default([]),
+  /** Абсолютный путь реестра `installed.json` — чтобы было видно, где он. */
+  installedRegistryPath: string().optional(),
+  /** Каталог установленного не читается — текст ошибки. */
+  installedError: string().optional(),
 });
 
 export type ProviderPluginsInfo = Infer<typeof providerPluginsInfoSchema>;

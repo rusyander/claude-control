@@ -16,11 +16,23 @@ function folderName(path: string): string {
 }
 
 /**
- * Выбор папки проекта через файловую систему. Сверху — корни (домашняя папка и
- * диски) и переход на уровень вверх; в списке — подкаталоги. «Открыть эту папку»
+ * Выбор пути через файловую систему. Сверху — корни (домашняя папка и диски) и
+ * переход на уровень вверх; в списке — подкаталоги. «Открыть эту папку»
  * добавляет её как проект, даже если Claude там ещё не работал.
+ *
+ * Тот же обзор работает и режимом выбора ФАЙЛА (`mode: 'file'`) — так
+ * указывают архив переноса окружения. Показываются только файлы с заданными
+ * расширениями: вываливать в окно всё содержимое диска незачем.
  */
-export function FolderPicker({ isOpen, onOpenChange, onPick }: FolderPickerProps) {
+export function FolderPicker({
+  isOpen,
+  onOpenChange,
+  onPick,
+  mode = 'dir',
+  fileExtensions,
+  title,
+  hint,
+}: FolderPickerProps) {
   const { t } = useTranslation();
   const [current, setCurrent] = useState<string | undefined>(undefined);
 
@@ -30,7 +42,7 @@ export function FolderPicker({ isOpen, onOpenChange, onPick }: FolderPickerProps
   }, [isOpen]);
 
   const roots = useFsRoots();
-  const listing = useFsList(current);
+  const listing = useFsList(current, mode === 'file' ? fileExtensions : undefined);
   const isLoading = current ? listing.isLoading : roots.isLoading;
   const entries = current ? (listing.data?.entries ?? []) : (roots.data ?? []);
   const parent = current ? listing.data?.parent : undefined;
@@ -39,8 +51,8 @@ export function FolderPicker({ isOpen, onOpenChange, onPick }: FolderPickerProps
     <Modal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
-      title={t('folderPicker.title')}
-      description={t('folderPicker.hint')}
+      title={title ?? t('folderPicker.title')}
+      description={hint ?? t('folderPicker.hint')}
       size="md"
       footer={
         <Stack
@@ -57,14 +69,18 @@ export function FolderPicker({ isOpen, onOpenChange, onPick }: FolderPickerProps
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               {t('common.cancel')}
             </Button>
-            <Button
-              variant="primary"
-              disabled={!current}
-              leftIcon={<Icon name="folder" size={20} />}
-              onClick={() => current && onPick(current, folderName(current))}
-            >
-              {t('folderPicker.pick')}
-            </Button>
+            {/* В режиме файла подтверждает выбор сам щелчок по файлу — кнопка
+                «выбрать эту папку» тут только запутала бы. */}
+            {mode === 'dir' && (
+              <Button
+                variant="primary"
+                disabled={!current}
+                leftIcon={<Icon name="folder" size={20} />}
+                onClick={() => current && onPick(current, folderName(current))}
+              >
+                {t('folderPicker.pick')}
+              </Button>
+            )}
           </Stack>
         </Stack>
       }
@@ -101,14 +117,14 @@ export function FolderPicker({ isOpen, onOpenChange, onPick }: FolderPickerProps
             key={entry.path}
             type="button"
             className={styles.item}
-            onClick={() => setCurrent(entry.path)}
+            onClick={() => (entry.isFile ? onPick(entry.path, entry.name) : setCurrent(entry.path))}
             title={entry.path}
           >
-            <Icon name="folder" size={18} />
+            <Icon name={entry.isFile ? 'file' : 'folder'} size={18} />
             <Typography variant="body-sm" as="span" truncate>
               {entry.name}
             </Typography>
-            <Icon name="chevronRight" size={16} />
+            {!entry.isFile && <Icon name="chevronRight" size={16} />}
           </button>
         ))}
       </div>

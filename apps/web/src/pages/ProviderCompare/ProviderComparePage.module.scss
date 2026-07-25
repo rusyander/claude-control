@@ -1,0 +1,69 @@
+// Сравнение двух конфигураций: сетка «ключ | слева | справа | состояние».
+// Колонки фиксированы одной сеткой на шапку и строки — иначе значения сторон
+// перестают читаться парами, а ради этого страница и существует.
+
+.picker {
+  flex-wrap: wrap;
+
+  > *:first-child,
+  > *:last-child {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(0, 2fr) minmax(0, 2fr) auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.head {
+  padding: 0 var(--spacing-xs) var(--spacing-2xs);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: var(--radius-sm);
+
+  &:nth-child(odd) {
+    background: var(--color-surface-sunken);
+  }
+
+  // Разница подсвечивается полосой слева: цветить строку целиком нельзя —
+  // значения сами по себе несут цвет бейджа, и фон стал бы шумом.
+  &[data-state='differs'] {
+    box-shadow: inset 2px 0 0 var(--color-warning);
+  }
+}
+
+.key {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  min-width: 0;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+// Значения могут быть длинными командами: переносим по словам, но не рвём слова.
+.value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-muted);
+}
+
+// Причина отказа занимает всю ширину под строкой — иначе она сжимает колонки.
+.blocked {
+  grid-column: 1 / -1;
+}

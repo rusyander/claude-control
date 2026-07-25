@@ -30,12 +30,19 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
   const isVoiceMode = speech.listening || speech.finalizing;
 
   // Надиктованное дописываем к тексту, а не заменяем: часть могла быть набрана
-  // руками до того, как пользователь взялся за микрофон.
+  // руками до того, как пользователь взялся за микрофон. Текущий текст и колбэки
+  // держим в ref: попади они в зависимости — эффект срабатывал бы на каждой
+  // набранной букве и дописывал распознанное повторно.
+  const latest = useRef({ value, onChange, reset: speech.reset });
+  latest.current = { value, onChange, reset: speech.reset };
+
+  const transcript = speech.transcript;
   useEffect(() => {
-    if (!speech.transcript) return;
-    onChange(value ? `${value} ${speech.transcript}` : speech.transcript);
-    speech.reset();
-  }, [speech.transcript]);
+    if (!transcript) return;
+    const { value: text, onChange: emit, reset } = latest.current;
+    emit(text ? `${text} ${transcript}` : transcript);
+    reset();
+  }, [transcript]);
 
   // Поле растёт под текст, пока не упрётся в предел из стилей.
   useEffect(() => {

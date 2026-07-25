@@ -233,6 +233,11 @@ export function resolveProviderProjectTarget(
       scope: 'project',
       filePath,
       backupName: providerProjectBackupName(provider.id, filePath),
+      // Снятие ключа с записи — свойство ФОРМАТА, а не уровня: если панель не
+      // пишет `experimental.hook` глобально, то и в проекте не пишет.
+      ...(provider.hooksConfig?.writeDisabledReason
+        ? { writeDisabledReason: provider.hooksConfig.writeDisabledReason }
+        : {}),
     };
   }
 
@@ -262,6 +267,10 @@ export function resolveProviderProjectTarget(
       backupPrefix: `${provider.id}-project-`,
       // Прочие каталоги загрузки — понятие ГЛОБАЛЬНОЕ (домашний каталог).
       externalDirs: [],
+      // Предел описания — свойство CLI, а не уровня: в проекте он тот же.
+      ...(provider.skillsConfig?.descriptionMax
+        ? { descriptionMax: provider.skillsConfig.descriptionMax }
+        : {}),
     };
   }
 
@@ -306,7 +315,9 @@ export function providerProjectInfo(target: ProviderProjectTarget): ProviderProj
     hooksPath: target.hooks?.filePath,
     skillsFormat: target.skills?.format,
     skillsDir: target.skills?.skillsDir,
-    pluginsFormat: target.plugins?.format,
+    // Проектные плагины бывают только у OpenCode (у Kimi они домашние и только
+    // для чтения) — сужение честное, а не «лишь бы собралось».
+    pluginsFormat: target.plugins?.format === 'opencode-plugins' ? 'opencode-plugins' : undefined,
     pluginsDir: target.plugins?.pluginsDir,
     pluginsConfigPath: target.plugins?.configPath,
   };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -41,26 +41,35 @@ export function SandboxModal({
   const [tab, setTab] = useState<Tab>(hasProbe ? 'probe' : 'chat');
   const [description, setDescription] = useState<SandboxDescription | undefined>(undefined);
 
-  const sandboxId = useMemo(() => `ui-${kind}-${Date.now()}`, [kind, isOpen]);
+  // Своя песочница на каждое открытие окна: идентификатор рождается там же, где
+  // она создаётся, поэтому уборка гарантированно стирает именно её.
+  const [sandboxId, setSandboxId] = useState('');
 
   const create = useCreateSandbox();
   const remove = useDeleteSandbox();
 
-  useEffect(() => {
-    if (!isOpen) return;
+  // Мутации меняют идентичность на каждом рендере, а `selection` приходит новым
+  // объектом от родителя — попади они в зависимости, песочница пересоздавалась
+  // бы под собственным ответом. Эффект должен зависеть только от открытия окна.
+  const latest = useRef({ kind, hasProbe, selection, open: create.mutate, drop: remove.mutate });
+  latest.current = { kind, hasProbe, selection, open: create.mutate, drop: remove.mutate };
 
-    setTab(hasProbe ? 'probe' : 'chat');
-    create.mutate(
-      { id: sandboxId, selection },
-      { onSuccess: (data) => setDescription(data.description) },
-    );
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const { kind: currentKind, hasProbe: probe, selection: what, open, drop } = latest.current;
+    const id = `ui-${currentKind}-${Date.now()}`;
+
+    setSandboxId(id);
+    setTab(probe ? 'probe' : 'chat');
+    open({ id, selection: what }, { onSuccess: (data) => setDescription(data.description) });
 
     // Песочница живёт ровно столько, сколько открыто окно: закрыли — стёрли.
     return () => {
-      remove.mutate(sandboxId);
+      drop(id);
       setDescription(undefined);
     };
-  }, [isOpen, sandboxId]);
+  }, [isOpen]);
 
   return (
     <Modal

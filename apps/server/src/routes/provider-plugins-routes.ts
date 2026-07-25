@@ -63,6 +63,26 @@ export function registerProviderPluginsRoutes(app: FastifyInstance, ctx: ServerC
     return target;
   };
 
+  /**
+   * Цель, в которую МОЖНО писать. У Kimi раздел показывает установленные
+   * плагины и ничего не пишет: ставят и включают их командой `/plugins` внутри
+   * CLI, а форма реестра `installed.json` не задокументирована. Ответ 409 (а не
+   * 422): файл в порядке, запрещена сама операция.
+   */
+  const requireWritableTarget = (reply: FastifyReply): ProviderPluginsTarget | undefined => {
+    const target = requireTarget(reply);
+    if (!target) return undefined;
+    if (target.format === 'kimi-plugins') {
+      void reply.code(409).send({
+        error: 'write_disabled',
+        message:
+          'Плагины Kimi Code панель только показывает: устанавливать, включать и выключать их нужно командой /plugins внутри CLI — форма реестра установленного не задокументирована.',
+      });
+      return undefined;
+    }
+    return target;
+  };
+
   /** Выполнить операцию домена, разложив её отказы в коды ответа (fail-closed). */
   const guarded = <T>(reply: FastifyReply, run: () => T): T | FastifyReply => {
     try {
@@ -93,7 +113,7 @@ export function registerProviderPluginsRoutes(app: FastifyInstance, ctx: ServerC
   });
 
   app.put<{ Body: unknown }>('/api/provider-plugins/file', (request, reply) => {
-    const target = requireTarget(reply);
+    const target = requireWritableTarget(reply);
     if (!target) return reply;
 
     const draft = parseProviderPluginFileDraft(request.body);
@@ -112,7 +132,7 @@ export function registerProviderPluginsRoutes(app: FastifyInstance, ctx: ServerC
   });
 
   app.delete<{ Querystring: { path?: string } }>('/api/provider-plugins/file', (request, reply) => {
-    const target = requireTarget(reply);
+    const target = requireWritableTarget(reply);
     if (!target) return reply;
 
     const raw = request.query.path;
@@ -132,7 +152,7 @@ export function registerProviderPluginsRoutes(app: FastifyInstance, ctx: ServerC
   // --- npm-пакеты (`plugin` в opencode.json) ---
 
   app.put<{ Body: unknown }>('/api/provider-plugins/packages', (request, reply) => {
-    const target = requireTarget(reply);
+    const target = requireWritableTarget(reply);
     if (!target) return reply;
 
     const packages = parseProviderPluginPackagesDraft(request.body);

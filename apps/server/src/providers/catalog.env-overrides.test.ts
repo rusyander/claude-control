@@ -12,11 +12,19 @@ import { getProvider } from './registry.ts';
  *     (на Linux это НЕ косметика: с заданной переменной `~/.config/opencode`
  *     просто неверный путь);
  *   • `OPENCODE_CONFIG` — OpenCode переносит САМ ФАЙЛ конфигурации куда угодно
- *     (не каталог): её уважают разделы, правящие opencode.json, — MCP и права.
+ *     (не каталог): её уважают разделы, правящие opencode.json, — MCP и права;
+ *   • `QWEN_HOME` — Qwen Code целиком переносит `~/.qwen` (форк Gemini добавил
+ *     переменную, которой у оригинала нет).
  * У Gemini/Cursor/Aider задокументированного переопределения нет → путь обязан
  * оставаться от домашнего каталога, ничего не выдумываем.
  */
-const ENV_KEYS = ['CODEX_HOME', 'XDG_CONFIG_HOME', 'OPENCODE_CONFIG'] as const;
+const ENV_KEYS = [
+  'CODEX_HOME',
+  'XDG_CONFIG_HOME',
+  'OPENCODE_CONFIG',
+  'QWEN_HOME',
+  'KIMI_CODE_HOME',
+] as const;
 const saved = new Map<string, string | undefined>();
 
 function setEnv(name: string, value: string | undefined): void {
@@ -133,11 +141,83 @@ describe('OpenCode: OPENCODE_CONFIG', () => {
   });
 });
 
+describe('Qwen Code: QWEN_HOME', () => {
+  it('без переменной — путь от домашнего каталога', () => {
+    for (const key of ENV_KEYS) setEnv(key, undefined);
+    const qwen = getProvider('qwen');
+
+    expect(qwen.instructionsFile!()).toBe(join(homedir(), '.qwen', 'QWEN.md'));
+    expect(qwen.mcpConfig!.path()).toBe(join(homedir(), '.qwen', 'settings.json'));
+    expect(qwen.configLocations!()).toEqual([join(homedir(), '.qwen')]);
+  });
+
+  it('с переменной переносятся ВСЕ пути qwen: инструкции, MCP, env, права, детект', () => {
+    const moved = join(homedir(), 'qwen-elsewhere');
+    setEnv('QWEN_HOME', moved);
+    const qwen = getProvider('qwen');
+
+    expect(qwen.instructionsFile!()).toBe(join(moved, 'QWEN.md'));
+    expect(qwen.mcpConfig!.path()).toBe(join(moved, 'settings.json'));
+    expect(qwen.envConfig!.path()).toBe(join(moved, '.env'));
+    expect(qwen.permissionsConfig!.path()).toBe(join(moved, 'settings.json'));
+    expect(qwen.configLocations!()).toEqual([moved]);
+  });
+
+  it('относительный путь становится абсолютным, пустая переменная игнорируется', () => {
+    setEnv('QWEN_HOME', 'qwen-rel');
+    expect(getProvider('qwen').mcpConfig!.path()).toBe(join(resolve('qwen-rel'), 'settings.json'));
+
+    setEnv('QWEN_HOME', '   ');
+    expect(getProvider('qwen').mcpConfig!.path()).toBe(join(homedir(), '.qwen', 'settings.json'));
+  });
+
+  // Соседний провайдер не должен «поймать» чужую переменную: у Gemini её нет.
+  it('QWEN_HOME не влияет на пути Gemini', () => {
+    setEnv('QWEN_HOME', join(homedir(), 'qwen-elsewhere'));
+    expect(getProvider('gemini').mcpConfig!.path()).toBe(
+      join(homedir(), '.gemini', 'settings.json'),
+    );
+  });
+});
+
+describe('Kimi Code: KIMI_CODE_HOME', () => {
+  it('без переменной — путь от домашнего каталога', () => {
+    for (const key of ENV_KEYS) setEnv(key, undefined);
+    const kimi = getProvider('kimi');
+
+    expect(kimi.instructionsFile!()).toBe(join(homedir(), '.kimi-code', 'AGENTS.md'));
+    // MCP у Kimi в ОТДЕЛЬНОМ файле, права — в config.toml.
+    expect(kimi.mcpConfig!.path()).toBe(join(homedir(), '.kimi-code', 'mcp.json'));
+    expect(kimi.permissionsConfig!.path()).toBe(join(homedir(), '.kimi-code', 'config.toml'));
+    expect(kimi.configLocations!()).toEqual([join(homedir(), '.kimi-code')]);
+  });
+
+  it('с переменной переносятся ВСЕ пути kimi: инструкции, MCP, права, детект', () => {
+    const moved = join(homedir(), 'kimi-elsewhere');
+    setEnv('KIMI_CODE_HOME', moved);
+    const kimi = getProvider('kimi');
+
+    expect(kimi.instructionsFile!()).toBe(join(moved, 'AGENTS.md'));
+    expect(kimi.mcpConfig!.path()).toBe(join(moved, 'mcp.json'));
+    expect(kimi.permissionsConfig!.path()).toBe(join(moved, 'config.toml'));
+    expect(kimi.configLocations!()).toEqual([moved]);
+  });
+
+  it('относительный путь становится абсолютным, пустая переменная игнорируется', () => {
+    setEnv('KIMI_CODE_HOME', 'kimi-rel');
+    expect(getProvider('kimi').mcpConfig!.path()).toBe(join(resolve('kimi-rel'), 'mcp.json'));
+
+    setEnv('KIMI_CODE_HOME', '   ');
+    expect(getProvider('kimi').mcpConfig!.path()).toBe(join(homedir(), '.kimi-code', 'mcp.json'));
+  });
+});
+
 describe('провайдеры без задокументированного переопределения', () => {
   it('gemini/cursor/aider переменные окружения НЕ уважают (не угадываем)', () => {
     setEnv('XDG_CONFIG_HOME', join(homedir(), 'xdg-config'));
     setEnv('CODEX_HOME', join(homedir(), 'codex-elsewhere'));
     setEnv('OPENCODE_CONFIG', join(homedir(), 'opencode-elsewhere.json'));
+    setEnv('QWEN_HOME', join(homedir(), 'qwen-elsewhere'));
 
     expect(getProvider('gemini').mcpConfig!.path()).toBe(
       join(homedir(), '.gemini', 'settings.json'),

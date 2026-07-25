@@ -13,7 +13,9 @@ import {
   useProviderProjectPermissions,
   useSaveProviderProjectPermissions,
 } from '@entities/Project';
+import { CursorPermissionsForm } from '@pages/ProviderPermissions/CursorPermissionsForm';
 import { OpencodePermissionsForm } from '@pages/ProviderPermissions/OpencodePermissionsForm';
+import { QwenPermissionsForm } from '@pages/ProviderPermissions/QwenPermissionsForm';
 import type { ProjectTabProps } from './ProjectRulesTab.types';
 
 /** Список инструментов ↔ текст: одно имя в строке (пустые строки игнорируются). */
@@ -35,8 +37,14 @@ const sameList = (a: string[], b: string[]): boolean =>
  *  - `gemini` (GEMINI-2, `<проект>/.gemini/settings.json`) — режим подтверждений
  *    плюс белый и чёрный списки инструментов; режима `yolo` в форме нет, в
  *    settings.json он ломает запуск CLI (сервер такой запрос тоже отклоняет);
+ *  - `qwen` (`<проект>/.qwen/settings.json`) — `tools.approvalMode` плюс три
+ *    списка правил `permissions.allow` / `ask` / `deny`; форма общая с глобальным
+ *    разделом;
  *  - `opencode` (OPENCODE-1, ключ `permission` в `<проект>/opencode.json`) — та
- *    же форма, что и в глобальном разделе (общий компонент).
+ *    же форма, что и в глобальном разделе (общий компонент);
+ *  - `cursor` (CURSOR-2, ключ `permissions` в `<проект>/.cursor/cli.json`) — два
+ *    списка `allow` / `deny`; форма общая с глобальным разделом. Имя проектного
+ *    файла у Cursor ДРУГОЕ (`cli.json`, не `cli-config.json`) — путь из документации.
  */
 export function ProviderProjectPermissionsTab({ projectId }: ProjectTabProps) {
   const { t } = useTranslation();
@@ -55,6 +63,76 @@ export function ProviderProjectPermissionsTab({ projectId }: ProjectTabProps) {
   }, [data]);
 
   if (isLoading || !data) return <SkeletonList rows={3} />;
+
+  // Qwen Code: та же форма, что и в глобальном разделе (общий компонент), файл —
+  // `<проект>/.qwen/settings.json`.
+  if (data.kind === 'qwen') {
+    return (
+      <QwenPermissionsForm
+        data={data}
+        onSave={(draft) => save.mutate(draft)}
+        header={({ dirty, submit }) => (
+          <Stack direction="row" justify="between" align="center" wrap gap="var(--spacing-sm)">
+            <Stack gap="var(--spacing-3xs)" flex={1} minWidth={0}>
+              <Typography variant="caption" color="subtle">
+                {t('providerProject.permissionsHint')}
+              </Typography>
+              <Typography variant="mono" color="subtle" as="span" truncate>
+                {data.filePath}
+              </Typography>
+            </Stack>
+            {!data.readOnly && (
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={<Icon name="check" size={20} />}
+                onClick={submit}
+                disabled={!dirty}
+                isLoading={save.isPending}
+              >
+                {t('common.save')}
+              </Button>
+            )}
+          </Stack>
+        )}
+      />
+    );
+  }
+
+  // CURSOR-2: форма прав Cursor — общий компонент с глобальным разделом, файл —
+  // `<проект>/.cursor/cli.json` (он держит ТОЛЬКО права, в отличие от глобального).
+  if (data.kind === 'cursor') {
+    return (
+      <CursorPermissionsForm
+        data={data}
+        onSave={(draft) => save.mutate(draft)}
+        header={({ dirty, submit }) => (
+          <Stack direction="row" justify="between" align="center" wrap gap="var(--spacing-sm)">
+            <Stack gap="var(--spacing-3xs)" flex={1} minWidth={0}>
+              <Typography variant="caption" color="subtle">
+                {t('providerProject.permissionsHint')}
+              </Typography>
+              <Typography variant="mono" color="subtle" as="span" truncate>
+                {data.filePath}
+              </Typography>
+            </Stack>
+            {!data.readOnly && (
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={<Icon name="check" size={20} />}
+                onClick={submit}
+                disabled={!dirty}
+                isLoading={save.isPending}
+              >
+                {t('common.save')}
+              </Button>
+            )}
+          </Stack>
+        )}
+      />
+    );
+  }
 
   // OPENCODE-1: форма прав OpenCode — общий компонент с глобальным разделом.
   if (data.kind === 'opencode') {
@@ -89,7 +167,7 @@ export function ProviderProjectPermissionsTab({ projectId }: ProjectTabProps) {
       />
     );
   }
-  // Проектный уровень объявлен только для этих двух моделей; codex сюда не
+  // Проектный уровень объявлен только для этих четырёх моделей; codex сюда не
   // приходит (у него нет проектного файла прав), но тип обязывает отсечь явно.
   if (data.kind !== 'gemini') return null;
 

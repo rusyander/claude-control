@@ -99,6 +99,18 @@ export function ProvidersTopic() {
         />
       </HelpSection>
 
+      <HelpSection title={tr('gapTitle')} caption={tr('gapCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('gapNone'), text: tr('gapNoneText') },
+            { title: tr('gapNoFile'), text: tr('gapNoFileText') },
+            { title: tr('gapReadOnly'), text: tr('gapReadOnlyText') },
+            { title: tr('gapOwned'), text: tr('gapOwnedText') },
+          ]}
+        />
+      </HelpSection>
+
       <HelpSection title={t('help.common.storageTitle')} caption={tr('filesCaption')}>
         <Stack gap="var(--spacing-xs)">
           <StorageCard
@@ -124,6 +136,55 @@ export function ProvidersTopic() {
               // окружения у Gemini живут в отдельном .env (GEMINI-3).
               { label: tr('fileMcp'), value: '~/.gemini/settings.json', isMono: true },
               { label: tr('fileEnv'), value: '~/.gemini/.env', isMono: true },
+            ]}
+          />
+          {/* Qwen Code — форк Gemini CLI: та же структура каталога, но свой ключ
+              прав (tools.approvalMode + permissions.*) и своя переменная переноса
+              каталога QWEN_HOME. */}
+          <StorageCard
+            title="Qwen Code"
+            rows={[
+              { label: tr('fileInstructions'), value: '~/.qwen/QWEN.md', isMono: true },
+              { label: tr('fileMcp'), value: '~/.qwen/settings.json', isMono: true },
+              { label: tr('fileEnv'), value: '~/.qwen/.env', isMono: true },
+              { label: tr('fileOverride'), value: 'QWEN_HOME', isMono: true },
+            ]}
+          />
+          {/* Continue: MCP и права лежат в РАЗНЫХ файлах одного каталога, а
+              инструкций глобально нет вовсе — только каталог правил проекта. */}
+          <StorageCard
+            title="Continue"
+            rows={[
+              { label: tr('fileMcp'), value: '~/.continue/config.yaml', isMono: true },
+              { label: tr('fileRest'), value: '~/.continue/permissions.yaml', isMono: true },
+              { label: tr('fileEnv'), value: '~/.continue/.env', isMono: true },
+              { label: tr('fileProject'), value: '<project>/.continue/rules/*.md', isMono: true },
+            ]}
+          />
+          {/* Goose: один config.yaml держит и расширения (MCP), и режим аппрувов;
+              путь под Windows отличается не только разделителями. */}
+          <StorageCard
+            title="Goose"
+            rows={[
+              { label: tr('fileInstructions'), value: '~/.config/goose/.goosehints', isMono: true },
+              { label: tr('fileMcp'), value: '~/.config/goose/config.yaml', isMono: true },
+              {
+                label: tr('fileWindows'),
+                value: '%APPDATA%\\Block\\goose\\config\\',
+                isMono: true,
+              },
+              { label: tr('fileProject'), value: '<project>/.goosehints', isMono: true },
+            ]}
+          />
+          {/* Kimi Code: MCP и права в РАЗНЫХ файлах одного каталога; проектного
+              config.toml нет — CLI читает ровно один пользовательский файл. */}
+          <StorageCard
+            title="Kimi Code"
+            rows={[
+              { label: tr('fileInstructions'), value: '~/.kimi-code/AGENTS.md', isMono: true },
+              { label: tr('fileMcp'), value: '~/.kimi-code/mcp.json', isMono: true },
+              { label: tr('fileRest'), value: '~/.kimi-code/config.toml', isMono: true },
+              { label: tr('fileOverride'), value: 'KIMI_CODE_HOME', isMono: true },
             ]}
           />
           <StorageCard

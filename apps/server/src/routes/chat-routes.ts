@@ -142,12 +142,18 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
 
   app.get('/api/fs/roots', () => listRoots());
 
-  app.get<{ Querystring: { path?: string } }>('/api/fs/list', (request, reply) => {
+  app.get<{ Querystring: { path?: string; files?: string } }>('/api/fs/list', (request, reply) => {
     const path = request.query.path;
     if (!path || !isAbsolute(path))
       return reply.code(400).send({ message: 'Нужен абсолютный путь' });
+    // `files=.zip,.json` — показать ещё и файлы с такими расширениями (выбор
+    // архива переноса). Без параметра поведение прежнее: только каталоги.
+    const fileExtensions = (request.query.files ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
     try {
-      return listDirectory(path);
+      return listDirectory(path, { fileExtensions });
     } catch {
       return reply.code(400).send({ message: 'Каталог недоступен' });
     }

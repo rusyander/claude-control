@@ -40,10 +40,12 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
   const templates = useResourceTemplates(kind);
   const applyTemplate = useApplyTemplate(kind, id);
 
-  const files = data.data?.files ?? [];
+  // `?? []` каждый раз даёт новый массив, поэтому мемо ключуем по самому ответу:
+  // иначе дерево пересобиралось бы на каждом рендере.
+  const files = data.data?.files;
   const isWritable = data.data?.isWritable ?? false;
 
-  const tree = useMemo(() => buildTree(files.map((file) => file.path)), [files]);
+  const tree = useMemo(() => buildTree((files ?? []).map((file) => file.path)), [files]);
 
   /**
    * Новый файл создаётся сразу пустым: отдельного черновика нет, иначе
@@ -59,7 +61,7 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
 
   // Пустому ресурсу предлагаем шаблон: начинать с чистого листа тяжелее,
   // чем дополнить готовую форму.
-  if (files.length === 0 && !data.isLoading) {
+  if ((files?.length ?? 0) === 0 && !data.isLoading) {
     return (
       <div className={styles.tree}>
         {isWritable && (templates.data?.length ?? 0) > 0 ? (

@@ -196,6 +196,11 @@ export function resolveProviderProjectTarget(
       jsonHttpUrlKey: config.mcp.jsonHttpUrlKey ?? 'httpUrl',
       // Копии проектных файлов отделены от глобальных префиксом `-project-`.
       backupName: providerProjectBackupName(provider.id, filePath),
+      // Каталог файлов-блоков проекта (Continue) — через ту же проверку границ,
+      // что и любой проектный путь: наружу `..` и абсолютный путь не выпускаются.
+      blockDir: config.mcp.relativeBlockDir
+        ? resolveProjectFile(root, config.mcp.relativeBlockDir)
+        : undefined,
     };
   }
 

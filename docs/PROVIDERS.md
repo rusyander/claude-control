@@ -58,9 +58,13 @@ comes from `type` (`stdio` by default, `sse`, `streamable-http`), a remote serve
 `requestOptions.headers`. Only that block is edited: every other key of the file (models, rules,
 context) and every comment outside the block survive, and unmodelled entry fields (`cwd`, timeouts,
 keys) are carried over by value. A new remote server gets `streamable-http` (the primary one per the
-docs), while an existing `sse` is never rewritten. The separate block files
-`~/.continue/mcpServers/*.yaml` are left alone; the project-level MCP is
-`<project>/.continue/mcpServers/mcp.json`.
+docs), while an existing `sse` is never rewritten. The separate **block files**
+`mcpServers/*.yaml` (a `name` / `version` / `schema: v1` header plus their own `mcpServers` list)
+are loaded by Continue alongside the main config — the panel lists them together, marks which file
+an entry comes from and edits it right there. New servers still go into `config.yaml`: the panel
+creates no block files of its own. A block it could not parse (a `uses:` reference instead of an
+entry, a duplicate name) is skipped whole, with the file name and the reason. The project-level MCP
+is `<project>/.continue/mcpServers/mcp.json` plus the block files of that same folder.
 
 **Goose — servers among the CLI's own extensions.** In `config.yaml` the `extensions` key is a
 "name → entry" map where external MCP servers sit next to **built-in extensions of Goose itself**
@@ -141,8 +145,10 @@ than marked "in development".
   (settings keys of this CLI are named like environment variables). Documented values: `auto` (acts
   without asking), `approve` (confirm every action), `smart_approve` (confirm the risky ones) and
   `chat` (talk only, no tools). No rule lists exist at all. Per-tool permissions Goose keeps in a
-  separate `permission.yaml` — that format has not been worked through, so the panel does not touch
-  it; `secrets.yaml` and the OS keyring are not touched either.
+  separate `permission.yaml`: the panel **shows** them as three lists (always allow, ask before,
+  never allow) but never writes that file — its format is absent from the Goose documentation, which
+  covers only the three levels themselves and the `goose configure` flow. `secrets.yaml` and the OS
+  keyring are not touched either.
 - **Kimi Code** — the second TOML model after Codex, and it has two parts at once: the root scalar
   `default_permission_mode` (`manual` — always ask, `auto` — the agent decides, `yolo` — never ask)
   and an ORDERED array of tables `[[permission.rules]]`, each with exactly `decision`

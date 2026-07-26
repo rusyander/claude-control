@@ -295,6 +295,19 @@ export const goosePermissionInfoSchema = object({
   mode: zodEnum(gooseModes),
   /** Все допустимые режимы — список для формы. */
   modes: array(zodEnum(gooseModes)),
+  /**
+   * Пофайловые разрешения инструментов из `permission.yaml` — ТОЛЬКО ПОКАЗ.
+   * Формата этого файла в документации Goose нет (задокументированы лишь три
+   * уровня и путь настройки `goose configure`), поэтому панель его не пишет.
+   * Ничего не настроено или форма незнакомая → поля нет.
+   */
+  toolPermissions: object({
+    alwaysAllow: array(string()),
+    askBefore: array(string()),
+    neverAllow: array(string()),
+  }).optional(),
+  /** Путь к `permission.yaml` — человеку нужно знать, какой файл смотреть. */
+  toolPermissionsPath: string().optional(),
   ...permissionInfoBase,
 });
 

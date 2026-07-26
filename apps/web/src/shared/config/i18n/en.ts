@@ -600,6 +600,8 @@ export const en: TranslationSchema = {
       '{{provider}} CLI was not detected. Saving still works — the file will be created at {{path}}.',
     readOnly:
       'The format of {{path}} was not recognized — the section is read-only and writing is disabled for safety.',
+    fromBlockFile: 'from block file: {{path}}',
+    blockSkipped: 'The panel does not manage block file {{path}}. {{reason}}',
   },
   // Instructions as a LIST OF REFERENCES (Aider): not a single-file editor but
   // management of the list of files the CLI config attaches. Named honestly.
@@ -1064,7 +1066,7 @@ export const en: TranslationSchema = {
     goose: {
       subtitle: '{{provider}} approval mode',
       explain:
-        '{{provider}} permissions are a single GOOSE_MODE key in {{fileName}}. Goose has no rule lists: the mode alone decides what the CLI does with tool calls. auto — run everything without asking (this is how non-interactive and scheduled sessions go), approve — decide by the configured tool permissions, smart_approve — auto-approve calls judged safe and ask about the rest, chat — never run tools at all, conversation only. The panel edits exactly that key: extensions, provider, model and comments of the same file stay untouched. Per-tool permissions live separately (permission.yaml) and the panel does not manage them. Changes take effect after the CLI restarts.',
+        '{{provider}} permissions are a single GOOSE_MODE key in {{fileName}}. Goose has no rule lists: the mode alone decides what the CLI does with tool calls. auto — run everything without asking (this is how non-interactive and scheduled sessions go), approve — decide by the configured tool permissions, smart_approve — auto-approve calls judged safe and ask about the rest, chat — never run tools at all, conversation only. The panel edits exactly that key: extensions, provider, model and comments of the same file stay untouched. Per-tool permissions live separately (permission.yaml): the panel shows them but never writes that file. Changes take effect after the CLI restarts.',
       usingDefaults:
         'The GOOSE_MODE key is not set in the file — the default mode is shown. The panel writes nothing until you pick a mode and save.',
       mode: {
@@ -1088,6 +1090,15 @@ export const en: TranslationSchema = {
           label: 'chat — no tools',
           description: 'Tools are never run: plain conversation only. The strictest mode.',
         },
+      },
+      tools: {
+        title: 'Per-tool permissions',
+        readOnly:
+          'Read-only: these lists live in {{path}}, and the file format is not covered by the Goose documentation — the panel never writes it. Configure them with goose configure → Tool Permission.',
+        alwaysAllow: 'Always allow',
+        askBefore: 'Ask before',
+        neverAllow: 'Never allow',
+        empty: 'No individual tool is configured — the selected mode decides.',
       },
     },
     // Kimi Code permission model: the default_permission_mode key plus an ORDERED

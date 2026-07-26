@@ -31,6 +31,12 @@ export const universalMcpServerSchema = object({
   url: string().optional(),
   /** HTTP-заголовки (только http). */
   headers: record(string(), string()).default({}),
+  /**
+   * Файл, в котором лежит запись, если это НЕ основной конфиг провайдера.
+   * Continue грузит ещё и файлы-блоки `mcpServers/*.yaml`; правка идёт в тот
+   * файл, где запись лежит, и человек должен видеть какой.
+   */
+  sourceFile: string().optional(),
 });
 
 export type UniversalMcpServer = Infer<typeof universalMcpServerSchema>;
@@ -78,6 +84,14 @@ export const providerMcpInfoSchema = object({
   readOnly: boolean().default(false),
   /** Текст ошибки, если формат не распознан. */
   error: string().optional(),
+  /** Каталог файлов-блоков, если провайдер их грузит (Continue). */
+  blockDir: string().optional(),
+  /**
+   * Файлы-блоки, которые панель не показывает и не правит, — с причиной.
+   * Пропуск ПОФАЙЛОВЫЙ: один непонятный блок не гасит весь раздел, но человек
+   * должен знать, что этот файл живёт мимо панели.
+   */
+  skippedBlocks: array(object({ path: string(), reason: string() })).default([]),
 });
 
 export type ProviderMcpInfo = Infer<typeof providerMcpInfoSchema>;

@@ -380,6 +380,15 @@ const qwenProvider: ConfigProvider = {
  *    `~/.continue/.env` → окружение процесса; панель ведёт глобальный и проектный
  *    `.continue/.env`;
  *  - **чат** (`chat = ready`): задокументированный headless-режим `cn -p "<промпт>"`;
+ *  - **файлы-блоки MCP** (`blockDir`): задокументированный каталог
+ *    `.continue/mcpServers/` — каждый `*.yaml` в нём несёт свой список
+ *    `mcpServers` под шапкой `name` / `version` / `schema: v1`. Continue грузит
+ *    их вместе с `config.yaml`, поэтому раздел показывает и те, и другие, а
+ *    правка идёт в тот файл, где запись лежит. Новые серверы панель по-прежнему
+ *    кладёт в `config.yaml` — свой файл она не заводит. Каталог блоков есть и в
+ *    проекте (`relativeBlockDir`), и глобально: документация описывает его в
+ *    рабочей папке, глобальный `~/.continue/mcpServers` Continue сканирует тем
+ *    же кодом — это ПОКА НЕ ПРОВЕРЕНО живьём (см. LIMITATIONS-PROVIDERS);
  *  - **проектный уровень** (`projects = ready`): `<проект>/.continue/rules/*.md`
  *    (каталог правил), `<проект>/.continue/mcpServers/mcp.json` (JSON-файл MCP в
  *    задокументированном каталоге блоков — форма `mcpServers` как у Claude
@@ -389,8 +398,7 @@ const qwenProvider: ConfigProvider = {
  * Continue задокументирован ТОЛЬКО проектный каталог правил `.continue/rules`;
  * глобального файла инструкций нет, а ключ `rules` в config.yaml — разнородный
  * список (строка правила ИЛИ ссылка `uses:`), под который модели раздела нет.
- * Угадывать не станем. Каталоги блоков `~/.continue/mcpServers/*.yaml` панель
- * тоже не трогает: она ведёт основной `config.yaml`.
+ * Угадывать не станем.
  */
 const continueProvider: ConfigProvider = {
   id: 'continue',
@@ -399,7 +407,11 @@ const continueProvider: ConfigProvider = {
   paths: unimplementedPaths('continue'),
   // Бинарь CLI — `cn` (пакет @continuedev/cli).
   cli: { command: 'cn', windowsCommand: 'cn.cmd' },
-  mcpConfig: { format: 'continue-yaml', path: () => join(continueHome(), 'config.yaml') },
+  mcpConfig: {
+    format: 'continue-yaml',
+    path: () => join(continueHome(), 'config.yaml'),
+    blockDir: () => join(continueHome(), 'mcpServers'),
+  },
   envConfig: { format: 'dotenv', path: () => join(continueHome(), '.env') },
   permissionsConfig: {
     format: 'continue-yaml',
@@ -407,7 +419,11 @@ const continueProvider: ConfigProvider = {
   },
   projectConfig: {
     instructionsRules: { format: 'continue-md', relativeDir: '.continue/rules' },
-    mcp: { format: 'json', relativePath: '.continue/mcpServers/mcp.json' },
+    mcp: {
+      format: 'json',
+      relativePath: '.continue/mcpServers/mcp.json',
+      relativeBlockDir: '.continue/mcpServers',
+    },
     env: { format: 'dotenv', relativePath: '.continue/.env' },
   },
   // Детект «конфиг найден» (Ф7): каталог ~/.continue. Только проверка существования.
@@ -458,10 +474,15 @@ const continueProvider: ConfigProvider = {
  *  - чат: `goose run --no-session -t "<промпт>"` — задокументированный
  *    неинтерактивный запуск (`--no-session` не плодит файлы сессий).
  *
+ *  - пофайловые разрешения инструментов: `permission.yaml` рядом с config.yaml —
+ *    ТОЛЬКО ПОКАЗ. Три уровня («Always allow» / «Ask before» / «Never allow») в
+ *    документации есть, а формата самого файла НЕТ: он известен лишь из
+ *    исходников CLI, и правило «чужой формат — только по документации» запрещает
+ *    его писать. Панель показывает, что настроено, и отсылает к `goose configure`.
+ *
  * ЧЕГО НЕТ: **переменных окружения** (`env = unsupported`). Своего `.env` Goose
  * не загружает: значения берутся из окружения процесса, а секреты — из связки
- * ключей ОС либо `secrets.yaml`, который панель вести не станет. Пофайловые
- * разрешения инструментов (`permission.yaml`) под панель не разбирались.
+ * ключей ОС либо `secrets.yaml`, который панель вести не станет.
  */
 const gooseProvider: ConfigProvider = {
   id: 'goose',
@@ -471,7 +492,12 @@ const gooseProvider: ConfigProvider = {
   cli: { command: 'goose', windowsCommand: 'goose.cmd' },
   instructionsFile: () => join(gooseConfigDir(), '.goosehints'),
   mcpConfig: { format: 'goose-yaml', path: () => join(gooseConfigDir(), 'config.yaml') },
-  permissionsConfig: { format: 'goose-yaml', path: () => join(gooseConfigDir(), 'config.yaml') },
+  permissionsConfig: {
+    format: 'goose-yaml',
+    path: () => join(gooseConfigDir(), 'config.yaml'),
+    // Пофайловые разрешения инструментов — ТОЛЬКО ПОКАЗ (см. ниже про формат).
+    readOnlyToolPermissionsPath: () => join(gooseConfigDir(), 'permission.yaml'),
+  },
   projectConfig: { instructions: '.goosehints' },
   configLocations: () => [gooseConfigDir()],
   // Своего модельного API у Goose нет: модель даёт провайдер, который настроен

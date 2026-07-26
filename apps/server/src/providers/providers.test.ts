@@ -259,6 +259,9 @@ describe('реестр провайдеров', () => {
 
     expect(provider.mcpConfig).toMatchObject({ format: 'continue-yaml' });
     expect(provider.mcpConfig?.path()).toBe(join(home, 'config.yaml'));
+    // Continue грузит ещё и отдельные файлы-блоки: раздел показывает их вместе
+    // с `config.yaml`, иначе сервер из блока выглядит отсутствующим.
+    expect(provider.mcpConfig?.blockDir?.()).toBe(join(home, 'mcpServers'));
     // Права — ОТДЕЛЬНЫЙ файл, а не секция config.yaml.
     expect(provider.permissionsConfig).toMatchObject({ format: 'continue-yaml' });
     expect(provider.permissionsConfig?.path()).toBe(join(home, 'permissions.yaml'));
@@ -267,7 +270,11 @@ describe('реестр провайдеров', () => {
     expect(provider.projectConfig).toEqual({
       // Правила проекта — каталог `.md`-файлов (у Cursor тот же раздел, но `.mdc`).
       instructionsRules: { format: 'continue-md', relativeDir: '.continue/rules' },
-      mcp: { format: 'json', relativePath: '.continue/mcpServers/mcp.json' },
+      mcp: {
+        format: 'json',
+        relativePath: '.continue/mcpServers/mcp.json',
+        relativeBlockDir: '.continue/mcpServers',
+      },
       env: { format: 'dotenv', relativePath: '.continue/.env' },
     });
     expect(provider.configLocations?.()).toEqual([home]);
@@ -312,6 +319,11 @@ describe('реестр провайдеров', () => {
     expect(provider.permissionsConfig).toMatchObject({ format: 'goose-yaml' });
     expect(provider.mcpConfig?.path()).toBe(join(home, 'config.yaml'));
     expect(provider.permissionsConfig?.path()).toBe(provider.mcpConfig?.path());
+    // Пофайловые разрешения — соседний файл и ТОЛЬКО ПОКАЗ: его формата в
+    // документации Goose нет, поэтому панель его читает, но не пишет.
+    expect(provider.permissionsConfig?.readOnlyToolPermissionsPath?.()).toBe(
+      join(home, 'permission.yaml'),
+    );
 
     // Своего .env у Goose нет — раздел закрыт, а не «пустой».
     expect(provider.envConfig).toBeUndefined();
@@ -370,9 +382,7 @@ describe('реестр провайдеров', () => {
     // который панель не пишет. Конфига со списком у этого формата нет вовсе.
     expect(provider.pluginsConfig).toMatchObject({ format: 'kimi-plugins' });
     expect(provider.pluginsConfig?.dir()).toBe(join(home, 'plugins', 'managed'));
-    expect(provider.pluginsConfig?.registryPath?.()).toBe(
-      join(home, 'plugins', 'installed.json'),
-    );
+    expect(provider.pluginsConfig?.registryPath?.()).toBe(join(home, 'plugins', 'installed.json'));
     expect(provider.pluginsConfig?.configPath).toBeUndefined();
 
     // В проекте — инструкции, MCP и скиллы; проектных прав и хуков нет (нет

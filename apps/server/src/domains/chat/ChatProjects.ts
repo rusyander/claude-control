@@ -19,6 +19,8 @@ export interface ProjectChatRef {
   title: string;
   updatedAt: string;
   messageCount: number;
+  /** Счётчик неполный: у большого транскрипта середина не сосчитана (см. chatSummarySchema). */
+  messageCountPartial?: boolean;
   isSandbox: boolean;
 }
 
@@ -96,6 +98,7 @@ export function listProjects(projectsDir: string): ProjectInfo[] {
       title: chat.title,
       updatedAt: chat.updatedAt,
       messageCount: chat.messageCount,
+      messageCountPartial: chat.messageCountPartial,
       isSandbox: chat.isSandbox,
     });
     if (chat.updatedAt > project.lastActivity) project.lastActivity = chat.updatedAt;

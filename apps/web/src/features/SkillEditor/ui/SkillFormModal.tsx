@@ -7,20 +7,13 @@ import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
+import { slugify } from '@shared/lib/slug';
 import { ResourceFileTree } from '@features/ResourceFiles';
 import { useResourceTemplates, useApplyTemplate } from '@entities/Resource';
 import { skillApi, useRenameSkill } from '@entities/Skill';
 import { SKILL_BODY_TEMPLATE_IDS, type SkillBodyTemplateId } from '../lib/skill-templates';
 import type { SkillFormModalProps } from './SkillFormModal.types';
 import styles from './SkillFormModal.module.scss';
-
-/** Идентификатор скилла — имя папки; сервер строит его тем же правилом. */
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
 
 /**
  * Конструктор скилла.

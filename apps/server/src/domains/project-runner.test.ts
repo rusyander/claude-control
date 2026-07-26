@@ -656,6 +656,53 @@ describe(
       registry.stop({ projectPath: dir });
     });
 
+    it('PORT сервера панели НЕ наследуется dev-сервером', async () => {
+      // Регрессия: окружение спавна собиралось из process.env как есть, и
+      // собственный PORT панели уходил в каждый dev-сервер. Проект без
+      // закреплённого порта поднимался на порту панели — то есть не поднимался.
+      const saved = process.env.PORT;
+      process.env.PORT = '5178';
+      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      try {
+        await registry.start({ projectPath: dir });
+        expect(await until(() => registry.get({ projectPath: dir })?.status === 'running')).toBe(
+          true,
+        );
+        expect(registry.get({ projectPath: dir })?.port).not.toBe(5178);
+      } finally {
+        registry.stopAll();
+        if (saved === undefined) delete process.env.PORT;
+        else process.env.PORT = saved;
+      }
+    });
+
+    it('два одновременных старта одной цели поднимают ОДИН процесс', async () => {
+      // Регрессия: между проверкой занятости закреплённого порта и записью в
+      // реестр успевал пройти второй запрос (два клика, автозапуск поверх
+      // ручного). Поднимались два процесса, реестр помнил последний — первый
+      // становился сиротой и держал порт.
+      let launched = 0;
+      const counting = (target: string): LaunchSpec => {
+        launched += 1;
+        return launch(target);
+      };
+      const registry = new ProjectRunnerRegistry({
+        openBrowser: () => {},
+        resolveLaunch: counting,
+      });
+      try {
+        const [a, b] = await Promise.all([
+          registry.start({ projectPath: dir }, { port: 4739 }),
+          registry.start({ projectPath: dir }, { port: 4739 }),
+        ]);
+        expect(launched).toBe(1);
+        expect(registry.list()).toHaveLength(1);
+        expect(b.startedAt).toBe(a.startedAt);
+      } finally {
+        registry.stopAll();
+      }
+    });
+
     it('процесс упал сам → error с хвостом вывода', async () => {
       writeFileSync(
         join(dir, 'server.mjs'),

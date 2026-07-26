@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { renameSync } from 'node:fs';
 import type {
   AppSettings,
   Automation,
@@ -9,6 +10,7 @@ import type {
   ProviderCheckResult,
 } from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from './safe-io.ts';
+import { hookContentId } from './hook-id.ts';
 
 /**
  * Память панели об одной ЦЕЛИ запуска: см. `AppState.runnerPrefs`.
@@ -177,7 +179,7 @@ export class AppStore {
   }
 
   private load(): AppState {
-    const loaded = readJsonFile<Partial<AppState>>(this.stateFile, {});
+    const loaded = this.readStateFile();
     // Клонируем дефолт целиком. Иначе при пустом state.json вложенные массивы
     // (groups, automations, disabled.hook и т.д.) остаются ОБЩЕЙ ссылкой с
     // модульным DEFAULT_STATE, и мутации одного стора (setEnabled/saveGroup)
@@ -197,6 +199,35 @@ export class AppStore {
       providerChecks: { ...base.providerChecks, ...loaded.providerChecks },
       settings: { ...base.settings, ...loaded.settings },
     };
+  }
+
+  /**
+   * Прочитать state.json, пережив испорченный файл.
+   *
+   * Разбор бросает на оборванном или изуродованном JSON (выключили питание
+   * посреди записи, руками правили файл), а этот конструктор вызывается на
+   * старте сервера — исключение отсюда означало «панель не запускается вовсе,
+   * и починить её нечем, потому что интерфейс не поднялся». Поэтому битый файл
+   * отодвигаем в сторону под именем `state.corrupt.json` (не удаляем: там
+   * группы и сценарии пользователя, их ещё можно вытащить руками) и стартуем
+   * с дефолтов.
+   */
+  private readStateFile(): Partial<AppState> {
+    try {
+      return readJsonFile<Partial<AppState>>(this.stateFile, {});
+    } catch (error) {
+      const parked = join(this.appDataDir, 'state.corrupt.json');
+      try {
+        renameSync(this.stateFile, parked);
+      } catch {
+        // Переименовать не вышло (файл занят, нет прав) — это не повод не
+        // запуститься: дальше работаем на дефолтах, первая же запись перезапишет.
+      }
+      process.stderr.write(
+        `state.json не читается (${(error as Error).message}); файл отложен в ${parked}, настройки взяты по умолчанию\n`,
+      );
+      return {};
+    }
   }
 
   private persist(): void {
@@ -341,9 +372,66 @@ export class AppStore {
       for (const member of group.members) {
         if (member.kind === kind && member.id === oldId) member.id = newId;
       }
+      // Дедупликация после переноса. Новое имя могло уже состоять в этой же
+      // группе — тогда участник оказывался в составе дважды и до следующего
+      // сохранения группы считался за двоих (счётчик участников, применение
+      // группы, снятие гашения). Отметки `disabled` от такого же дубля
+      // защищены выше — состав групп защищаем здесь.
+      const seen = new Set<string>();
+      group.members = group.members.filter((member) => {
+        const key = `${member.kind}:${member.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      // Дедупликация после переноса. Новое имя могло уже состоять в этой же
+      // группе — тогда участник оказывался в составе дважды и до следующего
+      // сохранения группы считался за двоих (счётчик участников, применение
+      // группы, снятие гашения). Отметки `disabled` от такого же дубля
+      // защищены выше — состав групп защищаем здесь.
+
     }
 
     this.persist();
+  }
+
+  /**
+   * Забыть сущность целиком — при её удалении.
+   *
+   * Удаляется запись в конфиге, а её след в state.json оставался: состав групп
+   * показывал участника-призрака, а `disabled`/`disabledByGroup` продолжали
+   * держать отметки. Стоило завести сущность с тем же именем — она молча
+   * наследовала чужие группы и могла оказаться погашенной группой, в которую
+   * никогда не входила.
+   *
+   * Пишем только если что-то действительно нашлось: удаление сущности без
+   * единой отметки не должно трогать файл состояния.
+   */
+  removeEntity(kind: EntityKind, id: string): void {
+    let changed = false;
+
+    const disabled = this.state.disabled[kind];
+    const at = disabled.indexOf(id);
+    if (at >= 0) {
+      disabled.splice(at, 1);
+      changed = true;
+    }
+
+    const byGroup = this.state.disabledByGroup[kind];
+    if (byGroup[id]) {
+      delete byGroup[id];
+      changed = true;
+    }
+
+    for (const group of this.state.groups) {
+      const kept = group.members.filter((member) => !(member.kind === kind && member.id === id));
+      if (kept.length !== group.members.length) {
+        group.members = kept;
+        changed = true;
+      }
+    }
+
+    if (changed) this.persist();
   }
 
   /**
@@ -388,9 +476,16 @@ export class AppStore {
    * Запомнить команду хука перед тем, как он исчезнет из settings.json.
    * Без этого выключение хука было бы его удалением: файл — единственное
    * место, где живёт текст команды.
+   *
+   * Ключ — ВСЕГДА содержательный id, а не тот, под которым хук показан в
+   * списке. В списке id бывает с префиксом файла (`local:…`) или с суффиксом
+   * дубля (`-2`), а читающая сторона (`readHooks`) пересчитывает его по
+   * содержимому — снимок под непересчитанным ключом потом не находился и не
+   * удалялся, и выключенный хук всплывал призраком при следующей перезаписи.
    */
   rememberDisabledHook(hook: Hook): void {
-    this.state.disabledHooks[hook.id] = hook;
+    const key = hookContentId(hook.event, hook.matcher, hook.command);
+    this.state.disabledHooks[key] = { ...hook, id: key };
     this.persist();
   }
 
@@ -401,9 +496,19 @@ export class AppStore {
   /**
    * Убрать снимки хуков, которые снова лежат в файле. Вызывается ПОСЛЕ
    * перезаписи settings.json: сотри снимок раньше — и включать будет нечего.
+   *
+   * Сверяем не только ключ, но и содержательный id самого снимка: в состоянии
+   * с прошлых версий панели лежат ключи старого, позиционного вида
+   * (`Stop:0:0`). По ключу такой снимок не совпал бы ни с чем, оставался бы
+   * навсегда — и стоило бы поправить команду хука в файле, как он возвращался
+   * бы в список вторым, «включённым» экземпляром и снова уезжал в settings.json.
    */
   pruneDisabledHooks(idsBackInFile: string[]): void {
-    for (const id of idsBackInFile) delete this.state.disabledHooks[id];
+    const back = new Set(idsBackInFile);
+    for (const [key, hook] of Object.entries(this.state.disabledHooks)) {
+      const contentId = hookContentId(hook.event, hook.matcher, hook.command);
+      if (back.has(key) || back.has(contentId)) delete this.state.disabledHooks[key];
+    }
     this.persist();
   }
 

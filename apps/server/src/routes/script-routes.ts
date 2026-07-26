@@ -1,7 +1,24 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import { readScripts, readScriptContent, saveScript, deleteScript } from '../domains/scripts.ts';
+import {
+  readScripts,
+  readScriptContent,
+  saveScript,
+  deleteScript,
+  UnsafeScriptPathError,
+} from '../domains/scripts.ts';
 import { readHooks } from '../domains/hooks.ts';
+
+/**
+ * Отказ по пути — 400 с явной причиной. Молча подставлять «очищенный» путь
+ * нельзя: правка ушла бы в другой файл, а ответ выглядел бы успехом.
+ */
+function replyUnsafePath(reply: FastifyReply, error: unknown): FastifyReply {
+  if (error instanceof UnsafeScriptPathError) {
+    return reply.code(400).send({ error: 'unsafe_path', message: error.message });
+  }
+  throw error;
+}
 
 /** Маршруты скриптов из каталога hooks/. */
 export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): void {
@@ -17,36 +34,63 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
 
   // Wildcard, а не `:id`: идентификатор скрипта может быть вложенным путём
   // (файл в подпапке hooks/), а `:id` остановился бы на первом слэше.
-  app.get<{ Params: { '*': string } }>('/api/scripts/*', (request) => ({
-    id: request.params['*'],
-    content: readScriptContent(ctx.location.paths.hooks, request.params['*']),
-  }));
+  app.get<{ Params: { '*': string } }>('/api/scripts/*', (request, reply) => {
+    try {
+      return {
+        id: request.params['*'],
+        content: readScriptContent(ctx.location.paths.hooks, request.params['*']),
+      };
+    } catch (error) {
+      return replyUnsafePath(reply, error);
+    }
+  });
 
-  app.put<{ Params: { '*': string }; Body: { content: string } }>('/api/scripts/*', (request) => ({
-    ok: true,
-    backupPath: saveScript(
-      ctx.location.paths.hooks,
-      request.params['*'],
-      request.body.content,
-      ctx.backupDir,
-    ),
-    needsRestart: true,
-  }));
+  app.put<{ Params: { '*': string }; Body: { content: string } }>(
+    '/api/scripts/*',
+    (request, reply) => {
+      try {
+        return {
+          ok: true,
+          backupPath: saveScript(
+            ctx.location.paths.hooks,
+            request.params['*'],
+            request.body.content,
+            ctx.backupDir,
+          ),
+          needsRestart: true,
+        };
+      } catch (error) {
+        return replyUnsafePath(reply, error);
+      }
+    },
+  );
 
-  app.post<{ Body: { name: string; content: string } }>('/api/scripts', (request) => ({
-    ok: true,
-    backupPath: saveScript(
-      ctx.location.paths.hooks,
-      request.body.name,
-      request.body.content,
-      ctx.backupDir,
-    ),
-    needsRestart: true,
-  }));
+  app.post<{ Body: { name: string; content: string } }>('/api/scripts', (request, reply) => {
+    try {
+      return {
+        ok: true,
+        backupPath: saveScript(
+          ctx.location.paths.hooks,
+          request.body.name,
+          request.body.content,
+          ctx.backupDir,
+        ),
+        needsRestart: true,
+      };
+    } catch (error) {
+      return replyUnsafePath(reply, error);
+    }
+  });
 
-  app.delete<{ Params: { '*': string } }>('/api/scripts/*', (request) => ({
-    ok: true,
-    backupPath: deleteScript(ctx.location.paths.hooks, request.params['*'], ctx.backupDir),
-    needsRestart: true,
-  }));
+  app.delete<{ Params: { '*': string } }>('/api/scripts/*', (request, reply) => {
+    try {
+      return {
+        ok: true,
+        backupPath: deleteScript(ctx.location.paths.hooks, request.params['*'], ctx.backupDir),
+        needsRestart: true,
+      };
+    } catch (error) {
+      return replyUnsafePath(reply, error);
+    }
+  });
 }

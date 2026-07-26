@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getProvider } from '../providers/registry.ts';
 import { setStoredKey } from '../lib/provider-keys.ts';
+import { quoteForShell } from '../lib/cli-args.ts';
 import { runAssistant, type RunAssistantDeps } from './assistant-runner.ts';
 
 /**
@@ -42,9 +43,34 @@ function fakeSpawn(opts: { stdout?: string; stderr?: string; code?: number; dela
   return { fn, calls, stdinChunks };
 }
 
-/** Найти промпт как ОТДЕЛЬНЫЙ элемент argv (проверка отсутствия shell-инъекции). */
+/**
+ * Промпт должен дойти до CLI ОДНИМ значением, а не куском команды.
+ *
+ * На POSIX это буквально отдельный элемент argv. На Windows argv нет: команду
+ * заново разбирает cmd.exe, поэтому значение обязано стоять в строке отдельным
+ * заквотированным словом — иначе `a&whoami` станет второй командой. Форма
+ * квотирования — общая для панели `quoteForShell` (см. lib/cli-args.ts).
+ */
+function cmdLine(args: string[]): string | undefined {
+  const at = args.indexOf('/c');
+  return at >= 0 ? args[at + 1] : undefined;
+}
+
 function argvHasDiscrete(args: string[], prompt: string): boolean {
-  return args.filter((a) => a === prompt).length === 1;
+  // Формы три, и проверять надо ту, что случилась, а не ту, что следует из
+  // платформы: POSIX — argv напрямую; Windows с найденным нативным .exe — тоже
+  // напрямую (оболочки нет, разбирать некому); Windows с одной .cmd-обёрткой —
+  // строка для cmd.exe, где значение обязано стоять отдельным заквотированным
+  // словом, иначе `a&whoami` станет второй командой.
+  const line = cmdLine(args);
+  if (line === undefined) return args.filter((a) => a === prompt).length === 1;
+  return line.split(quoteForShell(prompt)).length === 2;
+}
+
+/** Флаг запуска: элемент argv напрямую или слово внутри строки cmd.exe. */
+function argvIncludes(args: string[], value: string): boolean {
+  const line = cmdLine(args);
+  return line === undefined ? args.includes(value) : line.includes(value);
 }
 
 describe('runAssistant: CLI one-shot', () => {
@@ -69,7 +95,7 @@ describe('runAssistant: CLI one-shot', () => {
     expect(res.reply).toBe('привет из gemini');
     // Промпт со спецсимволами — ОДИН элемент argv (не склеен, не разбит).
     expect(argvHasDiscrete(spawn.calls[0]!.args, prompt)).toBe(true);
-    expect(spawn.calls[0]!.args).toContain('-p');
+    expect(argvIncludes(spawn.calls[0]!.args, '-p')).toBe(true);
   });
 
   it('codex → argv [exec, prompt]', async () => {
@@ -82,7 +108,7 @@ describe('runAssistant: CLI one-shot', () => {
       spawnImpl: spawn.fn,
     });
     expect(res.ok).toBe(true);
-    expect(spawn.calls[0]!.args).toContain('exec');
+    expect(argvIncludes(spawn.calls[0]!.args, 'exec')).toBe(true);
     expect(argvHasDiscrete(spawn.calls[0]!.args, prompt)).toBe(true);
   });
 
@@ -104,7 +130,7 @@ describe('runAssistant: CLI one-shot', () => {
     // Провайдер экспериментальный — бейдж «экспериментально» остаётся.
     expect(res.experimental).toBe(true);
     expect(res.reply).toBe('ответ aider');
-    expect(spawn.calls[0]!.args).toContain('--message');
+    expect(argvIncludes(spawn.calls[0]!.args, '--message')).toBe(true);
     expect(argvHasDiscrete(spawn.calls[0]!.args, prompt)).toBe(true);
     // Промпт НИКОГДА не склеивается со строкой команды в один аргумент.
     expect(spawn.calls[0]!.args.some((arg) => arg.startsWith('--message '))).toBe(false);
@@ -168,7 +194,7 @@ describe('runAssistant: CLI one-shot', () => {
     expect(res.reply).toBe('ответ opencode');
     // `run` присутствует отдельным аргументом (на Windows перед ним ещё идёт
     // обёртка cmd `/d /s /c`, поэтому проверяем вхождение, а не индекс 0).
-    expect(spawn.calls[0]!.args).toContain('run');
+    expect(argvIncludes(spawn.calls[0]!.args, 'run')).toBe(true);
     expect(argvHasDiscrete(spawn.calls[0]!.args, prompt)).toBe(true);
     // Промпт НИКОГДА не склеивается со строкой команды в один аргумент.
     expect(spawn.calls[0]!.args.some((arg) => arg.startsWith('run '))).toBe(false);
@@ -339,7 +365,7 @@ describe('runAssistant: none и claude-делегация', () => {
     expect(res.mode).toBe('cli');
     expect(res.experimental).toBe(false); // claude — verified, не experimental
     expect(res.reply).toBe('ответ claude');
-    expect(spawn.calls[0]!.args).toContain('-p');
+    expect(argvIncludes(spawn.calls[0]!.args, '-p')).toBe(true);
     expect(spawn.stdinChunks.join('')).toContain('вопрос');
   });
 });

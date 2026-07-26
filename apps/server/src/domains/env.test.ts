@@ -127,6 +127,73 @@ describe('env', () => {
       expect(lines).toEqual(['X=2']);
     });
 
+    it('правка комментария у существующей переменной доходит до файла (#52)', () => {
+      const draft = {
+        key: 'GITLAB_TOKEN',
+        value: 'glpat-1',
+        source: 'secrets' as const,
+        isSecret: true,
+        comment: 'выпустить в GitLab → Settings',
+      };
+      saveEnvVar(settingsPath, secretsPath, draft);
+      saveEnvVar(settingsPath, secretsPath, { ...draft, comment: 'выпустить в git.gorgona.ai' });
+
+      const content = readFileSync(secretsPath, 'utf8');
+      // Раньше ветка правки комментарий игнорировала: панель отвечала «сохранено»,
+      // а в файле оставался прежний текст.
+      expect(content).toContain('# выпустить в git.gorgona.ai');
+      expect(content).not.toContain('Settings');
+      // И ровно один комментарий, а не два подряд.
+      expect(content.split('\n').filter((line) => line.startsWith('#'))).toHaveLength(1);
+      expect(
+        readEnvVars(settingsPath, secretsPath).find((v) => v.key === 'GITLAB_TOKEN')?.comment,
+      ).toBe('выпустить в git.gorgona.ai');
+    });
+
+    it('пустой комментарий убирает его из файла, а не оставляет старый (#52)', () => {
+      const draft = {
+        key: 'API_TOKEN',
+        value: '1',
+        source: 'secrets' as const,
+        isSecret: true,
+        comment: 'временный',
+      };
+      saveEnvVar(settingsPath, secretsPath, draft);
+      saveEnvVar(settingsPath, secretsPath, { ...draft, comment: '' });
+
+      const content = readFileSync(secretsPath, 'utf8');
+      expect(content).toContain('API_TOKEN=1');
+      expect(content).not.toContain('временный');
+    });
+
+    it('комментарий не прислали — чужой в файле остаётся (массовое добавление)', () => {
+      writeFileSync(secretsPath, '# где выпустить\nAPI_TOKEN=1\n');
+      saveEnvVar(settingsPath, secretsPath, {
+        key: 'API_TOKEN',
+        value: '2',
+        source: 'secrets',
+        isSecret: true,
+      });
+
+      const content = readFileSync(secretsPath, 'utf8');
+      expect(content).toContain('# где выпустить');
+      expect(content).toContain('API_TOKEN=2');
+    });
+
+    it('правка значения не схлопывает многострочный комментарий', () => {
+      writeFileSync(secretsPath, '# первая\n# вторая\nAPI_TOKEN=1\n');
+      saveEnvVar(settingsPath, secretsPath, {
+        key: 'API_TOKEN',
+        value: '2',
+        source: 'secrets',
+        isSecret: true,
+        // Форма показывает блок склеенным через пробел и возвращает его как есть.
+        comment: 'первая вторая',
+      });
+
+      expect(readFileSync(secretsPath, 'utf8')).toBe('# первая\n# вторая\nAPI_TOKEN=2\n');
+    });
+
     it('удаление убирает переменную из своего хранилища', () => {
       saveEnvVar(settingsPath, secretsPath, {
         key: 'GITLAB_TOKEN',

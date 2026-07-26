@@ -48,9 +48,25 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
   setSecretsBasename(basename(ctx.location.paths.secretsEnv));
   app.get('/api/location', () => ctx.location);
 
-  app.post<{ Body: { path: string } }>('/api/location', (request) => {
-    const result = ctx.relocate(request.body.path);
-    if (result.isValid) ctx.store.updateSettings({ claudeDirOverride: request.body.path });
+  /**
+   * Смена каталога конфигурации. Путь обязателен и проверяется до переезда:
+   * тело `{}` раньше проходило насквозь — `detectClaudeLocation(undefined)`
+   * скатывался к `CLAUDE_CONFIG_DIR`/`~/.claude`, отвечал «всё в порядке», а
+   * заодно затирал сохранённый ручной каталог, и панель после перезапуска молча
+   * оказывалась в домашнем. Не строка (например число) роняла `.trim()` и
+   * возвращала 500 вместо объяснения.
+   */
+  app.post<{ Body: { path?: unknown } }>('/api/location', (request, reply) => {
+    const path = request.body?.path;
+    if (typeof path !== 'string' || !path.trim()) {
+      return reply.code(400).send({
+        error: 'invalid_path',
+        message: 'Укажите путь к каталогу конфигурации.',
+      });
+    }
+
+    const result = ctx.relocate(path);
+    if (result.isValid) ctx.store.updateSettings({ claudeDirOverride: path });
     return result;
   });
 
@@ -155,7 +171,10 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     }
 
     ctx.store.importState(parsed.data);
-    setBackupKeep(ctx.store.getSettings().backupKeep);
+    // Импорт мог принести другие значения глобальных настроек ввода-вывода —
+    // применяем их разом, а не только глубину ротации: иначе включённое в
+    // снимке шифрование копий секретов не действовало бы до перезапуска.
+    ctx.applyIoSettings();
     return { ok: true, needsRestart: true };
   });
 

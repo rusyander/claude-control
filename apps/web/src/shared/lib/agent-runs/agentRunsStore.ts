@@ -1,6 +1,9 @@
 import { apiClient } from '@shared/api/client';
+import { i18n } from '@shared/config/i18n';
+import { toast } from '@shared/lib/toast';
 import { normalizeProjectPath } from '@shared/lib/workspace';
 import { aggregateStatus, runStatus, type RunStatus } from './status';
+import { permissionDeliveryProblem } from './permissionDelivery';
 import { selectActiveRuns, type ActiveRunView } from './selectors';
 
 /**
@@ -42,6 +45,20 @@ export interface AgentRun {
   tokens: number;
   limitResetsAt?: number;
   error?: string;
+  /**
+   * Структурный код отказа сервера (`run_busy`, `unsupported_upload`,
+   * `workspace_missing`). По нему принимаются решения и подбирается текст на
+   * языке интерфейса; сам `error` — только для показа, разбирать его нельзя.
+   */
+  errorCode?: string;
+  /** Сервер (или сеть) сказал, что сбой временный, — можно перезапустить самим. */
+  errorRetriable?: boolean;
+  /**
+   * Ключ, под которым прогон зарегистрирован НА СЕРВЕРЕ. Отличается от `id`,
+   * когда разговор начался в другой вкладке под временным `new-…`, а эта знает
+   * его по sessionId: по этому ключу идут и подключение к потоку, и остановка.
+   */
+  serverRunId?: string;
   /** В последнем ходе агент задал вопрос человеку (AskUserQuestion). */
   askedQuestion: boolean;
   /** Запросы на права, ждущие ответа человека (интерактивный permission-prompt). */
@@ -82,7 +99,8 @@ type ChatEvent =
   | { kind: 'limit'; resetsAt: number; type: string; status: string }
   | { kind: 'usage'; input: number; output: number; cacheRead: number; cacheCreation: number }
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
-  | { kind: 'error'; message: string }
+  // `retriable` ставит сервер: временный ли сбой, решает он, а не разбор текста.
+  | { kind: 'error'; message: string; retriable?: boolean }
   | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
   | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' };
 
@@ -112,15 +130,52 @@ const autoRetries = new Map<string, number>();
 const MAX_AUTO_RETRIES = 2;
 
 /**
- * Похоже ли падение на временное (сеть моргнула, сервис перегружен, таймаут) —
- * такое чиним сами перезапуском, не дёргая пользователя. Настоящие ошибки
- * (нет прав, неверный ключ, отказ модели) сюда не попадают — их показываем.
+ * Отложенные авто-рестарты и прогоны, остановленные человеком.
+ *
+ * Авто-рестарт живёт в `setTimeout` — то есть переживает и отмену потока, и сам
+ * прогон. Без этих двух хранилищ «Остановить» гасило поток, а через пару секунд
+ * таймер поднимал агента заново: пользователь останавливал, а прогон продолжался.
  */
-function isTransientError(message: string | undefined): boolean {
-  if (!message) return false;
-  return /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|network|fetch failed|Connection error|overloaded|temporarily|timed?\s?out|\b50[234]\b|\b529\b/i.test(
-    message,
-  );
+const autoRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const stoppedByUser = new Set<string>();
+
+/** Снять запланированный авто-рестарт и обнулить бюджет попыток. */
+function cancelAutoRetry(id: string): void {
+  const timer = autoRetryTimers.get(id);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    autoRetryTimers.delete(id);
+  }
+  autoRetries.delete(id);
+}
+
+/**
+ * Перезапускать ли прогон самим после падения.
+ *
+ * Раньше решение принималось разбором ТЕКСТА ошибки по шаблону («network»,
+ * «timed out», «50[234]»). Текст же приходил с пользовательским вводом внутри:
+ * вложение с именем `network.zip` или `report 503.pdf` объявлялось «временным
+ * сбоем», и клиент дважды молча переотправлял заведомо отклонённое сообщение —
+ * несколько секунд тишины вместо ответа. Теперь решает только структурный
+ * признак: `retriable` от сервера (он же и разбирает текст CLI — но свой) либо
+ * обрыв связи, замеченный самим клиентом. Отказ с кодом не ретраится никогда.
+ */
+export function shouldAutoRetry(input: {
+  error?: string;
+  errorCode?: string;
+  errorRetriable?: boolean;
+  lastPrompt?: string;
+  spentRetries: number;
+  maxRetries: number;
+  stoppedByUser: boolean;
+}): boolean {
+  if (!input.error || !input.lastPrompt) return false;
+  if (input.errorCode) return false;
+  if (input.errorRetriable !== true) return false;
+  if (input.spentRetries >= input.maxRetries) return false;
+  // Остановлено человеком — никаких «сам перезапущу»: кнопка «Остановить»
+  // означает «хватит», даже если сбой выглядел временным.
+  return !input.stoppedByUser;
 }
 
 let onFinished: (() => void) | undefined;
@@ -236,6 +291,8 @@ function applyEvent(id: string, event: ChatEvent): void {
       break;
     case 'error':
       next.error = event.message;
+      // Признак временности — только тот, что прислал сервер.
+      next.errorRetriable = event.retriable === true;
       break;
     case 'permission': {
       // Новый запрос прав — добавляем (без дублей по toolUseId).
@@ -354,13 +411,48 @@ async function pumpStream(
   return sawTerminal ? 'clean' : 'dirty';
 }
 
+/**
+ * Итог приёма отправки. Нужен вызывающему (полю ввода): текст сообщения можно
+ * очищать только после того, как сервер его ПРИНЯЛ, иначе отказ уничтожает
+ * набранное — человеку остаётся печатать заново.
+ */
+export type SendOutcome =
+  { ok: true } | { ok: false; code?: string; message: string; files?: string[] };
+
+/** Разобрать тело отказа сервера: код и текст, ничего не выковыривая из строки. */
+async function readRefusal(response: Response): Promise<{
+  code?: string;
+  message: string;
+  files?: string[];
+  runId?: string;
+}> {
+  try {
+    const body = (await response.json()) as {
+      code?: string;
+      message?: string;
+      files?: string[];
+      runId?: string;
+    };
+    return {
+      code: body.code,
+      message: body.message || `Сервер ответил ${response.status}`,
+      files: body.files,
+      runId: body.runId,
+    };
+  } catch {
+    // Не JSON (прокси, падение) — кода нет, показываем статус.
+    return { message: `Сервер ответил ${response.status}` };
+  }
+}
+
 /** Открыть один поток: `send` стартует прогон (POST), `attach` подключается (GET). */
 async function openStream(
   id: string,
   input: StartInput,
   controller: AbortController,
   mode: 'send' | 'attach',
-): Promise<'clean' | 'dirty' | 'gone'> {
+  settle?: (outcome: SendOutcome) => void,
+): Promise<'clean' | 'dirty' | 'gone' | 'refused'> {
   let response: Response;
   if (mode === 'send') {
     response = await fetch(`${apiClient.defaults.baseURL}/chat/send`, {
@@ -371,20 +463,35 @@ async function openStream(
     });
   } else {
     const from = lastSeqs.get(id) ?? 0;
-    response = await fetch(`${apiClient.defaults.baseURL}/chat/${id}/stream?from=${from}`, {
+    // Прогон мог быть заведён на сервере под другим ключом (см. serverRunId).
+    const target = runs.get(id)?.serverRunId ?? id;
+    response = await fetch(`${apiClient.defaults.baseURL}/chat/${target}/stream?from=${from}`, {
       method: 'GET',
       signal: controller.signal,
     });
   }
 
   if (!response.ok) {
-    if (mode === 'send') throw new Error(`Сервер ответил ${response.status}`);
-    return 'dirty';
+    if (mode !== 'send') return 'dirty';
+    // Отказ до запуска агента: статус + код. Ни переподключаться, ни ретраить
+    // тут нечего — сообщение просто не принято, и об этом надо сказать прямо.
+    const refusal = await readRefusal(response);
+    setRun(id, {
+      error: refusal.message,
+      errorCode: refusal.code,
+      // 5xx — сбой самой панели, а не отказ: такое перезапустить можно.
+      errorRetriable: response.status >= 500,
+      serverRunId: refusal.runId ?? runs.get(id)?.serverRunId,
+    });
+    settle?.({ ok: false, code: refusal.code, message: refusal.message, files: refusal.files });
+    return 'refused';
   }
   if (!response.body) {
     if (mode === 'send') throw new Error('Пустой ответ сервера');
     return 'dirty';
   }
+  // Поток пошёл — сообщение принято, поле ввода можно очищать.
+  if (mode === 'send') settle?.({ ok: true });
   return pumpStream(id, response, controller);
 }
 
@@ -399,9 +506,10 @@ async function runStream(
   input: StartInput,
   controller: AbortController,
   initial: 'send' | 'attach',
+  settle?: (outcome: SendOutcome) => void,
 ): Promise<void> {
   try {
-    let outcome = await openStream(id, input, controller, initial);
+    let outcome = await openStream(id, input, controller, initial, settle);
     let attempt = 0;
     while (outcome === 'dirty' && !controller.signal.aborted && attempt < MAX_RECONNECT) {
       attempt += 1;
@@ -414,30 +522,89 @@ async function runStream(
     if (!(error instanceof DOMException && error.name === 'AbortError')) {
       const run = runs.get(id);
       if (run) {
-        runs.set(id, { ...run, error: error instanceof Error ? error.message : String(error) });
+        runs.set(id, {
+          ...run,
+          error: error instanceof Error ? error.message : String(error),
+          // Исключение на самом запросе — это оборванная связь, а не отказ:
+          // признак временности ставим по факту обрыва, а не по тексту.
+          errorRetriable: true,
+        });
       }
     }
   } finally {
     controllers.delete(id);
     lastSeqs.delete(id);
 
+    const run = runs.get(id);
+    const spent = autoRetries.get(id) ?? 0;
+
+    // Отказ «прогон уже идёт»: на сервере он ЖИВОЙ, просто эта вкладка о нём не
+    // знала — сдалась после MAX_RECONNECT переподключений или открыта второй.
+    // Оставить человека с одним отказом нельзя: кнопки «Остановить» на такой
+    // странице нет (она появляется только у идущего прогона), и деть чужой
+    // прогон было бы некуда, кроме F5. Поэтому подхватываем его потоком —
+    // возвращаются и живой текст, и статус «идёт», а с ним и «Остановить».
+    const takeover = Boolean(
+      run?.errorCode === 'run_busy' && !controller.signal.aborted && !stoppedByUser.has(id),
+    );
+
     // Упал по временной причине (сеть моргнула, перегрузка) — сами перезапускаем
     // тем же запросом, продолжая сессию. Пользователю ошибку не показываем и не
     // пищим: для него это просто «агент чуть задумался». Бюджет попыток ограничен.
-    const run = runs.get(id);
-    const spent = autoRetries.get(id) ?? 0;
-    const willAutoRetry = Boolean(
-      run && run.error && isTransientError(run.error) && spent < MAX_AUTO_RETRIES && run.lastPrompt,
-    );
+    const willAutoRetry =
+      !takeover &&
+      shouldAutoRetry({
+        error: run?.error,
+        errorCode: run?.errorCode,
+        errorRetriable: run?.errorRetriable,
+        lastPrompt: run?.lastPrompt,
+        spentRetries: spent,
+        maxRetries: MAX_AUTO_RETRIES,
+        stoppedByUser: stoppedByUser.has(id),
+      });
 
-    if (willAutoRetry) {
+    if (takeover) {
+      const next = new AbortController();
+      controllers.set(id, next);
+      lastSeqs.set(id, 0);
+      setRun(id, {
+        status: 'running',
+        error: undefined,
+        errorCode: undefined,
+        errorRetriable: undefined,
+        lastEventAt: Date.now(),
+      });
+      rebuildStatuses();
+      emit();
+      // С нулевого seq: буфер прогона отдадут заново, и ответ виден с начала.
+      void runStream(id, input, next, 'attach');
+    } else if (willAutoRetry) {
+      // Промпт остаётся у стора — он же его и переотправит; для поля ввода это
+      // «принято», очищать текст можно.
+      settle?.({ ok: true });
       autoRetries.set(id, spent + 1);
-      setRun(id, { status: 'running', error: undefined, lastEventAt: Date.now() });
+      setRun(id, {
+        status: 'running',
+        error: undefined,
+        errorCode: undefined,
+        errorRetriable: undefined,
+        lastEventAt: Date.now(),
+      });
       rebuildStatuses();
       emit();
       const delay = Math.min(1000 * 2 ** (spent + 1), 4000);
-      setTimeout(() => agentRuns.retry(id, { auto: true }), delay);
+      autoRetryTimers.set(
+        id,
+        setTimeout(() => {
+          autoRetryTimers.delete(id);
+          if (stoppedByUser.has(id)) return;
+          agentRuns.retry(id, { auto: true });
+        }, delay),
+      );
     } else {
+      // Поток оборвался, не дойдя даже до ответа сервера (сеть) — считаем
+      // отправку непринятой, чтобы набранный текст не пропал зря.
+      settle?.({ ok: false, message: run?.error ?? 'Отправить сообщение не удалось' });
       autoRetries.delete(id);
       finalize(id);
       onFinished?.();
@@ -448,10 +615,20 @@ async function runStream(
 }
 
 export const agentRuns = {
-  /** Запустить (или перезапустить) прогон под данным chatId. */
-  start(input: StartInput): void {
+  /**
+   * Запустить (или перезапустить) прогон под данным chatId.
+   *
+   * Возвращает итог ПРИЁМА отправки — принял ли сервер сообщение. Раньше вызов
+   * был «выстрелил и забыл», и поле ввода очищалось до ответа сервера: любой
+   * отказ (прогон занят, вложение не того типа) уничтожал набранный текст.
+   * Промис разрешается сразу по ответу на POST, а не по концу разговора.
+   */
+  start(input: StartInput): Promise<SendOutcome> {
     ensureWatchdog();
     const id = input.chatId;
+    // Новый запуск снимает пометку «остановлено человеком»: она относилась к
+    // прошлому прогону. Бюджет авто-попыток здесь не трогаем — им заведует retry.
+    stoppedByUser.delete(id);
     controllers.get(id)?.abort();
     const controller = new AbortController();
     controllers.set(id, controller);
@@ -482,6 +659,11 @@ export const agentRuns = {
       tokens: 0,
       costUsd: undefined,
       error: undefined,
+      errorCode: undefined,
+      errorRetriable: undefined,
+      // Свой запуск — свой прогон: чужой серверный ключ от прошлого отказа
+      // забываем, иначе поток и остановка ушли бы к чужому разговору.
+      serverRunId: undefined,
       askedQuestion: false,
       permissions: [],
       // Запоминаем запрос, права, модель и глубину — для кнопки «Повторить».
@@ -496,7 +678,15 @@ export const agentRuns = {
 
     // Поток отвязан от вкладки: обрыв связи сам переподключается, догоняя
     // пропущенное, а сервер тем временем держит агента живым.
-    void runStream(id, input, controller, 'send');
+    return new Promise<SendOutcome>((resolve) => {
+      let settled = false;
+      const settle = (outcome: SendOutcome): void => {
+        if (settled) return;
+        settled = true;
+        resolve(outcome);
+      };
+      void runStream(id, input, controller, 'send', settle);
+    });
   },
 
   /**
@@ -556,11 +746,39 @@ export const agentRuns = {
     }
   },
 
-  /** Остановить прогон: сервер убивает процесс, клиент перестаёт читать поток. */
+  /**
+   * Остановить прогон: сервер убивает процесс, клиент перестаёт читать поток.
+   *
+   * Снимаем и отложенный авто-рестарт — иначе через пару секунд таймер поднимет
+   * агента снова, уже после нажатия «Остановить». Не подтвердил сервер остановку
+   * — говорим об этом: процесс мог остаться жив, и молча писать «остановлено»
+   * значит врать.
+   */
   stop(id: string): void {
     const key = findKey(id) ?? id;
-    void apiClient.post(`/chat/${key}/stop`).catch(() => undefined);
-    controllers.get(key)?.abort();
+    stoppedByUser.add(key);
+    stoppedByUser.add(id);
+    cancelAutoRetry(key);
+    cancelAutoRetry(id);
+    // Прогон мог быть заведён другой вкладкой под своим ключом (serverRunId) —
+    // останавливать надо именно его, иначе сервер ответит «прогона нет», а
+    // агент продолжит работать.
+    const target = runs.get(key)?.serverRunId ?? key;
+    void apiClient.post(`/chat/${target}/stop`).catch((error: unknown) => {
+      const run = runs.get(key);
+      if (!run) return;
+      runs.set(key, {
+        ...run,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      emit();
+    });
+    const controller = controllers.get(key);
+    controller?.abort();
+    // Контроллера нет — прогон уже дочитан и ждал отложенного авто-рестарта.
+    // Оборвать нечего, и без этого он навис бы «идущим» навсегда: поток
+    // завершён, таймер только что снят, а финализировать его больше некому.
+    if (!controller) finalize(key);
   },
 
   /**
@@ -574,7 +792,7 @@ export const agentRuns = {
     if (!run.lastPrompt) return;
     const key = run.id || id;
     if (!options?.auto) autoRetries.delete(key);
-    agentRuns.start({
+    void agentRuns.start({
       chatId: key,
       prompt: run.lastPrompt,
       sessionId: run.sessionId,
@@ -593,7 +811,7 @@ export const agentRuns = {
   continue(id: string, prompt: string): void {
     const run = getRun(id);
     autoRetries.delete(run.id || id);
-    agentRuns.start({
+    void agentRuns.start({
       chatId: run.id || id,
       prompt,
       sessionId: run.sessionId,
@@ -604,11 +822,19 @@ export const agentRuns = {
     });
   },
 
-  /** Остановить все идущие прогоны разом — кнопка «Остановить всех» в пульте. */
+  /**
+   * Остановить все идущие прогоны разом — кнопка «Остановить всех» в пульте.
+   *
+   * Идём ровно тем же путём, что и одиночный `stop`. Перебирать одни
+   * `controllers` мало: прогон, ждущий отложенного авто-рестарта, контроллера
+   * уже не имеет (его убрали в `finally`), и такой прогон «Остановить всех»
+   * не задевало вовсе — через пару секунд таймер поднимал агента снова, уже
+   * после явной остановки. Поэтому берём и владельцев таймеров, и помечаем всех
+   * как остановленных человеком.
+   */
   stopAll(): void {
-    for (const key of [...controllers.keys()]) {
-      void apiClient.post(`/chat/${key}/stop`).catch(() => undefined);
-      controllers.get(key)?.abort();
+    for (const key of new Set([...controllers.keys(), ...autoRetryTimers.keys()])) {
+      agentRuns.stop(key);
     }
   },
 
@@ -676,9 +902,15 @@ export const agentRuns = {
       rebuildStatuses();
       emit();
     }
+    // …но если решение до брокера не дошло, об этом надо сказать: карточки уже
+    // нет, а агент всё ещё стоит и ждёт — молчание здесь выглядит как «ответил».
     void apiClient
       .post(`/chat/${key}/permission-decision`, { toolUseId, behavior, message })
-      .catch(() => undefined);
+      .then(({ data }) => permissionDeliveryProblem(data as { ok?: unknown }))
+      .catch((error: unknown) => permissionDeliveryProblem(undefined, error ?? 'network'))
+      .then((problem) => {
+        if (problem) toast.error(i18n.t(problem));
+      });
   },
 };
 

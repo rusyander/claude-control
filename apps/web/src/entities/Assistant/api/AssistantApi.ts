@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import type { AssistantRunRequest, AssistantRunResult } from '@claude-control/contracts';
-import { apiClient } from '@shared/api/client';
+import { apiClient, LONG_TIMEOUTS } from '@shared/api/client';
 
 /**
  * Мультимодельный ассистент (Ф6b): реальный запуск активного провайдера через
@@ -8,8 +8,12 @@ import { apiClient } from '@shared/api/client';
  * (CLI one-shot / прямой API). Claude сохраняет свой богатый стриминговый чат и
  * этот путь НЕ использует. Ключи наружу не приходят — сервер их не эхоит.
  */
-async function runAssistant(body: AssistantRunRequest): Promise<AssistantRunResult> {
-  const { data } = await apiClient.post<AssistantRunResult>('/assistant/run', body);
+export async function runAssistant(body: AssistantRunRequest): Promise<AssistantRunResult> {
+  // Свой таймаут: общие 60 c короче серверного бюджета прогона (180 c), и на
+  // холодном старте CLI клиент рвал уже идущий запрос ложной ошибкой таймаута.
+  const { data } = await apiClient.post<AssistantRunResult>('/assistant/run', body, {
+    timeout: LONG_TIMEOUTS.assistantRun,
+  });
   return data;
 }
 

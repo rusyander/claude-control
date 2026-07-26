@@ -162,11 +162,15 @@ function describeEntry(target: ProviderInstructionsTarget, raw: string): Provide
   // На проектном уровне запись вне каталога проекта показываем, но НЕ открываем:
   // конфиг чужой, а писать за пределы проекта раздел не имеет права.
   const outside = target.projectRoot !== undefined && !isInsideProject(target.projectRoot, path);
-  const reason = outside ? 'missing' : editabilityReason(path);
+  // Причина именно `unsafe_path` (тот же отказ, что бросает requireEditableEntry),
+  // а не `missing`: раньше существующий файл за пределами проекта показывался как
+  // несуществующий, панель предлагала его создать, создание ничего не меняло, и
+  // настоящая причина нигде не называлась.
+  const reason = outside ? 'unsafe_path' : editabilityReason(path);
   return {
     raw,
     path,
-    exists: !outside && existsSync(path),
+    exists: existsSync(path),
     editable: !outside && reason === undefined,
     ...(reason ? { reason } : {}),
   };

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'nod
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../lib/app-store.ts';
-import { readMcpServers, saveMcpServer } from './mcp.ts';
+import { readMcpServers, saveMcpServer, McpServerExistsError } from './mcp.ts';
 
 /**
  * Чтение и запись регистрации MCP-серверов.
@@ -119,6 +119,142 @@ describe('mcp', () => {
       const servers = readMcpServers(configPath, store);
       expect(servers.find((s) => s.id === 'on')?.isEnabled).toBe(true);
       expect(servers.find((s) => s.id === 'off')?.isEnabled).toBe(false);
+    });
+  });
+
+  describe('правка выключенного сервера', () => {
+    const disabledDraft = (name: string, args: string[]) => ({
+      name,
+      transport: 'stdio' as const,
+      command: 'npx',
+      args,
+      env: {},
+      headers: {},
+      groupIds: [],
+    });
+
+    const writeDisabled = (servers: Record<string, unknown>) =>
+      writeFileSync(configPath, JSON.stringify({ mcpServers: {}, mcpServersDisabled: servers }));
+
+    it('сохранение не включает сервер обратно', () => {
+      // Карандаш есть и на выключенной карточке: правка аргумента не должна
+      // возвращать сервер в mcpServers — Claude Code снова начал бы его грузить.
+      writeDisabled({ foo: { type: 'stdio', command: 'npx', args: ['old'] } });
+
+      saveMcpServer(configPath, 'foo', disabledDraft('foo', ['new']));
+
+      const raw = JSON.parse(readFileSync(configPath, 'utf8')) as {
+        mcpServers: Record<string, unknown>;
+        mcpServersDisabled: Record<string, { args?: string[] }>;
+      };
+      expect(raw.mcpServers).not.toHaveProperty('foo');
+      expect(raw.mcpServersDisabled.foo?.args).toEqual(['new']);
+      expect(readServer('foo')?.isEnabled).toBe(false);
+    });
+
+    it('переименование не оставляет призрака под старым именем', () => {
+      writeDisabled({ foo: { type: 'stdio', command: 'npx', args: ['old'] } });
+
+      saveMcpServer(configPath, 'foo', disabledDraft('bar', ['old']));
+
+      const raw = JSON.parse(readFileSync(configPath, 'utf8')) as {
+        mcpServers: Record<string, unknown>;
+        mcpServersDisabled: Record<string, unknown>;
+      };
+      expect(raw.mcpServers).not.toHaveProperty('bar');
+      expect(raw.mcpServersDisabled).not.toHaveProperty('foo');
+      expect(raw.mcpServersDisabled).toHaveProperty('bar');
+
+      const servers = readMcpServers(configPath, store);
+      expect(servers).toHaveLength(1);
+      expect(servers[0]?.id).toBe('bar');
+      expect(servers[0]?.isEnabled).toBe(false);
+    });
+
+    it('включённый сервер при переименовании остаётся включённым', () => {
+      writeConfig({ on: { type: 'stdio', command: 'npx' } });
+
+      saveMcpServer(configPath, 'on', disabledDraft('on-new', []));
+
+      const servers = readMcpServers(configPath, store);
+      expect(servers).toHaveLength(1);
+      expect(servers[0]?.id).toBe('on-new');
+      expect(servers[0]?.isEnabled).toBe(true);
+    });
+  });
+
+  describe('занятое имя', () => {
+    const draft = (name: string, args: string[] = []) => ({
+      name,
+      transport: 'stdio' as const,
+      command: 'npx',
+      args,
+      env: {},
+      headers: {},
+      groupIds: [],
+    });
+
+    const raw = () =>
+      JSON.parse(readFileSync(configPath, 'utf8')) as {
+        mcpServers?: Record<string, { args?: string[] }>;
+        mcpServersDisabled?: Record<string, { args?: string[] }>;
+      };
+
+    it('создание поверх включённого тёзки — отказ, запись цела', () => {
+      writeConfig({ ctx7: { type: 'stdio', command: 'npx', args: ['родной'] } });
+
+      expect(() => saveMcpServer(configPath, null, draft('ctx7', ['новый']))).toThrow(
+        McpServerExistsError,
+      );
+      expect(raw().mcpServers?.ctx7?.args).toEqual(['родной']);
+    });
+
+    it('создание поверх ВЫКЛЮЧЕННОГО тёзки — отказ, имя не оказывается в обеих секциях', () => {
+      // Выключенный сервер занимает имя так же, как включённый. Без проверки
+      // запись ложилась в mcpServers рядом с ней: список показывал одну карточку,
+      // и первое же выключение затирало выключенный оригинал.
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          mcpServers: {},
+          mcpServersDisabled: { ctx7: { type: 'stdio', command: 'npx', args: ['родной'] } },
+        }),
+      );
+
+      expect(() => saveMcpServer(configPath, null, draft('ctx7', ['новый']))).toThrow(/ctx7/);
+      expect(raw().mcpServers ?? {}).not.toHaveProperty('ctx7');
+      expect(raw().mcpServersDisabled?.ctx7?.args).toEqual(['родной']);
+    });
+
+    it('переименование в занятое имя — отказ, обе записи целы', () => {
+      writeConfig({
+        alpha: { type: 'stdio', command: 'npx', args: ['a'] },
+        beta: { type: 'stdio', command: 'npx', args: ['b'] },
+      });
+
+      expect(() => saveMcpServer(configPath, 'alpha', draft('beta', ['a']))).toThrow(
+        McpServerExistsError,
+      );
+      expect(raw().mcpServers?.alpha?.args).toEqual(['a']);
+      expect(raw().mcpServers?.beta?.args).toEqual(['b']);
+    });
+
+    it('правка без смены имени проходит', () => {
+      writeConfig({ ctx7: { type: 'stdio', command: 'npx', args: ['старый'] } });
+
+      saveMcpServer(configPath, 'ctx7', draft('ctx7', ['новый']));
+
+      expect(raw().mcpServers?.ctx7?.args).toEqual(['новый']);
+    });
+
+    it('явный allowOverwrite (перенос конфигурации) пишет поверх', () => {
+      writeConfig({ ctx7: { type: 'stdio', command: 'npx', args: ['старый'] } });
+
+      saveMcpServer(configPath, null, draft('ctx7', ['новый']), undefined, {
+        allowOverwrite: true,
+      });
+
+      expect(raw().mcpServers?.ctx7?.args).toEqual(['новый']);
     });
   });
 

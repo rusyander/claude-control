@@ -251,8 +251,17 @@ function ChatRow({ chat, isActive, language, onSelect, snippet, matchCount, quer
           <span className={styles.dot}>·</span>
           {/* Иконка снимает догадку: число рядом с ней читается как «сообщений». */}
           <Icon name="chat" size={14} />
-          <Typography variant="caption" color="subtle" as="span">
+          {/* «+» у длинного разговора: список читает большой транскрипт началом
+              и хвостом, поэтому точного итога у него нет — и выдавать неполное
+              число за итог нечестно. Пояснение — в подсказке. */}
+          <Typography
+            variant="caption"
+            color="subtle"
+            as="span"
+            title={chat.messageCountPartial ? t('chat.messageCountPartial') : undefined}
+          >
             {chat.messageCount}
+            {chat.messageCountPartial ? '+' : ''}
           </Typography>
           {matchCount !== undefined && (
             <>

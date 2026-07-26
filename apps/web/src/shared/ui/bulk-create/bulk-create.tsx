@@ -6,6 +6,7 @@ import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
 import type { BulkCreateProps, ParsedLine } from './bulk-create.types';
+import { runBulkCreate } from './bulk-create.model';
 import styles from './bulk-create.module.scss';
 
 /**
@@ -30,6 +31,8 @@ export function BulkCreate<TDraft>({
   const [text, setText] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | undefined>(undefined);
+  /** Строки, которые сервер отверг в прошлый заход, — их видно и можно повторить. */
+  const [failed, setFailed] = useState<string[]>([]);
 
   // Разбираем на каждый ввод: пользователь сразу видит, что распозналось,
   // и правит ошибки до создания, а не после.
@@ -48,18 +51,25 @@ export function BulkCreate<TDraft>({
 
   const create = async (): Promise<void> => {
     setIsCreating(true);
+    setFailed([]);
     setProgress({ done: 0, total: valid.length });
 
-    // Создаём по одному по порядку: сервер правит конфиг-файл, и параллельные
-    // записи в него наступали бы друг другу на пятки.
-    for (let index = 0; index < valid.length; index += 1) {
-      const draft = valid[index]?.draft;
-      if (draft) await createOne(draft);
-      setProgress({ done: index + 1, total: valid.length });
-    }
+    const result = await runBulkCreate(valid, createOne, (done, total) =>
+      setProgress({ done, total }),
+    );
 
     setIsCreating(false);
     setProgress(undefined);
+
+    // Что-то не прошло — форму не закрываем: оставляем в поле только упавшие
+    // строки, чтобы поправить и повторить. Закрытие спрятало бы и ошибку,
+    // и то, какие именно записи не создались.
+    if (result.failed.length > 0) {
+      setFailed(result.failed);
+      setText(result.failed.join('\n'));
+      return;
+    }
+
     onDone();
   };
 
@@ -83,6 +93,17 @@ export function BulkCreate<TDraft>({
           {t('bulk.hint')}
         </Typography>
       </Stack>
+
+      {failed.length > 0 && (
+        <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+          <Badge tone="danger">
+            {failed.length} {t('bulk.failed')}
+          </Badge>
+          <Typography variant="caption" color="subtle" as="span">
+            {t('bulk.failedHint')}
+          </Typography>
+        </Stack>
+      )}
 
       {parsed.length > 0 && (
         <Stack gap="var(--spacing-2xs)">
@@ -120,7 +141,7 @@ export function BulkCreate<TDraft>({
         <Button
           variant="primary"
           leftIcon={<Icon name="plus" size={18} />}
-          onClick={create}
+          onClick={() => void create()}
           disabled={valid.length === 0 || isCreating}
           isLoading={isCreating}
         >

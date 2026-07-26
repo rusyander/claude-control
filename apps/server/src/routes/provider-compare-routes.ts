@@ -57,6 +57,10 @@ export function registerProviderCompareRoutes(app: FastifyInstance, ctx: ServerC
           groupIds: [],
         },
         backupDir,
+        // Перенос конфигурации — осознанная замена: пользователь уже видел
+        // предпросмотр и подтвердил его. Отказ по занятому имени здесь означал бы,
+        // что повторный перенос падает на каждом уже перенесённом сервере.
+        { allowOverwrite: true },
       );
     },
   });

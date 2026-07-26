@@ -41,7 +41,15 @@ export class PermissionBroker {
     return new Promise((resolve) => {
       const key = this.key(request.runId, request.toolUseId);
       // Дубль по тому же tool_use — прежний снимаем (не должно случаться).
-      this.pending.get(key)?.resolve({ behavior: 'deny', message: 'Заменён новым запросом.' });
+      // Вместе с обещанием обязательно гасим и его таймер: он удаляет запись по
+      // КЛЮЧУ, а под ключом к тому времени лежит уже новый запрос — через
+      // полчаса стёрло бы живой, клик после этого не находил бы ничего
+      // (decide → false), и агент ждал бы до собственного таймаута.
+      const replaced = this.pending.get(key);
+      if (replaced) {
+        clearTimeout(replaced.timer);
+        replaced.resolve({ behavior: 'deny', message: 'Заменён новым запросом.' });
+      }
 
       const timer = setTimeout(() => {
         this.pending.delete(key);

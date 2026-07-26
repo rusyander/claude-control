@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { safeSessionId } from '../lib/cli-args.ts';
+import { killChildTree } from '../lib/process-tree.ts';
 import { defaultCliCommand } from '../providers/cli.ts';
 
 /**
@@ -95,7 +96,8 @@ function runClaude(prompt: string, command: string, sessionId?: string): Promise
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => {
-      child.kill();
+      // Дерево, а не сам процесс: под `cmd.exe` обычный kill оставил бы CLI жить.
+      killChildTree(child);
       reject(new Error('Помощник не ответил за отведённое время'));
     }, 180_000);
 
@@ -117,6 +119,12 @@ function runClaude(prompt: string, command: string, sessionId?: string): Promise
       else reject(new Error(stderr.slice(0, 500) || `CLI завершился с кодом ${code}`));
     });
 
+    // Обработчик ОБЯЗАТЕЛЕН: CLI закрывается сразу (сломан, не залогинен, протух
+    // --resume), а промпт со схемой и всей формой обычно длиннее буфера канала,
+    // и недописанный поток отдаёт EPIPE (на Windows EOF) отдельным `error`.
+    // Необработанное событие потока роняет весь сервер — здесь же это лишь
+    // «ввод не долетел»: исход прогона решают код выхода и stderr ниже.
+    child.stdin.on('error', () => undefined);
     child.stdin.write(prompt);
     child.stdin.end();
   });

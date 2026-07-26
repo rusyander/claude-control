@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeSessionId, safeName, safeModel, safeEffort, shellArgs } from '../../lib/cli-args.ts';
+import { killChildTree } from '../../lib/process-tree.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
@@ -94,6 +95,18 @@ export class ChatRun {
 
   /** Запускает CLI и вызывает onEvent по мере поступления событий. */
   async start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
+    try {
+      await this.run(options, onEvent);
+    } finally {
+      // Временная папка с mcp.json должна исчезать при ЛЮБОМ исходе. Раньше
+      // уборка стояла только в конце удачного пути, и каждый сорвавшийся
+      // запуск (отказ записи в stdin, обрыв потока) оставлял в %TEMP% папку
+      // cc-perm-* с id прогона и адресом панели внутри — их копило до чистки ОС.
+      this.cleanup();
+    }
+  }
+
+  private async run(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
     mkdirSync(options.cwd, { recursive: true });
 
     const args = [
@@ -151,7 +164,8 @@ export class ChatRun {
 
     // Имя чата — обычный текст с пробелами, а оболочка Windows разобрала бы
     // его как несколько аргументов, поэтому аргументы квотируются.
-    this.child = spawn(options.command ?? defaultCliCommand(), shellArgs(args), {
+    const command = options.command ?? defaultCliCommand();
+    const child = spawn(command, shellArgs(args), {
       cwd: options.cwd,
       shell: isWindows,
       windowsHide: true,
@@ -161,15 +175,35 @@ export class ChatRun {
         ...options.env,
       },
     });
+    this.child = child;
+
+    // Сбой запуска (пользователь выбрал провайдера, чей CLI не установлен →
+    // ENOENT) приходит СОБЫТИЕМ на процессе, а не исключением из spawn: без
+    // слушателя необработанное `error` уносит весь сервер, а не один чат.
+    // Вешаем сразу, до первого await, иначе событие успевает уйти в пустоту, и
+    // прогон повисает в «идёт» навсегда.
+    let spawnError: Error | undefined;
+    const closed = new Promise<number>((resolve) => {
+      child.on('error', (error: Error) => {
+        spawnError = error;
+        resolve(-1);
+      });
+      child.on('close', (exitCode) => resolve(exitCode ?? 0));
+    });
+
+    // Тот же капкан у stdin: CLI мог закрыться раньше, чем допишется промпт, —
+    // поток отдаёт EPIPE (на Windows EOF) отдельным `error`, и снова падает
+    // сервер. Для чата это всего лишь «не успели дописать ввод».
+    child.stdin.on('error', () => undefined);
 
     // Длинный промпт нельзя передавать аргументом: оболочка Windows его рвёт.
-    this.child.stdin.write(options.prompt);
-    this.child.stdin.end();
+    child.stdin.write(options.prompt);
+    child.stdin.end();
 
     const stderr: string[] = [];
-    this.child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk.toString()));
+    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk.toString()));
 
-    const lines = createInterface({ input: this.child.stdout });
+    const lines = createInterface({ input: child.stdout });
     for await (const line of lines) {
       if (!line.trim()) continue;
 
@@ -195,24 +229,35 @@ export class ChatRun {
       }
     }
 
-    const code = await new Promise<number>((resolve) => {
-      this.child?.on('close', (exitCode) => resolve(exitCode ?? 0));
-    });
+    const code = await closed;
 
-    if (code !== 0 && !this.isStopped) {
-      onEvent({
-        kind: 'error',
-        message: stderr.join('').trim() || `claude завершился с кодом ${code}`,
-      });
+    if (!this.isStopped) {
+      if (spawnError) {
+        // Молчать нельзя: несуществующий CLI закрывает потоки мгновенно, и без
+        // этой ветки прогон выглядел бы как удачный, но пустой ответ.
+        onEvent({
+          kind: 'error',
+          message: `Не удалось запустить «${command}»: ${spawnError.message}`,
+        });
+      } else if (code !== 0) {
+        onEvent({
+          kind: 'error',
+          message: stderr.join('').trim() || `claude завершился с кодом ${code}`,
+        });
+      }
     }
-
-    this.cleanup();
   }
 
-  /** Прерывание по кнопке «Остановить». */
+  /**
+   * Прерывание по кнопке «Остановить».
+   *
+   * Валим ДЕРЕВО: на Windows `claude` живёт под `cmd.exe`, и обычный `kill`
+   * снял бы только оболочку — прогон бы продолжался, тратя токены, при
+   * «остановленном» статусе в панели.
+   */
   stop(): void {
     this.isStopped = true;
-    this.child?.kill();
+    if (this.child) killChildTree(this.child);
     this.cleanup();
   }
 

@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type { Automation, Group, GroupDraft } from '@claude-control/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
+import { toast } from '@shared/lib/toast';
 
 // Группы и сценарии живут в данных приложения, а не в конфигах Claude Code,
 // поэтому у них свой набор запросов, а не общая CRUD-фабрика сущностей.
@@ -64,16 +66,24 @@ function invalidateGroupMembers(queryClient: ReturnType<typeof useQueryClient>):
 
 export function useSetGroupEnabled() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async (input: { id: string; isEnabled: boolean }) => {
-      const { data } = await apiClient.post<{ ok: true; affected: number }>(
-        `/groups/${input.id}/enabled`,
-        { isEnabled: input.isEnabled },
-      );
+      const { data } = await apiClient.post<{
+        ok: true;
+        affected: number;
+        skippedLocalHooks?: number;
+      }>(`/groups/${input.id}/enabled`, { isEnabled: input.isEnabled });
       return data;
     },
-    onSuccess: () => invalidateGroupMembers(queryClient),
+    onSuccess: (data) => {
+      invalidateGroupMembers(queryClient);
+      // Хук из settings.local.json группе не подчиняется: панель в этот файл не
+      // пишет. Молчать об этом нельзя — человек считал бы, что выключил его.
+      if (data.skippedLocalHooks)
+        toast.warning(t('groups.localHooksSkipped', { count: data.skippedLocalHooks }));
+    },
     meta: { successMessage: 'toasts.updated' },
   });
 }

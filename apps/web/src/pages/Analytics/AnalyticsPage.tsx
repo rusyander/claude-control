@@ -12,8 +12,10 @@ import { TimeSeries } from '@shared/ui/time-series';
 import { Heatmap } from '@shared/ui/heatmap';
 import { DonutChart } from '@shared/ui/donut-chart';
 import { formatCompact, formatMoney, formatNumber, formatPercent } from '@shared/lib/format-number';
-import { useAnalytics } from '@entities/Analytics';
+import { useAnalytics, DEFAULT_PERIOD, periodKey } from '@entities/Analytics';
+import type { AnalyticsPeriod } from '@entities/Analytics';
 import { useSettings } from '@entities/AppConfig';
+import { PeriodFilter } from './PeriodFilter';
 import { StatCard } from './StatCard';
 import { LiveAgentsCard } from './LiveAgentsCard';
 import { DetailModal } from './DetailModal';
@@ -21,15 +23,12 @@ import type { DetailKind } from './DetailModal.types';
 import { buildReportCsv, buildJson } from './model/report';
 import styles from './AnalyticsPage.module.scss';
 
-/** Ноль — «за всё время»: сервер понимает его как отсутствие ограничения. */
-const PERIODS = [7, 30, 90, 0];
-
 /** Аналитика по локальным транскриптам: расход, проекты, сессии, живые процессы. */
 export function AnalyticsPage() {
   const { t, i18n } = useTranslation();
-  const [days, setDays] = useState(30);
+  const [period, setPeriod] = useState<AnalyticsPeriod>(DEFAULT_PERIOD);
   const [detail, setDetail] = useState<{ kind: DetailKind; id: string } | null>(null);
-  const { data, isLoading } = useAnalytics(days);
+  const { data, isLoading } = useAnalytics(period);
   const { data: settings } = useSettings();
 
   const locale = i18n.language;
@@ -47,7 +46,7 @@ export function AnalyticsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const suffix = days === 0 ? 'all' : `${days}d`;
+  const suffix = periodKey(period);
 
   const exportJson = (): void => {
     if (data) download(`analytics-${suffix}.json`, buildJson(data), 'application/json');
@@ -68,16 +67,7 @@ export function AnalyticsPage() {
         helpTopic="analytics"
         actions={
           <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
-            {PERIODS.map((period) => (
-              <Button
-                key={period}
-                size="sm"
-                variant={days === period ? 'primary' : 'secondary'}
-                onClick={() => setDays(period)}
-              >
-                {period === 0 ? t('analytics.allTime') : t(`analytics.days${period}`)}
-              </Button>
-            ))}
+            <PeriodFilter value={period} onChange={setPeriod} />
             {hasData && (
               <>
                 <Button
@@ -147,30 +137,37 @@ export function AnalyticsPage() {
             />
           </div>
 
-          <Card padding="md">
-            <Stack gap="var(--spacing-sm)">
-              <Stack gap="var(--spacing-3xs)">
-                <Typography variant="body" weight="medium">
-                  {t('analytics.byDay')}
-                </Typography>
-                <Typography variant="caption" color="subtle">
-                  {t('analytics.byDayHint')}
-                </Typography>
-              </Stack>
+          {/*
+            График по дням нужен от двух точек: у периода «Сегодня» их одна, и
+            карточка занимала бы экран пустым полем. Разрез внутри суток на
+            странице есть — тепловая карта по часам ниже.
+          */}
+          {data.byDay.length > 1 && (
+            <Card padding="md">
+              <Stack gap="var(--spacing-sm)">
+                <Stack gap="var(--spacing-3xs)">
+                  <Typography variant="body" weight="medium">
+                    {t('analytics.byDay')}
+                  </Typography>
+                  <Typography variant="caption" color="subtle">
+                    {t('analytics.byDayHint')}
+                  </Typography>
+                </Stack>
 
-              <TimeSeries
-                seriesName={t('analytics.byDay')}
-                points={data.byDay.map((day) => ({
-                  label: day.date.slice(5),
-                  value: costUnit === 'money' ? day.estimatedCost : day.totals.total,
-                  valueLabel:
-                    costUnit === 'money'
-                      ? formatMoney(day.estimatedCost, locale)
-                      : `${formatCompact(day.totals.total, locale)} · ${formatNumber(day.totals.requests, locale)}`,
-                }))}
-              />
-            </Stack>
-          </Card>
+                <TimeSeries
+                  seriesName={t('analytics.byDay')}
+                  points={data.byDay.map((day) => ({
+                    label: day.date.slice(5),
+                    value: costUnit === 'money' ? day.estimatedCost : day.totals.total,
+                    valueLabel:
+                      costUnit === 'money'
+                        ? formatMoney(day.estimatedCost, locale)
+                        : `${formatCompact(day.totals.total, locale)} · ${formatNumber(day.totals.requests, locale)}`,
+                  }))}
+                />
+              </Stack>
+            </Card>
+          )}
 
           <div className={styles.twoColumns}>
             <Card padding="md">

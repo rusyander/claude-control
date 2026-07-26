@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { McpServer } from '@claude-control/contracts';
 import {
   hasOAuthTokens,
   clearOAuth,
+  renameOAuth,
   startOAuth,
   oauthStorePath,
   oauthCallbackUrl,
@@ -79,6 +80,65 @@ describe('mcp-oauth', () => {
       const path = oauthStorePath(appData);
       expect(existsSync(path)).toBe(true);
       expect(statSync(path).mode & 0o777).toBe(0o600);
+    });
+  });
+
+  describe('переименование сервера', () => {
+    const saveTokenFor = (id: string): Promise<void> => {
+      const provider = oauthProviderFor(networkServer({ id, name: id }), appData) as unknown as {
+        saveTokens(t: { access_token: string; token_type: string }): Promise<void>;
+      };
+      return provider.saveTokens({ access_token: `secret-${id}`, token_type: 'Bearer' });
+    };
+
+    it('вход переезжает на новое имя, старый ключ не остаётся', async () => {
+      // Иначе refresh-токен висел бы в файле под мёртвым именем, а пользователю
+      // пришлось бы авторизоваться заново.
+      await saveTokenFor('linear');
+
+      await renameOAuth(appData, 'linear', 'linear-mcp');
+
+      expect(hasOAuthTokens(appData, 'linear-mcp')).toBe(true);
+      expect(hasOAuthTokens(appData, 'linear')).toBe(false);
+    });
+
+    it('права 600 у файла сохраняются', async function () {
+      if (process.platform === 'win32') return; // POSIX-права на Windows не действуют
+
+      await saveTokenFor('linear');
+      await renameOAuth(appData, 'linear', 'linear-mcp');
+
+      expect(statSync(oauthStorePath(appData)).mode & 0o777).toBe(0o600);
+    });
+
+    it('переименование сервера без входа ничего не создаёт', async () => {
+      await expect(renameOAuth(appData, 'нет-такого', 'новый')).resolves.toBeUndefined();
+      expect(existsSync(oauthStorePath(appData))).toBe(false);
+    });
+
+    it('переименование НЕ наследует токен, лежащий под новым именем', async () => {
+      // Утечка: под именем «beta» остался вход прежнего сервера, у «alpha» входа
+      // не было — и перенос молча выходил, оставляя чужой токен. Панель показывала
+      // «авторизован», а проверка связи и список инструментов слали чужой
+      // access_token на адрес alpha. Переименование не может выдать доступ.
+      await saveTokenFor('beta');
+
+      await renameOAuth(appData, 'alpha', 'beta');
+
+      expect(hasOAuthTokens(appData, 'beta')).toBe(false);
+      expect(readFileSync(oauthStorePath(appData), 'utf8')).not.toContain('secret-beta');
+    });
+
+    it('переименование поверх чужого входа кладёт свой, а не оба', async () => {
+      await saveTokenFor('alpha');
+      await saveTokenFor('beta');
+
+      await renameOAuth(appData, 'alpha', 'beta');
+
+      const raw = readFileSync(oauthStorePath(appData), 'utf8');
+      expect(raw).toContain('secret-alpha');
+      expect(raw).not.toContain('secret-beta');
+      expect(hasOAuthTokens(appData, 'alpha')).toBe(false);
     });
   });
 

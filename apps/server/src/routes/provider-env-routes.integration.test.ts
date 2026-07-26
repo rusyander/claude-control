@@ -178,6 +178,66 @@ command = "node"
     expect(parsed.mcp_servers.x).toEqual({ command: 'node' });
   });
 
+  it('имя занято немоделируемой записью → 409 с именем переменной, а не «формат не распознан»', async () => {
+    // `PORT = 8080` панель хранит, но не показывает (её форма знает только
+    // строки). Пользователь заводит свою PORT — и раньше получал 422 «формат
+    // файла конфигурации не распознан — запись запрещена»: неправда про его
+    // config.toml, и ни слова о том, какая переменная мешает.
+    const original = `[shell_environment_policy]
+set = { CI = "1", PORT = 8080 }
+`;
+    writeFileSync(cfgPath, original, 'utf8');
+    await boot();
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/provider-env',
+      payload: {
+        vars: [
+          { key: 'CI', value: '1' },
+          { key: 'PORT', value: '3000' },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(409);
+    const body = res.json<{ error: string; message: string }>();
+    expect(body.error).toBe('env_key_preserved');
+    expect(body.message).toContain('PORT');
+    expect(body.message).not.toContain('не распознан');
+    // Файл не тронут: отказ до записи, чужое значение цело.
+    expect(readFileSync(cfgPath, 'utf8')).toBe(original);
+  });
+
+  it('раздел остаётся на запись: правка соседней переменной проходит', async () => {
+    // Отказ выше — про одно имя, а не про файл: GET не объявляет раздел
+    // readOnly, и следующее сохранение без конфликтного имени пишется.
+    writeFileSync(
+      cfgPath,
+      `[shell_environment_policy]
+set = { CI = "1", PORT = 8080 }
+`,
+      'utf8',
+    );
+    await boot();
+
+    const get = await app.inject({ method: 'GET', url: '/api/provider-env' });
+    expect(get.json<{ readOnly: boolean }>().readOnly).toBe(false);
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/provider-env',
+      payload: { vars: [{ key: 'CI', value: '2' }] },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const parsed = parseToml(readFileSync(cfgPath, 'utf8')) as {
+      shell_environment_policy: { set: Record<string, unknown> };
+    };
+    // PORT сохранён по значению — панель его не моделирует, но и не теряет.
+    expect(parsed.shell_environment_policy.set).toEqual({ CI: '2', PORT: 8080 });
+  });
+
   it('битый config.toml → PUT 422 format_unrecognized, файл не тронут', async () => {
     const broken = 'model = "gpt\n[shell_environment_policy\nset =';
     writeFileSync(cfgPath, broken, 'utf8');

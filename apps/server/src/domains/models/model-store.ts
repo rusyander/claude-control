@@ -38,8 +38,12 @@ export interface ModelSnapshot {
 export class ModelCatalogStore {
   private readonly cacheFile: string;
   private cache: ModelCacheFile | undefined;
-  /** Идущая загрузка — чтобы параллельные запросы не дёргали сеть по разу каждый. */
-  private inFlight: Promise<ModelSnapshot> | undefined;
+  /**
+   * Идущая загрузка — чтобы параллельные запросы не дёргали сеть по разу каждый.
+   * Вместе с ней помним, ЗА КАКИМИ вендорами она пошла: присоединяться к чужой
+   * загрузке можно только если в неё вошли все нужные.
+   */
+  private inFlight: { vendors: string[]; done: Promise<ModelSnapshot> } | undefined;
 
   constructor(appDataDir: string) {
     // Node в режиме strip-only не поддерживает parameter properties.
@@ -47,8 +51,27 @@ export class ModelCatalogStore {
     this.cache = this.readCache();
   }
 
+  /**
+   * Прочитать кэш каталога, пережив испорченный файл.
+   *
+   * `JSON.parse` бросает на оборванном файле (выключили питание посреди записи,
+   * кончилось место), а этот конструктор вызывается на старте сервера — исключение
+   * отсюда означало бы «панель не поднялась вовсе». Битый кэш равносилен его
+   * отсутствию: выбор модели остаётся ручным, пока не пройдёт обновление, которое
+   * файл и перезапишет.
+   */
   private readCache(): ModelCacheFile | undefined {
-    const cached = readJsonFile<ModelCacheFile | undefined>(this.cacheFile, undefined);
+    let cached: ModelCacheFile | undefined;
+    try {
+      cached = readJsonFile<ModelCacheFile | undefined>(this.cacheFile, undefined);
+    } catch (error) {
+      // Молчать нельзя: пустой список моделей выглядит как «источник ничего не отдал».
+      process.stderr.write(
+        `${CACHE_FILE} не читается (${(error as Error).message}); каталог моделей будет скачан заново\n`,
+      );
+      return undefined;
+    }
+
     if (!cached?.models?.length || !cached.fetchedAt) return undefined;
     return {
       ...cached,
@@ -73,7 +96,11 @@ export class ModelCatalogStore {
 
   isStale(maxAgeMs = MODELS_MAX_AGE_MS): boolean {
     if (!this.cache) return true;
-    return Date.now() - Date.parse(this.cache.fetchedAt) > maxAgeMs;
+
+    const age = Date.now() - Date.parse(this.cache.fetchedAt);
+    // Нечитаемая дата даёт NaN, а сравнение с NaN всегда ложно — каталог
+    // считался бы свежим вечно и никогда больше не обновился бы сам.
+    return !Number.isFinite(age) || age > maxAgeMs;
   }
 
   /**
@@ -92,12 +119,30 @@ export class ModelCatalogStore {
     if (!options.force && !this.isStale(options.maxAgeMs) && this.hasAll(vendors))
       return this.current(vendors);
 
-    this.inFlight ??= this.load(this.wanted(vendors));
-    try {
-      await this.inFlight;
-    } finally {
-      this.inFlight = undefined;
+    // Чужая загрузка годится, только если запрашивала все нужные вендоры. Иначе
+    // ждать её нельзя: она перезапишет кэш своим ответом, и вернувшийся отсюда
+    // current(vendors) отфильтрует его в пустой список — «моделей нет» у
+    // провайдера, который просто попал в параллель с другим.
+    const covers = (started: string[]): boolean =>
+      vendors.every((vendor) => started.includes(vendor));
+
+    let running = this.inFlight;
+    while (running && !covers(running.vendors)) {
+      // `.finally` у владельца снимает inFlight раньше, чем сюда вернётся
+      // управление, поэтому цикл не вечный.
+      await running.done;
+      running = this.inFlight;
     }
+
+    if (!this.inFlight) {
+      const wanted = this.wanted(vendors);
+      const done = this.load(wanted).finally(() => {
+        this.inFlight = undefined;
+      });
+      this.inFlight = { vendors: wanted, done };
+    }
+
+    await this.inFlight.done;
     return this.current(vendors);
   }
 

@@ -265,6 +265,26 @@ function maskValue(value: string): string {
   return `${value.slice(0, 4)}${'•'.repeat(Math.min(12, value.length - 8))}${value.slice(-4)}`;
 }
 
+/**
+ * Комментарий → строки файла. Каждая строка получает свой `#`: комментарий с
+ * переводом строки, записанный одной строкой, развалил бы файл (вторая половина
+ * стала бы «мусорной» строкой без `=`, и parseEnvFile молча её потерял бы).
+ */
+function commentLines(comment: string | undefined): string[] {
+  if (!comment?.trim()) return [];
+  return comment.split(/\r?\n/).map((part) => `# ${part.trim()}`.trimEnd());
+}
+
+/**
+ * Начало непрерывного блока комментариев прямо над строкой `index` — ровно то,
+ * что parseEnvFile привязывает к переменной (до пустой строки или не-комментария).
+ */
+function commentBlockStart(lines: string[], index: number): number {
+  let start = index;
+  while (start > 0 && (lines[start - 1]?.trim().startsWith('#') ?? false)) start -= 1;
+  return start;
+}
+
 /** Обновляет строку в env-файле на месте, сохраняя порядок и комментарии. */
 function upsertEnvFileLine(
   path: string,
@@ -276,10 +296,31 @@ function upsertEnvFileLine(
   const lines = readTextFile(path).split(/\r?\n/);
   const index = lines.findIndex((line) => startsWithKey(line, key));
 
-  if (index >= 0) lines[index] = `${key}=${value}`;
-  else {
+  if (index >= 0) {
+    lines[index] = `${key}=${value}`;
+
+    // Комментарий — часть той же записи: parseEnvFile отдаёт его форме вместе с
+    // переменной, deleteSecretLine удаляет вместе с ней. Ветка правки его
+    // раньше игнорировала: пользователь исправлял текст «где перевыпустить
+    // токен», панель отвечала «сохранено», а в файле оставался старый.
+    //
+    // `undefined` = поля не присылали (массовое добавление строк `KEY=value`) —
+    // чужой комментарий тогда не трогаем. Строка, в том числе пустая, = форма
+    // прислала поле целиком, и оно итоговое: пусто → комментарий убираем.
+    if (comment !== undefined) {
+      const start = commentBlockStart(lines, index);
+      const current = lines
+        .slice(start, index)
+        .map((line) => line.trim().replace(/^#\s?/, ''))
+        .join(' ');
+
+      // Не изменился — блок не трогаем вовсе: иначе многострочный комментарий
+      // схлопывался бы в одну строку от одной лишь правки значения.
+      if (current !== comment) lines.splice(start, index - start, ...commentLines(comment));
+    }
+  } else {
     if (lines.at(-1)?.trim() !== '') lines.push('');
-    if (comment) lines.push(`# ${comment}`);
+    lines.push(...commentLines(comment));
     lines.push(`${key}=${value}`);
   }
 

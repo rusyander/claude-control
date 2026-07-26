@@ -45,6 +45,10 @@ describe('config-routes: валидация настроек и импорта',
       },
       store,
       backupDir: join(root, 'claude-control', 'backups'),
+      // Импорт применяет глобальные настройки ввода-вывода разом (глубина
+      // ротации, шифрование копий секретов, имя файла секретов) — у настоящего
+      // контекста это один метод, здесь достаточно заглушки.
+      applyIoSettings: () => {},
       relocate: (path: string) => {
         relocated.push(path);
         return { isValid: true };

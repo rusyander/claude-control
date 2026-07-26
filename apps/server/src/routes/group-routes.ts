@@ -115,7 +115,25 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
       // оживает лишь когда его отпустят все.
       const leaves = collectLeafMembers(ctx.store.getGroups(), group.members);
 
+      // Хук из settings.local.json группе не подчиняется: панель в этот файл не
+      // пишет, поэтому выключить его нечем — и `readHooks` честно показывает его
+      // включённым. Раньше отметка всё равно ставилась: группа рапортовала «N
+      // выключено», а личный хук продолжал срабатывать. Теперь такие участники
+      // пропускаются и считаются отдельно, чтобы интерфейс сказал правду.
+      const localHookIds = new Set(
+        readHooks(ctx.location.paths.settings, ctx.store, ctx.location.paths.settingsLocal)
+          .filter((hook) => hook.source === 'settings-local')
+          .map((hook) => hook.id),
+      );
+
+      let skippedLocalHooks = 0;
+
       for (const member of leaves) {
+        if (member.kind === 'hook' && localHookIds.has(member.id)) {
+          skippedLocalHooks += 1;
+          continue;
+        }
+
         ctx.store.setGroupDisabled(member.kind, member.id, group.id, !isEnabled);
 
         const effective = !ctx.store.isDisabled(member.kind, member.id);
@@ -133,7 +151,10 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
         ok: true,
         backupPath: hookBackup ?? envBackup,
         needsRestart: true,
-        affected: leaves.length,
+        // Считаем только тех, кого действительно переключили: пропущенные
+        // локальные хуки уходят отдельным числом, а не растворяются в общем.
+        affected: leaves.length - skippedLocalHooks,
+        skippedLocalHooks,
       };
     },
   );

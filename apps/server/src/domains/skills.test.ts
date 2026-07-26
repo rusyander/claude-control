@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { parse as parseYaml } from 'yaml';
 import { AppStore } from '../lib/app-store.ts';
-import { readSkills, saveSkill } from './skills.ts';
+import { readSkills, saveSkill, SkillExistsError } from './skills.ts';
 
 /**
  * Тесты скиллов. Скилл — это папка с файлом SKILL.md, у которого в начале
@@ -214,17 +215,202 @@ describe('skills', () => {
       expect(skill?.body.trim()).toBe(templateBody.trim());
     });
 
-    it('slugifyName: не-латиница отбрасывается, латиница/цифры сохраняются', () => {
-      // slugifyName НЕ транслитерирует кириллицу (в отличие от правил): любые
-      // не [a-z0-9] схлопываются в дефис. «Скилл v2» → отбрасываем кириллицу,
-      // остаётся «v2».
+    it('slugifyName: кириллица транслитерируется, а не отбрасывается', () => {
+      // Раньше отбрасывались все не-[a-z0-9], и «Скилл v2» превращался в «v2».
+      // Теперь слаг общий с правилами: кириллица переводится в латиницу.
       saveSkill(skillsDir, null, {
         name: 'Скилл v2',
         description: 'x',
         body: 'Тело.',
         groupIds: [],
       });
-      expect(existsSync(join(skillsDir, 'v2', 'SKILL.md'))).toBe(true);
+      expect(existsSync(join(skillsDir, 'skill-v2', 'SKILL.md'))).toBe(true);
+    });
+
+    /**
+     * BUG-20. Имя целиком из кириллицы давало ПУСТОЙ слаг, а `join(skillsDir,
+     * '')` — сам каталог скиллов: панель писала `skills/SKILL.md`, отвечала
+     * «сохранено», скилл в списке не появлялся, а следующее русское имя молча
+     * затирало тот же файл.
+     */
+    it('русское имя создаёт папку скилла, а не файл skills/SKILL.md (BUG-20)', () => {
+      saveSkill(skillsDir, null, {
+        name: 'Проверка кода',
+        description: 'x',
+        body: 'Тело.',
+        groupIds: [],
+      });
+
+      expect(existsSync(join(skillsDir, 'proverka-koda', 'SKILL.md'))).toBe(true);
+      // Ключевое: в корне каталога скиллов не должно появиться посторонних файлов.
+      expect(existsSync(join(skillsDir, 'SKILL.md'))).toBe(false);
+      // И скилл виден в списке — раньше его там не было.
+      expect(readSkills(skillsDir, store).map((skill) => skill.id)).toContain('proverka-koda');
+    });
+
+    it('второе русское имя не затирает первый скилл (BUG-20)', () => {
+      const make = (name: string, body: string): void => {
+        saveSkill(skillsDir, null, { name, description: 'x', body, groupIds: [] });
+      };
+
+      make('Проверка кода', 'Первый.');
+      make('Разбор логов', 'Второй.');
+
+      expect(
+        readSkills(skillsDir, store)
+          .map((skill) => skill.id)
+          .sort(),
+      ).toEqual(['proverka-koda', 'razbor-logov']);
+    });
+
+    it('имя без букв и цифр — внятный отказ, а не запись мимо папки (BUG-20)', () => {
+      let statusCode: number | undefined;
+      try {
+        saveSkill(skillsDir, null, { name: '🙂🙂', description: 'x', body: 'Тело.', groupIds: [] });
+      } catch (error) {
+        statusCode = (error as { statusCode?: number }).statusCode;
+      }
+
+      expect(statusCode).toBe(400);
+      expect(existsSync(join(skillsDir, 'SKILL.md'))).toBe(false);
+    });
+  });
+
+  describe('saveSkill — правка не переносит скилл и не теряет чужие поля шапки', () => {
+    /** Хелпер: скилл, разложенный в skills-disabled/ (то есть выключенный). */
+    const putDisabledSkill = (id: string, skillMd: string): string => {
+      const skillDir = join(dir, 'skills-disabled', id);
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(join(skillDir, 'SKILL.md'), skillMd);
+      return skillDir;
+    };
+
+    /** Шапка файла, разобранная строгим YAML — так её читает сам Claude Code. */
+    const strictFrontmatter = (file: string): Record<string, unknown> => {
+      const raw = readFileSync(file, 'utf8');
+      const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(raw);
+      expect(match).not.toBeNull();
+      return parseYaml(match?.[1] ?? '') as Record<string, unknown>;
+    };
+
+    it('правка выключенного скилла пишется в skills-disabled и не включает его', () => {
+      const disabledDir = putDisabledSkill(
+        'code-review',
+        ['---', 'name: code-review', 'description: Старое описание', '---', '', 'Тело.'].join('\n'),
+      );
+
+      saveSkill(skillsDir, 'code-review', {
+        name: 'code-review',
+        description: 'Новое описание',
+        body: 'Новое тело.',
+        groupIds: [],
+      });
+
+      // Копии в skills/ не появилось: иначе Claude увидел бы выключенный скилл.
+      expect(existsSync(join(skillsDir, 'code-review'))).toBe(false);
+      expect(readFileSync(join(disabledDir, 'SKILL.md'), 'utf8')).toContain('Новое описание');
+
+      // И в списке он ровно один — выключенный, с новым описанием.
+      const found = readSkills(skillsDir, store).filter((s) => s.id === 'code-review');
+      expect(found).toHaveLength(1);
+      expect(found[0]?.isEnabled).toBe(false);
+      expect(found[0]?.description).toBe('Новое описание');
+    });
+
+    it('СОЗДАНИЕ с именем выключенного скилла отклоняется, а не пишется поверх', () => {
+      // Обратная сторона предыдущего правила: если правку выключенного скилла
+      // писать в skills-disabled, то и НОВЫЙ скилл с тем же именем лёг бы туда
+      // же — поверх чужого тела, и «созданный» скилл оказался бы выключенным.
+      const disabledDir = putDisabledSkill(
+        'code-review',
+        ['---', 'name: code-review', 'description: Чужой скилл', '---', '', 'Чужое тело.'].join(
+          '\n',
+        ),
+      );
+
+      expect(() =>
+        saveSkill(skillsDir, null, {
+          name: 'code-review',
+          description: 'Мой новый',
+          body: 'Моё тело.',
+          groupIds: [],
+        }),
+      ).toThrow(SkillExistsError);
+
+      expect(readFileSync(join(disabledDir, 'SKILL.md'), 'utf8')).toContain('Чужое тело.');
+    });
+
+    it('незнакомые поля шапки (allowed-tools, model, license) переживают правку', () => {
+      putSkill(
+        'with-extra',
+        [
+          '---',
+          'name: with-extra',
+          'description: Старое',
+          'allowed-tools: Read, Bash',
+          'model: opus',
+          'license: MIT',
+          '---',
+          '',
+          'Тело.',
+        ].join('\n'),
+      );
+
+      saveSkill(skillsDir, 'with-extra', {
+        name: 'with-extra',
+        description: 'Новое',
+        body: 'Тело.',
+        groupIds: [],
+      });
+
+      const header = strictFrontmatter(join(skillsDir, 'with-extra', 'SKILL.md'));
+      expect(header.description).toBe('Новое');
+      expect(header['allowed-tools']).toBe('Read, Bash');
+      expect(header.model).toBe('opus');
+      expect(header.license).toBe('MIT');
+    });
+
+    it('двоеточие, кавычки и перевод строки в значениях не ломают YAML-шапку', () => {
+      saveSkill(skillsDir, 'tricky', {
+        name: 'a11y-audit',
+        description: 'аудит фронта: axe-core\nвторая строка с "кавычками"',
+        body: 'Тело.',
+        groupIds: [],
+      });
+
+      // Строгий разбор обязан пройти: на самодельной шапке он падал с
+      // «Implicit map keys need to be followed by map values», и Claude Code
+      // переставал видеть name/description этого скилла.
+      const header = strictFrontmatter(join(skillsDir, 'tricky', 'SKILL.md'));
+      expect(header.name).toBe('a11y-audit');
+      expect(header.description).toBe('аудит фронта: axe-core\nвторая строка с "кавычками"');
+
+      // И собственный разбор панели возвращает то же значение целиком.
+      expect(readSkills(skillsDir, store).find((s) => s.id === 'tricky')?.description).toBe(
+        'аудит фронта: axe-core\nвторая строка с "кавычками"',
+      );
+    });
+
+    it('длинное описание остаётся одной строкой шапки', () => {
+      const long = `Use КОГДА ${'очень длинное описание '.repeat(8)}конец`;
+      saveSkill(skillsDir, 'long-desc', {
+        name: 'long-desc',
+        description: long,
+        body: 'Тело.',
+        groupIds: [],
+      });
+
+      // Перенос по ширине сложил бы значение в несколько строк — запасной
+      // построчный разбор шапки увидел бы от описания только первую.
+      const raw = readFileSync(join(skillsDir, 'long-desc', 'SKILL.md'), 'utf8');
+      expect(
+        raw
+          .split(/\r?\n/)
+          .some((line) => line.startsWith('description:') && line.includes('конец')),
+      ).toBe(true);
+      expect(readSkills(skillsDir, store).find((s) => s.id === 'long-desc')?.description).toBe(
+        long,
+      );
     });
   });
 });

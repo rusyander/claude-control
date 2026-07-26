@@ -93,6 +93,10 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
     projectPath,
     isSandbox: Boolean(projectPath) && isSandboxPath(projectPath),
     messageCount: records.filter(isDialogMessage).length,
+    // Большой файл прочитан началом и хвостом (см. readRecords) — значит
+    // середина не сосчитана. Отдаём это признаком, а не выдаём частичное число
+    // за итог: в списке оно рисуется как «38+».
+    messageCountPartial: stats.size > FULL_READ_LIMIT ? true : undefined,
     createdAt: records[0]?.timestamp ?? stats.birthtime.toISOString(),
     updatedAt: stats.mtime.toISOString(),
     preview: cleanText(textOf(lastMessage)).slice(0, 160) || undefined,

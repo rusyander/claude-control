@@ -383,3 +383,100 @@ describe('маршруты сущностей: локальные настрой
     expect(readFileSync(join(root, 'settings.local.json'), 'utf8')).toContain('локальный');
   });
 });
+
+/**
+ * Хук из settings.local.json группе не подчиняется: панель в этот файл не пишет.
+ * Раньше переключатель ставил ему отметку и рапортовал «выключено», а хук
+ * продолжал срабатывать — самый неприятный вид лжи в панели настроек. Теперь
+ * такой участник пропускается и считается отдельно.
+ */
+describe('маршруты групп: локальный хук группой не выключается', () => {
+  let root: string;
+  let app: FastifyInstance;
+  let store: AppStore;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), 'cc-group-local-'));
+    mkdirSync(join(root, 'claude-control'), { recursive: true });
+
+    writeFileSync(
+      join(root, 'settings.json'),
+      JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'общий' }] }] } }),
+    );
+    writeFileSync(
+      join(root, 'settings.local.json'),
+      JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'личный' }] }] } }),
+    );
+
+    store = new AppStore(join(root, 'claude-control'));
+
+    const ctx = {
+      location: {
+        paths: {
+          root,
+          settings: join(root, 'settings.json'),
+          settingsLocal: join(root, 'settings.local.json'),
+          claudeMd: join(root, 'CLAUDE.md'),
+          skills: join(root, 'skills'),
+          hooks: join(root, 'hooks'),
+          mcpConfig: join(root, '.claude.json'),
+          secretsEnv: join(root, '.mcp-secrets.env'),
+        },
+      },
+      store,
+      backupDir: join(root, 'claude-control', 'backups'),
+    } as unknown as ServerContext;
+
+    app = Fastify();
+    registerGroupRoutes(app, ctx);
+    registerEntityRoutes(app, ctx);
+    await app.ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('переключатель пропускает локальный хук и говорит об этом', async () => {
+    const hooks = (await app.inject({ method: 'GET', url: '/api/hooks' })).json<
+      { id: string; source: string }[]
+    >();
+    const local = hooks.find((hook) => hook.source === 'settings-local');
+    const shared = hooks.find((hook) => hook.source === 'settings');
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/groups',
+      payload: {
+        name: 'С личным хуком',
+        members: [
+          { kind: 'hook', id: shared!.id },
+          { kind: 'hook', id: local!.id },
+        ],
+      },
+    });
+    const groupId = created.json<{ id: string }>().id;
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/groups/${groupId}/enabled`,
+      payload: { isEnabled: false },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ affected: number; skippedLocalHooks: number }>();
+    // Переключён только общий хук; личный посчитан отдельно, а не как «выключен».
+    expect(body.affected).toBe(1);
+    expect(body.skippedLocalHooks).toBe(1);
+
+    // Личный файл не тронут, хук продолжает действовать и показан включённым.
+    expect(readFileSync(join(root, 'settings.local.json'), 'utf8')).toContain('личный');
+    const after = (await app.inject({ method: 'GET', url: '/api/hooks' })).json<
+      { id: string; source: string; isEnabled: boolean }[]
+    >();
+    expect(after.find((hook) => hook.source === 'settings-local')?.isEnabled).toBe(true);
+    // И в состоянии не осталось групповой отметки, которая ничего не делает.
+    expect(store.isDisabled('hook', local!.id)).toBe(false);
+  });
+});

@@ -121,4 +121,63 @@ describe('роуты скриптов: работают при любом акт
     expect(byId.get('used.mjs')).toBe(true);
     expect(byId.get('lonely.mjs')).toBe(false);
   });
+
+  /**
+   * BUG-7. Id из списка обязан открывать ТОТ ЖЕ файл. Пока маршрут «чистил» id
+   * до [a-zA-Z0-9._-], `my script.mjs` читался пустым, PUT создавал соседний
+   * `myscript.mjs`, а настоящий хук молча продолжал работать со старым кодом;
+   * DELETE не удалял ничего и всё равно отвечал ok:true.
+   */
+  it('файл с пробелом в имени читается, правится и удаляется по своему id (BUG-7)', async () => {
+    await bootWith('claude');
+    const real = join(root, 'hooks', 'my script.mjs');
+    writeFileSync(real, '// первый\n', 'utf8');
+
+    const list = await app.inject({ method: 'GET', url: '/api/scripts' });
+    expect(list.json<ScriptRow[]>().map((item) => item.id)).toEqual(['my script.mjs']);
+
+    const one = await app.inject({ method: 'GET', url: '/api/scripts/my%20script.mjs' });
+    expect(one.json<{ content: string }>().content).toBe('// первый\n');
+
+    const saved = await app.inject({
+      method: 'PUT',
+      url: '/api/scripts/my%20script.mjs',
+      payload: { content: '// второй\n' },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(readFileSync(real, 'utf8')).toBe('// второй\n');
+    expect(existsSync(join(root, 'hooks', 'myscript.mjs'))).toBe(false);
+
+    const removed = await app.inject({ method: 'DELETE', url: '/api/scripts/my%20script.mjs' });
+    expect(removed.statusCode).toBe(200);
+    expect(existsSync(real)).toBe(false);
+  });
+
+  it('кириллическое имя не схлопывается в .mjs (BUG-7)', async () => {
+    await bootWith('claude');
+    writeFileSync(join(root, 'hooks', 'проверка.mjs'), '// хук\n', 'utf8');
+
+    const one = await app.inject({
+      method: 'GET',
+      url: `/api/scripts/${encodeURIComponent('проверка.mjs')}`,
+    });
+
+    expect(one.json<{ content: string }>().content).toBe('// хук\n');
+    expect(existsSync(join(root, 'hooks', '.mjs'))).toBe(false);
+  });
+
+  it('выход за пределы hooks/ — 400 unsafe_path, а не тихая подмена пути', async () => {
+    await bootWith('claude');
+
+    const saved = await app.inject({
+      method: 'PUT',
+      url: '/api/scripts/..%2F..%2Fevil.mjs',
+      payload: { content: 'PWNED' },
+    });
+
+    expect(saved.statusCode).toBe(400);
+    expect(saved.json<{ error: string }>().error).toBe('unsafe_path');
+    expect(existsSync(join(root, 'hooks', 'evil.mjs'))).toBe(false);
+    expect(existsSync(join(root, 'evil.mjs'))).toBe(false);
+  });
 });

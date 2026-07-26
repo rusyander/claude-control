@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { killChildTree } from '../../lib/process-tree.ts';
 
 /**
  * Прямой прогон хука или скрипта на заготовленном событии.
@@ -166,8 +167,14 @@ export const EVENT_FIXTURES: EventFixture[] = [
  * Способов сообщить решение два, и оба в ходу: старый — выйти с кодом 2,
  * новый — вернуть JSON с полем permissionDecision. Стенд обязан понимать оба,
  * иначе хук, который честно требует подтверждения, выглядел бы бездействующим.
+ *
+ * `error` — не решение хука, а его отсутствие: процесс не запустился (нет
+ * интерпретатора, нет каталога) или завершился ошибкой. Отдельное значение
+ * нужно потому, что раньше такой исход показывался как «пропустил» — то есть
+ * ровно как хук, который отработал и сознательно не вмешался. Человек делал
+ * вывод «страж не реагирует на rm -rf», хотя страж вообще не запускался.
  */
-export type HookDecision = 'block' | 'ask' | 'pass';
+export type HookDecision = 'block' | 'ask' | 'pass' | 'error';
 
 export interface ProbeResult {
   fixtureId: string;
@@ -215,7 +222,9 @@ export async function runHookProbe(
 
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill();
+      // Хук запускается через оболочку: убить нужно дерево, иначе на Windows
+      // умрёт только `cmd.exe`, а сам скрипт продолжит держать запрос открытым.
+      killChildTree(child);
     }, TIMEOUT_MS);
 
     child.stdout.on('data', (chunk: Buffer) => {
@@ -239,7 +248,9 @@ export async function runHookProbe(
         exitCode: -1,
         stdout: '',
         stderr: error.message,
-        decision: 'pass',
+        // Процесс не поднялся вовсе — это не «пропустил», а несостоявшийся прогон.
+        decision: 'error',
+        reason: 'Хук не запустился',
         matchesExpectation: false,
         durationMs: Date.now() - startedAt,
         timedOut,
@@ -261,8 +272,12 @@ export async function runHookProbe(
         decision,
         reason,
         addedContext,
-        // Требование подтверждения — тоже вмешательство: действие не пройдёт молча.
-        matchesExpectation: (decision !== 'pass') === fixture.expectsBlock,
+        // Требование подтверждения — тоже вмешательство: действие не пройдёт
+        // молча. Несостоявшийся прогон (`error`) ожиданию не соответствует
+        // никогда: хук ничего не ответил, сверять не с чем.
+        matchesExpectation:
+          decision !== 'error' &&
+          (decision === 'block' || decision === 'ask') === fixture.expectsBlock,
         durationMs: Date.now() - startedAt,
         parsed,
         timedOut,
@@ -398,6 +413,11 @@ interface HookOutput {
  * решение приходит словом: deny — запрет, ask — нужно подтверждение
  * пользователя, allow — согласие. Молчание означает «не вмешиваюсь».
  *
+ * Любой другой ненулевой код — ошибка самого хука (нет интерпретатора, упал,
+ * оболочка не нашла команду), и «не вмешиваюсь» из неё не следует: раньше
+ * ненайденный python выглядел в панели точно так же, как отработавший и
+ * промолчавший страж.
+ *
  * Экспортируется ради тестов: это чистая логика, которую хочется проверить
  * без запуска настоящего процесса хука.
  */
@@ -417,6 +437,14 @@ export function readDecision(
   if (verdict === 'ask') return { decision: 'ask', reason, addedContext };
   if (output?.continue === false) {
     return { decision: 'block', reason: output.stopReason ?? reason, addedContext };
+  }
+
+  if (exitCode !== 0) {
+    return {
+      decision: 'error',
+      reason: reason ?? `Хук завершился с кодом ${exitCode} и решения не вернул`,
+      addedContext,
+    };
   }
 
   return { decision: 'pass', reason, addedContext };

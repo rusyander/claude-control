@@ -36,6 +36,13 @@ const SUPPORTED = new Set([
   '.py',
 ]);
 
+/**
+ * Список поддерживаемых расширений для сообщения человеку. Нужен, потому что
+ * отклонённое вложение больше не пропадает молча: пользователь должен видеть,
+ * что именно панель принимает, — иначе остаётся гадать, почему файл «не дошёл».
+ */
+export const SUPPORTED_UPLOAD_EXTENSIONS: string[] = [...SUPPORTED].sort();
+
 export function isSupportedUpload(name: string): boolean {
   return SUPPORTED.has(extname(name).toLowerCase());
 }

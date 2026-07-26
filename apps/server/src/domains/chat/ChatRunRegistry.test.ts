@@ -162,6 +162,28 @@ describe('ChatRunRegistry', () => {
     expect(created).toBe(1);
   });
 
+  // Регрессия: раньше `start` при идущем прогоне просто выходил, и маршрут
+  // подключал человека к ЧУЖОМУ прогону — его сообщение пропадало молча.
+  it('start при идущем прогоне возвращает false, а после завершения — true', async () => {
+    const runs: FakeRun[] = [];
+    const reg = new ChatRunRegistry(() => {
+      const run = new FakeRun();
+      runs.push(run);
+      return run;
+    });
+
+    expect(reg.start('c1', OPTIONS, {})).toBe(true);
+    expect(reg.start('c1', { ...OPTIONS, prompt: 'второе сообщение' }, {})).toBe(false);
+    // Второй промпт до прогона не дошёл — процесс всё тот же, первый.
+    expect(runs.length).toBe(1);
+
+    runs[0]!.finish();
+    await flush();
+
+    expect(reg.start('c1', { ...OPTIONS, prompt: 'второе сообщение' }, {})).toBe(true);
+    expect(runs.length).toBe(2);
+  });
+
   it('нет прогона — attach и has() это видят', () => {
     expect(registry.has('нет')).toBe(false);
     const { sub } = collector();
@@ -405,6 +427,60 @@ describe('ChatRunRegistry — emitExternal и grace-период', () => {
     // повторно стримить её через active() не будем — иначе поток отдаст ошибку заново.
     expect(registry.has('c1')).toBe(true);
     expect(registry.active()).toHaveLength(0);
+  });
+
+  /**
+   * Регрессия (двойной запуск): один разговор приходит в двух написаниях —
+   * свежий чат под `new-…`, он же из списка в соседней вкладке — под sessionId.
+   * Ключ строго по chatId их не сводил, и на один разговор поднималось два
+   * процесса CLI: оба писали в один транскрипт и в одни файлы.
+   */
+  describe('одна беседа в двух написаниях ключа', () => {
+    /** Реестр, считающий поднятые процессы. */
+    const counting = (): { reg: ChatRunRegistry; created: FakeRun[] } => {
+      const created: FakeRun[] = [];
+      const reg = new ChatRunRegistry(() => {
+        const run = new FakeRun();
+        created.push(run);
+        return run;
+      });
+      return { reg, created };
+    };
+
+    it('вторая вкладка под sessionId не поднимает второй процесс', () => {
+      const { reg, created } = counting();
+      expect(reg.start('new-1', OPTIONS, {})).toBe(true);
+      created[0]?.emit(SESSION); // прогон получил sessionId 'sess-1'
+
+      // Тот же разговор, открытый из списка: chatId = sessionId.
+      expect(reg.isRunning('sess-1')).toBe(true);
+      expect(reg.start('sess-1', OPTIONS, {})).toBe(false);
+      expect(created).toHaveLength(1);
+    });
+
+    it('новый чат с известным sessionId в теле тоже не задваивает прогон', () => {
+      const { reg, created } = counting();
+      expect(reg.start('sess-1', OPTIONS, { sessionId: 'sess-1' })).toBe(true);
+
+      // Другая вкладка начала «новый» чат, но продолжает ту же сессию.
+      expect(reg.isRunning('new-2', 'sess-1')).toBe(true);
+      expect(reg.start('new-2', OPTIONS, { sessionId: 'sess-1' })).toBe(false);
+      expect(created).toHaveLength(1);
+    });
+
+    it('остановка и подключение по sessionId находят прогон под `new-…`', () => {
+      const { reg, created } = counting();
+      reg.start('new-1', OPTIONS, {});
+      created[0]?.emit(SESSION);
+
+      const { events, sub } = collector();
+      expect(reg.attach('sess-1', 0, sub)).toBeTypeOf('function');
+      expect(events).toHaveLength(1);
+
+      expect(reg.stop('sess-1')).toBe(true);
+      expect(created[0]?.stopped).toBe(true);
+      expect(reg.has('new-1')).toBe(false);
+    });
   });
 
   it('stopAll останавливает все прогоны и очищает реестр', () => {

@@ -1,5 +1,6 @@
 import type { ResourceKind } from '@entities/Resource';
 import type { TreeNode } from '../model/buildTree';
+import type { CreateTarget } from '../model/createTarget';
 
 export interface ResourceFileTreeProps {
   kind: ResourceKind;
@@ -9,12 +10,14 @@ export interface ResourceFileTreeProps {
 export interface TreeItemProps {
   node: TreeNode;
   selected?: string;
-  creatingIn?: string;
+  creatingIn?: CreateTarget;
   isWritable: boolean;
   onSelect: (path: string) => void;
-  onCreateIn: (folder: string) => void;
+  /** undefined — закрыть поле; из-за узкого `string` отмена и не могла его закрыть. */
+  onCreateIn: (folder: CreateTarget) => void;
   onCreateFile: (folder: string, name: string) => void;
-  onDelete: (path: string) => void;
+  /** Узел целиком: для подтверждения нужно знать, папка это и сколько файлов внутри. */
+  onDelete: (node: TreeNode) => void;
   defaultOpen?: boolean;
 }
 

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { McpServer, McpServerDraft, McpToolsResult } from '@claude-control/contracts';
 import { createEntityApi } from '@shared/api/create-entity-api';
-import { apiClient } from '@shared/api/client';
+import { apiClient, LONG_TIMEOUTS } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 import { i18n } from '@shared/config/i18n';
 import { toast } from '@shared/lib/toast';
@@ -38,6 +38,11 @@ export function useStartOAuth() {
  * Список инструментов сервера для помощника отбора прав. Сервер поднимается и
  * опрашивается по протоколу — как проверка связи, но возвращаются сами имена.
  * Ждём дольше обычного: у stdio в рукопожатие входит запуск процесса.
+ *
+ * Бюджет тот же, что у проверки связи: серверный `listMcpServerTools` считает
+ * потолок по той же формуле, что и `checkMcpHealth` (до ~180 c при большом
+ * mcpNetworkTimeoutMs). Своих 120 c здесь не хватало — медленный сервер рвался
+ * на клиенте ложным таймаутом, пока серверная сторона спокойно ждала ответа.
  */
 export function useMcpServerTools() {
   return useMutation({
@@ -45,7 +50,7 @@ export function useMcpServerTools() {
       const { data } = await apiClient.post<McpToolsResult>(
         `/mcp/${encodeURIComponent(id)}/tools`,
         undefined,
-        { timeout: 120_000 },
+        { timeout: LONG_TIMEOUTS.mcpHealth },
       );
       return data;
     },

@@ -1,0 +1,19 @@
+// Запасной путь входа: адрес авторизации ссылкой, когда всплывающее окно
+// срезал блокировщик. Оформлен как компактная кнопка-ghost — в тон соседним
+// действиям карточки, а не браузерным синим подчёркиванием.
+.authLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  max-width: 100%;
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-radius: var(--radius-md);
+  color: var(--color-accent);
+  font-size: var(--font-size-body-sm);
+  text-decoration: none;
+  transition: background var(--duration-fast);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+  }
+}

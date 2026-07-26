@@ -1,8 +1,9 @@
 import { join } from 'node:path';
-import { watch, type FSWatcher } from 'chokidar';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { ServerContext } from './context.ts';
+import { allowedOrigins, isRequestAllowed } from './lib/origin-guard.ts';
+import { createConfigWatcher } from './lib/config-watcher.ts';
 import { registerConfigRoutes } from './routes/config-routes.ts';
 import { registerEnvTransferRoutes } from './routes/env-transfer-routes.ts';
 import { registerEntityRoutes } from './routes/entity-routes.ts';
@@ -36,26 +37,14 @@ import { registerProviderProjectRoutes } from './routes/provider-project-routes.
 import { registerProjectRunnerRoutes } from './routes/project-runner-routes.ts';
 import { registerProjectGitRoutes } from './routes/project-git-routes.ts';
 import { ProjectRunnerRegistry, autostartProjects } from './domains/project-runner.ts';
-import { sweepAbandonedSandboxes } from './domains/sandbox/SandboxConfig.ts';
+import { startSandboxHousekeeping } from './domains/sandbox/SandboxConfig.ts';
 
 const PORT = Number(process.env.PORT ?? 5178);
 const WEB_PORT = Number(process.env.WEB_PORT ?? 8888);
 const HOST = '127.0.0.1'; // только локально: приложение читает и пишет личные конфиги
 
-/**
- * Свой интерфейс и никто больше. У API нет аутентификации — он по построению
- * отдаёт секреты (`/api/env/reveal`) и заводит хуки, то есть команды, которые
- * Claude Code выполнит сам. Пока сервер запущен, он доступен и любой открытой
- * вкладке: браузер отправит запрос на localhost с чужой страницы. Отражать
- * присланный Origin поэтому нельзя — иначе сторонний сайт вычитает токены
- * из .mcp-secrets.env и поставит хук с произвольной командой.
- */
-const ALLOWED_ORIGINS = new Set([`http://localhost:${WEB_PORT}`, `http://127.0.0.1:${WEB_PORT}`]);
-
-/** Запрос без Origin — curl, сам сервер, переход по адресу: не кросс-доменный вызов. */
-function isAllowedOrigin(origin: string | undefined): boolean {
-  return !origin || ALLOWED_ORIGINS.has(origin);
-}
+/** Свой интерфейс и никто больше — правила и их обоснование в origin-guard.ts. */
+const ALLOWED_ORIGINS = allowedOrigins(WEB_PORT);
 
 const ctx = new ServerContext();
 const app = Fastify({ logger: { level: 'warn' } });
@@ -63,23 +52,21 @@ const app = Fastify({ logger: { level: 'warn' } });
 /**
  * Отказ выдаётся до маршрутов и до CORS — свой обработчик, а не ошибка плагина:
  * так чужой запрос не доходит до кода, а ответ остаётся понятным (403, а не 500).
- *
- * Проверок две. Origin ловит обычный кросс-доменный вызов. Sec-Fetch-Site нужен
- * там, где Origin не присылают: форма или <img> с чужой страницы уходят на
- * localhost и без него, а CORS ограничивает лишь чтение ответа — не отправку.
  */
 app.addHook('onRequest', (request, reply, done) => {
-  const origin = request.headers.origin;
   const site = request.headers['sec-fetch-site'];
 
-  // Возврат с сервера авторизации MCP — это переход по адресу в отдельном окне
-  // с чужого домена, то есть заведомо cross-site. Пропускаем именно его: это
-  // GET без побочных эффектов, а сам вход защищён параметром state, который
-  // сгенерировали мы, — подделать его нельзя. Всё прочее остаётся под запретом.
-  const path = request.url.split('?')[0];
-  const isOAuthCallback = request.method === 'GET' && path === '/api/mcp/oauth/callback';
+  const allowed = isRequestAllowed(
+    {
+      method: request.method,
+      url: request.url,
+      origin: request.headers.origin,
+      site: typeof site === 'string' ? site : undefined,
+    },
+    ALLOWED_ORIGINS,
+  );
 
-  if (!isOAuthCallback && (!isAllowedOrigin(origin) || site === 'cross-site')) {
+  if (!allowed) {
     reply.code(403).send({ error: 'Запрос с постороннего сайта отклонён' });
     return;
   }
@@ -87,8 +74,24 @@ app.addHook('onRequest', (request, reply, done) => {
   done();
 });
 
+/**
+ * Наблюдатель за файлами настраивается не только на старте: тумблер «следить за
+ * изменениями» и каталог конфигурации меняются на лету (PATCH /api/settings,
+ * POST /api/location, импорт состояния). Перечитываем состояние после каждого
+ * изменяющего запроса — это дешёвая проверка слепка путей, зато панель не
+ * остаётся ни со включённым наблюдением после выключения тумблера, ни со
+ * следилкой по ПРЕЖНЕМУ каталогу после переезда. Хук объявлен до маршрутов:
+ * добавленный позже, он бы к ним не применился.
+ */
+app.addHook('onResponse', (request, _reply, done) => {
+  if (request.method !== 'GET') syncConfigWatcher();
+  done();
+});
+
+// Читать ответ разрешено только своему интерфейсу. Запрос без Origin сюда
+// доходит уже отфильтрованным хуком выше, поэтому здесь он считается своим.
 await app.register(cors, {
-  origin: (origin, callback) => callback(null, isAllowedOrigin(origin ?? undefined)),
+  origin: (origin, callback) => callback(null, !origin || ALLOWED_ORIGINS.has(origin)),
 });
 
 registerConfigRoutes(app, ctx);
@@ -166,57 +169,27 @@ function broadcast(domains: string[], path: string): void {
   for (const send of subscribers) send(payload);
 }
 
-let watcher: FSWatcher | undefined;
+// Состояние читается на каждый sync, а не замыкается: и настройки, и
+// расположение подменяются целиком при смене каталога (`ctx.relocate`).
+const configWatcher = createConfigWatcher({
+  read: () => ({ enabled: ctx.store.getSettings().watchFiles, paths: ctx.location.paths }),
+  broadcast,
+});
 
-function startWatching(): void {
-  void watcher?.close();
-  if (!ctx.store.getSettings().watchFiles) return;
-
-  const { paths } = ctx.location;
-  watcher = watch(
-    [
-      paths.settings,
-      paths.settingsLocal,
-      paths.claudeMd,
-      paths.secretsEnv,
-      paths.skills,
-      paths.mcpConfig,
-    ],
-    {
-      ignoreInitial: true,
-      // Конфиги пишутся целиком, и без задержки прилетает событие на недописанный
-      // файл — читать его бессмысленно, получим то старое, то битое содержимое.
-      awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
-      depth: 3,
-    },
-  );
-
-  watcher.on('all', (_event, changedPath) => {
-    broadcast(domainsForPath(changedPath), changedPath);
-  });
+/** Объявлена функцией: хук выше ссылается на неё до этой строки (подъём). */
+function syncConfigWatcher(): void {
+  configWatcher.sync();
 }
 
-function domainsForPath(changedPath: string): string[] {
-  const { paths } = ctx.location;
-  if (changedPath.startsWith(paths.skills)) return ['skills'];
-  if (changedPath === paths.claudeMd) return ['rules'];
-  if (changedPath === paths.mcpConfig) return ['mcp'];
-  if (changedPath === paths.secretsEnv) return ['env'];
-  // Локальные настройки попадают в те же списки: панель показывает их наравне
-  // с основными, поэтому и обновлять надо то же самое.
-  if (changedPath === paths.settings || changedPath === paths.settingsLocal) {
-    return ['hooks', 'permissions', 'env'];
-  }
-  return ['overview'];
-}
-
-startWatching();
+syncConfigWatcher();
 
 // Песочницы существуют только пока жив сервер: их реестр держится в памяти.
 // Всё, что лежит на диске к моменту старта, — след аварийного завершения, а
 // внутри копия .credentials.json. Подметаем, не дожидаясь, пока человек
-// сделает это руками.
-const sweptSandboxes = sweepAbandonedSandboxes();
+// сделает это руками, и здесь же взводим периодическое подметание: раньше его
+// заводило только создание песочницы, поэтому в сеансе, где модалку не
+// открывали, брошенная копия доступа лежала до следующего перезапуска.
+const sandboxSweep = startSandboxHousekeeping();
 
 // Спавненные dev-серверы проектов живут в памяти процесса. Гасим их при выходе,
 // чтобы дочерние процессы не осиротели и не держали занятыми порты.
@@ -246,9 +219,14 @@ process.stdout.write(
     `Каталог конфигурации: ${location.paths.root} (источник: ${location.source})`,
     location.isValid ? '' : `ВНИМАНИЕ: ${location.problem ?? 'каталог недоступен'}`,
     location.missing.length > 0 ? `Не найдено: ${location.missing.join(', ')}` : '',
-    sweptSandboxes.length > 0
-      ? `Убрано брошенных песочниц: ${sweptSandboxes.length} (в них лежала копия учётных данных)`
+    sandboxSweep.removed.length > 0
+      ? `Убрано брошенных песочниц: ${sandboxSweep.removed.length} (в них лежала копия учётных данных)`
       : '',
+    // Отказ уборки виден и здесь, а не только в потоке ошибок: внутри такой
+    // папки осталась копия доступа к аккаунту, и убрать её может только человек.
+    ...sandboxSweep.failed.map(
+      (item) => `Песочницу не удалось убрать: ${item.path} — ${item.error}`,
+    ),
     // Порт печатает сам dev-сервер, и к этому моменту он обычно ещё не назвался —
     // поэтому в строке либо уже известный порт, либо честное «адрес будет в панели».
     ...autostarted.started.map(

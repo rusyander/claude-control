@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import { SecretBackupUnavailableError } from '../lib/safe-io.ts';
 import type {
   EntityKind,
   EnvVar,
@@ -12,13 +13,21 @@ import type {
 import type { ServerContext } from '../context.ts';
 import { readRules, saveRule, deleteRule } from '../domains/rules.ts';
 import { readHooks, upsertHook, deleteHook, moveHook } from '../domains/hooks.ts';
-import { readSkills, saveSkill, deleteSkill, renameSkill } from '../domains/skills.ts';
+import {
+  readSkills,
+  saveSkill,
+  deleteSkill,
+  renameSkill,
+  SkillExistsError,
+} from '../domains/skills.ts';
 import {
   readMcpServers,
   saveMcpServer,
   deleteMcpServer,
+  migrateMcpServerIdentity,
   checkMcpHealth,
   listMcpServerTools,
+  McpServerExistsError,
 } from '../domains/mcp.ts';
 import {
   startOAuth,
@@ -85,9 +94,13 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
     done(saveRule(paths().claudeMd, '', request.body, ctx.store, ctx.backupDir)),
   );
 
-  app.delete<{ Params: { id: string } }>('/api/rules/:id', (request) =>
-    done(deleteRule(paths().claudeMd, request.params.id, ctx.store, ctx.backupDir)),
-  );
+  app.delete<{ Params: { id: string } }>('/api/rules/:id', (request) => {
+    // След в state.json снимаем ДО удаления: `deleteRule` сдвигает id уцелевших
+    // тёзок («foo-2» → «foo»), и после него отметки удалённого «foo» уже
+    // принадлежали бы выжившему правилу.
+    ctx.store.removeEntity('rule', request.params.id);
+    return done(deleteRule(paths().claudeMd, request.params.id, ctx.store, ctx.backupDir));
+  });
 
   // --- Глобальные инструкции целиком (универсальны по активному провайдеру) ---
   // Раздел «Правила» разбирает файл на карточки, но там видно не всё: шапка,
@@ -151,9 +164,18 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
   });
 
   app.delete<{ Params: { id: string } }>('/api/hooks/:id', (request) => {
-    const id = findHook(ctx, request.params.id)?.id ?? request.params.id;
+    const hook = findHook(ctx, request.params.id);
+    const id = hook?.id ?? request.params.id;
 
-    return done(deleteHook(paths().settings, id, ctx.store, ctx.backupDir, targetOf(id)));
+    const backupPath = deleteHook(paths().settings, id, ctx.store, ctx.backupDir, targetOf(id));
+    // Удалённый хук не должен остаться призраком в составе групп и в отметках:
+    // иначе группа считает участника, которого нет, а новый хук с тем же
+    // содержимым (тот же контентный id) молча унаследовал бы его группы.
+    // Прежний, позиционный id снимаем тоже — по нему отметки могли лечь раньше.
+    ctx.store.removeEntity('hook', id);
+    if (hook?.legacyId) ctx.store.removeEntity('hook', hook.legacyId);
+
+    return done(backupPath);
   });
 
   // Порядок хуков внутри одного события: раньше он равнялся порядку в файле,
@@ -178,9 +200,18 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
   // --- Скиллы (папки в skills/) ---
   app.get('/api/skills', () => readSkills(paths().skills, ctx.store));
 
-  app.post<{ Body: SkillDraft }>('/api/skills', (request) =>
-    done(saveSkill(paths().skills, null, request.body, ctx.backupDir)),
-  );
+  app.post<{ Body: SkillDraft }>('/api/skills', (request, reply) => {
+    try {
+      return done(saveSkill(paths().skills, null, request.body, ctx.backupDir));
+    } catch (error) {
+      // Имя занято выключенным скиллом: молча писать поверх — потеря чужого
+      // скилла, поэтому отвечаем конфликтом и оставляем решение человеку.
+      if (error instanceof SkillExistsError) {
+        return reply.code(409).send({ error: 'skill_exists', message: error.message });
+      }
+      throw error;
+    }
+  });
 
   app.put<{ Params: { id: string }; Body: SkillDraft }>('/api/skills/:id', (request) =>
     done(saveSkill(paths().skills, request.params.id, request.body, ctx.backupDir)),
@@ -191,9 +222,14 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
   // Отдельного набора для скиллов больше нет: две почти одинаковые реализации
   // расходились, и правка попадала не туда, куда ходит интерфейс.
 
-  app.delete<{ Params: { id: string } }>('/api/skills/:id', (request) =>
-    done(deleteSkill(paths().skills, request.params.id, ctx.backupDir)),
-  );
+  app.delete<{ Params: { id: string } }>('/api/skills/:id', (request) => {
+    const backupPath = deleteSkill(paths().skills, request.params.id, ctx.backupDir);
+    // Тот же след, что и у остальных видов: состав групп и отметки выключения
+    // ключуются именем папки, и новый скилл с тем же именем наследовал бы их.
+    ctx.store.removeEntity('skill', request.params.id);
+
+    return done(backupPath);
+  });
 
   // Переименование скилла: имя папки — это идентификатор, поэтому меняется папка,
   // а отметки в state.json (выключение, группы) переезжают на новый id. Тело —
@@ -221,17 +257,69 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
   // --- MCP-серверы (~/.claude.json) ---
   app.get('/api/mcp', () => readMcpServers(paths().mcpConfig, ctx.store, paths().appData));
 
-  app.post<{ Body: McpServerDraft }>('/api/mcp', (request) =>
-    done(saveMcpServer(paths().mcpConfig, null, request.body, ctx.backupDir)),
+  // Занятое имя (в том числе выключенным тёзкой) — 409, как у скиллов и у MCP
+  // чужих провайдеров: писать поверх значит потерять чужой сервер, а решение —
+  // за человеком (переименовать или открыть существующий).
+  const mcpExists = (reply: FastifyReply, error: unknown): FastifyReply => {
+    if (error instanceof McpServerExistsError) {
+      return reply.code(409).send({ error: 'server_exists', message: error.message });
+    }
+    throw error;
+  };
+
+  app.post<{ Body: McpServerDraft }>('/api/mcp', (request, reply) => {
+    try {
+      return done(saveMcpServer(paths().mcpConfig, null, request.body, ctx.backupDir));
+    } catch (error) {
+      return mcpExists(reply, error);
+    }
+  });
+
+  // Правка сервера. Смена имени — это смена идентификатора, поэтому вместе с
+  // записью в конфиге переезжают отметки состояния (группы, выключение) и
+  // сохранённый OAuth-вход: иначе сервер выпадает из групп, а токен остаётся в
+  // хранилище под мёртвым ключом.
+  app.put<{ Params: { id: string }; Body: McpServerDraft }>(
+    '/api/mcp/:id',
+    async (request, reply) => {
+      let backupPath: string | undefined;
+      try {
+        backupPath = saveMcpServer(
+          paths().mcpConfig,
+          request.params.id,
+          request.body,
+          ctx.backupDir,
+        );
+      } catch (error) {
+        // Отказ до записи: перенос отметок и токена не запускаем — иначе
+        // состояние переехало бы на имя, которого сервер так и не получил.
+        return mcpExists(reply, error);
+      }
+
+      await migrateMcpServerIdentity(
+        ctx.store,
+        paths().appData,
+        request.params.id,
+        request.body.name,
+      );
+
+      return done(backupPath);
+    },
   );
 
-  app.put<{ Params: { id: string }; Body: McpServerDraft }>('/api/mcp/:id', (request) =>
-    done(saveMcpServer(paths().mcpConfig, request.params.id, request.body, ctx.backupDir)),
-  );
+  // Удаление уносит и сохранённый вход: карточки с кнопкой «Выйти» больше нет,
+  // так что refresh-токен третьей стороны иначе остался бы в хранилище навсегда
+  // и достался бы новому серверу, заведённому под тем же именем.
+  app.delete<{ Params: { id: string } }>('/api/mcp/:id', async (request) => {
+    const backupPath = deleteMcpServer(paths().mcpConfig, request.params.id, ctx.backupDir);
+    await clearOAuth(paths().appData, request.params.id);
+    // Вместе с записью и токеном уходит и след в state.json: иначе карточка
+    // группы показывает участника-призрака, а сервер, заведённый потом под тем
+    // же именем, молча получает чужие группы и их гашение.
+    ctx.store.removeEntity('mcp', request.params.id);
 
-  app.delete<{ Params: { id: string } }>('/api/mcp/:id', (request) =>
-    done(deleteMcpServer(paths().mcpConfig, request.params.id, ctx.backupDir)),
-  );
+    return done(backupPath);
+  });
 
   const findMcpServer = (id: string): ReturnType<typeof readMcpServers>[number] | undefined =>
     readMcpServers(paths().mcpConfig, ctx.store, paths().appData).find((item) => item.id === id);
@@ -346,7 +434,12 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
   app.delete<{ Params: { id: string } }>('/api/permissions/:id', (request) => {
     const { id } = request.params;
 
-    return done(deletePermission(targetOf(id).path, stripLocalPrefix(id), ctx.backupDir));
+    const backupPath = deletePermission(targetOf(id).path, stripLocalPrefix(id), ctx.backupDir);
+    // Отметки и состав групп ключуются id в том виде, в каком он пришёл (с
+    // префиксом `local:`, если право из settings.local.json) — снимаем его же.
+    ctx.store.removeEntity('permission', id);
+
+    return done(backupPath);
   });
 
   // Перенос права в противоположный файл: из settings.json в settings.local.json
@@ -372,29 +465,52 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
       ),
   );
 
-  app.post<{ Body: Parameters<typeof saveEnvVar>[2] }>('/api/env', (request) =>
-    done(
-      saveEnvVar(
-        paths().settings,
-        paths().secretsEnv,
-        request.body,
-        ctx.backupDir,
-        paths().settingsLocal,
+  /**
+   * Правка секрета без возможной резервной копии — отказ, но ВНЯТНЫЙ: 409 с
+   * причиной и подсказкой, а не 500. Причина одна и та же у записи и удаления:
+   * шифрование копий включено, а парольной фразы в памяти нет (обычное дело
+   * после перезапуска сервера), и писать копию открытым текстом нельзя.
+   */
+  const withSecretBackupGuard = <T>(reply: FastifyReply, run: () => T): T | FastifyReply => {
+    try {
+      return run();
+    } catch (error) {
+      if (error instanceof SecretBackupUnavailableError) {
+        return reply.code(409).send({ error: 'secret_backup_unavailable', message: error.message });
+      }
+      throw error;
+    }
+  };
+
+  app.post<{ Body: Parameters<typeof saveEnvVar>[2] }>('/api/env', (request, reply) =>
+    withSecretBackupGuard(reply, () =>
+      done(
+        saveEnvVar(
+          paths().settings,
+          paths().secretsEnv,
+          request.body,
+          ctx.backupDir,
+          paths().settingsLocal,
+        ),
       ),
     ),
   );
 
-  app.delete<{ Querystring: { key: string; source: EnvVar['source'] } }>('/api/env', (request) =>
-    done(
-      deleteEnvVar(
-        paths().settings,
-        paths().secretsEnv,
-        request.query.key,
-        request.query.source,
-        ctx.backupDir,
-        paths().settingsLocal,
+  app.delete<{ Querystring: { key: string; source: EnvVar['source'] } }>(
+    '/api/env',
+    (request, reply) =>
+      withSecretBackupGuard(reply, () =>
+        done(
+          deleteEnvVar(
+            paths().settings,
+            paths().secretsEnv,
+            request.query.key,
+            request.query.source,
+            ctx.backupDir,
+            paths().settingsLocal,
+          ),
+        ),
       ),
-    ),
   );
 
   // Перенос переменной между settings.json и settings.local.json. Секреты из

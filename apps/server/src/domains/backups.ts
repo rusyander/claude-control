@@ -2,7 +2,6 @@ import {
   existsSync,
   readdirSync,
   statSync,
-  copyFileSync,
   readFileSync,
   openSync,
   readSync,
@@ -14,9 +13,12 @@ import {
   removeEntry,
   copyRecursive,
   writeTextFile,
+  writeBinaryFile,
   setSecretPassphrase,
+  SecretBackupUnavailableError,
 } from '../lib/safe-io.ts';
 import { isEncryptedBackup, decryptSecret } from '../lib/secret-crypto.ts';
+import { SKILLS_DISABLED_DIR } from './skills.ts';
 
 /**
  * Резервные копии и откат к ним.
@@ -110,8 +112,8 @@ export function listBackups(
  *
  *   файл — ищется в известном списке путей по basename;
  *   папка — это копия скилла с именем `<родитель>-<id>` (skills-… или
- *     skills-disabled-…). Снимаем известный префикс и возвращаем в активный
- *     каталог skills/<id>. `id` обязан быть одним безопасным сегментом — иначе
+ *     skills-disabled-…). Снимаем известный префикс и возвращаем скилл ТУДА,
+ *     откуда копия снята. `id` обязан быть одним безопасным сегментом — иначе
  *     `../` увёл бы запись наружу.
  */
 export function resolveBackupTarget(
@@ -120,15 +122,107 @@ export function resolveBackupTarget(
   knownPaths: Record<string, string>,
   skillsDir?: string,
 ): string | undefined {
-  if (isDirectory) {
-    if (!skillsDir) return undefined;
-    let id: string | undefined;
-    if (target.startsWith('skills-disabled-')) id = target.slice('skills-disabled-'.length);
-    else if (target.startsWith('skills-')) id = target.slice('skills-'.length);
-    if (!id || /[\\/]/.test(id) || id.includes('..')) return undefined;
-    return join(skillsDir, id);
-  }
+  if (isDirectory) return resolveSkillRestore(target, skillsDir)?.target;
   return Object.values(knownPaths).find((path) => basename(path) === target);
+}
+
+/**
+ * Куда разворачивать копию скилла и что при этом мешает.
+ *
+ * Префикс имени копии говорит, где скилл лежал в момент снимка: `skills-…` —
+ * включённым, `skills-disabled-…` — выключенным. Возвращаем ровно туда. Раньше
+ * обе копии разворачивались в активный `skills/`, и откат ВКЛЮЧАЛ скилл,
+ * который пользователь выключил, — Claude Code начинал его исполнять, о чём
+ * никто не просил.
+ *
+ * `sibling` — тот же id в соседнем каталоге. Один скилл не может быть
+ * одновременно включённым и выключенным: `readSkills` обходит оба каталога, и
+ * такой id показался бы в списке дважды, а переключатель падал бы на
+ * переименовании папки поверх существующей. Поэтому соседа при откате убираем
+ * (сняв с него копию — он мог отличаться от восстанавливаемого).
+ *
+ * Имя копии читается двояко: `skills-disabled-обзор` — это и выключенный
+ * «обзор», и включённый скилл, который так и называется — «disabled-обзор».
+ * Разбор только по префиксу выбирал первое всегда и на скилле `disabled-обзор`
+ * разворачивал копию мимо цели, а «соседом» считал ПОСТОРОННИЙ скилл `обзор` —
+ * и удалял его. Поэтому спрашиваем диск: берём то прочтение, чья папка на месте.
+ */
+interface SkillRestore {
+  target: string;
+  sibling: string;
+  siblingName: string;
+}
+
+function skillRestoreOptions(target: string, skillsDir: string): SkillRestore[] {
+  const disabledDir = join(skillsDir, '..', SKILLS_DISABLED_DIR);
+  const options: SkillRestore[] = [];
+
+  const isSafeId = (id: string): boolean => Boolean(id) && !/[\\/]/.test(id) && !id.includes('..');
+
+  // Голый префикс («skills-», «skills-disabled-») — испорченное имя копии.
+  // Второе прочтение дало бы из него скилл с именем «disabled-», то есть
+  // разворачивало бы копию в папку, которой у пользователя нет и быть не должно.
+  const primary = target.startsWith(`${SKILLS_DISABLED_DIR}-`)
+    ? target.slice(SKILLS_DISABLED_DIR.length + 1)
+    : target.startsWith('skills-')
+      ? target.slice('skills-'.length)
+      : '';
+  if (!isSafeId(primary)) return [];
+
+  const add = (wasDisabled: boolean, id: string): void => {
+    if (!isSafeId(id)) return;
+    options.push({
+      target: join(wasDisabled ? disabledDir : skillsDir, id),
+      sibling: join(wasDisabled ? skillsDir : disabledDir, id),
+      siblingName: `${wasDisabled ? 'skills' : SKILLS_DISABLED_DIR}-${id}`,
+    });
+  };
+
+  // Порядок важен: при равных правах (обеих папок нет) остаётся прежнее
+  // поведение — префикс `skills-disabled-` возвращает скилл выключенным.
+  if (target.startsWith(`${SKILLS_DISABLED_DIR}-`))
+    add(true, target.slice(SKILLS_DISABLED_DIR.length + 1));
+  if (target.startsWith('skills-')) add(false, target.slice('skills-'.length));
+
+  return options;
+}
+
+function resolveSkillRestore(target: string, skillsDir?: string): SkillRestore | undefined {
+  if (!skillsDir) return undefined;
+
+  const options = skillRestoreOptions(target, skillsDir);
+  if (options.length <= 1) return options[0];
+
+  const alive = options.filter((option) => existsSync(option.target));
+  if (alive.length === 1) return alive[0];
+  // Ни одной папки нет — скилл удалили, возвращаем по префиксу. Обе на месте —
+  // прочтение неразличимо, и любой выбор перезаписал бы живой чужой скилл:
+  // честнее отказать (кнопка отката у такой копии просто погаснет).
+  return alive.length === 0 ? options[0] : undefined;
+}
+
+/**
+ * Снимок восстанавливаемой копии, снятый ДО того, как что-либо тронет каталог
+ * копий: расшифрованный текст, содержимое файла или временный дубль папки.
+ */
+type RestoreSnapshot =
+  | { kind: 'text'; text: string }
+  | { kind: 'file'; data: Buffer }
+  | { kind: 'directory'; staged: string };
+
+/** Счётчик временных имён — два отката подряд не должны драться за один путь. */
+let stageCounter = 0;
+
+/**
+ * Временный дубль папки-копии внутри каталога копий. Имя нарочно не похоже на
+ * копию (`<файл>.<метка>.bak`): так его не подберёт ни `listBackups`, ни
+ * ротация, которая иначе удалила бы дубль вместе с оригиналом.
+ */
+function stageDirectory(source: string, backupDir: string): string {
+  const staged = join(backupDir, `.restore-${process.pid}-${(stageCounter += 1)}`);
+  removeEntry(staged);
+  copyRecursive(source, staged);
+  return staged;
 }
 
 export interface RestoreResult {
@@ -167,7 +261,12 @@ export function restoreBackup(
   if (!entry) return { ok: false, error: 'Копия не найдена' };
 
   const isDirectory = statSync(source).isDirectory();
-  const target = resolveBackupTarget(entry.target, isDirectory, knownPaths, skillsDir);
+  // Разбор имени делаем ОДИН раз: дальше мы сами меняем диск (снимаем копии,
+  // убираем соседа), а разбор смотрит на диск — повторный дал бы другой ответ.
+  const skill = isDirectory ? resolveSkillRestore(entry.target, skillsDir) : undefined;
+  const target = isDirectory
+    ? skill?.target
+    : resolveBackupTarget(entry.target, isDirectory, knownPaths, skillsDir);
   if (!target) {
     return { ok: false, error: `Непонятно, куда возвращать копию «${entry.target}»` };
   }
@@ -190,22 +289,58 @@ export function restoreBackup(
     setSecretPassphrase(passphrase);
   }
 
-  // Перед заменой снимаем копию текущего состояния — откат тоже обратим.
-  const backupPath = existsSync(target) ? backupEntry(target, backupDir, entry.target) : undefined;
+  // Содержимое копии забираем ДО всего остального: копия текущего состояния
+  // заканчивается ротацией, а та удаляет самые старые копии той же базы — то
+  // есть ровно ту, которую сейчас восстанавливают. Откат к старейшей копии
+  // падал на её собственном удалении, а у папки скилла успевал стереть цель и
+  // терял разом и копию, и скилл.
+  let snapshot: RestoreSnapshot;
+  if (decrypted !== undefined) snapshot = { kind: 'text', text: decrypted };
+  else if (isDirectory) snapshot = { kind: 'directory', staged: stageDirectory(source, backupDir) };
+  else snapshot = { kind: 'file', data: readFileSync(source) };
 
-  if (isDirectory) {
-    // Папку разворачиваем целиком: сперва убираем прежнюю, чтобы не смешать
-    // старые и новые файлы, затем копируем рекурсивно.
-    removeEntry(target);
-    copyRecursive(source, target);
-  } else if (decrypted !== undefined) {
-    // Расшифрованный секрет пишем атомарно, как обычную правку.
-    writeTextFile(target, decrypted);
-  } else {
-    copyFileSync(source, target);
+  try {
+    // Перед заменой снимаем копию текущего состояния — откат тоже обратим.
+    // Если копия невозможна (шифрование секретов включено, фразы в памяти нет —
+    // так бывает при откате СТАРОЙ, ещё незашифрованной копии .mcp-secrets.env),
+    // откат не делаем вовсе: иначе живые токены исчезли бы безвозвратно, а
+    // панель отрапортовала бы «восстановлено».
+    let backupPath: string | undefined;
+    try {
+      backupPath = existsSync(target) ? backupEntry(target, backupDir, entry.target) : undefined;
+    } catch (error) {
+      if (error instanceof SecretBackupUnavailableError) return { ok: false, error: error.message };
+      throw error;
+    }
+
+    if (snapshot.kind === 'directory') {
+      // Тот же скилл в соседнем каталоге (skills/ против skills-disabled/)
+      // убираем: иначе один id оказался бы и включённым, и выключенным сразу —
+      // в списке он двоился бы, а переключатель падал бы на переносе папки
+      // поверх существующей. Копию с соседа снимаем: это отдельное состояние,
+      // и потерять его молча нельзя.
+      if (skill && existsSync(skill.sibling)) {
+        backupEntry(skill.sibling, backupDir, skill.siblingName);
+        removeEntry(skill.sibling);
+      }
+
+      // Папку разворачиваем целиком: сперва убираем прежнюю, чтобы не смешать
+      // старые и новые файлы, затем копируем рекурсивно.
+      removeEntry(target);
+      copyRecursive(snapshot.staged, target);
+    } else if (snapshot.kind === 'text') {
+      // Расшифрованный секрет пишем атомарно, как обычную правку.
+      writeTextFile(target, snapshot.text);
+    } else {
+      // Тоже атомарно и с сохранением прав целевого файла: прямой writeFileSync
+      // отдавал бы восстановленному секрету 0644, если файла на месте не было.
+      writeBinaryFile(target, snapshot.data);
+    }
+
+    return { ok: true, restoredTo: target, backupPath };
+  } finally {
+    if (snapshot.kind === 'directory') removeEntry(snapshot.staged);
   }
-
-  return { ok: true, restoredTo: target, backupPath };
 }
 
 /** Удаление копии — на случай, когда в ней лежит то, чего быть на диске не должно. */

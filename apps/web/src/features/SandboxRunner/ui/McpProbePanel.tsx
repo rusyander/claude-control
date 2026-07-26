@@ -7,6 +7,7 @@ import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
 import { Icon } from '@shared/ui/icon';
 import { useMcpTools, useCallMcpTool } from '@entities/Sandbox';
+import { parseToolArgs } from '../model/parseToolArgs';
 import styles from './SandboxModal.module.scss';
 
 /**
@@ -23,6 +24,7 @@ export function McpProbePanel({ mcpId }: { mcpId: string }) {
 
   const [tool, setTool] = useState('');
   const [args, setArgs] = useState('{}');
+  const [argsError, setArgsError] = useState<string>();
 
   // Список инструментов тянем ровно на смену сервера. Сама мутация меняет
   // идентичность на каждом рендере, поэтому держим её в ref — иначе эффект
@@ -38,15 +40,17 @@ export function McpProbePanel({ mcpId }: { mcpId: string }) {
   const current = list.find((item) => item.name === tool);
 
   const invoke = (): void => {
-    let parsed: Record<string, unknown> = {};
-
-    try {
-      parsed = JSON.parse(args || '{}') as Record<string, unknown>;
-    } catch {
-      // Разбирать нечего — отправим пустые параметры, сервер сам пожалуется.
+    // Сломанный JSON раньше молча превращался в пустой объект: инструмент
+    // отвечал на умолчаниях, и успех выглядел как ответ на введённые параметры.
+    // Теперь вызов не уходит, а ошибка разбора стоит прямо под полем.
+    const parsed = parseToolArgs(args, t);
+    if (!parsed.ok) {
+      setArgsError(parsed.error);
+      return;
     }
 
-    call.mutate({ mcpId, tool, args: parsed });
+    setArgsError(undefined);
+    call.mutate({ mcpId, tool, args: parsed.args });
   };
 
   return (
@@ -80,6 +84,7 @@ export function McpProbePanel({ mcpId }: { mcpId: string }) {
             rows={5}
             isMono
             hint={t('sandbox.argumentsHint')}
+            error={argsError}
           />
 
           <Stack direction="row" align="center" gap="var(--spacing-xs)">

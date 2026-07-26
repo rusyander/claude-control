@@ -21,7 +21,10 @@ describe('commandExists — безопасность команды', () => {
   });
 });
 
-describe('detectEditors', () => {
+// Обнаружение спрашивает систему про КАЖДЫЙ известный редактор (`where`/`which`
+// синхронным запуском). На Windows под полной нагрузкой набора это не
+// укладывается в дефолтные 5 секунд — отсюда свой запас времени.
+describe('detectEditors', { timeout: 30_000 }, () => {
   it('возвращает все известные редакторы с флагом доступности', () => {
     const editors = detectEditors();
     expect(editors).toHaveLength(KNOWN_EDITORS.length);

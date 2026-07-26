@@ -229,7 +229,20 @@ describe('Aider инструкции-список: содержимое пере
     // Обе записи вне проекта: раздел их показывает, но открыть не даёт.
     for (const entry of readProviderInstructionsEntries(projectTarget)) {
       expect(entry.editable).toBe(false);
+      // Причина названа честно (#52-соседний баг #59): раньше здесь стояло
+      // `missing`, и существующий файл за пределами проекта показывался как
+      // несуществующий — панель предлагала создать то, что уже есть.
+      expect(entry.reason).toBe('unsafe_path');
     }
+
+    // Запись за пределами проекта, файл которой РЕАЛЬНО есть, помечена
+    // существующей: предлагать её создать (как делала пометка `missing`)
+    // бессмысленно — создание ничего бы не изменило.
+    const outsideFile = join(outside, 'x.md');
+    expect(readProviderInstructionsEntries(projectTarget)[1]!.exists).toBe(false);
+    writeFileSync(outsideFile, 'снаружи\n', 'utf8');
+    const now = readProviderInstructionsEntries(projectTarget)[1]!;
+    expect(now).toMatchObject({ exists: true, editable: false, reason: 'unsafe_path' });
     for (const raw of readProviderInstructionsEntries(projectTarget).map((e) => e.raw)) {
       expect(() => readListedInstructionsFile(projectTarget, raw)).toThrow(
         ListedFileNotEditableError,

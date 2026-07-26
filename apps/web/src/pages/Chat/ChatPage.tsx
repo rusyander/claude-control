@@ -20,12 +20,13 @@ import {
   useTotalCost,
   useTotalTokens,
   type ActiveRunView,
+  type SendOutcome,
 } from '@shared/lib/agent-runs';
 import { toast } from '@shared/lib/toast';
 import { useChatPrefs, getChatPrefs } from '@shared/lib/chat-prefs';
 import { playNotification } from '@shared/lib/notify-sound';
 import { useDraft, migrateDraft } from '@shared/lib/draft';
-import { formatSpend } from '@shared/lib/format';
+import { formatSpend, formatBytes } from '@shared/lib/format';
 import { ChatList } from '@features/ChatList';
 import { ProjectList } from '@features/ProjectList';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
@@ -38,7 +39,7 @@ import { ProjectGitControls } from '@features/ProjectGit';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { ChatMessages } from '@features/ChatMessages';
-import { ChatComposer } from '@features/ChatComposer';
+import { ChatComposer, MAX_FILE_BYTES } from '@features/ChatComposer';
 import { ArtifactPreview } from '@features/ArtifactPreview';
 import {
   useChats,
@@ -56,6 +57,8 @@ import { useClearRunnerAutostart } from '@entities/ProjectRunner';
 import { useSettings } from '@entities/AppConfig';
 import { useModelCatalog } from '@entities/ModelCatalog';
 import { ResizeHandle } from '@shared/ui/resize-handle';
+import { SUPPORTED_UPLOAD_EXTENSIONS } from './lib/uploads';
+import { planSend } from './lib/send';
 import styles from './ChatPage.module.scss';
 
 const PREVIEW_WIDTH_KEY = 'claude-control:preview-width';
@@ -473,7 +476,7 @@ export function ChatPage() {
     const stamp = Date.now();
     selected.forEach((project, index) => {
       ws.openProject(project.path, project.name);
-      agentRuns.start({
+      void agentRuns.start({
         chatId: `new-${stamp}-${index}`,
         prompt,
         projectPath: project.path,
@@ -494,19 +497,36 @@ export function ChatPage() {
     Boolean(run.text) ||
     Boolean(run.error);
 
+  /** Текст отказа — по структурному коду сервера, а не по разбору сообщения. */
+  const notSentText = (outcome: Extract<SendOutcome, { ok: false }>): string => {
+    if (outcome.code === 'run_busy') return t('chat.notSent.busy');
+    if (outcome.code === 'unsupported_upload')
+      return t('chat.notSent.files', {
+        names: (outcome.files ?? []).join(', '),
+        supported: SUPPORTED_UPLOAD_EXTENSIONS.join(', '),
+      });
+    return t('chat.notSent.other', { message: outcome.message });
+  };
+
   // Общий путь отправки: и для поля ввода, и для клика по варианту вопроса.
   // Показываем реплику сразу (pending), продолжаем существующую сессию.
-  const dispatch = (prompt: string, files: { name: string; base64: string }[]): void => {
+  // Возвращает, ПРИНЯЛ ли сервер сообщение: отказ обязан быть виден и не должен
+  // ничего стоить — ни текста в поле, ни оптимистичного пузыря в ленте.
+  const dispatch = async (
+    prompt: string,
+    files: { name: string; base64: string }[],
+  ): Promise<boolean> => {
     let id = chatId;
     if (!id) {
       id = `new-${Date.now()}`;
       setDraftId(id);
     }
 
+    const pendingId = `pending-${Date.now()}`;
     setPending((current) => [
       ...current,
       {
-        id: `pending-${Date.now()}`,
+        id: pendingId,
         role: 'user',
         blocks: [{ type: 'text', text: prompt }],
         timestamp: new Date().toISOString(),
@@ -520,7 +540,7 @@ export function ChatPage() {
     const fork = forkNextRef.current && Boolean(resumeSession);
     forkNextRef.current = false;
 
-    agentRuns.start({
+    const outcome = await agentRuns.start({
       chatId: id,
       prompt,
       // Продолжаем существующую сессию; у нового чата её ещё нет.
@@ -535,13 +555,43 @@ export function ChatPage() {
       // статусов. У продолжения сессии рабочая папка уже известна.
       projectPath,
     });
+
+    if (!outcome.ok) {
+      // Сообщение не дошло ни до агента, ни до транскрипта — убираем пузырь,
+      // возвращаем пометку ветвления и говорим человеку, что произошло.
+      setPending((current) => current.filter((message) => message.id !== pendingId));
+      if (fork) forkNextRef.current = true;
+      toast.error(notSentText(outcome));
+      return false;
+    }
+    return true;
   };
 
-  const send = (files: { name: string; base64: string }[]): void => {
-    const prompt = input.trim();
-    if (!prompt) return;
-    setInput('');
-    dispatch(prompt, files);
+  /**
+   * Отправка из поля ввода. Текст очищаем ТОЛЬКО после приёма: раньше поле
+   * чистилось до запроса, и любой отказ сервера стирал набранное безвозвратно
+   * (черновик в localStorage очищался вместе с ним). Ответ `false` — сигнал
+   * композеру оставить вложения на месте.
+   */
+  const send = async (files: { name: string; base64: string }[]): Promise<boolean> => {
+    // Неподдерживаемое вложение отсеиваем здесь, а не ответом сервера: только
+    // так отказ приходит до того, как композер снял чипы, и человеку не нужно
+    // прикладывать файлы заново. Сервер всё равно проверит ещё раз.
+    const plan = planSend(input, files);
+    if (plan.action === 'ignore') return false;
+    if (plan.action === 'reject') {
+      toast.error(
+        t('chat.notSent.files', {
+          names: plan.names.join(', '),
+          supported: SUPPORTED_UPLOAD_EXTENSIONS.join(', '),
+        }),
+      );
+      return false;
+    }
+
+    const accepted = await dispatch(plan.prompt, files);
+    if (accepted) setInput('');
+    return accepted;
   };
 
   /**
@@ -563,7 +613,7 @@ export function ChatPage() {
   const answerQuestion = (answer: string): void => {
     const prompt = answer.trim();
     if (!prompt || isRunning) return;
-    dispatch(prompt, []);
+    void dispatch(prompt, []);
   };
 
   return (
@@ -941,6 +991,16 @@ export function ChatPage() {
             onChange={setInput}
             onSend={send}
             onStop={() => chatId && agentRuns.stop(chatId)}
+            // Отказ по размеру идёт тем же путём, что и отказ по типу файла:
+            // одно сообщение из семейства notSent, а не второй механизм рядом.
+            onRejectFiles={(names) =>
+              toast.error(
+                t('chat.notSent.tooLarge', {
+                  names: names.join(', '),
+                  limit: formatBytes(MAX_FILE_BYTES),
+                }),
+              )
+            }
             isRunning={isRunning}
           />
         </div>

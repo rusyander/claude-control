@@ -25,12 +25,23 @@ const FETCH_TIMEOUT_MS = 10_000;
 
 const CACHE_FILE = 'pricing-cache.json';
 
-/** Колонки таблицы, которые нам нужны, и как их узнать в заголовке. */
+/** Колонки таблицы, без которых цена неполна: нет любой — разбор отменяется. */
 const COLUMNS: Array<{ field: keyof PricingEntry['price']; matches: string }> = [
   { field: 'input', matches: 'base input' },
   { field: 'cacheWrite', matches: '5m cache' },
   { field: 'cacheRead', matches: 'cache hits' },
   { field: 'output', matches: 'output' },
+];
+
+/**
+ * Колонки, которые берём, если они есть. Часовая запись кэша («1h Cache
+ * Writes») стоит отдельной колонкой и в 1.6 раза дороже пятиминутной — без неё
+ * весь объём кэша считался по дешёвой ставке. Но требовать её нельзя: пропажа
+ * колонки отменила бы разбор целиком и увела панель на встроенную таблицу, что
+ * хуже, чем вывести часовую ставку из пятиминутной (pricing.ts).
+ */
+const OPTIONAL_COLUMNS: Array<{ field: keyof PricingEntry['price']; matches: string }> = [
+  { field: 'cacheWrite1h', matches: '1h cache' },
 ];
 
 /**
@@ -58,6 +69,12 @@ export function parsePricingTable(markdown: string): PricingEntry[] {
     columnOf.set(column.field, index);
   }
 
+  const optionalOf = new Map<keyof PricingEntry['price'], number>();
+  for (const column of OPTIONAL_COLUMNS) {
+    const index = lastIndexMatching(header, column.matches);
+    if (index >= 0) optionalOf.set(column.field, index);
+  }
+
   const entries: PricingEntry[] = [];
 
   for (const row of rows.slice(headerIndex + 1)) {
@@ -65,7 +82,7 @@ export function parsePricingTable(markdown: string): PricingEntry[] {
     // Строка-разделитель `|---|---|` и всё, что короче заголовка.
     if (cells.length < header.length || /^:?-+:?$/.test(cells[0] ?? '')) continue;
 
-    const entry = parseRow(cells, columnOf);
+    const entry = parseRow(cells, columnOf, optionalOf);
     // Таблица цен идёт до первого чужого блока: как только строка перестала
     // быть ценой, дальше уже другая таблица (пакетные цены, токены на tool use).
     if (!entry) break;
@@ -96,13 +113,21 @@ function splitRow(row: string): string[] {
 function parseRow(
   cells: string[],
   columnOf: Map<keyof PricingEntry['price'], number>,
+  optionalOf: Map<keyof PricingEntry['price'], number> = new Map(),
 ): PricingEntry | undefined {
-  const price = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const price: PricingEntry['price'] = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 
   for (const [field, index] of columnOf) {
     const amount = parseAmount(cells[index] ?? '');
     if (amount === undefined) return undefined;
     price[field] = amount;
+  }
+
+  // Необязательная колонка: непрочитанная ячейка (прочерк, «N/A») — не повод
+  // забраковать строку, ставка просто останется выведенной из пятиминутной.
+  for (const [field, index] of optionalOf) {
+    const amount = parseAmount(cells[index] ?? '');
+    if (amount !== undefined) price[field] = amount;
   }
 
   const named = parseModelCell(cells[0] ?? '');
@@ -202,6 +227,8 @@ export class PricingStore {
   private snapshot: PricingSnapshot;
   /** Идущая загрузка — чтобы параллельные запросы не дёргали сеть по разу каждый. */
   private inFlight: Promise<PricingSnapshot> | undefined;
+  /** Чем кончилась последняя попытка обновиться. Пусто — удалась либо её не было. */
+  private failure: string | undefined;
 
   constructor(appDataDir: string) {
     // Node в режиме strip-only не поддерживает parameter properties.
@@ -209,11 +236,29 @@ export class PricingStore {
     this.snapshot = this.readCache();
   }
 
+  /**
+   * Прочитать кэш прайса, пережив испорченный файл.
+   *
+   * `JSON.parse` бросает на оборванном файле (выключили питание посреди записи,
+   * кончилось место), а этот конструктор вызывается на старте сервера — исключение
+   * отсюда означало бы «панель не поднялась вовсе, и починить её нечем, потому что
+   * интерфейс не открылся». Цена в отчётах справочная, поэтому битый кэш — это
+   * откат на встроенную таблицу, а не отказ старта. Файл не трогаем: он не хранит
+   * ничего пользовательского, первое же удачное обновление перезапишет его.
+   */
   private readCache(): PricingSnapshot {
-    const cached = readJsonFile<PricingSnapshot | undefined>(this.cacheFile, undefined);
-    // Пустой или битый кэш не должен обнулить расчёт стоимости.
-    if (!cached?.entries?.length) return BUILT_IN_SNAPSHOT;
-    return cached;
+    try {
+      const cached = readJsonFile<PricingSnapshot | undefined>(this.cacheFile, undefined);
+      // Пустой кэш не должен обнулить расчёт стоимости.
+      if (!cached?.entries?.length) return BUILT_IN_SNAPSHOT;
+      return cached;
+    } catch (error) {
+      // Молчать нельзя: снаружи встроенная таблица неотличима от свежего прайса.
+      process.stderr.write(
+        `${CACHE_FILE} не читается (${(error as Error).message}); цены взяты из встроенной таблицы\n`,
+      );
+      return BUILT_IN_SNAPSHOT;
+    }
   }
 
   /** Что сейчас в силе — без обращения к сети. */
@@ -221,9 +266,22 @@ export class PricingStore {
     return this.snapshot;
   }
 
+  /**
+   * Почему провалилась последняя попытка обновления. Нужно маршруту: молчаливый
+   * ответ старым прайсом на явное «Обновить» неотличим от «цены и так свежие».
+   */
+  lastError(): string | undefined {
+    return this.failure;
+  }
+
   isStale(maxAgeMs = PRICING_MAX_AGE_MS): boolean {
     if (this.snapshot.source !== 'anthropic') return true;
-    return Date.now() - Date.parse(this.snapshot.fetchedAt) > maxAgeMs;
+
+    const age = Date.now() - Date.parse(this.snapshot.fetchedAt);
+    // Нечитаемая дата (правка руками, кэш чужой версии) даёт NaN, а любое
+    // сравнение с NaN ложно — снимок считался бы свежим вечно, и панель до
+    // конца дней считала бы расход по замороженным ценам.
+    return !Number.isFinite(age) || age > maxAgeMs;
   }
 
   /**
@@ -245,10 +303,13 @@ export class PricingStore {
     try {
       const fresh = await fetchPricing();
       this.snapshot = fresh;
+      this.failure = undefined;
       writeJsonFile(this.cacheFile, fresh);
-    } catch {
-      // Молча: отсутствие сети — обычное дело для локальной панели, а цифра
-      // стоимости справочная. Давность источника видна в настройках.
+    } catch (error) {
+      // Наружу не бросаем: отсутствие сети — обычное дело для локальной панели,
+      // а цифра стоимости справочная. Но причину запоминаем — по кнопке
+      // «Обновить» о ней обязаны сказать.
+      this.failure = (error as Error).message;
     }
     return this.snapshot;
   }

@@ -1,5 +1,6 @@
 import type { Rule, RuleDraft } from '@claude-control/contracts';
 import { readTextFile, writeTextFile } from '../lib/safe-io.ts';
+import { slugify } from '../lib/slug.ts';
 import type { AppStore } from '../lib/app-store.ts';
 
 /**
@@ -160,7 +161,63 @@ export function saveRule(
   if (index >= 0) rules[index] = updated;
   else rules.push(updated);
 
-  return writeTextFile(claudeMdPath, serializeRules(preamble, rules), { backupDir });
+  const serialized = serializeRules(preamble, rules);
+  const backupPath = writeTextFile(claudeMdPath, serialized, { backupDir });
+
+  // Отметки переносим ПОСЛЕ успешной записи: не записалось — состояние панели
+  // должно остаться от прежнего файла.
+  migrateRuleIds(rules, store);
+
+  return backupPath;
+}
+
+/**
+ * Перенос отметок правил на идентификаторы, которые получатся при следующем
+ * чтении файла.
+ *
+ * У правила нет собственного ключа на диске: id выводится из заголовка при
+ * каждом разборе CLAUDE.md. Значит правка заголовка меняет id, и всё, что
+ * записано по старому (ручное выключение, гашение группой, состав групп),
+ * осталось бы висеть на несуществующем правиле: правило теряло значок группы,
+ * групповой переключатель переставал его находить, а мусор в state.json жил бы
+ * вечно. Скиллы этот перенос делают явно (`renameSkill` → `store.renameEntity`),
+ * правилам он был нужен не меньше.
+ *
+ * Новые id не угадываем и не вычитываем обратно из файла: считаем их тем же
+ * правилом, что и разборщик (slugify заголовка + суффикс `-2` при повторе) в
+ * том же порядке, в каком их пишет сборка — сперва включённые, потом
+ * выключенные. Прежний вариант сверял свой список с повторным разбором
+ * записанного текста и молча отказывался при расхождении длин: тело правила с
+ * собственной строкой «## ПРАВИЛО:» дробится при разборе на два — и отметки
+ * оставались висеть на несуществующем id.
+ *
+ * Переносим в два прохода через временные id. Переименования могут меняться
+ * местами (два правила с заголовком «Тест»: `тест` ↔ `тест-2`), и
+ * последовательный перенос затёр бы отметки первого вторым — временный id
+ * разводит их во времени.
+ */
+function migrateRuleIds(written: readonly Rule[], store: AppStore): void {
+  const emitted = [
+    ...written.filter((rule) => rule.isEnabled),
+    ...written.filter((rule) => !rule.isEnabled),
+  ];
+
+  const used = new Set<string>();
+  const pairs: Array<{ oldId: string; newId: string }> = [];
+  for (const rule of emitted) {
+    const base = slugify(rule.title);
+    let newId = base;
+    for (let n = 2; used.has(newId); n += 1) newId = `${base}-${n}`;
+    used.add(newId);
+    if (rule.id !== newId) pairs.push({ oldId: rule.id, newId });
+  }
+  if (pairs.length === 0) return;
+
+  // Временное имя нарочно не похоже на slug правила: пересечься с настоящим id
+  // оно не может, а значит и затереть чужие отметки на промежуточном шаге.
+  const stamp = `~migrate-${process.pid}`;
+  pairs.forEach((pair, at) => store.renameEntity('rule', pair.oldId, `${stamp}-${at}`));
+  pairs.forEach((pair, at) => store.renameEntity('rule', `${stamp}-${at}`, pair.newId));
 }
 
 export function deleteRule(
@@ -172,7 +229,15 @@ export function deleteRule(
   const markdown = readTextFile(claudeMdPath);
   const { preamble, rules } = parseRules(markdown, 'global', store);
   const remaining = rules.filter((rule) => rule.id !== ruleId);
-  return writeTextFile(claudeMdPath, serializeRules(preamble, remaining), { backupDir });
+
+  const serialized = serializeRules(preamble, remaining);
+  const backupPath = writeTextFile(claudeMdPath, serialized, { backupDir });
+
+  // Удаление тоже сдвигает id: из двух тёзок («foo», «foo-2») уцелевший станет
+  // «foo». Без переноса его отметки остались бы на «foo-2».
+  migrateRuleIds(remaining, store);
+
+  return backupPath;
 }
 
 /**
@@ -184,55 +249,4 @@ function freeId(base: string, rules: readonly Rule[]): string {
   let id = base;
   for (let n = 2; taken.has(id); n += 1) id = `${base}-${n}`;
   return id;
-}
-
-/**
- * Слаг из заголовка. Кириллица транслитерируется — иначе id получится пустым
- * и правила перестанут различаться.
- */
-function slugify(title: string): string {
-  const map: Record<string, string> = {
-    а: 'a',
-    б: 'b',
-    в: 'v',
-    г: 'g',
-    д: 'd',
-    е: 'e',
-    ё: 'e',
-    ж: 'zh',
-    з: 'z',
-    и: 'i',
-    й: 'y',
-    к: 'k',
-    л: 'l',
-    м: 'm',
-    н: 'n',
-    о: 'o',
-    п: 'p',
-    р: 'r',
-    с: 's',
-    т: 't',
-    у: 'u',
-    ф: 'f',
-    х: 'h',
-    ц: 'c',
-    ч: 'ch',
-    ш: 'sh',
-    щ: 'sch',
-    ъ: '',
-    ы: 'y',
-    ь: '',
-    э: 'e',
-    ю: 'yu',
-    я: 'ya',
-  };
-
-  return title
-    .toLowerCase()
-    .split('')
-    .map((char) => map[char] ?? char)
-    .join('')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
 }

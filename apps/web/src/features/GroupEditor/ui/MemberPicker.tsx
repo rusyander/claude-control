@@ -40,11 +40,17 @@ export function MemberPicker({ value, onChange, excludeGroupId }: MemberPickerPr
   const items: Array<{ kind: GroupMemberKind; id: string; label: string }> = [
     ...rules.map((item) => ({ kind: 'rule' as const, id: item.id, label: item.title })),
     ...skills.map((item) => ({ kind: 'skill' as const, id: item.id, label: item.name })),
-    ...hooks.map((item) => ({
-      kind: 'hook' as const,
-      id: item.id,
-      label: `${item.event}${item.matcher ? ` · ${item.matcher}` : ''}`,
-    })),
+    // Хук из settings.local.json в группу не берём: панель в этот файл не пишет,
+    // выключить его группой нечем — участник выглядел бы погашенным, продолжая
+    // срабатывать. Уже добавленные такие участники остаются в составе, но при
+    // переключении группы честно пропускаются (см. POST /groups/:id/enabled).
+    ...hooks
+      .filter((item) => item.source !== 'settings-local')
+      .map((item) => ({
+        kind: 'hook' as const,
+        id: item.id,
+        label: `${item.event}${item.matcher ? ` · ${item.matcher}` : ''}`,
+      })),
     ...servers.map((item) => ({ kind: 'mcp' as const, id: item.id, label: item.name })),
     // Себя в участники добавить нельзя — исключаем правящуюся группу из списка.
     ...groups

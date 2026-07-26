@@ -169,13 +169,41 @@ export function readProviderMcpServers(target: ProviderMcpTarget): UniversalMcpS
   }
 }
 
-/** Добавить или изменить сервер (при переименовании `serverId` — прежнее имя). */
+/** Имя MCP-сервера уже занято — маршрут отвечает 409, а не пишет поверх чужой записи. */
+export class McpServerExistsError extends Error {
+  readonly serverName: string;
+
+  constructor(serverName: string) {
+    super(`MCP-сервер «${serverName}» уже есть в конфигурации.`);
+    this.name = 'McpServerExistsError';
+    this.serverName = serverName;
+  }
+}
+
+/**
+ * Добавить или изменить сервер (при переименовании `serverId` — прежнее имя).
+ *
+ * Создание с занятым именем и переименование в занятое имя — ОТКАЗ
+ * (`McpServerExistsError` → 409), а не запись поверх: запись шла по имени
+ * безусловно, и «github» из формы молча заменял настроенный «github» —
+ * пользователь видел «сохранено», а прежняя команда/адрес исчезали. Осознанная
+ * замена (перенос между провайдерами, самопроверка, предпросмотр) передаёт
+ * `allowOverwrite` явно.
+ */
 export function upsertProviderMcpServer(
   target: ProviderMcpTarget,
   serverId: string | null,
   draft: UniversalMcpServerDraft,
   backupDir: string | undefined,
+  options?: { allowOverwrite?: boolean },
 ): string | undefined {
+  if (serverId !== draft.name && !options?.allowOverwrite) {
+    // Список берём из того же файла тем же читателем — форма имени у каждого
+    // формата своя (ключ отображения, `name` внутри записи у continue).
+    const taken = readProviderMcpServers(target).some((server) => server.name === draft.name);
+    if (taken) throw new McpServerExistsError(draft.name);
+  }
+
   switch (target.format) {
     case 'json':
       return upsertJsonMcpServer(target, serverId, draft, backupDir);
@@ -212,13 +240,12 @@ export function deleteProviderMcpServer(
 
 // --- Формат `json`: ключ mcpServers (Gemini settings.json, Cursor mcp.json) ---
 
+/**
+ * Запись сервера из чужого JSON. Значения намеренно `unknown`: файл написан
+ * человеком, а не панелью, — форма (`command`, `args`, `env`, `url`, `httpUrl`,
+ * `headers`) здесь лишь ожидание, каждое поле проверяется в рантайме.
+ */
 interface RawJsonMcpServer {
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
-  url?: string;
-  httpUrl?: string;
-  headers?: Record<string, string>;
   [key: string]: unknown;
 }
 
@@ -233,23 +260,51 @@ interface RawJsonMcpConfig {
  */
 const parseJsonObject = parseProviderJsonObject;
 
+/** Ключ `mcpServers` как отображение «имя → запись». Не-объект → fail-closed. */
+function jsonMcpServersOf(config: RawJsonMcpConfig): Record<string, unknown> {
+  const servers: unknown = config.mcpServers;
+  if (servers === undefined) return {};
+  if (!servers || typeof servers !== 'object' || Array.isArray(servers)) {
+    throw new UnrecognizedFormatError();
+  }
+  return servers as Record<string, unknown>;
+}
+
+/** Запись сервера, если она вообще объект; иначе пусто (чужую форму не гадаем). */
+function asRawJsonServer(value: unknown): RawJsonMcpServer {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as RawJsonMcpServer)
+    : {};
+}
+
 function readJsonMcpServers(text: string): UniversalMcpServer[] {
-  const servers = parseJsonObject<RawJsonMcpConfig>(text).mcpServers ?? {};
+  const servers = jsonMcpServersOf(parseJsonObject<RawJsonMcpConfig>(text));
   return Object.entries(servers)
-    .map(([name, raw]): UniversalMcpServer => {
+    .map(([name, entry]): UniversalMcpServer => {
+      // Типы полей проверяем как остальные читатели файла (codex/continue/goose):
+      // рукописный `"args": "-y pkg"` иначе уезжал бы в API строкой под видом
+      // string[] и ронял страницу на `args.join(' ')` вместо пометки о формате.
+      const raw = asRawJsonServer(entry);
       // gemini: httpUrl (стримируемый HTTP) имеет приоритет над url (sse);
       // cursor хранит адрес удалённого сервера в url. В универсальной модели оба
       // сводятся к транспорту http — читаем оба ключа у обоих провайдеров.
-      const httpAddress = raw.httpUrl ?? raw.url;
+      const httpAddress =
+        typeof raw.httpUrl === 'string'
+          ? raw.httpUrl
+          : typeof raw.url === 'string'
+            ? raw.url
+            : undefined;
       const transport = httpAddress ? 'http' : 'stdio';
       return {
         name,
         transport,
-        command: raw.command,
-        args: raw.args ?? [],
-        env: raw.env ?? {},
+        command: typeof raw.command === 'string' ? raw.command : undefined,
+        args: Array.isArray(raw.args)
+          ? raw.args.filter((a): a is string => typeof a === 'string')
+          : [],
+        env: isStringRecord(raw.env) ? raw.env : {},
         url: httpAddress,
-        headers: raw.headers ?? {},
+        headers: isStringRecord(raw.headers) ? raw.headers : {},
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -294,7 +349,10 @@ function writeJsonMcpConfig(
 ): string | undefined {
   const text = readTextFile(target.filePath);
   const config: RawJsonMcpConfig = text.trim() ? parseJsonObject<RawJsonMcpConfig>(text) : {};
-  config.mcpServers ??= {};
+  // Форму `mcpServers` проверяем ДО правки: если там не отображение (строка,
+  // массив), вписать в него одну запись значило бы испортить чужой файл →
+  // fail-closed. Тот же объект возвращается по ссылке, чужие записи целы.
+  config.mcpServers = jsonMcpServersOf(config) as Record<string, RawJsonMcpServer>;
   mutate(config);
   // preserveForm по умолчанию: файл пересобирается целиком из JSON.stringify (LF,
   // без BOM), поэтому его форму — BOM и CRLF пользователя — возвращает safe-io.
@@ -313,8 +371,9 @@ function upsertJsonMcpServer(
   return writeJsonMcpConfig(
     target,
     (config) => {
-      // Чужие поля берём у ПРЕЖНЕЙ записи (при переименовании — у неё же).
-      const existing = config.mcpServers![serverId ?? draft.name];
+      // Чужие поля берём у ПРЕЖНЕЙ записи (при переименовании — у неё же);
+      // если она не объект, переносить нечего (строку в поля не разбираем).
+      const existing = asRawJsonServer(config.mcpServers![serverId ?? draft.name]);
       if (serverId && serverId !== draft.name) delete config.mcpServers![serverId];
       config.mcpServers![draft.name] = buildJsonMcpRaw(draft, target.jsonHttpUrlKey, existing);
     },
@@ -499,9 +558,18 @@ function readCodexServers(text: string): CodexReadResult {
   return { servers, raw };
 }
 
-/** Собрать запись сервера codex из черновика (только моделируемые поля). */
-function buildCodexRaw(draft: UniversalMcpServerDraft): RawCodexServer {
-  const raw: RawCodexServer = {};
+/**
+ * Поля записи codex, которые панель МОДЕЛИРУЕТ и пересобирает при записи. Всё
+ * остальное (`startup_timeout_sec`, `tool_timeout_sec`, `enabled`, `env_vars` и
+ * любые будущие ключи) переносится из прежней записи по значению.
+ */
+const CODEX_MODELLED_KEYS = ['command', 'args', 'env', 'url', 'http_headers'];
+
+/** Собрать запись сервера codex из черновика, сохранив чужие поля прежней. */
+function buildCodexRaw(draft: UniversalMcpServerDraft, existing?: RawCodexServer): RawCodexServer {
+  const raw: RawCodexServer = Object.fromEntries(
+    Object.entries(existing ?? {}).filter(([key]) => !CODEX_MODELLED_KEYS.includes(key)),
+  );
   if (draft.transport === 'stdio') {
     if (draft.command) raw.command = draft.command;
     if (draft.args.length > 0) raw.args = draft.args;
@@ -571,8 +639,10 @@ function upsertCodexServer(
 ): string | undefined {
   const text = readTextFile(target.filePath);
   const raw = text.trim() ? parseCodexRaw(text) : {};
+  // При переименовании немоделируемые поля переносим со СТАРОГО имени.
+  const existing = (serverId ? raw[serverId] : undefined) ?? raw[draft.name];
   if (serverId && serverId !== draft.name) delete raw[serverId];
-  raw[draft.name] = buildCodexRaw(draft);
+  raw[draft.name] = buildCodexRaw(draft, existing);
   return writeCodexServers(target, raw, backupDir);
 }
 

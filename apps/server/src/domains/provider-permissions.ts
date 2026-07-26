@@ -931,8 +931,12 @@ function readGeminiPermissions(text: string): GeminiPermissionsValues {
  * Проекция «всё, кроме управляемых панелью ключей». По ней результат сверяется с
  * оригиналом: если хоть один чужой ключ (в том числе соседи внутри `general` и
  * весь `mcpServers`) изменился — запись отменяется.
+ *
+ * Экспортирована ради собственного теста: сегодняшний путь записи вложенных
+ * ключей не трогает, поэтому чувствительность страховки снаружи не наблюдаема —
+ * а именно она здесь и ломалась (#56).
  */
-function geminiOtherKeysProjection(config: RawGeminiSettings): string {
+export function geminiOtherKeysProjection(config: RawGeminiSettings): string {
   const rest: Record<string, unknown> = { ...config };
   delete rest.coreTools;
   delete rest.excludeTools;
@@ -945,8 +949,13 @@ function geminiOtherKeysProjection(config: RawGeminiSettings): string {
     else delete rest.general;
   }
 
-  // Ключи сортируем: сравниваем СОДЕРЖИМОЕ, а не порядок обхода.
-  return JSON.stringify(rest, Object.keys(rest).sort());
+  // Ключи сортируем РЕКУРСИВНО (`stableJson`, как у всех соседних проекций):
+  // сравниваем содержимое, а не порядок обхода. Прежний
+  // `JSON.stringify(rest, Object.keys(rest).sort())` был не сортировкой, а
+  // фильтром-разрешением, который JSON.stringify применяет на КАЖДОМ уровне
+  // вложенности: все вложенные объекты сериализовались в `{}`, и страховка не
+  // видела правок ни внутри `mcpServers`, ни у соседей внутри `general`.
+  return stableJson(rest);
 }
 
 /**

@@ -31,6 +31,7 @@ import { BackupsCard } from './BackupsCard';
 import { EnvTransferCard } from './EnvTransferCard';
 import { SecretEncryptionCard } from './SecretEncryptionCard';
 import { SettingToggleRow } from './SettingToggleRow';
+import { NumberSettingRow } from './NumberSettingRow';
 import { ProviderSelectorCard } from './ProviderSelectorCard';
 import { ProviderCheckCard } from './ProviderCheckCard';
 import { ProviderKeysCard } from './ProviderKeysCard';
@@ -233,31 +234,17 @@ export function SettingsPage() {
             checked={settings.mcpAutoCheck}
             onChange={(mcpAutoCheck) => patch({ mcpAutoCheck })}
           />
-          <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
-            <Stack gap="var(--spacing-3xs)" flex={1} minWidth="200px">
-              <Typography variant="body-sm" weight="medium">
-                {t('settings.mcpTimeout')}
-              </Typography>
-              <Typography variant="caption" color="subtle" className={styles.hint}>
-                {t('settings.mcpTimeoutHint')}
-              </Typography>
-            </Stack>
-            <input
-              type="number"
-              min={2000}
-              max={120000}
-              step={500}
-              value={settings.mcpNetworkTimeoutMs}
-              onChange={(event) => {
-                const next = Number(event.target.value);
-                if (Number.isFinite(next) && next >= 2000 && next <= 120000) {
-                  patch({ mcpNetworkTimeoutMs: Math.floor(next) });
-                }
-              }}
-              className={styles.numberInput}
-              aria-label={t('settings.mcpTimeout')}
-            />
-          </Stack>
+          <NumberSettingRow
+            label={t('settings.mcpTimeout')}
+            hint={t('settings.mcpTimeoutHint')}
+            value={settings.mcpNetworkTimeoutMs}
+            min={2000}
+            max={120000}
+            step={500}
+            inputClassName={styles.numberInput}
+            hintClassName={styles.hint}
+            onChange={(mcpNetworkTimeoutMs) => patch({ mcpNetworkTimeoutMs })}
+          />
         </Stack>
       </Card>
 
@@ -309,30 +296,15 @@ export function SettingsPage() {
             checked={settings.previewProviderWrites}
             onChange={(previewProviderWrites) => patch({ previewProviderWrites })}
           />
-          <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
-            <Stack gap="var(--spacing-3xs)" flex={1} minWidth="200px">
-              <Typography variant="body-sm" weight="medium">
-                {t('settings.backupKeep')}
-              </Typography>
-              <Typography variant="caption" color="subtle">
-                {t('settings.backupKeepHint')}
-              </Typography>
-            </Stack>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={settings.backupKeep}
-              onChange={(event) => {
-                const next = Number(event.target.value);
-                if (Number.isFinite(next) && next >= 1 && next <= 100) {
-                  patch({ backupKeep: Math.floor(next) });
-                }
-              }}
-              className={styles.numberInput}
-              aria-label={t('settings.backupKeep')}
-            />
-          </Stack>
+          <NumberSettingRow
+            label={t('settings.backupKeep')}
+            hint={t('settings.backupKeepHint')}
+            value={settings.backupKeep}
+            min={1}
+            max={100}
+            inputClassName={styles.numberInput}
+            onChange={(backupKeep) => patch({ backupKeep })}
+          />
           <SettingToggleRow
             label={t('settings.watchFiles')}
             hint={t('settings.watchHint')}

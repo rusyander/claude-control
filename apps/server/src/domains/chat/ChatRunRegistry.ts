@@ -93,23 +93,52 @@ export class ChatRunRegistry {
     this.createRun = createRun;
   }
 
-  /** Идёт ли сейчас прогон с этим chatId. */
-  isRunning(chatId: string): boolean {
-    return this.runs.get(chatId)?.status === 'running';
+  /**
+   * Ключ, под которым разговор ДЕЙСТВИТЕЛЬНО зарегистрирован.
+   *
+   * Один разговор приходит в двух написаниях: свежий чат стартует под временным
+   * `new-<ts>`, а он же, открытый из списка (в соседней вкладке), — уже под
+   * своим `sessionId`. Ключ строго по chatId эти написания не сводил: проверка
+   * «прогон уже идёт» промахивалась, и на один разговор поднималось ДВА
+   * процесса CLI — оба писали в те же файлы и в тот же транскрипт. Поэтому
+   * ищем: точное совпадение → прогон, чей sessionId равен пришедшему chatId →
+   * совпадение по самому sessionId (в обе стороны). Ничего не нашли — ключом
+   * остаётся chatId (новый разговор).
+   */
+  resolveKey(chatId: string, sessionId?: string): string {
+    if (this.runs.has(chatId)) return chatId;
+    for (const [key, run] of this.runs) if (run.sessionId === chatId) return key;
+    if (sessionId) {
+      if (this.runs.has(sessionId)) return sessionId;
+      for (const [key, run] of this.runs) if (run.sessionId === sessionId) return key;
+    }
+    return chatId;
+  }
+
+  /** Идёт ли сейчас прогон этого разговора (в любом из написаний ключа). */
+  isRunning(chatId: string, sessionId?: string): boolean {
+    return this.runs.get(this.resolveKey(chatId, sessionId))?.status === 'running';
   }
 
   /** Есть ли прогон в реестре (идущий или в буфере после завершения). */
   has(chatId: string): boolean {
-    return this.runs.has(chatId);
+    return this.runs.has(this.resolveKey(chatId));
   }
 
   /**
-   * Запустить прогон, отвязанный от запроса. Если для chatId уже идёт прогон —
-   * возвращаем его (защита от двойной отправки), не плодя второй процесс.
+   * Запустить прогон, отвязанный от запроса. Второй процесс на тот же chatId не
+   * плодим, но и молча глотать новый промпт нельзя: раньше `start` просто
+   * выходил, а маршрут подключался к ИДУЩЕМУ прогону с seq 0 — пользователю
+   * перепечатывался прошлый ответ, а его сообщение не доходило ни до агента, ни
+   * до транскрипта. Поэтому возвращаем признак: false — прогон уже идёт, промпт
+   * НЕ принят, вызывающий обязан сказать об этом человеку.
    */
-  start(chatId: string, options: RunOptions, meta: RunMeta): void {
-    const existing = this.runs.get(chatId);
-    if (existing && existing.status === 'running') return;
+  start(chatId: string, options: RunOptions, meta: RunMeta): boolean {
+    // Ищем прогон по ОБОИМ написаниям ключа (см. resolveKey): иначе вторая
+    // вкладка того же разговора заводила второй процесс мимо этой проверки.
+    const existingKey = this.resolveKey(chatId, meta.sessionId);
+    const existing = this.runs.get(existingKey);
+    if (existing && existing.status === 'running') return false;
     // Перезапуск поверх завершённого (повтор упавшего) — чистим старый буфер.
     // Если прошлый прогон УПАЛ, его расход уже осел в общем счётчике, а ретрай
     // посчитает всё заново — поэтому вклад упавшей попытки откатываем, чтобы он
@@ -120,7 +149,7 @@ export class ChatRunRegistry {
         this.totalCostUsd -= existing.spentCostUsd;
         this.totalTokens -= existing.spentTokens;
       }
-      this.remove(chatId);
+      this.remove(existingKey);
     }
 
     const run = this.createRun();
@@ -149,6 +178,8 @@ export class ChatRunRegistry {
         });
         this.finish(registered);
       });
+
+    return true;
   }
 
   /**
@@ -208,7 +239,9 @@ export class ChatRunRegistry {
    * или его нет вовсе.
    */
   attach(chatId: string, fromSeq: number, subscriber: RunSubscriber): (() => void) | undefined {
-    const run = this.runs.get(chatId);
+    // По ключу-синониму тоже: вкладка, узнавшая о прогоне под sessionId, должна
+    // суметь подключиться к нему, даже если он зарегистрирован под `new-…`.
+    const run = this.runs.get(this.resolveKey(chatId));
     if (!run) return undefined;
 
     for (const buffered of run.events) {
@@ -223,12 +256,23 @@ export class ChatRunRegistry {
 
   /** Остановить прогон по кнопке: убить процесс и убрать из реестра. */
   stop(chatId: string): boolean {
-    const run = this.runs.get(chatId);
+    // Ключ-синоним: «Остановить» из вкладки, знающей разговор по sessionId,
+    // обязано убить процесс, поднятый под временным `new-…`, — иначе кнопка
+    // молча отвечала бы «прогона нет», а агент продолжал работать.
+    const key = this.resolveKey(chatId);
+    const run = this.runs.get(key);
     if (!run) return false;
-    run.run.stop();
+    try {
+      run.run.stop();
+    } catch {
+      // Убить процесс не вышло (уже умер, отказано в доступе) — но реестр и
+      // подписчиков всё равно закрываем: иначе исключение отсюда оставило бы
+      // прогон «идущим» навсегда, кнопка «Остановить» больше ничего бы не
+      // делала, а `stopAll` при выходе панели споткнулся бы на первом же таком.
+    }
     if (run.status === 'running') run.status = 'stopped';
     for (const subscriber of run.subscribers) subscriber.close();
-    this.remove(chatId);
+    this.remove(key);
     return true;
   }
 

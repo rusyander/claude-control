@@ -33,6 +33,12 @@ columns are located by HEADER, not by index (a "1h Cache Writes" column sits bet
 read — by index it would land in read), and any surprise aborts the whole parse. Showing
 yesterday's price is survivable; showing an invented one is not.
 
+**One assistant message spans many transcript lines, and `usage.output_tokens` GROWS across them.**
+Every line repeats the same `usage` object with a running total; the complete count is on the LAST
+line. Deduping by `message.id|requestId` and keeping the FIRST line undercounted output by 35% on
+the real `~/.claude` (39.2M vs 60.0M). `scanner.ts` buffers per response key, keeps max
+`output_tokens`, and flushes at end of file.
+
 **models.dev `experimental` is an OBJECT, not a boolean.** It describes a model's experimental
 MODES (e.g. a fast mode with its own pricing) — every recent Anthropic flagship carries it. Read as
 truthy it means "preview model", which is wrong; a badge built on it labelled Opus 5 experimental.
@@ -65,6 +71,16 @@ group membership and command snapshot with it. The old id lives on as `legacyId`
 and `getGroupIdsFor` take it as a second argument, routes normalize incoming ids via `findHook`.
 Keep this while users still have old `state.json` files.
 
+**The content id's separator is a NUL byte** (`hookContentId`, `lib/hook-id.ts`). The Read tool
+renders `\0` as a space, so it looks like an ordinary separator and an Edit "fixing" it silently
+invalidates every stored disabled-mark, group membership and `?id=` link. Hash the same way in
+`hooks.ts` and `AppStore` — computing it twice was exactly how a disabled hook came back as an
+enabled phantom.
+
+**Only settings-level hooks get remembered on disable.** A `settings.local.json` hook snapshotted
+into `state.json` was re-enabled into the SHARED `settings.json` — a personal hook leaking to
+everyone. Filter by `source` before `rememberDisabledHook` (`entity-toggle.ts`).
+
 **Every settings entry carries a `source`** — the file it was read from (`settings.json` or
 `settings.local.json`). Write it back to that same file: `writeHooks` filters the list by source,
 routes pick the path via `targetOf`. Mix them up and a personal setting lands in the shared config
@@ -75,6 +91,17 @@ or the other way round.
 **Secrets are written only through `writeSecretFile`** (`credentials.ts`): mode `0600` is set at
 creation, not by a later `chmod` — in between the file would lie open.
 
+**Atomic write CREATES the file, so it loses the target's mode.** tmp + rename means a 0600
+`.credentials.json` would come back 0644 after one panel edit. `safe-io` snapshots the mode before
+writing and restores it after (`fileMode`/`applyFileMode`); a NEW file whose basename is a known
+secret gets 0600 outright. Same reason backup restore goes through `writeBinaryFile`, not a raw
+`writeFileSync`. On Windows chmod is a no-op — POSIX-only tests are skipped there, not deleted.
+
+**axios JSON-parses ANY response body, whatever its content type.** Fastify returns a bare string
+as `text/plain`, so a purely numeric secret arrived as a number and a `{"a":1}`-shaped one as an
+object — a fail-closed `typeof !== 'string'` guard then refused a legitimate save. Reading a raw
+value → pass `transformResponse: [(raw) => raw]` (`EnvFormModal.buildEnvDraft`).
+
 **The MCP OAuth callback deliberately bypasses the origin guard** (`index.ts`). A return from an
 authorization server is a cross-domain navigation, i.e. inevitably `Sec-Fetch-Site: cross-site`,
 which the general rule would reject. The exception is narrow: `GET /api/mcp/oauth/callback` only,
@@ -84,6 +111,17 @@ equally wrong. Tokens live in a separate 600 file, not in the shared `~/.claude.
 
 **`shell: true` with an argument array** produces Node's DEP0190 warning and does not escape
 anything. On Windows: either one string, or `shellArgs`.
+
+**`cmd.exe` quoting, measured on Windows 11, not recalled.** `"`-wrapping + doubling inner `"` as
+`""` + doubling trailing backslashes + `cmd /d /s /v:off /c` blocks `& | < > ^ ( )` and `!VAR!` —
+`\"` does NOT escape (that is a C-runtime rule cmd never learned; `a" & echo X & "b` executed).
+Two things stay broken no matter the quoting: `%NAME%` still expands inside quotes, and a raw
+newline TRUNCATES the command line at line 1 while exiting 0 — silently. Passing the value through
+an env var (`%CC_PROMPT%` on the command line) is strictly worse: inner quotes break out and run.
+Therefore `spawnCli` resolves a real `.exe` on PATH first (`lib/win-exec.ts`) and spawns it with no
+shell at all; `cmd.exe` is only for a `.cmd` shim with no binary beside it, and there a multi-line
+prompt is REFUSED (`flattenPrompt` joins history with `\n\n`, so truncation would hit almost every
+follow-up question and answer half of it as if whole).
 
 ## Windows filesystem
 

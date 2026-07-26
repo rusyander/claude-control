@@ -13,6 +13,8 @@ export interface ProjectChatRef {
   title: string;
   updatedAt: string;
   messageCount: number;
+  /** Счётчик неполный: у большого транскрипта середина не сосчитана (см. chatSummarySchema). */
+  messageCountPartial?: boolean;
   isSandbox: boolean;
 }
 

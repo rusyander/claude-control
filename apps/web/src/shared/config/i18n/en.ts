@@ -263,6 +263,8 @@ export const en: TranslationSchema = {
     recognized: 'recognised',
     withErrors: 'with an error',
     createAll: 'Create all ({{count}})',
+    failed: 'not created',
+    failedHint: 'The server rejected these lines — the rest were created. Fix them and try again.',
     sharedDecision: 'The action applies to every line in the list.',
     unbalanced: 'unbalanced brackets',
     needEquals: 'no = sign',
@@ -278,7 +280,7 @@ export const en: TranslationSchema = {
     preparing: 'Preparing the sandbox…',
     isolationTitle: 'Sandbox boundaries',
     isolationText:
-      'A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when this window closes.',
+      'A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling.',
     tabProbe: 'Event run',
     tabTools: 'Tools',
     tabChat: 'Conversation',
@@ -299,12 +301,15 @@ export const en: TranslationSchema = {
       block: 'stopped it',
       ask: 'asked for confirmation',
       pass: 'let it through',
+      error: 'did not run',
     },
     connecting: 'Starting the server and requesting its tools…',
     tool: 'Tool',
     chooseTool: '— choose a tool —',
     arguments: 'Call arguments',
     argumentsHint: 'JSON with the arguments. An empty object if none are needed.',
+    argumentsInvalid: 'The arguments are not valid JSON — the call was not sent',
+    argumentsNotObject: 'The arguments must be a JSON object like {"key": "value"}',
     callTool: 'Call',
     callOk: 'The tool answered',
     callFailed: 'The tool returned an error',
@@ -316,6 +321,20 @@ export const en: TranslationSchema = {
     runPrompt: 'Send to the sandbox',
     waiting: 'Claude is answering…',
     answerPlaceholder: 'The sandbox answer will appear here',
+    runFailed: 'The server could not start the sandbox (code {{status}})',
+    emptyResponse: 'Empty server response',
+    expired:
+      'The sandbox was wiped after two hours of idling: a copy of your account access must not sit on disk for hours. Close the window and open it again — its contents will be assembled anew.',
+    deleteFailed:
+      'The sandbox was not deleted, a copy of your account access is still inside. {{reason}}',
+    accessTitle: 'Account access',
+    access_file: 'Claude Code settings file',
+    access_keychain: 'macOS keychain',
+    access_panel: 'Set by hand in the panel settings',
+    access_apiKey: 'API key from the environment',
+    access_none: 'Not found',
+    noAccess:
+      'A sandbox conversation will not work: Claude Code will answer «Not logged in». Set the access up in Settings → Claude Code access.',
   },
   chat: {
     title: 'Chat',
@@ -340,6 +359,10 @@ export const en: TranslationSchema = {
     questionMulti: 'multiple choices allowed',
     pickOption: 'Answer with this option',
     permissionTitle: 'The agent needs permission',
+    permissionLost:
+      'The decision never reached the agent: the request had already been dropped — it timed out or the conversation was restarted. If the agent is still waiting, send the prompt again.',
+    permissionUnreachable:
+      'The decision was not sent: no connection to the panel server. The agent keeps waiting for an answer.',
     allow: 'Allow',
     deny: 'Deny',
     model: 'Model',
@@ -369,6 +392,8 @@ export const en: TranslationSchema = {
     },
     sandboxHint: 'This chat keeps its files in a separate folder; your projects stay untouched',
     sandboxLabel: 'Panel chat',
+    messageCountPartial:
+      'Long conversation: the list reads the head and tail of the file, so there are at least this many messages.',
     allowEdits: 'Allow editing project files',
     readOnly: 'Read-only',
     editsAllowed: 'Edits allowed',
@@ -395,6 +420,14 @@ export const en: TranslationSchema = {
     deleteArtifactConfirm:
       'File “{{name}}” will be removed from the chat folder. This cannot be undone.',
     artifactDeleted: 'File “{{name}}” deleted',
+    notSent: {
+      busy: 'The previous answer is still being generated — your message was not sent. The running answer is shown: use “Stop” to interrupt it.',
+      files:
+        'The panel cannot pass these attachments: {{names}}. Message not sent. Allowed extensions: {{supported}}.',
+      tooLarge:
+        'The panel does not pass attachments over {{limit}}, so the file was not attached: {{names}}.',
+      other: 'Message not sent: {{message}}',
+    },
     kind: {
       html: 'page',
       markdown: 'markup',
@@ -423,6 +456,10 @@ export const en: TranslationSchema = {
     readOnlyHint: 'These files are read-only: Claude Code installs and updates them',
     noFiles: 'No nested files',
     binaryFile: 'Binary file — cannot be shown as text',
+    deleteFileWarn:
+      'The file {{path}} will be removed from disk. There is no undo — only a backup.',
+    deleteFolderWarn:
+      'The folder {{path}} will be removed entirely, with every file inside it ({{count}}). There is no undo — only a backup.',
   },
   scripts: {
     title: 'Scripts',
@@ -579,6 +616,8 @@ export const en: TranslationSchema = {
     reason_binary: 'Not a text file — the panel does not open it.',
     reason_too_large: 'Too large to edit in the panel.',
     reason_directory: 'This is a directory, not a file.',
+    reason_unsafe_path:
+      'The file lies outside the project — the panel neither opens nor writes it.',
     editFile: 'Edit contents',
     closeFile: 'Collapse',
     moveUp: 'Move up',
@@ -812,6 +851,8 @@ export const en: TranslationSchema = {
       missing_description: 'no description',
     },
     badgeNameMismatch: 'name ≠ folder',
+    deleteSkill:
+      'The skill folder and every file in it will be removed from disk. A copy of the folder is kept in claude-control/backups — restoring it from there is manual only.',
     readOnly: {
       no_frontmatter:
         'The file has no YAML front matter between "---" lines — OpenCode will not load such a skill, and the panel does not rewrite it. Read-only.',
@@ -1254,6 +1295,7 @@ export const en: TranslationSchema = {
     explain:
       'An MCP server gives Claude a set of tools: access to GitLab, Jira, Telegram and others. Servers start together with Claude Code, so new ones appear only after a restart.',
     checkHealth: 'Check',
+    healthTimeout: 'The server did not answer in time — check the URL and the MCP network timeout',
     connected: 'Responding',
     failed: 'Not responding',
     unknown: 'Not checked',
@@ -1262,6 +1304,9 @@ export const en: TranslationSchema = {
     authorized: 'Authorized',
     signOut: 'Sign out',
     oauthCleared: 'Authorization cleared',
+    popupBlocked: 'The browser blocked the sign-in window — open the authorization page yourself',
+    openAuthPage: 'Open the sign-in page',
+    oauthNoUrl: 'The server returned no authorization address — sign-in did not start',
     transport: 'Transport',
     command: 'Start command',
     addServer: 'Add server',
@@ -1367,6 +1412,8 @@ export const en: TranslationSchema = {
       'A group bundles rules, skills, hooks and servers so you can toggle them together and set shared variables. Handy when a set of settings belongs to one task.',
     members: 'members',
     membersTitle: 'Group contents',
+    localHooksSkipped:
+      'Hooks from settings.local.json are not switched by a group ({{count}}): the panel never writes that file, so they keep firing.',
     conflict:
       'Permission conflict: "{{patterns}}" is set to both allow and deny in the group — Claude Code picks one.',
     groupName: 'Name',
@@ -1526,7 +1573,10 @@ export const en: TranslationSchema = {
     pricing_input: 'Input',
     pricing_output: 'Output',
     pricing_cacheRead: 'Cache read',
-    pricing_cacheWrite: 'Cache write',
+    pricing_cacheWrite: 'Cache write, 5 min',
+    pricing_cacheWrite1h: 'Cache write, 1 hour',
+    pricingCacheWriteHint:
+      'Cache writes are billed by how long the entry lives: in the Anthropic price list the 1-hour rate is 1.6× the 5-minute one, and in transcripts almost all cache writes go to the 1-hour cache. Your own price is used exactly as you type it — the panel never scales it. Leave the 1-hour field empty and 1-hour writes are billed at your 5-minute rate.',
     pricingReset: 'Clear own prices',
     backupsTitle: 'Backups',
     backupsHint:
@@ -1568,6 +1618,14 @@ export const en: TranslationSchema = {
     speakNow: 'Speak — the text will appear here',
     finalizing: 'Converting speech to text…',
     applyVoice: 'Done',
+    speechError: {
+      noPermission:
+        'The microphone is unavailable: the browser denied access. Allow recording in the site settings and try again.',
+      network:
+        'The speech recognition service is not responding. Check the internet and try again.',
+      unsupported:
+        'This browser cannot recognise speech — dictation is unavailable. Type the text or open the panel in Chrome.',
+    },
     thinking: 'Thinking…',
     noReply: 'Done.',
     failed: 'Could not get an answer. Check that Claude Code is installed and you are signed in.',
@@ -1733,10 +1791,13 @@ export const en: TranslationSchema = {
     title: 'Analytics',
     subtitle: 'Token spend, sessions and running agents — from local transcripts',
     period: 'Period',
+    today: 'Today',
     days7: '7 days',
     days30: '30 days',
     days90: '90 days',
     allTime: 'All time',
+    rangeFrom: 'Range start',
+    rangeTo: 'Range end',
     exportCsv: 'Export daily data as CSV',
     exportJson: 'Export all data as JSON',
     totalTokens: 'Total tokens',

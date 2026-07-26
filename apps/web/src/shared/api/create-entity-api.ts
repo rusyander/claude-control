@@ -19,6 +19,16 @@ export interface EntityApiConfig {
   alsoInvalidate?: readonly (readonly string[])[];
 }
 
+/**
+ * Путь к одной сущности. id — не всегда слаг: у прав доступа это
+ * `deny:Read(~/.ssh/**)`, и сырая подстановка режет его на лишние сегменты
+ * пути — Fastify-маршрут `/:id` читает ровно один сегмент и отвечает 404,
+ * то есть правило нельзя ни изменить, ни удалить. Кодируем всегда.
+ */
+export function entityPath(resource: string, id: string): string {
+  return `/${resource}/${encodeURIComponent(id)}`;
+}
+
 export function createEntityApi<TItem, TDraft>(config: EntityApiConfig) {
   const { resource, listKey, kind, alsoInvalidate = [queryKeys.overview] } = config;
 
@@ -33,19 +43,20 @@ export function createEntityApi<TItem, TDraft>(config: EntityApiConfig) {
   }
 
   async function update(input: { id: string; draft: TDraft }): Promise<WriteResult> {
-    const { data } = await apiClient.put<WriteResult>(`/${resource}/${input.id}`, input.draft);
+    const { data } = await apiClient.put<WriteResult>(entityPath(resource, input.id), input.draft);
     return data;
   }
 
   async function remove(id: string): Promise<WriteResult> {
-    const { data } = await apiClient.delete<WriteResult>(`/${resource}/${id}`);
+    const { data } = await apiClient.delete<WriteResult>(entityPath(resource, id));
     return data;
   }
 
   async function setEnabled(input: { id: string; isEnabled: boolean }): Promise<WriteResult> {
-    const { data } = await apiClient.post<WriteResult>(`/entities/${kind}/${input.id}/enabled`, {
-      isEnabled: input.isEnabled,
-    });
+    const { data } = await apiClient.post<WriteResult>(
+      `/entities/${kind}/${encodeURIComponent(input.id)}/enabled`,
+      { isEnabled: input.isEnabled },
+    );
     return data;
   }
 

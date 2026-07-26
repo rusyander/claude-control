@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../context.ts';
 import {
   listResourceFiles,
@@ -24,6 +24,18 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
   type Params = { kind: string; id: string };
 
   const kindOf = (params: Params): ResourceKind | undefined => layoutOf(params.kind)?.kind;
+
+  /**
+   * Имя файла приходит из запроса и дальше идёт в `safePath`, где его сразу
+   * тримят. Пропущенный параметр (`/file` без `?file=`) валил там TypeError:
+   * маршрут чтения отвечал 500 с внутренним текстом, удаление — 400 с ним же.
+   * Отсутствие имени — некорректный запрос, и сказать об этом надо словами.
+   */
+  const fileOf = (value: unknown): string | undefined =>
+    typeof value === 'string' && value.trim() ? value : undefined;
+
+  const noFile = (reply: FastifyReply): FastifyReply =>
+    reply.code(400).send({ message: 'Не указан файл' });
 
   // Заготовки структуры: начинать с пустого файла тяжело, а форма скилла
   // с модулями повторяется от скилла к скиллу.
@@ -127,30 +139,36 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
     };
   });
 
-  app.get<{ Params: Params; Querystring: { file: string } }>(
+  app.get<{ Params: Params; Querystring: { file?: string } }>(
     '/api/resources/:kind/:id/file',
     (request, reply) => {
       const kind = kindOf(request.params);
       if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
 
+      const file = fileOf(request.query.file);
+      if (!file) return noFile(reply);
+
       return {
-        file: request.query.file,
-        ...readResourceFile(kind, request.params.id, request.query.file, ctx.location),
+        file,
+        ...readResourceFile(kind, request.params.id, file, ctx.location),
       };
     },
   );
 
-  app.put<{ Params: Params; Body: { file: string; content: string } }>(
+  app.put<{ Params: Params; Body: { file?: string; content: string } }>(
     '/api/resources/:kind/:id/file',
     (request, reply) => {
       const kind = kindOf(request.params);
       if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
+
+      const file = fileOf(request.body?.file);
+      if (!file) return noFile(reply);
 
       try {
         writeResourceFile(
           kind,
           request.params.id,
-          request.body.file,
+          file,
           request.body.content,
           ctx.location,
           ctx.backupDir,
@@ -164,17 +182,20 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
     },
   );
 
-  app.delete<{ Params: Params; Querystring: { file: string } }>(
+  app.delete<{ Params: Params; Querystring: { file?: string } }>(
     '/api/resources/:kind/:id/file',
     (request, reply) => {
       const kind = kindOf(request.params);
       if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
 
+      const file = fileOf(request.query.file);
+      if (!file) return noFile(reply);
+
       try {
         const backupPath = deleteResourceFile(
           kind,
           request.params.id,
-          request.query.file,
+          file,
           ctx.location,
           ctx.backupDir,
         );

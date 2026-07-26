@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type {
   McpServerDraft,
   PermissionDraft,
@@ -14,6 +14,7 @@ import {
   saveMcpServer,
   deleteMcpServer,
   setMcpServerEnabled,
+  McpServerExistsError,
 } from '../domains/mcp.ts';
 import { readPermissions, savePermission, deletePermission } from '../domains/permissions.ts';
 import {
@@ -145,12 +146,26 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
     return readMcpServers(pathsOf(project).mcpConfig, ctx.store);
   });
 
+  // Занятое имя — 409 вместо записи поверх (та же защита, что и на
+  // пользовательском уровне): .mcp.json проекта лежит в его репозитории, и
+  // молчаливая замена чужой записи уехала бы в общий коммит.
+  const mcpExists = (reply: FastifyReply, error: unknown): FastifyReply => {
+    if (error instanceof McpServerExistsError) {
+      return reply.code(409).send({ error: 'server_exists', message: error.message });
+    }
+    throw error;
+  };
+
   app.post<{ Params: { id: string }; Body: McpServerDraft }>(
     '/api/projects/:id/mcp',
     (request, reply) => {
       const project = requireProject(request.params.id, reply);
       if (!project) return reply;
-      return done(saveMcpServer(pathsOf(project).mcpConfig, null, request.body, ctx.backupDir));
+      try {
+        return done(saveMcpServer(pathsOf(project).mcpConfig, null, request.body, ctx.backupDir));
+      } catch (error) {
+        return mcpExists(reply, error);
+      }
     },
   );
 
@@ -159,14 +174,18 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
     (request, reply) => {
       const project = requireProject(request.params.id, reply);
       if (!project) return reply;
-      return done(
-        saveMcpServer(
-          pathsOf(project).mcpConfig,
-          request.params.serverId,
-          request.body,
-          ctx.backupDir,
-        ),
-      );
+      try {
+        return done(
+          saveMcpServer(
+            pathsOf(project).mcpConfig,
+            request.params.serverId,
+            request.body,
+            ctx.backupDir,
+          ),
+        );
+      } catch (error) {
+        return mcpExists(reply, error);
+      }
     },
   );
 

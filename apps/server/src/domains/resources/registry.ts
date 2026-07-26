@@ -1,5 +1,5 @@
 import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import type { ClaudeLocation } from '@claude-control/contracts';
 
 /**
@@ -43,10 +43,7 @@ export interface ResourceLayout {
 export const RESOURCE_LAYOUTS: Record<ResourceKind, ResourceLayout> = {
   skill: {
     kind: 'skill',
-    rootFor: (location, id) => {
-      const segment = safeSegment(id);
-      return segment ? join(location.paths.skills, segment) : undefined;
-    },
+    rootFor: (location, id) => resourceRoot(location.paths.skills, id),
     isDirectory: true,
     isWritable: true,
     entryFile: 'SKILL.md',
@@ -96,11 +93,11 @@ function resolvePluginRoot(claudeRoot: string, id: string): string | undefined {
   const at = id.indexOf('@');
   if (at <= 0) return undefined;
 
-  const name = safeSegment(id.slice(0, at));
-  const marketplace = safeSegment(id.slice(at + 1));
-  if (!name || !marketplace) return undefined;
-
-  const base = join(claudeRoot, 'plugins', 'cache', marketplace, name);
+  // Каждый сегмент кладётся отдельно и с проверкой попадания внутрь предыдущего:
+  // так ни имя, ни маркетплейс не могут увести путь за пределы кэша плагинов.
+  const marketplaceDir = resourceRoot(join(claudeRoot, 'plugins', 'cache'), id.slice(at + 1));
+  const base = marketplaceDir ? resourceRoot(marketplaceDir, id.slice(0, at)) : undefined;
+  if (!base) return undefined;
 
   let versions: string[];
   try {
@@ -120,15 +117,59 @@ function resolvePluginRoot(claudeRoot: string, id: string): string | undefined {
 }
 
 /**
- * Идентификатор приходит из запроса и становится частью пути.
+ * Символы, из-за которых имя перестаёт быть ОДНИМ безопасным сегментом пути:
+ * разделители каталогов и запрещённые в именах файлов Windows. Двоеточие
+ * особенно важно — `SKILL.md:поток` на NTFS не имя файла, а альтернативный
+ * поток внутри чужого.
+ */
+const UNSAFE_SEGMENT = /[\\/:*?"<>|]/;
+
+/** Управляющий символ в имени — не опечатка, а попытка обмануть разбор пути. */
+function hasControlChar(value: string): boolean {
+  for (const char of value) {
+    if ((char.codePointAt(0) ?? 0) < 0x20) return true;
+  }
+  return false;
+}
+
+/**
+ * Идентификатор приходит из запроса и становится ОДНИМ сегментом пути.
  *
- * Возвращает undefined, если после очистки не осталось безопасного имени:
- * кириллица и эмодзи вырезаются целиком, и пустой результат склеился бы с
- * корнем каталога — тогда операция ушла бы не на конкретный ресурс, а на всю
- * папку скиллов. Точки тоже отвергаем: `.` и `..` уводят вверх по дереву.
+ * Раньше отсюда вырезалось всё, кроме `[a-zA-Z0-9._@-]`, — и это чинило ввод
+ * вместо того, чтобы его проверять. Идентификатор скилла — это имя его папки,
+ * а имена папкам даёт пользователь, поэтому кириллица здесь норма, а не атака:
+ * `мой-skill` превращался в `-skill`, панель показывала пустое дерево
+ * несуществующего скилла, а запись создавала папку-призрак рядом с настоящей.
+ * Хуже того, чистка СКЛЕИВАЕТ разные имена в одно (`мой-skill` и `твой-skill`
+ * дают тот же `-skill`) — правки уезжали в чужой ресурс.
+ *
+ * Поэтому имя больше не правится, а отвергается целиком, если перестаёт быть
+ * одним сегментом внутри корня. Некрасивое имя папки (эмодзи, пробелы) — не
+ * наша беда; выход за корень и совпадение двух разных имён — наша.
  */
 export function safeSegment(value: string): string | undefined {
-  const cleaned = value.replace(/[^a-zA-Z0-9._@-]/g, '');
-  if (!cleaned || cleaned === '.' || cleaned === '..' || /^\.+$/.test(cleaned)) return undefined;
-  return cleaned;
+  if (!value || UNSAFE_SEGMENT.test(value) || hasControlChar(value)) return undefined;
+
+  // `.` и `..` — не имена, а шаги вверх по дереву.
+  if (/^\.+$/.test(value)) return undefined;
+
+  // Windows молча срезает хвостовые точки и пробелы: `demo.` открыл бы `demo`,
+  // то есть чужой ресурс под другим именем.
+  if (process.platform === 'win32' && /[. ]$/.test(value)) return undefined;
+
+  return value;
+}
+
+/**
+ * Корень ресурса внутри базовой папки — второй рубеж после `safeSegment`.
+ * Проверяем не только исходное имя, но и РЕЗУЛЬТАТ: что бы ни пропустила
+ * проверка имени на конкретной системе, наружу базовой папки путь не уйдёт, а
+ * совпадение с самим корнем (операция над всей папкой скиллов) отвергается.
+ */
+export function resourceRoot(base: string, id: string): string | undefined {
+  const segment = safeSegment(id);
+  if (!segment) return undefined;
+
+  const root = resolve(base, segment);
+  return root.startsWith(`${resolve(base)}${sep}`) ? root : undefined;
 }

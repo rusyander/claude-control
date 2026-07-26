@@ -9,7 +9,17 @@ export const modelPricingSchema = object({
   input: number().nonnegative(),
   output: number().nonnegative(),
   cacheRead: number().nonnegative(),
+  /** Запись кэша со сроком жизни 5 минут — обычный режим. */
   cacheWrite: number().nonnegative(),
+  /**
+   * Запись кэша со сроком жизни 1 час — в прайсе это ОТДЕЛЬНАЯ колонка (2×
+   * базового входа против 1.25× у пятиминутной). Поле необязательное, но
+   * молчаливо домножать чужую цену на этот множитель нельзя: пока схема знала
+   * четыре поля, zod срезал часовую ставку из своих цен пользователя, и
+   * введённые $6.25 превращались в счёте в $10. Пусто у СВОЕЙ цены означает
+   * «часовая равна пятиминутной, как введено», а не «выведи множителем».
+   */
+  cacheWrite1h: number().nonnegative().optional(),
 });
 
 export type ModelPricing = Infer<typeof modelPricingSchema>;

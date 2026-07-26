@@ -8,6 +8,7 @@ import {
   parseProviderEnvDraft,
   UnrecognizedFormatError,
   EnvKeyNotEncodableError,
+  EnvKeyPreservedError,
   type ProviderEnvTarget,
 } from '../domains/provider-env.ts';
 
@@ -99,6 +100,12 @@ export function registerProviderEnvRoutes(app: FastifyInstance, ctx: ServerConte
       // (400), а не сломанный файл: сообщение объясняет, что именно не так.
       if (error instanceof EnvKeyNotEncodableError) {
         return reply.code(400).send({ error: 'invalid_draft', message: error.message });
+      }
+      // Имя занято немоделируемой записью файла — конфликт одного ключа (409), а
+      // не сломанный формат: раздел остаётся на запись, и пользователь узнаёт,
+      // какую именно переменную поправить. Общий 422 говорил ему неправду.
+      if (error instanceof EnvKeyPreservedError) {
+        return reply.code(409).send({ error: 'env_key_preserved', message: error.message });
       }
       if (error instanceof UnrecognizedFormatError)
         return reply.code(422).send(FORMAT_UNRECOGNIZED);

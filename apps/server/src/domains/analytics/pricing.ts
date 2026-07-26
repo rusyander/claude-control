@@ -16,7 +16,50 @@ export interface ModelPricing {
   input: number;
   output: number;
   cacheRead: number;
+  /** Запись кэша со сроком жизни 5 минут — обычный режим. */
   cacheWrite: number;
+  /**
+   * Запись кэша со сроком жизни 1 час: в прайсе это ОТДЕЛЬНАЯ колонка и стоит
+   * она в 1.6 раза дороже пятиминутной (2× базового входа против 1.25×). На
+   * реальных транскриптах часовым кэшем записано 99% объёма, поэтому одна общая
+   * ставка занижала стоимость записи почти в те же 1.6 раза.
+   *
+   * Пусто у строки ПРАЙСА (встроенная таблица, старый кэш прайса) — ставка
+   * выводится из пятиминутной по {@link LONG_CACHE_RATIO}: это опубликованное
+   * правило, а не догадка. Пусто у СВОЕЙ цены из настроек — берётся введённая
+   * пятиминутная как есть, см. {@link withOwnLongCacheRate}.
+   */
+  cacheWrite1h?: number;
+}
+
+/**
+ * Во сколько раз часовая запись кэша дороже пятиминутной. Обе ставки прайса —
+ * доли базового входа: 1.25× за 5 минут и 2× за час, отсюда 1.6. На встроенной
+ * таблице это соотношение выполняется точно (opus 4.8: 6.25 → 10), поэтому
+ * вывод по множителю не выдумывает цену, а повторяет опубликованное правило.
+ */
+const LONG_CACHE_RATIO = 2 / 1.25;
+
+/**
+ * Часовая ставка строки ПРАЙСА: своя, если источник её дал, иначе выведенная из
+ * пятиминутной. Округление снимает двоичный мусор (6.25 × 1.6 = 10.000000000000002),
+ * который иначе вылезал бы в таблице настроек как «$10.00» вместо «$10».
+ */
+export function longCacheRate(price: ModelPricing): number {
+  if (price.cacheWrite1h !== undefined) return price.cacheWrite1h;
+  return Math.round(price.cacheWrite * LONG_CACHE_RATIO * 1e6) / 1e6;
+}
+
+/**
+ * Часовая ставка СВОЕЙ цены пользователя. Множитель здесь запрещён: цена задана
+ * руками и означает ровно то, что введено. Пока часовое поле не существовало,
+ * `estimateCost` домножал введённую пятиминутную на 1.6 — набранные $6.25
+ * превращались в $10 (+59.6 % на реальных транскриптах, где часовым кэшем
+ * записано 99 % объёма), и ни одно поле интерфейса этого не показывало.
+ * Не знаем часовую — берём введённую как есть, а не придумываем.
+ */
+export function withOwnLongCacheRate(price: ModelPricing): ModelPricing {
+  return price.cacheWrite1h === undefined ? { ...price, cacheWrite1h: price.cacheWrite } : price;
 }
 
 /**
@@ -216,7 +259,7 @@ export function getPricing(model: string, lookup: PricingLookup = {}): ModelPric
   const own = Object.entries(lookup.overrides ?? {})
     .filter(([fragment]) => name.includes(fragment.toLowerCase()))
     .sort((a, b) => b[0].length - a[0].length)[0];
-  if (own) return own[1];
+  if (own) return withOwnLongCacheRate(own[1]);
 
   const entries = lookup.entries ?? BUILT_IN_ENTRIES;
   return findEntry(model, entries, lookup.at)?.price ?? FALLBACK;
@@ -224,16 +267,36 @@ export function getPricing(model: string, lookup: PricingLookup = {}): ModelPric
 
 export function estimateCost(
   model: string,
-  tokens: { input: number; output: number; cacheRead: number; cacheCreation: number },
+  tokens: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheCreation: number;
+    /**
+     * Сколько из `cacheCreation` записано в ЧАСОВОЙ кэш. Это доля, а не
+     * слагаемое: общий объём записи остаётся в `cacheCreation`, здесь — та его
+     * часть, что тарифицируется по дорогой ставке.
+     */
+    cacheCreation1h?: number;
+  },
   lookup: PricingLookup = {},
 ): number {
   const price = getPricing(model, lookup);
   const perMillion = 1_000_000;
 
+  // Долю зажимаем в границы целого: транскрипт пишет не панель, и рассогласование
+  // полей usage не должно давать отрицательную стоимость.
+  const long = Math.min(Math.max(tokens.cacheCreation1h ?? 0, 0), tokens.cacheCreation);
+  const short = tokens.cacheCreation - long;
+  // getPricing уже проставил часовую ставку своей цене (как введена), поэтому
+  // множитель ниже достаётся только строкам прайса без часовой колонки.
+  const longRate = longCacheRate(price);
+
   return (
     (tokens.input * price.input) / perMillion +
     (tokens.output * price.output) / perMillion +
     (tokens.cacheRead * price.cacheRead) / perMillion +
-    (tokens.cacheCreation * price.cacheWrite) / perMillion
+    (short * price.cacheWrite) / perMillion +
+    (long * longRate) / perMillion
   );
 }

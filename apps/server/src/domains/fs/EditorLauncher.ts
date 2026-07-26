@@ -79,10 +79,17 @@ export function resolveEditorCommand(preferred?: string): string | undefined {
   return found?.command;
 }
 
-/** Запустить редактор на каталоге, не блокируя сервер (fire-and-forget). */
+/**
+ * Запустить редактор на каталоге, не блокируя сервер (fire-and-forget).
+ *
+ * Имя команды не дополняем `.cmd`: запуск идёт через оболочку, и cmd.exe сам
+ * разрешает его по PATHEXT — ровно так же, как это делает `where` в проверке
+ * выше. Дополнение молча ломало все редакторы, которые ставятся как `.exe`
+ * (nvim, subl, zed): `where` их находил, а `nvim.cmd` не существует, и кнопка
+ * «Открыть в редакторе» не делала ничего — без единого сообщения.
+ */
 export function openInEditor(path: string, command: string): void {
-  const editorCommand = isWindows && SAFE_COMMAND.test(command) ? `${command}.cmd` : command;
-  const child = spawn(editorCommand, shellArgs([path]), {
+  const child = spawn(command, shellArgs([path]), {
     shell: isWindows,
     windowsHide: true,
     detached: true,

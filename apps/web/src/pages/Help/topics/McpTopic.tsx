@@ -91,7 +91,7 @@ export function McpTopic() {
             tr('canToggle'),
             tr('canAutoCheck'),
           ]}
-          cant={[tr('cantInstall'), tr('cantSecrets'), tr('cantPerTool')]}
+          cant={[tr('cantInstall'), tr('cantSecrets'), tr('cantPerTool'), tr('cantDuplicate')]}
         />
       </HelpSection>
 

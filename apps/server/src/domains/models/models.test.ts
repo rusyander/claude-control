@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ModelInfo } from '@claude-control/contracts';
@@ -220,6 +220,24 @@ describe('кэш каталога', () => {
     expect(cached.models.length).toBeGreaterThan(0);
   });
 
+  it('битый кэш не валит старт панели: каталог пустой, а не исключение', () => {
+    // Оборванная запись: конструктор зовётся на старте сервера, до app.listen —
+    // исключение отсюда означало бы «панель не открывается вовсе».
+    writeFileSync(join(dir, 'models-cache.json'), '{"models": [{"id": "claude-opus');
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+    try {
+      const store = new ModelCatalogStore(dir);
+
+      expect(store.current(['anthropic']).models).toEqual([]);
+      expect(store.isStale()).toBe(true);
+      // Пустой список сам по себе выглядит как «источник ничего не отдал».
+      expect(stderr).toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
   it('свежий кэш второй раз в сеть не ходит, кнопка «обновить» — ходит', async () => {
     const store = new ModelCatalogStore(dir);
     await store.refresh(['anthropic']);
@@ -261,6 +279,53 @@ describe('кэш каталога', () => {
 
     const snapshot = await store.refresh(['anthropic'], { force: true });
     expect(snapshot.models.map((model) => model.id)).toContain('claude-opus-5');
+  });
+
+  /**
+   * Регрессия: идущая загрузка была общей на всех, без оглядки на вендоров. На
+   * старте панели /api/models (активный провайдер) и /api/models?provider=codex
+   * приходят вместе: второй присоединялся к чужой загрузке anthropic и получал
+   * пустой список моделей — без ошибки, с датой, то есть «у Codex моделей нет».
+   */
+  it('параллельные запросы разных вендоров получают каждый свои модели', async () => {
+    const store = new ModelCatalogStore(dir);
+
+    const [anthropic, openai] = await Promise.all([
+      store.refresh(['anthropic']),
+      store.refresh(['openai']),
+    ]);
+
+    expect(anthropic.models.map((model) => model.id)).toContain('claude-opus-5');
+    expect(openai.models.length).toBeGreaterThan(0);
+    expect(openai.models.every((model) => model.vendor === 'openai')).toBe(true);
+  });
+
+  it('параллельные запросы одного вендора по-прежнему дёргают сеть один раз', async () => {
+    const store = new ModelCatalogStore(dir);
+
+    await Promise.all([store.refresh(['anthropic']), store.refresh(['anthropic'])]);
+
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Регрессия: `Date.now() - Date.parse('позавчера')` — NaN, а сравнение с NaN
+   * ложно. Кэш с испорченной датой считался свежим навсегда, и каталог больше
+   * не обновлялся сам — оставалось только жать кнопку или удалять файл.
+   */
+  it('нечитаемая дата в кэше не делает каталог свежим навсегда', async () => {
+    const file = join(dir, 'models-cache.json');
+    await new ModelCatalogStore(dir).refresh(['anthropic']);
+
+    const cached = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+    writeFileSync(file, JSON.stringify({ ...cached, fetchedAt: 'позавчера' }), 'utf8');
+
+    const restarted = new ModelCatalogStore(dir);
+    expect(restarted.isStale()).toBe(true);
+
+    respond(CATALOG);
+    await restarted.refresh(['anthropic']);
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
   });
 
   it('кэш переживает перезапуск панели', async () => {

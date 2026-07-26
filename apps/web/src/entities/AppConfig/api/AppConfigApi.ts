@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import type {
   AppSettings,
   ClaudeLocation,
@@ -6,7 +7,7 @@ import type {
   Overview,
 } from '@claude-control/contracts';
 import { apiClient } from '@shared/api/client';
-import { queryKeys } from '@shared/api/query-keys';
+import { isProviderScopedKey, queryKeys } from '@shared/api/query-keys';
 
 // Транспорт: чистые функции, ничего не знающие про React.
 
@@ -79,19 +80,39 @@ export function useUpdateClaudeMd() {
   });
 }
 
+/**
+ * Разложить ответ `PATCH /settings` по кешу.
+ *
+ * Вынесено из хука отдельной функцией, потому что прогон фронта идёт в node без
+ * DOM: отрендерить мутацию в тесте негде, а поведение при смене провайдера
+ * проверять обязательно.
+ */
+export function applySettingsUpdate(
+  queryClient: QueryClient,
+  settings: AppSettings,
+  patch: Partial<AppSettings>,
+): void {
+  // Настройки кладём в кеш напрямую: тема и язык должны примениться
+  // мгновенно, без ожидания повторного запроса.
+  queryClient.setQueryData(queryKeys.settings, settings);
+  if (patch.provider === undefined) return;
+  // Смена провайдера меняет активный id и карту возможностей — перечитываем
+  // /providers, чтобы навигация перестроилась под нового провайдера.
+  void queryClient.invalidateQueries({ queryKey: queryKeys.providers });
+  // Разделы универсального слоя кешированы без id провайдера. Именно reset, а
+  // не invalidate: invalidate оставляет данные в кеше, и раздел успевает
+  // отрисовать файлы ПРОШЛОГО CLI и утащить их в локальный state редактора —
+  // а «Сохранить» уже уйдёт на маршрут нового провайдера. Сброс гарантирует
+  // загрузку вместо чужих данных; открытые разделы перезапросятся сразу.
+  void queryClient.resetQueries({ predicate: (query) => isProviderScopedKey(query.queryKey) });
+}
+
 export function useUpdateSettings() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: patchSettings,
     onSuccess: (settings, variables) => {
-      // Настройки кладём в кеш напрямую: тема и язык должны примениться
-      // мгновенно, без ожидания повторного запроса.
-      queryClient.setQueryData(queryKeys.settings, settings);
-      // Смена провайдера меняет активный id и карту возможностей — перечитываем
-      // /providers, чтобы навигация перестроилась под нового провайдера.
-      if (variables.provider !== undefined) {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.providers });
-      }
+      applySettingsUpdate(queryClient, settings, variables);
     },
   });
 }

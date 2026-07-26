@@ -261,3 +261,31 @@ describe('runAssistant: сессия сначала, one-shot как запас�
     expect(ask).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Потоки сервера сессий. Сервер живёт до конца работы панели и всё это время
+ * пишет в лог; читать его вывод некому. Оставленная труба заполняется за
+ * единицы килобайт — и запись в неё блокирует сервер НАВСЕГДА, посреди ответа.
+ */
+describe('OpencodeServe: вывод сервера не копится в трубе', () => {
+  it('процесс поднимается со stdio: ignore', async () => {
+    let options: { stdio?: string } | undefined;
+    const spawnImpl = vi.fn(
+      (_command: string, _args: string[], spawnOptions: { stdio?: string }) => {
+        options = spawnOptions;
+        return fakeChild();
+      },
+    );
+    const serve = new OpencodeServe();
+
+    await serve.ensure({
+      command: 'opencode',
+      spawnImpl: spawnImpl as never,
+      fetchImpl: (async () => okHealth()) as never,
+      port: 4097,
+    });
+
+    expect(spawnImpl).toHaveBeenCalled();
+    expect(options?.stdio).toBe('ignore');
+  });
+});

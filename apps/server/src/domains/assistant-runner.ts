@@ -1,8 +1,7 @@
-import {
-  spawn as nodeSpawn,
-  spawnSync,
-  type ChildProcessWithoutNullStreams,
-} from 'node:child_process';
+import { spawn as nodeSpawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { killChildTree } from '../lib/process-tree.ts';
+import { shellArgs } from '../lib/cli-args.ts';
+import { resolveWindowsExecutable, cmdWouldTruncate } from '../lib/win-exec.ts';
 import type { ModelInfo } from '@claude-control/contracts';
 import type { ConfigProvider } from '../providers/types.ts';
 import { providerCliCommand } from '../providers/cli.ts';
@@ -94,20 +93,7 @@ function isWindows(): boolean {
  * остаётся жить и держать порты/файлы. `taskkill /T /F` валит всё дерево; на POSIX
  * достаточно обычного сигнала. Ошибки глушим — снятие процесса не должно ронять ответ.
  */
-function killSpawned(child: { pid?: number; kill: (signal?: NodeJS.Signals) => boolean }): void {
-  try {
-    if (isWindows() && child.pid) {
-      spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
-    }
-  } catch {
-    // taskkill может отсутствовать/отказать — падаем на обычный kill ниже.
-  }
-  try {
-    child.kill();
-  } catch {
-    // Процесс уже завершился — это не ошибка.
-  }
-}
+const killSpawned = killChildTree;
 
 /** Собрать один текстовый промпт из истории (basic-режим — простой текст). */
 function flattenPrompt(messages: AssistantMessage[]): string {
@@ -128,10 +114,33 @@ interface SpawnOutcome {
 }
 
 /**
- * Запуск CLI безопасно, БЕЗ shell-интерполяции: argv-массив передаётся как есть.
- * На Windows команда-обёртка (`*.cmd`) исполняется через `cmd.exe /c` с argv-
- * массивом (Node сам корректно квотит аргументы для cmd.exe) — промпт остаётся
- * отдельным элементом и никогда не склеивается со строкой команды.
+ * Запуск CLI без shell-интерполяции. На POSIX это буквально argv-массив: оболочки
+ * нет, метасимволы разбирать некому.
+ *
+ * На Windows иначе: команда-обёртка (`*.cmd`) запускается только через `cmd.exe`,
+ * а он РАЗБИРАЕТ полученную строку заново. Раньше сюда уходил argv-массив в
+ * расчёте на то, что квотирует Node, — но libuv берёт в кавычки только аргументы
+ * с пробелом, табом или кавычкой. Промпт без пробелов, зато с `&`, `|`, `>` или
+ * `^` доходил до cmd.exe голым: `2+2>4?` перенаправлялся в файл, а `a&whoami`
+ * запускал вторую команду правами сервера. Промпт попадает в argv у всех
+ * провайдеров, кроме claude (у него — через stdin), так что случай не редкий.
+ *
+ * Поэтому строку командной строки собираем сами — тем же `shellArgs`, что и
+ * ChatRunner: правило проекта гласит, что через оболочку идёт либо ОДНА строка,
+ * либо `shellArgs`, но не сырой массив. Внешняя пара кавычек и
+ * `windowsVerbatimArguments` нужны в паре: без флага libuv заквотировал бы уже
+ * заквотированное по второму разу, а `/s` снимает ровно эту внешнюю пару.
+ * `/v:off` добивает `!ИМЯ!`: при включённом отложенном разворачивании оно
+ * подставляется даже внутри кавычек.
+ *
+ * Но и с идеальными кавычками cmd.exe остаётся плохим посредником: `%ИМЯ%` он
+ * подставит из окружения, а на первом переводе строки ОБРЕЖЕТ команду и молча
+ * (код 0) выполнит только первую строку — промпт склеен из истории через
+ * «\n\n», так что обрезание ловил почти каждый второй вопрос подряд. Поэтому
+ * сперва ищем настоящий `.exe` и запускаем его БЕЗ оболочки: argv уходит как
+ * есть. Обёртка `.cmd` без `.exe` рядом — единственный случай, когда cmd.exe
+ * всё ещё нужен, и там мы лучше откажемся с внятной ошибкой, чем отправим
+ * обрубок промпта и выдадим ответ на него за полный.
  */
 function spawnCli(
   command: string,
@@ -145,10 +154,29 @@ function spawnCli(
   let child: ChildProcessWithoutNullStreams;
   try {
     if (isWindows()) {
-      const comspec = process.env.ComSpec || 'cmd.exe';
-      child = spawnImpl(comspec, ['/d', '/s', '/c', command, ...args], {
-        windowsHide: true,
-      }) as ChildProcessWithoutNullStreams;
+      const direct = resolveWindowsExecutable(command);
+      if (direct) {
+        child = spawnImpl(direct, args, { windowsHide: true }) as ChildProcessWithoutNullStreams;
+      } else if (cmdWouldTruncate(args)) {
+        return Promise.resolve({
+          code: null,
+          stdout: '',
+          stderr: '',
+          timedOut: false,
+          spawnError: new Error(
+            `«${command}» установлен как .cmd-обёртка, а через неё Windows обрезает команду ` +
+              'на первом переводе строки — многострочный запрос дошёл бы обрубком. ' +
+              'Поставьте нативный исполняемый файл CLI или задайте запрос одной строкой.',
+          ),
+        });
+      } else {
+        const comspec = process.env.ComSpec || 'cmd.exe';
+        const line = shellArgs([command, ...args]).join(' ');
+        child = spawnImpl(comspec, ['/d', '/s', '/v:off', '/c', `"${line}"`], {
+          windowsHide: true,
+          windowsVerbatimArguments: true,
+        }) as ChildProcessWithoutNullStreams;
+      }
     } else {
       child = spawnImpl(command, args, { windowsHide: true }) as ChildProcessWithoutNullStreams;
     }

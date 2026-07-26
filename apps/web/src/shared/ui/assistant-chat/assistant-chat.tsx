@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
 import { useSpeechRecognition } from '@shared/hooks/use-speech-recognition';
 import { useMicLevels } from '@shared/hooks/use-mic-levels';
+import { speechErrorMessageKey } from '@shared/lib/speech';
 import { VoiceWave } from '@shared/ui/voice-wave';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -41,6 +42,9 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
   // в текст, кнопки заблокированы, но пользователь видит, что идёт обработка.
   const isVoiceMode = speech.listening || speech.finalizing;
   const levels = useMicLevels(speech.listening);
+  // Ошибка распознавания: режим записи закрывается сам, и без этой строки отказ
+  // микрофона не доходил до человека вовсе. null — тишина/отмена, о них молчим.
+  const speechErrorKey = speechErrorMessageKey(speech.error);
 
   /** Отмена: запись прекращается, надиктованное не попадает в поле. */
   const cancelVoice = (): void => {
@@ -187,50 +191,58 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
           </Stack>
         </div>
       ) : (
-        <div className={styles.composer}>
-          <textarea
-            className={styles.input}
-            // Метка для QA-прогона: по ней проверяется, что помощник есть в форме.
-            data-assistant-input
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => {
-              // Enter отправляет, Shift+Enter переносит строку.
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                send();
-              }
-            }}
-            placeholder={t('assistant.inputPlaceholder')}
-            rows={4}
-            aria-label={t('assistant.title')}
-          />
+        <>
+          {speechErrorKey && (
+            <Typography variant="caption" color="danger" className={styles.speechError}>
+              {t(speechErrorKey)}
+            </Typography>
+          )}
 
-          <div className={styles.composerActions}>
-            {speech.supported && (
+          <div className={styles.composer}>
+            <textarea
+              className={styles.input}
+              // Метка для QA-прогона: по ней проверяется, что помощник есть в форме.
+              data-assistant-input
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                // Enter отправляет, Shift+Enter переносит строку.
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  send();
+                }
+              }}
+              placeholder={t('assistant.inputPlaceholder')}
+              rows={4}
+              aria-label={t('assistant.title')}
+            />
+
+            <div className={styles.composerActions}>
+              {speech.supported && (
+                <Button
+                  variant="secondary"
+                  size="md"
+                  iconOnly
+                  icon={<Icon name="mic" size={24} />}
+                  aria-label={t('assistant.startVoice')}
+                  onClick={() => speech.start()}
+                  disabled={ask.isPending}
+                />
+              )}
+
               <Button
-                variant="secondary"
+                variant="primary"
                 size="md"
                 iconOnly
-                icon={<Icon name="mic" size={24} />}
-                aria-label={t('assistant.startVoice')}
-                onClick={() => speech.start()}
-                disabled={ask.isPending}
+                icon={<Icon name="send" size={24} />}
+                aria-label={t('assistant.send')}
+                onClick={send}
+                disabled={!input.trim() || ask.isPending}
+                isLoading={ask.isPending}
               />
-            )}
-
-            <Button
-              variant="primary"
-              size="md"
-              iconOnly
-              icon={<Icon name="send" size={24} />}
-              aria-label={t('assistant.send')}
-              onClick={send}
-              disabled={!input.trim() || ask.isPending}
-              isLoading={ask.isPending}
-            />
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

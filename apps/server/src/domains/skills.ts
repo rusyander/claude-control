@@ -1,6 +1,6 @@
 import { readdirSync, statSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import type { Skill, SkillDraft } from '@claude-control/contracts';
 import {
   readTextFile,
@@ -9,6 +9,7 @@ import {
   removeEntry,
   copyRecursive,
 } from '../lib/safe-io.ts';
+import { slugify } from '../lib/slug.ts';
 import type { AppStore } from '../lib/app-store.ts';
 
 /**
@@ -21,11 +22,12 @@ import type { AppStore } from '../lib/app-store.ts';
  * скрыть скилл, не удаляя его.
  */
 
-const DISABLED_DIR_NAME = 'skills-disabled';
+/** Каталог выключенных скиллов рядом с skills/. Знает и откат копий (backups.ts). */
+export const SKILLS_DISABLED_DIR = 'skills-disabled';
 
 export function readSkills(skillsDir: string, store: AppStore): Skill[] {
   const skills: Skill[] = [];
-  const disabledDir = join(skillsDir, '..', DISABLED_DIR_NAME);
+  const disabledDir = join(skillsDir, '..', SKILLS_DISABLED_DIR);
 
   for (const [dir, isEnabled] of [
     [skillsDir, true],
@@ -72,6 +74,17 @@ function readSkill(
   };
 }
 
+/** Имя нового скилла уже занято — маршрут отвечает 409, а не пишет поверх. */
+export class SkillExistsError extends Error {
+  readonly skillId: string;
+
+  constructor(skillId: string) {
+    super(`Скилл «${skillId}» уже существует и сейчас выключен`);
+    this.name = 'SkillExistsError';
+    this.skillId = skillId;
+  }
+}
+
 export function saveSkill(
   skillsDir: string,
   skillId: string | null,
@@ -79,22 +92,52 @@ export function saveSkill(
   backupDir?: string,
 ): string | undefined {
   const id = skillId ?? slugifyName(draft.name);
-  const skillDir = join(skillsDir, id);
+
+  // Выключенный скилл физически лежит в skills-disabled/. Запись правки в
+  // skills/ создала бы вторую, включённую копию: панель по-прежнему считает
+  // скилл выключенным, а Claude его уже видит. Поэтому пишем туда, где скилл
+  // лежит сейчас, — правка не меняет состояние включённости.
+  const disabledDir = join(skillsDir, '..', SKILLS_DISABLED_DIR);
+  const livesDisabled = !existsSync(join(skillsDir, id)) && existsSync(join(disabledDir, id));
+
+  // СОЗДАНИЕ с занятым слагом — отказ, а не запись поверх: иначе новый черновик
+  // затёр бы чужой скилл. Занят он выключенным (лежит в skills-disabled/, и
+  // «созданный» скилл оказался бы сразу выключенным) или включённым — разницы
+  // нет, теряется чужая работа. Слаги совпадают чаще, чем кажется: имена
+  // режутся до 60 символов, так что «…руководство по стилю, часть первая» и
+  // «…часть вторая» дают один и тот же id.
+  if (skillId === null && (livesDisabled || existsSync(join(skillsDir, id))))
+    throw new SkillExistsError(id);
+
+  const base = livesDisabled ? disabledDir : skillsDir;
+  const skillDir = join(base, id);
   mkdirSync(skillDir, { recursive: true });
 
-  const frontmatter = [
-    '---',
-    `name: ${draft.name}`,
-    `description: ${draft.description}`,
-    '---',
-  ].join('\n');
+  const skillFile = join(skillDir, 'SKILL.md');
+
+  // Шапку пересобираем поверх лежащей на диске: allowed-tools, model, license
+  // форма не знает, а молча их стереть — потеря данных в живом ~/.claude.
+  // Сериализуем тем же yaml, которым разбираем: значение с двоеточием,
+  // кавычками или переводом строки он закавычит сам. Собранная руками строка
+  // такие значения ломала, и Claude Code переставал читать name/description.
+  const existing = existsSync(skillFile)
+    ? splitFrontmatter(readTextFile(skillFile)).frontmatter
+    : {};
+  const header: Record<string, unknown> = { name: draft.name, description: draft.description };
+  for (const [key, value] of Object.entries(existing)) {
+    if (key !== 'name' && key !== 'description') header[key] = value;
+  }
+
+  // lineWidth: 0 — иначе длинное описание сложится в несколько строк, и
+  // запасной построчный разбор шапки увидит от него только первую.
+  const frontmatter = `---\n${stringifyYaml(header, { lineWidth: 0 })}---`;
 
   // Пустой скилл бесполезен: без инструкций Claude нечего исполнять.
   // Поэтому вместо пустого файла кладём каркас с подсказками по разделам.
   const body = draft.body.trim() || buildSkillTemplate(draft.name);
   const content = `${frontmatter}\n\n${body}\n`;
 
-  return writeTextFile(join(skillDir, 'SKILL.md'), content, { backupDir });
+  return writeTextFile(skillFile, content, { backupDir });
 }
 
 /** Каркас нового скилла: структура, которую потом остаётся наполнить. */
@@ -123,7 +166,7 @@ function buildSkillTemplate(name: string): string {
 
 /** Включение и выключение — перенос папки между skills/ и skills-disabled/. */
 export function setSkillEnabled(skillsDir: string, skillId: string, isEnabled: boolean): void {
-  const disabledDir = join(skillsDir, '..', DISABLED_DIR_NAME);
+  const disabledDir = join(skillsDir, '..', SKILLS_DISABLED_DIR);
   const from = isEnabled ? join(disabledDir, skillId) : join(skillsDir, skillId);
   const to = isEnabled ? join(skillsDir, skillId) : join(disabledDir, skillId);
 
@@ -174,7 +217,7 @@ export function renameSkill(
     throw skillError('invalid_name', 'Недопустимое имя скилла.');
   }
 
-  const disabledDir = join(skillsDir, '..', DISABLED_DIR_NAME);
+  const disabledDir = join(skillsDir, '..', SKILLS_DISABLED_DIR);
   const base = existsSync(join(skillsDir, oldId))
     ? skillsDir
     : existsSync(join(disabledDir, oldId))
@@ -225,7 +268,10 @@ export function deleteSkill(
 ): string | undefined {
   let backupPath: string | undefined;
 
-  for (const dir of [join(skillsDir, skillId), join(skillsDir, '..', DISABLED_DIR_NAME, skillId)]) {
+  for (const dir of [
+    join(skillsDir, skillId),
+    join(skillsDir, '..', SKILLS_DISABLED_DIR, skillId),
+  ]) {
     if (!existsSync(dir)) continue;
 
     const made = backupDir
@@ -313,9 +359,27 @@ function directorySize(dir: string): number {
   return listFiles(dir).reduce((total, file) => total + statSync(join(dir, file)).size, 0);
 }
 
+/**
+ * Имя папки скилла из имени, введённого человеком.
+ *
+ * Слаг общий с правилами (`lib/slug.ts`), потому что здесь он не украшение, а
+ * путь на диске: до транслитерации русское имя («Проверка кода») давало пустую
+ * строку, `join(skillsDir, '')` указывал на САМ каталог skills/, и панель
+ * писала `skills/SKILL.md` — скилл не появлялся в списке, а следующее такое же
+ * имя молча затирало этот файл.
+ *
+ * Из имени вообще без букв и цифр (иероглифы, только эмодзи) слага не выйдет —
+ * тогда отказываем с внятным текстом, а не пишем непонятно куда. `statusCode`
+ * читает Fastify: маршрут отвечает 400, а не 500.
+ */
 function slugifyName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  const id = slugify(name);
+  if (id) return id;
+
+  throw Object.assign(
+    new Error(
+      'Из имени не получается имя папки. Добавьте в название латиницу, кириллицу или цифры.',
+    ),
+    { statusCode: 400, code: 'invalid_name' },
+  );
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { settingsPatchSchema } from './settings-validation.ts';
+import { settingsPatchSchema, importStateSchema } from './settings-validation.ts';
 
 /**
  * Серверная схема PATCH — своя копия контрактной, разъезжаться им нельзя.
@@ -94,5 +94,73 @@ describe('settingsPatchSchema — провайдер', () => {
 
   it('отклоняет провайдера неверного типа', () => {
     expect(settingsPatchSchema.safeParse({ provider: 123 }).success).toBe(false);
+  });
+});
+
+/**
+ * Регрессия про ДЕНЬГИ. Прайс держит ДВЕ ставки записи кэша: пятиминутную и
+ * часовую (последняя в 1.6 раза дороже), и на реальных транскриптах часовым
+ * кэшем пишется 99% объёма. Схема знала четыре поля — zod срезал часовую ставку
+ * из своей цены пользователя, она не доезжала до state.json, а расчёт домножал
+ * введённую пятиминутную на 1.6: набранные $6.25 превращались в счёте в $10.
+ */
+describe('settingsPatchSchema — своя часовая ставка кэша', () => {
+  const price = { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 };
+
+  it('часовая ставка доезжает до настроек, а не срезается схемой', () => {
+    const parsed = settingsPatchSchema.safeParse({
+      modelPricing: { 'claude-opus-4-8': { ...price, cacheWrite1h: 7 } },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.modelPricing?.['claude-opus-4-8']).toEqual({ ...price, cacheWrite1h: 7 });
+  });
+
+  it('часовая ставка необязательна — прежние свои цены остаются валидными', () => {
+    const parsed = settingsPatchSchema.safeParse({ modelPricing: { opus: price } });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.modelPricing?.opus).toEqual(price);
+  });
+
+  it('отрицательная часовая ставка отклоняется', () => {
+    expect(
+      settingsPatchSchema.safeParse({ modelPricing: { opus: { ...price, cacheWrite1h: -1 } } })
+        .success,
+    ).toBe(false);
+  });
+});
+
+/**
+ * Импорт снимка с другой машины. zod вырезает всё, чего в схеме нет, поэтому
+ * каждое поле состояния обязано быть в ней перечислено: без этого перенос
+ * МОЛЧА терял часть настроек — пользователь видел «импортировано» и пустой
+ * список проектов.
+ */
+describe('importStateSchema — ничего не теряется при переносе', () => {
+  it('пропускает список проектов, команды и настройки запуска, отметки провайдеров', () => {
+    const parsed = importStateSchema.safeParse({
+      projects: [{ path: 'c:/work/app', name: 'app' }],
+      runnerCommands: { 'c:/work/app': 'pnpm dev' },
+      runnerPrefs: { 'c:/work/app': { autostart: true, pinnedPort: 5173 } },
+      providerChecks: { codex: { status: 'ok' } },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.projects).toHaveLength(1);
+    expect(parsed.data.runnerCommands).toEqual({ 'c:/work/app': 'pnpm dev' });
+    expect(parsed.data.runnerPrefs?.['c:/work/app']).toBeDefined();
+    expect(parsed.data.providerChecks?.codex).toBeDefined();
+  });
+
+  it('отпечаток парольной фразы НЕ переносится: чужой заблокировал бы шифрование навсегда', () => {
+    const parsed = importStateSchema.safeParse({ secretBackupVerifier: 'чужой-отпечаток' });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect('secretBackupVerifier' in parsed.data).toBe(false);
+  });
+
+  it('отклоняет команды запуска неверного типа', () => {
+    expect(importStateSchema.safeParse({ runnerCommands: { 'c:/work': 42 } }).success).toBe(false);
   });
 });

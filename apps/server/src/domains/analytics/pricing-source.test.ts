@@ -47,7 +47,47 @@ describe('parsePricingTable', () => {
     const opus = parsePricingTable(PAGE).find((entry) => entry.id === 'claude-opus-4-8');
     // Колонка «1h Cache Writes» ($10) стоит между записью и чтением кэша —
     // при разборе по номерам колонок она бы уехала в цену чтения.
-    expect(opus?.price).toEqual({ input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 });
+    expect(opus?.price).toEqual({
+      input: 5,
+      output: 25,
+      cacheRead: 0.5,
+      cacheWrite: 6.25,
+      cacheWrite1h: 10,
+    });
+  });
+
+  describe('часовая запись кэша — своя колонка (регрессия)', () => {
+    // Разбор брал только «5m Cache Writes», а транскрипты пишут почти весь объём
+    // в часовой кэш — он в 1.6 раза дороже. Вся запись кэша считалась по дешёвой
+    // ставке, и стоимость в панели выходила заниженной примерно на 38%.
+    it('ставка $10 за час берётся из своей колонки, а не приравнивается к $6.25', () => {
+      const opus = parsePricingTable(PAGE).find((entry) => entry.id === 'claude-opus-4-8');
+      expect(opus?.price.cacheWrite1h).toBe(10);
+      expect(opus?.price.cacheWrite).toBe(6.25);
+    });
+
+    it('часовая ставка разобрана у всех строк таблицы', () => {
+      const entries = parsePricingTable(PAGE);
+      expect(
+        entries.every((entry) => (entry.price.cacheWrite1h ?? 0) > entry.price.cacheWrite),
+      ).toBe(true);
+    });
+
+    it('колонки нет — разбор не отменяется, ставка просто не проставлена', () => {
+      // Обязательной её делать нельзя: пропажа увела бы панель на встроенную
+      // таблицу целиком, а это хуже, чем вывести часовую ставку из пятиминутной.
+      const withoutLong = `## Model pricing
+
+| Model | Base Input Tokens | 5m Cache Writes | Cache Hits & Refreshes | Output Tokens |
+| ----- | ----------------- | --------------- | ---------------------- | ------------- |
+| Claude Opus 4.8 | $5 / MTok | $6.25 / MTok | $0.50 / MTok | $25 / MTok |
+`;
+      const opus = parsePricingTable(withoutLong).find((entry) => entry.id === 'claude-opus-4-8');
+
+      expect(opus?.price.cacheWrite).toBe(6.25);
+      expect(opus?.price.cacheRead).toBe(0.5);
+      expect(opus?.price.cacheWrite1h).toBeUndefined();
+    });
   });
 
   it('останавливается на конце таблицы и не тянет цены из соседней', () => {
@@ -224,6 +264,24 @@ describe('PricingStore', () => {
     expect(store.isStale()).toBe(true);
   });
 
+  it('битый кэш не валит старт панели, а откатывает на встроенную таблицу', () => {
+    // Оборванная запись: конструктор зовётся на старте сервера, до app.listen —
+    // исключение отсюда означало бы «панель не открывается вовсе».
+    writeFileSync(join(dir, 'pricing-cache.json'), '{"entries": [{"id": "claude-opus');
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+    try {
+      const store = new PricingStore(dir);
+
+      expect(store.current().source).toBe('built-in');
+      expect(store.isStale()).toBe(true);
+      // Подмена молчком неотличима от свежего прайса — про неё должно быть сказано.
+      expect(stderr).toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
   it('обновление сохраняет прайс на диск и делает его актуальным', async () => {
     const store = new PricingStore(dir);
     await store.refresh();
@@ -291,6 +349,28 @@ describe('PricingStore', () => {
       expect(store.current().source).toBe('anthropic');
     });
 
+    /**
+     * Регрессия: неудача обновления не оставляла следа, и маршрут не мог
+     * отличить «сходили и не смогли» от «ходить было незачем» — кнопка
+     * «Обновить» отвечала успехом при выключенной сети.
+     */
+    it('причина неудачи запоминается и снимается после удачного обновления', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          throw new Error('ENOTFOUND');
+        }),
+      );
+      const store = new PricingStore(dir);
+
+      await store.refresh({ force: true });
+      expect(store.lastError()).toContain('ENOTFOUND');
+
+      stubOk();
+      await store.refresh({ force: true });
+      expect(store.lastError()).toBeUndefined();
+    });
+
     it('на первом запуске без сети остаёмся на встроенной таблице', async () => {
       vi.stubGlobal(
         'fetch',
@@ -311,6 +391,27 @@ describe('PricingStore', () => {
     const store = new PricingStore(dir);
     expect(store.current().source).toBe('built-in');
     expect(store.current().entries.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * Регрессия: `Date.now() - Date.parse('вчера')` — это NaN, а любое сравнение с
+   * NaN ложно. Кэш с испорченной датой объявлялся свежим НАВСЕГДА: в сеть панель
+   * больше не ходила и до конца дней считала расход по замороженным ценам.
+   */
+  it('нечитаемая дата в кэше не делает прайс свежим навсегда', async () => {
+    stubOk();
+    const file = join(dir, 'pricing-cache.json');
+    await new PricingStore(dir).refresh();
+
+    const cached = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+    writeFileSync(file, JSON.stringify({ ...cached, fetchedAt: 'позавчера' }), 'utf8');
+
+    const restarted = new PricingStore(dir);
+    expect(restarted.isStale()).toBe(true);
+
+    const spy = stubOk();
+    await restarted.refresh();
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it('сохранённый кэш читается обратно как валидный JSON', async () => {

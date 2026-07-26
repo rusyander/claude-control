@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ClaudeLocation } from '@claude-control/contracts';
 import { AppStore } from '../../lib/app-store.ts';
-import { createSandbox, removeSandbox, sandboxPaths } from './SandboxConfig.ts';
+import { createSandbox, removeSandbox, sandboxPaths, stopSandboxSweeper } from './SandboxConfig.ts';
 
 /**
  * Тесты изоляции песочницы. Суть песочницы — временный каталог настроек, куда
@@ -50,6 +50,8 @@ describe('SandboxConfig', () => {
   });
 
   afterEach(() => {
+    // Сборка песочницы взводит фоновое подметание — тест не оставляет его тикать.
+    stopSandboxSweeper();
     removeSandbox(sandboxId);
     rmSync(root, { recursive: true, force: true });
   });
@@ -143,6 +145,57 @@ describe('SandboxConfig', () => {
     // А глобальное окружение сервера не тронуто: раньше при параллельной сборке
     // двух песочниц значение протекало во все последующие дочерние процессы.
     expect(process.env.CLAUDE_CONTROL_SANDBOX_WORKDIR).toBeUndefined();
+  });
+
+  // ── Удаление песочницы: внутри копия доступа к аккаунту ──
+  describe('removeSandbox', () => {
+    it('сносит песочницу со скиллом, у которого русское имя папки', () => {
+      // Регрессия: рекурсивный rmSync на таких путях под Windows рапортует об
+      // успехе, ничего не удалив (см. safe-io.ts), — и копия .credentials.json
+      // оставалась на диске, пока панель докладывала «песочница стёрта».
+      mkdirSync(join(root, 'skills', 'мой-скилл'), { recursive: true });
+      writeFileSync(join(root, 'skills', 'мой-скилл', 'SKILL.md'), '# скилл');
+
+      const sandbox = createSandbox(sandboxId, { skillIds: ['мой-скилл'] }, location, store);
+      expect(existsSync(join(sandbox.configDir, 'skills', 'мой-скилл', 'SKILL.md'))).toBe(true);
+
+      removeSandbox(sandboxId);
+
+      const { root: sandboxRoot } = sandboxPaths(sandboxId);
+      expect(existsSync(sandboxRoot)).toBe(false);
+      expect(existsSync(join(sandbox.configDir, '.credentials.json'))).toBe(false);
+    });
+
+    it('повторное удаление не считается ошибкой', () => {
+      createSandbox(sandboxId, {}, location, store);
+      removeSandbox(sandboxId);
+
+      expect(() => removeSandbox(sandboxId)).not.toThrow();
+    });
+
+    it.runIf(process.platform === 'win32')(
+      'папку не отдали — наружу ошибка с путём, а не молчаливое «удалено»',
+      () => {
+        // Ради чего всё затевалось: маршрут DELETE возвращает {ok:true}
+        // последней строкой, поэтому неудача обязана прийти исключением, иначе
+        // пользователю сообщат об удалении оставшейся на диске копии доступа.
+        // Занятую папку воспроизводим текущим каталогом процесса — Windows не
+        // даёт её удалить (на POSIX даёт, поэтому проверка только здесь).
+        const sandbox = createSandbox(sandboxId, {}, location, store);
+        const { root: sandboxRoot } = sandboxPaths(sandboxId);
+        const cwd = process.cwd();
+        process.chdir(sandboxRoot);
+
+        try {
+          expect(() => removeSandbox(sandboxId)).toThrow(/удалить/i);
+          expect(existsSync(sandboxRoot)).toBe(true);
+        } finally {
+          process.chdir(cwd);
+        }
+
+        expect(sandbox.configDir).toContain(sandboxRoot);
+      },
+    );
   });
 
   it('MCP-сервер попадает в settings.json песочницы со своими полями', () => {

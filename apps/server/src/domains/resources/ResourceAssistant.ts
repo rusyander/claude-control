@@ -3,6 +3,7 @@ import type { ClaudeLocation } from '@claude-control/contracts';
 import { listResourceFiles, readResourceFile, isWritable } from './ResourceFiles.ts';
 import type { ResourceKind } from './registry.ts';
 import { safeSessionId } from '../../lib/cli-args.ts';
+import { killChildTree } from '../../lib/process-tree.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
 
 /**
@@ -141,7 +142,8 @@ function runClaude(prompt: string, command: string, sessionId?: string): Promise
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => {
-      child.kill();
+      // Дерево, а не сам процесс: под `cmd.exe` обычный kill оставил бы CLI жить.
+      killChildTree(child);
       reject(new Error('Помощник не ответил за отведённое время'));
     }, 240_000);
 

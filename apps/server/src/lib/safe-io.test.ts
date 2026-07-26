@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+  readFileSync,
+  readdirSync,
+  existsSync,
+  statSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -170,6 +178,31 @@ describe('safe-io', () => {
       const backup = writeJsonFile(path, { version: 2 }, { backupDir });
       expect(backup).toBeDefined();
       expect(JSON.parse(readFileSync(backup!, 'utf8'))).toEqual({ version: 1 });
+    });
+  });
+
+  // На Windows chmod управляет только флагом «только чтение», прав POSIX там нет —
+  // проверять нечего, поэтому блок пропускается целиком.
+  describe.skipIf(process.platform === 'win32')('права доступа', () => {
+    it('перезапись не сбрасывает права существующего файла', () => {
+      const path = join(dir, 'settings.json');
+      writeFileSync(path, '{}', { mode: 0o600 });
+      writeJsonFile(path, { version: 2 });
+      // Запись идёт через временный файл + rename: без восстановления режима
+      // файл стал бы 0644 (umask), то есть читаемым для всех.
+      expect(statSync(path).mode & 0o777).toBe(0o600);
+    });
+
+    it('новый файл секретов создаётся с 0600', () => {
+      const path = join(dir, '.credentials.json');
+      writeJsonFile(path, { claudeAiOauth: { accessToken: 'секрет' } });
+      expect(statSync(path).mode & 0o777).toBe(0o600);
+    });
+
+    it('обычный новый файл права не ужимает', () => {
+      const path = join(dir, 'settings.json');
+      writeJsonFile(path, { version: 1 });
+      expect(statSync(path).mode & 0o600).toBe(0o600);
     });
   });
 

@@ -21,6 +21,11 @@ const modelPricingSchema = object({
   output: number().nonnegative(),
   cacheRead: number().nonnegative(),
   cacheWrite: number().nonnegative(),
+  // Часовая запись кэша — отдельная ставка прайса. Без этого поля zod срезал бы
+  // её из своей цены пользователя, и панель считала бы часть записи по
+  // выведенному множителю ×1.6 вместо введённой цифры (см. modelPricingSchema
+  // в contracts).
+  cacheWrite1h: number().nonnegative().optional(),
 });
 
 /** Поля настроек без дефолтов — для частичной проверки PATCH. */
@@ -67,5 +72,16 @@ export const importStateSchema = object({
   disabledByGroup: record(string(), record(string(), array(string()))),
   disabledHooks: record(string(), unknown()),
   envByGroup: record(string(), array(string())),
+  // Эти четыре поля обязаны быть в схеме, хотя `importState` и так умеет их
+  // сливать: zod вырезает всё, чего в схеме нет, — и без них экспорт с одной
+  // машины, применённый на другой, МОЛЧА терял список проектов, команды и
+  // автозапуск dev-серверов и отметки о проверке провайдеров.
+  projects: array(unknown()),
+  runnerCommands: record(string(), string()),
+  runnerPrefs: record(string(), unknown()),
+  providerChecks: record(string(), unknown()),
+  // `secretBackupVerifier` намеренно НЕ импортируем: это отпечаток парольной
+  // фразы, которая есть только в голове у владельца исходной машины. Чужой
+  // verifier заблокировал бы шифрование копий здесь навсегда.
   settings: settingsPatchSchema,
 }).partial();

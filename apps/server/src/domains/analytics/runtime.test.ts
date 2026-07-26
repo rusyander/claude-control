@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { isClaudeAgentCommand, parseWindowsOutput, parseUnixOutput } from './runtime.ts';
+import type { RunningAgent } from '@claude-control/contracts';
+import {
+  isClaudeAgentCommand,
+  parseWindowsOutput,
+  parseUnixOutput,
+  createProcessScanCache,
+} from './runtime.ts';
 
 /**
  * Раздел «Работающие агенты» искал процесс с именем `claude` — а Claude Code,
@@ -111,6 +117,139 @@ describe('parseWindowsOutput', () => {
   it('пустой вывод — пустой список', () => {
     expect(parseWindowsOutput('')).toEqual([]);
     expect(parseWindowsOutput('   ')).toEqual([]);
+  });
+});
+
+/**
+ * Кэш обхода процессов. Обход стоит секунды (на Windows это powershell.exe с
+ * Get-CimInstance — 4-5 с на замерах), а страница аналитики опрашивает живые
+ * данные раз в 5 секунд: без кэша PowerShell не выходил из памяти вовсе, и
+ * КАЖДЫЙ ответ /api/analytics ждал его целиком — даже отдавая всё остальное из
+ * своего кэша. Проверяем четыре свойства: повтор не сканирует, параллельные
+ * вызовы делят обход, устаревшее отдаётся сразу и обновляется в фоне, а совсем
+ * старое ждёт настоящий обход.
+ */
+describe('createProcessScanCache', () => {
+  const agent = (pid: number): RunningAgent => ({ pid, name: 'claude', memoryMb: 1 });
+  const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('в пределах TTL обход не повторяется', async () => {
+    let calls = 0;
+    const cached = createProcessScanCache(async () => {
+      calls += 1;
+      return [agent(calls)];
+    }, 60_000);
+
+    expect(await cached()).toEqual([agent(1)]);
+    expect(await cached()).toEqual([agent(1)]);
+    expect(calls).toBe(1);
+  });
+
+  it('параллельные вызовы делят один обход', async () => {
+    let calls = 0;
+    const cached = createProcessScanCache(async () => {
+      calls += 1;
+      await tick();
+      return [agent(calls)];
+    }, 60_000);
+
+    const [first, second] = await Promise.all([cached(), cached()]);
+    expect(calls).toBe(1);
+    expect(first).toEqual(second);
+  });
+
+  it('устаревший список отдаётся сразу, а обновляется в фоне (регрессия)', async () => {
+    let calls = 0;
+    let finishSecond: ((agents: RunningAgent[]) => void) | undefined;
+    const cached = createProcessScanCache(
+      () => {
+        calls += 1;
+        if (calls === 1) return Promise.resolve([agent(1)]);
+        return new Promise<RunningAgent[]>((resolve) => {
+          finishSecond = resolve;
+        });
+        // TTL нулевой, потолок устаревания — заведомо недостижимый: здесь
+        // проверяется именно фоновая ветка.
+      },
+      0,
+      60_000,
+    );
+
+    // Первый вызов ждёт обход: показывать ещё нечего.
+    expect(await cached()).toEqual([agent(1)]);
+
+    // TTL истёк, но ответ приходит немедленно — второй обход ещё висит.
+    expect(await cached()).toEqual([agent(1)]);
+    expect(calls).toBe(2);
+
+    finishSecond?.([agent(2)]);
+    await tick();
+    expect(await cached()).toEqual([agent(2)]);
+  });
+
+  /**
+   * Регрессия: устаревание было НЕОГРАНИЧЕННЫМ. Фоновое обновление случается
+   * только когда за списком приходят, поэтому после часа простоя первый же
+   * ответ отдавал часовой список — а маршрут штампует его `at: сейчас`, то есть
+   * давно закрытые агенты показывались работающими прямо сейчас.
+   */
+  it('за потолком устаревания ответ ждёт настоящий обход (регрессия)', async () => {
+    let calls = 0;
+    let finishSecond: ((agents: RunningAgent[]) => void) | undefined;
+    const cached = createProcessScanCache(
+      () => {
+        calls += 1;
+        if (calls === 1) return Promise.resolve([agent(1)]);
+        return new Promise<RunningAgent[]>((resolve) => {
+          finishSecond = resolve;
+        });
+      },
+      0,
+      0,
+    );
+
+    expect(await cached()).toEqual([agent(1)]);
+
+    // Второй вызов не отвечает старым списком — он висит, пока обход не придёт.
+    let answered: RunningAgent[] | undefined;
+    const pending = cached().then((agents) => {
+      answered = agents;
+    });
+
+    await tick();
+    expect(calls).toBe(2);
+    expect(answered).toBeUndefined();
+
+    finishSecond?.([agent(2)]);
+    await pending;
+    expect(answered).toEqual([agent(2)]);
+  });
+
+  it('за потолком устаревания отказ обхода отдаёт последнее известное', async () => {
+    let calls = 0;
+    const cached = createProcessScanCache(
+      () => {
+        calls += 1;
+        return calls === 1 ? Promise.resolve([agent(1)]) : Promise.reject(new Error('нет прав'));
+      },
+      0,
+      0,
+    );
+
+    expect(await cached()).toEqual([agent(1)]);
+    expect(await cached()).toEqual([agent(1)]);
+  });
+
+  it('первый вызов ждёт обход, пустой результат кэшируется как значение', async () => {
+    let calls = 0;
+    const cached = createProcessScanCache(async () => {
+      calls += 1;
+      return [];
+    }, 60_000);
+
+    expect(await cached()).toEqual([]);
+    expect(await cached()).toEqual([]);
+    expect(calls).toBe(1);
   });
 });
 

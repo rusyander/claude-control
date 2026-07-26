@@ -6,7 +6,13 @@ import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
-import { useCreateSandbox, useDeleteSandbox, type SandboxDescription } from '@entities/Sandbox';
+import {
+  useCreateSandbox,
+  useDeleteSandbox,
+  sandboxAccessNotice,
+  type SandboxCredentials,
+  type SandboxDescription,
+} from '@entities/Sandbox';
 import { HookProbePanel } from './HookProbePanel';
 import { McpProbePanel } from './McpProbePanel';
 import { SandboxChat } from './SandboxChat';
@@ -41,6 +47,11 @@ export function SandboxModal({
   const [tab, setTab] = useState<Tab>(hasProbe ? 'probe' : 'chat');
   const [description, setDescription] = useState<SandboxDescription | undefined>(undefined);
 
+  // Откуда песочница взяла доступ к аккаунту. Без него разговор не пойдёт, и
+  // узнавать об этом из «Not logged in» после запроса — поздно.
+  const [credentials, setCredentials] = useState<SandboxCredentials | undefined>(undefined);
+  const access = sandboxAccessNotice(credentials, t);
+
   // Своя песочница на каждое открытие окна: идентификатор рождается там же, где
   // она создаётся, поэтому уборка гарантированно стирает именно её.
   const [sandboxId, setSandboxId] = useState('');
@@ -62,12 +73,21 @@ export function SandboxModal({
 
     setSandboxId(id);
     setTab(probe ? 'probe' : 'chat');
-    open({ id, selection: what }, { onSuccess: (data) => setDescription(data.description) });
+    open(
+      { id, selection: what },
+      {
+        onSuccess: (data) => {
+          setDescription(data.description);
+          setCredentials(data.credentials);
+        },
+      },
+    );
 
     // Песочница живёт ровно столько, сколько открыто окно: закрыли — стёрли.
     return () => {
       drop(id);
       setDescription(undefined);
+      setCredentials(undefined);
     };
   }, [isOpen]);
 
@@ -113,6 +133,31 @@ export function SandboxModal({
             {create.isPending && <Typography color="muted">{t('sandbox.preparing')}</Typography>}
 
             {description && <ContentsList description={description} />}
+
+            {/* Доступ к аккаунту: называем источник, а при его отсутствии —
+                причину. Разговор без доступа не пойдёт, и человек должен узнать
+                это здесь, а не из «Not logged in» в ответе CLI. */}
+            {access && (
+              <div className={styles.access}>
+                <Stack gap="var(--spacing-3xs)">
+                  <Typography variant="caption" color="subtle" as="span">
+                    {t('sandbox.accessTitle')}
+                  </Typography>
+                  <Typography
+                    variant="body-sm"
+                    color={access.warning ? 'warning' : 'default'}
+                    as="span"
+                  >
+                    {access.sourceText}
+                  </Typography>
+                  {access.warning && (
+                    <Typography variant="caption" color="warning">
+                      {access.warning}
+                    </Typography>
+                  )}
+                </Stack>
+              </div>
+            )}
 
             <div className={styles.isolation}>
               <Stack gap="var(--spacing-3xs)">

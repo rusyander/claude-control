@@ -8,6 +8,7 @@ import {
   deleteProviderMcpServer,
   parseUniversalDraft,
   UnrecognizedFormatError,
+  McpServerExistsError,
   type ProviderMcpTarget,
 } from '../domains/provider-mcp.ts';
 
@@ -93,6 +94,11 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
     try {
       return done(upsertProviderMcpServer(target, null, draft, ctx.backupDir));
     } catch (error) {
+      // Имя занято: молча писать поверх — потеря чужого сервера, поэтому
+      // конфликт и решение остаётся за человеком (переименовать или открыть тот).
+      if (error instanceof McpServerExistsError) {
+        return reply.code(409).send({ error: 'server_exists', message: error.message });
+      }
       if (error instanceof UnrecognizedFormatError)
         return reply.code(422).send(FORMAT_UNRECOGNIZED);
       throw error;
@@ -109,6 +115,10 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
     try {
       return done(upsertProviderMcpServer(target, request.params.id, draft, ctx.backupDir));
     } catch (error) {
+      // Переименование в занятое имя — тот же конфликт, что и создание.
+      if (error instanceof McpServerExistsError) {
+        return reply.code(409).send({ error: 'server_exists', message: error.message });
+      }
       if (error instanceof UnrecognizedFormatError)
         return reply.code(422).send(FORMAT_UNRECOGNIZED);
       throw error;

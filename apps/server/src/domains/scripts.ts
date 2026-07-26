@@ -1,6 +1,6 @@
-import { readdirSync, statSync, existsSync, mkdirSync, rmSync } from 'node:fs';
-import { join, extname, relative, sep } from 'node:path';
-import { readTextFile, writeTextFile, backupEntry } from '../lib/safe-io.ts';
+import { readdirSync, statSync, existsSync, mkdirSync } from 'node:fs';
+import { join, extname, relative, sep, isAbsolute } from 'node:path';
+import { readTextFile, writeTextFile, backupEntry, removeEntry } from '../lib/safe-io.ts';
 
 /**
  * Скрипты в каталоге hooks/. Это обычные файлы, которые запускают хуки, но
@@ -78,7 +78,14 @@ export function readScripts(hooksDir: string, usedPaths: string[]): ScriptFile[]
 }
 
 export function readScriptContent(hooksDir: string, id: string): string {
-  return readTextFile(join(hooksDir, sanitizeRelPath(id)));
+  const path = resolveScriptPath(hooksDir, id);
+
+  // Отсутствующий файл — отказ, а не пустая строка. Пустой редактор выглядел бы
+  // как «скрипт пустой», и первое же сохранение СОЗДАВАЛО бы файл заново вместо
+  // правки того, за которым пришли (список к тому моменту мог устареть).
+  if (!existsSync(path)) throw new ScriptNotFoundError(id);
+
+  return readTextFile(path);
 }
 
 export function saveScript(
@@ -87,7 +94,7 @@ export function saveScript(
   content: string,
   backupDir?: string,
 ): string | undefined {
-  const target = join(hooksDir, sanitizeRelPath(id));
+  const target = resolveScriptPath(hooksDir, id);
   mkdirSync(dirOf(target), { recursive: true });
   return writeTextFile(target, content, { backupDir });
 }
@@ -98,11 +105,19 @@ export function saveScript(
  * способ отмены. Возвращаем путь резервной копии, чтобы маршрут его отдал.
  */
 export function deleteScript(hooksDir: string, id: string, backupDir?: string): string | undefined {
-  const path = join(hooksDir, sanitizeRelPath(id));
-  if (!existsSync(path)) return undefined;
+  const path = resolveScriptPath(hooksDir, id);
+
+  // Раньше отсутствие файла тихо возвращало undefined, а маршрут отвечал
+  // `{ok:true}` — панель показывала «удалено», хотя не удалила ничего (файл мог
+  // остаться на диске из-за другой ошибки, а пользователь считал вопрос
+  // закрытым). Отказ честнее: `statusCode` Fastify превращает в 404.
+  if (!existsSync(path)) throw new ScriptNotFoundError(id);
 
   const backupPath = backupDir ? backupEntry(path, backupDir) : undefined;
-  rmSync(path, { force: true });
+
+  // removeEntry, а не rmSync: имя скрипта может быть нелатинским, а рекурсивный
+  // rmSync на таком пути в Windows рапортует об успехе, ничего не удалив.
+  removeEntry(path);
   return backupPath;
 }
 
@@ -113,17 +128,53 @@ function dirOf(path: string): string {
 }
 
 /**
- * Идентификатор приходит из запроса и может быть вложенным путём. Разрешаем
- * подпапки, но каждый сегмент чистим до безопасных символов и выкидываем `.`,
- * `..` и пустые — так `join(hooksDir, …)` не выйдет за пределы каталога.
+ * Скрипта с таким id на диске нет. `statusCode` читает сам Fastify — маршрут
+ * отвечает 404 без своей обработки, а панель показывает текст причины.
  */
-function sanitizeRelPath(id: string): string {
-  const parts = id
-    .replace(/\\/g, '/')
-    .split('/')
-    .map((segment) => segment.replace(/[^a-zA-Z0-9._-]/g, ''))
-    .filter((segment) => segment && segment !== '.' && segment !== '..');
-  return parts.join('/') || 'script.mjs';
+export class ScriptNotFoundError extends Error {
+  readonly statusCode = 404;
+
+  constructor(id: string) {
+    super(`Скрипт «${id}» не найден`);
+    this.name = 'ScriptNotFoundError';
+  }
+}
+
+/** Небезопасный идентификатор скрипта — маршрут отвечает 400, НИКОГДА не 404. */
+export class UnsafeScriptPathError extends Error {
+  constructor(shown: string, reason: string) {
+    super(`Небезопасный путь скрипта «${shown}»: ${reason}`);
+    this.name = 'UnsafeScriptPathError';
+  }
+}
+
+/**
+ * Идентификатор приходит из запроса и может быть вложенным путём. Раньше каждый
+ * сегмент «чистился» до `[a-zA-Z0-9._-]` — и id переставал указывать на файл,
+ * которым его выдал readScripts: `my script.mjs` открывался как `myscript.mjs`
+ * (редактор показывал пустоту), сохранение создавало ЧУЖОЙ файл, а настоящий
+ * хук продолжал работать со старым кодом; `проверка.mjs` схлопывался в `.mjs`.
+ * Поэтому имя не переписываем — опасный путь отклоняем целиком, а собранный
+ * путь дополнительно проверяем на выход за пределы hooks/.
+ */
+function resolveScriptPath(hooksDir: string, id: string): string {
+  if (id.includes('\0')) throw new UnsafeScriptPathError(id, 'недопустимый символ.');
+
+  // Разделители не схлопываем: пустой сегмент (`sub//a.mjs`) — уже странная
+  // форма пути, угадывать за пользователя нечего.
+  const segments = id.split(/[\\/]/);
+  for (const segment of segments) {
+    if (!segment || segment === '.' || segment === '..') {
+      throw new UnsafeScriptPathError(id, 'сегменты «.», «..» и пустые запрещены.');
+    }
+  }
+
+  const fullPath = join(hooksDir, ...segments);
+  const rel = relative(hooksDir, fullPath);
+  if (!rel || rel.startsWith('..') || isAbsolute(rel)) {
+    throw new UnsafeScriptPathError(id, 'путь выходит за пределы каталога hooks/.');
+  }
+  return fullPath;
 }
 
 /** Первые строки комментария в шапке файла. */

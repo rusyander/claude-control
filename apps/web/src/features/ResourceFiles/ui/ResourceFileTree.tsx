@@ -4,6 +4,7 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import {
   useResourceFiles,
   useSaveResourceFile,
@@ -12,6 +13,13 @@ import {
   useApplyTemplate,
 } from '@entities/Resource';
 import { buildTree, countFiles } from '../model/buildTree';
+import { planDelete, isRemovedByDelete, type DeletePlan } from '../model/deletePlan';
+import {
+  cancelCreate,
+  isCreatingIn,
+  CREATE_IN_ROOT,
+  type CreateTarget,
+} from '../model/createTarget';
 import { ResourceFileEditor } from './ResourceFileEditor';
 import { StructureAssistant } from './StructureAssistant';
 import type {
@@ -31,8 +39,10 @@ import styles from './ResourceFileTree.module.scss';
 export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<string | undefined>(undefined);
-  /** Куда добавляем файл: путь папки или пустая строка для корня. */
-  const [creatingIn, setCreatingIn] = useState<string | undefined>(undefined);
+  /** Куда добавляем файл: путь папки, '' — корень, undefined — поля нет. */
+  const [creatingIn, setCreatingIn] = useState<CreateTarget>(undefined);
+  /** Что ждёт подтверждения удаления; пусто — диалога нет. */
+  const [pendingDelete, setPendingDelete] = useState<DeletePlan | undefined>(undefined);
 
   const data = useResourceFiles(kind, id);
   const save = useSaveResourceFile(kind, id);
@@ -56,7 +66,7 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
     const path = folder ? `${folder}/${name}` : name;
 
     save.mutate({ file: path, content: '' }, { onSuccess: () => setSelected(path) });
-    setCreatingIn(undefined);
+    setCreatingIn(cancelCreate());
   };
 
   // Пустому ресурсу предлагаем шаблон: начинать с чистого листа тяжелее,
@@ -99,16 +109,16 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
               size="sm"
               variant="ghost"
               leftIcon={<Icon name="plus" size={16} />}
-              onClick={() => setCreatingIn('')}
+              onClick={() => setCreatingIn(CREATE_IN_ROOT)}
             >
               {t('resources.emptyStart')}
             </Button>
 
-            {creatingIn === '' && (
+            {isCreatingIn(creatingIn, CREATE_IN_ROOT) && (
               <NewNodeInput
                 placeholder="SKILL.md"
-                onCancel={() => setCreatingIn(undefined)}
-                onSubmit={(name) => createFile('', name)}
+                onCancel={() => setCreatingIn(cancelCreate())}
+                onSubmit={(name) => createFile(CREATE_IN_ROOT, name)}
               />
             )}
 
@@ -136,18 +146,18 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
             size="sm"
             variant="ghost"
             leftIcon={<Icon name="plus" size={16} />}
-            onClick={() => setCreatingIn('')}
+            onClick={() => setCreatingIn(CREATE_IN_ROOT)}
           >
             {t('resources.newFile')}
           </Button>
         )}
       </Stack>
 
-      {creatingIn === '' && (
+      {isCreatingIn(creatingIn, CREATE_IN_ROOT) && (
         <NewNodeInput
           placeholder="references/notes.md"
-          onCancel={() => setCreatingIn(undefined)}
-          onSubmit={(name) => createFile('', name)}
+          onCancel={() => setCreatingIn(cancelCreate())}
+          onSubmit={(name) => createFile(CREATE_IN_ROOT, name)}
         />
       )}
 
@@ -161,10 +171,10 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
           onSelect={setSelected}
           onCreateIn={setCreatingIn}
           onCreateFile={createFile}
-          onDelete={(path) => {
-            remove.mutate(path);
-            if (selected === path) setSelected(undefined);
-          }}
+          // Не удаляем по клику: у папки сервер сносит всю вложенность разом, а
+          // отмены нет — только ручное копание в бэкапах. Спрашиваем, как и
+          // остальные удаления в панели.
+          onDelete={(target) => setPendingDelete(planDelete(target))}
           // Первый уровень раскрыт сразу: иначе видно только названия папок
           // и приходится кликать дважды.
           defaultOpen
@@ -182,6 +192,30 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
       )}
 
       {isWritable && <StructureAssistant kind={kind} id={id} />}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          isOpen
+          onOpenChange={(open) => !open && setPendingDelete(undefined)}
+          onConfirm={() => {
+            remove.mutate(pendingDelete.path);
+            if (isRemovedByDelete(selected, pendingDelete.path)) setSelected(undefined);
+            setPendingDelete(undefined);
+          }}
+          title={t('common.deleteTitle')}
+          description={
+            pendingDelete.isDirectory
+              ? t('resources.deleteFolderWarn', {
+                  path: pendingDelete.path,
+                  count: pendingDelete.fileCount,
+                })
+              : t('resources.deleteFileWarn', { path: pendingDelete.path })
+          }
+          confirmationName={pendingDelete.name}
+          confirmLabel={t('common.delete')}
+          isPending={remove.isPending}
+        />
+      )}
     </div>
   );
 }
@@ -214,7 +248,7 @@ function TreeItem({
               type="button"
               className={styles.nodeAction}
               aria-label={`${t('common.delete')}: ${node.path}`}
-              onClick={() => onDelete(node.path)}
+              onClick={() => onDelete(node)}
             >
               <Icon name="trash" size={14} />
             </button>
@@ -255,7 +289,7 @@ function TreeItem({
               type="button"
               className={styles.nodeAction}
               aria-label={`${t('common.delete')}: ${node.path}`}
-              onClick={() => onDelete(node.path)}
+              onClick={() => onDelete(node)}
             >
               <Icon name="trash" size={14} />
             </button>
@@ -265,10 +299,12 @@ function TreeItem({
 
       {isOpen && (
         <div className={styles.children}>
-          {creatingIn === node.path && (
+          {isCreatingIn(creatingIn, node.path) && (
             <NewNodeInput
               placeholder="notes.md"
-              onCancel={() => onCreateIn('')}
+              // Отмена ЗАКРЫВАЕТ поле. Пустая строка здесь означала бы корень:
+              // Escape в папке открывал ввод имени наверху дерева.
+              onCancel={() => onCreateIn(cancelCreate())}
               onSubmit={(name) => onCreateFile(node.path, name)}
             />
           )}

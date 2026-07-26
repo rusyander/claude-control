@@ -523,7 +523,9 @@ export const helpEn: HelpSchema = {
         'The share read from cache is counted separately. A high share means long ' +
         'conversations cost less than their size suggests.',
 
-      canPeriod: 'Switch the period: a week, a month, a quarter, or all time',
+      canPeriod:
+        'Switch the period: today by default (since midnight), plus a week, ' +
+        'a month, a quarter, all time, or a custom date range',
       canDetail: 'Open the detail for a model or a project by clicking its bar',
       canLive: 'See the Claude Code processes actually running now and their memory use',
       canTools: 'See which tools and skills come up most often',
@@ -576,7 +578,9 @@ export const helpEn: HelpSchema = {
         'is charged for these requests. The panel pulls the price list from the Anthropic site ' +
         'when you open Settings (at most once a day) and prices each record at the model version ' +
         'named in the transcript: Opus 4.1 costs three times Opus 4.8. Rates are visible and ' +
-        'editable there if your terms differ.',
+        'editable there if your terms differ. Cache writes use two rates: the 1-hour cache ' +
+        'costs 1.6× the 5-minute one in the price list, and in transcripts almost all writes ' +
+        'go to it. Your own price is used exactly as typed and is never scaled.',
       metricRequests: 'Requests and active sessions',
       metricRequestsText:
         'How many calls to the model happened in the period, and how many ' +
@@ -734,7 +738,11 @@ export const helpEn: HelpSchema = {
       fieldBackup: 'Make a backup of the file before every write.',
       fieldEncrypt:
         'Encrypt .mcp-secrets.env backups (AES-256-GCM under a passphrase). Off by ' +
-        'default, and then secret backups sit in plain text.',
+        'default, and then secret backups sit in plain text. While encryption is on ' +
+        'and the passphrase has not been re-entered after a server restart, editing ' +
+        'secrets and restoring a backup over them are refused: no copy can be made, ' +
+        'writing it in plain text is not allowed, so the panel will not overwrite ' +
+        'tokens with no way back.',
       fieldWatch: 'Watch the files and refresh the interface on outside changes.',
       fieldA11y: 'Large text, less motion, higher contrast.',
       fieldEditor: 'The code editor command. Empty means the first one found on the system.',
@@ -1409,7 +1417,8 @@ export const helpEn: HelpSchema = {
       canHeaders: 'Set request headers for http and sse — for authorisation, for instance',
       canOAuth:
         'Sign in interactively over OAuth to a network server: the panel opens the ' +
-        'authorization window, stores the token and refreshes it on expiry',
+        'authorization window, stores the token and refreshes it on expiry. If the ' +
+        'window is blocked, the sign-in address shows up on the card as a link',
       canAutoCheck:
         'Turn on an automatic connection check when the section opens — the mcpAutoCheck ' +
         'setting in Settings (off by default, so servers are not started needlessly)',
@@ -1422,6 +1431,9 @@ export const helpEn: HelpSchema = {
       cantPerTool:
         'Enable individual tools of a server: a server connects whole, and limits are ' +
         'set through permissions',
+      cantDuplicate:
+        'Add a second server under a taken name: the name is the identifier, so saving ' +
+        'over an existing one (a disabled namesake included) is refused',
 
       storageFile: 'Where it is stored',
       storageFileValue: '~/.claude.json — outside the .claude directory',
@@ -2318,7 +2330,8 @@ export const helpEn: HelpSchema = {
         'verify the result.',
       fieldFiles:
         'Nested files of the skill: examples, configs, templates. Edited as a tree in ' +
-        'the card.',
+        'the card. Deleting a file or folder in the tree asks for confirmation with the ' +
+        'name typed in: a folder goes with everything inside it.',
       fieldGroups: 'Groups the skill belongs to.',
 
       offTitle: 'What happens when you switch a skill off',

@@ -30,15 +30,37 @@ interface RawUsage {
   output_tokens?: number;
   cache_read_input_tokens?: number;
   cache_creation_input_tokens?: number;
+  /**
+   * Разбивка записи кэша по сроку жизни. Часовая запись стоит в 1.6 раза
+   * дороже пятиминутной, а на реальных транскриптах именно ею записано ~99%
+   * объёма — считать всё по пятиминутной ставке значит занижать стоимость
+   * записи почти во столько же раз.
+   */
+  cache_creation?: {
+    ephemeral_5m_input_tokens?: number;
+    ephemeral_1h_input_tokens?: number;
+  };
+}
+
+/**
+ * Общий объём записи кэша. Плоское поле — основное; разбивка суммируется
+ * только когда его нет, иначе объём разошёлся бы со стоимостью.
+ */
+function cacheCreationTokens(usage: RawUsage): number {
+  if (usage.cache_creation_input_tokens !== undefined) return usage.cache_creation_input_tokens;
+  const split = usage.cache_creation;
+  return (split?.ephemeral_5m_input_tokens ?? 0) + (split?.ephemeral_1h_input_tokens ?? 0);
 }
 
 interface RawEntry {
   type?: string;
   timestamp?: string;
   sessionId?: string;
+  requestId?: string;
   cwd?: string;
   gitBranch?: string;
   message?: {
+    id?: string;
     model?: string;
     usage?: RawUsage;
     content?: Array<{ type?: string; name?: string }>;
@@ -53,7 +75,7 @@ function addUsage(target: TokenTotals, usage: RawUsage): void {
   const input = usage.input_tokens ?? 0;
   const output = usage.output_tokens ?? 0;
   const cacheRead = usage.cache_read_input_tokens ?? 0;
-  const cacheCreation = usage.cache_creation_input_tokens ?? 0;
+  const cacheCreation = cacheCreationTokens(usage);
 
   target.input += input;
   target.output += output;
@@ -80,6 +102,16 @@ interface Accumulator {
 export interface ScanOptions {
   /** Сколько последних дней учитывать. Ограничение бережёт время сканирования. */
   days: number;
+  /**
+   * Начало периода в миллисекундах. Задано — перебивает `days`: календарные
+   * сутки («сегодня») начинаются в местную полночь, а не за 24 часа до сейчас.
+   */
+  since?: number;
+  /**
+   * Конец периода в миллисекундах включительно. Нужен произвольному диапазону:
+   * без него любой период тянулся бы до «сейчас» и правая граница не работала.
+   */
+  until?: number;
   /** Сколько сессий вернуть в списке последних. */
   recentSessionsLimit: number;
   /** Свои тарифы из настроек: фрагмент имени модели → цена за миллион токенов. */
@@ -98,7 +130,10 @@ export async function scanAnalytics(
   // падает на `new Date(NaN).toISOString()` — маршрут отвечает 500. Непонятный
   // ввод трактуем как период по умолчанию.
   const days = Number.isFinite(options.days) ? options.days : 30;
-  const since = Date.now() - days * 24 * 60 * 60 * 1000;
+  const since =
+    options.since !== undefined && Number.isFinite(options.since)
+      ? options.since
+      : Date.now() - days * 24 * 60 * 60 * 1000;
 
   const accumulator: Accumulator = {
     overall: emptyTotals(),
@@ -111,10 +146,13 @@ export async function scanAnalytics(
     tools: new Map(),
   };
 
-  const files = collectTranscripts(projectsDir, since);
-  for (const file of files) await scanFile(file, since, accumulator, options);
+  const until =
+    options.until !== undefined && Number.isFinite(options.until) ? options.until : Date.now();
 
-  return buildResult(accumulator, options, files.length, Date.now() - startedAt, since);
+  const files = collectTranscripts(projectsDir, since);
+  for (const file of files) await scanFile(file, since, until, accumulator, options);
+
+  return buildResult(accumulator, options, files.length, Date.now() - startedAt, since, until);
 }
 
 /** Собирает пути транскриптов, отсекая старые по времени изменения файла. */
@@ -146,37 +184,42 @@ function collectTranscripts(
 async function scanFile(
   file: { path: string; mtimeMs: number },
   since: number,
+  until: number,
   acc: Accumulator,
   options: Pick<ScanOptions, 'pricing' | 'pricingEntries'>,
 ): Promise<void> {
   const isActive = Date.now() - file.mtimeMs < ACTIVE_WINDOW_MS;
   const stream = createReadStream(file.path, { encoding: 'utf8' });
   const lines = createInterface({ input: stream, crlfDelay: Infinity });
+  /**
+   * Отложенные ответы этого файла: ключ — сам ответ модели, значение — САМАЯ
+   * ПОЛНАЯ его строка.
+   *
+   * Claude Code пишет отдельную строку на каждый блок ответа (thinking, text,
+   * tool_use) и в каждой повторяет usage целиком — но растущий: input и кэш во
+   * всех строках одинаковы, а `output_tokens` дописывается по мере генерации, и
+   * полное число несёт последняя строка (замер на реальном ~/.claude: у 17 тысяч
+   * ответов выход различался, первая строка занижала его на 35%). Поэтому мало
+   * отбросить повторы — нужно выбрать из них максимум и учесть один раз.
+   *
+   * Карта живёт на файл, а не на весь обход: повторы одного ответа лежат в одном
+   * транскрипте, и память не растёт на тысячах файлов.
+   */
+  const pending = new Map<
+    string,
+    { entry: RawEntry; usage: RawUsage; time: number; stamp: string }
+  >();
 
-  for await (const line of lines) {
-    if (!line.trim()) continue;
-
-    let entry: RawEntry;
-    try {
-      entry = JSON.parse(line) as RawEntry;
-    } catch {
-      continue; // недописанная строка активной сессии
-    }
-
-    countTools(entry, acc);
-
-    const usage = entry.message?.usage;
-    if (entry.type !== 'assistant' || !usage || !entry.timestamp) continue;
-
-    const time = new Date(entry.timestamp).getTime();
-    if (Number.isNaN(time) || time < since) continue;
-
+  /** Учесть один ответ модели во всех разрезах сразу. */
+  const count = (entry: RawEntry, usage: RawUsage, time: number, stamp: string): void => {
     const model = entry.message?.model ?? 'unknown';
     const tokens = {
       input: usage.input_tokens ?? 0,
       output: usage.output_tokens ?? 0,
       cacheRead: usage.cache_read_input_tokens ?? 0,
-      cacheCreation: usage.cache_creation_input_tokens ?? 0,
+      cacheCreation: cacheCreationTokens(usage),
+      // Часовая доля записи — по своей, более дорогой ставке.
+      cacheCreation1h: usage.cache_creation?.ephemeral_1h_input_tokens ?? 0,
     };
     // Цену берём НА МОМЕНТ записи, а не на сегодня: у части моделей цена
     // менялась по расписанию (вводная цена Sonnet 5), и пересчёт старого
@@ -195,9 +238,9 @@ async function scanFile(
     // та же запись у пользователя в поясе ≠ UTC попадала бы в «день» и «час» из
     // разных суток. На цену это не влияет: стоимость считается по абсолютному
     // моменту записи (estimateCost выше, at: time), а не по ключу группировки.
-    upsert(acc.byDay, localDay(entry.timestamp), usage, cost);
+    upsert(acc.byDay, localDay(stamp), usage, cost);
 
-    const hour = new Date(entry.timestamp).getHours();
+    const hour = new Date(stamp).getHours();
     const hourly = acc.byHour.get(hour) ?? { requests: 0, tokens: 0 };
     hourly.requests += 1;
     hourly.tokens += tokens.input + tokens.output + tokens.cacheRead + tokens.cacheCreation;
@@ -205,7 +248,56 @@ async function scanFile(
 
     trackProject(acc, entry, usage, cost);
     trackSession(acc, entry, usage, cost, model, isActive, file.path);
+  };
+
+  for await (const line of lines) {
+    if (!line.trim()) continue;
+
+    let entry: RawEntry;
+    try {
+      entry = JSON.parse(line) as RawEntry;
+    } catch {
+      continue; // недописанная строка активной сессии
+    }
+
+    // Период отсекается ДО счётчика инструментов. Раньше инструменты считались
+    // по всем строкам файлов, переживших фильтр по mtime: долгоживущий транскрипт
+    // с полугодовой историей давал «Топ инструментов» за все 180 дней рядом с
+    // графиками токенов за выбранную неделю — две половины одной страницы жили
+    // разными периодами. Запись без разбираемой метки времени в период поместить
+    // нельзя, поэтому она не учитывается нигде.
+    const stamp = entry.timestamp;
+    if (!stamp) continue;
+
+    const time = new Date(stamp).getTime();
+    if (Number.isNaN(time) || time < since || time > until) continue;
+
+    countTools(entry, acc);
+
+    const usage = entry.message?.usage;
+    if (entry.type !== 'assistant' || !usage) continue;
+
+    // Один ответ модели = message.id + requestId. У старых транскриптов этих
+    // полей нет — такие считаем сразу и по строке, как раньше, иначе молча
+    // потеряли бы всю их историю.
+    const responseKey = `${entry.message?.id ?? ''}|${entry.requestId ?? ''}`;
+    if (responseKey === '|') {
+      count(entry, usage, time, stamp);
+      continue;
+    }
+
+    // Побеждает строка с наибольшим выходом, при равенстве — последняя: именно
+    // она несёт итоговый usage ответа (см. комментарий к `pending`).
+    const best = pending.get(responseKey);
+    if (!best || (usage.output_tokens ?? 0) >= (best.usage.output_tokens ?? 0)) {
+      pending.set(responseKey, { entry, usage, time, stamp });
+    }
   }
+
+  // Порядок вставки Map сохраняется, поэтому ответы учитываются в том же
+  // порядке, в каком встретились, — от него зависят «последняя активность»
+  // сессии и проекта.
+  for (const item of pending.values()) count(item.entry, item.usage, item.time, item.stamp);
 }
 
 function upsert(
@@ -319,6 +411,7 @@ function buildResult(
   scannedFiles: number,
   scanDurationMs: number,
   since: number,
+  until: number,
 ): Omit<Analytics, 'runningAgents' | 'topSkills'> {
   const byModel: ModelUsage[] = [...acc.byModel.entries()]
     .map(([model, bucket]) => ({ model, totals: bucket.totals, estimatedCost: bucket.cost }))
@@ -358,7 +451,9 @@ function buildResult(
 
   return {
     from: new Date(since).toISOString(),
-    to: new Date().toISOString(),
+    // Правая граница честно повторяет запрошенную: у диапазона в прошлом «до» —
+    // не «сейчас», и отчёт не должен утверждать обратное.
+    to: new Date(Math.min(until, Date.now())).toISOString(),
     overall: acc.overall,
     estimatedCost: acc.cost,
     byModel,

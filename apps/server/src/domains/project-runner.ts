@@ -488,15 +488,34 @@ function runLines(file: string, args: string[]): string[] {
   return result.stdout.split(/\r?\n/).filter((line) => line.trim().length > 0);
 }
 
-/** Имя процесса по PID — чтобы пользователь видел, кого ему предлагают убить. */
-function processName(pid: number): string | undefined {
-  const lines = isWindows
-    ? runLines('tasklist', ['/FI', `PID eq ${pid}`, '/NH', '/FO', 'CSV'])
-    : runLines('ps', ['-p', String(pid), '-o', 'comm=']);
-  const first = lines[0];
-  if (!first) return undefined;
-  const name = isWindows ? /^"([^"]+)"/.exec(first)?.[1] : first.trim();
-  return name && name !== 'INFO:' ? name : undefined;
+/**
+ * Имена процессов по списку PID — чтобы пользователь видел, кого ему предлагают
+ * убить.
+ *
+ * ОДИН вызов на весь список, а не по вызову на PID: `tasklist` с фильтром
+ * стоит секунды, а `spawnSync` держит цикл событий — сервер панели на это время
+ * замирает целиком. Полный список процессов стоит столько же, сколько один
+ * отфильтрованный, поэтому берём его разом и раскладываем в карту.
+ */
+function processNames(pids: number[]): Map<number, string> {
+  const names = new Map<number, string>();
+  if (pids.length === 0) return names;
+
+  if (isWindows) {
+    for (const line of runLines('tasklist', ['/NH', '/FO', 'CSV'])) {
+      // CSV: "имя.exe","PID","сессия",...
+      const parts = /^"([^"]+)","(\d+)"/.exec(line);
+      const pid = Number(parts?.[2]);
+      if (parts?.[1] && Number.isInteger(pid)) names.set(pid, parts[1]);
+    }
+  } else {
+    for (const line of runLines('ps', ['-o', 'pid=,comm=', '-p', pids.join(',')])) {
+      const parts = /^\s*(\d+)\s+(.+)$/.exec(line);
+      const pid = Number(parts?.[1]);
+      if (parts?.[2] && Number.isInteger(pid)) names.set(pid, parts[2].trim());
+    }
+  }
+  return names;
 }
 
 /**
@@ -543,9 +562,11 @@ export async function describePort(
   port: number,
   isOurs: (pid: number) => boolean,
 ): Promise<PortHoldersInfo> {
-  const holders = findPortHolders(port).map((pid) => ({
+  const pids = findPortHolders(port);
+  const names = processNames(pids);
+  const holders = pids.map((pid) => ({
     pid,
-    name: processName(pid),
+    name: names.get(pid),
     ours: isOurs(pid),
   }));
   return { port, busy: (await isPortBusy(port)) || holders.length > 0, holders };
@@ -783,6 +804,27 @@ export class ProjectRunnerRegistry {
   }
 
   /**
+   * Бронь ключа на время старта: запись без процесса в стадии `starting`.
+   * Нужна, чтобы параллельный запрос увидел «уже запускается» и не поднял
+   * второй сервер. Снимается при любом отказе до спавна.
+   */
+  private reservation(root: string, dir: string, path: string, command: string): RunEntry {
+    return {
+      projectPath: root,
+      dir,
+      path,
+      name: readPackageJson(path)?.name ?? basename(path),
+      status: 'starting',
+      command,
+      startedAt: new Date().toISOString(),
+      stopping: false,
+      silent: false,
+      pinned: false,
+      output: '',
+    };
+  }
+
+  /**
    * Запустить dev-сервер цели. Возвращает состояние сразу со стадией `starting`;
    * адрес и открытие браузера идут в фоне. Уже запущенную цель отдаём как есть,
    * второй процесс не плодим.
@@ -810,6 +852,13 @@ export class ProjectRunnerRegistry {
 
     const launch = this.resolveLaunch(path, options.command, root);
 
+    // Занимаем ключ ДО первого await. Между проверкой занятости порта и записью
+    // в реестр успевает пройти второй запрос (два клика, автозапуск поверх
+    // ручного старта) — и тогда поднимались бы два процесса, а реестр помнил бы
+    // только последний: первый становился сиротой и держал порт.
+    const held = this.reservation(root, dir, path, launch.display);
+    this.runs.set(key, held);
+
     const pinned =
       options.port && Number.isInteger(options.port) && options.port > 0 && options.port < 65_536
         ? options.port
@@ -818,6 +867,9 @@ export class ProjectRunnerRegistry {
     // запущенным мимо панели. Промолчать нельзя: TCP-проба тут же увидела бы
     // «слушает» и объявила чужой процесс нашим.
     if (pinned !== undefined && (await isPortBusy(pinned))) {
+      // Бронь снимаем: запуска не будет, а «вечно запускается» в панели хуже
+      // честной ошибки.
+      this.runs.delete(key);
       throw new RunnerError(
         'port-busy',
         `Порт ${pinned} уже занят — возможно, сервер уже запущен вне панели.`,
@@ -825,30 +877,39 @@ export class ProjectRunnerRegistry {
       );
     }
 
-    // На Windows пакетные менеджеры (pnpm/npm/yarn) — это .cmd-обёртки, а запуск
-    // идёт через оболочку. Голое имя команды дополняем .cmd, полный путь (с
-    // разделителями/пробелами) — квотируем: без кавычек путь вида
-    // `C:\Program Files\...` развалился бы на несколько аргументов.
+    // Имя команды НЕ дополняем `.cmd`: запуск идёт через оболочку, а cmd.exe сам
+    // разрешает имя по PATHEXT — `pnpm` находит `pnpm.cmd`. Дополнение же было
+    // фатальным для всего, что ставится как `.exe` (`node`, `python`, `deno`):
+    // `node.cmd` не существует, и своя команда пользователя падала сразу.
+    // Полный путь (с разделителями или пробелами) по-прежнему квотируем: без
+    // кавычек `C:\Program Files\...` развалился бы на несколько аргументов.
     const bare = /^[a-zA-Z0-9._-]+$/.test(launch.file);
-    const file = isWindows
-      ? bare
-        ? `${launch.file}.cmd`
-        : quoteForShell(launch.file)
-      : launch.file;
+    const file = isWindows && !bare ? quoteForShell(launch.file) : launch.file;
 
     // PORT передаём ТОЛЬКО когда пользователь закрепил порт. Без этого панель
-    // навязывала бы адрес тем, кто его и так знает из своего конфига.
+    // навязывала бы адрес тем, кто его и так знает из своего конфига, — включая
+    // собственный PORT сервера панели, который иначе утёк бы в каждый dev-сервер
+    // по наследству от process.env.
     const env = { ...process.env, BROWSER: 'none', FORCE_COLOR: '0' } as NodeJS.ProcessEnv;
-    if (pinned !== undefined) env.PORT = String(pinned);
+    if (pinned === undefined) delete env.PORT;
+    else env.PORT = String(pinned);
 
-    const child = spawn(file, shellArgs(launch.args), {
-      cwd: path,
-      shell: isWindows,
-      windowsHide: true,
-      // POSIX: своя группа процессов, чтобы убить всё дерево через kill(-pid).
-      detached: !isWindows,
-      env,
-    });
+    let child: ChildProcess;
+    try {
+      child = spawn(file, shellArgs(launch.args), {
+        cwd: path,
+        shell: isWindows,
+        windowsHide: true,
+        // POSIX: своя группа процессов, чтобы убить всё дерево через kill(-pid).
+        detached: !isWindows,
+        env,
+      });
+    } catch (error) {
+      // Спавн бросает синхронно (нет прав на каталог, кривой путь) — бронь снимаем,
+      // иначе цель навсегда осталась бы в стадии «запускается».
+      this.runs.delete(key);
+      throw error;
+    }
 
     const entry: RunEntry = {
       projectPath: root,
@@ -858,7 +919,9 @@ export class ProjectRunnerRegistry {
       port: pinned,
       status: 'starting',
       command: launch.display,
-      startedAt: new Date().toISOString(),
+      // Время старта берём у брони: параллельный запрос уже получил её вид, и
+      // разное время у одного и того же запуска сбивало бы клиента с толку.
+      startedAt: held.startedAt,
       child,
       stopping: false,
       silent: options.openBrowser === false,

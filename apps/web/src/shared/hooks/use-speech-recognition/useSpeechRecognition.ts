@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { joinText } from '@shared/lib/join-text';
-import { createSpeechProvider } from '@shared/lib/speech';
-import type { SpeechErrorKind } from '@shared/lib/speech';
+import {
+  createSpeechProvider,
+  isReportableSpeechError,
+  nextStateAfterEnd,
+} from '@shared/lib/speech';
+import type { SpeechErrorKind, SpeechState } from '@shared/lib/speech';
 
-/** Состояния распознавания (ТЗ №3 §5). 'finalizing' — стоп нажат, ждём финал речь→текст (onEnd). */
-export type SpeechState = 'idle' | 'listening' | 'finalizing' | 'error' | 'unsupported';
+// Тип состояния и переходы живут рядом с провайдером (@shared/lib/speech):
+// их проверяют тестами без браузера, а хук остаётся тонкой обвязкой над ними.
+export type { SpeechState };
 
 export interface SpeechRecognitionApi {
   state: SpeechState;
@@ -60,9 +65,12 @@ export function useSpeechRecognition(lang: string): SpeechRecognitionApi {
       setTranscript(joinText(committedRef.current, text));
     });
     provider.onError((kind) => {
-      setError(kind);
       wantRef.current = false;
-      setState('error');
+      // Показываем только то, что человеку что-то объясняет: тишина и отмена —
+      // обычный ход диктовки, о них молчим и просто возвращаемся в покой.
+      const reportable = isReportableSpeechError(kind);
+      setError(reportable ? kind : null);
+      setState(reportable ? 'error' : 'idle');
     });
     provider.onEnd(() => {
       // Сессия завершилась (тишина/стоп): фиксируем её финал в committed (без двойного учёта).
@@ -72,9 +80,10 @@ export function useSpeechRecognition(lang: string): SpeechRecognitionApi {
       setTranscript(committedRef.current);
       if (wantRef.current) {
         provider.start(langRef.current); // авто-продолжение при долгой паузе
-      } else {
-        setState('idle');
       }
+      // Браузер после ошибки досылает end — раньше он затирал 'error' на 'idle',
+      // и отказ в микрофоне пропадал, не дойдя до экрана.
+      setState((prev) => nextStateAfterEnd(prev, wantRef.current));
     });
     return () => {
       wantRef.current = false;
@@ -104,6 +113,8 @@ export function useSpeechRecognition(lang: string): SpeechRecognitionApi {
     sessionRef.current = '';
     setTranscript('');
     setPartial('');
+    // Сброс — это «начали заново», старая жалоба на микрофон под полем не нужна.
+    setError(null);
   }, []);
 
   return {

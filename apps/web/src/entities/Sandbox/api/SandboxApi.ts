@@ -1,5 +1,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '@shared/api/client';
+import { toast } from '@shared/lib/toast';
+import { sandboxDeleteFailedText } from '../model/sandboxError';
 
 /**
  * Проверка настроек в изоляции. Сервер собирает временную конфигурацию
@@ -26,6 +29,18 @@ export interface SandboxDescription {
   scripts: string[];
 }
 
+/**
+ * Откуда песочница взяла доступ к аккаунту (сервер, `lib/credentials.ts`).
+ * `none` — не взяла ниоткуда: разговор в песочнице не пойдёт.
+ */
+export type SandboxCredentialsSource = 'file' | 'keychain' | 'panel' | 'apiKey' | 'none';
+
+/** Источник доступа и причина отказа. Ни токена, ни ключа здесь нет. */
+export interface SandboxCredentials {
+  source: SandboxCredentialsSource;
+  reason?: string;
+}
+
 export interface EventFixture {
   id: string;
   event: string;
@@ -35,7 +50,8 @@ export interface EventFixture {
   payload: Record<string, unknown>;
 }
 
-export type HookDecision = 'block' | 'ask' | 'pass';
+/** `error` — прогон не состоялся: хук не запустился или упал, решения нет. */
+export type HookDecision = 'block' | 'ask' | 'pass' | 'error';
 
 export interface ProbeResult {
   fixtureId: string;
@@ -75,6 +91,9 @@ export function useCreateSandbox() {
         configDir: string;
         workDir: string;
         description: SandboxDescription;
+        // Откуда доступ к аккаунту и почему его нет: без него разговор
+        // в песочнице не пойдёт, и сказать об этом надо до первого запроса.
+        credentials?: SandboxCredentials;
       }>('/sandbox/create', input, { timeout: 60_000 });
       return data;
     },
@@ -128,10 +147,22 @@ export function useCallMcpTool() {
   });
 }
 
+/**
+ * Удаление песочницы. Уходит из размонтирования модалки, то есть с экрана, до
+ * которого ответ уже не вернётся, — поэтому отказ показывается тостом.
+ *
+ * `silentError` выключает общий тост из MutationCache: он показал бы сырое
+ * сообщение сервера без объяснения, чем это грозит. Здесь текст свой, с рамкой
+ * и на языке интерфейса, а причина сервера (в ней путь к папке) внутри.
+ */
 export function useDeleteSandbox() {
+  const { t } = useTranslation();
+
   return useMutation({
     mutationFn: async (id: string) => {
       await apiClient.delete(`/sandbox/${encodeURIComponent(id)}`);
     },
+    meta: { silentError: true },
+    onError: (error) => toast.error(sandboxDeleteFailedText(error, t)),
   });
 }

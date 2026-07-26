@@ -148,14 +148,41 @@ describe('ResourceFiles', () => {
     });
 
     it('id из кириллицы не даёт доступ к корню skills/', () => {
-      // safeSegment схлопнул бы «скилл» в пустоту → корнем стала бы вся папка.
+      // Имя больше не схлопывается в пустоту, но и корнем не становится:
+      // это папка skills/скилл, которой на диске нет.
       const files = listResourceFiles('skill', 'скилл', location);
       expect(files).toHaveLength(0);
     });
 
-    it('запись по небезопасному id отклоняется, файл в корне не создаётся', () => {
-      expect(() => writeResourceFile('skill', '🎉', 'evil.txt', 'x', location)).toThrow();
+    it('кириллический id ведёт в СВОЮ папку, а не в чужую с обрезанным именем', () => {
+      // Регрессия: safeSegment превращал «мой-skill» в «-skill», и файлы скилла
+      // не находились, а запись создавала папку-призрак рядом с настоящей.
+      mkdirSync(join(root, 'skills', 'мой-skill'), { recursive: true });
+      writeFileSync(join(root, 'skills', 'мой-skill', 'SKILL.md'), '# мой');
+
+      expect(listResourceFiles('skill', 'мой-skill', location).map((f) => f.path)).toEqual([
+        'SKILL.md',
+      ]);
+
+      writeResourceFile('skill', 'мой-skill', 'notes.md', 'текст', location);
+      expect(existsSync(join(root, 'skills', 'мой-skill', 'notes.md'))).toBe(true);
+      // Ни огрызка, ни соседней папки-призрака не появилось.
+      expect(existsSync(join(root, 'skills', '-skill'))).toBe(false);
+    });
+
+    it('разные кириллические id не пишут в одну и ту же папку', () => {
+      writeResourceFile('skill', 'мой-skill', 'a.md', 'мой', location);
+      writeResourceFile('skill', 'твой-skill', 'a.md', 'твой', location);
+
+      expect(readResourceFile('skill', 'мой-skill', 'a.md', location).content).toBe('мой');
+      expect(readResourceFile('skill', 'твой-skill', 'a.md', location).content).toBe('твой');
+    });
+
+    it('запись по id с разделителем пути отклоняется, файл в корне не создаётся', () => {
+      expect(() => writeResourceFile('skill', '../..', 'evil.txt', 'x', location)).toThrow();
+      expect(() => writeResourceFile('skill', 'a/../b', 'evil.txt', 'x', location)).toThrow();
       expect(existsSync(join(root, 'skills', 'evil.txt'))).toBe(false);
+      expect(existsSync(join(root, 'evil.txt'))).toBe(false);
     });
 
     it('обход пути ../ за пределы ресурса отклоняется', () => {

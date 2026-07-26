@@ -11,6 +11,7 @@ import {
   saveProviderEnvVars,
   parseProviderEnvDraft,
   UnrecognizedFormatError,
+  EnvKeyPreservedError,
   type ProviderEnvTarget,
 } from './provider-env.ts';
 
@@ -230,6 +231,81 @@ args = ["server.js"]
     saveProviderEnvVars(targetFor(filePath), before, backupDir);
     const after = readProviderEnvVars(targetFor(filePath));
     expect(after).toEqual(before);
+  });
+
+  // set с нестроковыми значениями: TOML это позволяет (PORT = 8080), панель их
+  // не показывает — и потому не должна терять на обычном «Сохранить».
+  const CONFIG_MIXED = `[shell_environment_policy]
+inherit = "all"
+
+[shell_environment_policy.set]
+CI = "1"
+PORT = 8080
+DEBUG = true
+`;
+
+  it('нестроковые значения set не показываются, но переживают запись', () => {
+    const filePath = join(root, 'config.toml');
+    writeFileSync(filePath, CONFIG_MIXED, 'utf8');
+
+    // Панель ведёт только строки.
+    expect(readProviderEnvVars(targetFor(filePath))).toEqual([{ key: 'CI', value: '1' }]);
+
+    // «Сохранить» без правок: PORT и DEBUG обязаны остаться в чужом конфиге.
+    saveProviderEnvVars(targetFor(filePath), [{ key: 'CI', value: '1' }], backupDir);
+    const parsed = asToml(readFileSync(filePath, 'utf8'));
+    expect(parsed.shell_environment_policy?.set).toEqual({ CI: '1', PORT: 8080, DEBUG: true });
+    expect(parsed.shell_environment_policy?.inherit).toBe('all');
+
+    // Правка строковой переменной их тоже не задевает.
+    saveProviderEnvVars(
+      targetFor(filePath),
+      [
+        { key: 'CI', value: 'false' },
+        { key: 'NEW', value: 'x' },
+      ],
+      backupDir,
+    );
+    expect(asToml(readFileSync(filePath, 'utf8')).shell_environment_policy?.set).toEqual({
+      CI: 'false',
+      NEW: 'x',
+      PORT: 8080,
+      DEBUG: true,
+    });
+  });
+
+  it('удаление строковой переменной не трогает нестроковые', () => {
+    const filePath = join(root, 'config.toml');
+    writeFileSync(filePath, CONFIG_MIXED, 'utf8');
+    saveProviderEnvVars(targetFor(filePath), [], backupDir);
+    expect(asToml(readFileSync(filePath, 'utf8')).shell_environment_policy?.set).toEqual({
+      PORT: 8080,
+      DEBUG: true,
+    });
+  });
+
+  it('черновик, назвавший нестроковый ключ, → именной отказ, а не «формат не распознан»', () => {
+    // Отказ про ОДНО имя: файл разобран, раздел остаётся на запись. Пока этот
+    // случай шёл общей ошибкой формата, пользователю сообщали, что его
+    // config.toml нечитаем и доступен только на чтение, — неправда, и без
+    // единого слова о том, какая переменная мешает.
+    const filePath = join(root, 'config.toml');
+    writeFileSync(filePath, CONFIG_MIXED, 'utf8');
+
+    const call = () =>
+      saveProviderEnvVars(
+        targetFor(filePath),
+        [
+          { key: 'CI', value: '1' },
+          { key: 'PORT', value: '9090' },
+        ],
+        backupDir,
+      );
+
+    expect(call).toThrow(EnvKeyPreservedError);
+    expect(call).not.toThrow(UnrecognizedFormatError);
+    expect(call).toThrow(/PORT/);
+    expect(readFileSync(filePath, 'utf8')).toBe(CONFIG_MIXED);
   });
 
   it('повторная запись создаёт резервную копию', () => {

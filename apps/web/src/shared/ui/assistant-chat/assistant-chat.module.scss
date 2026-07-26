@@ -178,6 +178,13 @@
   animation: message-in var(--duration-normal) ease;
 }
 
+// Причина, по которой диктовка не началась. Стоит над полем ввода: режим
+// записи при ошибке закрывается сам, и без этой строки отказ микрофона
+// исчезал бы вместе с ним.
+.speechError {
+  padding: var(--spacing-xs) var(--spacing-sm) 0;
+}
+
 .voiceText {
   min-height: 2.6em;
   text-align: center;

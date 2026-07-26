@@ -7,7 +7,11 @@ import { searchChats } from '../domains/chat/ChatSearch.ts';
 import { listProjects } from '../domains/chat/ChatProjects.ts';
 import { listRoots, listDirectory } from '../domains/fs/FileBrowser.ts';
 import { detectEditors, resolveEditorCommand, openInEditor } from '../domains/fs/EditorLauncher.ts';
-import { ChatRunRegistry, type RunSubscriber } from '../domains/chat/ChatRunRegistry.ts';
+import {
+  ChatRunRegistry,
+  type RunSubscriber,
+  type BufferedEvent,
+} from '../domains/chat/ChatRunRegistry.ts';
 import { PermissionBroker } from '../domains/chat/ChatPermissions.ts';
 import {
   readArtifacts,
@@ -22,6 +26,7 @@ import {
   saveUpload,
   isSupportedUpload,
   buildPromptWithFiles,
+  SUPPORTED_UPLOAD_EXTENSIONS,
 } from '../domains/chat/ChatUploads.ts';
 import { activeCliCommand } from '../providers/cli.ts';
 
@@ -39,15 +44,50 @@ const SSE_HEADERS = {
  * Прогоны живут в реестре, отвязанном от HTTP-запроса: обрыв соединения или уход
  * на другую вкладку не убивают агента, а к идущему прогону можно переподключиться
  * потоком, догнав пропущенное. Остановка — только по явной кнопке.
+ *
+ * Реестр можно передать снаружи: в тестах это единственный способ поставить
+ * маршруты в состояние «прогон уже идёт», не запуская настоящий CLI.
  */
-export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): void {
-  const registry = new ChatRunRegistry();
+export function registerChatRoutes(
+  app: FastifyInstance,
+  ctx: ServerContext,
+  registry: ChatRunRegistry = new ChatRunRegistry(),
+): void {
   const permissions = new PermissionBroker();
 
   // Адрес, по которому мини-MCP-сервер прав стучится за решением пользователя.
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
 
-  const projectsDir = join(ctx.location.paths.root, 'projects');
+  /**
+   * Папка разговоров Claude Code. Считается на каждом обращении, а не один раз
+   * при регистрации маршрутов: каталог конфигурации меняется на лету
+   * (`ctx.relocate` из настроек), и запомненный путь оставлял бы чат читать
+   * ПРЕЖНИЙ каталог до перезапуска сервера — с пустым списком и без объяснений.
+   */
+  const projectsDir = (): string => join(ctx.location.paths.root, 'projects');
+
+  /** Отказ на новое сообщение, пока прошлый ответ ещё генерируется. */
+  const RUN_BUSY_MESSAGE =
+    'Предыдущий ответ в этом разговоре ещё генерируется. Дождитесь его окончания или нажмите «Остановить» — сообщение не отправлено.';
+
+  /**
+   * Отказ до запуска агента: HTTP-статус плюс структурный `code`, а не
+   * SSE-кадр с текстом.
+   *
+   * Раньше отказ приходил обычным `error`-событием потока, и клиент разбирал
+   * его ТЕКСТ: и чтобы решить, показывать ли ошибку, и чтобы понять, временная
+   * ли она. Текст же содержит пользовательский ввод — имя отклонённого файла.
+   * Файл `network.zip` попадал под шаблон «временной» ошибки, и клиент молча
+   * ретраил отправку дважды, прежде чем сказать хоть слово. Со статусом и кодом
+   * решения принимаются по структуре: текст остаётся только для показа.
+   */
+  const refuse = (
+    reply: FastifyReply,
+    status: number,
+    code: string,
+    message: string,
+    extra?: Record<string, unknown>,
+  ): FastifyReply => reply.code(status).send({ code, message, ...extra });
 
   /**
    * Отдать SSE-поток прогона в ответ, начиная с `fromSeq`. Держит соединение
@@ -85,9 +125,7 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
       const subscriber: RunSubscriber = {
         send: (buffered) => {
           try {
-            reply.raw.write(
-              `data: ${JSON.stringify({ ...buffered.event, seq: buffered.seq })}\n\n`,
-            );
+            reply.raw.write(frame(buffered));
           } catch {
             // Клиент отвалился — close-обработчик отцепит.
           }
@@ -108,7 +146,7 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
       if (!unsubscribe) finish();
     });
 
-  app.get('/api/chats', () => readChats(projectsDir));
+  app.get('/api/chats', () => readChats(projectsDir()));
 
   /**
    * Полнотекстовый поиск по телу переписки: в дополнение к фильтру списка по
@@ -117,11 +155,11 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
    * запрос отдаёт пустой результат, не читая диск.
    */
   app.get<{ Querystring: { q?: string } }>('/api/chat/search', (request) =>
-    searchChats(projectsDir, request.query.q ?? ''),
+    searchChats(projectsDir(), request.query.q ?? ''),
   );
 
   /** Проекты, с которыми работал Claude Code, — для таба «Проекты» в чате. */
-  app.get('/api/chats/projects', () => listProjects(projectsDir));
+  app.get('/api/chats/projects', () => listProjects(projectsDir()));
 
   /**
    * Каталог, в котором можно начать новый разговор проекта. Путь приходит от
@@ -193,7 +231,7 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
     (request) => {
       const limit = clampInt(request.query.limit, DEFAULT_MESSAGE_PAGE, 1, MAX_MESSAGE_PAGE);
       const offset = clampInt(request.query.offset, 0, 0, Number.MAX_SAFE_INTEGER);
-      return readChatMessages(projectsDir, request.params.chatId, { limit, offset });
+      return readChatMessages(projectsDir(), request.params.chatId, { limit, offset });
     },
   );
 
@@ -207,11 +245,13 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
       const { chatId } = request.params;
       const format: ExportFormat = request.query.format === 'json' ? 'json' : 'md';
 
-      const page = await readChatMessages(projectsDir, chatId, { limit: Number.MAX_SAFE_INTEGER });
+      const page = await readChatMessages(projectsDir(), chatId, {
+        limit: Number.MAX_SAFE_INTEGER,
+      });
       if (page.messages.length === 0)
         return reply.code(404).send({ message: 'Разговор не найден' });
 
-      const title = readChats(projectsDir).find((chat) => chat.id === chatId)?.title;
+      const title = readChats(projectsDir()).find((chat) => chat.id === chatId)?.title;
       const file = buildChatExport(page.messages, format, title);
       const safeId = chatId.replace(/[^a-zA-Z0-9-]/g, '') || 'chat';
 
@@ -256,10 +296,45 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
       effort,
     } = request.body;
 
+    // Прошлый ответ ещё генерируется — второй промпт принять некуда. Раньше
+    // маршрут в этом случае молча подключался к идущему прогону с seq 0:
+    // человек получал перепечатку прошлого ответа под своим новым сообщением, а
+    // само сообщение не доходило ни до агента, ни до транскрипта. Отвечаем
+    // отказом ДО сохранения вложений — иначе они осели бы на диске впустую.
+    //
+    // Отказ обязан быть действенным: в теле отдаём `runId` — ключ, под которым
+    // прогон живёт в реестре. Вкладка, сдавшаяся после серии переподключений
+    // (или просто вторая), по нему подключается к ЖИВОМУ прогону и получает
+    // назад и текст ответа, и кнопку «Остановить». Без этого человек упирался в
+    // отказ, которому нечего противопоставить, кроме перезагрузки страницы.
+    if (registry.isRunning(chatId, sessionId)) {
+      return refuse(reply, 409, 'run_busy', RUN_BUSY_MESSAGE, {
+        runId: registry.resolveKey(chatId, sessionId),
+      });
+    }
+
+    // Вложение, которое панель не умеет передавать, раньше просто исчезало:
+    // чип в поле ввода был, файл до агента не доходил, и тот отвечал «файла не
+    // вижу». Отказываем явно и перечисляем, что именно не принято. Имена
+    // отклонённых файлов идут отдельным полем, а не только в тексте: клиент
+    // собирает своё сообщение на своём языке, ничего не выковыривая из строки.
+    const rejected = (files ?? []).filter((file) => !isSupportedUpload(file.name));
+    if (rejected.length > 0) {
+      const names = rejected.map((file) => file.name);
+      return refuse(
+        reply,
+        415,
+        'unsupported_upload',
+        `Не поддерживаются вложения: ${names.join(', ')}. ` +
+          `Сообщение не отправлено. Допустимые расширения: ${SUPPORTED_UPLOAD_EXTENSIONS.join(', ')}.`,
+        { files: names, supported: SUPPORTED_UPLOAD_EXTENSIONS },
+      );
+    }
+
     // Разговор продолжается только из той папки, где он начинался. Для нового
     // чата, открытого из проекта, рабочей папкой становится каталог проекта.
     const workspace = resolveWorkspace(
-      projectsDir,
+      projectsDir(),
       chatId,
       sessionId,
       true,
@@ -267,15 +342,13 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
     );
 
     if (workspace.isMissing) {
-      reply.raw.writeHead(200, SSE_HEADERS);
-      reply.raw.write(
-        `data: ${JSON.stringify({
-          kind: 'error',
-          message: `Рабочая папка этого чата не найдена: ${workspace.cwd}. Разговор начинался в ней, и продолжить его можно только оттуда.`,
-        })}\n\n`,
+      return refuse(
+        reply,
+        422,
+        'workspace_missing',
+        `Рабочая папка этого чата не найдена: ${workspace.cwd}. Разговор начинался в ней, и продолжить его можно только оттуда.`,
+        { cwd: workspace.cwd },
       );
-      reply.raw.end();
-      return;
     }
 
     const cwd = workspace.cwd;
@@ -286,14 +359,13 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
     // проекта, и вложение осело бы прямо в рабочем дереве, попав затем в
     // ближайший `git add`. Промпт получает абсолютные пути, поэтому читаются
     // они одинаково откуда угодно.
+    // Неподдерживаемые сюда уже не доходят — их отсеял отказ выше.
     const uploadDir = workspace.isSandbox ? cwd : chatDirectory(chatId);
-    const saved = (files ?? [])
-      .filter((file) => isSupportedUpload(file.name))
-      .map((file) => saveUpload(uploadDir, file.name, file.base64));
+    const saved = (files ?? []).map((file) => saveUpload(uploadDir, file.name, file.base64));
 
-    // Запускаем прогон в реестре (или подхватываем уже идущий) и подключаемся к
-    // нему потоком. Обрыв этого соединения агента не тронет.
-    registry.start(
+    // Запускаем прогон в реестре и подключаемся к нему потоком. Обрыв этого
+    // соединения агента не тронет.
+    const started = registry.start(
       chatId,
       {
         prompt: buildPromptWithFiles(prompt, saved),
@@ -317,6 +389,15 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
       // у песочницы/домашнего чата проекта нет.
       { projectPath: workspace.isSandbox ? undefined : cwd, sessionId },
     );
+
+    // Страховка на случай, если прогон успел появиться между проверкой выше и
+    // запуском: подключаться к ЧУЖОМУ прогону с seq 0 нельзя — это и была
+    // подмена ответа. Лучше честный отказ — с тем же ключом для подключения.
+    if (!started) {
+      return refuse(reply, 409, 'run_busy', RUN_BUSY_MESSAGE, {
+        runId: registry.resolveKey(chatId, sessionId),
+      });
+    }
 
     await streamRun(reply, chatId, 0);
   });
@@ -402,7 +483,7 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
    * «созданных файлов» было бы и бесполезно, и опасно.
    */
   const artifactDirectory = (chatId: string): string | undefined => {
-    const workspace = resolveWorkspace(projectsDir, chatId, undefined, false);
+    const workspace = resolveWorkspace(projectsDir(), chatId, undefined, false);
     return workspace.isSandbox && !workspace.isMissing ? workspace.cwd : undefined;
   };
 
@@ -468,6 +549,34 @@ export function registerChatRoutes(app: FastifyInstance, ctx: ServerContext): vo
         : reply.code(404).send({ message: 'Файл не найден' });
     },
   );
+}
+
+/**
+ * Похоже ли падение прогона на временное — «сеть моргнула», перегрузка, таймаут.
+ *
+ * Разбор текста живёт ЗДЕСЬ, а не на клиенте, и применяется только к ошибкам,
+ * пришедшим от самого CLI. Клиент по тексту не решает ничего: он видит готовый
+ * флаг. Отказы панели (занят/вложение/нет папки) сюда не попадают вовсе — они
+ * уходят HTTP-статусом с кодом, и подставить в такой текст своё имя файла,
+ * чтобы выпросить авто-ретрай, больше нельзя.
+ */
+export function isRetriableRunError(message: string): boolean {
+  return /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|network|fetch failed|Connection error|overloaded|temporarily|timed?\s?out|\b50[234]\b|\b529\b/i.test(
+    message,
+  );
+}
+
+/**
+ * Кадр SSE. Ошибке прогона добавляем структурный `retriable` — по нему клиент
+ * решает, перезапускать ли самому, не заглядывая в текст сообщения.
+ */
+function frame(buffered: BufferedEvent): string {
+  const event = buffered.event;
+  const payload =
+    event.kind === 'error'
+      ? { ...event, seq: buffered.seq, retriable: isRetriableRunError(event.message) }
+      : { ...event, seq: buffered.seq };
+  return `data: ${JSON.stringify(payload)}\n\n`;
 }
 
 /** Размер окна ленты по умолчанию — последние N сообщений разговора. */

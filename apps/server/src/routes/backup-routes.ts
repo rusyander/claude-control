@@ -57,18 +57,30 @@ export function registerBackupRoutes(app: FastifyInstance, ctx: ServerContext): 
       }
 
       setSecretPassphrase(passphrase);
-      if (request.body.enable) ctx.store.updateSettings({ encryptSecretBackups: true });
+      if (request.body.enable) {
+        ctx.store.updateSettings({ encryptSecretBackups: true });
+        // Настройку мало записать в state.json: шифрование живёт глобальным
+        // флагом в safe-io, и без этого вызова он оставался бы выключенным до
+        // перезапуска — панель показывала бы «шифрование включено», а копии
+        // `.mcp-secrets.env` продолжали ложиться открытым текстом.
+        ctx.applyIoSettings();
+      }
 
       return { ok: true, encryptSecrets: ctx.store.getSettings().encryptSecretBackups };
     },
   );
 
+  // Имя копии берём как есть: клиент кодирует его один раз, и Fastify уже
+  // раскодировал параметр пути. Лишний decodeURIComponent здесь раскодировал
+  // имя ВТОРОЙ раз — `skills-50%off.…` падал на битой escape-последовательности
+  // (URIError → 500 вместо отката), а `a%2520b` схлопывался в другое имя и
+  // приводил к «Копия не найдена».
   app.post<{ Params: { name: string }; Body: { passphrase?: string } }>(
     '/api/backups/:name/restore',
     (request, reply) => {
       const result = restoreBackup(
         ctx.store.backupDir,
-        decodeURIComponent(request.params.name),
+        request.params.name,
         restorableTargets(),
         ctx.location.paths.skills,
         request.body?.passphrase,
@@ -81,7 +93,8 @@ export function registerBackupRoutes(app: FastifyInstance, ctx: ServerContext): 
   );
 
   app.delete<{ Params: { name: string } }>('/api/backups/:name', (request, reply) => {
-    const removed = deleteBackup(ctx.store.backupDir, decodeURIComponent(request.params.name));
+    // То же самое, что и в откате: имя уже раскодировано маршрутизатором.
+    const removed = deleteBackup(ctx.store.backupDir, request.params.name);
     if (!removed) return reply.code(404).send({ error: 'Копия не найдена' });
 
     return { ok: true };

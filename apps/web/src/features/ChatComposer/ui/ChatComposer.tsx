@@ -2,23 +2,29 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'r
 import { useTranslation } from 'react-i18next';
 import { useSpeechRecognition } from '@shared/hooks/use-speech-recognition';
 import { useMicLevels } from '@shared/hooks/use-mic-levels';
+import { speechErrorMessageKey } from '@shared/lib/speech';
 import { VoiceWave } from '@shared/ui/voice-wave';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { planAttach } from '../lib/attachments';
 import type { AttachedFile, ChatComposerProps } from './ChatComposer.types';
 import styles from './ChatComposer.module.scss';
-
-/** Больше этого размера файл не приложить: он поедет в теле запроса. */
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 /**
  * Поле ввода чата: текст, надиктовка голосом и вложения. Пока идёт ответ,
  * отправка сменяется остановкой — прервать долгий разговор нужно уметь
  * в любой момент, а не ждать его конца.
  */
-export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: ChatComposerProps) {
+export function ChatComposer({
+  value,
+  onChange,
+  onSend,
+  onStop,
+  onRejectFiles,
+  isRunning,
+}: ChatComposerProps) {
   const { t, i18n } = useTranslation();
   const [files, setFiles] = useState<AttachedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -28,6 +34,8 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
   const speech = useSpeechRecognition(i18n.language === 'en' ? 'en-US' : 'ru-RU');
   const levels = useMicLevels(speech.listening);
   const isVoiceMode = speech.listening || speech.finalizing;
+  // null — либо ошибок не было, либо это тишина/отмена: о них не говорят.
+  const speechErrorKey = speechErrorMessageKey(speech.error);
 
   // Надиктованное дописываем к тексту, а не заменяем: часть могла быть набрана
   // руками до того, как пользователь взялся за микрофон. Текущий текст и колбэки
@@ -56,16 +64,26 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
   const attach = async (list: FileList | null): Promise<void> => {
     if (!list) return;
 
-    const attached = await Promise.all(
-      [...list].filter((file) => file.size <= MAX_FILE_BYTES).map(toAttachedFile),
-    );
+    // Слишком большой файл раньше отсеивался молча: чип не появлялся, сообщения
+    // не было — отличить это от сломанного перетаскивания было нельзя. Отказ
+    // уходит тем же путём, что и отказ по типу файла: сообщением от страницы.
+    const plan = planAttach([...list]);
+    if (plan.rejected.length > 0) onRejectFiles?.(plan.rejected);
+    if (plan.accepted.length === 0) return;
+
+    const attached = await Promise.all(plan.accepted.map(toAttachedFile));
     setFiles((current) => [...current, ...attached]);
   };
 
   const submit = (): void => {
     if (!value.trim() || isRunning) return;
-    onSend(files);
-    setFiles([]);
+    // Чипы снимаем, только когда отправку приняли. Сообщение может быть
+    // отклонено (неподдерживаемый тип файла, занятый прогон), и раньше в этом
+    // случае вложения пропадали вместе с текстом — приложить их приходилось
+    // заново, хотя человек ничего не отменял.
+    void Promise.resolve(onSend(files)).then((accepted) => {
+      if (accepted !== false) setFiles([]);
+    });
   };
 
   if (isVoiceMode) {
@@ -196,7 +214,7 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
               variant="ghost"
               iconOnly
               icon={<Icon name="mic" size={24} />}
-              aria-label={t('assistant.voiceInput')}
+              aria-label={t('assistant.startVoice')}
               onClick={() => speech.start()}
               disabled={!speech.supported}
             />
@@ -227,8 +245,15 @@ export function ChatComposer({ value, onChange, onSend, onStop, isRunning }: Cha
         </Stack>
       </div>
 
-      <Typography variant="caption" color="subtle" className={styles.hint}>
-        {t('chat.hint')}
+      {/* Голосовой режим при ошибке (нет доступа к микрофону, нет сети) просто
+          закрывался, и человек жал микрофон снова. Пока причина не устарела,
+          она стоит вместо подсказки: место одно, а сказать важнее. */}
+      <Typography
+        variant="caption"
+        color={speechErrorKey ? 'danger' : 'subtle'}
+        className={styles.hint}
+      >
+        {speechErrorKey ? t(speechErrorKey) : t('chat.hint')}
       </Typography>
     </div>
   );

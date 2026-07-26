@@ -38,9 +38,12 @@ export const providerInstructionsEntrySchema = object({
   editable: boolean(),
   /**
    * Почему запись не редактируется: `missing` (файла нет — панель его НЕ создаёт),
-   * `binary` (не текстовый файл), `too_large` (больше лимита), `directory`.
+   * `binary` (не текстовый файл), `too_large` (больше лимита), `directory`,
+   * `unsafe_path` (запись проектного конфига ведёт ЗА пределы проекта — панель
+   * туда не пишет, даже если файл существует; называть это `missing` значило бы
+   * предлагать создать уже существующий файл).
    */
-  reason: zodEnum(['missing', 'binary', 'too_large', 'directory']).optional(),
+  reason: zodEnum(['missing', 'binary', 'too_large', 'directory', 'unsafe_path']).optional(),
 });
 
 export type ProviderInstructionsEntry = Infer<typeof providerInstructionsEntrySchema>;

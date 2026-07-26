@@ -11,6 +11,7 @@ import {
   deleteProviderMcpServer,
   parseUniversalDraft,
   UnrecognizedFormatError,
+  McpServerExistsError,
   type ProviderMcpTarget,
 } from './provider-mcp.ts';
 
@@ -133,6 +134,9 @@ KEY = "value"
 web_search = true
 `;
 
+  /** Пара задокументированных полей codex, которыми панель не управляет. */
+  const TIMEOUTS = 'startup_timeout_sec = 20\ntool_timeout_sec = 60';
+
   it('добавление сервера: прочие ключи, комментарии и чужой сервер целы; оба сервера на месте', () => {
     const filePath = join(root, 'config.toml');
     writeFileSync(filePath, CONFIG, 'utf8');
@@ -166,6 +170,70 @@ web_search = true
       transport: 'stdio',
       command: 'node',
       env: { KEY: 'value' },
+    });
+  });
+
+  it('правка сервера: немоделируемые поля самой записи переживают перезапись', () => {
+    const filePath = join(root, 'config.toml');
+    writeFileSync(filePath, CONFIG.replace('startup_timeout_sec = 20', TIMEOUTS), 'utf8');
+
+    upsertProviderMcpServer(
+      targetFor(filePath),
+      'existing',
+      stdioDraft('existing', 'deno'),
+      backupDir,
+    );
+
+    const parsed = asToml(readFileSync(filePath, 'utf8'));
+    // Панель владеет только command/args/env — таймауты codex не её поля.
+    expect(parsed.mcp_servers.existing).toEqual({
+      startup_timeout_sec: 20,
+      tool_timeout_sec: 60,
+      command: 'deno',
+      args: ['-y', 'pkg'],
+      env: { TOKEN: 'abc' },
+    });
+  });
+
+  it('переименование: чужие поля переезжают со старого имени, старой таблицы нет', () => {
+    const filePath = join(root, 'config.toml');
+    writeFileSync(filePath, CONFIG, 'utf8');
+
+    upsertProviderMcpServer(
+      targetFor(filePath),
+      'existing',
+      stdioDraft('renamed', 'deno'),
+      backupDir,
+    );
+
+    const parsed = asToml(readFileSync(filePath, 'utf8'));
+    expect(Object.keys(parsed.mcp_servers)).toEqual(['renamed']);
+    expect(parsed.mcp_servers.renamed!.startup_timeout_sec).toBe(20);
+  });
+
+  it('смена транспорта на http: моделируемые stdio-ключи уходят, чужие остаются', () => {
+    const filePath = join(root, 'config.toml');
+    writeFileSync(filePath, CONFIG, 'utf8');
+
+    upsertProviderMcpServer(
+      targetFor(filePath),
+      'existing',
+      {
+        name: 'existing',
+        transport: 'http',
+        command: undefined,
+        args: [],
+        env: {},
+        url: 'https://example.com/mcp',
+        headers: {},
+      },
+      backupDir,
+    );
+
+    const parsed = asToml(readFileSync(filePath, 'utf8'));
+    expect(parsed.mcp_servers.existing).toEqual({
+      startup_timeout_sec: 20,
+      url: 'https://example.com/mcp',
     });
   });
 
@@ -770,7 +838,9 @@ describe('OpenCode JSON (ключ mcp): local/remote ↔ stdio/http, чужие 
       headers: {},
     };
     upsertProviderMcpServer(targetFor(filePath), null, draft, backupDir);
-    upsertProviderMcpServer(targetFor(filePath), null, draft, backupDir);
+    // Вторая запись — правка того же сервера (создание с занятым именем теперь
+    // отвечает конфликтом), копия всё равно должна появиться.
+    upsertProviderMcpServer(targetFor(filePath), 'x', draft, backupDir);
     expect(readdirSync(backupDir).filter((n) => n.endsWith('.bak')).length).toBeGreaterThanOrEqual(
       1,
     );
@@ -899,5 +969,237 @@ describe('Kimi JSON (~/.kimi-code/mcp.json): mcpServers с адресом в url
       upsertProviderMcpServer(targetFor(filePath), null, stdioDraft('a'), backupDir),
     ).toThrow(UnrecognizedFormatError);
     expect(readFileSync(filePath, 'utf8')).toBe(broken);
+  });
+});
+
+describe('Формат json: чужие значения проверяются в рантайме (рукописный конфиг)', () => {
+  let root: string;
+  let backupDir: string;
+
+  const targetFor = (filePath: string): ProviderMcpTarget => ({
+    provider: getProvider('gemini'),
+    format: 'json',
+    filePath,
+    cliDetected: false,
+    jsonHttpUrlKey: 'httpUrl',
+  });
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-json-mcp-raw-'));
+    backupDir = join(root, 'backups');
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  // Человек написал args строкой, env числом, headers массивом. Раньше эти
+  // значения уезжали в API как есть — страница падала на `args.join(' ')`.
+  it('нестроковые args/env/headers/command не выдаются за string[]/Record', () => {
+    const filePath = join(root, 'settings.json');
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        mcpServers: {
+          handwritten: {
+            command: 'npx',
+            args: '-y pkg',
+            env: { OK: 'yes', PORT: 8080 },
+            headers: ['A: b'],
+          },
+          weird: { command: 42, args: [1, 'ok', null] },
+        },
+      }),
+      'utf8',
+    );
+
+    const servers = readProviderMcpServers(targetFor(filePath));
+    expect(servers.find((s) => s.name === 'handwritten')).toEqual({
+      name: 'handwritten',
+      transport: 'stdio',
+      command: 'npx',
+      args: [],
+      env: {},
+      url: undefined,
+      headers: {},
+    });
+    const weird = servers.find((s) => s.name === 'weird')!;
+    expect(weird.command).toBeUndefined();
+    expect(weird.args).toEqual(['ok']);
+  });
+
+  it('нестроковый httpUrl не подменяет транспорт: адрес берётся из url', () => {
+    const filePath = join(root, 'settings.json');
+    writeFileSync(
+      filePath,
+      JSON.stringify({ mcpServers: { r: { httpUrl: 123, url: 'https://e/mcp' } } }),
+      'utf8',
+    );
+    expect(readProviderMcpServers(targetFor(filePath))[0]).toMatchObject({
+      transport: 'http',
+      url: 'https://e/mcp',
+    });
+  });
+
+  it('запись сервера строкой вместо объекта не разбирается по символам', () => {
+    const filePath = join(root, 'settings.json');
+    writeFileSync(filePath, JSON.stringify({ mcpServers: { s: 'npx -y pkg' } }), 'utf8');
+    expect(readProviderMcpServers(targetFor(filePath))[0]).toMatchObject({
+      name: 's',
+      transport: 'stdio',
+      command: undefined,
+      args: [],
+    });
+
+    upsertProviderMcpServer(
+      targetFor(filePath),
+      's',
+      {
+        name: 's',
+        transport: 'stdio',
+        command: 'npx',
+        args: [],
+        env: {},
+        url: undefined,
+        headers: {},
+      },
+      backupDir,
+    );
+    expect(JSON.parse(readFileSync(filePath, 'utf8')).mcpServers.s).toEqual({ command: 'npx' });
+  });
+
+  it('mcpServers не отображение → fail-closed на чтении и записи, файл цел', () => {
+    const filePath = join(root, 'settings.json');
+    const text = JSON.stringify({ mcpServers: ['github'] });
+    writeFileSync(filePath, text, 'utf8');
+    expect(() => readProviderMcpServers(targetFor(filePath))).toThrow(UnrecognizedFormatError);
+    expect(() =>
+      upsertProviderMcpServer(
+        targetFor(filePath),
+        null,
+        {
+          name: 'a',
+          transport: 'stdio',
+          command: 'npx',
+          args: [],
+          env: {},
+          url: undefined,
+          headers: {},
+        },
+        backupDir,
+      ),
+    ).toThrow(UnrecognizedFormatError);
+    expect(readFileSync(filePath, 'utf8')).toBe(text);
+  });
+});
+
+describe('Занятое имя сервера: конфликт вместо записи поверх', () => {
+  let root: string;
+  let backupDir: string;
+
+  const draft = (name: string, command: string) => ({
+    name,
+    transport: 'stdio' as const,
+    command,
+    args: [],
+    env: {},
+    url: undefined,
+    headers: {},
+  });
+
+  const jsonTarget = (filePath: string): ProviderMcpTarget => ({
+    provider: getProvider('gemini'),
+    format: 'json',
+    filePath,
+    cliDetected: false,
+    jsonHttpUrlKey: 'httpUrl',
+  });
+
+  const codexTarget = (filePath: string): ProviderMcpTarget => ({
+    provider: getProvider('codex'),
+    format: 'toml',
+    filePath,
+    cliDetected: false,
+    jsonHttpUrlKey: 'httpUrl',
+  });
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-mcp-exists-'));
+    backupDir = join(root, 'backups');
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('создание с занятым именем (json) → McpServerExistsError, прежний сервер цел', () => {
+    const filePath = join(root, 'settings.json');
+    const text = JSON.stringify({ mcpServers: { github: { command: 'node', args: ['s.js'] } } });
+    writeFileSync(filePath, text, 'utf8');
+
+    expect(() =>
+      upsertProviderMcpServer(jsonTarget(filePath), null, draft('github', 'npx'), backupDir),
+    ).toThrow(McpServerExistsError);
+    expect(readFileSync(filePath, 'utf8')).toBe(text);
+  });
+
+  it('переименование в занятое имя (json) → конфликт, оба сервера целы', () => {
+    const filePath = join(root, 'settings.json');
+    const text = JSON.stringify({
+      mcpServers: { github: { command: 'node' }, gh: { command: 'npx' } },
+    });
+    writeFileSync(filePath, text, 'utf8');
+
+    expect(() =>
+      upsertProviderMcpServer(jsonTarget(filePath), 'gh', draft('github', 'npx'), backupDir),
+    ).toThrow(McpServerExistsError);
+    expect(readFileSync(filePath, 'utf8')).toBe(text);
+  });
+
+  it('правка сервера под тем же именем конфликтом не считается', () => {
+    const filePath = join(root, 'settings.json');
+    writeFileSync(
+      filePath,
+      JSON.stringify({ mcpServers: { github: { command: 'node' } } }),
+      'utf8',
+    );
+    upsertProviderMcpServer(jsonTarget(filePath), 'github', draft('github', 'npx'), backupDir);
+    expect(JSON.parse(readFileSync(filePath, 'utf8')).mcpServers.github).toEqual({
+      command: 'npx',
+    });
+  });
+
+  it('осознанная замена (перенос между провайдерами) проходит с allowOverwrite', () => {
+    const filePath = join(root, 'settings.json');
+    writeFileSync(
+      filePath,
+      JSON.stringify({ mcpServers: { github: { command: 'node' } } }),
+      'utf8',
+    );
+    upsertProviderMcpServer(jsonTarget(filePath), null, draft('github', 'npx'), backupDir, {
+      allowOverwrite: true,
+    });
+    expect(JSON.parse(readFileSync(filePath, 'utf8')).mcpServers.github).toEqual({
+      command: 'npx',
+    });
+  });
+
+  it('тот же отказ у codex (проверка в диспетчере, а не в одном адаптере)', () => {
+    const filePath = join(root, 'config.toml');
+    const text = '[mcp_servers.github]\ncommand = "node"\n';
+    writeFileSync(filePath, text, 'utf8');
+
+    expect(() =>
+      upsertProviderMcpServer(codexTarget(filePath), null, draft('github', 'npx'), backupDir),
+    ).toThrow(McpServerExistsError);
+    expect(readFileSync(filePath, 'utf8')).toBe(text);
+  });
+
+  it('создание с новым именем не задето', () => {
+    const filePath = join(root, 'settings.json');
+    writeFileSync(
+      filePath,
+      JSON.stringify({ mcpServers: { github: { command: 'node' } } }),
+      'utf8',
+    );
+    upsertProviderMcpServer(jsonTarget(filePath), null, draft('tavily', 'npx'), backupDir);
+    expect(Object.keys(JSON.parse(readFileSync(filePath, 'utf8')).mcpServers).sort()).toEqual([
+      'github',
+      'tavily',
+    ]);
   });
 });

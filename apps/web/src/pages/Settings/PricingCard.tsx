@@ -11,6 +11,14 @@ import { Stack } from '@shared/ui/stack';
 import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { useUpdateSettings } from '@entities/AppConfig';
+import {
+  PRICING_FIELDS,
+  draftFromPrice,
+  nextCustom,
+  overrideFor,
+  priceFromDraft,
+  type PricingDraft,
+} from './model/PricingRow';
 import styles from './PricingCard.module.scss';
 
 /**
@@ -22,7 +30,9 @@ import styles from './PricingCard.module.scss';
  * при открытии настроек (не чаще раза в сутки), и здесь видно, откуда он и
  * какой давности.
  *
- * Свои цены остаются: они перебивают прайс — на случай своих условий.
+ * Свои цены остаются: они перебивают прайс — на случай своих условий. Правятся
+ * ПЯТЬ полей: у записи кэша две ставки, часовая и пятиминутная (`model/PricingRow.ts`).
+ * Пока часового поля не было, свою цену домножали на 1.6 за спиной пользователя.
  */
 export function PricingCard() {
   const { t, i18n } = useTranslation();
@@ -31,7 +41,7 @@ export function PricingCard() {
 
   /** Какая строка сейчас правится. Пусто — все только для чтения. */
   const [editing, setEditing] = useState<string | undefined>();
-  const [draft, setDraft] = useState<Partial<Record<keyof ModelPricing, string>>>({});
+  const [draft, setDraft] = useState<PricingDraft>({});
 
   const { data } = useQuery({
     queryKey: ['analytics', 'pricing'],
@@ -65,13 +75,8 @@ export function PricingCard() {
   if (!data?.entries?.length) return null;
 
   const rows = activeEntries(data.entries);
-  const fields: Array<keyof ModelPricing> = ['input', 'output', 'cacheRead', 'cacheWrite'];
-
-  /** Своя цена для строки: точное совпадение либо фрагмент, заданный раньше. */
-  const overrideFor = (id: string): ModelPricing | undefined => {
-    const own = Object.entries(data.custom).find(([fragment]) => id.includes(fragment));
-    return own?.[1];
-  };
+  const fields = PRICING_FIELDS;
+  const custom = data.custom;
 
   /**
    * Перечитываем ТОЛЬКО после ответа сервера. Сбросить кэш сразу — значит
@@ -91,33 +96,22 @@ export function PricingCard() {
   };
 
   const startEdit = (entry: PricingEntry): void => {
-    const current = overrideFor(entry.id) ?? entry.price;
     setEditing(entry.id);
-    setDraft(Object.fromEntries(fields.map((field) => [field, String(current[field])])));
+    setDraft(draftFromPrice(overrideFor(custom, entry.id) ?? entry.price));
   };
 
   const save = (entry: PricingEntry): void => {
-    const next = Object.fromEntries(
-      fields.map((field) => [field, Number(draft[field])]),
-    ) as unknown as ModelPricing;
+    // Мусор в поле не сохраняем: сервер такое отклонит, и строка молча осталась
+    // бы прежней. Кнопка на этот случай и так заблокирована.
+    const next = priceFromDraft(draft);
+    if (!next) return;
 
-    // Прежние ключи-фрагменты («opus») убираем: иначе рядом жили бы две своих
-    // цены на одну модель, и какая победит — зависело бы от порядка ключей.
-    const custom = Object.fromEntries(
-      Object.entries(data.custom).filter(([fragment]) => !entry.id.includes(fragment)),
-    );
-
-    // Совпало с прайсом — не храним: пусть работает цена с сайта, тогда
-    // обновление принесёт свежую само.
-    const matchesPrice = fields.every((field) => next[field] === entry.price[field]);
-    if (!matchesPrice) custom[entry.id] = next;
-
-    savePricing(custom);
+    savePricing(nextCustom(custom, entry, next));
   };
 
   const resetAll = (): void => savePricing({});
 
-  const hasCustom = Object.keys(data.custom).length > 0;
+  const hasCustom = Object.keys(custom).length > 0;
 
   return (
     <Card padding="md">
@@ -162,7 +156,7 @@ export function PricingCard() {
             </thead>
             <tbody>
               {rows.map((entry) => {
-                const own = overrideFor(entry.id);
+                const own = overrideFor(custom, entry.id);
                 const price = own ?? entry.price;
                 const isEditing = editing === entry.id;
 
@@ -184,7 +178,7 @@ export function PricingCard() {
 
                 // В режиме правки поля занимают всю строку: подписи у них
                 // собственные, и вжимать их в колонки по одному значило бы
-                // получить четыре узких столбика с обрезанными подписями.
+                // получить пять узких столбиков с обрезанными подписями.
                 if (isEditing) {
                   return (
                     <tr key={entry.id}>
@@ -203,8 +197,15 @@ export function PricingCard() {
                               />
                             ))}
                           </Stack>
+                          <Typography variant="body-sm" color="muted" className="prose">
+                            {t('settings.pricingCacheWriteHint')}
+                          </Typography>
                           <Stack direction="row" gap="var(--spacing-2xs)">
-                            <Button variant="primary" onClick={() => save(entry)}>
+                            <Button
+                              variant="primary"
+                              onClick={() => save(entry)}
+                              disabled={!priceFromDraft(draft)}
+                            >
                               {t('common.save')}
                             </Button>
                             <Button variant="ghost" onClick={() => setEditing(undefined)}>
@@ -262,7 +263,15 @@ function activeEntries(entries: PricingEntry[]): PricingEntry[] {
   });
 }
 
-/** Цена за миллион токенов: $5, $0.50, $6.25 — без хвостов вида «$5.00». */
-function formatPrice(value: number): string {
+/**
+ * Цена за миллион токенов: $5, $0.50, $6.25 — без хвостов вида «$5.00».
+ *
+ * Ставки нет — прочерк. Часовую запись кэша сервер проставляет сам (по прайсу
+ * либо равной введённой пятиминутной), и пустой она приходит разве что от
+ * старого сервера при разработке. Показать в этом месте выдуманное число хуже,
+ * чем показать, что цифры нет.
+ */
+function formatPrice(value: number | undefined): string {
+  if (value === undefined) return '—';
   return `$${Number.isInteger(value) ? value : value.toFixed(2)}`;
 }

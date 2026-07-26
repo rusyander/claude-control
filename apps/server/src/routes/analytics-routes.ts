@@ -5,12 +5,14 @@ import type { ServerContext } from '../context.ts';
 import { scanAnalytics } from '../domains/analytics/scanner.ts';
 import { getRunningAgents, getSkillUsage } from '../domains/analytics/runtime.ts';
 import { PRICING_URL } from '../domains/analytics/pricing-source.ts';
+import { longCacheRate, withOwnLongCacheRate } from '../domains/analytics/pricing.ts';
 
 /**
  * Аналитика. Полный обход транскриптов стоит секунд, поэтому результат
  * кэшируется: открытие страницы и переключение фильтров не должны каждый раз
- * перечитывать тысячу файлов. Список процессов при этом всегда свежий —
- * он дешёвый, а именно он показывает, что происходит прямо сейчас.
+ * перечитывать тысячу файлов. Список процессов живёт на своём коротком кэше
+ * (`runtime.ts`) — он показывает происходящее прямо сейчас, но на Windows его
+ * обход стоит секунды, а не копейки.
  */
 const CACHE_TTL_MS = 60_000;
 
@@ -22,22 +24,81 @@ interface CacheEntry {
 
 let cache: CacheEntry | undefined;
 
+/** Местная полночь текущих суток — начало периода «сегодня». */
+function startOfLocalDay(): number {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return start.getTime();
+}
+
+/**
+ * Границы произвольного диапазона из `?from=YYYY-MM-DD&to=YYYY-MM-DD`.
+ *
+ * Даты разбираются как МЕСТНЫЕ сутки, а не UTC (`new Date('2026-07-26')` — это
+ * полночь по Гринвичу, в поясе +3 она уже вчерашний вечер): группировка по дням
+ * и часам в `scanner.ts` тоже локальная, границы обязаны совпадать с ней.
+ * Правая граница включительна — до 23:59:59.999 выбранного дня.
+ *
+ * Мусор или неполная пара («только from») — не диапазон: возвращаем undefined и
+ * маршрут молча падает на период по дням, вместо 500 на NaN.
+ */
+function parseRange(from?: string, to?: string): { since: number; until: number } | undefined {
+  const start = parseLocalDay(from);
+  const end = parseLocalDay(to);
+  if (start === undefined || end === undefined) return undefined;
+
+  // Перепутанные местами даты выбираются пикером на раз — не ошибка, а порядок.
+  const [since, endDay] = start <= end ? [start, end] : [end, start];
+  return { since, until: endDay + 24 * 60 * 60 * 1000 - 1 };
+}
+
+function parseLocalDay(value?: string): number | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const [year = 0, month = 1, day = 1] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day, 0, 0, 0, 0);
+  return Number.isNaN(date.getTime()) ? undefined : date.getTime();
+}
+
 export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext): void {
-  app.get<{ Querystring: { days?: string; refresh?: string } }>(
+  app.get<{ Querystring: { days?: string; from?: string; to?: string; refresh?: string } }>(
     '/api/analytics',
     async (request): Promise<Analytics> => {
+      // Явный диапазон из пикера перебивает период по дням.
+      const range = parseRange(request.query.from, request.query.to);
+      // days=today — календарные сутки: период начинается в МЕСТНУЮ полночь, а
+      // не за 24 часа до текущего момента (иначе утром в отчёт попадала бы
+      // половина вчерашнего дня). Дата дня и час берутся по локальному времени
+      // (`scanner.ts`), поэтому и граница периода — локальная.
+      //
       // days=0 означает «за всё время»: берём заведомо больший интервал,
       // чем возраст любых транскриптов, вместо отдельной ветки без фильтра.
       // Нечисловой ввод (`?days=abc` → NaN) откатываем к периоду по умолчанию:
       // иначе NaN пролез бы в расчёт since и уронил сборку отчёта.
-      const requested = Number(request.query.days ?? 30);
+      const raw = request.query.days ?? 'today';
+      const isToday = raw === 'today';
+      const requested = Number(raw);
       const normalized = Number.isFinite(requested) ? requested : 30;
-      const days = normalized === 0 ? 36_500 : Math.min(Math.max(normalized, 1), 3650);
+      const days = isToday
+        ? 1
+        : normalized === 0
+          ? 36_500
+          : Math.min(Math.max(normalized, 1), 3650);
+      const since = range ? range.since : isToday ? startOfLocalDay() : undefined;
+      const until = range?.until;
       const snapshot = ctx.pricing.current();
+      const projectsDir = join(ctx.location.paths.root, 'projects');
       // Тарифы входят в ключ: иначе после правки цен (или после обновления
       // прайса) панель ещё минуту показывала бы стоимость по старым.
+      //
+      // Каталог конфигурации — тоже: при переключении на другой ~/.claude всё
+      // остальное в ключе совпадает (у свежего каталога нет своего кэша прайса,
+      // и обе стороны падают на встроенный снимок с одной и той же датой), и
+      // панель ещё минуту выдавала бы расход ПРЕЖНЕГО каталога за новый.
       const key = [
-        `days:${days}`,
+        // «Сегодня» и «1 день» — разные периоды при одном days: ключ различает
+        // их сам, иначе один ответ выдавался бы за другой в пределах TTL.
+        range ? `range:${range.since}-${range.until}` : `days:${isToday ? 'today' : days}`,
+        projectsDir,
         JSON.stringify(ctx.store.getSettings().modelPricing),
         snapshot.fetchedAt,
       ].join('|');
@@ -45,12 +106,13 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
       const forceRefresh = request.query.refresh === 'true';
 
       if (!isFresh || forceRefresh) {
-        const projectsDir = join(ctx.location.paths.root, 'projects');
         cache = {
           key,
           at: Date.now(),
           data: await scanAnalytics(projectsDir, {
             days,
+            since,
+            until,
             recentSessionsLimit: 25,
             // Свои тарифы из настроек перебивают прайс: пользователь мог
             // считать по своим условиям.
@@ -85,20 +147,46 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
    * Открытие настроек — и есть повод обновиться: прайс тянется с сайта, если
    * кэшу больше суток. Сеть недоступна — отдаём прошлый кэш, а `source` и
    * `fetchedAt` честно скажут интерфейсу, какой он давности.
+   *
+   * Исключение — явное `refresh=true`: нажатая кнопка обязана уметь провалиться.
+   * Ответ 200 с прежними строками неотличим от «цены и так свежие», поэтому
+   * неудачное принудительное обновление отвечает ошибкой (её покажет тост), а
+   * карточка остаётся на прошлых ценах — они верны, просто не обновились.
    */
   app.get<{ Querystring: { refresh?: string } }>(
     '/api/analytics/pricing',
-    async (request): Promise<AnalyticsPricing> => {
-      const snapshot = await ctx.pricing.refresh({ force: request.query.refresh === 'true' });
+    async (request, reply) => {
+      const force = request.query.refresh === 'true';
+      const snapshot = await ctx.pricing.refresh({ force });
 
-      return {
-        entries: snapshot.entries,
+      const failure = ctx.pricing.lastError();
+      if (force && failure)
+        return reply.code(502).send({ message: `Не удалось обновить прайс: ${failure}` });
+
+      const custom = ctx.store.getSettings().modelPricing;
+
+      const body: AnalyticsPricing = {
+        // Часовую ставку проставляем ЗДЕСЬ, а не на фронте: правило вывода
+        // (×1.6 для прайса, «как введено» для своей цены) живёт в одном месте,
+        // иначе таблица настроек показывала бы одну цифру, а счёт считался бы
+        // по другой. На сам расчёт это не влияет — там те же функции.
+        entries: snapshot.entries.map((entry) => ({
+          ...entry,
+          price: { ...entry.price, cacheWrite1h: longCacheRate(entry.price) },
+        })),
         source: snapshot.source,
         fetchedAt: snapshot.fetchedAt,
         url: snapshot.url ?? PRICING_URL,
         stale: ctx.pricing.isStale(),
-        custom: ctx.store.getSettings().modelPricing,
+        custom: Object.fromEntries(
+          Object.entries(custom).map(([fragment, price]) => [
+            fragment,
+            withOwnLongCacheRate(price),
+          ]),
+        ),
       };
+
+      return body;
     },
   );
 }

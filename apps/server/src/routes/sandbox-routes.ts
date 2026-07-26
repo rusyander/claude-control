@@ -1,10 +1,13 @@
-import { join } from 'node:path';
+import { join, relative, isAbsolute } from 'node:path';
 import { existsSync } from 'node:fs';
 import { platform } from 'node:process';
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
 import {
   createSandbox,
+  isSandboxExpired,
+  markSandboxBusy,
+  markSandboxFree,
   removeSandbox,
   sandboxPaths,
   type SandboxSelection,
@@ -34,6 +37,26 @@ import { readArtifacts } from '../domains/chat/ChatArtifacts.ts';
  * настоящим разговором не проверить, поэтому для них поднимается Claude Code
  * с временной конфигурацией, где есть только проверяемое.
  */
+/**
+ * Путь к скрипту внутри hooks/ песочницы по имени из запроса.
+ *
+ * Имя приходит от клиента, а собранная из него команда исполняется через
+ * оболочку — поэтому путь не «чистим», а отклоняем целиком: пустые сегменты,
+ * «.», «..» и NUL запрещены, результат обязан остаться внутри каталога. Без
+ * этого `../../work/deploy.sh` собирался в существующий файл где угодно на
+ * диске, и панель запускала его, называя это прогоном в изоляции.
+ */
+function safeScriptPath(hooksDir: string, name: string): string | undefined {
+  if (name.includes('\0')) return undefined;
+
+  const segments = name.split(/[\\/]/);
+  if (segments.some((segment) => !segment || segment === '.' || segment === '..')) return undefined;
+
+  const full = join(hooksDir, ...segments);
+  const rel = relative(hooksDir, full);
+  return !rel || rel.startsWith('..') || isAbsolute(rel) ? undefined : full;
+}
+
 export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext): void {
   const running = new Map<string, ChatRun>();
 
@@ -85,6 +108,18 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
   }>('/api/sandbox/probe-hook', async (request) => {
     const { id, hookId, scriptName, fixtureIds, customEvent } = request.body;
     const { workDir, configDir } = sandboxPaths(id);
+    const sandboxHooks = join(configDir, 'hooks');
+
+    // Пока песочница не собрана, запускать нечего: кнопку «Прогнать» можно
+    // нажать раньше, чем ответит сборка. Раньше прогон всё равно начинался —
+    // spawn падал невнятным ENOENT на отсутствующем рабочем каталоге, а до
+    // этого успевал взяться за НАСТОЯЩИЙ скрипт вместо копии.
+    if (!existsSync(workDir)) {
+      return {
+        results: [],
+        error: 'Песочница ещё не собрана: дождитесь окончания сборки и повторите прогон.',
+      };
+    }
 
     let command = '';
 
@@ -95,15 +130,34 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       command = hook?.command ?? '';
 
       // Запускаем копию скрипта из песочницы, а не оригинал: если хук что-то
-      // пишет на диск, это должно остаться внутри песочницы.
+      // пишет на диск, это должно остаться внутри песочницы. Копии нет —
+      // отказываемся: подмена пути здесь единственное, что удерживает хук
+      // внутри, и запуск оригинала нарушил бы обещание изоляции молча.
       if (hook?.scriptPath) {
-        const copy = join(configDir, 'hooks', hook.scriptPath.split(/[\\/]/).pop() ?? '');
-        if (existsSync(copy)) command = command.split(hook.scriptPath).join(copy);
+        const copy = safeScriptPath(sandboxHooks, hook.scriptPath.split(/[\\/]/).pop() ?? '');
+        if (!copy || !existsSync(copy)) {
+          return {
+            results: [],
+            error:
+              'Скрипт этого хука не попал в песочницу — прогон отменён, чтобы не запустить настоящий файл. Соберите песочницу заново.',
+          };
+        }
+        command = command.split(hook.scriptPath).join(copy);
       }
     } else if (scriptName) {
-      const copy = join(configDir, 'hooks', scriptName);
-      const source = existsSync(copy) ? copy : join(ctx.location.paths.hooks, scriptName);
-      command = scriptCommand(source);
+      const copy = safeScriptPath(sandboxHooks, scriptName);
+      if (!copy) return { results: [], error: 'Недопустимое имя скрипта' };
+
+      // Только копия: раньше при её отсутствии брался файл из настоящего
+      // hooks/ — то есть песочница запускала оригинал.
+      if (!existsSync(copy)) {
+        return {
+          results: [],
+          error:
+            'Скрипт не попал в песочницу — прогон отменён, чтобы не запустить настоящий файл. Соберите песочницу заново.',
+        };
+      }
+      command = scriptCommand(copy);
     }
 
     if (!command) {
@@ -192,9 +246,22 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
     async (request, reply) => {
       const { id, prompt, sessionId } = request.body;
 
-      // Песочницу без выбранных элементов заводим на месте: она нужна для
-      // сравнения «как отвечает Claude без этого правила».
       if (!existsSync(sandboxPaths(id).configDir)) {
+        // Песочницу, которую унесло подметание, ПУСТОЙ не подменяем. Раньше на
+        // её месте молча собиралась песочница без единого правила и скилла:
+        // разговор шёл дальше, `--resume` не находил переписку, ответ приходил
+        // такой, будто проверяемое ни на что не влияет, — а панель всё это
+        // время показывала прежний состав. Ложный отрицательный ответ хуже
+        // отказа, поэтому истечение называется вслух.
+        if (isSandboxExpired(id)) {
+          return reply.code(410).send({
+            message:
+              'Песочница убрана по простою: копия доступа к аккаунту в ней не должна лежать часами. Откройте её заново — состав соберётся снова.',
+          });
+        }
+
+        // Песочницу без выбранных элементов заводим на месте: она нужна для
+        // сравнения «как отвечает Claude без этого правила».
         createSandbox(id, {}, ctx.location, ctx.store);
       }
 
@@ -217,6 +284,11 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       const run = new ChatRun();
       running.set(id, run);
 
+      // Пока идёт прогон, подметание эту песочницу не трогает: длинный агентный
+      // ход может часами ничего не писать на диск и по одним отметкам времени
+      // выглядит брошенным.
+      markSandboxBusy(id);
+
       reply.raw.on('close', () => {
         if (running.get(id) === run) {
           run.stop();
@@ -230,6 +302,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
         send({ kind: 'error', message: error instanceof Error ? error.message : String(error) });
       } finally {
         running.delete(id);
+        markSandboxFree(id);
         reply.raw.end();
       }
     },

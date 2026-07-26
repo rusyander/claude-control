@@ -194,6 +194,9 @@ function ResultRow({ result, title }: ResultRowProps) {
     block: styles.resultBlock,
     ask: styles.resultAsk,
     pass: styles.resultPass,
+    // Несостоявшийся прогон нельзя показывать как «пропустил»: иначе
+    // незапустившийся страж выглядит как страж, который решил не вмешиваться.
+    error: styles.resultError,
   }[result.decision];
 
   return (
@@ -233,7 +236,7 @@ function ResultRow({ result, title }: ResultRowProps) {
 }
 
 function toneOf(decision: HookDecision): 'danger' | 'warning' | 'neutral' {
-  if (decision === 'block') return 'danger';
+  if (decision === 'block' || decision === 'error') return 'danger';
   if (decision === 'ask') return 'warning';
   return 'neutral';
 }

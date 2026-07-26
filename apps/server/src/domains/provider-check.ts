@@ -203,6 +203,10 @@ function checkMcp(providerId: string, deps: ProviderCheckDeps): ProviderCheckSte
       },
       // Копии временного файла не нужны — их некуда откатывать.
       undefined,
+      // allowOverwrite: самопроверка пишет в КОПИЮ и проверяет круг записи. Если
+      // сервер с пробным именем в конфигурации уже есть, отказ по конфликту
+      // выдал бы «формат сломан» там, где всё исправно.
+      { allowOverwrite: true },
     );
     const withProbe = readProviderMcpServers(probeTarget);
     if (!withProbe.some((server) => server.name === PROBE_SERVER)) {

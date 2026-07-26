@@ -44,13 +44,19 @@ describe('backups: безопасность вывода цели восстан
       );
     });
 
-    it('skills-disabled-<id> тоже возвращается в активный skills/<id>', () => {
+    /**
+     * BUG-38. Раньше обе копии разворачивались в активный skills/ — откат
+     * ВКЛЮЧАЛ скилл, который пользователь выключил. Префикс имени копии
+     * говорит, где скилл лежал в момент снимка, туда он и возвращается.
+     */
+    it('skills-disabled-<id> возвращается в skills-disabled/<id>, а не включается (BUG-38)', () => {
       expect(resolveBackupTarget('skills-disabled-мой', true, {}, skillsDir)).toBe(
-        join(skillsDir, 'мой'),
+        join(skillsDir, '..', 'skills-disabled', 'мой'),
       );
-      // Префикс «disabled» снимается первым — id не должен остаться с «disabled-».
+      // Префикс снимается целиком — id не должен остаться с «disabled-».
+      expect(resolveBackupTarget('skills-disabled-мой', true, {}, skillsDir)).toContain('мой');
       expect(resolveBackupTarget('skills-disabled-мой', true, {}, skillsDir)).not.toContain(
-        'disabled',
+        'disabled-мой',
       );
     });
 

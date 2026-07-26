@@ -15,12 +15,14 @@ import {
   deleteProviderMcpServer,
   parseUniversalDraft,
   UnrecognizedFormatError,
+  McpServerExistsError,
 } from '../domains/provider-mcp.ts';
 import {
   readProviderEnvVars,
   saveProviderEnvVars,
   parseProviderEnvDraft,
   EnvKeyNotEncodableError,
+  EnvKeyPreservedError,
 } from '../domains/provider-env.ts';
 import {
   saveProviderPermissions,
@@ -493,6 +495,11 @@ export function registerProviderProjectRoutes(app: FastifyInstance, ctx: ServerC
     try {
       return done(run());
     } catch (error) {
+      // Имя занято (создание или переименование) — конфликт, а не запись поверх:
+      // проектный конфиг такой же чужой файл, что и глобальный.
+      if (error instanceof McpServerExistsError) {
+        return reply.code(409).send({ error: 'server_exists', message: error.message });
+      }
       if (error instanceof UnrecognizedFormatError)
         return reply.code(422).send(FORMAT_UNRECOGNIZED);
       throw error;
@@ -587,6 +594,12 @@ export function registerProviderProjectRoutes(app: FastifyInstance, ctx: ServerC
         // а не сломанный файл: сообщение объясняет, что именно не так.
         if (error instanceof EnvKeyNotEncodableError) {
           return reply.code(400).send({ error: 'invalid_draft', message: error.message });
+        }
+        // Имя занято немоделируемой записью файла — конфликт одного ключа (409),
+        // а не сломанный формат: файл проекта разобран, править нужно одну
+        // переменную. Общий 422 объявлял исправный config.toml нечитаемым.
+        if (error instanceof EnvKeyPreservedError) {
+          return reply.code(409).send({ error: 'env_key_preserved', message: error.message });
         }
         if (error instanceof UnrecognizedFormatError)
           return reply.code(422).send(FORMAT_UNRECOGNIZED);

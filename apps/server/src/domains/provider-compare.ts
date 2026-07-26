@@ -594,14 +594,20 @@ function mcpWriter(
       providerName: target.provider.name,
       filePath: target.filePath,
     },
+    // allowOverwrite: перенос — это осознанное «сделать как у источника»:
+    // одноимённый сервер приёмника заменяется намеренно, и пользователь видит
+    // замену в предпросмотре ДО применения. Конфликтом отвечают формы (409).
     apply: (server, backupDir) =>
-      void upsertProviderMcpServer(target, null, draftOf(server), backupDir),
+      void upsertProviderMcpServer(target, null, draftOf(server), backupDir, {
+        allowOverwrite: true,
+      }),
     applyTo: (path, server) =>
       void upsertProviderMcpServer(
         { ...target, filePath: path, backupName: undefined },
         null,
         draftOf(server),
         undefined,
+        { allowOverwrite: true },
       ),
   };
 }

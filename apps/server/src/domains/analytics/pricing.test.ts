@@ -3,6 +3,7 @@ import {
   getPricing,
   estimateCost,
   findEntry,
+  longCacheRate,
   BUILT_IN_ENTRIES,
   type ModelPricing,
   type PricingEntry,
@@ -141,7 +142,12 @@ describe('getPricing', () => {
     const own: ModelPricing = { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 };
 
     it('перебивают прайс', () => {
-      expect(getPricing('claude-opus-4-8', { overrides: { opus: own }, at: AT })).toEqual(own);
+      // Часовая ставка проставляется равной введённой пятиминутной: своя цена
+      // множителем не достраивается (см. регрессию про ×1.6 ниже).
+      expect(getPricing('claude-opus-4-8', { overrides: { opus: own }, at: AT })).toEqual({
+        ...own,
+        cacheWrite1h: own.cacheWrite,
+      });
     });
 
     it('не задевают модели, под чей фрагмент не подходят', () => {
@@ -152,6 +158,7 @@ describe('getPricing', () => {
     it('при нескольких подходящих фрагментах побеждает самый точный (длинный)', () => {
       const broad: ModelPricing = { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 };
       const exact: ModelPricing = { input: 9, output: 9, cacheRead: 9, cacheWrite: 9 };
+      const chosen = { ...exact, cacheWrite1h: 9 };
 
       // Точный фрагмент 'claude-opus-4-8' специфичнее общего 'opus' — берётся он.
       expect(
@@ -159,7 +166,7 @@ describe('getPricing', () => {
           overrides: { opus: broad, 'claude-opus-4-8': exact },
           at: AT,
         }),
-      ).toEqual(exact);
+      ).toEqual(chosen);
 
       // Порядок ключей на выбор не влияет — и в обратном порядке точный побеждает.
       expect(
@@ -167,7 +174,7 @@ describe('getPricing', () => {
           overrides: { 'claude-opus-4-8': exact, opus: broad },
           at: AT,
         }),
-      ).toEqual(exact);
+      ).toEqual(chosen);
     });
   });
 
@@ -227,6 +234,120 @@ describe('estimateCost', () => {
       expect(readCost).toBe(0.5);
       expect(writeCost).toBe(6.25);
       expect(writeCost).toBeGreaterThan(readCost);
+    });
+  });
+
+  describe('часовой кэш дороже пятиминутного (регрессия)', () => {
+    // Прайс держит две ставки записи: 1.25× базового входа за 5 минут и 2× за
+    // час. Транскрипты пишут почти весь объём в часовой кэш, а считался он по
+    // пятиминутной ставке — стоимость записи выходила на ~38% ниже настоящей.
+
+    it('весь объём в часовом кэше opus 4.8 = ставка 1h (10), а не 5m (6.25)', () => {
+      const cost = estimateCost(
+        'claude-opus-4-8',
+        { ...NO_TOKENS, cacheCreation: M, cacheCreation1h: M },
+        { at: AT },
+      );
+      expect(cost).toBe(10);
+    });
+
+    it('cacheCreation1h — доля общего объёма, а не добавка к нему', () => {
+      // Половина миллиона по 10 плюс половина по 6.25 = 8.125.
+      const cost = estimateCost(
+        'claude-opus-4-8',
+        { ...NO_TOKENS, cacheCreation: M, cacheCreation1h: M / 2 },
+        { at: AT },
+      );
+      expect(cost).toBe(8.125);
+    });
+
+    it('без часовой доли считается по-старому — по пятиминутной ставке', () => {
+      expect(estimateCost('claude-opus-4-8', { ...NO_TOKENS, cacheCreation: M }, { at: AT })).toBe(
+        6.25,
+      );
+    });
+
+    it('явная часовая ставка прайса важнее выведенной из пятиминутной', () => {
+      const entries: PricingEntry[] = [
+        {
+          id: 'claude-opus-4-8',
+          label: 'Claude Opus 4.8',
+          price: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25, cacheWrite1h: 99 },
+        },
+      ];
+      expect(
+        estimateCost(
+          'claude-opus-4-8',
+          { ...NO_TOKENS, cacheCreation: M, cacheCreation1h: M },
+          { entries, at: AT },
+        ),
+      ).toBe(99);
+    });
+
+    /**
+     * Регрессия про ДЕНЬГИ: своя цена без часовой ставки домножалась на 1.6.
+     * Пользователь вводил $6.25 за запись кэша, а панель выставляла $10 — и ни
+     * одно поле интерфейса этого не показывало. Часовую ставку теперь можно
+     * задать явно; не задана — берётся введённая, а не выведенная.
+     */
+    it('своя цена без часовой ставки считается как введена, без ×1.6', () => {
+      const own: ModelPricing = { input: 1, output: 2, cacheRead: 3, cacheWrite: 10 };
+      const cost = estimateCost(
+        'claude-opus-4-8',
+        { ...NO_TOKENS, cacheCreation: M, cacheCreation1h: M },
+        { overrides: { opus: own }, at: AT },
+      );
+      expect(cost).toBe(10);
+    });
+
+    it('своя цена с часовой ставкой считается по ней', () => {
+      const own: ModelPricing = {
+        input: 1,
+        output: 2,
+        cacheRead: 3,
+        cacheWrite: 10,
+        cacheWrite1h: 12,
+      };
+      const half = estimateCost(
+        'claude-opus-4-8',
+        { ...NO_TOKENS, cacheCreation: M, cacheCreation1h: M / 2 },
+        { overrides: { opus: own }, at: AT },
+      );
+      // Половина по 12 и половина по 10 — обе ставки свои, ни одна не выведена.
+      expect(half).toBe(11);
+    });
+
+    it('getPricing проставляет своей цене часовую ставку из пятиминутной', () => {
+      const own: ModelPricing = { input: 1, output: 2, cacheRead: 3, cacheWrite: 10 };
+      expect(getPricing('claude-opus-4-8', { overrides: { opus: own }, at: AT })).toEqual({
+        ...own,
+        cacheWrite1h: 10,
+      });
+    });
+
+    it('строка прайса без часовой колонки по-прежнему выводит её множителем', () => {
+      // Множитель — опубликованное правило (2× против 1.25× базового входа), а
+      // не догадка: на встроенной таблице он выполняется точно.
+      expect(longCacheRate({ input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 })).toBe(10);
+    });
+
+    it('рассогласованный usage не даёт отрицательной стоимости', () => {
+      // Часовая доля больше общего объёма или отрицательная — данные не наши,
+      // пишет их CLI; зажимаем в границы вместо отрицательных денег.
+      expect(
+        estimateCost(
+          'claude-opus-4-8',
+          { ...NO_TOKENS, cacheCreation: M, cacheCreation1h: 5 * M },
+          { at: AT },
+        ),
+      ).toBe(10);
+      expect(
+        estimateCost(
+          'claude-opus-4-8',
+          { ...NO_TOKENS, cacheCreation: M, cacheCreation1h: -M },
+          { at: AT },
+        ),
+      ).toBe(6.25);
     });
   });
 

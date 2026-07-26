@@ -8,7 +8,13 @@ export {
   subscribeRuns,
   EMPTY_RUN,
 } from './agentRunsStore';
-export type { AgentRun, StartInput, StreamedTool, PendingPermission } from './agentRunsStore';
+export type {
+  AgentRun,
+  StartInput,
+  StreamedTool,
+  PendingPermission,
+  SendOutcome,
+} from './agentRunsStore';
 export {
   useAgentRun,
   useProjectStatuses,

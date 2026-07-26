@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   backupEntry,
+  writeTextFile,
+  SecretBackupUnavailableError,
   setEncryptSecretBackups,
   setSecretsBasename,
   setSecretPassphrase,
@@ -72,16 +74,40 @@ describe('safe-io: шифрование копий секретов', () => {
     expect(decryptSecret(blob, PASS)).toBe(SECRET_BODY);
   });
 
-  it('шифрование включено, но фразы нет — копия секретов НЕ создаётся (плейнтекст не утекает)', () => {
+  it('шифрование включено, но фразы нет — отказ, а не молчаливое «копии нет» (#67)', () => {
     setEncryptSecretBackups(true);
     setSecretPassphrase(undefined);
     const path = writeSecret();
 
-    const target = backupEntry(path, backupDir);
-    expect(target).toBeUndefined();
-    // В каталоге копий не появилось ни одного .bak.
-    const baks = readdirSync(backupDir).filter((name) => name.endsWith('.bak'));
+    // Раньше здесь возвращался undefined, и вызывающий спокойно перезаписывал
+    // живые секреты без единой копии. Теперь копия невозможна → запись не идёт.
+    expect(() => backupEntry(path, backupDir)).toThrow(SecretBackupUnavailableError);
+    // Плейнтекст на диск не утёк: ни одного .bak (каталога копий может и не быть).
+    const baks = existsSync(backupDir)
+      ? readdirSync(backupDir).filter((name) => name.endsWith('.bak'))
+      : [];
     expect(baks).toHaveLength(0);
+  });
+
+  it('фразы нет — правка файла секретов через writeTextFile тоже отказывает (#67)', () => {
+    setEncryptSecretBackups(true);
+    setSecretPassphrase(undefined);
+    const path = writeSecret();
+
+    expect(() => writeTextFile(path, 'TOKEN=новый\n', { backupDir })).toThrow(
+      SecretBackupUnavailableError,
+    );
+    // Главное: старое значение на месте — обратимость не потеряна.
+    expect(readFileSync(path, 'utf8')).toBe(SECRET_BODY);
+  });
+
+  it('копию просят не для секретов — отказ не срабатывает', () => {
+    setEncryptSecretBackups(true);
+    setSecretPassphrase(undefined);
+    const path = join(dir, 'settings.json');
+    writeFileSync(path, '{"a":1}');
+
+    expect(backupEntry(path, backupDir)).toBeDefined();
   });
 
   it('обычные файлы не шифруются даже при включённом шифровании', () => {

@@ -56,6 +56,29 @@ import { readDotenvVars, writeDotenvVars } from '../lib/dotenv-file.ts';
 // Переэкспорт для роутов/тестов; классы те же самые (из lib) — `instanceof` цел.
 export { UnrecognizedFormatError, EnvKeyNotEncodableError };
 
+/**
+ * Имя переменной занято записью, которую панель хранит, но не моделирует
+ * (`PORT = 8080`, `DEBUG = true`, вложенная таблица).
+ *
+ * Отдельный класс, а не `UnrecognizedFormatError`: файл разобран прекрасно и
+ * раздел остаётся на запись — конфликт ровно в одном имени. Раньше этот случай
+ * шёл общей ошибкой формата, и пользователь получал «формат файла не распознан —
+ * запись запрещена»: неправда про его config.toml, и ни слова о том, какая
+ * переменная мешает.
+ */
+export class EnvKeyPreservedError extends Error {
+  readonly key: string;
+
+  constructor(key: string) {
+    super(
+      `Переменная «${key}» задана в config.toml значением, которое панель не моделирует (число, булево или таблица), — переименуйте её здесь или измените значение в файле вручную. Остальные переменные не сохранены.`,
+    );
+    // Явное поле вместо parameter property: рантайм сервера — strip-types.
+    this.name = 'EnvKeyPreservedError';
+    this.key = key;
+  }
+}
+
 interface ProviderEnvSettingsSource {
   getSettings(): Pick<AppSettings, 'provider' | 'claudeDirOverride'>;
 }
@@ -142,6 +165,31 @@ function parsePolicy(text: string): Record<string, unknown> {
 }
 
 /**
+ * Разложить `set` политики на то, что панель ВЕДЁТ (строковые значения), и то,
+ * что она лишь ХРАНИТ. Строкой значение переменной окружения бывает не всегда:
+ * человек мог написать `PORT = 8080` или `DEBUG = true` — TOML это позволяет.
+ * Такие записи панель не показывает (её форма знает только строки), но и не
+ * теряет: на записи они возвращаются в файл по значению.
+ * Не-объект (строка/массив вместо таблицы) → fail-closed.
+ */
+function splitPolicySet(policy: Record<string, unknown>): {
+  vars: ProviderEnvVar[];
+  preserved: Record<string, unknown>;
+} {
+  const set = policy.set;
+  if (set === undefined) return { vars: [], preserved: {} };
+  if (typeof set !== 'object' || Array.isArray(set)) throw new UnrecognizedFormatError();
+
+  const vars: ProviderEnvVar[] = [];
+  const preserved: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(set as Record<string, unknown>)) {
+    if (typeof value === 'string') vars.push({ key, value });
+    else preserved[key] = value;
+  }
+  return { vars, preserved };
+}
+
+/**
  * Прочитать переменные окружения активного провайдера. Формат выбирается по
  * `target.format`: Codex — ключ `set` таблицы `[shell_environment_policy]`,
  * Aider — список `set-env` в `~/.aider.conf.yml`. Значения приводим к строке.
@@ -155,14 +203,7 @@ export function readProviderEnvVars(target: ProviderEnvTarget): ProviderEnvVar[]
   if (target.format === 'dotenv') {
     return readDotenvVars(text).sort((a, b) => a.key.localeCompare(b.key));
   }
-  const set = parsePolicy(text).set;
-  if (set === undefined) return [];
-  if (typeof set !== 'object' || Array.isArray(set)) throw new UnrecognizedFormatError();
-
-  return Object.entries(set as Record<string, unknown>)
-    .filter(([, value]) => typeof value === 'string')
-    .map(([key, value]) => ({ key, value: value as string }))
-    .sort((a, b) => a.key.localeCompare(b.key));
+  return splitPolicySet(parsePolicy(text)).vars.sort((a, b) => a.key.localeCompare(b.key));
 }
 
 /**
@@ -186,10 +227,23 @@ export function saveProviderEnvVars(
   // Прочие ключи политики (inherit/exclude/…) берём из существующего файла и
   // сохраняем как есть; меняем только `set`. Оригинал обязан парситься (иначе не
   // знаем, где регион и какие ключи политики беречь) — fail-closed.
-  const policy: Record<string, unknown> = original.trim() ? { ...parsePolicy(original) } : {};
+  const parsed = original.trim() ? parsePolicy(original) : {};
+  const policy: Record<string, unknown> = { ...parsed };
 
-  const set: Record<string, string> = {};
-  for (const { key, value } of vars) set[key] = value;
+  // Немоделируемые записи `set` (TOML-число, bool, вложенная таблица) панель не
+  // показывает — и потому не может их «сохранить обратно» из формы. Переносим их
+  // по значению: иначе обычное «Сохранить» без единой правки молча удаляло бы
+  // `PORT = 8080` из чужого конфига, а верификация ниже этого не заметила бы —
+  // она сверяет результат с намерением, собранным из того же списка.
+  const { preserved } = splitPolicySet(parsed);
+  const set: Record<string, unknown> = { ...preserved };
+  for (const { key, value } of vars) {
+    // Черновик назвал сохранённый ключ: чем он был в файле, панель не знает, а
+    // записать строку поверх — потеря чужого значения. Отказ, но именной (409):
+    // файл в порядке, мешает ровно эта переменная — так и говорим.
+    if (key in preserved) throw new EnvKeyPreservedError(key);
+    set[key] = value;
+  }
   policy.set = set;
 
   const block = stringifyToml({ [POLICY_KEY]: policy });

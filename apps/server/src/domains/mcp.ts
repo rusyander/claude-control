@@ -12,7 +12,7 @@ import type {
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
 import type { AppStore } from '../lib/app-store.ts';
 import { openMcpSession, DEFAULT_NETWORK_TIMEOUT_MS } from './mcp-client.ts';
-import { hasOAuthTokens } from './mcp-oauth.ts';
+import { hasOAuthTokens, renameOAuth } from './mcp-oauth.ts';
 
 /**
  * Регистрация MCP-серверов живёт в ~/.claude.json — рядом с каталогом .claude,
@@ -104,17 +104,64 @@ export function readMcpServers(
   ].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Имя MCP-сервера уже занято — маршрут отвечает 409, а не пишет поверх чужой записи. */
+export class McpServerExistsError extends Error {
+  readonly serverName: string;
+
+  constructor(serverName: string) {
+    super(`MCP-сервер «${serverName}» уже есть в конфигурации.`);
+    // Явное поле, а не parameter property: рантайм сервера читает TypeScript
+    // через strip-types, а их он не поддерживает.
+    this.name = 'McpServerExistsError';
+    this.serverName = serverName;
+  }
+}
+
+/**
+ * Добавить или изменить сервер (при переименовании `serverId` — прежнее имя).
+ *
+ * Создание с занятым именем и переименование в занятое — ОТКАЗ
+ * (`McpServerExistsError` → 409), как у скиллов и у MCP чужих провайдеров.
+ * Осознанная замена (перенос конфигурации между провайдерами) передаёт
+ * `allowOverwrite` явно.
+ */
 export function saveMcpServer(
   mcpConfigPath: string,
   serverId: string | null,
   draft: McpServerDraft,
   backupDir?: string,
+  options?: { allowOverwrite?: boolean },
 ): string | undefined {
   const config = readJsonFile<RawMcpConfig>(mcpConfigPath, {});
   config.mcpServers ??= {};
+  const disabled = config[DISABLED_KEY] as Record<string, RawMcpServer> | undefined;
 
-  // Переименование: убираем запись под старым именем.
-  if (serverId && serverId !== draft.name) delete config.mcpServers[serverId];
+  // Занятое имя — отказ, а не запись поверх. Запись шла по имени безусловно:
+  // «ctx7» из формы молча замещал настроенный «ctx7», а если тёзка лежал в
+  // выключенных, имя оказывалось сразу в обеих секциях — список показывал одну
+  // карточку, и первое же переключение уничтожало выключенный оригинал.
+  // Проверяем ОБЕ секции: выключенный сервер занимает имя так же, как включённый.
+  if (serverId !== draft.name && !options?.allowOverwrite) {
+    const taken =
+      config.mcpServers[draft.name] !== undefined || disabled?.[draft.name] !== undefined;
+    if (taken) throw new McpServerExistsError(draft.name);
+  }
+
+  // В какую секцию класть результат правки. Кнопка «карандаш» есть и у
+  // выключенной карточки, а раньше запись всегда уходила в mcpServers — правка
+  // молча включала сервер обратно, и Claude Code снова его грузил. Признак
+  // берём так же, как чтение: имя в обеих секциях считается включённым.
+  const wasDisabled =
+    serverId !== null &&
+    disabled?.[serverId] !== undefined &&
+    config.mcpServers[serverId] === undefined;
+
+  // Переименование: убираем запись под старым именем из обеих секций. Только из
+  // активной — мало: выключенный сервер остался бы вторым, «призрачным».
+  if (serverId && serverId !== draft.name) {
+    delete config.mcpServers[serverId];
+    if (disabled) delete disabled[serverId];
+  }
 
   const raw: RawMcpServer = { type: draft.transport };
   if (draft.command) raw.command = draft.command;
@@ -123,8 +170,36 @@ export function saveMcpServer(
   if (Object.keys(draft.env).length > 0) raw.env = draft.env;
   if (Object.keys(draft.headers).length > 0) raw.headers = draft.headers;
 
-  config.mcpServers[draft.name] = raw;
+  if (wasDisabled)
+    ((config[DISABLED_KEY] as Record<string, RawMcpServer>) ??= {})[draft.name] = raw;
+  else config.mcpServers[draft.name] = raw;
+
   return writeJsonFile(mcpConfigPath, config, { backupDir });
+}
+
+/**
+ * Перенос идентичности сервера при переименовании.
+ *
+ * Имя MCP-сервера — это его идентификатор, и по нему ключуется не только запись
+ * в ~/.claude.json: в state.json по нему висят состав групп и отметка ручного
+ * выключения, а в отдельном файле с правами 600 — сохранённый OAuth-вход.
+ * Раньше правился только конфиг, поэтому после переименования сервер выпадал из
+ * своих групп (группа продолжала гасить несуществующий id), а токен оставался в
+ * mcp-oauth.json под мёртвым ключом — пользователь заходил заново.
+ *
+ * Асинхронность — из-за очереди записи хранилища токенов: перенос обязан встать
+ * в ту же цепочку, что и сохранение токена при обновлении.
+ */
+export async function migrateMcpServerIdentity(
+  store: AppStore,
+  appData: string | undefined,
+  oldId: string,
+  newId: string,
+): Promise<void> {
+  if (!oldId || !newId || oldId === newId) return;
+
+  store.renameEntity('mcp', oldId, newId);
+  if (appData !== undefined) await renameOAuth(appData, oldId, newId);
 }
 
 /** Включение и выключение — перенос записи между двумя секциями файла. */
@@ -201,7 +276,7 @@ export async function checkMcpHealth(
   } catch (error) {
     // Отказ по авторизации объясняем прямо: без этого пользователь видит
     // «сервер не ответил на рукопожатие» и не понимает, что нужно войти.
-    if (error instanceof UnauthorizedError || isUnauthorized(error)) {
+    if (isUnauthorized(error, server.transport)) {
       return { health: 'failed', detail: 'Требуется авторизация OAuth — нажмите «Авторизоваться»' };
     }
     const detail = error instanceof Error ? error.message : String(error);
@@ -242,7 +317,7 @@ export async function listMcpServerTools(
       await session.close();
     }
   } catch (error) {
-    if (error instanceof UnauthorizedError || isUnauthorized(error)) {
+    if (isUnauthorized(error, server.transport)) {
       return { tools: [], error: 'Требуется авторизация OAuth — нажмите «Авторизоваться»' };
     }
     const detail = error instanceof Error ? error.message : String(error);
@@ -250,8 +325,31 @@ export async function listMcpServerTools(
   }
 }
 
-/** `UnauthorizedError` от SDK иногда прилетает завёрнутым — ловим и по тексту. */
-function isUnauthorized(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /\b401\b|unauthorized/i.test(message);
+/**
+ * Отказ по авторизации: `UnauthorizedError` от SDK иногда прилетает завёрнутым,
+ * поэтому идём по цепочке `cause` и в крайнем случае смотрим текст.
+ *
+ * Два ограничения, без которых догадка врала. Первое: у stdio авторизации нет
+ * вовсе (кнопки «Авторизоваться» на карточке такого сервера тоже нет), а его
+ * сообщение — это до 600 символов чужого stderr (`describeFailure` в
+ * mcp-client.ts). Любая строка вроде «request failed with status 401» из лога
+ * самого сервера подменяла настоящую причину советом войти через OAuth.
+ * Второе: текст проверяем у КАЖДОГО звена цепочки по отдельности — у исходной
+ * ошибки SDK, ещё без приклеенного к ней stderr.
+ */
+function isUnauthorized(error: unknown, transport: McpTransport): boolean {
+  if (transport === 'stdio') return false;
+
+  // Потолок обхода — на случай ошибки, зациклившей сам себя через cause.
+  let current: unknown = error;
+  for (let depth = 0; current !== undefined && current !== null && depth < 5; depth += 1) {
+    if (current instanceof UnauthorizedError) return true;
+
+    const message = current instanceof Error ? current.message : String(current);
+    if (/\b401\b|unauthorized/i.test(message)) return true;
+
+    current = current instanceof Error ? current.cause : undefined;
+  }
+
+  return false;
 }

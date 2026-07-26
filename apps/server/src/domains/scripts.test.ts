@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readScripts, readScriptContent, saveScript, deleteScript } from './scripts.ts';
+import {
+  readScripts,
+  readScriptContent,
+  saveScript,
+  deleteScript,
+  UnsafeScriptPathError,
+  ScriptNotFoundError,
+} from './scripts.ts';
 
 /**
  * Тесты скриптов из каталога hooks/. Важное здесь:
@@ -168,22 +175,66 @@ describe('scripts', () => {
       expect(existsSync(backup as string)).toBe(true);
     });
 
-    it('путь с ../ не выходит за пределы hooks/ (path traversal)', () => {
-      // Пытаемся записать за пределы каталога — сегменты .. должны отброситься.
-      saveScript(hooksDir, '../../evil.mjs', 'PWNED');
+    /**
+     * BUG-7. Id — это НАСТОЯЩИЙ относительный путь из readScripts. Пока сегменты
+     * чистились до [a-zA-Z0-9._-], `my script.mjs` читался как `myscript.mjs`
+     * (пустой редактор), сохранение создавало чужой файл, а настоящий хук
+     * оставался со старым кодом.
+     */
+    it('читает и перезаписывает файл с пробелом в имени, а не соседний (BUG-7)', () => {
+      writeFileSync(join(hooksDir, 'my script.mjs'), 'старое');
+      writeFileSync(join(hooksDir, 'myscript.mjs'), 'сосед');
 
-      // Файл не должен появиться выше hooksDir.
+      expect(readScriptContent(hooksDir, 'my script.mjs')).toBe('старое');
+
+      saveScript(hooksDir, 'my script.mjs', 'новое');
+
+      expect(readFileSync(join(hooksDir, 'my script.mjs'), 'utf8')).toBe('новое');
+      expect(readFileSync(join(hooksDir, 'myscript.mjs'), 'utf8')).toBe('сосед');
+    });
+
+    it('кириллическое имя не схлопывается в .mjs (BUG-7)', () => {
+      writeFileSync(join(hooksDir, 'проверка.mjs'), '// проверка');
+
+      expect(readScriptContent(hooksDir, 'проверка.mjs')).toBe('// проверка');
+
+      saveScript(hooksDir, 'вложенная папка/проверка.mjs', '// вложенный');
+
+      expect(readFileSync(join(hooksDir, 'вложенная папка', 'проверка.mjs'), 'utf8')).toBe(
+        '// вложенный',
+      );
+      expect(existsSync(join(hooksDir, '.mjs'))).toBe(false);
+    });
+
+    it('id из readScripts всегда открывает тот же файл (BUG-7)', () => {
+      mkdirSync(join(hooksDir, 'под папка'), { recursive: true });
+      writeFileSync(join(hooksDir, 'под папка', 'хук №1.mjs'), 'содержимое');
+
+      const id = readScripts(hooksDir, [])[0]?.id as string;
+
+      expect(readScriptContent(hooksDir, id)).toBe('содержимое');
+    });
+
+    it('путь с ../ отклоняется, а не «очищается» (path traversal)', () => {
+      // Молча писать по другому пути нельзя: это и есть BUG-7 в другой одежде.
+      expect(() => saveScript(hooksDir, '../../evil.mjs', 'PWNED')).toThrow(UnsafeScriptPathError);
+
       expect(existsSync(join(dir, 'evil.mjs'))).toBe(false);
-      expect(existsSync(join(dir, '..', 'evil.mjs'))).toBe(false);
-      // Он оседает внутри hooks/ под очищенным именем.
-      expect(existsSync(join(hooksDir, 'evil.mjs'))).toBe(true);
+      expect(existsSync(join(hooksDir, 'evil.mjs'))).toBe(false);
     });
 
     it('чтение по пути с ../ тоже не вырывается наружу', () => {
       writeFileSync(join(dir, 'secret.txt'), 'секрет за пределами');
-      // sanitizeRelPath выкидывает .. → путь замыкается внутри hooks/.
-      const content = readScriptContent(hooksDir, '../secret.txt');
-      expect(content).not.toContain('секрет за пределами');
+
+      expect(() => readScriptContent(hooksDir, '../secret.txt')).toThrow(UnsafeScriptPathError);
+    });
+
+    it('абсолютный путь и пустой id отклоняются', () => {
+      expect(() => readScriptContent(hooksDir, '/etc/passwd')).toThrow(UnsafeScriptPathError);
+      expect(() => readScriptContent(hooksDir, 'C:/Windows/win.ini')).toThrow(
+        UnsafeScriptPathError,
+      );
+      expect(() => saveScript(hooksDir, '', 'x')).toThrow(UnsafeScriptPathError);
     });
   });
 
@@ -194,8 +245,38 @@ describe('scripts', () => {
       expect(existsSync(join(hooksDir, 'z.mjs'))).toBe(false);
     });
 
-    it('удаление отсутствующего скрипта не бросает', () => {
-      expect(() => deleteScript(hooksDir, 'нет.mjs')).not.toThrow();
+    /**
+     * BUG-24. Раньше отсутствующий файл давал тихий `undefined`, а маршрут
+     * отвечал `{ok:true}` — панель рапортовала «удалено», хотя не удалила
+     * ничего. Теперь это отказ с 404: пользователь видит настоящее положение
+     * дел, а не выдуманный успех.
+     */
+    it('удаление отсутствующего скрипта — честный отказ 404, а не мнимый успех (BUG-24)', () => {
+      expect(() => deleteScript(hooksDir, 'нет.mjs')).toThrow(ScriptNotFoundError);
+
+      let statusCode: number | undefined;
+      try {
+        deleteScript(hooksDir, 'нет.mjs');
+      } catch (error) {
+        statusCode = (error as { statusCode?: number }).statusCode;
+      }
+      expect(statusCode).toBe(404);
+    });
+
+    it('чтение отсутствующего скрипта тоже отказ, а не пустой редактор (BUG-24)', () => {
+      // Пустая строка выглядела бы как «скрипт пустой», и сохранение создало бы
+      // файл заново вместо правки того, за которым пришли.
+      expect(() => readScriptContent(hooksDir, 'нет.mjs')).toThrow(ScriptNotFoundError);
+    });
+
+    it('удаляет скрипт с кириллицей в имени по-настоящему (BUG-24)', () => {
+      // rmSync на кириллическом пути в Windows умеет рапортовать об успехе,
+      // ничего не удалив, — удаление идёт через removeEntry из safe-io.
+      writeFileSync(join(hooksDir, 'проверка хуков.mjs'), '// проверка');
+
+      deleteScript(hooksDir, 'проверка хуков.mjs');
+
+      expect(existsSync(join(hooksDir, 'проверка хуков.mjs'))).toBe(false);
     });
 
     it('удаляет вложенный скрипт, не задевая соседей', () => {

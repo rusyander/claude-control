@@ -44,6 +44,21 @@ describe('HookProbe.readDecision', () => {
     expect(readDecision(0, undefined).decision).toBe('pass');
   });
 
+  it('ненулевой код без вердикта — ошибка хука, а не пропуск', () => {
+    // Регрессия: ненайденный интерпретатор оболочка сообщает кодом (127 в sh,
+    // 1 и 9009 в cmd). Раньше это читалось как «хук отработал и не вмешался» —
+    // человек делал вывод, что страж не реагирует на rm -rf.
+    const result = readDecision(127, undefined);
+    expect(result.decision).toBe('error');
+    expect(result.reason).toContain('127');
+    expect(readDecision(1, undefined).decision).toBe('error');
+  });
+
+  it('вердикт из JSON сильнее ненулевого кода', () => {
+    const parsed = { hookSpecificOutput: { permissionDecision: 'deny' } };
+    expect(readDecision(1, parsed).decision).toBe('block');
+  });
+
   it('continue:false — блокировка со stopReason', () => {
     const result = readDecision(0, { continue: false, stopReason: 'нельзя' });
     expect(result.decision).toBe('block');
@@ -173,17 +188,32 @@ describe('HookProbe.runHookProbe', () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it('несуществующая команда — ненулевой код и decision pass, без падения', async () => {
+  it('несуществующая команда — ненулевой код и decision error, без падения', async () => {
     // Через shell:true пропавшую команду сообщает сама оболочка ненулевым кодом
     // (1 в cmd, 127 в sh), а не событие error процесса. Блокировкой это не
-    // считается — код не равен 2, JSON нет, поэтому pass.
+    // считается, но и пропуском тоже: хук не отработал.
     const result = await runHookProbe(
       'нет-такой-команды-xyzzy',
       bigFixture({ hook_event_name: 'PreToolUse' }),
       dir,
     );
     expect(result.exitCode).not.toBe(0);
-    expect(result.decision).toBe('pass');
+    expect(result.decision).toBe('error');
+  });
+
+  it('процесс не поднялся (нет рабочего каталога) — error, а не «пропустил»', async () => {
+    // Именно этот случай вводил в заблуждение: строка результата показывала
+    // нейтральное «пропустил», хотя хука никто не запускал.
+    const result = await runHookProbe(
+      'node --version',
+      { ...bigFixture({ hook_event_name: 'PreToolUse' }), expectsBlock: true },
+      join(dir, 'нет-такой-папки'),
+    );
+
+    expect(result.decision).toBe('error');
+    expect(result.exitCode).toBe(-1);
+    // Несостоявшийся прогон не может «совпасть с ожиданием» заготовки.
+    expect(result.matchesExpectation).toBe(false);
   });
 
   it('хук с кодом выхода 2 распознаётся как блокировка', async () => {

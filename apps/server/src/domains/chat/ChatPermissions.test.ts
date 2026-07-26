@@ -112,6 +112,19 @@ describe('PermissionBroker', () => {
       expect(broker.decide('c1', 'tool-1', { behavior: 'allow' })).toBe(false);
     });
 
+    it('таймер снятого дубля не уносит пришедший ему на смену запрос', async () => {
+      // Первый запрос ждёт секунду, сменивший его — вдесятеро дольше.
+      broker.request(REQ({ toolUseId: 'tool-1' }), 1000);
+      const second = broker.request(REQ({ toolUseId: 'tool-1' }), 10_000);
+
+      // Срок ПЕРВОГО вышел: его таймер не должен трогать чужую запись.
+      await vi.advanceTimersByTimeAsync(1500);
+
+      expect(broker.hasPending('c1')).toBe(true);
+      expect(broker.decide('c1', 'tool-1', { behavior: 'allow' })).toBe(true);
+      await expect(second).resolves.toEqual({ behavior: 'allow' });
+    });
+
     it('клик до таймаута отменяет отложенный отказ', async () => {
       const decision = broker.request(REQ(), 1000);
       broker.decide('c1', 'tool-1', { behavior: 'allow' });

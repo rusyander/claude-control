@@ -109,13 +109,19 @@ export class OpencodeServe {
     // не выставляем ни при каких настройках.
     const args = ['serve', '--port', String(port), '--hostname', '127.0.0.1'];
 
+    // stdio: 'ignore' — принципиально. По умолчанию потоки уходят в трубы,
+    // которые НИКТО не читает: сервер CLI живёт до конца работы панели и всё
+    // это время пишет в лог, а заполненный буфер трубы (единицы килобайт)
+    // блокирует его запись НАВСЕГДА — сервер тихо замирает посреди ответа.
+    // Вывод нам не нужен: о готовности мы узнаём опросом /global/health.
     let child: ChildProcess;
     try {
       child = isWindows()
         ? spawnImpl(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', deps.command, ...args], {
             windowsHide: true,
+            stdio: 'ignore',
           })
-        : spawnImpl(deps.command, args, { windowsHide: true });
+        : spawnImpl(deps.command, args, { windowsHide: true, stdio: 'ignore' });
     } catch {
       return undefined;
     }

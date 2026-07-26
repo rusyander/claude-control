@@ -86,4 +86,32 @@ describe('Резервные копии: восстановление зашиф
     // Копия текущего состояния не должна лежать открытым текстом.
     expect(blob.toString('utf8')).not.toContain('текущий-секрет');
   });
+  it('откат СТАРОЙ незашифрованной копии без фразы отклоняется, токены целы (#67)', () => {
+    // Копия из времён до включения шифрования — обычный текст, расшифровывать
+    // нечего, поэтому фраза у пользователя и не спрашивается. Раньше копия
+    // «состояния до» в этом состоянии просто не делалась (backupEntry молча
+    // возвращал undefined), маршрут отвечал ok, и текущие токены исчезали
+    // безвозвратно.
+    const plainName = '.mcp-secrets.env.2026-07-20T10-00-00-000Z.bak';
+    writeFileSync(join(backupDir, plainName), OLD_SECRET);
+
+    const result = restoreBackup(backupDir, plainName, knownPaths, undefined, undefined);
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/парольная фраза/i);
+    expect(readFileSync(secretsPath, 'utf8')).toBe(CURRENT_SECRET);
+  });
+
+  it('с фразой в памяти тот же откат проходит и оставляет зашифрованную копию (#67)', () => {
+    const plainName = '.mcp-secrets.env.2026-07-20T10-00-00-000Z.bak';
+    writeFileSync(join(backupDir, plainName), OLD_SECRET);
+    setSecretPassphrase(PASS);
+
+    const result = restoreBackup(backupDir, plainName, knownPaths, undefined, undefined);
+
+    expect(result.ok).toBe(true);
+    expect(readFileSync(secretsPath, 'utf8')).toBe(OLD_SECRET);
+    expect(result.backupPath).toBeDefined();
+    expect(readFileSync(result.backupPath!).toString('utf8')).not.toContain('текущий-секрет');
+  });
 });

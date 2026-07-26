@@ -88,41 +88,47 @@ function ProviderKeyRow({ item }: { item: ProviderKeyItem }) {
           </Badge>
         </Stack>
 
-        <Stack direction="row" align="end" gap="var(--spacing-xs)" wrap>
-          <div style={{ flex: 1, minWidth: '220px' }}>
-            <TextField
-              label={t('providerKeys.inputLabel', { provider: item.providerName })}
-              type="password"
-              value={value}
-              onChange={setValue}
-              placeholder={t('providerKeys.inputPlaceholder')}
-              hint={
-                item.envVars.length > 0
-                  ? t('providerKeys.envHint', { vars: item.envVars.join(', ') })
-                  : undefined
-              }
-            />
-          </div>
-          <Button
-            variant="primary"
-            size="sm"
-            leftIcon={<Icon name="check" size={18} />}
-            onClick={submit}
-            disabled={!value.trim()}
-            isLoading={save.isPending}
-          >
-            {t('common.save')}
-          </Button>
-          {status.source === 'stored' && (
+        {/* Подсказка про переменные окружения вынесена ПОД строку, а не в hint
+            поля: внутри поля она удлиняет его блок, и кнопки, выровненные по
+            низу строки, уезжают ниже самого инпута. Снаружи низ поля и низ
+            кнопок совпадают при любой длине подсказки. */}
+        <Stack gap="var(--spacing-2xs)">
+          <Stack direction="row" align="end" gap="var(--spacing-xs)" wrap>
+            <Stack flex={1} minWidth="220px">
+              <TextField
+                label={t('providerKeys.inputLabel', { provider: item.providerName })}
+                type="password"
+                value={value}
+                onChange={setValue}
+                placeholder={t('providerKeys.inputPlaceholder')}
+              />
+            </Stack>
             <Button
-              variant="secondary"
+              variant="primary"
               size="sm"
-              leftIcon={<Icon name="trash" size={18} />}
-              onClick={() => clear.mutate(item.providerId)}
-              isLoading={clear.isPending}
+              leftIcon={<Icon name="check" size={18} />}
+              onClick={submit}
+              disabled={!value.trim()}
+              isLoading={save.isPending}
             >
-              {t('providerKeys.clear')}
+              {t('common.save')}
             </Button>
+            {status.source === 'stored' && (
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Icon name="trash" size={18} />}
+                onClick={() => clear.mutate(item.providerId)}
+                isLoading={clear.isPending}
+              >
+                {t('providerKeys.clear')}
+              </Button>
+            )}
+          </Stack>
+          {item.envVars.length > 0 && (
+            <Typography variant="caption" color="subtle">
+              {t('providerKeys.envHint', { vars: item.envVars.join(', ') })}
+            </Typography>
           )}
         </Stack>
       </Stack>

@@ -119,6 +119,11 @@
   border-left: 3px solid var(--color-border-strong);
 }
 
+/* Хук не запустился: пунктир отличает несостоявшийся прогон от остановки. */
+.resultError {
+  border-left: 3px dashed var(--color-danger);
+}
+
 .output {
   margin-top: var(--spacing-2xs);
   padding: var(--spacing-2xs);
@@ -146,5 +151,13 @@
 .isolation {
   margin-top: var(--spacing-sm);
   padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Доступ к аккаунту: отделён от состава чертой — это не «что подключено»,
+   а условие, без которого разговор в песочнице не пойдёт вовсе. */
+.access {
+  margin-top: var(--spacing-xs);
+  padding-top: var(--spacing-xs);
   border-top: 1px solid var(--color-border);
 }

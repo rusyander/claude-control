@@ -9,6 +9,7 @@ import {
   saveProviderPermissions,
   parseProviderPermissionsDraft,
   isCliOnlyGeminiApprovalMode,
+  geminiOtherKeysProjection,
   UnrecognizedFormatError,
   type ProviderPermissionsTarget,
 } from './provider-permissions.ts';
@@ -201,5 +202,58 @@ describe('parseProviderPermissionsDraft: модель gemini', () => {
   // Форму задаёт ФАЙЛ провайдера, а не клиент: codex-черновик в gemini не лезет.
   it('codex-черновик под форматом gemini-json отклоняется', () => {
     expect(parse({ approvalPolicy: 'never', sandboxMode: 'read-only' })).toBeUndefined();
+  });
+});
+
+/**
+ * Страховка «чужие ключи целы» (#56): она обязана видеть правку на ЛЮБОЙ глубине.
+ *
+ * Проверяется напрямую, потому что снаружи её чувствительность не наблюдаема:
+ * сегодняшняя запись вложенных ключей не трогает, поэтому расхождения проекций
+ * через saveProviderPermissions не получить — а сама проекция была слепа.
+ * Прежний `JSON.stringify(rest, Object.keys(rest).sort())` — это не сортировка,
+ * а фильтр-разрешение, который применяется на каждом уровне вложенности: все
+ * вложенные объекты сериализовались в `{}`, и порча внутри `mcpServers` или
+ * соседей `general` прошла бы в файл незамеченной.
+ */
+describe('Gemini: проекция чужих ключей', () => {
+  it('видит правку внутри mcpServers и внутри general', () => {
+    const before = geminiOtherKeysProjection({
+      mcpServers: { probe: { command: 'node' } },
+      general: { other: 1 },
+    });
+    const after = geminiOtherKeysProjection({
+      mcpServers: { probe: { command: 'ПОДМЕНЕНО' } },
+      general: { other: 2 },
+    });
+    expect(before).not.toBe(after);
+    // И проекция вообще не пустая: содержимое действительно попадает в сравнение.
+    expect(before).toContain('node');
+  });
+
+  it('порядок ключей на любой глубине значения не меняет', () => {
+    const one = geminiOtherKeysProjection({
+      theme: 'GitHub',
+      mcpServers: { probe: { command: 'node', args: ['x.js'] } },
+    });
+    const two = geminiOtherKeysProjection({
+      mcpServers: { probe: { args: ['x.js'], command: 'node' } },
+      theme: 'GitHub',
+    });
+    expect(one).toBe(two);
+  });
+
+  it('управляемые панелью ключи из сравнения исключены', () => {
+    const withManaged = geminiOtherKeysProjection({
+      theme: 'GitHub',
+      coreTools: ['ReadFile'],
+      excludeTools: ['Shell'],
+      general: { preferredEditor: 'vscode', defaultApprovalMode: 'plan' },
+    });
+    const withoutManaged = geminiOtherKeysProjection({
+      theme: 'GitHub',
+      general: { preferredEditor: 'vscode' },
+    });
+    expect(withManaged).toBe(withoutManaged);
   });
 });

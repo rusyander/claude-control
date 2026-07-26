@@ -92,7 +92,13 @@ export function applyEntityState(
   // запомнить ДО перезаписи файла: после неё брать её будет неоткуда.
   if (kind === 'hook' && !isEnabled) {
     const hook = findHook(ctx, id);
-    if (hook) ctx.store.rememberDisabledHook({ ...hook, isEnabled: false });
+    // Локальный хук не запоминаем: панель в settings.local.json не пишет, и
+    // выключить его нечем. Снимок же лёг бы в общее состояние без пометки о
+    // файле — и первая же перезапись перенесла бы личный хук в settings.json,
+    // то есть включила бы его всем, кто читает этот конфиг.
+    if (hook && hook.source !== 'settings-local') {
+      ctx.store.rememberDisabledHook({ ...hook, isEnabled: false });
+    }
   }
 
   return { needsHookRewrite: kind === 'hook' };

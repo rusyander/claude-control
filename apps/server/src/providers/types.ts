@@ -154,6 +154,14 @@ export interface ProviderMcpConfigLocation {
    * оба ключа у обоих; ключ влияет только на ЗАПИСЬ — форматы не угадываем.
    */
   jsonHttpUrlKey?: 'httpUrl' | 'url';
+  /**
+   * Каталог файлов-блоков (Continue): рядом с основным конфигом лежит папка,
+   * каждый `*.yaml`/`*.yml` в которой несёт СВОЙ список `mcpServers` (шапка
+   * блока — `name` / `version` / `schema`). Continue грузит их вместе с
+   * основным файлом, поэтому раздел показывает и те, и другие, а правка идёт в
+   * тот файл, где запись лежит. Задан только у формата `continue-yaml`.
+   */
+  blockDir?: (override?: string) => string;
 }
 
 /**
@@ -273,6 +281,13 @@ export interface ProviderPermissionsConfigLocation {
     | 'cursor-json';
   /** Абсолютный путь к файлу конфигурации с правами/аппрувами. */
   path: (override?: string) => string;
+  /**
+   * ТОЛЬКО ЧТЕНИЕ: отдельный файл пофайловых разрешений инструментов (Goose —
+   * `permission.yaml` рядом с `config.yaml`). Панель его показывает, но НЕ
+   * пишет: формата в опубликованной документации нет, известен он лишь из
+   * исходников CLI, а угадывать чужой формат правило запрещает.
+   */
+  readOnlyToolPermissionsPath?: (override?: string) => string;
 }
 
 /**
@@ -434,6 +449,11 @@ export interface ProviderProjectConfigLocation {
     relativePath: string;
     /** Ключ адреса http-сервера при записи (см. `ProviderMcpConfigLocation`). */
     jsonHttpUrlKey?: 'httpUrl' | 'url';
+    /**
+     * Каталог файлов-блоков внутри проекта (Continue: `.continue/mcpServers`) —
+     * тот же механизм, что и у глобального `blockDir`. Разделитель — `/`.
+     */
+    relativeBlockDir?: string;
   };
   /**
    * Проектный файл переменных окружения: относительный путь + формат (тот же

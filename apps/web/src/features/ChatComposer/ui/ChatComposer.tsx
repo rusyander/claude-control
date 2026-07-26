@@ -8,6 +8,7 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { UPLOAD_ACCEPT_ATTRIBUTE } from '@claude-control/contracts/uploads';
 import { planAttach } from '../lib/attachments';
 import type { AttachedFile, ChatComposerProps } from './ChatComposer.types';
 import styles from './ChatComposer.module.scss';
@@ -218,12 +219,15 @@ export function ChatComposer({
               onClick={() => speech.start()}
               disabled={!speech.supported}
             />
+            {/* accept берётся из общего списка расширений: своя строка здесь
+                расходилась бы с проверками фронта и сервера молча — диалог не
+                показывал бы файл, который панель на самом деле принимает. */}
             <input
               ref={fileRef}
               type="file"
               multiple
               className={styles.hiddenInput}
-              accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.md,.txt,.json,.csv,.yml,.yaml,.html,.css,.js,.ts,.tsx,.py"
+              accept={UPLOAD_ACCEPT_ATTRIBUTE}
               onChange={(event: ChangeEvent<HTMLInputElement>) => void attach(event.target.files)}
             />
           </Stack>

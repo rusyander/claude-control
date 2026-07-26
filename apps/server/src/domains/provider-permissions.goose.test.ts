@@ -139,6 +139,50 @@ extensions:
     expect(readFileSync(filePath, 'utf8')).toBe(broken);
   });
 
+  it('разрешения инструментов из соседнего permission.yaml читаются, файл не трогается', () => {
+    const filePath = join(root, 'config.yaml');
+    writeFileSync(filePath, CONFIG, 'utf8');
+    const toolsPath = join(root, 'permission.yaml');
+    const tools =
+      'user:\n  always_allow:\n    - developer__shell\n  ask_before:\n    - dev__edit\n';
+    writeFileSync(toolsPath, tools, 'utf8');
+
+    const values = readProviderPermissions({
+      ...targetFor(filePath),
+      toolPermissionsPath: toolsPath,
+    });
+    if (values.kind !== 'goose') throw new Error('ожидалась goose-модель прав');
+
+    expect(values.toolPermissions).toEqual({
+      alwaysAllow: ['developer__shell'],
+      askBefore: ['dev__edit'],
+      neverAllow: [],
+    });
+
+    // Запись режима — только в config.yaml: чужой permission.yaml панель не пишет.
+    saveProviderPermissions(
+      { ...targetFor(filePath), toolPermissionsPath: toolsPath },
+      { mode: 'chat' },
+      backupDir,
+    );
+    expect(readFileSync(toolsPath, 'utf8')).toBe(tools);
+    expect(parseYaml(readFileSync(filePath, 'utf8')).GOOSE_MODE).toBe('chat');
+  });
+
+  it('permission.yaml отсутствует — раздел работает, показывать нечего', () => {
+    const filePath = join(root, 'config.yaml');
+    writeFileSync(filePath, CONFIG, 'utf8');
+
+    const values = readProviderPermissions({
+      ...targetFor(filePath),
+      toolPermissionsPath: join(root, 'permission.yaml'),
+    });
+    if (values.kind !== 'goose') throw new Error('ожидалась goose-модель прав');
+
+    expect(values.toolPermissions).toBeUndefined();
+    expect(existsSync(join(root, 'permission.yaml'))).toBe(false);
+  });
+
   it('чужая форма значения (карта, список, корень-список) — fail-closed', () => {
     const asMap = join(root, 'map.yaml');
     writeFileSync(asMap, `GOOSE_MODE:\n  value: approve\n`, 'utf8');

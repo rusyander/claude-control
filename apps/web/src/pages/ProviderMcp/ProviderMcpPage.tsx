@@ -99,6 +99,19 @@ export function ProviderMcpPage() {
         </Card>
       )}
 
+      {/* Файлы-блоки, которые панель не показывает: молчать о них нельзя —
+          сервер из такого файла Continue поднимет, а в списке его нет. */}
+      {(data.skippedBlocks ?? []).map((skipped) => (
+        <Card key={skipped.path} padding="sm">
+          <Stack direction="row" align="start" gap="var(--spacing-xs)">
+            <Icon name="warning" size={18} />
+            <Typography variant="body-sm" color="warning">
+              {t('providerMcp.blockSkipped', { path: skipped.path, reason: skipped.reason })}
+            </Typography>
+          </Stack>
+        </Card>
+      ))}
+
       <Stack gap="var(--spacing-sm)">
         {data.servers.map((server) => (
           <Card key={server.name} padding="md">
@@ -122,6 +135,13 @@ export function ProviderMcpPage() {
                     ? `${server.command} ${server.args.join(' ')}`.trim()
                     : (server.url ?? '')}
                 </Typography>
+                {/* Запись живёт в отдельном файле-блоке — правка уйдёт туда, и
+                    человек должен знать, какой файл изменится. */}
+                {server.sourceFile && (
+                  <Typography variant="caption" color="subtle" as="span" truncate>
+                    {t('providerMcp.fromBlockFile', { path: server.sourceFile })}
+                  </Typography>
+                )}
               </Stack>
 
               {!readOnly && (

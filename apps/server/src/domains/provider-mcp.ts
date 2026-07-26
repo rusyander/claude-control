@@ -8,7 +8,18 @@ import type {
 } from '@claude-control/contracts';
 import { getActiveProvider } from '../providers/registry.ts';
 import type { ConfigProvider } from '../providers/types.ts';
-import { providerBackupName, readTextFile, writeTextFile } from '../lib/safe-io.ts';
+import {
+  providerBackupName,
+  providerProjectBackupName,
+  readTextFile,
+  writeTextFile,
+} from '../lib/safe-io.ts';
+import {
+  scanMcpBlocks,
+  findBlockOf,
+  type McpBlockScan,
+  type SkippedMcpBlock,
+} from './provider-mcp-blocks.ts';
 import { parseProviderJsonObject } from '../lib/provider-json.ts';
 import {
   UnrecognizedFormatError,
@@ -84,11 +95,28 @@ export interface ProviderMcpTarget {
    * глобального конфига того же провайдера.
    */
   backupName?: string;
+  /**
+   * Каталог файлов-блоков (Continue): их серверы показываются вместе с
+   * серверами основного файла, а правка идёт в тот файл, где запись лежит.
+   * Не задан → блоков у провайдера нет (все прочие форматы).
+   */
+  blockDir?: string;
 }
 
 /** Имя копии для этой цели: своё, если задано, иначе стандартное `<id>-<basename>`. */
 function backupNameOf(target: ProviderMcpTarget): string {
   return target.backupName ?? providerBackupName(target.provider.id, target.filePath);
+}
+
+/**
+ * Имя копии для файла-блока. Уровень наследуется от цели: у проектной цели
+ * задан свой `backupName` (`<id>-project-…`), значит и блок проектный —
+ * иначе копии проекта делили бы ротацию с глобальными.
+ */
+function blockBackupNameOf(target: ProviderMcpTarget, blockPath: string): string {
+  return target.backupName
+    ? providerProjectBackupName(target.provider.id, blockPath)
+    : providerBackupName(target.provider.id, blockPath);
 }
 
 /**
@@ -103,13 +131,15 @@ export function resolveProviderMcpTarget(
   const provider = getActiveProvider(store);
   if (provider.capabilities.mcp !== 'ready' || !provider.mcpConfig) return undefined;
 
-  const filePath = provider.mcpConfig.path(store.getSettings().claudeDirOverride);
+  const override = store.getSettings().claudeDirOverride;
+  const filePath = provider.mcpConfig.path(override);
   return {
     provider,
     format: provider.mcpConfig.format,
     filePath,
     cliDetected: existsSync(dirname(filePath)),
     jsonHttpUrlKey: provider.mcpConfig.jsonHttpUrlKey ?? 'httpUrl',
+    blockDir: provider.mcpConfig.blockDir?.(override),
   };
 }
 
@@ -151,8 +181,11 @@ export function parseUniversalDraft(body: unknown): UniversalMcpServerDraft | un
 
 // --- Диспетчер по формату ----------------------------------------------------
 
-/** Прочитать список серверов. Бросает `UnrecognizedFormatError`, если формат не распознан. */
-export function readProviderMcpServers(target: ProviderMcpTarget): UniversalMcpServer[] {
+/**
+ * Серверы ОСНОВНОГО файла цели (без файлов-блоков). Бросает
+ * `UnrecognizedFormatError`, если формат не распознан.
+ */
+function readMainFileServers(target: ProviderMcpTarget): UniversalMcpServer[] {
   const text = readTextFile(target.filePath);
   if (!text.trim()) return [];
   switch (target.format) {
@@ -161,12 +194,51 @@ export function readProviderMcpServers(target: ProviderMcpTarget): UniversalMcpS
     case 'opencode-json':
       return readOpencodeServers(text);
     case 'continue-yaml':
-      return readContinueMcpServers(text);
+      return mapContinueServers(readContinueServers(text));
     case 'goose-yaml':
       return readGooseMcpServers(text);
     default:
       return readCodexServers(text).servers;
   }
+}
+
+/** Раздел целиком: серверы основного файла + файлов-блоков и пропущенные блоки. */
+export interface ProviderMcpSection {
+  servers: UniversalMcpServer[];
+  /** Файлы-блоки, которые панель не показывает и не правит, — с причиной. */
+  skippedBlocks: SkippedMcpBlock[];
+}
+
+/**
+ * Прочитать раздел: основной файл плюс файлы-блоки (Continue). Серверы блока
+ * несут путь своего файла в `sourceFile` — без него человек не поймёт, какой
+ * файл изменится при правке. Порядок общий: по имени.
+ *
+ * Основной файл fail-closed целиком (не распознан → бросаем), файлы-блоки —
+ * порознь: непонятный блок уходит в `skippedBlocks`, остальные работают.
+ */
+export function readProviderMcpSection(target: ProviderMcpTarget): ProviderMcpSection {
+  const main = readMainFileServers(target);
+  if (!target.blockDir) return { servers: main, skippedBlocks: [] };
+
+  const scan = scanMcpBlocks(
+    target.blockDir,
+    main.map((server) => server.name),
+  );
+
+  const fromBlocks = scan.files.flatMap((file) =>
+    mapContinueServers(file.servers).map((server) => ({ ...server, sourceFile: file.path })),
+  );
+
+  return {
+    servers: [...main, ...fromBlocks].sort((a, b) => a.name.localeCompare(b.name)),
+    skippedBlocks: scan.skipped,
+  };
+}
+
+/** Прочитать список серверов раздела (основной файл + блоки). */
+export function readProviderMcpServers(target: ProviderMcpTarget): UniversalMcpServer[] {
+  return readProviderMcpSection(target).servers;
 }
 
 /** Имя MCP-сервера уже занято — маршрут отвечает 409, а не пишет поверх чужой записи. */
@@ -204,6 +276,18 @@ export function upsertProviderMcpServer(
     if (taken) throw new McpServerExistsError(draft.name);
   }
 
+  // Запись из файла-блока правится В СВОЁМ файле: перенести её в основной конфиг
+  // значило бы оставить в блоке прежнюю копию — Continue грузит оба файла.
+  const blockPath = blockPathOf(target, serverId);
+  if (blockPath) {
+    return writeContinueBlock(
+      target,
+      blockPath,
+      (servers) => upsertContinueEntry(servers, serverId, draft),
+      backupDir,
+    );
+  }
+
   switch (target.format) {
     case 'json':
       return upsertJsonMcpServer(target, serverId, draft, backupDir);
@@ -224,6 +308,21 @@ export function deleteProviderMcpServer(
   serverId: string,
   backupDir: string | undefined,
 ): string | undefined {
+  // Удаляем оттуда же, где запись лежит: убрать её из основного конфига,
+  // оставив в блоке, значит «удалить» сервер, который Continue продолжит грузить.
+  const blockPath = blockPathOf(target, serverId);
+  if (blockPath) {
+    return writeContinueBlock(
+      target,
+      blockPath,
+      (servers) => {
+        const index = servers.findIndex((item) => item.name === serverId);
+        if (index >= 0) servers.splice(index, 1);
+      },
+      backupDir,
+    );
+  }
+
   switch (target.format) {
     case 'json':
       return deleteJsonMcpServer(target, serverId, backupDir);
@@ -679,8 +778,13 @@ function continueHeaders(raw: ContinueRawServer): Record<string, string> {
   return isStringRecord(headers) ? headers : {};
 }
 
-function readContinueMcpServers(text: string): UniversalMcpServer[] {
-  return readContinueServers(text)
+/**
+ * Записи Continue → универсальная модель. Вынесено из чтения файла: ровно те же
+ * записи приходят из файлов-блоков (`provider-mcp-blocks.ts`), и разбирать их
+ * вторым, отдельным кодом значило бы завести второе поведение на один формат.
+ */
+function mapContinueServers(raw: ContinueRawServer[]): UniversalMcpServer[] {
+  return raw
     .map((raw): UniversalMcpServer => {
       const url = typeof raw.url === 'string' ? raw.url : undefined;
       // Транспорт задаёт `type`; если его нет — опираемся на наличие url
@@ -770,6 +874,29 @@ function writeContinueConfig(
   });
 }
 
+/**
+ * Вписать запись в список Continue — на месте. Один и тот же список приходит из
+ * `config.yaml` и из файла-блока, форма у них одна.
+ */
+function upsertContinueEntry(
+  servers: ContinueRawServer[],
+  serverId: string | null,
+  draft: UniversalMcpServerDraft,
+): void {
+  // Имя записи лежит ВНУТРИ неё, поэтому и поиск, и переименование — по полю
+  // `name`. Порядок записей значим для пользователя: правим на месте.
+  const index = servers.findIndex((item) => item.name === (serverId ?? draft.name));
+  const existing = index >= 0 ? servers[index] : undefined;
+  const next = buildContinueRaw(draft, existing);
+  if (index >= 0) servers[index] = next;
+  else servers.push(next);
+  // Переименование в имя, которое уже занято другой записью: одноимённых в
+  // списке быть не должно (иначе запись не адресуема) — прежняя уходит.
+  for (let i = servers.length - 1; i >= 0; i -= 1) {
+    if (i !== servers.indexOf(next) && servers[i]!.name === draft.name) servers.splice(i, 1);
+  }
+}
+
 function upsertContinueServer(
   target: ProviderMcpTarget,
   serverId: string | null,
@@ -778,20 +905,7 @@ function upsertContinueServer(
 ): string | undefined {
   return writeContinueConfig(
     target,
-    (servers) => {
-      // Имя записи лежит ВНУТРИ неё, поэтому и поиск, и переименование — по полю
-      // `name`. Порядок записей значим для пользователя: правим на месте.
-      const index = servers.findIndex((item) => item.name === (serverId ?? draft.name));
-      const existing = index >= 0 ? servers[index] : undefined;
-      const next = buildContinueRaw(draft, existing);
-      if (index >= 0) servers[index] = next;
-      else servers.push(next);
-      // Переименование в имя, которое уже занято другой записью: одноимённых в
-      // списке быть не должно (иначе запись не адресуема) — прежняя уходит.
-      for (let i = servers.length - 1; i >= 0; i -= 1) {
-        if (i !== servers.indexOf(next) && servers[i]!.name === draft.name) servers.splice(i, 1);
-      }
-    },
+    (servers) => upsertContinueEntry(servers, serverId, draft),
     backupDir,
   );
 }
@@ -809,6 +923,58 @@ function deleteContinueServer(
     },
     backupDir,
   );
+}
+
+// --- Continue: файлы-блоки (`mcpServers/*.yaml`) -----------------------------
+
+/**
+ * Правка одного файла-блока: меняется ТОЛЬКО его список `mcpServers`, шапка
+ * блока (`name` / `version` / `schema`) и комментарии вне списка целы.
+ *
+ * Опустевший блок не удаляем: файл написан человеком (или самим Continue), и
+ * снести его молча — потеря, которую нечем откатить в интерфейсе. Ключ
+ * `mcpServers` при этом уходит, остаётся шапка — вернуть в неё сервер можно
+ * руками, а панель такой файл покажет пустым.
+ */
+function writeContinueBlock(
+  target: ProviderMcpTarget,
+  blockPath: string,
+  mutate: (servers: ContinueRawServer[]) => void,
+  backupDir: string | undefined,
+): string | undefined {
+  const text = readTextFile(blockPath);
+  const servers = text.trim() ? readContinueServers(text) : [];
+  mutate(servers);
+  return writeTextFile(blockPath, writeContinueServers(text, servers), {
+    backupDir,
+    backupName: blockBackupNameOf(target, blockPath),
+  });
+}
+
+/**
+ * Файл, в котором лежит существующая запись: файл-блок или основной конфиг.
+ * Новая запись (`serverId === null`) всегда идёт в основной конфиг — своих
+ * файлов-блоков панель не заводит.
+ */
+function blockPathOf(target: ProviderMcpTarget, serverId: string | null): string | undefined {
+  if (!target.blockDir || serverId === null) return undefined;
+
+  let scan: McpBlockScan;
+  try {
+    // Имена основного файла нужны как «занятые»: блок, повторяющий их, пропущен
+    // и правке не подлежит — иначе панель писала бы в файл, который не показывает.
+    scan = scanMcpBlocks(
+      target.blockDir,
+      readMainFileServers(target).map((server) => server.name),
+    );
+  } catch (error) {
+    // Основной файл не разбирается — писать в блоки тоже нельзя: неизвестно,
+    // какие имена он занимает. Раздел и так уже только для чтения.
+    if (error instanceof UnrecognizedFormatError) return undefined;
+    throw error;
+  }
+
+  return findBlockOf(scan, serverId)?.path;
 }
 
 // --- Goose (YAML: config.yaml, ОТОБРАЖЕНИЕ `extensions`) ---------------------

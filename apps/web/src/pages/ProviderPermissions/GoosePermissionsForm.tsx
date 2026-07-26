@@ -65,6 +65,48 @@ export function GoosePermissionsForm({ data, header, onSave }: GoosePermissionsF
           </Typography>
         </Stack>
       </Card>
+
+      {/* Пофайловые разрешения инструментов — ТОЛЬКО ПОКАЗ: формат
+          `permission.yaml` в документации Goose не описан, поэтому панель его не
+          пишет. Скрывать его тоже нельзя: в режимах «approve» и «smart_approve»
+          именно эти списки решают, что спросят, а что выполнят молча. */}
+      {data.toolPermissionsPath && (
+        <Card padding="md">
+          <Stack gap="var(--spacing-xs)">
+            <Typography variant="body" weight="medium" as="h3">
+              {t('providerPermissions.goose.tools.title')}
+            </Typography>
+            <Typography variant="caption" color="subtle">
+              {t('providerPermissions.goose.tools.readOnly', { path: data.toolPermissionsPath })}
+            </Typography>
+
+            {data.toolPermissions ? (
+              (
+                [
+                  ['alwaysAllow', data.toolPermissions.alwaysAllow],
+                  ['askBefore', data.toolPermissions.askBefore],
+                  ['neverAllow', data.toolPermissions.neverAllow],
+                ] as const
+              )
+                .filter(([, tools]) => tools.length > 0)
+                .map(([level, tools]) => (
+                  <Stack key={level} gap="var(--spacing-3xs)">
+                    <Typography variant="body-sm" weight="medium" as="span">
+                      {t(`providerPermissions.goose.tools.${level}`)}
+                    </Typography>
+                    <Typography variant="mono" color="subtle" as="span">
+                      {tools.join(', ')}
+                    </Typography>
+                  </Stack>
+                ))
+            ) : (
+              <Typography variant="body-sm" color="muted">
+                {t('providerPermissions.goose.tools.empty')}
+              </Typography>
+            )}
+          </Stack>
+        </Card>
+      )}
     </Stack>
   );
 }

@@ -3,7 +3,7 @@ import type { ProviderMcpInfo } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import {
   resolveProviderMcpTarget,
-  readProviderMcpServers,
+  readProviderMcpSection,
   upsertProviderMcpServer,
   deleteProviderMcpServer,
   parseUniversalDraft,
@@ -53,17 +53,24 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
       format: target.format,
       filePath: target.filePath,
       cliDetected: target.cliDetected,
+      blockDir: target.blockDir,
     };
 
     try {
-      const servers = readProviderMcpServers(target);
-      return { ...base, servers, readOnly: false } satisfies ProviderMcpInfo;
+      const section = readProviderMcpSection(target);
+      return {
+        ...base,
+        servers: section.servers,
+        skippedBlocks: section.skippedBlocks,
+        readOnly: false,
+      } satisfies ProviderMcpInfo;
     } catch (error) {
       // Формат не распознан — отдаём раздел на чтение (пустой список) с пометкой.
       if (error instanceof UnrecognizedFormatError) {
         return {
           ...base,
           servers: [],
+          skippedBlocks: [],
           readOnly: true,
           error: error.message,
         } satisfies ProviderMcpInfo;

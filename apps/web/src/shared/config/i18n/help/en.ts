@@ -1585,7 +1585,11 @@ export const helpEn: HelpSchema = {
         'MCP exists for Codex (TOML), Gemini, Qwen Code, Cursor, OpenCode, Continue, Goose and Kimi Code, and the panel edits ' +
         'their ' +
         'files directly. Continue has its own shape: not “name → entry” but a mcpServers ' +
-        'LIST in config.yaml, with the name inside each entry. With Goose the servers live among ' +
+        'LIST in config.yaml, with the name inside each entry; plus separate block files in the ' +
+        'mcpServers folder — they appear in the same list marked with the file an entry comes ' +
+        'from and are edited right there, while new servers always go into config.yaml. A block ' +
+        'the panel could not parse (a uses: reference instead of an entry, a duplicate name) is ' +
+        'named and left alone. With Goose the servers live among ' +
         'the extensions of config.yaml: the CLI’s own built-in extensions (developer, memory) ' +
         'are neither shown nor ever touched. Kimi Code keeps its servers in a SEPARATE ' +
         'mcp.json in the same directory (config.toml only holds timeouts): the usual ' +
@@ -1775,7 +1779,10 @@ export const helpEn: HelpSchema = {
         'the agent). In headless mode (cn -p) tools under ask are unavailable: there is ' +
         'nobody to confirm. Goose boils down to ONE key, GOOSE_MODE in config.yaml: auto (run ' +
         'without asking), approve (by the configured permissions), smart_approve (auto-approve ' +
-        'the safe calls) and chat (never run tools at all). Goose has no rule lists. ' +
+        'the safe calls) and chat (never run tools at all). Goose has no rule lists, and per-tool ' +
+        'permissions sit in a neighbouring permission.yaml: the panel shows them as three lists ' +
+        'but never writes that file — its format is absent from the Goose documentation, and the ' +
+        'panel will not guess a foreign format. Change them with goose configure. ' +
         'Kimi Code has two models at once: the default_permission_mode key of config.toml ' +
         '(manual — always ask, auto — the agent decides, yolo — never ask) and an ORDERED ' +
         'array of [[permission.rules]], each with a pattern (Read, Bash(git push*), ' +

@@ -1,5 +1,9 @@
 import { writeFileSync } from 'node:fs';
-import { join, basename, extname } from 'node:path';
+import { join, basename } from 'node:path';
+// Список расширений — ОДИН на сервер, фронт и поле выбора файла; он лежит в
+// contracts отдельной точкой экспорта (бочку без расширений Node не резолвит,
+// см. комментарий в самом файле).
+import { SUPPORTED_UPLOAD_EXTENSIONS, isSupportedUpload } from '@claude-control/contracts/uploads';
 
 /**
  * Файлы, которые пользователь прикладывает к сообщению. Claude Code читает их
@@ -14,38 +18,11 @@ export interface UploadedFile {
   sizeBytes: number;
 }
 
-/** Расширения, которые Claude Code умеет читать напрямую. */
-const SUPPORTED = new Set([
-  '.pdf',
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.md',
-  '.txt',
-  '.json',
-  '.csv',
-  '.yml',
-  '.yaml',
-  '.html',
-  '.css',
-  '.js',
-  '.ts',
-  '.tsx',
-  '.py',
-]);
-
 /**
- * Список поддерживаемых расширений для сообщения человеку. Нужен, потому что
- * отклонённое вложение больше не пропадает молча: пользователь должен видеть,
- * что именно панель принимает, — иначе остаётся гадать, почему файл «не дошёл».
+ * Реэкспорт для потребителей внутри сервера: отклонённое вложение не пропадает
+ * молча — пользователю называют, что именно панель принимает.
  */
-export const SUPPORTED_UPLOAD_EXTENSIONS: string[] = [...SUPPORTED].sort();
-
-export function isSupportedUpload(name: string): boolean {
-  return SUPPORTED.has(extname(name).toLowerCase());
-}
+export { SUPPORTED_UPLOAD_EXTENSIONS, isSupportedUpload };
 
 /** Сохраняет вложение в папку чата. Содержимое приходит строкой base64. */
 export function saveUpload(chatDir: string, name: string, base64: string): UploadedFile {

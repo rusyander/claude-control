@@ -10,7 +10,7 @@ import {
   type ProviderProjectTarget,
 } from '../domains/provider-projects.ts';
 import {
-  readProviderMcpServers,
+  readProviderMcpSection,
   upsertProviderMcpServer,
   deleteProviderMcpServer,
   parseUniversalDraft,
@@ -477,14 +477,23 @@ export function registerProviderProjectRoutes(app: FastifyInstance, ctx: ServerC
       format: target.mcp.format,
       filePath: target.mcp.filePath,
       cliDetected: target.mcp.cliDetected,
+      blockDir: target.mcp.blockDir,
     };
 
     try {
-      return { ...base, servers: readProviderMcpServers(target.mcp), readOnly: false };
+      // Файлы-блоки проекта (Continue: `<проект>/.continue/mcpServers/*.yaml`)
+      // читаются тем же кодом, что и глобальные, — раздел один и тот же.
+      const section = readProviderMcpSection(target.mcp);
+      return {
+        ...base,
+        servers: section.servers,
+        skippedBlocks: section.skippedBlocks,
+        readOnly: false,
+      };
     } catch (error) {
       // Формат не распознан — отдаём раздел на чтение (пустой список) с пометкой.
       if (error instanceof UnrecognizedFormatError) {
-        return { ...base, servers: [], readOnly: true, error: error.message };
+        return { ...base, servers: [], skippedBlocks: [], readOnly: true, error: error.message };
       }
       throw error;
     }

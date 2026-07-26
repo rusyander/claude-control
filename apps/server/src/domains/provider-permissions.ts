@@ -44,6 +44,10 @@ import {
   type GooseMode,
 } from '../lib/goose-yaml.ts';
 import {
+  readGooseToolPermissions,
+  type GooseToolPermissions,
+} from '../lib/goose-permission-file.ts';
+import {
   KIMI_DECISIONS,
   KIMI_DEFAULT_MODE,
   KIMI_MODES,
@@ -233,6 +237,12 @@ export interface ProviderPermissionsTarget {
    * чтобы копии проекта не делили ротацию с копиями глобального конфига.
    */
   backupName?: string;
+  /**
+   * ТОЛЬКО ЧТЕНИЕ: файл пофайловых разрешений инструментов (Goose
+   * `permission.yaml`). Задан — раздел показывает его содержимое и говорит, что
+   * правится оно только через `goose configure`.
+   */
+  toolPermissionsPath?: string;
 }
 
 /** Имя копии для этой цели: своё, если задано, иначе стандартное `<id>-<basename>`. */
@@ -253,12 +263,14 @@ export function resolveProviderPermissionsTarget(
   if (provider.capabilities.permissions !== 'ready' || !provider.permissionsConfig)
     return undefined;
 
-  const filePath = provider.permissionsConfig.path(store.getSettings().claudeDirOverride);
+  const override = store.getSettings().claudeDirOverride;
+  const filePath = provider.permissionsConfig.path(override);
   return {
     provider,
     format: provider.permissionsConfig.format,
     filePath,
     cliDetected: existsSync(dirname(filePath)),
+    toolPermissionsPath: provider.permissionsConfig.readOnlyToolPermissionsPath?.(override),
   };
 }
 
@@ -576,6 +588,12 @@ export interface GoosePermissionsValues {
   mode: GooseMode;
   /** Ключа `GOOSE_MODE` в файле нет; дефолт CLI не записан. */
   usingDefaults: boolean;
+  /**
+   * Пофайловые разрешения инструментов из соседнего `permission.yaml` — ТОЛЬКО
+   * ПОКАЗ (формат не опубликован, панель его не пишет). Файла нет или он не
+   * сходится с ожидаемой формой → `undefined`: показывать нечего.
+   */
+  toolPermissions?: GooseToolPermissions;
 }
 
 /** Значения прав Kimi Code: режим корня + упорядоченные правила config.toml. */
@@ -609,7 +627,7 @@ export function readProviderPermissions(
   if (target.format === 'qwen-json') return readQwenPermissions(text);
   if (target.format === 'continue-yaml') return readContinuePermissionsValues(text);
   if (target.format === 'cursor-json') return readCursorPermissions(text);
-  if (target.format === 'goose-yaml') return readGoosePermissionsValues(text);
+  if (target.format === 'goose-yaml') return readGoosePermissionsValues(text, target);
   if (target.format === 'kimi-toml') return readKimiPermissionsValues(text);
   if (target.format === 'opencode-json') return readOpencodePermissions(text);
   return readCodexPermissions(text);
@@ -740,6 +758,10 @@ export function buildProviderPermissionInfo(
       mode: goose?.mode ?? GOOSE_DEFAULT_MODE,
       modes: [...GOOSE_MODES],
       usingDefaults: goose?.usingDefaults ?? true,
+      // Пофайловые разрешения — показ без правки: путь нужен, чтобы человек
+      // знал, какой файл смотреть, даже когда в нём пока ничего нет.
+      toolPermissions: goose?.toolPermissions,
+      toolPermissionsPath: target.toolPermissionsPath,
       readOnly,
       error,
     };
@@ -1370,16 +1392,28 @@ function saveCursorPermissions(
  * дефолтом, но раздел НЕ считается «на дефолтах»: в файле что-то задано, и
  * пользователь должен это видеть.
  */
-function readGoosePermissionsValues(text: string): GoosePermissionsValues {
-  if (!text.trim()) return { kind: 'goose', mode: GOOSE_DEFAULT_MODE, usingDefaults: true };
+function readGoosePermissionsValues(
+  text: string,
+  target: ProviderPermissionsTarget,
+): GoosePermissionsValues {
+  // Пофайловые разрешения живут в СОСЕДНЕМ файле и от режима не зависят: их
+  // читаем всегда, даже когда `GOOSE_MODE` в config.yaml не задан.
+  const toolPermissions = target.toolPermissionsPath
+    ? readGooseToolPermissions(readTextFile(target.toolPermissionsPath))
+    : undefined;
+
+  if (!text.trim())
+    return { kind: 'goose', mode: GOOSE_DEFAULT_MODE, usingDefaults: true, toolPermissions };
 
   const raw = readGooseMode(text);
-  if (raw === undefined) return { kind: 'goose', mode: GOOSE_DEFAULT_MODE, usingDefaults: true };
+  if (raw === undefined)
+    return { kind: 'goose', mode: GOOSE_DEFAULT_MODE, usingDefaults: true, toolPermissions };
   const known = (GOOSE_MODES as readonly string[]).includes(raw);
   return {
     kind: 'goose',
     mode: known ? (raw as GooseMode) : GOOSE_DEFAULT_MODE,
     usingDefaults: false,
+    toolPermissions,
   };
 }
 

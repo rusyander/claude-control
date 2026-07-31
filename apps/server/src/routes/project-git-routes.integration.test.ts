@@ -90,49 +90,97 @@ describe('project-git-routes', () => {
     expect(commit.statusCode).toBe(400);
   });
 
-  it.skipIf(!GIT_AVAILABLE)('полный круг: ветка → коммит → переключение', async () => {
-    const git = (...args: string[]): void => {
-      execFileSync('git', args, { cwd: dir, stdio: 'ignore', windowsHide: true });
-    };
-    git('init', '--initial-branch=main');
-    git('config', 'user.email', 'test@example.invalid');
-    git('config', 'user.name', 'Test');
-    git('config', 'commit.gpgsign', 'false');
-    writeFileSync(join(dir, 'a.txt'), 'a\n');
-    git('add', '-A');
-    git('commit', '-m', 'first');
+  it.skipIf(!GIT_AVAILABLE)(
+    'полный круг: ветка → коммит → переключение',
+    async () => {
+      const git = (...args: string[]): void => {
+        execFileSync('git', args, { cwd: dir, stdio: 'ignore', windowsHide: true });
+      };
+      git('init', '--initial-branch=main');
+      git('config', 'user.email', 'test@example.invalid');
+      git('config', 'user.name', 'Test');
+      git('config', 'commit.gpgsign', 'false');
+      writeFileSync(join(dir, 'a.txt'), 'a\n');
+      git('add', '-A');
+      git('commit', '-m', 'first');
 
-    const created = await app.inject({
-      method: 'POST',
-      url: '/api/project-git/branch',
-      payload: { path: dir, name: 'feature/x' },
-    });
-    expect(created.statusCode).toBe(200);
-    expect(created.json<ProjectGitResult>().info.branch).toBe('feature/x');
+      const created = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/branch',
+        payload: { path: dir, name: 'feature/x' },
+      });
+      expect(created.statusCode).toBe(200);
+      expect(created.json<ProjectGitResult>().info.branch).toBe('feature/x');
 
-    writeFileSync(join(dir, 'b.txt'), 'b\n');
-    const committed = await app.inject({
-      method: 'POST',
-      url: '/api/project-git/commit',
-      payload: { path: dir, message: 'через панель' },
-    });
-    expect(committed.statusCode).toBe(200);
-    expect(committed.json<ProjectGitResult>().info.dirtyCount).toBe(0);
+      writeFileSync(join(dir, 'b.txt'), 'b\n');
+      const committed = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/commit',
+        payload: { path: dir, message: 'через панель' },
+      });
+      expect(committed.statusCode).toBe(200);
+      expect(committed.json<ProjectGitResult>().info.dirtyCount).toBe(0);
 
-    const switched = await app.inject({
-      method: 'POST',
-      url: '/api/project-git/checkout',
-      payload: { path: dir, branch: 'main' },
-    });
-    expect(switched.statusCode).toBe(200);
-    expect(switched.json<ProjectGitResult>().info.branch).toBe('main');
+      const switched = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/checkout',
+        payload: { path: dir, branch: 'main' },
+      });
+      expect(switched.statusCode).toBe(200);
+      expect(switched.json<ProjectGitResult>().info.branch).toBe('main');
 
-    // Ветки нет среди локальных — 400, а не молчаливый detached HEAD.
-    const missing = await app.inject({
+      // Ветки нет среди локальных — 400, а не молчаливый detached HEAD.
+      const missing = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/checkout',
+        payload: { path: dir, branch: 'origin/main' },
+      });
+      expect(missing.statusCode).toBe(400);
+    },
+    30_000,
+  );
+
+  it.skipIf(!GIT_AVAILABLE)(
+    'pull без удалённых — 400 с текстом git, а не 500',
+    async () => {
+      const git = (...args: string[]): void => {
+        execFileSync('git', args, { cwd: dir, stdio: 'ignore', windowsHide: true });
+      };
+      git('init', '--initial-branch=main');
+      git('config', 'user.email', 'test@example.invalid');
+      git('config', 'user.name', 'Test');
+      git('config', 'commit.gpgsign', 'false');
+      writeFileSync(join(dir, 'a.txt'), 'a\n');
+      git('add', '-A');
+      git('commit', '-m', 'first');
+
+      // Ветка не из списка удалённого — отказ ещё до похода в сеть.
+      const foreign = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/pull',
+        payload: { path: dir, branch: 'main' },
+      });
+      expect(foreign.statusCode).toBe(400);
+
+      // Пустая строка от селекта «текущая ветка» — это обычный pull, а не
+      // ветка с пустым именем: upstream не настроен, поэтому git откажет сам.
+      const current = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/pull',
+        payload: { path: dir, branch: '' },
+      });
+      expect(current.statusCode).toBe(400);
+      expect(current.json<{ message: string }>().message).not.toBe('');
+    },
+    30_000,
+  );
+
+  it('pull с нестроковой веткой — 400, а не попытка склеить путь', async () => {
+    const res = await app.inject({
       method: 'POST',
-      url: '/api/project-git/checkout',
-      payload: { path: dir, branch: 'origin/main' },
+      url: '/api/project-git/pull',
+      payload: { path: dir, branch: 42 },
     });
-    expect(missing.statusCode).toBe(400);
-  }, 30_000);
+    expect(res.statusCode).toBe(400);
+  });
 });

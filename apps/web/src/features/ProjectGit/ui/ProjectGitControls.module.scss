@@ -23,6 +23,13 @@
   box-shadow: var(--shadow-lg);
 }
 
+// Шеврон приглушён: он подсказка про поведение кнопки, а не её содержание.
+.chevron {
+  flex: none;
+  margin-left: var(--spacing-3xs);
+  color: var(--color-fg-subtle);
+}
+
 // Имя ветки в кнопке: длинное не должно распирать ряд.
 .branch {
   display: inline-block;
@@ -37,6 +44,80 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-3xs);
+}
+
+// Список изменённых файлов. Свой скролл: у длинного списка поповер иначе
+// вырастает на весь экран и прячет кнопки под ним.
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: var(--spacing-3xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+.file {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  font-size: var(--font-size-caption);
+  line-height: 1.6;
+}
+
+// Буква состояния: моноширинная и фиксированной ширины, чтобы пути не прыгали.
+.status {
+  flex: none;
+  width: 1.1em;
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  color: var(--color-fg-subtle);
+}
+
+.added,
+.untracked {
+  color: var(--color-success);
+}
+.modified,
+.typechange {
+  color: var(--color-warning);
+}
+.deleted {
+  color: var(--color-danger);
+}
+.renamed {
+  color: var(--color-accent);
+}
+.conflict {
+  color: var(--color-danger);
+}
+
+// Сжимается каталог, имя файла остаётся целым: искать глазами будут именно его.
+.dir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-fg-subtle);
+}
+
+.name {
+  flex: none;
+  color: var(--color-fg);
+}
+
+.staged {
+  flex: none;
+  margin-left: auto;
+  padding-left: var(--spacing-3xs);
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
 }
 
 .select,

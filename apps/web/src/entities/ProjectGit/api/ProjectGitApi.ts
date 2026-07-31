@@ -4,8 +4,9 @@ import { apiClient } from '@shared/api/client';
 import { normalizeProjectPath } from '@shared/lib/workspace';
 
 /**
- * Git выбранного проекта: состояние (ветка, список веток, сколько файлов
- * изменено) и три операции — переключиться, создать ветку, закоммитить.
+ * Git выбранного проекта: состояние (ветка, список веток, какие файлы изменены,
+ * отставание от удалённого) и четыре операции — переключиться, создать ветку,
+ * закоммитить, подтянуть чужое.
  *
  * Состояние перечитывается по фокусу окна и с редким поллингом: ветку и файлы
  * человек чаще меняет в терминале и в редакторе, чем здесь, — панель не должна
@@ -61,4 +62,12 @@ export function useCreateBranch() {
 /** Закоммитить все изменения рабочего дерева. */
 export function useCommitAll() {
   return useGitAction<{ path: string; message: string }>('/project-git/commit');
+}
+
+/**
+ * Подтянуть чужие коммиты. Без `branch` — обычный `git pull` в текущей ветке,
+ * с `branch` — из этой ветки удалённого.
+ */
+export function usePullChanges() {
+  return useGitAction<{ path: string; branch?: string }>('/project-git/pull');
 }

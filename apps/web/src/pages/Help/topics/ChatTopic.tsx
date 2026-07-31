@@ -137,6 +137,7 @@ export function ChatTopic() {
             { title: tr('toolsPort'), text: tr('toolsPortText') },
             { title: tr('toolsAutostart'), text: tr('toolsAutostartText') },
             { title: tr('toolsGit'), text: tr('toolsGitText') },
+            { title: tr('toolsPull'), text: tr('toolsPullText') },
           ]}
         />
         <Callout tone="info" title={tr('toolsNote')} />

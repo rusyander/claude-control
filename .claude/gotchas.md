@@ -112,6 +112,19 @@ equally wrong. Tokens live in a separate 600 file, not in the shared `~/.claude.
 **`shell: true` with an argument array** produces Node's DEP0190 warning and does not escape
 anything. On Windows: either one string, or `shellArgs`.
 
+**`git status --porcelain=v2` without `-z` C-quotes paths.** Any space or non-ASCII byte comes back
+as `"docs/\320\274\320\276\320\271 \321\204\320\260\320\271\320\273.md"` — every Russian filename
+unreadable, and splitting the record on spaces cuts the path in half. `-z` removes both problems:
+records are NUL-terminated and paths are raw. Cost of `-z`: a rename (`2 …`) puts its OLD path in
+the NEXT NUL field, so the parser must consume two fields for one file or it counts the rename
+twice (`parseStatus` in `domains/project-git.ts`).
+
+**Everything the panel hands to git comes from a list git itself printed.** `checkout` and
+`pull <remote> <branch>` both verify the name against `branches`/`remoteBranches` before spawning.
+Not paranoia about shells (there is none — `execFile` with an array): a branch argument that is
+really an option (`--upload-pack=…`) or an arbitrary ref would be accepted by git as such. Loosen
+this to "pass the request string through" and the closed list stops meaning anything.
+
 **`cmd.exe` quoting, measured on Windows 11, not recalled.** `"`-wrapping + doubling inner `"` as
 `""` + doubling trailing backslashes + `cmd /d /s /v:off /c` blocks `& | < > ^ ( )` and `!VAR!` —
 `\"` does NOT escape (that is a C-runtime rule cmd never learned; `a" & echo X & "b` executed).

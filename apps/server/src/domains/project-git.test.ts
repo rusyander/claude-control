@@ -1,16 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  CHANGED_FILES_MAX,
   GitError,
   checkoutBranch,
   commitAll,
   createBranch,
   isGitRepo,
   parseBranches,
+  parseRemoteBranches,
   parseStatus,
+  pickRemote,
+  pullChanges,
   readProjectGit,
 } from './project-git.ts';
 
@@ -47,46 +51,129 @@ function hasGit(): boolean {
 
 const GIT_AVAILABLE = hasGit();
 
-describe('parseStatus: разбор git status --porcelain=v2 --branch', () => {
+/** Записи `--porcelain=v2 -z` разделены NUL, а не переводом строки. */
+const z = (...entries: string[]): string => entries.map((entry) => `${entry}\0`).join('');
+
+describe('parseStatus: разбор git status --porcelain=v2 --branch -z', () => {
   it('ветка, чистое дерево', () => {
-    const out = '# branch.oid abc123\n# branch.head main\n# branch.upstream origin/main\n';
+    const out = z('# branch.oid abc123', '# branch.head main', '# branch.upstream origin/main');
     expect(parseStatus(out)).toEqual({
       branch: 'main',
       detached: false,
       unborn: false,
       dirtyCount: 0,
+      changedFiles: [],
+      changedFilesTruncated: false,
+      ahead: undefined,
+      behind: undefined,
     });
   });
 
   it('считает изменённые файлы и не считает заголовки', () => {
-    const out = [
+    const out = z(
       '# branch.oid abc123',
       '# branch.head feature/x',
       '1 .M N... 100644 100644 100644 aaa bbb file.ts',
       '? new.txt',
-      'u UU N... 100644 100644 100644 100644 a b c d conflict.ts',
-      '',
-    ].join('\n');
+      'u UU N... 100644 100644 100644 100644 a b c conflict.ts',
+    );
     const parsed = parseStatus(out);
     expect(parsed.branch).toBe('feature/x');
     expect(parsed.dirtyCount).toBe(3);
   });
 
+  it('отдаёт сами файлы: путь, состояние и есть ли правка в индексе', () => {
+    const out = z(
+      '# branch.head main',
+      '1 .M N... 100644 100644 100644 aaa bbb src/file.ts',
+      '1 A. N... 100644 100644 100644 aaa bbb src/added.ts',
+      '1 .D N... 100644 100644 100644 aaa bbb gone.ts',
+      '? new.txt',
+      'u UU N... 100644 100644 100644 100644 a b c conflict.ts',
+    );
+    expect(parseStatus(out).changedFiles).toEqual([
+      { path: 'src/file.ts', status: 'modified', staged: false },
+      { path: 'src/added.ts', status: 'added', staged: true },
+      { path: 'gone.ts', status: 'deleted', staged: false },
+      { path: 'new.txt', status: 'untracked', staged: false },
+      { path: 'conflict.ts', status: 'conflict', staged: false },
+    ]);
+  });
+
+  it('переименование: прежний путь лежит СЛЕДУЮЩИМ полем и не считается вторым файлом', () => {
+    const out = z(
+      '# branch.head main',
+      '2 R. N... 100644 100644 100644 aaa bbb R100 new/name.ts',
+      'old/name.ts',
+      '? after.txt',
+    );
+    const parsed = parseStatus(out);
+    expect(parsed.dirtyCount).toBe(2);
+    expect(parsed.changedFiles).toEqual([
+      { path: 'new/name.ts', status: 'renamed', staged: true, from: 'old/name.ts' },
+      { path: 'after.txt', status: 'untracked', staged: false },
+    ]);
+  });
+
+  it('пробелы и кириллица в пути доезжают целиком — ради этого и взят -z', () => {
+    const out = z(
+      '# branch.head main',
+      '1 .M N... 100644 100644 100644 aaa bbb docs/мой файл.md',
+      '? новая папка/файл с пробелом.txt',
+    );
+    expect(parseStatus(out).changedFiles.map((file) => file.path)).toEqual([
+      'docs/мой файл.md',
+      'новая папка/файл с пробелом.txt',
+    ]);
+  });
+
+  it('расхождение с upstream: впереди и позади', () => {
+    const parsed = parseStatus(z('# branch.head main', '# branch.ab +2 -5'));
+    expect(parsed.ahead).toBe(2);
+    expect(parsed.behind).toBe(5);
+  });
+
+  it('список обрезается по потолку, но счётчик остаётся полным', () => {
+    const entries = ['# branch.head main'];
+    for (let index = 0; index < CHANGED_FILES_MAX + 7; index += 1) {
+      entries.push(`? file-${index}.txt`);
+    }
+    const parsed = parseStatus(z(...entries));
+    expect(parsed.dirtyCount).toBe(CHANGED_FILES_MAX + 7);
+    expect(parsed.changedFiles).toHaveLength(CHANGED_FILES_MAX);
+    expect(parsed.changedFilesTruncated).toBe(true);
+  });
+
   it('detached HEAD — ветки нет', () => {
-    const parsed = parseStatus('# branch.oid abc\n# branch.head (detached)\n');
+    const parsed = parseStatus(z('# branch.oid abc', '# branch.head (detached)'));
     expect(parsed.detached).toBe(true);
     expect(parsed.branch).toBeUndefined();
   });
 
   it('репозиторий без коммитов помечается unborn', () => {
-    const parsed = parseStatus('# branch.oid (initial)\n# branch.head main\n');
+    const parsed = parseStatus(z('# branch.oid (initial)', '# branch.head main'));
     expect(parsed.unborn).toBe(true);
   });
 
-  it('CRLF в выводе не ломает разбор', () => {
-    const parsed = parseStatus('# branch.oid abc\r\n# branch.head main\r\n? new.txt\r\n');
-    expect(parsed.branch).toBe('main');
+  it('игнорируемый файл изменением не считается', () => {
+    const parsed = parseStatus(z('# branch.head main', '! dist/bundle.js', '? real.txt'));
     expect(parsed.dirtyCount).toBe(1);
+    expect(parsed.changedFiles).toEqual([{ path: 'real.txt', status: 'untracked', staged: false }]);
+  });
+});
+
+describe('pickRemote / parseRemoteBranches: откуда тянуть', () => {
+  it('origin выигрывает, иначе первый по алфавиту, пусто — undefined', () => {
+    expect(pickRemote('upstream\norigin\n')).toBe('origin');
+    expect(pickRemote('zeta\nalpha\n')).toBe('alpha');
+    expect(pickRemote('')).toBeUndefined();
+  });
+
+  it('ветки выбранного удалённого, без префикса и без HEAD', () => {
+    const refs = 'origin/HEAD\norigin/main\norigin/feature/b\nupstream/main\n';
+    expect(parseRemoteBranches(refs, 'origin')).toEqual(['feature/b', 'main']);
+    expect(parseRemoteBranches(refs, 'upstream')).toEqual(['main']);
+    expect(parseRemoteBranches(refs, undefined)).toEqual([]);
   });
 });
 
@@ -115,6 +202,8 @@ describe('isGitRepo: раздел появляется только при .git'
       unborn: false,
       branches: [],
       dirtyCount: 0,
+      changedFiles: [],
+      remoteBranches: [],
     });
   });
 
@@ -204,5 +293,111 @@ describe.skipIf(!GIT_AVAILABLE)('операции на настоящем реп
     // аргумент, оболочки нет — поэтому это просто негодное имя ветки.
     await expect(createBranch(dir, 'x; rm -rf /')).rejects.toBeInstanceOf(GitError);
     expect((await readProjectGit(dir)).branches).toEqual(['main']);
+  });
+
+  it('изменённые файлы приезжают списком, а не только числом', async () => {
+    writeFileSync(join(dir, 'new.txt'), 'x');
+    writeFileSync(join(dir, 'readme.md'), 'changed\n');
+    const info = await readProjectGit(dir);
+    expect(info.dirtyCount).toBe(2);
+    expect([...info.changedFiles].sort((a, b) => a.path.localeCompare(b.path))).toEqual([
+      { path: 'new.txt', status: 'untracked', staged: false },
+      { path: 'readme.md', status: 'modified', staged: false },
+    ]);
+  });
+
+  it('без удалённых pull отказывает, а не идёт в сеть наугад', async () => {
+    const info = await readProjectGit(dir);
+    expect(info.remote).toBeUndefined();
+    expect(info.remoteBranches).toEqual([]);
+    await expect(pullChanges(dir, 'main')).rejects.toBeInstanceOf(GitError);
+  });
+});
+
+/**
+ * Pull проверяется на паре настоящих репозиториев: «удалённый» — это голый
+ * репозиторий в temp, а не сеть. Подделывать здесь нечего: смысл проверки
+ * именно в том, что команда действительно приносит чужой коммит.
+ */
+describe.skipIf(!GIT_AVAILABLE)('pull на настоящих репозиториях', { timeout: 60_000 }, () => {
+  let root: string;
+  let dir: string;
+  let other: string;
+
+  const run = (cwd: string, ...args: string[]): void => {
+    execFileSync('git', args, { cwd, stdio: 'ignore', windowsHide: true });
+  };
+  const identify = (cwd: string): void => {
+    run(cwd, 'config', 'user.email', 'test@example.invalid');
+    run(cwd, 'config', 'user.name', 'Test');
+    run(cwd, 'config', 'commit.gpgsign', 'false');
+  };
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-git-pull-'));
+    const bare = join(root, 'origin.git');
+    dir = join(root, 'work');
+    other = join(root, 'other');
+
+    execFileSync('git', ['init', '--bare', '--initial-branch=main', bare], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    execFileSync('git', ['clone', bare, dir], { stdio: 'ignore', windowsHide: true });
+    identify(dir);
+    writeFileSync(join(dir, 'readme.md'), 'hello\n');
+    run(dir, 'add', '-A');
+    run(dir, 'commit', '-m', 'first');
+    run(dir, 'push', '-u', 'origin', 'main');
+
+    execFileSync('git', ['clone', bare, other], { stdio: 'ignore', windowsHide: true });
+    identify(other);
+  });
+  afterEach(() => dropTemp(root));
+
+  /** Второй клон отправляет коммит — так у первого появляется что тянуть. */
+  const pushFromOther = (name: string): void => {
+    writeFileSync(join(other, name), 'from other\n');
+    run(other, 'add', '-A');
+    run(other, 'commit', '-m', `add ${name}`);
+    run(other, 'push', 'origin', 'main');
+  };
+
+  it('видит удалённый, его ветки и отставание', async () => {
+    pushFromOther('theirs.txt');
+    run(dir, 'fetch', 'origin');
+    const info = await readProjectGit(dir);
+    expect(info.remote).toBe('origin');
+    expect(info.remoteBranches).toEqual(['main']);
+    expect(info.behind).toBe(1);
+    expect(info.ahead).toBe(0);
+  });
+
+  it('обычный pull приносит чужой коммит в текущую ветку', async () => {
+    pushFromOther('theirs.txt');
+    await pullChanges(dir);
+    expect(existsSync(join(dir, 'theirs.txt'))).toBe(true);
+    expect((await readProjectGit(dir)).behind).toBe(0);
+  });
+
+  it('pull из выбранной ветки удалённого работает по имени из списка', async () => {
+    pushFromOther('picked.txt');
+    await pullChanges(dir, 'main');
+    expect(existsSync(join(dir, 'picked.txt'))).toBe(true);
+  });
+
+  it('чужая ссылка не уходит в git: тянем только из перечисленных веток', async () => {
+    await expect(pullChanges(dir, 'HEAD')).rejects.toBeInstanceOf(GitError);
+    await expect(pullChanges(dir, 'origin/main')).rejects.toBeInstanceOf(GitError);
+    await expect(pullChanges(dir, '--upload-pack=touch hacked')).rejects.toBeInstanceOf(GitError);
+    expect(existsSync(join(dir, 'hacked'))).toBe(false);
+  });
+
+  it('конфликт — это отказ с текстом git, а не молчание', async () => {
+    pushFromOther('readme.md');
+    writeFileSync(join(dir, 'readme.md'), 'мой вариант\n');
+    run(dir, 'add', '-A');
+    run(dir, 'commit', '-m', 'local');
+    await expect(pullChanges(dir)).rejects.toBeInstanceOf(GitError);
   });
 });

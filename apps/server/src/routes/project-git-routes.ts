@@ -6,12 +6,13 @@ import {
   checkoutBranch,
   commitAll,
   createBranch,
+  pullChanges,
   readProjectGit,
 } from '../domains/project-git.ts';
 
 /**
  * Маршруты git выбранного проекта: состояние, переключение ветки, создание
- * ветки, коммит.
+ * ветки, коммит, подтягивание чужих коммитов.
  *
  * Чтение свободно и всегда отвечает 200 — даже «это не репозиторий» (`isRepo:
  * false`) и «git сломан» (`error`) — это ответ, а не ошибка запроса: клиенту
@@ -90,6 +91,24 @@ export function registerProjectGitRoutes(app: FastifyInstance): void {
         return reply.code(400).send({ message: 'Не указано сообщение коммита' });
       }
       return write(path, reply, () => commitAll(path, message));
+    },
+  );
+
+  /**
+   * Подтянуть чужие коммиты. Без `branch` — обычный `git pull` в текущей ветке;
+   * с `branch` — из соответствующей ветки удалённого. Пустая строка приходит от
+   * селекта «текущая ветка», поэтому она равнозначна отсутствию поля.
+   */
+  app.post<{ Body: { path?: string; branch?: string } }>(
+    '/api/project-git/pull',
+    async (request, reply) => {
+      const path = requirePath(request.body?.path, reply);
+      if (!path) return reply;
+      const branch = request.body.branch;
+      if (branch !== undefined && typeof branch !== 'string') {
+        return reply.code(400).send({ message: 'Ветка задана неверно' });
+      }
+      return write(path, reply, () => pullChanges(path, branch));
     },
   );
 }

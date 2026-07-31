@@ -2,12 +2,23 @@ import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { ProjectGitInfo } from '@claude-control/contracts';
+import type {
+  ProjectGitChange,
+  ProjectGitFileStatus,
+  ProjectGitInfo,
+} from '@claude-control/contracts';
 
 /**
- * Git выбранного проекта: где я сейчас, куда переключиться, как завести ветку и
- * закоммитить. Ровно четыре операции — `status`, `checkout`, `checkout -b`,
- * `commit`; слияния, ребейзы, пуши и удаление веток панель не делает намеренно.
+ * Git выбранного проекта: где я сейчас, что изменено, куда переключиться, как
+ * завести ветку, закоммитить и подтянуть чужое. Пять операций — `status`,
+ * `checkout`, `checkout -b`, `commit`, `pull`; пуши, ребейзы и удаление веток
+ * панель не делает намеренно.
+ *
+ * `pull` — единственная сетевая операция и единственная, после которой рабочее
+ * дерево может остаться в конфликте. Панель его не разрешает и не откатывает:
+ * она передаёт вывод git как есть, дальше человек идёт в терминал. Обрезать это
+ * до `--ff-only` было бы честнее, но выбор сделан в пользу поведения обычного
+ * `git pull` — так кнопка не врёт про то, чем она является.
  *
  * ПОЯВЛЯЕТСЯ ТОЛЬКО ПРИ `.git` в каталоге проекта. Проверяем именно вхождение
  * `.git`, а не запуском git: в рабочем дереве worktree это ФАЙЛ, а не каталог,
@@ -27,6 +38,15 @@ const execFileAsync = promisify(execFile);
 
 /** Потолок ожидания одной команды git. Хуки коммита бывают долгими, но не вечными. */
 const GIT_TIMEOUT_MS = 60_000;
+/** Для `pull` потолок другой: это поход в сеть, а не локальная операция. */
+const GIT_NETWORK_TIMEOUT_MS = 180_000;
+/**
+ * Сколько изменённых файлов показываем списком. Полное число живёт в
+ * `dirtyCount` и не обрезается: счётчик обязан быть честным, даже когда список
+ * не поместился. Потолок нужен, чтобы после массового переформатирования ответ
+ * не превратился в мегабайт путей, которые никто не прочитает.
+ */
+export const CHANGED_FILES_MAX = 500;
 /** Потолок вывода: список веток огромного репозитория не должен съесть память. */
 const GIT_MAX_BUFFER = 4 * 1024 * 1024;
 /** Длина сообщения коммита: с запасом на подробное описание, но не безразмерно. */
@@ -54,7 +74,15 @@ export function isGitRepo(projectDir: string): boolean {
 
 /** Пустое состояние «это не репозиторий» — им же отвечаем и при отсутствии каталога. */
 function notARepo(): ProjectGitInfo {
-  return { isRepo: false, detached: false, unborn: false, branches: [], dirtyCount: 0 };
+  return {
+    isRepo: false,
+    detached: false,
+    unborn: false,
+    branches: [],
+    dirtyCount: 0,
+    changedFiles: [],
+    remoteBranches: [],
+  };
 }
 
 /**
@@ -62,11 +90,11 @@ function notARepo(): ProjectGitInfo {
  * Вывод stderr при ненулевом коде — это и есть человеческое объяснение git
  * («ветка уже существует», «не задан user.email»), поэтому оно и уходит наверх.
  */
-async function git(projectDir: string, args: string[]): Promise<string> {
+async function git(projectDir: string, args: string[], timeout = GIT_TIMEOUT_MS): Promise<string> {
   try {
     const { stdout } = await execFileAsync('git', args, {
       cwd: resolve(projectDir),
-      timeout: GIT_TIMEOUT_MS,
+      timeout,
       maxBuffer: GIT_MAX_BUFFER,
       windowsHide: true,
     });
@@ -81,24 +109,93 @@ async function git(projectDir: string, args: string[]): Promise<string> {
   }
 }
 
+/** Буква из `XY` порядкового статуса → человеческое состояние файла. */
+const STATUS_BY_CODE: Record<string, ProjectGitFileStatus> = {
+  A: 'added',
+  M: 'modified',
+  D: 'deleted',
+  R: 'renamed',
+  C: 'renamed',
+  T: 'typechange',
+};
+
 /**
- * Разбор `git status --porcelain=v2 --branch`. Один вызов отвечает сразу на
- * три вопроса: какая ветка, отцеплен ли HEAD, сколько файлов изменено, — а
- * заголовок `# branch.oid (initial)` отличает репозиторий без коммитов.
+ * Хвост записи после `count` полей, разделённых пробелом. Путь в porcelain v2
+ * всегда идёт последним, поэтому его нельзя резать по пробелам: в имени файла
+ * они законны. Отсчитываем ровно служебные поля и берём весь остаток.
+ */
+function tailAfter(line: string, count: number): string {
+  let index = 0;
+  for (let n = 0; n < count; n += 1) {
+    const next = line.indexOf(' ', index);
+    if (next < 0) return '';
+    index = next + 1;
+  }
+  return line.slice(index);
+}
+
+/** Число из `# branch.ab +1 -2`; мусор превращается в undefined, а не в NaN. */
+function countOf(token: string | undefined): number | undefined {
+  if (!token) return undefined;
+  const value = Number.parseInt(token.slice(1), 10);
+  return Number.isFinite(value) ? Math.abs(value) : undefined;
+}
+
+/** Одна запись статуса → строка списка. Незнакомый тип записи → undefined. */
+function parseChange(entry: string): ProjectGitChange | undefined {
+  if (entry.startsWith('? ')) {
+    return { path: tailAfter(entry, 1), status: 'untracked', staged: false };
+  }
+  if (entry.startsWith('u ')) {
+    return { path: tailAfter(entry, 10), status: 'conflict', staged: false };
+  }
+  const renamed = entry.startsWith('2 ');
+  if (!renamed && !entry.startsWith('1 ')) return undefined;
+
+  const xy = entry.slice(2, 4);
+  // X — что уже в индексе, Y — что только в рабочем дереве. Показываем то из
+  // двух, что случилось: индекс важнее, ведь именно он уйдёт в коммит.
+  const staged = xy[0] !== '.' && xy[0] !== undefined;
+  const code = staged ? xy[0] : xy[1];
+  return {
+    path: tailAfter(entry, renamed ? 9 : 8),
+    status: (code && STATUS_BY_CODE[code]) || 'modified',
+    staged,
+  };
+}
+
+/**
+ * Разбор `git status --porcelain=v2 --branch -z`. Один вызов отвечает сразу на
+ * всё: какая ветка, отцеплен ли HEAD, насколько разошлась с upstream, сколько
+ * файлов изменено и какие именно. Заголовок `# branch.oid (initial)` отличает
+ * репозиторий без коммитов.
+ *
+ * Формат ИМЕННО `-z`: без него git экранирует пути с пробелами и не-латиницей
+ * в C-кавычки с восьмеричными байтами, и любое русское имя файла приезжает
+ * нечитаемым. Записи разделены NUL, а у переименования (`2 …`) прежний путь —
+ * это СЛЕДУЮЩЕЕ поле, а не часть той же записи.
  */
 export function parseStatus(stdout: string): {
   branch?: string;
   detached: boolean;
   unborn: boolean;
   dirtyCount: number;
+  changedFiles: ProjectGitChange[];
+  changedFilesTruncated: boolean;
+  ahead?: number;
+  behind?: number;
 } {
   let branch: string | undefined;
   let detached = false;
   let unborn = false;
   let dirtyCount = 0;
+  let ahead: number | undefined;
+  let behind: number | undefined;
+  const changedFiles: ProjectGitChange[] = [];
 
-  for (const raw of stdout.split('\n')) {
-    const line = raw.replace(/\r$/, '');
+  const entries = stdout.split('\0');
+  for (let index = 0; index < entries.length; index += 1) {
+    const line = entries[index];
     if (!line) continue;
     if (line.startsWith('# branch.oid ')) {
       unborn = line.slice('# branch.oid '.length).trim() === '(initial)';
@@ -110,13 +207,69 @@ export function parseStatus(stdout: string): {
       else branch = head;
       continue;
     }
-    // Служебные заголовки не считаем; всё остальное — изменённый файл
-    // (`1`/`2` — учтённые и переименования, `u` — конфликт, `?` — неучтённый,
-    // `!` — игнорируемый, но без `--ignored` его в выводе нет).
-    if (!line.startsWith('#')) dirtyCount += 1;
+    if (line.startsWith('# branch.ab ')) {
+      const [plus, minus] = line.slice('# branch.ab '.length).trim().split(/\s+/);
+      ahead = countOf(plus);
+      behind = countOf(minus);
+      continue;
+    }
+    if (line.startsWith('#')) continue;
+    // `!` — игнорируемый файл: без `--ignored` его в выводе нет, но если он
+    // всё же пришёл, изменением он не считается.
+    if (line.startsWith('! ')) continue;
+
+    const change = parseChange(line);
+    if (!change) continue;
+    dirtyCount += 1;
+    if (line.startsWith('2 ')) {
+      // Прежний путь переименования лежит отдельным полем следом за записью.
+      const from = entries[index + 1];
+      index += 1;
+      if (from) change.from = from;
+    }
+    if (changedFiles.length < CHANGED_FILES_MAX) changedFiles.push(change);
   }
 
-  return { branch, detached, unborn, dirtyCount };
+  return {
+    branch,
+    detached,
+    unborn,
+    dirtyCount,
+    changedFiles,
+    changedFilesTruncated: dirtyCount > changedFiles.length,
+    ahead,
+    behind,
+  };
+}
+
+/**
+ * Куда ходить за чужими коммитами. `origin` — если он есть: это имя по
+ * умолчанию у всех, кто клонировал репозиторий. Иначе первый по алфавиту, и
+ * это лучше, чем молча не показать кнопку у репозитория с одним `upstream`.
+ */
+export function pickRemote(stdout: string): string | undefined {
+  const names = stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  return names.includes('origin') ? 'origin' : names[0];
+}
+
+/**
+ * Ветки выбранного удалённого, без префикса `<remote>/`. `origin/HEAD` — это
+ * не ветка, а указатель на ветку по умолчанию; тянуть по нему нечего.
+ */
+export function parseRemoteBranches(stdout: string, remote: string | undefined): string[] {
+  if (!remote) return [];
+  const prefix = `${remote}/`;
+  return stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith(prefix))
+    .map((line) => line.slice(prefix.length))
+    .filter((name) => name && name !== 'HEAD')
+    .sort((a, b) => a.localeCompare(b));
 }
 
 /** Локальные ветки по алфавиту. Удалённых нет: переключаемся только по локальным. */
@@ -137,17 +290,28 @@ export async function readProjectGit(projectDir: string): Promise<ProjectGitInfo
   if (!isGitRepo(projectDir)) return notARepo();
 
   try {
-    const [statusOut, branchesOut] = await Promise.all([
-      git(projectDir, ['status', '--porcelain=v2', '--branch']),
+    // Четыре чтения независимы, поэтому идут разом: последовательно они
+    // растянули бы обновление пульта на каждый фокус окна.
+    const [statusOut, branchesOut, remotesOut, remoteRefsOut] = await Promise.all([
+      git(projectDir, ['status', '--porcelain=v2', '--branch', '-z']),
       git(projectDir, ['for-each-ref', '--format=%(refname:short)', 'refs/heads']),
+      git(projectDir, ['remote']),
+      git(projectDir, ['for-each-ref', '--format=%(refname:short)', 'refs/remotes']),
     ]);
     const status = parseStatus(statusOut);
+    const remote = pickRemote(remotesOut);
     return {
       isRepo: true,
       detached: status.detached,
       unborn: status.unborn,
       branches: parseBranches(branchesOut),
       dirtyCount: status.dirtyCount,
+      changedFiles: status.changedFiles,
+      remoteBranches: parseRemoteBranches(remoteRefsOut, remote),
+      ...(status.changedFilesTruncated ? { changedFilesTruncated: true } : {}),
+      ...(remote ? { remote } : {}),
+      ...(status.ahead === undefined ? {} : { ahead: status.ahead }),
+      ...(status.behind === undefined ? {} : { behind: status.behind }),
       ...(status.branch ? { branch: status.branch } : {}),
     };
   } catch (error) {
@@ -219,6 +383,44 @@ export async function createBranch(projectDir: string, name: string): Promise<st
   }
   const out = await git(projectDir, ['checkout', '-b', value]);
   return out.trim() || `Создана ветка ${value}`;
+}
+
+/**
+ * Подтянуть чужие коммиты. Без имени ветки — обычный `git pull` в текущей: он
+ * сам знает свой upstream, и подставлять что-то вместо него панель не вправе.
+ * С именем — `git pull <remote> <branch>`, причём имя обязано быть из списка
+ * веток этого удалённого: как и у checkout, в git уходит только то, что git же
+ * и перечислил, а не строка из запроса.
+ *
+ * Слияние здесь возможно, и это осознанно (см. заголовок файла). Конфликт —
+ * не ошибка панели: git вернёт ненулевой код, его текст уйдёт пользователем как
+ * есть, а рабочее дерево останется в конфликте до ручного разбора.
+ */
+export async function pullChanges(projectDir: string, branch?: string): Promise<string> {
+  const info = await requireRepo(projectDir);
+  if (info.unborn) {
+    throw new GitError('В репозитории ещё нет коммитов — тянуть некуда');
+  }
+  const value = branch?.trim();
+
+  if (!value) {
+    if (info.detached) {
+      throw new GitError(
+        'HEAD отцеплен от ветки — переключитесь на ветку или выберите её в списке',
+      );
+    }
+    const out = await git(projectDir, ['pull'], GIT_NETWORK_TIMEOUT_MS);
+    return out.trim() || 'Обновлено';
+  }
+
+  if (!info.remote) {
+    throw new GitError('У репозитория нет удалённых — тянуть неоткуда');
+  }
+  if (!info.remoteBranches.includes(value)) {
+    throw new GitError(`Ветки ${value} нет на ${info.remote}`);
+  }
+  const out = await git(projectDir, ['pull', info.remote, value], GIT_NETWORK_TIMEOUT_MS);
+  return out.trim() || `Обновлено из ${info.remote}/${value}`;
 }
 
 /**

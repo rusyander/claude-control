@@ -24,10 +24,15 @@ const ROUTES = [
 ];
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const problems = [];
 
+// Своя вкладка на маршрут. Одна вкладка на весь обход выдыхается: после
+// восьми-одиннадцати переходов приложение перестаёт отрисовывать `nav`, и прогон
+// падал по таймауту на КАЖДЫЙ РАЗ РАЗНОМ маршруте — притом что тот же маршрут в
+// одиночку открывается за сотню миллисекунд. Вкладка стоит дёшево, ложное
+// падение обхода — дорого.
 for (const [name, path] of ROUTES) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.goto(`${BASE_URL}${path}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('nav');
   await page.waitForTimeout(900);
@@ -76,6 +81,8 @@ for (const [name, path] of ROUTES) {
     problems.push(`\n[${name}]`);
     for (const issue of report.slice(0, 6)) problems.push(`  · ${issue}`);
   }
+
+  await page.close();
 }
 
 await browser.close();

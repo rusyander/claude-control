@@ -3,6 +3,12 @@ export {
   useCheckoutBranch,
   useCreateBranch,
   useCommitAll,
+  usePullChanges,
   projectGitKey,
 } from './api/ProjectGitApi';
-export type { ProjectGitInfo, ProjectGitResult } from '@claude-control/contracts';
+export type {
+  ProjectGitChange,
+  ProjectGitFileStatus,
+  ProjectGitInfo,
+  ProjectGitResult,
+} from '@claude-control/contracts';

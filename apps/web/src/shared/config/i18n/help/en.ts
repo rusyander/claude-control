@@ -132,8 +132,8 @@ export const helpEn: HelpSchema = {
         'Tick the “Autostart” toggle on a target — its dev server comes up by itself on the ' +
         'panel’s next start, without opening a browser window',
       canGit:
-        'See the current branch, switch branches, create a new one and commit changes right ' +
-        'from the tab — whenever the project has a .git',
+        'See the current branch and the list of changed files, switch branches, create a ' +
+        'new one, commit and pull — right from the tab, whenever the project has a .git',
 
       cantApprove:
         'Grant permissions in advance: the panel asks at the moment of the action, and ' +
@@ -210,14 +210,25 @@ export const helpEn: HelpSchema = {
         'It is not about now but about the panel’s next start: a ticked target comes up ' +
         'by itself, with no browser window and no navigation. Close the project tab and the ' +
         'toggle clears on all of its targets.',
-      toolsGit: 'Branch and commit',
+      toolsGit: 'Branch, files, commit and pull',
       toolsGitText:
         'The button with the current branch name shows up only when the project has a ' +
-        '.git. Under it: the list of local branches to switch to, a “new branch” field and ' +
-        'a commit message field; the counter next to it shows how many files changed.',
+        '.git. It carries two numbers: how many files changed and by how many commits you ' +
+        'are behind the remote. Everything else opens under it — the list of changed files ' +
+        '(the letter on the left: A added, M modified, D deleted, R renamed, ? outside git, ' +
+        'U conflict), the list of local branches, the pull row, a “new branch” field and a ' +
+        'commit message field.',
+      toolsPull: 'The Pull button',
+      toolsPullText:
+        'By default it pulls into the current branch through its upstream — a plain git ' +
+        'pull. The select next to it picks another source: a specific remote branch, which ' +
+        'runs git pull origin <branch>. The list holds only branches git has already seen ' +
+        'on the remote; the panel pulls no arbitrary ref.',
       toolsNote:
-        'A commit takes every change (git add -A) and lands on the current branch. The ' +
-        'panel never pushes, merges or deletes branches — that is deliberately left to you.',
+        'A commit takes every change (git add -A) and lands on the current branch. Pull is ' +
+        'the only operation that reaches the network and may merge: on a conflict the ' +
+        'working tree stays in conflict and you sort it out in a terminal. The panel never ' +
+        'pushes or deletes branches.',
 
       dotsTitle: 'Coloured dots: what the agent is doing',
       dotsCaption:

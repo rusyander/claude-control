@@ -5,6 +5,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import type { RuleSection, SectionKind } from '../model/ruleSections';
 import type { RuleBuilderProps } from './RuleBuilder.types';
+import { SECTION_ICON } from './RuleBuilder.constants';
 import styles from './RuleBuilder.module.scss';
 
 /**
@@ -127,10 +128,3 @@ export function RuleBuilder({ sections, onChange }: RuleBuilderProps) {
     </Stack>
   );
 }
-
-const SECTION_ICON = {
-  allow: 'check',
-  deny: 'close',
-  caution: 'warning',
-  custom: 'rules',
-} as const;

@@ -7,6 +7,7 @@ import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useProviderPluginFile, useSaveProviderPluginFile } from '@entities/ProviderPlugins';
+import type { ProviderPluginFileEditorProps } from './ProviderPluginFileEditor.types';
 import styles from './ProviderPluginsPage.module.scss';
 
 /**
@@ -17,11 +18,7 @@ export function ProviderPluginFileEditor({
   path,
   projectId,
   onClose,
-}: {
-  path: string;
-  projectId?: string;
-  onClose: () => void;
-}) {
+}: ProviderPluginFileEditorProps) {
   const { t } = useTranslation();
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderPluginFile(path, scope);

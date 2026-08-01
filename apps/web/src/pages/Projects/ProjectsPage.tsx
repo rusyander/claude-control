@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Project } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
@@ -78,6 +79,22 @@ export function ProjectsPage() {
   };
 
   const selected = projects.find((project) => project.id === selectedId);
+
+  // Правая колонка: пока проект не выбран — приглашение выбрать, дальше конфиг
+  // выбранного, своя панель у Claude и универсальная у прочих провайдеров.
+  const renderDetails = (): ReactNode => {
+    if (!selected) {
+      return (
+        <EmptyState
+          icon="settings"
+          title={t('projectConfig.pickTitle')}
+          text={t('projectConfig.pickText')}
+        />
+      );
+    }
+    if (providerId === 'claude') return <ProjectConfigPanel project={selected} />;
+    return <ProviderProjectPanel project={selected} />;
+  };
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
@@ -162,19 +179,7 @@ export function ProjectsPage() {
             ))}
           </Stack>
 
-          {selected ? (
-            providerId === 'claude' ? (
-              <ProjectConfigPanel project={selected} />
-            ) : (
-              <ProviderProjectPanel project={selected} />
-            )
-          ) : (
-            <EmptyState
-              icon="settings"
-              title={t('projectConfig.pickTitle')}
-              text={t('projectConfig.pickText')}
-            />
-          )}
+          {renderDetails()}
         </div>
       )}
 

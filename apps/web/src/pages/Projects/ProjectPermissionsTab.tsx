@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { PermissionDecision, PermissionRule } from '@claude-control/contracts';
+import type { PermissionRule } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
@@ -11,15 +11,10 @@ import { Icon } from '@shared/ui/icon';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { TruncatedText } from '@shared/ui/truncated-text';
 import { DeleteButton } from '@features/EntityDelete';
+import { DECISION_TONE } from '@entities/Permission';
 import { useProjectPermissions, useDeleteProjectPermission } from '@entities/Project';
 import { ProjectPermissionForm } from './ProjectPermissionForm';
 import type { ProjectTabProps } from './ProjectRulesTab.types';
-
-const TONE: Record<PermissionDecision, 'success' | 'warning' | 'danger'> = {
-  allow: 'success',
-  ask: 'warning',
-  deny: 'danger',
-};
 
 /** Права проекта из его `.claude/settings.json` (+ settings.local.json). */
 export function ProjectPermissionsTab({ projectId }: ProjectTabProps) {
@@ -64,7 +59,7 @@ export function ProjectPermissionsTab({ projectId }: ProjectTabProps) {
             <TruncatedText text={rule.pattern} variant="mono" />
 
             <Stack direction="row" align="center" gap="var(--spacing-2xs)" flexShrink={0}>
-              <Badge tone={TONE[rule.decision]} withDot>
+              <Badge tone={DECISION_TONE[rule.decision]} withDot>
                 {t(`permissions.${rule.decision}`)}
               </Badge>
               <SourceBadge source={rule.source} />

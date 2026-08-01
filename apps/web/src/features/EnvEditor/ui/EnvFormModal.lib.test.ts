@@ -10,7 +10,7 @@ vi.mock('@shared/api/client', () => ({
 
 import { apiClient } from '@shared/api/client';
 import type { EnvVar } from '@claude-control/contracts';
-import { buildEnvDraft } from './EnvFormModal';
+import { buildEnvDraft } from './EnvFormModal.lib';
 
 /**
  * Правка секрета не должна стирать его значение.

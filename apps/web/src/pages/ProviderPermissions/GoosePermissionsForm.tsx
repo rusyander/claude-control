@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { GooseMode, GoosePermissionInfo } from '@claude-control/contracts';
+import type { GooseMode } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Typography } from '@shared/ui/typography';
 import { SelectField } from '@shared/ui/select-field/select-field';
+import type { GoosePermissionsFormProps } from './ProviderPermissionsForm.types';
 
 /**
  * Форма прав Goose — самая короткая из всех: ОДИН корневой ключ `GOOSE_MODE`
@@ -14,19 +15,6 @@ import { SelectField } from '@shared/ui/select-field/select-field';
  * Режим `auto` подсвечивается предупреждением: в нём Goose выполняет команды и
  * правит файлы без единого вопроса — пользователь должен видеть, что выбирает.
  */
-
-/** Черновик, который форма отдаёт наружу на сохранение. */
-export interface GoosePermissionsDraft {
-  mode: GooseMode;
-}
-
-export interface GoosePermissionsFormProps {
-  data: GoosePermissionInfo;
-  onSave: (draft: GoosePermissionsDraft) => void;
-  /** Шапка раздела: своя у глобальной страницы и у таба проекта. */
-  header: (state: { dirty: boolean; submit: () => void }) => React.ReactNode;
-}
-
 export function GoosePermissionsForm({ data, header, onSave }: GoosePermissionsFormProps) {
   const { t } = useTranslation();
 

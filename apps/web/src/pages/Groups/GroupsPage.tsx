@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Automation, Group, GroupMember } from '@claude-control/contracts';
+import type { Automation, Group } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { SkeletonList } from '@shared/ui/skeleton';
@@ -25,21 +25,8 @@ import {
   useSaveAutomation,
   useDeleteAutomation,
 } from '@entities/Group';
-import type { SandboxSelection } from '@entities/Sandbox';
+import { selectionOfGroup } from './GroupsPage.lib';
 import styles from './GroupsPage.module.scss';
-
-/**
- * Состав группы для песочницы. Права в изолированный прогон не переносим:
- * там свои границы, и чужие разрешения их только запутали бы.
- */
-function selectionOfGroup(members: GroupMember[]): SandboxSelection {
-  return {
-    ruleIds: members.filter((item) => item.kind === 'rule').map((item) => item.id),
-    skillIds: members.filter((item) => item.kind === 'skill').map((item) => item.id),
-    hookIds: members.filter((item) => item.kind === 'hook').map((item) => item.id),
-    mcpIds: members.filter((item) => item.kind === 'mcp').map((item) => item.id),
-  };
-}
 
 /** Группы и сценарии: пользовательская структура поверх сущностей Claude Code. */
 export function GroupsPage() {

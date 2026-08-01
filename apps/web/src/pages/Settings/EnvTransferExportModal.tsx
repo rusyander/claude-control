@@ -4,20 +4,10 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import type { EnvTransferExportResult, EnvTransferPreview } from './EnvTransfer.types';
 import { formatArchiveSize } from './model/EnvTransferPlan';
 import { EnvTransferChecklist } from './EnvTransferChecklist';
+import type { EnvTransferExportModalProps } from './EnvTransferExportModal.types';
 import styles from './EnvTransferCard.module.scss';
-
-export interface EnvTransferExportModalProps {
-  /** Показывается до сборки: что уедет и чего в архиве не будет. */
-  preview?: EnvTransferPreview;
-  /** Показывается после сборки: путь к готовому архиву. */
-  result?: EnvTransferExportResult;
-  isBusy: boolean;
-  onChooseFolder: () => void;
-  onClose: () => void;
-}
 
 /**
  * Экспорт в два шага: сначала предпросмотр (сколько файлов, откуда, что не

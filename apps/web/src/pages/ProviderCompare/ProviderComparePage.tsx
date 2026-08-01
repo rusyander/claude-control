@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CompareSectionResult, ProviderMigrateRequest } from '@claude-control/contracts';
@@ -98,6 +99,33 @@ export function ProviderComparePage() {
 
   if (!settings || !providers) return <SkeletonList rows={4} />;
 
+  // Нижняя половина страницы: одинаковые стороны сравнивать нечего, дальше по
+  // порядку — загрузка, отказ сервера и сами секции сравнения.
+  const renderResult = (): ReactNode => {
+    if (leftId === rightId) return <EmptyState icon="swap" title={t('providerCompare.samePair')} />;
+    if (compare.isLoading) return <SkeletonList rows={4} />;
+    if (compare.isError) {
+      return (
+        <ExplainBox
+          title={t('providerCompare.loadError')}
+          text={t('providerCompare.loadErrorText')}
+        />
+      );
+    }
+    return (
+      <Stack gap="var(--spacing-md)">
+        {compare.data?.sections.map((section: CompareSectionResult) => (
+          <CompareSection
+            key={section.section}
+            section={section}
+            busy={migrate.isPending}
+            onMigrate={askMigrate}
+          />
+        ))}
+      </Stack>
+    );
+  };
+
   return (
     <Stack gap="var(--spacing-md)">
       <PageHeader
@@ -126,24 +154,7 @@ export function ProviderComparePage() {
         </Stack>
       </Card>
 
-      {leftId === rightId ? (
-        <EmptyState icon="swap" title={t('providerCompare.samePair')} />
-      ) : compare.isLoading ? (
-        <SkeletonList rows={4} />
-      ) : compare.isError ? (
-        <ExplainBox title={t('providerCompare.loadError')} text={t('providerCompare.loadErrorText')} />
-      ) : (
-        <Stack gap="var(--spacing-md)">
-          {compare.data?.sections.map((section: CompareSectionResult) => (
-            <CompareSection
-              key={section.section}
-              section={section}
-              busy={migrate.isPending}
-              onMigrate={askMigrate}
-            />
-          ))}
-        </Stack>
-      )}
+      {renderResult()}
 
       <WritePreviewDialog
         isOpen={pending !== undefined}

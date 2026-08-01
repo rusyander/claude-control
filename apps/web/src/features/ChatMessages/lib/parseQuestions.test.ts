@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseQuestions } from './QuestionCard';
+import { parseQuestions } from './parseQuestions';
 
 /**
  * Разбор input вызова AskUserQuestion в кликабельные варианты ответа. Формат нам

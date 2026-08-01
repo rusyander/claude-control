@@ -1,41 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import type { IconName } from '@shared/ui/icon';
 import { Icon } from '@shared/ui/icon';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { useReducedMotion } from '@shared/hooks/use-reduced-motion';
 import { DURATION, EASE, withReducedMotion } from '@shared/lib/motion';
-import type { ToastTone } from '@shared/lib/toast';
+import { TONE_ICON } from '@shared/config/toast-tone-icon';
+import { TOAST_VARIANTS, TONE_ROLE } from './toast-item.constants';
 import type { ToastItemProps } from './toast-item.types';
 import styles from './toast.module.scss';
-
-/** Иконка под каждый тон — узнаётся мгновенно, не только по цвету. */
-const TONE_ICON: Record<ToastTone, IconName> = {
-  success: 'check',
-  error: 'error',
-  warning: 'warning',
-  info: 'info',
-};
-
-/**
- * Роль для скринридера: ошибки/предупреждения читаются немедленно (`alert`),
- * успех и справка — не перебивая (`status`). Так уведомление доступно и без
- * зрения, а важное не теряется в потоке.
- */
-const TONE_ROLE: Record<ToastTone, 'alert' | 'status'> = {
-  success: 'status',
-  error: 'alert',
-  warning: 'alert',
-  info: 'status',
-};
-
-/** Появление снизу вверх, уход — вбок к краю, откуда тост «выезжал». */
-const TOAST_VARIANTS = {
-  hidden: { opacity: 0, y: 12, scale: 0.98 },
-  visible: { opacity: 1, y: 0, scale: 1 },
-  exit: { opacity: 0, x: 24, scale: 0.98 },
-};
 
 /** Одна карточка уведомления: сама себя закрывает по таймеру, пауза на наведении. */
 export function ToastItem({ toast, onDismiss }: ToastItemProps) {

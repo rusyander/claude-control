@@ -1,12 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
-import type { EnvTransferChecklistItem } from './EnvTransfer.types';
+import type { EnvTransferChecklistProps } from './EnvTransferChecklist.types';
 import styles from './EnvTransferCard.module.scss';
-
-export interface EnvTransferChecklistProps {
-  items: EnvTransferChecklistItem[];
-}
 
 /**
  * Чек-лист «что придётся ввести руками». Секретов в архиве нет по устройству,

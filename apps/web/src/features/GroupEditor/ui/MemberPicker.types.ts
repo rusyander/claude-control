@@ -1,4 +1,11 @@
-import type { GroupMember } from '@claude-control/contracts';
+import type { GroupMember, GroupMemberKind } from '@claude-control/contracts';
+
+/** Строка сводного списка: сущность любого вида под общим подписанным видом. */
+export interface PickerItem {
+  kind: GroupMemberKind;
+  id: string;
+  label: string;
+}
 
 export interface MemberPickerProps {
   value: GroupMember[];

@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import styles from './time-series.module.scss';
+import { PADDING, VIEW_WIDTH } from './time-series.constants';
 import type { TimeSeriesProps } from './time-series.types';
-
-const VIEW_WIDTH = 1000;
-const PADDING = { top: 12, right: 8, bottom: 22, left: 8 };
 
 /**
  * Динамика во времени: линия с заливкой и подсказкой по наведению.

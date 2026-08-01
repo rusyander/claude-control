@@ -6,19 +6,13 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { Toggle } from '@shared/ui/toggle';
-import { StatusDot } from '@shared/ui/status-dot';
-import { statusTone, type ActiveRunView } from '@shared/lib/agent-runs';
 import { useChatPrefs, MIN_SOUND_VOLUME, MAX_SOUND_VOLUME } from '@shared/lib/chat-prefs';
 import { playNotification } from '@shared/lib/notify-sound';
 import { formatSpend } from '@shared/lib/format';
-import type { AgentsPanelProps, AgentRowProps } from './AgentsPanel.types';
+import { worstTone } from '../lib/worstTone';
+import { AgentRow } from './AgentRow';
+import type { AgentsPanelProps } from './AgentsPanel.types';
 import styles from './AgentsPanel.module.scss';
-
-/** Короткое имя проекта из пути. */
-function projectName(path: string | undefined, fallback: string): string {
-  if (!path) return fallback;
-  return path.split(/[\\/]/).filter(Boolean).pop() || path;
-}
 
 /**
  * Пульт агентов: сколько сейчас работает, что каждый делает, сколько всё это
@@ -170,51 +164,4 @@ export function AgentsPanel({
       )}
     </div>
   );
-}
-
-function AgentRow({ run, costUnit, statusLabel, chatLabel, onOpen, onStop }: AgentRowProps) {
-  const { t } = useTranslation();
-  const spent =
-    run.tokens || run.costUsd ? formatSpend(costUnit, run.tokens ?? 0, run.costUsd ?? 0) : '';
-
-  return (
-    <Stack
-      direction="row"
-      align="center"
-      gap="var(--spacing-2xs)"
-      padding="var(--spacing-3xs) var(--spacing-2xs) var(--spacing-3xs) var(--spacing-sm)"
-      className={styles.row}
-    >
-      <button type="button" className={styles.rowMain} onClick={onOpen} title={run.projectPath}>
-        {/* Все активные прогоны пульсируют: работает — виден, ждёт/упал — зовёт. */}
-        <StatusDot tone={statusTone(run.status)} pulse />
-
-        <Stack gap="0" className={styles.rowText}>
-          <Typography variant="body-sm" as="span" truncate>
-            {projectName(run.projectPath, chatLabel)}
-          </Typography>
-          <Typography variant="caption" color="subtle" as="span">
-            {statusLabel}
-            {spent ? ` · ${spent}` : ''}
-          </Typography>
-        </Stack>
-      </button>
-      <Button
-        variant="ghost"
-        size="sm"
-        iconOnly
-        icon={<Icon name="stop" size={18} />}
-        aria-label={t('chat.stop')}
-        onClick={onStop}
-      />
-    </Stack>
-  );
-}
-
-/** Самый тревожный тон среди активных — для бейджа-счётчика. */
-function worstTone(runs: ActiveRunView[]): 'success' | 'warning' | 'danger' | 'neutral' {
-  if (runs.some((run) => run.status === 'error')) return 'danger';
-  if (runs.some((run) => run.status === 'waiting')) return 'warning';
-  if (runs.some((run) => run.status === 'running')) return 'success';
-  return 'neutral';
 }

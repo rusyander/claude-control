@@ -1,0 +1,28 @@
+.tab {
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+
+  &:hover {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+}
+
+.tabActive {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent);
+  }
+}

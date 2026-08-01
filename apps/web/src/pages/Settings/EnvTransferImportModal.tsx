@@ -5,25 +5,11 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
-import type { BadgeTone } from '@shared/ui/badge';
-import type { EnvTransferPlan, EnvTransferEntryStatus } from './EnvTransfer.types';
 import { defaultSelection, isAllSelected, selectableEntries } from './model/EnvTransferPlan';
 import { EnvTransferChecklist } from './EnvTransferChecklist';
+import { STATUS_TONE } from './EnvTransferImportModal.constants';
+import type { EnvTransferImportModalProps } from './EnvTransferImportModal.types';
 import styles from './EnvTransferCard.module.scss';
-
-export interface EnvTransferImportModalProps {
-  plan?: EnvTransferPlan;
-  isBusy: boolean;
-  onApply: (selection: string[]) => void;
-  onClose: () => void;
-}
-
-const STATUS_TONE: Record<EnvTransferEntryStatus, BadgeTone> = {
-  new: 'success',
-  same: 'neutral',
-  differs: 'warning',
-  unresolved: 'danger',
-};
 
 /**
  * План разворота архива: по каждой записи видно, появится она впервые, уже

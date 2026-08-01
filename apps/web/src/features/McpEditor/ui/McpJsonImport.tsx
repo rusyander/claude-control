@@ -5,9 +5,10 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
-import type { McpServerDraft } from '@claude-control/contracts';
 import { mcpServerApi } from '@entities/McpServer';
 import type { McpJsonImportProps } from './McpJsonImport.types';
+import { parseServers } from './McpJsonImport.lib';
+import { PLACEHOLDER } from './McpJsonImport.constants';
 import styles from './McpFormModal.module.scss';
 
 /**
@@ -104,66 +105,3 @@ export function McpJsonImport({ onDone }: McpJsonImportProps) {
     </Stack>
   );
 }
-
-interface RawServer {
-  command?: string;
-  args?: unknown[];
-  url?: string;
-  type?: string;
-  transport?: string;
-  env?: Record<string, string>;
-  headers?: Record<string, string>;
-}
-
-/**
- * Разбор JSON в список черновиков. Транспорт определяется по наличию url:
- * это надёжнее поля type, которое в разных источниках называется по-разному.
- */
-function parseServers(text: string): { drafts: McpServerDraft[]; error?: string } {
-  if (!text.trim()) return { drafts: [] };
-
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    return { drafts: [], error: 'JSON не разбирается — проверьте синтаксис' };
-  }
-
-  const root = json as { mcpServers?: Record<string, RawServer> } & Record<string, RawServer>;
-  const servers = root.mcpServers ?? root;
-
-  if (!servers || typeof servers !== 'object') {
-    return { drafts: [], error: 'Не нашёл серверов: ожидается объект mcpServers' };
-  }
-
-  const drafts: McpServerDraft[] = [];
-  for (const [name, raw] of Object.entries(servers)) {
-    if (!raw || typeof raw !== 'object' || name === 'mcpServers') continue;
-
-    const hasUrl = typeof raw.url === 'string' && raw.url.length > 0;
-    drafts.push({
-      name,
-      transport: hasUrl ? (raw.type === 'http' ? 'http' : 'sse') : 'stdio',
-      command: raw.command,
-      args: Array.isArray(raw.args) ? raw.args.map(String) : [],
-      url: raw.url,
-      env: raw.env ?? {},
-      headers: raw.headers ?? {},
-      groupIds: [],
-    });
-  }
-
-  if (drafts.length === 0) return { drafts: [], error: 'В JSON нет ни одного сервера' };
-  return { drafts };
-}
-
-const PLACEHOLDER = `{
-  "mcpServers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": { "GITHUB_TOKEN": "\${GITHUB_TOKEN}" }
-    },
-    "sentry": { "url": "https://mcp.sentry.dev/sse" }
-  }
-}`;

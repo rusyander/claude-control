@@ -1,36 +1,20 @@
 import { useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import type { SearchResultKind } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
-import type { IconName } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { SearchField } from '@shared/ui/search-field';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { EmptyState } from '@shared/ui/empty-state';
 import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
+import { KIND_ICON } from '@shared/config/search-kind-icon';
 import { useSearch, MIN_SEARCH_LENGTH } from '@entities/Search';
 import { groupResults } from './model/groupResults';
 import styles from './SearchPage.module.scss';
-
-/** Иконка раздела, из которого пришёл результат. */
-const KIND_ICON: Record<SearchResultKind, IconName> = {
-  rule: 'rules',
-  skill: 'skills',
-  hook: 'hooks',
-  script: 'scripts',
-  plugin: 'plugins',
-  mcp: 'mcp',
-  permission: 'permissions',
-  env: 'env',
-  // Файл глобальных инструкций провайдера (AGENTS.md/GEMINI.md) — та же иконка,
-  // что и у раздела инструкций в навигации.
-  instructions: 'file',
-};
 
 /** Глобальный поиск по всем разделам конфигурации. */
 export function SearchPage() {

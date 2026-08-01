@@ -3,23 +3,25 @@ import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
-import { Badge } from '@shared/ui/badge';
 import { Button } from '@shared/ui/button';
 import { SearchField } from '@shared/ui/search-field';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { EmptyState } from '@shared/ui/empty-state';
-import { StatusDot } from '@shared/ui/status-dot';
-import { formatDate } from '@shared/lib/format';
 import { normalizeProjectPath } from '@shared/lib/workspace';
-import { statusTone } from '@shared/lib/agent-runs';
-import type { ProjectListProps, ProjectRowProps } from './ProjectList.types';
+import { ProjectRow } from './ProjectRow';
+import type { ProjectListProps } from './ProjectList.types';
 import styles from './ProjectList.module.scss';
 
 /**
  * Список проектов, с которыми работал Claude Code. Клик открывает проект табом
- * и начинает в нём новый разговор. Существующие каталоги — сверху; исчезнувшие с
- * диска помечаем и открыть не даём: работать в несуществующей папке негде.
- * Цветная точка показывает, работает ли в проекте агент прямо сейчас.
+ * и начинает в нём новый разговор. Цветная точка показывает, работает ли в
+ * проекте агент прямо сейчас.
+ *
+ * Каталогов, которых на диске уже нет, в списке нет вовсе: работать в
+ * несуществующей папке негде, а строка, по которой нельзя кликнуть, — просто
+ * мусор в списке. Копятся они быстро: каждая временная папка проверки остаётся
+ * в истории Claude Code навсегда. Переписка при этом не пропадает — разговор
+ * ищется поиском по чатам.
  */
 export function ProjectList({
   projects,
@@ -33,14 +35,16 @@ export function ProjectList({
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
 
+  const present = useMemo(() => projects.filter((project) => project.exists), [projects]);
+
   const found = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return projects;
-    return projects.filter(
+    if (!needle) return present;
+    return present.filter(
       (project) =>
         project.name.toLowerCase().includes(needle) || project.path.toLowerCase().includes(needle),
     );
-  }, [projects, query]);
+  }, [present, query]);
 
   return (
     <Stack className={styles.panel}>
@@ -63,7 +67,7 @@ export function ProjectList({
               {t('projects.addFolder')}
             </Button>
           )}
-          {onParallelLaunch && projects.length > 0 && (
+          {onParallelLaunch && present.length > 0 && (
             <Button
               variant="secondary"
               size="sm"
@@ -82,7 +86,7 @@ export function ProjectList({
           placeholder={t('projects.searchPlaceholder')}
         />
         <Typography variant="caption" color="subtle">
-          {t('projects.count', { count: projects.length })}
+          {t('projects.count', { count: present.length })}
         </Typography>
       </Stack>
 
@@ -104,56 +108,10 @@ export function ProjectList({
             isActive={normalizeProjectPath(project.path) === activeId}
             status={statuses?.get(normalizeProjectPath(project.path)) ?? 'idle'}
             language={i18n.language}
-            onOpen={() => project.exists && onOpen(project)}
+            onOpen={() => onOpen(project)}
           />
         ))}
       </div>
     </Stack>
-  );
-}
-
-function ProjectRow({ project, isActive, status, language, onOpen }: ProjectRowProps) {
-  const { t } = useTranslation();
-
-  return (
-    <button
-      type="button"
-      className={[styles.item, isActive && styles.itemActive, !project.exists && styles.itemGone]
-        .filter(Boolean)
-        .join(' ')}
-      onClick={onOpen}
-      disabled={!project.exists}
-      title={project.path}
-    >
-      <Stack gap="var(--spacing-3xs)">
-        <Stack direction="row" align="center" gap="var(--spacing-2xs)">
-          <StatusDot
-            tone={statusTone(status)}
-            pulse={status === 'running'}
-            label={status !== 'idle' ? t(`workspace.status.${status}`) : undefined}
-          />
-          <Icon name="folder" size={16} />
-          <Typography variant="body-sm" weight="medium" as="span" truncate className={styles.name}>
-            {project.name}
-          </Typography>
-          {!project.exists && <Badge tone="warning">{t('projects.missing')}</Badge>}
-        </Stack>
-
-        <Typography variant="mono" color="subtle" as="span" truncate className={styles.path}>
-          {project.path}
-        </Typography>
-
-        <Stack direction="row" align="center" gap="var(--spacing-3xs)">
-          <Icon name="chat" size={14} />
-          <Typography variant="caption" color="subtle" as="span">
-            {t('projects.chats', { count: project.chats.length })}
-          </Typography>
-          <span className={styles.dot}>·</span>
-          <Typography variant="caption" color="subtle" as="span">
-            {formatDate(project.lastActivity, language)}
-          </Typography>
-        </Stack>
-      </Stack>
-    </button>
   );
 }

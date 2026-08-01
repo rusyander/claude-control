@@ -6,11 +6,9 @@ import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
 import { useMcpServerTools } from '@entities/McpServer';
-import { useCreatePermissions } from '@entities/Permission';
+import { useCreatePermissions, PERMISSION_DECISIONS } from '@entities/Permission';
 import type { McpToolsModalProps } from './McpToolsModal.types';
 import styles from './McpToolsModal.module.scss';
-
-const DECISIONS: PermissionDecision[] = ['allow', 'ask', 'deny'];
 
 /**
  * Помощник отбора инструментов MCP-сервера. Показывает, что сервер умеет, и
@@ -163,7 +161,7 @@ export function McpToolsModal({ isOpen, onOpenChange, server }: McpToolsModalPro
                 {t('permissions.decision')}
               </Typography>
               <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-                {DECISIONS.map((item) => (
+                {PERMISSION_DECISIONS.map((item) => (
                   <Button
                     key={item}
                     size="sm"

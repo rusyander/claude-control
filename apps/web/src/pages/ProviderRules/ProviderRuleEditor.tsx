@@ -11,6 +11,7 @@ import { TextField } from '@shared/ui/text-field';
 import { Toggle } from '@shared/ui/toggle';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useProviderRule, useSaveProviderRule } from '@entities/ProviderRules';
+import type { ProviderRuleEditorProps } from './ProviderRuleEditor.types';
 import styles from './ProviderRulesPage.module.scss';
 
 /**
@@ -22,15 +23,7 @@ import styles from './ProviderRulesPage.module.scss';
  * Правило, чей frontmatter панель не разобрала, открывается ТОЛЬКО НА ЧТЕНИЕ:
  * показываем файл целиком и честно говорим, почему кнопки сохранения нет.
  */
-export function ProviderRuleEditor({
-  path,
-  projectId,
-  onClose,
-}: {
-  path: string;
-  projectId?: string;
-  onClose: () => void;
-}) {
+export function ProviderRuleEditor({ path, projectId, onClose }: ProviderRuleEditorProps) {
   const { t } = useTranslation();
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderRule(path, scope);

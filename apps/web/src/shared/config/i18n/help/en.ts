@@ -284,8 +284,9 @@ export const helpEn: HelpSchema = {
         'and an agent starts in each. The window has its own edit toggle, switched off ' +
         'every time it opens. Handy for sweeps like “check every repository for X”.',
       panelNote:
-        'Projects missing from disk are excluded from a parallel launch and cannot be ' +
-        'clicked in the list — they carry a separate badge.',
+        'Projects missing from disk are not listed at all and never reach a parallel ' +
+        'launch: there is nowhere to work in a folder that no longer exists. The ' +
+        'conversations survive — find them through the chat search.',
 
       composerTitle: 'What the input field can do',
       composerEnter: 'Enter and Shift+Enter',

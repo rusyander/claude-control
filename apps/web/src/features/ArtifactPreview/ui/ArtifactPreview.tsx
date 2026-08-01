@@ -5,20 +5,17 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
-import { useArtifactSource, artifactUrl } from '@entities/Chat';
+import { TabButton } from '@shared/ui/tab-button';
+import { useArtifactSource } from '@entities/Chat';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { highlightCode } from '@shared/lib/markdown/highlightCode';
 import { useTheme } from '@shared/hooks/use-theme';
 import { toast } from '@shared/lib/toast';
-import type {
-  ArtifactPreviewProps,
-  PreviewBodyProps,
-  ArtifactPlainTextProps,
-  TabButtonProps,
-} from './ArtifactPreview.types';
+import { formatSize } from '@shared/lib/format';
+import { escapeHtml } from '../lib/escapeHtml';
+import { PreviewBody } from './PreviewBody';
+import type { ArtifactPreviewProps, Tab } from './ArtifactPreview.types';
 import styles from './ArtifactPreview.module.scss';
-
-type Tab = 'preview' | 'source';
 
 /**
  * Предпросмотр файла, созданного Claude. Страницу показываем как страницу,
@@ -135,62 +132,5 @@ export function ArtifactPreview({ chatId, artifact, onClose }: ArtifactPreviewPr
         )}
       </div>
     </Stack>
-  );
-}
-
-function PreviewBody({ chatId, artifact, documentHtml }: PreviewBodyProps) {
-  const url = artifactUrl(chatId, artifact.name);
-
-  if (artifact.kind === 'image') {
-    return <img src={url} alt={artifact.name} className={styles.image} />;
-  }
-
-  if (artifact.kind === 'pdf' || artifact.kind === 'html') {
-    return (
-      <iframe
-        // Страница сгенерирована моделью, поэтому идёт в песочницу: скрипты
-        // внутри работают, но до самого приложения дотянуться не могут.
-        sandbox="allow-scripts"
-        src={artifact.kind === 'pdf' ? url : `${url}&as=html`}
-        className={styles.frame}
-        title={artifact.name}
-      />
-    );
-  }
-
-  if (artifact.kind === 'markdown') {
-    // Разметку собирает markdown-it с выключенным html — сырых тегов из
-    // ответа модели в неё не попадёт.
-    return <div className={styles.document} dangerouslySetInnerHTML={{ __html: documentHtml }} />;
-  }
-
-  return <ArtifactPlainText chatId={chatId} name={artifact.name} />;
-}
-
-function ArtifactPlainText({ chatId, name }: ArtifactPlainTextProps) {
-  const source = useArtifactSource(chatId, name);
-  return <div className={styles.source}>{source.data}</div>;
-}
-
-function TabButton({ isActive, onClick, children }: TabButtonProps) {
-  return (
-    <button
-      type="button"
-      className={`${styles.tab} ${isActive ? styles.tabActive : ''}`}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
-}
-
-function formatSize(bytes: number): string {
-  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(
-    /[&<>]/g,
-    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[char] ?? char,
   );
 }

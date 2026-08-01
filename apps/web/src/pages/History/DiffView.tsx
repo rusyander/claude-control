@@ -1,14 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { DiffLineKind } from '@claude-control/contracts';
 import { Typography } from '@shared/ui/typography';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
+import { DIFF_LINE_PREFIX } from '@shared/config/diff-line-prefix';
 import { useHistoryDiff, useRevertHunk } from '@entities/History';
 import type { DiffViewProps } from './DiffView.types';
 import styles from './HistoryPage.module.scss';
-
-/** Префикс строки диффа по её типу: как в unified diff. */
-const PREFIX: Record<DiffLineKind, string> = { add: '+', del: '-', ctx: ' ' };
 
 /**
  * Полный построчный дифф одной копии. Грузится лениво — только когда запись
@@ -84,7 +81,7 @@ export function DiffView({ name }: DiffViewProps) {
               className={styles.diffLine}
               data-kind={line.kind}
             >
-              <span className={styles.diffSign}>{PREFIX[line.kind]}</span>
+              <span className={styles.diffSign}>{DIFF_LINE_PREFIX[line.kind]}</span>
               <span className={styles.diffText}>{line.text}</span>
               {canRevert && isHunkStart && (
                 <button

@@ -12,7 +12,7 @@ import {
   useResourceTemplates,
   useApplyTemplate,
 } from '@entities/Resource';
-import { buildTree, countFiles } from '../model/buildTree';
+import { buildTree } from '../model/buildTree';
 import { planDelete, isRemovedByDelete, type DeletePlan } from '../model/deletePlan';
 import {
   cancelCreate,
@@ -20,13 +20,11 @@ import {
   CREATE_IN_ROOT,
   type CreateTarget,
 } from '../model/createTarget';
+import { NewNodeInput } from './NewNodeInput';
+import { TreeItem } from './TreeItem';
 import { ResourceFileEditor } from './ResourceFileEditor';
 import { StructureAssistant } from './StructureAssistant';
-import type {
-  NewNodeInputProps,
-  ResourceFileTreeProps,
-  TreeItemProps,
-} from './ResourceFileTree.types';
+import type { ResourceFileTreeProps } from './ResourceFileTree.types';
 import styles from './ResourceFileTree.module.scss';
 
 /**
@@ -217,144 +215,5 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
         />
       )}
     </div>
-  );
-}
-
-function TreeItem({
-  node,
-  selected,
-  creatingIn,
-  isWritable,
-  onSelect,
-  onCreateIn,
-  onCreateFile,
-  onDelete,
-  defaultOpen = false,
-}: TreeItemProps) {
-  const { t } = useTranslation();
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  if (!node.isDirectory) {
-    return (
-      <div className={`${styles.node} ${selected === node.path ? styles.nodeActive : ''}`}>
-        <button type="button" className={styles.nodeMain} onClick={() => onSelect(node.path)}>
-          <Icon name="file" size={16} />
-          <span className={styles.name}>{node.name}</span>
-        </button>
-
-        {isWritable && (
-          <span className={styles.nodeActions}>
-            <button
-              type="button"
-              className={styles.nodeAction}
-              aria-label={`${t('common.delete')}: ${node.path}`}
-              onClick={() => onDelete(node)}
-            >
-              <Icon name="trash" size={14} />
-            </button>
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className={styles.node}>
-        <button type="button" className={styles.nodeMain} onClick={() => setIsOpen((v) => !v)}>
-          <Icon
-            name="chevronRight"
-            size={16}
-            className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`}
-          />
-          <Icon name="folder" size={16} />
-          <span className={styles.name}>{node.name}</span>
-          <span className={styles.count}>{countFiles(node)}</span>
-        </button>
-
-        {isWritable && (
-          <span className={styles.nodeActions}>
-            <button
-              type="button"
-              className={styles.nodeAction}
-              aria-label={`${t('resources.newFile')}: ${node.path}`}
-              onClick={() => {
-                setIsOpen(true);
-                onCreateIn(node.path);
-              }}
-            >
-              <Icon name="plus" size={14} />
-            </button>
-            <button
-              type="button"
-              className={styles.nodeAction}
-              aria-label={`${t('common.delete')}: ${node.path}`}
-              onClick={() => onDelete(node)}
-            >
-              <Icon name="trash" size={14} />
-            </button>
-          </span>
-        )}
-      </div>
-
-      {isOpen && (
-        <div className={styles.children}>
-          {isCreatingIn(creatingIn, node.path) && (
-            <NewNodeInput
-              placeholder="notes.md"
-              // Отмена ЗАКРЫВАЕТ поле. Пустая строка здесь означала бы корень:
-              // Escape в папке открывал ввод имени наверху дерева.
-              onCancel={() => onCreateIn(cancelCreate())}
-              onSubmit={(name) => onCreateFile(node.path, name)}
-            />
-          )}
-
-          {node.children.map((child) => (
-            <TreeItem
-              key={child.path}
-              node={child}
-              selected={selected}
-              creatingIn={creatingIn}
-              isWritable={isWritable}
-              onSelect={onSelect}
-              onCreateIn={onCreateIn}
-              onCreateFile={onCreateFile}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
-/**
- * Поле имени прямо в дереве — как в редакторах кода. Enter создаёт, Escape
- * отменяет; отдельного окна ради одного имени не нужно.
- */
-function NewNodeInput({ placeholder, onSubmit, onCancel }: NewNodeInputProps) {
-  const [name, setName] = useState('');
-
-  return (
-    <Stack
-      direction="row"
-      align="center"
-      gap="var(--spacing-2xs)"
-      padding="var(--spacing-3xs) var(--spacing-2xs)"
-    >
-      <Icon name="file" size={16} />
-      <input
-        className={styles.newNodeInput}
-        value={name}
-        placeholder={placeholder}
-        autoFocus
-        onChange={(event) => setName(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && name.trim()) onSubmit(name.trim());
-          if (event.key === 'Escape') onCancel();
-        }}
-        onBlur={() => !name.trim() && onCancel()}
-      />
-    </Stack>
   );
 }

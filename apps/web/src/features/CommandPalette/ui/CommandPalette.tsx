@@ -3,35 +3,19 @@ import { Root, Portal, Overlay, Content, Title } from '@radix-ui/react-dialog';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
-import type { SearchResultKind } from '@claude-control/contracts';
 import { DIALOG, FADE, DURATION, EASE, withReducedMotion } from '@shared/lib/motion';
 import { useReducedMotion } from '@shared/hooks/use-reduced-motion';
 import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
 import { NAV_ITEMS } from '@shared/config/navigation';
+import { KIND_ICON } from '@shared/config/search-kind-icon';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
-import type { IconName } from '@shared/ui/icon';
 import { useSearch, MIN_SEARCH_LENGTH } from '@entities/Search';
 import { useProviders, activeCapabilities, visibleNavItems } from '@entities/Provider';
 import { rankByFuzzy } from '../model/fuzzy';
 import type { CommandPaletteProps, PaletteOption } from './CommandPalette.types';
 import styles from './CommandPalette.module.scss';
-
-/** Иконка раздела, из которого пришёл результат поиска. */
-const KIND_ICON: Record<SearchResultKind, IconName> = {
-  rule: 'rules',
-  skill: 'skills',
-  hook: 'hooks',
-  script: 'scripts',
-  plugin: 'plugins',
-  mcp: 'mcp',
-  permission: 'permissions',
-  env: 'env',
-  // Файл глобальных инструкций провайдера (AGENTS.md/GEMINI.md) — та же иконка,
-  // что и у раздела инструкций в навигации.
-  instructions: 'file',
-};
 
 /** Сколько разделов показывать в быстром переходе, чтобы список не разрастался. */
 const NAV_LIMIT = 6;

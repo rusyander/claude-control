@@ -8,6 +8,8 @@ import { Typography } from '@shared/ui/typography';
 import { TextField } from '@shared/ui/text-field';
 import { Toggle } from '@shared/ui/toggle';
 import { useSaveProviderRule } from '@entities/ProviderRules';
+import { rulePathError } from './ruleLabels';
+import type { ProviderRuleCreateFormProps } from './ProviderRuleCreateForm.types';
 
 /**
  * Создание нового правила `.mdc`. Путь задаётся ОТНОСИТЕЛЬНО каталога правил —
@@ -20,12 +22,7 @@ export function ProviderRuleCreateForm({
   existing,
   projectId,
   onCreated,
-}: {
-  rulesDir: string;
-  existing: string[];
-  projectId?: string;
-  onCreated: (path: string) => void;
-}) {
+}: ProviderRuleCreateFormProps) {
   const { t } = useTranslation();
   const save = useSaveProviderRule(projectId ? { projectId } : {});
 
@@ -76,13 +73,7 @@ export function ProviderRuleCreateForm({
           placeholder="frontend/react.mdc"
           isMono
           hint={t('providerRules.hintPath', { rulesDir })}
-          error={
-            duplicate
-              ? t('providerRules.duplicate')
-              : unsafe
-                ? t('providerRules.unsafePath')
-                : undefined
-          }
+          error={rulePathError(duplicate, unsafe, t)}
         />
 
         <TextField

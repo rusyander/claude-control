@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ProviderCheckStep } from '@claude-control/contracts';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -16,9 +15,9 @@ import {
   useRunProviderCheck,
   findCheck,
   trustBadge,
-  stepTone,
   checkScore,
 } from '@entities/ProviderCheck';
+import { CheckStepRow } from './CheckStepRow';
 import { SettingToggleRow } from './SettingToggleRow';
 import styles from './ProviderCheckCard.module.scss';
 
@@ -124,25 +123,5 @@ export function ProviderCheckCard() {
         )}
       </Stack>
     </Card>
-  );
-}
-
-/** Одна строка чек-листа: что проверяли, чем кончилось и почему. */
-function CheckStepRow({ step }: { step: ProviderCheckStep }) {
-  const { t } = useTranslation();
-
-  return (
-    <Stack direction="row" align="start" gap="var(--spacing-xs)" className={styles.row} wrap>
-      <Badge tone={stepTone(step.status)}>{t(`providerCheck.status.${step.status}`)}</Badge>
-      <Stack gap="var(--spacing-3xs)" className={styles.text}>
-        <Typography variant="body-sm" as="span">
-          {t(`providerCheck.step.${step.id}`)}
-        </Typography>
-        <Typography variant="caption" color="subtle" as="span">
-          {step.detail}
-        </Typography>
-        {step.filePath && <span className={styles.path}>{step.filePath}</span>}
-      </Stack>
-    </Stack>
   );
 }

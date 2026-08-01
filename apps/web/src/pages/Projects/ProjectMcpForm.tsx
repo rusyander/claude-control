@@ -8,10 +8,9 @@ import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
 import { Typography } from '@shared/ui/typography';
 import { envToText, textToEnv, parseArgs, formatArgs } from '@shared/lib/env-text';
+import { MCP_TRANSPORTS } from '@entities/McpServer';
 import { useCreateProjectMcp, useUpdateProjectMcp } from '@entities/Project';
 import type { ProjectMcpFormProps } from './ProjectMcpForm.types';
-
-const TRANSPORTS: McpTransport[] = ['stdio', 'sse', 'http'];
 
 /**
  * Добавление и правка MCP-сервера проекта (запись в `.mcp.json` в корне
@@ -97,7 +96,7 @@ export function ProjectMcpForm({ isOpen, onOpenChange, projectId, server }: Proj
           label={t('mcp.transport')}
           value={transport}
           onChange={(value) => setTransport(value as McpTransport)}
-          options={TRANSPORTS.map((value) => ({ value, label: value }))}
+          options={MCP_TRANSPORTS.map((value) => ({ value, label: value }))}
           hint={t('mcp.transportHint')}
         />
 

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ContinuePermissionInfo } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { TextField } from '@shared/ui/text-field';
+import { listToText, textToList, sameList } from '@entities/ProviderPermissions';
+import type { ContinuePermissionsFormProps } from './ProviderPermissionsForm.types';
 
 /**
  * Форма прав Continue — три списка `allow` / `ask` / `exclude` из отдельного файла
@@ -15,34 +16,6 @@ import { TextField } from '@shared/ui/text-field';
  * не толкует и хранит как есть: одно правило в строке. Пустой список удаляет свой
  * ключ из файла.
  */
-
-/** Список правил ↔ текст: одно правило в строке (пустые строки игнорируются). */
-const listToText = (list: string[]): string => list.join('\n');
-function textToList(text: string): string[] {
-  const list: string[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const rule = line.trim();
-    if (rule && !list.includes(rule)) list.push(rule);
-  }
-  return list;
-}
-const sameList = (a: string[], b: string[]): boolean =>
-  a.length === b.length && a.every((item, index) => item === b[index]);
-
-/** Черновик, который форма отдаёт наружу на сохранение. */
-export interface ContinuePermissionsDraft {
-  allow: string[];
-  ask: string[];
-  exclude: string[];
-}
-
-export interface ContinuePermissionsFormProps {
-  data: ContinuePermissionInfo;
-  onSave: (draft: ContinuePermissionsDraft) => void;
-  /** Шапка раздела: своя у глобальной страницы и у таба проекта. */
-  header: (state: { dirty: boolean; submit: () => void }) => React.ReactNode;
-}
-
 export function ContinuePermissionsForm({ data, header, onSave }: ContinuePermissionsFormProps) {
   const { t } = useTranslation();
 

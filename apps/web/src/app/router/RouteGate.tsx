@@ -1,14 +1,8 @@
-import type { ReactNode } from 'react';
-import type { Capability } from '@claude-control/contracts';
 import { useSettings } from '@entities/AppConfig';
 import { useProviders, activeProvider } from '@entities/Provider';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { ProviderSectionPlaceholder } from '@pages/ProviderSection/ProviderSectionPlaceholder';
-
-interface RouteGateProps {
-  capability: Capability;
-  children: ReactNode;
-}
+import type { RouteGateProps } from './RouteGate.types';
 
 /**
  * Гейт раздела на уровне маршрута. Решает, показать НАСТОЯЩУЮ страницу раздела

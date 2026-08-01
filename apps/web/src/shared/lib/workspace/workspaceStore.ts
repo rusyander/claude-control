@@ -19,6 +19,11 @@ export function normalizeProjectPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 }
 
+/** Короткое имя проекта из пути — для табов и уведомлений о фоновом агенте. */
+export function projectShortName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() || path;
+}
+
 /** Открыть проект: если таб уже есть — просто активировать, иначе добавить. */
 export function openProjectTab(
   state: WorkspaceState,

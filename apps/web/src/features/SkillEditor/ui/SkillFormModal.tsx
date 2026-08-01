@@ -12,6 +12,7 @@ import { ResourceFileTree } from '@features/ResourceFiles';
 import { useResourceTemplates, useApplyTemplate } from '@entities/Resource';
 import { skillApi, useRenameSkill } from '@entities/Skill';
 import { SKILL_BODY_TEMPLATE_IDS, type SkillBodyTemplateId } from '../lib/skill-templates';
+import { primaryLabelKey } from './SkillFormModal.lib';
 import type { SkillFormModalProps } from './SkillFormModal.types';
 import styles from './SkillFormModal.module.scss';
 
@@ -118,13 +119,9 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
 
   // Кнопка объясняет, что произойдёт: у конструктора первый шаг — создать скилл,
   // а дерево появится после.
-  const primaryLabel = activeId
-    ? skill
-      ? t('common.save')
-      : t('skills.saveFrontmatter')
-    : isBuilder
-      ? t('skills.createAndBuild')
-      : t('common.save');
+  const primaryLabel = t(
+    primaryLabelKey({ hasActiveId: Boolean(activeId), hasSkill: Boolean(skill), isBuilder }),
+  );
 
   return (
     <Modal

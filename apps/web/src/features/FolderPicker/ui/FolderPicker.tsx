@@ -6,14 +6,10 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { SkeletonList } from '@shared/ui/skeleton';
+import { projectShortName } from '@shared/lib/workspace';
 import { useFsRoots, useFsList } from '@entities/Project';
 import type { FolderPickerProps } from './FolderPicker.types';
 import styles from './FolderPicker.module.scss';
-
-/** Имя папки из пути — для подписи таба проекта. */
-function folderName(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).pop() || path;
-}
 
 /**
  * Выбор пути через файловую систему. Сверху — корни (домашняя папка и диски) и
@@ -76,7 +72,7 @@ export function FolderPicker({
                 variant="primary"
                 disabled={!current}
                 leftIcon={<Icon name="folder" size={20} />}
-                onClick={() => current && onPick(current, folderName(current))}
+                onClick={() => current && onPick(current, projectShortName(current))}
               >
                 {t('folderPicker.pick')}
               </Button>

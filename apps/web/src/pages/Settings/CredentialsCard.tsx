@@ -10,6 +10,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Modal } from '@shared/ui/modal';
 import { TextField } from '@shared/ui/text-field';
+import { TEMPLATES, TONE } from './CredentialsCard.constants';
 import styles from './SettingsPage.module.scss';
 
 /**
@@ -29,32 +30,6 @@ interface CredentialsStatus {
   manualPath: string;
   platform: string;
 }
-
-const TONE = {
-  file: 'success',
-  keychain: 'success',
-  panel: 'info',
-  apiKey: 'info',
-  none: 'warning',
-} as const;
-
-/** Заготовки для ручного ввода: чаще всего достаточно подставить своё. */
-const TEMPLATES = {
-  oauth: `{
-  "claudeAiOauth": {
-    "accessToken": "sk-ant-oat01-…",
-    "refreshToken": "sk-ant-ort01-…",
-    "expiresAt": 1784000000000,
-    "scopes": ["user:inference"]
-  }
-}`,
-  apiKey: `{
-  "apiKey": "sk-ant-api03-…"
-}`,
-  readFrom: `{
-  "readFrom": "/полный/путь/к/вашему/credentials.json"
-}`,
-};
 
 export function CredentialsCard() {
   const { t } = useTranslation();

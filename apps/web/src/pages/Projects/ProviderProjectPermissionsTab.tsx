@@ -4,7 +4,6 @@ import type { GeminiApprovalMode } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Typography } from '@shared/ui/typography';
-import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { SelectField } from '@shared/ui/select-field/select-field';
@@ -13,23 +12,12 @@ import {
   useProviderProjectPermissions,
   useSaveProviderProjectPermissions,
 } from '@entities/Project';
+import { listToText, textToList, sameList } from '@entities/ProviderPermissions';
 import { CursorPermissionsForm } from '@pages/ProviderPermissions/CursorPermissionsForm';
 import { OpencodePermissionsForm } from '@pages/ProviderPermissions/OpencodePermissionsForm';
 import { QwenPermissionsForm } from '@pages/ProviderPermissions/QwenPermissionsForm';
+import { ProviderProjectPermissionsHeader } from './ProviderProjectPermissionsHeader';
 import type { ProjectTabProps } from './ProjectRulesTab.types';
-
-/** Список инструментов ↔ текст: одно имя в строке (пустые строки игнорируются). */
-const listToText = (list: string[]): string => list.join('\n');
-function textToList(text: string): string[] {
-  const list: string[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const name = line.trim();
-    if (name && !list.includes(name)) list.push(name);
-  }
-  return list;
-}
-const sameList = (a: string[], b: string[]): boolean =>
-  a.length === b.length && a.every((item, index) => item === b[index]);
 
 /**
  * Права/аппрувы проекта у НЕ-Claude провайдеров. Модель выбирает СЕРВЕР (поле
@@ -72,28 +60,13 @@ export function ProviderProjectPermissionsTab({ projectId }: ProjectTabProps) {
         data={data}
         onSave={(draft) => save.mutate(draft)}
         header={({ dirty, submit }) => (
-          <Stack direction="row" justify="between" align="center" wrap gap="var(--spacing-sm)">
-            <Stack gap="var(--spacing-3xs)" flex={1} minWidth={0}>
-              <Typography variant="caption" color="subtle">
-                {t('providerProject.permissionsHint')}
-              </Typography>
-              <Typography variant="mono" color="subtle" as="span" truncate>
-                {data.filePath}
-              </Typography>
-            </Stack>
-            {!data.readOnly && (
-              <Button
-                variant="primary"
-                size="sm"
-                leftIcon={<Icon name="check" size={20} />}
-                onClick={submit}
-                disabled={!dirty}
-                isLoading={save.isPending}
-              >
-                {t('common.save')}
-              </Button>
-            )}
-          </Stack>
+          <ProviderProjectPermissionsHeader
+            filePath={data.filePath}
+            readOnly={data.readOnly}
+            dirty={dirty}
+            isPending={save.isPending}
+            onSubmit={submit}
+          />
         )}
       />
     );
@@ -107,28 +80,13 @@ export function ProviderProjectPermissionsTab({ projectId }: ProjectTabProps) {
         data={data}
         onSave={(draft) => save.mutate(draft)}
         header={({ dirty, submit }) => (
-          <Stack direction="row" justify="between" align="center" wrap gap="var(--spacing-sm)">
-            <Stack gap="var(--spacing-3xs)" flex={1} minWidth={0}>
-              <Typography variant="caption" color="subtle">
-                {t('providerProject.permissionsHint')}
-              </Typography>
-              <Typography variant="mono" color="subtle" as="span" truncate>
-                {data.filePath}
-              </Typography>
-            </Stack>
-            {!data.readOnly && (
-              <Button
-                variant="primary"
-                size="sm"
-                leftIcon={<Icon name="check" size={20} />}
-                onClick={submit}
-                disabled={!dirty}
-                isLoading={save.isPending}
-              >
-                {t('common.save')}
-              </Button>
-            )}
-          </Stack>
+          <ProviderProjectPermissionsHeader
+            filePath={data.filePath}
+            readOnly={data.readOnly}
+            dirty={dirty}
+            isPending={save.isPending}
+            onSubmit={submit}
+          />
         )}
       />
     );
@@ -141,28 +99,13 @@ export function ProviderProjectPermissionsTab({ projectId }: ProjectTabProps) {
         data={data}
         onSave={(entries) => save.mutate({ entries })}
         header={({ dirty, submit }) => (
-          <Stack direction="row" justify="between" align="center" wrap gap="var(--spacing-sm)">
-            <Stack gap="var(--spacing-3xs)" flex={1} minWidth={0}>
-              <Typography variant="caption" color="subtle">
-                {t('providerProject.permissionsHint')}
-              </Typography>
-              <Typography variant="mono" color="subtle" as="span" truncate>
-                {data.filePath}
-              </Typography>
-            </Stack>
-            {!data.readOnly && (
-              <Button
-                variant="primary"
-                size="sm"
-                leftIcon={<Icon name="check" size={20} />}
-                onClick={submit}
-                disabled={!dirty}
-                isLoading={save.isPending}
-              >
-                {t('common.save')}
-              </Button>
-            )}
-          </Stack>
+          <ProviderProjectPermissionsHeader
+            filePath={data.filePath}
+            readOnly={data.readOnly}
+            dirty={dirty}
+            isPending={save.isPending}
+            onSubmit={submit}
+          />
         )}
       />
     );
@@ -186,28 +129,13 @@ export function ProviderProjectPermissionsTab({ projectId }: ProjectTabProps) {
 
   return (
     <Stack gap="var(--spacing-sm)">
-      <Stack direction="row" justify="between" align="center" wrap gap="var(--spacing-sm)">
-        <Stack gap="var(--spacing-3xs)" flex={1} minWidth={0}>
-          <Typography variant="caption" color="subtle">
-            {t('providerProject.permissionsHint')}
-          </Typography>
-          <Typography variant="mono" color="subtle" as="span" truncate>
-            {data.filePath}
-          </Typography>
-        </Stack>
-        {!readOnly && (
-          <Button
-            variant="primary"
-            size="sm"
-            leftIcon={<Icon name="check" size={20} />}
-            onClick={() => save.mutate({ approvalMode, coreTools, excludeTools })}
-            disabled={!dirty}
-            isLoading={save.isPending}
-          >
-            {t('common.save')}
-          </Button>
-        )}
-      </Stack>
+      <ProviderProjectPermissionsHeader
+        filePath={data.filePath}
+        readOnly={readOnly}
+        dirty={dirty}
+        isPending={save.isPending}
+        onSubmit={() => save.mutate({ approvalMode, coreTools, excludeTools })}
+      />
 
       {readOnly && (
         <Card padding="sm">

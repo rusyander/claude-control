@@ -1,9 +1,11 @@
+import type { AppMarkProps } from './AppMark.types';
+
 /**
  * Знак приложения: пульт управления как кольцо с делениями и точкой отсчёта.
  * Нарисован разметкой, а не картинкой, — так он берёт цвет темы и остаётся
  * чётким в любом размере, включая свёрнутую панель.
  */
-export function AppMark({ size = 32 }: { size?: number }) {
+export function AppMark({ size = 32 }: AppMarkProps) {
   return (
     <svg
       width={size}

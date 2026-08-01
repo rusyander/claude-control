@@ -9,7 +9,7 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { UPLOAD_ACCEPT_ATTRIBUTE } from '@claude-control/contracts/uploads';
-import { planAttach } from '../lib/attachments';
+import { planAttach, toAttachedFile } from '../lib/attachments';
 import type { AttachedFile, ChatComposerProps } from './ChatComposer.types';
 import styles from './ChatComposer.module.scss';
 
@@ -270,17 +270,4 @@ export function ChatComposer({
       </Typography>
     </div>
   );
-}
-
-async function toAttachedFile(file: File): Promise<AttachedFile> {
-  const buffer = await file.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-
-  // btoa не принимает большие строки целиком — собираем порциями.
-  let binary = '';
-  for (let index = 0; index < bytes.length; index += 8192) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + 8192));
-  }
-
-  return { name: file.name, sizeBytes: file.size, base64: btoa(binary) };
 }

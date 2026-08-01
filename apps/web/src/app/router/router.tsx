@@ -20,50 +20,10 @@ import { SettingsPage } from '@pages/Settings/SettingsPage';
 import { ProviderComparePage } from '@pages/ProviderCompare/ProviderComparePage';
 import { HelpPage } from '@pages/Help/HelpPage';
 import { SearchPage } from '@pages/Search/SearchPage';
-import type { Capability } from '@claude-control/contracts';
-import type { ComponentType, ReactElement } from 'react';
-import { RouteGate } from './RouteGate';
+import { gated } from './gated';
+import { validateSearch } from './validateSearch';
 
 const rootRoute = createRootRoute({ component: MainLayout });
-
-/**
- * Обернуть страницу гейтом возможности провайдера: у активного провайдера раздел
- * либо работает (страница), либо «в разработке»/недоступен (заглушка). Для
- * Claude гейт прозрачен — страница показывается как прежде.
- */
-function gated(capability: Capability, Page: ComponentType) {
-  return function GatedRoute(): ReactElement {
-    return (
-      <RouteGate capability={capability}>
-        <Page />
-      </RouteGate>
-    );
-  };
-}
-
-/**
- * Адрес открытого элемента.
- *
- * `?id=…` — единый способ сослаться на что угодно: разговор, правило, скилл,
- * хук, сервер. Открытие элемента дописывает id в адрес, а переход по такому
- * адресу открывает элемент — ссылкой можно поделиться и вернуться к ней позже.
- *
- * `?topic=…` — раздел справки. Тем же способом: ссылка на объяснение
- * конкретного раздела открывается сразу на нужном документе.
- */
-function validateSearch(search: Record<string, unknown>): {
-  id?: string;
-  topic?: string;
-  create?: boolean;
-} {
-  return {
-    ...(typeof search.id === 'string' && search.id ? { id: search.id } : {}),
-    ...(typeof search.topic === 'string' && search.topic ? { topic: search.topic } : {}),
-    // `?create=1` — быстрое действие «Добавить» с обзора: раздел открывает свою
-    // форму создания (см. useCreateParam). Держим булевым флагом, а не строкой.
-    ...(search.create ? { create: true } : {}),
-  };
-}
 
 /** Маршруты объявлены кодом: страниц немного, генератор файловых роутов избыточен. */
 const routes = [

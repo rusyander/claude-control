@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type {
-  KimiDecision,
-  KimiMode,
-  KimiPermissionInfo,
-  KimiPermissionRule,
-} from '@claude-control/contracts';
+import type { KimiDecision, KimiMode } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Button } from '@shared/ui/button';
@@ -13,6 +8,13 @@ import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { SelectField } from '@shared/ui/select-field/select-field';
 import { TextField } from '@shared/ui/text-field';
+import {
+  toKimiRuleRows,
+  toKimiRules,
+  stableKimiRules,
+  type KimiRuleRow,
+} from '@entities/ProviderPermissions';
+import type { KimiPermissionsFormProps } from './ProviderPermissionsForm.types';
 
 /**
  * Форма прав Kimi Code — `default_permission_mode` и массив таблиц
@@ -24,54 +26,21 @@ import { TextField } from '@shared/ui/text-field';
  * Синтаксис шаблона (`Read`, `Bash(git push*)`, `mcp__сервер__инструмент`)
  * панель не толкует и хранит как есть; пустые строки при сохранении отбрасываются.
  */
-
-/** Строка формы: `id` нужен, чтобы строки не «прыгали» при вводе. */
-interface RuleRow {
-  id: number;
-  decision: KimiDecision;
-  pattern: string;
-}
-
-const toRows = (rules: readonly KimiPermissionRule[]): RuleRow[] =>
-  rules.map((rule, index) => ({ id: index, decision: rule.decision, pattern: rule.pattern }));
-
-/** Черновик для сервера: пустые шаблоны выбрасываются, порядок сохраняется. */
-const toRules = (rows: readonly RuleRow[]): KimiPermissionRule[] =>
-  rows
-    .map((row) => ({ decision: row.decision, pattern: row.pattern.trim() }))
-    .filter((rule) => rule.pattern.length > 0);
-
-const stable = (rules: readonly KimiPermissionRule[]): string =>
-  JSON.stringify(rules.map((rule) => [rule.decision, rule.pattern]));
-
-/** Черновик, который форма отдаёт наружу на сохранение. */
-export interface KimiPermissionsDraft {
-  mode: KimiMode;
-  rules: KimiPermissionRule[];
-}
-
-export interface KimiPermissionsFormProps {
-  data: KimiPermissionInfo;
-  onSave: (draft: KimiPermissionsDraft) => void;
-  /** Шапка раздела: своя у глобальной страницы и у таба проекта. */
-  header: (state: { dirty: boolean; submit: () => void }) => React.ReactNode;
-}
-
 export function KimiPermissionsForm({ data, header, onSave }: KimiPermissionsFormProps) {
   const { t } = useTranslation();
 
   const [mode, setMode] = useState<KimiMode>(data.mode);
-  const [rows, setRows] = useState<RuleRow[]>(() => toRows(data.rules));
+  const [rows, setRows] = useState<KimiRuleRow[]>(() => toKimiRuleRows(data.rules));
 
   // Синхронизируем локальную форму с сервером при загрузке/обновлении данных.
   useEffect(() => {
     setMode(data.mode);
-    setRows(toRows(data.rules));
+    setRows(toKimiRuleRows(data.rules));
   }, [data]);
 
   const readOnly = data.readOnly;
-  const rules = toRules(rows);
-  const dirty = mode !== data.mode || stable(rules) !== stable(data.rules);
+  const rules = toKimiRules(rows);
+  const dirty = mode !== data.mode || stableKimiRules(rules) !== stableKimiRules(data.rules);
 
   const modeOptions = data.modes.map((value) => ({
     value,
@@ -82,7 +51,7 @@ export function KimiPermissionsForm({ data, header, onSave }: KimiPermissionsFor
     label: t(`providerPermissions.kimi.decision.${value}.label`),
   }));
 
-  const patchRow = (id: number, patch: Partial<RuleRow>): void => {
+  const patchRow = (id: number, patch: Partial<KimiRuleRow>): void => {
     setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   };
 

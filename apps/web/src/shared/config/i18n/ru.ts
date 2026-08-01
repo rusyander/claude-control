@@ -2001,7 +2001,6 @@ export const ru = {
     searchPlaceholder: 'имя или путь',
     count: 'Проектов: {{count}}',
     chats: 'чатов: {{count}}',
-    missing: 'нет на диске',
     emptyTitle: 'Проектов пока нет',
     emptyText: 'Здесь появятся каталоги, с которыми работал Claude Code.',
     newChat: 'Новый чат в проекте',

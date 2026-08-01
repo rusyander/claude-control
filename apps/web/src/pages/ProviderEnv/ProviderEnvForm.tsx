@@ -1,22 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ProviderEnvVar } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
-
-interface ProviderEnvFormProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  /** Правимая переменная (undefined → создание новой). */
-  envVar?: ProviderEnvVar;
-  /** Уже существующие ключи — чтобы не допустить дубликат при создании. */
-  existingKeys: string[];
-  onSubmit: (draft: ProviderEnvVar) => void;
-  isPending: boolean;
-}
+import type { ProviderEnvFormProps } from './ProviderEnvForm.types';
 
 /**
  * Добавление и правка переменной окружения универсальной модели (Codex). Простой

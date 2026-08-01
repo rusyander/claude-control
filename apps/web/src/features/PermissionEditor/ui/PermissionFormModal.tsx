@@ -13,15 +13,11 @@ import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
-import { permissionApi } from '@entities/Permission';
+import { permissionApi, PERMISSION_DECISIONS, RISK_TONE } from '@entities/Permission';
 import { BulkCreate } from '@shared/ui/bulk-create';
 import type { PermissionFormModalProps } from './PermissionFormModal.types';
 import { looksLikePermission } from '../model/looksLikePermission';
 import styles from './PermissionFormModal.module.scss';
-
-const DECISIONS: PermissionDecision[] = ['allow', 'ask', 'deny'];
-
-const RISK_TONE = { low: 'success', medium: 'warning', high: 'danger' } as const;
 
 /**
  * Создание и правка правила доступа. Правила пишутся в особом формате
@@ -118,7 +114,7 @@ export function PermissionFormModal({
                 {t('permissions.decision')}
               </Typography>
               <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-                {DECISIONS.map((item) => (
+                {PERMISSION_DECISIONS.map((item) => (
                   <Button
                     key={item}
                     size="sm"
@@ -168,7 +164,7 @@ export function PermissionFormModal({
             if (typeof applied.pattern === 'string') setPattern(applied.pattern);
             if (
               typeof applied.decision === 'string' &&
-              DECISIONS.includes(applied.decision as PermissionDecision)
+              PERMISSION_DECISIONS.includes(applied.decision as PermissionDecision)
             ) {
               setDecision(applied.decision as PermissionDecision);
             }
@@ -257,7 +253,7 @@ export function PermissionFormModal({
               </Typography>
 
               <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-                {DECISIONS.map((item) => (
+                {PERMISSION_DECISIONS.map((item) => (
                   <Button
                     key={item}
                     size="sm"

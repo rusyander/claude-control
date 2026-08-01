@@ -1980,7 +1980,6 @@ export const en: TranslationSchema = {
     searchPlaceholder: 'name or path',
     count: 'Projects: {{count}}',
     chats: 'chats: {{count}}',
-    missing: 'not on disk',
     emptyTitle: 'No projects yet',
     emptyText: 'Directories Claude Code has worked in will appear here.',
     newChat: 'New chat in project',

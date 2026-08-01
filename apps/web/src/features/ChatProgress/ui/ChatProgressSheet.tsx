@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ProgressAgent, ProgressTask } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
-import { StatusDot } from '@shared/ui/status-dot';
 import { summarizeProgress } from '../model/progressView';
+import { TaskRow } from './TaskRow';
+import { AgentRow } from './AgentRow';
 import type { ChatProgressSheetProps } from './ChatProgressSheet.types';
 import styles from './ChatProgressSheet.module.scss';
 
@@ -89,47 +89,5 @@ export function ChatProgressSheet({ progress, isRunning }: ChatProgressSheetProp
         </div>
       )}
     </div>
-  );
-}
-
-function TaskRow({ task }: { task: ProgressTask }) {
-  const { t } = useTranslation();
-
-  return (
-    <li className={`${styles.task} ${styles[task.status]}`}>
-      <Icon name={task.status === 'completed' ? 'check' : 'chevronRight'} size={16} />
-      <span>{task.text}</span>
-      <span className={styles.taskStatus}>{t(`chat.progress.status.${task.status}`)}</span>
-    </li>
-  );
-}
-
-function AgentRow({ agent }: { agent: ProgressAgent }) {
-  const { t } = useTranslation();
-  const tone =
-    agent.status === 'failed' ? 'danger' : agent.status === 'done' ? 'success' : 'warning';
-
-  return (
-    <li className={styles.agent}>
-      <Stack direction="row" align="center" gap="var(--spacing-2xs)">
-        <StatusDot tone={tone} pulse={agent.status === 'running'} />
-        <Typography variant="body-sm" as="span" weight="medium">
-          {agent.kind}
-        </Typography>
-        <Typography variant="caption" color="subtle" as="span" className={styles.agentText}>
-          {agent.description}
-        </Typography>
-        <Typography variant="caption" color="subtle" as="span">
-          {t(`chat.progress.agentStatus.${agent.status}`)}
-        </Typography>
-      </Stack>
-
-      {agent.result && (
-        <details className={styles.result}>
-          <summary>{t('chat.progress.result')}</summary>
-          <div className={styles.resultBody}>{agent.result}</div>
-        </details>
-      )}
-    </li>
   );
 }

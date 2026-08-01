@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CompareSectionResult, ProviderMigrateRequest } from '@claude-control/contracts';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Badge } from '@shared/ui/badge';
@@ -9,13 +8,9 @@ import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { TruncatedText } from '@shared/ui/truncated-text';
 import { stateTone, stateLabelKey, selectableKeys } from '@entities/ProviderCompare';
+import { SideHead } from './SideHead';
+import type { CompareSectionProps } from './CompareSection.types';
 import styles from './ProviderComparePage.module.scss';
-
-interface CompareSectionProps {
-  section: CompareSectionResult;
-  busy: boolean;
-  onMigrate: (request: ProviderMigrateRequest) => void;
-}
 
 /**
  * Один раздел сравнения: две колонки значений и, если раздел переносимый, выбор
@@ -56,7 +51,9 @@ export function CompareSection({ section, busy, onMigrate }: CompareSectionProps
     <Card padding="md">
       <Stack gap="var(--spacing-sm)">
         <Stack direction="row" justify="between" align="center">
-          <Typography variant="heading-sm">{t(`providerCompare.section.${section.section}`)}</Typography>
+          <Typography variant="heading-sm">
+            {t(`providerCompare.section.${section.section}`)}
+          </Typography>
           {!section.comparable && <Badge tone="neutral">{t('providerCompare.incomparable')}</Badge>}
         </Stack>
 
@@ -135,26 +132,5 @@ export function CompareSection({ section, busy, onMigrate }: CompareSectionProps
         )}
       </Stack>
     </Card>
-  );
-}
-
-/** Шапка колонки: чей это столбец, из какого файла и почему он мог быть пуст. */
-function SideHead({ side }: { side: CompareSectionResult['left'] }) {
-  return (
-    <Stack gap="2px">
-      <Typography variant="body-sm" weight="medium">
-        {side.providerName}
-      </Typography>
-      {side.filePath && (
-        <Typography variant="caption" color="subtle">
-          <TruncatedText text={side.filePath} />
-        </Typography>
-      )}
-      {side.note && (
-        <Typography variant="caption" color="subtle">
-          {side.note}
-        </Typography>
-      )}
-    </Stack>
   );
 }

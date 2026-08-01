@@ -9,12 +9,8 @@ import { Icon } from '@shared/ui/icon';
 import { toast } from '@shared/lib/toast';
 import { useProviderRunner } from '@entities/ProviderKeys';
 import { useRunAssistant } from '@entities/Assistant';
+import type { ChatTurn } from './BasicAssistantChat.types';
 import styles from './BasicAssistantChat.module.scss';
-
-interface ChatTurn {
-  role: 'user' | 'assistant';
-  content: string;
-}
 
 /**
  * Basic-чат мультимодельного ассистента (Ф6b) для НЕ-claude провайдеров.

@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import type { FormatCheckProvider, FormatCheckState } from '@claude-control/contracts';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -10,6 +9,7 @@ import { formatDate } from '@shared/lib/format';
 import { toast } from '@shared/lib/toast';
 import { useProviders } from '@entities/Provider';
 import { useFormatCheck, useRefreshFormatCheck } from '@entities/FormatCheck';
+import { FormatCheckRow } from './FormatCheckRow';
 import styles from './FormatCheckCard.module.scss';
 
 /**
@@ -105,39 +105,4 @@ export function FormatCheckCard() {
       </Stack>
     </Card>
   );
-}
-
-/** Итог по одному CLI: состояние, ведомые ключи и пояснение. */
-function FormatCheckRow({ row, name }: { row: FormatCheckProvider; name: string }) {
-  const { t } = useTranslation();
-
-  return (
-    <Stack direction="row" align="start" gap="var(--spacing-xs)" className={styles.row} wrap>
-      <Badge tone={stateTone(row.state)}>{t(`formatCheck.state.${row.state}`)}</Badge>
-      <Stack gap="var(--spacing-3xs)" className={styles.text}>
-        <Typography variant="body-sm" as="span">
-          {name}
-        </Typography>
-        {row.note && (
-          <Typography variant="caption" color="subtle" as="span">
-            {row.note}
-          </Typography>
-        )}
-        {row.keys.map((key) => (
-          <span key={key.path} className={styles.key}>
-            {key.present
-              ? t('formatCheck.keyPresent', { path: key.path })
-              : t('formatCheck.keyMissing', { path: key.path })}
-          </span>
-        ))}
-      </Stack>
-    </Stack>
-  );
-}
-
-/** Цвет бейджа по состоянию. Отсутствие схемы — не тревога, а факт. */
-function stateTone(state: FormatCheckState): 'success' | 'warning' | 'neutral' {
-  if (state === 'ok') return 'success';
-  if (state === 'drift') return 'warning';
-  return 'neutral';
 }

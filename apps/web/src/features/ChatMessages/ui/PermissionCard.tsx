@@ -3,6 +3,7 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { Button } from '@shared/ui/button';
+import { summarize } from '../lib/summarize';
 import type { PermissionCardProps } from './PermissionCard.types';
 import styles from './ChatMessages.module.scss';
 
@@ -11,22 +12,6 @@ import styles from './ChatMessages.module.scss';
  * поэтому карточка заметная, а решение — в один клик прямо в чате, без перехода
  * в терминал. Показываем, что именно агент хочет сделать (команду, файл, адрес).
  */
-
-/** Короткая суть запроса: команда/файл/адрес, иначе — компактный JSON. */
-function summarize(input: unknown): string {
-  const object = (input ?? {}) as Record<string, unknown>;
-  for (const key of ['command', 'file_path', 'path', 'url', 'pattern']) {
-    const value = object[key];
-    if (typeof value === 'string' && value) return value;
-  }
-  try {
-    const json = JSON.stringify(object);
-    return json.length > 240 ? `${json.slice(0, 240)}…` : json;
-  } catch {
-    return '';
-  }
-}
-
 export function PermissionCard({ permissions, onDecide }: PermissionCardProps) {
   const { t } = useTranslation();
   if (permissions.length === 0) return null;

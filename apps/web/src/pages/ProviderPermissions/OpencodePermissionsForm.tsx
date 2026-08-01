@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type {
-  OpencodePermissionEntry,
-  OpencodePermissionInfo,
-  OpencodePermissionLevel,
-  OpencodePermissionTool,
-} from '@claude-control/contracts';
+import type { OpencodePermissionLevel, OpencodePermissionTool } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Button } from '@shared/ui/button';
@@ -13,6 +8,15 @@ import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { SelectField } from '@shared/ui/select-field/select-field';
 import { TextField } from '@shared/ui/text-field';
+import {
+  toOpencodeFormState,
+  toOpencodeEntries,
+  stableOpencodeEntries,
+  type OpencodeFormState,
+  type OpencodePatternRow,
+  type OpencodeToolChoice,
+} from '@entities/ProviderPermissions';
+import type { OpencodePermissionsFormProps } from './ProviderPermissionsForm.types';
 
 /**
  * Форма прав OpenCode (OPENCODE-1) — ключ `permission` файла `opencode.json`.
@@ -29,105 +33,22 @@ import { TextField } from '@shared/ui/text-field';
  * непонятая форма значения), показываются отдельной карточкой ТОЛЬКО ДЛЯ ЧТЕНИЯ:
  * панель их сохраняет как есть и никогда не переписывает.
  */
-
-/** Значение селекта инструмента: «не задано», уровень или список шаблонов. */
-type ToolChoice = 'unset' | OpencodePermissionLevel | 'patterns';
-
-/** Строка списка шаблонов в форме (`id` нужен, чтобы строки не «прыгали» при вводе). */
-interface PatternRow {
-  id: number;
-  pattern: string;
-  level: OpencodePermissionLevel;
-}
-
-interface OpencodeFormState {
-  choices: Record<string, ToolChoice>;
-  patterns: PatternRow[];
-}
-
-/** Разложить ответ сервера в состояние формы. */
-function toState(data: OpencodePermissionInfo): OpencodeFormState {
-  const choices: Record<string, ToolChoice> = {};
-  for (const tool of data.tools) choices[tool] = 'unset';
-
-  let patterns: PatternRow[] = [];
-  let nextId = 0;
-  for (const entry of data.entries) {
-    if (entry.mode === 'patterns') {
-      choices[entry.tool] = 'patterns';
-      patterns = (entry.patterns ?? []).map((rule) => ({
-        id: nextId++,
-        pattern: rule.pattern,
-        level: rule.level,
-      }));
-    } else if (entry.level) {
-      choices[entry.tool] = entry.level;
-    }
-  }
-  return { choices, patterns };
-}
-
-/** Собрать черновик для сервера: только ЗАДАННЫЕ ограничения. */
-function toEntries(
-  data: OpencodePermissionInfo,
-  state: OpencodeFormState,
-): OpencodePermissionEntry[] {
-  const entries: OpencodePermissionEntry[] = [];
-  for (const tool of data.tools) {
-    // Запись, которую панель не ведёт, в черновик не попадает никогда.
-    if (data.preserved.some((item) => item.key === tool)) continue;
-
-    const choice = state.choices[tool] ?? 'unset';
-    if (choice === 'unset') continue;
-
-    if (choice === 'patterns') {
-      const rules = state.patterns
-        .map((row) => ({ pattern: row.pattern.trim(), level: row.level }))
-        .filter((row) => row.pattern.length > 0);
-      if (rules.length > 0) entries.push({ tool, mode: 'patterns', patterns: rules });
-      continue;
-    }
-
-    entries.push({ tool, mode: 'level', level: choice });
-  }
-  return entries;
-}
-
-const stable = (entries: OpencodePermissionEntry[]): string =>
-  JSON.stringify(
-    [...entries]
-      .sort((a, b) => a.tool.localeCompare(b.tool))
-      .map((entry) => [
-        entry.tool,
-        entry.mode,
-        entry.level ?? '',
-        (entry.patterns ?? []).map((rule) => [rule.pattern, rule.level]),
-      ]),
-  );
-
-export interface OpencodePermissionsFormProps {
-  data: OpencodePermissionInfo;
-  /** Шапка раздела: своя у глобальной страницы и у таба проекта. */
-  header: (state: { dirty: boolean; submit: () => void }) => React.ReactNode;
-  onSave: (entries: OpencodePermissionEntry[]) => void;
-}
-
 export function OpencodePermissionsForm({ data, header, onSave }: OpencodePermissionsFormProps) {
   const { t } = useTranslation();
-  const [state, setState] = useState<OpencodeFormState>(() => toState(data));
+  const [state, setState] = useState<OpencodeFormState>(() => toOpencodeFormState(data));
 
   // Синхронизируем локальную форму с сервером при загрузке/обновлении данных.
   useEffect(() => {
-    setState(toState(data));
+    setState(toOpencodeFormState(data));
   }, [data]);
 
   const readOnly = data.readOnly;
-  const entries = toEntries(data, state);
-  const dirty = stable(entries) !== stable(data.entries);
+  const entries = toOpencodeEntries(data, state);
+  const dirty = stableOpencodeEntries(entries) !== stableOpencodeEntries(data.entries);
 
   const submit = (): void => onSave(entries);
 
-  const setChoice = (tool: OpencodePermissionTool, choice: ToolChoice): void => {
+  const setChoice = (tool: OpencodePermissionTool, choice: OpencodeToolChoice): void => {
     setState((prev) => ({
       choices: { ...prev.choices, [tool]: choice },
       // Переход на шаблоны с пустым списком — сразу даём одну строку с `*`,
@@ -139,7 +60,7 @@ export function OpencodePermissionsForm({ data, header, onSave }: OpencodePermis
     }));
   };
 
-  const patchRow = (id: number, patch: Partial<PatternRow>): void => {
+  const patchRow = (id: number, patch: Partial<OpencodePatternRow>): void => {
     setState((prev) => ({
       ...prev,
       patterns: prev.patterns.map((row) => (row.id === id ? { ...row, ...patch } : row)),
@@ -211,7 +132,7 @@ export function OpencodePermissionsForm({ data, header, onSave }: OpencodePermis
                 <SelectField
                   label={t(`providerPermissions.opencode.tool.${tool}.label`)}
                   value={choice}
-                  onChange={(value) => setChoice(tool, value as ToolChoice)}
+                  onChange={(value) => setChoice(tool, value as OpencodeToolChoice)}
                   options={options}
                 />
                 <Typography variant="caption" color="subtle">

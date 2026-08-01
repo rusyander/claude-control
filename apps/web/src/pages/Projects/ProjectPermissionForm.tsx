@@ -6,10 +6,9 @@ import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
+import { PERMISSION_DECISIONS } from '@entities/Permission';
 import { useCreateProjectPermission, useUpdateProjectPermission } from '@entities/Project';
 import type { ProjectPermissionFormProps } from './ProjectPermissionForm.types';
-
-const DECISIONS: PermissionDecision[] = ['allow', 'ask', 'deny'];
 
 /**
  * Создание и правка правила доступа проекта (запись в `.claude/settings.json`
@@ -78,7 +77,7 @@ export function ProjectPermissionForm({
             {t('permissions.decision')}
           </Typography>
           <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-            {DECISIONS.map((item) => (
+            {PERMISSION_DECISIONS.map((item) => (
               <Button
                 key={item}
                 size="sm"

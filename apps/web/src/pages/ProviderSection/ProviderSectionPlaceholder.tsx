@@ -1,20 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import type { Capability } from '@claude-control/contracts';
-import type { SectionAccess } from '@entities/Provider';
 import { Stack } from '@shared/ui/stack';
 import { Badge } from '@shared/ui/badge';
 import { PageHeader } from '@shared/ui/page-header';
 import { EmptyState } from '@shared/ui/empty-state';
 import { NAV_ITEMS } from '@shared/config/navigation';
-
-interface ProviderSectionPlaceholderProps {
-  /** Возможность, к которой привязан раздел, — для подписи/иконки. */
-  capability: Capability;
-  /** Имя активного провайдера для текста «раздел для X». */
-  providerName?: string;
-  /** planned → «в разработке»; иначе (unsupported при прямом заходе) → «недоступен». */
-  access: SectionAccess;
-}
+import type { ProviderSectionPlaceholderProps } from './ProviderSectionPlaceholder.types';
 
 /**
  * Заглушка раздела для не-Claude провайдера.

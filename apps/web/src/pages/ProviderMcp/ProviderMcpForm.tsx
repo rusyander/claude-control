@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type {
-  UniversalMcpServer,
-  UniversalMcpServerDraft,
-  UniversalMcpTransport,
-} from '@claude-control/contracts';
+import type { UniversalMcpTransport } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
@@ -12,26 +8,8 @@ import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
 import { Typography } from '@shared/ui/typography';
 import { envToText, textToEnv, parseArgs, formatArgs } from '@shared/lib/env-text';
-
-export interface ProviderMcpFormProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  server?: UniversalMcpServer;
-  /**
-   * Сохранение: черновик, прежнее имя сервера (при правке) и колбэк «готово»
-   * (форма закроется). Мутации задаёт вызывающая страница — так одна форма
-   * обслуживает и глобальный раздел провайдера, и проектный уровень (COMMON-2).
-   */
-  onSave: (
-    draft: UniversalMcpServerDraft,
-    serverId: string | undefined,
-    onDone: () => void,
-  ) => void;
-  isPending: boolean;
-  isError: boolean;
-}
-
-const TRANSPORTS: UniversalMcpTransport[] = ['stdio', 'http'];
+import { UNIVERSAL_MCP_TRANSPORTS } from '@entities/McpServer';
+import type { ProviderMcpFormProps } from './ProviderMcpForm.types';
 
 /**
  * Добавление и правка MCP-сервера универсальной модели (Gemini/Codex/Cursor/
@@ -119,7 +97,7 @@ export function ProviderMcpForm({
           label={t('mcp.transport')}
           value={transport}
           onChange={(value) => setTransport(value as UniversalMcpTransport)}
-          options={TRANSPORTS.map((value) => ({ value, label: value }))}
+          options={UNIVERSAL_MCP_TRANSPORTS.map((value) => ({ value, label: value }))}
           hint={t('providerMcp.transportHint')}
         />
 

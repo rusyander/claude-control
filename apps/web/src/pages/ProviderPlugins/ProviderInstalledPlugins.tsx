@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import type { ProviderPluginsInfo } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { Typography } from '@shared/ui/typography';
 import { ExplainBox } from '@shared/ui/explain-box';
+import type { ProviderInstalledPluginsProps } from './ProviderInstalledPlugins.types';
 
 /**
  * Плагины Kimi Code (KIMI-3) — ТОЛЬКО ПОКАЗ.
@@ -21,7 +21,7 @@ import { ExplainBox } from '@shared/ui/explain-box';
  * будто умеет этим управлять. Угадывать форму реестра запрещено тем же
  * правилом, по которому панель перестала писать `experimental.hook` у OpenCode.
  */
-export function ProviderInstalledPlugins({ data }: { data: ProviderPluginsInfo }) {
+export function ProviderInstalledPlugins({ data }: ProviderInstalledPluginsProps) {
   const { t } = useTranslation();
 
   return (

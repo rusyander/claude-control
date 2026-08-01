@@ -1,22 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import type { DiffLineKind, ProviderPreviewResponse } from '@claude-control/contracts';
 import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
+import { DIFF_LINE_PREFIX } from '@shared/config/diff-line-prefix';
+import type { WritePreviewDialogProps } from './WritePreviewDialog.types';
 import styles from './WritePreviewDialog.module.scss';
-
-/** Префикс строки диффа по её типу: как в unified diff. */
-const PREFIX: Record<DiffLineKind, string> = { add: '+', del: '-', ctx: ' ' };
-
-interface WritePreviewDialogProps {
-  isOpen: boolean;
-  isLoading: boolean;
-  preview: ProviderPreviewResponse | undefined;
-  error: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}
 
 /**
  * Окно предпросмотра: что именно окажется в файле чужого CLI.
@@ -98,7 +87,7 @@ export function WritePreviewDialog({
                   className={styles.line}
                   data-kind={line.kind}
                 >
-                  <span className={styles.sign}>{PREFIX[line.kind]}</span>
+                  <span className={styles.sign}>{DIFF_LINE_PREFIX[line.kind]}</span>
                   <span className={styles.text}>{line.text}</span>
                 </div>
               ))}

@@ -17,13 +17,11 @@ import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
 import { Typography } from '@shared/ui/typography';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
-import { mcpServerApi } from '@entities/McpServer';
+import { mcpServerApi, MCP_TRANSPORTS } from '@entities/McpServer';
 import { envToText, textToEnv, parseArgs, formatArgs } from '@shared/lib/env-text';
 import type { McpFormModalProps } from './McpFormModal.types';
 import { McpJsonImport } from './McpJsonImport';
 import styles from './McpFormModal.module.scss';
-
-const TRANSPORTS: McpTransport[] = ['stdio', 'sse', 'http'];
 
 /**
  * Добавление и правка MCP-сервера. Поля зависят от транспорта: у stdio это
@@ -225,7 +223,7 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
               label={t('mcp.transport')}
               value={transport}
               onChange={(value) => setTransport(value as McpTransport)}
-              options={TRANSPORTS.map((value) => ({ value, label: value }))}
+              options={MCP_TRANSPORTS.map((value) => ({ value, label: value }))}
               hint={t('mcp.transportHint')}
             />
 

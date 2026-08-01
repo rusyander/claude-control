@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { QwenApprovalMode, QwenPermissionInfo } from '@claude-control/contracts';
+import type { QwenApprovalMode } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Typography } from '@shared/ui/typography';
 import { SelectField } from '@shared/ui/select-field/select-field';
 import { TextField } from '@shared/ui/text-field';
+import { listToText, textToList, sameList } from '@entities/ProviderPermissions';
+import type { QwenPermissionsFormProps } from './ProviderPermissionsForm.types';
 
 /**
  * Форма прав Qwen Code — `tools.approvalMode` и три списка правил внутри
@@ -20,35 +22,6 @@ import { TextField } from '@shared/ui/text-field';
  * задокументирован именно как значение `settings.json`. Риск каждого режима
  * подписан под селектом.
  */
-
-/** Список правил ↔ текст: одно правило в строке (пустые строки игнорируются). */
-const listToText = (list: string[]): string => list.join('\n');
-function textToList(text: string): string[] {
-  const list: string[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const rule = line.trim();
-    if (rule && !list.includes(rule)) list.push(rule);
-  }
-  return list;
-}
-const sameList = (a: string[], b: string[]): boolean =>
-  a.length === b.length && a.every((item, index) => item === b[index]);
-
-/** Черновик, который форма отдаёт наружу на сохранение. */
-export interface QwenPermissionsDraft {
-  approvalMode: QwenApprovalMode;
-  allow: string[];
-  ask: string[];
-  deny: string[];
-}
-
-export interface QwenPermissionsFormProps {
-  data: QwenPermissionInfo;
-  onSave: (draft: QwenPermissionsDraft) => void;
-  /** Шапка раздела: своя у глобальной страницы и у таба проекта. */
-  header: (state: { dirty: boolean; submit: () => void }) => React.ReactNode;
-}
-
 export function QwenPermissionsForm({ data, header, onSave }: QwenPermissionsFormProps) {
   const { t } = useTranslation();
 

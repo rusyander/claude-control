@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CursorPermissionInfo } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Typography } from '@shared/ui/typography';
 import { TextField } from '@shared/ui/text-field';
+import { listToText, textToList, sameList } from '@entities/ProviderPermissions';
+import type { CursorPermissionsFormProps } from './ProviderPermissionsForm.types';
 
 /**
  * Форма прав Cursor — ДВА списка правил, `allow` и `deny`, из ключа `permissions`
@@ -17,33 +18,6 @@ import { TextField } from '@shared/ui/text-field';
  * панель не толкует и хранит как есть, одно правило в строке; задокументированные
  * формы показаны подсказкой под полями.
  */
-
-/** Список правил ↔ текст: одно правило в строке (пустые строки игнорируются). */
-const listToText = (list: string[]): string => list.join('\n');
-function textToList(text: string): string[] {
-  const list: string[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const rule = line.trim();
-    if (rule && !list.includes(rule)) list.push(rule);
-  }
-  return list;
-}
-const sameList = (a: string[], b: string[]): boolean =>
-  a.length === b.length && a.every((item, index) => item === b[index]);
-
-/** Черновик, который форма отдаёт наружу на сохранение. */
-export interface CursorPermissionsDraft {
-  allow: string[];
-  deny: string[];
-}
-
-export interface CursorPermissionsFormProps {
-  data: CursorPermissionInfo;
-  onSave: (draft: CursorPermissionsDraft) => void;
-  /** Шапка раздела: своя у глобальной страницы и у таба проекта. */
-  header: (state: { dirty: boolean; submit: () => void }) => React.ReactNode;
-}
-
 export function CursorPermissionsForm({ data, header, onSave }: CursorPermissionsFormProps) {
   const { t } = useTranslation();
 

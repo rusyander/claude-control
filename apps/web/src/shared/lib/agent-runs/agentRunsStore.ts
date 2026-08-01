@@ -67,6 +67,8 @@ export interface AgentRun {
   lastPrompt?: string;
   /** Разрешались ли правки в прошлом запуске — для повтора с теми же правами. */
   allowEdits?: boolean;
+  /** Было ли включено автоподтверждение прав — чтобы повтор шёл так же. */
+  autoApprove?: boolean;
   /** Модель и глубина продумывания прошлого запуска — для повтора теми же. */
   model?: string;
   effort?: string;
@@ -83,6 +85,11 @@ export interface StartInput {
   projectPath?: string;
   /** Полный доступ (bypassPermissions) — для «Разрешить и продолжить». */
   fullAccess?: boolean;
+  /**
+   * Автоподтверждение безопасных запросов прав. Опасное (записи в git, удаление,
+   * миграции) и всё под правилами `ask`/`deny` панель всё равно спросит.
+   */
+  autoApprove?: boolean;
   /** Модель для разговора (алиас/полное имя); пусто = по умолчанию. */
   model?: string;
   /** Глубина продумывания (--effort); пусто = по умолчанию. */
@@ -669,6 +676,7 @@ export const agentRuns = {
       // Запоминаем запрос, права, модель и глубину — для кнопки «Повторить».
       lastPrompt: input.prompt,
       allowEdits: input.allowEdits,
+      autoApprove: input.autoApprove,
       model: input.model,
       effort: input.effort,
       lastEventAt: Date.now(),
@@ -798,6 +806,7 @@ export const agentRuns = {
       sessionId: run.sessionId,
       projectPath: run.projectPath,
       allowEdits: run.allowEdits,
+      autoApprove: run.autoApprove,
       model: run.model,
       effort: run.effort,
       fullAccess: options?.fullAccess,
@@ -817,6 +826,7 @@ export const agentRuns = {
       sessionId: run.sessionId,
       projectPath: run.projectPath,
       allowEdits: run.allowEdits,
+      autoApprove: run.autoApprove,
       model: run.model,
       effort: run.effort,
     });
@@ -881,6 +891,24 @@ export const agentRuns = {
   /** Колбэк на новый запрос прав любого прогона — звук/тост/карточка. */
   setOnPermissionRequest(callback: ((run: AgentRun) => void) | undefined): void {
     onPermissionRequest = callback;
+  },
+
+  /**
+   * Переключить автоподтверждение прав у идущего прогона. Без этого новое
+   * положение тумблера подействовало бы только со следующего сообщения — а
+   * щёлкают его как раз посреди прогона, устав жать «Разрешить».
+   */
+  setAutoApprove(id: string, enabled: boolean): void {
+    const run = getRun(id);
+    const key = run.id || id;
+    if (!key) return;
+    const current = runs.get(key);
+    if (current) {
+      runs.set(key, { ...current, autoApprove: enabled });
+      emit();
+    }
+    if (run.status !== 'running') return;
+    void apiClient.post(`/chat/${key}/auto-approve`, { enabled }).catch(() => undefined);
   },
 
   /** Ответить на запрос прав (клик «Разрешить»/«Запретить»). */

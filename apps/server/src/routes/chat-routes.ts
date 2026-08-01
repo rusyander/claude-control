@@ -13,6 +13,8 @@ import {
   type BufferedEvent,
 } from '../domains/chat/ChatRunRegistry.ts';
 import { PermissionBroker } from '../domains/chat/ChatPermissions.ts';
+import { shouldAutoApprove } from '../domains/chat/auto-approve.ts';
+import { readPermissions } from '../domains/permissions.ts';
 import {
   readArtifacts,
   readArtifactText,
@@ -54,6 +56,20 @@ export function registerChatRoutes(
   registry: ChatRunRegistry = new ChatRunRegistry(),
 ): void {
   const permissions = new PermissionBroker();
+
+  /**
+   * Автоподтверждение прав по разговорам: ключ тот же, под которым прогон
+   * зарегистрирован у брокера прав (chatId из запроса на отправку). Состояние
+   * живёт в памяти прогона: тумблер в шапке чата присылают и при отправке, и
+   * отдельным запросом, когда его щёлкнули на ходу.
+   */
+  const autoApprove = new Map<string, { enabled: boolean; allowEdits: boolean }>();
+
+  /** Охраняемые паттерны: всё, что пользователь просил спрашивать или запрещать. */
+  const guardedPatterns = (): string[] =>
+    readPermissions(ctx.location.paths.settings, ctx.store, ctx.location.paths.settingsLocal)
+      .filter((rule) => rule.decision !== 'allow')
+      .map((rule) => rule.pattern);
 
   // Адрес, по которому мини-MCP-сервер прав стучится за решением пользователя.
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
@@ -274,6 +290,12 @@ export function registerChatRoutes(
       allowEdits?: boolean;
       /** Полный доступ (bypassPermissions) — «Разрешить и продолжить» у упавшего агента. */
       fullAccess?: boolean;
+      /**
+       * Автоподтверждение безопасных запросов прав — тумблером из шапки чата.
+       * Опасное (git-записи, удаление, миграции) и всё под правилами `ask`/`deny`
+       * по-прежнему спрашивают человека.
+       */
+      autoApprove?: boolean;
       /** Каталог проекта для нового разговора — когда чат открыт из списка проектов. */
       projectPath?: string;
       /** Модель для этого разговора (алиас или полное имя); пусто = по умолчанию. */
@@ -291,6 +313,7 @@ export function registerChatRoutes(
       files,
       allowEdits,
       fullAccess,
+      autoApprove: autoApproveRequested,
       projectPath,
       model,
       effort,
@@ -363,6 +386,16 @@ export function registerChatRoutes(
     const uploadDir = workspace.isSandbox ? cwd : chatDirectory(chatId);
     const saved = (files ?? []).map((file) => saveUpload(uploadDir, file.name, file.base64));
 
+    // Автоподтверждение — на этот прогон. Заодно выбрасываем записи прогонов,
+    // которые уже не идут: иначе карта копила бы по строчке на каждый разговор.
+    for (const key of autoApprove.keys()) if (!registry.isRunning(key)) autoApprove.delete(key);
+    autoApprove.set(chatId, {
+      enabled: autoApproveRequested === true,
+      // «Только чтение» — это выключенный тумблер правок в настоящем проекте;
+      // в песочнице и при полном доступе правки разрешены всегда.
+      allowEdits: workspace.isSandbox || allowEdits === true || fullAccess === true,
+    });
+
     // Запускаем прогон в реестре и подключаемся к нему потоком. Обрыв этого
     // соединения агента не тронет.
     const started = registry.start(
@@ -434,8 +467,28 @@ export function registerChatRoutes(
   app.post<{ Params: { chatId: string } }>('/api/chat/:chatId/stop', (request) => {
     // Заодно отклоняем висящие запросы прав — иначе агент ждал бы решения зря.
     permissions.cancelRun(request.params.chatId);
+    autoApprove.delete(request.params.chatId);
     return { ok: registry.stop(request.params.chatId) };
   });
+
+  /**
+   * Тумблер автоподтверждения, щёлкнутый во время прогона. Без этого маршрута
+   * новое положение действовало бы только со следующего сообщения, а человек
+   * ждёт его сразу — он же щёлкает, потому что устал жать «Разрешить».
+   * Права на правки берём из уже идущего прогона: их задаёт другой тумблер.
+   */
+  app.post<{ Params: { chatId: string }; Body: { enabled?: boolean } }>(
+    '/api/chat/:chatId/auto-approve',
+    (request) => {
+      const { chatId } = request.params;
+      const current = autoApprove.get(chatId);
+      autoApprove.set(chatId, {
+        enabled: request.body.enabled === true,
+        allowEdits: current?.allowEdits ?? false,
+      });
+      return { ok: true };
+    },
+  );
 
   /**
    * Запрос на разрешение от мини-MCP-сервера прав. Показываем его в потоке
@@ -446,6 +499,23 @@ export function registerChatRoutes(
     Body: { runId: string; toolName: string; input: unknown; toolUseId: string };
   }>('/api/chat/permission-request', async (request, reply) => {
     const { runId, toolName, input, toolUseId } = request.body;
+
+    // Автоподтверждение: безопасный запрос разрешаем молча, не показывая
+    // карточку. Опасное (записи в git, удаление, миграции, записи через MCP) и
+    // всё, что попадает под правила `ask`/`deny` пользователя, идёт человеку —
+    // ради этого тумблер и существует.
+    const auto = autoApprove.get(runId);
+    if (
+      auto?.enabled &&
+      shouldAutoApprove({
+        toolName,
+        input,
+        guardedPatterns: guardedPatterns(),
+        allowEdits: auto.allowEdits,
+      })
+    ) {
+      return reply.send({ behavior: 'allow', updatedInput: input });
+    }
 
     const shown = registry.emitExternal(runId, { kind: 'permission', toolName, input, toolUseId });
     if (!shown) return reply.send({ behavior: 'deny', message: 'Разговор не найден.' });

@@ -93,7 +93,7 @@ export function ChatPage() {
   );
   // Тумблер прав хранится в chatPrefs (localStorage): по умолчанию правки
   // разрешены и не слетают после перезагрузки.
-  const { allowEdits, setAllowEdits } = useChatPrefs();
+  const { allowEdits, setAllowEdits, autoApprove, setAutoApprove } = useChatPrefs();
   const [homeSection, setHomeSection] = useState<'chats' | 'projects'>('chats');
   const [isFolderPickerOpen, setFolderPickerOpen] = useState(false);
   const [isParallelOpen, setParallelOpen] = useState(false);
@@ -489,6 +489,14 @@ export function ChatPage() {
     void queryClient.invalidateQueries({ queryKey: chatKeys.list });
   };
 
+  // Автоподтверждение прав: запоминаем выбор для всех чатов и, если прогон уже
+  // идёт, сообщаем о нём серверу — иначе тумблер подействовал бы только со
+  // следующего сообщения.
+  const toggleAutoApprove = (enabled: boolean): void => {
+    setAutoApprove(enabled);
+    if (chatId) agentRuns.setAutoApprove(chatId, enabled);
+  };
+
   const hasContent =
     messageList.length > 0 ||
     pending.length > 0 ||
@@ -547,6 +555,7 @@ export function ChatPage() {
       sessionId: resumeSession,
       files,
       allowEdits,
+      autoApprove,
       fork,
       // Модель и глубина: дефолт из настроек или локальный оверрайд чата.
       model: effectiveModel,
@@ -787,6 +796,29 @@ export function ChatPage() {
                   </Typography>
                 </Stack>
               )}
+
+              {/* Автоподтверждение: панель сама разрешает безопасные запросы, а
+                  опасные (записи в git, удаление, миграции) и всё под правилами
+                  ask/deny из settings.json по-прежнему спрашивает. */}
+              <Stack
+                as="label"
+                direction="row"
+                align="center"
+                gap="var(--spacing-2xs)"
+                padding="var(--spacing-3xs) var(--spacing-xs)"
+                className={styles.editsToggle}
+                title={t('chat.autoApproveHint')}
+              >
+                <Toggle
+                  size="sm"
+                  checked={autoApprove}
+                  onCheckedChange={toggleAutoApprove}
+                  aria-label={t('chat.autoApprove')}
+                />
+                <Typography variant="caption" color={autoApprove ? 'default' : 'subtle'} as="span">
+                  {autoApprove ? t('chat.autoApproveOn') : t('chat.autoApproveOff')}
+                </Typography>
+              </Stack>
 
               {run.status === 'error' && chatId && (
                 <>

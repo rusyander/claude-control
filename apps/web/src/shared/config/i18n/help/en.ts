@@ -311,6 +311,19 @@ export const helpEn: HelpSchema = {
         'its own. The exception is the parallel launch window: it has its own toggle, ' +
         'switched off every time it opens.',
 
+      autoApproveTitle: 'Auto-approving permissions',
+      autoApproveText:
+        'The second toggle in the chat header — «Permissions auto» — takes the routine ' +
+        'away: a safe request is approved by the panel itself, and no ' +
+        '«Allow/Deny» card appears. What still asks: git writes (commit, push, merge, ' +
+        'reset), deleting and overwriting files, migrations and database queries, ' +
+        'deployment, MCP writes (issue, MR, wiki page) — and anything covered by your ' +
+        'own ask and deny rules from settings.json. An unclear case goes to a human ' +
+        'too: a command the panel could not parse counts as dangerous. With edits ' +
+        'switched off, file edits stay yours even when auto-approval is on. The ' +
+        'toggle takes effect immediately, mid-run included, and its position is ' +
+        'remembered.',
+
       historyTitle: 'How a conversation continues',
       historyCaption:
         'The chat identifier is the transcript file name. That is what the ' +

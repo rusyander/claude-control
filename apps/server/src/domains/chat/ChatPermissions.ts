@@ -15,14 +15,19 @@ export interface PermissionRequest {
   toolUseId: string;
 }
 
-export interface PermissionDecision {
+/**
+ * Ответ на запрос прав в чате. Имя намеренно не `PermissionDecision`: так
+ * зовётся правило настроек (`allow`/`ask`/`deny`) в контрактах, а здесь — ответ
+ * человека конкретному запросу агента.
+ */
+export interface ChatPermissionReply {
   behavior: 'allow' | 'deny';
   updatedInput?: unknown;
   message?: string;
 }
 
 interface Pending {
-  resolve: (decision: PermissionDecision) => void;
+  resolve: (decision: ChatPermissionReply) => void;
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -37,7 +42,10 @@ export class PermissionBroker {
   }
 
   /** Запросить решение пользователя. Ждёт клика; по таймауту — «запретить». */
-  request(request: PermissionRequest, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<PermissionDecision> {
+  request(
+    request: PermissionRequest,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+  ): Promise<ChatPermissionReply> {
     return new Promise((resolve) => {
       const key = this.key(request.runId, request.toolUseId);
       // Дубль по тому же tool_use — прежний снимаем (не должно случаться).
@@ -61,7 +69,7 @@ export class PermissionBroker {
   }
 
   /** Ответить на запрос (клик пользователя). false — если запрос уже снят. */
-  decide(runId: string, toolUseId: string, decision: PermissionDecision): boolean {
+  decide(runId: string, toolUseId: string, decision: ChatPermissionReply): boolean {
     const key = this.key(runId, toolUseId);
     const pending = this.pending.get(key);
     if (!pending) return false;

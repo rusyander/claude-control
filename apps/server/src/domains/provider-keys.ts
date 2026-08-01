@@ -1,4 +1,11 @@
-import type { AppSettings } from '@claude-control/contracts';
+import type {
+  AppSettings,
+  KeySource,
+  KeyStatus,
+  ProviderKeyItem,
+  RunnerMode,
+  RunnerReason,
+} from '@claude-control/contracts';
 import {
   getActiveProvider,
   getProvider,
@@ -14,7 +21,7 @@ import {
   clearStoredKey,
   MAX_KEY_LENGTH,
 } from '../lib/provider-keys.ts';
-import { detectCliOnPath, findCliOnPath } from '../lib/provider-detect.ts';
+import { detectCliOnPath, findCliOnPath } from '../providers/detect.ts';
 
 /**
  * Резолвинг ключей и раннера ассистента (Ф6a). Инфраструктура мультимодельного
@@ -31,18 +38,20 @@ interface KeysSettingsSource {
   getSettings(): Pick<AppSettings, 'provider'>;
 }
 
-/** Откуда взят ключ: сохранён в панели, из окружения, или ключа нет. */
-export type KeySource = 'stored' | 'env' | null;
-
-/** Статус ключа провайдера — без раскрытия самого ключа. */
-export interface KeyStatus {
-  present: boolean;
-  source: KeySource;
-  /** Маска (`sk-…1a2b`), пусто если ключа нет. Полный ключ наружу не отдаётся. */
-  masked: string;
-  /** Имя env-переменной, из которой подхвачен ключ (когда source = 'env'). */
-  envVar?: string;
-}
+/**
+ * Формы ключа и раннера описаны в контракте (`packages/contracts/src/provider-keys.ts`)
+ * — сервер их переэкспортирует, чтобы не держать вторую копию:
+ *
+ * - `KeySource` — откуда взят ключ: сохранён в панели, из окружения, или ключа нет.
+ * - `KeyStatus` — статус ключа без раскрытия самого ключа (маска + источник + env-имя).
+ * - `RunnerMode` — режим запуска ассистента активного провайдера.
+ * - `RunnerReason` — причина итогового режима (машиночитаемая, для i18n на клиенте):
+ *   `api_key` — есть ключ, идём в API; `cli_found` — ключа нет, но CLI провайдера
+ *   найден в PATH; `no_key_no_cli` — ни ключа, ни CLI; `unsupported` — у провайдера
+ *   нет модельного API и запуск через CLI не поддержан (Cursor).
+ * - `ProviderKeyItem` — одна строка списка `GET /api/provider-keys`.
+ */
+export type { KeySource, KeyStatus, RunnerMode, RunnerReason, ProviderKeyItem };
 
 /**
  * Резолвинг ключа провайдера по приоритету: (1) сохранённый в панели,
@@ -63,18 +72,6 @@ export function resolveKey(provider: ConfigProvider, appDataDir: string): KeySta
   return { present: false, source: null, masked: '' };
 }
 
-/** Режим запуска ассистента активного провайдера. */
-export type RunnerMode = 'api' | 'cli' | 'none';
-
-/**
- * Причина итогового режима (машиночитаемая, для i18n на клиенте):
- * - `api_key` — есть ключ, идём в API;
- * - `cli_found` — ключа нет, но CLI провайдера найден в PATH;
- * - `no_key_no_cli` — ни ключа, ни CLI;
- * - `unsupported` — у провайдера нет модельного API и запуск через CLI не поддержан (Cursor).
- */
-export type RunnerReason = 'api_key' | 'cli_found' | 'no_key_no_cli' | 'unsupported';
-
 export interface RunnerResolution {
   mode: RunnerMode;
   reason: RunnerReason;
@@ -91,7 +88,7 @@ export interface RunnerResolution {
 }
 
 /**
- * Детект бинаря CLI в PATH — ОБЩИЙ хелпер `lib/provider-detect.ts` (Ф7). Здесь
+ * Детект бинаря CLI в PATH — ОБЩИЙ хелпер `providers/detect.ts` (Ф7). Здесь
  * он переэкспортируется, чтобы резолвинг раннера и детект провайдеров пользовались
  * ОДНОЙ реализацией (`where`/`which`, с таймаутом, никогда не бросает).
  */
@@ -167,18 +164,6 @@ export function canHoldKey(provider: ConfigProvider): boolean {
 }
 
 // --- Сводки для роутов ------------------------------------------------------
-
-/** Одна строка списка `GET /api/provider-keys`: метаданные ключа провайдера. */
-export interface ProviderKeyItem {
-  providerId: string;
-  providerName: string;
-  apiKind: AssistantApiKind;
-  /** Может ли провайдер держать ключ (apiKind ≠ none). */
-  supported: boolean;
-  keyStatus: KeyStatus;
-  /** Стандартные env-переменные, из которых ключ подхватывается автоматически. */
-  envVars: string[];
-}
 
 /** Список провайдеров с их статусом ключей (для раздела настроек). */
 export function describeProviderKeys(appDataDir: string): ProviderKeyItem[] {

@@ -1,7 +1,7 @@
 import { parseDocument, isMap, isSeq, isScalar, type Document } from 'yaml';
 import type { ProviderEnvVar } from '@claude-control/contracts';
-import { UnrecognizedFormatError } from './codex-toml.ts';
 import { EnvKeyNotEncodableError } from './env-key.ts';
+import { UnrecognizedFormatError } from './format-errors.ts';
 import { stripBom } from './text-form.ts';
 
 /**

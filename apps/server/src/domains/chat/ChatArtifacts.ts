@@ -1,25 +1,19 @@
 import { readdirSync, statSync, existsSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, extname, basename, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
+import type { Artifact } from '@claude-control/contracts';
 
 /**
  * Файлы, созданные Claude в рабочей папке чата. Для интерфейса это «артефакты»:
  * страницу или документ нужно показать в предпросмотре, а не отдавать ссылкой
  * на файл. Тип превью выбирается по расширению — от него зависит, рисуем мы
  * страницу, размеченный текст, документ или подсвеченный код.
+ *
+ * Сама форма ответа описана контрактом (`Artifact`), поэтому здесь она не
+ * переобъявляется: своё имя было бы вторым таким же типом в репозитории.
  */
 
-export type ArtifactKind = 'html' | 'markdown' | 'pdf' | 'image' | 'code' | 'data' | 'other';
-
-export interface Artifact {
-  name: string;
-  path: string;
-  kind: ArtifactKind;
-  sizeBytes: number;
-  modifiedAt: string;
-  /** Показывать ли вкладку с исходником рядом с предпросмотром. */
-  hasSource: boolean;
-}
+export type ArtifactKind = Artifact['kind'];
 
 const KIND_BY_EXTENSION: Record<string, ArtifactKind> = {
   '.html': 'html',

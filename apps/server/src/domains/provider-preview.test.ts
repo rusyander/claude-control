@@ -53,9 +53,12 @@ describe('previewProviderWrite', () => {
     expect(result.exists).toBe(true);
     expect(result.unchanged).toBe(false);
     expect(result.added).toBeGreaterThan(0);
-    expect(result.lines.some((line: { kind: string; text: string }) => line.kind === 'add' && line.text.includes('fresh'))).toBe(
-      true,
-    );
+    expect(
+      result.lines.some(
+        (line: { kind: string; text: string }) =>
+          line.kind === 'add' && line.text.includes('fresh'),
+      ),
+    ).toBe(true);
     // Всё, что ВНЕ региона mcp_servers, осталось контекстом — адаптер правит
     // только свой участок файла.
     expect(

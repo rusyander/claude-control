@@ -24,6 +24,7 @@ import {
   type ProjectPaths,
 } from '../domains/projects.ts';
 import { getActiveProvider } from '../providers/registry.ts';
+import { done } from './write-result.ts';
 
 /**
  * Маршруты проектного уровня конфигурации.
@@ -40,12 +41,6 @@ import { getActiveProvider } from '../providers/registry.ts';
  * (проектные сущности в пользовательские группы не входят по смыслу).
  */
 export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext): void {
-  const done = (backupPath?: string): { ok: true; backupPath?: string; needsRestart: true } => ({
-    ok: true,
-    backupPath,
-    needsRestart: true,
-  });
-
   /**
    * Запись реестра по id или 404-ответ. Возвращает undefined, отправив ответ.
    *

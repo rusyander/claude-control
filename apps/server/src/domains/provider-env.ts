@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { stringify as stringifyToml } from 'smol-toml';
-import type { AppSettings, ProviderEnvVar } from '@claude-control/contracts';
+import type { AppSettings, ProviderEnvFormat, ProviderEnvVar } from '@claude-control/contracts';
 import { getActiveProvider } from '../providers/registry.ts';
 import type { ConfigProvider } from '../providers/types.ts';
 import { providerBackupName, readTextFile, writeTextFile } from '../lib/safe-io.ts';
@@ -83,8 +83,12 @@ interface ProviderEnvSettingsSource {
   getSettings(): Pick<AppSettings, 'provider' | 'claudeDirOverride'>;
 }
 
-/** Формат файла переменных окружения, поддержанный универсальным разделом. */
-export type ProviderEnvFormat = 'toml' | 'aider-yaml' | 'dotenv';
+/**
+ * Формат файла переменных окружения описан в контракте
+ * (`packages/contracts/src/provider-env.ts`) — сервер его переэкспортирует, чтобы
+ * не держать вторую копию.
+ */
+export type { ProviderEnvFormat };
 
 /** Разрешённая цель раздела: провайдер + формат + путь к файлу. */
 export interface ProviderEnvTarget {

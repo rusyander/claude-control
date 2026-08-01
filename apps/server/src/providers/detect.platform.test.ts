@@ -13,7 +13,7 @@ vi.mock('node:child_process', () => ({
   spawnSync: (...args: unknown[]) => spawnSyncMock(...args),
 }));
 
-const { detectCliOnPath, findCliOnPath, detectProvider } = await import('./provider-detect.ts');
+const { detectCliOnPath, findCliOnPath, detectProvider } = await import('./detect.ts');
 const { getProvider } = await import('../providers/registry.ts');
 
 function withPlatform(platform: NodeJS.Platform): void {

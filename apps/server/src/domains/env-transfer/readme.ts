@@ -1,4 +1,4 @@
-import type { ArchiveManifest } from './archive.ts';
+import type { ArchiveManifest } from './archive.types.ts';
 
 /**
  * README внутри архива. Его читают двое: человек, который развернёт архив на

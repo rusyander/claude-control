@@ -285,9 +285,9 @@ describe('OpenCode: плагины (каталог файлов + массив p
   it('пустой список при сохранённых записях ключ НЕ удаляет', () => {
     writeFileSync(configPath, JSON.stringify({ plugin: [['a', {}], 'b'] }));
     saveProviderPluginPackages(target, [], backupDir);
-    expect(
-      (JSON.parse(readFileSync(configPath, 'utf8')) as { plugin: unknown }).plugin,
-    ).toEqual([['a', {}]]);
+    expect((JSON.parse(readFileSync(configPath, 'utf8')) as { plugin: unknown }).plugin).toEqual([
+      ['a', {}],
+    ]);
   });
 
   it('битый JSON и не-массив plugin: список только для чтения, файл не тронут', () => {

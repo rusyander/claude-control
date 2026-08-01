@@ -6,12 +6,22 @@ import type {
   Group,
   GroupDraft,
   GroupMember,
+  HookEvent,
 } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import { readHooks, writeHooks } from '../domains/hooks.ts';
-import { applyEntityState, rewriteHooks } from '../domains/entity-toggle.ts';
+import { applyEntityState, rewriteHooks, type EntityToggleDeps } from '../domains/entity-toggle.ts';
 import { applyGroupEnv, existingEnvKeys } from '../domains/env.ts';
 import { collectLeafMembers, wouldCreateCycle } from '../domains/group-graph.ts';
+
+/**
+ * Что доменные функции переключения берут от контекста. Собираем на каждом
+ * обращении, а не один раз при регистрации: каталог конфигурации меняется на
+ * лету (`ctx.relocate`), вместе с ним — пути и хранилище состояния.
+ */
+function toggleDeps(ctx: ServerContext): EntityToggleDeps {
+  return { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir };
+}
 
 /**
  * Группы и сценарии — надстройка приложения. Claude Code про них не знает,
@@ -137,12 +147,12 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
         ctx.store.setGroupDisabled(member.kind, member.id, group.id, !isEnabled);
 
         const effective = !ctx.store.isDisabled(member.kind, member.id);
-        const result = applyEntityState(ctx, member.kind, member.id, effective);
+        const result = applyEntityState(toggleDeps(ctx), member.kind, member.id, effective);
         needsHookRewrite ||= result.needsHookRewrite;
       }
 
       // Хуки лежат в одном файле, поэтому перезапись одна на всю группу.
-      const hookBackup = needsHookRewrite ? rewriteHooks(ctx) : undefined;
+      const hookBackup = needsHookRewrite ? rewriteHooks(toggleDeps(ctx)) : undefined;
       // Переменные окружения группы: включение пишет их в settings.json,
       // выключение — снимает свои, не задев ручные и общие с другой группой.
       const envBackup = applyGroupEnvState(ctx, group, isEnabled);
@@ -169,9 +179,9 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
         ctx.store.setGroupDisabled(member.kind, member.id, group.id, false);
 
         const effective = !ctx.store.isDisabled(member.kind, member.id);
-        applyEntityState(ctx, member.kind, member.id, effective);
+        applyEntityState(toggleDeps(ctx), member.kind, member.id, effective);
       }
-      rewriteHooks(ctx);
+      rewriteHooks(toggleDeps(ctx));
     }
 
     // Снимаем переменные окружения, которые держала эта группа (кроме общих с
@@ -289,7 +299,7 @@ function reconcileMembers(ctx: ServerContext, group: Group, previousMembers: Gro
     ctx.store.setGroupDisabled(member.kind, member.id, group.id, heldByGroup);
     const after = ctx.store.isDisabled(member.kind, member.id);
     if (before !== after) {
-      const result = applyEntityState(ctx, member.kind, member.id, !after);
+      const result = applyEntityState(toggleDeps(ctx), member.kind, member.id, !after);
       needsHookRewrite ||= result.needsHookRewrite;
     }
   };
@@ -297,7 +307,7 @@ function reconcileMembers(ctx: ServerContext, group: Group, previousMembers: Gro
   for (const member of removed) reapply(member, false);
   if (!group.isEnabled) for (const member of added) reapply(member, true);
 
-  if (needsHookRewrite) rewriteHooks(ctx);
+  if (needsHookRewrite) rewriteHooks(toggleDeps(ctx));
 }
 
 const MARKER = '# claude-control:automation';
@@ -311,7 +321,7 @@ function compileAutomations(ctx: ServerContext): void {
     .filter((automation) => automation.isEnabled)
     .map((automation) => ({
       id: `automation:${automation.id}`,
-      event: automation.trigger.event as ReturnType<typeof readHooks>[number]['event'],
+      event: automation.trigger.event as HookEvent,
       matcher: automation.trigger.matcher,
       command: `${automation.action.command} ${MARKER}:${automation.id}`,
       timeout: automation.action.timeout,

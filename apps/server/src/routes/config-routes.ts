@@ -3,10 +3,10 @@ import { existsSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import type { AppSettings, Overview, ProviderDetectResponse } from '@claude-control/contracts';
 import type { ZodError } from 'zod';
-import { settingsPatchSchema, importStateSchema } from '../lib/settings-validation.ts';
+import { settingsPatchSchema, importStateSchema } from '../providers/settings-validation.ts';
 import type { ServerContext } from '../context.ts';
 import { describeProviders } from '../providers/registry.ts';
-import { detectProviders } from '../lib/provider-detect.ts';
+import { detectProviders } from '../providers/detect.ts';
 import {
   readClaudeCredentials,
   validatePanelCredentials,
@@ -14,13 +14,8 @@ import {
   removePanelCredentials,
   panelCredentialsPath,
 } from '../lib/credentials.ts';
-import { readRules } from '../domains/rules.ts';
-import { readHooks } from '../domains/hooks.ts';
-import { readSkills } from '../domains/skills.ts';
-import { readMcpServers } from '../domains/mcp.ts';
-import { readPermissions } from '../domains/permissions.ts';
+import { buildOverview } from '../domains/overview.ts';
 import { readAccount } from '../domains/account.ts';
-import { readScripts } from '../domains/scripts.ts';
 import {
   setBackupKeep,
   clampBackupKeep,
@@ -178,47 +173,8 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     return { ok: true, needsRestart: true };
   });
 
-  app.get('/api/overview', (): Overview => {
-    const { paths } = ctx.location;
-    const rules = readRules(paths.claudeMd, ctx.store);
-    // Обзор отвечает на вопрос «что сейчас действует», поэтому локальные
-    // настройки считаются наравне с основными.
-    const hooks = readHooks(paths.settings, ctx.store, paths.settingsLocal);
-    const skills = readSkills(paths.skills, ctx.store);
-    const servers = readMcpServers(paths.mcpConfig, ctx.store);
-    const permissions = readPermissions(paths.settings, ctx.store, paths.settingsLocal);
-    const scripts = readScripts(
-      paths.hooks,
-      hooks.map((hook) => hook.scriptPath).filter((path): path is string => Boolean(path)),
-    );
+  app.get('/api/overview', (): Overview => buildOverview(ctx.location.paths, ctx.store));
 
-    return {
-      rules: { total: rules.length, enabled: rules.filter((item) => item.isEnabled).length },
-      hooks: {
-        total: hooks.length,
-        enabled: hooks.filter((item) => item.isEnabled).length,
-        // Хук с несуществующим скриптом молча не сработает — такие важно видеть.
-        broken: hooks.filter((item) => item.scriptPath && item.scriptExists === false).length,
-      },
-      skills: { total: skills.length, enabled: skills.filter((item) => item.isEnabled).length },
-      scripts: {
-        total: scripts.length,
-        unused: scripts.filter((item) => !item.isUsed).length,
-      },
-      mcp: {
-        total: servers.length,
-        enabled: servers.filter((item) => item.isEnabled).length,
-        connected: servers.filter((item) => item.health === 'connected').length,
-        failed: servers.filter((item) => item.health === 'failed').length,
-      },
-      permissions: {
-        allow: permissions.filter((item) => item.decision === 'allow').length,
-        ask: permissions.filter((item) => item.decision === 'ask').length,
-        deny: permissions.filter((item) => item.decision === 'deny').length,
-      },
-      groups: { total: ctx.store.getGroups().length },
-    };
-  });
   /**
    * Доступ Claude Code к аккаунту.
    *

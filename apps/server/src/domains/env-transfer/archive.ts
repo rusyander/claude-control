@@ -1,7 +1,14 @@
 import type { ConfigProvider } from '../../providers/types.ts';
 import { createZip, readZip, type ZipEntry } from '../../lib/zip.ts';
-import { collectProviderFiles, type ChecklistItem, type CollectResult } from './collect.ts';
+import { collectProviderFiles, type ChecklistItem } from './collect.ts';
 import { buildArchiveReadme } from './readme.ts';
+import type {
+  ArchiveManifest,
+  BuiltArchive,
+  ManifestEntry,
+  ManifestLocation,
+  ManifestSkipped,
+} from './archive.types.ts';
 
 /**
  * Архив переноса окружения: опись (`MANIFEST.json`), пояснение для человека и
@@ -21,49 +28,13 @@ export const ARCHIVE_KIND = 'claude-control-environment';
 export const MANIFEST_PATH = 'MANIFEST.json';
 export const README_PATH = 'README.md';
 
-export interface ManifestLocation {
-  index: number;
-  kind: 'dir' | 'file';
-  role: string;
-  /** Путь на машине-источнике. Импорт его НЕ использует — только показывает. */
-  sourcePath: string;
-}
-
-export interface ManifestEntry {
-  archivePath: string;
-  locationIndex: number;
-  relative: string;
-  sourcePath: string;
-  applyMode: 'file' | 'json-merge';
-  mergeKeys?: string[];
-  bytes: number;
-  sha256: string;
-  redactedKeys: string[];
-}
-
-export interface ManifestSkipped {
-  sourcePath: string;
-  reason: string;
-}
-
-export interface ArchiveManifest {
-  kind: string;
-  formatVersion: number;
-  exportedAt: string;
-  provider: { id: string; name: string; status: string };
-  source: { platform: string };
-  locations: ManifestLocation[];
-  entries: ManifestEntry[];
-  skipped: ManifestSkipped[];
-  /** Что придётся ввести руками: секреты в архив не кладутся. */
-  checklist: ChecklistItem[];
-}
-
-export interface BuiltArchive {
-  manifest: ArchiveManifest;
-  zip: Buffer;
-  collected: CollectResult;
-}
+export type {
+  ManifestLocation,
+  ManifestEntry,
+  ManifestSkipped,
+  ArchiveManifest,
+  BuiltArchive,
+} from './archive.types.ts';
 
 /**
  * Собирает архив окружения провайдера. `exportedAt` приходит извне (запрос или

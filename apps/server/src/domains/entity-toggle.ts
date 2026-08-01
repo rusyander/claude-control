@@ -1,5 +1,5 @@
-import type { EntityKind, Hook, PermissionDecision } from '@claude-control/contracts';
-import type { ServerContext } from '../context.ts';
+import type { ClaudePaths, EntityKind, Hook, PermissionDecision } from '@claude-control/contracts';
+import type { AppStore } from '../lib/app-store.ts';
 import { readRules, saveRule } from './rules.ts';
 import { readHooks, writeHooks } from './hooks.ts';
 import { setSkillEnabled } from './skills.ts';
@@ -30,39 +30,49 @@ export interface ApplyResult {
 }
 
 /**
+ * Всё, что домену нужно от окружения: пути активного каталога конфигурации,
+ * состояние панели и каталог резервных копий. Та же тройка, что берут соседние
+ * домены — собирает её вызывающий, про сборку сервера домен не знает.
+ */
+export interface EntityToggleDeps {
+  paths: ClaudePaths;
+  store: AppStore;
+  backupDir?: string;
+}
+
+/**
  * Поиск хука по идентификатору — с оглядкой на прежний, позиционный.
  *
  * Состав групп и ссылки вида `?id=…`, сделанные до перехода на контентные id,
  * ссылаются на старые значения. Искать только по новому — значит не найти
  * ровно те хуки, которые пользователь настроил раньше.
  */
-export function findHook(ctx: ServerContext, id: string): Hook | undefined {
-  const { settings, settingsLocal } = ctx.location.paths;
-  const hooks = readHooks(settings, ctx.store, settingsLocal);
+export function findHook({ paths, store }: EntityToggleDeps, id: string): Hook | undefined {
+  const hooks = readHooks(paths.settings, store, paths.settingsLocal);
 
   return hooks.find((hook) => hook.id === id) ?? hooks.find((hook) => hook.legacyId === id);
 }
 
 export function applyEntityState(
-  ctx: ServerContext,
+  deps: EntityToggleDeps,
   kind: EntityKind,
   id: string,
   isEnabled: boolean,
 ): ApplyResult {
-  const paths = ctx.location.paths;
+  const { paths, store, backupDir } = deps;
 
   // У скиллов и MCP-серверов выключение физическое: перенос папки или
   // секции конфига. Остальное хранится отметкой в состоянии приложения.
   if (kind === 'skill') setSkillEnabled(paths.skills, id, isEnabled);
-  if (kind === 'mcp') setMcpServerEnabled(paths.mcpConfig, id, isEnabled, ctx.backupDir);
+  if (kind === 'mcp') setMcpServerEnabled(paths.mcpConfig, id, isEnabled, backupDir);
 
   // Правило физически уезжает в раздел отключённых — перезаписью CLAUDE.md.
   // Состояние передаём явно: при чтении оно берётся из расположения правила в
   // файле, а нам нужно записать то, которое запросили, иначе выключенное
   // правило нечем было бы включить обратно.
   if (kind === 'rule') {
-    const rule = readRules(paths.claudeMd, ctx.store).find((item) => item.id === id);
-    if (rule) saveRule(paths.claudeMd, id, { ...rule, isEnabled }, ctx.store, ctx.backupDir);
+    const rule = readRules(paths.claudeMd, store).find((item) => item.id === id);
+    if (rule) saveRule(paths.claudeMd, id, { ...rule, isEnabled }, store, backupDir);
   }
 
   // Право — паттерн в settings.json → permissions.<decision>. Гашение группой
@@ -81,23 +91,23 @@ export function applyEntityState(
         target,
         null,
         { decision: decision as PermissionDecision, pattern: rest.join(':'), groupIds: [] },
-        ctx.backupDir,
+        backupDir,
       );
     } else {
-      deletePermission(target, bareId, ctx.backupDir);
+      deletePermission(target, bareId, backupDir);
     }
   }
 
   // Хук выключается удалением из settings.json, поэтому его команду надо
   // запомнить ДО перезаписи файла: после неё брать её будет неоткуда.
   if (kind === 'hook' && !isEnabled) {
-    const hook = findHook(ctx, id);
+    const hook = findHook(deps, id);
     // Локальный хук не запоминаем: панель в settings.local.json не пишет, и
     // выключить его нечем. Снимок же лёг бы в общее состояние без пометки о
     // файле — и первая же перезапись перенесла бы личный хук в settings.json,
     // то есть включила бы его всем, кто читает этот конфиг.
     if (hook && hook.source !== 'settings-local') {
-      ctx.store.rememberDisabledHook({ ...hook, isEnabled: false });
+      store.rememberDisabledHook({ ...hook, isEnabled: false });
     }
   }
 
@@ -109,14 +119,13 @@ export function applyEntityState(
  * в settings.json. Один вызов на всю операцию — читать и писать файл на
  * каждого участника группы незачем.
  */
-export function rewriteHooks(ctx: ServerContext): string | undefined {
-  const { settings, settingsLocal } = ctx.location.paths;
-  const hooks = readHooks(settings, ctx.store, settingsLocal);
-  const backupPath = writeHooks(settings, hooks, ctx.backupDir);
+export function rewriteHooks({ paths, store, backupDir }: EntityToggleDeps): string | undefined {
+  const hooks = readHooks(paths.settings, store, paths.settingsLocal);
+  const backupPath = writeHooks(paths.settings, hooks, backupDir);
 
   // Снимок нужен только выключенному хуку: включённый снова лежит в файле.
   // Чистим после записи — иначе включать было бы нечего.
-  ctx.store.pruneDisabledHooks(hooks.filter((hook) => hook.isEnabled).map((hook) => hook.id));
+  store.pruneDisabledHooks(hooks.filter((hook) => hook.isEnabled).map((hook) => hook.id));
 
   return backupPath;
 }

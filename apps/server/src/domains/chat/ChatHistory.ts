@@ -1,22 +1,27 @@
-import {
-  readdirSync,
-  statSync,
-  existsSync,
-  createReadStream,
-  openSync,
-  readSync,
-  closeSync,
-} from 'node:fs';
+import { readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { createInterface } from 'node:readline';
-import type {
-  ChatSummary,
-  ChatMessage,
-  ChatBlock,
-  ChatMessagesPage,
-  MessageUsage,
-} from '@claude-control/contracts';
+import type { ChatSummary, ChatMessage, ChatMessagesPage } from '@claude-control/contracts';
 import { isSandboxPath } from './ChatArtifacts.ts';
+import {
+  FULL_READ_LIMIT,
+  fileSessionId,
+  findTranscript,
+  readRecords,
+  streamLines,
+} from './ChatTranscriptFile.ts';
+import {
+  cleanText,
+  firstMeaningfulText,
+  isAwaitingReply,
+  isDialogMessage,
+  lastValue,
+  textOf,
+  toBlocks,
+  toUsage,
+  withAwaitingWindow,
+  type ContentBlock,
+  type Record,
+} from './ChatRecords.ts';
 
 /**
  * Чтение истории разговоров Claude Code из ~/.claude/projects.
@@ -24,17 +29,14 @@ import { isSandboxPath } from './ChatArtifacts.ts';
  * Транскрипт — это JSON Lines, куда строки только дописываются. Файлы бывают
  * очень большими (медиана около двух мегабайт, отдельные — за сотню), поэтому
  * читать их целиком ради строки в списке нельзя: для списка берём начало и
- * конец файла, а разобранное держим в кеше по времени изменения.
+ * конец файла (`ChatTranscriptFile`), а разобранное держим в кеше по времени
+ * изменения. Толкование записей живёт в `ChatRecords`.
  */
 
-/** Файл больше этого размера не читается целиком — только начало и хвост. */
-const FULL_READ_LIMIT = 4 * 1024 * 1024;
-/** Сколько байт хвоста читать у большого файла. */
-const TAIL_BYTES = 1024 * 1024;
-/** Сколько первых строк достаточно, чтобы найти первую реплику человека. */
-const HEAD_LINES = 300;
 /** Сколько последних сообщений отдавать в ленту чата. */
 const MESSAGE_LIMIT = 400;
+
+export { findTranscript };
 
 interface CacheEntry {
   mtimeMs: number;
@@ -73,7 +75,9 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
 
   const cached = cache.get(path);
   if (cached && cached.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
-    return cached.summary;
+    // Окно ожидания считаем ПОСЛЕ кеша: сводка кешируется по времени файла и не
+    // пересчитывается, а сутки идут — иначе вопрос оставался бы «свежим» вечно.
+    return withAwaitingWindow(cached.summary, stats.mtimeMs);
   }
 
   const records = readRecords(path, stats.size);
@@ -106,7 +110,7 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
   };
 
   cache.set(path, { mtimeMs: stats.mtimeMs, size: stats.size, summary });
-  return summary;
+  return withAwaitingWindow(summary, stats.mtimeMs);
 }
 
 /** Параметры окна ленты: сколько сообщений отдать и сколько новых пропустить. */
@@ -201,280 +205,6 @@ export function findSessionCwd(projectsDir: string, sessionId: string): string |
   return lastValue(records, (record) => record.cwd);
 }
 
-export function findTranscript(projectsDir: string, chatId: string): string | undefined {
-  if (!existsSync(projectsDir)) return undefined;
-
-  const safeId = chatId.replace(/[^a-zA-Z0-9-]/g, '');
-  for (const entry of readdirSync(projectsDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-
-    const candidate = join(projectsDir, entry.name, `${safeId}.jsonl`);
-    if (existsSync(candidate)) return candidate;
-  }
-
-  return undefined;
-}
-
-interface Record {
-  type?: string;
-  uuid?: string;
-  parentUuid?: string | null;
-  timestamp?: string;
-  cwd?: string;
-  aiTitle?: string;
-  isMeta?: boolean;
-  isCompactSummary?: boolean;
-  isApiErrorMessage?: boolean;
-  toolUseResult?: unknown;
-  isSidechain?: boolean;
-  message?: {
-    role?: string;
-    model?: string;
-    content?: string | ContentBlock[];
-    /** Расход на шаг — модель кладёт его рядом с ответом. */
-    usage?: {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_read_input_tokens?: number;
-      cache_creation_input_tokens?: number;
-      /** Разбивка записи в кэш по сроку жизни: часовая стоит вдвое дороже. */
-      cache_creation?: { ephemeral_1h_input_tokens?: number };
-    };
-  };
-}
-
-interface ContentBlock {
-  type: string;
-  text?: string;
-  thinking?: string;
-  name?: string;
-  input?: unknown;
-  /** Идентификатор вызова инструмента — по нему результат сходится с вызовом. */
-  id?: string;
-  tool_use_id?: string;
-  content?: string | ContentBlock[];
-  is_error?: boolean;
-  source?: { type?: string; media_type?: string; data?: string };
-  title?: string;
-}
-
-/**
- * Разбор файла. Маленькие читаются целиком, у больших берём начало и хвост:
- * этого хватает и на заголовок, и на первую с последней репликой, а на файле
- * в сотню мегабайт полный проход занял бы секунды.
- */
-function readRecords(path: string, sizeHint: number): Record[] {
-  const size = sizeHint || statSync(path).size;
-
-  if (size <= FULL_READ_LIMIT) return parseLines(readWholeFile(path));
-
-  return [...parseLines(readHead(path)), ...parseLines(readTail(path, size))];
-}
-
-function parseLines(text: string): Record[] {
-  const records: Record[] = [];
-
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith('{')) continue;
-
-    try {
-      records.push(JSON.parse(trimmed) as Record);
-    } catch {
-      // Обрезанная строка на границе куска — пропускаем.
-    }
-  }
-
-  return records;
-}
-
-function readWholeFile(path: string): string {
-  return readChunk(path, 0, statSync(path).size);
-}
-
-function readHead(path: string): string {
-  const text = readChunk(path, 0, 512 * 1024);
-  return text.split('\n').slice(0, HEAD_LINES).join('\n');
-}
-
-function readTail(path: string, size: number): string {
-  return readChunk(path, Math.max(0, size - TAIL_BYTES), Math.min(TAIL_BYTES, size));
-}
-
-function readChunk(path: string, position: number, length: number): string {
-  const handle = openSync(path, 'r');
-
-  try {
-    const buffer = Buffer.alloc(length);
-    const read = readSync(handle, buffer, 0, length, position);
-    return buffer.subarray(0, read).toString('utf8');
-  } finally {
-    closeSync(handle);
-  }
-}
-
-/** Настоящая реплика диалога, а не служебная запись. */
-/**
- * Расход на шаг из записи транскрипта.
- *
- * Только у ответов модели: реплика человека токенов не тратит, и бейдж «0» на
- * ней читался бы как сбой подсчёта, а не как «здесь нечего показывать».
- * Пустой usage (все четыре нуля) отбрасываем по той же причине.
- *
- * Стоимость здесь НЕ считается: тарифы живут в кэше прайса, до которого
- * добирается роут, — история о ценах ничего не знает.
- */
-function toUsage(record: Record): MessageUsage | undefined {
-  const usage = record.message?.usage;
-  if (!usage) return undefined;
-
-  const input = usage.input_tokens ?? 0;
-  const output = usage.output_tokens ?? 0;
-  const cacheRead = usage.cache_read_input_tokens ?? 0;
-  const cacheCreation = usage.cache_creation_input_tokens ?? 0;
-  if (!input && !output && !cacheRead && !cacheCreation) return undefined;
-
-  const long = usage.cache_creation?.ephemeral_1h_input_tokens;
-  return {
-    input,
-    output,
-    cacheRead,
-    cacheCreation,
-    cacheCreation1h: long || undefined,
-    model: record.message?.model,
-  };
-}
-
-/**
- * Разговор стоит на вопросе к человеку.
- *
- * Смотрим последнюю запись СО СМЫСЛОМ (служебные — заголовок, отметка о
- * промпте — пропускаем, ветки субагентов тоже): если это вызов
- * `AskUserQuestion`, ответа за ним ещё нет — CLI пишет его следующей строкой,
- * сразу как человек выбрал вариант. Через `isDialogMessage` это не считается
- * намеренно: тот прячет результаты инструментов, и ответ на вопрос перестал бы
- * гасить признак.
- */
-function isAwaitingReply(records: Record[]): boolean {
-  for (let index = records.length - 1; index >= 0; index -= 1) {
-    const record = records[index];
-    if (!record?.message || record.isSidechain) continue;
-    if (record.type !== 'assistant') return false;
-
-    const content = record.message.content;
-    if (!Array.isArray(content)) return false;
-    return content.some((block) => block.type === 'tool_use' && block.name === 'AskUserQuestion');
-  }
-
-  return false;
-}
-
-function isDialogMessage(record: Record): boolean {
-  if (record.type !== 'user' && record.type !== 'assistant') return false;
-  if (record.isMeta || record.isCompactSummary || record.isApiErrorMessage) return false;
-  // У результата инструмента есть разобранный результат — это не реплика.
-  if (record.type === 'user' && record.toolUseResult !== undefined) return false;
-
-  const content = record.message?.content;
-  if (Array.isArray(content) && content.every((block) => block.type === 'tool_result'))
-    return false;
-
-  // Отметка самого CLI: в пакетном режиме он дописывает её в конец хода, когда
-  // отвечать не на что. Репликой разговора она не является и в ленте только
-  // разбивает переписку пустыми вставками.
-  if (record.type === 'assistant' && textOf(record).trim() === 'No response requested.') {
-    return false;
-  }
-
-  return true;
-}
-
-/**
- * Первые осмысленные слова человека — из них делается название чата, когда
- * Claude Code не успел придумать своё. Реплика нередко начинается со служебной
- * вставки среды (открытый файл, напоминание), после очистки от неё остаётся
- * пусто — поэтому идём по репликам, пока не найдётся непустой текст.
- */
-function firstMeaningfulText(records: Record[]): string {
-  for (const record of records) {
-    if (!isDialogMessage(record) || record.type !== 'user') continue;
-
-    const text = cleanText(textOf(record));
-    if (text.length > 1) return text;
-  }
-
-  return '';
-}
-
-function toBlocks(record: Record): ChatBlock[] {
-  const content = record.message?.content;
-  if (typeof content === 'string') return content.trim() ? [{ type: 'text', text: content }] : [];
-  if (!Array.isArray(content)) return [];
-
-  const blocks: ChatBlock[] = [];
-
-  for (const block of content) {
-    if (block.type === 'text' && block.text?.trim()) {
-      blocks.push({ type: 'text', text: block.text });
-    } else if (block.type === 'thinking' && block.thinking?.trim()) {
-      blocks.push({ type: 'thinking', text: block.thinking });
-    } else if (block.type === 'tool_use') {
-      blocks.push({
-        type: 'tool',
-        name: block.name ?? '',
-        input: JSON.stringify(block.input ?? {}),
-      });
-    } else if (block.type === 'image' && block.source?.data) {
-      // Картинки лежат в транскрипте прямо в base64.
-      blocks.push({
-        type: 'image',
-        source: `data:${block.source.media_type ?? 'image/png'};base64,${block.source.data}`,
-      });
-    } else if (block.type === 'document') {
-      blocks.push({ type: 'text', text: `📎 ${block.title ?? 'документ'}` });
-    }
-  }
-
-  return blocks;
-}
-
-function textOf(record: Record | undefined): string {
-  if (!record) return '';
-
-  const content = record.message?.content;
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return '';
-
-  // Служебная вставка среды часто идёт отдельным блоком перед настоящим
-  // текстом, поэтому склеиваем все текстовые блоки, а не берём первый.
-  return content
-    .filter((block) => block.type === 'text' && block.text)
-    .map((block) => block.text)
-    .join(' ');
-}
-
-/**
- * Служебные обёртки среды попадают в текст первой реплики и в названии чата
- * выглядят мусором, поэтому их вырезаем.
- */
-function cleanText(text: string): string {
-  return text
-    .replace(/<(ide_[a-z_]+|command-[a-z]+|task-notification|system-reminder)>[\s\S]*?<\/\1>/g, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function lastValue<T>(records: Record[], pick: (record: Record) => T | undefined): T | undefined {
-  for (let index = records.length - 1; index >= 0; index -= 1) {
-    const record = records[index];
-    const value = record && pick(record);
-    if (value !== undefined && value !== false) return value as T;
-  }
-
-  return undefined;
-}
-
 /**
  * Разобранный транскрипт для соседних разборщиков (прогресс агента). Читает тем
  * же способом, что и лента: маленький файл целиком, у большого — начало и хвост.
@@ -485,12 +215,3 @@ export function readTranscriptRecords(path: string): TranscriptRecord[] {
 
 export type TranscriptRecord = Record;
 export type TranscriptBlock = ContentBlock;
-
-function fileSessionId(path: string): string {
-  return path.split(/[\\/]/).pop()?.replace('.jsonl', '') ?? '';
-}
-
-async function* streamLines(path: string): AsyncGenerator<string> {
-  const lines = createInterface({ input: createReadStream(path, { encoding: 'utf8' }) });
-  for await (const line of lines) yield line;
-}

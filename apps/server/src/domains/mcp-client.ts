@@ -22,6 +22,13 @@ import type { McpServer, McpTransport } from '@claude-control/contracts';
  * ждать и как назвать ошибку словами, понятными на странице.
  */
 
+/**
+ * Инструмент MCP-сервера в терминах КЛИЕНТА — намеренно ШИРЕ контрактного
+ * `McpTool` (`packages/contracts/src/mcp.ts`, там только `name` + `description`
+ * для помощника отбора прав). Здесь дополнительно несётся `inputSchema`, по
+ * которой рисуется форма вызова в песочнице; поэтому копия остаётся, а не
+ * заменяется импортом контракта.
+ */
 export interface McpTool {
   name: string;
   description?: string;

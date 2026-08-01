@@ -5,9 +5,9 @@ import type {
   ProviderDetectResponse,
   ProviderDetection,
 } from '@claude-control/contracts';
-import { getActiveProviderId, listProviders } from '../providers/registry.ts';
-import { providerCliCandidates, providerCliCommand } from '../providers/cli.ts';
-import type { ConfigProvider } from '../providers/types.ts';
+import { getActiveProviderId, listProviders } from './registry.ts';
+import { providerCliCandidates, providerCliCommand } from './cli.ts';
+import type { ConfigProvider } from './types.ts';
 
 /**
  * Детект установленных провайдер-CLI (Ф7) — ОБЩИЙ хелпер.

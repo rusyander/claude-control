@@ -16,7 +16,7 @@ import {
 import { readMcpServers, saveMcpServer } from '../domains/mcp.ts';
 import { readEnvVars } from '../domains/env.ts';
 import { readPermissions } from '../domains/permissions.ts';
-import { UnrecognizedFormatError } from '../domains/provider-mcp.ts';
+import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 
 /**
  * Сравнение конфигураций двух провайдеров и перенос записей между ними

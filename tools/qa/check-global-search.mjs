@@ -27,7 +27,13 @@ console.log('приглашение до ввода:', prompt > 0 ? 'есть' :
 const field = page.getByRole('searchbox').or(page.getByPlaceholder(/Что ищем/));
 await field.first().fill('a');
 await field.first().fill('git');
-await page.waitForTimeout(1200); // дебаунс + запрос
+// `/api/search` перечитывает всю конфигурацию, поэтому ответ приходит не за
+// фиксированную паузу: ждём саму выдачу, а не время.
+await page
+  .getByText(/Найдено:|Ничего не найдено/)
+  .first()
+  .waitFor({ timeout: 15000 })
+  .catch(() => {});
 
 const hasResults = await page.getByText(/Найдено:/).count();
 const hasEmpty = await page.getByText('Ничего не найдено').count();

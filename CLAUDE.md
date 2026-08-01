@@ -47,7 +47,8 @@ through the panel's API).
 
 QA runs (need `pnpm dev` up + `pnpm qa:setup`): `tools/qa/audit-layout.mjs` (layout, all pages),
 `check-motion.mjs` (animation + geometry), `check-chat-regressions.mjs` (end-to-end chat),
-`check-all-forms.mjs` (9 forms), `check-sandbox.mjs`.
+`check-all-forms.mjs` (9 forms), `check-sandbox.mjs`, `check-commands.mjs` (slash-command list,
+both locales), `check-help.mjs` (every help document, leaked i18n keys).
 
 ## Symptom → cause → fix
 
@@ -91,9 +92,9 @@ and `127.0.0.1:WEB_PORT`. Changed the front port → set `WEB_PORT` for the serv
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
 
 Gate before "done": `pnpm type-check && pnpm lint && pnpm test && node tools/qa/audit-layout.mjs`.
-Touched help → also run the help sweep: it walks every section in both themes looking for on-page
-`help.…` strings, i.e. a key called under a name that doesn't exist (`tsc` checks dictionary
-completeness, not call sites).
+Touched help → also `node tools/qa/check-help.mjs`: it opens every document from the `HELP_GROUPS`
+registry looking for on-page `help.…` strings, i.e. a key called under a name that doesn't exist
+(`tsc` checks dictionary completeness, not call sites).
 
 ## Where things live
 
@@ -107,7 +108,8 @@ enable/disable on disk `domains/entity-toggle.ts` · MCP client (stdio/HTTP/SSE)
 transcripts `domains/chat/ChatHistory.ts` · conversation workdir `domains/chat/ChatWorkspace.ts` ·
 project list `domains/chat/ChatProjects.ts` · disk browse & open-in-editor `domains/fs/` · sandbox
 assembly `domains/sandbox/SandboxConfig.ts` · provider catalog & capabilities `providers/` ·
-foreign-format check vs published schemas `domains/format-check.ts` · opencode session server
+foreign-format check vs published schemas `domains/format-check.ts` · slash-command inventory
+(skills + `commands/` + plugins, read-only) `domains/commands.ts` · opencode session server
 `domains/opencode-serve.ts` · routes `routes/*.ts`.
 
 **Web** `apps/web/src/`, FSD layers `app` → `pages` → `features` → `entities` → `shared` — UI kit
@@ -115,7 +117,8 @@ foreign-format check vs published schemas `domains/format-check.ts` · opencode 
 project tabs `shared/lib/workspace/` · sticky chat prefs `shared/lib/chat-prefs/` · motion
 `shared/lib/motion/` · showcase data `shared/lib/mocks/` · dictionaries `shared/config/i18n/` ·
 help texts `shared/config/i18n/help/` · help documents `pages/Help/topics/` + registry
-`pages/Help/model/topics.ts` · diagrams `shared/ui/diagram/`.
+`pages/Help/model/topics.ts` · built-in slash-command catalog (hand-maintained, ru+en)
+`entities/Command/model/builtinCommands.ts` · diagrams `shared/ui/diagram/`.
 
 Storybook: `pnpm --filter @claude-control/web storybook` (120 stories, 30 doc pages); port 6006
 often taken → `-p 6019`.

@@ -1,4 +1,5 @@
 import type { ChatSummary } from '@claude-control/contracts';
+import type { RunStatus } from '@shared/lib/agent-runs';
 
 /** Режим поиска в списке: по названию/проекту/превью или по телу переписки. */
 export type ChatSearchMode = 'title' | 'messages';
@@ -9,6 +10,8 @@ export interface ChatListProps {
   activeId?: string;
   onSelect: (chat: ChatSummary) => void;
   onCreate: () => void;
+  /** Статус агента по каждому разговору: «id разговора → работает/ждёт/упал». */
+  statuses?: Map<string, RunStatus>;
 }
 
 export interface ChatRowProps {
@@ -22,4 +25,6 @@ export interface ChatRowProps {
   matchCount?: number;
   /** Запрос — для подсветки совпадений в сниппете. */
   query?: string;
+  /** Статус агента этого разговора; нет прогона — нет и точки. */
+  status?: RunStatus;
 }

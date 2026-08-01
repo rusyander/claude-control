@@ -236,6 +236,10 @@ interface ContentBlock {
   thinking?: string;
   name?: string;
   input?: unknown;
+  /** Идентификатор вызова инструмента — по нему результат сходится с вызовом. */
+  id?: string;
+  tool_use_id?: string;
+  content?: string | ContentBlock[];
   is_error?: boolean;
   source?: { type?: string; media_type?: string; data?: string };
   title?: string;
@@ -402,6 +406,17 @@ function lastValue<T>(records: Record[], pick: (record: Record) => T | undefined
 
   return undefined;
 }
+
+/**
+ * Разобранный транскрипт для соседних разборщиков (прогресс агента). Читает тем
+ * же способом, что и лента: маленький файл целиком, у большого — начало и хвост.
+ */
+export function readTranscriptRecords(path: string): TranscriptRecord[] {
+  return readRecords(path, 0);
+}
+
+export type TranscriptRecord = Record;
+export type TranscriptBlock = ContentBlock;
 
 function fileSessionId(path: string): string {
   return path.split(/[\\/]/).pop()?.replace('.jsonl', '') ?? '';

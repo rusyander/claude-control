@@ -32,6 +32,7 @@ The panel answers them: a visible shape, a switch that deletes nothing, and a sa
 
 - **Rules** — the `## ПРАВИЛО:` sections of `CLAUDE.md`, each with search and its own switch; a separate page edits the whole file
 - **Skills** — the `skills/` folder: file tree, editor, rename, a library of `SKILL.md` templates
+- **Commands** — everything invoked through `/` in one searchable list: skills, command files, plugins and built-in CLI commands, with a description, an owner and a jump to editing
 - **Hooks** — grouped by event, matcher shown explicitly, order within an event rearranged by hand
 - **Scripts** — files from `hooks/`, nested folders included, with a flag on the ones nothing calls
 - **MCP servers** — a real protocol-level connection check (stdio, HTTP, SSE), interactive OAuth login, a tool listing, and `mcp__server__tool` permissions generated from it
@@ -47,7 +48,7 @@ The panel answers them: a visible shape, a switch that deletes nothing, and a sa
 - **Sandbox** — test a rule, skill, hook or MCP server in isolation; a hook against a prepared or hand-written JSON event
 - **Chat** — a conversation with Claude Code inside the panel: streaming, attachments, voice, artifact preview, model and thinking depth, branching by editing a message, full-text search, export to md/json
 - **Several projects at once** — tabs, parallel agents, dev servers launched from the tab: one target per package in a monorepo, each on its own port, autostarted when the panel boots
-- **Project git** — current branch, switching, creating a branch and committing right from the tab; the section shows up only when the project has a `.git`
+- **Project git** — current branch, the list of changed files, switching, creating a branch, committing and `pull` right from the tab; the section shows up only when the project has a `.git`
 - **Search** — one query across rules, skills, hooks, scripts, permissions, env, MCP and plugins (secret values are never revealed)
 - **History** — a line-by-line diff over the backups, rollback of a whole file or of a single hunk
 - **Analytics** — token spend and estimated cost from local transcripts: hour heatmap, cache share, CSV/JSON export
@@ -78,7 +79,7 @@ There is no database. The panel is a view over the files Claude Code already rea
 ```mermaid
 flowchart LR
     subgraph browser["Browser · localhost:8888"]
-        UI["React UI<br/>19 sections"]
+        UI["React UI<br/>20 sections"]
     end
 
     subgraph server["Node server · 127.0.0.1:5178"]
@@ -207,6 +208,7 @@ Detection is a hint, never coercion: the provider never switches on its own, the
 | Chat / assistant<sup>5</sup>        |          ✅          |  🧪   |   🧪   |    🧪     |    🧪    |  🧪   |    🧪     |   —    |    🧪    |  🧪   |
 | Rules (`## ПРАВИЛО:`)               |          ✅          |   —   |   —    |     —     |    —     |   —   |     —     |   —    |    —     |   —   |
 | Skills<sup>10</sup>                 |          ✅          |   —   |   —    |    ✅     |    —     |   —   |    ✅     |   —    |    ✅    |   —   |
+| Commands<sup>11</sup>               |          👁           |   —   |   👁    |     👁     |    —     |   —   |     —     |   —    |    👁     |   —   |
 | Hooks<sup>8</sup>                   |          ✅          |   —   |   —    |    ✅     |    —     |   —   |    ✅     |   —    |    👁     |   —   |
 | Scripts<sup>6</sup>                 |          ✅          |  ✅   |   ✅   |    ✅     |    ✅    |  ✅   |    ✅     |   ✅   |    ✅    |  ✅   |
 | Plugins<sup>9</sup>                 |          ✅          |   —   |   —    |     —     |    —     |   —   |     👁     |   —    |    ✅    |   —   |

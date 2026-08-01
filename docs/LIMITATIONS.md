@@ -41,18 +41,18 @@ The per-CLI boundaries live in their own file:
 
 ## Chat
 
-| What                                                                          | Why                                                                                                                                                          |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A run finishing while the page is closed waits one minute                     | **by design.** The buffer holds it for a grace minute; later it lives only in the transcript                                                                 |
-| Conversations cannot be deleted or renamed                                    | **by design.** Transcripts belong to Claude Code; the panel only reads them                                                                                  |
-| Full-text search over messages is bounded                                     | **by design.** To avoid reading gigantic transcripts whole, matches and files scanned are capped                                                             |
-| The feed opens at the latest messages                                         | **by design.** Earlier ones arrive via "Load more"                                                                                                           |
-| The created-files list exists only for chats outside a project                | **by design.** Inside a real repository it is useless                                                                                                        |
-| Per-item permissions do nothing in full-access mode                           | **by design.** Everything is allowed there by definition                                                                                                     |
+| What                                                                          | Why                                                                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A run finishing while the page is closed waits one minute                     | **by design.** The buffer holds it for a grace minute; later it lives only in the transcript                                                                                                                                           |
+| Conversations cannot be deleted or renamed                                    | **by design.** Transcripts belong to Claude Code; the panel only reads them                                                                                                                                                            |
+| Full-text search over messages is bounded                                     | **by design.** To avoid reading gigantic transcripts whole, matches and files scanned are capped                                                                                                                                       |
+| The feed opens at the latest messages                                         | **by design.** Earlier ones arrive via "Load more"                                                                                                                                                                                     |
+| The created-files list exists only for chats outside a project                | **by design.** Inside a real repository it is useless                                                                                                                                                                                  |
+| Per-item permissions do nothing in full-access mode                           | **by design.** Everything is allowed there by definition                                                                                                                                                                               |
 | Project git has no `push` or branch deletion                                  | **by design.** The panel is not a git client; it does exactly what you need while an agent works in the repository: branch, switch, new branch, commit, `pull`. A conflict left by `pull` is not resolved here — that is terminal work |
-| A commit takes every change (`git add -A`)                                    | **by design.** There is no file picking and no index editing in the panel — git is for that                                                                  |
-| The panel does not assign the dev server's port — it reads it from the output | **by design.** `PORT` is ignored by everything that keeps the port in its config. A server that prints no address runs without a link — pin its port by hand |
-| Freeing a busy port kills a process by PID, and only on a button press        | **by design.** A database or a neighbouring project may live there: the panel shows who it is, the person decides                                            |
+| A commit takes every change (`git add -A`)                                    | **by design.** There is no file picking and no index editing in the panel — git is for that                                                                                                                                            |
+| The panel does not assign the dev server's port — it reads it from the output | **by design.** `PORT` is ignored by everything that keeps the port in its config. A server that prints no address runs without a link — pin its port by hand                                                                           |
+| Freeing a busy port kills a process by PID, and only on a button press        | **by design.** A database or a neighbouring project may live there: the panel shows who it is, the person decides                                                                                                                      |
 
 ## Rules
 
@@ -70,6 +70,16 @@ The per-CLI boundaries live in their own file:
 | No versions and no edit history                     | **by design.** That is what git is for                                     |
 | Whether a skill will be picked up is not knowable   | **not ours.** The model decides from the description; test it in a sandbox |
 | Nested files are read only if `SKILL.md` links them | **not ours.** Claude Code does not walk the folder                         |
+
+## Commands
+
+| What                                         | Why                                                                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| The section edits nothing                    | **by design.** It is a display case: editing happens in Skills or Plugins, one button away  |
+| A command cannot be run from here            | **by design.** Invoking stays with the chat and the CLI                                     |
+| The built-in list is maintained by the panel | **not ours.** The CLI cannot enumerate its own commands; a fresh one arrives with an update |
+| Foreign descriptions are not translated      | **by design.** A skill's or plugin's description is shown exactly as written in its file    |
+| Groups follow names and owners, not intent   | **by design.** A shared name prefix or one plugin are the only signals visible on disk      |
 
 ## Hooks
 

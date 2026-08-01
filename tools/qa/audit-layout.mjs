@@ -12,6 +12,7 @@ const ROUTES = [
   ['Аналитика', '/analytics'],
   ['Правила', '/rules'],
   ['Скиллы', '/skills'],
+  ['Команды', '/commands'],
   ['Хуки', '/hooks'],
   ['Плагины', '/plugins'],
   ['MCP', '/mcp'],

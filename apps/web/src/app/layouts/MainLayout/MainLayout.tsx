@@ -5,6 +5,7 @@ import { DURATION, EASE, RISE, withReducedMotion } from '@shared/lib/motion';
 import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMotion';
 import { useMediaQuery } from '@shared/hooks/use-media-query/useMediaQuery';
 import { Stack } from '@shared/ui/stack';
+import { useAttentionBadge } from '@shared/lib/attention';
 import { OnboardingWizard } from '@app/onboarding/OnboardingWizard';
 import { ProviderTrustBadge } from '@features/ProviderTrust';
 import { Sidebar } from './Sidebar';
@@ -37,6 +38,11 @@ export function MainLayout() {
   // доступной), сколько бы ни стояло в сохранённом состоянии.
   const isNarrow = useMediaQuery('(max-width: 900px)');
   const effectiveCollapsed = isCollapsed || isNarrow;
+
+  // Точка на значке вкладки и в её заголовке, пока агент где-то ждёт ответа.
+  // Живёт в каркасе, а не в чате: уйти в другой раздел и не узнать, что тебя
+  // спросили, — ровно тот случай, ради которого метка и заводилась.
+  useAttentionBadge();
 
   return (
     <Stack direction="row" className={styles.root}>

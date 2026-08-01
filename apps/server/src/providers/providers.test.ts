@@ -85,10 +85,20 @@ describe('реестр провайдеров', () => {
       CAPABILITIES.filter((cap) => getProvider('codex').capabilities[cap] === 'ready').sort(),
     ).toEqual(['chat', 'env', 'globalInstructions', 'mcp', 'permissions', 'projects', 'scripts']);
     // Gemini: GEMINI-3 закрыл env (файл .env), GEMINI-2 — права
-    // (general.defaultApprovalMode + coreTools/excludeTools в settings.json).
+    // (general.defaultApprovalMode + coreTools/excludeTools в settings.json),
+    // команды — каталог commands/**/*.toml (только чтение).
     expect(
       CAPABILITIES.filter((cap) => getProvider('gemini').capabilities[cap] === 'ready').sort(),
-    ).toEqual(['chat', 'env', 'globalInstructions', 'mcp', 'permissions', 'projects', 'scripts']);
+    ).toEqual([
+      'chat',
+      'commands',
+      'env',
+      'globalInstructions',
+      'mcp',
+      'permissions',
+      'projects',
+      'scripts',
+    ]);
   });
 
   it('mcpConfig задан у codex/gemini/cursor/opencode; у claude и aider — нет', () => {
@@ -230,6 +240,8 @@ describe('реестр провайдеров', () => {
 
     expect(CAPABILITIES.filter((cap) => provider.capabilities[cap] === 'ready').sort()).toEqual([
       'chat',
+      // Команды — тот же формат, что у gemini: ~/.qwen/commands/**/*.toml.
+      'commands',
       'env',
       'globalInstructions',
       'hooks',
@@ -527,6 +539,8 @@ describe('реестр провайдеров', () => {
     expect(CAPABILITIES.filter((cap) => capabilities[cap] === 'ready').sort()).toEqual([
       // OPENCODE-7: one-shot `opencode run "<промпт>"` — basic-чат стал рабочим.
       'chat',
+      // Команды: файлы commands/*.md с шапкой + ключ `command` в opencode.json.
+      'commands',
       'globalInstructions',
       // OPENCODE-3: `experimental.hook` в opencode.json (глобальном и проектном).
       'hooks',

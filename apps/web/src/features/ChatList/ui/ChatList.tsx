@@ -8,6 +8,8 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { SearchField } from '@shared/ui/search-field';
+import { StatusDot } from '@shared/ui/status-dot';
+import { statusTone } from '@shared/lib/agent-runs';
 import { VirtualList } from '@shared/ui/virtual-list';
 import { useElementHeight } from '@shared/hooks/use-element-height';
 import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
@@ -25,7 +27,14 @@ import styles from './ChatList.module.scss';
  * со сниппетом вокруг совпадения). Результаты поиска по телу — те же строки
  * списка, поэтому клик по ним открывает разговор ровно как обычно.
  */
-export function ChatList({ chats, isLoading, activeId, onSelect, onCreate }: ChatListProps) {
+export function ChatList({
+  chats,
+  isLoading,
+  activeId,
+  onSelect,
+  onCreate,
+  statuses,
+}: ChatListProps) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<ChatSearchMode>('title');
@@ -131,6 +140,7 @@ export function ChatList({ chats, isLoading, activeId, onSelect, onCreate }: Cha
                 snippet={row.data.snippet}
                 matchCount={row.data.matchCount}
                 query={searchNeedle}
+                status={statuses?.get(row.data.chat.id)}
                 onSelect={() => onSelect(row.data.chat)}
               />
             )
@@ -211,7 +221,16 @@ function timeGroup(iso: string): TimeGroup {
   return date.getTime() >= weekAgo.getTime() ? 'thisWeek' : 'earlier';
 }
 
-function ChatRow({ chat, isActive, language, onSelect, snippet, matchCount, query }: ChatRowProps) {
+function ChatRow({
+  chat,
+  isActive,
+  language,
+  onSelect,
+  snippet,
+  matchCount,
+  query,
+  status,
+}: ChatRowProps) {
   const { t } = useTranslation();
 
   return (
@@ -222,9 +241,17 @@ function ChatRow({ chat, isActive, language, onSelect, snippet, matchCount, quer
       title={chat.projectPath || chat.project}
     >
       <Stack gap="var(--spacing-3xs)">
-        <Typography variant="body-sm" weight="medium" className={styles.title}>
-          {chat.title}
-        </Typography>
+        <Stack direction="row" align="center" gap="var(--spacing-2xs)">
+          {/* Точка у разговора, а не только у проекта: агентов в проекте может
+              быть несколько, и «кто-то ждёт ответа» без адреса бесполезно.
+              Пульсирует — тот же язык, что и в пульте агентов. */}
+          {status && (
+            <StatusDot tone={statusTone(status)} pulse label={t(`workspace.status.${status}`)} />
+          )}
+          <Typography variant="body-sm" weight="medium" className={styles.title}>
+            {chat.title}
+          </Typography>
+        </Stack>
 
         {snippet ? (
           <Typography variant="caption" color="subtle" className={styles.preview} as="div">

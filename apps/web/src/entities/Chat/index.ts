@@ -3,6 +3,7 @@ export {
   useChatMessages,
   useChatBodySearch,
   useArtifacts,
+  useChatProgress,
   useArtifactSource,
   useDeleteArtifact,
   useRefreshChat,

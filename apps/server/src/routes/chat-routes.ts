@@ -3,6 +3,7 @@ import { statSync } from 'node:fs';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../context.ts';
 import { readChats, readChatMessages } from '../domains/chat/ChatHistory.ts';
+import { readChatProgress } from '../domains/chat/ChatProgress.ts';
 import { searchChats } from '../domains/chat/ChatSearch.ts';
 import { listProjects } from '../domains/chat/ChatProjects.ts';
 import { listRoots, listDirectory } from '../domains/fs/FileBrowser.ts';
@@ -249,6 +250,14 @@ export function registerChatRoutes(
       const offset = clampInt(request.query.offset, 0, 0, Number.MAX_SAFE_INTEGER);
       return readChatMessages(projectsDir(), request.params.chatId, { limit, offset });
     },
+  );
+
+  /**
+   * Прогресс агента: чекпоинты его собственного плана и дерево субагентов.
+   * Только чтение — план принадлежит агенту, панель его не правит.
+   */
+  app.get<{ Params: { chatId: string } }>('/api/chat/:chatId/progress', (request) =>
+    readChatProgress(projectsDir(), request.params.chatId),
   );
 
   /**

@@ -10,6 +10,7 @@ export * from './settings-source';
 export * from './rules';
 export * from './hooks';
 export * from './skills';
+export * from './commands';
 export * from './mcp';
 export * from './mcp-presets';
 export * from './provider-mcp';

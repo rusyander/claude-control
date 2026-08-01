@@ -3,6 +3,7 @@ import type { RunStatus } from './status';
 import type { ActiveRunView } from './selectors';
 import {
   getProjectStatuses,
+  getChatStatuses,
   getActiveRuns,
   getTotalCost,
   getTotalTokens,
@@ -23,6 +24,11 @@ export function useAgentRun(id: string | undefined): AgentRun {
 /** Карта «нормализованный путь проекта → статус» для точек на табах и в списке. */
 export function useProjectStatuses(): Map<string, RunStatus> {
   return useSyncExternalStore(subscribeRuns, getProjectStatuses, getProjectStatuses);
+}
+
+/** Карта «id разговора → статус» — точки в списке чатов одного проекта. */
+export function useChatStatuses(): Map<string, RunStatus> {
+  return useSyncExternalStore(subscribeRuns, getChatStatuses, getChatStatuses);
 }
 
 /** Активные прогоны (работают/ждут/упали) — для пульта агентов. */

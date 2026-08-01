@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { SkeletonList } from '@shared/ui/skeleton';
+import { SkeletonList, SkeletonText } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
+import { Icon } from '@shared/ui/icon';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { MessageBubble } from './MessageBubble';
 import { QuestionCard, parseQuestions } from './QuestionCard';
@@ -29,6 +30,7 @@ export function ChatMessages({
   isRunning,
   permissions,
   onPermissionDecide,
+  onRetry,
 }: ChatMessagesProps) {
   const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -180,6 +182,15 @@ export function ChatMessages({
               </Stack>
             )}
 
+            {/*
+              Скелетон под подписью: три точки говорят «жив», но не показывают,
+              что ответ вообще-то пишется. Полосы занимают место будущего текста,
+              поэтому лента не прыгает, когда первые слова наконец приходят.
+            */}
+            {stream.isRunning && !stream.text && (
+              <SkeletonText lines={3} className={styles.pendingSkeleton} />
+            )}
+
             {stream.isRunning && stream.text && <span className={styles.caret} />}
           </div>
         </div>
@@ -189,12 +200,37 @@ export function ChatMessages({
         <PermissionCard permissions={permissions} onDecide={onPermissionDecide} />
       )}
 
+      {/*
+        Ошибка — такое же событие разговора, как ответ, и место ей в ленте.
+        Раньше здесь была голая красная строка внизу: на длинной переписке её
+        не отличить от обрыва, а что делать дальше — не сказано. Карточка
+        называет беду, показывает текст целиком (он бывает многострочным) и
+        даёт то самое действие, которого человек ищет, — повторить.
+      */}
       {stream.error && (
-        <Stack gap="var(--spacing-2xs)">
-          <Typography variant="body-sm" color="danger">
-            {stream.error}
-          </Typography>
-        </Stack>
+        <div className={styles.row}>
+          <div className={styles.errorCard} role="alert" data-chat-error>
+            <Stack direction="row" align="center" gap="var(--spacing-2xs)">
+              <Icon name="error" size={20} />
+              <Typography variant="body-sm" weight="medium" as="span">
+                {t('chat.errorTitle')}
+              </Typography>
+            </Stack>
+            <div className={styles.errorText}>{stream.error}</div>
+            {onRetry && (
+              <Stack direction="row" gap="var(--spacing-2xs)">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leftIcon={<Icon name="refresh" size={18} />}
+                  onClick={onRetry}
+                >
+                  {t('chat.retry')}
+                </Button>
+              </Stack>
+            )}
+          </div>
+        </div>
       )}
 
       <div ref={bottomRef} />

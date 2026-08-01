@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import type {
   Artifact,
   ChatMessagesPage,
+  ChatProgress,
   ChatSearchResponse,
   ChatSummary,
 } from '@claude-control/contracts';
@@ -14,6 +15,7 @@ export const chatKeys = {
   list: ['chats'] as const,
   messages: (id: string) => ['chats', id, 'messages'] as const,
   artifacts: (id: string) => ['chats', id, 'artifacts'] as const,
+  progress: (id: string) => ['chats', id, 'progress'] as const,
   /** Поиск по телу переписки: ключ зависит от запроса — кешируем по строке. */
   search: (query: string) => ['chats', 'search', query] as const,
 };
@@ -86,6 +88,24 @@ export function useArtifacts(chatId: string | undefined) {
       return data;
     },
     enabled: Boolean(chatId),
+  });
+}
+
+/**
+ * Прогресс агента: его собственные чекпоинты и дерево субагентов. Источник —
+ * транскрипт, поэтому данные есть и у вчерашнего разговора, а не только у
+ * открытой вкладки. Пока агент работает, перечитываем раз в несколько секунд:
+ * CLI дописывает транскрипт по ходу дела, и план обновляется почти сразу.
+ */
+export function useChatProgress(chatId: string | undefined, isRunning: boolean) {
+  return useQuery({
+    queryKey: chatKeys.progress(chatId ?? ''),
+    queryFn: async () => {
+      const { data } = await apiClient.get<ChatProgress>(`/chat/${chatId}/progress`);
+      return data;
+    },
+    enabled: Boolean(chatId),
+    refetchInterval: isRunning ? 4000 : false,
   });
 }
 

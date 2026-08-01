@@ -8,7 +8,8 @@ import { Badge } from '@shared/ui/badge';
 import { Toggle } from '@shared/ui/toggle';
 import { StatusDot } from '@shared/ui/status-dot';
 import { statusTone, type ActiveRunView } from '@shared/lib/agent-runs';
-import { useChatPrefs } from '@shared/lib/chat-prefs';
+import { useChatPrefs, MIN_SOUND_VOLUME, MAX_SOUND_VOLUME } from '@shared/lib/chat-prefs';
+import { playNotification } from '@shared/lib/notify-sound';
 import { formatSpend } from '@shared/lib/format';
 import type { AgentsPanelProps, AgentRowProps } from './AgentsPanel.types';
 import styles from './AgentsPanel.module.scss';
@@ -35,7 +36,7 @@ export function AgentsPanel({
 }: AgentsPanelProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
-  const { sound, setSound } = useChatPrefs();
+  const { sound, setSound, soundVolume, setSoundVolume } = useChatPrefs();
 
   const running = activeRuns.filter((run) => run.status === 'running').length;
   const worst = worstTone(activeRuns);
@@ -88,6 +89,39 @@ export function AgentsPanel({
                     {t('agents.sound')}
                   </Typography>
                 </Stack>
+
+                {/* Громкость: базовый синтезированный сигнал слышно едва, поэтому
+                    по умолчанию он усилен вдвое, а ползунок доводит до нужного.
+                    Щелчок по проценту проигрывает пробу — подбирать на слух. */}
+                {sound && (
+                  <Stack
+                    direction="row"
+                    align="center"
+                    gap="var(--spacing-3xs)"
+                    title={t('agents.volumeHint')}
+                  >
+                    <input
+                      type="range"
+                      className={styles.volume}
+                      min={MIN_SOUND_VOLUME}
+                      max={MAX_SOUND_VOLUME}
+                      step={0.25}
+                      value={soundVolume}
+                      aria-label={t('agents.volume')}
+                      onChange={(event) => setSoundVolume(Number(event.target.value))}
+                      onMouseUp={() => playNotification('waiting', soundVolume)}
+                      onKeyUp={() => playNotification('waiting', soundVolume)}
+                    />
+                    <button
+                      type="button"
+                      className={styles.volumeValue}
+                      onClick={() => playNotification('waiting', soundVolume)}
+                      title={t('agents.volumeTest')}
+                    >
+                      {Math.round(soundVolume * 100)}%
+                    </button>
+                  </Stack>
+                )}
               </Stack>
               {activeRuns.length > 0 && (
                 <Button variant="danger" size="sm" onClick={onStopAll}>

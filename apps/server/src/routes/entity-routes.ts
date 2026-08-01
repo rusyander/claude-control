@@ -13,6 +13,7 @@ import type {
 import type { ServerContext } from '../context.ts';
 import { readRules, saveRule, deleteRule } from '../domains/rules.ts';
 import { readHooks, upsertHook, deleteHook, moveHook } from '../domains/hooks.ts';
+import { readCommands } from '../domains/commands.ts';
 import {
   readSkills,
   saveSkill,
@@ -199,6 +200,14 @@ export function registerEntityRoutes(app: FastifyInstance, ctx: ServerContext): 
 
   // --- Скиллы (папки в skills/) ---
   app.get('/api/skills', () => readSkills(paths().skills, ctx.store));
+
+  /**
+   * Слэш-команды активного провайдера — сводный список того, что вызывается
+   * через `/`. Только чтение: правится команда там, где живёт (скилл — в разделе
+   * скиллов, плагин — в разделе плагинов). Встроенных команд CLI здесь нет:
+   * файла у них не существует, их каталог ведёт клиент.
+   */
+  app.get('/api/commands', () => readCommands(paths(), ctx.store));
 
   app.post<{ Body: SkillDraft }>('/api/skills', (request, reply) => {
     try {

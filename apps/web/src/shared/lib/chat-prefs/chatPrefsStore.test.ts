@@ -32,6 +32,20 @@ describe('sanitizePrefs', () => {
     expect(sanitizePrefs({}).sound).toBe(true);
     expect(sanitizePrefs({ sound: false }).sound).toBe(false);
   });
+
+  /**
+   * Громкость по умолчанию 200%: базовый синтезированный тон слышно едва, и
+   * ради него настройка и заводилась. Мусор и выход за границы не должны ни
+   * оглушать, ни выключать звук молча.
+   */
+  it('громкость: дефолт 200%, мусор → дефолт, выход за границы обрезается', () => {
+    expect(sanitizePrefs(undefined).soundVolume).toBe(2);
+    expect(sanitizePrefs({ soundVolume: 'громко' as unknown as number }).soundVolume).toBe(2);
+    expect(sanitizePrefs({ soundVolume: Number.NaN }).soundVolume).toBe(2);
+    expect(sanitizePrefs({ soundVolume: 99 }).soundVolume).toBe(4);
+    expect(sanitizePrefs({ soundVolume: -5 }).soundVolume).toBe(0);
+    expect(sanitizePrefs({ soundVolume: 1.5 }).soundVolume).toBe(1.5);
+  });
 });
 
 /**

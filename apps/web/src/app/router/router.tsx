@@ -6,6 +6,7 @@ import { RulesPage } from '@pages/Rules/RulesPage';
 import { InstructionsSection } from '@pages/ClaudeMd/InstructionsSection';
 import { HooksSection } from '@pages/Hooks/HooksSection';
 import { SkillsSection } from '@pages/Skills/SkillsSection';
+import { CommandsPage } from '@pages/Commands/CommandsPage';
 import { ScriptsPage } from '@pages/Scripts/ScriptsPage';
 import { ChatSection } from '@pages/Chat/ChatSection';
 import { PluginsSection } from '@pages/Plugins/PluginsSection';
@@ -81,6 +82,7 @@ const routes = [
   { path: '/claude-md', component: gated('globalInstructions', InstructionsSection) },
   { path: '/hooks', component: gated('hooks', HooksSection) },
   { path: '/skills', component: gated('skills', SkillsSection) },
+  { path: '/commands', component: gated('commands', CommandsPage) },
   { path: '/scripts', component: gated('scripts', ScriptsPage) },
   { path: '/plugins', component: gated('plugins', PluginsSection) },
   { path: '/mcp', component: gated('mcp', McpSection) },

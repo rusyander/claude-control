@@ -26,6 +26,31 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+/* Ползунок громкости узкий: он делит строку со счётчиком агентов и тумблером,
+   а панель шириной 360px. */
+.volume {
+  width: 72px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.volumeValue {
+  min-width: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-fg-subtle);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-fg);
+  }
+}
+
 .list {
   max-height: 50vh;
   overflow-y: auto;

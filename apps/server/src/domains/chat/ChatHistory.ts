@@ -14,6 +14,7 @@ import type {
   ChatMessage,
   ChatBlock,
   ChatMessagesPage,
+  MessageUsage,
 } from '@claude-control/contracts';
 import { isSandboxPath } from './ChatArtifacts.ts';
 
@@ -101,6 +102,7 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
     updatedAt: stats.mtime.toISOString(),
     preview: cleanText(textOf(lastMessage)).slice(0, 160) || undefined,
     model: lastValue(records, (record) => record.message?.model),
+    awaitingReply: isAwaitingReply(records) || undefined,
   };
 
   cache.set(path, { mtimeMs: stats.mtimeMs, size: stats.size, summary });
@@ -165,6 +167,7 @@ export async function readChatMessages(
       blocks,
       timestamp: record.timestamp ?? '',
       parentId: record.parentUuid ?? undefined,
+      usage: toUsage(record),
     });
 
     // Лишнее с начала выбрасываем сразу, не дожидаясь конца файла.
@@ -223,10 +226,20 @@ interface Record {
   isCompactSummary?: boolean;
   isApiErrorMessage?: boolean;
   toolUseResult?: unknown;
+  isSidechain?: boolean;
   message?: {
     role?: string;
     model?: string;
     content?: string | ContentBlock[];
+    /** Расход на шаг — модель кладёт его рядом с ответом. */
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+      /** Разбивка записи в кэш по сроку жизни: часовая стоит вдвое дороже. */
+      cache_creation?: { ephemeral_1h_input_tokens?: number };
+    };
   };
 }
 
@@ -301,6 +314,61 @@ function readChunk(path: string, position: number, length: number): string {
 }
 
 /** Настоящая реплика диалога, а не служебная запись. */
+/**
+ * Расход на шаг из записи транскрипта.
+ *
+ * Только у ответов модели: реплика человека токенов не тратит, и бейдж «0» на
+ * ней читался бы как сбой подсчёта, а не как «здесь нечего показывать».
+ * Пустой usage (все четыре нуля) отбрасываем по той же причине.
+ *
+ * Стоимость здесь НЕ считается: тарифы живут в кэше прайса, до которого
+ * добирается роут, — история о ценах ничего не знает.
+ */
+function toUsage(record: Record): MessageUsage | undefined {
+  const usage = record.message?.usage;
+  if (!usage) return undefined;
+
+  const input = usage.input_tokens ?? 0;
+  const output = usage.output_tokens ?? 0;
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const cacheCreation = usage.cache_creation_input_tokens ?? 0;
+  if (!input && !output && !cacheRead && !cacheCreation) return undefined;
+
+  const long = usage.cache_creation?.ephemeral_1h_input_tokens;
+  return {
+    input,
+    output,
+    cacheRead,
+    cacheCreation,
+    cacheCreation1h: long || undefined,
+    model: record.message?.model,
+  };
+}
+
+/**
+ * Разговор стоит на вопросе к человеку.
+ *
+ * Смотрим последнюю запись СО СМЫСЛОМ (служебные — заголовок, отметка о
+ * промпте — пропускаем, ветки субагентов тоже): если это вызов
+ * `AskUserQuestion`, ответа за ним ещё нет — CLI пишет его следующей строкой,
+ * сразу как человек выбрал вариант. Через `isDialogMessage` это не считается
+ * намеренно: тот прячет результаты инструментов, и ответ на вопрос перестал бы
+ * гасить признак.
+ */
+function isAwaitingReply(records: Record[]): boolean {
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    if (!record?.message || record.isSidechain) continue;
+    if (record.type !== 'assistant') return false;
+
+    const content = record.message.content;
+    if (!Array.isArray(content)) return false;
+    return content.some((block) => block.type === 'tool_use' && block.name === 'AskUserQuestion');
+  }
+
+  return false;
+}
+
 function isDialogMessage(record: Record): boolean {
   if (record.type !== 'user' && record.type !== 'assistant') return false;
   if (record.isMeta || record.isCompactSummary || record.isApiErrorMessage) return false;

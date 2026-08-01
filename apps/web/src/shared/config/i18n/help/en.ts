@@ -258,7 +258,10 @@ export const helpEn: HelpSchema = {
       dotGreen: 'Green',
       dotGreenText: 'The agent is working. The dot pulses while events keep arriving.',
       dotYellow: 'Yellow',
-      dotYellowText: 'The agent asked a question and is waiting. Reply in the input field.',
+      dotYellowText:
+        'The agent asked a question or wants permission and is waiting. A question ' +
+        'shows up even for a conversation the panel did not start: it is read from ' +
+        'the transcript, so an agent in a terminal or another window calls too.',
       dotRed: 'Red',
       dotRedText:
         'An error, a rate limit — or a stalled run: if no events arrive for two ' +
@@ -396,6 +399,17 @@ export const helpEn: HelpSchema = {
       spendLimitText:
         'Appears only when a limit was hit: it shows when the limit resets. How much of ' +
         'the limit is left cannot be found out locally.',
+      spendStep: 'The numbers to the right of an action',
+      spendStepText:
+        'The price of every step, right in the feed: the muted number is the whole ' +
+        'volume that went through the model, the accented one is the new work of that ' +
+        'step (fresh input, cache writes, generation). They are split because the full ' +
+        'volume is roughly the size of the context on almost every step and consists ' +
+        'mostly of cache reads: a cheap action cannot be told from an expensive one by ' +
+        'it. Hover the numbers for the breakdown by token kind with shares, the model ' +
+        'of that step and the cost at its rate; a click pins the panel. The model ' +
+        'counts spend per STEP, so several calls made at once share one number — the ' +
+        'panel says so outright instead of splitting it evenly.',
 
       recipesTitle: 'How to start working with a project',
       recipe1: 'Open the project',
@@ -432,6 +446,14 @@ export const helpEn: HelpSchema = {
         'ordinary message into the same conversation. While the agent is busy the ' +
         'buttons are disabled — wait for the reply or stop the run. If none of the ' +
         'options fits, type your own answer as usual.',
+      noteOutsideTitle: 'A question calls even from a conversation the panel did not start',
+      noteOutsideText:
+        'The dot, the browser badge and the sound are raised from the transcript, so ' +
+        'an agent in a terminal or a neighbouring window calls too: the sound plays ' +
+        'once per new question, and the dot stays until you answer. A permission ' +
+        'request is not visible this way — it lives only inside the process and never ' +
+        'reaches the transcript before it is decided, so the panel knows about it only ' +
+        'for its own runs.',
       noteArtifactsTitle: 'The list of created files exists only for chats outside a project',
       noteArtifactsText:
         'Inside a real project the panel deliberately does not show it: dumping a ' +
@@ -450,6 +472,13 @@ export const helpEn: HelpSchema = {
       noteHistoryText:
         'Very long conversations are trimmed from the top: transcripts run to hundreds ' +
         'of megabytes, and there is nothing to read them whole with in a browser.',
+      noteLiveTitle: 'A conversation running outside the panel is picked up on its own',
+      noteLiveText:
+        'The same chat can be driven from a terminal or an editor extension — such a ' +
+        'turn has no event stream of its own. The feed still updates: the server ' +
+        'watches transcript files and reports changes, and the panel additionally asks ' +
+        'for the fingerprint of the open conversation every few seconds — in case file ' +
+        'watching is switched off in settings or the stream broke. No page reload needed.',
       noteProviderTitle: 'The assistant is basic with other providers',
       noteProviderText:
         'Everything described here — streaming, attachments, branching, parallel agents, ' +

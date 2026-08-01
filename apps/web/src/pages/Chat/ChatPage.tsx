@@ -48,6 +48,7 @@ import { ArtifactPreview } from '@features/ArtifactPreview';
 import {
   useChats,
   useChatMessages,
+  useChatAutoRefresh,
   useArtifacts,
   useChatProgress,
   useDeleteArtifact,
@@ -55,6 +56,9 @@ import {
   chatExportUrl,
   chatKeys,
   CHAT_PAGE_SIZE,
+  useAwaitingChats,
+  mergeAwaitingStatuses,
+  mergeAwaitingProjectStatuses,
 } from '@entities/Chat';
 import type { StreamState } from '@entities/Chat';
 import { useProjects, useOpenInEditor, type ProjectInfo } from '@entities/Project';
@@ -113,10 +117,22 @@ export function ChatPage() {
   const projects = useProjects();
   const ws = useWorkspace();
   const clearRunnerAutostart = useClearRunnerAutostart();
-  const projectStatuses = useProjectStatuses();
+  const liveProjectStatuses = useProjectStatuses();
   // Точки в списке чатов: в одном проекте агентов может быть несколько, и по
   // точке на табе не понять, который из разговоров зовёт.
-  const chatStatuses = useChatStatuses();
+  const liveChatStatuses = useChatStatuses();
+  // Разговор мог стоять на вопросе задолго до того, как открыли панель, — или
+  // идти вовсе мимо неё. Такие видны только по транскрипту, и точку им ставит
+  // тот же механизм, что и живым прогонам.
+  const awaitingChats = useAwaitingChats();
+  const chatStatuses = useMemo(
+    () => mergeAwaitingStatuses(liveChatStatuses, awaitingChats),
+    [liveChatStatuses, awaitingChats],
+  );
+  const projectStatuses = useMemo(
+    () => mergeAwaitingProjectStatuses(liveProjectStatuses, awaitingChats),
+    [liveProjectStatuses, awaitingChats],
+  );
   const activeRuns = useActiveRuns();
   const totalCost = useTotalCost();
   const totalTokens = useTotalTokens();
@@ -128,6 +144,7 @@ export function ChatPage() {
   const stream: StreamState = useMemo(
     () => ({
       text: run.text,
+      textUsage: run.textUsage,
       thinking: run.thinking,
       tools: run.tools,
       isRunning,
@@ -192,6 +209,10 @@ export function ChatPage() {
 
   const messages = useChatMessages(activeChat?.id, messagesLimit);
   const messageList = messages.data?.messages ?? [];
+  // Разговор мог продолжиться мимо панели — из терминала или расширения
+  // редактора. Такой ход не даёт потока событий, и лента жила бы снимком на
+  // момент открытия: вопрос агента человек увидел бы только после F5.
+  useChatAutoRefresh(activeChat?.id, isRunning);
   // Прогресс агента читается из транскрипта, поэтому нужен настоящий id сессии:
   // у нового разговора он появляется только с первым событием потока.
   const progress = useChatProgress(activeChat?.id ?? run.sessionId, isRunning);
@@ -982,6 +1003,8 @@ export function ChatPage() {
                 chatId && agentRuns.decidePermission(chatId, toolUseId, behavior)
               }
               onRetry={chatId ? () => agentRuns.retry(chatId) : undefined}
+              costUnit={costUnit}
+              effort={run.effort}
             />
           ) : (
             <Stack

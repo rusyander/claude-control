@@ -15,8 +15,20 @@ export function FileWatchProvider({ children }: FileWatchProviderProps) {
     const source = new EventSource('/api/events');
 
     source.onmessage = (event) => {
-      const payload = JSON.parse(event.data) as { domains?: string[] };
+      const payload = JSON.parse(event.data) as { domains?: string[]; path?: string };
       for (const domain of payload.domains ?? []) {
+        // Транскрипты — единственный домен, где важно, ЧТО именно изменилось:
+        // разговоров сотни, они пишутся постоянно (в том числе из терминала и
+        // соседних окон), и общая инвалидация заставляла бы открытый чат
+        // перечитываться из-за чужой переписки. Ленту трогаем только у того
+        // разговора, чей файл дописали; список обновляем всегда — в нём
+        // меняются превью и время.
+        if (domain === 'chats') {
+          void queryClient.invalidateQueries({ queryKey: ['chats'], exact: true });
+          const sessionId = payload.path?.match(/([^\\/]+)\.jsonl$/)?.[1];
+          if (sessionId) void queryClient.invalidateQueries({ queryKey: ['chats', sessionId] });
+          continue;
+        }
         for (const key of DOMAIN_KEYS[domain] ?? []) {
           void queryClient.invalidateQueries({ queryKey: key });
         }

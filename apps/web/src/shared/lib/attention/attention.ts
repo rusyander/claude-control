@@ -30,17 +30,27 @@ export function callsForAttention(status: ActiveRunView['status']): boolean {
 /**
  * Свести активные прогоны к одному сигналу. `dismissed` — карта «прогон → статус,
  * в котором его уже видели»: совпал статус, значит человек этот повод закрыл.
+ *
+ * `awaiting` — разговоры, где вопрос агента висит без ответа по данным самого
+ * транскрипта. Такой повод не гасится показом: пока не ответишь, ждут по
+ * -настоящему, а прогона за ним может и не быть — агента могли запустить в
+ * терминале, и в память вкладки он не попал.
  */
 export function selectAttention(
   runs: ActiveRunView[],
   dismissed: ReadonlyMap<string, string>,
+  awaiting: readonly string[] = [],
 ): AttentionView {
   const calling = runs.filter(
     (run) => callsForAttention(run.status) && dismissed.get(run.id) !== run.status,
   );
-  if (calling.length === 0) return { count: 0 };
+  const counted = new Set(calling.flatMap((run) => [run.id, run.sessionId ?? run.id]));
+  const extra = awaiting.filter((id) => !counted.has(id));
+
+  const count = calling.length + extra.length;
+  if (count === 0) return { count: 0 };
   return {
-    count: calling.length,
+    count,
     tone: calling.some((run) => run.status === 'error') ? 'danger' : 'warning',
   };
 }

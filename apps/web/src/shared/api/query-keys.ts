@@ -149,4 +149,7 @@ export const DOMAIN_KEYS: Record<string, readonly (readonly string[])[]> = {
   permissions: [queryKeys.permissions, queryKeys.overview, queryKeys.history],
   env: [queryKeys.env, queryKeys.history],
   overview: [queryKeys.overview],
+  // Транскриптов здесь намеренно нет: разговоров сотни, и правка одного не
+  // повод перечитывать открытый — обновление идёт адресно, по пути из события
+  // (см. FileWatchProvider).
 };

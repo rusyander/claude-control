@@ -2,7 +2,8 @@ import { join, isAbsolute } from 'node:path';
 import { statSync } from 'node:fs';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import { readChats, readChatMessages } from '../domains/chat/ChatHistory.ts';
+import type { ChatMessage } from '@claude-control/contracts';
+import { readChats, readChatMessages, findTranscript } from '../domains/chat/ChatHistory.ts';
 import { readChatProgress } from '../domains/chat/ChatProgress.ts';
 import { searchChats } from '../domains/chat/ChatSearch.ts';
 import { listProjects } from '../domains/chat/ChatProjects.ts';
@@ -32,6 +33,7 @@ import {
   SUPPORTED_UPLOAD_EXTENSIONS,
 } from '../domains/chat/ChatUploads.ts';
 import { activeCliCommand } from '../providers/cli.ts';
+import { estimateCost } from '../domains/analytics/pricing.ts';
 
 /** Заголовки SSE-ответа: держим поток открытым, ничего не кэшируем. */
 const SSE_HEADERS = {
@@ -57,6 +59,16 @@ export function registerChatRoutes(
   registry: ChatRunRegistry = new ChatRunRegistry(),
 ): void {
   const permissions = new PermissionBroker();
+
+  // Реестр считает расход, но тарифов не знает: прайс и свои цены пользователя
+  // доступны только здесь. Отдаём ему саму функцию, а не таблицу, — тогда правка
+  // цен в настройках подхватывается со следующего же шага.
+  registry.setCostEstimator((model, tokens) =>
+    estimateCost(model, tokens, {
+      overrides: ctx.store.getSettings().modelPricing,
+      entries: ctx.pricing.current().entries,
+    }),
+  );
 
   /**
    * Автоподтверждение прав по разговорам: ключ тот же, под которым прогон
@@ -245,12 +257,63 @@ export function registerChatRoutes(
    */
   app.get<{ Params: { chatId: string }; Querystring: { limit?: string; offset?: string } }>(
     '/api/chats/:chatId/messages',
-    (request) => {
+    async (request) => {
       const limit = clampInt(request.query.limit, DEFAULT_MESSAGE_PAGE, 1, MAX_MESSAGE_PAGE);
       const offset = clampInt(request.query.offset, 0, 0, Number.MAX_SAFE_INTEGER);
-      return readChatMessages(projectsDir(), request.params.chatId, { limit, offset });
+      const page = await readChatMessages(projectsDir(), request.params.chatId, { limit, offset });
+      return { ...page, messages: page.messages.map(withStepCost) };
     },
   );
+
+  /**
+   * Дополнить расход шага ценой по тарифу его модели.
+   *
+   * Считается здесь, а не в истории: тарифы живут в кэше прайса и в настройках
+   * пользователя, до которых добирается только слой маршрутов. Цена нужна как
+   * раз потому, что по объёму токенов дешёвый шаг от дорогого не отличить —
+   * чтение кэша стоит на порядок меньше свежего входа.
+   *
+   * Момент берём по времени самого сообщения: у моделей бывают вводные цены с
+   * датой окончания, и старая переписка должна считаться по тем тарифам,
+   * которые действовали тогда.
+   */
+  function withStepCost(message: ChatMessage): ChatMessage {
+    const { usage } = message;
+    if (!usage?.model) return message;
+
+    const at = Date.parse(message.timestamp);
+    const costUsd = estimateCost(usage.model, usage, {
+      overrides: ctx.store.getSettings().modelPricing,
+      entries: ctx.pricing.current().entries,
+      at: Number.isNaN(at) ? undefined : at,
+    });
+
+    return { ...message, usage: { ...usage, costUsd } };
+  }
+
+  /**
+   * Отпечаток транскрипта: изменился ли разговор с прошлого раза.
+   *
+   * Страховка к потоку `/api/events`: тот же разговор могут вести из терминала
+   * или расширения редактора, наблюдатель за файлами бывает выключен тумблером,
+   * а поток — оборван прокси. Опрашивать этой точкой дёшево (одна `stat`), в
+   * отличие от самой ленты: ту приходится читать построчно целиком, а
+   * транскрипт бывает стомегабайтным.
+   *
+   * Нет файла — нули: разговор ещё не начат, и это не ошибка.
+   */
+  app.get<{ Params: { chatId: string } }>('/api/chats/:chatId/version', (request) => {
+    const path = findTranscript(projectsDir(), request.params.chatId);
+    if (!path) return { mtimeMs: 0, size: 0 };
+
+    try {
+      const stats = statSync(path);
+      return { mtimeMs: stats.mtimeMs, size: stats.size };
+    } catch {
+      // Файл убрали между поиском и чтением — для опроса это просто «пусто».
+      return { mtimeMs: 0, size: 0 };
+    }
+  });
 
   /**
    * Прогресс агента: чекпоинты его собственного плана и дерево субагентов.

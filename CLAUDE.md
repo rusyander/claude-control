@@ -3,11 +3,11 @@
 Auto-loaded every session → tight and English. Humans read [docs/SETUP.ru.md](docs/SETUP.ru.md);
 answers to the user stay Russian.
 
-**Read on demand, not loaded here:** [.claude/gotchas.md](.claude/gotchas.md) — traps already paid
-for; read the relevant entry BEFORE touching pricing/analytics, enable-disable of
-hooks/rules/groups, sessions & chat resume, MCP OAuth, secrets, help texts, Windows file ops.
-[.agent/universal-providers.agent.md](.agent/universal-providers.agent.md) — capability map and
-IMMUTABLE RULES; read BEFORE any provider-layer edit.
+**Read on demand:** [.claude/gotchas.md](.claude/gotchas.md) — traps already paid for; read the
+entry BEFORE touching pricing/analytics, enable-disable of hooks/rules/groups, sessions & chat
+resume, MCP OAuth, secrets, help texts, Windows file ops ·
+[.agent/universal-providers.agent.md](.agent/universal-providers.agent.md) — capability map +
+IMMUTABLE RULES, before any provider-layer edit ·
 [.agent/provider-tools.agent.md](.agent/provider-tools.agent.md) — model catalog, environment
 transfer, format check vs published schemas.
 
@@ -17,11 +17,11 @@ transfer, format check vs published schemas.
 
 Local web panel over Claude Code's own configuration: reads and edits `~/.claude` (rules, skills,
 hooks, permissions, MCP, env), transcript analytics, full CLI chat, isolated sandbox. Nine more
-CLIs (codex/gemini/qwen/continue/goose/kimi/cursor/opencode/aider) are configurable, Claude is the
-default and the only verified one. No database — **source of truth = Claude Code's files**; most behaviour follows.
+CLIs (codex/gemini/qwen/continue/goose/kimi/cursor/opencode/aider) are configurable; Claude is the
+default and the only verified one. No database — **source of truth = Claude Code's files**.
 
-- `apps/server` — Fastify, port 5178; reads/writes `~/.claude`, spawns `claude`
-- `apps/web` — React + Vite, port 8888; proxies `/api`
+- `apps/server` — Fastify :5178, reads/writes `~/.claude`, spawns `claude`
+- `apps/web` — React + Vite :8888, proxies `/api`
 - `packages/contracts` — shared types + zod schemas
 - `tools/` — `doctor.mjs` (environment check), `qa/*.mjs` (Playwright runs)
 
@@ -42,13 +42,13 @@ the API), panel vs CLI (`claude --version` in the terminal that started the serv
 **verify by running**, then report what was verified and what stayed unverified.
 
 Fix without asking: project code, deps, build config, launch env. Ask first: files in `~/.claude` —
-the user's real config, not test data (reading is free; hand-editing for diagnosis is not, go
-through the panel's API).
+the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
-QA runs (need `pnpm dev` up + `pnpm qa:setup`): `tools/qa/audit-layout.mjs` (layout, all pages),
-`check-motion.mjs` (animation + geometry), `check-chat-regressions.mjs` (end-to-end chat),
-`check-all-forms.mjs` (9 forms), `check-sandbox.mjs`, `check-commands.mjs` (slash-command list,
-both locales), `check-help.mjs` (every help document, leaked i18n keys).
+QA runs (need `pnpm dev` up + `pnpm qa:setup`): `tools/qa/audit-layout.mjs` (layout, all pages) ·
+`check-motion.mjs` (animation + geometry) · `check-chat-regressions.mjs` (end-to-end chat) ·
+`check-all-forms.mjs` (9 forms) · `check-sandbox.mjs` · `check-commands.mjs` (slash commands, both
+locales) · `check-help.mjs` (every help document, leaked i18n keys) · `check-attention.mjs`
+(waiting-dot + tab badge; stubs `/api/chats`, so it needs no particular history on disk).
 
 ## Symptom → cause → fix
 
@@ -59,14 +59,14 @@ picked it. Order in `claude-paths.ts`, first match wins: `manual` (Settings → 
 remembered) → `env` (`CLAUDE_CONFIG_DIR`) → `home` (`~/.claude`). A once-set manual path beats the
 env var — if the user changed it and forgot, that's the answer.
 
-**Sandbox says `Not logged in` while normal chat works** — most common on macOS, not an account
-problem: the sandbox runs Claude with a substituted `CLAUDE_CONFIG_DIR`, so access must be carried
-over separately. Windows/Linux keep it in `~/.claude/.credentials.json`; macOS has no such file
-(keychain). Chain in `lib/credentials.ts`, first hit wins: `~/.claude-control/credentials.json`
-(manual, beats all) → `<config>/.credentials.json` → macOS keychain → `ANTHROPIC_API_KEY`. Fix:
-`pnpm doctor` "Доступ" line → on macOS accept the keychain dialog with "Always Allow" (renamed
-entry → `CLAUDE_CONTROL_KEYCHAIN_SERVICE`) → universal route is Settings → Claude Code access → set
-manually (`claudeAiOauth` | `apiKey` | `readFrom`), validated on the spot.
+**Sandbox says `Not logged in` while normal chat works** — usually macOS, not an account problem:
+the sandbox substitutes `CLAUDE_CONFIG_DIR`, so access is carried separately. Windows/Linux keep it
+in `~/.claude/.credentials.json`; macOS has no such file (keychain). Chain in `lib/credentials.ts`,
+first hit wins: `~/.claude-control/credentials.json` (manual, beats all) →
+`<config>/.credentials.json` → macOS keychain → `ANTHROPIC_API_KEY`. Fix: `pnpm doctor` "Доступ"
+line → on macOS accept the keychain dialog with "Always Allow" (renamed entry →
+`CLAUDE_CONTROL_KEYCHAIN_SERVICE`) → universal route is Settings → Claude Code access, set manually
+(`claudeAiOauth` | `apiKey` | `readFrom`).
 
 **`claude not found`** — panel spawns `claude.cmd` on Windows, `claude` elsewhere; must be in the
 PATH of the process that started the server.
@@ -84,36 +84,37 @@ and `127.0.0.1:WEB_PORT`. Changed the front port → set `WEB_PORT` for the serv
 
 - Verify by running, not by reasoning — `tools/qa/` drives the real UI per area.
 - Never repeat failed logins (brute-force lockouts).
-- Help is part of the code: sections `pages/Help/topics/*.tsx`, texts
-  `shared/config/i18n/help/{ru,en}.ts`. Change a section's behaviour → change its help document
-  (the user reads help inside the panel; drift here beats a stale README in damage). New document =
+- Help is part of the code: documents `pages/Help/topics/*.tsx`, texts
+  `shared/config/i18n/help/{ru,en}.ts`. Change a section's behaviour → change its help document —
+  the user reads help inside the panel, drift here beats a stale README in damage. New document =
   entry in `HELP_GROUPS` + component beside it; index, `?topic=`, "?" button and next-section link
   follow automatically.
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
 
 Gate before "done": `pnpm type-check && pnpm lint && pnpm test && node tools/qa/audit-layout.mjs`.
-Touched help → also `node tools/qa/check-help.mjs`: it opens every document from the `HELP_GROUPS`
-registry looking for on-page `help.…` strings, i.e. a key called under a name that doesn't exist
-(`tsc` checks dictionary completeness, not call sites).
+Touched help → also `node tools/qa/check-help.mjs`: it looks for on-page `help.…` strings, i.e. a
+key called under a name that doesn't exist (`tsc` checks the dictionary, not call sites).
 
 ## Where things live
 
-**Server** `apps/server/src/` — config-dir discovery `lib/claude-paths.ts` · account access & OS
-differences `lib/credentials.ts` · CLI arg escaping `lib/cli-args.ts` · safe write with backup
-`lib/safe-io.ts` · backups/rollback `domains/backups.ts` · pricing fetch+cache
+**Server** `apps/server/src/` — config dir `lib/claude-paths.ts` · account access & OS differences
+`lib/credentials.ts` · CLI arg escaping `lib/cli-args.ts` · safe write `lib/safe-io.ts` ·
+backups/rollback `domains/backups.ts` · pricing fetch+cache
 `domains/analytics/pricing-source.ts` · rates & per-model match `domains/analytics/pricing.ts` ·
 enable/disable on disk `domains/entity-toggle.ts` · MCP client (stdio/HTTP/SSE)
 `domains/mcp-client.ts` · MCP OAuth `domains/mcp-oauth.ts` · local-settings flag
-`lib/settings-source.ts` · spawn `claude` + stream parsing `domains/chat/ChatRunner.ts` ·
-transcripts `domains/chat/ChatHistory.ts` · conversation workdir `domains/chat/ChatWorkspace.ts` ·
-project list `domains/chat/ChatProjects.ts` · disk browse & open-in-editor `domains/fs/` · sandbox
-assembly `domains/sandbox/SandboxConfig.ts` · provider catalog & capabilities `providers/` ·
-foreign-format check vs published schemas `domains/format-check.ts` · slash-command inventory
-(skills + `commands/` + plugins, read-only) `domains/commands.ts` · opencode session server
-`domains/opencode-serve.ts` · routes `routes/*.ts`.
+`lib/settings-source.ts` · file watcher (config + transcripts) `lib/config-watcher.ts` · spawn
+`claude` + stream parsing `domains/chat/ChatRunner.ts` · transcripts, per-step usage,
+awaiting-reply flag `domains/chat/ChatHistory.ts` · conversation workdir
+`domains/chat/ChatWorkspace.ts` · project list `domains/chat/ChatProjects.ts` · disk browse
+`domains/fs/` · sandbox assembly `domains/sandbox/SandboxConfig.ts` · provider catalog
+`providers/` · foreign-format check `domains/format-check.ts` · slash-command inventory
+(read-only) `domains/commands.ts` · opencode session server `domains/opencode-serve.ts` · routes
+`routes/*.ts`.
 
 **Web** `apps/web/src/`, FSD layers `app` → `pages` → `features` → `entities` → `shared` — UI kit
 `shared/ui/` (each component has `*.stories.tsx`) · parallel agent runs `shared/lib/agent-runs/` ·
+browser badge & dots `shared/lib/attention/` · awaiting-reply selection `entities/Chat/model/` ·
 project tabs `shared/lib/workspace/` · sticky chat prefs `shared/lib/chat-prefs/` · motion
 `shared/lib/motion/` · showcase data `shared/lib/mocks/` · dictionaries `shared/config/i18n/` ·
 help texts `shared/config/i18n/help/` · help documents `pages/Help/topics/` + registry

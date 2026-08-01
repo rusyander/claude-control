@@ -42,6 +42,22 @@ export interface ConfigWatcher {
   watched: () => string[];
 }
 
+/**
+ * Каталог транскриптов. Разговор ведёт не только панель: тот же чат идёт из
+ * терминала, из расширения редактора, из второго окна — и дописывается прямо в
+ * этот каталог. Без наблюдения за ним лента обновлялась ТОЛЬКО у прогона,
+ * запущенного самой панелью, а чужой разговор приходилось догонять руками
+ * через F5.
+ */
+export function projectsPath(paths: ClaudePaths): string {
+  // Разделитель берём из самого каталога, а не у платформы: путь приходит и в
+  // POSIX-виде (переменная окружения, настройка «свой каталог»), а `join` на
+  // Windows превратил бы его в смешанный — и сравнение с путём из наблюдателя
+  // перестало бы совпадать.
+  const separator = paths.root.includes('\\') ? '\\' : '/';
+  return `${paths.root.replace(/[\\/]+$/, '')}${separator}projects`;
+}
+
 /** Файлы и каталоги конфигурации, изменения которых интересуют интерфейс. */
 export function watchedPaths(paths: ClaudePaths): string[] {
   return [
@@ -51,11 +67,16 @@ export function watchedPaths(paths: ClaudePaths): string[] {
     paths.secretsEnv,
     paths.skills,
     paths.mcpConfig,
+    projectsPath(paths),
   ];
 }
 
 /** Какие разделы интерфейса перечитать из-за изменения этого файла. */
 export function domainsForPath(paths: ClaudePaths, changedPath: string): string[] {
+  // Сравниваем в едином написании: наблюдатель отдаёт путь в том виде, в каком
+  // его вернула система, и на Windows он смешивает разделители.
+  const slashed = (value: string): string => value.replace(/\\/g, '/');
+  if (slashed(changedPath).startsWith(slashed(projectsPath(paths)))) return ['chats'];
   if (changedPath.startsWith(paths.skills)) return ['skills'];
   if (changedPath === paths.claudeMd) return ['rules'];
   if (changedPath === paths.mcpConfig) return ['mcp'];
@@ -77,6 +98,15 @@ const defaultCreateWatcher = (paths: string[]): WatcherLike =>
     depth: 3,
   });
 
+/**
+ * Насколько склеивать очередь событий.
+ *
+ * Транскрипт идущего разговора дописывается непрерывно, и без склейки панель
+ * перечитывала бы ленту по нескольку раз в секунду. Задержка заметно меньше
+ * времени реакции человека — сообщение всё равно появляется «сразу».
+ */
+const COALESCE_MS = 1000;
+
 export function createConfigWatcher(deps: ConfigWatcherDeps): ConfigWatcher {
   const create = deps.createWatcher ?? defaultCreateWatcher;
 
@@ -84,10 +114,35 @@ export function createConfigWatcher(deps: ConfigWatcherDeps): ConfigWatcher {
   /** Слепок того, что уже применено, — чтобы не пересоздавать наблюдателя зря. */
   let applied = '';
 
+  /** Что накопилось за окно склейки: разделы и последний задевший их путь. */
+  let pending: { domains: Set<string>; path: string } | undefined;
+  let flushTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const flush = (): void => {
+    flushTimer = undefined;
+    if (!pending) return;
+    const { domains, path } = pending;
+    pending = undefined;
+    deps.broadcast([...domains], path);
+  };
+
+  const queue = (domains: string[], path: string): void => {
+    if (!pending) pending = { domains: new Set(), path };
+    for (const domain of domains) pending.domains.add(domain);
+    pending.path = path;
+    if (flushTimer) return;
+    flushTimer = setTimeout(flush, COALESCE_MS);
+    // Таймер склейки не должен держать процесс живым на выходе.
+    flushTimer.unref?.();
+  };
+
   const stop = (): void => {
     watcher?.close();
     watcher = undefined;
     applied = '';
+    if (flushTimer) clearTimeout(flushTimer);
+    flushTimer = undefined;
+    pending = undefined;
   };
 
   const sync = (): void => {
@@ -109,7 +164,7 @@ export function createConfigWatcher(deps: ConfigWatcherDeps): ConfigWatcher {
     // Пути читаем на момент события, а не замыкаем: каталог мог смениться
     // прямо во время доставки, и разбирать путь надо по актуальной карте.
     watcher.on('all', (_event, changedPath) => {
-      deps.broadcast(domainsForPath(deps.read().paths, changedPath), changedPath);
+      queue(domainsForPath(deps.read().paths, changedPath), changedPath);
     });
   };
 

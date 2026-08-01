@@ -30,7 +30,25 @@ export type ChatEvent =
   | { kind: 'thinking'; text: string }
   | { kind: 'tool'; name: string; input: unknown; id: string }
   | { kind: 'limit'; resetsAt: number; type: string; status: string }
-  | { kind: 'usage'; input: number; output: number; cacheRead: number; cacheCreation: number }
+  /**
+   * Расход одного шага модели. `toolIds` — вызовы, рождённые ЭТИМ шагом: по ним
+   * интерфейс ставит цифру у конкретного действия. Вызовов бывает несколько
+   * (модель зовёт инструменты параллельно одним сообщением) — тогда расход у них
+   * общий, и делить его между ними нельзя: раздельного счёта модель не даёт.
+   */
+  | {
+      kind: 'usage';
+      input: number;
+      output: number;
+      cacheRead: number;
+      cacheCreation: number;
+      cacheCreation1h?: number;
+      model?: string;
+      /** Пусто — шаг закончился одним текстом, привязывать расход не к чему. */
+      toolIds?: string[];
+      /** Оценка стоимости шага; проставляет реестр — тарифы знает только он. */
+      costUsd?: number;
+    }
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
   | { kind: 'error'; message: string }
   // Интерактивные права: агент хочет применить инструмент — ждём решения человека.
@@ -212,14 +230,25 @@ export class ChatRun {
 
         // Токены расхода приходят в usage сообщений ассистента — отдаём их
         // отдельным событием, чтобы показать расход в токенах, а не только в деньгах.
+        //
+        // Вместе с расходом отдаём и вызовы этого же сообщения: без них цифра
+        // осталась бы «расходом за прогон вообще», и понять, во что обошёлся
+        // конкретный Bash, было бы нельзя. Событие идёт ПЕРЕД самими вызовами —
+        // порядок не важен, интерфейс сводит их по id.
         const usage = raw.message?.usage;
         if (usage) {
+          const long = usage.cache_creation?.ephemeral_1h_input_tokens;
           onEvent({
             kind: 'usage',
             input: usage.input_tokens ?? 0,
             output: usage.output_tokens ?? 0,
             cacheRead: usage.cache_read_input_tokens ?? 0,
             cacheCreation: usage.cache_creation_input_tokens ?? 0,
+            cacheCreation1h: long || undefined,
+            model: raw.message?.model,
+            toolIds: (raw.message?.content ?? [])
+              .filter((block) => block.type === 'tool_use' && block.id)
+              .map((block) => block.id ?? ''),
           });
         }
 
@@ -280,12 +309,16 @@ interface RawEvent {
   model?: string;
   tools?: unknown[];
   message?: {
+    /** Модель ЭТОГО шага: в разговоре они чередуются (переключение, субагенты). */
+    model?: string;
     content?: { type: string; text?: string; name?: string; input?: unknown; id?: string }[];
     usage?: {
       input_tokens?: number;
       output_tokens?: number;
       cache_read_input_tokens?: number;
       cache_creation_input_tokens?: number;
+      /** Разбивка записи в кэш по сроку жизни: часовая стоит вдвое дороже. */
+      cache_creation?: { ephemeral_1h_input_tokens?: number };
     };
   };
   event?: {

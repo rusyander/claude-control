@@ -36,6 +36,26 @@ describe('selectAttention', () => {
     const dismissed = new Map([['a', 'waiting']]);
     expect(selectAttention([run('a', 'error')], dismissed)).toEqual({ count: 1, tone: 'danger' });
   });
+
+  it('разговор с вопросом без прогона зовёт наравне с прогоном', () => {
+    // Агента запустили в терминале — в памяти вкладки его нет, а ждут всё равно.
+    expect(selectAttention([], new Map(), ['chat-1'])).toEqual({ count: 1, tone: 'warning' });
+  });
+
+  it('тот же разговор дважды не считается', () => {
+    const waiting: ActiveRunView = { id: 'r1', sessionId: 'chat-1', status: 'waiting' };
+    expect(selectAttention([waiting], new Map(), ['chat-1'])).toEqual({
+      count: 1,
+      tone: 'warning',
+    });
+  });
+
+  it('вопрос не понижает красный тон упавшего агента', () => {
+    expect(selectAttention([run('a', 'error')], new Map(), ['chat-1'])).toEqual({
+      count: 2,
+      tone: 'danger',
+    });
+  });
 });
 
 describe('attentionTitle', () => {

@@ -1,3 +1,4 @@
+import type { MessageUsage } from '@claude-control/contracts';
 import { apiClient } from '@shared/api/client';
 import { i18n } from '@shared/config/i18n';
 import { toast } from '@shared/lib/toast';
@@ -21,6 +22,10 @@ import { selectActiveRuns, type ActiveRunView } from './selectors';
 export interface StreamedTool {
   name: string;
   input: string;
+  /** Идентификатор вызова — по нему к нему приходит расход шага. */
+  id?: string;
+  /** Расход шага, породившего вызов; общий на все вызовы одного шага. */
+  usage?: MessageUsage;
 }
 
 /** Запрос агента на разрешение инструмента — ждёт «Разрешить»/«Запретить». */
@@ -63,6 +68,12 @@ export interface AgentRun {
   costUsd?: number;
   /** Токенов израсходовано в этом прогоне (input+output+cache). */
   tokens: number;
+  /**
+   * Расход шагов, не породивших ни одного вызова, — то есть цена самого текста
+   * ответа. Складывается по шагам: текст в ленте склеивается в один блок, и
+   * разложить его обратно по шагам нечем.
+   */
+  textUsage?: MessageUsage;
   limitResetsAt?: number;
   error?: string;
   /**
@@ -126,7 +137,18 @@ type ChatEvent =
   | { kind: 'thinking'; text: string }
   | { kind: 'tool'; name: string; input: unknown; id: string }
   | { kind: 'limit'; resetsAt: number; type: string; status: string }
-  | { kind: 'usage'; input: number; output: number; cacheRead: number; cacheCreation: number }
+  | {
+      kind: 'usage';
+      input: number;
+      output: number;
+      cacheRead: number;
+      cacheCreation: number;
+      cacheCreation1h?: number;
+      model?: string;
+      costUsd?: number;
+      /** Вызовы, рождённые этим шагом; пусто — шаг закончился одним текстом. */
+      toolIds?: string[];
+    }
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
   // `retriable` ставит сервер: временный ли сбой, решает он, а не разбор текста.
   | { kind: 'error'; message: string; retriable?: boolean }
@@ -304,6 +326,41 @@ function findKey(id: string | undefined): string | undefined {
   return undefined;
 }
 
+/**
+ * Расход шага, пришедший раньше своих вызовов: прогон → id вызова → расход.
+ *
+ * Сервер отдаёт usage сообщения ДО его же tool_use-блоков, поэтому в момент
+ * прихода расхода привязывать его ещё не к чему. Хранится вне снимка прогона:
+ * это служебная переписка событий, перерисовывать по ней ленту незачем.
+ */
+const pendingUsage = new Map<string, Map<string, MessageUsage>>();
+
+/**
+ * Сложить расход двух шагов. Нужно там, где несколько шагов схлопываются в один
+ * блок интерфейса (сплошной текст ответа): показать два числа негде, а выбрать
+ * одно из них — значит потерять второе. Модель берём последнюю: при смене
+ * модели посреди хода честнее назвать ту, что писала конец, чем молчать.
+ */
+function addUsage(base: MessageUsage | undefined, step: MessageUsage): MessageUsage {
+  if (!base) return step;
+
+  return {
+    input: base.input + step.input,
+    output: base.output + step.output,
+    cacheRead: base.cacheRead + step.cacheRead,
+    cacheCreation: base.cacheCreation + step.cacheCreation,
+    cacheCreation1h:
+      base.cacheCreation1h || step.cacheCreation1h
+        ? (base.cacheCreation1h ?? 0) + (step.cacheCreation1h ?? 0)
+        : undefined,
+    model: step.model ?? base.model,
+    costUsd:
+      base.costUsd === undefined && step.costUsd === undefined
+        ? undefined
+        : (base.costUsd ?? 0) + (step.costUsd ?? 0),
+  };
+}
+
 function applyEvent(id: string, event: ChatEvent): void {
   const run = runs.get(id);
   if (!run) return;
@@ -321,7 +378,16 @@ function applyEvent(id: string, event: ChatEvent): void {
       next.thinking = run.thinking + event.text;
       break;
     case 'tool':
-      next.tools = [...run.tools, { name: event.name, input: JSON.stringify(event.input) }];
+      next.tools = [
+        ...run.tools,
+        {
+          name: event.name,
+          input: JSON.stringify(event.input),
+          id: event.id || undefined,
+          // Расход своего шага приходит РАНЬШЕ самих вызовов — забираем отложенное.
+          usage: event.id ? pendingUsage.get(id)?.get(event.id) : undefined,
+        },
+      ];
       // Вопрос человеку — повод для жёлтой точки, когда ход завершится.
       if (event.name === 'AskUserQuestion') next.askedQuestion = true;
       break;
@@ -333,6 +399,35 @@ function applyEvent(id: string, event: ChatEvent): void {
       // считает сервер (см. loadSpend), чтобы он не слетал на перезагрузке.
       const spent = event.input + event.output + event.cacheRead + event.cacheCreation;
       next.tokens = run.tokens + spent;
+
+      // Тот же расход — ещё и адресно, к действиям этого шага. Событие обгоняет
+      // сами вызовы, поэтому кладём его в отложенные: их разберёт case 'tool'.
+      const step: MessageUsage = {
+        input: event.input,
+        output: event.output,
+        cacheRead: event.cacheRead,
+        cacheCreation: event.cacheCreation,
+        cacheCreation1h: event.cacheCreation1h,
+        model: event.model,
+        costUsd: event.costUsd,
+      };
+      const toolIds = event.toolIds ?? [];
+      if (toolIds.length === 0) {
+        // Шаг без вызовов — это цена текста ответа.
+        next.textUsage = addUsage(run.textUsage, step);
+        break;
+      }
+
+      let waiting = pendingUsage.get(id);
+      if (!waiting) {
+        waiting = new Map();
+        pendingUsage.set(id, waiting);
+      }
+      for (const toolId of toolIds) waiting.set(toolId, step);
+      // Вызов мог прийти и раньше расхода — тогда дополняем уже показанный.
+      next.tools = run.tools.map((tool) =>
+        tool.id && toolIds.includes(tool.id) ? { ...tool, usage: step } : tool,
+      );
       break;
     }
     case 'done':
@@ -380,6 +475,8 @@ function finalize(id: string): void {
     ? { ...run, status, permissions: [] }
     : { ...run, status, text: '', thinking: '', tools: [], permissions: [] };
   runs.set(id, finalized);
+  // Ход закончен — все вызовы уже пришли, ждать больше нечему.
+  pendingUsage.delete(id);
   rebuildStatuses();
   emit();
 
@@ -728,6 +825,9 @@ export const agentRuns = {
     }
 
     const prev = runs.get(id);
+    // Новый ход — новый счёт: расход прошлого остался в ленте, а отложенные
+    // привязки к его вызовам больше никому не адресованы.
+    pendingUsage.delete(id);
     setRun(id, {
       id,
       // Идентификатор сессии — ниточка разговора, сохраняем между ходами.
@@ -738,6 +838,7 @@ export const agentRuns = {
       thinking: '',
       tools: [],
       tokens: 0,
+      textUsage: undefined,
       costUsd: undefined,
       error: undefined,
       errorCode: undefined,
@@ -832,6 +933,7 @@ export const agentRuns = {
         thinking: '',
         tools: [],
         tokens: 0,
+        textUsage: undefined,
         costUsd: undefined,
         error: undefined,
         askedQuestion: false,

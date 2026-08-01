@@ -46,6 +46,9 @@ const pathsIn = (root: string): ClaudePaths =>
     appData: `${root}/claude-control`,
   }) as unknown as ClaudePaths;
 
+/** Дождаться конца окна склейки: рассылка отложена таймером, а не мгновенна. */
+const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 1200));
+
 function harness(initial: { enabled: boolean; root: string }) {
   const state = { ...initial };
   const created: FakeWatcher[] = [];
@@ -120,11 +123,39 @@ describe('createConfigWatcher', () => {
     expect(created[0]!.closed).toBe(false);
   });
 
-  it('событие наблюдателя уходит подписчикам с разделами по пути', () => {
+  it('событие наблюдателя уходит подписчикам с разделами по пути', async () => {
     const { created, broadcasts, watcher } = harness({ enabled: true, root: '/cfg-a' });
     watcher.sync();
     created[0]!.emit('/cfg-a/skills/my-skill/SKILL.md');
+
+    // Рассылка идёт через окно склейки — до его конца подписчики молчат.
+    expect(broadcasts).toEqual([]);
+    await settle();
     expect(broadcasts).toEqual([{ domains: ['skills'], path: '/cfg-a/skills/my-skill/SKILL.md' }]);
+  });
+
+  it('поток правок транскрипта склеивается в одну рассылку', async () => {
+    // Транскрипт идущего разговора дописывается непрерывно: без склейки панель
+    // перечитывала бы ленту на каждую дописанную строку.
+    const { created, broadcasts, watcher } = harness({ enabled: true, root: '/cfg-a' });
+    watcher.sync();
+    created[0]!.emit('/cfg-a/projects/proj/s1.jsonl');
+    created[0]!.emit('/cfg-a/projects/proj/s1.jsonl');
+    created[0]!.emit('/cfg-a/projects/proj/s1.jsonl');
+    await settle();
+
+    expect(broadcasts).toEqual([{ domains: ['chats'], path: '/cfg-a/projects/proj/s1.jsonl' }]);
+  });
+
+  it('разные разделы за одно окно уходят вместе, не теряясь', async () => {
+    const { created, broadcasts, watcher } = harness({ enabled: true, root: '/cfg-a' });
+    watcher.sync();
+    created[0]!.emit('/cfg-a/projects/proj/s1.jsonl');
+    created[0]!.emit('/cfg-a/skills/my-skill/SKILL.md');
+    await settle();
+
+    expect(broadcasts.length).toBe(1);
+    expect(broadcasts[0]!.domains.sort()).toEqual(['chats', 'skills']);
   });
 });
 

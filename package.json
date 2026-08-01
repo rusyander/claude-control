@@ -16,7 +16,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "depcruise": "depcruise apps/web/src",
+    "depcruise": "depcruise apps/web/src apps/server/src",
     "test": "pnpm -r test",
     "qa:setup": "playwright install --with-deps chromium",
     "check": "pnpm format:check && pnpm type-check && pnpm lint && pnpm depcruise && pnpm build",

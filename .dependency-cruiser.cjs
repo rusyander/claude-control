@@ -1,4 +1,7 @@
-// Границы FSD фронта — усиление из фронт-доктрины, адаптированное под монорепу.
+// Границы слоёв монорепы: FSD у фронта, `routes → domains → providers → lib` у сервера.
+//
+// Проверяются здесь, а не в ESLint: у dependency-cruiser есть рабочий резолвер путей
+// (`tsconfig.depcruise.json`) и он отличает импорт в чужой слайс от соседнего файла своей папки.
 //
 // Поправки против эталона доктрины (там `src` — корень пакета):
 //  1) правила запускаются из корня монорепы, цель — apps/web/src, поэтому якори
@@ -67,6 +70,38 @@ module.exports = {
         path: '^apps/web/src/(?:entities|features)/([^/]+)/[^/]+/.+',
         pathNot: ['index\\.(ts|tsx)$', '^apps/web/src/(?:entities|features)/$1/'],
       },
+    },
+    // --- Сервер: слои объявлены только прозой в CLAUDE.md, здесь они становятся проверкой.
+    // Направление: context → routes → domains → providers → lib → contracts.
+    // Обратные рёбра ниже и запрещены; `no-circular` выше ловит остальное.
+    // Тесты из правил исключены намеренно: тест собирает сцену из любого слоя — это его работа.
+    {
+      name: 'server-lib-is-leaf',
+      comment:
+        'lib/ — форматные и системные хелперы. Он не знает ни про домены, ни про маршруты, ни про ' +
+        'реестр провайдеров, ни про сборку приложения. Всё, что зависит от реестра, живёт в providers/.',
+      severity: 'error',
+      from: { path: '^apps/server/src/lib/', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^apps/server/src/(domains|routes|providers)/|^apps/server/src/(context|index)\\.ts$',
+      },
+    },
+    {
+      name: 'server-providers-below-domains',
+      comment:
+        'providers/ — каталог возможностей и путей CLI; он ниже доменов и не тянет их обратно.',
+      severity: 'error',
+      from: { path: '^apps/server/src/providers/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/server/src/(domains|routes)/|^apps/server/src/(context|index)\\.ts$' },
+    },
+    {
+      name: 'server-domains-below-routes',
+      comment:
+        'Домен не знает ни про HTTP-слой, ни про сборку приложения: он принимает примитивы ' +
+        '(paths, store, backupDir), а не ServerContext.',
+      severity: 'error',
+      from: { path: '^apps/server/src/domains/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/server/src/routes/|^apps/server/src/(context|index)\\.ts$' },
     },
   ],
   options: {

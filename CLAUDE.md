@@ -91,26 +91,42 @@ and `127.0.0.1:WEB_PORT`. Changed the front port → set `WEB_PORT` for the serv
   follow automatically.
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
 
-Gate before "done": `pnpm type-check && pnpm lint && pnpm test && node tools/qa/audit-layout.mjs`.
-Touched help → also `node tools/qa/check-help.mjs`: it looks for on-page `help.…` strings, i.e. a
-key called under a name that doesn't exist (`tsc` checks the dictionary, not call sites).
+Gate before "done": `pnpm type-check && pnpm lint && pnpm test && pnpm depcruise && node
+tools/qa/audit-layout.mjs`. Touched help → also `node tools/qa/check-help.mjs`: it looks for on-page
+`help.…` strings, i.e. a key called under a name that doesn't exist (`tsc` checks the dictionary, not
+call sites).
+
+## Layer boundaries — checked, not just described
+
+Both apps' layer maps are machine-enforced by `.dependency-cruiser.cjs` (`pnpm depcruise`), NOT by
+ESLint: dependency-cruiser has a working path resolver (`tsconfig.depcruise.json`) and tells an
+import into a foreign slice apart from a sibling file of one's own folder. `eslint.config.mjs` keeps
+only what needs no resolver (no default exports, no nested ternaries, `max-lines` 400 as a warning).
+
+- **Web**: `app → pages → features → entities → shared`, downward only, cross-feature forbidden
+  (one exception, `features/ResourceFiles`, documented in the config); a foreign slice is reachable
+  only through its `index.ts`.
+- **Server**: `context → routes → domains → providers → lib → contracts`, downward only. A domain
+  takes primitives (`paths`, `store`, `backupDir`), never `ServerContext`. `lib/` is format and OS
+  helpers with no knowledge of the registry — anything that needs the provider registry lives in
+  `providers/`. Tests are exempt: a test may reach into any layer.
+- Oversized module split idiom: `foo.ts` becomes a thin facade re-exporting a `foo/` folder of
+  cohesive modules, so every existing import path (and every test) keeps working.
 
 ## Where things live
 
 **Server** `apps/server/src/` — config dir `lib/claude-paths.ts` · account access & OS differences
 `lib/credentials.ts` · CLI arg escaping `lib/cli-args.ts` · safe write `lib/safe-io.ts` ·
-backups/rollback `domains/backups.ts` · pricing fetch+cache
-`domains/analytics/pricing-source.ts` · rates & per-model match `domains/analytics/pricing.ts` ·
-enable/disable on disk `domains/entity-toggle.ts` · MCP client (stdio/HTTP/SSE)
-`domains/mcp-client.ts` · MCP OAuth `domains/mcp-oauth.ts` · local-settings flag
-`lib/settings-source.ts` · file watcher (config + transcripts) `lib/config-watcher.ts` · spawn
-`claude` + stream parsing `domains/chat/ChatRunner.ts` · transcripts, per-step usage,
-awaiting-reply flag `domains/chat/ChatHistory.ts` · conversation workdir
-`domains/chat/ChatWorkspace.ts` · project list `domains/chat/ChatProjects.ts` · disk browse
-`domains/fs/` · sandbox assembly `domains/sandbox/SandboxConfig.ts` · provider catalog
-`providers/` · foreign-format check `domains/format-check.ts` · slash-command inventory
-(read-only) `domains/commands.ts` · opencode session server `domains/opencode-serve.ts` · routes
-`routes/*.ts`.
+path-containment guard shared by rules/skills/plugins `lib/section-fs.ts` · "foreign format not
+recognised" sentinel `lib/format-errors.ts` · local-settings flag `lib/settings-source.ts` · file
+watcher `lib/config-watcher.ts` · provider catalog, CLI detect and settings validation `providers/` ·
+backups/rollback `domains/backups.ts` · pricing `domains/analytics/` · enable/disable on disk
+`domains/entity-toggle.ts` · MCP client and OAuth `domains/mcp-client.ts`, `domains/mcp-oauth.ts` ·
+chat (spawn+stream, transcripts, workdir, projects, SSE, cost) `domains/chat/` · disk browse
+`domains/fs/` · sandbox assembly `domains/sandbox/` · foreign-format check
+`domains/format-check.ts` · slash-command inventory (read-only) `domains/commands/` · opencode
+session server `domains/opencode-serve.ts` · routes `routes/`. Per-section provider domains
+(`provider-{mcp,permissions,rules,skills,plugins,hooks,…}`) each follow the facade+folder idiom.
 
 **Web** `apps/web/src/`, FSD layers `app` → `pages` → `features` → `entities` → `shared` — UI kit
 `shared/ui/` (each component has `*.stories.tsx`) · parallel agent runs `shared/lib/agent-runs/` ·

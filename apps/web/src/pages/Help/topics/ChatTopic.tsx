@@ -304,6 +304,7 @@ export function ChatTopic() {
             { name: tr('spendRun'), description: tr('spendRunText'), isMono: false },
             { name: tr('spendSession'), description: tr('spendSessionText'), isMono: false },
             { name: tr('spendLimit'), description: tr('spendLimitText'), isMono: false },
+            { name: tr('spendStep'), description: tr('spendStepText'), isMono: false },
           ]}
         />
       </HelpSection>
@@ -327,6 +328,9 @@ export function ChatTopic() {
           <Callout tone="info" title={tr('noteQuestionTitle')}>
             {tr('noteQuestionText')}
           </Callout>
+          <Callout tone="info" title={tr('noteOutsideTitle')}>
+            {tr('noteOutsideText')}
+          </Callout>
           <Callout tone="info" title={tr('noteArtifactsTitle')}>
             {tr('noteArtifactsText')}
           </Callout>
@@ -338,6 +342,9 @@ export function ChatTopic() {
           </Callout>
           <Callout tone="info" title={tr('noteHistoryTitle')}>
             {tr('noteHistoryText')}
+          </Callout>
+          <Callout tone="info" title={tr('noteLiveTitle')}>
+            {tr('noteLiveText')}
           </Callout>
           <Callout tone="info" title={tr('noteProviderTitle')}>
             {tr('noteProviderText')}

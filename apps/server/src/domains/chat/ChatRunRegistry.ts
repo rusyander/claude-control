@@ -72,6 +72,15 @@ interface RegisteredRun {
   spentTokens: number;
 }
 
+/** Токены одного шага — то, из чего считается его цена. */
+export interface StepTokens {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheCreation: number;
+  cacheCreation1h?: number;
+}
+
 /** Сколько держать завершённый прогон в буфере — на догон при переподключении. */
 const GRACE_MS = 60_000;
 
@@ -82,6 +91,17 @@ export class ChatRunRegistry {
   /** Накопленный за сеанс сервера расход — переживает перезагрузку вкладки. */
   private totalCostUsd = 0;
   private totalTokens = 0;
+
+  /**
+   * Оценка стоимости шага. Ставится снаружи (маршрутами): тарифы живут в кэше
+   * прайса и в настройках пользователя, а реестр про них ничего не знает и
+   * знать не должен. Не задана — цена шага просто не показывается.
+   */
+  private estimateStepCost?: (model: string, tokens: StepTokens) => number;
+
+  setCostEstimator(estimate: (model: string, tokens: StepTokens) => number): void {
+    this.estimateStepCost = estimate;
+  }
 
   /**
    * Фабрика прогона: по умолчанию — настоящий CLI, в тестах — управляемый фейк.
@@ -205,17 +225,25 @@ export class ChatRunRegistry {
     // обнуляется при перезагрузке вкладки, как и сами прогоны. Дублируем вклад в
     // самом прогоне (spent*) — чтобы при ретрае упавшей попытки откатить именно
     // её долю из общего счётчика, а не гадать.
+    let outgoing = event;
     if (event.kind === 'usage') {
       const tokens = event.input + event.output + event.cacheRead + event.cacheCreation;
       run.spentTokens += tokens;
       this.totalTokens += tokens;
+
+      // Цена шага — чтобы разбивка по действию была видна сразу, а не после
+      // перечитывания ленты из транскрипта: по одним токенам дешёвый шаг от
+      // дорогого не отличить.
+      if (event.model && this.estimateStepCost) {
+        outgoing = { ...event, costUsd: this.estimateStepCost(event.model, event) };
+      }
     }
     if (event.kind === 'done') {
       run.spentCostUsd += event.costUsd;
       this.totalCostUsd += event.costUsd;
     }
 
-    const buffered: BufferedEvent = { seq: ++run.seq, event };
+    const buffered: BufferedEvent = { seq: ++run.seq, event: outgoing };
     run.events.push(buffered);
     for (const subscriber of run.subscribers) subscriber.send(buffered);
   }

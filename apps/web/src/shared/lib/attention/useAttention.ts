@@ -4,11 +4,15 @@ import { getDismissed, subscribeDismissed } from './attentionStore';
 import { selectAttention, attentionTitle, type AttentionView } from './attention';
 import { applyFaviconBadge } from './favicon';
 
-/** Кто сейчас зовёт человека — для точек в интерфейсе. */
-export function useAttention(): AttentionView {
+/**
+ * Кто сейчас зовёт человека — для точек в интерфейсе. `awaiting` — id разговоров,
+ * стоящих на вопросе по данным транскрипта: их считает вызывающий (список чатов
+ * живёт слоем выше), а сюда они приходят готовыми.
+ */
+export function useAttention(awaiting: readonly string[] = []): AttentionView {
   const runs = useActiveRuns();
   const dismissed = useSyncExternalStore(subscribeDismissed, getDismissed, getDismissed);
-  return selectAttention(runs, dismissed);
+  return selectAttention(runs, dismissed, awaiting);
 }
 
 /**
@@ -16,8 +20,8 @@ export function useAttention(): AttentionView {
  * уровне приложения, а не страницы чата, — уйти в «Настройки» и не узнать, что
  * агент спросил, было бы худшим из исходов.
  */
-export function useAttentionBadge(): void {
-  const { count, tone } = useAttention();
+export function useAttentionBadge(awaiting: readonly string[] = []): void {
+  const { count, tone } = useAttention(awaiting);
 
   useEffect(() => {
     // Исходный заголовок запоминаем один раз: иначе после первой же метки

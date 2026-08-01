@@ -31,6 +31,10 @@ export interface ChatMessagesProps {
   onPermissionDecide?: (toolUseId: string, behavior: 'allow' | 'deny') => void;
   /** Повторить упавший запрос — кнопка прямо в карточке ошибки. */
   onRetry?: () => void;
+  /** Единицы расхода из настроек: объём в токенах или деньги. */
+  costUnit?: 'tokens' | 'money';
+  /** Глубина продумывания текущего прогона — идёт в разбивку расхода. */
+  effort?: string;
 }
 
 export interface MessageBubbleProps {
@@ -40,4 +44,6 @@ export interface MessageBubbleProps {
   onPickOption?: (answer: string) => void;
   /** Идёт прогон — варианты недоступны. */
   isRunning?: boolean;
+  /** Единицы расхода из настроек: объём в токенах или деньги. */
+  costUnit?: 'tokens' | 'money';
 }

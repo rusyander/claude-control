@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Artifact,
@@ -18,6 +19,8 @@ export const chatKeys = {
   progress: (id: string) => ['chats', id, 'progress'] as const,
   /** Поиск по телу переписки: ключ зависит от запроса — кешируем по строке. */
   search: (query: string) => ['chats', 'search', query] as const,
+  /** Отпечаток транскрипта: по нему видно, что разговор дописали. */
+  version: (id: string) => ['chats', id, 'version'] as const,
 };
 
 /** Ниже этого порога поиск по телу не запускаем — совпадает с порогом на сервере. */
@@ -77,6 +80,65 @@ export function useChatMessages(chatId: string | undefined, limit = CHAT_PAGE_SI
     enabled: Boolean(chatId),
     placeholderData: keepPreviousData,
   });
+}
+
+/**
+ * Держать открытый разговор в актуальном состоянии — без F5.
+ *
+ * Панель владеет не каждым прогоном: тот же чат идёт из терминала, из
+ * расширения редактора, из соседнего окна панели. Своего потока событий в таком
+ * разговоре нет, и до появления этой страховки лента показывала снимок на
+ * момент открытия — вопрос агента человек видел только после перезагрузки
+ * страницы.
+ *
+ * Дорог тут не опрос, а перечитывание ленты, поэтому спрашиваем отпечаток
+ * (одна `stat` на сервере) и трогаем ленту, только когда он изменился. Второй,
+ * более быстрый канал — `/api/events` от наблюдателя за файлами; этот работает
+ * и тогда, когда наблюдение выключено тумблером или поток оборван.
+ */
+export function useChatAutoRefresh(chatId: string | undefined, isRunning: boolean): void {
+  const queryClient = useQueryClient();
+
+  const { data } = useQuery({
+    queryKey: chatKeys.version(chatId ?? ''),
+    queryFn: async () => {
+      const { data: version } = await apiClient.get<{ mtimeMs: number; size: number }>(
+        `/chats/${chatId}/version`,
+      );
+      return version;
+    },
+    enabled: Boolean(chatId),
+    // Пока идёт свой прогон, лента и так живёт потоком, но чужой ход виден
+    // только отсюда — опрашиваем чаще, стоит это одной `stat`.
+    refetchInterval: isRunning ? 2000 : 5000,
+    // Вкладку свернули — опрашивать некому и незачем; вернулись к ней —
+    // спрашиваем сразу, не дожидаясь очередного такта.
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
+
+  const stamp = data ? `${data.mtimeMs}:${data.size}` : undefined;
+  const seen = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!chatId || !stamp) return;
+    // Первый ответ — это то, что уже показано: перечитывать нечего.
+    if (seen.current === undefined) {
+      seen.current = stamp;
+      return;
+    }
+    if (seen.current === stamp) return;
+    seen.current = stamp;
+    void queryClient.invalidateQueries({ queryKey: chatKeys.messages(chatId) });
+    void queryClient.invalidateQueries({ queryKey: chatKeys.list });
+  }, [chatId, stamp, queryClient]);
+
+  // Смена разговора начинает счёт заново — иначе первый же отпечаток нового
+  // чата выглядел бы изменением и дёргал ленту сразу после открытия.
+  useEffect(() => {
+    seen.current = undefined;
+  }, [chatId]);
 }
 
 /** Файлы, созданные Claude в папке чата. */

@@ -5,6 +5,7 @@ import { SkeletonList, SkeletonText } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { TokenBadge } from '@shared/ui/token-badge';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { MessageBubble } from './MessageBubble';
 import { QuestionCard, parseQuestions } from './QuestionCard';
@@ -31,6 +32,8 @@ export function ChatMessages({
   permissions,
   onPermissionDecide,
   onRetry,
+  costUnit,
+  effort,
 }: ChatMessagesProps) {
   const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -109,6 +112,7 @@ export function ChatMessages({
           onEdit={onEdit}
           onPickOption={onPickOption}
           isRunning={isRunning}
+          costUnit={costUnit}
         />
       ))}
 
@@ -126,31 +130,61 @@ export function ChatMessages({
               const questions =
                 tool.name === 'AskUserQuestion' ? parseQuestions(tool.input) : undefined;
 
+              // Расход шага приходит отдельным событием и садится на свой вызов
+              // по id. У параллельных вызовов он общий — сколько их было,
+              // считаем прямо здесь, по совпадению шага.
+              const spend = tool.usage ? (
+                <TokenBadge
+                  usage={tool.usage}
+                  unit={costUnit}
+                  effort={effort}
+                  label={tool.name}
+                  sharedWith={stream.tools.filter((other) => other.usage === tool.usage).length}
+                  className={styles.spend}
+                />
+              ) : null;
+
               if (questions) {
                 return (
-                  <QuestionCard
-                    key={`${tool.name}-${index}`}
-                    questions={questions}
-                    onPick={onPickOption}
-                    disabled={isRunning}
-                  />
+                  <div key={`${tool.name}-${index}`} className={styles.block}>
+                    <QuestionCard
+                      questions={questions}
+                      onPick={onPickOption}
+                      disabled={isRunning}
+                    />
+                    {spend}
+                  </div>
                 );
               }
 
               return (
-                <details key={`${tool.name}-${index}`} className={styles.tool}>
-                  <summary>{tool.name}</summary>
-                  <div className={styles.toolInput}>{tool.input}</div>
-                </details>
+                <div key={`${tool.name}-${index}`} className={styles.block}>
+                  <details className={styles.tool}>
+                    <summary>{tool.name}</summary>
+                    <div className={styles.toolInput}>{tool.input}</div>
+                  </details>
+                  {spend}
+                </div>
               );
             })}
 
             {stream.text && (
-              <div
-                className={styles.text}
-                // Разметку строит markdown-it с выключенным сырым html.
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(stream.text) }}
-              />
+              <div className={styles.block}>
+                <div
+                  className={styles.text}
+                  // Разметку строит markdown-it с выключенным сырым html.
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(stream.text) }}
+                />
+                {stream.textUsage && (
+                  <TokenBadge
+                    usage={stream.textUsage}
+                    unit={costUnit}
+                    effort={effort}
+                    label={t('chat.usage.answer')}
+                    className={styles.spend}
+                  />
+                )}
+              </div>
             )}
 
             {/*

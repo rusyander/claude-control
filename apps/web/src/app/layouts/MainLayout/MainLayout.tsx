@@ -6,6 +6,7 @@ import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMot
 import { useMediaQuery } from '@shared/hooks/use-media-query/useMediaQuery';
 import { Stack } from '@shared/ui/stack';
 import { useAttentionBadge } from '@shared/lib/attention';
+import { useAwaitingAlarm } from '@entities/Chat';
 import { OnboardingWizard } from '@app/onboarding/OnboardingWizard';
 import { ProviderTrustBadge } from '@features/ProviderTrust';
 import { Sidebar } from './Sidebar';
@@ -41,8 +42,11 @@ export function MainLayout() {
 
   // Точка на значке вкладки и в её заголовке, пока агент где-то ждёт ответа.
   // Живёт в каркасе, а не в чате: уйти в другой раздел и не узнать, что тебя
-  // спросили, — ровно тот случай, ради которого метка и заводилась.
-  useAttentionBadge();
+  // спросили, — ровно тот случай, ради которого метка и заводилась. Сюда же
+  // сходятся разговоры, стоящие на вопросе по данным транскрипта: их агента
+  // панель не запускала, и без этого списка о них некому было сообщить.
+  const awaiting = useAwaitingAlarm();
+  useAttentionBadge(awaiting.map((chat) => chat.id));
 
   return (
     <Stack direction="row" className={styles.root}>

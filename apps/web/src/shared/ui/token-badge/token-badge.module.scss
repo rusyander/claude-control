@@ -1,0 +1,153 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-2xs);
+  padding: 2px var(--spacing-xs);
+  border: none;
+  border-radius: var(--radius-full);
+  background-color: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background-color: var(--color-surface-sunken);
+  }
+}
+
+/* Общий объём — служебная величина: почти на каждом шаге он равен размеру
+   контекста, поэтому взгляд цеплять не должен. */
+.total {
+  color: var(--color-fg-subtle);
+}
+
+/* Новая работа шага — то, что действительно стоит денег. Акцент приглушённый:
+   бейджей в ленте десятки, и яркими они забили бы сам ответ. */
+.fresh {
+  color: var(--color-accent);
+  opacity: 0.85;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + var(--spacing-2xs));
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  width: 240px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--font-size-caption);
+  cursor: default;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+}
+
+.title {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-fg-default);
+}
+
+.model {
+  font-family: var(--font-mono);
+  color: var(--color-fg-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar {
+  display: flex;
+  height: 4px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background-color: var(--color-surface-sunken);
+}
+
+.rows,
+.foot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.foot {
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+}
+
+.rowName {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  color: var(--color-fg-muted);
+}
+
+.rowValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-2xs);
+  font-family: var(--font-mono);
+  color: var(--color-fg-default);
+}
+
+.share {
+  min-width: 30px;
+  text-align: right;
+  color: var(--color-fg-subtle);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.note {
+  color: var(--color-fg-subtle);
+}
+
+/* Виды токенов различаются оттенком одной шкалы, а не разными цветами:
+   это одна величина в разрезе, а не четыре независимых показателя. */
+.barInput {
+  background-color: var(--color-accent);
+}
+
+.barWrite {
+  background-color: var(--color-warning);
+}
+
+.barRead {
+  background-color: var(--color-border-strong);
+}
+
+.barOutput {
+  background-color: var(--color-success);
+}

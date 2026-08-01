@@ -34,6 +34,15 @@ export const chatSummarySchema = object({
   /** Первые слова последнего сообщения — как подзаголовок в списке. */
   preview: string().optional(),
   model: string().optional(),
+  /**
+   * Последним в переписке стоит вопрос агента, на который никто не ответил.
+   *
+   * Считается из самого транскрипта, а не из живого прогона: разговор мог идти
+   * в терминале или в другом окне, и тогда панель о нём ничего не знает — а
+   * человека всё равно ждут. Запрос прав так не виден: он живёт только в
+   * процессе и в файл до решения не попадает.
+   */
+  awaitingReply: boolean().optional(),
 });
 
 export type ChatSummary = Infer<typeof chatSummarySchema>;
@@ -53,6 +62,40 @@ export const chatBlockSchema = union([
 
 export type ChatBlock = Infer<typeof chatBlockSchema>;
 
+/**
+ * Расход токенов на один шаг модели.
+ *
+ * Приходит от самой модели вместе с ответом (usage), поэтому ничего не стоит:
+ * это метаданные уже сгенерированного сообщения, а не отдельный запрос.
+ *
+ * Четыре вида считаются раздельно и НЕ складываются в одно число на показ:
+ * чтение кэша дешевле входа на порядок, и сумма «всего токенов» одинаково
+ * велика на каждом шаге (контекст перечитывается целиком), то есть по ней не
+ * отличить дешёвый Read от тяжёлой генерации. Отличает `costUsd`.
+ */
+export const messageUsageSchema = object({
+  /** Свежий вход — то, чего не было в кэше. */
+  input: number(),
+  /** Сгенерировано моделью. */
+  output: number(),
+  /** Прочитано из кэша: дешевле входа примерно в десять раз. */
+  cacheRead: number(),
+  /** Записано в кэш — дороже входа, но окупается следующими шагами. */
+  cacheCreation: number(),
+  /**
+   * Какая часть `cacheCreation` записана в часовой кэш. Это доля, а не
+   * слагаемое: тарифицируется вдвое дороже пятиминутной, и без неё оценка
+   * стоимости занижена.
+   */
+  cacheCreation1h: number().optional(),
+  /** Модель этого шага: в одном разговоре они могут чередоваться. */
+  model: string().optional(),
+  /** Оценка по тарифам модели; пусто — модель шага неизвестна, считать не по чему. */
+  costUsd: number().optional(),
+});
+
+export type MessageUsage = Infer<typeof messageUsageSchema>;
+
 export const chatMessageSchema = object({
   id: string(),
   role: union([literal('user'), literal('assistant')]),
@@ -60,6 +103,11 @@ export const chatMessageSchema = object({
   timestamp: string(),
   /** Ссылка на предыдущее сообщение — по ней восстанавливается ветка диалога. */
   parentId: string().optional(),
+  /**
+   * Расход на этот шаг. Есть только у ответов модели: реплика человека токенов
+   * не тратит, а её стоимость уже посчитана во входе следующего шага.
+   */
+  usage: messageUsageSchema.optional(),
 });
 
 export type ChatMessage = Infer<typeof chatMessageSchema>;

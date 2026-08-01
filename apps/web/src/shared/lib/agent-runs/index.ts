@@ -2,6 +2,7 @@ export {
   agentRuns,
   getRun,
   getProjectStatuses,
+  getChatStatuses,
   getActiveRuns,
   getTotalCost,
   getTotalTokens,
@@ -13,11 +14,13 @@ export type {
   StartInput,
   StreamedTool,
   PendingPermission,
+  QueuedMessage,
   SendOutcome,
 } from './agentRunsStore';
 export {
   useAgentRun,
   useProjectStatuses,
+  useChatStatuses,
   useActiveRuns,
   useTotalCost,
   useTotalTokens,

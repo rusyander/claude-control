@@ -101,6 +101,20 @@ export const helpEn: HelpSchema = {
         'and voice input — none of which the terminal has.',
 
       canParallel: 'Hold several conversations at once, across different projects',
+      canQueue:
+        'Add messages while the agent is busy: the send button no longer locks, the ' +
+        'addition joins a queue above the input and goes into the same conversation ' +
+        'as soon as the current turn ends',
+      canProgress:
+        "Watch the agent's plan: the strip above the input shows its own checkpoints " +
+        '(done, in progress) and the tree of subagents it handed work to, together ' +
+        'with what each one returned',
+      canChatDots:
+        'Tell conversations apart by the dots in the chat list: a project can hold ' +
+        'several agents, and it is visible which one is waiting for an answer',
+      canVolume:
+        'Hear the agent louder: the agents panel has a notification volume (200% by ' +
+        'default), and the browser tab is marked with a dot while an agent waits',
       canOpenFolder: 'Open any folder as a project, even one Claude has never worked in',
       canAttach: 'Attach files by dragging them in or with the paperclip',
       canVoice: 'Dictate a request by voice',
@@ -139,6 +153,13 @@ export const helpEn: HelpSchema = {
         'Grant permissions in advance: the panel asks at the moment of the action, and ' +
         'the standing list of what is allowed lives in the Permissions section',
       cantDelete: 'Delete or rename conversations — transcripts are only ever read',
+      cantEditPlan:
+        "Edit the agent's plan from the panel: it keeps the checkpoints itself and " +
+        'the panel shows their trace from the transcript — a tick here would drift ' +
+        'from its own state',
+      cantInterrupt:
+        'Interrupt the current turn with an added message: the CLI runs the turn to ' +
+        'the end, so the addition goes out at the turn boundary — wait, or press Stop',
 
       storageTranscripts: 'Transcripts',
       storageTranscriptsValue: '~/.claude/projects/<project-path>/<sessionId>.jsonl',
@@ -2433,6 +2454,130 @@ export const helpEn: HelpSchema = {
         'like OpenCode, also picks up the shared ~/.agents/skills, and the panel writes ' +
         'nothing there either. One difference: Kimi’s docs cap description at 240 ' +
         'characters, and the panel checks exactly that bound.',
+    },
+
+    commands: {
+      title: 'Commands',
+      summary: 'Everything you type after “/”, in one searchable list',
+      lead:
+        'A slash command is not a thing of its own on disk: the same “/” menu is ' +
+        'assembled from skills, command files, plugins and the built-in commands of ' +
+        'the CLI itself. The palette shows only a name, so there is usually nowhere ' +
+        'to learn what a command does, whose it is and where to edit it. This ' +
+        'section shows the whole set at once: source, description, owner, file path ' +
+        'and a button that jumps to the section where the command lives.',
+
+      whyOne: 'One list instead of four places',
+      whyOneText:
+        'Skills, command files, plugins and built-ins live in different places yet ' +
+        'are invoked the same way. Here they are merged into one list sorted by name.',
+      whyWhose: 'Origin is visible',
+      whyWhoseText:
+        'Every row carries a source badge and an owner: a skill, a file in commands/, ' +
+        'a plugin command or a built-in CLI command. It is immediately clear where a ' +
+        'command came from and why it disappears once a plugin is switched off.',
+      whyJump: 'Editing is one click away',
+      whyJumpText:
+        'When a command has a file, the button opens it in its home section — a skill ' +
+        'in Skills, a plugin command in Plugins, with the item already selected.',
+
+      storageSkills: 'Skills',
+      storageFiles: 'Command files',
+      storagePlugins: 'Plugins',
+      storageBuiltin: 'Built-ins',
+      storageBuiltinValue:
+        'no file — they are baked into the CLI, the panel keeps its own list with descriptions',
+
+      flowTitle: 'How the list is assembled',
+      flowCaption:
+        'The panel reads the active provider’s directories every time the section is ' +
+        'opened: nothing is cached and nothing is copied anywhere.',
+      flowDisk: 'Directories on disk',
+      flowDiskCaption: 'skills/, commands/, plugins/',
+      flowMerge: 'The panel merges them',
+      flowMergeCaption: 'source, description, owner',
+      flowSearch: 'Search and filters',
+      flowSearchCaption: 'by name, description, owner',
+      flowOpen: 'Jump to editing',
+      flowOpenCaption: 'to the section where it lives',
+
+      sourcesTitle: 'Four sources',
+      sourcesCaption:
+        'The name follows from the source: a skill uses its folder name, a file uses ' +
+        'its path through a colon, a plugin puts its own name before the colon.',
+      sourceSkill:
+        'A skill folder: ~/.claude/skills/<name>/SKILL.md. The description comes from ' +
+        'the description field, the command name equals the folder name.',
+      sourceCommand:
+        'A file ~/.claude/commands/<folder>/<name>.md. A nested folder becomes part of ' +
+        'the name: commands/git/commit.md is invoked as /git:commit.',
+      sourcePlugin:
+        'A command or skill of an installed plugin. The plugin name comes first; a ' +
+        'disabled plugin stays in the list with a badge.',
+      sourceBuiltin:
+        'Commands of the CLI itself. They have no file and cannot be edited — the panel ' +
+        'keeps its own list of them with descriptions in both languages.',
+      badgeSkill: 'skill',
+      badgeCommand: 'file',
+      badgePlugin: 'plugin',
+      badgeBuiltin: 'built-in',
+
+      canList: 'See every command of the active provider in a single list',
+      canSearch: 'Search by name, description, owner and aliases — with or without the leading “/”',
+      canFilter: 'Keep only skills, files, plugins or built-ins — with counts',
+      canFamily: 'See which commands this one is grouped with',
+      canOpen: 'Jump to editing a skill or a plugin with one button',
+      canDisabled: 'See disabled skills and plugins — they are badged, not hidden',
+      canProvider: 'Open the same list for Gemini, Qwen and OpenCode — from their command folders',
+
+      cantEdit: 'Edit a command here — the section only reads, editing happens in its home section',
+      cantRun: 'Run a command from here — invoking stays with the chat and the CLI',
+      cantTranslate:
+        'Translate foreign descriptions: a skill’s or plugin’s description is shown exactly ' +
+        'as written in its file',
+      cantFresh:
+        'Learn about a brand-new built-in without updating the panel: the CLI does not expose its list',
+
+      familyTitle: 'Command groups',
+      familyCaption:
+        'Commands often come in sets. The panel derives the group itself, from the name ' +
+        'and the owner, and shows the siblings right in the row.',
+      familyPrefix: 'By the start of the name',
+      familyPrefixText:
+        'Commands sharing a first word count as one group: /design-sync and /design-login. ' +
+        'A group of one is not shown.',
+      familyOwner: 'By owner',
+      familyOwnerText:
+        'Everything a single plugin brings is one group regardless of names. That makes it ' +
+        'visible that removing the plugin takes all of its commands with it.',
+
+      notesTitle: 'Worth knowing',
+      noteReadOnlyTitle: 'The section changes nothing',
+      noteReadOnlyText:
+        'There are no forms and no save buttons here: it is a display case. Any edit goes ' +
+        'through the Skills or Plugins section the button leads to.',
+      noteAutoTitle: 'Your commands show up on their own',
+      noteAutoText:
+        'The list is read from disk every time the section is opened. A new skill, a new ' +
+        'file in commands/ or an installed plugin appears here with no setup — anyone who ' +
+        'installs the panel sees their own commands, not someone else’s.',
+      noteBuiltinTitle: 'Built-ins are checked against the docs',
+      noteBuiltinText:
+        'The list of built-in commands is maintained by the panel — the CLI cannot enumerate ' +
+        'them. It is checked against the Claude Code reference and updated together with the ' +
+        'panel, so a command from a fresh CLI release may show up here later.',
+      noteDescTitle: 'The description comes from the file',
+      noteDescText:
+        'For skills and plugins the panel shows their own description and does not translate ' +
+        'it: the language of the file is the language you see. Switching the language changes ' +
+        'the interface and the descriptions of built-in commands.',
+      noteProviderTitle: 'With other providers',
+      noteProviderText:
+        'Gemini and Qwen keep commands in commands/**/*.toml files (description comes from the ' +
+        'description field, otherwise from the first line of prompt), OpenCode in commands/*.md ' +
+        'and in the command key of opencode.json. For the remaining CLIs the format of user ' +
+        'commands is not covered by their documentation, so the section is hidden there: the ' +
+        'panel does not invent a format the docs do not describe.',
     },
 
     rules: {

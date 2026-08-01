@@ -94,6 +94,10 @@ export function ChatTopic() {
           cantTitle={t('help.common.cantTitle')}
           can={[
             tr('canParallel'),
+            tr('canQueue'),
+            tr('canProgress'),
+            tr('canChatDots'),
+            tr('canVolume'),
             tr('canContinue'),
             tr('canFork'),
             tr('canAnswerButtons'),
@@ -114,7 +118,7 @@ export function ChatTopic() {
             tr('canSpend'),
             tr('canEditor'),
           ]}
-          cant={[tr('cantApprove'), tr('cantDelete')]}
+          cant={[tr('cantApprove'), tr('cantDelete'), tr('cantEditPlan'), tr('cantInterrupt')]}
         />
       </HelpSection>
 

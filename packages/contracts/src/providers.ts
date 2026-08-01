@@ -18,6 +18,7 @@ export const CAPABILITIES = [
   'rules',
   'globalInstructions',
   'skills',
+  'commands',
   'hooks',
   'scripts',
   'mcp',

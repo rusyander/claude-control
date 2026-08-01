@@ -30,6 +30,26 @@ export interface PendingPermission {
   toolUseId: string;
 }
 
+/**
+ * Сообщение, дописанное человеком, пока агент ещё занят. Уходит само, как только
+ * текущий ход закончится, — тем же `--resume`, то есть в тот же разговор.
+ *
+ * Прервать чужой ход панель не может и не притворяется, что может: CLI в режиме
+ * `-p` доводит ход до конца, и любое «мгновенное вмешательство» всё равно легло
+ * бы в очередь — только внутри CLI и без права её увидеть или отменить. Здесь
+ * очередь на виду: видно, что уйдёт следующим, и можно передумать.
+ */
+export interface QueuedMessage {
+  /** Локальный id — чтобы удалить конкретное сообщение из очереди. */
+  id: string;
+  prompt: string;
+  files?: { name: string; base64: string }[];
+  allowEdits?: boolean;
+  autoApprove?: boolean;
+  model?: string;
+  effort?: string;
+}
+
 export interface AgentRun {
   /** Стабильный id прогона — chatId, с которым он стартовал. */
   id: string;
@@ -63,6 +83,8 @@ export interface AgentRun {
   askedQuestion: boolean;
   /** Запросы на права, ждущие ответа человека (интерактивный permission-prompt). */
   permissions: PendingPermission[];
+  /** Дописанное, пока агент занят: уйдёт по очереди, как только он освободится. */
+  queued: QueuedMessage[];
   /** Последний отправленный запрос — для кнопки «Повторить». */
   lastPrompt?: string;
   /** Разрешались ли правки в прошлом запуске — для повтора с теми же правами. */
@@ -120,6 +142,7 @@ export const EMPTY_RUN: AgentRun = {
   tokens: 0,
   askedQuestion: false,
   permissions: [],
+  queued: [],
   lastEventAt: 0,
 };
 
@@ -145,6 +168,9 @@ const MAX_AUTO_RETRIES = 2;
  */
 const autoRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const stoppedByUser = new Set<string>();
+
+/** Счётчик мест в очереди: два сообщения в одну миллисекунду тоже различимы. */
+let queueCounter = 0;
 
 /** Снять запланированный авто-рестарт и обнулить бюджет попыток. */
 function cancelAutoRetry(id: string): void {
@@ -192,6 +218,12 @@ let onPermissionRequest: ((run: AgentRun) => void) | undefined;
 /** Чат, открытый на экране: его завершение не уведомляем — пользователь и так видит. */
 let activeId: string | undefined;
 let statusSnapshot = new Map<string, RunStatus>();
+/**
+ * Статус по КОНКРЕТНОМУ разговору — точка в списке чатов. Табам хватает свода по
+ * проекту, но в одном проекте разговоров несколько, и агент в каждом свой:
+ * без этой карты видно «в проекте кто-то ждёт», а в котором именно — нет.
+ */
+let chatStatusSnapshot = new Map<string, RunStatus>();
 let activeRunsSnapshot: ActiveRunView[] = [];
 /**
  * Накопленный за сеанс расход. Считает его сервер (реестр прогонов) — так
@@ -209,16 +241,26 @@ function emit(): void {
 function rebuildStatuses(): void {
   const now = Date.now();
   const byProject = new Map<string, RunStatus[]>();
+  const byChat = new Map<string, RunStatus>();
 
   for (const run of runs.values()) {
-    if (!run.projectPath) continue;
-    const key = normalizeProjectPath(run.projectPath);
     const status = runStatus({
       status: run.status,
       lastEventAt: run.lastEventAt,
       now,
       pendingPermission: run.permissions.length > 0,
     });
+
+    // Разговор в списке чатов опознаётся по sessionId, а прогон мог стартовать
+    // под временным `new-…` — кладём обе ссылки, чтобы точка нашлась в любом
+    // случае. Завершённые (idle) в карту не идут: точки у них нет.
+    if (status !== 'idle') {
+      byChat.set(run.id, status);
+      if (run.sessionId) byChat.set(run.sessionId, status);
+    }
+
+    if (!run.projectPath) continue;
+    const key = normalizeProjectPath(run.projectPath);
     const list = byProject.get(key) ?? [];
     list.push(status);
     byProject.set(key, list);
@@ -227,6 +269,7 @@ function rebuildStatuses(): void {
   const next = new Map<string, RunStatus>();
   for (const [key, list] of byProject) next.set(key, aggregateStatus(list));
   statusSnapshot = next;
+  chatStatusSnapshot = byChat;
 
   // Пульт агентов и счётчик работают из того же снимка.
   activeRunsSnapshot = selectActiveRuns([...runs.values()], now);
@@ -343,6 +386,37 @@ function finalize(id: string): void {
   // Уведомляем только о фоновых проектных прогонах: активный виден и так, а
   // фоновый агент мог задать вопрос или упасть, пока ты в другом табе.
   if (!isActive && finalized.projectPath && onBackgroundEvent) onBackgroundEvent(finalized);
+
+  // Ход закончился — самое время отдать то, что человек дописал, пока агент был
+  // занят. Остановленному человеком прогону очередь не досылаем: он остановил.
+  if (!stoppedByUser.has(id)) drainQueue(id);
+}
+
+/**
+ * Отправить следующее сообщение из очереди — по одному: второе дождётся конца
+ * хода, который сейчас начнётся. Продолжаем ту же сессию, поэтому дописанное
+ * попадает в тот же контекст, а не заводит разговор заново.
+ */
+function drainQueue(id: string): void {
+  const run = runs.get(id);
+  if (!run || run.queued.length === 0) return;
+
+  const next = run.queued[0];
+  if (!next) return;
+  runs.set(id, { ...run, queued: run.queued.slice(1) });
+  emit();
+
+  void agentRuns.start({
+    chatId: run.id || id,
+    prompt: next.prompt,
+    sessionId: run.sessionId,
+    projectPath: run.projectPath,
+    files: next.files,
+    allowEdits: next.allowEdits,
+    autoApprove: next.autoApprove,
+    model: next.model,
+    effort: next.effort,
+  });
 }
 
 /** Пауза с учётом прерывания — между попытками переподключения. */
@@ -698,6 +772,36 @@ export const agentRuns = {
   },
 
   /**
+   * Дописать сообщение в занятый прогон. Кнопка отправки из-за этого больше не
+   * блокируется: задача может идти часами, и всё это время «сказать ещё одно»
+   * было нельзя — оставалось либо ждать, либо убивать агента и начинать заново.
+   *
+   * Возвращает id места в очереди — по нему сообщение можно отменить, пока оно
+   * не ушло.
+   */
+  enqueue(id: string, message: Omit<QueuedMessage, 'id'>): string {
+    const key = findKey(id) ?? id;
+    const queuedId = `queued-${Date.now()}-${queueCounter++}`;
+    const run = runs.get(key);
+    setRun(key, {
+      id: run?.id || key,
+      queued: [...(run?.queued ?? []), { ...message, id: queuedId }],
+    });
+    emit();
+    return queuedId;
+  },
+
+  /** Передумал — убрать дописанное из очереди, пока оно ещё не ушло агенту. */
+  cancelQueued(id: string, queuedId: string): void {
+    const key = findKey(id);
+    if (!key) return;
+    const run = runs.get(key);
+    if (!run) return;
+    runs.set(key, { ...run, queued: run.queued.filter((item) => item.id !== queuedId) });
+    emit();
+  },
+
+  /**
    * Подхватить прогоны, которые идут на сервере, но которых нет в этом сторе, —
    * после перезагрузки страницы. Тянем каждый с нуля, восстанавливая вывод.
    */
@@ -766,6 +870,10 @@ export const agentRuns = {
     const key = findKey(id) ?? id;
     stoppedByUser.add(key);
     stoppedByUser.add(id);
+    // Остановка гасит и очередь: человек прервал работу, а дописанное ушло бы
+    // сразу после — получилось бы, что кнопка «Остановить» ничего не остановила.
+    const queuedRun = runs.get(key);
+    if (queuedRun && queuedRun.queued.length > 0) runs.set(key, { ...queuedRun, queued: [] });
     cancelAutoRetry(key);
     cancelAutoRetry(id);
     // Прогон мог быть заведён другой вкладкой под своим ключом (serverRunId) —
@@ -949,6 +1057,11 @@ export function getRun(id: string | undefined): AgentRun {
 
 export function getProjectStatuses(): Map<string, RunStatus> {
   return statusSnapshot;
+}
+
+/** Карта «id разговора → статус его агента» — точки в списке чатов. */
+export function getChatStatuses(): Map<string, RunStatus> {
+  return chatStatusSnapshot;
 }
 
 export function getActiveRuns(): ActiveRunView[] {

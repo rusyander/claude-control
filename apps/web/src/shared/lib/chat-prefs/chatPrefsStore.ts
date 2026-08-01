@@ -13,19 +13,42 @@ export interface ChatPrefs {
   /** Звук уведомлений (агент ждёт ответа, упал или закончил). По умолчанию — да. */
   sound: boolean;
   /**
+   * Громкость уведомлений как множитель базового тона: 1 = исходные 100%,
+   * 2 = вдвое громче. По умолчанию 2 — базовый синтезированный сигнал слишком
+   * тихий, чтобы услышать его из другой комнаты или поверх музыки.
+   */
+  soundVolume: number;
+  /**
    * Подтверждать безопасные запросы прав самой панелью. По умолчанию — нет:
    * молча разрешать за человека можно только по его прямому выбору.
    */
   autoApprove: boolean;
 }
 
-const DEFAULT: ChatPrefs = { allowEdits: true, sound: true, autoApprove: false };
+/** Границы громкости: тише 0 не бывает, выше 4× сигнал начинает хрипеть. */
+export const MIN_SOUND_VOLUME = 0;
+export const MAX_SOUND_VOLUME = 4;
+export const DEFAULT_SOUND_VOLUME = 2;
+
+const DEFAULT: ChatPrefs = {
+  allowEdits: true,
+  sound: true,
+  soundVolume: DEFAULT_SOUND_VOLUME,
+  autoApprove: false,
+};
+
+/** Привести громкость к допустимому диапазону; мусор из хранилища → дефолт. */
+export function clampVolume(raw: unknown): number {
+  const value = typeof raw === 'number' && Number.isFinite(raw) ? raw : DEFAULT_SOUND_VOLUME;
+  return Math.min(MAX_SOUND_VOLUME, Math.max(MIN_SOUND_VOLUME, value));
+}
 
 export function sanitizePrefs(raw: unknown): ChatPrefs {
   const source = (raw ?? {}) as Partial<ChatPrefs>;
   return {
     allowEdits: typeof source.allowEdits === 'boolean' ? source.allowEdits : true,
     sound: typeof source.sound === 'boolean' ? source.sound : true,
+    soundVolume: clampVolume(source.soundVolume),
     autoApprove: source.autoApprove === true,
   };
 }
@@ -82,6 +105,14 @@ export function setAutoApprove(autoApprove: boolean): void {
 export function setSound(sound: boolean): void {
   if (prefs.sound === sound) return;
   prefs = { ...prefs, sound };
+  persist(prefs);
+  emit();
+}
+
+export function setSoundVolume(volume: number): void {
+  const next = clampVolume(volume);
+  if (prefs.soundVolume === next) return;
+  prefs = { ...prefs, soundVolume: next };
   persist(prefs);
   emit();
 }

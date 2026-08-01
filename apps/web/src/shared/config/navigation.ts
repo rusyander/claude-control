@@ -65,6 +65,14 @@ export const NAV_SECTIONS: NavSection[] = [
         capability: 'globalInstructions',
       },
       { path: '/skills', label: 'nav.skills', icon: 'skills', key: 'skills', capability: 'skills' },
+      // Команды идут сразу за скиллами: половина списка — это они и есть.
+      {
+        path: '/commands',
+        label: 'nav.commands',
+        icon: 'commands',
+        key: 'commands',
+        capability: 'commands',
+      },
       { path: '/hooks', label: 'nav.hooks', icon: 'hooks', key: 'hooks', capability: 'hooks' },
       {
         path: '/scripts',

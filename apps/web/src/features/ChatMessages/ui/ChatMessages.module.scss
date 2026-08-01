@@ -407,6 +407,37 @@
   animation: pulse 2s ease-in-out infinite;
 }
 
+// Полосы на месте будущего ответа: видно, что текст ещё пишется, и лента не
+// подпрыгивает, когда он приходит. Ширина — как у пузыря, не во всю ленту.
+.pendingSkeleton {
+  min-width: 220px;
+  margin-top: var(--spacing-2xs);
+}
+
+// Карточка ошибки: тот же ряд ленты, что и у ответа, но своим цветом — беду
+// видно, не вчитываясь.
+.errorCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  max-width: min(760px, 100%);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-lg);
+  background: var(--color-danger-subtle);
+  color: var(--color-fg);
+}
+
+.errorText {
+  max-height: 220px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-word;
+  scrollbar-width: thin;
+}
+
 @keyframes blink {
   50% {
     opacity: 0;

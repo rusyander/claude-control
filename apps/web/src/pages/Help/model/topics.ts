@@ -7,6 +7,7 @@ import { ChatTopic } from '../topics/ChatTopic';
 import { RulesTopic } from '../topics/RulesTopic';
 import { ClaudeMdTopic } from '../topics/ClaudeMdTopic';
 import { SkillsTopic } from '../topics/SkillsTopic';
+import { CommandsTopic } from '../topics/CommandsTopic';
 import { HooksTopic } from '../topics/HooksTopic';
 import { ScriptsTopic } from '../topics/ScriptsTopic';
 import { PluginsTopic } from '../topics/PluginsTopic';
@@ -62,6 +63,7 @@ export const HELP_GROUPS: HelpGroup[] = [
       { id: 'rules', icon: 'rules', pagePath: '/rules', Content: RulesTopic },
       { id: 'claudeMd', icon: 'file', pagePath: '/claude-md', Content: ClaudeMdTopic },
       { id: 'skills', icon: 'skills', pagePath: '/skills', Content: SkillsTopic },
+      { id: 'commands', icon: 'commands', pagePath: '/commands', Content: CommandsTopic },
       { id: 'hooks', icon: 'hooks', pagePath: '/hooks', Content: HooksTopic },
       { id: 'scripts', icon: 'scripts', pagePath: '/scripts', Content: ScriptsTopic },
       { id: 'plugins', icon: 'plugins', pagePath: '/plugins', Content: PluginsTopic },

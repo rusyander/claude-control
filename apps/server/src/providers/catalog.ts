@@ -231,6 +231,14 @@ const geminiProvider: ConfigProvider = {
     env: { format: 'dotenv', relativePath: '.gemini/.env' },
     permissions: { format: 'gemini-json', relativePath: '.gemini/settings.json' },
   },
+  // Слэш-команды Gemini — задокументированный каталог `~/.gemini/commands` с
+  // файлами `.toml` (обязателен `prompt`, `description` необязателен), подкаталог
+  // даёт пространство имён: `git/fix.toml` вызывается как `/git:fix`. Только чтение.
+  commandsConfig: {
+    format: 'toml-prompt',
+    dir: () => join(homedir(), '.gemini', 'commands'),
+    namespaceSeparator: ':',
+  },
   // Детект «конфиг найден» (Ф7): каталог ~/.gemini. Только проверка существования.
   configLocations: () => [join(homedir(), '.gemini')],
   // Ассистент Gemini: API — Google (ключи GEMINI_API_KEY / GOOGLE_API_KEY), есть
@@ -255,6 +263,8 @@ const geminiProvider: ConfigProvider = {
     projects: 'ready',
     // Раздел самой панели — от провайдера не зависит (см. codex).
     scripts: 'ready',
+    // Команды: каталог `commands/*.toml` задокументирован — раздел читает его.
+    commands: 'ready',
     skills: 'unsupported',
     hooks: 'unsupported',
     plugins: 'unsupported',
@@ -312,6 +322,13 @@ const qwenProvider: ConfigProvider = {
   // шапки те же два (`name`, `description`), прочие (`priority`, `paths`,
   // `user-invocable`, `disable-model-invocation`) панель сохраняет как чужие.
   skillsConfig: { format: 'skill-md-dir', dir: () => join(qwenHome(), 'skills') },
+  // Слэш-команды — тот же формат, что у Gemini (форк документацию сохранил):
+  // `~/.qwen/commands` с файлами `.toml`, подкаталог даёт `/namespace:command`.
+  commandsConfig: {
+    format: 'toml-prompt',
+    dir: () => join(qwenHome(), 'commands'),
+    namespaceSeparator: ':',
+  },
   // Проектный уровень: проектный QWEN.md в корне, `<проект>/.qwen/settings.json`
   // (MCP и права; проектные настройки перекрывают пользовательские) и
   // `<проект>/.qwen/.env`. Форматы те же, что у глобальных разделов.
@@ -353,6 +370,8 @@ const qwenProvider: ConfigProvider = {
     // `skills/` с папками SKILL.md. Оба формата разобраны по документации.
     skills: 'ready',
     hooks: 'ready',
+    // Команды: каталог `commands/*.toml`, формат унаследован от Gemini.
+    commands: 'ready',
     // Плагинов у Qwen Code документация не описывает → раздел скрыт.
     plugins: 'unsupported',
     analytics: 'unsupported',
@@ -794,6 +813,16 @@ const opencodeProvider: ConfigProvider = {
       join(homedir(), '.agents', 'skills'),
     ],
   },
+  // Слэш-команды OpenCode — задокументированы ДВА источника сразу: каталог
+  // `~/.config/opencode/commands/` с файлами `.md` (шапка `description`, `agent`,
+  // `model`; имя файла = имя команды) и ключ `command` в самом конфиге, где у
+  // записи есть `template` и `description`. Читаем оба, иначе список соврёт.
+  // Вложенность подкаталогов в документации не описана → её не разбираем.
+  commandsConfig: {
+    format: 'md-frontmatter',
+    dir: () => join(opencodeConfigDir(), 'commands'),
+    configPath: opencodeConfigFile,
+  },
   // Переменных окружения у OpenCode НЕТ (OPENCODE-2, `env = unsupported`): по
   // документации он умеет только подстановку `{env:ПЕРЕМЕННАЯ}` внутри
   // opencode.json, то есть ЧИТАЕТ уже заданное окружение процесса, и своего
@@ -881,6 +910,8 @@ const opencodeProvider: ConfigProvider = {
     // OPENCODE-4: плагины — каталог файлов JS/TS (`plugins/`, глобальный и
     // проектный) плюс массив npm-пакетов `plugin` в opencode.json.
     plugins: 'ready',
+    // Команды: каталог `commands/*.md` + ключ `command` в конфиге.
+    commands: 'ready',
     analytics: 'unsupported',
     sandbox: 'unsupported',
   }),

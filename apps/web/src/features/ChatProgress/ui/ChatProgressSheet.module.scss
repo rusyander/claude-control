@@ -1,0 +1,117 @@
+/* Полоса прогресса живёт над полем ввода: свёрнутая — одна строка со счётом и
+   текущим шагом, развёрнутая — весь план и дерево субагентов. */
+.sheet {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  padding: var(--spacing-2xs) var(--spacing-xl);
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+  }
+}
+
+/* Текущий шаг занимает остаток строки и обрезается: это анонс, а не текст. */
+.current {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.body {
+  max-height: 40vh;
+  padding: 0 var(--spacing-xl) var(--spacing-sm);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.tasks,
+.tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-3xs) 0;
+  font-size: var(--font-size-body-sm);
+}
+
+.completed {
+  color: var(--color-fg-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--color-border-strong);
+}
+
+.in_progress {
+  color: var(--color-fg);
+  font-weight: var(--font-weight-medium);
+}
+
+.pending {
+  color: var(--color-fg-subtle);
+}
+
+.taskStatus {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+}
+
+/* Дерево оркестрации: ветка с отступом и направляющей — видно, что субагенты
+   принадлежат этому разговору, а не идут рядом с ним. */
+.tree {
+  padding-left: var(--spacing-sm);
+  border-left: 1px solid var(--color-border);
+}
+
+.agent {
+  padding: var(--spacing-3xs) 0;
+}
+
+.agentText {
+  min-width: 0;
+  max-width: 48ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.result {
+  margin-left: calc(var(--spacing-sm) + 2px);
+  font-size: var(--font-size-caption);
+
+  summary {
+    color: var(--color-fg-subtle);
+    cursor: pointer;
+  }
+}
+
+.resultBody {
+  max-height: 180px;
+  margin-top: var(--spacing-3xs);
+  overflow: auto;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-fg-muted);
+  scrollbar-width: thin;
+}

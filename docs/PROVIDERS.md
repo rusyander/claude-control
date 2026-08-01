@@ -312,3 +312,30 @@ directory — the panel says so and writes nothing there. One difference: Kimi's
 `description` at 240 characters, and the panel checks exactly that bound. The skill name is held to
 the strictest of the three rules (lowercase letters, digits, single hyphens) — such a name is valid
 in any of these CLIs, so moving a skill between them needs no renaming.
+
+## 11. Commands
+
+The section is **read-only** for every provider: it merges everything invoked through `/` into a
+single list and links to the section that owns each entry. The panel never writes command files,
+for any CLI.
+
+For **Claude** the list comes from four sources: skills (`~/.claude/skills/<name>/SKILL.md` →
+`/<name>`), command files (`~/.claude/commands/**/*.md`, where a nested folder becomes a namespace:
+`commands/git/<file>.md` → `/git:<file>`), commands and skills of installed plugins
+(`/<plugin>:<name>`), and the built-in commands of the CLI itself. Built-ins have no file — the CLI
+cannot enumerate them — so the panel maintains its own list of them with descriptions in both
+languages and updates it with each release; a command from a newer CLI shows up here later.
+Disabled skills and plugins stay in the list with a badge instead of disappearing.
+
+**Gemini** and **Qwen Code** share one format — `~/.gemini/commands/**/*.toml` and
+`~/.qwen/commands/**/*.toml`: a required `prompt` key, an optional `description`, and a nested
+folder giving the name through a colon. With no `description`, the list shows the first line of
+`prompt`.
+
+**OpenCode** takes commands from two places at once: `commands/*.md` files with YAML front matter
+(`description`, `agent`, `model`) and the `command` key in `opencode.json`. Both sources merge into
+one list.
+
+For **Codex**, **Continue**, **Goose**, **Kimi Code**, **Cursor** and **Aider** the format of user
+commands is not covered by their documentation, so the section is hidden there. The panel does not
+invent a format the docs do not describe.

@@ -29,6 +29,8 @@ export interface ChatMessagesProps {
   permissions?: PendingPermission[];
   /** Решение по запросу прав. */
   onPermissionDecide?: (toolUseId: string, behavior: 'allow' | 'deny') => void;
+  /** Повторить упавший запрос — кнопка прямо в карточке ошибки. */
+  onRetry?: () => void;
 }
 
 export interface MessageBubbleProps {

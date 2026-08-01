@@ -16,6 +16,7 @@ import {
   agentRuns,
   useAgentRun,
   useProjectStatuses,
+  useChatStatuses,
   useActiveRuns,
   useTotalCost,
   useTotalTokens,
@@ -23,8 +24,9 @@ import {
   type SendOutcome,
 } from '@shared/lib/agent-runs';
 import { toast } from '@shared/lib/toast';
-import { useChatPrefs, getChatPrefs } from '@shared/lib/chat-prefs';
-import { playNotification } from '@shared/lib/notify-sound';
+import { useChatPrefs } from '@shared/lib/chat-prefs';
+import { notifyAgent } from '@shared/lib/notify-sound';
+import { dismissAttention } from '@shared/lib/attention';
 import { useDraft, migrateDraft } from '@shared/lib/draft';
 import { formatSpend, formatBytes } from '@shared/lib/format';
 import { ChatList } from '@features/ChatList';
@@ -40,11 +42,14 @@ import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { ChatMessages } from '@features/ChatMessages';
 import { ChatComposer, MAX_FILE_BYTES } from '@features/ChatComposer';
+import { ChatQueue } from '@features/ChatQueue';
+import { ChatProgressSheet } from '@features/ChatProgress';
 import { ArtifactPreview } from '@features/ArtifactPreview';
 import {
   useChats,
   useChatMessages,
   useArtifacts,
+  useChatProgress,
   useDeleteArtifact,
   useRefreshChat,
   chatExportUrl,
@@ -109,6 +114,9 @@ export function ChatPage() {
   const ws = useWorkspace();
   const clearRunnerAutostart = useClearRunnerAutostart();
   const projectStatuses = useProjectStatuses();
+  // Точки в списке чатов: в одном проекте агентов может быть несколько, и по
+  // точке на табе не понять, который из разговоров зовёт.
+  const chatStatuses = useChatStatuses();
   const activeRuns = useActiveRuns();
   const totalCost = useTotalCost();
   const totalTokens = useTotalTokens();
@@ -184,6 +192,9 @@ export function ChatPage() {
 
   const messages = useChatMessages(activeChat?.id, messagesLimit);
   const messageList = messages.data?.messages ?? [];
+  // Прогресс агента читается из транскрипта, поэтому нужен настоящий id сессии:
+  // у нового разговора он появляется только с первым событием потока.
+  const progress = useChatProgress(activeChat?.id ?? run.sessionId, isRunning);
   const artifacts = useArtifacts(chatId);
   const deleteArtifact = useDeleteArtifact(chatId);
   const refresh = useRefreshChat(chatId);
@@ -232,15 +243,13 @@ export function ChatPage() {
       else toast.success(t('projects.notifyDone', { name }), options);
 
       // Звук уведомления — чтобы услышать другого агента, не глядя в экран.
-      if (getChatPrefs().sound) {
-        playNotification(
-          backgroundRun.status === 'error'
-            ? 'error'
-            : backgroundRun.status === 'waiting'
-              ? 'waiting'
-              : 'done',
-        );
-      }
+      notifyAgent(
+        backgroundRun.status === 'error'
+          ? 'error'
+          : backgroundRun.status === 'waiting'
+            ? 'waiting'
+            : 'done',
+      );
     });
     return () => agentRuns.setOnBackgroundEvent(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -257,7 +266,7 @@ export function ChatPage() {
         const options = path ? { onClick: () => ws.openProject(path, name) } : undefined;
         toast.warning(t('projects.notifyPermission', { name }), options);
       }
-      if (getChatPrefs().sound) playNotification('waiting');
+      notifyAgent('waiting');
     });
     return () => agentRuns.setOnPermissionRequest(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -271,10 +280,30 @@ export function ChatPage() {
     const prev = prevStatusRef.current;
     prevStatusRef.current = run.status;
     if (prev !== 'running') return;
-    if ((run.status === 'waiting' || run.status === 'error') && getChatPrefs().sound) {
-      playNotification(run.status);
-    }
+    if (run.status === 'waiting' || run.status === 'error') notifyAgent(run.status);
   }, [run.status]);
+
+  // Метка в браузере гаснет по действию человека, а не по таймеру: открыт тот
+  // самый чат и окно активно — значит, повод увиден. Слушаем возврат фокуса и
+  // возврат на вкладку: пришёл на зов из другой программы — метка снимается.
+  useEffect(() => {
+    const runId = run.id || chatId;
+    if (!runId) return;
+    if (run.status !== 'waiting' && run.status !== 'error') return;
+
+    const seen = (): void => {
+      if (document.visibilityState === 'visible' && document.hasFocus()) {
+        dismissAttention(runId, run.status);
+      }
+    };
+    seen();
+    window.addEventListener('focus', seen);
+    document.addEventListener('visibilitychange', seen);
+    return () => {
+      window.removeEventListener('focus', seen);
+      document.removeEventListener('visibilitychange', seen);
+    };
+  }, [run.id, run.status, chatId]);
 
   // Завершение прогона активного чата — перечитываем его переписку из истории.
   const wasRunningRef = useRef(false);
@@ -598,6 +627,23 @@ export function ChatPage() {
       return false;
     }
 
+    // Агент ещё занят — не отказываем, а дописываем в очередь: уйдёт само, как
+    // только он закончит текущий ход, в тот же разговор. Прервать чужой ход
+    // нельзя (CLI доводит его до конца), но и ждать конца, ничего не сказав,
+    // человек не обязан.
+    if (isRunning && chatId) {
+      agentRuns.enqueue(chatId, {
+        prompt: plan.prompt,
+        files,
+        allowEdits,
+        autoApprove,
+        model: effectiveModel,
+        effort: effectiveEffort,
+      });
+      setInput('');
+      return true;
+    }
+
     const accepted = await dispatch(plan.prompt, files);
     if (accepted) setInput('');
     return accepted;
@@ -696,6 +742,7 @@ export function ChatPage() {
                 chats={visibleChats}
                 isLoading={chats.isLoading}
                 activeId={activeChat?.id}
+                statuses={chatStatuses}
                 onSelect={openChat}
                 onCreate={
                   ws.activeProject ? () => ws.activeProject && enterProjectDraft() : startNewChat
@@ -934,6 +981,7 @@ export function ChatPage() {
               onPermissionDecide={(toolUseId, behavior) =>
                 chatId && agentRuns.decidePermission(chatId, toolUseId, behavior)
               }
+              onRetry={chatId ? () => agentRuns.retry(chatId) : undefined}
             />
           ) : (
             <Stack
@@ -1017,6 +1065,16 @@ export function ChatPage() {
               </Stack>
             </Stack>
           )}
+
+          {/* План агента и дерево субагентов — read-only, из транскрипта. */}
+          <ChatProgressSheet progress={progress.data} isRunning={isRunning} />
+
+          {/* Дописанное, пока агент занят: видно, что уйдёт следующим, и можно
+              передумать до отправки. */}
+          <ChatQueue
+            items={run.queued}
+            onCancel={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
+          />
 
           <ChatComposer
             value={input}

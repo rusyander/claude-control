@@ -77,7 +77,7 @@ export function ChatComposer({
   };
 
   const submit = (): void => {
-    if (!value.trim() || isRunning) return;
+    if (!value.trim()) return;
     // Чипы снимаем, только когда отправку приняли. Сообщение может быть
     // отклонено (неподдерживаемый тип файла, занятый прогон), и раньше в этом
     // случае вложения пропадали вместе с текстом — приложить их приходилось
@@ -232,20 +232,29 @@ export function ChatComposer({
             />
           </Stack>
 
-          {isRunning ? (
-            <Button variant="secondary" leftIcon={<Icon name="stop" size={20} />} onClick={onStop}>
-              {t('chat.stop')}
-            </Button>
-          ) : (
+          {/* Пока агент занят, рядом с остановкой остаётся и отправка: дописанное
+              встанет в очередь и уйдёт на границе хода. Раньше кнопка тут просто
+              исчезала — сказать агенту хоть слово можно было, только убив его. */}
+          <Stack direction="row" align="center" gap="var(--spacing-2xs)">
+            {isRunning && (
+              <Button
+                variant="secondary"
+                leftIcon={<Icon name="stop" size={20} />}
+                onClick={onStop}
+              >
+                {t('chat.stop')}
+              </Button>
+            )}
             <Button
               variant="primary"
               iconOnly
               icon={<Icon name="send" size={24} />}
-              aria-label={t('chat.send')}
+              aria-label={isRunning ? t('chat.queue.add') : t('chat.send')}
+              title={isRunning ? t('chat.queue.hint') : undefined}
               onClick={submit}
               disabled={!value.trim()}
             />
-          )}
+          </Stack>
         </Stack>
       </div>
 

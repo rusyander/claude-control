@@ -1,0 +1,21 @@
+.queue {
+  padding: var(--spacing-2xs) var(--spacing-xl) 0;
+}
+
+.item {
+  max-width: 100%;
+  padding: var(--spacing-3xs) var(--spacing-2xs) var(--spacing-3xs) var(--spacing-xs);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+/* Текст сообщения — одной строкой: очередь показывает, ЧТО уйдёт, а не читает
+   его целиком; развернуть можно, наведя (title). */
+.text {
+  min-width: 0;
+  max-width: 42ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

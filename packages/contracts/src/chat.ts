@@ -156,3 +156,42 @@ export const rateLimitSchema = object({
 });
 
 export type RateLimit = Infer<typeof rateLimitSchema>;
+
+/**
+ * Прогресс работы агента — то самое ТЗ, которое агент ставит себе сам.
+ *
+ * Панель ничего не выдумывает: чекпоинты — это вызовы `TodoWrite` из транскрипта,
+ * дерево — вызовы `Task` (субагенты). Поэтому список только читается: править
+ * чужой план из панели значило бы врать агенту о его же состоянии.
+ */
+export const progressTaskSchema = object({
+  text: string(),
+  status: union([literal('pending'), literal('in_progress'), literal('completed')]),
+});
+
+export type ProgressTask = Infer<typeof progressTaskSchema>;
+
+/** Субагент, запущенный вызовом Task, — ветка дерева оркестрации. */
+export const progressAgentSchema = object({
+  id: string(),
+  /** Тип субагента (`general-purpose`, `Explore`, свой) — как его назвал агент. */
+  kind: string(),
+  /** Короткое описание задачи, с которым субагент был запущен. */
+  description: string(),
+  status: union([literal('running'), literal('done'), literal('failed')]),
+  /** Первые строки того, что субагент вернул, — для read-only заглядывания. */
+  result: string().optional(),
+});
+
+export type ProgressAgent = Infer<typeof progressAgentSchema>;
+
+export const chatProgressSchema = object({
+  /** Чекпоинты последнего плана агента (перезаписывается каждым TodoWrite). */
+  tasks: array(progressTaskSchema),
+  /** Субагенты этого разговора в порядке запуска. */
+  agents: array(progressAgentSchema),
+  /** Время последней записи в транскрипт, по которой собран прогресс. */
+  updatedAt: string().optional(),
+});
+
+export type ChatProgress = Infer<typeof chatProgressSchema>;

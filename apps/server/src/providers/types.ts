@@ -18,6 +18,7 @@ export const CAPABILITIES = [
   'rules',
   'globalInstructions',
   'skills',
+  'commands',
   'hooks',
   'scripts',
   'mcp',
@@ -395,6 +396,33 @@ export interface ProviderSkillsConfigLocation {
 }
 
 /**
+ * Расположение ФАЙЛОВ СЛЭШ-КОМАНД провайдера.
+ *
+ * Формат берётся ТОЛЬКО из документации CLI: у Gemini и его форка Qwen это
+ * каталог `commands` с файлами `.toml` (обязательное поле `prompt`, необязательное
+ * `description`; подкаталог даёт пространство имён — `git/fix.toml` вызывается
+ * как `/git:fix`), у OpenCode — `commands/*.md` с YAML-шапкой (`description`,
+ * `agent`, `model`), а ДОПОЛНИТЕЛЬНО команды можно задать ключом `command` в
+ * самом конфиге. Раздел читающий: панель эти файлы не пишет.
+ */
+export interface ProviderCommandsConfigLocation {
+  /** `toml-prompt` — Gemini/Qwen; `md-frontmatter` — OpenCode. */
+  format: 'toml-prompt' | 'md-frontmatter';
+  /** Абсолютный путь КАТАЛОГА команд. */
+  dir: (override?: string) => string;
+  /**
+   * Файл конфигурации, в котором команды могут быть объявлены ключом (у
+   * OpenCode — `command` в `opencode.json`). Не задан → команды только файлами.
+   */
+  configPath?: (override?: string) => string;
+  /**
+   * Разделитель пространства имён из подкаталогов. Задан у Gemini/Qwen (`:`),
+   * у остальных вложенность не задокументирована → подкаталоги не разбираем.
+   */
+  namespaceSeparator?: string;
+}
+
+/**
  * Проектный уровень конфигурации провайдера (COMMON-2).
  *
  * Задаётся ТОЛЬКО у провайдеров, у которых проектные пути ЗАДОКУМЕНТИРОВАНЫ, — у
@@ -603,6 +631,15 @@ export interface ConfigProvider {
    * скиллов на собственных маршрутах — `skillsConfig` здесь он не имеет.
    */
   skillsConfig?: ProviderSkillsConfigLocation;
+  /**
+   * Расположение ФАЙЛОВ КОМАНД — задано только там, где формат слэш-команд
+   * задокументирован (Gemini/Qwen: `commands/*.toml`, OpenCode: `commands/*.md`
+   * плюс ключ `command` в конфиге). Отсутствует → раздел команд у провайдера
+   * `unsupported`: угадывать, где чужой CLI держит команды, нельзя. У Claude
+   * команд несколько источников сразу (скиллы, `commands/`, плагины), поэтому у
+   * него собственная сборка, а не `commandsConfig`.
+   */
+  commandsConfig?: ProviderCommandsConfigLocation;
   /**
    * Проектный уровень конфигурации — задан только у провайдеров с
    * задокументированными проектными путями (Codex/Gemini/OpenCode/Cursor), у них

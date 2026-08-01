@@ -4,6 +4,7 @@ import {
   subscribeChatPrefs,
   setAllowEdits,
   setSound,
+  setSoundVolume,
   setAutoApprove,
 } from './chatPrefsStore';
 
@@ -15,6 +16,8 @@ export function useChatPrefs() {
     setAllowEdits,
     sound: prefs.sound,
     setSound,
+    soundVolume: prefs.soundVolume,
+    setSoundVolume,
     autoApprove: prefs.autoApprove,
     setAutoApprove,
   };

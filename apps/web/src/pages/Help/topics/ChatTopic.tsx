@@ -240,6 +240,10 @@ export function ChatTopic() {
         <Callout tone="warning" title={tr('editsResetTitle')}>
           {tr('editsResetText')}
         </Callout>
+
+        <Callout tone="info" title={tr('autoApproveTitle')}>
+          {tr('autoApproveText')}
+        </Callout>
       </HelpSection>
 
       <HelpSection title={tr('historyTitle')} caption={tr('historyCaption')}>

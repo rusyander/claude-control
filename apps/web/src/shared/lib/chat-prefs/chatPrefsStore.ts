@@ -12,15 +12,21 @@ export interface ChatPrefs {
   allowEdits: boolean;
   /** Звук уведомлений (агент ждёт ответа, упал или закончил). По умолчанию — да. */
   sound: boolean;
+  /**
+   * Подтверждать безопасные запросы прав самой панелью. По умолчанию — нет:
+   * молча разрешать за человека можно только по его прямому выбору.
+   */
+  autoApprove: boolean;
 }
 
-const DEFAULT: ChatPrefs = { allowEdits: true, sound: true };
+const DEFAULT: ChatPrefs = { allowEdits: true, sound: true, autoApprove: false };
 
 export function sanitizePrefs(raw: unknown): ChatPrefs {
   const source = (raw ?? {}) as Partial<ChatPrefs>;
   return {
     allowEdits: typeof source.allowEdits === 'boolean' ? source.allowEdits : true,
     sound: typeof source.sound === 'boolean' ? source.sound : true,
+    autoApprove: source.autoApprove === true,
   };
 }
 
@@ -62,6 +68,13 @@ export function subscribeChatPrefs(listener: () => void): () => void {
 export function setAllowEdits(allowEdits: boolean): void {
   if (prefs.allowEdits === allowEdits) return;
   prefs = { ...prefs, allowEdits };
+  persist(prefs);
+  emit();
+}
+
+export function setAutoApprove(autoApprove: boolean): void {
+  if (prefs.autoApprove === autoApprove) return;
+  prefs = { ...prefs, autoApprove };
   persist(prefs);
   emit();
 }

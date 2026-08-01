@@ -397,6 +397,11 @@ export const en: TranslationSchema = {
     allowEdits: 'Allow editing project files',
     readOnly: 'Read-only',
     editsAllowed: 'Edits allowed',
+    autoApprove: 'Auto-approve permissions',
+    autoApproveOn: 'Permissions auto',
+    autoApproveOff: 'Permissions manual',
+    autoApproveHint:
+      'The panel approves safe requests itself. Git writes (commit, push, merge), deletions, migrations, MCP writes and anything covered by ask/deny rules from settings.json still ask.',
     retry: 'Retry',
     retryHint: 'Restart with the same prompt',
     continue: 'Continue',

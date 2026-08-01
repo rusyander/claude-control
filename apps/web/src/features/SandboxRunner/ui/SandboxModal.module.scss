@@ -21,32 +21,6 @@
   padding-bottom: var(--spacing-2xs);
 }
 
-.tab {
-  padding: var(--spacing-2xs) var(--spacing-sm);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-fg-muted);
-  font: inherit;
-  font-size: var(--font-size-body-sm);
-  cursor: pointer;
-
-  &:hover {
-    background: var(--color-surface-sunken);
-    color: var(--color-fg);
-  }
-}
-
-.tabActive {
-  background: var(--color-accent-subtle);
-  color: var(--color-accent);
-
-  &:hover {
-    background: var(--color-accent-subtle);
-    color: var(--color-accent);
-  }
-}
-
 // Готовые запросы. Каждый — плашка из двух частей: подставить и скопировать.
 .chip {
   display: inline-flex;

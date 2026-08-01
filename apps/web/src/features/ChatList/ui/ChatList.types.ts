@@ -14,6 +14,18 @@ export interface ChatListProps {
   statuses?: Map<string, RunStatus>;
 }
 
+/** Строка списка: разговор и, для поиска по телу, его сниппет с числом совпадений. */
+export interface ChatRowData {
+  chat: ChatSummary;
+  snippet?: string;
+  matchCount?: number;
+}
+
+export type TimeGroup = 'today' | 'yesterday' | 'thisWeek' | 'earlier';
+
+export type Row =
+  { kind: 'header'; group: TimeGroup } | { kind: 'chat'; group: TimeGroup; data: ChatRowData };
+
 export interface ChatRowProps {
   chat: ChatSummary;
   isActive: boolean;

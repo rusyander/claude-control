@@ -1,3 +1,6 @@
+// Короткое имя проекта из пути — им подписываются чаты и запуски агентов.
+export { projectName } from './lib/projectName';
+
 export {
   useProjects,
   projectsKey,

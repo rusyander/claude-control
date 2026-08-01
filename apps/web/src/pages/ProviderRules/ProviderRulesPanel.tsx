@@ -12,6 +12,8 @@ import { DeleteButton } from '@features/EntityDelete';
 import { useProviderRules, useDeleteProviderRule } from '@entities/ProviderRules';
 import { ProviderRuleEditor } from './ProviderRuleEditor';
 import { ProviderRuleCreateForm } from './ProviderRuleCreateForm';
+import { ruleActionKey } from './ruleLabels';
+import type { ProviderRulesPanelProps } from './ProviderRulesPanel.types';
 
 /**
  * Правила в модели КАТАЛОГА `.mdc` (CURSOR-1) — общая начинка для глобального
@@ -23,7 +25,7 @@ import { ProviderRuleCreateForm } from './ProviderRuleCreateForm';
  * markdown-телом; подкаталоги поддерживаются. Обычный `.md` в этом каталоге
  * Cursor не читает — такие файлы показаны отдельным списком и не правятся.
  */
-export function ProviderRulesPanel({ projectId }: { projectId?: string }) {
+export function ProviderRulesPanel({ projectId }: ProviderRulesPanelProps) {
   const { t } = useTranslation();
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderRules(scope);
@@ -117,11 +119,7 @@ export function ProviderRulesPanel({ projectId }: { projectId?: string }) {
                       variant="secondary"
                       onClick={() => setOpenRule(openRule === rule.path ? undefined : rule.path)}
                     >
-                      {openRule === rule.path
-                        ? t('providerRules.close')
-                        : rule.frontmatterOk
-                          ? t('providerRules.edit')
-                          : t('providerRules.view')}
+                      {t(ruleActionKey(openRule === rule.path, rule.frontmatterOk))}
                     </Button>
                     <DeleteButton
                       entityName={rule.path}

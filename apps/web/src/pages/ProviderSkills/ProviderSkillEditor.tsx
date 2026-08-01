@@ -11,6 +11,7 @@ import { TextField } from '@shared/ui/text-field';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useProviderSkill, useSaveProviderSkill } from '@entities/ProviderSkills';
 import { skillProblemKey } from './skillProblem';
+import type { ProviderSkillEditorProps } from './ProviderSkillEditor.types';
 import styles from './ProviderSkillsPage.module.scss';
 
 /**
@@ -24,15 +25,7 @@ import styles from './ProviderSkillsPage.module.scss';
  * Скилл, чью шапку панель не разобрала, открывается ТОЛЬКО НА ЧТЕНИЕ: показываем
  * файл целиком и честно говорим, почему кнопки сохранения нет.
  */
-export function ProviderSkillEditor({
-  path,
-  projectId,
-  onClose,
-}: {
-  path: string;
-  projectId?: string;
-  onClose: () => void;
-}) {
+export function ProviderSkillEditor({ path, projectId, onClose }: ProviderSkillEditorProps) {
   const { t } = useTranslation();
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderSkill(path, scope);

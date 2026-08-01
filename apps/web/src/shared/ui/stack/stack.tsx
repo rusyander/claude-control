@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import styles from './stack.module.scss';
-import type { SpaceValue, StackProps } from './stack.types';
+import { toCss } from './stack.lib';
+import type { StackProps } from './stack.types';
 
 /**
  * Заменяет любой flex-контейнер. Раскладка задаётся пропами, а не отдельным
@@ -55,9 +56,4 @@ export function Stack({
       {children}
     </Component>
   );
-}
-
-function toCss(value: SpaceValue | undefined): string | undefined {
-  if (value === undefined) return undefined;
-  return typeof value === 'number' ? `${value}px` : value;
 }

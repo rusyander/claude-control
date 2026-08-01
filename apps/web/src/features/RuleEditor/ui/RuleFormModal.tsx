@@ -16,10 +16,8 @@ import {
   hasContent,
   type RuleSection,
 } from '../model/ruleSections';
-import type { RuleFormModalProps } from './RuleFormModal.types';
+import type { Mode, RuleFormModalProps } from './RuleFormModal.types';
 import styles from './RuleFormModal.module.scss';
-
-type Mode = 'simple' | 'builder' | 'bulk';
 
 /**
  * Создание и правка правила из CLAUDE.md.

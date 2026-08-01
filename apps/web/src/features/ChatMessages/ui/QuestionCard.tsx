@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
-import type { Question, QuestionCardProps } from './QuestionCard.types';
+import type { QuestionCardProps } from './QuestionCard.types';
 import styles from './ChatMessages.module.scss';
 
 /**
@@ -17,19 +17,6 @@ import styles from './ChatMessages.module.scss';
  * сессии), и выбрать можно прямо здесь, не уходя в терминал. Если колбэк не
  * передан (витрина, поток ещё идёт), варианты показываются просто списком.
  */
-
-/** Разбор input вызова: пришёл он строкой JSON, и формат нам не подконтролен. */
-export function parseQuestions(input: string): Question[] | undefined {
-  try {
-    const parsed: unknown = JSON.parse(input);
-    const questions = (parsed as { questions?: unknown }).questions;
-    if (!Array.isArray(questions) || questions.length === 0) return undefined;
-    return questions as Question[];
-  } catch {
-    return undefined;
-  }
-}
-
 export function QuestionCard({ questions, onPick, disabled }: QuestionCardProps) {
   const { t } = useTranslation();
 

@@ -11,12 +11,14 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
+import { formatSize } from '@shared/lib/format';
 import { ScriptFormModal } from '@features/ScriptEditor';
 import { DeleteButton } from '@features/EntityDelete';
 import { SandboxButton } from '@features/SandboxRunner';
 import { ResourceFileTree } from '@features/ResourceFiles';
 import { useScripts, useDeleteScript, type ScriptFile } from '@entities/Script';
 import { useIsCapabilityReady } from '@entities/Provider';
+import { formatDate } from './ScriptsPage.lib';
 import styles from './ScriptsPage.module.scss';
 
 /**
@@ -179,12 +181,4 @@ export function ScriptsPage() {
       <ScriptFormModal isOpen={isFormOpen} onOpenChange={closeForm} script={editing} />
     </Stack>
   );
-}
-
-function formatSize(bytes: number): string {
-  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
 }

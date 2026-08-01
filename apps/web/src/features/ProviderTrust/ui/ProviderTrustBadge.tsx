@@ -3,13 +3,7 @@ import { Badge } from '@shared/ui/badge';
 import { useSettings } from '@entities/AppConfig';
 import { useProviders } from '@entities/Provider';
 import { useProviderChecks, findCheck, trustBadge } from '@entities/ProviderCheck';
-
-interface ProviderTrustBadgeProps {
-  /** Провайдер; по умолчанию — активный. */
-  providerId?: string;
-  /** Показывать ли бейдж для Claude (по умолчанию нет — он дефолт и не шумит). */
-  showForClaude?: boolean;
-}
+import type { ProviderTrustBadgeProps } from './ProviderTrustBadge.types';
 
 /**
  * Бейдж доверия провайдера — тот же, что в селекторе, но пригодный к показу

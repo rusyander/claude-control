@@ -5,6 +5,7 @@ export {
   getWorkspaceState,
   subscribeWorkspace,
   normalizeProjectPath,
+  projectShortName,
   openProjectTab,
   closeProjectTab,
   activateTab,

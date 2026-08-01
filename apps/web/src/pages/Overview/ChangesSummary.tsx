@@ -6,18 +6,9 @@ import { Card } from '@shared/ui/card';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { useHistory } from '@entities/History';
+import { DAY_MS, DEFAULT_DAYS, HISTORY_ROUTE } from './ChangesSummary.constants';
 import type { ChangesSummaryProps } from './ChangesSummary.types';
 import styles from './OverviewPage.module.scss';
-
-const DEFAULT_DAYS = 7;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Тип — `string`, а не литерал: у роутера нет статического дерева путей (маршруты
- * собираются циклом), и литерал `to` не прошёл бы проверку. Тот же приём, что у
- * HELP_ROUTE.
- */
-const HISTORY_ROUTE: string = '/history';
 
 /**
  * Сводка «изменилось за N дней»: сколько правок конфигурации накопилось за

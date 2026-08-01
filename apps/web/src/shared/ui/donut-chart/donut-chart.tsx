@@ -2,15 +2,9 @@ import { useState } from 'react';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { buildDonutArcs } from './donut-chart.model';
+import { CENTER, CIRCUMFERENCE, GAP, RADIUS, STROKE } from './donut-chart.constants';
 import type { DonutChartProps } from './donut-chart.types';
 import styles from './donut-chart.module.scss';
-
-const RADIUS = 40;
-const CENTER = 50;
-const STROKE = 16;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-/** Зазор-разделитель между сегментами в единицах viewBox (~2px на экране). */
-const GAP = 1.5;
 
 /**
  * Кольцевая диаграмма состава: доли одного целого. Уместна, когда сегментов

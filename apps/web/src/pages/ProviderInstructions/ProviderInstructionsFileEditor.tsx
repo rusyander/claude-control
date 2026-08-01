@@ -10,6 +10,7 @@ import {
   useProviderInstructionsFile,
   useSaveProviderInstructionsFile,
 } from '@entities/ProviderInstructions';
+import type { ProviderInstructionsFileEditorProps } from './ProviderInstructionsFileEditor.types';
 import styles from './ProviderInstructionsPage.module.scss';
 
 /**
@@ -21,10 +22,7 @@ import styles from './ProviderInstructionsPage.module.scss';
 export function ProviderInstructionsFileEditor({
   raw,
   projectId,
-}: {
-  raw: string;
-  projectId?: string;
-}) {
+}: ProviderInstructionsFileEditorProps) {
   const { t } = useTranslation();
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderInstructionsFile(raw, scope);

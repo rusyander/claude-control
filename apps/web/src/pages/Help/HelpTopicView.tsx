@@ -5,20 +5,17 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
-import { HELP_ROUTE, findTopicNeighbours, type HelpTopic } from './model/topics';
+import { HELP_ROUTE, findTopicNeighbours } from './model/topics';
 import { TopicNav } from './ui';
+import type { HelpTopicViewProps } from './HelpTopicView.types';
 import styles from './HelpPage.module.scss';
-
-interface Props {
-  topic: HelpTopic;
-}
 
 /**
  * Оболочка документа: путь назад, заголовок, кнопка в сам раздел и вводный
  * абзац. Всё, что ниже, рисует компонент раздела — оболочка одинакова для
  * любого документа, поэтому её видом не приходится заниматься дважды.
  */
-export function HelpTopicView({ topic }: Props) {
+export function HelpTopicView({ topic }: HelpTopicViewProps) {
   const { t } = useTranslation();
   const { Content } = topic;
   const { prev, next } = findTopicNeighbours(topic.id);

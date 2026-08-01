@@ -1,5 +1,8 @@
-import type { SandboxDescription, SandboxKind, SandboxSelection } from '@entities/Sandbox';
+import type { SandboxKind, SandboxSelection } from '@entities/Sandbox';
 import type { TestContext } from '../model/buildTestPrompt';
+
+/** Способ проверки: прямой прогон или разговор. */
+export type Tab = 'probe' | 'chat';
 
 export interface SandboxModalProps {
   isOpen: boolean;
@@ -21,14 +24,4 @@ export interface SandboxModalProps {
    * Без них чипы будут общими и по-настоящему ничего не проверят.
    */
   context?: Omit<TestContext, 'title'>;
-}
-
-export interface ContentsListProps {
-  description: SandboxDescription;
-}
-
-export interface TabButtonProps {
-  isActive: boolean;
-  onClick: () => void;
-  children: string;
 }

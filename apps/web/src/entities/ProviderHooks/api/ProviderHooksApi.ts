@@ -53,7 +53,9 @@ export function useProviderHooks({ projectId }: Scope = {}) {
 export function useSaveProviderHooks({ projectId }: Scope = {}) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (draft: ProviderHooksDraft | ProviderHookRulesDraft): Promise<WriteResult> => {
+    mutationFn: async (
+      draft: ProviderHooksDraft | ProviderHookRulesDraft,
+    ): Promise<WriteResult> => {
       const { data } = await apiClient.put<WriteResult>(basePath(projectId), draft);
       return data;
     },

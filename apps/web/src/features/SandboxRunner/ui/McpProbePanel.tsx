@@ -8,6 +8,7 @@ import { SelectField } from '@shared/ui/select-field';
 import { Icon } from '@shared/ui/icon';
 import { useMcpTools, useCallMcpTool } from '@entities/Sandbox';
 import { parseToolArgs } from '../model/parseToolArgs';
+import type { McpProbePanelProps } from './McpProbePanel.types';
 import styles from './SandboxModal.module.scss';
 
 /**
@@ -17,7 +18,7 @@ import styles from './SandboxModal.module.scss';
  * видно содержимое: список инструментов с описаниями и настоящий ответ на
  * вызов с заданными параметрами.
  */
-export function McpProbePanel({ mcpId }: { mcpId: string }) {
+export function McpProbePanel({ mcpId }: McpProbePanelProps) {
   const { t } = useTranslation();
   const tools = useMcpTools();
   const call = useCallMcpTool();

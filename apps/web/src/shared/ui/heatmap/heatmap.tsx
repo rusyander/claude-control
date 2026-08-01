@@ -2,14 +2,9 @@ import { useState } from 'react';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { cellIntensity, gridPosition, labelStep } from './heatmap.model';
+import { GAP, RADIUS, ROW_HEIGHT } from './heatmap.constants';
 import type { HeatmapProps } from './heatmap.types';
 import styles from './heatmap.module.scss';
-
-/** Высота одной строки ячеек в пикселях: сетка тянется по ширине контейнера. */
-const ROW_HEIGHT = 34;
-/** Зазор между ячейками в единицах сетки: фон-разделитель, а не рамка. */
-const GAP = 0.08;
-const RADIUS = 0.14;
 
 /**
  * Тепловая шкала: величина кодируется насыщенностью одного тона. Форма выбрана

@@ -5,7 +5,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { TextField } from '@shared/ui/text-field';
-import type { ActionRow } from './ProviderHooks.types';
+import type { ProviderHookActionEditorProps } from './ProviderHookActionEditor.types';
 
 /**
  * Одно действие хука OpenCode: команда и переменные окружения.
@@ -16,13 +16,6 @@ import type { ActionRow } from './ProviderHooks.types';
  * именем. Форма поэтому и сделана списком полей — чтобы этого нельзя было
  * перепутать.
  */
-export interface ProviderHookActionEditorProps {
-  action: ActionRow;
-  disabled: boolean;
-  onChange: (patch: Partial<ActionRow>) => void;
-  onRemove: () => void;
-}
-
 export function ProviderHookActionEditor({
   action,
   disabled,

@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import styles from './typography.module.scss';
+import { defaultTag } from './typography.lib';
 import type { TypographyProps } from './typography.types';
 
 /**
@@ -21,8 +22,6 @@ export function Typography({
   children,
   ...rest
 }: TypographyProps) {
-  // Заголовки по умолчанию рендерятся заголовочными тегами: так структура
-  // страницы остаётся осмысленной для скринридеров без ручного as.
   const Component = as ?? defaultTag(variant);
 
   const classes = [
@@ -45,12 +44,4 @@ export function Typography({
       {children}
     </Component>
   );
-}
-
-function defaultTag(variant: TypographyProps['variant']): 'h1' | 'h2' | 'h3' | 'p' | 'span' {
-  if (variant === 'heading-lg') return 'h1';
-  if (variant === 'heading') return 'h2';
-  if (variant === 'heading-sm') return 'h3';
-  if (variant === 'caption' || variant === 'mono') return 'span';
-  return 'p';
 }

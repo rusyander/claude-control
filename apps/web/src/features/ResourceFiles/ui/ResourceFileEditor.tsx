@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -35,6 +36,32 @@ export function ResourceFileEditor({
 
   const isDirty = draft !== (loaded.data?.content ?? '');
   const isBinary = loaded.data?.isBinary ?? false;
+
+  // Тело окна: бинарный файл только объясняем, в режиме правки даём textarea,
+  // иначе показываем загруженный текст.
+  const renderBody = (): ReactNode => {
+    if (isBinary) {
+      return (
+        <div className={styles.viewerBody}>
+          <Typography color="subtle">{t('resources.binaryFile')}</Typography>
+        </div>
+      );
+    }
+    if (isEditing) {
+      return (
+        <textarea
+          className={styles.editor}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          spellCheck={false}
+          autoFocus
+        />
+      );
+    }
+    return (
+      <div className={styles.viewerBody}>{loaded.isLoading ? t('common.loading') : draft}</div>
+    );
+  };
 
   return (
     <div className={styles.viewer}>
@@ -106,21 +133,7 @@ export function ResourceFileEditor({
         </Stack>
       </div>
 
-      {isBinary ? (
-        <div className={styles.viewerBody}>
-          <Typography color="subtle">{t('resources.binaryFile')}</Typography>
-        </div>
-      ) : isEditing ? (
-        <textarea
-          className={styles.editor}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          spellCheck={false}
-          autoFocus
-        />
-      ) : (
-        <div className={styles.viewerBody}>{loaded.isLoading ? t('common.loading') : draft}</div>
-      )}
+      {renderBody()}
     </div>
   );
 }

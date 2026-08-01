@@ -8,6 +8,7 @@ import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { RISK_TONE, DECISION_TONE } from '@entities/Permission';
 import type { SystemPermissionsProps } from './SystemPermissions.types';
 import styles from './PermissionsPage.module.scss';
 
@@ -17,9 +18,6 @@ interface SystemInfo {
   homeDir: string;
   shell: string;
 }
-
-const RISK_TONE = { low: 'success', medium: 'warning', high: 'danger' } as const;
-const DECISION_TONE = { allow: 'success', ask: 'warning', deny: 'danger' } as const;
 
 /**
  * Что Claude Code делает с этим компьютером. В отличие от общего списка,

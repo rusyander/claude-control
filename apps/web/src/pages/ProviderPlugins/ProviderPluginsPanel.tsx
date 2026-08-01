@@ -18,6 +18,8 @@ import {
 } from '@entities/ProviderPlugins';
 import { ProviderPluginFileEditor } from './ProviderPluginFileEditor';
 import { ProviderInstalledPlugins } from './ProviderInstalledPlugins';
+import { fileError, packageError } from './ProviderPluginsPanel.lib';
+import type { ProviderPluginsPanelProps } from './ProviderPluginsPanel.types';
 
 /**
  * Плагины CLI (OPENCODE-4) — общая начинка для глобального раздела и вкладки
@@ -33,7 +35,7 @@ import { ProviderInstalledPlugins } from './ProviderInstalledPlugins';
  * Записи расширенной формы (`[имя, {настройки}]`) панель не ведёт — они
  * показаны только для чтения и остаются в файле нетронутыми.
  */
-export function ProviderPluginsPanel({ projectId }: { projectId?: string }) {
+export function ProviderPluginsPanel({ projectId }: ProviderPluginsPanelProps) {
   const { t } = useTranslation();
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderPlugins(scope);
@@ -212,13 +214,7 @@ export function ProviderPluginsPanel({ projectId }: { projectId?: string }) {
               placeholder="notify.ts"
               isMono
               hint={t('providerPlugins.file.hintPath', { pluginsDir: data.pluginsDir })}
-              error={
-                duplicateFile
-                  ? t('providerPlugins.file.duplicate')
-                  : unsafeFile
-                    ? t('providerPlugins.file.unsafePath')
-                    : undefined
-              }
+              error={fileError(duplicateFile, unsafeFile, t)}
             />
             <Stack direction="row" justify="end">
               <Button
@@ -292,13 +288,7 @@ export function ProviderPluginsPanel({ projectId }: { projectId?: string }) {
                     onChange={setNewPackage}
                     placeholder="@my-org/custom-plugin"
                     isMono
-                    error={
-                      duplicatePackage
-                        ? t('providerPlugins.packages.duplicate')
-                        : invalidPackage
-                          ? t('providerPlugins.packages.invalid')
-                          : undefined
-                    }
+                    error={packageError(duplicatePackage, invalidPackage, t)}
                   />
                 </Stack>
                 <Button

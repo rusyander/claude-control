@@ -12,11 +12,9 @@ import { skillApi } from '@entities/Skill';
 import { hookApi } from '@entities/Hook';
 import { mcpServerApi } from '@entities/McpServer';
 import { useGroups } from '@entities/Group';
-import type { MemberPickerProps } from './MemberPicker.types';
+import type { MemberPickerProps, PickerItem } from './MemberPicker.types';
+import { KIND_FILTERS } from './MemberPicker.constants';
 import styles from './GroupFormModal.module.scss';
-
-/** Виды-фильтры выбора участников: сущности плюс вложенная группа. */
-const KIND_FILTERS = ['all', 'rule', 'skill', 'hook', 'mcp', 'group'] as const;
 
 /**
  * Выбор участников группы. Группа объединяет сущности разных типов и даже другие
@@ -37,7 +35,7 @@ export function MemberPicker({ value, onChange, excludeGroupId }: MemberPickerPr
   const servers = mcpServerApi.useList().data ?? [];
   const { data: groups = [] } = useGroups();
 
-  const items: Array<{ kind: GroupMemberKind; id: string; label: string }> = [
+  const items: PickerItem[] = [
     ...rules.map((item) => ({ kind: 'rule' as const, id: item.id, label: item.title })),
     ...skills.map((item) => ({ kind: 'skill' as const, id: item.id, label: item.name })),
     // Хук из settings.local.json в группу не берём: панель в этот файл не пишет,

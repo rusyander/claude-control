@@ -10,22 +10,8 @@ import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { SelectField } from '@shared/ui/select-field/select-field';
 import { TextField } from '@shared/ui/text-field';
+import { listToText, textToList, sameList } from '@entities/ProviderPermissions';
 import type { GeminiPermissionsPanelProps } from './ProviderPermissionsPanel.types';
-
-/** Список инструментов ↔ текст: одно имя в строке (пустые строки игнорируются). */
-function listToText(list: string[]): string {
-  return list.join('\n');
-}
-function textToList(text: string): string[] {
-  const list: string[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const name = line.trim();
-    if (name && !list.includes(name)) list.push(name);
-  }
-  return list;
-}
-const sameList = (a: string[], b: string[]): boolean =>
-  a.length === b.length && a.every((item, index) => item === b[index]);
 
 /**
  * Права/аппрувы Gemini (GEMINI-2). Три ключа `settings.json`:

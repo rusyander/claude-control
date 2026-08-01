@@ -8,10 +8,3 @@ export interface PluginCatalogProps {
   installingId?: string;
   onInstall: (id: string) => void;
 }
-
-export interface CatalogRowProps {
-  plugin: Plugin;
-  isBusy: boolean;
-  isInstalling: boolean;
-  onInstall: () => void;
-}

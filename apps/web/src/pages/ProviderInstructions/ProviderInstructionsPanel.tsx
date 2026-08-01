@@ -17,6 +17,7 @@ import {
 } from '@entities/ProviderInstructions';
 import { useWritePreview } from '@features/WritePreview';
 import { ProviderInstructionsFileEditor } from './ProviderInstructionsFileEditor';
+import type { ProviderInstructionsPanelProps } from './ProviderInstructionsPanel.types';
 
 /**
  * Инструкции в модели СПИСКА ССЫЛОК (AIDER-1) — общая начинка для глобального
@@ -29,7 +30,7 @@ import { ProviderInstructionsFileEditor } from './ProviderInstructionsFileEditor
  * можно открыть и поправить отдельно — но только если файл уже существует:
  * файлов «от себя» панель не создаёт.
  */
-export function ProviderInstructionsPanel({ projectId }: { projectId?: string }) {
+export function ProviderInstructionsPanel({ projectId }: ProviderInstructionsPanelProps) {
   const { t } = useTranslation();
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderInstructions(scope);

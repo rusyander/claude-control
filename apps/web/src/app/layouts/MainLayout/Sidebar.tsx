@@ -10,17 +10,11 @@ import { NotificationCenter } from '@shared/ui/notification-center';
 import { Badge } from '@shared/ui/badge';
 import { useOverview } from '@entities/AppConfig';
 import { useProviders, activeCapabilities, gateNavSections } from '@entities/Provider';
-import { NAV_SECTIONS } from './Sidebar.constants';
+import { NAV_SECTIONS, COLLAPSED_WIDTH, EXPANDED_WIDTH } from './Sidebar.constants';
+import { navItemTitle } from './Sidebar.lib';
 import { AppMark } from './AppMark';
 import type { SidebarProps } from './Sidebar.types';
 import styles from './MainLayout.module.scss';
-
-/**
- * Ширины держим числами: анимировать значение из CSS-переменной нельзя,
- * а раскладка на них и так завязана (см. --layout-sidebar-width).
- */
-const EXPANDED_WIDTH = 260;
-const COLLAPSED_WIDTH = 60;
 
 /**
  * Боковая навигация со счётчиками: видно объём каждого раздела до перехода.
@@ -135,13 +129,7 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
                 to={item.path}
                 className={styles.navLink}
                 // В свёрнутом виде подписи не видно — подсказка браузера её заменяет.
-                title={
-                  isCollapsed
-                    ? item.access === 'inDevelopment'
-                      ? `${t(item.label)} — ${t('providers.inDevelopment')}`
-                      : t(item.label)
-                    : undefined
-                }
+                title={navItemTitle(item, isCollapsed, t)}
               >
                 <Icon name={item.icon} size={24} />
 

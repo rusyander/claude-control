@@ -7,6 +7,8 @@ import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { TextField } from '@shared/ui/text-field';
 import { useSaveProviderSkill } from '@entities/ProviderSkills';
+import { skillNameError } from './skillLabels';
+import type { ProviderSkillCreateFormProps } from './ProviderSkillCreateForm.types';
 
 /**
  * Создание нового скилла. Имя становится ИМЕНЕМ ПАПКИ и путём `<имя>/SKILL.md`,
@@ -20,12 +22,7 @@ export function ProviderSkillCreateForm({
   existing,
   projectId,
   onCreated,
-}: {
-  skillsDir: string;
-  existing: string[];
-  projectId?: string;
-  onCreated: (path: string) => void;
-}) {
+}: ProviderSkillCreateFormProps) {
   const { t } = useTranslation();
   const save = useSaveProviderSkill(projectId ? { projectId } : {});
 
@@ -39,13 +36,7 @@ export function ProviderSkillCreateForm({
   const descriptionEmpty = !description.trim();
   const path = trimmed ? `${trimmed}/SKILL.md` : '';
 
-  const nameError = !trimmed
-    ? undefined
-    : !nameValid
-      ? t('providerSkills.nameInvalid')
-      : duplicate
-        ? t('providerSkills.duplicate')
-        : undefined;
+  const nameError = skillNameError({ trimmed, nameValid, duplicate }, t);
 
   const canCreate = Boolean(path) && nameValid && !duplicate && !descriptionEmpty;
 

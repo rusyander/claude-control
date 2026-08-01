@@ -17,15 +17,9 @@ import { ExplainBox } from '@shared/ui/explain-box';
 import { SearchField } from '@shared/ui/search-field';
 import { VirtualList } from '@shared/ui/virtual-list';
 import { TruncatedText } from '@shared/ui/truncated-text';
-import { permissionApi, useMovePermission } from '@entities/Permission';
+import { permissionApi, useMovePermission, DECISION_TONE } from '@entities/Permission';
 import { SystemPermissions } from './SystemPermissions';
 import styles from './PermissionsPage.module.scss';
-
-const TONE: Record<PermissionDecision, 'success' | 'warning' | 'danger'> = {
-  allow: 'success',
-  ask: 'warning',
-  deny: 'danger',
-};
 
 /** Раздел прав доступа с фильтром по типу решения. */
 export function PermissionsPage() {
@@ -154,7 +148,7 @@ export function PermissionsPage() {
                 <TruncatedText text={rule.pattern} variant="mono" />
 
                 <Stack direction="row" align="center" gap="var(--spacing-2xs)" flexShrink={0}>
-                  <Badge tone={TONE[rule.decision]} withDot>
+                  <Badge tone={DECISION_TONE[rule.decision]} withDot>
                     {t(`permissions.${rule.decision}`)}
                   </Badge>
                   <SourceBadge source={rule.source} />

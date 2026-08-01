@@ -12,23 +12,10 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Modal } from '@shared/ui/modal';
 import { EmptyState } from '@shared/ui/empty-state';
-import { TONE_ICON, type NotificationCenterProps } from './notification-center.types';
+import { TONE_ICON } from '@shared/config/toast-tone-icon';
+import { formatRelative } from './notification-center.lib';
+import type { NotificationCenterProps } from './notification-center.types';
 import styles from './notification-center.module.scss';
-
-/**
- * Относительное время появления уведомления: «только что», «5 мин назад».
- * Формат зависит от языка интерфейса, поэтому язык приходит параметром.
- */
-function formatRelative(at: number, now: number, language: string): string {
-  const format = new Intl.RelativeTimeFormat(language, { numeric: 'auto' });
-  const seconds = Math.round((at - now) / 1000);
-  const abs = Math.abs(seconds);
-
-  if (abs < 45) return format.format(0, 'second');
-  if (abs < 3600) return format.format(Math.round(seconds / 60), 'minute');
-  if (abs < 86_400) return format.format(Math.round(seconds / 3600), 'hour');
-  return format.format(Math.round(seconds / 86_400), 'day');
-}
 
 /**
  * Журнал уведомлений: колокольчик со счётчиком непрочитанных и окно со списком

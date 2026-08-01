@@ -5,7 +5,8 @@ import { Icon } from '@shared/ui/icon';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { toast } from '@shared/lib/toast';
-import { QuestionCard, parseQuestions } from './QuestionCard';
+import { parseQuestions } from '../lib/parseQuestions';
+import { QuestionCard } from './QuestionCard';
 import type { MessageBubbleProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 

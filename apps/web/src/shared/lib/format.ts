@@ -5,6 +5,15 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Размер мелкого файла — скрипта или артефакта чата. В отличие от `formatBytes`
+ * шкала обрывается на килобайтах: файлы этих разделов до мегабайта не дорастают,
+ * а лишняя ступень только сбивает при сравнении соседних строк списка.
+ */
+export function formatSize(bytes: number): string {
+  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+}
+
 /** Дата в коротком локальном формате. */
 export function formatDate(iso: string, locale: string): string {
   return new Date(iso).toLocaleDateString(locale, {

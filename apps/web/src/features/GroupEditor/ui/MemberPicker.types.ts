@@ -1,4 +1,11 @@
-import type { GroupMember } from '@agentdeck/contracts';
+import type { GroupMember, GroupMemberKind } from '@agentdeck/contracts';
+
+/** Строка сводного списка: сущность любого вида под общим подписанным видом. */
+export interface PickerItem {
+  kind: GroupMemberKind;
+  id: string;
+  label: string;
+}
 
 export interface MemberPickerProps {
   value: GroupMember[];

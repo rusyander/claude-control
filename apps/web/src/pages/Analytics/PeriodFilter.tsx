@@ -3,24 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
 import type { AnalyticsPreset } from '@entities/Analytics';
+import { PRESETS } from './PeriodFilter.constants';
+import { isoDay, presetLabel } from './PeriodFilter.lib';
 import type { PeriodFilterProps } from './PeriodFilter.types';
 import styles from './PeriodFilter.module.scss';
-
-/** Ноль — «за всё время»: сервер понимает его как отсутствие ограничения. */
-const PRESETS: AnalyticsPreset[] = ['today', 7, 30, 90, 0];
-
-/** Местная дата в формате `input[type=date]`: сутки те же, что в отчёте. */
-function isoDay(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
-function presetLabel(preset: AnalyticsPreset): string {
-  if (preset === 'today') return 'analytics.today';
-  if (preset === 0) return 'analytics.allTime';
-  return `analytics.days${preset}`;
-}
 
 /**
  * Период отчёта: быстрые кнопки и произвольный диапазон.

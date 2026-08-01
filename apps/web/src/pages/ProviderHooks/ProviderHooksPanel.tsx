@@ -21,10 +21,9 @@ import {
   toActionRow,
   toPatternDraft,
   toPatternRow,
-  type ActionRow,
-  type HooksFormState,
-  type PatternRow,
-} from './ProviderHooks.types';
+} from './ProviderHooks.lib';
+import type { ActionRow, HooksFormState, PatternRow } from './ProviderHooks.types';
+import type { ProviderHooksPanelProps } from './ProviderHooksPanel.types';
 
 /**
  * Хуки НЕ-Claude провайдера — общая начинка для глобального раздела и для
@@ -45,7 +44,7 @@ import {
  * `experimental`), показано отдельной карточкой ТОЛЬКО ДЛЯ ЧТЕНИЯ и остаётся в
  * файле нетронутым.
  */
-export function ProviderHooksPanel({ projectId }: { projectId?: string }) {
+export function ProviderHooksPanel({ projectId }: ProviderHooksPanelProps) {
   const { t } = useTranslation();
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderHooks(scope);

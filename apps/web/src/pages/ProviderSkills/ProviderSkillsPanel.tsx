@@ -12,7 +12,9 @@ import { DeleteButton } from '@features/EntityDelete';
 import { useProviderSkills, useDeleteProviderSkill } from '@entities/ProviderSkills';
 import { ProviderSkillEditor } from './ProviderSkillEditor';
 import { ProviderSkillCreateForm } from './ProviderSkillCreateForm';
+import { skillActionKey } from './skillLabels';
 import { skillProblemKey } from './skillProblem';
+import type { ProviderSkillsPanelProps } from './ProviderSkillsPanel.types';
 
 /**
  * Скиллы CLI (OPENCODE-5) — общая начинка для глобального раздела и вкладки
@@ -26,7 +28,7 @@ import { skillProblemKey } from './skillProblem';
  * Панель редактирует `name`/`description` и тело; прочие поля шапки сохраняет.
  * Скилл с неразобранной шапкой доступен только на чтение.
  */
-export function ProviderSkillsPanel({ projectId }: { projectId?: string }) {
+export function ProviderSkillsPanel({ projectId }: ProviderSkillsPanelProps) {
   const { t } = useTranslation();
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderSkills(scope);
@@ -142,11 +144,7 @@ export function ProviderSkillsPanel({ projectId }: { projectId?: string }) {
                         setOpenSkill(openSkill === skill.path ? undefined : skill.path)
                       }
                     >
-                      {openSkill === skill.path
-                        ? t('common.close')
-                        : skill.frontmatterOk
-                          ? t('providerSkills.edit')
-                          : t('providerSkills.view')}
+                      {t(skillActionKey(openSkill === skill.path, skill.frontmatterOk))}
                     </Button>
                     <DeleteButton
                       entityName={skill.name}

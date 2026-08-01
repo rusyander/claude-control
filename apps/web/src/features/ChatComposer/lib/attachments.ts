@@ -7,6 +7,8 @@
  * стороны это выглядело сломанным перетаскиванием, и человек пробовал снова.
  */
 
+import type { AttachedFile } from '../ui/ChatComposer.types';
+
 /** Больше этого размера файл не приложить: он поедет в теле запроса. */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -31,4 +33,18 @@ export function planAttach<T extends { name: string; size: number }>(
   }
 
   return { accepted, rejected };
+}
+
+/** Читает файл в base64 — в таком виде вложение уходит на сервер. */
+export async function toAttachedFile(file: File): Promise<AttachedFile> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  // btoa не принимает большие строки целиком — собираем порциями.
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 8192));
+  }
+
+  return { name: file.name, sizeBytes: file.size, base64: btoa(binary) };
 }

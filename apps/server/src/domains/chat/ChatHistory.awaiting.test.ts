@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { readChats } from './ChatHistory.ts';
@@ -91,6 +91,16 @@ describe('readChats — ожидание ответа человека', () => {
         message: { role: 'assistant', content: [{ type: 'text', text: 'готово' }] },
       },
     ]);
+
+    expect(readChats(projectsDir)[0]?.awaitingReply).toBeUndefined();
+  });
+
+  it('вопрос старше суток ожиданием не считается', () => {
+    // Процесс, задавший вопрос, живёт минутами: брошенная месяц назад переписка
+    // держала бы метку в браузере зажжённой навсегда.
+    write([ask, question]);
+    const stale = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    utimesSync(join(projectsDir, 'proj', 's.jsonl'), stale, stale);
 
     expect(readChats(projectsDir)[0]?.awaitingReply).toBeUndefined();
   });

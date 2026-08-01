@@ -120,21 +120,17 @@ describe('Секреты не попадают в глобальный поис�
   // Два полных прохода поиска по каждому провайдеру: сам по себе тест ~2 c, но
   // под полным прогоном (параллельные файлы, диск занят) выходит за 5 c по
   // умолчанию. Запас времени, а не смягчение проверки.
-  it(
-    'API-ключ провайдера не находится и не индексируется',
-    { timeout: 30_000 },
-    async () => {
-      for (const provider of PROVIDERS) {
-        store.updateSettings({ provider });
-        const response = await searchConfig({ paths, store }, 'секретный-ключ');
-        expect(response.results).toEqual([]);
+  it('API-ключ провайдера не находится и не индексируется', { timeout: 30_000 }, async () => {
+    for (const provider of PROVIDERS) {
+      store.updateSettings({ provider });
+      const response = await searchConfig({ paths, store }, 'секретный-ключ');
+      expect(response.results).toEqual([]);
 
-        const inputs = await collectSearchInputs({ paths, store });
-        expect(JSON.stringify(inputs)).not.toContain(API_KEY_VALUE);
-        expect(JSON.stringify(inputs)).not.toContain(MCP_SECRET_VALUE);
-      }
-    },
-  );
+      const inputs = await collectSearchInputs({ paths, store });
+      expect(JSON.stringify(inputs)).not.toContain(API_KEY_VALUE);
+      expect(JSON.stringify(inputs)).not.toContain(MCP_SECRET_VALUE);
+    }
+  });
 
   it('у провайдера в индекс попадают ИМЕНА переменных, но не значения', async () => {
     store.updateSettings({ provider: 'codex' });

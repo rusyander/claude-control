@@ -6,9 +6,10 @@ import {
   parseProviderPermissionsDraft,
   isCliOnlyGeminiApprovalMode,
   buildProviderPermissionInfo,
-  UnrecognizedFormatError,
   type ProviderPermissionsTarget,
 } from '../domains/provider-permissions.ts';
+import { UnrecognizedFormatError } from '../lib/format-errors.ts';
+import { done } from './write-result.ts';
 
 /**
  * Универсальный раздел прав/аппрувов для провайдеров Codex (TOML), Gemini
@@ -45,12 +46,6 @@ export function registerProviderPermissionsRoutes(app: FastifyInstance, ctx: Ser
     message:
       'Формат файла конфигурации не распознан — запись запрещена (раздел только для чтения).',
   } as const;
-
-  const done = (backupPath?: string): { ok: true; backupPath?: string; needsRestart: true } => ({
-    ok: true,
-    backupPath,
-    needsRestart: true,
-  });
 
   const requireTarget = (reply: FastifyReply): ProviderPermissionsTarget | undefined => {
     const target = resolveProviderPermissionsTarget(ctx.store);

@@ -7,10 +7,11 @@ import {
   upsertProviderMcpServer,
   deleteProviderMcpServer,
   parseUniversalDraft,
-  UnrecognizedFormatError,
   McpServerExistsError,
   type ProviderMcpTarget,
 } from '../domains/provider-mcp.ts';
+import { UnrecognizedFormatError } from '../lib/format-errors.ts';
+import { done } from './write-result.ts';
 
 /**
  * Универсальный раздел MCP-серверов для провайдеров Gemini (JSON) и Codex (TOML).
@@ -27,12 +28,6 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
     error: 'section_unsupported',
     message: 'У активного провайдера нет универсального раздела MCP.',
   } as const;
-
-  const done = (backupPath?: string): { ok: true; backupPath?: string; needsRestart: true } => ({
-    ok: true,
-    backupPath,
-    needsRestart: true,
-  });
 
   const requireTarget = (reply: FastifyReply): ProviderMcpTarget | undefined => {
     const target = resolveProviderMcpTarget(ctx.store);

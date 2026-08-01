@@ -253,7 +253,13 @@ describe('подметание и состояние песочницы', () => 
     // Раньше таймер заводило только создание песочницы: в сеансе, где модалку не
     // открывали, брошенная копия доступа лежала до следующего перезапуска.
     vi.useFakeTimers();
-    startSandboxHousekeeping({ root, now: Date.now(), graceMs: 60_000, intervalMs: 1000, idleMs: hour });
+    startSandboxHousekeeping({
+      root,
+      now: Date.now(),
+      graceMs: 60_000,
+      intervalMs: 1000,
+      idleMs: hour,
+    });
 
     // Песочница появилась уже после старта — стартовый проход её не видел.
     const dir = makeSandbox('qa-later', 3 * hour);

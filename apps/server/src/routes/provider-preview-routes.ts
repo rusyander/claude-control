@@ -6,7 +6,8 @@ import {
   SectionUnsupportedError,
   InvalidDraftError,
 } from '../domains/provider-preview.ts';
-import { UnrecognizedFormatError, McpServerExistsError } from '../domains/provider-mcp.ts';
+import { McpServerExistsError } from '../domains/provider-mcp.ts';
+import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 
 /**
  * Предпросмотр записи в конфигурацию активного провайдера.

@@ -1,5 +1,5 @@
 import { object, string, boolean, number, record, array, unknown, enum as zodEnum } from 'zod';
-import { isKnownProviderId } from '../providers/registry.ts';
+import { isKnownProviderId } from './registry.ts';
 
 /**
  * Серверная проверка тел `PATCH /api/settings` и `POST /api/settings/import`.

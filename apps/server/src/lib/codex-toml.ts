@@ -1,4 +1,5 @@
 import { parse as parseToml } from 'smol-toml';
+import { UnrecognizedFormatError } from './format-errors.ts';
 import { blockToEol, detectEol, stripBom } from './text-form.ts';
 
 /**
@@ -17,13 +18,10 @@ import { blockToEol, detectEol, stripBom } from './text-form.ts';
  * — формат неоднозначен, бросаем `UnrecognizedFormatError` и НЕ пишем.
  */
 
-/** Формат файла не распознан → раздел только для чтения, запись запрещена. */
-export class UnrecognizedFormatError extends Error {
-  constructor(message = 'Формат файла не распознан — раздел доступен только для чтения.') {
-    super(message);
-    this.name = 'UnrecognizedFormatError';
-  }
-}
+// Переэкспорт для доменов/маршрутов/тестов: объявление живёт в
+// `lib/format-errors.ts` (сигнал общий для всех форматов, не только TOML), класс
+// тот же самый, `instanceof` цел.
+export { UnrecognizedFormatError };
 
 /**
  * Разобрать config.toml. Невалидный TOML → fail-closed (read-only).

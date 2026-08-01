@@ -11,7 +11,7 @@ import {
   WriteDisabledError,
   type ProviderHooksTarget,
 } from '../domains/provider-hooks.ts';
-import { UnrecognizedFormatError } from '../lib/codex-toml.ts';
+import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 
 /**
  * Хуки НЕ-Claude провайдера (OPENCODE-3) — глобальный уровень.

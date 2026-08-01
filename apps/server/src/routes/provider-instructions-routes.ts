@@ -10,7 +10,8 @@ import {
   ListedFileNotEditableError,
   type ProviderInstructionsTarget,
 } from '../domains/provider-instructions.ts';
-import { UnrecognizedFormatError } from '../lib/aider-yaml.ts';
+import { UnrecognizedFormatError } from '../lib/format-errors.ts';
+import { done } from './write-result.ts';
 
 /**
  * Раздел инструкций в модели СПИСКА ССЫЛОК (AIDER-1) — глобальный уровень.
@@ -43,12 +44,6 @@ export function registerProviderInstructionsRoutes(app: FastifyInstance, ctx: Se
     message:
       'Формат файла конфигурации не распознан — запись запрещена (раздел только для чтения).',
   } as const;
-
-  const done = (backupPath?: string): { ok: true; backupPath?: string; needsRestart: true } => ({
-    ok: true,
-    backupPath,
-    needsRestart: true,
-  });
 
   const requireTarget = (reply: FastifyReply): ProviderInstructionsTarget | undefined => {
     const target = resolveProviderInstructionsTarget(ctx.store);

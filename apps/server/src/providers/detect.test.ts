@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { getProvider } from '../providers/registry.ts';
-import { detectProvider, detectProviders, pathExists, type DetectDeps } from './provider-detect.ts';
+import { getProvider } from './registry.ts';
+import { detectProvider, detectProviders, pathExists, type DetectDeps } from './detect.ts';
 
 /**
  * Детект установленных провайдер-CLI (Ф7).

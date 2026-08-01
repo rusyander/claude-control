@@ -12,7 +12,7 @@ import {
   describePluginError,
   type ProviderPluginsTarget,
 } from '../domains/provider-plugins.ts';
-import { UnrecognizedFormatError } from '../lib/codex-toml.ts';
+import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 
 /**
  * Плагины НЕ-Claude провайдера (OPENCODE-4) — глобальный уровень.

@@ -6,11 +6,12 @@ import {
   readProviderEnvVars,
   saveProviderEnvVars,
   parseProviderEnvDraft,
-  UnrecognizedFormatError,
   EnvKeyNotEncodableError,
   EnvKeyPreservedError,
   type ProviderEnvTarget,
 } from '../domains/provider-env.ts';
+import { UnrecognizedFormatError } from '../lib/format-errors.ts';
+import { done } from './write-result.ts';
 
 /**
  * Универсальный раздел переменных окружения для провайдеров Codex (TOML), Aider
@@ -41,12 +42,6 @@ export function registerProviderEnvRoutes(app: FastifyInstance, ctx: ServerConte
     message:
       'Формат файла конфигурации не распознан — запись запрещена (раздел только для чтения).',
   } as const;
-
-  const done = (backupPath?: string): { ok: true; backupPath?: string; needsRestart: true } => ({
-    ok: true,
-    backupPath,
-    needsRestart: true,
-  });
 
   const requireTarget = (reply: FastifyReply): ProviderEnvTarget | undefined => {
     const target = resolveProviderEnvTarget(ctx.store);

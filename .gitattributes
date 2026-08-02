@@ -1,0 +1,16 @@
+# Перевод строки в репозитории всегда LF, независимо от того, с какой ОС коммитят.
+# Без этого настройка core.autocrlf у отдельного участника решала бы, что попадёт
+# в историю, и файл, собранный на Windows, приезжал бы на Linux и macOS с \r.
+* text=auto eol=lf
+
+# Двоичное не трогать: перевод строки в них — данные, а не разметка.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.zip binary

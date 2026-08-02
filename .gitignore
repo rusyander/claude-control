@@ -9,3 +9,6 @@ storybook-static/
 # Скриншоты и артефакты проверок — рабочий мусор, в репозитории не нужны
 .qa-screenshots/
 .agent
+
+# Отчёт о покрытии — генерируется `vitest run --coverage`, в историю не нужен
+coverage/

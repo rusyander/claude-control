@@ -6,6 +6,7 @@ import {
   number,
   record,
   enum as zodEnum,
+  unknown as zodUnknown,
   type infer as Infer,
 } from 'zod';
 
@@ -76,6 +77,24 @@ export const mcpToolSchema = object({
 });
 
 export type McpTool = Infer<typeof mcpToolSchema>;
+
+/**
+ * Тот же инструмент, но со СХЕМОЙ ПАРАМЕТРОВ — форма ответа песочницы
+ * (`/api/sandbox/mcp-tools`). Схема нужна ровно там: по ней рисуется форма
+ * вызова инструмента. Помощник отбора прав (`/api/mcp/:id/tools`) её не
+ * получает — ему хватает имени и описания, и лишнее в ответе там ни к чему.
+ *
+ * Форм две, а не одна с необязательным полем, потому что разные и ответы: одна
+ * ручка схему НЕ отдаёт никогда, вторая отдаёт, когда сервер её сообщил.
+ */
+export const mcpToolDetailSchema = object({
+  name: string(),
+  description: string().optional(),
+  /** Схема параметров как есть, в терминах самого MCP-сервера. */
+  inputSchema: zodUnknown().optional(),
+});
+
+export type McpToolDetail = Infer<typeof mcpToolDetailSchema>;
 
 /**
  * Ответ маршрута списка инструментов сервера. Неудачу отдаём значением, а не

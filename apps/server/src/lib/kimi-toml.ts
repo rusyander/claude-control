@@ -1,5 +1,11 @@
 import { stringify as stringifyToml } from 'smol-toml';
 import {
+  KIMI_DECISIONS,
+  KIMI_MODES,
+  type KimiDecision,
+  type KimiMode,
+} from '@claude-control/contracts/vocabulary';
+import {
   UnrecognizedFormatError,
   parseCodexToml,
   spliceCodexTableRegion,
@@ -55,16 +61,14 @@ export const KIMI_MODE_KEY = 'default_permission_mode';
 /** Регион правил — массив таблиц `[[permission.rules]]`. */
 export const KIMI_PERMISSION_KEY = 'permission';
 
-/** Задокументированные режимы, в порядке роста самостоятельности агента. */
-export const KIMI_MODES = ['manual', 'auto', 'yolo'] as const;
-export type KimiMode = (typeof KIMI_MODES)[number];
+/** Задокументированные режимы, в порядке роста самостоятельности агента (общий словарь). */
+export { KIMI_MODES, type KimiMode };
 
 /** Режим по умолчанию: без ключа Kimi спрашивает подтверждение каждый раз. */
 export const KIMI_DEFAULT_MODE: KimiMode = 'manual';
 
-/** Задокументированные решения правила. */
-export const KIMI_DECISIONS = ['allow', 'ask', 'deny'] as const;
-export type KimiDecision = (typeof KIMI_DECISIONS)[number];
+/** Задокументированные решения правила (общий словарь). */
+export { KIMI_DECISIONS, type KimiDecision };
 
 /** Поля правила, которые панель ведёт. Любое другое поле → fail-closed. */
 const RULE_KEYS = ['decision', 'pattern'];

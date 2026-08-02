@@ -4,40 +4,25 @@
  */
 
 /**
- * Почему union возможностей и статусов продублирован здесь значением, а не взят
- * из `@claude-control/contracts`: contracts тянется в сервер ТОЛЬКО как тип. Его
- * barrel реэкспортирует модули без расширений, а Node ESM в рантайме такие пути
- * не резолвит — импорт ЗНАЧЕНИЯ из contracts уронил бы сервер на старте
- * (`ERR_MODULE_NOT_FOUND`). Список обязан совпадать с contracts `CAPABILITIES`.
+ * Набор возможностей и статусы берутся из общего словаря контрактов. Бочку
+ * `@claude-control/contracts` сервер импортировать не может (её реэкспорты идут
+ * без расширений, Node ESM их не резолвит), а вот отдельная точка экспорта
+ * `@claude-control/contracts/vocabulary` — самодостаточный модуль без импортов,
+ * и она резолвится. Так набор перестал быть двумя копиями, которые расходятся
+ * молча: у каждой стороны свой тест, оба зелёные, а значения разные.
  */
-export const CAPABILITIES = [
-  'rules',
-  'globalInstructions',
-  'skills',
-  'commands',
-  'hooks',
-  'scripts',
-  'mcp',
-  'permissions',
-  'env',
-  'plugins',
-  'analytics',
-  'projects',
-  'chat',
-  'sandbox',
-] as const;
+import {
+  CAPABILITIES,
+  type Capability,
+  type CapabilityStatus,
+} from '@claude-control/contracts/vocabulary';
 
-export type Capability = (typeof CAPABILITIES)[number];
-
-/**
- * Статус возможности у провайдера. `ready` — работает сейчас; `planned` —
- * поддержим, адаптера ещё нет (раздел «в разработке», ничего не пишет);
- * `unsupported` — у этого CLI такого нет (раздел скрыт). См. contracts.
- */
-export type CapabilityStatus = 'ready' | 'planned' | 'unsupported';
-
-/** Насколько провайдер проверен: `verified` (Claude) или `experimental`. */
-export type ProviderStatus = 'verified' | 'experimental';
+export {
+  CAPABILITIES,
+  type Capability,
+  type CapabilityStatus,
+  type ProviderStatus,
+} from '@claude-control/contracts/vocabulary';
 
 /** Полная карта возможностей: статус по каждому ключу. */
 export type CapabilityMap = Record<Capability, CapabilityStatus>;

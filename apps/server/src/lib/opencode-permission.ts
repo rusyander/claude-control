@@ -1,3 +1,9 @@
+import {
+  OPENCODE_PERMISSION_LEVELS,
+  OPENCODE_PERMISSION_TOOLS,
+  type OpencodePermissionLevel,
+  type OpencodePermissionTool,
+} from '@claude-control/contracts/vocabulary';
 import { UnrecognizedFormatError } from './codex-toml.ts';
 
 /**
@@ -40,13 +46,17 @@ import { UnrecognizedFormatError } from './codex-toml.ts';
  * для чтения, запись 422). Форматы не угадываем.
  */
 
-/** Уровни прав OpenCode. Ровно эти три значения, без синонимов. */
-export const OPENCODE_PERMISSION_LEVELS = ['allow', 'deny', 'ask'] as const;
-export type OpencodePermissionLevel = (typeof OPENCODE_PERMISSION_LEVELS)[number];
-
-/** Задокументированные инструменты, у которых панель ведёт уровень прав. */
-export const OPENCODE_PERMISSION_TOOLS = ['edit', 'bash', 'webfetch'] as const;
-export type OpencodePermissionTool = (typeof OPENCODE_PERMISSION_TOOLS)[number];
+/**
+ * Уровни прав OpenCode (ровно три значения, без синонимов) и задокументированные
+ * инструменты, у которых панель ведёт уровень. Оба набора — из общего словаря
+ * контрактов: теми же значениями фронт рисует форму.
+ */
+export {
+  OPENCODE_PERMISSION_LEVELS,
+  OPENCODE_PERMISSION_TOOLS,
+  type OpencodePermissionLevel,
+  type OpencodePermissionTool,
+};
 
 /**
  * Инструменты, у которых задокументирована КАРТА ШАБЛОНОВ (команда → уровень) и

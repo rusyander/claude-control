@@ -4,7 +4,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import type { McpServer, McpTransport } from '@claude-control/contracts';
+import type { McpServer, McpToolDetail, McpTransport } from '@claude-control/contracts';
 
 /**
  * Один разговор с MCP-сервером — на любом из трёх транспортов.
@@ -23,18 +23,14 @@ import type { McpServer, McpTransport } from '@claude-control/contracts';
  */
 
 /**
- * Инструмент MCP-сервера в терминах КЛИЕНТА — намеренно ШИРЕ контрактного
- * `McpTool` (`packages/contracts/src/mcp.ts`, там только `name` + `description`
- * для помощника отбора прав). Здесь дополнительно несётся `inputSchema`, по
- * которой рисуется форма вызова в песочнице; поэтому копия остаётся, а не
- * заменяется импортом контракта.
+ * Инструмент MCP-сервера в терминах КЛИЕНТА — это контрактный `McpToolDetail`:
+ * имя, описание и схема параметров, по которой песочница рисует форму вызова.
+ * Имя оставлено прежним, потому что по нему ходит весь серверный код.
+ *
+ * Контракт тянется сюда ТОЛЬКО как тип — значение из бочки контрактов сервер
+ * импортировать не может (см. `contracts/vocabulary`), но типы стираются.
  */
-export interface McpTool {
-  name: string;
-  description?: string;
-  /** Схема параметров как есть — по ней рисуется форма вызова. */
-  inputSchema?: unknown;
-}
+export type McpTool = McpToolDetail;
 
 export interface McpToolCall {
   ok: boolean;

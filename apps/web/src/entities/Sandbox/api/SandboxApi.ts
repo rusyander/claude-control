@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import type { McpToolDetail } from '@claude-control/contracts';
 import { apiClient } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
 import { sandboxDeleteFailedText } from '../model/sandboxError';
@@ -66,11 +67,11 @@ export interface ProbeResult {
   timedOut: boolean;
 }
 
-export interface McpTool {
-  name: string;
-  description?: string;
-  inputSchema?: unknown;
-}
+/**
+ * Инструмент MCP в песочнице — контрактная форма `McpToolDetail`: имя, описание
+ * и схема параметров. Имя оставлено прежним: под ним он ходит по интерфейсу.
+ */
+export type McpTool = McpToolDetail;
 
 export function useEventFixtures() {
   return useQuery({

@@ -1,4 +1,5 @@
 import { isMap, isScalar, type Document } from 'yaml';
+import { GOOSE_MODES, type GooseMode } from '@claude-control/contracts/vocabulary';
 import { UnrecognizedFormatError } from './codex-toml.ts';
 import { deleteYamlKey, otherYamlKeysProjection, parseYamlMapDocument } from './yaml-doc.ts';
 
@@ -63,9 +64,8 @@ export const GOOSE_EXTENSIONS_KEY = 'extensions';
 /** Ключ режима аппрувов — скаляр в КОРНЕ файла. */
 export const GOOSE_MODE_KEY = 'GOOSE_MODE';
 
-/** Задокументированные режимы аппрувов Goose, в порядке показа. */
-export const GOOSE_MODES = ['auto', 'approve', 'smart_approve', 'chat'] as const;
-export type GooseMode = (typeof GOOSE_MODES)[number];
+/** Задокументированные режимы аппрувов Goose, в порядке показа (общий словарь). */
+export { GOOSE_MODES, type GooseMode };
 
 /** Режим по умолчанию: неинтерактивные и плановые сессии Goose идут в `auto`. */
 export const GOOSE_DEFAULT_MODE: GooseMode = 'auto';

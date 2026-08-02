@@ -36,8 +36,10 @@ import { registerProjectRoutes } from './routes/project-routes.ts';
 import { registerProviderProjectRoutes } from './routes/provider-project-routes.ts';
 import { registerProjectRunnerRoutes } from './routes/project-runner-routes.ts';
 import { registerProjectGitRoutes } from './routes/project-git-routes.ts';
+import { registerProviderChatRoutes } from './routes/provider-chat-routes.ts';
 import type { RouteRegistrar } from './routes/register.ts';
 import { ChatRunRegistry } from './domains/chat/ChatRunRegistry.ts';
+import { ProviderChatService } from './domains/provider-chat.ts';
 import { ProjectRunnerRegistry, autostartProjects } from './domains/project-runner.ts';
 import { startSandboxHousekeeping } from './domains/sandbox/SandboxConfig.ts';
 
@@ -108,6 +110,7 @@ const projectRunner = new ProjectRunnerRegistry({
   },
 });
 const chatRuns = new ChatRunRegistry();
+const providerChats = new ProviderChatService();
 
 /**
  * Все маршруты панели одной таблицей. Форма у модулей общая (`RouteRegistrar`),
@@ -147,6 +150,7 @@ const ROUTES: RouteRegistrar[] = [
   registerProviderProjectRoutes,
   registerProjectGitRoutes,
   (instance, context) => registerChatRoutes(instance, context, chatRuns),
+  (instance, context) => registerProviderChatRoutes(instance, context, providerChats),
   (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
 ];
 
@@ -204,9 +208,13 @@ syncConfigWatcher();
 // открывали, брошенная копия доступа лежала до следующего перезапуска.
 const sandboxSweep = startSandboxHousekeeping();
 
-// Спавненные dev-серверы проектов живут в памяти процесса. Гасим их при выходе,
-// чтобы дочерние процессы не осиротели и не держали занятыми порты.
-const shutdownRunners = (): void => projectRunner.stopAll();
+// Спавненные dev-серверы проектов и CLI чужих чатов живут в памяти процесса.
+// Гасим их при выходе, чтобы дочерние процессы не осиротели и не держали
+// занятыми порты.
+const shutdownRunners = (): void => {
+  projectRunner.stopAll();
+  providerChats.stopAll();
+};
 process.on('exit', shutdownRunners);
 process.on('SIGINT', () => {
   shutdownRunners();

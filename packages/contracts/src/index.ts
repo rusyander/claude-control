@@ -24,6 +24,7 @@ export * from './provider-permissions';
 export * from './provider-keys';
 export * from './provider-projects';
 export * from './assistant-run';
+export * from './provider-chat';
 export * from './permissions';
 export * from './permission-presets';
 export * from './env';

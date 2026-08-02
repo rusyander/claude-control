@@ -480,15 +480,19 @@ export const helpEn: HelpSchema = {
         'watches transcript files and reports changes, and the panel additionally asks ' +
         'for the fingerprint of the open conversation every few seconds — in case file ' +
         'watching is switched off in settings or the stream broke. No page reload needed.',
-      noteProviderTitle: 'The assistant is basic with other providers',
+      noteProviderTitle: 'Other providers have a chat of their own',
       noteProviderText:
-        'Everything described here — streaming, attachments, branching, parallel agents, ' +
-        'history — works with the Claude provider. Codex and Gemini get a basic experimental ' +
-        'assistant instead: one question, one answer, no streaming and no attachments. Aider ' +
-        'and OpenCode get the same basic assistant (aider --message, opencode run "<prompt>" — ' +
-        'prompt as a positional argument, the CLI accepts no stdin), but it is built from the ' +
-        'docs and has not been exercised live — those CLIs are not installed on the development ' +
-        'machine. Cursor has no model API of its own.',
+        'With a non-Claude provider active, the Chat section shows its own chat: a list of ' +
+        'conversations, memory between questions, the reply as the CLI prints it, a working ' +
+        'directory and file attachments by path. The panel keeps the transcript there — these ' +
+        'CLIs have no readable history of their own — and the context of the next question is ' +
+        'assembled from it. What is missing: parsed steps and tools, cost, branching, voice and ' +
+        'parallel agents — all of that is read out of the claude streaming protocol, and no ' +
+        'other CLI publishes such a format. OpenCode holds a session (opencode serve) instead ' +
+        'of a run per question, so its answer arrives whole. The Aider, OpenCode, Continue, ' +
+        'Goose and Kimi Code chats are built from the docs and have not been exercised live — ' +
+        'those CLIs are not installed on the development machine. Cursor has neither a ' +
+        'non-interactive entry point nor a model API of its own.',
     },
 
     overview: {

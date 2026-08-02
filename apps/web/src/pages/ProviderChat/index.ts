@@ -1,0 +1,1 @@
+export { ProviderChatPage } from './ProviderChatPage';

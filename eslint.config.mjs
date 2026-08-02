@@ -21,6 +21,21 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  /**
+   * Подчёркивание = «параметр объявлен намеренно и не используется». Так уже
+   * ведёт себя `tsc` (`noUnusedParameters`), и без этой строки два проверяющих
+   * расходились: TypeScript молчал, ESLint падал. Нужно там, где форма функции
+   * задана извне — общий тип регистрации маршрутов, обработчик Fastify, колбэк
+   * библиотеки: параметр обязан быть в списке, а делать с ним нечего.
+   */
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+    },
+  },
   // Служебные скрипты исполняются Node напрямую: process и console там есть.
   {
     files: ['tools/**/*.{mjs,js}', '*.cjs', '*.mjs'],

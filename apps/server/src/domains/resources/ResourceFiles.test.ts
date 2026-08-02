@@ -82,6 +82,24 @@ describe('ResourceFiles', () => {
       expect(files).toHaveLength(1);
       expect(files[0]?.path).toBe('guard.mjs');
     });
+
+    it('скрипт из подпапки виден в дереве под своим путём', () => {
+      mkdirSync(join(root, 'hooks', 'lib'), { recursive: true });
+      writeFileSync(join(root, 'hooks', 'lib', 'shared.mjs'), 'shared');
+
+      const files = listResourceFiles('script', 'lib/shared.mjs', location);
+      expect(files).toHaveLength(1);
+      expect(files[0]?.path).toBe('lib/shared.mjs');
+    });
+
+    it('идентификатор скрипта с ../ не выводит за пределы hooks/', () => {
+      writeFileSync(join(root, 'settings.json'), '{}');
+      expect(listResourceFiles('script', '../settings.json', location)).toEqual([]);
+    });
+
+    it('идентификатор хука не путается с путём файла', () => {
+      expect(listResourceFiles('hook', 'PreToolUse:12ab', location)).toEqual([]);
+    });
   });
 
   describe('правка и создание', () => {

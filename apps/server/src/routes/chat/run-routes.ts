@@ -3,7 +3,7 @@ import type { ServerContext } from '../../context.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
 import { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { shouldAutoApprove } from '../../domains/chat/auto-approve.ts';
-import { readPermissions } from '../../domains/permissions.ts';
+import { createGuardedPatternsReader } from '../../domains/permissions.ts';
 import { chatDirectory } from '../../domains/chat/ChatArtifacts.ts';
 import { resolveWorkspace, permissionModeFor } from '../../domains/chat/ChatWorkspace.ts';
 import {
@@ -66,11 +66,16 @@ export function registerChatRunRoutes(
     }),
   );
 
-  /** Охраняемые паттерны: всё, что пользователь просил спрашивать или запрещать. */
-  const guardedPatterns = (): string[] =>
-    readPermissions(ctx.location.paths.settings, ctx.store, ctx.location.paths.settingsLocal)
-      .filter((rule) => rule.decision !== 'allow')
-      .map((rule) => rule.pattern);
+  /**
+   * Охраняемые паттерны: всё, что пользователь просил спрашивать или запрещать.
+   * Спрашивается на каждый вызов инструмента, поэтому читатель кэширует ответ до
+   * первой правки самих файлов настроек (см. `createGuardedPatternsReader`).
+   */
+  const guardedPatterns = createGuardedPatternsReader(() => ({
+    settings: ctx.location.paths.settings,
+    settingsLocal: ctx.location.paths.settingsLocal,
+    store: ctx.store,
+  }));
 
   // Адрес, по которому мини-MCP-сервер прав стучится за решением пользователя.
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;

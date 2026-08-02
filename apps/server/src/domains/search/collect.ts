@@ -5,7 +5,7 @@ import { readHooks } from '../hooks.ts';
 import { readInstructionsInfo, resolveInstructionsTarget } from '../instructions.ts';
 import { readMcpServers } from '../mcp.ts';
 import { readPermissions } from '../permissions.ts';
-import { readPlugins } from '../plugins.ts';
+import { readInstalledPluginsCached } from '../plugins.ts';
 import { readProviderEnvVars, resolveProviderEnvTarget } from '../provider-env.ts';
 import { readProviderMcpServers, resolveProviderMcpTarget } from '../provider-mcp.ts';
 import {
@@ -182,8 +182,10 @@ export async function collectSearchInputs(sources: SearchSources): Promise<Searc
     .filter((path): path is string => Boolean(path));
 
   // Каталог плагинов вызывает CLI Claude Code; читалка сама гасит ошибки и
-  // отдаёт пустой список, поэтому недоступный CLI не роняет весь поиск.
-  const { installed } = await readPlugins(paths.root);
+  // отдаёт пустой список, поэтому недоступный CLI не роняет весь поиск. Здесь
+  // берётся кэширующая читалка: поиск дёргается на каждую паузу в наборе, а
+  // запуск CLI ради одной строки выдачи и был главной ценой запроса.
+  const installed = await readInstalledPluginsCached();
 
   return {
     rules: readRules(paths.claudeMd, store),

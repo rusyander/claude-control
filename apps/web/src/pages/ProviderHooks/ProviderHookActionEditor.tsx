@@ -5,6 +5,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { TextField } from '@shared/ui/text-field';
+import { nextRowId } from './ProviderHooks.lib';
 import type { ProviderHookActionEditorProps } from './ProviderHookActionEditor.types';
 
 /**
@@ -23,8 +24,6 @@ export function ProviderHookActionEditor({
   onRemove,
 }: ProviderHookActionEditorProps) {
   const { t } = useTranslation();
-
-  const nextId = (rows: { id: number }[]): number => Math.max(0, ...rows.map((r) => r.id)) + 1;
 
   return (
     <Card padding="sm">
@@ -98,7 +97,7 @@ export function ProviderHookActionEditor({
                 leftIcon={<Icon name="plus" size={20} />}
                 onClick={() =>
                   onChange({
-                    command: [...action.command, { id: nextId(action.command), value: '' }],
+                    command: [...action.command, { id: nextRowId(), value: '' }],
                   })
                 }
               >
@@ -169,7 +168,7 @@ export function ProviderHookActionEditor({
                 leftIcon={<Icon name="plus" size={20} />}
                 onClick={() =>
                   onChange({
-                    env: [...action.env, { id: nextId(action.env), key: '', value: '' }],
+                    env: [...action.env, { id: nextRowId(), key: '', value: '' }],
                   })
                 }
               >

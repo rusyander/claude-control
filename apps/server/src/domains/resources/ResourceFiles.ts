@@ -2,7 +2,7 @@ import { readdirSync, statSync, existsSync, mkdirSync, renameSync, readFileSync 
 import { join, resolve, dirname, basename, sep } from 'node:path';
 import type { ClaudeLocation } from '@claude-control/contracts';
 import { writeTextFile, backupEntry, removeEntry } from '../../lib/safe-io.ts';
-import { layoutOf, type ResourceKind } from './registry.ts';
+import { layoutOf, safeSegment, type ResourceKind } from './registry.ts';
 
 /**
  * Работа с файлами любого ресурса: чтение дерева, содержимого, запись,
@@ -58,14 +58,15 @@ export function listResourceFiles(
   if (!layout || !root || !existsSync(root)) return [];
 
   if (!layout.isDirectory) {
-    // У одиночного файла (скрипт, хук) идентификатор — это имя файла. Берём
-    // из него только имя без пути: иначе через id="../x" можно было бы
-    // выйти из папки.
-    const name = basename(id);
-    if (!name || name === '.' || name === '..') return [];
+    // У одиночного файла (скрипт, хук) идентификатор — это путь файла ОТ корня,
+    // а не его имя: скрипты лежат и в подпапках (`lib/git-guard.mjs`). Раньше
+    // здесь бралось только имя, и у такого скрипта дерево приходило пустым,
+    // хотя сам он в разделе виден и запускается.
+    const relative = relativeInside(id);
+    if (!relative) return [];
 
-    const target = join(root, name);
-    return existsSync(target) && statSync(target).isFile() ? [describe(root, name)] : [];
+    const target = join(root, ...relative.split('/'));
+    return existsSync(target) && statSync(target).isFile() ? [describe(root, relative)] : [];
   }
 
   return walk(root, root, '', new Set(layout.ignoreDirs)).sort((a, b) =>
@@ -161,6 +162,22 @@ export function moveResourceFile(
 
 function assertWritable(kind: ResourceKind): void {
   if (!isWritable(kind)) throw new Error('Этот вид ресурса доступен только для чтения');
+}
+
+/**
+ * Идентификатор одиночного ресурса как путь ВНУТРИ его корня, приведённый к
+ * одному виду (`/` между сегментами), или undefined, если это не путь к файлу.
+ *
+ * Каждый сегмент проходит ту же проверку, что и имя папки ресурса: `..`, пустой
+ * сегмент, двоеточие и управляющие символы отвергают весь идентификатор целиком,
+ * а не правятся. Поэтому `lib/git-guard.mjs` проходит, а `../../settings.json`
+ * и `PreToolUse:12ab` — нет.
+ */
+function relativeInside(id: string): string | undefined {
+  const segments = id.split(/[/\\]/).filter(Boolean);
+  if (!segments.length) return undefined;
+
+  return segments.every((segment) => safeSegment(segment)) ? segments.join('/') : undefined;
 }
 
 /**

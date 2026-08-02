@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import { ChatRunRegistry } from '../domains/chat/ChatRunRegistry.ts';
+import type { ChatRunRegistry } from '../domains/chat/ChatRunRegistry.ts';
 import { registerChatTranscriptRoutes } from './chat/transcript-routes.ts';
 import { registerChatBrowseRoutes } from './chat/browse-routes.ts';
 import { registerChatRunRoutes } from './chat/run-routes.ts';
@@ -20,8 +20,12 @@ export { isRetriableRunError } from '../domains/chat/run-errors.ts';
  * на другую вкладку не убивают агента, а к идущему прогону можно переподключиться
  * потоком, догнав пропущенное. Остановка — только по явной кнопке.
  *
- * Реестр можно передать снаружи: в тестах это единственный способ поставить
- * маршруты в состояние «прогон уже идёт», не запуская настоящий CLI.
+ * Реестр приходит снаружи и параметр обязателен: он живёт дольше запроса, и
+ * создать его должен тот, кто сможет погасить прогоны при выходе, — `index.ts`.
+ * Прежнее значение по умолчанию это молча ломало: модуль заводил собственный
+ * реестр, до которого снаружи было уже не дотянуться. В тестах передача реестра
+ * — единственный способ поставить маршруты в состояние «прогон уже идёт», не
+ * запуская настоящий CLI.
  *
  * Сами маршруты разложены по `chat/*`: чтение переписки, обзор диска, прогон
  * агента и артефакты песочницы; здесь только сборка.
@@ -29,7 +33,7 @@ export { isRetriableRunError } from '../domains/chat/run-errors.ts';
 export function registerChatRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
-  registry: ChatRunRegistry = new ChatRunRegistry(),
+  registry: ChatRunRegistry,
 ): void {
   registerChatTranscriptRoutes(app, ctx);
   registerChatBrowseRoutes(app, ctx);

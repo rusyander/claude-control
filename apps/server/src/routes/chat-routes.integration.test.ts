@@ -43,7 +43,7 @@ describe('маршруты чата: проекты и ФС', () => {
     } as unknown as ServerContext;
 
     app = Fastify();
-    registerChatRoutes(app, ctx);
+    registerChatRoutes(app, ctx, new ChatRunRegistry());
     await app.ready();
   });
 

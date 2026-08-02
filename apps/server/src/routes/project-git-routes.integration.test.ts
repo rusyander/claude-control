@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectGitInfo, ProjectGitResult } from '@claude-control/contracts';
+import type { ServerContext } from '../context.ts';
 import { registerProjectGitRoutes } from './project-git-routes.ts';
 
 /**
@@ -43,7 +44,8 @@ describe('project-git-routes', () => {
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'cc-git-routes-'));
     app = Fastify();
-    registerProjectGitRoutes(app);
+    // Контекст этим маршрутам не нужен: путь приходит запросом.
+    registerProjectGitRoutes(app, {} as ServerContext);
     await app.ready();
   });
 
@@ -56,6 +58,28 @@ describe('project-git-routes', () => {
     expect((await app.inject({ method: 'GET', url: '/api/project-git' })).statusCode).toBe(400);
     const relative = await app.inject({ method: 'GET', url: '/api/project-git?path=./x' });
     expect(relative.statusCode).toBe(400);
+  });
+
+  it('несуществующий каталог отклоняется до запуска git — и на чтении, и на записи', async () => {
+    const missing = join(dir, 'нет-такого-каталога');
+
+    const read = await app.inject({ method: 'GET', url: `/api/project-git?path=${missing}` });
+    expect(read.statusCode).toBe(400);
+    expect(read.json<{ message: string }>().message).toContain('не существует');
+
+    const write = await app.inject({
+      method: 'POST',
+      url: '/api/project-git/commit',
+      payload: { path: missing, message: 'x' },
+    });
+    expect(write.statusCode).toBe(400);
+  });
+
+  it('файл вместо каталога отклоняется', async () => {
+    const file = join(dir, 'file.txt');
+    writeFileSync(file, 'x');
+    const res = await app.inject({ method: 'GET', url: `/api/project-git?path=${file}` });
+    expect(res.statusCode).toBe(400);
   });
 
   it('каталог без .git — 200 и isRepo:false', async () => {

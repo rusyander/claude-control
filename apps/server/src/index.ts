@@ -36,6 +36,8 @@ import { registerProjectRoutes } from './routes/project-routes.ts';
 import { registerProviderProjectRoutes } from './routes/provider-project-routes.ts';
 import { registerProjectRunnerRoutes } from './routes/project-runner-routes.ts';
 import { registerProjectGitRoutes } from './routes/project-git-routes.ts';
+import type { RouteRegistrar } from './routes/register.ts';
+import { ChatRunRegistry } from './domains/chat/ChatRunRegistry.ts';
 import { ProjectRunnerRegistry, autostartProjects } from './domains/project-runner.ts';
 import { startSandboxHousekeeping } from './domains/sandbox/SandboxConfig.ts';
 
@@ -94,50 +96,61 @@ await app.register(cors, {
   origin: (origin, callback) => callback(null, !origin || ALLOWED_ORIGINS.has(origin)),
 });
 
-registerConfigRoutes(app, ctx);
-registerEnvTransferRoutes(app, ctx);
-registerEntityRoutes(app, ctx);
-registerProviderMcpRoutes(app, ctx);
-registerProviderEnvRoutes(app, ctx);
-registerProviderInstructionsRoutes(app, ctx);
-registerProviderRulesRoutes(app, ctx);
-registerProviderHooksRoutes(app, ctx);
-registerProviderPluginsRoutes(app, ctx);
-registerProviderSkillsRoutes(app, ctx);
-registerProviderPermissionsRoutes(app, ctx);
-registerProviderKeysRoutes(app, ctx);
-registerGroupRoutes(app, ctx);
-registerAnalyticsRoutes(app, ctx);
-registerModelRoutes(app, ctx);
-registerProviderCheckRoutes(app, ctx);
-registerProviderPreviewRoutes(app, ctx);
-registerProviderCompareRoutes(app, ctx);
-registerFormatCheckRoutes(app, ctx);
-registerPluginRoutes(app, ctx);
-registerAssistantRoutes(app, ctx);
-registerScriptRoutes(app, ctx);
-registerChatRoutes(app, ctx);
-registerSandboxRoutes(app, ctx);
-registerResourceRoutes(app, ctx);
-registerBackupRoutes(app, ctx);
-registerHistoryRoutes(app, ctx);
-registerSearchRoutes(app, ctx);
-registerProjectRoutes(app, ctx);
-registerProviderProjectRoutes(app, ctx);
-
-// Реестр dev-серверов проектов держим здесь, а не внутри маршрутов: при выходе
-// сервера панели их надо погасить (иначе спавненные процессы осиротеют).
-// Порт становится известен уже после ответа на запуск (его печатает сам
-// dev-сервер), поэтому запоминает его реестр — через узкий колбэк, а не зная
-// про состояние панели.
+// Объекты, живущие дольше запроса, создаются здесь: только отсюда их можно
+// погасить при выходе. Реестр dev-серверов проектов — иначе спавненные процессы
+// осиротеют; порт становится известен уже после ответа на запуск (его печатает
+// сам dev-сервер), поэтому запоминает его реестр — через узкий колбэк, а не
+// зная про состояние панели. Реестр прогонов чата — по той же причине.
 const projectRunner = new ProjectRunnerRegistry({
   onPortDiscovered: ({ projectPath, dir, port }) => {
     const target = dir ? join(projectPath, dir) : projectPath;
     ctx.store.rememberRunnerPort(target, port, { projectPath, dir });
   },
 });
-registerProjectRunnerRoutes(app, ctx, projectRunner);
-registerProjectGitRoutes(app);
+const chatRuns = new ChatRunRegistry();
+
+/**
+ * Все маршруты панели одной таблицей. Форма у модулей общая (`RouteRegistrar`),
+ * поэтому строки читаются как список разделов, а не как набор разных вызовов;
+ * тому, кому нужен долгоживущий объект, он подаётся замыканием — видно прямо
+ * здесь, кто такой объект держит.
+ */
+const ROUTES: RouteRegistrar[] = [
+  registerConfigRoutes,
+  registerEnvTransferRoutes,
+  registerEntityRoutes,
+  registerProviderMcpRoutes,
+  registerProviderEnvRoutes,
+  registerProviderInstructionsRoutes,
+  registerProviderRulesRoutes,
+  registerProviderHooksRoutes,
+  registerProviderPluginsRoutes,
+  registerProviderSkillsRoutes,
+  registerProviderPermissionsRoutes,
+  registerProviderKeysRoutes,
+  registerGroupRoutes,
+  registerAnalyticsRoutes,
+  registerModelRoutes,
+  registerProviderCheckRoutes,
+  registerProviderPreviewRoutes,
+  registerProviderCompareRoutes,
+  registerFormatCheckRoutes,
+  registerPluginRoutes,
+  registerAssistantRoutes,
+  registerScriptRoutes,
+  registerSandboxRoutes,
+  registerResourceRoutes,
+  registerBackupRoutes,
+  registerHistoryRoutes,
+  registerSearchRoutes,
+  registerProjectRoutes,
+  registerProviderProjectRoutes,
+  registerProjectGitRoutes,
+  (instance, context) => registerChatRoutes(instance, context, chatRuns),
+  (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
+];
+
+for (const register of ROUTES) register(app, ctx);
 
 /**
  * Поток событий об изменениях файлов. Конфиги правит не только это приложение:

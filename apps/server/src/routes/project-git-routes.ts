@@ -1,6 +1,7 @@
-import { isAbsolute } from 'node:path';
+import { resolve } from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ProjectGitResult } from '@claude-control/contracts';
+import type { ServerContext } from '../context.ts';
 import {
   GitError,
   checkoutBranch,
@@ -9,6 +10,7 @@ import {
   pullChanges,
   readProjectGit,
 } from '../domains/project-git.ts';
+import { checkProjectDir } from '../domains/projects.ts';
 
 /**
  * Маршруты git выбранного проекта: состояние, переключение ветки, создание
@@ -19,15 +21,31 @@ import {
  * надо решить, показывать ли пульт. А вот любая ЗАПИСЬ, которая не удалась,
  * отвечает 400 с текстом самого git: подменять его формулировку своей — значит
  * прятать от пользователя то единственное, что объясняет отказ.
+ *
+ * Каталог приходит путём, а не идентификатором реестра, и это осознанно: вкладку
+ * проекта можно открыть на любой папке, выбранной в проводнике панели, — она в
+ * реестре не числится, а git у неё должен работать. Тот же уговор у рабочего
+ * каталога чата. Общего с реестром здесь одно, и этого достаточно: путь проходит
+ * через ту же проверку `checkProjectDir`, что и запись в реестр, и дальше в git
+ * уходит уже нормализованным.
+ *
+ * Контекст сервера здесь не нужен — работаем с путём из запроса, — но параметр
+ * объявлен: под `RouteRegistrar` подходят все модули маршрутов без исключений.
  */
-export function registerProjectGitRoutes(app: FastifyInstance): void {
-  /** Путь из запроса должен быть абсолютным — искать репозиторий больше негде. */
+export function registerProjectGitRoutes(app: FastifyInstance, _ctx: ServerContext): void {
+  /**
+   * Каталог из запроса, пригодный для запуска git, или undefined с уже
+   * отправленным 400. Проверка — общая с реестром проектов: абсолютный путь,
+   * каталог существует и это действительно каталог. Наружу отдаётся `resolve`,
+   * чтобы дальше по коду ходил один вид пути, а не тот, что прислал клиент.
+   */
   const requirePath = (path: string | undefined, reply: FastifyReply): string | undefined => {
-    if (!path || !isAbsolute(path)) {
-      void reply.code(400).send({ message: 'Нужен абсолютный путь к каталогу проекта' });
+    const problem = checkProjectDir(String(path ?? ''));
+    if (problem) {
+      void reply.code(400).send({ message: problem });
       return undefined;
     }
-    return path;
+    return resolve(path as string);
   };
 
   /** Обёртка записи: результат = новое состояние + вывод git. */

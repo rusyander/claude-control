@@ -9,8 +9,9 @@ entry BEFORE touching pricing/analytics, enable-disable of hooks/rules/groups, s
 resume, MCP OAuth, secrets, help texts, Windows file ops ·
 [.agent/universal-providers.agent.md](.agent/universal-providers.agent.md) — capability map +
 IMMUTABLE RULES, before any provider-layer edit ·
-[.agent/provider-tools.agent.md](.agent/provider-tools.agent.md) — model catalog, environment
-transfer, format check vs published schemas.
+[.agent/provider-formats.agent.md](.agent/provider-formats.agent.md) — per-CLI facts, the ONE entry
+you touch · [.agent/provider-tools.agent.md](.agent/provider-tools.agent.md) — model catalog,
+environment transfer, format check vs published schemas.
 
 **"Doesn't start" / "doesn't work on my system" → start at Triage, not at the code.**
 
@@ -45,11 +46,9 @@ the API), panel vs CLI (`claude --version` in the terminal that started the serv
 Fix without asking: project code, deps, build config, launch env. Ask first: files in `~/.claude` —
 the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
-QA runs (need `pnpm dev` up + `pnpm qa:setup`): `tools/qa/audit-layout.mjs` (layout, all pages) ·
-`check-motion.mjs` (animation + geometry) · `check-chat-regressions.mjs` (end-to-end chat) ·
-`check-all-forms.mjs` (9 forms) · `check-sandbox.mjs` · `check-commands.mjs` (slash commands, both
-locales) · `check-help.mjs` (every help document, leaked i18n keys) · `check-attention.mjs`
-(waiting-dot + tab badge; stubs `/api/chats`, so it needs no particular history on disk).
+QA runs live in `tools/qa/` and need `pnpm dev` up + `pnpm qa:setup`; each drives the real UI of one
+area. Two behave unlike the rest: `check-attention.mjs` and `check-provider-chat.mjs` stub their
+API, so they depend on no particular history and on no installed CLI.
 
 ## Symptom → cause → fix
 
@@ -64,8 +63,8 @@ env var — if the user changed it and forgot, that's the answer.
 the sandbox substitutes `CLAUDE_CONFIG_DIR`, so access is carried separately. Windows/Linux keep it
 in `~/.claude/.credentials.json`; macOS has no such file (keychain). Chain in `lib/credentials.ts`,
 first hit wins: `~/.claude-control/credentials.json` (manual, beats all) →
-`<config>/.credentials.json` → macOS keychain → `ANTHROPIC_API_KEY`. Fix: `pnpm doctor` "Доступ"
-line → on macOS accept the keychain dialog with "Always Allow" (renamed entry →
+`<config>/.credentials.json` → macOS keychain → `ANTHROPIC_API_KEY`. Fix: read the access line of
+`pnpm doctor` → on macOS accept the keychain dialog with "Always Allow" (renamed entry →
 `CLAUDE_CONTROL_KEYCHAIN_SERVICE`) → universal route is Settings → Claude Code access, set manually
 (`claudeAiOauth` | `apiKey` | `readFrom`).
 
@@ -100,9 +99,9 @@ call sites).
 ## Layer boundaries — checked, not just described
 
 Both apps' layer maps are machine-enforced by `.dependency-cruiser.cjs` (`pnpm depcruise`), NOT by
-ESLint: dependency-cruiser has a working path resolver (`tsconfig.depcruise.json`) and tells an
-import into a foreign slice apart from a sibling file of one's own folder. `eslint.config.mjs` keeps
-only what needs no resolver (no default exports, no nested ternaries, `max-lines` 400 as a warning).
+ESLint — only dependency-cruiser has a path resolver (`tsconfig.depcruise.json`) and can tell an
+import into a foreign slice from a sibling file of one's own folder. `eslint.config.mjs` keeps only
+what needs no resolver (no default exports, no nested ternaries, `max-lines` 400 as a warning).
 
 - **Web**: `app → pages → features → entities → shared`, downward only, cross-feature forbidden
   (one exception, `features/ResourceFiles`, documented in the config); a foreign slice is reachable
@@ -116,27 +115,26 @@ only what needs no resolver (no default exports, no nested ternaries, `max-lines
 
 ## Where things live
 
+Only what a name does not give away — the rest is one `Grep` from here.
+
 **Server** `apps/server/src/` — config dir `lib/claude-paths.ts` · account access & OS differences
-`lib/credentials.ts` · CLI arg escaping `lib/cli-args.ts` · safe write `lib/safe-io.ts` ·
-path-containment guard shared by rules/skills/plugins `lib/section-fs.ts` · "foreign format not
-recognised" sentinel `lib/format-errors.ts` · local-settings flag `lib/settings-source.ts` · file
-watcher `lib/config-watcher.ts` · provider catalog, CLI detect and settings validation `providers/` ·
-backups/rollback `domains/backups.ts` · pricing `domains/analytics/` · enable/disable on disk
-`domains/entity-toggle.ts` · MCP client and OAuth `domains/mcp-client.ts`, `domains/mcp-oauth.ts` ·
-chat (spawn+stream, transcripts, workdir, projects, SSE, cost) `domains/chat/` · disk browse
-`domains/fs/` · sandbox assembly `domains/sandbox/` · foreign-format check
-`domains/format-check.ts` · slash-command inventory (read-only) `domains/commands/` · opencode
-session server `domains/opencode-serve.ts` · routes `routes/`. Per-section provider domains
-(`provider-{mcp,permissions,rules,skills,plugins,hooks,…}`) each follow the facade+folder idiom.
+`lib/credentials.ts` · CLI arg escaping `lib/cli-args.ts` · process spawn, both chat branches
+`lib/cli-spawn.ts` · safe write `lib/safe-io.ts` · path-containment guard shared by
+rules/skills/plugins `lib/section-fs.ts` · "foreign format not recognised" sentinel
+`lib/format-errors.ts` · provider catalog, CLI detect, settings validation `providers/` · pricing
+`domains/analytics/` · enable/disable on disk `domains/entity-toggle.ts` · Claude chat (spawn,
+stream, transcripts, SSE, cost) `domains/chat/` · chat of a FOREIGN provider — panel-owned JSONL,
+prompt rebuild, streamed stdout — `domains/provider-chat/`, which never touches the Claude branch:
+that separation is the regress guarantee. Per-section provider domains
+(`provider-{mcp,permissions,rules,skills,plugins,hooks,…}`) follow the facade+folder idiom.
 
 **Web** `apps/web/src/`, FSD layers `app` → `pages` → `features` → `entities` → `shared` — UI kit
-`shared/ui/` (each component has `*.stories.tsx`) · parallel agent runs `shared/lib/agent-runs/` ·
-browser badge & dots `shared/lib/attention/` · awaiting-reply selection `entities/Chat/model/` ·
-project tabs `shared/lib/workspace/` · sticky chat prefs `shared/lib/chat-prefs/` · motion
-`shared/lib/motion/` · showcase data `shared/lib/mocks/` · dictionaries `shared/config/i18n/` ·
-help texts `shared/config/i18n/help/` · help documents `pages/Help/topics/` + registry
+`shared/ui/` (each component has `*.stories.tsx`) · browser badge & dots `shared/lib/attention/` ·
+foreign-provider chat `pages/ProviderChat/` + `entities/ProviderChat/` (routed from
+`pages/Chat/ChatSection.tsx`) · dictionaries `shared/config/i18n/` · help texts
+`shared/config/i18n/help/` · help documents `pages/Help/topics/` + registry
 `pages/Help/model/topics.ts` · built-in slash-command catalog (hand-maintained, ru+en)
-`entities/Command/model/builtinCommands.ts` · diagrams `shared/ui/diagram/`.
+`entities/Command/model/builtinCommands.ts`.
 
 Storybook: `pnpm --filter @claude-control/web storybook` (120 stories, 30 doc pages); port 6006
 often taken → `-p 6019`.

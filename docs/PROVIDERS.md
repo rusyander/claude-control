@@ -162,22 +162,45 @@ than marked "in development".
   `git push *` → `deny`), edited as "pattern + level" rows. Anything else inside `permission` is
   kept as is and shown read-only; per-agent overrides (`agent.*`) are not touched at all.
 
-## 5. Chat / assistant
+## 5. Chat
 
-With Claude this is the full chat: streaming, attachments, branching, parallel agents, history.
+With Claude this is the full chat: the agent's work step by step, tools, cost, branching, parallel
+agents, voice, file attachments, history from its own transcripts.
 
-🧪 for Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, OpenCode and Aider means a **basic assistant**:
-one question, one answer, no streaming and no attachments (`codex exec`, `gemini -p`, `qwen -p`,
-`cn -p`, `goose run --no-session -t "<prompt>"`, `kimi -p`, `opencode run "<prompt>"`,
-`aider --message`). The
-prompt is always a separate argv element, never interpolated into a shell
-string; for OpenCode it is a positional argument of the `run` subcommand (this CLI accepts no
-stdin). Goose is asked for a single answer explicitly: `run` with `--no-session` leaves no session
-file behind, and the prompt goes in through `-t`.
+🧪 for Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, OpenCode and Aider means **the panel's
+own chat**: a list of conversations, memory between questions, the reply as the CLI prints it, a
+working directory and file attachments by path.
 
-The Aider, OpenCode, Continue, Goose and Kimi Code assistants are **built from documentation and never exercised live** — those
-CLIs are not installed on the development machine. **Cursor** has no model API of its own, so no
-assistant.
+How it works and why:
+
+- **The panel keeps the transcript.** These CLIs either have no readable history of their own or
+  its format is undocumented. A conversation lives in
+  `<panel directory>/provider-chats/<provider>/<id>.jsonl` — one line per turn: a write cut in half
+  damages one line, not the whole conversation. The format is ours; nothing foreign is parsed here.
+- **The context is assembled from that same transcript** and travels as one text. A long
+  conversation is trimmed from the front (~24 000 characters): the prompt is a separate
+  command-line element, and the command line is cut at about 32 000 characters — dropping old turns
+  beats silently sending half a question. The last question is never dropped.
+- **The reply is shown as it is printed** — exactly what the process wrote to stdout, with no
+  parsing of steps or tools: none of these CLIs publishes a streaming format with steps.
+- **The entry point** is the documented non-interactive one (`codex exec`, `gemini -p`, `qwen -p`,
+  `cn -p`, `goose run --no-session -t "<prompt>"`, `kimi -p`, `opencode run "<prompt>"`,
+  `aider --message`). The prompt is always a separate argv element, never interpolated into a shell
+  string; for OpenCode it is a positional argument of the `run` subcommand (this CLI accepts no
+  stdin). Goose is asked for a single answer explicitly: `run` with `--no-session` leaves no session
+  file behind, and the prompt goes in through `-t`.
+- **OpenCode holds a session** (`opencode serve`) instead of a run per question: the context is not
+  resent, but the answer arrives whole rather than as it is printed. A hiccup of that server drops
+  the conversation back to the one-shot stream, not into an error.
+- **The run belongs to the server, not to the tab.** A closed tab, a move to another page and F5 do
+  not kill the answer: on return the panel asks for the state and shows what has been printed.
+- **An attachment is a file path**, not its content: agent CLIs read files themselves.
+- **No CLI means a direct model API call** with the stored key; neither one available means an
+  honest refusal with an explanation, not an empty answer.
+
+The Aider, OpenCode, Continue, Goose and Kimi Code chats are **built from documentation and never
+exercised live** — those CLIs are not installed on the development machine. **Cursor** has neither a
+non-interactive entry point nor a model API of its own, so no chat.
 
 ## 6. Scripts
 

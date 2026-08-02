@@ -205,7 +205,7 @@ Detection is a hint, never coercion: the provider never switches on its own, the
 | MCP servers<sup>2</sup>             |          ✅          |  ✅   |   ✅   |    ✅     |    ✅    |  ✅   |    ✅     |   ✅   |    ✅    |   —   |
 | Environment<sup>3</sup>             |          ✅          |  ✅   |   ✅   |    ✅     |    ✅    |   —   |     —     |   —    |    —     |  ✅   |
 | Permissions / approvals<sup>4</sup> |          ✅          |  ✅   |   ✅   |    ✅     |    ✅    |  ✅   |    ✅     |   ✅   |    ✅    |   —   |
-| Chat / assistant<sup>5</sup>        |          ✅          |  🧪   |   🧪   |    🧪     |    🧪    |  🧪   |    🧪     |   —    |    🧪    |  🧪   |
+| Chat<sup>5</sup>                    |          ✅          |  🧪   |   🧪   |    🧪     |    🧪    |  🧪   |    🧪     |   —    |    🧪    |  🧪   |
 | Rules (`## ПРАВИЛО:`)               |          ✅          |   —   |   —    |     —     |    —     |   —   |     —     |   —    |    —     |   —   |
 | Skills<sup>10</sup>                 |          ✅          |   —   |   —    |    ✅     |    —     |   —   |    ✅     |   —    |    ✅    |   —   |
 | Commands<sup>11</sup>               |          👁           |   —   |   👁    |     👁     |    —     |   —   |     —     |   —    |    👁     |   —   |
@@ -220,12 +220,9 @@ Detection is a hint, never coercion: the provider never switches on its own, the
 
 What each footnote stands for — the file path, the keys the panel edits, the reason behind the status — is in [Providers: format details](docs/PROVIDERS.md).
 
-Claude is marked **verified**: its path has been exercised live and is covered by tests. The rest are **experimental**: formats come from each CLI's documentation and are covered by round-trip tests, but the first real write of a foreign format is worth eyeballing. Which is exactly why four tools are built around foreign formats — all of them in [Providers: panel-side tools](docs/PROVIDER-TOOLS.md):
+Claude is marked **verified**: its path has been exercised live and is covered by tests. The rest are **experimental**: formats come from each CLI's documentation and are covered by round-trip tests, but the first real write of a foreign format is worth eyeballing. Which is exactly why four tools are built around foreign formats — a write preview, a provider check on your machine, a daily comparison against the published schemas, and migration of settings between CLIs. How each one works and why → [Providers: panel-side tools](docs/PROVIDER-TOOLS.md).
 
-- **Write preview.** A diff stands between "Save" and a foreign file, and it is not a prediction: the panel copies the file into a temp dir, performs the **real** write there with the same adapter, reads the result back and shows the difference. The preview runs exactly the write's validation — it cannot turn out to be kinder.
-- **Provider check on your machine.** CLI → config → a read-write-read round trip per section → one real assistant run. Every write goes into a copy of the directory, the real files are untouched, and the verdict (verified / partial / failed) outranks the catalog status in both directions.
-- **Format check against published schemas.** Once a day the panel downloads the CLI's official JSON schema and compares it with the keys it writes itself. The very first real run found a genuine drift: `experimental.hook` is gone from the OpenCode schema — so hooks there are read-only now, as a fact rather than a guess.
-- **Migration between providers.** Narrower than comparison, deliberately: MCP servers and instructions yes; environment variables never (their values _are_ the keys), permissions never (eight different approval models, no shared vocabulary).
+How little of that is theory: the very first format check found a genuine drift — `experimental.hook` is gone from the OpenCode schema, so hooks there are read-only as a fact rather than a guess.
 
 ### Your subscription outranks a paid API
 
@@ -236,11 +233,10 @@ Keys you do enter are stored encrypted (AES-256-GCM) in `claude-control/provider
 ### What protects a foreign config
 
 - **A backup before every write, and the write is atomic.** Provider backups are named `<provider>-<file>` and can never roll back over Claude's.
-- **Formats come from documentation, not from memory.**
+- **Formats come from documentation, not from memory.** Nothing undocumented exists here — neither a format nor a directory override (`CODEX_HOME`, `XDG_CONFIG_HOME` and `OPENCODE_CONFIG` for OpenCode, `QWEN_HOME` are honoured).
 - **Validation before write, plus round-trip:** the file is read, changed, serialized back and compared with what was read. Mismatch — no write.
 - **Surgical edits.** Codex: only the relevant region of `config.toml` changes, comments, profiles and key order stay byte-for-byte; Aider's YAML keeps its comments; `CRLF`/`LF` is preserved and a BOM is stripped on read and restored on write.
 - **Fail-closed.** An unfamiliar or broken file is no reason to guess: the section returns an error and stays read-only. An unsupported capability simply has no section.
-- **Directory overrides are honoured where documented:** `CODEX_HOME`, `XDG_CONFIG_HOME` (OpenCode's directory), `OPENCODE_CONFIG` (the file itself), `QWEN_HOME` (Qwen Code's directory). Undocumented variables are not invented.
 
 ## Security
 

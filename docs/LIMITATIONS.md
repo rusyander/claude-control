@@ -103,12 +103,13 @@ The per-CLI boundaries live in their own file:
 
 ## Plugins
 
-| What                                                      | Why                                                                 |
-| --------------------------------------------------------- | ------------------------------------------------------------------- |
-| An installed plugin cannot be edited or partially adopted | **by design.** The content belongs to its author; scaffold your own |
-| Everything depends on the CLI: no `claude`, no section    | **not ours.** The page is a wrapper around `claude plugin`          |
-| Any operation blocks the page                             | **by design.** Plugin commands must not interleave                  |
-| It does not work offline                                  | **not ours**                                                        |
+| What                                                                            | Why                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| An installed plugin cannot be edited or partially adopted                       | **by design.** The content belongs to its author; scaffold your own                                                                                                                                                        |
+| Everything depends on the CLI: no `claude`, no section                          | **not ours.** The page is a wrapper around `claude plugin`                                                                                                                                                                 |
+| Any operation blocks the page                                                   | **by design.** Plugin commands must not interleave                                                                                                                                                                         |
+| It does not work offline                                                        | **not ours**                                                                                                                                                                                                               |
+| A plugin installed outside the panel reaches global search within half a minute | **by design.** The installed list comes from the CLI (half a second to spawn), and search keeps it cached for 30 seconds; the section itself shows the plugin at once, and any panel operation drops the cache immediately |
 
 ## MCP servers
 

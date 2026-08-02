@@ -3,7 +3,8 @@
 Auto-loaded every session → tight and English. Humans read [docs/SETUP.ru.md](docs/SETUP.ru.md);
 answers to the user stay Russian.
 
-**Read on demand:** [.claude/gotchas.md](.claude/gotchas.md) — traps already paid for; read the
+**Read on demand** (working notes, kept out of git — absent in a fresh clone):
+[.claude/gotchas.md](.claude/gotchas.md) — traps already paid for; read the
 entry BEFORE touching pricing/analytics, enable-disable of hooks/rules/groups, sessions & chat
 resume, MCP OAuth, secrets, help texts, Windows file ops ·
 [.agent/universal-providers.agent.md](.agent/universal-providers.agent.md) — capability map +

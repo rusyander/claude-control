@@ -175,8 +175,22 @@ describe('маршрут тарифов', () => {
     const roots: string[] = [];
     const apps: FastifyInstance[] = [];
 
-    /** Каталог с двумя записями: вчерашний полдень и текущие сутки. */
-    const buildWithDays = (): FastifyInstance => {
+    /** Строка транскрипта: один ответ модели с заданным временем и входом. */
+    const line = (id: string, at: Date, input: number): string =>
+      `${JSON.stringify({
+        type: 'assistant',
+        timestamp: at.toISOString(),
+        sessionId: 'sess',
+        cwd: '/work/a',
+        message: {
+          id,
+          model: 'claude-opus-4-8',
+          usage: { input_tokens: input, output_tokens: 0 },
+        },
+      })}\n`;
+
+    /** Каталог с двумя записями: вчерашний полдень и текущие сутки, плюс `extra`. */
+    const buildWithDays = (extra = ''): FastifyInstance => {
       const configRoot = mkdtempSync(join(tmpdir(), 'cc-analytics-period-'));
       roots.push(configRoot);
       const appData = join(configRoot, 'claude-control');
@@ -188,22 +202,10 @@ describe('маршрут тарифов', () => {
 
       const sessionDir = join(configRoot, 'projects', 'proj');
       mkdirSync(sessionDir, { recursive: true });
-      const line = (id: string, at: Date, input: number): string =>
-        `${JSON.stringify({
-          type: 'assistant',
-          timestamp: at.toISOString(),
-          sessionId: 'sess',
-          cwd: '/work/a',
-          message: {
-            id,
-            model: 'claude-opus-4-8',
-            usage: { input_tokens: input, output_tokens: 0 },
-          },
-        })}\n`;
 
       writeFileSync(
         join(sessionDir, 'sess.jsonl'),
-        line('msg-yesterday', yesterdayNoon, 100) + line('msg-today', midnight, 7),
+        line('msg-yesterday', yesterdayNoon, 100) + line('msg-today', midnight, 7) + extra,
       );
 
       const ctx = {
@@ -242,6 +244,26 @@ describe('маршрут тарифов', () => {
       const from = new Date(body.from);
       expect([from.getHours(), from.getMinutes()]).toEqual([0, 0]);
       expect(isoDay(from)).toBe(isoDay(new Date()));
+    });
+
+    it('«сегодня» — сутки целиком, а не отрезок до текущего момента', async () => {
+      const lateToday = new Date();
+      lateToday.setHours(23, 59, 59, 0);
+      const tomorrow = new Date();
+      tomorrow.setHours(0, 0, 0, 0);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const instance = buildWithDays(
+        line('msg-late', lateToday, 3) + line('msg-tomorrow', tomorrow, 1000),
+      );
+      const body = (
+        await instance.inject({ method: 'GET', url: '/api/analytics?days=today' })
+      ).json();
+
+      // 7 + 3: запись с меткой позже «сейчас» (часы машины ушли вперёд) — та же
+      // дата и тот же столбец byDay, значит и те же итоги. Завтрашняя полночь
+      // уже за правой границей.
+      expect(body.overall.input).toBe(10);
     });
 
     it('диапазон дат отдаёт только свои сутки', async () => {

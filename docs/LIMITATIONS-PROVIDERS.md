@@ -18,24 +18,30 @@ universal.** The "section × provider" map lives in
 
 ### Claude-only by nature
 
-| What                                                    | Why                                                                                                                               |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Token analytics, the sandbox, plugin marketplaces       | **not ours.** The other CLIs either have no such entity or build it on fundamentally different lines                              |
-| Rules (`## ПРАВИЛО:` inside `CLAUDE.md`)                | **by design.** Splitting the file into named sections is this panel's convention; elsewhere the instructions file is edited whole |
-| The rich chat: streaming, attachments, voice, branching | **by design.** It is built on the `claude` CLI's streaming protocol                                                               |
-| History and search across every section at once         | **by design.** For a foreign provider only its working sections reach the feed and the search                                     |
+| What                                                               | Why                                                                                                                                 |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Token analytics, the sandbox, plugin marketplaces                  | **not ours.** The other CLIs either have no such entity or build it on fundamentally different lines                                |
+| Rules (`## ПРАВИЛО:` inside `CLAUDE.md`)                           | **by design.** Splitting the file into named sections is this panel's convention; elsewhere the instructions file is edited whole   |
+| The agent's work in the chat: tools, steps, cost, branching, voice | **by design.** All of it is parsed out of the `claude` CLI's streaming protocol; no other CLI publishes a documented format like it |
+| History and search across every section at once                    | **by design.** For a foreign provider only its working sections reach the feed and the search                                       |
 
 Hooks, plugins and skills are the exception: OpenCode, Qwen Code and Kimi Code have them, each in
 its own model, as separate sections.
 
-### The assistant for foreign providers
+### The chat for foreign providers
 
-| What                                                                              | Why                                                                                                                                                                                                                                           |
-| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| For Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code and Aider it is basic    | **not yet.** The documented non-interactive entry point: no streaming, attachments, history or thinking depth; the answer arrives whole                                                                                                       |
-| OpenCode keeps the conversation context, and no more                              | **by design.** The panel runs `opencode serve` and holds a session, so the next message remembers the previous ones; there is still no streaming and no attachments, and any hiccup of that server drops the answer back to the one-shot mode |
-| The Aider, OpenCode, Continue, Goose and Kimi Code assistants were never run live | **honestly.** Those CLIs are not installed on the dev machine: the runners come from documentation and are covered by argv-shape tests                                                                                                        |
-| Cursor has no assistant and will not get one                                      | **not ours.** Cursor has no model API of its own                                                                                                                                                                                              |
+Conversations, memory between questions, the reply as it is printed, a working directory and file
+attachments work for every CLI with a documented non-interactive entry point. The boundaries follow.
+
+| What                                                                     | Why                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The panel keeps the transcript, not the CLI                              | **by design.** These CLIs either have no readable history of their own or its format is undocumented. Conversations live in the panel's files, and the context of the next question is assembled from them               |
+| The raw CLI output is shown, with no parsing of steps or tools           | **not ours.** None of these CLIs publishes a streaming format with steps; showing anything beyond the printed bytes would mean inventing a format on their behalf                                                        |
+| A long conversation is trimmed from the front (around 24 000 characters) | **not ours.** The prompt travels as a separate command-line element, and the command line is cut at about 32 000 characters; dropping old turns beats silently sending half a question                                   |
+| An attachment is a file path, not the file's content                     | **by design.** Agent CLIs read files themselves; embedding the content into the prompt would mean inventing their attachment format                                                                                      |
+| OpenCode holds a session instead of a run per question                   | **by design.** The panel runs `opencode serve`, so the context is not resent; the answer then arrives whole rather than as it is printed, and a hiccup of that server drops the conversation back to the one-shot stream |
+| The Aider, OpenCode, Continue, Goose and Kimi Code chats never ran live  | **honestly.** Those CLIs are not installed on the dev machine: the launch comes from documentation and is covered by argv-shape tests                                                                                    |
+| Cursor has no chat and will not get one                                  | **not ours.** Cursor has neither a non-interactive entry point nor a model API of its own                                                                                                                                |
 
 ### Sections still open per provider
 

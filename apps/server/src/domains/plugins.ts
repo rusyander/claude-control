@@ -19,5 +19,10 @@ export {
   uninstallPlugin,
   updatePlugin,
 } from './plugins/actions.ts';
-export { readAvailablePlugins, readPlugins } from './plugins/read.ts';
+export {
+  forgetInstalledPlugins,
+  readAvailablePlugins,
+  readInstalledPluginsCached,
+  readPlugins,
+} from './plugins/read.ts';
 export { pluginSlug, scaffoldPlugin } from './plugins/scaffold.ts';

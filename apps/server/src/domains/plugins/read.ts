@@ -64,6 +64,52 @@ export async function readPlugins(
   return { installed, available: [], marketplaces: readMarketplaces(claudeRoot) };
 }
 
+/**
+ * Сколько живёт кэш установленных плагинов для ЧТЕНИЯ ВСКОЛЬЗЬ.
+ *
+ * Список установленного отдаёт CLI — это запуск процесса, и на этой машине он
+ * стоит порядка полусекунды. Раздел «Плагины» столько ждать обязан: там список
+ * и есть предмет разговора. А вот глобальный поиск зовёт ту же читалку ради
+ * одной строки в выдаче, на КАЖДЫЙ запрос, то есть на каждую паузу в наборе, —
+ * и именно из-за неё поиск отвечал секундами.
+ *
+ * Полминуты выбраны по тому, как плагины меняются на самом деле: их ставят и
+ * удаляют руками, отдельным действием, а не по ходу набора запроса. Худшее, что
+ * даёт задержка, — свежепоставленный плагин не находится поиском в ближайшие
+ * полминуты; в своём разделе он виден сразу, потому что тот кэш не трогает.
+ */
+const INSTALLED_TTL_MS = 30_000;
+
+let installedCache: { command: string; at: number; plugins: Plugin[] } | undefined;
+
+/**
+ * Установленные плагины для тех, кому список нужен вскользь (поиск): свежий
+ * ответ CLI или недавний из кэша. Разделу плагинов не предназначено — ему нужен
+ * `readPlugins`, спрашивающий CLI каждый раз.
+ */
+export async function readInstalledPluginsCached(
+  command: string = defaultCliCommand(),
+  now: number = Date.now(),
+): Promise<Plugin[]> {
+  if (
+    installedCache &&
+    installedCache.command === command &&
+    now - installedCache.at < INSTALLED_TTL_MS
+  ) {
+    return installedCache.plugins;
+  }
+
+  const plugins = await readInstalled(command);
+  installedCache = { command, at: now, plugins };
+
+  return plugins;
+}
+
+/** Сбросить кэш установленных: панель сама поставила или удалила плагин. */
+export function forgetInstalledPlugins(): void {
+  installedCache = undefined;
+}
+
 /** Каталог маркетплейсов: отдельный запрос, выполняется по требованию. */
 export async function readAvailablePlugins(
   command: string = defaultCliCommand(),

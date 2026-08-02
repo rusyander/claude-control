@@ -1,10 +1,10 @@
 import type { ClaudePaths, EntityKind, Hook, PermissionDecision } from '@claude-control/contracts';
 import type { AppStore } from '../lib/app-store.ts';
-import { readRules, saveRule } from './rules.ts';
+import { readRules, saveRule, setRulesEnabled } from './rules.ts';
 import { readHooks, writeHooks } from './hooks.ts';
 import { setSkillEnabled } from './skills.ts';
 import { setMcpServerEnabled } from './mcp.ts';
-import { savePermission, deletePermission } from './permissions.ts';
+import { savePermission, deletePermission, setPermissionsEnabled } from './permissions.ts';
 import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 
 /**
@@ -51,6 +51,65 @@ export function findHook({ paths, store }: EntityToggleDeps, id: string): Hook |
   const hooks = readHooks(paths.settings, store, paths.settingsLocal);
 
   return hooks.find((hook) => hook.id === id) ?? hooks.find((hook) => hook.legacyId === id);
+}
+
+/** Одно применение состояния: что переключаем и в какое состояние. */
+export interface EntityState {
+  kind: EntityKind;
+  id: string;
+  isEnabled: boolean;
+}
+
+/**
+ * Применить состояние сразу к пачке сущностей — путь группового тумблера.
+ *
+ * Смысл в файлах, а не в скорости самой по себе: правила лежат в одном
+ * `CLAUDE.md`, права — в одном `settings.json`, и поштучный проход читал и
+ * переписывал общий файл на КАЖДОГО участника, каждый раз откатывая резервную
+ * копию. Здесь такой файл читается один раз и пишется один раз.
+ *
+ * У правил это ещё и вопрос правильности: их id выводится из заголовка при
+ * каждом разборе, поэтому гашение первого из двух ОДНОИМЁННЫХ правил меняло id
+ * второго — и до него очередь уже не доходила (см. `setRulesEnabled`).
+ *
+ * Скиллы и MCP-серверы остаются поштучными: у каждого своя папка или своя
+ * секция конфига, общего файла, который стоило бы переписать разом, у них нет.
+ * Хуки, как и раньше, применяются одной перезаписью в конце — она за
+ * вызывающим (`rewriteHooks`), потому что нужна и после одиночного переключения.
+ */
+export function applyEntityStates(deps: EntityToggleDeps, states: EntityState[]): ApplyResult {
+  const { paths, store, backupDir } = deps;
+
+  const rules = new Map<string, boolean>();
+  const permissions = new Map<string, { id: string; isEnabled: boolean }[]>();
+  let needsHookRewrite = false;
+
+  for (const state of states) {
+    if (state.kind === 'rule') {
+      rules.set(state.id, state.isEnabled);
+      continue;
+    }
+
+    if (state.kind === 'permission') {
+      // Локальное право правится в settings.local.json; префикс `local:` файлу
+      // неизвестен — снимаем его, как и при поштучной записи.
+      const target = isLocalId(state.id) ? paths.settingsLocal : paths.settings;
+      const list = permissions.get(target) ?? [];
+      list.push({ id: stripLocalPrefix(state.id), isEnabled: state.isEnabled });
+      permissions.set(target, list);
+      continue;
+    }
+
+    needsHookRewrite = applyEntityState(deps, state.kind, state.id, state.isEnabled)
+      .needsHookRewrite
+      ? true
+      : needsHookRewrite;
+  }
+
+  if (rules.size > 0) setRulesEnabled(paths.claudeMd, rules, store, backupDir);
+  for (const [target, list] of permissions) setPermissionsEnabled(target, list, backupDir);
+
+  return { needsHookRewrite };
 }
 
 export function applyEntityState(

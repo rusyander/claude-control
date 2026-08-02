@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs';
 import type {
   PermissionDecision,
   PermissionDraft,
@@ -67,6 +68,56 @@ export function readPermissions(
   if (!localPath) return own;
 
   return [...own, ...readPermissionsFrom(localPath, store, 'settings-local')];
+}
+
+/** Что читателю охраняемых шаблонов нужно знать прямо сейчас. */
+export interface GuardedPatternsSource {
+  settings: string;
+  settingsLocal?: string;
+  store: AppStore;
+}
+
+/**
+ * Читатель охраняемых шаблонов — всего, что пользователь просил спрашивать или
+ * запрещать. Спрашивается это на КАЖДЫЙ вызов инструмента при включённом
+ * автоподтверждении, а разбор обоих файлов настроек на каждый вызов — работа
+ * заметная и совершенно лишняя: между двумя вызовами файл обычно тот же.
+ *
+ * Кэш держится на слепке самих файлов (время правки, размер, путь), а не на
+ * времени жизни. Это важнее, чем кажется: правило `deny`, добавленное руками в
+ * `settings.json` мимо панели, обязано действовать сразу, а не «через минуту».
+ * Слепок снимается двумя `stat`, и это на порядки дешевле разбора JSON.
+ *
+ * Путь тоже входит в слепок: каталог конфигурации меняется на лету, и после
+ * переключения кэш от прежнего каталога отвечал бы за чужие права.
+ */
+export function createGuardedPatternsReader(read: () => GuardedPatternsSource): () => string[] {
+  let stamp: string | undefined;
+  let patterns: string[] = [];
+
+  const stampOf = (path: string | undefined): string => {
+    if (!path) return '';
+    try {
+      const stats = statSync(path);
+      return `${path}:${stats.mtimeMs}:${stats.size}`;
+    } catch {
+      // Файла нет — это тоже состояние, и его надо отличать от «был и стал другим».
+      return `${path}:нет`;
+    }
+  };
+
+  return () => {
+    const { settings, settingsLocal, store } = read();
+    const current = `${stampOf(settings)}|${stampOf(settingsLocal)}`;
+    if (current === stamp) return patterns;
+
+    patterns = readPermissions(settings, store, settingsLocal)
+      .filter((rule) => rule.decision !== 'allow')
+      .map((rule) => rule.pattern);
+    stamp = current;
+
+    return patterns;
+  };
 }
 
 export function savePermission(
@@ -144,6 +195,50 @@ export function deletePermission(
   if (list && settings.permissions) {
     settings.permissions[decision as PermissionDecision] = list.filter((item) => item !== pattern);
   }
+
+  return writeJsonFile(settingsPath, settings, { backupDir });
+}
+
+/**
+ * Пакетное включение и выключение прав в ОДНОМ файле настроек: чтение одно,
+ * запись одна, резервная копия одна. Нужно групповому тумблеру — раньше каждое
+ * право группы читало и переписывало `settings.json` само.
+ *
+ * Идентификатор права — `decision:pattern`, всё нужное для восстановления в нём
+ * и лежит: выключение убирает шаблон из своего списка, включение возвращает.
+ * Списки держатся отсортированными, как и при поштучном сохранении. Ничего не
+ * изменилось — файл не трогаем.
+ */
+export function setPermissionsEnabled(
+  settingsPath: string,
+  states: ReadonlyArray<{ id: string; isEnabled: boolean }>,
+  backupDir?: string,
+): string | undefined {
+  if (states.length === 0) return undefined;
+
+  const settings = readJsonFile<RawSettings>(settingsPath, {});
+  const before = JSON.stringify(settings.permissions ?? {});
+  settings.permissions ??= {};
+
+  for (const { id, isEnabled } of states) {
+    const [rawDecision, ...rest] = id.split(':');
+    const decision = rawDecision as PermissionDecision;
+    const pattern = rest.join(':');
+    if (!pattern) continue;
+
+    if (isEnabled) {
+      const list = (settings.permissions[decision] ??= []);
+      if (!list.includes(pattern)) {
+        list.push(pattern);
+        list.sort();
+      }
+    } else {
+      const list = settings.permissions[decision];
+      if (list) settings.permissions[decision] = list.filter((item) => item !== pattern);
+    }
+  }
+
+  if (JSON.stringify(settings.permissions) === before) return undefined;
 
   return writeJsonFile(settingsPath, settings, { backupDir });
 }

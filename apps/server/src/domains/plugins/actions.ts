@@ -2,6 +2,7 @@ import type { CommandResult } from '@claude-control/contracts';
 import { safePluginId } from '../../lib/cli-args.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
 import { runClaude } from './cli.ts';
+import { forgetInstalledPlugins } from './read.ts';
 
 /**
  * Операции над плагинами и маркетплейсами — всё через штатный CLI Claude Code.
@@ -12,6 +13,9 @@ import { runClaude } from './cli.ts';
 async function runPluginCommand(command: string, args: string[]): Promise<CommandResult> {
   try {
     const { stdout, stderr } = await runClaude(command, ['plugin', ...args]);
+    // Набор установленного только что изменился нашими же руками — держать
+    // кэш для поиска бессмысленно, иначе панель показывала бы своё прошлое.
+    forgetInstalledPlugins();
     return { ok: true, output: (stdout || stderr).trim(), needsRestart: true };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);

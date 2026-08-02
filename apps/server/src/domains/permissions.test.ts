@@ -9,6 +9,8 @@ import {
   savePermission,
   deletePermission,
   movePermission,
+  setPermissionsEnabled,
+  createGuardedPatternsReader,
 } from './permissions.ts';
 
 /**
@@ -293,6 +295,94 @@ describe('permissions', () => {
 
       expect(backup).toBeTypeOf('string');
       expect(existsSync(backup as string)).toBe(true);
+    });
+  });
+
+  describe('setPermissionsEnabled — пачкой в один файл', () => {
+    const read = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
+
+    it('снимает и возвращает несколько прав за одну запись', () => {
+      writeSettings({ permissions: { deny: ['Bash(rm:*)', 'Bash(sudo:*)'], allow: ['Read(a)'] } });
+
+      setPermissionsEnabled(settingsPath, [
+        { id: 'deny:Bash(rm:*)', isEnabled: false },
+        { id: 'deny:Bash(sudo:*)', isEnabled: false },
+      ]);
+      expect(read(settingsPath).permissions.deny).toEqual([]);
+      // Чужие списки не задеты.
+      expect(read(settingsPath).permissions.allow).toEqual(['Read(a)']);
+
+      setPermissionsEnabled(settingsPath, [
+        { id: 'deny:Bash(sudo:*)', isEnabled: true },
+        { id: 'deny:Bash(rm:*)', isEnabled: true },
+      ]);
+      // Список держится отсортированным, как и при поштучном сохранении.
+      expect(read(settingsPath).permissions.deny).toEqual(['Bash(rm:*)', 'Bash(sudo:*)']);
+    });
+
+    it('шаблон с двоеточиями не рвётся по разделителю id', () => {
+      writeSettings({ permissions: { ask: ['Bash(git push:*)'] } });
+
+      setPermissionsEnabled(settingsPath, [{ id: 'ask:Bash(git push:*)', isEnabled: false }]);
+
+      expect(read(settingsPath).permissions.ask).toEqual([]);
+    });
+
+    it('без изменений файл не переписывается', () => {
+      writeSettings({ permissions: { deny: ['Bash(rm:*)'] } });
+
+      const backup = setPermissionsEnabled(
+        settingsPath,
+        [{ id: 'deny:Bash(rm:*)', isEnabled: true }],
+        join(dir, 'backups'),
+      );
+
+      expect(backup).toBeUndefined();
+      expect(existsSync(join(dir, 'backups'))).toBe(false);
+    });
+  });
+
+  describe('createGuardedPatternsReader — кэш до правки файла', () => {
+    it('отдаёт только ask и deny', () => {
+      writeSettings({ permissions: { allow: ['Read(a)'], ask: ['Write(b)'], deny: ['Bash(c)'] } });
+
+      const guarded = createGuardedPatternsReader(() => ({ settings: settingsPath, store }));
+
+      expect(guarded()).toEqual(['Write(b)', 'Bash(c)']);
+    });
+
+    it('повторный вызов не перечитывает файл', () => {
+      writeSettings({ permissions: { deny: ['Bash(c)'] } });
+
+      const guarded = createGuardedPatternsReader(() => ({ settings: settingsPath, store }));
+      const first = guarded();
+
+      // Файл на месте, содержимое то же — читатель обязан вернуть ТОТ ЖЕ массив.
+      expect(guarded()).toBe(first);
+    });
+
+    it('правка файла мимо панели действует сразу', () => {
+      writeSettings({ permissions: { deny: ['Bash(c)'] } });
+
+      const guarded = createGuardedPatternsReader(() => ({ settings: settingsPath, store }));
+      expect(guarded()).toEqual(['Bash(c)']);
+
+      writeSettings({ permissions: { deny: ['Bash(c)', 'Bash(rm:*)'] } });
+
+      expect(guarded()).toEqual(['Bash(c)', 'Bash(rm:*)']);
+    });
+
+    it('смена каталога конфигурации сбрасывает кэш', () => {
+      writeSettings({ permissions: { deny: ['Bash(c)'] } });
+      const other = join(dir, 'other-settings.json');
+      writeFileSync(other, JSON.stringify({ permissions: { ask: ['Write(x)'] } }));
+
+      let current = settingsPath;
+      const guarded = createGuardedPatternsReader(() => ({ settings: current, store }));
+      expect(guarded()).toEqual(['Bash(c)']);
+
+      current = other;
+      expect(guarded()).toEqual(['Write(x)']);
     });
   });
 });

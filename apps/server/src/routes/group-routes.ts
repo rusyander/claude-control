@@ -10,7 +10,12 @@ import type {
 } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import { readHooks, writeHooks } from '../domains/hooks.ts';
-import { applyEntityState, rewriteHooks, type EntityToggleDeps } from '../domains/entity-toggle.ts';
+import {
+  applyEntityStates,
+  rewriteHooks,
+  type EntityState,
+  type EntityToggleDeps,
+} from '../domains/entity-toggle.ts';
 import { applyGroupEnv, existingEnvKeys } from '../domains/env.ts';
 import { collectLeafMembers, wouldCreateCycle } from '../domains/group-graph.ts';
 
@@ -117,8 +122,6 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
       const { isEnabled } = request.body;
       ctx.store.saveGroup({ ...group, isEnabled });
 
-      let needsHookRewrite = false;
-
       // Разворачиваем вложенные группы: гасим/зажигаем и потомков по всей ветке,
       // а не только прямых участников. Отметка «погашено этой группой» ставится
       // от id переключаемой группы — так лист, входящий ещё и в другую группу,
@@ -138,6 +141,12 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
 
       let skippedLocalHooks = 0;
 
+      // Сначала отметки — они и решают итог для каждого участника, — и только
+      // потом одна запись на файл. Раньше отметка и запись шли вперемешку по
+      // участникам, и общий файл переписывался столько раз, сколько в группе
+      // участников.
+      const states: EntityState[] = [];
+
       for (const member of leaves) {
         if (member.kind === 'hook' && localHookIds.has(member.id)) {
           skippedLocalHooks += 1;
@@ -145,11 +154,14 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
         }
 
         ctx.store.setGroupDisabled(member.kind, member.id, group.id, !isEnabled);
-
-        const effective = !ctx.store.isDisabled(member.kind, member.id);
-        const result = applyEntityState(toggleDeps(ctx), member.kind, member.id, effective);
-        needsHookRewrite ||= result.needsHookRewrite;
+        states.push({
+          kind: member.kind,
+          id: member.id,
+          isEnabled: !ctx.store.isDisabled(member.kind, member.id),
+        });
       }
+
+      const { needsHookRewrite } = applyEntityStates(toggleDeps(ctx), states);
 
       // Хуки лежат в одном файле, поэтому перезапись одна на всю группу.
       const hookBackup = needsHookRewrite ? rewriteHooks(toggleDeps(ctx)) : undefined;
@@ -175,12 +187,18 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     const group = ctx.store.getGroups().find((item) => item.id === request.params.id);
 
     if (group && !group.isEnabled) {
+      const states: EntityState[] = [];
+
       for (const member of collectLeafMembers(ctx.store.getGroups(), group.members)) {
         ctx.store.setGroupDisabled(member.kind, member.id, group.id, false);
-
-        const effective = !ctx.store.isDisabled(member.kind, member.id);
-        applyEntityState(toggleDeps(ctx), member.kind, member.id, effective);
+        states.push({
+          kind: member.kind,
+          id: member.id,
+          isEnabled: !ctx.store.isDisabled(member.kind, member.id),
+        });
       }
+
+      applyEntityStates(toggleDeps(ctx), states);
       rewriteHooks(toggleDeps(ctx));
     }
 
@@ -279,7 +297,11 @@ function applyGroupEnvState(
  * Хуки лежат в одном файле, поэтому перезапись одна на всю правку.
  */
 function reconcileMembers(ctx: ServerContext, group: Group, previousMembers: GroupMember[]): void {
-  const keyOf = (member: EntityRef): string => `${member.kind} ${member.id}`;
+  // Разделитель — двоеточие, а не байт NUL: из-за NUL git и ripgrep считали
+  // этот файл двоичным и молча пропускали его при поиске по репозиторию. Ключ
+  // только сравнивается и никогда не разбирается обратно, а `kind` — значение
+  // закрытого перечисления без двоеточия, поэтому склейка остаётся однозначной.
+  const keyOf = (member: EntityRef): string => `${member.kind}:${member.id}`;
   // Сравниваем не прямой состав, а развёрнутые листья: правка вложенной группы
   // добавляет/убирает всех её потомков, и отметки удержания должны идти за ними.
   const groups = ctx.store.getGroups();
@@ -292,21 +314,19 @@ function reconcileMembers(ctx: ServerContext, group: Group, previousMembers: Gro
   const removed = previousLeaves.filter((member) => !nextKeys.has(keyOf(member)));
   const added = nextLeaves.filter((member) => !prevKeys.has(keyOf(member)));
 
-  let needsHookRewrite = false;
+  const states: EntityState[] = [];
 
   const reapply = (member: EntityRef, heldByGroup: boolean): void => {
     const before = ctx.store.isDisabled(member.kind, member.id);
     ctx.store.setGroupDisabled(member.kind, member.id, group.id, heldByGroup);
     const after = ctx.store.isDisabled(member.kind, member.id);
-    if (before !== after) {
-      const result = applyEntityState(toggleDeps(ctx), member.kind, member.id, !after);
-      needsHookRewrite ||= result.needsHookRewrite;
-    }
+    if (before !== after) states.push({ kind: member.kind, id: member.id, isEnabled: !after });
   };
 
   for (const member of removed) reapply(member, false);
   if (!group.isEnabled) for (const member of added) reapply(member, true);
 
+  const { needsHookRewrite } = applyEntityStates(toggleDeps(ctx), states);
   if (needsHookRewrite) rewriteHooks(toggleDeps(ctx));
 }
 

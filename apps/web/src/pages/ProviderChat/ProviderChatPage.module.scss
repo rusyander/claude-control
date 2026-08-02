@@ -1,0 +1,214 @@
+// Чат чужого провайдера. Раскладка повторяет чат Claude — список разговоров
+// слева, переписка справа, — потому что это одно и то же занятие, и переучивать
+// человека при смене провайдера не за что.
+.shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  // Гасим padding области раздела не до нуля, а до ровной рамки в 8px — как в
+  // чате Claude, иначе разделы выглядели бы по-разному.
+  margin: calc(-1 * var(--spacing-lg));
+  overflow: hidden;
+
+  @media (max-width: 900px) {
+    margin: calc(-1 * var(--spacing-xs));
+  }
+
+  @media (max-width: 480px) {
+    margin: calc(-1 * var(--spacing-2xs));
+  }
+}
+
+.page {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+
+// Узкий экран: две колонки не помещаются — список уезжает наверх отдельной
+// полосой, разговор под ним.
+@media (max-width: 640px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+
+  @media (max-width: 640px) {
+    max-height: 34vh;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+.sidebarHead {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sidebarList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-2xs);
+}
+
+.chatItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface-raised, rgba(127, 127, 127, 0.08));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent, #6b8afd);
+    outline-offset: 1px;
+  }
+}
+
+.chatItemActive {
+  background: var(--color-surface-raised, rgba(127, 127, 127, 0.12));
+  border-color: var(--color-border);
+}
+
+.chatItemTitle {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.header {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.empty {
+  text-align: center;
+  padding: var(--spacing-xl);
+}
+
+.emptyText {
+  max-width: 46ch;
+}
+
+.userTurn,
+.assistantTurn {
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md, 8px);
+}
+
+.userTurn {
+  background: var(--color-surface-raised, rgba(127, 127, 127, 0.08));
+  align-self: flex-end;
+  max-width: 80%;
+}
+
+.assistantTurn {
+  background: var(--color-surface-sunken, rgba(127, 127, 127, 0.04));
+  align-self: flex-start;
+  max-width: 90%;
+}
+
+// Неудавшийся ответ виден сразу: это текст ошибки CLI, а не слова модели, и в
+// контекст следующего вопроса он не пойдёт.
+.failedTurn {
+  border: 1px solid var(--color-danger, #d05353);
+}
+
+.turnText {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+// Курсор набора: пока идёт ответ, видно, что он живой, а не завис.
+.caret {
+  display: inline-block;
+  width: 0.5ch;
+  animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}
+
+.composer {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: flex-end;
+  padding: var(--spacing-sm) var(--spacing-xl);
+  border-top: 1px solid var(--color-border);
+}
+
+.textarea {
+  flex: 1;
+  resize: vertical;
+  min-height: 44px;
+  max-height: 220px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface, transparent);
+  color: inherit;
+  font: inherit;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent, #6b8afd);
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+.attachments {
+  padding: 0 var(--spacing-xl) var(--spacing-2xs);
+}

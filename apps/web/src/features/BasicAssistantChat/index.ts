@@ -1,1 +1,0 @@
-export { BasicAssistantChat } from './BasicAssistantChat';

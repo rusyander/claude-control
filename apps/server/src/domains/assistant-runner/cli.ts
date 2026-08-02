@@ -1,7 +1,5 @@
-import { spawn as nodeSpawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { killChildTree } from '../../lib/process-tree.ts';
-import { shellArgs } from '../../lib/cli-args.ts';
-import { resolveWindowsExecutable, cmdWouldTruncate } from '../../lib/win-exec.ts';
+import { spawnCliProcess } from '../../lib/cli-spawn.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
 import { providerCliCommand } from '../../providers/cli.ts';
 import { opencodeServe } from '../opencode-serve.ts';
@@ -12,14 +10,6 @@ import type {
   RunAssistantDeps,
   SpawnOutcome,
 } from './types.ts';
-
-/**
- * Платформа — ФУНКЦИЯ, а не константа модуля: константа замерла бы на импорте, и
- * подменить `process.platform` в кроссплатформенном тесте было бы нечем.
- */
-function isWindows(): boolean {
-  return process.platform === 'win32';
-}
 
 /**
  * Снять зависший one-shot ЦЕЛИКОМ. На Windows мы запускаем CLI через `cmd.exe /c`,
@@ -40,33 +30,9 @@ export function flattenPrompt(messages: AssistantMessage[]): string {
 // --- CLI one-shot ------------------------------------------------------------
 
 /**
- * Запуск CLI без shell-интерполяции. На POSIX это буквально argv-массив: оболочки
- * нет, метасимволы разбирать некому.
- *
- * На Windows иначе: команда-обёртка (`*.cmd`) запускается только через `cmd.exe`,
- * а он РАЗБИРАЕТ полученную строку заново. Раньше сюда уходил argv-массив в
- * расчёте на то, что квотирует Node, — но libuv берёт в кавычки только аргументы
- * с пробелом, табом или кавычкой. Промпт без пробелов, зато с `&`, `|`, `>` или
- * `^` доходил до cmd.exe голым: `2+2>4?` перенаправлялся в файл, а `a&whoami`
- * запускал вторую команду правами сервера. Промпт попадает в argv у всех
- * провайдеров, кроме claude (у него — через stdin), так что случай не редкий.
- *
- * Поэтому строку командной строки собираем сами — тем же `shellArgs`, что и
- * ChatRunner: правило проекта гласит, что через оболочку идёт либо ОДНА строка,
- * либо `shellArgs`, но не сырой массив. Внешняя пара кавычек и
- * `windowsVerbatimArguments` нужны в паре: без флага libuv заквотировал бы уже
- * заквотированное по второму разу, а `/s` снимает ровно эту внешнюю пару.
- * `/v:off` добивает `!ИМЯ!`: при включённом отложенном разворачивании оно
- * подставляется даже внутри кавычек.
- *
- * Но и с идеальными кавычками cmd.exe остаётся плохим посредником: `%ИМЯ%` он
- * подставит из окружения, а на первом переводе строки ОБРЕЖЕТ команду и молча
- * (код 0) выполнит только первую строку — промпт склеен из истории через
- * «\n\n», так что обрезание ловил почти каждый второй вопрос подряд. Поэтому
- * сперва ищем настоящий `.exe` и запускаем его БЕЗ оболочки: argv уходит как
- * есть. Обёртка `.cmd` без `.exe` рядом — единственный случай, когда cmd.exe
- * всё ещё нужен, и там мы лучше откажемся с внятной ошибкой, чем отправим
- * обрубок промпта и выдадим ответ на него за полный.
+ * One-shot: дождаться конца работы CLI и отдать вывод целиком. Как именно
+ * процесс запускается (и почему на Windows это отдельная история) — в
+ * `lib/cli-spawn.ts`; здесь только ожидание, таймаут и сбор вывода.
  */
 function spawnCli(
   command: string,
@@ -74,47 +40,20 @@ function spawnCli(
   deps: RunAssistantDeps,
   stdin?: string,
 ): Promise<SpawnOutcome> {
-  const spawnImpl = deps.spawnImpl ?? nodeSpawn;
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT;
+  const spawned = spawnCliProcess(command, args, { spawnImpl: deps.spawnImpl });
 
-  let child: ChildProcessWithoutNullStreams;
-  try {
-    if (isWindows()) {
-      const direct = resolveWindowsExecutable(command);
-      if (direct) {
-        child = spawnImpl(direct, args, { windowsHide: true }) as ChildProcessWithoutNullStreams;
-      } else if (cmdWouldTruncate(args)) {
-        return Promise.resolve({
-          code: null,
-          stdout: '',
-          stderr: '',
-          timedOut: false,
-          spawnError: new Error(
-            `«${command}» установлен как .cmd-обёртка, а через неё Windows обрезает команду ` +
-              'на первом переводе строки — многострочный запрос дошёл бы обрубком. ' +
-              'Поставьте нативный исполняемый файл CLI или задайте запрос одной строкой.',
-          ),
-        });
-      } else {
-        const comspec = process.env.ComSpec || 'cmd.exe';
-        const line = shellArgs([command, ...args]).join(' ');
-        child = spawnImpl(comspec, ['/d', '/s', '/v:off', '/c', `"${line}"`], {
-          windowsHide: true,
-          windowsVerbatimArguments: true,
-        }) as ChildProcessWithoutNullStreams;
-      }
-    } else {
-      child = spawnImpl(command, args, { windowsHide: true }) as ChildProcessWithoutNullStreams;
-    }
-  } catch (error) {
+  if (spawned.error) {
     return Promise.resolve({
       code: null,
       stdout: '',
       stderr: '',
       timedOut: false,
-      spawnError: error instanceof Error ? error : new Error(String(error)),
+      spawnError: spawned.error,
     });
   }
+
+  const child = spawned.child;
 
   return new Promise<SpawnOutcome>((resolve) => {
     // Куски копим БУФЕРАМИ и декодируем один раз в конце. Декодировать каждый

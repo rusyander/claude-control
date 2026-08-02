@@ -9,6 +9,13 @@ import {
   boolean,
   type infer as Infer,
 } from 'zod';
+import {
+  GOOSE_MODES,
+  KIMI_DECISIONS,
+  KIMI_MODES,
+  OPENCODE_PERMISSION_LEVELS,
+  OPENCODE_PERMISSION_TOOLS,
+} from './vocabulary';
 
 /**
  * Универсальная модель прав/аппрувов провайдера. Моделей ВОСЕМЬ, потому что и у CLI
@@ -96,24 +103,14 @@ export const qwenApprovalModes = ['default', 'plan', 'auto-edit', 'auto', 'yolo'
 export type QwenApprovalMode = (typeof qwenApprovalModes)[number];
 
 /**
- * Уровни прав OpenCode (ключ `permission` в `opencode.json`):
- * - `allow` — выполнять без вопроса;
- * - `ask` — спрашивать подтверждение перед каждым вызовом;
- * - `deny` — запретить полностью.
- *
- * Других значений у OpenCode нет: всё, что вне набора, сервер отклоняет до записи.
+ * Уровни прав OpenCode и инструменты, у которых уровень задокументирован.
+ * Наборы живут в `./vocabulary`: их же значениями проверяет запись сервер, а
+ * бочку контрактов он импортировать не может (см. комментарий там).
  */
-export const opencodePermissionLevels = ['allow', 'deny', 'ask'] as const;
+export const opencodePermissionLevels = OPENCODE_PERMISSION_LEVELS;
 export type OpencodePermissionLevel = (typeof opencodePermissionLevels)[number];
 
-/**
- * Инструменты OpenCode, у которых уровень прав ЗАДОКУМЕНТИРОВАН: правка файлов,
- * запуск команд оболочки и загрузка страниц из сети. Прочие ключи внутри
- * `permission` панель не ведёт — они сохраняются как есть и показываются только
- * для чтения (переопределения на уровне агента живут вне `permission` и не
- * затрагиваются вовсе).
- */
-export const opencodePermissionTools = ['edit', 'bash', 'webfetch'] as const;
+export const opencodePermissionTools = OPENCODE_PERMISSION_TOOLS;
 export type OpencodePermissionTool = (typeof opencodePermissionTools)[number];
 
 /** Строка карты шаблонов: шаблон команды → уровень (расширенная форма `bash`). */
@@ -282,8 +279,8 @@ export const cursorPermissionInfoSchema = object({
 
 export type CursorPermissionInfo = Infer<typeof cursorPermissionInfoSchema>;
 
-/** Режимы аппрувов Goose: значение корневого ключа `GOOSE_MODE`. */
-export const gooseModes = ['auto', 'approve', 'smart_approve', 'chat'] as const;
+/** Режимы аппрувов Goose: значение корневого ключа `GOOSE_MODE` (см. `./vocabulary`). */
+export const gooseModes = GOOSE_MODES;
 export type GooseMode = (typeof gooseModes)[number];
 
 /** Права Goose: один режим в корне `config.yaml`, без списков. */
@@ -314,11 +311,11 @@ export const goosePermissionInfoSchema = object({
 export type GoosePermissionInfo = Infer<typeof goosePermissionInfoSchema>;
 
 /** Режимы аппрувов Kimi Code: значение корневого ключа `default_permission_mode`. */
-export const kimiModes = ['manual', 'auto', 'yolo'] as const;
+export const kimiModes = KIMI_MODES;
 export type KimiMode = (typeof kimiModes)[number];
 
 /** Решение правила Kimi: что делать с подходящим вызовом инструмента. */
-export const kimiDecisions = ['allow', 'ask', 'deny'] as const;
+export const kimiDecisions = KIMI_DECISIONS;
 export type KimiDecision = (typeof kimiDecisions)[number];
 
 /**

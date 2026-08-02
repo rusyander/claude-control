@@ -13,41 +13,19 @@
  * Возможности провайдера — по разделам панели. Активный провайдер отдаёт карту
  * статусов по каждому ключу; клиент по ней решает, что показать. У Claude есть
  * всё; у более простого CLI часть разделов ещё не реализована или отсутствует.
+ *
+ * Сам набор живёт в `./vocabulary` — он нужен и серверу как ЗНАЧЕНИЕ, а бочку
+ * контрактов сервер импортировать не может (см. комментарий там). Здесь только
+ * реэкспорт, чтобы имя осталось на прежнем месте.
  */
-export const CAPABILITIES = [
-  'rules',
-  'globalInstructions',
-  'skills',
-  'commands',
-  'hooks',
-  'scripts',
-  'mcp',
-  'permissions',
-  'env',
-  'plugins',
-  'analytics',
-  'projects',
-  'chat',
-  'sandbox',
-] as const;
+import type { Capability, CapabilityStatus, ProviderStatus } from './vocabulary';
 
-export type Capability = (typeof CAPABILITIES)[number];
-
-/**
- * Статус конкретной возможности у провайдера:
- * - `ready` — реально работает сейчас (есть адаптер, чтение/запись безопасны);
- * - `planned` — по карте поддержим, адаптера ещё нет → раздел показывается с
- *   пометкой «в разработке», но ничего не читает и не пишет (fail-closed);
- * - `unsupported` — у этого CLI такого раздела нет → скрыт из навигации.
- */
-export type CapabilityStatus = 'ready' | 'planned' | 'unsupported';
-
-/**
- * Статус провайдера целиком:
- * - `verified` — поведение проверено (Claude);
- * - `experimental` — форматы взяты из документации, часть разделов в разработке.
- */
-export type ProviderStatus = 'verified' | 'experimental';
+export {
+  CAPABILITIES,
+  type Capability,
+  type CapabilityStatus,
+  type ProviderStatus,
+} from './vocabulary';
 
 /**
  * Как у провайдера устроены глобальные инструкции:

@@ -47,7 +47,6 @@ export type ProviderRulesScope = (typeof providerRulesScopes)[number];
  *   Cursor правило не подхватит; переписывать такой файл вслепую панель не станет.
  */
 export const providerRuleProblemSchema = zodEnum(['malformed', 'no_frontmatter']);
-export type ProviderRuleProblem = Infer<typeof providerRuleProblemSchema>;
 
 /** Одна строка списка правил каталога. */
 export const providerRuleSummarySchema = object({

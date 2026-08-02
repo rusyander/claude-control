@@ -20,7 +20,6 @@ import { object, string, array, boolean, enum as zodEnum, type infer as Infer } 
 
 /** Формат конфигурации, в которой лежит список ссылок (пока только Aider). */
 export const providerInstructionsFormats = ['aider-yaml'] as const;
-export type ProviderInstructionsFormat = (typeof providerInstructionsFormats)[number];
 
 /** Уровень конфигурации: глобальный файл в домашнем каталоге или файл проекта. */
 export const providerInstructionsScopes = ['global', 'project'] as const;
@@ -77,17 +76,6 @@ export const providerInstructionsInfoSchema = object({
 });
 
 export type ProviderInstructionsInfo = Infer<typeof providerInstructionsInfoSchema>;
-
-/**
- * Тело запроса на сохранение списка: полный желаемый набор записей В ПОРЯДКЕ
- * отображения. Добавление, удаление и перестановка на клиенте сводятся к одному
- * PUT — сервер пишет ровно этот список в ключ `read`.
- */
-export const providerInstructionsDraftSchema = object({
-  entries: array(string()),
-});
-
-export type ProviderInstructionsDraft = Infer<typeof providerInstructionsDraftSchema>;
 
 /** Содержимое ОДНОГО файла из списка (открывается только для существующей записи). */
 export const providerInstructionsFileSchema = object({

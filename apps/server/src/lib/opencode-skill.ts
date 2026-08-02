@@ -39,12 +39,6 @@ export const SKILL_FILE_NAME = 'SKILL.md';
 /** Ключи шапки, которыми управляет панель (в задокументированном порядке). */
 export const SKILL_MANAGED_KEYS = ['name', 'description'] as const;
 
-/**
- * Прочие ЗАДОКУМЕНТИРОВАННЫЕ ключи шапки. Панель их не редактирует, но знает о
- * них, чтобы честно показать: это не «чужие» ключи, а признанные OpenCode.
- */
-export const SKILL_DOCUMENTED_KEYS = ['license', 'compatibility', 'metadata'] as const;
-
 /** Грамматика имени скилла: строчные буквы/цифры, одиночные дефисы-разделители. */
 export const SKILL_NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 

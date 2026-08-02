@@ -59,12 +59,6 @@ export const providerKeysResponseSchema = object({
 });
 export type ProviderKeysResponse = Infer<typeof providerKeysResponseSchema>;
 
-/** Тело `PUT /api/provider-keys/:id`: сам ключ. Наружу он не эхоится. */
-export const providerKeyDraftSchema = object({
-  key: string(),
-});
-export type ProviderKeyDraft = Infer<typeof providerKeyDraftSchema>;
-
 /** Режим запуска ассистента активного провайдера. */
 export const runnerModes = ['api', 'cli', 'none'] as const;
 export type RunnerMode = (typeof runnerModes)[number];

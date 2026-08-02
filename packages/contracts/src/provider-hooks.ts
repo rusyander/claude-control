@@ -63,7 +63,6 @@ export type ProviderHooksShape = (typeof providerHooksShapes)[number];
 
 /** Единица измерения таймаута правила: у Qwen миллисекунды, у Kimi секунды. */
 export const providerHookTimeoutUnits = ['ms', 's'] as const;
-export type ProviderHookTimeoutUnit = (typeof providerHookTimeoutUnits)[number];
 
 /**
  * Одно правило модели `event-rules`: событие, необязательный матчер (регулярное
@@ -84,8 +83,6 @@ export const providerHookEventInfoSchema = object({
   supportsMatcher: boolean(),
 });
 
-export type ProviderHookEventInfo = Infer<typeof providerHookEventInfoSchema>;
-
 /** Уровень: глобальный конфиг или конфиг проекта. */
 export const providerHooksScopes = ['global', 'project'] as const;
 export type ProviderHooksScope = (typeof providerHooksScopes)[number];
@@ -95,8 +92,6 @@ export const providerHookEnvVarSchema = object({
   key: string(),
   value: string(),
 });
-
-export type ProviderHookEnvVar = Infer<typeof providerHookEnvVarSchema>;
 
 /**
  * Одно действие хука. `command` — МАССИВ аргументов (первый элемент — сама
@@ -123,8 +118,6 @@ export const providerHookPreservedEntrySchema = object({
   key: string(),
   value: string(),
 });
-
-export type ProviderHookPreservedEntry = Infer<typeof providerHookPreservedEntrySchema>;
 
 /**
  * Сводка раздела хуков провайдера. `readOnly` = true, когда файл не разобран:

@@ -75,11 +75,6 @@ export interface CompareSectionResult {
   note?: string;
 }
 
-export interface ProviderCompareRequest {
-  left: string;
-  right: string;
-}
-
 export interface ProviderCompareResponse {
   left: { providerId: string; providerName: string };
   right: { providerId: string; providerName: string };

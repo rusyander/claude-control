@@ -24,7 +24,6 @@ import { object, string, array, boolean, number, enum as zodEnum, type infer as 
 
 /** Формат каталога скиллов (пока только OpenCode). */
 export const providerSkillsFormats = ['skill-md-dir'] as const;
-export type ProviderSkillsFormat = (typeof providerSkillsFormats)[number];
 
 /** Уровень каталога скиллов: глобальный (`~`) или каталог проекта. */
 export const providerSkillsScopes = ['global', 'project'] as const;
@@ -91,8 +90,6 @@ export const providerSkillsExternalDirSchema = object({
   path: string(),
   exists: boolean(),
 });
-
-export type ProviderSkillsExternalDir = Infer<typeof providerSkillsExternalDirSchema>;
 
 /**
  * Ответ раздела скиллов. `readOnly` = true, когда сам каталог прочитать не

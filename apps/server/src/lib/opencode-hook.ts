@@ -51,10 +51,6 @@ import { UnrecognizedFormatError } from './codex-toml.ts';
  * `experimental: {}` в файле не появляются.
  */
 
-/** Задокументированные события хуков. Ровно два, добавлять «на глаз» нельзя. */
-export const OPENCODE_HOOK_EVENTS = ['file_edited', 'session_completed'] as const;
-export type OpencodeHookEvent = (typeof OPENCODE_HOOK_EVENTS)[number];
-
 /** Одна пара переменной окружения действия (порядок файла сохраняется). */
 export interface OpencodeHookEnvVar {
   key: string;

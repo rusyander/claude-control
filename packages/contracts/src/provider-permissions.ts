@@ -82,14 +82,6 @@ export const geminiApprovalModes = ['default', 'auto_edit', 'plan'] as const;
 export type GeminiApprovalMode = (typeof geminiApprovalModes)[number];
 
 /**
- * Значение режима аппрувов, которое панель отказывается записывать в файл, —
- * `yolo` (см. `geminiApprovalModes`). Держим значением, чтобы и сервер, и
- * интерфейс объясняли отказ одинаково.
- */
-export const geminiForbiddenApprovalModes = ['yolo'] as const;
-export type GeminiForbiddenApprovalMode = (typeof geminiForbiddenApprovalModes)[number];
-
-/**
  * Режимы аппрувов Qwen Code (`tools.approvalMode` в `settings.json`) — все пять
  * задокументированы ИМЕННО как значения файла настроек (пример с `"yolo"` есть в
  * документации), поэтому запрещённого набора, как у Gemini, здесь нет:

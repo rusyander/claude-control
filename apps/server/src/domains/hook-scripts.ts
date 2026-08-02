@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HookDraft } from '@claude-control/contracts';
 import { writeTextFile } from '../lib/safe-io.ts';
@@ -133,9 +133,4 @@ export function generateHookScript(
   writeTextFile(path, build(draft), { backupDir });
 
   return { path, command: `node "${path.replace(/\\/g, '/')}"` };
-}
-
-/** Удаляет файл скрипта — вызывается вместе с удалением самого хука. */
-export function deleteHookScript(scriptPath: string): void {
-  if (existsSync(scriptPath)) rmSync(scriptPath, { force: true });
 }

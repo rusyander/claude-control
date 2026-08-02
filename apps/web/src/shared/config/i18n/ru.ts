@@ -6,7 +6,6 @@ export const ru = {
 
   common: {
     appName: 'Claude Control',
-    appTagline: 'Настройки Claude Code — в одном месте',
     collapseSidebar: 'Свернуть панель',
     expandSidebar: 'Развернуть панель',
     save: 'Сохранить',
@@ -20,12 +19,9 @@ export const ru = {
     disabled: 'Выключено',
     loading: 'Загрузка…',
     empty: 'Пусто',
-    error: 'Ошибка',
     total: 'всего',
     show: 'Показать',
-    hide: 'Скрыть',
     needsRestart: 'Изменения применятся после перезапуска Claude Code',
-    backupCreated: 'Создана резервная копия',
     confirmTypeName: 'Введите «{{name}}», чтобы подтвердить',
     other: 'Прочее',
     close: 'Закрыть',
@@ -873,7 +869,6 @@ export const ru = {
       'Панель правит только .js, .ts и .mjs. Остальное в каталоге она показывает, но не трогает.',
     file: {
       edit: 'Править',
-      content: 'Содержимое файла',
       delete:
         'Удалить файл плагина? Перед удалением панель сделает резервную копию, каталог останется на месте.',
       empty: 'Файлов-плагинов пока нет: создайте первый — он появится в каталоге.',
@@ -1736,7 +1731,6 @@ export const ru = {
     inputPlaceholder: 'Что нужно сделать?',
     send: 'Отправить',
     startVoice: 'Надиктовать голосом',
-    stopVoice: 'Остановить запись',
     speakNow: 'Говорите — текст появится здесь',
     finalizing: 'Перевожу речь в текст…',
     applyVoice: 'Готово',
@@ -1966,12 +1960,9 @@ export const ru = {
     activityMore: 'больше',
   },
   errors: {
-    locationInvalid: 'Каталог .claude не найден',
     locationHint:
       'Не удалось определить путь автоматически. Укажите его вручную — приложение сразу подхватит конфигурацию.',
-    loadFailed: 'Не удалось загрузить данные',
     saveFailed: 'Не удалось сохранить',
-    serverUnreachable: 'Сервер приложения не отвечает. Проверьте, что он запущен.',
   },
   toasts: {
     created: 'Создано',
@@ -2035,7 +2026,6 @@ export const ru = {
     stop: 'Остановить',
     starting: 'Запускается…',
     open: 'Перейти',
-    notRunnable: 'Нет скрипта dev или start и не задана команда запуска',
     failed: 'Не удалось запустить dev-сервер проекта',
     autostart: 'Автозапуск',
     settings: 'Настройки запуска',
@@ -2229,7 +2219,6 @@ export const ru = {
     active: 'Активных агентов: {{count}}',
     empty: 'Нет активных агентов',
     stopAll: 'Остановить всех',
-    totalCost: 'Всего за сессию',
     total: 'Всего за сессию',
     chat: 'Чат',
     sound: 'Звук',

@@ -1,14 +1,4 @@
-import { object, string, array, boolean, number, type infer as Infer } from 'zod';
-
-/** Единый конверт ошибки API — фронт показывает message пользователю как есть. */
-export const apiErrorSchema = object({
-  error: string(),
-  message: string(),
-  /** Путь к файлу, на котором споткнулись, если ошибка файловая. */
-  path: string().optional(),
-});
-
-export type ApiError = Infer<typeof apiErrorSchema>;
+import { object, string, boolean, number, type infer as Infer } from 'zod';
 
 /** Результат записи в конфиг — с путём к резервной копии, если она делалась. */
 export const writeResultSchema = object({
@@ -19,21 +9,6 @@ export const writeResultSchema = object({
 });
 
 export type WriteResult = Infer<typeof writeResultSchema>;
-
-/**
- * События, которые сервер шлёт по SSE. На них фронт инвалидирует кеш
- * и подтягивает свежие данные — так интерфейс отражает правки файлов,
- * сделанные мимо приложения (руками или самим Claude Code).
- */
-export const serverEventSchema = object({
-  type: string(),
-  /** Какие домены затронуты: rules, hooks, skills, mcp, permissions, env. */
-  domains: array(string()),
-  path: string().optional(),
-  at: string(),
-});
-
-export type ServerEvent = Infer<typeof serverEventSchema>;
 
 /** Сводка для главного экрана. */
 export const overviewSchema = object({

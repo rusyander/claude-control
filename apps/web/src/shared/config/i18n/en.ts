@@ -7,7 +7,6 @@ export const en: TranslationSchema = {
 
   common: {
     appName: 'Claude Control',
-    appTagline: 'Every Claude Code setting in one place',
     collapseSidebar: 'Collapse the sidebar',
     expandSidebar: 'Expand the sidebar',
     save: 'Save',
@@ -21,12 +20,9 @@ export const en: TranslationSchema = {
     disabled: 'Disabled',
     loading: 'Loading…',
     empty: 'Empty',
-    error: 'Error',
     total: 'total',
     show: 'Show',
-    hide: 'Hide',
     needsRestart: 'Changes apply after restarting Claude Code',
-    backupCreated: 'Backup created',
     confirmTypeName: 'Type "{{name}}" to confirm',
     other: 'Other',
     close: 'Close',
@@ -859,7 +855,6 @@ export const en: TranslationSchema = {
       'The panel edits only .js, .ts and .mjs. Anything else in the directory is listed but never touched.',
     file: {
       edit: 'Edit',
-      content: 'File contents',
       delete:
         'Delete this plugin file? The panel makes a backup first; the directory itself stays in place.',
       empty: 'No plugin files yet: create the first one and it will appear in the directory.',
@@ -1715,7 +1710,6 @@ export const en: TranslationSchema = {
     inputPlaceholder: 'What should be done?',
     send: 'Send',
     startVoice: 'Dictate by voice',
-    stopVoice: 'Stop recording',
     speakNow: 'Speak — the text will appear here',
     finalizing: 'Converting speech to text…',
     applyVoice: 'Done',
@@ -1945,12 +1939,9 @@ export const en: TranslationSchema = {
     activityMore: 'more',
   },
   errors: {
-    locationInvalid: '.claude directory not found',
     locationHint:
       'Automatic detection failed. Enter the path manually — the app will pick up the configuration right away.',
-    loadFailed: 'Failed to load data',
     saveFailed: 'Failed to save',
-    serverUnreachable: 'The app server is not responding. Check that it is running.',
   },
   toasts: {
     created: 'Created',
@@ -2014,7 +2005,6 @@ export const en: TranslationSchema = {
     stop: 'Stop',
     starting: 'Starting…',
     open: 'Open',
-    notRunnable: 'No dev or start script and no run command set',
     failed: 'Failed to start the project dev server',
     autostart: 'Autostart',
     settings: 'Run settings',
@@ -2208,7 +2198,6 @@ export const en: TranslationSchema = {
     active: 'Active agents: {{count}}',
     empty: 'No active agents',
     stopAll: 'Stop all',
-    totalCost: 'Total this session',
     total: 'Total this session',
     chat: 'Chat',
     sound: 'Sound',

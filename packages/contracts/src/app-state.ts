@@ -1,4 +1,4 @@
-import { object, string, array, record, type infer as Infer } from 'zod';
+import { object, string, array, record } from 'zod';
 import { groupSchema, automationSchema } from './groups';
 import { hookSchema } from './hooks';
 import { projectSchema } from './projects';
@@ -35,5 +35,3 @@ export const importStateSchema = object({
   /** Итоги проверки провайдеров: id провайдера → последний результат. */
   providerChecks: providerChecksSchema.optional(),
 });
-
-export type ImportState = Infer<typeof importStateSchema>;

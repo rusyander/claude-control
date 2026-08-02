@@ -1,5 +1,5 @@
 import { existsSync, statSync } from 'node:fs';
-import { delimiter, isAbsolute, join, extname, basename, dirname } from 'node:path';
+import { delimiter, isAbsolute, join, extname, basename } from 'node:path';
 
 /**
  * Поиск НАСТОЯЩЕГО исполняемого файла на Windows.
@@ -71,11 +71,6 @@ export function resolveWindowsExecutable(
   }
 
   return undefined;
-}
-
-/** Каталог обёртки — нужен только для сообщения об ошибке (человеку понятнее с путём). */
-export function shimDirectory(command: string): string | undefined {
-  return command.includes('/') || command.includes('\\') ? dirname(command) : undefined;
 }
 
 /**

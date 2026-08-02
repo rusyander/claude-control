@@ -65,34 +65,6 @@ export interface ProjectGitInfo {
   error?: string;
 }
 
-/** Тело запроса «переключиться на ветку». */
-export interface ProjectGitCheckoutDraft {
-  path: string;
-  branch: string;
-}
-
-/** Тело запроса «создать ветку от текущего HEAD и перейти на неё». */
-export interface ProjectGitBranchDraft {
-  path: string;
-  name: string;
-}
-
-/** Тело запроса «закоммитить». */
-export interface ProjectGitCommitDraft {
-  path: string;
-  message: string;
-}
-
-/**
- * Тело запроса «подтянуть изменения». Без `branch` — обычный `git pull` в
- * текущей ветке (по её upstream); с `branch` — `git pull <remote> <branch>`,
- * и имя обязано быть из `remoteBranches`, произвольную ссылку панель не тянет.
- */
-export interface ProjectGitPullDraft {
-  path: string;
-  branch?: string;
-}
-
 /** Ответ на любую операцию записи: новое состояние + что именно сделано. */
 export interface ProjectGitResult {
   info: ProjectGitInfo;

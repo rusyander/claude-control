@@ -38,14 +38,12 @@ import { object, string, array, boolean, number, enum as zodEnum, type infer as 
 
 /** Формат раздела плагинов: файлы+npm у OpenCode, список установленного у Kimi. */
 export const providerPluginsFormats = ['opencode-plugins', 'kimi-plugins'] as const;
-export type ProviderPluginsFormat = (typeof providerPluginsFormats)[number];
 
 /**
  * Половины раздела. У OpenCode их две (`files` + `packages`), у Kimi одна
  * (`installed`) — интерфейс рисует ровно то, что назвал сервер.
  */
 export const providerPluginsSections = ['files', 'packages', 'installed'] as const;
-export type ProviderPluginsSection = (typeof providerPluginsSections)[number];
 
 /** Установленный плагин Kimi: манифест, прочитанный только для показа. */
 export const providerInstalledPluginSchema = object({
@@ -99,8 +97,6 @@ export const providerPluginPreservedEntrySchema = object({
   index: number(),
   value: string(),
 });
-
-export type ProviderPluginPreservedEntry = Infer<typeof providerPluginPreservedEntrySchema>;
 
 /**
  * Сводка раздела плагинов. Две независимые половины (файлы и npm-список) могут
@@ -171,14 +167,3 @@ export const providerPluginFileDraftSchema = object({
 });
 
 export type ProviderPluginFileDraft = Infer<typeof providerPluginFileDraftSchema>;
-
-/**
- * Тело запроса на запись списка npm-плагинов. Список передаётся ЦЕЛИКОМ; пустой
- * означает «ключа `plugin` в файле быть не должно» (ключ удаляется, а не пишется
- * пустым массивом).
- */
-export const providerPluginPackagesDraftSchema = object({
-  packages: array(string()),
-});
-
-export type ProviderPluginPackagesDraft = Infer<typeof providerPluginPackagesDraftSchema>;

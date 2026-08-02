@@ -16,14 +16,12 @@ import { runnerModes } from './provider-keys';
 
 /** Роль реплики в мультимодельном чате (пользователь / ассистент). */
 export const assistantRunRoles = ['user', 'assistant'] as const;
-export type AssistantRunRole = (typeof assistantRunRoles)[number];
 
 /** Одна реплика диалога (простой текст — basic-режим). */
 export const assistantRunMessageSchema = object({
   role: zodEnum(assistantRunRoles),
   content: string(),
 });
-export type AssistantRunMessage = Infer<typeof assistantRunMessageSchema>;
 
 /**
  * Тело `POST /api/assistant/run`: история сообщений (последнее — новый запрос).

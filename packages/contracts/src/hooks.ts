@@ -119,16 +119,6 @@ export const HOOK_EVENT_INFO: readonly HookEventInfo[] = [
  * ради типовой задачи не нужно.
  */
 export const HOOK_TEMPLATES = ['message', 'guard', 'shell', 'blank'] as const;
-export type HookTemplate = (typeof HOOK_TEMPLATES)[number];
-
-/** Одна команда внутри matcher-группы. */
-export const hookCommandSchema = object({
-  type: zodEnum(['command']),
-  command: string(),
-  timeout: number().optional(),
-});
-
-export type HookCommand = Infer<typeof hookCommandSchema>;
 
 /**
  * Хук в том виде, в каком его показывает приложение: плоская запись,

@@ -195,16 +195,6 @@ export const artifactSchema = object({
 
 export type Artifact = Infer<typeof artifactSchema>;
 
-/** Состояние лимитов подписки — CLI сообщает его при каждом запросе. */
-export const rateLimitSchema = object({
-  status: string(),
-  type: string(),
-  /** Момент сброса окна, unix-секунды. */
-  resetsAt: number(),
-});
-
-export type RateLimit = Infer<typeof rateLimitSchema>;
-
 /**
  * Прогресс работы агента — то самое ТЗ, которое агент ставит себе сам.
  *

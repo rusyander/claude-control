@@ -18,7 +18,6 @@ import { assistantRunReasons } from './assistant-run';
 
 /** Роль реплики: спросил пользователь или ответил провайдер. */
 export const providerChatRoles = ['user', 'assistant'] as const;
-export type ProviderChatRole = (typeof providerChatRoles)[number];
 
 /**
  * Чем именно отработал ответ:

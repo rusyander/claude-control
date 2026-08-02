@@ -1,4 +1,4 @@
-import { object, string, array, record, literal, union, type infer as Infer } from 'zod';
+import { object, string, array, record, literal, union } from 'zod';
 
 /**
  * Проверка провайдера — «доверие, подтверждённое делом».
@@ -105,5 +105,3 @@ export const providerCheckResultSchema = object({
 });
 
 export const providerChecksSchema = record(string(), providerCheckResultSchema);
-
-export type ProviderCheckResultInput = Infer<typeof providerCheckResultSchema>;

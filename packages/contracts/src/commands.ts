@@ -21,16 +21,12 @@ import { object, string, array, boolean, enum as enumOf, type infer as Infer } f
  */
 export const commandSourceSchema = enumOf(['builtin', 'skill', 'command', 'plugin']);
 
-export type CommandSource = Infer<typeof commandSourceSchema>;
-
 /**
  * Куда ведёт кнопка «Открыть». Не у всякой команды есть страница: у встроенной
  * править нечего, у файла чужого CLI своей страницы в панели пока нет — тогда
  * показываем путь, а не ведём в никуда.
  */
 export const commandTargetSchema = enumOf(['skill', 'plugin', 'none']);
-
-export type CommandTarget = Infer<typeof commandTargetSchema>;
 
 export const slashCommandSchema = object({
   /** Уникален в пределах списка: источник + вызов (`skill:/deep-review`). */

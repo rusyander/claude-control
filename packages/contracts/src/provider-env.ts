@@ -58,14 +58,3 @@ export const providerEnvInfoSchema = object({
 });
 
 export type ProviderEnvInfo = Infer<typeof providerEnvInfoSchema>;
-
-/**
- * Тело запроса на сохранение переменных окружения провайдера: полный желаемый
- * набор пар ключ→значение. Раздел записывает ровно этот набор в `set` (bulk
- * replace) — добавление/правка/удаление на клиенте сводятся к одному PUT.
- */
-export const providerEnvDraftSchema = object({
-  vars: array(providerEnvVarSchema),
-});
-
-export type ProviderEnvDraft = Infer<typeof providerEnvDraftSchema>;

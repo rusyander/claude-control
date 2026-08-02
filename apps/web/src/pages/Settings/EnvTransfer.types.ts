@@ -51,9 +51,3 @@ export interface EnvTransferPlan {
   counts: { new: number; same: number; differs: number; unresolved: number };
   checklist: EnvTransferChecklistItem[];
 }
-
-export interface EnvTransferApplyResult {
-  ok: true;
-  needsRestart: true;
-  summary: { written: string[]; merged: string[]; skipped: string[]; backupPaths: string[] };
-}

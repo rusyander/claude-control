@@ -12,7 +12,6 @@ export const MODEL_OPTIONS = ['', 'opus', 'sonnet', 'haiku'] as const;
 
 /** Уровни глубины продумывания (--effort). '' = по умолчанию. */
 export const EFFORT_LEVELS = ['', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
-export type EffortLevel = (typeof EFFORT_LEVELS)[number];
 
 /** «opus» → «Opus»; пусто отдаём как есть (подпишут отдельно). */
 export function modelLabel(model: string): string {

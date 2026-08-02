@@ -24,11 +24,28 @@ interface CacheEntry {
 
 let cache: CacheEntry | undefined;
 
-/** Местная полночь текущих суток — начало периода «сегодня». */
-function startOfLocalDay(): number {
+/**
+ * Границы периода «сегодня» — ровно одни календарные сутки: от местной полуночи
+ * текущего дня до полуночи следующего. Правый край — не «сейчас»: запись с
+ * меткой позже текущего момента (часы машины ушли вперёд) относится к этому же
+ * дню и попадает в столбец `byDay` за сегодня, значит обязана попасть и в итоги.
+ */
+function todayRange(): { since: number; until: number } {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
-  return start.getTime();
+  return { since: start.getTime(), until: endOfLocalDay(start.getTime()) };
+}
+
+/**
+ * Последняя миллисекунда местных суток, начавшихся в `start`. Конец берём
+ * следующей полуночью ПО КАЛЕНДАРЮ, а не «плюс 24 часа»: в день перевода часов
+ * сутки длятся 23 или 25 часов, и арифметика на миллисекундах отрезала бы час
+ * своего дня или прихватывала час соседнего.
+ */
+function endOfLocalDay(start: number): number {
+  const next = new Date(start);
+  next.setDate(next.getDate() + 1);
+  return next.getTime() - 1;
 }
 
 /**
@@ -49,7 +66,7 @@ function parseRange(from?: string, to?: string): { since: number; until: number 
 
   // Перепутанные местами даты выбираются пикером на раз — не ошибка, а порядок.
   const [since, endDay] = start <= end ? [start, end] : [end, start];
-  return { since, until: endDay + 24 * 60 * 60 * 1000 - 1 };
+  return { since, until: endOfLocalDay(endDay) };
 }
 
 function parseLocalDay(value?: string): number | undefined {
@@ -65,10 +82,11 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
     async (request): Promise<Analytics> => {
       // Явный диапазон из пикера перебивает период по дням.
       const range = parseRange(request.query.from, request.query.to);
-      // days=today — календарные сутки: период начинается в МЕСТНУЮ полночь, а
-      // не за 24 часа до текущего момента (иначе утром в отчёт попадала бы
-      // половина вчерашнего дня). Дата дня и час берутся по локальному времени
-      // (`scanner.ts`), поэтому и граница периода — локальная.
+      // days=today — календарные сутки целиком: от местной полуночи текущего дня
+      // до полуночи следующего, а не скользящие 24 часа до текущего момента
+      // (иначе утром в отчёт попадала бы половина вчерашнего дня). Дата дня и
+      // час берутся по локальному времени (`scanner.ts`), поэтому и границы
+      // периода — локальные.
       //
       // days=0 означает «за всё время»: берём заведомо больший интервал,
       // чем возраст любых транскриптов, вместо отдельной ветки без фильтра.
@@ -83,8 +101,11 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
         : normalized === 0
           ? 36_500
           : Math.min(Math.max(normalized, 1), 3650);
-      const since = range ? range.since : isToday ? startOfLocalDay() : undefined;
-      const until = range?.until;
+      // Явный диапазон перебивает пресет; у остальных периодов границ нет —
+      // сканер сам отсчитает `days` назад от текущего момента.
+      const bounds = range ?? (isToday ? todayRange() : undefined);
+      const since = bounds?.since;
+      const until = bounds?.until;
       const snapshot = ctx.pricing.current();
       const projectsDir = join(ctx.location.paths.root, 'projects');
       // Тарифы входят в ключ: иначе после правки цен (или после обновления
@@ -95,9 +116,10 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
       // и обе стороны падают на встроенный снимок с одной и той же датой), и
       // панель ещё минуту выдавала бы расход ПРЕЖНЕГО каталога за новый.
       const key = [
-        // «Сегодня» и «1 день» — разные периоды при одном days: ключ различает
-        // их сам, иначе один ответ выдавался бы за другой в пределах TTL.
-        range ? `range:${range.since}-${range.until}` : `days:${isToday ? 'today' : days}`,
+        // В ключе стоят сами границы, а не пресет: «сегодня» и «1 день» — разные
+        // периоды при одном days, а ещё ответ за вчера не должен доживать в кэше
+        // до сегодняшнего запроса «сегодня» — с полуночью меняются и границы.
+        bounds ? `range:${bounds.since}-${bounds.until}` : `days:${days}`,
         projectsDir,
         JSON.stringify(ctx.store.getSettings().modelPricing),
         snapshot.fetchedAt,

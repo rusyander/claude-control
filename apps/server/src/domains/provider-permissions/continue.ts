@@ -4,7 +4,9 @@ import { UnrecognizedFormatError } from '../../lib/codex-toml.ts';
 import {
   CONTINUE_PERMISSION_KEYS,
   hasContinuePermissionKeys,
-  readContinuePermissions,
+  // Низкоуровневая читалка отдаёт голые списки; имя стадии раздела занято
+  // адаптером ниже, поэтому здесь она под своим смыслом.
+  readContinuePermissions as readContinueLists,
   writeContinuePermissions,
 } from '../../lib/continue-yaml.ts';
 import { parseToolList } from './normalize.ts';
@@ -41,12 +43,12 @@ export function parseContinueDraft(
  * инструментов спрашивается) — их панель НЕ пишет, только показывает пустые
  * списки. Файл есть, но все три ключа отсутствуют → тоже «на дефолтах».
  */
-export function readContinuePermissionsValues(text: string): ContinuePermissionsValues {
+export function readContinuePermissions(text: string): ContinuePermissionsValues {
   if (!text.trim()) {
     return { kind: 'continue', allow: [], ask: [], exclude: [], usingDefaults: true };
   }
 
-  const lists = readContinuePermissions(text);
+  const lists = readContinueLists(text);
   return {
     kind: 'continue',
     ...lists,

@@ -11,7 +11,7 @@ import {
   deleteContinueServer,
   writeContinueBlock,
 } from './continue-format.ts';
-import { readGooseMcpServers, upsertGooseServer, deleteGooseServer } from './goose-format.ts';
+import { readGooseServers, upsertGooseServer, deleteGooseServer } from './goose-format.ts';
 import { readJsonMcpServers, upsertJsonMcpServer, deleteJsonMcpServer } from './json-format.ts';
 import {
   readOpencodeServers,
@@ -40,7 +40,7 @@ function readMainFileServers(target: ProviderMcpTarget): UniversalMcpServer[] {
     case 'continue-yaml':
       return mapContinueServers(readContinueServers(text));
     case 'goose-yaml':
-      return readGooseMcpServers(text);
+      return readGooseServers(text);
     default:
       return readCodexServers(text);
   }

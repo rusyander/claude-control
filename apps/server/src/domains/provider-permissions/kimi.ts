@@ -64,7 +64,7 @@ export function parseKimiDraft(rec: Record<string, unknown>): KimiPermissionDraf
  * набора показываем дефолтом, но «на дефолтах» раздел уже не считается: в файле
  * что-то задано. Чужая форма блока правил → fail-closed (бросает).
  */
-export function readKimiPermissionsValues(text: string): KimiPermissionsValues {
+export function readKimiPermissions(text: string): KimiPermissionsValues {
   if (!text.trim()) {
     return { kind: 'kimi', mode: KIMI_DEFAULT_MODE, rules: [], usingDefaults: true };
   }

@@ -35,12 +35,12 @@ import { parseGeminiDraft, readGeminiPermissions, saveGeminiPermissions } from '
 import { parseQwenDraft, readQwenPermissions, saveQwenPermissions } from './qwen.ts';
 import {
   parseContinueDraft,
-  readContinuePermissionsValues,
+  readContinuePermissions,
   saveContinuePermissions,
 } from './continue.ts';
 import { parseCursorDraft, readCursorPermissions, saveCursorPermissions } from './cursor.ts';
-import { parseGooseDraft, readGoosePermissionsValues, saveGoosePermissions } from './goose.ts';
-import { parseKimiDraft, readKimiPermissionsValues, saveKimiPermissions } from './kimi.ts';
+import { parseGooseDraft, readGoosePermissions, saveGoosePermissions } from './goose.ts';
+import { parseKimiDraft, readKimiPermissions, saveKimiPermissions } from './kimi.ts';
 import {
   parseOpencodeDraft,
   readOpencodePermissions,
@@ -90,10 +90,10 @@ export function readProviderPermissions(
   const text = readTextFile(target.filePath);
   if (target.format === 'gemini-json') return readGeminiPermissions(text);
   if (target.format === 'qwen-json') return readQwenPermissions(text);
-  if (target.format === 'continue-yaml') return readContinuePermissionsValues(text);
+  if (target.format === 'continue-yaml') return readContinuePermissions(text);
   if (target.format === 'cursor-json') return readCursorPermissions(text);
-  if (target.format === 'goose-yaml') return readGoosePermissionsValues(text, target);
-  if (target.format === 'kimi-toml') return readKimiPermissionsValues(text);
+  if (target.format === 'goose-yaml') return readGoosePermissions(text, target);
+  if (target.format === 'kimi-toml') return readKimiPermissions(text);
   if (target.format === 'opencode-json') return readOpencodePermissions(text);
   return readCodexPermissions(text);
 }

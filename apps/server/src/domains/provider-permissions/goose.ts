@@ -40,7 +40,7 @@ export function parseGooseDraft(rec: Record<string, unknown>): GoosePermissionDr
  * дефолтом, но раздел НЕ считается «на дефолтах»: в файле что-то задано, и
  * пользователь должен это видеть.
  */
-export function readGoosePermissionsValues(
+export function readGoosePermissions(
   text: string,
   target: ProviderPermissionsTarget,
 ): GoosePermissionsValues {

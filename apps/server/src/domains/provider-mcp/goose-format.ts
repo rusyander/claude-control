@@ -19,7 +19,7 @@ import { isStringRecord, preserveUnmodelled, sortByName, stringList } from './va
  * типы) в раздел НЕ попадают: это не внешние MCP-серверы, а части самого CLI —
  * показывать их как «серверы» значило бы предлагать пользователю их править.
  */
-export function readGooseMcpServers(text: string): UniversalMcpServer[] {
+export function readGooseServers(text: string): UniversalMcpServer[] {
   const servers: UniversalMcpServer[] = [];
   for (const [name, raw] of readGooseExtensions(text)) {
     if (!isGooseMcpExtension(raw)) continue;

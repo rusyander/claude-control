@@ -315,4 +315,5 @@ The full section-by-section breakdown is in [LIMITATIONS.md](docs/LIMITATIONS.md
 
 ## License
 
-Not decided yet.
+[MIT](LICENSE) — use, modify and distribute freely, including commercially; keep the copyright
+notice. The software comes with no warranty.

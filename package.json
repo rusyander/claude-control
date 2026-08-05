@@ -2,6 +2,7 @@
   "name": "claude-control",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Универсальный пульт управления конфигурацией Claude Code: правила, хуки, скиллы, MCP-серверы, группы и связи",
   "packageManager": "pnpm@10.28.0",

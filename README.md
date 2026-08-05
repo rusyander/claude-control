@@ -315,5 +315,9 @@ The full section-by-section breakdown is in [LIMITATIONS.md](docs/LIMITATIONS.md
 
 ## License
 
-[MIT](LICENSE) — use, modify and distribute freely, including commercially; keep the copyright
-notice. The software comes with no warranty.
+[PolyForm Perimeter 1.0.1](LICENSE) — use, modify and redistribute it freely, at home and at work,
+inside a company and in commercial projects; keep the required notice. The one thing the license
+withholds is building a product that competes with this one. The software comes with no warranty.
+
+This is a source-available licence, not an OSI-approved open-source one. Earlier commits carried an
+MIT `LICENSE`; that grant stays with the snapshots that shipped it.

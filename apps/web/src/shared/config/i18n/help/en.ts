@@ -604,7 +604,9 @@ export const helpEn: HelpSchema = {
 
       canPeriod:
         'Switch the period: today by default (since midnight), plus a week, ' +
-        'a month, a quarter, all time, or a custom date range',
+        'a month, a quarter, all time, or custom dates. In the calendar one ' +
+        'click reports on that single day, a second click stretches it into a ' +
+        'range; "Reset" returns to the default period',
       canDetail: 'Open the detail for a model or a project by clicking its bar',
       canLive: 'See the Claude Code processes actually running now and their memory use',
       canTools: 'See which tools and skills come up most often',
@@ -3185,6 +3187,357 @@ export const helpEn: HelpSchema = {
         'AGENTS.md and the MCP file <project>/.kimi-code/mcp.json in the project; it has no ' +
         'project permissions, since the CLI reads exactly one user-level config.toml. Nobody but Claude ' +
         'gets project hooks.',
+    },
+
+    dlp: {
+      title: 'Data protection',
+      summary:
+        'A local proxy between the CLI and the model: it sees the request body and rewrites it by rules',
+      lead:
+        'The panel raises a listener on 127.0.0.1. Point a CLI at that address instead of the ' +
+        'model address and all its traffic goes through the panel, which then sees the BODY of ' +
+        'every request: the prompt, the contents of files the agent read, tool output, call ' +
+        'arguments. Whatever the rules match is either replaced by a placeholder or stops the ' +
+        'request entirely. This is the deepest of the three mechanisms in this area — and the ' +
+        'one whose limits matter most: it finds exactly what you described, and nothing beyond.',
+
+      whyBody: 'The body, not just the prompt',
+      whyBodyText:
+        'A prompt hook sees the line a human typed. The proxy sees everything the agent ' +
+        'assembled on its own: files it read, command output, tool contents. Those are what ' +
+        'usually leak — not what was typed by hand.',
+      whyBack: 'The placeholder is restored',
+      whyBackText:
+        'A surname becomes [ИМЯ_1] in the request; [ИМЯ_1] becomes the surname again in the ' +
+        'reply. The model works with the placeholder, the human reads the real text — including ' +
+        'in a streamed reply where the placeholder is split across frames.',
+      whyNoTls: 'No TLS interception',
+      whyNoTlsText:
+        'The CLI talks plain http to a local address, and the proxy makes its own https call ' +
+        'upstream. No substituted certificates, no trusted roots, no MITM — which is why the ' +
+        'whole setup is one changed address.',
+
+      threeTitle: 'Three different things, easy to confuse',
+      threeCaption:
+        'The panel does all three, but they solve different problems and fail differently. ' +
+        'None of them replaces the other two.',
+      threeHeader: 'Mechanism',
+      threeWhat: 'What it decides',
+      threeEndpoint: 'Your own endpoint',
+      threeEndpointText:
+        'WHERE the request goes. A model on your own hardware or a company gateway — the data ' +
+        'never leaves the perimeter. The request contents are untouched.',
+      threeProxy: 'This proxy',
+      threeProxyText:
+        'WHAT goes in the request. Works with any address, the vendor cloud included: it finds ' +
+        'what the rules describe and replaces or refuses.',
+      threeGate: 'Prompt gate',
+      threeGateText:
+        'What a human TYPED by hand. The hook fires before sending, but it only sees the prompt ' +
+        'line — files and tool output pass it by.',
+
+      stepsTitle: 'How to switch it on',
+      stepsCaption:
+        'Five steps; everything outside the panel is a single address line in the CLI config.',
+      step1: 'Set up rules',
+      step1Text:
+        'The ready-made set — email, phone, INN, SNILS, card, secret keys. INN, SNILS and card ' +
+        'numbers are checksum-verified: without that, the rule would catch any number of the ' +
+        'right length, and a false positive in data protection is worse than a miss — it breaks ' +
+        'work and teaches people to switch protection off.',
+      step2: 'Add your own dictionary',
+      step2Text:
+        'Staff names, project names, internal addresses — one value per line. This is precisely ' +
+        'what no built-in pattern knows, and precisely what leaks most often.',
+      step3: 'Check against a sample text',
+      step3Text:
+        'The section shows exactly what the model would see, from the current edits and without ' +
+        'touching the network. Better to find a mistake in a rule here than in the journal ' +
+        'after a leak.',
+      step4: 'Start the proxy',
+      step4Text:
+        'Say where to forward: the vendor cloud, a local model or an endpoint profile. With no ' +
+        'address the proxy will not start — it will not guess the vendor cloud for you.',
+      step5: 'Point the CLI at the proxy',
+      step5Text:
+        'An address like http://127.0.0.1:5179 goes into the CLI as the model address — most ' +
+        'easily via an endpoint profile on the settings page. Until that is done the proxy sees ' +
+        'nothing, while the section looks like it is working.',
+
+      rulesTitle: 'Kinds of rules',
+      rulesCaption: 'Three kinds; they coexist happily in one set.',
+      rulesHeader: 'Kind',
+      rulesWhat: 'What it matches',
+      kindBuiltin: 'Built-in pattern',
+      kindBuiltinText:
+        'Email, phone, INN, SNILS, card number, secret keys. Wherever the format has a ' +
+        'checksum, it is verified.',
+      kindTerms: 'Own dictionary',
+      kindTermsText:
+        'A list of values: surnames, names, addresses. Case-insensitive, whole words; Russian ' +
+        'inflections are covered — "Урманова" matches "Урманов", while "Ивановский" does not ' +
+        'match "Иванов".',
+      kindRegex: 'Own expression',
+      kindRegexText:
+        'A regular expression for formats not among the built-ins: contract numbers, internal ' +
+        'identifiers. Validated before saving.',
+
+      actionsTitle: 'What to do with a match',
+      actionsCaption:
+        'The action is set per rule. A "refuse" rule wins over any replacement: if a request ' +
+        'contains something that must not leave at all, sending it partly masked is pointless.',
+      actionsHeader: 'Action',
+      actionsWhat: 'What happens',
+      actionMask: 'Replace with a placeholder',
+      actionMaskText:
+        'The value becomes [LABEL_N] — one number per value — and the placeholder is restored ' +
+        'in the model reply. Numbers live as long as the proxy runs: stop it and they are gone.',
+      actionBlock: 'Refuse the request',
+      actionBlockText:
+        'The request goes nowhere. The CLI gets a refusal shaped like its own API, so the ' +
+        'reason reaches the human instead of turning into "unexpected response".',
+      actionFlag: 'Record only',
+      actionFlagText:
+        'Nothing changes, the match lands in the journal. A break-in mode for a new rule: first ' +
+        'see what it catches, only then switch replacement on.',
+      actionFlagBadge: 'journal',
+
+      shapesTitle: 'Which requests the panel parses',
+      shapesCaption:
+        'Body shapes come from the API documentation, they are never guessed. An unfamiliar ' +
+        'shape is refused by default — that is the main setting of this section.',
+      shapesHeader: 'Path',
+      shapesWhat: 'What is parsed',
+      shapeAnthropic:
+        'system, message texts, tool-result contents and string arguments of tool calls. ' +
+        'Thinking blocks are left alone: they carry a signature, and editing would break the reply.',
+      shapeOpenai:
+        'Message contents and function-call arguments. The same parsing serves any ' +
+        'OpenAI-compatible gateway.',
+      shapeOther: 'Everything else',
+      shapeOtherText:
+        'An unfamiliar path or a non-JSON body — this includes Gemini, whose shape the panel ' +
+        'does not parse. Such a request is refused by default; passing it through can be ' +
+        'enabled separately, and every pass-through lands in the journal.',
+      shapeRefused: 'refused',
+
+      filesCaption:
+        'Rules live apart from the panel settings on purpose: their dictionaries hold real ' +
+        'surnames and phone numbers, while settings travel between machines by export.',
+      filesPanelTitle: 'On disk',
+      fileRules: 'Rules and dictionaries',
+      fileJournal: 'Match journal',
+      fileSettings: 'Proxy settings (rules excluded)',
+      filesMemoryTitle: 'In memory only',
+      fileVault: 'Placeholder vault',
+      fileVaultText:
+        'The value → [LABEL_N] mapping lives in process memory and is never written to disk. ' +
+        'Restart the panel and numbering starts over.',
+
+      limitsTitle: 'Limits — what the proxy does not do',
+      limitRulesTitle: 'It finds only what is described',
+      limitRulesText:
+        'This is not a model and not a heuristic: the proxy will not guess a surname you did ' +
+        'not write down, will not notice a typo in it, and will not read a passport photo in an ' +
+        'attachment. An empty or incomplete rule set means there is no protection — while the ' +
+        'section still says "running".',
+      limitParaphraseTitle: 'The model may paraphrase a placeholder',
+      limitParaphraseText:
+        'Restoration works on exact text. If the reply says "name 1" instead of [ИМЯ_1], or ' +
+        'translates the placeholder, there is nothing to substitute into: the human sees the ' +
+        'placeholder. It is visible immediately and risks no data, but it looks broken.',
+      limitShapeTitle: 'An unfamiliar shape is refused, not passed',
+      limitShapeText:
+        'By default a request whose body the panel did not parse is refused. That is a ' +
+        'deliberate choice: a proxy that silently passes what it did not understand is worse ' +
+        'than no proxy. The opposite setting exists, but switch it on knowing what it permits.',
+      limitLocalTitle: 'The listener is 127.0.0.1 only',
+      limitLocalText:
+        'The proxy sees decrypted requests together with keys, so no setting publishes it ' +
+        'outside. Sharing it with a team over the network is impossible — a limit, not an ' +
+        'unfinished feature.',
+      limitJournalTitle: 'No values in the journal',
+      limitJournalText:
+        'Rule, placeholder and count are written — the journal shows what fired and how often, ' +
+        'never what was found. A data-protection journal that stores the data next to it would ' +
+        'be the biggest hole in that protection.',
+
+      gateTitle: 'Prompt gate',
+      gateCaption:
+        'A second mechanism on the same rules: the panel writes a script into the hooks ' +
+        'directory and registers it on the UserPromptSubmit event. It needs no proxy — and it ' +
+        'replaces none, because it sees incomparably less.',
+      gateHeader: 'Side',
+      gateWhat: 'How it is',
+      gateSees: 'What it sees',
+      gateSeesText:
+        'Exactly what a human submitted from the input line — typed by hand or pasted. The ' +
+        'check runs before the prompt reaches the model.',
+      gateBlind: 'What it misses',
+      gateBlindText:
+        'Files the agent read on its own, command output, tool results, subagent prompts, the ' +
+        'rest of the conversation. All of it reaches the model past the gate — only the proxy ' +
+        'sees that.',
+      gateActions: 'What it can do',
+      gateActionsText:
+        'Reject the prompt, or warn and send it. The gate can NOT replace text with a ' +
+        'placeholder: the UserPromptSubmit event cannot rewrite the prompt — a limit of Claude ' +
+        'Code itself, not of the panel.',
+      gateWhere: 'Where it lives',
+      gateWhereText:
+        'The script sits in the configuration hooks directory, its registration in settings.json ' +
+        'as an ordinary hook. It is visible in the Hooks section and can be disabled or deleted ' +
+        'there; the panel keeps no hidden mechanism.',
+
+      gateLimitTitle: 'A second to bypass — and that is fine',
+      gateLimitText:
+        'The same meaning in other words gets through: the gate matches rules, it does not ' +
+        'understand text. This is a barrier against pasting someone’s passport into a prompt by ' +
+        'accident, not against a person who wants the data out. Real content control is the ' +
+        'proxy above.',
+      gateSharedTitle: 'Rules shared with the proxy',
+      gateSharedText:
+        'There is no second dictionary: the gate reads the same dlp-rules.json. A rule whose own ' +
+        'action is “reject” stops the prompt even when the gate setting says “warn” — otherwise ' +
+        'that setting would silently downgrade a ban to a notice.',
+      gateSafeTitle: 'Doubt is not a reason to block',
+      gateSafeText:
+        'If the rules file cannot be read, or the hook input shape is unfamiliar, the prompt ' +
+        'goes through and the human is told it was NOT checked. A script that started blocking ' +
+        'every prompt after a format change would be switched off the same day — along with the ' +
+        'protection.',
+    },
+
+    endpoints: {
+      title: 'Your own endpoint',
+      summary:
+        'A model address instead of the vendor cloud: a local model, a company gateway or a proxy',
+      lead:
+        'An agentic CLI reaches its model at an address, and that address can be changed. ' +
+        'An endpoint profile is an address, an API kind and a model, entered once at the ' +
+        'panel level and spread across the environment variables of the CLI you pick with ' +
+        'a single button. This is how you attach a model running on your own hardware, a ' +
+        'company gateway, or a proxy that your requests pass through.',
+
+      whyLocal: 'The request never leaves',
+      whyLocalText:
+        'If the address points at a model inside your perimeter, neither the prompt nor ' +
+        'the contents of the files the agent read ever leave it. This is the only way to ' +
+        'get that in full: rules and hooks do not see everything that goes to the model.',
+      whyOnce: 'One profile across several CLIs',
+      whyOnceText:
+        'Every CLI has its own variable name: ANTHROPIC_BASE_URL, GOOGLE_GEMINI_BASE_URL, ' +
+        'OPENAI_BASE_URL, AIDER_OPENAI_API_BASE. The profile is entered once, and the ' +
+        'panel knows what goes where.',
+      whySecret: 'The secret is not written by default',
+      whySecretText:
+        'Only the address and the model — non-secret values — reach a foreign config ' +
+        'file. The token is kept encrypted inside the panel and lands in a CLI file only ' +
+        'behind a separate checkbox, with a warning.',
+
+      stepsTitle: 'How to connect one',
+      stepsCaption: 'The "Your own endpoint" block sits in Settings, below the model catalog.',
+      step1: 'Create a profile and pick the API kind',
+      step1Text:
+        'The API kind is the schema the endpoint accepts requests in. It decides both the ' +
+        'shape of the address and which CLIs can take this profile at all.',
+      step2: 'Type the address',
+      step2Text:
+        'The hint under the field says what the chosen API kind expects: the host root or ' +
+        'the address including the version. For a local model this is usually an address ' +
+        'on 127.0.0.1.',
+      step3: 'Press "Check connection"',
+      step3Text:
+        'The panel asks the address for its model list. On success a badge appears next to ' +
+        'the button and the model field turns into a dropdown of what that address offers.',
+      step4: 'Pick a model',
+      step4Text:
+        'Left empty, the panel does not touch the model variable and the CLI decides for ' +
+        'itself. A local server usually needs the name: there is no "default model" there.',
+      step5: 'Apply it to the CLI you need',
+      step5Text:
+        'The list below shows, per CLI, exactly what will be written and into which file. ' +
+        '"Apply" writes there with a backup — like every other config edit in the panel.',
+
+      kindTitle: 'API kinds',
+      kindCaption:
+        'The panel supports three schemas — the ones the CLIs themselves understand. The ' +
+        'kind follows the endpoint, not the CLI: one and the same local model often ' +
+        'answers in several schemas at once.',
+      kindHeader: 'Kind',
+      kindWhen: 'When to pick it',
+      kindOpenai:
+        'The common case: llama.cpp, vLLM, Ollama, LM Studio, corporate gateways — nearly ' +
+        'all of them speak the OpenAI schema. The panel reads the model list from /models.',
+      kindAnthropic:
+        'A proxy or gateway speaking the Anthropic schema. This is the only kind Claude ' +
+        'Code accepts.',
+      kindGoogle:
+        'A gateway speaking the Gemini schema. The model list comes from /v1beta/models. ' +
+        'Gemini CLI itself accepts an https address only; localhost is the sole exception.',
+
+      targetsTitle: 'Who accepts a profile',
+      targetsCaption:
+        'The panel never invents the address variable: only what the CLI itself documents ' +
+        'is used. Where no such variable exists, the row says so — instead of guessing.',
+      targetsCli: 'CLI',
+      targetsVars: 'What gets written',
+      targetClaude:
+        'ANTHROPIC_BASE_URL, ANTHROPIC_MODEL, ANTHROPIC_AUTH_TOKEN — into ' +
+        '~/.claude/settings.json, the env key.',
+      targetGemini: 'GOOGLE_GEMINI_BASE_URL, GEMINI_MODEL, GEMINI_API_KEY — into ~/.gemini/.env.',
+      targetQwen:
+        'OPENAI_BASE_URL, OPENAI_MODEL, OPENAI_API_KEY — or the ANTHROPIC_* triple: Qwen ' +
+        'Code takes both kinds. Into ~/.qwen/.env.',
+      targetAider:
+        'AIDER_OPENAI_API_BASE, AIDER_MODEL, AIDER_OPENAI_API_KEY — into ~/.aider.conf.yml, ' +
+        'the set-env key.',
+      targetAssistant: 'Panel assistant',
+      targetAssistantText:
+        'A separate choice in the same block. It writes nothing: the panel calls the ' +
+        'address directly, bypassing both the cloud and the provider CLI.',
+      targetAnyKind: 'any kind',
+      targetSkipped: 'not accepted',
+      targetNoVar:
+        'Their model address is set in the config file only, by hand: Codex has the ' +
+        'model_providers block in config.toml, Continue has apiBase on each model in ' +
+        'config.yaml. No environment variable for it is documented, and the panel does not ' +
+        'invent one.',
+      targetNoEnv:
+        'These CLIs have no environment-variable section at all — there is nowhere to write.',
+
+      filesCaption: 'The profile lives in the panel; only the result reaches a CLI config.',
+      filePanelTitle: 'Panel',
+      fileProfiles: 'Profiles (address, API kind, model)',
+      fileToken: 'Token — encrypted, AES-256-GCM',
+      fileCliTitle: 'Where a profile is written',
+
+      notesTitle: 'Things people trip over',
+      noteProbeTitle: '"Check connection" only fetches the model list',
+      noteProbeText:
+        'The request asks for the list of models, not for a generation: it costs nothing ' +
+        'and burns no tokens. Checking that the model actually answers happens in the ' +
+        'chat — a separate action, and that one is billed.',
+      noteTokenTitle: 'The "write the token" checkbox is a deliberate step',
+      noteTokenText:
+        'With it, the token lands in the CLI config file in plain text: foreign CLIs have ' +
+        'no secret store of their own. Without it only the address and the model are ' +
+        'written, and the token stays in the panel, used for the connection check and by ' +
+        'the assistant.',
+      noteAssistantTitle: 'The panel and the CLI may look in different directions',
+      noteAssistantText:
+        'The panel assistant is switched separately and does not follow the profile by ' +
+        'itself. That is by design: form hints and agent work are different jobs, and ' +
+        'their addresses may differ.',
+      noteRestartTitle: 'A CLI reads its variables at startup',
+      noteRestartText:
+        'The write is instant, but a CLI session already running will not learn about it. ' +
+        'Restart the CLI — as after any other change to its environment.',
+      notePrivacyTitle: 'Your own address is not the same as masking data',
+      notePrivacyText:
+        'The profile decides WHERE a request goes, not WHAT is in it. If the address is an ' +
+        'external gateway, the data still leaves your perimeter. Substituting names and ' +
+        'phone numbers inside the request is a separate job, and a profile does not solve it.',
     },
 
     providers: {

@@ -1,34 +1,12 @@
+// Календарь отделён от быстрых кнопок чертой: это другой способ задать период,
+// а не ещё один пресет в общем ряду.
+//
+// Стилей поля здесь больше нет: нативный input[type=date] заменён компонентом
+// кита, и вместе с ним ушла возня с color-scheme для тёмной темы — календарь
+// рисуем мы, а не браузер.
 .range {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-2xs);
   padding-left: var(--spacing-2xs);
   border-left: 1px solid var(--color-border);
-}
-
-.input {
-  height: 32px;
-  padding: 0 var(--spacing-2xs);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-fg);
-  font-family: inherit;
-  font-size: var(--font-size-body-sm);
-  // Календарь и стрелки у input[type=date] рисует браузер: без color-scheme
-  // всплывающий календарь остаётся белым на тёмной теме.
-  color-scheme: light;
-
-  &:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 1px;
-  }
-
-  &[data-active='true'] {
-    border-color: var(--color-accent);
-  }
-}
-
-:global([data-theme='dark']) .input {
-  color-scheme: dark;
 }

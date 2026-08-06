@@ -17,7 +17,14 @@ export {
   type ProviderStatus,
 } from './types/capabilities.ts';
 
-export type { AssistantApiKind, ProviderAssistant, ProviderCli } from './types/assistant.ts';
+export type {
+  AssistantApiKind,
+  ProviderAssistant,
+  ProviderCli,
+  ProviderEndpointApiKind,
+  ProviderEndpointConfig,
+  ProviderEndpointVars,
+} from './types/assistant.ts';
 
 export type {
   ProviderInstructionsListLocation,

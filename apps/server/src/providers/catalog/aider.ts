@@ -69,6 +69,19 @@ export const aiderProvider: ConfigProvider = {
     cliRunnable: true,
     oneShotArgs: (prompt) => ['--message', prompt],
   },
+  // Свой эндпоинт: у Aider свои имена под собственным префиксом —
+  // `AIDER_OPENAI_API_BASE` («Specify the api base url»), `AIDER_MODEL`
+  // («Specify the model to use for the main chat») и переменная ключа с тем же
+  // префиксом. Пишутся в `set-env` его же конфига. Anthropic-адреса в
+  // справочнике переменных нет — вид API у профиля тут только совместимый с
+  // OpenAI.
+  endpointConfig: {
+    'openai-compat': {
+      baseUrlEnv: 'AIDER_OPENAI_API_BASE',
+      modelEnv: 'AIDER_MODEL',
+      credentialEnv: 'AIDER_OPENAI_API_KEY',
+    },
+  },
   capabilities: buildCapabilities({
     // AIDER-1: инструкции есть, но модель другая — список ссылок `read`.
     globalInstructions: 'ready',

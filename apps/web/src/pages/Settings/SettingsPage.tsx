@@ -36,6 +36,7 @@ import { ProviderSelectorCard } from './ProviderSelectorCard';
 import { ProviderCheckCard } from './ProviderCheckCard';
 import { ProviderKeysCard } from './ProviderKeysCard';
 import { ModelCatalogCard } from './ModelCatalogCard';
+import { EndpointCard } from './EndpointCard';
 import { FormatCheckCard } from './FormatCheckCard';
 import styles from './SettingsPage.module.scss';
 
@@ -220,6 +221,10 @@ export function SettingsPage() {
 
       {/* Каталог моделей провайдера: он же питает выпадающий список выше. */}
       <ModelCatalogCard />
+
+      {/* Свой эндпоинт: адрес модели вместо облака вендора. Сразу за каталогом
+          моделей — оба про то, откуда берутся ответы. */}
+      <EndpointCard />
 
       {/* MCP: автопроверка связи при открытии раздела и потолок ожидания сети. */}
       <Card padding="md">

@@ -81,6 +81,23 @@ export const qwenProvider: ConfigProvider = {
     cliRunnable: true,
     oneShotArgs: (prompt) => ['-p', prompt],
   },
+  // Свой эндпоинт: Qwen Code документирует ДВА протокола сразу — совместимый с
+  // OpenAI (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`) и Anthropic
+  // (`ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL`), — и сам же
+  // говорит, что берёт их из `.env` (порядок: `.qwen/.env` → `.env` → домашние).
+  // Поэтому профиль обоих видов сюда переносится.
+  endpointConfig: {
+    'openai-compat': {
+      baseUrlEnv: 'OPENAI_BASE_URL',
+      modelEnv: 'OPENAI_MODEL',
+      credentialEnv: 'OPENAI_API_KEY',
+    },
+    anthropic: {
+      baseUrlEnv: 'ANTHROPIC_BASE_URL',
+      modelEnv: 'ANTHROPIC_MODEL',
+      credentialEnv: 'ANTHROPIC_API_KEY',
+    },
+  },
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
     mcp: 'ready',

@@ -28,7 +28,8 @@ export function AnalyticsPage() {
   const { t, i18n } = useTranslation();
   const [period, setPeriod] = useState<AnalyticsPeriod>(DEFAULT_PERIOD);
   const [detail, setDetail] = useState<{ kind: DetailKind; id: string } | null>(null);
-  const { data, isLoading } = useAnalytics(period);
+  // isPlaceholderData — на экране отчёт за прошлый период, новый ещё считается.
+  const { data, isLoading, isPlaceholderData } = useAnalytics(period);
   const { data: settings } = useSettings();
 
   const locale = i18n.language;
@@ -68,26 +69,29 @@ export function AnalyticsPage() {
         actions={
           <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
             <PeriodFilter value={period} onChange={setPeriod} />
-            {hasData && (
-              <>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={exportCsv}
-                  title={t('analytics.exportCsv')}
-                >
-                  CSV
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={exportJson}
-                  title={t('analytics.exportJson')}
-                >
-                  JSON
-                </Button>
-              </>
-            )}
+            {/*
+              Кнопки выгрузки всегда на месте и лишь гаснут без данных. Пока они
+              появлялись и исчезали вместе с ответом, ряд фильтров
+              перевёрстывался на каждое переключение периода.
+            */}
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!hasData}
+              onClick={exportCsv}
+              title={t('analytics.exportCsv')}
+            >
+              CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!hasData}
+              onClick={exportJson}
+              title={t('analytics.exportJson')}
+            >
+              JSON
+            </Button>
           </Stack>
         }
       />
@@ -106,7 +110,7 @@ export function AnalyticsPage() {
       )}
 
       {data && data.overall.requests > 0 && (
-        <>
+        <Stack gap="var(--spacing-lg)" className={styles.report} data-stale={isPlaceholderData}>
           <div className={styles.statGrid}>
             <StatCard
               label={t('analytics.totalTokens')}
@@ -389,7 +393,7 @@ export function AnalyticsPage() {
               analytics={data}
             />
           )}
-        </>
+        </Stack>
       )}
     </Stack>
   );

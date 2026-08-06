@@ -118,6 +118,11 @@ export const NAV_SECTIONS: NavSection[] = [
       { path: '/history', label: 'nav.history', icon: 'history', key: 'history' },
       { path: '/compare', label: 'nav.compare', icon: 'swap', key: 'compare' },
       { path: '/settings', label: 'nav.settings', icon: 'settings', key: 'settings' },
+      // Панель-level, без `capability`: прокси стоит между ЛЮБЫМ CLI и моделью.
+      // Именно поэтому он здесь, а не среди интеграций: там всё гейтится по
+      // возможностям провайдера, и вечный пункт мешал бы секции исчезать
+      // целиком, когда у провайдера нет ни одной интеграции.
+      { path: '/dlp', label: 'nav.dlp', icon: 'lock', key: 'dlp' },
       { path: '/help', label: 'nav.help', icon: 'help', key: 'help' },
     ],
   },

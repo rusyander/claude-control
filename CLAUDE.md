@@ -125,7 +125,10 @@ rules/skills/plugins `lib/section-fs.ts` · "foreign format not recognised" sent
 `domains/analytics/` · enable/disable on disk `domains/entity-toggle.ts` · Claude chat (spawn,
 stream, transcripts, SSE, cost) `domains/chat/` · chat of a FOREIGN provider — panel-owned JSONL,
 prompt rebuild, streamed stdout — `domains/provider-chat/`, which never touches the Claude branch:
-that separation is the regress guarantee. Per-section provider domains
+that separation is the regress guarantee. DLP proxy between a CLI and the model (127.0.0.1 only, no
+TLS interception, fail-closed on an unparsed body) `domains/dlp/`; the `UserPromptSubmit` gate built
+on the same rules — block/warn only, the event cannot rewrite a prompt — `domains/prompt-gate/` —
+read `.agent/provider-tools.agent.md` before touching either. Per-section provider domains
 (`provider-{mcp,permissions,rules,skills,plugins,hooks,…}`) follow the facade+folder idiom.
 
 **Web** `apps/web/src/`, FSD layers `app` → `pages` → `features` → `entities` → `shared` — UI kit
@@ -144,3 +147,11 @@ often taken → `-p 6019`.
 Own database (source of truth is Claude Code's files) · own login (the CLI authenticates) ·
 serving the built front from the server (`pnpm start` = API only; dev front lives on Vite,
 production must serve `dist` separately).
+
+**Stays a local single-user app — decided 2026-08-06, do not re-litigate.** Not a hosted service:
+the truth is the files on THIS machine, access comes from the CLI's own login, and exposing the
+panel would first require inventing auth, tenants and isolation that nothing here needs. Remote
+access = SSH tunnel, not a deploy. Electron was weighed and dropped too: it fixes nothing (the user
+still installs and logs into the CLI himself) and adds code signing, ~180 MB and an update channel.
+If shipping to another person ever comes up, the answer is an `npx` wrapper that boots the server
+and opens the browser — not a package format.

@@ -61,6 +61,19 @@ export const geminiProvider: ConfigProvider = {
     cliRunnable: true,
     oneShotArgs: (prompt) => ['-p', prompt],
   },
+  // Свой эндпоинт: задокументированная переменная `GOOGLE_GEMINI_BASE_URL`
+  // («Overrides the default base URL for Gemini API requests») — она же
+  // требует HTTPS везде, кроме localhost/127.0.0.1/[::1]. Модель —
+  // `GEMINI_MODEL`, ключ — `GEMINI_API_KEY`; всё это документация прямо
+  // разрешает держать в `.env`, куда панель и пишет. Vertex-адрес
+  // (`GOOGLE_VERTEX_BASE_URL`) — другой вид авторизации, сюда не тянем.
+  endpointConfig: {
+    google: {
+      baseUrlEnv: 'GOOGLE_GEMINI_BASE_URL',
+      modelEnv: 'GEMINI_MODEL',
+      credentialEnv: 'GEMINI_API_KEY',
+    },
+  },
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
     mcp: 'ready',

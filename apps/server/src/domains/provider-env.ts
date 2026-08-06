@@ -118,10 +118,27 @@ function backupNameOf(target: ProviderEnvTarget): string {
 export function resolveProviderEnvTarget(
   store: ProviderEnvSettingsSource,
 ): ProviderEnvTarget | undefined {
-  const provider = getActiveProvider(store);
+  return resolveProviderEnvTargetFor(
+    getActiveProvider(store),
+    store.getSettings().claudeDirOverride,
+  );
+}
+
+/**
+ * То же самое для ЯВНО названного провайдера — не обязательно активного.
+ *
+ * Нужно разделу «свой эндпоинт»: профиль применяется к выбранному в списке CLI,
+ * а переключать ради этого активного провайдера панели было бы подменой
+ * пользовательского выбора. Условие поддержки и построение цели те же самые —
+ * второй реализации у них нет.
+ */
+export function resolveProviderEnvTargetFor(
+  provider: ConfigProvider,
+  override?: string,
+): ProviderEnvTarget | undefined {
   if (provider.capabilities.env !== 'ready' || !provider.envConfig) return undefined;
 
-  const filePath = provider.envConfig.path(store.getSettings().claudeDirOverride);
+  const filePath = provider.envConfig.path(override);
   return {
     provider,
     format: provider.envConfig.format,

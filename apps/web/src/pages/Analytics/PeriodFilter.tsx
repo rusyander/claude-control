@@ -1,39 +1,43 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
+import { DatePicker, todayIso } from '@shared/ui/date-picker';
+import type { DateRangeValue } from '@shared/ui/date-picker';
+import { DEFAULT_PERIOD, periodKey } from '@entities/Analytics';
 import type { AnalyticsPreset } from '@entities/Analytics';
 import { PRESETS } from './PeriodFilter.constants';
-import { isoDay, presetLabel } from './PeriodFilter.lib';
+import { presetLabel } from './PeriodFilter.lib';
 import type { PeriodFilterProps } from './PeriodFilter.types';
 import styles from './PeriodFilter.module.scss';
 
 /**
- * Период отчёта: быстрые кнопки и произвольный диапазон.
+ * Период отчёта: быстрые кнопки, произвольный диапазон и сброс.
  *
- * Диапазон применяется, только когда заполнены обе даты: по одной границе
- * непонятно, что показывать, а перезапрашивать тяжёлую аналитику на каждый
- * промежуточный ввод — секунды обхода транскриптов впустую.
+ * Своего черновика дат здесь больше нет — календарь отдаёт обе границы сразу,
+ * и состояние живёт в одном месте, в `value`. Раньше половина диапазона копилась
+ * в локальном стейте и молча расходилась с показанным периодом.
+ *
+ * Одни сутки — законный выбор, а не незаконченный ввод: первый клик по календарю
+ * даёт `from === to`, и отчёт строится за этот день.
  */
 export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
   const { t } = useTranslation();
-  const [draft, setDraft] = useState(() =>
-    value.kind === 'range' ? { from: value.from, to: value.to } : { from: '', to: '' },
-  );
 
   const isRange = value.kind === 'range';
-  const today = isoDay(new Date());
+  const range: DateRangeValue = isRange ? { from: value.from, to: value.to } : {};
+  const isDefault = periodKey(value) === periodKey(DEFAULT_PERIOD);
 
-  const changeBound = (bound: 'from' | 'to', date: string): void => {
-    const next = { ...draft, [bound]: date };
-    setDraft(next);
-    if (next.from && next.to) onChange({ kind: 'range', from: next.from, to: next.to });
+  const changeRange = (next: DateRangeValue): void => {
+    // Отметку с календаря сняли — фильтра по датам не осталось, и период
+    // возвращается к значению по умолчанию: пустой отчёт показывать не за что.
+    if (!next.from || !next.to) {
+      onChange(DEFAULT_PERIOD);
+      return;
+    }
+    onChange({ kind: 'range', from: next.from, to: next.to });
   };
 
   const choosePreset = (preset: AnalyticsPreset): void => {
-    // Кнопка обнуляет диапазон: иначе поля дат остались бы заполненными и
-    // противоречили выбранному пресету.
-    setDraft({ from: '', to: '' });
     onChange({ kind: 'preset', preset });
   };
 
@@ -51,29 +55,32 @@ export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
       ))}
 
       <span className={styles.range}>
-        <input
-          type="date"
-          className={styles.input}
-          value={draft.from}
-          max={draft.to || today}
-          aria-label={t('analytics.rangeFrom')}
-          title={t('analytics.rangeFrom')}
-          data-active={isRange}
-          onChange={(event) => changeBound('from', event.target.value)}
-        />
-        <span aria-hidden="true">—</span>
-        <input
-          type="date"
-          className={styles.input}
-          value={draft.to}
-          min={draft.from || undefined}
-          max={today}
-          aria-label={t('analytics.rangeTo')}
-          title={t('analytics.rangeTo')}
-          data-active={isRange}
-          onChange={(event) => changeBound('to', event.target.value)}
+        <DatePicker
+          mode="range"
+          value={range}
+          onChange={changeRange}
+          max={todayIso()}
+          placeholder={t('analytics.rangePlaceholder')}
+          ariaLabel={t('analytics.rangeLabel')}
+          isActive={isRange}
+          align="end"
         />
       </span>
+
+      {/*
+        Кнопка сброса не появляется и не исчезает, а гаснет: пропадающий элемент
+        менял бы ширину ряда на каждое переключение периода, и фильтры прыгали бы
+        ровно так же, как раньше прыгала вся страница.
+      */}
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={isDefault}
+        title={t('analytics.resetHint')}
+        onClick={() => onChange(DEFAULT_PERIOD)}
+      >
+        {t('analytics.reset')}
+      </Button>
     </Stack>
   );
 }

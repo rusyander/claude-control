@@ -28,6 +28,43 @@ const modelPricingSchema = object({
   cacheWrite1h: number().nonnegative().optional(),
 });
 
+/**
+ * Профиль своего эндпоинта. Токена здесь НЕТ и быть не может: он живёт в
+ * зашифрованном хранилище панели, а `state.json` лежит открытым текстом и
+ * уезжает с машины на машину экспортом настроек.
+ */
+const endpointProfileSchema = object({
+  id: string().min(1),
+  name: string().min(1),
+  baseUrl: string().min(1),
+  apiKind: zodEnum(['anthropic', 'google', 'openai-compat']),
+  model: string(),
+  writeToken: boolean(),
+});
+
+/**
+ * Настройки прокси защиты данных. Правил здесь нет намеренно — они в отдельном
+ * файле, и через общий PATCH настроек не правятся: в словарях правил лежат сами
+ * персональные данные (см. `domains/dlp/rules-store.ts`).
+ */
+const dlpSettingsSchema = object({
+  enabled: boolean(),
+  port: number().int().min(1024).max(65535),
+  upstreamUrl: string(),
+  upstreamProfileId: string(),
+  passUnknown: boolean(),
+  journal: boolean(),
+});
+
+/**
+ * Гейт на промпте. Действий два: замены меткой у события `UserPromptSubmit`
+ * нет — оно по документации не умеет подменять промпт.
+ */
+const promptGateSettingsSchema = object({
+  enabled: boolean(),
+  action: zodEnum(['block', 'warn']),
+});
+
 /** Поля настроек без дефолтов — для частичной проверки PATCH. */
 export const settingsPatchSchema = object({
   theme: zodEnum(['light', 'dark', 'system']),
@@ -55,6 +92,10 @@ export const settingsPatchSchema = object({
   encryptSecretBackups: boolean(),
   autoUpdateModels: boolean(),
   previewProviderWrites: boolean(),
+  endpointProfiles: array(endpointProfileSchema),
+  assistantEndpointId: string(),
+  dlp: dlpSettingsSchema,
+  promptGate: promptGateSettingsSchema,
 }).partial();
 
 /**

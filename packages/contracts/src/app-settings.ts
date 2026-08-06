@@ -1,4 +1,16 @@
-import { object, string, boolean, number, record, enum as zodEnum, type infer as Infer } from 'zod';
+import {
+  object,
+  string,
+  boolean,
+  number,
+  record,
+  array,
+  enum as zodEnum,
+  type infer as Infer,
+} from 'zod';
+import { endpointProfileSchema } from './endpoints';
+import { dlpSettingsSchema } from './dlp';
+import { promptGateSettingsSchema } from './prompt-gate';
 
 /**
  * Тариф за миллион токенов. Панель считает по нему справочную стоимость —
@@ -171,6 +183,33 @@ export const appSettingsSchema = object({
    * предпросмотра нет: его разделы давно свои и проверены.
    */
   previewProviderWrites: boolean().default(true),
+  /**
+   * Профили своего эндпоинта: адрес модели, вид API и модель. Уровень панели, а
+   * не провайдера: один и тот же локальный сервер или корпоративный шлюз обычно
+   * раздают на все CLI сразу, и держать его копию в каждом разделе — тот самый
+   * ручной ввод `ANTHROPIC_BASE_URL`, ради отмены которого профиль и заведён.
+   * ТОКЕНА здесь нет: он в зашифрованном хранилище панели (см. endpoints.ts).
+   */
+  endpointProfiles: array(endpointProfileSchema).default([]),
+  /**
+   * Профиль, по которому ходит ассистент САМОЙ панели (формы, проверка
+   * провайдера). Пусто — ассистент идёт в облако вендора, как раньше. Отдельно
+   * от применения к CLI: панель и CLI могут смотреть в разные стороны, и молча
+   * переводить ассистента на чужой адрес вслед за правкой профиля нельзя.
+   */
+  assistantEndpointId: string().default(''),
+  /**
+   * Защита данных: локальный прокси между CLI и моделью. Здесь только
+   * настройки слушателя — САМИ правила лежат отдельным файлом (`dlp-rules.json`),
+   * потому что в их словарях стоят настоящие фамилии и телефоны, а `state.json`
+   * ездит между машинами экспортом настроек.
+   */
+  dlp: dlpSettingsSchema.default(() => dlpSettingsSchema.parse({})),
+  /**
+   * Гейт на промпте. Правила у него общие с прокси — второго словаря нет
+   * намеренно: два списка «что защищать» разошлись бы в первую же неделю.
+   */
+  promptGate: promptGateSettingsSchema.default(() => promptGateSettingsSchema.parse({})),
 });
 
 export type AppSettings = Infer<typeof appSettingsSchema>;

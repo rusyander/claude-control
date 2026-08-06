@@ -15,6 +15,23 @@ export interface AssistantMessage {
  */
 export type { AssistantRunReason, AssistantRunResult };
 
+/**
+ * Свой эндпоинт для ассистента САМОЙ панели: адрес вместо облака вендора.
+ *
+ * Приходит из настроек (`assistantEndpointId` → профиль), а не из окружения
+ * процесса, как раньше. Задан → раннер идёт прямым вызовом API по ЭТОМУ виду
+ * API и ЭТОМУ адресу, минуя резолв «CLI или ключ»: пользователь выбрал, куда
+ * уходят его данные, и подписочный CLI отправил бы их в облако вопреки выбору.
+ */
+export interface AssistantEndpoint {
+  baseUrl: string;
+  apiKind: 'anthropic' | 'google' | 'openai-compat';
+  /** Имя модели на этом адресе; пусто — зашитый в код минимум. */
+  model: string;
+  /** Токен эндпоинта; пусто — запрос уходит без авторизации (локальная модель). */
+  token?: string;
+}
+
 /** Внедряемые зависимости (для тестов: без реальной сети и без реального spawn). */
 export interface RunAssistantDeps {
   appDataDir: string;
@@ -39,6 +56,11 @@ export interface RunAssistantDeps {
   sessionServe?: OpencodeServe;
   /** Сколько ждать готовности локального сервера CLI, мс. */
   serveReadyTimeoutMs?: number;
+  /**
+   * Свой эндпоинт ассистента панели. Не задан → всё как раньше: облако вендора
+   * и обычный порядок «CLI → ключ → отказ».
+   */
+  endpoint?: AssistantEndpoint;
 }
 
 /** Исход one-shot запуска CLI до превращения в результат ассистента. */

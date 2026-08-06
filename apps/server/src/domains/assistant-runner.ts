@@ -21,6 +21,7 @@
  * режим; `api.ts` — прямые вызовы модельных API; `run.ts` — сам switch).
  */
 export type {
+  AssistantEndpoint,
   AssistantMessage,
   AssistantRunReason,
   AssistantRunResult,

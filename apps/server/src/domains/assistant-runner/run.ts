@@ -15,6 +15,13 @@ export async function runAssistant(
   messages: AssistantMessage[],
   deps: RunAssistantDeps,
 ): Promise<AssistantRunResult> {
+  // Свой эндпоинт выбран — идём прямо туда, для ЛЮБОГО провайдера, включая
+  // Claude. Обычный порядок «подписка через CLI, потом ключ» здесь неуместен:
+  // подписочный CLI отправил бы разговор в облако вендора, а профиль заведён
+  // ровно затем, чтобы этого не происходило. Ключ провайдера не подставляем —
+  // у эндпоинта свой токен (или его нет вовсе).
+  if (deps.endpoint) return runProviderApi(provider, messages, '', deps);
+
   const resolution = resolveRunner(provider, deps.appDataDir, deps.detect);
 
   // Claude — ОТДЕЛЬНАЯ ветка: делегируем существующему пути, не переписываем.

@@ -2,6 +2,17 @@
   max-width: var(--layout-content-max);
 }
 
+// Пока считается новый период, прежний отчёт остаётся на месте и просто гаснет.
+// Подменять его скелетом нельзя: скелет в разы короче, страница схлопывается и
+// утаскивает за собой прокрутку — это и был тот самый прыжок при смене фильтра.
+.report {
+  transition: opacity var(--duration-normal) ease;
+
+  &[data-stale='true'] {
+    opacity: 0.55;
+  }
+}
+
 .statGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -78,6 +89,12 @@
 
   &:not(:last-child) {
     border-bottom: 1px solid var(--color-border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .report {
+    transition: none;
   }
 }
 

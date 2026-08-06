@@ -26,6 +26,21 @@ export const claudeProvider: ConfigProvider = {
   // рабочий CLI-путь (`claude`), поэтому при отсутствии ключа, но найденном CLI
   // раннер = `cli` — текущее поведение чата сохраняется (регресс-ноль).
   assistant: { apiKind: 'anthropic', apiKeyEnvVars: ['ANTHROPIC_API_KEY'], cliRunnable: true },
+  // Свой эндпоинт (шлюз организации, прокси, локальная модель): задокументирован
+  // `ANTHROPIC_BASE_URL` — «the variable that points Claude Code at the gateway»,
+  // — плюс `ANTHROPIC_MODEL` для выбора модели. Токен документация предлагает
+  // класть в `ANTHROPIC_AUTH_TOKEN` (уходит заголовком `Authorization: Bearer`);
+  // это же значение по умолчанию советуют, когда вид учётки неизвестен, а
+  // `ANTHROPIC_API_KEY` (заголовок `x-api-key`) требует ещё и одобрения в
+  // интерактивной сессии. Всё это пишется в блок `env` файла settings.json —
+  // ровно туда, куда указывает документация шлюзов.
+  endpointConfig: {
+    anthropic: {
+      baseUrlEnv: 'ANTHROPIC_BASE_URL',
+      modelEnv: 'ANTHROPIC_MODEL',
+      credentialEnv: 'ANTHROPIC_AUTH_TOKEN',
+    },
+  },
   // Модели: каталог Anthropic (models.dev). Алиасы (`opus`, `sonnet`, `haiku`)
   // CLI разворачивает сам, поэтому каталог нужен ровно для двух вещей — видеть
   // вышедшие модели и заметить смену поколения у пришпиленного дефолта.

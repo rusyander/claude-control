@@ -164,6 +164,40 @@ The per-CLI boundaries live in their own file:
 | `.mcp-secrets.env` backups are plain text by default     | **by design.** Optional encryption exists (`encryptSecretBackups`, AES-256-GCM under a password), off by default |
 | No account login and no way to view the token            | **by design.** The CLI handles authentication; only the source of access is exposed                              |
 
+## Your own endpoint
+
+| What                                                     | Why                                                                                                                                                                                                           |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Only Claude, Gemini, Qwen and Aider accept a profile     | **foreign.** Codex and Continue set the model address in their config file only, with no documented environment variable for it; Goose, Kimi, Cursor and OpenCode have no environment-variable section at all |
+| Data inside the request is not masked                    | **by design.** A profile decides WHERE a request goes, not WHAT is in it                                                                                                                                      |
+| "Check connection" does not check generation             | **by design.** Only the model list is requested — that is free; the model's answer is checked in the chat                                                                                                     |
+| The token lands in a CLI config in plain text            | **foreign.** Only behind an explicit checkbox: foreign CLIs have no secret store of their own                                                                                                                 |
+| A CLI session already running will not learn of a change | **foreign.** Environment variables are read at startup                                                                                                                                                        |
+
+## Data protection (local proxy)
+
+| What                                                   | Why                                                                                                                                                  |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| It finds only what the rules describe                  | **by design.** Not a model, not a heuristic: it will not guess a surname you did not write down, notice a typo in it, or read an attached document   |
+| A placeholder paraphrased by the model is not restored | **by design.** Restoration works on exact text; the human sees `[ИМЯ_1]` — immediately visible, no data at risk                                      |
+| Gemini requests are not parsed                         | **foreign.** Body shapes come from documentation, never guessed; an unparsed shape is refused by default, not passed                                 |
+| An unfamiliar shape is refused, not passed             | **by design.** A proxy that silently passes what it did not understand is worse than no proxy. The opposite setting exists; every pass is journalled |
+| The listener is `127.0.0.1` only, it cannot be shared  | **by design.** The proxy sees decrypted requests together with keys                                                                                  |
+| The journal holds no values                            | **by design.** Rule, placeholder and count only: a data-protection journal storing the data next to it would be the biggest hole in that protection  |
+| The placeholder vault does not survive a panel restart | **by design.** The value → placeholder mapping lives in memory only and is never written to disk                                                     |
+| Compressed upstream responses are not supported        | **by design.** `accept-encoding: identity` is forced upstream: decompressing and recompressing a stream just to swap a placeholder is extra risk     |
+
+## Prompt gate (hook)
+
+| What                                               | Why                                                                                                                                               |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| It sees only what a human typed                    | **foreign.** The `UserPromptSubmit` event receives the prompt string; files the agent read, command output and subagent prompts never reach it    |
+| It cannot replace text with a placeholder          | **foreign.** The event cannot rewrite the prompt — hence two actions, reject or warn. Replacement is the proxy's job                              |
+| Rewording bypasses it                              | **by design.** It matches the same rules, not meaning: a barrier against an accidental paste, not against a deliberate send                       |
+| Claude Code only                                   | **foreign.** No other CLI documents a "prompt submitted" event that can refuse                                                                    |
+| Unreadable rules or an unfamiliar input shape pass | **by design.** The prompt goes through marked "not checked": a script that blocks everything after a format change gets switched off the same day |
+| A hand-edited script is never overwritten          | **by design.** Silently overwriting someone's edit in their own config is not allowed; restoring the panel's version is a separate button         |
+
 ## CLIs other than Claude
 
 The panel configures more than Claude Code, but the honest wording is: **far from everything is

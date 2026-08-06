@@ -35,5 +35,21 @@ export const DEFAULT_STATE: AppState = {
     encryptSecretBackups: false,
     autoUpdateModels: true,
     previewProviderWrites: true,
+    endpointProfiles: [],
+    assistantEndpointId: '',
+    dlp: {
+      enabled: false,
+      port: 5179,
+      upstreamUrl: '',
+      upstreamProfileId: '',
+      // Выключено — значит выключено целиком: неразобранное тело отклоняется,
+      // а не пропускается. Прокси, молча пропускающий то, чего не понял,
+      // опаснее его отсутствия — он создаёт ложное спокойствие.
+      passUnknown: false,
+      journal: true,
+    },
+    // Гейт на промпте: по умолчанию выключен и, когда включён, останавливает
+    // отправку. Предупреждение — осознанное ослабление, а не стартовая точка.
+    promptGate: { enabled: false, action: 'block' },
   },
 };

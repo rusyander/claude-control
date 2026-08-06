@@ -1,6 +1,6 @@
 import type { ClaudePaths } from '@claude-control/contracts';
 import type { CapabilityMap, ProviderStatus } from './capabilities.ts';
-import type { ProviderAssistant, ProviderCli } from './assistant.ts';
+import type { ProviderAssistant, ProviderCli, ProviderEndpointConfig } from './assistant.ts';
 import type {
   ProviderInstructionsListLocation,
   ProviderInstructionsRulesLocation,
@@ -272,6 +272,15 @@ export interface ConfigProvider {
    * Cursor `apiKind='none'` + `cliRunnable=false` — ассистент unsupported.
    */
   assistant?: ProviderAssistant;
+  /**
+   * ЗАДОКУМЕНТИРОВАННЫЕ переменные окружения своего эндпоинта — по видам API
+   * (`ProviderEndpointConfig`). Задан только там, где имя переменной названо в
+   * документации CLI: claude (`ANTHROPIC_BASE_URL`), gemini
+   * (`GOOGLE_GEMINI_BASE_URL`), qwen (`OPENAI_BASE_URL` и `ANTHROPIC_BASE_URL`),
+   * aider (`AIDER_OPENAI_API_BASE`). Не задан → профиль своего эндпоинта в этот
+   * CLI не переносится (fail-closed): переменную адреса панель не выдумывает.
+   */
+  endpointConfig?: ProviderEndpointConfig;
   /**
    * Вендоры каталога моделей (models.dev), чьи модели относятся к этому CLI:
    * claude → `anthropic`, codex → `openai`, gemini → `google`, qwen →

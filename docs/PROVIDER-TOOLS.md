@@ -3,7 +3,8 @@
 A continuation of [Providers: format details](PROVIDERS.md). That document covers what the panel
 edits inside each CLI's files; this one covers the tools that work ON TOP of providers: moving an
 environment between machines, the model catalog, the on-your-machine check, the write preview,
-configuration comparison, and the format check against published schemas.
+configuration comparison, the format check against published schemas, and your own endpoint instead
+of the vendor cloud.
 
 🇷🇺 [Русская версия](PROVIDER-TOOLS.ru.md) · 📖 [What this project is](../README.md) ·
 🚫 [What the panel does not do](LIMITATIONS.md) · 🔧 [Setup and troubleshooting](SETUP.md)
@@ -200,3 +201,143 @@ The network is touched at most once a week and never on your path: the section o
 (`claude-control/format-check.json`), a stale result refreshes in the background, and even a total
 network failure yields `not checked` for one provider rather than an error in the panel. "Check
 now" is the only place where the answer waits for the network.
+
+## 7. Your own endpoint
+
+An agentic CLI reaches its model at an address, and that address can be changed — to a model inside
+your own perimeter, to a company gateway, or to a proxy. It is done through environment variables,
+different in every CLI: `ANTHROPIC_BASE_URL`, `GOOGLE_GEMINI_BASE_URL`, `OPENAI_BASE_URL`,
+`AIDER_OPENAI_API_BASE`. The "Your own endpoint" card in Settings takes the profile once — address,
+API kind, model — and spreads it across the right variables of the CLI you pick with one button.
+
+The API kind is the schema the endpoint accepts requests in, and it follows the endpoint rather than
+the CLI: one and the same local model often answers in several schemas at once.
+
+| API kind        | Who it fits                                                                   |
+| --------------- | ----------------------------------------------------------------------------- |
+| `openai-compat` | llama.cpp, vLLM, Ollama, LM Studio, corporate gateways — nearly all speak it  |
+| `anthropic`     | a proxy or gateway on the Anthropic schema; the only kind Claude Code accepts |
+| `google`        | a gateway on the Gemini schema                                                |
+
+"Check connection" asks the address for its **model list** (`/v1/models`, `/v1beta/models` or
+`/models`, depending on the API kind) and generates nothing: the check is free and burns no tokens.
+If a list comes back, the model field turns into a dropdown of what that address actually offers. A
+trial answer from the model is the chat's job — a separate action, and a billed one.
+
+Four CLIs accept a profile — the ones whose address variable is documented:
+
+| CLI         | Where it is written                                                                        |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| Claude Code | `~/.claude/settings.json` → `env`: `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL`                 |
+| Gemini CLI  | `~/.gemini/.env`: `GOOGLE_GEMINI_BASE_URL`, `GEMINI_MODEL` (`https` only, localhost aside) |
+| Qwen Code   | `~/.qwen/.env`: the `OPENAI_*` triple or the `ANTHROPIC_*` one — Qwen takes both kinds     |
+| Aider       | `~/.aider.conf.yml` → `set-env`: `AIDER_OPENAI_API_BASE`, `AIDER_MODEL`                    |
+
+Codex and Continue set the model address in their config file only, by hand (`model_providers` in
+`config.toml`, and `apiBase` on each model in `config.yaml`); no environment variable for it is
+documented, and the panel does not invent one — the row says exactly that. Goose, Kimi Code, Cursor
+and OpenCode have no environment-variable section at all.
+
+A separate choice in the same card assigns the profile to the **panel's built-in assistant** — the
+one that fills in forms. It writes nothing: the panel calls the address directly, bypassing both the
+cloud and the provider CLI. It switches independently of the CLI on purpose: form hints and agent
+work are different jobs.
+
+**By default the token never reaches a foreign config.** It is kept encrypted inside the panel
+(`provider-keys.enc`, AES-256-GCM) and used for the connection check and by the assistant; only a
+mask ever leaves the server. It will land in a CLI file in plain text if you tick "write the token
+into the CLI config" — foreign CLIs have no secret store of their own, so this is a deliberate step
+with a warning. Without the tick, only the address and the model are written.
+
+The write behaves like every other config edit: a backup, an atomic write, and your other values in
+that file are preserved. A CLI session already running will not learn about the change — variables
+are read at startup.
+
+Your own address answers the question of WHERE a request goes, not WHAT is in it: if the address is
+an external gateway, the data still leaves your perimeter. Substituting names and phone numbers
+inside the request is a separate job, and a profile does not solve it.
+
+## 8. Data protection (local proxy)
+
+Your own address decides WHERE a request goes. The "Data protection" section decides WHAT goes in it
+— and it works with any address, the vendor cloud included.
+
+The panel raises a listener on `127.0.0.1` (port 5179 by default) and forwards requests upstream
+itself. Point a CLI at that address instead of the model address and the panel sees the **body** of
+every request: the prompt, the contents of files the agent read, tool output, call arguments. That
+is strictly more than a prompt hook sees.
+
+TLS is not intercepted: the CLI talks plain `http` to a local address, and the proxy makes its own
+`https` call upstream. No substituted certificates, no trusted roots — the whole setup is one changed
+address, most easily via an endpoint profile from §7.
+
+### Rules
+
+| Kind             | What it matches                                                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| built-in pattern | email, phone, INN, SNILS, card number, secret keys; wherever the format has a checksum, it is verified                                   |
+| own dictionary   | a list of values (names, projects, addresses): case-insensitive, whole words, Russian inflections covered — "Урманова" matches "Урманов" |
+| own expression   | a regular expression; validated before saving                                                                                            |
+
+Checksums matter more than they look: without one, the INN rule would catch any eleven-digit number,
+and a false positive in data protection is worse than a miss — it breaks work and teaches people to
+switch protection off.
+
+There are three actions. `mask` replaces the value with a `[ИМЯ_1]` placeholder and **restores it in
+the model reply** — including a streamed reply where the placeholder is split across frames. `block`
+stops the request entirely and hands the CLI a refusal shaped like its own API. `flag` changes
+nothing and only writes to the journal — a break-in mode for a new rule.
+
+### What is parsed
+
+| Path                | What the panel rewrites                                                                             |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| `/v1/messages`      | `system`, message texts, tool results, string arguments of tool calls                               |
+| `/chat/completions` | message contents and function-call arguments (any OpenAI-compatible gateway)                        |
+| everything else     | not parsed — **refused** by default (this includes Gemini: the panel does not parse its body shape) |
+
+Anthropic thinking blocks are never touched: they carry a signature, and editing would break the reply.
+
+### Limits
+
+The proxy finds exactly what the rules describe: it will not guess a surname you did not write down,
+and restoration works on exact text — if the model paraphrases the placeholder in its reply, there is
+nothing to substitute into and the human sees `[ИМЯ_1]`. No setting publishes the listener outside:
+it sees decrypted requests together with keys. The journal holds no values — rule, placeholder and
+count only.
+
+Rules live in `<config dir>/claude-control/dlp-rules.json`, apart from `state.json`: their
+dictionaries hold real surnames and phone numbers, while panel settings travel between machines by
+export. The placeholder vault lives in memory only and is never written to disk.
+
+## 9. Prompt gate (hook)
+
+The third mechanism, the simplest and the most limited: the panel writes a
+`claude-control-prompt-gate.mjs` script into the configuration hooks directory and registers it in
+`settings.json` on the `UserPromptSubmit` event. The §8 proxy is not needed for this; rules come from
+the same `dlp-rules.json` — there is no second dictionary.
+
+The gate sees **only what a human submitted from the input line**. Files the agent read, command
+output, tool results and subagent prompts go past it — that is what the proxy sees.
+
+There are two actions: reject the prompt, or warn and send it. The gate cannot replace text with a
+placeholder: the `UserPromptSubmit` event cannot rewrite the prompt. That is a limit of Claude Code,
+not of the panel. A rule whose own action is `block` stops the prompt even when the shared setting
+says "warn" — otherwise that setting would silently downgrade a ban to a notice.
+
+| Situation                     | What the script does                                     |
+| ----------------------------- | -------------------------------------------------------- |
+| no matches                    | exits 0 silently                                         |
+| a match, action "reject"      | writes **rule names** (not values) to stderr and exits 2 |
+| a match, action "warn"        | emits a `systemMessage` and lets the prompt through      |
+| the rules file is unreadable  | lets the prompt through and says it was **not checked**  |
+| the input shape is unfamiliar | the same: doubt is not a reason to block someone's work  |
+
+The script is self-contained: the matching logic is inlined at install time, so it works with the
+panel closed. It holds no dictionary — rules are read from disk on every run, otherwise the hook file
+would carry personal data along with an environment transfer. A hand-edited script is neither
+overwritten nor deleted: the section says so, and restoring the panel's version is a separate button.
+
+The gate is trivial to bypass — the same meaning in other words gets through. It is a barrier against
+pasting someone else's data into a prompt by accident, not against a person who wants to send it out.
+Real content control is §8.

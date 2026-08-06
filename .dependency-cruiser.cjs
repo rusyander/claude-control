@@ -18,7 +18,7 @@ module.exports = {
     {
       name: 'no-orphans',
       severity: 'warn',
-      from: { orphan: true, pathNot: '\\.(d\\.ts|test\\.tsx?|stories\\.tsx)$' },
+      from: { orphan: true, pathNot: '\\.(d\\.ts|d\\.mts|test\\.tsx?|stories\\.tsx)$' },
       to: {},
     },
     // Cross-feature запрещён: одна feature не тянет другую.

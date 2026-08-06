@@ -17,6 +17,7 @@ import { ProjectsPage } from '@pages/Projects/ProjectsPage';
 import { GroupsPage } from '@pages/Groups/GroupsPage';
 import { HistoryPage } from '@pages/History/HistoryPage';
 import { SettingsPage } from '@pages/Settings/SettingsPage';
+import { DlpPage } from '@pages/Dlp/DlpPage';
 import { ProviderComparePage } from '@pages/ProviderCompare/ProviderComparePage';
 import { HelpPage } from '@pages/Help/HelpPage';
 import { SearchPage } from '@pages/Search/SearchPage';
@@ -33,6 +34,7 @@ const routes = [
   { path: '/groups', component: GroupsPage },
   { path: '/history', component: HistoryPage },
   { path: '/settings', component: SettingsPage },
+  { path: '/dlp', component: DlpPage },
   { path: '/compare', component: ProviderComparePage },
   { path: '/help', component: HelpPage },
   // Разделы провайдера — под гейтом возможностей (для Claude всё `ready`).

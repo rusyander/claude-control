@@ -19,6 +19,7 @@ import { registerProviderKeysRoutes } from './routes/provider-keys-routes.ts';
 import { registerGroupRoutes } from './routes/group-routes.ts';
 import { registerAnalyticsRoutes } from './routes/analytics-routes.ts';
 import { registerModelRoutes } from './routes/model-routes.ts';
+import { registerEndpointRoutes } from './routes/endpoint-routes.ts';
 import { registerProviderCheckRoutes } from './routes/provider-check-routes.ts';
 import { registerProviderPreviewRoutes } from './routes/provider-preview-routes.ts';
 import { registerProviderCompareRoutes } from './routes/provider-compare-routes.ts';
@@ -37,10 +38,13 @@ import { registerProviderProjectRoutes } from './routes/provider-project-routes.
 import { registerProjectRunnerRoutes } from './routes/project-runner-routes.ts';
 import { registerProjectGitRoutes } from './routes/project-git-routes.ts';
 import { registerProviderChatRoutes } from './routes/provider-chat-routes.ts';
+import { registerDlpRoutes } from './routes/dlp-routes.ts';
+import { registerPromptGateRoutes } from './routes/prompt-gate-routes.ts';
 import type { RouteRegistrar } from './routes/register.ts';
 import { ChatRunRegistry } from './domains/chat/ChatRunRegistry.ts';
 import { ProviderChatService } from './domains/provider-chat.ts';
 import { ProjectRunnerRegistry, autostartProjects } from './domains/project-runner.ts';
+import { buildDlpRuntime, DlpProxy } from './domains/dlp.ts';
 import { startSandboxHousekeeping } from './domains/sandbox/SandboxConfig.ts';
 
 const PORT = Number(process.env.PORT ?? 5178);
@@ -111,6 +115,9 @@ const projectRunner = new ProjectRunnerRegistry({
 });
 const chatRuns = new ChatRunRegistry();
 const providerChats = new ProviderChatService();
+// Прокси защиты данных: тоже слушатель, тоже переживает запрос. Создаётся
+// всегда, поднимается — только если человек включил его в настройках.
+const dlpProxy = new DlpProxy();
 
 /**
  * Все маршруты панели одной таблицей. Форма у модулей общая (`RouteRegistrar`),
@@ -134,6 +141,7 @@ const ROUTES: RouteRegistrar[] = [
   registerGroupRoutes,
   registerAnalyticsRoutes,
   registerModelRoutes,
+  registerEndpointRoutes,
   registerProviderCheckRoutes,
   registerProviderPreviewRoutes,
   registerProviderCompareRoutes,
@@ -152,6 +160,8 @@ const ROUTES: RouteRegistrar[] = [
   (instance, context) => registerChatRoutes(instance, context, chatRuns),
   (instance, context) => registerProviderChatRoutes(instance, context, providerChats),
   (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
+  (instance, context) => registerDlpRoutes(instance, context, dlpProxy),
+  registerPromptGateRoutes,
 ];
 
 for (const register of ROUTES) register(app, ctx);
@@ -233,6 +243,19 @@ await app.listen({ port: PORT, host: HOST });
 // готовность API.
 const autostarted = await autostartProjects(projectRunner, ctx.store);
 
+// Прокси защиты данных поднимается сам, если он включён: CLI уже настроен на
+// его адрес, и молчаливое «панель перезапустилась, прокси не поднялся» означало
+// бы либо отказ всех запросов, либо — хуже — их уход в модель без фильтра.
+let dlpNote = '';
+if (ctx.store.getSettings().dlp.enabled) {
+  try {
+    await dlpProxy.start(buildDlpRuntime(ctx.store, ctx.location.paths.appData));
+    dlpNote = `Защита данных: ${dlpProxy.status().address} → ${dlpProxy.status().upstream}`;
+  } catch (error) {
+    dlpNote = `Защита данных НЕ поднялась: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
 const { location } = ctx;
 process.stdout.write(
   [
@@ -254,6 +277,7 @@ process.stdout.write(
       (run) => `Автозапуск: ${run.path}${run.port ? ` → порт ${run.port}` : ' (адрес — в панели)'}`,
     ),
     ...autostarted.failed.map((run) => `Автозапуск не удался: ${run.path} — ${run.message}`),
+    dlpNote,
     '',
   ]
     .filter(Boolean)

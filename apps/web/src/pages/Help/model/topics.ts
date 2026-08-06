@@ -20,6 +20,8 @@ import { HistoryTopic } from '../topics/HistoryTopic';
 import { SettingsTopic } from '../topics/SettingsTopic';
 import { CompareTopic } from '../topics/CompareTopic';
 import { ProvidersTopic } from '../topics/ProvidersTopic';
+import { EndpointsTopic } from '../topics/EndpointsTopic';
+import { DlpTopic } from '../topics/DlpTopic';
 
 export { HELP_ROUTE } from '@shared/config/routes';
 
@@ -90,6 +92,13 @@ export const HELP_GROUPS: HelpGroup[] = [
       { id: 'history', icon: 'history', pagePath: '/history', Content: HistoryTopic },
       { id: 'compare', icon: 'swap', pagePath: '/compare', Content: CompareTopic },
       { id: 'settings', icon: 'settings', pagePath: '/settings', Content: SettingsTopic },
+      // Свой эндпоинт — блок на странице настроек, но объясняет он окружение
+      // чужих CLI, а не саму панель. Отдельным документом, потому что вопрос
+      // «куда уходят данные» задают до того, как открывают настройки.
+      { id: 'endpoints', icon: 'link', pagePath: '/settings', Content: EndpointsTopic },
+      // Рядом со «своим эндпоинтом» намеренно: вопрос один и тот же — куда
+      // уходят данные, — и читать эти два документа надо подряд.
+      { id: 'dlp', icon: 'lock', pagePath: '/dlp', Content: DlpTopic },
       // Единственный сквозной документ: он объясняет не свой раздел, а почему
       // набор разделов вообще меняется. Своей страницы у него нет, поэтому
       // `pagePath` ведёт в «Настройки» — там стоит переключатель провайдера.

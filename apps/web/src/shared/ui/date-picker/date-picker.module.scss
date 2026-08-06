@@ -1,0 +1,129 @@
+// Кнопка, открывающая календарь. Ростом и рамкой повторяет поля ввода рядом:
+// в ряду фильтров она обязана читаться как такой же элемент управления.
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  height: 32px;
+  padding: 0 var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: var(--font-size-body-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) ease,
+    background-color var(--duration-fast) ease;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+
+  // Заполненный фильтр видно по рамке — так же, как у активного пресета.
+  &[data-active='true'] {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+}
+
+.label {
+  // Подпись не сжимается в многоточие: дата — это и есть смысл кнопки.
+  font-variant-numeric: tabular-nums;
+}
+
+.popover {
+  z-index: 60;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-lg);
+}
+
+// Календарь библиотеки настраивается своими переменными — перекрываем их
+// токенами темы, чтобы он переключался вместе с приложением, а не жил своей
+// палитрой. Правим переменные, а не селекторы: их имена — публичный контракт
+// react-day-picker, а внутренняя вёрстка меняется от версии к версии.
+.calendar {
+  --rdp-accent-color: var(--color-accent);
+  --rdp-accent-background-color: var(--color-accent-subtle);
+  --rdp-today-color: var(--color-accent);
+
+  --rdp-day-height: 36px;
+  --rdp-day-width: 36px;
+  --rdp-day_button-height: 34px;
+  --rdp-day_button-width: 34px;
+  --rdp-day_button-border-radius: var(--radius-sm);
+  --rdp-selected-border: none;
+
+  --rdp-nav_button-height: 28px;
+  --rdp-nav_button-width: 28px;
+  --rdp-months-gap: var(--spacing-md);
+
+  --rdp-range_start-color: var(--color-accent-fg);
+  --rdp-range_end-color: var(--color-accent-fg);
+  --rdp-range_middle-color: var(--color-fg);
+
+  margin: 0;
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: var(--font-size-body-sm);
+
+  // Классы библиотеки глобальные, поэтому весь блок идёт через :global.
+  :global {
+    // Два месяца рядом не помещаются в узкое окно — разрешаем перенос вниз.
+    .rdp-months {
+      flex-wrap: wrap;
+    }
+
+    .rdp-month_caption {
+      font-weight: var(--font-weight-medium);
+    }
+
+    .rdp-weekday {
+      color: var(--color-fg-muted);
+      font-weight: var(--font-weight-regular);
+    }
+
+    // Подсветка под курсором — только для НЕвыбранных дней. Без этого условия
+    // она перекрывала акцентную заливку выбранной даты (специфичность выше),
+    // и день под курсором сливался с фоном: на тёмной теме тёмный текст на
+    // тёмном квадрате не читался вовсе.
+    .rdp-day:not(.rdp-selected) .rdp-day_button:hover:not([disabled]) {
+      background: var(--color-surface-sunken);
+    }
+
+    .rdp-chevron {
+      fill: var(--color-fg-muted);
+    }
+
+    .rdp-button_next,
+    .rdp-button_previous {
+      border-radius: var(--radius-sm);
+
+      &:hover:not([disabled]) {
+        background: var(--color-surface-sunken);
+      }
+    }
+
+    // Дни соседних месяцев приглушены, но не спрятаны: по ним видно, где
+    // кончается месяц, и в них можно попасть при выборе диапазона.
+    .rdp-outside {
+      color: var(--color-fg-subtle);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger {
+    transition: none;
+  }
+}

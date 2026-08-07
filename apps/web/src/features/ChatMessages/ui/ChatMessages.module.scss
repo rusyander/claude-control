@@ -300,6 +300,69 @@
   border-top: 1px solid var(--color-border);
 }
 
+// Карточка ведёт по одному вопросу: активен ровно один, следующие видны, но
+// погашены — так понятно, что спросят дальше, и невозможно ответить не по
+// порядку, потеряв по дороге остальные вопросы.
+.questionLocked {
+  opacity: 0.45;
+  filter: grayscale(1);
+  pointer-events: none;
+}
+
+// Отвеченный вопрос сворачивается в строку «что спросили — что выбрано»: он
+// больше не требует внимания, но и прятать его нельзя — по нему сверяются.
+.questionDone {
+  padding-top: var(--spacing-xs);
+}
+
+.questionDoneIcon {
+  flex: none;
+  color: var(--color-success);
+}
+
+.questionStep {
+  margin-left: auto;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+}
+
+.questionNext {
+  margin-top: var(--spacing-xs);
+}
+
+.questionSubmit {
+  margin-top: var(--spacing-md);
+  width: 100%;
+}
+
+// Отправлено: ответ ушёл, агент думает. Состояние ставится по клику, не по
+// ответу сервера, — иначе секунды ожидания читаются как «клик не прошёл».
+.questionSent {
+  border-color: var(--color-border-strong);
+  border-left-color: var(--color-border-strong);
+}
+
+.questionSentNote {
+  margin-top: var(--spacing-sm);
+}
+
+.questionSpinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-accent);
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .questionBadge {
   display: inline-block;
   margin-bottom: var(--spacing-2xs);
@@ -364,6 +427,13 @@
 .optionClickable:disabled {
   cursor: default;
   opacity: 0.6;
+}
+
+// Выбранный вариант виден и в множественном выборе, и в свёрнутом ответе:
+// иначе после клика ничто не подтверждает, что попал именно туда.
+.optionChosen {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
 }
 
 // Карточка запроса прав: тот же каркас, что у вопроса, но тон «требует решения»

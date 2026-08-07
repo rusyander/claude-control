@@ -106,12 +106,13 @@ export function ChatMessages({
 
       {isLoading && <SkeletonList rows={3} withActions={false} />}
 
-      {messages.map((message) => (
+      {messages.map((message, index) => (
         <MessageBubble
           key={message.id}
           message={message}
           onEdit={onEdit}
           onPickOption={onPickOption}
+          isLast={index === messages.length - 1}
           isRunning={isRunning}
           costUnit={costUnit}
         />

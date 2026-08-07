@@ -37,6 +37,7 @@ import { registerProjectRoutes } from './routes/project-routes.ts';
 import { registerProviderProjectRoutes } from './routes/provider-project-routes.ts';
 import { registerProjectRunnerRoutes } from './routes/project-runner-routes.ts';
 import { registerProjectGitRoutes } from './routes/project-git-routes.ts';
+import { registerProjectFilesRoutes } from './routes/project-files-routes.ts';
 import { registerProviderChatRoutes } from './routes/provider-chat-routes.ts';
 import { registerDlpRoutes } from './routes/dlp-routes.ts';
 import { registerPromptGateRoutes } from './routes/prompt-gate-routes.ts';
@@ -157,6 +158,7 @@ const ROUTES: RouteRegistrar[] = [
   registerProjectRoutes,
   registerProviderProjectRoutes,
   registerProjectGitRoutes,
+  registerProjectFilesRoutes,
   (instance, context) => registerChatRoutes(instance, context, chatRuns),
   (instance, context) => registerProviderChatRoutes(instance, context, providerChats),
   (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),

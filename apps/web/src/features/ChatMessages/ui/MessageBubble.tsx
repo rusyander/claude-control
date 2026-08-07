@@ -19,6 +19,7 @@ export function MessageBubble({
   message,
   onEdit,
   onPickOption,
+  isLast,
   isRunning,
   costUnit,
 }: MessageBubbleProps) {
@@ -125,7 +126,16 @@ export function MessageBubble({
             if (questions)
               return (
                 <div key={index} className={styles.block}>
-                  <QuestionCard questions={questions} onPick={onPickOption} disabled={isRunning} />
+                  {/*
+                    Отвечать можно только на ПОСЛЕДНЕЕ сообщение ленты: вопрос
+                    из середины истории давно закрыт, и клик по нему отправил бы
+                    агенту реплику ни с того ни с сего.
+                  */}
+                  <QuestionCard
+                    questions={questions}
+                    onPick={isLast ? onPickOption : undefined}
+                    disabled={isRunning}
+                  />
                   {spend}
                 </div>
               );

@@ -117,6 +117,7 @@ export function ChatTopic() {
             tr('canRetry'),
             tr('canSpend'),
             tr('canEditor'),
+            tr('canCode'),
           ]}
           cant={[tr('cantApprove'), tr('cantDelete'), tr('cantEditPlan'), tr('cantInterrupt')]}
         />
@@ -145,6 +146,39 @@ export function ChatTopic() {
           ]}
         />
         <Callout tone="info" title={tr('toolsNote')} />
+      </HelpSection>
+
+      <HelpSection title={tr('codeTitle')} caption={tr('codeCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('codeTree'), text: tr('codeTreeText') },
+            { title: tr('codeDiff'), text: tr('codeDiffText') },
+            { title: tr('codePreview'), text: tr('codePreviewText') },
+            { title: tr('codeEdit'), text: tr('codeEditText') },
+            { title: tr('codeMemory'), text: tr('codeMemoryText') },
+          ]}
+        />
+        <Callout tone="warning" title={tr('codeLimitsTitle')}>
+          {tr('codeLimitsText')}
+        </Callout>
+        <Callout tone="info" title={tr('codeSaveTitle')}>
+          {tr('codeSaveText')}
+        </Callout>
+      </HelpSection>
+
+      <HelpSection title={tr('askTitle')} caption={tr('askCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('askOrder'), text: tr('askOrderText') },
+            { title: tr('askChange'), text: tr('askChangeText') },
+            { title: tr('askSent'), text: tr('askSentText') },
+          ]}
+        />
+        <Callout tone="info" title={tr('askOldTitle')}>
+          {tr('askOldText')}
+        </Callout>
       </HelpSection>
 
       <HelpSection title={tr('dotsTitle')} caption={tr('dotsCaption')}>

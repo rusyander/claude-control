@@ -13,6 +13,7 @@ import { migrateDraft } from '@shared/lib/draft';
 import { useRefreshChat } from '@entities/Chat';
 import type { ProjectInfo } from '@entities/Project';
 import { useClearRunnerAutostart } from '@entities/ProjectRunner';
+import { useForgetProjectCodeView } from '@entities/ProjectFile';
 import { draftKeyFor } from '../lib/draftKey';
 
 export interface ChatSessionInput {
@@ -62,6 +63,7 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
   const ws = useWorkspace();
   const writeUrl = useEntityUrlWriter();
   const clearRunnerAutostart = useClearRunnerAutostart();
+  const forgetCodeView = useForgetProjectCodeView();
 
   const chatId = activeChat?.id ?? draftId;
   const run = useAgentRun(chatId);
@@ -224,10 +226,17 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
    * из этого проекта подниматься не должно. Отказ сервера здесь не мешает
    * закрыть вкладку: тумблеры видны в самой вкладке, и человек поправит их,
    * когда откроет проект снова.
+   *
+   * Тем же движением забываем, что было открыто в окне кода этого проекта:
+   * снимок дерева и файла живёт РОВНО столько, сколько открыт таб, — так
+   * договорились. Закрыли вкладку — вернулись к чистому листу.
    */
   const closeProjectTab = (id: string): void => {
     const tab = ws.state.projectTabs.find((item) => item.id === id);
-    if (tab) clearRunnerAutostart.mutate({ path: tab.path });
+    if (tab) {
+      clearRunnerAutostart.mutate({ path: tab.path });
+      forgetCodeView.mutate({ path: tab.path });
+    }
     ws.closeProject(id);
   };
 

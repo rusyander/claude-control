@@ -22,6 +22,7 @@ export function Modal({
   children,
   footer,
   size = 'md',
+  bodyFill = false,
 }: ModalProps) {
   const { t } = useTranslation();
   const isReduced = useReducedMotion();
@@ -83,7 +84,11 @@ export function Modal({
                   />
                 </Close>
 
-                <div className={styles.body}>{children}</div>
+                <div
+                  className={[styles.body, bodyFill && styles.bodyFill].filter(Boolean).join(' ')}
+                >
+                  {children}
+                </div>
 
                 {footer && <div className={styles.footer}>{footer}</div>}
               </motion.div>

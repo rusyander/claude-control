@@ -33,6 +33,7 @@ export function mergeState(loaded: Partial<AppState>): AppState {
     runnerCommands: { ...base.runnerCommands, ...loaded.runnerCommands },
     runnerPrefs: { ...base.runnerPrefs, ...loaded.runnerPrefs },
     providerChecks: { ...base.providerChecks, ...loaded.providerChecks },
+    projectCodeViews: { ...base.projectCodeViews, ...loaded.projectCodeViews },
     settings: { ...base.settings, ...loaded.settings },
   };
 }

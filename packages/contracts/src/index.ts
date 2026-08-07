@@ -41,6 +41,7 @@ export * from './chat';
 export * from './projects';
 export * from './project-runner';
 export * from './project-git';
+export * from './project-files';
 export * from './search';
 export * from './history';
 export * from './api';

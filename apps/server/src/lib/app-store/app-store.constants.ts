@@ -11,6 +11,7 @@ export const DEFAULT_STATE: AppState = {
   runnerCommands: {},
   runnerPrefs: {},
   providerChecks: {},
+  projectCodeViews: {},
   settings: {
     theme: 'system',
     language: 'ru',

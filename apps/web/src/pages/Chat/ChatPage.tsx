@@ -15,6 +15,7 @@ import { useDraft } from '@shared/lib/draft';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
 import { ParallelLaunch } from '@features/ParallelLaunch';
 import { FolderPicker } from '@features/FolderPicker';
+import { ProjectCodeModal } from '@features/ProjectCode';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { ChatMessages } from '@features/ChatMessages';
@@ -67,6 +68,7 @@ export function ChatPage() {
   // разрешены и не слетают после перезагрузки.
   const { allowEdits, setAllowEdits, autoApprove, setAutoApprove } = useChatPrefs();
   const [isFolderPickerOpen, setFolderPickerOpen] = useState(false);
+  const [isCodeOpen, setCodeOpen] = useState(false);
   const openEditor = useOpenInEditor();
   const { data: settings } = useSettings();
   const { data: modelCatalog } = useModelCatalog();
@@ -273,6 +275,7 @@ export function ChatPage() {
             onEffortChange={setEffortOverride}
             isEditorPending={openEditor.isPending}
             onOpenEditor={(path) => openEditor.mutate(path)}
+            onOpenCode={() => setCodeOpen(true)}
             allowEdits={allowEdits}
             onAllowEditsChange={setAllowEdits}
             autoApprove={autoApprove}
@@ -366,6 +369,17 @@ export function ChatPage() {
         confirmLabel={t('common.delete')}
         isPending={isDeleting}
       />
+
+      {/* Код проекта. Разговор передаём, чтобы дифф показывал правки ИМЕННО
+          этого чата; в песочнице кнопки нет — окно живёт только у проекта. */}
+      {isProjectContext && projectPath && (
+        <ProjectCodeModal
+          isOpen={isCodeOpen}
+          onOpenChange={setCodeOpen}
+          projectPath={projectPath}
+          chatId={activeChat?.id}
+        />
+      )}
 
       <ParallelLaunch
         isOpen={isParallelOpen}

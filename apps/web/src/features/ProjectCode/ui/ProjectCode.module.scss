@@ -1,0 +1,330 @@
+// Окно кода проекта: дерево слева, один файл справа.
+//
+// Высоту задаёт окно (`bodyFill`), а не содержимое: прокручиваются только две
+// внутренние области — дерево и редактор, — каждая своей полосой. Само окно не
+// едет никуда, поэтому шапка с кнопкой сохранения и вкладки списка остаются на
+// месте на файле любой длины.
+// Колонки задаются инлайном (ширина списка — перетаскиваемая и общая на панель),
+// здесь только запасное значение на случай, если стиль ещё не подставлен.
+.layout {
+  display: grid;
+  grid-template-columns: 300px auto minmax(0, 1fr);
+  gap: var(--spacing-2xs);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: var(--spacing-2xs);
+  overflow: hidden;
+}
+
+// Ячейка сетки под разделитель: сам он из UI-кита и растягивается по высоте
+// колонки, поэтому здесь только flex-обёртка нужной ширины.
+.resizer {
+  display: flex;
+  min-height: 0;
+}
+
+.sidebarTabs {
+  flex: none;
+}
+
+.tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.treeNote {
+  display: block;
+  padding: var(--spacing-2xs);
+}
+
+// Размер строки — это читаемость списка, по которому ходят весь сеанс: мельче
+// имена сливаются, а попасть в строку становится работой. Держим кегль обычного
+// текста и высоту строки, в которую попадаешь не целясь.
+.node {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  min-height: 28px;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}
+
+.nodeActive {
+  background: var(--color-accent-subtle);
+  color: var(--color-fg);
+}
+
+// Тронутое агентом видно прямо в дереве, без перехода на вкладку «Изменённые»:
+// у файла зелёное имя, у папки — зелёная точка на иконке. Точка, а не цвет
+// имени: у папки менялось не имя, а что-то внутри, и красить её так же, как
+// сам изменённый файл, значило бы врать о том, что поменялось.
+.nodeChanged .nodeName {
+  color: var(--color-success);
+  font-weight: var(--font-weight-medium);
+}
+
+// Обёртка нужна самой метке: точку рисует псевдоэлемент, а на <svg> он не
+// отображается — значок иконки живёт внутри этого span.
+.nodeIcon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.nodeInside .nodeIcon::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.nodeName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeCounts {
+  display: flex;
+  flex: none;
+  gap: var(--spacing-3xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+}
+
+.added {
+  color: var(--color-success);
+}
+
+.removed {
+  color: var(--color-danger);
+}
+
+.chevron {
+  flex: none;
+  transition: transform var(--duration-fast) ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.chevronSpacer {
+  flex: none;
+  width: 16px;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: var(--spacing-2xs);
+}
+
+.mainHeader {
+  flex: none;
+}
+
+.editorArea {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.placeholder {
+  display: block;
+  padding: var(--spacing-lg);
+}
+
+// Показ файла вместо кода. Прокрутка здесь своя: у окна её нет вовсе, а
+// картинка в полный рост и длинная разметка одинаково не обязаны помещаться.
+.previewBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--spacing-md);
+  overflow: auto;
+
+  // Шахматка под картинкой: без неё прозрачный PNG на светлой теме выглядит
+  // белым прямоугольником, а на тёмной — исчезает вовсе.
+  background-image:
+    linear-gradient(45deg, var(--color-surface-raised) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--color-surface-raised) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--color-surface-raised) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--color-surface-raised) 75%);
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+}
+
+.previewImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.previewFrame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--color-surface);
+}
+
+.previewDocument {
+  height: 100%;
+  padding: var(--spacing-lg);
+  overflow: auto;
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  background: var(--color-surface);
+
+  :global(pre) {
+    padding: var(--spacing-sm);
+    overflow-x: auto;
+    background: var(--color-surface-sunken);
+    border-radius: var(--radius-sm);
+  }
+
+  :global(img) {
+    max-width: 100%;
+  }
+
+  :global(table) {
+    border-collapse: collapse;
+
+    :global(td),
+    :global(th) {
+      padding: var(--spacing-3xs) var(--spacing-xs);
+      border: 1px solid var(--color-border);
+    }
+  }
+}
+
+// Пока грузится следующий файл, прежний остаётся на экране под затемнением.
+// Пустой прямоугольник вместо кода на каждом клике мигал бы сильнее, чем
+// помогал: файл приезжает за десятки миллисекунд.
+.loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-surface) 62%, transparent);
+}
+
+.status {
+  flex: none;
+  min-height: var(--spacing-lg);
+}
+
+// Хост редактора. Цвета подсветки заданы переменными: тема панели переключается
+// атрибутом на <html>, и так редактор перекрашивается вместе со страницей, а не
+// пересоздаётся на JS с потерей курсора и истории отмен (см. model/editorSetup).
+.editor {
+  height: 100%;
+
+  --code-keyword: #8250df;
+  --code-string: #0a7c42;
+  --code-comment: #6e7781;
+  --code-number: #0550ae;
+  --code-function: #8250df;
+  --code-type: #953800;
+  --code-property: #0550ae;
+  --code-punctuation: #57606a;
+
+  :global(.cm-editor) {
+    height: 100%;
+  }
+
+  // Палитра @codemirror/merge задана правилами вида
+  // `.cm-editor.cm-light .cm-deletedLineGutter` — три класса. Селекторы ниже
+  // намеренно удваивают `.cm-editor`: иначе выигрывает библиотечный красный на
+  // удалении, а договорённость здесь другая — старое серым, новое зелёным.
+
+  // Новый код — тот, что реально лежит в файле, — зелёный.
+  :global(.cm-editor.cm-editor .cm-changedLine) {
+    background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  }
+
+  :global(.cm-editor.cm-editor .cm-changedText) {
+    background: color-mix(in srgb, var(--color-success) 22%, transparent);
+  }
+
+  :global(.cm-editor.cm-editor .cm-changedLineGutter) {
+    background: var(--color-success);
+  }
+
+  // Удалённый код в файле уже отсутствует: он показан серой вставкой, которую
+  // нельзя править и которая никуда не сохраняется, — только память о том, что
+  // здесь было. grayscale гасит подсветку синтаксиса внутри куска: иначе старая
+  // строка выглядит такой же живой, как новая, и глазу не за что зацепиться.
+  :global(.cm-editor.cm-editor .cm-deletedChunk) {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg-subtle);
+    border-left: 3px solid var(--color-border-strong);
+    filter: grayscale(1) opacity(0.85);
+  }
+
+  :global(.cm-editor.cm-editor .cm-deletedChunk .cm-deletedText) {
+    background: color-mix(in srgb, var(--color-fg-subtle) 22%, transparent);
+  }
+
+  :global(.cm-editor.cm-editor .cm-deletedLineGutter) {
+    background: var(--color-border-strong);
+  }
+}
+
+:global(:root[data-theme='dark']) .editor {
+  --code-keyword: #d2a8ff;
+  --code-string: #7ee787;
+  --code-comment: #8b949e;
+  --code-number: #79c0ff;
+  --code-function: #d2a8ff;
+  --code-type: #ffa657;
+  --code-property: #79c0ff;
+  --code-punctuation: #9aa2b1;
+}

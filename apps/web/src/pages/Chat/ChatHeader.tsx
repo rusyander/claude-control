@@ -43,6 +43,7 @@ export function ChatHeader({
   onEffortChange,
   isEditorPending,
   onOpenEditor,
+  onOpenCode,
   allowEdits,
   onAllowEditsChange,
   autoApprove,
@@ -112,15 +113,30 @@ export function ChatHeader({
         />
 
         {isProjectContext && projectPath && (
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Icon name="scripts" size={20} />}
-            isLoading={isEditorPending}
-            onClick={() => onOpenEditor(projectPath)}
-          >
-            {t('projects.openInEditor')}
-          </Button>
+          <>
+            {/* Код проекта прямо в панели: дерево файлов, дифф правок агента за
+                этот разговор и правка на месте. Стоит перед «Открыть в
+                редакторе» намеренно — это ответ на тот же вопрос («что он
+                натворил»), только не требующий уходить из панели. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<Icon name="file" size={20} />}
+              onClick={onOpenCode}
+            >
+              {t('projectCode.open')}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<Icon name="scripts" size={20} />}
+              isLoading={isEditorPending}
+              onClick={() => onOpenEditor(projectPath)}
+            >
+              {t('projects.openInEditor')}
+            </Button>
+          </>
         )}
 
         {/* Запуск/остановка dev-сервера проекта + «Перейти» — в том же ряду,

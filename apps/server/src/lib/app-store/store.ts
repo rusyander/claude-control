@@ -6,9 +6,18 @@ import type {
   Group,
   Hook,
   Project,
+  ProjectCodeLayout,
+  ProjectCodeView,
   ProviderCheckResult,
 } from '@claude-control/contracts';
 import { writeJsonFile } from '../safe-io.ts';
+import {
+  forgetCodeView as dropCodeView,
+  getCodeLayout as readCodeLayout,
+  getCodeView as readCodeView,
+  setCodeLayout as writeCodeLayout,
+  setCodeView as writeCodeView,
+} from './code-view.ts';
 import type { AppState, RunnerPrefs, RunnerTargetMeta } from './app-store.types.ts';
 import { mergeState, readStateFile, stateFilePath } from './state-file.ts';
 import {
@@ -282,5 +291,27 @@ export class AppStore {
 
   listAutostartProjects(): RunnerPrefs[] {
     return listAutostartTargets(this.state);
+  }
+
+  getCodeLayout(): ProjectCodeLayout {
+    return readCodeLayout(this.state);
+  }
+
+  setCodeLayout(layout: ProjectCodeLayout): void {
+    writeCodeLayout(this.state, layout);
+    this.persist();
+  }
+
+  getCodeView(path: string): ProjectCodeView | undefined {
+    return readCodeView(this.state, path);
+  }
+
+  setCodeView(path: string, view: ProjectCodeView): void {
+    writeCodeView(this.state, path, view);
+    this.persist();
+  }
+
+  forgetCodeView(path: string): void {
+    if (dropCodeView(this.state, path)) this.persist();
   }
 }

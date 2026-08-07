@@ -120,6 +120,7 @@ export const helpEn: HelpSchema = {
       canVoice: 'Dictate a request by voice',
       canStop: 'Stop one agent or all of them at once',
       canEditor: 'Open the project in your code editor with one button',
+      canCode: 'View and edit project code inside the panel, with a diff of the agent’s edits',
       canContinue: 'Continue any past conversation, including ones started in the terminal',
       canFork:
         'Branch the conversation: editing your own message goes off as a new branch ' +
@@ -250,6 +251,93 @@ export const helpEn: HelpSchema = {
         'the only operation that reaches the network and may merge: on a conflict the ' +
         'working tree stays in conflict and you sort it out in a terminal. The panel never ' +
         'pushes or deletes branches.',
+
+      codeTitle: 'Project code: what the agent changed, and editing on the spot',
+      codeCaption:
+        'The “Project code” button in the project tab header opens a window: files on ' +
+        'the left, one file on the right with syntax highlighting and this ' +
+        'conversation’s edits.',
+      codeTree: 'Two lists on the left',
+      codeTreeText:
+        '“Changed” is a flat list of files the agent touched in THIS conversation, with ' +
+        'the count of added and removed lines; its first file is loaded right away. ' +
+        '“All files” is the whole project tree: a changed file is marked there with a ' +
+        'green name and line counts, and every folder on the way to it carries a green ' +
+        'dot, so the result of a run is visible without expanding everything. The tree ' +
+        'is loaded one expanded folder at a time; build directories (node_modules, ' +
+        'dist, .git and the like) are not shown at all. The lists and the code scroll ' +
+        'on their own — the window itself never moves. The border between the list and ' +
+        'the code can be dragged with the mouse or moved with the left/right arrows; ' +
+        'the chosen width is remembered ONCE for the panel and applies to every project.',
+      codeMemory: 'Tab memory',
+      codeMemoryText:
+        'The open file, the expanded folders and the display modes are remembered per ' +
+        'project tab and restored the next time the window opens. This lives in the ' +
+        'panel’s state on disk, not in the browser: clearing the cache or switching ' +
+        'browsers does not lose it. Close the project tab and the record is erased — ' +
+        'next time the window opens from scratch.',
+      codePreview: 'Not only code',
+      codePreviewText:
+        'Images (png, jpg, gif, webp, avif, bmp, ico) and PDFs open as images and ' +
+        'documents rather than a “binary file” notice. SVG and Markdown get two tabs: ' +
+        '“Code” — the source with every edit and the diff, “Preview” — what it turns ' +
+        'into. A file that has a preview opens on it; the one exception is an unsaved ' +
+        'edit — you come back to it in “Code”. The SVG and Markdown preview is built ' +
+        'from the TEXT IN THE EDITOR, so an edit is visible before saving. Images and PDFs are ' +
+        'fetched from the panel by the browser itself; formats the browser would ' +
+        'execute (html and the svg file itself) are never served that way.',
+      codeDiff: 'Green and grey',
+      codeDiffText:
+        'Green marks the lines the agent added — they really are in the file. The grey ' +
+        'blocks between lines show what used to be there: that code is gone from the ' +
+        'file, cannot be edited and is never saved anywhere. The “Agent edits” toggle ' +
+        'turns the highlighting off and leaves a plain editor.',
+      codeEdit: 'Editing and saving',
+      codeEditText:
+        'The file is edited right in the window: syntax highlighting, line numbers, ' +
+        'in-file search, undo. The “Save” button or Ctrl+S (⌘S) writes it. The edit goes ' +
+        'into the real project file, and the previous version goes into the panel’s ' +
+        'backups, where it can be restored from.',
+      codeLimitsTitle: 'The diff is derived from the transcript, and that has limits',
+      codeLimitsText:
+        'The previous text is stored nowhere — the panel rebuilds it by rolling the ' +
+        'agent’s edits back over the current file. So: a file the agent overwrote whole ' +
+        '(the Write tool) shows up as entirely new — the transcript holds no previous ' +
+        'text; an edit whose fragment was later rewritten outside this chat counts as ' +
+        'unmatched, and the panel says how many there are. What is not shown is stated ' +
+        'as such; the panel will not invent the agent’s work for it.',
+      codeSaveTitle: 'Concurrent writes',
+      codeSaveText:
+        'If the agent changed the file while it was open, saving is refused: the panel ' +
+        'checks the write time on disk and will not let you silently overwrite someone ' +
+        'else’s work. Reload the file (reopen it in the tree) and reapply your edit.',
+
+      askTitle: 'Agent question: the “Your choice is needed” card',
+      askCaption:
+        'When the agent needs a decision it asks a question — sometimes several at ' +
+        'once. You can answer right in the chat instead of switching to the terminal.',
+      askOrder: 'One question at a time',
+      askOrderText:
+        'Exactly one question is active; the next ones are visible but dimmed. The ' +
+        'answer to the whole card goes out as ONE message, so answering out of order ' +
+        'would drop the remaining questions on the way. A question marked “multiple ' +
+        'choices allowed” is closed by the “Next” button, not by the first tick.',
+      askChange: 'A misclick is fixable',
+      askChangeText:
+        'An answered question collapses into a “what was asked — what was chosen” ' +
+        'line with a “Change” button next to it: you can go back and re-answer before ' +
+        'sending. A single question with a single choice is sent on the click itself — ' +
+        'there is nothing to confirm there.',
+      askSent: 'Sent — and it shows',
+      askSentText:
+        'Once sent, the card dims and says “Answer sent — the agent is thinking”. That ' +
+        'happens on the click, not on the server reply: the agent answers in tens of ' +
+        'seconds, and all that time it must be obvious the click went through.',
+      askOldTitle: 'An old question cannot be answered',
+      askOldText:
+        'Only the LAST message in the feed is answerable. In a question from the ' +
+        'middle of the history the options are plain text rather than buttons: it was ' +
+        'closed long ago, and a click would send the agent a remark out of nowhere.',
 
       dotsTitle: 'Coloured dots: what the agent is doing',
       dotsCaption:

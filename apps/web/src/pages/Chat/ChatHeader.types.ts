@@ -29,6 +29,8 @@ export interface ChatHeaderProps {
 
   isEditorPending: boolean;
   onOpenEditor: (path: string) => void;
+  /** Открыть окно кода проекта: дерево файлов и дифф правок этого разговора. */
+  onOpenCode: () => void;
 
   allowEdits: boolean;
   onAllowEditsChange: (value: boolean) => void;

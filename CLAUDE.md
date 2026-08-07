@@ -47,8 +47,9 @@ Fix without asking: project code, deps, build config, launch env. Ask first: fil
 the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
 QA runs live in `tools/qa/` and need `pnpm dev` up + `pnpm qa:setup`; each drives the real UI of one
-area. Two behave unlike the rest: `check-attention.mjs` and `check-provider-chat.mjs` stub their
-API, so they depend on no particular history and on no installed CLI.
+area. Three behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
+`check-project-code.mjs` stub their API, so they depend on no particular history and on no installed
+CLI.
 
 ## Symptom → cause → fix
 
@@ -128,8 +129,14 @@ prompt rebuild, streamed stdout — `domains/provider-chat/`, which never touche
 that separation is the regress guarantee. DLP proxy between a CLI and the model (127.0.0.1 only, no
 TLS interception, fail-closed on an unparsed body) `domains/dlp/`; the `UserPromptSubmit` gate built
 on the same rules — block/warn only, the event cannot rewrite a prompt — `domains/prompt-gate/` —
-read `.agent/provider-tools.agent.md` before touching either. Per-section provider domains
-(`provider-{mcp,permissions,rules,skills,plugins,hooks,…}`) follow the facade+folder idiom.
+read `.agent/provider-tools.agent.md` before touching either. Project file tree, read/write of one
+file, and the diff baseline replayed BACKWARDS out of the chat transcript (`Edit`/`Write` calls
+undone over the current bytes — never git) `domains/project-files/` + `routes/project-files-routes.ts`;
+what the code window remembered per project tab `lib/app-store/code-view.ts`. Which formats show as
+something other than text, and the byte-serving allowlist behind `GET /api/project-files/raw`,
+`domains/project-files/media.ts` — extension decides, and the list holds no type a browser would
+EXECUTE (no `text/html`, no `image/svg+xml`; SVG is drawn client-side inside `<img>`). Per-section provider
+domains (`provider-{mcp,permissions,rules,skills,plugins,hooks,…}`) follow the facade+folder idiom.
 
 **Web** `apps/web/src/`, FSD layers `app` → `pages` → `features` → `entities` → `shared` — UI kit
 `shared/ui/` (each component has `*.stories.tsx`) · browser badge & dots `shared/lib/attention/` ·
@@ -137,7 +144,11 @@ foreign-provider chat `pages/ProviderChat/` + `entities/ProviderChat/` (routed f
 `pages/Chat/ChatSection.tsx`) · dictionaries `shared/config/i18n/` · help texts
 `shared/config/i18n/help/` · help documents `pages/Help/topics/` + registry
 `pages/Help/model/topics.ts` · built-in slash-command catalog (hand-maintained, ru+en)
-`entities/Command/model/builtinCommands.ts`.
+`entities/Command/model/builtinCommands.ts` · code window of a project tab `features/ProjectCode/`
+
+- `entities/ProjectFile/`, opened from `pages/Chat/ChatHeader.tsx`. CodeMirror grammars are a
+  CURATED map, `features/ProjectCode/model/languages.ts` — literal `import()`s Vite can scan; never
+  `@codemirror/language-data`, whose runtime specifiers 504 as an outdated optimize dep.
 
 Storybook: `pnpm --filter @claude-control/web storybook` (120 stories, 30 doc pages); port 6006
 often taken → `-p 6019`.
@@ -148,10 +159,8 @@ Own database (source of truth is Claude Code's files) · own login (the CLI auth
 serving the built front from the server (`pnpm start` = API only; dev front lives on Vite,
 production must serve `dist` separately).
 
-**Stays a local single-user app — decided 2026-08-06, do not re-litigate.** Not a hosted service:
-the truth is the files on THIS machine, access comes from the CLI's own login, and exposing the
-panel would first require inventing auth, tenants and isolation that nothing here needs. Remote
-access = SSH tunnel, not a deploy. Electron was weighed and dropped too: it fixes nothing (the user
-still installs and logs into the CLI himself) and adds code signing, ~180 MB and an update channel.
-If shipping to another person ever comes up, the answer is an `npx` wrapper that boots the server
-and opens the browser — not a package format.
+**Stays a local single-user app — decided 2026-08-06, do not re-litigate.** The truth is the files
+on THIS machine and access comes from the CLI's own login, so hosting it would first mean inventing
+auth, tenants and isolation nothing here needs. Remote = SSH tunnel. Electron was weighed and
+dropped (fixes nothing, costs signing + ~180 MB + an update channel); shipping to another person
+would be an `npx` wrapper that boots the server and opens the browser.

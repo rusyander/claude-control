@@ -14,13 +14,15 @@ import styles from './ParallelLaunch.module.scss';
 /**
  * Запуск одного запроса сразу в нескольких проектах. Отмечаешь проекты, пишешь
  * одну задачу — в каждом стартует свой агент. За ними потом видно из пульта и по
- * цветным точкам на табах. По умолчанию только чтение: правки — осознанно.
+ * цветным точкам на табах. Правки по умолчанию разрешены — как и в обычном чате
+ * (`chatPrefsStore`): агент, которому нельзя писать, в проекте бесполезен, а
+ * выключить тумблер перед запуском можно тут же.
  */
 export function ParallelLaunch({ isOpen, onOpenChange, projects, onLaunch }: ParallelLaunchProps) {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [prompt, setPrompt] = useState('');
-  const [allowEdits, setAllowEdits] = useState(false);
+  const [allowEdits, setAllowEdits] = useState(true);
 
   // При каждом открытии — с чистого листа.
   useEffect(() => {

@@ -5,6 +5,8 @@ import type {
   Group,
   Hook,
   Project,
+  ProjectCodeLayout,
+  ProjectCodeView,
   ProviderCheckResult,
 } from '@claude-control/contracts';
 
@@ -107,6 +109,20 @@ export interface AppState {
    * берётся бейдж «проверен» вместо вечного «экспериментальный».
    */
   providerChecks: Record<string, ProviderCheckResult>;
+  /**
+   * Что открыто в окне кода у таба проекта: нормализованный путь → снимок
+   * (дерево, файл, режимы показа).
+   *
+   * На сервере, а не в браузере, по просьбе владельца: localStorage уходит
+   * вместе с чисткой кэша, а вкладка кода — рабочее место, которое обидно
+   * терять. Запись живёт, пока открыт таб; закрытие таба её стирает.
+   */
+  projectCodeViews: Record<string, ProjectCodeView>;
+  /**
+   * Раскладка окна кода — одна на панель. Ширина списка файлов не свойство
+   * проекта, а привычка человека: настроил один раз — ждёт её везде.
+   */
+  projectCodeLayout?: ProjectCodeLayout;
   /**
    * Verifier парольной фразы шифрования копий секретов. Не сама фраза, а её
    * производная (scrypt-хэш с солью): по нему проверяется, та ли фраза введена,

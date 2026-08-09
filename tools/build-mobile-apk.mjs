@@ -42,7 +42,7 @@
  * --keep-build`.
  */
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatGb, sweepMobileBuild } from './clean-mobile-build.mjs';
@@ -56,6 +56,19 @@ const isWindows = process.platform === 'win32';
 /** Промежуточные файлы обычно не нужны; `--keep-build` бережёт время пересборки. */
 const KEEP_BUILD = process.argv.includes('--keep-build');
 
+/**
+ * Адрес панели, который попадёт в сборку как значение по умолчанию: экран
+ * сопряжения покажет его заполненным, и APK можно отдать другому человеку, не
+ * диктуя адрес голосом. Источник — переменная `MOBILE_DEFAULT_URL` либо файл
+ * `apps/mobile/.panel-url` (он в игноре: тайлнет-имя машины личное, а
+ * репозиторий публичный). Токен так НЕ передаётся никогда: APK распаковывается
+ * одной командой, а токен равен полному доступу к машине.
+ */
+const urlFile = join(appsDir, 'mobile', '.panel-url');
+const defaultUrl = (
+  process.env.MOBILE_DEFAULT_URL ?? (existsSync(urlFile) ? readFileSync(urlFile, 'utf8') : '')
+).trim();
+
 if (!existsSync(join(androidDir, isWindows ? 'gradlew.bat' : 'gradlew'))) {
   console.error('Нет каталога android/ — сначала выполните expo prebuild в apps/mobile.');
   process.exit(1);
@@ -68,7 +81,7 @@ function gradle(cwd, tasks) {
     cwd,
     stdio: 'inherit',
     shell: isWindows,
-    env: { ...process.env, CLAUDE_CONTROL_REPO_ROOT: root },
+    env: { ...process.env, CLAUDE_CONTROL_REPO_ROOT: root, MOBILE_DEFAULT_URL: defaultUrl },
   });
   return result.status === 0;
 }
@@ -93,6 +106,11 @@ if (existsSync(target)) {
   console.log(`Убран прежний ${outputName}`);
 }
 
+console.log(
+  defaultUrl
+    ? `Адрес панели в сборке: ${defaultUrl} (токен НЕ вшивается)`
+    : 'Адрес панели в сборке не задан — поле останется пустым (MOBILE_DEFAULT_URL или apps/mobile/.panel-url)',
+);
 console.log('Собираю релизный APK — первый раз это минут десять…');
 let built;
 

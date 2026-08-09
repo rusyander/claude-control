@@ -6,7 +6,7 @@ import type { RemotePairing } from '@claude-control/contracts';
 import { Button, Card, Field, Mono, Muted, Screen, Title } from '../src/shared/ui';
 import { colors, radius, space } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
-import { normalizeUrl, saveConnection } from '../src/shared/api/connection';
+import { bundledUrl, normalizeUrl, saveConnection } from '../src/shared/api/connection';
 import { registerForPush } from '../src/shared/lib/notifications';
 
 /**
@@ -21,7 +21,8 @@ export default function PairScreen() {
   const t = useT();
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const [url, setUrl] = useState('');
+  // Адрес из сборки — стартовое значение, а не жёсткое: своё всегда можно вписать.
+  const [url, setUrl] = useState(bundledUrl);
   const [token, setToken] = useState('');
   const [failed, setFailed] = useState('');
   const [saving, setSaving] = useState(false);

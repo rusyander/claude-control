@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 
 /**
@@ -13,6 +14,16 @@ import * as SecureStore from 'expo-secure-store';
 
 const KEY_URL = 'panel.url';
 const KEY_TOKEN = 'panel.token';
+
+/**
+ * Адрес, вшитый в сборку (`MOBILE_DEFAULT_URL` при `pnpm mobile:apk`). Нужен,
+ * когда APK отдают другому человеку: поле адреса уже заполнено, остаётся токен.
+ * Токен так не передаётся никогда — он равен полному доступу к машине.
+ */
+export function bundledUrl(): string {
+  const value = Constants.expoConfig?.extra?.defaultPanelUrl;
+  return typeof value === 'string' ? value.trim() : '';
+}
 
 export interface Connection {
   /** Базовый адрес API, без хвостового слэша, например `https://mac.tail.ts.net`. */

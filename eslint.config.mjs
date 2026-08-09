@@ -47,6 +47,30 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   /**
+   * Конфигурация Metro — единственный CommonJS в приложении на телефоне: её
+   * читает сам сборщик до всякой транспиляции, поэтому ни `import`, ни ESM-путь
+   * там невозможны.
+   */
+  {
+    files: ['apps/mobile/*.js'],
+    languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+  /**
+   * Приложение на React Native. Правила хуков те же, что у фронта: расхождение
+   * означало бы, что одна и та же ошибка ловится в браузере и проходит на
+   * телефоне. Экспорт по умолчанию здесь не запрещён — его требует expo-router:
+   * файл маршрута ОБЯЗАН отдавать компонент именно так.
+   */
+  {
+    files: ['apps/mobile/{app,src}/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+    },
+  },
+  /**
    * Правила хуков для фронта. Блок доктрины ниже нацелен на `src/**`, а код
    * этого монорепо лежит в `apps/web/src/**` — из-за чего плагин не был
    * подключён вовсе, и даже `eslint-disable react-hooks/...` считался ошибкой

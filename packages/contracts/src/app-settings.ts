@@ -11,6 +11,7 @@ import {
 import { endpointProfileSchema } from './endpoints';
 import { dlpSettingsSchema } from './dlp';
 import { promptGateSettingsSchema } from './prompt-gate';
+import { remoteAccessSettingsSchema } from './remote';
 
 /**
  * Тариф за миллион токенов. Панель считает по нему справочную стоимость —
@@ -210,6 +211,12 @@ export const appSettingsSchema = object({
    * намеренно: два списка «что защищать» разошлись бы в первую же неделю.
    */
   promptGate: promptGateSettingsSchema.default(() => promptGateSettingsSchema.parse({})),
+  /**
+   * Доступ с телефона. Выключено — API живёт как жил, на петле и без токена;
+   * включено — токен обязателен всем, включая свой интерфейс (его подставляет
+   * прокси Vite, потому что он на той же машине и читает файл токена сам).
+   */
+  remoteAccess: remoteAccessSettingsSchema.default(() => remoteAccessSettingsSchema.parse({})),
 });
 
 export type AppSettings = Infer<typeof appSettingsSchema>;

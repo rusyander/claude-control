@@ -13,6 +13,7 @@ import {
   useCreateBranch,
   useCommitAll,
   usePullChanges,
+  usePushBranch,
 } from '@entities/ProjectGit';
 import { STATUS_LETTER, pullBody, splitPath } from '../model/projectGitView';
 import type { ProjectGitControlsProps } from './ProjectGitControls.types';
@@ -46,13 +47,15 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
   const create = useCreateBranch();
   const commit = useCommitAll();
   const pull = usePullChanges();
+  const push = usePushBranch();
 
   const info = git.data;
   // Нет репозитория — раздела нет. Пока состояние не пришло, кнопку тоже не
   // показываем: мигать ею у проекта без git было бы неправдой.
   if (!info?.isRepo) return null;
 
-  const busy = checkout.isPending || create.isPending || commit.isPending || pull.isPending;
+  const busy =
+    checkout.isPending || create.isPending || commit.isPending || pull.isPending || push.isPending;
   const branchLabel = info.branch ?? (info.detached ? t('git.detached') : t('git.noBranch'));
   const behind = info.behind ?? 0;
 
@@ -86,6 +89,10 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
 
   const onPull = (): void => {
     pull.mutate(pullBody(path, pullFrom), { onSuccess: done, onError: failed });
+  };
+
+  const onPush = (): void => {
+    push.mutate({ path }, { onSuccess: done, onError: failed });
   };
 
   const onCommit = (): void => {
@@ -228,6 +235,31 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
                         onClick={onPull}
                       >
                         {t('git.pullAction')}
+                      </Button>
+                    </Stack>
+                  </label>
+
+                  {/* Push стоит следом за pull: это та же ось «мы и удалённый»,
+                      и после коммита взгляд идёт сюда. Отправляется ТОЛЬКО
+                      текущая ветка; выбирать нечего, поэтому и селекта нет.
+                      Кнопка выключена там, где push невозможен по существу:
+                      нет удалённого, нет коммитов, HEAD отцеплен от ветки. */}
+                  <label className={styles.row}>
+                    <Typography variant="body-sm" weight="medium" as="span">
+                      {t('git.push')}
+                    </Typography>
+                    <Stack direction="row" gap="var(--spacing-2xs)">
+                      <Typography variant="caption" color="subtle">
+                        {info.ahead ? t('git.ahead', { count: info.ahead }) : t('git.pushNothing')}
+                      </Typography>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        isLoading={push.isPending}
+                        disabled={busy || !info.remote || info.unborn || info.detached}
+                        onClick={onPush}
+                      >
+                        {t('git.pushAction')}
                       </Button>
                     </Stack>
                   </label>

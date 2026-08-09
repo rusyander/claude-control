@@ -15,6 +15,7 @@ import {
   parseStatus,
   pickRemote,
   pullChanges,
+  pushBranch,
   readProjectGit,
 } from './project-git.ts';
 
@@ -312,6 +313,15 @@ describe.skipIf(!GIT_AVAILABLE)('операции на настоящем реп
     expect(info.remoteBranches).toEqual([]);
     await expect(pullChanges(dir, 'main')).rejects.toBeInstanceOf(GitError);
   });
+
+  it('без удалённых push отказывает: отправлять некуда', async () => {
+    await expect(pushBranch(dir)).rejects.toBeInstanceOf(GitError);
+  });
+
+  it('с отцепленным HEAD push отказывает: ветки нет', async () => {
+    git('checkout', '--detach');
+    await expect(pushBranch(dir)).rejects.toBeInstanceOf(GitError);
+  });
 });
 
 /**
@@ -399,5 +409,38 @@ describe.skipIf(!GIT_AVAILABLE)('pull на настоящих репозитор
     run(dir, 'add', '-A');
     run(dir, 'commit', '-m', 'local');
     await expect(pullChanges(dir)).rejects.toBeInstanceOf(GitError);
+  });
+
+  it('push отправляет коммит текущей ветки в удалённый', async () => {
+    writeFileSync(join(dir, 'mine.txt'), 'mine\n');
+    run(dir, 'add', '-A');
+    run(dir, 'commit', '-m', 'mine');
+    expect((await readProjectGit(dir)).ahead).toBe(1);
+
+    await pushBranch(dir);
+    expect((await readProjectGit(dir)).ahead).toBe(0);
+
+    // Доказательство, что коммит дошёл именно до удалённого, а не остался
+    // локальным: второй клон его видит после обычного pull.
+    run(other, 'pull', 'origin', 'main');
+    expect(existsSync(join(other, 'mine.txt'))).toBe(true);
+  });
+
+  it('новая ветка уходит с --set-upstream: первый push не требует терминала', async () => {
+    run(dir, 'checkout', '-b', 'feature/panel');
+    writeFileSync(join(dir, 'feature.txt'), 'x\n');
+    run(dir, 'add', '-A');
+    run(dir, 'commit', '-m', 'feature');
+
+    // До отправки upstream у ветки нет — именно этот случай раньше требовал
+    // руками написать `git push -u origin <ветка>`.
+    expect((await readProjectGit(dir)).ahead).toBeUndefined();
+    await pushBranch(dir);
+    expect((await readProjectGit(dir)).ahead).toBe(0);
+  });
+
+  it('отправлять нечего — это не ошибка: git отвечает «всё уже там»', async () => {
+    const output = await pushBranch(dir);
+    expect(output.length).toBeGreaterThan(0);
   });
 });

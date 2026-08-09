@@ -147,6 +147,23 @@ for (const [label, port] of ports) {
 if (existsSync(join(process.cwd(), 'node_modules'))) ok('Зависимости установлены');
 else fail('Зависимости не установлены', 'Выполните: pnpm install');
 
+// === Место под телефонное приложение ===
+// Нативная сборка оставляет объектные файлы внутри node_modules — гигабайты,
+// которых нет ни в APK, ни в репозитории. Сборка убирает их за собой, но
+// прерванная сборка или `--keep-build` могут их оставить.
+if (existsSync(join(process.cwd(), 'apps', 'mobile', 'android'))) {
+  const { mobileBuildFootprint, formatGb } = await import('./clean-mobile-build.mjs');
+  const bytes = mobileBuildFootprint();
+  if (bytes > 2 * 1024 ** 3) {
+    warn(
+      `Промежуточные файлы сборки телефона: ${formatGb(bytes)}`,
+      'Это мусор нативной сборки внутри node_modules. Уберите: pnpm mobile:clean',
+    );
+  } else if (bytes > 0) {
+    ok(`Промежуточные файлы сборки телефона: ${formatGb(bytes)}`);
+  }
+}
+
 // === Вывод ===
 const MARK = { ok: '✓', warn: '!', fail: '✗' };
 

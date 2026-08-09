@@ -1,0 +1,44 @@
+/**
+ * Карточка удалённого доступа. Единственное, что здесь нестандартно, — блок
+ * спаривания: QR-код и токен показываются только по кнопке, поэтому у них своя
+ * рамка, отделяющая «то, что видно всем в комнате» от остальных настроек.
+ */
+.input {
+  width: 100%;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  font-size: var(--font-size-body-sm);
+}
+
+.pairing {
+  align-items: center;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-sunken);
+}
+
+.qr {
+  width: 240px;
+  height: 240px;
+  border-radius: var(--radius-sm);
+  // Код рисуется чёрным по белому: инвертированный на тёмной теме камера
+  // читает через раз, а «через раз» здесь означает «человек решил, что не работает».
+  background-color: #fff;
+}
+
+.token {
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  word-break: break-all;
+}
+
+.device {
+  justify-content: space-between;
+}

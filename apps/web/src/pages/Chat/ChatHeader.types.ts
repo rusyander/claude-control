@@ -31,6 +31,7 @@ export interface ChatHeaderProps {
   onOpenEditor: (path: string) => void;
   /** Открыть окно кода проекта: дерево файлов и дифф правок этого разговора. */
   onOpenCode: () => void;
+  onOpenTests: () => void;
 
   allowEdits: boolean;
   onAllowEditsChange: (value: boolean) => void;

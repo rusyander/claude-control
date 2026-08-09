@@ -2,7 +2,8 @@ import { join } from 'node:path';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { ServerContext } from './context.ts';
-import { allowedOrigins, isRequestAllowed } from './lib/origin-guard.ts';
+import { allowedOrigins, isOAuthCallback, isRequestAllowed } from './lib/origin-guard.ts';
+import { isValidApiToken, presentedToken, readApiToken } from './lib/api-token.ts';
 import { createConfigWatcher } from './lib/config-watcher.ts';
 import { registerConfigRoutes } from './routes/config-routes.ts';
 import { registerEnvTransferRoutes } from './routes/env-transfer-routes.ts';
@@ -38,13 +39,17 @@ import { registerProviderProjectRoutes } from './routes/provider-project-routes.
 import { registerProjectRunnerRoutes } from './routes/project-runner-routes.ts';
 import { registerProjectGitRoutes } from './routes/project-git-routes.ts';
 import { registerProjectFilesRoutes } from './routes/project-files-routes.ts';
+import { registerProjectTestsRoutes } from './routes/project-tests-routes.ts';
 import { registerProviderChatRoutes } from './routes/provider-chat-routes.ts';
 import { registerDlpRoutes } from './routes/dlp-routes.ts';
 import { registerPromptGateRoutes } from './routes/prompt-gate-routes.ts';
+import { registerRemoteRoutes } from './routes/remote-routes.ts';
+import { createRunNotifier } from './domains/remote-notify.ts';
 import type { RouteRegistrar } from './routes/register.ts';
 import { ChatRunRegistry } from './domains/chat/ChatRunRegistry.ts';
 import { ProviderChatService } from './domains/provider-chat.ts';
 import { ProjectRunnerRegistry, autostartProjects } from './domains/project-runner.ts';
+import { ProjectTestRunRegistry } from './domains/project-tests.ts';
 import { buildDlpRuntime, DlpProxy } from './domains/dlp.ts';
 import { startSandboxHousekeeping } from './domains/sandbox/SandboxConfig.ts';
 
@@ -64,20 +69,32 @@ const app = Fastify({ logger: { level: 'warn' } });
  */
 app.addHook('onRequest', (request, reply, done) => {
   const site = request.headers['sec-fetch-site'];
+  const guarded = {
+    method: request.method,
+    url: request.url,
+    origin: request.headers.origin,
+    site: typeof site === 'string' ? site : undefined,
+  };
 
-  const allowed = isRequestAllowed(
-    {
-      method: request.method,
-      url: request.url,
-      origin: request.headers.origin,
-      site: typeof site === 'string' ? site : undefined,
-    },
-    ALLOWED_ORIGINS,
-  );
-
-  if (!allowed) {
+  if (!isRequestAllowed(guarded, ALLOWED_ORIGINS)) {
     reply.code(403).send({ error: 'Запрос с постороннего сайта отклонён' });
     return;
+  }
+
+  /**
+   * Второй рубеж — токен, и он поднимается только при включённом удалённом
+   * доступе. Проверка Origin выше от телефона не защищает вовсе: заголовок
+   * подделывает любой не-браузерный клиент, а через Tailscale Serve запрос
+   * приходит с петли и от местного неотличим. Поэтому включённый доступ требует
+   * токен ОТ ВСЕХ, включая свой интерфейс: прокси Vite подставляет его сам,
+   * читая тот же файл на той же машине.
+   */
+  if (ctx.store.getSettings().remoteAccess.enabled && !isOAuthCallback(guarded)) {
+    const presented = presentedToken(request.headers.authorization, request.query);
+    if (!isValidApiToken(presented, readApiToken())) {
+      reply.code(401).send({ error: 'Нужен токен доступа' });
+      return;
+    }
   }
 
   done();
@@ -115,6 +132,20 @@ const projectRunner = new ProjectRunnerRegistry({
   },
 });
 const chatRuns = new ChatRunRegistry();
+// Прогоны тестов — третий такой объект: агент ходит по кейсам минутами, и
+// оборванный при выходе панели процесс остался бы висеть с полным доступом.
+const projectTestRuns = new ProjectTestRunRegistry();
+/**
+ * Уведомления на телефон. Реестр прогонов знает, ЧТО случилось, но не знает ни
+ * про устройства, ни про настройку — поэтому отправитель собирается здесь и
+ * подаётся реестру тем же приёмом, что и оценка стоимости шага.
+ */
+const notifyRun = createRunNotifier({
+  isEnabled: () => ctx.store.getSettings().remoteAccess.notify,
+  devices: () => ctx.store.getPushDevices(),
+  forget: (token) => ctx.store.removePushDevice(token),
+});
+chatRuns.setNotifier(notifyRun);
 const providerChats = new ProviderChatService();
 // Прокси защиты данных: тоже слушатель, тоже переживает запрос. Создаётся
 // всегда, поднимается — только если человек включил его в настройках.
@@ -162,7 +193,9 @@ const ROUTES: RouteRegistrar[] = [
   (instance, context) => registerChatRoutes(instance, context, chatRuns),
   (instance, context) => registerProviderChatRoutes(instance, context, providerChats),
   (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
+  (instance, context) => registerProjectTestsRoutes(instance, context, projectTestRuns),
   (instance, context) => registerDlpRoutes(instance, context, dlpProxy),
+  (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
   registerPromptGateRoutes,
 ];
 
@@ -175,11 +208,27 @@ for (const register of ROUTES) register(app, ctx);
  */
 const subscribers = new Set<(event: string) => void>();
 
+/**
+ * Как часто в поток уходит пустой комментарий.
+ *
+ * Молчащее соединение рвут все, кто стоит между браузером и сервером, — прокси
+ * разработки, NAT, спящий ноутбук, — и рвут ТИХО: сокет остаётся полуоткрытым,
+ * ошибки браузер не видит, переподключаться не начинает. Панель после этого
+ * живёт снимком: новый разговор из терминала или с телефона в списке не
+ * появляется, лента не дописывается, и всё чинится только перезагрузкой
+ * страницы. Регулярный байт в поток не даёт соединению замолчать, а если оно
+ * всё-таки оборвалось — обрыв становится ЯВНЫМ, и клиент переподключается сам.
+ */
+const HEARTBEAT_MS = 25_000;
+
 app.get('/api/events', (request, reply) => {
   reply.raw.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    // Прокси разработки и обратные прокси иначе копят ответ в буфере: события
+    // приходят пачкой через минуту вместо того, чтобы приходить сразу.
+    'X-Accel-Buffering': 'no',
   });
   reply.raw.write(': connected\n\n');
 
@@ -188,7 +237,12 @@ app.get('/api/events', (request, reply) => {
   };
   subscribers.add(send);
 
+  const heartbeat = setInterval(() => reply.raw.write(': ping\n\n'), HEARTBEAT_MS);
+  // Таймер не должен держать процесс живым на выходе.
+  heartbeat.unref?.();
+
   request.raw.on('close', () => {
+    clearInterval(heartbeat);
     subscribers.delete(send);
   });
 });
@@ -226,6 +280,7 @@ const sandboxSweep = startSandboxHousekeeping();
 const shutdownRunners = (): void => {
   projectRunner.stopAll();
   providerChats.stopAll();
+  projectTestRuns.stopAll();
 };
 process.on('exit', shutdownRunners);
 process.on('SIGINT', () => {

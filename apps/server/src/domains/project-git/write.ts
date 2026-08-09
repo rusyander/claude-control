@@ -9,8 +9,13 @@ import { git, GitError } from './exec.ts';
 import { isGitRepo, readProjectGit } from './read.ts';
 
 /**
- * Операции записи: переключение ветки, создание ветки, коммит и pull. Пуши,
- * ребейзы и удаление веток панель не делает намеренно.
+ * Операции записи: переключение ветки, создание ветки, коммит, pull и push.
+ * Ребейзов и удаления веток панель не делает намеренно.
+ *
+ * Push появился вместе с приложением на телефоне: закоммитить с дороги и не
+ * иметь возможности отправить — половина работы. Отправляется ТОЛЬКО текущая
+ * ветка и только вперёд: `--force` и явный refspec не передаются нигде, так что
+ * чужую историю эта кнопка переписать не может.
  *
  * Сверх запуска без оболочки имя ветки проходит через `git check-ref-format
  * --branch` — это задокументированная проверка самого git, и придумывать свою
@@ -117,6 +122,31 @@ export async function pullChanges(projectDir: string, branch?: string): Promise<
   }
   const out = await git(projectDir, ['pull', info.remote, value], GIT_NETWORK_TIMEOUT_MS);
   return out.trim() || `Обновлено из ${info.remote}/${value}`;
+}
+
+/**
+ * Отправить текущую ветку. Без upstream — `push --set-upstream <remote> <ветка>`,
+ * с ним — голый `git push`: он сам знает, куда. Ветка берётся из ответа git, а
+ * не из запроса, поэтому отправить чужую ветку этой кнопкой нельзя.
+ *
+ * Отсутствие upstream видно по `ahead`: его считают только при нём.
+ */
+export async function pushBranch(projectDir: string): Promise<string> {
+  const info = await requireRepo(projectDir);
+  if (info.unborn) throw new GitError('В репозитории ещё нет коммитов — отправлять нечего');
+  if (info.detached) {
+    throw new GitError('HEAD отцеплен от ветки — переключитесь на ветку и повторите');
+  }
+  if (!info.branch) throw new GitError('Текущая ветка не определена');
+  if (!info.remote) throw new GitError('У репозитория нет удалённых — отправлять некуда');
+
+  const tracked = info.ahead !== undefined;
+  const args = tracked ? ['push'] : ['push', '--set-upstream', info.remote, info.branch];
+  const out = await git(projectDir, args, GIT_NETWORK_TIMEOUT_MS);
+  return (
+    out.trim() ||
+    (tracked ? `Отправлено в ${info.remote}` : `Ветка ${info.branch} отправлена в ${info.remote}`)
+  );
 }
 
 /**

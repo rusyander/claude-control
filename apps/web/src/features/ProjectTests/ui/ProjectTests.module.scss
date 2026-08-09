@@ -1,0 +1,133 @@
+// Окно тест-кейсов: пульт сверху, список кейсов под ним.
+//
+// Высоту задаёт окно (`bodyFill`): прокручивается ТОЛЬКО список. Пульт с
+// кнопками прогона и вкладки групп остаются на месте — иначе на трёхстах
+// кейсах «Остановить» уезжало бы за экран ровно тогда, когда оно нужнее всего.
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  // Двух пикселей хватает, чтобы рамка и кольцо фокуса крайнего поля не
+  // срезались краем окна: `overflow: hidden` режет их вплотную к границе.
+  padding: 2px;
+}
+
+.bar {
+  flex: none;
+}
+
+// Поле пожелания растягивается, кнопки прогона держат свою ширину справа.
+.scope {
+  flex: 1;
+  min-width: 220px;
+
+  // Поле само по себе держит ширину «поиска»; здесь оно должно занять всё
+  // свободное место, иначе подсказка обрезается на полуслове.
+  > * {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tabs {
+  flex: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+}
+
+// Строка кейса. Слева отметка выбора и статус, дальше текст, справа кнопки —
+// они появляются всегда, а не по наведению: на списке в сотни строк искать
+// исчезающую кнопку мышью невозможно.
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.rowFailed {
+  border-color: var(--color-danger);
+}
+
+.rowRunning {
+  border-color: var(--color-accent);
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+}
+
+// Заголовок кейса — кнопка раскрытия. Кнопка по умолчанию центрирует и
+// обрезает содержимое, поэтому её выравнивание снимается здесь целиком.
+.head {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.steps {
+  margin: 0;
+  padding-left: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+}
+
+.actions {
+  display: flex;
+  gap: var(--spacing-3xs);
+  align-items: center;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2xs);
+}
+
+// Лог прогона: моноширинный хвост вывода агента, отдельной прокруткой.
+.log {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  scrollbar-width: thin;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-subtle);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs);
+}
+
+.checkbox {
+  margin-top: 2px;
+}

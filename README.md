@@ -48,7 +48,8 @@ The panel answers them: a visible shape, a switch that deletes nothing, and a sa
 - **Sandbox** — test a rule, skill, hook or MCP server in isolation; a hook against a prepared or custom JSON event
 - **Chat** — a conversation with Claude Code inside the panel: streaming, attachments, voice, artifact preview, model and thinking depth, branching by editing a message, search, export to md/json
 - **Several projects at once** — tabs, parallel agents, dev servers launched from the tab: one target per package in a monorepo, each on its own port, autostarted when the panel boots
-- **Project git** — current branch, the list of changed files, switching, creating a branch, committing and `pull` right from the tab; the section shows up only when the project has a `.git`
+- **Project git** — current branch, the list of changed files, switching, creating a branch, committing, `pull` and `push` right from the tab; the section shows up only when the project has a `.git`
+- **From a phone** — an Android/iOS app (`apps/mobile`) over the same API: the whole chat, the project's files and diffs read-only, git `push`, all of analytics; paired once by QR, reachable over your own Tailscale network
 - **Search** — one query across rules, skills, hooks, scripts, permissions, env, MCP and plugins (secret values are never revealed)
 - **History** — a line-by-line diff over the backups, rollback of a whole file or of a single hunk
 - **Analytics** — token spend and estimated cost from local transcripts: hour heatmap, cache share, CSV/JSON export
@@ -183,7 +184,7 @@ What the panel adds is concurrency: each project gets its own tab and its own pr
 - **Edits are allowed by default,** and the toggle remembers its position — check it before handing a task to an unfamiliar repository. A stalled run offers "Retry" and "Allow and continue"; the second replays the request with full access, bypassing both the toggle and the Permissions section.
 - **Spend is visible immediately** — in tokens by default, because on a subscription dollars mean nothing; switch to money in Settings.
 - **A project tab is its dev server too.** "Start" takes the command from `package.json` (`dev`, otherwise `start`) or your own and runs it with the package manager the project actually uses — pnpm, yarn or npm, read from `packageManager` and the lock file. **The panel does not assign the port:** the app comes up on its own, and the panel reads the address from the output, opening the browser once the port answers. A monorepo has several targets — the gear lists the root and the packages, and they run at the same time. If a port is taken, the panel shows who holds it (name and PID) and offers to free it; it kills nothing on its own. "Autostart" brings a target up on the panel's _next_ start, **with no browser window and no navigation**; close the tab and it clears on all targets.
-- **Branch, files, commit and pull right there,** whenever the project has a `.git` (no `.git`, no section at all): the button carries the current branch, the number of changed files and how far behind the remote you are; under it sit the changed files, the local branches, the `pull` row, a new-branch field and a commit message field. `pull` goes into the current branch through its upstream, or from a chosen remote branch; it is the only operation that reaches the network and may merge — the panel neither resolves nor rolls back a conflict, git’s own text reaches you as is. No `push`, no branch deletion: this is not a git client, only what you need while an agent works in the repository. Under the hood: `git` with no shell, branch names validated by `git check-ref-format`, checkout and pull limited to names on the list, so a stray ref cannot walk HEAD into detached state.
+- **Branch, files, commit and pull right there,** whenever the project has a `.git` (no `.git`, no section at all): the button carries the current branch, the number of changed files and how far behind the remote you are; under it sit the changed files, the local branches, the `pull` row, a new-branch field and a commit message field. `pull` goes into the current branch through its upstream, or from a chosen remote branch; it is the operation that may merge — the panel neither resolves nor rolls back a conflict, git’s own text reaches you as is. `push` sends the current branch, setting the upstream on its first run; nothing is forced, and a rejected push comes back with git’s own words. No branch deletion, no force: this is not a git client, only what you need while an agent works in the repository. Under the hood: `git` with no shell, branch names validated by `git check-ref-format`, checkout and pull limited to names on the list, so a stray ref cannot walk HEAD into detached state.
 - **A run belongs to the server, not to the tab.** Closing the tab or hitting F5 only detaches a listener; the panel re-attaches to live runs, and a run that finished while the tab was closed makes it back into the feed within a grace minute, after which it lives only in the transcript. Session spend is counted server-side too. The real boundary is a server restart: the run registry lives in its memory.
 
 ## CLIs other than Claude
@@ -245,8 +246,10 @@ The tool sits on sensitive files by construction: full access to `~/.claude`, in
 
 **The API is closed to everything but your own UI.** Listening on `127.0.0.1` alone is not enough — a request from a page in your browser already comes from inside the loopback. So CORS is restricted to the panel's own origin (`localhost:8888` / `127.0.0.1:8888`, anything else gets 403 before the handler), requests marked `Sec-Fetch-Site: cross-site` are rejected (that covers forms and `<img>` tags aimed at foreign addresses), and values that end up in CLI arguments (session id, model, chat name, plugin id) are checked against an allowlist rather than escaped — `cmd.exe` quoting rules cannot be trusted. Verified against a live server: with a foreign `Origin`, reading configuration, reading secrets and installing a hook are all refused.
 
+**Remote access is the one deliberate exception, and it is off until you turn it on.** With it on, a request that does not come from the panel's own origin is served only if it carries the Bearer token generated on this machine — shown once as a QR code for the phone, never returned by the API afterwards, revoked by rotating it. The listen address does not change: the tunnel (Tailscale Serve) terminates on the machine itself and proxies to `127.0.0.1`, so nothing is published to the internet and there is no second account system to trust.
+
 > [!IMPORTANT]
-> Do not change the listen address to `0.0.0.0`, do not put the API behind a reverse proxy or tunnel, do not publish the port from a container. The API has no authentication by design: whoever reaches it reads your tokens and installs a hook — and a hook is a command Claude Code will run itself.
+> Do not change the listen address to `0.0.0.0`, do not publish the port from a container, do not park the API behind a proxy that drops the token check. With remote access off the API has no authentication by design: whoever reaches it reads your tokens and installs a hook — and a hook is a command Claude Code will run itself. With it on, that token is the only thing standing in the way: keep it inside your own tailnet and rotate it the moment a device is lost.
 
 **Worth knowing.** Sandboxes under `~/.claude-control/sandboxes/` hold a copy of `.credentials.json` and MCP `env` values in plain text; they are deleted on close, and ones abandoned after a crash are swept at the next server start (folders younger than a minute are left alone so two servers starting at once do not fight). Backups of `.mcp-secrets.env` are plain text too, with the original's permissions. `HookProbe.ts` contains a synthetic, non-working `glpat-…` string — bait for verifying that the secret-blocking hook fires. It is not a leak, but GitHub secret scanning will react to it.
 
@@ -260,6 +263,8 @@ pnpm dev
 ```
 
 The panel opens at **http://localhost:8888**, the API runs on **127.0.0.1:5178**.
+
+For the phone: turn on Settings → remote access, then `pnpm remote` (raises Tailscale Serve in front of the API and prints the address), scan the QR in the app, `pnpm remote:off` to take it down. The app itself is `apps/mobile` — `pnpm mobile` builds and installs it on a connected device or emulator, `pnpm mobile:apk` drops a release APK into the repository root (Android 12+). Tailscale must be installed and logged in under your own account; without it the panel says so instead of guessing an address.
 
 Anything unexpected — a port in use, an empty configuration directory, plugins not listing — is covered in **[SETUP.md](docs/SETUP.md)**, along with where `.claude` lives on each OS.
 
@@ -284,19 +289,25 @@ The core is portable: the home directory is always resolved through `os.homedir(
 apps/
   server/     Fastify API · TypeScript run directly by Node, no build step
   web/        React 19 + Vite · FSD layout, SCSS modules
+  mobile/     Expo + React Native · its own toolchain (npm, not the pnpm workspace)
 packages/
   contracts/  Shared zod schemas and types
 tools/qa/     Playwright scripts — screenshots, layout audit, flow checks
 ```
 
-| Command           | What it does                                                 |
-| ----------------- | ------------------------------------------------------------ |
-| `pnpm dev`        | Server and frontend together                                 |
-| `pnpm check`      | The full gate: format, types, lint, module boundaries, build |
-| `pnpm type-check` | TypeScript across all packages                               |
-| `pnpm lint`       | ESLint                                                       |
-| `pnpm depcruise`  | FSD layer boundaries                                         |
-| `pnpm qa:setup`   | Install the Chromium build the QA scripts need (once)        |
+| Command             | What it does                                                       |
+| ------------------- | ------------------------------------------------------------------ |
+| `pnpm dev`          | Server and frontend together                                       |
+| `pnpm check`        | The full gate: format, types, lint, module boundaries, build       |
+| `pnpm type-check`   | TypeScript across all packages                                     |
+| `pnpm lint`         | ESLint                                                             |
+| `pnpm depcruise`    | FSD layer boundaries                                               |
+| `pnpm qa:setup`     | Install the Chromium build the QA scripts need (once)              |
+| `pnpm mobile`       | Build the phone app and install it on a device or emulator         |
+| `pnpm mobile:apk`   | Release APK into the repository root                               |
+| `pnpm mobile:clean` | Drop leftover native build intermediates (`--dry` to only measure) |
+
+The phone app has its own chain because Gradle keeps every native library's intermediates inside `node_modules/<package>/android/{build,.cxx}` — about 10 GB per release build, reaching neither the APK nor the repository. `pnpm mobile:apk` wipes them itself once the APK is copied (`--keep-build` keeps them for a faster rebuild); `pnpm mobile:clean` is the manual route.
 
 QA scripts run against a live panel (`node tools/qa/audit-layout.mjs` and friends); point them elsewhere with `APP_URL`. FSD layer boundaries are machine-enforced by dependency-cruiser: imports only go downward, cross-feature imports are rejected. The server has no build step — Node runs TypeScript via `--experimental-strip-types`, which is why the Node floor is 22.6 and constructs needing real compilation (parameter properties, enums) are avoided.
 

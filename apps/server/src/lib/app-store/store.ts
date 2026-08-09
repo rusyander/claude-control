@@ -9,8 +9,14 @@ import type {
   ProjectCodeLayout,
   ProjectCodeView,
   ProviderCheckResult,
+  PushDevice,
 } from '@claude-control/contracts';
 import { writeJsonFile } from '../safe-io.ts';
+import {
+  addPushDevice as writePushDevice,
+  getPushDevices as readPushDevices,
+  removePushDevice as dropPushDevice,
+} from './devices.ts';
 import {
   forgetCodeView as dropCodeView,
   getCodeLayout as readCodeLayout,
@@ -127,6 +133,25 @@ export class AppStore {
   saveProviderCheck(result: ProviderCheckResult): void {
     this.state.providerChecks[result.provider] = result;
     this.persist();
+  }
+
+  /** Телефоны, которым уходят уведомления о прогонах. */
+  getPushDevices(): PushDevice[] {
+    return readPushDevices(this.state);
+  }
+
+  /** Приложение прислало свой push-токен — запомнить или обновить запись. */
+  addPushDevice(device: PushDevice): PushDevice[] {
+    const devices = writePushDevice(this.state, device);
+    this.persist();
+    return devices;
+  }
+
+  /** Отвязать телефон: руками из панели или потому, что токен больше не живой. */
+  removePushDevice(token: string): boolean {
+    const removed = dropPushDevice(this.state, token);
+    if (removed) this.persist();
+    return removed;
   }
 
   /** Verifier парольной фразы шифрования копий секретов (или undefined, если не задан). */

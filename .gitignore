@@ -12,3 +12,6 @@ storybook-static/
 
 # Отчёт о покрытии — генерируется `vitest run --coverage`, в историю не нужен
 coverage/
+
+# Релизный APK телефонного приложения — пересобирается `pnpm mobile:apk`
+claude-control.apk

@@ -60,6 +60,8 @@ export const queryKeys = {
   dlpJournal: ['dlp', 'journal'] as const,
   /** Гейт на промпте: настройки + что на самом деле лежит в каталоге хуков. */
   promptGate: ['prompt-gate'] as const,
+  /** Удалённый доступ: токен, адрес в приватной сети и спаренные телефоны. */
+  remote: ['remote'] as const,
   /** Сверка форматов чужих CLI с их официальными схемами: кэш на неделю. */
   formatCheck: ['format-check'] as const,
   /** Резолв раннера активного провайдера (api/cli/none) — модалка ассистента. */

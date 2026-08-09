@@ -44,6 +44,7 @@ export function ChatHeader({
   isEditorPending,
   onOpenEditor,
   onOpenCode,
+  onOpenTests,
   allowEdits,
   onAllowEditsChange,
   autoApprove,
@@ -125,6 +126,18 @@ export function ChatHeader({
               onClick={onOpenCode}
             >
               {t('projectCode.open')}
+            </Button>
+
+            {/* Тест-кейсы проекта: список того, что агент проверяет в
+                интерфейсе, и пульт прогона. Рядом с кодом намеренно — это два
+                ответа на один вопрос «в каком состоянии проект». */}
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<Icon name="check" size={20} />}
+              onClick={onOpenTests}
+            >
+              {t('projectTests.open')}
             </Button>
 
             <Button

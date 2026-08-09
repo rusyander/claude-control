@@ -81,6 +81,22 @@ export function SettingsTopic() {
         <Callout tone="info" title={tr('credsNote')} />
       </HelpSection>
 
+      <HelpSection title={tr('remoteTitle')} caption={tr('remoteCaption')}>
+        <Stack gap="var(--spacing-xs)">
+          <OptionCards
+            items={[
+              { title: tr('remoteAddress'), text: tr('remoteAddressText') },
+              { title: tr('remoteToken'), text: tr('remoteTokenText') },
+              { title: tr('remotePair'), text: tr('remotePairText') },
+              { title: tr('remoteNotify'), text: tr('remoteNotifyText') },
+            ]}
+          />
+          <Callout tone="warning" title={tr('remoteWarnTitle')}>
+            {tr('remoteWarnText')}
+          </Callout>
+        </Stack>
+      </HelpSection>
+
       <HelpSection title={tr('modelsTitle')} caption={tr('modelsCaption')}>
         <OptionCards
           items={[

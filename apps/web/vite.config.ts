@@ -1,8 +1,35 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 
 const API_PORT = Number(process.env.API_PORT ?? 5178);
+
+/**
+ * Токен доступа к API. При включённом удалённом доступе сервер требует его от
+ * ВСЕХ — иначе проверка не защищала бы ни от чего (Origin подделывает любой
+ * не-браузерный клиент). Браузеру токен взять неоткуда, а прокси живёт на той же
+ * машине и читает тот же файл, что и сервер, поэтому подставляет заголовок сам.
+ * Кэш на несколько секунд: смена токена подхватывается без перезапуска Vite.
+ */
+const TOKEN_PATH = join(homedir(), '.claude-control', 'api-token');
+const TOKEN_TTL_MS = 5_000;
+let tokenCache = { value: '', readAt: 0 };
+
+function apiToken(): string {
+  const now = Date.now();
+  if (now - tokenCache.readAt < TOKEN_TTL_MS) return tokenCache.value;
+  let value = '';
+  try {
+    if (existsSync(TOKEN_PATH)) value = readFileSync(TOKEN_PATH, 'utf8').trim();
+  } catch {
+    // Файла нет или он недоступен — значит удалённый доступ не настраивали.
+  }
+  tokenCache = { value, readAt: now };
+  return value;
+}
 
 export default defineConfig({
   plugins: [react()],
@@ -29,6 +56,12 @@ export default defineConfig({
       '/api': {
         target: `http://127.0.0.1:${API_PORT}`,
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            const token = apiToken();
+            if (token) proxyReq.setHeader('authorization', `Bearer ${token}`);
+          });
+        },
       },
     },
   },

@@ -26,6 +26,7 @@ import { AccountCard } from './AccountCard';
 import { ClaudeDirField } from './ClaudeDirField';
 import { CredentialsCard } from './CredentialsCard';
 import { EditorCard } from './EditorCard';
+import { RemoteAccessCard } from './RemoteAccessCard';
 import { PricingCard } from './PricingCard';
 import { BackupsCard } from './BackupsCard';
 import { EnvTransferCard } from './EnvTransferCard';
@@ -115,6 +116,10 @@ export function SettingsPage() {
       <ClaudeDirField />
 
       <CredentialsCard />
+
+      {/* Удалённый доступ стоит сразу за доступом к аккаунту: обе карточки про
+          то, кого панель пускает, — только одна про модель, а вторая про людей. */}
+      <RemoteAccessCard />
 
       <EditorCard />
 

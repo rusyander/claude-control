@@ -8,6 +8,7 @@ import {
   commitAll,
   createBranch,
   pullChanges,
+  pushBranch,
   readProjectGit,
 } from '../domains/project-git.ts';
 import { checkProjectDir } from '../domains/projects.ts';
@@ -129,4 +130,15 @@ export function registerProjectGitRoutes(app: FastifyInstance, _ctx: ServerConte
       return write(path, reply, () => pullChanges(path, branch));
     },
   );
+
+  /**
+   * Отправить текущую ветку. Тела сверх пути нет намеренно: что отправлять,
+   * решает состояние репозитория, а не запрос, — иначе кнопка «отправить»
+   * умела бы больше, чем показывает.
+   */
+  app.post<{ Body: { path?: string } }>('/api/project-git/push', async (request, reply) => {
+    const path = requirePath(request.body?.path, reply);
+    if (!path) return reply;
+    return write(path, reply, () => pushBranch(path));
+  });
 }

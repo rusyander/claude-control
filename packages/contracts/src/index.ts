@@ -42,6 +42,8 @@ export * from './projects';
 export * from './project-runner';
 export * from './project-git';
 export * from './project-files';
+export * from './project-tests';
 export * from './search';
 export * from './history';
+export * from './remote';
 export * from './api';

@@ -4,6 +4,8 @@ Auto-loaded every session → tight and English. Humans read [docs/SETUP.ru.md](
 answers to the user stay Russian.
 
 **Read on demand** (working notes, kept out of git — absent in a fresh clone):
+[.agent/code-map.agent.md](.agent/code-map.agent.md) — which module owns what, per app; read it
+before touching code you have not touched this session ·
 [.claude/gotchas.md](.claude/gotchas.md) — traps already paid for; read the
 entry BEFORE touching pricing/analytics, enable-disable of hooks/rules/groups, sessions & chat
 resume, MCP OAuth, secrets, help texts, Windows file ops ·
@@ -24,8 +26,16 @@ default and the only verified one. No database — **source of truth = Claude Co
 
 - `apps/server` — Fastify :5178, reads/writes `~/.claude`, spawns `claude`
 - `apps/web` — React + Vite :8888, proxies `/api`
+- `apps/mobile` — Expo (SDK 57 / RN 0.86) phone app over the same API, own toolchain (`npm`, not
+  the pnpm workspace); `pnpm mobile`, `pnpm mobile:type-check`, `pnpm mobile:apk` (release APK to
+  the repo root, gitignored, replaces the previous one), `pnpm mobile:clean`
 - `packages/contracts` — shared types + zod schemas
-- `tools/` — `doctor.mjs` (environment check), `qa/*.mjs` (Playwright runs)
+- `tools/` — `doctor.mjs` (environment check), `qa/*.mjs` (Playwright runs), `tailscale-serve.mjs`
+  (`pnpm remote` / `off`), `build-mobile-apk.mjs`, `clean-mobile-build.mjs` (Gradle hides native
+  intermediates in `node_modules/*/android/{build,.cxx}` — ~10 GB per release build, in neither APK
+  nor repo; the build sweeps them itself, `--keep-build` opts out, `--dry` measures),
+  `make-mobile-icons.mjs` (one SVG mark → every icon/splash size, so launcher, splash and favicon
+  cannot drift)
 
 Needs **Node 22.6+** (server runs with `--experimental-strip-types`), pnpm 10, `claude` in PATH.
 
@@ -61,13 +71,12 @@ remembered) → `env` (`CLAUDE_CONFIG_DIR`) → `home` (`~/.claude`). A once-set
 env var — if the user changed it and forgot, that's the answer.
 
 **Sandbox says `Not logged in` while normal chat works** — usually macOS, not an account problem:
-the sandbox substitutes `CLAUDE_CONFIG_DIR`, so access is carried separately. Windows/Linux keep it
-in `~/.claude/.credentials.json`; macOS has no such file (keychain). Chain in `lib/credentials.ts`,
-first hit wins: `~/.claude-control/credentials.json` (manual, beats all) →
-`<config>/.credentials.json` → macOS keychain → `ANTHROPIC_API_KEY`. Fix: read the access line of
-`pnpm doctor` → on macOS accept the keychain dialog with "Always Allow" (renamed entry →
-`CLAUDE_CONTROL_KEYCHAIN_SERVICE`) → universal route is Settings → Claude Code access, set manually
-(`claudeAiOauth` | `apiKey` | `readFrom`).
+the sandbox substitutes `CLAUDE_CONFIG_DIR`, so access is carried separately, and macOS has no
+`.credentials.json` at all (keychain). Chain in `lib/credentials.ts`, first hit wins:
+`~/.claude-control/credentials.json` (manual, beats all) → `<config>/.credentials.json` → macOS
+keychain → `ANTHROPIC_API_KEY`. Fix: read the access line of `pnpm doctor` → on macOS accept the
+keychain dialog with "Always Allow" (renamed entry → `CLAUDE_CONTROL_KEYCHAIN_SERVICE`) →
+universal route is Settings → Claude Code access (`claudeAiOauth` | `apiKey` | `readFrom`).
 
 **`claude not found`** — panel spawns `claude.cmd` on Windows, `claude` elsewhere; must be in the
 PATH of the process that started the server.
@@ -80,6 +89,15 @@ and `127.0.0.1:WEB_PORT`. Changed the front port → set `WEB_PORT` for the serv
 
 **`127.0.0.1:8888` dead but `localhost:8888` works** — Vite binds `127.0.0.1` explicitly
 (`vite.config.ts`). Reverse case = `localhost` resolves to `::1`.
+
+**Panel stays on a stale snapshot until F5** (a chat started elsewhere never shows up, an answer
+stops growing) — liveness has two independent legs, check both: `/api/events` must emit `: ping`
+every 25 s (`index.ts` — an idle SSE socket dies silently and `EventSource` never notices without
+a break it can see), and `FileWatchProvider` must reconnect on `visibilitychange`/`online`,
+invalidating everything on any non-first `onopen`. A run started OUTSIDE this window is adopted by
+polling `/chat/active` (`pages/Chat/model/useRunLifecycle.ts`), not by one shot on mount. Proof is
+`node tools/qa/check-live-sync.mjs`: it fires a run straight into the API, like the phone does, and
+never reloads the page.
 
 ## Working rules
 
@@ -101,8 +119,8 @@ call sites).
 
 Both apps' layer maps are machine-enforced by `.dependency-cruiser.cjs` (`pnpm depcruise`), NOT by
 ESLint — only dependency-cruiser has a path resolver (`tsconfig.depcruise.json`) and can tell an
-import into a foreign slice from a sibling file of one's own folder. `eslint.config.mjs` keeps only
-what needs no resolver (no default exports, no nested ternaries, `max-lines` 400 as a warning).
+import into a foreign slice from a sibling of one's own folder. `eslint.config.mjs` keeps only what
+needs no resolver (no default exports, no nested ternaries, `max-lines` 400 as a warning).
 
 - **Web**: `app → pages → features → entities → shared`, downward only, cross-feature forbidden
   (one exception, `features/ResourceFiles`, documented in the config); a foreign slice is reachable
@@ -116,42 +134,10 @@ what needs no resolver (no default exports, no nested ternaries, `max-lines` 400
 
 ## Where things live
 
-Only what a name does not give away — the rest is one `Grep` from here.
-
-**Server** `apps/server/src/` — config dir `lib/claude-paths.ts` · account access & OS differences
-`lib/credentials.ts` · CLI arg escaping `lib/cli-args.ts` · process spawn, both chat branches
-`lib/cli-spawn.ts` · safe write `lib/safe-io.ts` · path-containment guard shared by
-rules/skills/plugins `lib/section-fs.ts` · "foreign format not recognised" sentinel
-`lib/format-errors.ts` · provider catalog, CLI detect, settings validation `providers/` · pricing
-`domains/analytics/` · enable/disable on disk `domains/entity-toggle.ts` · Claude chat (spawn,
-stream, transcripts, SSE, cost) `domains/chat/` · chat of a FOREIGN provider — panel-owned JSONL,
-prompt rebuild, streamed stdout — `domains/provider-chat/`, which never touches the Claude branch:
-that separation is the regress guarantee. DLP proxy between a CLI and the model (127.0.0.1 only, no
-TLS interception, fail-closed on an unparsed body) `domains/dlp/`; the `UserPromptSubmit` gate built
-on the same rules — block/warn only, the event cannot rewrite a prompt — `domains/prompt-gate/` —
-read `.agent/provider-tools.agent.md` before touching either. Project file tree, read/write of one
-file, and the diff baseline replayed BACKWARDS out of the chat transcript (`Edit`/`Write` calls
-undone over the current bytes — never git) `domains/project-files/` + `routes/project-files-routes.ts`;
-what the code window remembered per project tab `lib/app-store/code-view.ts`. Which formats show as
-something other than text, and the byte-serving allowlist behind `GET /api/project-files/raw`,
-`domains/project-files/media.ts` — extension decides, and the list holds no type a browser would
-EXECUTE (no `text/html`, no `image/svg+xml`; SVG is drawn client-side inside `<img>`). Per-section provider
-domains (`provider-{mcp,permissions,rules,skills,plugins,hooks,…}`) follow the facade+folder idiom.
-
-**Web** `apps/web/src/`, FSD layers `app` → `pages` → `features` → `entities` → `shared` — UI kit
-`shared/ui/` (each component has `*.stories.tsx`) · browser badge & dots `shared/lib/attention/` ·
-foreign-provider chat `pages/ProviderChat/` + `entities/ProviderChat/` (routed from
-`pages/Chat/ChatSection.tsx`) · dictionaries `shared/config/i18n/` · help texts
-`shared/config/i18n/help/` · help documents `pages/Help/topics/` + registry
-`pages/Help/model/topics.ts` · built-in slash-command catalog (hand-maintained, ru+en)
-`entities/Command/model/builtinCommands.ts` · code window of a project tab `features/ProjectCode/`
-
-- `entities/ProjectFile/`, opened from `pages/Chat/ChatHeader.tsx`. CodeMirror grammars are a
-  CURATED map, `features/ProjectCode/model/languages.ts` — literal `import()`s Vite can scan; never
-  `@codemirror/language-data`, whose runtime specifiers 504 as an outdated optimize dep.
-
-Storybook: `pnpm --filter @claude-control/web storybook` (120 stories, 30 doc pages); port 6006
-often taken → `-p 6019`.
+Roots: `apps/server/src/` (Fastify) · `apps/web/src/` (React, FSD) · `apps/mobile/`
+(Expo) · `packages/contracts/` · `tools/`. Everything else — which module owns which behaviour, and
+the traps around it — is [.agent/code-map.agent.md](.agent/code-map.agent.md), read on demand
+before touching code. Keep it current in the same pass as the code; it is the map, not a changelog.
 
 ## Deliberately absent
 
@@ -161,6 +147,7 @@ production must serve `dist` separately).
 
 **Stays a local single-user app — decided 2026-08-06, do not re-litigate.** The truth is the files
 on THIS machine and access comes from the CLI's own login, so hosting it would first mean inventing
-auth, tenants and isolation nothing here needs. Remote = SSH tunnel. Electron was weighed and
-dropped (fixes nothing, costs signing + ~180 MB + an update channel); shipping to another person
-would be an `npx` wrapper that boots the server and opens the browser.
+auth, tenants and isolation nothing here needs. Remote (2026-08-09) does not change that: loopback
+bind, Tailscale Serve terminating on this machine, the phone as the SAME user with one opt-in
+Bearer token. Electron was weighed and dropped (fixes nothing, costs signing + ~180 MB + an update
+channel); shipping to another person would be an `npx` wrapper booting the server.

@@ -4,6 +4,7 @@ export {
   useCreateBranch,
   useCommitAll,
   usePullChanges,
+  usePushBranch,
   projectGitKey,
 } from './api/ProjectGitApi';
 export type {

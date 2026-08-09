@@ -16,6 +16,7 @@ import { WorkspaceTabs } from '@features/WorkspaceTabs';
 import { ParallelLaunch } from '@features/ParallelLaunch';
 import { FolderPicker } from '@features/FolderPicker';
 import { ProjectCodeModal } from '@features/ProjectCode';
+import { ProjectTestsModal } from '@features/ProjectTests';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { ChatMessages } from '@features/ChatMessages';
@@ -69,6 +70,7 @@ export function ChatPage() {
   const { allowEdits, setAllowEdits, autoApprove, setAutoApprove } = useChatPrefs();
   const [isFolderPickerOpen, setFolderPickerOpen] = useState(false);
   const [isCodeOpen, setCodeOpen] = useState(false);
+  const [isTestsOpen, setTestsOpen] = useState(false);
   const openEditor = useOpenInEditor();
   const { data: settings } = useSettings();
   const { data: modelCatalog } = useModelCatalog();
@@ -276,6 +278,7 @@ export function ChatPage() {
             isEditorPending={openEditor.isPending}
             onOpenEditor={(path) => openEditor.mutate(path)}
             onOpenCode={() => setCodeOpen(true)}
+            onOpenTests={() => setTestsOpen(true)}
             allowEdits={allowEdits}
             onAllowEditsChange={setAllowEdits}
             autoApprove={autoApprove}
@@ -378,6 +381,16 @@ export function ChatPage() {
           onOpenChange={setCodeOpen}
           projectPath={projectPath}
           chatId={activeChat?.id}
+        />
+      )}
+
+      {/* Тест-кейсы живут в самом проекте, поэтому окно знает только его путь:
+          к конкретному разговору они не привязаны. */}
+      {isProjectContext && projectPath && (
+        <ProjectTestsModal
+          isOpen={isTestsOpen}
+          onOpenChange={setTestsOpen}
+          projectPath={projectPath}
         />
       )}
 

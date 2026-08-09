@@ -93,8 +93,9 @@ export const helpEn: HelpSchema = {
       whyHistory: 'One place for the whole history',
       whyHistoryText:
         'The panel reads the same transcripts Claude Code writes. A conversation ' +
-        'started in the terminal or in an editor shows up here — and the other way ' +
-        'around.',
+        'started in the terminal, in an editor or on the phone shows up here by ' +
+        'itself, and its answer keeps growing before your eyes — no page reload ' +
+        'needed.',
       whyVisible: 'You can see what is going on',
       whyVisibleText:
         'Coloured dots on tabs, the agents panel, the cost of a run, attachments ' +
@@ -121,6 +122,7 @@ export const helpEn: HelpSchema = {
       canStop: 'Stop one agent or all of them at once',
       canEditor: 'Open the project in your code editor with one button',
       canCode: 'View and edit project code inside the panel, with a diff of the agent’s edits',
+      canTests: 'See the project’s test cases, edit them and have the agent run them',
       canContinue: 'Continue any past conversation, including ones started in the terminal',
       canFork:
         'Branch the conversation: editing your own message goes off as a new branch ' +
@@ -232,7 +234,7 @@ export const helpEn: HelpSchema = {
         'It is not about now but about the panel’s next start: a ticked target comes up ' +
         'by itself, with no browser window and no navigation. Close the project tab and the ' +
         'toggle clears on all of its targets.',
-      toolsGit: 'Branch, files, commit and pull',
+      toolsGit: 'Branch, files, commit, pull and push',
       toolsGitText:
         'The button with the current branch name shows up only when the project has a ' +
         '.git. It carries two numbers: how many files changed and by how many commits you ' +
@@ -246,11 +248,21 @@ export const helpEn: HelpSchema = {
         'pull. The select next to it picks another source: a specific remote branch, which ' +
         'runs git pull origin <branch>. The list holds only branches git has already seen ' +
         'on the remote; the panel pulls no arbitrary ref.',
+      toolsPush: 'The Push button',
+      toolsPushText:
+        'It sends the current branch ONLY, and only forward: --force is never passed ' +
+        'anywhere, so this button cannot rewrite anyone else’s history. A branch with no ' +
+        'upstream goes out with --set-upstream, otherwise the first push of a new branch ' +
+        'would need a terminal. Next to the button you see how many commits you are ahead ' +
+        'of the remote. It is disabled where a push makes no sense: no remote, no commits ' +
+        'at all, HEAD detached from a branch. If git asks for credentials the operation ' +
+        'does not hang waiting for input — the panel runs it with GIT_TERMINAL_PROMPT=0, ' +
+        'so you get an error instead of an eternal “working”.',
       toolsNote:
         'A commit takes every change (git add -A) and lands on the current branch. Pull is ' +
-        'the only operation that reaches the network and may merge: on a conflict the ' +
-        'working tree stays in conflict and you sort it out in a terminal. The panel never ' +
-        'pushes or deletes branches.',
+        'the only operation that may merge: on a conflict the working tree stays in ' +
+        'conflict and you sort it out in a terminal. The panel deletes no branches and ' +
+        'never rebases.',
 
       codeTitle: 'Project code: what the agent changed, and editing on the spot',
       codeCaption:
@@ -311,6 +323,53 @@ export const helpEn: HelpSchema = {
         'If the agent changed the file while it was open, saving is refused: the panel ' +
         'checks the write time on disk and will not let you silently overwrite someone ' +
         'else’s work. Reload the file (reopen it in the tree) and reapply your edit.',
+
+      testsTitle: 'Tests: the “Tests” button on a project tab',
+      testsCaption:
+        'The list of checks over the project’s interface: what to click, what should ' +
+        'happen and how the last run ended. The agent writes the cases, you edit them, ' +
+        'and the agent walks through them live.',
+      testsWhere: 'Where they live',
+      testsWhereText:
+        'Not in the panel but in the project itself — .agent/tests/, one file per group ' +
+        '(gui.tests.json, e2e.tests.json). The file IS the tab: create a file and a tab ' +
+        'appears. Tests travel with the code and are visible to anyone who opens the ' +
+        'repository without the panel.',
+      testsGenerate: 'Generate',
+      testsGenerateText:
+        'The agent looks around the app and writes cases: it extends similar ones and ' +
+        'drops stale ones. The “What to focus on” field narrows the work down — for ' +
+        'example, “chat and analytics only”.',
+      testsRun: 'Run',
+      testsRunText:
+        'The agent walks each case live and writes the result to the file after EVERY ' +
+        'one. That is why checkmarks appear as it goes and an interrupted run keeps what ' +
+        'it already verified. “Full retest” clears the checkmarks first, so an old “passed” ' +
+        'cannot pass for a new one. Tick some cases and only those are run.',
+      testsEdit: 'Your own cases',
+      testsEditText:
+        'A case you wrote is marked as yours, and the agent may not delete or rewrite ' +
+        'it — only extend it. Its own cases it creates, updates and removes itself when ' +
+        'a feature is gone from the app.',
+      testsConvention: 'Asking from the chat',
+      testsConventionText:
+        'The buttons in this window explain the format to the agent themselves. An ' +
+        'ordinary conversation knows nothing about it: say “run the tests” in the chat ' +
+        'and it will check and write nothing down. The “Write it into the project’s ' +
+        'CLAUDE.md” button appends a block with the format and the rules to the end of ' +
+        'the file; it is read in EVERY conversation, so from then on the cases are kept ' +
+        'no matter where the request came from. Your own text is left alone and pressing ' +
+        'it twice adds nothing.',
+      testsBrokenTitle: 'A broken group file',
+      testsBrokenText:
+        'If the JSON does not parse, the panel disables ONLY that tab and leaves the file ' +
+        'alone: someone’s work stands behind it. The other groups keep working. Fix the ' +
+        'file by hand and the list comes back on its own.',
+      testsAccessTitle: 'Full access during a run',
+      testsAccessText:
+        'A run happens in the background with nobody to ask, so the agent works without ' +
+        '“Allow” cards. The task holds the boundaries: it may change only files under ' +
+        '.agent/tests, and a bug it finds is a test result, not a reason to fix code.',
 
       askTitle: 'Agent question: the “Your choice is needed” card',
       askCaption:
@@ -919,6 +978,46 @@ export const helpEn: HelpSchema = {
         'How spending is shown in the chat: tokens (the default) or money. Tokens are ' +
         'always visible, while the dollar figure is an estimate at API rates and is ' +
         'never charged on a subscription.',
+
+      remoteTitle: 'Remote access: the panel from a phone',
+      remoteCaption:
+        'The “Remote access” card ties the panel to the phone app: same chat, same ' +
+        'projects, same analytics — from anywhere your Tailscale network reaches.',
+      remoteAddress: 'Outside address',
+      remoteAddressText:
+        'The server keeps listening on 127.0.0.1 — no port is opened outward at all. What ' +
+        'carries the panel outside is tailscale serve: it runs on this same machine and ' +
+        'proxies to the loopback, so an address like https://machine.tailnet.ts.net is ' +
+        'visible only to devices in your tailnet. Turn it on with pnpm remote (off with ' +
+        'pnpm remote:off); the panel finds the machine name itself and shows it on the card.',
+      remoteToken: 'The “Require a token” switch',
+      remoteTokenText:
+        'While it is off nothing changes: only this machine can reach the API. Once on, ' +
+        'EVERY request must carry the token — including requests from the browser on this ' +
+        'same computer. The browser neither knows nor should know: the dev proxy adds the ' +
+        'header, reading the same token file. The token lives in ~/.claude-control/api-token ' +
+        'with mode 0600 and never enters the panel’s backups.',
+      remotePair: 'Pairing code',
+      remotePairText:
+        'The button shows a QR code with the address and the token — in the app it is ' +
+        'Settings → Pair, and the camera does the rest. The same token is printed under the ' +
+        'code, so it can be typed by hand when the camera is denied. “Rotate token” is the ' +
+        '“I lost my phone” button: the old one stops working immediately and every paired ' +
+        'device must connect again.',
+      remoteNotify: 'Notifications',
+      remoteNotifyText:
+        'The panel pushes when work is done, has failed, waits for a permission or the ' +
+        'agent has asked a question. Only the KIND of event and the project folder name ' +
+        'leave the machine — no conversation text, no code, no paths. The “Test ' +
+        'notification” button exercises the whole path: without it “nothing arrived” is ' +
+        'discovered on a real run, which is too late.',
+      remoteWarnTitle: 'The token opens the entire panel API',
+      remoteWarnText:
+        'It is not a password to one section: the same token reads secrets, edits hooks and ' +
+        'starts the agent. Do not show the QR code to others, do not forward it in a chat ' +
+        'and do not post a screenshot of the settings. The panel shows the token openly on ' +
+        'purpose — there is no other way to carry it to the phone, and reading it through ' +
+        'the API already requires a token.',
 
       modelsTitle: 'Provider models',
       modelsCaption:

@@ -1,3 +1,4 @@
+import type { RemoteNotifyKind } from '@claude-control/contracts';
 import { ChatRun, type ChatEvent, type RunOptions } from './ChatRunner.ts';
 
 /**
@@ -14,6 +15,19 @@ import { ChatRun, type ChatEvent, type RunOptions } from './ChatRunner.ts';
  * отцепляет слушателя — сам агент продолжает работать. Завершённый прогон живёт
  * в буфере ещё минуту (на случай переподключения), затем убирается.
  */
+
+/**
+ * Повод дёрнуть человека на телефоне: работа кончилась или упёрлась в вопрос.
+ * Текста здесь нет намеренно — реестр не знает языка интерфейса, а состав
+ * уведомления собирает тот, кто его отправляет.
+ */
+export interface RunNotice {
+  kind: RemoteNotifyKind;
+  chatId: string;
+  projectPath?: string;
+  /** Инструмент, который просит разрешения, — только у `permission`. */
+  toolName?: string;
+}
 
 /** Событие с порядковым номером — по нему клиент догоняет пропущенное. */
 export interface BufferedEvent {
@@ -101,6 +115,17 @@ export class ChatRunRegistry {
 
   setCostEstimator(estimate: (model: string, tokens: StepTokens) => number): void {
     this.estimateStepCost = estimate;
+  }
+
+  /**
+   * Куда сообщить, что прогон закончился или требует человека. Ставится снаружи
+   * по той же причине, что и оценка цены: устройства и настройка уведомлений
+   * живут в состоянии панели, а реестр про него не знает. Не задан — молчим.
+   */
+  private notify?: (notice: RunNotice) => void;
+
+  setNotifier(notify: (notice: RunNotice) => void): void {
+    this.notify = notify;
   }
 
   /**
@@ -243,6 +268,21 @@ export class ChatRunRegistry {
       this.totalCostUsd += event.costUsd;
     }
 
+    // Два повода дёрнуть телефон посреди прогона: агент упёрся в разрешение или
+    // задал вопрос. Оба означают, что работа ВСТАЛА и ждёт человека, — а
+    // человек в этот момент смотрит не в панель.
+    if (event.kind === 'permission') {
+      this.notify?.({
+        kind: 'permission',
+        chatId: run.chatId,
+        projectPath: run.meta.projectPath,
+        toolName: event.toolName,
+      });
+    }
+    if (event.kind === 'tool' && event.name === 'AskUserQuestion') {
+      this.notify?.({ kind: 'question', chatId: run.chatId, projectPath: run.meta.projectPath });
+    }
+
     const buffered: BufferedEvent = { seq: ++run.seq, event: outgoing };
     run.events.push(buffered);
     for (const subscriber of run.subscribers) subscriber.send(buffered);
@@ -253,6 +293,11 @@ export class ChatRunRegistry {
     if (run.status !== 'running') return;
     run.status = run.errored ? 'error' : 'done';
     run.finishedAt = Date.now();
+    this.notify?.({
+      kind: run.errored ? 'error' : 'done',
+      chatId: run.chatId,
+      projectPath: run.meta.projectPath,
+    });
     // Закрываем текущих слушателей, но буфер держим ещё минуту — вдруг клиент
     // переподключается и хочет догнать хвост с терминальным событием.
     for (const subscriber of run.subscribers) subscriber.close();

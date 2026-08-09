@@ -118,6 +118,7 @@ export function ChatTopic() {
             tr('canSpend'),
             tr('canEditor'),
             tr('canCode'),
+            tr('canTests'),
           ]}
           cant={[tr('cantApprove'), tr('cantDelete'), tr('cantEditPlan'), tr('cantInterrupt')]}
         />
@@ -143,6 +144,7 @@ export function ChatTopic() {
             { title: tr('toolsAutostart'), text: tr('toolsAutostartText') },
             { title: tr('toolsGit'), text: tr('toolsGitText') },
             { title: tr('toolsPull'), text: tr('toolsPullText') },
+            { title: tr('toolsPush'), text: tr('toolsPushText') },
           ]}
         />
         <Callout tone="info" title={tr('toolsNote')} />
@@ -164,6 +166,25 @@ export function ChatTopic() {
         </Callout>
         <Callout tone="info" title={tr('codeSaveTitle')}>
           {tr('codeSaveText')}
+        </Callout>
+      </HelpSection>
+
+      <HelpSection title={tr('testsTitle')} caption={tr('testsCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('testsWhere'), text: tr('testsWhereText') },
+            { title: tr('testsGenerate'), text: tr('testsGenerateText') },
+            { title: tr('testsRun'), text: tr('testsRunText') },
+            { title: tr('testsEdit'), text: tr('testsEditText') },
+            { title: tr('testsConvention'), text: tr('testsConventionText') },
+          ]}
+        />
+        <Callout tone="warning" title={tr('testsAccessTitle')}>
+          {tr('testsAccessText')}
+        </Callout>
+        <Callout tone="info" title={tr('testsBrokenTitle')}>
+          {tr('testsBrokenText')}
         </Callout>
       </HelpSection>
 

@@ -34,6 +34,10 @@ export async function git(
       timeout,
       maxBuffer: GIT_MAX_BUFFER,
       windowsHide: true,
+      // Спрашивать логин и пароль не у кого: процесс без терминала, и запрос
+      // credentials висел бы до самого таймаута. С этим флагом git сразу
+      // сдаётся и объясняет причину — она и уходит пользователю.
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
     });
     return stdout;
   } catch (error) {

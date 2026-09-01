@@ -193,7 +193,7 @@ describe('планировщик продолжения', () => {
     };
   }
 
-  function build(text: string, mtime: number | undefined) {
+  function build(text: string, mtime: number | undefined, contextLimit = 0) {
     const chains = new HandoffChains();
     const registry = new ChatRunRegistry(() => fakeRun(text));
     registry.setHandoffPlanner(
@@ -201,10 +201,61 @@ describe('планировщик продолжения', () => {
         runs: registry,
         chains,
         selfBaseUrl: 'http://127.0.0.1:5178',
+        contextLimit: () => contextLimit,
         stat: () => mtime,
       }),
     );
     return { chains, registry };
+  }
+
+  /** Прогон, который перед завершением сообщает размер окна. */
+  function fakeRunWithContext(text: string, context: number): RunLike {
+    return {
+      start: async (_options, onEvent) => {
+        onEvent({ kind: 'text', text });
+        onEvent({
+          kind: 'usage',
+          input: 10,
+          output: 5,
+          cacheRead: context - 10,
+          cacheCreation: 0,
+        });
+        onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: 'sess-1' });
+      },
+      stop: () => undefined,
+    };
+  }
+
+  function buildWithContext(context: number, mtime: number | undefined, limit: number) {
+    const chains = new HandoffChains();
+    const registry = new ChatRunRegistry(() => fakeRunWithContext('Работаю дальше.', context));
+    registry.setHandoffPlanner(
+      createHandoffPlanner({
+        runs: registry,
+        chains,
+        selfBaseUrl: 'http://127.0.0.1:5178',
+        contextLimit: () => limit,
+        stat: () => mtime,
+      }),
+    );
+    return { chains, registry };
+  }
+
+  /** Ленты одного прогона: какие события продолжения увидела вкладка. */
+  function watch(registry: ChatRunRegistry, chatId: string) {
+    const seen: { reason?: string; contextTokens?: number }[] = [];
+    registry.attach(chatId, 0, {
+      send: ({ event }) => {
+        if (event.kind === 'handoff') {
+          seen.push({
+            ...(event.reason ? { reason: event.reason } : {}),
+            ...(event.contextTokens ? { contextTokens: event.contextTokens } : {}),
+          });
+        }
+      },
+      close: () => undefined,
+    });
+    return seen;
   }
 
   it('после успешного прогона со свежим чекпойнтом заводит новую сессию сам', async () => {
@@ -262,5 +313,81 @@ describe('планировщик продолжения', () => {
     await new Promise((done) => setTimeout(done, 20));
 
     expect(registry.active().every((run) => !run.chatId.startsWith('new-'))).toBe(true);
+  });
+
+  it('окно переросло порог без блока в ответе: предложение с размером окна', async () => {
+    const { registry } = buildWithContext(250_000, Date.now() + 10_000, 200_000);
+
+    registry.start(
+      'чат-1',
+      { prompt: 'работай', cwd: 'C:/work/проект' },
+      {
+        projectPath: 'C:/work/проект',
+      },
+    );
+    const seen = watch(registry, 'чат-1');
+    await new Promise((done) => setTimeout(done, 20));
+
+    expect(seen).toEqual([{ reason: 'context_high', contextTokens: 250_000 }]);
+    // Сама панель ничего не завела: тумблер выключен, решает человек.
+    expect(registry.active().every((run) => !run.chatId.startsWith('new-'))).toBe(true);
+  });
+
+  it('с включённым автоматом порог продолжает работу сам', async () => {
+    const { chains, registry } = buildWithContext(250_000, Date.now() + 10_000, 200_000);
+    chains.setAuto(['чат-1'], true);
+
+    registry.start(
+      'чат-1',
+      { prompt: 'работай', cwd: 'C:/work/проект' },
+      {
+        projectPath: 'C:/work/проект',
+      },
+    );
+    await new Promise((done) => setTimeout(done, 20));
+
+    expect(registry.active().some((run) => run.chatId.startsWith('new-'))).toBe(true);
+  });
+
+  it('несвежий чекпойнт при пороге: причина названа, разговор не стёрт', async () => {
+    const { chains, registry } = buildWithContext(250_000, 1, 200_000);
+    chains.setAuto(['чат-1'], true);
+
+    registry.start(
+      'чат-1',
+      { prompt: 'работай', cwd: 'C:/work/проект' },
+      {
+        projectPath: 'C:/work/проект',
+      },
+    );
+    const seen = watch(registry, 'чат-1');
+    await new Promise((done) => setTimeout(done, 20));
+
+    expect(seen[0]?.reason).toBe('checkpoint_stale');
+    expect(registry.active().every((run) => !run.chatId.startsWith('new-'))).toBe(true);
+  });
+
+  it('порог ниже окна не трогает разговор, пока слежение выключено нулём', async () => {
+    const { registry } = buildWithContext(250_000, Date.now() + 10_000, 0);
+
+    registry.start(
+      'чат-1',
+      { prompt: 'работай', cwd: 'C:/work/проект' },
+      {
+        projectPath: 'C:/work/проект',
+      },
+    );
+    const seen = watch(registry, 'чат-1');
+    await new Promise((done) => setTimeout(done, 20));
+
+    expect(seen).toEqual([]);
+  });
+
+  it('о том же окне не напоминает дважды', () => {
+    const chains = new HandoffChains();
+    expect(chains.shouldNoticeContext(['чат-1'], 210_000)).toBe(true);
+    expect(chains.shouldNoticeContext(['чат-1'], 215_000)).toBe(false);
+    // Выросло ещё на шаг — повод сказать снова.
+    expect(chains.shouldNoticeContext(['чат-1'], 240_000)).toBe(true);
   });
 });

@@ -44,6 +44,8 @@ export interface RunFinished {
   ok: boolean;
   startedAt: number;
   options: RunOptions;
+  /** Окно контекста на последнем шаге; 0 — расход не приходил (чужой CLI, ошибка). */
+  contextTokens: number;
 }
 
 /** Событие с порядковым номером — по нему клиент догоняет пропущенное. */
@@ -107,6 +109,13 @@ interface RegisteredRun {
    */
   spentCostUsd: number;
   spentTokens: number;
+  /**
+   * Размер окна на последнем шаге — вход целиком (свежий, из кэша и записанный
+   * в кэш). Это НЕ накопленный расход `spentTokens`: тот растёт от каждого шага,
+   * а здесь — сколько контекста перевыставит СЛЕДУЮЩИЙ запрос. Именно по этому
+   * числу видно, что разговор пора продолжать с чистого листа.
+   */
+  contextTokens: number;
 }
 
 /** Токены одного шага — то, из чего считается его цена. */
@@ -273,6 +282,7 @@ export class ChatRunRegistry {
       subscribers: new Set(),
       spentCostUsd: 0,
       spentTokens: 0,
+      contextTokens: 0,
     };
     this.runs.set(chatId, registered);
 
@@ -329,6 +339,11 @@ export class ChatRunRegistry {
       run.spentTokens += tokens;
       this.totalTokens += tokens;
 
+      // Размер окна берём по ПОСЛЕДНЕМУ шагу, а не по максимуму: окно может и
+      // уменьшиться — после автосжатия в самом CLI следующий запрос несёт уже
+      // сводку, и предлагать продолжение по устаревшему пику было бы неправдой.
+      run.contextTokens = event.input + event.cacheRead + event.cacheCreation;
+
       // Цена шага — чтобы разбивка по действию была видна сразу, а не после
       // перечитывания ленты из транскрипта: по одним токенам дешёвый шаг от
       // дорогого не отличить.
@@ -381,6 +396,7 @@ export class ChatRunRegistry {
           ok: !run.errored,
           startedAt: run.startedAt,
           options: run.options,
+          contextTokens: run.contextTokens,
         });
         if (event) this.emit(run, event);
       } catch {

@@ -402,7 +402,13 @@ export const en: TranslationSchema = {
         checkpoint_missing: 'No continuation: the checkpoint file is missing',
         checkpoint_stale: 'No continuation: the checkpoint file was not updated in this run',
         no_project: 'No continuation: the conversation runs outside a project',
+        context_high: 'The conversation window has grown — a clean session is cheaper from here',
       },
+      /** Триггер по размеру окна: тост кликабельный, клик и есть продолжение. */
+      contextHigh: 'Context at {{tokens}}k — tap to continue in a clean chat',
+      contextStale:
+        'Context at {{tokens}}k, but .agent/PROGRESS.md was not updated in this run — ' +
+        'there would be nothing to continue from',
     },
     attach: 'Attach a file',
     thinking: 'Thinking',
@@ -1938,6 +1944,17 @@ export const en: TranslationSchema = {
       'TASKS.md — finished items move to .agent/ARCHIVE.md, one line each) and then offers to ' +
       'continue in a new conversation: an old context is paid for again on every turn. The move ' +
       'itself is always your call — the card button, or auto-continue enabled in that conversation.',
+    handoffContextLimit: 'Offer to continue once the window reaches',
+    handoffContextLimitHint:
+      'The second reason to continue is not meaning but size: context is paid for again on every ' +
+      'turn, and by 200 thousand tokens almost the whole turn goes on resending the old one. The ' +
+      'threshold looks at the run’s last turn; the offer arrives as a notification, and a click ' +
+      'starts the continuation. With auto-continue enabled in that conversation the panel continues ' +
+      'on its own, under the same safeguards (a fresh mark in .agent/PROGRESS.md, a successful turn, ' +
+      'no more than five steps in a row).',
+    handoffContextLimitOff: 'Never offer',
+    handoffContextLimitValue: '{{tokens}} thousand tokens',
+    handoffContextLimitDefault: '{{tokens}} thousand tokens (recommended)',
     chatEffortAuto: 'CLI default',
     pricingTitle: 'Rates used to estimate cost',
     pricingHint:

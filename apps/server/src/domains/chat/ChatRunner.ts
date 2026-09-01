@@ -66,6 +66,12 @@ export type ChatEvent =
       path?: string;
       chainDepth?: number;
       reason?: HandoffRefusal;
+      /**
+       * Окно, из-за размера которого зашла речь о продолжении. Есть только у
+       * повода по порогу: у предложения агента причина смысловая, и число тут
+       * сбивало бы с толку.
+       */
+      contextTokens?: number;
     };
 
 export interface RunOptions {

@@ -5,8 +5,12 @@ import { Icon } from '@shared/ui/icon';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { toast } from '@shared/lib/toast';
+import { scanSplitBlocks } from '@claude-control/contracts/task-split';
+import { scanHandoffBlocks } from '@claude-control/contracts/chat-handoff';
 import { parseQuestions } from '../lib/parseQuestions';
 import { QuestionCard } from './QuestionCard';
+import { TaskSplitCard } from './TaskSplitCard';
+import { HandoffCard } from './HandoffCard';
 import type { MessageBubbleProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 
@@ -22,6 +26,10 @@ export function MessageBubble({
   isLast,
   isRunning,
   costUnit,
+  onSplit,
+  onKeepHere,
+  isSplitPending,
+  handoff,
 }: MessageBubbleProps) {
   const { t } = useTranslation();
   const isUser = message.role === 'user';
@@ -92,14 +100,80 @@ export function MessageBubble({
             ) : null;
 
           if (block.type === 'text') {
+            // Предложения панели приходят блоками кода внутри текста. Показываем
+            // их карточками, а сами блоки из текста убираем: сырой JSON в ленте
+            // не читается, а решение принимается по составу, не по формату.
+            // Порядок разборов не важен — языки блоков разные, и каждый скан
+            // видит только свой.
+            const split = scanSplitBlocks(block.text);
+            const handoffScan = scanHandoffBlocks(split.text);
+
             return (
               <div key={index} className={styles.block}>
-                <div
-                  className={styles.text}
-                  // markdown-it с выключенным сырым html — теги из ответа
-                  // модели в разметку не попадут.
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(block.text) }}
-                />
+                {/* Текст и карточки — одной колонкой: соседом карточка попадала
+                    в колонку расхода и сжималась в узкий столбик. */}
+                <div className={styles.blockBody}>
+                  {handoffScan.text && (
+                    <div
+                      className={styles.text}
+                      // markdown-it с выключенным сырым html — теги из ответа
+                      // модели в разметку не попадут.
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(handoffScan.text) }}
+                    />
+                  )}
+                  {split.proposals.map((proposal, position) => (
+                    <TaskSplitCard
+                      key={position}
+                      proposal={proposal}
+                      // Делить можно только по ПОСЛЕДНЕМУ предложению: карточка
+                      // из середины истории давно отработана, и заводить по ней
+                      // ветки десять ходов спустя никто не просил.
+                      onSplit={isLast ? (options) => onSplit?.(proposal, options) : undefined}
+                      onKeepHere={isLast ? onKeepHere : undefined}
+                      isPending={isSplitPending}
+                      disabled={isRunning}
+                    />
+                  ))}
+                  {/* Блок предложения, который панель не поняла, остаётся выше
+                      текстом — и без этой строки человек видит простыню JSON, не
+                      понимая, что кнопок нет из-за ОТКАЗА разбора, а не потому
+                      что агент так решил написать. */}
+                  {split.rejected > 0 && (
+                    <div className={styles.splitRejected} role="status">
+                      {t('chat.split.notParsed')}
+                    </div>
+                  )}
+                  {handoffScan.proposals.map((proposal, position) => (
+                    <HandoffCard
+                      key={position}
+                      proposal={proposal}
+                      // Ровно та же причина, что и у разделения: продолжать
+                      // можно только по последнему предложению — карточка из
+                      // середины истории отработана десять ходов назад.
+                      {...(isLast && handoff
+                        ? {
+                            onContinue: (options: { startRun: boolean }) =>
+                              handoff.onContinue(proposal, options),
+                            onKeepHere: handoff.onKeepHere,
+                            auto: handoff.auto,
+                            onAutoChange: handoff.onAutoChange,
+                            chainDepth: handoff.chainDepth,
+                            maxChain: handoff.maxChain,
+                            isPending: handoff.isPending,
+                          }
+                        : {})}
+                      disabled={isRunning}
+                    />
+                  ))}
+                  {/* Та же строка и по той же причине, что у разделения выше:
+                      непонятый блок остаётся текстом, и без объяснения человек
+                      видит JSON без единой кнопки и считает это поломкой. */}
+                  {handoffScan.rejected > 0 && (
+                    <div className={styles.splitRejected} role="status">
+                      {t('chat.handoff.notParsed')}
+                    </div>
+                  )}
+                </div>
                 {spend}
               </div>
             );

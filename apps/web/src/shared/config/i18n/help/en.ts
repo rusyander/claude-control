@@ -151,6 +151,9 @@ export const helpEn: HelpSchema = {
       canGit:
         'See the current branch and the list of changed files, switch branches, create a ' +
         'new one, commit and pull — right from the tab, whenever the project has a .git',
+      canWorktrees:
+        'Create a parallel working copy of the project on its own branch and run a ' +
+        'separate agent there — several agents in one repository, out of each other’s way',
 
       cantApprove:
         'Grant permissions in advance: the panel asks at the moment of the action, and ' +
@@ -263,6 +266,178 @@ export const helpEn: HelpSchema = {
         'the only operation that may merge: on a conflict the working tree stays in ' +
         'conflict and you sort it out in a terminal. The panel deletes no branches and ' +
         'never rebases.',
+
+      parallelTitle: 'Parallel branches: several agents in one project',
+      parallelCaption:
+        'The “Parallel branches” block at the bottom of the git popover creates working ' +
+        'copies of the repository. A copy is a separate directory next to the project ' +
+        'with its own branch and shared history (git worktree), and it opens as an ' +
+        'ordinary project tab.',
+      parallelWhy: 'What it is for',
+      parallelWhyText:
+        'Runs are already parallel: an agent in one tab does not block an agent in ' +
+        'another. The shared directory is what gets in the way — two agents in one ' +
+        'working tree switch branches under each other and mix their edits. A copy ' +
+        'removes exactly that: own directory, own branch, shared history.',
+      parallelCreate: 'Creating one',
+      parallelCreateText:
+        'Type a branch name and press “Create a copy”. No such branch — it is created ' +
+        'from the current HEAD; a local branch — the copy checks it out; a branch that ' +
+        'exists only on the remote — it is created with tracking (that is how you take ' +
+        'apart someone else’s merge request). The directory appears next to the ' +
+        'project: <project>-worktrees/<branch>. A finished copy opens as a tab at once.',
+      parallelWork: 'Working in a copy',
+      parallelWorkText:
+        'The copy’s tab is an ordinary project tab: its own chat list, its own agent, ' +
+        'its own status dot, its own git controls. The branch shown in the list is the ' +
+        'one the copy is on RIGHT NOW: inside it the agent is free to switch and create ' +
+        'branches, and the panel does not police that. Dependencies are not installed in ' +
+        'a fresh copy — the agent installs them itself, as in a fresh clone.',
+      parallelRemove: 'Removing one',
+      parallelRemoveText:
+        'The “Remove” button deletes the copy through git. While an agent works there ' +
+        'the button is disabled and the server refuses too: deleting the directory from ' +
+        'under a live process loses its work silently. Uncommitted changes inside are ' +
+        'not surrendered by git either — a second button appears, “Remove with its ' +
+        'changes”. The main copy is never removed.',
+      parallelNote:
+        'The panel never merges: bringing a branch back is your step, not its. The agent ' +
+        'inside a copy is not barred from plain git — it can pull main into its branch ' +
+        'and resolve the conflicts itself if you ask it to.',
+      parallelMemory: 'A tab remembers its conversation',
+      parallelMemoryText:
+        'Every tab remembers which chat is open in it and brings that one back — not a ' +
+        'blank sheet. This is what makes working with several agents possible: leave for ' +
+        'another tab, come back, and the same conversation is there; and if an agent ' +
+        'asked something meanwhile, you hear a sound and get a toast that jumps to it.',
+
+      splitTitle: 'Splitting tasks across chats: the agent proposes, you decide',
+      splitCaption:
+        'A sequel to parallel copies: there a copy is made by hand, here the agent ' +
+        'proposes one itself. A list of independent tasks in a single message is ' +
+        'sorted into groups, and the panel shows that as a card with two answers.',
+      splitWhen: 'When the proposal appears',
+      splitWhenText:
+        'The agent proposes a split on its own once it sees three or more tasks in ' +
+        'one message that do not depend on each other. The proposal comes instead of ' +
+        'the work: until you press a button nothing is created and nothing is ' +
+        'started. You can also ask for it yourself — the “Split tasks across chats” ' +
+        'button in the composer, at any point in the conversation.',
+      splitCard: 'What the card shows',
+      splitCardText:
+        'Shared context on top, then the groups: a name, the branch that will be ' +
+        'created and a numbered list of that group’s tasks. No raw JSON in the feed — ' +
+        'the decision is made from the makeup of the groups. There are two buttons ' +
+        'and both are equal: “Split into N chats” and “Do it here, one by one” — the ' +
+        'refusal goes to the agent as an ordinary reply and it carries on right here. ' +
+        'The agent need not propose a branch name at all: the panel builds one from ' +
+        'the group’s name, transliterating a Russian name into latin. If a proposal ' +
+        'block could not be read, a line under it says so — “no buttons” is never ' +
+        'left unexplained.',
+      splitWhat: 'What happens when you agree',
+      splitWhatText:
+        'Each group gets its own copy of the repository on its own branch (as in ' +
+        '“Parallel branches”), its own chat inside it and its own running agent; the ' +
+        'task given to it is the shared context plus that group’s tasks. A branch ' +
+        'name already taken gets a suffix rather than a refusal. If the project is ' +
+        'not a repository, the chats are created in the same directory, with no ' +
+        'copies. One group failing does not cancel the rest: a separate toast says ' +
+        'so, and the other chats stay.',
+      splitTree: 'Where the new chats are',
+      splitTreeText:
+        'In the list on the left they stand as a tree: the chat the proposal came ' +
+        'from, and under it, indented and joined by a line, the ones it spawned. That ' +
+        'is how you see four conversations came from one request instead of finding ' +
+        'them scattered among the rest. The branch is not broken by the “Today” and ' +
+        '“Earlier” headings: children stay with their parent wherever its date puts ' +
+        'it. If the parent is not in the list at all (a search matched only a child), ' +
+        'the row stays an ordinary one — nothing is hidden.',
+      splitButton: 'Create the chats only',
+      splitButtonText:
+        'A toggle in the card. On, the copies, branches and tabs appear but no agent ' +
+        'starts: each group’s task lands in the composer of its tab, where you can ' +
+        'read it through and edit it before sending. This is also the rescue when ' +
+        'four agents starting at once is not what you wanted.',
+      splitOff: 'How to turn the proposals off',
+      splitOffText:
+        'Settings → “Offer to split tasks across chats”. Off, the agent no longer ' +
+        'proposes a split on its own, but the composer button works as before: the ' +
+        'setting takes away the initiative, not the ability.',
+      splitNote:
+        'No subagents appear here: every group is an ordinary chat you talk in ' +
+        'yourself, only inside its own copy of the repository. The panel will not ' +
+        'bring the branches back together — that is your step, as with copies made ' +
+        'by hand.',
+
+      handoffTitle: 'Continuing in a clean session: the stage closes, the context stays behind',
+      handoffCaption:
+        'A conversation gets more expensive with every turn: the whole context ' +
+        'window goes to the model on each request, so after a task is done you ' +
+        'keep paying for a conversation nobody needs any more. In the CLI itself ' +
+        'that is cured by /clear, but neither the model nor a hook can call it. ' +
+        'The panel owns the process, so a “clean session” here is a new ' +
+        'conversation in the same directory that knows exactly what the ' +
+        'checkpoint file says.',
+      handoffWhen: 'When the offer appears',
+      handoffWhenText:
+        'The agent offers the move on its own once the task the conversation was ' +
+        'about is closed and verified — and only after it has tidied its working ' +
+        'files. The offer comes instead of new work: until you press the button, ' +
+        'nothing is created and nothing is started. You can ask for it yourself ' +
+        'too — the “Close the stage and continue in a clean session” button in ' +
+        'the composer, at any point in the conversation.',
+      handoffCard: 'What the card shows',
+      handoffCardText:
+        'What is closed, what was pruned from the working files, the checkpoint ' +
+        'file and the full text of the task — exactly what will travel into the ' +
+        'new session. There is no raw JSON in the feed: you decide by the ' +
+        'content. Two buttons, both legitimate: “Continue in a new chat” and ' +
+        '“Stay here” — the refusal goes to the agent as an ordinary message and ' +
+        'the conversation carries on.',
+      handoffWhat: 'What happens when you agree',
+      handoffWhatText:
+        'A new conversation starts in the same directory and the same branch: no ' +
+        'copy of the repository is made, only the context window changes. Model, ' +
+        'thinking effort and permissions are inherited from the closed run, the ' +
+        'task from the card goes out as the first message, and the tab moves to ' +
+        'the new chat. The old conversation does not go anywhere — it stays in ' +
+        'the chat list and can be reopened and reread. The “Only create the chat” ' +
+        'toggle puts the task into the composer instead of starting the agent — ' +
+        'so you can read it through and edit it.',
+      handoffAuto: '“Keep going on your own” and the chain cap',
+      handoffAutoText:
+        'The toggle on the card enables auto-continue FOR THIS conversation: from ' +
+        'then on the panel moves to a clean session by itself as soon as the ' +
+        'agent closes the next stage. Out of the box it is off, deliberately: ' +
+        'wiping context silently on the model’s say-so is lost work, not saved ' +
+        'money. The decision is made by the server, not by the tab: the chain ' +
+        'survives a closed browser — the agent works at night, you look in the ' +
+        'morning. A conversation continues at most five times in a row, after ' +
+        'which the panel stops and says so. A move that did not happen is ' +
+        'explained by a toast too: the run failed, the checkpoint was not ' +
+        'updated, the chain ran out.',
+      handoffTidy: 'Tidying the working files — half the point',
+      handoffTidyText:
+        'A clean session reads exactly the checkpoint file (.agent/PROGRESS.md by ' +
+        'default), so the agent must prune and write first and only then offer ' +
+        'the move: closed items out of PROGRESS, finished ones out of TASKS.md — ' +
+        'each moved to .agent/ARCHIVE.md as a single line — leaving only what is ' +
+        'open, the decisions and the paths into the code. Otherwise the saving ' +
+        'turns into a loss: the new agent picks up the wrong thing. The same rule ' +
+        'ships as the ready-made “Tidying the agent working files” template in ' +
+        'the Skills section — for when you want the agent tidying without any ' +
+        'handover at all.',
+      handoffOff: 'How to turn the offers off',
+      handoffOffText:
+        'Settings → “Offer to continue in a clean session”. Off means the agent no ' +
+        'longer offers the move by itself, but the composer button still works: ' +
+        'the setting takes away the initiative, not the ability.',
+      handoffNote:
+        'The panel never wipes context silently, whatever the toggles say: a move ' +
+        'is always a NEW conversation, and the old one stays in the list in full. ' +
+        'Auto-continue is enabled per conversation and lives until the server ' +
+        'restarts — there is deliberately no way to turn it on for every chat at ' +
+        'once.',
 
       codeTitle: 'Project code: what the agent changed, and editing on the spot',
       codeCaption:
@@ -725,6 +900,13 @@ export const helpEn: HelpSchema = {
       noteMissingText:
         'Some configuration files are created on first use. An empty rule list only means ' +
         'CLAUDE.md has not been started yet.',
+      noteToastTitle: 'Notifications are not lost',
+      noteToastText:
+        'A notification in the bottom-right corner lives for three seconds, shows at most ' +
+        'three lines and closes with the ×; hovering pauses the timer. Long command output ' +
+        'is not cut off: clicking the card opens a window with the full text and a Copy ' +
+        'button. Missed ones stay under “Notifications” at the bottom of the sidebar — same ' +
+        'window on click.',
     },
 
     analytics: {
@@ -1221,6 +1403,50 @@ export const helpEn: HelpSchema = {
       canOrder: 'Set the order of members with the ↑ and ↓ arrows',
       canAutomation: 'Describe a scenario in words and get a working hook',
       canAssistant: 'Fill the group or scenario form with the assistant',
+      canBindProject: 'Bind a group to projects — it switches itself on when you work in them',
+      canSteps: 'Describe the working order as steps: the panel builds a skill out of them',
+
+      bindTitle: 'Binding to a project',
+      bindCaption:
+        'The bundle switches itself on when an agent starts working in the project ' +
+        'directory. With no bindings the group lives on its manual toggle alone.',
+      bindProject: 'When it fires',
+      bindProjectText:
+        'On sending a message to the agent: the panel looks at the working directory ' +
+        'of the run and switches on the groups bound to it. The same happens for chats ' +
+        'the panel creates itself — a task split across branches and a continuation in ' +
+        'a clean session switch the set on the same way, or such a chat would start ' +
+        'with the project rules and skills off. An already enabled group is not touched ' +
+        'at all — not a single write to disk.',
+      bindWorktree: 'Branch copies count too',
+      bindWorktreeText:
+        'A branch copy lives next to the repository, in the sibling directory ' +
+        '"<project>-worktrees/<branch>". For the binding that is the same project, so ' +
+        'chats split across branches get the same bundle.',
+      bindNoOff: 'It never switches itself off',
+      bindNoOffText:
+        'Leaving the project does not switch the group off, and that is deliberate: ' +
+        'the config files are shared by every running agent, and switching off would ' +
+        'hit somebody else mid-run. Off is a manual action.',
+
+      stepsTitle: 'Working order',
+      stepsCaption:
+        'The steps of a routine task: where the agent starts, what it does and how it ' +
+        'finishes. Claude knows nothing about groups, so the steps become a skill.',
+      stepsSkill: 'Steps become a skill',
+      stepsSkillText:
+        'The steps compile into skills/scenario-… with a header and sections. The ' +
+        'skill becomes a member of the group at once, so it goes dark and comes back ' +
+        'with it and obeys its project binding.',
+      stepsGate: 'Every step carries its proof',
+      stepsGateText:
+        'The "done when" field is the reason the step is written down at all: without ' +
+        'it the list stays a wish and the agent decides for itself that the step is done.',
+      stepsTrigger: 'A trigger instead of hope',
+      stepsTriggerText:
+        'The skill description merely offers itself to the model. A regular expression ' +
+        'over the prompt text adds a UserPromptSubmit hook with a script next to the ' +
+        'skill — it brings the working order up itself. A broken expression is refused.',
 
       cantKnow: 'Expect Claude to know about groups: all it sees is the resulting settings',
       cantMagic: 'Get more from a scenario than a hook can do — it is a hook, just more convenient',
@@ -1321,6 +1547,11 @@ export const helpEn: HelpSchema = {
         'What the group is for. It is what reminds you of the point of the bundle a month later.',
       fieldMembers: 'The contents: references to rules, skills, hooks, servers and permissions.',
       fieldEnv: 'Environment variables of the group, one KEY=VALUE per line.',
+      fieldProjectPaths:
+        'Project directories where the group switches itself on. Empty — manual toggle only.',
+      fieldSteps: 'Steps of the working order. They compile into the skill that joins the group.',
+      fieldScenarioTrigger:
+        'Regular expression over the prompt text. Filled in — the panel adds a UserPromptSubmit hook.',
       fieldTrigger: 'The scenario event and an optional filter.',
       fieldAction: 'The command to run and its timeout.',
       fieldCompiled: 'A reference to the hook the scenario became. Read only.',
@@ -1352,6 +1583,12 @@ export const helpEn: HelpSchema = {
       notePermText:
         'Even when they belong to the group. An isolated run has boundaries of its own, and ' +
         'replacing them with yours would be wrong.',
+      noteAutoOnTitle: 'A bound group switches on without asking',
+      noteAutoOnText:
+        'The first message to an agent in a bound project switches the group on — with ' +
+        'its rules, skills, hooks and variables, and everywhere at once, because the ' +
+        'config files are shared. That is the price of the automation, so bind bundles ' +
+        'that do not get in the way of your other work.',
       noteRebuildTitle: 'Scenarios are rebuilt on every save',
       noteRebuildText:
         'The panel recreates hooks from them and leaves hand-written hooks as they are. ' +

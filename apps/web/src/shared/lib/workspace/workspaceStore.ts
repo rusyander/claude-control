@@ -12,7 +12,7 @@ import { HOME_TAB_ID, type ProjectTab, type WorkspaceState } from './workspace.t
 
 const STORAGE_KEY = 'claude-control:workspace';
 
-const EMPTY: WorkspaceState = { projectTabs: [], activeTabId: HOME_TAB_ID };
+const EMPTY: WorkspaceState = { projectTabs: [], activeTabId: HOME_TAB_ID, views: {} };
 
 /** Один каталог пишется по-разному (регистр, слэши) — приводим к общему виду. */
 export function normalizeProjectPath(path: string): string {
@@ -34,7 +34,7 @@ export function openProjectTab(
   const projectTabs = exists
     ? state.projectTabs
     : [...state.projectTabs, { id, path: project.path, name: project.name }];
-  return { projectTabs, activeTabId: id };
+  return { ...state, projectTabs, activeTabId: id };
 }
 
 /**
@@ -51,7 +51,29 @@ export function closeProjectTab(state: WorkspaceState, id: string): WorkspaceSta
     const leftNeighbor = index > 0 ? state.projectTabs[index - 1]?.id : undefined;
     activeTabId = leftNeighbor ?? HOME_TAB_ID;
   }
-  return { projectTabs, activeTabId };
+  // Закрыли вкладку — забыли и то, что в ней было открыто: иначе хранилище
+  // копило бы разговоры давно закрытых проектов.
+  const { [id]: _closed, ...views } = state.views;
+  return { projectTabs, activeTabId, views };
+}
+
+/**
+ * Запомнить, какой разговор открыт во вкладке. Пустой id — забыть: так вкладка
+ * возвращается к чистому листу, когда смотреть в ней больше нечего.
+ */
+export function rememberTabView(
+  state: WorkspaceState,
+  tabId: string,
+  chatId: string | undefined,
+): WorkspaceState {
+  if (!tabId) return state;
+  if (!chatId) {
+    if (!(tabId in state.views)) return state;
+    const { [tabId]: _forgotten, ...views } = state.views;
+    return { ...state, views };
+  }
+  if (state.views[tabId] === chatId) return state;
+  return { ...state, views: { ...state.views, [tabId]: chatId } };
 }
 
 /** Сделать таб активным. Несуществующий id игнорируем — состояние не портим. */
@@ -87,7 +109,16 @@ export function sanitizeState(raw: unknown): WorkspaceState {
       ? source.activeTabId
       : HOME_TAB_ID;
 
-  return { projectTabs, activeTabId: activeTabId ?? HOME_TAB_ID };
+  // Открытые разговоры оставляем только у живых вкладок: запись про давно
+  // закрытый проект восстановила бы чужой чат при следующем его открытии.
+  const views: Record<string, string> = {};
+  const known = new Set([HOME_TAB_ID, ...projectTabs.map((tab) => tab.id)]);
+  const rawViews = (source.views ?? {}) as Record<string, unknown>;
+  for (const [tabId, chatId] of Object.entries(rawViews)) {
+    if (typeof chatId === 'string' && chatId && known.has(tabId)) views[tabId] = chatId;
+  }
+
+  return { projectTabs, activeTabId: activeTabId ?? HOME_TAB_ID, views };
 }
 
 // --- Singleton-стор поверх чистых функций ---
@@ -142,5 +173,9 @@ export const workspace = {
   },
   activate(id: string): void {
     commit(activateTab(state, id));
+  },
+  /** Запомнить разговор, открытый во вкладке (пусто — забыть). */
+  rememberView(tabId: string, chatId: string | undefined): void {
+    commit(rememberTabView(state, tabId, chatId));
   },
 };

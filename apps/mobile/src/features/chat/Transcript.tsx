@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { ChatBlock, ChatMessage } from '@claude-control/contracts';
+import { scanSplitBlocks } from '@claude-control/contracts/task-split';
+import { scanHandoffBlocks } from '@claude-control/contracts/chat-handoff';
 import { colors, font, radius, space } from '../../shared/config/theme';
 import { useT } from '../../shared/config/i18n';
 import type { CostUnit } from '../../shared/lib/format';
@@ -48,7 +50,28 @@ export function Transcript({
             }
           >
             {message.blocks.map((block, index) => {
-              if (block.type === 'text') return <Markdown key={index}>{block.text}</Markdown>;
+              if (block.type === 'text') {
+                // Предложения панели приходят блоками кода внутри ответа. На
+                // телефоне карточек нет — решение принимают в панели, — но
+                // показывать вместо них сырой JSON тем более незачем: убираем
+                // блок и говорим строкой, что предложение было.
+                const split = scanSplitBlocks(block.text);
+                const handoff = scanHandoffBlocks(split.text);
+                const offers = [
+                  ...split.proposals.map(() => t.chat.offerSplit),
+                  ...handoff.proposals.map(() => t.chat.offerHandoff),
+                ];
+                return (
+                  <View key={index} style={styles.textBlock}>
+                    {handoff.text ? <Markdown>{handoff.text}</Markdown> : null}
+                    {offers.map((offer, position) => (
+                      <Text key={position} style={styles.offer}>
+                        {offer}
+                      </Text>
+                    ))}
+                  </View>
+                );
+              }
               if (block.type === 'thinking') {
                 return (
                   <Text key={index} style={styles.thinking} numberOfLines={6}>
@@ -123,6 +146,8 @@ const styles = StyleSheet.create({
   assistant: { backgroundColor: colors.surface, borderColor: colors.border },
   toolsOnly: { gap: space.xs, marginVertical: -space.xs },
   thinking: { color: colors.textFaint, fontSize: font.small, fontStyle: 'italic', lineHeight: 18 },
+  textBlock: { gap: space.sm },
+  offer: { color: colors.accent, fontSize: font.small, lineHeight: 18 },
   toolRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   tool: { color: colors.accent, fontSize: font.small, fontFamily: font.mono },
   toolError: { color: colors.danger },

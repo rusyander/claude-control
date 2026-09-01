@@ -9,6 +9,7 @@ export {
   openProjectTab,
   closeProjectTab,
   activateTab,
+  rememberTabView,
   sanitizeState,
 } from './workspaceStore';
 export { useWorkspace, type UseWorkspace } from './useWorkspace';

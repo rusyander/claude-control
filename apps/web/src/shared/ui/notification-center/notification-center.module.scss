@@ -56,17 +56,46 @@
   white-space: nowrap;
 }
 
+// Высота списка задана, а не набегает от числа записей: окно журнала не должно
+// прыгать от одного уведомления к десяти. Прокручивается список, шапка и кнопка
+// «Очистить» остаются на месте.
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
 }
 
+// Запись — кнопка: клик открывает полный текст тем же окном, что и у тоста.
 .entry {
+  width: 100%;
   padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-md);
+  border: none;
   border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
   background-color: var(--color-surface-sunken);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease;
+
+  &:hover {
+    background-color: var(--color-surface-raised);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+// Текст записи — те же три строки, что и в тосте: журнал листают глазами, а
+// читают уже в окне.
+.entryMessage {
+  white-space: pre-line;
 }
 
 .entryIcon {

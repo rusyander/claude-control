@@ -4,6 +4,7 @@ import { Stack } from '@shared/ui/stack';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { useCreateParam } from '@shared/hooks/use-create-param';
 import { SkeletonList } from '@shared/ui/skeleton';
+import { EmptyState } from '@shared/ui/empty-state';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
@@ -134,8 +135,13 @@ export function RulesPage() {
         ))}
       </Stack>
 
+      {/* Пусто здесь означает две очень разные вещи, и серое «Пусто» их путало:
+          либо не совпал поиск, либо в CLAUDE.md нет ни одного заголовка
+          «## ПРАВИЛО:» — а он там и не обязан быть, панель считает правилами
+          только их (domains/rules.ts). Второй случай выглядит как поломка
+          счётчика, поэтому объясняем прямо. */}
       {!isLoading && filtered.length === 0 && (
-        <Typography color="subtle">{t('common.empty')}</Typography>
+        <EmptyState icon="rules" title={t('rules.emptyTitle')} text={t('rules.emptyText')} />
       )}
 
       <RuleFormModal isOpen={isFormOpen} onOpenChange={closeForm} rule={editing} />

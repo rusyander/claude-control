@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
+import type { TaskSplitProposal } from '@claude-control/contracts/task-split';
+import type { HandoffProposal } from '@claude-control/contracts/chat-handoff';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
@@ -7,6 +10,7 @@ import { toast } from '@shared/lib/toast';
 import { FolderPicker } from '@features/FolderPicker';
 import { useProviderRunner } from '@entities/ProviderKeys';
 import {
+  providerChatKeys,
   useCreateProviderChat,
   useDeleteProviderChat,
   usePatchProviderChat,
@@ -14,6 +18,8 @@ import {
   useProviderChatRun,
   useProviderChats,
 } from '@entities/ProviderChat';
+import { useSplitTasks } from '@entities/ChatSplit';
+import { useStartHandoff } from '@entities/ChatHandoff';
 import { ProviderChatSidebar } from './ProviderChatSidebar';
 import { ProviderChatHeader } from './ProviderChatHeader';
 import { ProviderChatMessages } from './ProviderChatMessages';
@@ -31,6 +37,7 @@ import styles from './ProviderChatPage.module.scss';
  */
 export function ProviderChatPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { data: runner } = useProviderRunner();
   const { data: chats = [], isLoading } = useProviderChats();
   const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
@@ -87,6 +94,60 @@ export function ProviderChatPage() {
     setAttachments([]);
   };
 
+  /**
+   * Разделение задач по чатам. Копии репозитория и сами разговоры заводит тот же
+   * серверный маршрут, что и у Claude, — вид чата решает активный провайдер, а
+   * не клиент. Здесь остаётся освежить список: новые разговоры уже созданы.
+   */
+  const split = useSplitTasks();
+  const splitTasks = (proposal: TaskSplitProposal, options: { startRuns: boolean }): void => {
+    const projectPath = chat?.workdir;
+    if (!projectPath) return;
+    split.mutate(
+      { projectPath, proposal, startRuns: options.startRuns, allowEdits: true },
+      {
+        onSuccess: (result) => {
+          void queryClient.invalidateQueries({ queryKey: providerChatKeys.list });
+          if (result.chats.length > 0) {
+            toast.success(t('chat.split.done', { count: result.chats.length }));
+          }
+          for (const failure of result.failures) {
+            toast.error(t('chat.split.failed', { title: failure.title, message: failure.message }));
+          }
+        },
+        onError: (error) => toast.error(t('chat.split.failedAll', { message: error.message })),
+      },
+    );
+  };
+
+  /**
+   * Продолжение в чистой сессии. Здесь это буквально новый разговор панели с тем
+   * же рабочим каталогом: своей истории у чужих CLI нет, память ведёт панель, —
+   * значит, пустой разговор и есть чистый лист. Заводит его тот же серверный
+   * маршрут, что и у Claude.
+   */
+  const handoff = useStartHandoff();
+  const continueClean = (proposal: HandoffProposal, options: { startRun: boolean }): void => {
+    const projectPath = chat?.workdir;
+    if (!projectPath) return;
+    handoff.mutate(
+      {
+        projectPath,
+        ...(activeChatId ? { chatId: activeChatId } : {}),
+        proposal,
+        startRun: options.startRun,
+        allowEdits: true,
+      },
+      {
+        onSuccess: (started) => {
+          void queryClient.invalidateQueries({ queryKey: providerChatKeys.list });
+          toast.success(started.started ? t('chat.handoff.done') : t('chat.handoff.doneDraft'));
+        },
+        onError: (error) => toast.error(t('chat.handoff.failed', { message: error.message })),
+      },
+    );
+  };
+
   const deleteChat = (): void => {
     if (!activeChatId) return;
     remove.mutate(activeChatId, {
@@ -140,6 +201,12 @@ export function ProviderChatPage() {
             isEmptyState={!activeChatId}
             onCreate={startChat}
             isCreating={create.isPending}
+            {...(chat?.workdir ? { onSplit: splitTasks } : {})}
+            onKeepHere={() => send(t('chat.split.keepHerePrompt'))}
+            isSplitPending={split.isPending}
+            {...(chat?.workdir ? { onHandoff: continueClean } : {})}
+            onHandoffKeepHere={() => send(t('chat.handoff.keepHerePrompt'))}
+            isHandoffPending={handoff.isPending}
           />
 
           <ProviderChatComposer

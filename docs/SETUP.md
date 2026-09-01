@@ -308,6 +308,20 @@ drifting from the lockfile.
 
 ---
 
+### The panel was running and switched itself off
+
+After a few idle hours the stand can vanish entirely or by half: the API answers and the front end does not, or the other way round. Nothing in the panel crashed. A system process janitor took it: `pnpm dev` grows from a shell that exited long ago, so the whole tree reads as orphaned, and usually only the processes holding a socket are spared — the `pnpm`, `cmd` and `node --watch` above them die, and one half of the stand is left living alone.
+
+The repository ships a watchdog for exactly this:
+
+```bash
+pnpm keepalive:install   # add to the user's autostart
+pnpm keepalive:status    # what is happening right now
+pnpm keepalive:off       # remove it
+```
+
+Every 20 seconds it knocks on both ports with a plain TCP connection — not HTTP, because with the remote-access token on a live panel answers 401 — and after two silences in a row it restarts exactly the half that went quiet. A stand that is already up gets adopted, never fought for its port. Log: `%LOCALAPPDATA%\claude-control\keepalive.log`.
+
 ### The panel opens but is empty or broken
 
 #### Every section shows zero

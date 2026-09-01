@@ -34,6 +34,7 @@ export function mergeState(loaded: Partial<AppState>): AppState {
     runnerPrefs: { ...base.runnerPrefs, ...loaded.runnerPrefs },
     providerChecks: { ...base.providerChecks, ...loaded.providerChecks },
     projectCodeViews: { ...base.projectCodeViews, ...loaded.projectCodeViews },
+    chatLinks: { ...base.chatLinks, ...loaded.chatLinks },
     settings: { ...base.settings, ...loaded.settings },
   };
 }

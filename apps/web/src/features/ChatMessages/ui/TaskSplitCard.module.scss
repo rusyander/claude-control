@@ -1,0 +1,63 @@
+// Карточка предложения разделить задачи. Отделяется от ленты так же, как
+// карточка вопроса: полосой слева и приподнятой поверхностью — заливка акцентом
+// в тёмной теме сливается и с фоном страницы, и с фоном реплик человека.
+.card {
+  margin-bottom: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  border: 1px solid var(--color-accent);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.head {
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-accent);
+}
+
+.shared {
+  margin-bottom: var(--spacing-xs);
+}
+
+.groups {
+  margin-bottom: var(--spacing-sm);
+}
+
+.group {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+}
+
+// Имя ветки — техническая подробность, но именно по ней потом ищут копию на
+// диске, поэтому показываем как есть, моноширинным, без переносов внутри слова.
+.branch {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--color-surface-muted, var(--color-surface));
+  color: var(--color-fg-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.tasks {
+  margin: var(--spacing-3xs) 0 0;
+  padding-left: var(--spacing-md);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+
+  li + li {
+    margin-top: 2px;
+  }
+}
+
+.option {
+  margin-bottom: var(--spacing-xs);
+}
+
+.actions {
+  margin-top: var(--spacing-2xs);
+}

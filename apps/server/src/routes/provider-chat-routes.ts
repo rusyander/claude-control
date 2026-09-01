@@ -6,6 +6,7 @@ import type {
   ProviderChatSendRequest,
 } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
+import { initiativePrompt } from '../domains/chat/initiative.ts';
 import { getActiveProvider } from '../providers/registry.ts';
 import {
   createChat,
@@ -142,6 +143,9 @@ export function registerProviderChatRoutes(
         : [];
 
       const provider = getActiveProvider(ctx.store);
+      // Инициативы панели — у чужого CLI это первая реплика переписки, а не
+      // флаг: системного промпта у них нет.
+      const initiative = initiativePrompt(ctx.store.getSettings());
       const outcome = chats.send(
         appData(),
         providerId,
@@ -151,6 +155,7 @@ export function registerProviderChatRoutes(
           provider,
           // Только кэш: чат не должен ждать сеть ради имени модели.
           models: ctx.models.current(provider.modelVendors ?? []).models,
+          ...(initiative ? { systemPrefix: initiative } : {}),
         },
       );
 

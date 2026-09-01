@@ -8,7 +8,7 @@ Runs entirely on your machine: no account, no server, no telemetry.
 
 By default the panel configures Claude Code, where everything is available; it also edits the configuration of Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, Cursor, OpenCode and Aider — each in its native format, see [CLIs other than Claude](#clis-other-than-claude).
 
-🇷🇺 [Русская версия](README.ru.md) · 🔧 [Setup and troubleshooting](docs/SETUP.md) · 🚫 [What the panel does not do](docs/LIMITATIONS.md)
+🇷🇺 [Русская версия](README.ru.md) · 🔧 [Setup and troubleshooting](docs/SETUP.md) · 💬 [Chat and parallel agents](docs/CHAT.md) · 👥 [Groups](docs/GROUPS.md) · 🚫 [What the panel does not do](docs/LIMITATIONS.md)
 
 > [!TIP]
 > **Won't start?** `pnpm doctor` explains every finding. Still stuck — open Claude Code in this
@@ -48,12 +48,15 @@ The panel answers them: a visible shape, a switch that deletes nothing, and a sa
 - **Sandbox** — test a rule, skill, hook or MCP server in isolation; a hook against a prepared or custom JSON event
 - **Chat** — a conversation with Claude Code inside the panel: streaming, attachments, voice, artifact preview, model and thinking depth, branching by editing a message, search, export to md/json
 - **Several projects at once** — tabs, parallel agents, dev servers launched from the tab: one target per package in a monorepo, each on its own port, autostarted when the panel boots
+- **Parallel branches** — one button makes a working copy of the repository for a branch (`git worktree`) next to the project and opens it as an ordinary tab: three agents on three branches never collide, a copy with a live agent cannot be removed, and the panel never merges anything
+- **Task fan-out** — hand the agent a list of independent tasks and it proposes a split as a card: "do them here in turn" or "split into N chats", where every group gets its own branch, its own copy and its own chat
+- **Continuing in a clean session** — once a task is closed the agent tidies its working files and offers to carry on in a new conversation: the expensive context stays behind and the new session reads the checkpoint file. By button — or on its own, if you enable auto-continue in that conversation
 - **Project git** — current branch, the list of changed files, switching, creating a branch, committing, `pull` and `push` right from the tab; the section shows up only when the project has a `.git`
 - **From a phone** — an Android/iOS app (`apps/mobile`) over the same API: the whole chat, the project's files and diffs read-only, git `push`, all of analytics; paired once by QR, reachable over your own Tailscale network
 - **Search** — one query across rules, skills, hooks, scripts, permissions, env, MCP and plugins (secret values are never revealed)
 - **History** — a line-by-line diff over the backups, rollback of a whole file or of a single hunk
 - **Analytics** — token spend and estimated cost from local transcripts: hour heatmap, cache share, CSV/JSON export
-- **Groups** — arbitrary sets of entities toggled together, nestable
+- **Groups** — arbitrary sets of entities toggled together, nestable, bound to a project (start working in it and the group switches itself on) and holding a working order that compiles into an ordinary skill with a trigger hook. In detail — [Groups: bundles, binding and a working order](docs/GROUPS.md)
 - **Automations** — compiled down to ordinary hooks
 - **AI assistant** — describe a rule or skill in words, get a filled-in form
 - **Environment transfer** — pack any provider's environment (instructions, MCP, permissions, hooks, skills, plugins) into an archive and unpack it on another machine with a new / identical / will-overwrite plan
@@ -180,12 +183,12 @@ Not a separate bot and not an API wrapper: the same `claude` you run in the term
 
 What the panel adds is concurrency: each project gets its own tab and its own process, and switching tabs does not stop an agent.
 
-- **The dot on the tab.** Green — working, yellow — waiting on an answer, red — an error, a limit, or a stall (two minutes without events). A background agent that finished or hit a question sends a notification; clicking it opens that project.
-- **Edits are allowed by default,** and the toggle remembers its position — check it before handing a task to an unfamiliar repository. A stalled run offers "Retry" and "Allow and continue"; the second replays the request with full access, bypassing both the toggle and the Permissions section.
-- **Spend is visible immediately** — in tokens by default, because on a subscription dollars mean nothing; switch to money in Settings.
-- **A project tab is its dev server too.** "Start" takes the command from `package.json` (`dev`, otherwise `start`) or your own and runs it with the package manager the project actually uses — pnpm, yarn or npm, read from `packageManager` and the lock file. **The panel does not assign the port:** the app comes up on its own, and the panel reads the address from the output, opening the browser once the port answers. A monorepo has several targets — the gear lists the root and the packages, and they run at the same time. If a port is taken, the panel shows who holds it (name and PID) and offers to free it; it kills nothing on its own. "Autostart" brings a target up on the panel's _next_ start, **with no browser window and no navigation**; close the tab and it clears on all targets.
-- **Branch, files, commit and pull right there,** whenever the project has a `.git` (no `.git`, no section at all): the button carries the current branch, the number of changed files and how far behind the remote you are; under it sit the changed files, the local branches, the `pull` row, a new-branch field and a commit message field. `pull` goes into the current branch through its upstream, or from a chosen remote branch; it is the operation that may merge — the panel neither resolves nor rolls back a conflict, git’s own text reaches you as is. `push` sends the current branch, setting the upstream on its first run; nothing is forced, and a rejected push comes back with git’s own words. No branch deletion, no force: this is not a git client, only what you need while an agent works in the repository. Under the hood: `git` with no shell, branch names validated by `git check-ref-format`, checkout and pull limited to names on the list, so a stray ref cannot walk HEAD into detached state.
-- **A run belongs to the server, not to the tab.** Closing the tab or hitting F5 only detaches a listener; the panel re-attaches to live runs, and a run that finished while the tab was closed makes it back into the feed within a grace minute, after which it lives only in the transcript. Session spend is counted server-side too. The real boundary is a server restart: the run registry lives in its memory.
+- **The dot on the tab** — working, waiting on an answer, or stalled; a background agent that finished or hit a question sends a notification. The edits toggle, spend in tokens, the project dev server and its git live in the same tab.
+- **A branch per agent** — a working copy of the repository (`git worktree`) next to the project, opened as an ordinary tab; a copy with a live agent cannot be removed, and there is no merging in the panel at all.
+- **Splitting a list of tasks across chats** and **continuing in a clean session** — the agent offers a card, the decision and the button are yours.
+- **A run belongs to the server, not to the tab** — F5 and a closed tab stop nothing.
+
+In detail — [Chat, tabs and parallel agents](docs/CHAT.md).
 
 ## CLIs other than Claude
 
@@ -197,28 +200,7 @@ The panel grew out of Claude Code and stays its tool: **the Claude provider is a
 
 ### The map: section × provider
 
-**✅ works** · **👁 read-only** — the section is there, but the panel never writes into it (why — in the footnote) · **🧪 experimental** · **— unsupported**, section hidden.
-
-|                                     | Claude | Codex | Gemini | Qwen | Continue | Goose | Kimi | Cursor | OpenCode | Aider |
-| ----------------------------------- | :----: | :---: | :----: | :--: | :------: | :---: | :--: | :----: | :------: | :---: |
-| Global instructions<sup>1</sup>     |   ✅   |  ✅   |   ✅   |  ✅  |    —     |  ✅   |  ✅  |  ✅ *  |    ✅    | ✅ *  |
-| MCP servers<sup>2</sup>             |   ✅   |  ✅   |   ✅   |  ✅  |    ✅    |  ✅   |  ✅  |   ✅   |    ✅    |   —   |
-| Environment<sup>3</sup>             |   ✅   |  ✅   |   ✅   |  ✅  |    ✅    |   —   |  —   |   —    |    —     |  ✅   |
-| Permissions / approvals<sup>4</sup> |   ✅   |  ✅   |   ✅   |  ✅  |    ✅    |  ✅   |  ✅  |   ✅   |    ✅    |   —   |
-| Chat<sup>5</sup>                    |   ✅   |  🧪   |   🧪   |  🧪  |    🧪    |  🧪   |  🧪  |   —    |    🧪    |  🧪   |
-| Rules (`## ПРАВИЛО:`)               |   ✅   |   —   |   —    |  —   |    —     |   —   |  —   |   —    |    —     |   —   |
-| Skills<sup>10</sup>                 |   ✅   |   —   |   —    |  ✅  |    —     |   —   |  ✅  |   —    |    ✅    |   —   |
-| Commands<sup>11</sup>               |   👁    |   —   |   👁    |  👁   |    —     |   —   |  —   |   —    |    👁     |   —   |
-| Hooks<sup>8</sup>                   |   ✅   |   —   |   —    |  ✅  |    —     |   —   |  ✅  |   —    |    👁     |   —   |
-| Scripts<sup>6</sup>                 |   ✅   |  ✅   |   ✅   |  ✅  |    ✅    |  ✅   |  ✅  |   ✅   |    ✅    |  ✅   |
-| Plugins<sup>9</sup>                 |   ✅   |   —   |   —    |  —   |    —     |   —   |  👁   |   —    |    ✅    |   —   |
-| Projects<sup>7</sup>                |   ✅   |  ✅   |   ✅   |  ✅  |    ✅    |  ✅   |  ✅  |   ✅   |    ✅    |  ✅   |
-| Analytics (tokens, cost)            |   ✅   |   —   |   —    |  —   |    —     |   —   |  —   |   —    |    —     |   —   |
-| Sandbox                             |   ✅   |   —   |   —    |  —   |    —     |   —   |  —   |   —    |    —     |   —   |
-
-**Overview, Search, Groups, History, Settings and Help are always there** — those are the panel's own sections. History and search do follow the active provider's files: foreign backups are named separately and never mix with Claude's.
-
-What each footnote stands for — the file path, the keys the panel edits, the reason behind the status — is in [Providers: format details](docs/PROVIDERS.md).
+What actually works in each CLI — the "section × provider" table in [What the panel does not do with other CLIs](docs/LIMITATIONS-PROVIDERS.md#the-map-section--provider). File paths, the keys the panel edits and the reason behind every status — in [Providers: format details](docs/PROVIDERS.md).
 
 Claude is marked **verified**: its path has been exercised live and is covered by tests. The rest are **experimental**: formats come from each CLI's documentation and are covered by round-trip tests, but the first real write is worth eyeballing. Which is why four tools surround them — a write preview, a provider check on your machine, a daily comparison against the published schemas, and migration of settings between CLIs ([Providers: panel-side tools](docs/PROVIDER-TOOLS.md)). Not theory: the very first format check found a drift — `experimental.hook` is gone from the OpenCode schema, so hooks there are read-only as a fact rather than a guess.
 
@@ -295,17 +277,18 @@ packages/
 tools/qa/     Playwright scripts — screenshots, layout audit, flow checks
 ```
 
-| Command             | What it does                                                       |
-| ------------------- | ------------------------------------------------------------------ |
-| `pnpm dev`          | Server and frontend together                                       |
-| `pnpm check`        | The full gate: format, types, lint, module boundaries, build       |
-| `pnpm type-check`   | TypeScript across all packages                                     |
-| `pnpm lint`         | ESLint                                                             |
-| `pnpm depcruise`    | FSD layer boundaries                                               |
-| `pnpm qa:setup`     | Install the Chromium build the QA scripts need (once)              |
-| `pnpm mobile`       | Build the phone app and install it on a device or emulator         |
-| `pnpm mobile:apk`   | Release APK into the repository root                               |
-| `pnpm mobile:clean` | Drop leftover native build intermediates (`--dry` to only measure) |
+| Command                  | What it does                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`               | Server and frontend together                                                                             |
+| `pnpm check`             | The full gate: format, types, lint, module boundaries, build                                             |
+| `pnpm type-check`        | TypeScript across all packages                                                                           |
+| `pnpm lint`              | ESLint                                                                                                   |
+| `pnpm depcruise`         | FSD layer boundaries                                                                                     |
+| `pnpm qa:setup`          | Install the Chromium build the QA scripts need (once)                                                    |
+| `pnpm keepalive:install` | Watchdog: TCP-probes both ports every 20 s and brings back the half that went silent (`:status`, `:off`) |
+| `pnpm mobile`            | Build the phone app and install it on a device or emulator                                               |
+| `pnpm mobile:apk`        | Release APK into the repository root                                                                     |
+| `pnpm mobile:clean`      | Drop leftover native build intermediates (`--dry` to only measure)                                       |
 
 The phone app has its own chain because Gradle keeps every native library's intermediates inside `node_modules/<package>/android/{build,.cxx}` — about 10 GB per release build, reaching neither the APK nor the repository. `pnpm mobile:apk` wipes them itself once the APK is copied (`--keep-build` keeps them for a faster rebuild); `pnpm mobile:clean` is the manual route.
 

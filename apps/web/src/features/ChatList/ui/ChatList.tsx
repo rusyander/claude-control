@@ -10,7 +10,7 @@ import { VirtualList } from '@shared/ui/virtual-list';
 import { useElementHeight } from '@shared/hooks/use-element-height';
 import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
 import { useChatBodySearch, MIN_CHAT_SEARCH_LENGTH } from '@entities/Chat';
-import { matchBodyHits, withGroupHeaders } from '../lib/rows';
+import { matchBodyHits, withGroupHeaders, withTree } from '../lib/rows';
 import { ChatRow } from './ChatRow';
 import { GROUP_HEIGHT, ROW_HEIGHT } from './ChatList.constants';
 import type { ChatListProps, ChatRowData, ChatSearchMode } from './ChatList.types';
@@ -66,8 +66,9 @@ export function ChatList({
   }, [chats, query, mode, bodySearch.data]);
 
   // Заголовки групп идут строками того же списка — иначе виртуализация и
-  // разбивка по датам мешали бы друг другу.
-  const rows = useMemo(() => withGroupHeaders(found), [found]);
+  // разбивка по датам мешали бы друг другу. Дерево строится ДО заголовков:
+  // ветвь обязана остаться под своим корнем, а не уехать в свою дату.
+  const rows = useMemo(() => withGroupHeaders(withTree(found)), [found]);
 
   const showSkeleton = isLoading || (mode === 'messages' && isBodyReady && bodySearch.isLoading);
   const searchNeedle = mode === 'messages' ? bodyQuery : '';
@@ -138,6 +139,7 @@ export function ChatList({
                 matchCount={row.data.matchCount}
                 query={searchNeedle}
                 status={statuses?.get(row.data.chat.id)}
+                depth={row.data.depth}
                 onSelect={() => onSelect(row.data.chat)}
               />
             )

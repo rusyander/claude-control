@@ -1,7 +1,7 @@
 import type { MessageUsage } from '@claude-control/contracts';
 import { callbacks, emit, pendingUsage, runs } from './agent-runs.state';
 import { rebuildStatuses } from './agent-runs.statuses';
-import type { AgentRun, ChatEvent } from './agent-runs.types';
+import type { AgentRun, ChatEvent, HandoffEvent } from './agent-runs.types';
 import { addUsage } from './agent-runs.usage';
 
 /**
@@ -14,6 +14,7 @@ export function applyEvent(id: string, event: ChatEvent): void {
 
   const next: AgentRun = { ...run, lastEventAt: Date.now() };
   let firePermission = false;
+  let fireHandoff: HandoffEvent | undefined;
   switch (event.kind) {
     case 'session':
       next.sessionId = event.sessionId;
@@ -101,10 +102,17 @@ export function applyEvent(id: string, event: ChatEvent): void {
     case 'permissionResolved':
       next.permissions = run.permissions.filter((p) => p.toolUseId !== event.toolUseId);
       break;
+    case 'handoff':
+      // В самом прогоне ничего не меняется: он закрыт, а работа уехала в другой
+      // разговор. Колбэк вызываем ПОСЛЕ записи снимка, ниже, — обработчик
+      // переключает вкладку и читает прогон, который должен быть уже актуален.
+      fireHandoff = event;
+      break;
   }
   runs.set(id, next);
   // Запрос/ответ прав меняют «важность» прогона (жёлтая точка) — пересобираем.
   if (event.kind === 'permission' || event.kind === 'permissionResolved') rebuildStatuses();
   emit();
   if (firePermission) callbacks.onPermissionRequest?.(next);
+  if (fireHandoff) callbacks.onHandoff?.(fireHandoff, next);
 }

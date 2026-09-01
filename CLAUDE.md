@@ -28,10 +28,12 @@ default and the only verified one. No database — **source of truth = Claude Co
 - `apps/web` — React + Vite :8888, proxies `/api`
 - `apps/mobile` — Expo (SDK 57 / RN 0.86) phone app over the same API, own toolchain (`npm`, not
   the pnpm workspace); `pnpm mobile`, `pnpm mobile:type-check`, `pnpm mobile:apk` (release APK to
-  the repo root, gitignored, replaces the previous one), `pnpm mobile:clean`
+  the repo root, gitignored, replaces the previous one), `pnpm mobile:clean`. Expo's API moves
+  between SDKs — check https://docs.expo.dev/versions/v57.0.0/ before writing native code
 - `packages/contracts` — shared types + zod schemas
 - `tools/` — `doctor.mjs` (environment check), `qa/*.mjs` (Playwright runs), `tailscale-serve.mjs`
-  (`pnpm remote` / `off`), `build-mobile-apk.mjs`, `clean-mobile-build.mjs` (Gradle hides native
+  (`pnpm remote` / `off`), `keepalive.mjs` (`pnpm keepalive[:install|:off|:status]` — watchdog over
+  both dev halves, see the entry below), `build-mobile-apk.mjs`, `clean-mobile-build.mjs` (Gradle hides native
   intermediates in `node_modules/*/android/{build,.cxx}` — ~10 GB per release build, in neither APK
   nor repo; the build sweeps them itself, `--keep-build` opts out, `--dry` measures),
   `make-mobile-icons.mjs` (one SVG mark → every icon/splash size, so launcher, splash and favicon
@@ -57,9 +59,10 @@ Fix without asking: project code, deps, build config, launch env. Ask first: fil
 the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
 QA runs live in `tools/qa/` and need `pnpm dev` up + `pnpm qa:setup`; each drives the real UI of one
-area. Three behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
-`check-project-code.mjs` stub their API, so they depend on no particular history and on no installed
-CLI.
+area. Six behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
+`check-project-code.mjs`, `check-task-split.mjs`, `check-handoff.mjs` stub their API and
+`check-worktrees.mjs` builds its own git repository in temp, so they depend on no particular history,
+on no installed CLI, and leave neither branches nor copies behind.
 
 ## Symptom → cause → fix
 
@@ -98,6 +101,30 @@ invalidating everything on any non-first `onopen`. A run started OUTSIDE this wi
 polling `/chat/active` (`pages/Chat/model/useRunLifecycle.ts`), not by one shot on mount. Proof is
 `node tools/qa/check-live-sync.mjs`: it fires a run straight into the API, like the phone does, and
 never reloads the page.
+
+**A group switched itself on and nobody touched the toggle** — by design. A group bound to project
+paths is ENABLED when a run starts in one of them (`domains/group-activation.ts`, called from
+`routes/chat/run-routes.ts`), a parallel copy `<repo>-worktrees/<branch>` included. It never disables
+anything, so nothing the user turned on is taken away; drop the path on the Groups page to stop it.
+
+**A parallel working copy refuses to be removed (409)** — an agent is running inside it. That is why
+`routes/project-git-routes.ts` takes the run registry as its third argument, and the check holds for
+the phone too. Copies live NEXT to the repo (`<parent>/<repo>-worktrees/<branch>`, never inside —
+watchers and bundlers would recurse), and the panel never merges anything: merging stays with the
+user.
+
+**Panel "switched itself off" after a few idle hours; sometimes only one half** — nothing in the
+panel crashed. The machine's own janitor (`~/.claude/tools/proc-reaper`, scheduled task `ProcReaper`,
+every 4 h) reaped the stand: `pnpm dev` grows from a shell that has long exited, so the whole tree
+reads as orphaned, and the reaper spared only the two PIDs holding a socket — the `pnpm` / `cmd` /
+`node --watch` above them died, which is exactly why one half kept serving and the other vanished.
+Fixed 2026-09-01 on both sides. Janitor: `ProtectPorts` (5178/8888 — listener, its subtree AND its
+ancestor chain, no age cap) plus ancestor immunity for every young listener, so no stand is
+decapitated again. Repo: `pnpm keepalive:install` — TCP-probes both ports every 20 s, restarts the
+silent half, adopts a stand that is already up instead of fighting it for the port. Autostart is
+user-level (Startup folder + a 5-minute pickup task; `/sc ONLOGON` needs admin and is not used).
+Log `%LOCALAPPDATA%\claude-control\keepalive.log`, state `pnpm keepalive:status`. The probe is a TCP
+connect, never HTTP: with the remote token gate on, a live panel answers 401.
 
 ## Working rules
 

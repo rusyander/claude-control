@@ -63,12 +63,18 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
   app.get('/api/sandbox/fixtures', () => EVENT_FIXTURES);
 
   /** Сборка песочницы: показываем состав до того, как что-либо запускать. */
-  app.post<{ Body: { id: string; selection: SandboxSelection } }>(
+  app.post<{ Body: { id?: string; selection?: SandboxSelection } }>(
     '/api/sandbox/create',
-    (request) => {
+    (request, reply) => {
+      // Идентификатор задаёт КАТАЛОГ песочницы — домыслить его нельзя, а без
+      // проверки запрос без тела собирал путь из `undefined` и отвечал 500.
+      if (!request.body.id) {
+        return reply.code(400).send({ message: 'Не указана песочница' });
+      }
+
       const sandbox = createSandbox(
         request.body.id,
-        request.body.selection,
+        request.body.selection ?? {},
         ctx.location,
         ctx.store,
       );
@@ -241,10 +247,16 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
    * Claude Code запускается с временным каталогом конфигурации, поэтому видит
    * только проверяемые настройки и ничего из настоящих.
    */
-  app.post<{ Body: { id: string; prompt: string; sessionId?: string } }>(
+  app.post<{ Body: { id?: string; prompt?: string; sessionId?: string } }>(
     '/api/sandbox/run',
     async (request, reply) => {
       const { id, prompt, sessionId } = request.body;
+
+      // Ни песочницу, ни вопрос домыслить нечем. Без этой проверки запрос без
+      // тела уходил собирать пути из `undefined` и отвечал 500.
+      if (!id || !prompt) {
+        return reply.code(400).send({ message: 'Нужны песочница и текст вопроса' });
+      }
 
       if (!existsSync(sandboxPaths(id).configDir)) {
         // Песочницу, которую унесло подметание, ПУСТОЙ не подменяем. Раньше на

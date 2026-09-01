@@ -44,3 +44,10 @@
 .orderLabel {
   min-width: 0;
 }
+
+/* Шаг сценария — карточка: без рамки поля трёх шагов сливаются в одну простыню. */
+.stepCard {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: var(--spacing-xs);
+}

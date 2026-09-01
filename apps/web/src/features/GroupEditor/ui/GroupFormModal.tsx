@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { GroupMember } from '@claude-control/contracts';
+import type { GroupMember, GroupScenario } from '@claude-control/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
@@ -11,6 +11,9 @@ import { useSaveGroup } from '@entities/Group';
 import { permissionApi } from '@entities/Permission';
 import { envToText, textToEnv } from '@shared/lib/env-text';
 import { MemberPicker } from './MemberPicker';
+import { ProjectBinding } from './ProjectBinding';
+import { ScenarioFields } from './ScenarioFields';
+import { EMPTY_SCENARIO } from './ScenarioFields.constants';
 import type { GroupFormModalProps } from './GroupFormModal.types';
 
 /**
@@ -24,6 +27,8 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
   const [description, setDescription] = useState('');
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [envText, setEnvText] = useState('');
+  const [projectPaths, setProjectPaths] = useState<string[]>([]);
+  const [scenario, setScenario] = useState<GroupScenario>(EMPTY_SCENARIO);
 
   const saveGroup = useSaveGroup();
   const { data: permissions = [] } = permissionApi.useList();
@@ -52,6 +57,8 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
     setDescription(group?.description ?? '');
     setMembers(group?.members ?? []);
     setEnvText(group ? envToText(group.env) : '');
+    setProjectPaths(group?.projectPaths ?? []);
+    setScenario(group?.scenario ?? EMPTY_SCENARIO);
   }, [isOpen, group]);
 
   const canSave = name.trim().length > 0 && !saveGroup.isPending;
@@ -67,6 +74,9 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
           icon: group?.icon ?? 'folder',
           members,
           env: textToEnv(envText),
+          projectPaths,
+          // Пустой сценарий не сохраняем: он завёл бы скилл без шагов.
+          scenario: scenario.steps.length > 0 ? scenario : undefined,
           isEnabled: group?.isEnabled ?? true,
         },
       },
@@ -135,6 +145,20 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
                 {t('groups.conflict', { patterns: conflicts.join(', ') })}
               </Typography>
             )}
+          </Stack>
+
+          <Stack gap="var(--spacing-2xs)">
+            <Typography variant="body-sm" weight="medium">
+              {t('groups.projectsTitle')}
+            </Typography>
+            <ProjectBinding value={projectPaths} onChange={setProjectPaths} />
+          </Stack>
+
+          <Stack gap="var(--spacing-2xs)">
+            <Typography variant="body-sm" weight="medium">
+              {t('groups.scenarioTitle')}
+            </Typography>
+            <ScenarioFields value={scenario} onChange={setScenario} />
           </Stack>
 
           <TextField

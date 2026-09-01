@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../../context.ts';
+import { initiativePrompt } from '../../domains/chat/initiative.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
 import { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { shouldAutoApprove } from '../../domains/chat/auto-approve.ts';
@@ -12,6 +13,7 @@ import {
   buildPromptWithFiles,
   SUPPORTED_UPLOAD_EXTENSIONS,
 } from '../../domains/chat/ChatUploads.ts';
+import { activateGroupsForCwd } from '../../domains/group-activation.ts';
 import { activeCliCommand } from '../../providers/cli.ts';
 import { estimateCost } from '../../domains/analytics/pricing.ts';
 import { projectsDir, validTargetCwd } from './paths.ts';
@@ -178,6 +180,22 @@ export function registerChatRunRoutes(
 
     const cwd = workspace.cwd;
 
+    // Набор, привязанный к этому проекту, включается сам — до запуска агента,
+    // иначе правила и скиллы доехали бы только к следующему сообщению. Уже
+    // включённая группа не трогается вовсе, поэтому вызов на каждом сообщении
+    // ничего не стоит. Песочница исключена: у неё свой каталог конфигурации.
+    // Осечка тут не имеет права ронять прогон — набор не главнее разговора.
+    if (!workspace.isSandbox) {
+      try {
+        activateGroupsForCwd(
+          { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
+          cwd,
+        );
+      } catch (error) {
+        app.log.warn({ err: error }, 'group activation failed');
+      }
+    }
+
     // Вложения кладём в папку панели и перечисляем пути в промпте: Claude Code
     // читает файлы с диска сам, включая PDF и картинки. Именно в папку панели,
     // а не в рабочую: у разговора из настоящего проекта cwd — это каталог
@@ -196,6 +214,8 @@ export function registerChatRunRoutes(
       allowEdits: workspace.isSandbox || allowEdits === true || fullAccess === true,
     });
 
+    const initiative = initiativePrompt(ctx.store.getSettings());
+
     // Запускаем прогон в реестре и подключаемся к нему потоком. Обрыв этого
     // соединения агента не тронет.
     const started = registry.start(
@@ -211,6 +231,11 @@ export function registerChatRunRoutes(
         // Модель и глубина продумывания — выбор пользователя в шапке чата.
         model,
         effort,
+        // Инициативы панели (разделить задачи, закрыть этап чистой сессией) —
+        // одной строкой к системному промпту. Тумблеры в настройках, потому что
+        // уместны они не всякому: кто ведёт один короткий разговор, увидит в них
+        // лишний шаг.
+        ...(initiative ? { appendSystemPrompt: initiative } : {}),
         // Полный доступ снимает все проверки прав — по кнопке «Разрешить и
         // продолжить» у агента, вставшего из-за отсутствия разрешения.
         permissionMode: fullAccess ? 'bypassPermissions' : permissionModeFor(workspace, allowEdits),
@@ -276,7 +301,9 @@ export function registerChatRunRoutes(
   app.post<{ Params: { chatId: string }; Body: { enabled?: boolean } }>(
     '/api/chat/:chatId/auto-approve',
     (request) => {
-      session.toggleAutoApprove(request.params.chatId, request.body.enabled === true);
+      // Тело читаем через `?.`: запрос без него значит «выключено», а не 500 —
+      // на пустом или обрезанном теле панель не должна выглядеть сломанной.
+      session.toggleAutoApprove(request.params.chatId, request.body?.enabled === true);
       return { ok: true };
     },
   );

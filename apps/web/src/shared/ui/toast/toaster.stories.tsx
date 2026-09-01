@@ -70,6 +70,50 @@ export const Песочница: Story = {
   ),
 };
 
+/**
+ * Настоящий случай, из-за которого тост переставал закрываться: вывод `git commit`
+ * на сотню файлов. Карточка обязана остаться прежнего роста — три строки и
+ * многоточие, — а весь текст открываться в окне по клику.
+ */
+const GIT_OUTPUT = [
+  '[main 9267209] feat(mobile): адрес панели по умолчанию задаётся при сборке',
+  ' 124 files changed, 4457 insertions(+), 396 deletions(-)',
+  ' create mode 100644 inst-admin-api/internal/api/handler_guardrails_response_test.go',
+  ' create mode 100644 inst-admin-api/internal/service/guardrail_cp_response_test.go',
+  ' create mode 100644 inst-admin-api/internal/store/guardrails_response_test.go',
+  ' create mode 100644 inst-admin-api/internal/store/teams_test.go',
+  ' create mode 100644 mod-agentbox/src/agentbox/logging_safe.py',
+  ' create mode 100644 mod-agentbox/tests/test_agent_from_definition.py',
+  ' create mode 100644 mod-agentbox/tests/test_coordinator_worker.py',
+  ' create mode 100644 mod-agentbox/tests/test_runs_coordinator_endpoint.py',
+  ' create mode 100644 mod-kbbox/tests/test_embeddings.py',
+  ' create mode 100644 mod-llmbox/tests/test_error_contract.py',
+].join('\n');
+
+export const ДлинныйТекст: Story = {
+  render: () => (
+    <>
+      <Stack gap="var(--spacing-sm)" style={{ maxWidth: 520 }}>
+        <Typography variant="body-sm" color="muted">
+          Вывод команды на сотню файлов. Тост показывает начало, остальное — по клику.
+        </Typography>
+        <Stack direction="row" gap="var(--spacing-sm)" wrap>
+          <Button variant="secondary" onClick={() => toast.success(GIT_OUTPUT)}>
+            Длинный успех
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => toast.error(GIT_OUTPUT, { title: 'Коммит не прошёл' })}
+          >
+            Длинная ошибка с заголовком
+          </Button>
+        </Stack>
+      </Stack>
+      <Toaster />
+    </>
+  ),
+};
+
 export const СЗаголовком: Story = {
   render: () => (
     <>

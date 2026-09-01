@@ -4,11 +4,13 @@ import type { Artifact, ChatMessage, ChatSummary } from '@claude-control/contrac
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import {
   useWorkspace,
+  workspace,
+  getWorkspaceState,
   normalizeProjectPath,
   projectShortName,
   HOME_TAB_ID,
 } from '@shared/lib/workspace';
-import { useAgentRun, type ActiveRunView } from '@shared/lib/agent-runs';
+import { useAgentRun } from '@shared/lib/agent-runs';
 import { migrateDraft } from '@shared/lib/draft';
 import { useRefreshChat } from '@entities/Chat';
 import type { ProjectInfo } from '@entities/Project';
@@ -19,6 +21,17 @@ import { draftKeyFor } from '../lib/draftKey';
 export interface ChatSessionInput {
   /** Все разговоры из истории Claude Code — по ним находится «повзрослевший» чат. */
   chats?: ChatSummary[];
+}
+
+/**
+ * Куда переключить главную колонку. Нарочно уже, чем `ActiveRunView`: показывать
+ * приходится не только живой прогон из пульта, но и разговор, только что
+ * заведённый продолжением в чистой сессии, — у того нет ни статуса, ни расхода,
+ * а путь и ключ есть.
+ */
+export interface ViewTarget {
+  id: string;
+  projectPath?: string;
 }
 
 export interface ChatSession {
@@ -42,7 +55,7 @@ export interface ChatSession {
   openChat: (chat: ChatSummary) => void;
   openProject: (project: ProjectInfo) => void;
   openProjectPath: (path: string, name: string) => void;
-  viewRun: (run: ActiveRunView) => void;
+  viewRun: (run: ViewTarget) => void;
   closeProjectTab: (id: string) => void;
 }
 
@@ -90,9 +103,13 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
 
   const enterProjectDraft = useCallback(() => {
     setActiveChat(undefined);
-    setDraftId(`new-${Date.now()}`);
+    const draft = `new-${Date.now()}`;
+    setDraftId(draft);
     setPreview(undefined);
     setPending([]);
+    // Черновик тоже запоминаем за вкладкой: с него начинается разговор, и если
+    // в нём уже пошёл прогон, возврат на вкладку обязан показать именно его.
+    workspace.rememberView(getWorkspaceState().activeTabId, draft);
     // Поле не трогаем: заранее вписанного вопроса про проект больше нет, а свой
     // недописанный черновик проекта хук подгрузит сам по смене ключа контекста.
     writeUrl(undefined);
@@ -108,10 +125,50 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
       setDraftId(runId);
       setPreview(undefined);
       setPending([]);
+      workspace.rememberView(getWorkspaceState().activeTabId, runId);
       writeUrl(undefined);
     },
     [writeUrl],
   );
+
+  /**
+   * Разговор, который вкладка должна показать, когда список чатов доедет.
+   * Запомненный id приходит из хранилища раньше самих чатов, а без записи в
+   * списке он неотличим от черновика — поэтому ждём и доводим потом.
+   */
+  const restoreRef = useRef<string | undefined>(undefined);
+
+  /** Открыть запомненный разговор: настоящий — из списка, иначе как черновик. */
+  const restoreView = useCallback(
+    (wanted: string, known: ChatSummary[] | undefined): void => {
+      const found = known?.find((chat) => chat.id === wanted);
+      if (found) {
+        restoreRef.current = undefined;
+        setActiveChat(found);
+        setDraftId(undefined);
+        setPreview(undefined);
+        setPending([]);
+        writeUrl(found.id);
+        return;
+      }
+      // Списка ещё нет — покажем как черновик (живой прогон под этим id виден
+      // сразу), а эффект ниже доведёт до настоящего разговора, когда список придёт.
+      restoreRef.current = wanted;
+      showRun(wanted);
+    },
+    [showRun, writeUrl],
+  );
+
+  useEffect(() => {
+    const wanted = restoreRef.current;
+    if (!wanted || !chats) return;
+    const found = chats.find((chat) => chat.id === wanted);
+    if (!found) return;
+    restoreRef.current = undefined;
+    setActiveChat(found);
+    setDraftId(undefined);
+    writeUrl(found.id);
+  }, [chats, writeUrl]);
 
   // Смена активного таба: вид сбрасываем, для проекта готовим новый разговор с
   // подсказкой. Фоновый прогон прежнего таба при этом НЕ трогаем — он идёт
@@ -122,19 +179,25 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     if (tabId === prevTabRef.current) return;
     prevTabRef.current = tabId;
 
-    const project = ws.state.projectTabs.find((tab) => tab.id === tabId);
-    if (project) {
-      // Пришли смотреть конкретного агента — показываем его прогон.
-      if (pendingViewRef.current) {
-        showRun(pendingViewRef.current);
-        pendingViewRef.current = undefined;
-      } else {
-        enterProjectDraft();
-      }
-    } else if (pendingViewRef.current) {
-      // Просмотр домашнего прогона.
+    // Пришли смотреть конкретного агента (клик в пульте) — он важнее памяти
+    // вкладки: человек только что назвал, что хочет видеть.
+    if (pendingViewRef.current) {
       showRun(pendingViewRef.current);
       pendingViewRef.current = undefined;
+      return;
+    }
+
+    // Вкладка помнит свой разговор — возвращаем именно его. Это и есть работа с
+    // несколькими агентами разом: ушёл в другую вкладку, вернулся — на месте.
+    const remembered = getWorkspaceState().views[tabId];
+    if (remembered) {
+      restoreView(remembered, chats);
+      return;
+    }
+
+    const project = ws.state.projectTabs.find((tab) => tab.id === tabId);
+    if (project) {
+      enterProjectDraft();
     } else {
       setActiveChat(undefined);
       setDraftId(undefined);
@@ -164,6 +227,9 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
 
     setActiveChat(created);
     setDraftId(undefined);
+    // Вкладка помнила черновик — теперь помнит настоящий разговор, иначе после
+    // возврата открылся бы пустой лист вместо только что состоявшегося ответа.
+    workspace.rememberView(getWorkspaceState().activeTabId, created.id);
     writeUrl(created.id);
     refresh(created.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,9 +237,11 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
 
   const startNewChat = (): void => {
     setActiveChat(undefined);
-    setDraftId(`new-${Date.now()}`);
+    const draft = `new-${Date.now()}`;
+    setDraftId(draft);
     setPreview(undefined);
     setPending([]);
+    workspace.rememberView(getWorkspaceState().activeTabId, draft);
     writeUrl(undefined);
   };
 
@@ -182,6 +250,8 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     setDraftId(undefined);
     setPreview(undefined);
     setPending([]);
+    restoreRef.current = undefined;
+    workspace.rememberView(getWorkspaceState().activeTabId, chat.id);
     writeUrl(chat.id);
   };
 
@@ -194,7 +264,7 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
   // Клик по агенту в пульте: показать его живой поток в главном чате. Если агент
   // в проекте — открываем таб (эффект смены таба подхватит pendingViewRef и
   // покажет прогон); если уже в этом табе — показываем сразу.
-  const viewRun = (activeRun: ActiveRunView): void => {
+  const viewRun = (activeRun: ViewTarget): void => {
     if (activeRun.projectPath) {
       const id = normalizeProjectPath(activeRun.projectPath);
       if (ws.activeProject?.id === id) {

@@ -23,13 +23,62 @@ export function matchBodyHits(
     });
 }
 
+/**
+ * Ставит чаты, выделенные разделением, под их родителя.
+ *
+ * Дерево нужно ровно для одного: увидеть, что пять чатов приехали из одной
+ * просьбы. Поэтому оно ровно одноуровневое и строится поверх УЖЕ отсортированного
+ * списка — порядок родителей остаётся прежним (свежие сверху), а дети встают под
+ * своим родителем в том же порядке, в каком их завели.
+ *
+ * Сирота (родитель не попал в видимый список — удалён, отфильтрован поиском)
+ * остаётся обычной строкой на своём месте: спрятать разговор, потому что не
+ * нашлась его родня, — худшее, что можно сделать со списком.
+ */
+export function withTree(items: ChatRowData[]): ChatRowData[] {
+  const byParent = new Map<string, ChatRowData[]>();
+  for (const item of items) {
+    const parent = item.chat.parentId;
+    if (!parent) continue;
+    const kin = byParent.get(parent);
+    if (kin) kin.push(item);
+    else byParent.set(parent, [item]);
+  }
+  if (byParent.size === 0) return items;
+
+  const present = new Set(items.map((item) => item.chat.id));
+  const placed = new Set<string>();
+  const rows: ChatRowData[] = [];
+
+  for (const item of items) {
+    // Ребёнка, у которого родитель тоже в списке, ставит сам родитель.
+    if (item.chat.parentId && present.has(item.chat.parentId)) continue;
+
+    rows.push(item);
+    placed.add(item.chat.id);
+
+    for (const child of byParent.get(item.chat.id) ?? []) {
+      if (placed.has(child.chat.id)) continue;
+      rows.push({ ...child, depth: 1 });
+      placed.add(child.chat.id);
+    }
+  }
+
+  return rows;
+}
+
 /** Раскладывает отсортированный список по группам «Сегодня / Вчера / …». */
 export function withGroupHeaders(items: ChatRowData[]): Row[] {
   const rows: Row[] = [];
   let current: TimeGroup | undefined;
 
   for (const data of items) {
-    const group = timeGroup(data.chat.updatedAt);
+    // Ветвь дерева не отрывается от своего корня: у ребёнка своя дата, и по ней
+    // между ним и родителем мог бы встать заголовок «Вчера» — тогда дерево
+    // распалось бы ровно там, ради чего его и рисуют.
+    const group = data.depth
+      ? (current ?? timeGroup(data.chat.updatedAt))
+      : timeGroup(data.chat.updatedAt);
     if (group !== current) {
       rows.push({ kind: 'header', group });
       current = group;

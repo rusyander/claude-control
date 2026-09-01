@@ -5,6 +5,9 @@ export {
   useCommitAll,
   usePullChanges,
   usePushBranch,
+  useProjectWorktrees,
+  useAddWorktree,
+  useRemoveWorktree,
   projectGitKey,
 } from './api/ProjectGitApi';
 export type {
@@ -12,4 +15,7 @@ export type {
   ProjectGitFileStatus,
   ProjectGitInfo,
   ProjectGitResult,
+  ProjectWorktree,
+  ProjectWorktreesInfo,
+  ProjectWorktreesResult,
 } from '@claude-control/contracts';

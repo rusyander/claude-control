@@ -14,4 +14,8 @@ export interface ChatDockProps {
   /** `false` — сообщение не приняли: вложения остаются в поле. */
   onSend: (files: ChatSendFile[]) => Promise<boolean>;
   onStop: () => void;
+  /** Попросить агента разделить задачи по чатам; пусто — разговор не в проекте. */
+  onSplitTasks?: () => void;
+  /** Попросить закрыть этап и продолжить в чистой сессии; пусто — вне проекта. */
+  onHandoff?: () => void;
 }

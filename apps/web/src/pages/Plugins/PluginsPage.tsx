@@ -157,12 +157,17 @@ export function PluginsPage() {
         <Typography variant="heading-sm">{t('plugins.marketplaces')}</Typography>
 
         <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-          <TextField
-            label={t('plugins.marketplaceSource')}
-            value={marketplaceSource}
-            onChange={setMarketplaceSource}
-            placeholder="owner/repo, https://… или путь"
-          />
+          {/* Тот же приём, что у поля установки: без пола поле делит строку с
+              кнопкой и ужимается до 185px, а от подсказки остаётся «owner/repo,
+              https://… или». Кнопка при нехватке места переносится вниз. */}
+          <div className={styles.installField}>
+            <TextField
+              label={t('plugins.marketplaceSource')}
+              value={marketplaceSource}
+              onChange={setMarketplaceSource}
+              placeholder={t('plugins.marketplaceSourceHint')}
+            />
+          </div>
           <Button
             variant="secondary"
             leftIcon={<Icon name="plus" size={20} />}

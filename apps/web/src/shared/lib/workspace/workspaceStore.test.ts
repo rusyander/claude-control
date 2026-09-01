@@ -5,6 +5,7 @@ import {
   openProjectTab,
   closeProjectTab,
   activateTab,
+  rememberTabView,
   sanitizeState,
 } from './workspaceStore';
 
@@ -14,7 +15,7 @@ import {
  * багов: дедуп при открытии, куда уходит фокус при закрытии, устойчивость к
  * мусору из localStorage. Тест-кейсы см. .agent/TEST-CASES.md → «Табы проектов».
  */
-const HOME: WorkspaceState = { projectTabs: [], activeTabId: HOME_TAB_ID };
+const HOME: WorkspaceState = { projectTabs: [], activeTabId: HOME_TAB_ID, views: {} };
 
 function withTabs(...paths: string[]): WorkspaceState {
   let state = HOME;
@@ -84,6 +85,31 @@ describe('activateTab', () => {
   });
 });
 
+describe('rememberTabView: вкладка помнит свой разговор', () => {
+  it('запоминает и переписывает разговор вкладки', () => {
+    const state = rememberTabView(withTabs('C:/a'), 'c:/a', 'chat-1');
+    expect(state.views['c:/a']).toBe('chat-1');
+    expect(rememberTabView(state, 'c:/a', 'chat-2').views['c:/a']).toBe('chat-2');
+  });
+
+  it('пустой разговор — забыть; повтор того же — то же состояние', () => {
+    const state = rememberTabView(withTabs('C:/a'), 'c:/a', 'chat-1');
+    expect(rememberTabView(state, 'c:/a', 'chat-1')).toBe(state);
+    expect(rememberTabView(state, 'c:/a', undefined).views['c:/a']).toBeUndefined();
+  });
+
+  it('закрытая вкладка уносит свою память с собой', () => {
+    const state = rememberTabView(withTabs('C:/a', 'C:/b'), 'c:/a', 'chat-1');
+    expect(closeProjectTab(state, 'c:/a').views['c:/a']).toBeUndefined();
+  });
+
+  it('открытие второго проекта не стирает память первого', () => {
+    const one = rememberTabView(withTabs('C:/a'), 'c:/a', 'chat-1');
+    const two = openProjectTab(one, { path: 'C:/b', name: 'b' });
+    expect(two.views['c:/a']).toBe('chat-1');
+  });
+});
+
 describe('sanitizeState', () => {
   it('чинит мусор из хранилища: дубли, битые записи, несуществующий активный', () => {
     const raw = {
@@ -114,5 +140,14 @@ describe('sanitizeState', () => {
       activeTabId: 'c:/a',
     });
     expect(state.activeTabId).toBe('c:/a');
+  });
+
+  it('память вкладок переживает перезагрузку, но только у живых вкладок', () => {
+    const state = sanitizeState({
+      projectTabs: [{ id: 'c:/a', path: 'C:/a', name: 'a' }],
+      activeTabId: 'c:/a',
+      views: { 'c:/a': 'chat-1', home: 'chat-home', 'c:/закрытая': 'chat-2', 'c:/битая': 42 },
+    });
+    expect(state.views).toEqual({ 'c:/a': 'chat-1', home: 'chat-home' });
   });
 });

@@ -1,5 +1,7 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { scanSplitBlocks } from '@claude-control/contracts/task-split';
+import { scanHandoffBlocks } from '@claude-control/contracts/chat-handoff';
 import { Stack } from '@shared/ui/stack';
 import { SkeletonList, SkeletonText } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
@@ -10,6 +12,8 @@ import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { parseQuestions } from '../lib/parseQuestions';
 import { MessageBubble } from './MessageBubble';
 import { QuestionCard } from './QuestionCard';
+import { TaskSplitCard } from './TaskSplitCard';
+import { HandoffCard } from './HandoffCard';
 import { PermissionCard } from './PermissionCard';
 import type { ChatMessagesProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
@@ -35,6 +39,10 @@ export function ChatMessages({
   onRetry,
   costUnit,
   effort,
+  onSplit,
+  onKeepHere,
+  isSplitPending,
+  handoff,
 }: ChatMessagesProps) {
   const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -76,6 +84,13 @@ export function ChatMessages({
     restoreScroll.current = undefined;
   }, [messages.length]);
 
+  // Разбор идущего ответа: каждый кусок текста заново, поэтому по памяти — это
+  // единственное место ленты, которое пересчитывается на каждое слово. Оба
+  // разбора идут цепочкой по одному и тому же тексту — языки блоков разные, и
+  // каждый скан видит только свой.
+  const streamed = useMemo(() => scanSplitBlocks(stream.text), [stream.text]);
+  const streamedHandoff = useMemo(() => scanHandoffBlocks(streamed.text), [streamed.text]);
+
   const loadMore = (): void => {
     if (listRef.current) restoreScroll.current = listRef.current.scrollHeight;
     onLoadMore?.();
@@ -115,6 +130,10 @@ export function ChatMessages({
           isLast={index === messages.length - 1}
           isRunning={isRunning}
           costUnit={costUnit}
+          onSplit={onSplit}
+          onKeepHere={onKeepHere}
+          isSplitPending={isSplitPending}
+          handoff={handoff}
         />
       ))}
 
@@ -172,11 +191,38 @@ export function ChatMessages({
 
             {stream.text && (
               <div className={styles.block}>
-                <div
-                  className={styles.text}
-                  // Разметку строит markdown-it с выключенным сырым html.
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(stream.text) }}
-                />
+                {/*
+                  Предложение разделить задачи прячем из текста уже здесь, пока
+                  ответ печатается: иначе в ленте несколько секунд стоял бы голый
+                  JSON, а незакрытый блок показывался бы обрубком. Карточку
+                  рисуем сразу, но погашенной — решать можно, когда агент
+                  договорит, и это ровно то, что видно.
+                */}
+                <div className={styles.blockBody}>
+                  {streamedHandoff.text && (
+                    <div
+                      className={styles.text}
+                      // Разметку строит markdown-it с выключенным сырым html.
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(streamedHandoff.text) }}
+                    />
+                  )}
+                  {streamed.proposals.map((proposal, index) => (
+                    <TaskSplitCard key={index} proposal={proposal} disabled />
+                  ))}
+                  {streamed.rejected > 0 && (
+                    <div className={styles.splitRejected} role="status">
+                      {t('chat.split.notParsed')}
+                    </div>
+                  )}
+                  {streamedHandoff.proposals.map((proposal, index) => (
+                    <HandoffCard key={index} proposal={proposal} disabled />
+                  ))}
+                  {streamedHandoff.rejected > 0 && (
+                    <div className={styles.splitRejected} role="status">
+                      {t('chat.handoff.notParsed')}
+                    </div>
+                  )}
+                </div>
                 {stream.textUsage && (
                   <TokenBadge
                     usage={stream.textUsage}

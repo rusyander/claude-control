@@ -5,6 +5,7 @@ import { ServerContext } from './context.ts';
 import { allowedOrigins, isOAuthCallback, isRequestAllowed } from './lib/origin-guard.ts';
 import { isValidApiToken, presentedToken, readApiToken } from './lib/api-token.ts';
 import { createConfigWatcher } from './lib/config-watcher.ts';
+import { registerEmptyBodyGuard } from './lib/empty-body.ts';
 import { registerConfigRoutes } from './routes/config-routes.ts';
 import { registerEnvTransferRoutes } from './routes/env-transfer-routes.ts';
 import { registerEntityRoutes } from './routes/entity-routes.ts';
@@ -29,6 +30,9 @@ import { registerPluginRoutes } from './routes/plugin-routes.ts';
 import { registerAssistantRoutes } from './routes/assistant-routes.ts';
 import { registerScriptRoutes } from './routes/script-routes.ts';
 import { registerChatRoutes } from './routes/chat-routes.ts';
+import { registerChatSplitRoutes } from './routes/chat/split-routes.ts';
+import { createHandoffPlanner, registerChatHandoffRoutes } from './routes/chat/handoff-routes.ts';
+import { HandoffChains } from './domains/chat/ChatHandoff.ts';
 import { registerSandboxRoutes } from './routes/sandbox-routes.ts';
 import { registerResourceRoutes } from './routes/resource-routes.ts';
 import { registerBackupRoutes } from './routes/backup-routes.ts';
@@ -100,6 +104,10 @@ app.addHook('onRequest', (request, reply, done) => {
   done();
 });
 
+// Пустое тело — `{}`, а не `undefined`: почему это хук, а не правка по месту,
+// написано в самом модуле.
+registerEmptyBodyGuard(app);
+
 /**
  * Наблюдатель за файлами настраивается не только на старте: тумблер «следить за
  * изменениями» и каталог конфигурации меняются на лету (PATCH /api/settings,
@@ -146,6 +154,31 @@ const notifyRun = createRunNotifier({
   forget: (token) => ctx.store.removePushDevice(token),
 });
 chatRuns.setNotifier(notifyRun);
+/**
+ * Дерево чатов переживает смену ключа. Разделение заводит чат под временным
+ * `new-<ts>-<n>`, а настоящий `sessionId` Claude Code выдаёт уже в прогоне —
+ * и в списке чат появляется под ним. Без переноса связи ветвь дерева обрывалась
+ * бы ровно в момент, когда чат становится настоящим.
+ */
+chatRuns.setSessionListener((chatId, sessionId) => ctx.store.linkChatSession(chatId, sessionId));
+/**
+ * Цепочки продолжений в чистой сессии: тумблер автомата и номер шага. Объект
+ * переживает запрос — тумблер ставится в одном обращении, а срабатывает при
+ * завершении прогона, возможно, уже без открытой вкладки.
+ */
+const handoffChains = new HandoffChains();
+/**
+ * Кто решает, продолжать ли работу самому. Реестр знает только, что прогон
+ * кончился; предохранители (свежесть файла-опоры, потолок цепочки, успешное
+ * завершение) живут в домене и подаются сюда тем же приёмом, что и уведомления.
+ */
+chatRuns.setHandoffPlanner(
+  createHandoffPlanner({
+    runs: chatRuns,
+    chains: handoffChains,
+    selfBaseUrl: `http://127.0.0.1:${process.env.PORT ?? 5178}`,
+  }),
+);
 const providerChats = new ProviderChatService();
 // Прокси защиты данных: тоже слушатель, тоже переживает запрос. Создаётся
 // всегда, поднимается — только если человек включил его в настройках.
@@ -188,9 +221,24 @@ const ROUTES: RouteRegistrar[] = [
   registerSearchRoutes,
   registerProjectRoutes,
   registerProviderProjectRoutes,
-  registerProjectGitRoutes,
+  // Реестр прогонов git-маршрутам нужен ровно за одним: не дать снести рабочую
+  // копию, в которой прямо сейчас работает агент.
+  (instance, context) => registerProjectGitRoutes(instance, context, chatRuns),
   registerProjectFilesRoutes,
   (instance, context) => registerChatRoutes(instance, context, chatRuns),
+  // Разделение задач по чатам заводит копии репозитория и открывает разговоры —
+  // у Claude через реестр прогонов, у чужого CLI через его собственный сервис.
+  // Поэтому оба живут дольше запроса и приходят сюда параметром.
+  (instance, context) =>
+    registerChatSplitRoutes(instance, context, { runs: chatRuns, providerChats }),
+  // Продолжение в чистой сессии: маршруты заводят новый разговор по кнопке, а
+  // цепочки (тумблер автомата и номер шага) переживают запрос — как и реестр.
+  (instance, context) =>
+    registerChatHandoffRoutes(instance, context, {
+      runs: chatRuns,
+      chains: handoffChains,
+      providerChats,
+    }),
   (instance, context) => registerProviderChatRoutes(instance, context, providerChats),
   (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
   (instance, context) => registerProjectTestsRoutes(instance, context, projectTestRuns),

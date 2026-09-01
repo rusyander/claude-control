@@ -2,22 +2,28 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type {
   Automation,
-  EntityRef,
   Group,
   GroupDraft,
-  GroupMember,
+  GroupScenario,
   HookEvent,
 } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import { readHooks, writeHooks } from '../domains/hooks.ts';
+import type { EntityToggleDeps } from '../domains/entity-toggle.ts';
 import {
-  applyEntityStates,
-  rewriteHooks,
-  type EntityState,
-  type EntityToggleDeps,
-} from '../domains/entity-toggle.ts';
-import { applyGroupEnv, existingEnvKeys } from '../domains/env.ts';
-import { collectLeafMembers, wouldCreateCycle } from '../domains/group-graph.ts';
+  applyGroupEnvState,
+  reconcileMembers,
+  releaseGroupMembers,
+  sameEnv,
+  setGroupEnabled,
+} from '../domains/group-toggle.ts';
+import {
+  compileScenarioHooks,
+  compileScenarioSkill,
+  isValidTrigger,
+} from '../domains/group-scenario.ts';
+import { activateGroupsForCwd } from '../domains/group-activation.ts';
+import { wouldCreateCycle } from '../domains/group-graph.ts';
 
 /**
  * Что доменные функции переключения берут от контекста. Собираем на каждом
@@ -30,9 +36,9 @@ function toggleDeps(ctx: ServerContext): EntityToggleDeps {
 
 /**
  * Группы и сценарии — надстройка приложения. Claude Code про них не знает,
- * поэтому сценарии перед сохранением компилируются в обычные хуки: то, что
- * пользователь описал как «после вызова скилла запустить проверку», ложится
- * в settings.json как PostToolUse с matcher.
+ * поэтому и то и другое перед сохранением компилируется в обычные сущности:
+ * автоматизация — в хук settings.json, сценарий группы — в скилл и, если задан
+ * триггер, в хук `UserPromptSubmit`.
  */
 export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): void {
   app.get('/api/groups', () => ctx.store.getGroups());
@@ -51,46 +57,102 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     icon: body.icon ?? 'folder',
     members: body.members ?? [],
     env: body.env ?? {},
+    projectPaths: body.projectPaths ?? [],
+    scenario: normalizeScenario(body.scenario),
     isEnabled: body.isEnabled ?? true,
   });
 
+  /**
+   * Сохранение группы вместе со сценарием: шаги пишутся в скилл, скилл
+   * становится участником группы. Общее для создания и правки — иначе новая
+   * группа со сценарием получила бы скилл только со второго сохранения.
+   */
+  const persist = (group: Group, previousMembers: Group['members']): Group => {
+    const deps = toggleDeps(ctx);
+    const skillId = compileScenarioSkill(deps, group);
+
+    // Скилл сценария обязан быть участником: иначе он не погаснет вместе с
+    // группой и остался бы включённым во всех проектах разом.
+    const ready: Group =
+      skillId && group.scenario
+        ? {
+            ...group,
+            scenario: { ...group.scenario, compiledSkillId: skillId },
+            members: group.members.some(
+              (member) => member.kind === 'skill' && member.id === skillId,
+            )
+              ? group.members
+              : [...group.members, { kind: 'skill' as const, id: skillId }],
+          }
+        : group;
+
+    const saved = ctx.store.saveGroup(ready);
+    reconcileMembers(deps, saved, previousMembers);
+    compileScenarioHooks(deps);
+    return saved;
+  };
+
   app.post<{ Body: GroupDraft }>('/api/groups', (request, reply) => {
+    // Тело нормализуем один раз: Fastify отдаёт `undefined` на запрос без тела и
+    // `null` на литерал `null`, а `withDefaults` ниже читает поля напрямую —
+    // без этого пустой запрос падал бы пятисоткой вместо пустой группы.
+    const body = request.body ?? ({} as GroupDraft);
+    // Набор без имени человеку не опознать: в списке он безымянная строка,
+    // выключить которую можно только угадав. Оборванный запрос должен получить
+    // отказ, а не завести призрака в настоящем конфиге.
+    if (!body.name?.trim()) return reply.code(400).send({ error: 'Не указано имя набора' });
+
     const id = randomUUID();
     // Вложенная группа может замкнуть цикл (A→B→A) — тогда обход состава не
     // завершился бы. Отвергаем ещё до сохранения, а не чиним на обходе.
-    if (wouldCreateCycle(ctx.store.getGroups(), id, request.body.members ?? [])) {
+    if (wouldCreateCycle(ctx.store.getGroups(), id, body.members ?? [])) {
       return reply.code(400).send({ error: 'Вложение групп образует цикл' });
     }
+    const invalid = triggerError(body.scenario);
+    if (invalid) return reply.code(400).send({ error: invalid });
+
     const group: Group = {
-      ...withDefaults(request.body),
+      ...withDefaults(body),
       id,
       order: ctx.store.getGroups().length,
     };
-    return ctx.store.saveGroup(group);
+    return persist(group, []);
   });
 
   app.put<{ Params: { id: string }; Body: Group }>('/api/groups/:id', (request, reply) => {
+    // Причина та же, что и у создания: запрос без тела — это 400 по существу
+    // («править нечем»), а не поломка сервера.
+    const body = request.body ?? ({} as Group);
+    // Имя обязательно и здесь: PUT по неизвестному id ЗАВОДИТ набор, поэтому
+    // без проверки оборванный запрос создавал безымянного — ровно как POST.
+    if (!body.name?.trim()) return reply.code(400).send({ error: 'Не указано имя набора' });
+
     // Группа не может входить сама в себя ни напрямую, ни через цепочку вложенных
     // — иначе включение/выключение зациклилось бы по ветке.
-    if (wouldCreateCycle(ctx.store.getGroups(), request.params.id, request.body.members ?? [])) {
+    if (wouldCreateCycle(ctx.store.getGroups(), request.params.id, body.members ?? [])) {
       return reply.code(400).send({ error: 'Вложение групп образует цикл' });
     }
+    const invalid = triggerError(body.scenario);
+    if (invalid) return reply.code(400).send({ error: invalid });
+
     // Клиент шлёт GroupDraft без поля order, поэтому при правке порядок нельзя
     // сбрасывать в 0 (иначе редактирование любой группы перекидывало бы её в
     // начало списка и сталкивало по order с уже существующей нулевой). Берём
     // прежний order группы, если тело его не прислало.
     const existing = ctx.store.getGroups().find((item) => item.id === request.params.id);
-    const previousMembers = existing?.members ?? [];
-    const saved = ctx.store.saveGroup({
-      ...withDefaults(request.body),
-      id: request.params.id,
-      order: request.body.order ?? existing?.order ?? 0,
-    });
-    // Смена состава должна привести отметки disabledByGroup к новому составу,
-    // иначе участник, убранный из ВЫКЛЮЧЕННОЙ группы, остался бы заперт её
-    // отметкой навсегда (в списках уже не видно, какая группа его держит), а
-    // добавленный в выключенную группу — не погас бы.
-    reconcileMembers(ctx, saved, previousMembers);
+    // Скомпилированный скилл держится за группой, а не за телом запроса:
+    // клиент про его id не знает, и без этого каждая правка заводила бы новый.
+    const scenario = normalizeScenario(body.scenario, existing?.scenario);
+
+    const saved = persist(
+      {
+        ...withDefaults(body),
+        scenario,
+        id: request.params.id,
+        order: body.order ?? existing?.order ?? 0,
+      },
+      existing?.members ?? [],
+    );
     // Правка переменных у включённой группы применяется сразу: снимаем прежние
     // свои ключи и накладываем заново. Но переприменяем только когда есть за чем:
     // набор env реально изменился ЛИБО группу этим же PUT включили (её ключи
@@ -98,132 +160,110 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     // (переименование, смена цвета) не должна зря переписывать settings.json.
     const envChanged = !sameEnv(existing?.env, saved.env);
     if (saved.isEnabled && (envChanged || !existing?.isEnabled)) {
-      applyGroupEnvState(ctx, saved, false);
-      applyGroupEnvState(ctx, saved, true);
+      applyGroupEnvState(toggleDeps(ctx), saved, false);
+      applyGroupEnvState(toggleDeps(ctx), saved, true);
     }
     return saved;
   });
 
-  /**
-   * Переключатель группы. Выключение гасит все её участники разом — ради
-   * этого группы и заводят: набор правил и скиллов под задачу включается и
-   * выключается одним движением.
-   *
-   * Групповая отметка ставится отдельно от ручной. Поэтому участник, который
-   * человек выключил сам, не оживёт при включении группы, а участник двух
-   * групп оживёт только когда его отпустят обе.
-   */
   app.post<{ Params: { id: string }; Body: { isEnabled: boolean } }>(
     '/api/groups/:id/enabled',
     (request, reply) => {
       const group = ctx.store.getGroups().find((item) => item.id === request.params.id);
       if (!group) return reply.code(404).send({ error: 'Группа не найдена' });
 
-      const { isEnabled } = request.body;
-      ctx.store.saveGroup({ ...group, isEnabled });
-
-      // Разворачиваем вложенные группы: гасим/зажигаем и потомков по всей ветке,
-      // а не только прямых участников. Отметка «погашено этой группой» ставится
-      // от id переключаемой группы — так лист, входящий ещё и в другую группу,
-      // оживает лишь когда его отпустят все.
-      const leaves = collectLeafMembers(ctx.store.getGroups(), group.members);
-
-      // Хук из settings.local.json группе не подчиняется: панель в этот файл не
-      // пишет, поэтому выключить его нечем — и `readHooks` честно показывает его
-      // включённым. Раньше отметка всё равно ставилась: группа рапортовала «N
-      // выключено», а личный хук продолжал срабатывать. Теперь такие участники
-      // пропускаются и считаются отдельно, чтобы интерфейс сказал правду.
-      const localHookIds = new Set(
-        readHooks(ctx.location.paths.settings, ctx.store, ctx.location.paths.settingsLocal)
-          .filter((hook) => hook.source === 'settings-local')
-          .map((hook) => hook.id),
-      );
-
-      let skippedLocalHooks = 0;
-
-      // Сначала отметки — они и решают итог для каждого участника, — и только
-      // потом одна запись на файл. Раньше отметка и запись шли вперемешку по
-      // участникам, и общий файл переписывался столько раз, сколько в группе
-      // участников.
-      const states: EntityState[] = [];
-
-      for (const member of leaves) {
-        if (member.kind === 'hook' && localHookIds.has(member.id)) {
-          skippedLocalHooks += 1;
-          continue;
-        }
-
-        ctx.store.setGroupDisabled(member.kind, member.id, group.id, !isEnabled);
-        states.push({
-          kind: member.kind,
-          id: member.id,
-          isEnabled: !ctx.store.isDisabled(member.kind, member.id),
-        });
+      // Состояние обязано прийти явно: домыслить его тут значило бы переключить
+      // группу не туда, куда просили, — а это правка настоящего ~/.claude.
+      const isEnabled = request.body?.isEnabled;
+      if (typeof isEnabled !== 'boolean') {
+        return reply.code(400).send({ error: 'Не указано состояние группы' });
       }
 
-      const { needsHookRewrite } = applyEntityStates(toggleDeps(ctx), states);
-
-      // Хуки лежат в одном файле, поэтому перезапись одна на всю группу.
-      const hookBackup = needsHookRewrite ? rewriteHooks(toggleDeps(ctx)) : undefined;
-      // Переменные окружения группы: включение пишет их в settings.json,
-      // выключение — снимает свои, не задев ручные и общие с другой группой.
-      const envBackup = applyGroupEnvState(ctx, group, isEnabled);
+      const result = setGroupEnabled(toggleDeps(ctx), group, isEnabled);
 
       return {
         ok: true,
-        backupPath: hookBackup ?? envBackup,
+        backupPath: result.backupPath,
         needsRestart: true,
         // Считаем только тех, кого действительно переключили: пропущенные
         // локальные хуки уходят отдельным числом, а не растворяются в общем.
-        affected: leaves.length - skippedLocalHooks,
-        skippedLocalHooks,
+        affected: result.affected,
+        skippedLocalHooks: result.skippedLocalHooks,
       };
     },
+  );
+
+  /**
+   * Включить группы, привязанные к каталогу. Тем же путём идут браузер, телефон
+   * и разделение задач по чатам, поэтому решение принимает сервер, а не клиент.
+   */
+  app.post<{ Body: { path?: string } }>('/api/groups/activate', (request) =>
+    // Тело читаем через `?.`: запрос без него — не ошибка сервера, а «включать
+    // нечего», и 500 здесь означал бы, что панель сломалась на пустом месте.
+    activateGroupsForCwd(toggleDeps(ctx), request.body?.path ?? ''),
   );
 
   app.delete<{ Params: { id: string } }>('/api/groups/:id', (request) => {
     // Группа уходит — её отметки должны уйти вместе с ней, иначе участники
     // остались бы погашенными навсегда, без видимой причины.
     const group = ctx.store.getGroups().find((item) => item.id === request.params.id);
+    const deps = toggleDeps(ctx);
 
-    if (group && !group.isEnabled) {
-      const states: EntityState[] = [];
-
-      for (const member of collectLeafMembers(ctx.store.getGroups(), group.members)) {
-        ctx.store.setGroupDisabled(member.kind, member.id, group.id, false);
-        states.push({
-          kind: member.kind,
-          id: member.id,
-          isEnabled: !ctx.store.isDisabled(member.kind, member.id),
-        });
-      }
-
-      applyEntityStates(toggleDeps(ctx), states);
-      rewriteHooks(toggleDeps(ctx));
-    }
+    if (group && !group.isEnabled) releaseGroupMembers(deps, group);
 
     // Снимаем переменные окружения, которые держала эта группа (кроме общих с
     // другими). Работает и для включённой группы: её ключи не должны пережить её.
-    if (group) applyGroupEnvState(ctx, group, false);
+    if (group) applyGroupEnvState(deps, group, false);
 
     ctx.store.deleteGroup(request.params.id);
+    // Скилл сценария остаётся на диске: это обычный скилл, и удалять чужую
+    // работу вместе с группой панель не вправе. А вот триггер уходит — он
+    // ссылался на группу, которой больше нет.
+    compileScenarioHooks(deps);
     return { ok: true };
   });
 
   app.get('/api/automations', () => ctx.store.getAutomations());
 
-  app.post<{ Body: Omit<Automation, 'id'> }>('/api/automations', (request) => {
-    const automation: Automation = { ...request.body, id: randomUUID() };
+  /**
+   * Сценарий компилируется в хук `settings.json`, поэтому пустой записи здесь
+   * быть не должно: без события и команды в конфиг ушёл бы хук, который ничего
+   * не ловит и ничего не делает, а в списке появилась бы безымянная строка.
+   */
+  const automationError = (body: Partial<Automation>): string | undefined => {
+    if (!body.name?.trim()) return 'Не указано имя сценария';
+    if (!body.trigger?.event) return 'Не указано событие сценария';
+    if (!body.action?.command?.trim()) return 'Не указана команда сценария';
+    return undefined;
+  };
+
+  app.post<{ Body: Partial<Omit<Automation, 'id'>> }>('/api/automations', (request, reply) => {
+    const invalid = automationError(request.body);
+    if (invalid) return reply.code(400).send({ error: invalid });
+
+    const automation: Automation = {
+      ...(request.body as Omit<Automation, 'id'>),
+      id: randomUUID(),
+    };
     ctx.store.saveAutomation(automation);
     compileAutomations(ctx);
     return automation;
   });
 
-  app.put<{ Params: { id: string }; Body: Automation }>('/api/automations/:id', (request) => {
-    const automation = ctx.store.saveAutomation({ ...request.body, id: request.params.id });
-    compileAutomations(ctx);
-    return automation;
-  });
+  app.put<{ Params: { id: string }; Body: Partial<Automation> }>(
+    '/api/automations/:id',
+    (request, reply) => {
+      const invalid = automationError(request.body);
+      if (invalid) return reply.code(400).send({ error: invalid });
+
+      const automation = ctx.store.saveAutomation({
+        ...(request.body as Automation),
+        id: request.params.id,
+      });
+      compileAutomations(ctx);
+      return automation;
+    },
+  );
 
   app.delete<{ Params: { id: string } }>('/api/automations/:id', (request) => {
     ctx.store.deleteAutomation(request.params.id);
@@ -233,103 +273,39 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
 }
 
 /**
- * Переносит включённые сценарии в settings.json. Ранее скомпилированные
- * записи помечены маркером в команде, поэтому их можно отличить от хуков,
- * написанных руками, и пересобрать, не задев чужое.
+ * Сценарий из тела запроса с проставленными умолчаниями. Причина та же, что у
+ * `withDefaults`: схема контрактов при выполнении недоступна, а неполный шаг
+ * уронил бы сборку скилла на `undefined.trim()`.
  */
-/** Совпадают ли наборы env двух версий группы (одни ключи и значения). */
-function sameEnv(a: Record<string, string> = {}, b: Record<string, string> = {}): boolean {
-  const keysA = Object.keys(a);
-  if (keysA.length !== Object.keys(b).length) return false;
-  return keysA.every((key) => a[key] === b[key]);
-}
+function normalizeScenario(
+  scenario?: Partial<GroupScenario>,
+  previous?: GroupScenario,
+): GroupScenario | undefined {
+  if (!scenario) return undefined;
 
-/**
- * Применить или снять переменные окружения группы в settings.json.
- *
- * Включение: пишем ключи группы, но пропускаем те, что уже заданы вручную (есть
- * в settings и не принадлежат ни одной группе) — ручная переменная важнее. Что
- * реально записали, запоминаем за группой.
- *
- * Выключение: снимаем только свои ключи и только те, что больше не держит ни
- * одна другая группа. Поэтому ручные и общие с другой группой ключи остаются.
- */
-function applyGroupEnvState(
-  ctx: ServerContext,
-  group: Group,
-  isEnabled: boolean,
-): string | undefined {
-  const settingsPath = ctx.location.paths.settings;
-
-  if (isEnabled) {
-    const manual = new Set(
-      existingEnvKeys(settingsPath).filter((key) => !ctx.store.isEnvKeyOwnedByGroup(key)),
-    );
-    const set: Record<string, string> = {};
-    const applied: string[] = [];
-    for (const [key, value] of Object.entries(group.env ?? {})) {
-      if (manual.has(key)) continue;
-      set[key] = value;
-      applied.push(key);
-    }
-    ctx.store.setGroupEnvKeys(group.id, applied);
-    return Object.keys(set).length
-      ? applyGroupEnv(settingsPath, set, [], ctx.backupDir)
-      : undefined;
-  }
-
-  const owned = ctx.store.getGroupEnvKeys(group.id);
-  ctx.store.setGroupEnvKeys(group.id, []);
-  const remove = owned.filter((key) => !ctx.store.isEnvKeyOwnedByGroup(key));
-  return remove.length ? applyGroupEnv(settingsPath, {}, remove, ctx.backupDir) : undefined;
-}
-
-/**
- * Привести отметки «погашено этой группой» к новому составу после правки PUT.
- *
- * Ушедший из группы участник освобождается от её удержания: снимаем отметку
- * этой группы, и если сущность больше не держит ни другая группа, ни ручное
- * выключение — она оживает на диске (как будто участник вышел из группы).
- * Пришедший в ВЫКЛЮЧЕННУЮ группу участник, симметрично, гасится ею.
- *
- * На диск ходим только когда итог реально сменился — иначе каждая правка имени
- * включённой группы дёргала бы перезапись файлов и плодила резервные копии.
- * Хуки лежат в одном файле, поэтому перезапись одна на всю правку.
- */
-function reconcileMembers(ctx: ServerContext, group: Group, previousMembers: GroupMember[]): void {
-  // Разделитель — двоеточие, а не байт NUL: из-за NUL git и ripgrep считали
-  // этот файл двоичным и молча пропускали его при поиске по репозиторию. Ключ
-  // только сравнивается и никогда не разбирается обратно, а `kind` — значение
-  // закрытого перечисления без двоеточия, поэтому склейка остаётся однозначной.
-  const keyOf = (member: EntityRef): string => `${member.kind}:${member.id}`;
-  // Сравниваем не прямой состав, а развёрнутые листья: правка вложенной группы
-  // добавляет/убирает всех её потомков, и отметки удержания должны идти за ними.
-  const groups = ctx.store.getGroups();
-  const nextLeaves = collectLeafMembers(groups, group.members);
-  const previousLeaves = collectLeafMembers(groups, previousMembers);
-
-  const nextKeys = new Set(nextLeaves.map(keyOf));
-  const prevKeys = new Set(previousLeaves.map(keyOf));
-
-  const removed = previousLeaves.filter((member) => !nextKeys.has(keyOf(member)));
-  const added = nextLeaves.filter((member) => !prevKeys.has(keyOf(member)));
-
-  const states: EntityState[] = [];
-
-  const reapply = (member: EntityRef, heldByGroup: boolean): void => {
-    const before = ctx.store.isDisabled(member.kind, member.id);
-    ctx.store.setGroupDisabled(member.kind, member.id, group.id, heldByGroup);
-    const after = ctx.store.isDisabled(member.kind, member.id);
-    if (before !== after) states.push({ kind: member.kind, id: member.id, isEnabled: !after });
+  return {
+    when: scenario.when ?? '',
+    trigger: scenario.trigger ?? '',
+    steps: (scenario.steps ?? []).map((step) => ({
+      title: step.title ?? '',
+      body: step.body ?? '',
+      gate: step.gate ?? '',
+    })),
+    compiledSkillId: scenario.compiledSkillId ?? previous?.compiledSkillId,
   };
-
-  for (const member of removed) reapply(member, false);
-  if (!group.isEnabled) for (const member of added) reapply(member, true);
-
-  const { needsHookRewrite } = applyEntityStates(toggleDeps(ctx), states);
-  if (needsHookRewrite) rewriteHooks(toggleDeps(ctx));
 }
 
+/** Текст отказа для негодного выражения триггера — или пусто, если всё в порядке. */
+function triggerError(scenario?: Partial<GroupScenario>): string | undefined {
+  if (!scenario?.trigger || isValidTrigger(scenario.trigger)) return undefined;
+  return 'Выражение триггера не является регулярным выражением';
+}
+
+/**
+ * Переносит включённые сценарии-автоматизации в settings.json. Ранее
+ * скомпилированные записи помечены маркером в команде, поэтому их можно
+ * отличить от хуков, написанных руками, и пересобрать, не задев чужое.
+ */
 const MARKER = '# claude-control:automation';
 
 function compileAutomations(ctx: ServerContext): void {

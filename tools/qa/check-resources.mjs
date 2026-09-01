@@ -3,6 +3,7 @@
  * (папка с вложенностью), и на скрипте (одиночный файл).
  */
 import { chromium } from 'playwright';
+import { apiFetch } from './api-auth.mjs';
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
@@ -30,8 +31,18 @@ await page.screenshot({ path: '.qa-screenshots/resources-skill.png' });
 // Имя берётся из API, а не зашито: набор скриптов зависит от конфигурации
 // проверяющего. Нужен скрипт из корня — у вложенного (`lib/foo.mjs`) сервер
 // отдаёт пустой список файлов, это отдельная задача, а не предмет этой проверки.
-const scripts = await fetch('http://127.0.0.1:5178/api/scripts').then((r) => r.json());
+// Мимо страницы — значит и мимо прокси Vite, который подставляет токен: без
+// заголовка при включённом удалённом доступе вместо списка приедет отказ.
+const scripts = await apiFetch('http://127.0.0.1:5178/api/scripts').then((r) => r.json());
+if (!Array.isArray(scripts)) {
+  console.log('скрипты — API не отдал список:', JSON.stringify(scripts).slice(0, 200));
+  process.exit(1);
+}
 const flatScript = scripts.find((s) => !s.name.includes('/'));
+if (!flatScript) {
+  console.log('скрипты — в корне нет ни одного файла, проверять нечего');
+  process.exit(1);
+}
 await page.goto('http://localhost:8888/scripts', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
 await page.waitForTimeout(1500);

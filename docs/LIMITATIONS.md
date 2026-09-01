@@ -41,18 +41,11 @@ The per-CLI boundaries live in their own file:
 
 ## Chat
 
-| What                                                                          | Why                                                                                                                                                                                                                                               |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A run finishing while the page is closed waits one minute                     | **by design.** The buffer holds it for a grace minute; later it lives only in the transcript                                                                                                                                                      |
-| Conversations cannot be deleted or renamed                                    | **by design.** Transcripts belong to Claude Code; the panel only reads them                                                                                                                                                                       |
-| Full-text search over messages is bounded                                     | **by design.** To avoid reading gigantic transcripts whole, matches and files scanned are capped                                                                                                                                                  |
-| The feed opens at the latest messages                                         | **by design.** Earlier ones arrive via "Load more"                                                                                                                                                                                                |
-| The created-files list exists only for chats outside a project                | **by design.** Inside a real repository it is useless                                                                                                                                                                                             |
-| Per-item permissions do nothing in full-access mode                           | **by design.** Everything is allowed there by definition                                                                                                                                                                                          |
-| Project git has no branch deletion, no merge, no conflict resolution          | **by design.** The panel is not a git client; it does exactly what you need while an agent works in the repository: branch, switch, new branch, commit, `pull` and `push`. A conflict left by `pull` is not resolved here — that is terminal work |
-| A commit takes every change (`git add -A`)                                    | **by design.** There is no file picking and no index editing in the panel — git is for that                                                                                                                                                       |
-| The panel does not assign the dev server's port — it reads it from the output | **by design.** `PORT` is ignored by everything that keeps the port in its config. A server that prints no address runs without a link — pin its port by hand                                                                                      |
-| Freeing a busy port kills a process by PID, and only on a button press        | **by design.** A database or a neighbouring project may live there: the panel shows who it is, the person decides                                                                                                                                 |
+Chat is the panel’s largest section, and its boundaries are documented next to the section itself:
+[Chat, tabs and parallel agents § What the chat does not do](CHAT.md#what-the-chat-does-not-do) —
+a run that finished while the page was closed, conversations that cannot be deleted or renamed,
+project git without merging or conflict resolution, parallel copies, the fan-out caps and the rules
+of continuing in a clean session.
 
 ## Rules
 
@@ -151,10 +144,12 @@ The per-CLI boundaries live in their own file:
 
 ## Groups
 
-| What                                     | Why                                                  |
-| ---------------------------------------- | ---------------------------------------------------- |
-| Claude knows nothing about groups        | **by design.** It only ever sees the resulting files |
-| An automation can do no more than a hook | **by design.** It compiles down to one               |
+| What                                                                   | Why                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude knows nothing about groups                                      | **by design.** It only ever sees the resulting files                                                                                                                                                                                                |
+| An automation can do no more than a hook                               | **by design.** It compiles down to one                                                                                                                                                                                                              |
+| A project binding only ever switches a group ON                        | **by design.** Auto-disabling would strip what a person turned on by hand. The match covers a parallel copy `<repository>-worktrees/<branch>` too                                                                                                   |
+| The working order is edited in the group, not in the skill it produces | **by design.** The steps compile into `skills/scenario-…` with a trigger hook; that skill joins the same group and obeys its toggle, and a trigger regexp that does not compile is refused at save — inside the hook it would throw on every prompt |
 
 ## Settings
 
@@ -212,8 +207,9 @@ The per-CLI boundaries live in their own file:
 
 The panel configures more than Claude Code, but the honest wording is: **far from everything is
 universal.** The per-CLI boundaries live separately —
-[LIMITATIONS-PROVIDERS.md](LIMITATIONS-PROVIDERS.md). The section × provider map is in
-[README.md](../README.md#clis-other-than-claude), format details in [PROVIDERS.md](PROVIDERS.md).
+[LIMITATIONS-PROVIDERS.md](LIMITATIONS-PROVIDERS.md), and so does the
+[section × provider map](LIMITATIONS-PROVIDERS.md#the-map-section--provider); format details are in
+[PROVIDERS.md](PROVIDERS.md).
 
 ## Platform support
 

@@ -29,6 +29,10 @@ export const en: Dictionary = {
     blank: 'Empty. Write a task — it goes to the agent on your computer.',
     queued: (prompt: string) => `Queued: ${prompt} ✕`,
     image: '[image]',
+    // Предложения панели: карточек на телефоне нет, решают в панели, — но и
+    // сырой JSON вместо них показывать незачем.
+    offerSplit: 'The agent offered to split the tasks across chats — decide in the panel.',
+    offerHandoff: 'The agent offered to continue in a clean session — decide in the panel.',
     plan: (done: number, total: number) => `Plan ${done}/${total}`,
     subagents: (count: number) => `Subagents: ${count}`,
     permission: 'Permission needed',

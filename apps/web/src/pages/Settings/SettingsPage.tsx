@@ -221,6 +221,26 @@ export function SettingsPage() {
             options={effortOptions}
             hint={t('settings.chatEffortHint')}
           />
+          {/* Инициатива разделения задач по чатам. Тумблер здесь, а не в
+              «безопасности»: это привычка агента в разговоре, а не право на
+              запись. Кнопка «Разделить задачи» в поле ввода работает и при
+              выключенном — просьбу всегда можно высказать вручную. */}
+          <SettingToggleRow
+            label={t('settings.taskSplitInitiative')}
+            hint={t('settings.taskSplitInitiativeHint')}
+            checked={settings.taskSplitInitiative}
+            onChange={(taskSplitInitiative) => patch({ taskSplitInitiative })}
+          />
+          {/* Инициатива закрыть этап и продолжить в чистой сессии. Тумблер
+              включает только ПРЕДЛОЖЕНИЕ: сам переход всё равно идёт по решению
+              человека — кнопкой на карточке или автоматом, включённым в том
+              конкретном разговоре. */}
+          <SettingToggleRow
+            label={t('settings.handoffInitiative')}
+            hint={t('settings.handoffInitiativeHint')}
+            checked={settings.handoffInitiative}
+            onChange={(handoffInitiative) => patch({ handoffInitiative })}
+          />
         </Stack>
       </Card>
 

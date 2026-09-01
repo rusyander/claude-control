@@ -21,26 +21,14 @@
  *
  * Запуск: `node tools/qa/check-live-sync.mjs`.
  */
-import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { bypassOnboarding } from './bypass-onboarding.mjs';
+import { authHeaders } from './api-auth.mjs';
 
 const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 const API = process.env.API_URL ?? 'http://127.0.0.1:5178';
 /** Метка в тексте задачи: по ней разговор узнаётся в списке. */
 const MARK = `сверка-${Date.now().toString(36)}`;
-
-/** Гейт токена может быть включён — тогда без заголовка сервер ответит 401. */
-function authHeaders() {
-  try {
-    const token = readFileSync(join(homedir(), '.claude-control', 'api-token'), 'utf8').trim();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  } catch {
-    return {};
-  }
-}
 
 const failures = [];
 const check = (ok, what) => {

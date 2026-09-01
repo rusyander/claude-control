@@ -110,10 +110,22 @@ export function GroupsPage() {
                   {Object.keys(group.env ?? {}).length > 0 && (
                     <Badge tone="info">env: {Object.keys(group.env ?? {}).length}</Badge>
                   )}
+                  {/* Привязка и сценарий видны прямо на карточке: набор, который
+                      включается сам, человек обязан отличать от обычного. */}
+                  {(group.projectPaths ?? []).length > 0 && (
+                    <Badge tone="success">
+                      {t('groups.projectsBadge', { count: (group.projectPaths ?? []).length })}
+                    </Badge>
+                  )}
+                  {group.scenario && group.scenario.steps.length > 0 && (
+                    <Badge tone="warning">
+                      {t('groups.scenarioBadge', { count: group.scenario.steps.length })}
+                    </Badge>
+                  )}
                   {!group.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
                 </Stack>
                 {group.description && (
-                  <Typography variant="body-sm" color="muted">
+                  <Typography variant="body-sm" color="muted" className={styles.description}>
                     {group.description}
                   </Typography>
                 )}

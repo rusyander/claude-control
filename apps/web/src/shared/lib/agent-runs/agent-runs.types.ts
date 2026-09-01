@@ -1,4 +1,5 @@
 import type { MessageUsage } from '@claude-control/contracts';
+import type { HandoffRefusal } from '@claude-control/contracts/chat-handoff';
 import type { RunStatus } from './status';
 
 export interface StreamedTool {
@@ -113,6 +114,22 @@ export interface StartInput {
   fork?: boolean;
 }
 
+/**
+ * Работа продолжена в чистой сессии — или НЕ продолжена, и тогда есть `reason`.
+ * Приходит последним событием закрываемого прогона: по нему вкладка переезжает
+ * на новый разговор, а не остаётся смотреть на завершённый.
+ */
+export interface HandoffEvent {
+  /** Ключ нового разговора; пусто — продолжения не было. */
+  chatId?: string;
+  /** Каталог нового разговора — тот же, что и у закрытого. */
+  path?: string;
+  /** Какой это шаг цепочки. */
+  chainDepth?: number;
+  /** Почему не продолжили: код разбирается панелью, текст живёт в словаре. */
+  reason?: HandoffRefusal;
+}
+
 export type ChatEvent =
   | { kind: 'session'; sessionId: string; model: string; tools: number }
   | { kind: 'text'; text: string }
@@ -135,7 +152,8 @@ export type ChatEvent =
   // `retriable` ставит сервер: временный ли сбой, решает он, а не разбор текста.
   | { kind: 'error'; message: string; retriable?: boolean }
   | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
-  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' };
+  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
+  | ({ kind: 'handoff' } & HandoffEvent);
 
 /**
  * Итог приёма отправки. Нужен вызывающему (полю ввода): текст сообщения можно

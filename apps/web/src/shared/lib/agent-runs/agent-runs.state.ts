@@ -1,6 +1,6 @@
 import type { MessageUsage } from '@claude-control/contracts';
 import { EMPTY_RUN } from './agent-runs.constants';
-import type { AgentRun } from './agent-runs.types';
+import type { AgentRun, HandoffEvent } from './agent-runs.types';
 
 /**
  * Живое состояние стора: сами прогоны, их потоки и подписчики. Лежит в модуле, а
@@ -40,6 +40,12 @@ export const callbacks: {
   onBackgroundEvent?: (run: AgentRun) => void;
   /** Новый запрос прав по любому прогону — для карточки, звука и тоста. */
   onPermissionRequest?: (run: AgentRun) => void;
+  /**
+   * Работа уехала в чистую сессию (или отказ с причиной). Отдаём и сам прогон:
+   * продолжиться мог ЛЮБОЙ из идущих, а переезжать вкладке нужно только за
+   * своим — сравнивать есть с чем только имея закрытый разговор на руках.
+   */
+  onHandoff?: (event: HandoffEvent, run: AgentRun) => void;
   /** Чат, открытый на экране: его завершение не уведомляем — пользователь и так видит. */
   activeId?: string;
 } = {};

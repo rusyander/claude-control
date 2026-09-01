@@ -29,6 +29,23 @@ export interface RunNotice {
   toolName?: string;
 }
 
+/**
+ * Завершившийся прогон глазами планировщика продолжения: чем он был запущен, в
+ * каком каталоге шёл, чем кончился и что успел сказать. Больше реестр о прогоне
+ * не знает — и знать не должен, вся логика продолжения живёт снаружи.
+ */
+export interface RunFinished {
+  chatId: string;
+  sessionId?: string;
+  projectPath?: string;
+  /** Хвост ответа агента — в нём ищется блок предложения. */
+  text: string;
+  /** Прогон закончился без ошибки (лимит и остановка тоже приходят ошибкой). */
+  ok: boolean;
+  startedAt: number;
+  options: RunOptions;
+}
+
 /** Событие с порядковым номером — по нему клиент догоняет пропущенное. */
 export interface BufferedEvent {
   seq: number;
@@ -69,6 +86,12 @@ interface RegisteredRun {
   chatId: string;
   run: RunLike;
   meta: RunMeta;
+  /** С чем прогон стартовал: продолжение в чистой сессии идёт теми же. */
+  options: RunOptions;
+  /** Момент старта (мс) — по нему видно, обновлён ли файл-опора этим прогоном. */
+  startedAt: number;
+  /** Хвост ответа агента: в нём ищется блок предложения продолжить. */
+  text: string;
   events: BufferedEvent[];
   seq: number;
   status: RunStatus;
@@ -98,6 +121,14 @@ export interface StepTokens {
 /** Сколько держать завершённый прогон в буфере — на догон при переподключении. */
 const GRACE_MS = 60_000;
 
+/**
+ * Сколько последних символов ответа держим ради разбора блока продолжения.
+ * Хвоста хватает: блок агент выводит в самом конце хода, а хранить целиком
+ * ответы всех прогонов сервера значило бы держать в памяти мегабайты текста,
+ * который уже лежит в транскрипте.
+ */
+const TEXT_TAIL = 32_768;
+
 export class ChatRunRegistry {
   private runs = new Map<string, RegisteredRun>();
   private readonly createRun: RunFactory;
@@ -126,6 +157,35 @@ export class ChatRunRegistry {
 
   setNotifier(notify: (notice: RunNotice) => void): void {
     this.notify = notify;
+  }
+
+  /**
+   * Что делать с завершившимся прогоном, если агент предложил продолжить работу
+   * в чистой сессии. Ставится снаружи по той же причине, что и оценка цены:
+   * предохранители, настройки и цепочки живут в домене, а реестр знает только
+   * про прогоны. Не задан — продолжений не бывает вовсе.
+   *
+   * Планировщик СИНХРОННЫЙ намеренно: его событие обязано попасть в поток до
+   * того, как прогон закроет слушателей, иначе вкладка узнает о новом разговоре
+   * только следующим опросом — и несколько секунд будет показывать законченный.
+   */
+  private planHandoff?: (finished: RunFinished) => ChatEvent | undefined;
+
+  setHandoffPlanner(plan: (finished: RunFinished) => ChatEvent | undefined): void {
+    this.planHandoff = plan;
+  }
+
+  /**
+   * Прогон назвал свой настоящий `sessionId`. Ставится снаружи по той же
+   * причине, что и остальные крючки: реестр знает про прогоны, а что делать с
+   * этим знанием — дело домена. Сейчас слушатель ровно один: разделение задач
+   * переносит на настоящий ключ связь «родитель → потомок», иначе дерево чатов
+   * распадалось бы ровно в тот момент, когда временный ключ сменяется живым.
+   */
+  private onSession?: (chatId: string, sessionId: string) => void;
+
+  setSessionListener(listener: (chatId: string, sessionId: string) => void): void {
+    this.onSession = listener;
   }
 
   /**
@@ -202,6 +262,9 @@ export class ChatRunRegistry {
       chatId,
       run,
       meta,
+      options,
+      startedAt: Date.now(),
+      text: '',
       events: [],
       seq: 0,
       status: 'running',
@@ -242,9 +305,19 @@ export class ChatRunRegistry {
   /** Записать событие в буфер и разослать живым слушателям. */
   private emit(run: RegisteredRun, event: ChatEvent): void {
     // Запоминаем sessionId — его отдаёт /chat/active для переподключения после F5.
+    const knownSession = run.sessionId;
     if (event.kind === 'session') run.sessionId = event.sessionId;
     if (event.kind === 'done' && event.sessionId) run.sessionId = event.sessionId;
+    // Ключ разговора стал настоящим — сообщаем ровно один раз, на смене.
+    if (run.sessionId && run.sessionId !== knownSession) {
+      this.onSession?.(run.chatId, run.sessionId);
+    }
     if (event.kind === 'error') run.errored = true;
+    // Текст копим ХВОСТОМ: планировщику продолжения нужен конец ответа, а не
+    // весь разговор (см. TEXT_TAIL).
+    if (event.kind === 'text') {
+      run.text = (run.text + event.text).slice(-TEXT_TAIL);
+    }
 
     // Накопленный расход считаем здесь, на сервере: тогда счётчик за сеанс не
     // обнуляется при перезагрузке вкладки, как и сами прогоны. Дублируем вклад в
@@ -293,6 +366,28 @@ export class ChatRunRegistry {
     if (run.status !== 'running') return;
     run.status = run.errored ? 'error' : 'done';
     run.finishedAt = Date.now();
+
+    // Продолжение в чистой сессии — ДО закрытия слушателей: событие о новом
+    // разговоре должно уйти живой вкладке, а не только в буфер. Планировщик
+    // чужой, поэтому его падение не имеет права утащить завершение прогона:
+    // без этого исключение оставило бы слушателей открытыми навсегда.
+    if (this.planHandoff) {
+      try {
+        const event = this.planHandoff({
+          chatId: run.chatId,
+          sessionId: run.sessionId,
+          projectPath: run.meta.projectPath,
+          text: run.text,
+          ok: !run.errored,
+          startedAt: run.startedAt,
+          options: run.options,
+        });
+        if (event) this.emit(run, event);
+      } catch {
+        // Молча: причина отказа человеку не поможет, а прогон обязан закрыться.
+      }
+    }
+
     this.notify?.({
       kind: run.errored ? 'error' : 'done',
       chatId: run.chatId,

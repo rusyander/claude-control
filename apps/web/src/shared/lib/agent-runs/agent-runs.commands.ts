@@ -16,7 +16,7 @@ import {
   setRun,
 } from './agent-runs.state';
 import { ensureWatchdog, rebuildStatuses } from './agent-runs.statuses';
-import type { AgentRun, QueuedMessage } from './agent-runs.types';
+import type { AgentRun, HandoffEvent, QueuedMessage } from './agent-runs.types';
 import { permissionDeliveryProblem } from './permissionDelivery';
 
 /**
@@ -215,6 +215,13 @@ export function setOnBackgroundEvent(callback: ((run: AgentRun) => void) | undef
 /** Колбэк на новый запрос прав любого прогона — звук/тост/карточка. */
 export function setOnPermissionRequest(callback: ((run: AgentRun) => void) | undefined): void {
   callbacks.onPermissionRequest = callback;
+}
+
+/** Колбэк на продолжение в чистой сессии — переезд вкладки и тост. */
+export function setOnHandoff(
+  callback: ((event: HandoffEvent, run: AgentRun) => void) | undefined,
+): void {
+  callbacks.onHandoff = callback;
 }
 
 /**

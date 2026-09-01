@@ -30,17 +30,24 @@ config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
 config.resolver.disableHierarchicalLookup = true;
 
 /**
- * Единственный модуль контрактов, который нужен как ЗНАЧЕНИЕ, а не как тип:
- * список поддерживаемых вложений. Он самодостаточен (ни одного импорта — это
- * условие записано в самом файле ради сервера), поэтому резолвится напрямую в
+ * Модули контрактов, которые нужны как ЗНАЧЕНИЯ, а не как типы: список
+ * поддерживаемых вложений и два разбора предложений панели (разделение задач и
+ * продолжение в чистой сессии). Каждый самодостаточен — ни одного импорта, это
+ * условие записано в самих файлах ради сервера, — поэтому резолвится напрямую в
  * исходник и не тянет за собой zod. Бочку `@claude-control/contracts` так
  * подключать нельзя: она импортирует zod, которого в node_modules приложения нет.
  */
-const UPLOADS = '@claude-control/contracts/uploads';
-const uploadsFile = path.resolve(repoRoot, 'packages/contracts/src/uploads.ts');
+const VALUE_MODULES = ['uploads', 'task-split', 'chat-handoff'];
+const aliases = new Map(
+  VALUE_MODULES.map((name) => [
+    `@claude-control/contracts/${name}`,
+    path.resolve(repoRoot, `packages/contracts/src/${name}.ts`),
+  ]),
+);
 const defaultResolve = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === UPLOADS) return { type: 'sourceFile', filePath: uploadsFile };
+  const filePath = aliases.get(moduleName);
+  if (filePath) return { type: 'sourceFile', filePath };
   return (defaultResolve ?? context.resolveRequest)(context, moduleName, platform);
 };
 

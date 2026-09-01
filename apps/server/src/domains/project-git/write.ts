@@ -1,4 +1,3 @@
-import type { ProjectGitInfo } from '@claude-control/contracts';
 import {
   BRANCH_FORBIDDEN,
   COMMIT_MESSAGE_MAX,
@@ -6,7 +5,7 @@ import {
   GIT_NETWORK_TIMEOUT_MS,
 } from './constants.ts';
 import { git, GitError } from './exec.ts';
-import { isGitRepo, readProjectGit } from './read.ts';
+import { requireRepo } from './read.ts';
 
 /**
  * Операции записи: переключение ветки, создание ветки, коммит, pull и push.
@@ -23,16 +22,6 @@ import { isGitRepo, readProjectGit } from './read.ts';
  * СУЩЕСТВУЮЩУЮ локальную ветку из списка: иначе `checkout <что угодно>` отцепил
  * бы HEAD на произвольный коммит, чего никто не просил.
  */
-
-/** Каталог проекта пригоден для операции записи, иначе — GitError с причиной. */
-async function requireRepo(projectDir: string): Promise<ProjectGitInfo> {
-  if (!isGitRepo(projectDir)) {
-    throw new GitError('В каталоге проекта нет .git — это не репозиторий');
-  }
-  const info = await readProjectGit(projectDir);
-  if (info.error) throw new GitError(info.error);
-  return info;
-}
 
 /**
  * Имя ветки проверяет сам git (`check-ref-format --branch`) — это его правила,

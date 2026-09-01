@@ -19,13 +19,22 @@ export function ChatRow({
   matchCount,
   query,
   status,
+  depth,
 }: ChatRowProps) {
   const { t } = useTranslation();
+
+  // У чата из разделения имя проекта бесполезно — это копия того же
+  // репозитория. Полезна ветка: по ней человек и узнаёт свою группу.
+  const subtitle = () => {
+    if (chat.branch) return chat.branch;
+    if (chat.isSandbox) return t('chat.sandboxLabel');
+    return projectName(chat.projectPath, chat.project);
+  };
 
   return (
     <button
       type="button"
-      className={`${styles.item} ${isActive ? styles.itemActive : ''}`}
+      className={`${styles.item} ${isActive ? styles.itemActive : ''} ${depth ? styles.itemChild : ''}`}
       onClick={onSelect}
       title={chat.projectPath || chat.project}
     >
@@ -56,7 +65,7 @@ export function ChatRow({
           </Typography>
         ) : (
           <Typography variant="caption" color="subtle" className={styles.preview}>
-            {chat.isSandbox ? t('chat.sandboxLabel') : projectName(chat.projectPath, chat.project)}
+            {subtitle()}
           </Typography>
         )}
 

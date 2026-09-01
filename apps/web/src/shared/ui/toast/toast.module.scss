@@ -6,8 +6,14 @@
 
   display: flex;
   flex-direction: column;
+  // Прижимаем стопку к низу: старое уходит вверх, свежее появляется у угла.
+  justify-content: flex-end;
   gap: var(--spacing-xs);
   width: min(380px, calc(100vw - var(--spacing-xl)));
+  // Выше экрана стопка не растёт. Раньше длинный вывод команды уносил верх
+  // карточки за край, а вместе с ним и крестик — тост нельзя было закрыть.
+  max-height: calc(100dvh - 2 * var(--spacing-lg));
+  overflow: hidden;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -50,6 +56,19 @@
   overflow-wrap: anywhere;
 }
 
+// Число строк задаёт Typography (clamp), здесь — только переносы: три строки
+// лога читаются, а склеенный в один абзац вывод команды — нет. Всё, что не
+// поместилось, открывается окном по клику.
+.message {
+  white-space: pre-line;
+}
+
+// Приглашение открыть полный текст. Появляется только когда текст реально
+// обрезан — иначе это обещание показать то, что и так на виду.
+.more {
+  margin-top: var(--spacing-3xs);
+}
+
 // Кликабельный тост (например, «перейти в проект»): тело — кнопка.
 .clickable {
   padding: 0;
@@ -89,6 +108,37 @@
     outline: 2px solid var(--color-accent);
     outline-offset: 1px;
   }
+}
+
+// --- Окно с полным текстом ---------------------------------------------------
+
+.detailsBody {
+  display: flex;
+  gap: var(--spacing-sm);
+  height: 100%;
+  min-height: 0;
+}
+
+.detailsIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  margin-top: 2px;
+  color: var(--tone-color, var(--color-fg-muted));
+}
+
+// Прокручивается сам текст, а не окно: шапка с заголовком и кнопка копирования
+// остаются на месте, каким бы длинным ни был вывод.
+.detailsText {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 // Тона: одна переменная --tone-color задаёт иконку и левую грань.

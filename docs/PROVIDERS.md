@@ -1,7 +1,7 @@
 # Providers: format details
 
 The footnotes of the "section × provider" map, which lives in
-[README.md](../README.md#clis-other-than-claude). Per row of that map: where the file is, what the
+[LIMITATIONS-PROVIDERS.md](LIMITATIONS-PROVIDERS.md#the-map-section--provider). Per row of that map: where the file is, what the
 panel edits in it, what it leaves alone, and why the status is what it is. All of it from each
 CLI's official documentation and from the adapter code.
 

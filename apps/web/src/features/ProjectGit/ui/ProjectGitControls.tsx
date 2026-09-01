@@ -16,6 +16,7 @@ import {
   usePushBranch,
 } from '@entities/ProjectGit';
 import { STATUS_LETTER, pullBody, splitPath } from '../model/projectGitView';
+import { WorktreeSection } from './WorktreeSection';
 import type { ProjectGitControlsProps } from './ProjectGitControls.types';
 import styles from './ProjectGitControls.module.scss';
 
@@ -313,6 +314,11 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
                       </Button>
                     </Stack>
                   </label>
+
+                  {/* Параллельные ветки — последним разделом: это про другие
+                      копии репозитория, а не про текущую, и открывают его
+                      реже, чем коммит. */}
+                  <WorktreeSection path={path} busy={busy} />
 
                   <Typography variant="caption" color="subtle">
                     {t('git.note')}

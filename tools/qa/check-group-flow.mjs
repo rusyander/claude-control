@@ -23,6 +23,31 @@ page.on('console', (message) => {
 await page.goto(`${BASE_URL}/groups`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
 
+// --- привязка к проекту и порядок работы: только форма, без сохранения ---
+// Сценарий НЕ сохраняем намеренно: сохранение записало бы скилл в настоящий
+// ~/.claude/skills, а автотест не имеет права оставлять следы в конфигурации.
+await page.getByRole('button', { name: /Создать группу/i }).click();
+await page.waitForSelector('[role="dialog"]');
+
+// Ищем внутри диалога: «Проекты» есть ещё и в боковом меню.
+const dialog = page.locator('[role="dialog"]');
+const hasBinding = await dialog.getByText('Проекты', { exact: true }).isVisible();
+const hasOrder = await dialog.getByText('Порядок работы', { exact: true }).isVisible();
+console.log('Блоки привязки и порядка работы на месте:', hasBinding && hasOrder ? 'да' : 'НЕТ');
+
+await page.getByLabel('Триггер по тексту запроса').fill('GOR-(\\d+');
+await page.waitForTimeout(200);
+const showsTriggerError = await page.getByText('Это не регулярное выражение').isVisible();
+console.log('Сломанное выражение триггера подсвечено:', showsTriggerError ? 'да' : 'НЕТ');
+
+await page.getByRole('button', { name: /Добавить шаг/i }).click();
+await page.waitForTimeout(200);
+const hasStepFields = await page.getByLabel('Готово, когда').isVisible();
+console.log('Шаг добавляется вместе с признаком выполнения:', hasStepFields ? 'да' : 'НЕТ');
+
+await page.getByRole('button', { name: /^Отмена$/ }).click();
+await page.waitForSelector('[role="dialog"]', { state: 'detached', timeout: 8000 });
+
 // --- создание ---
 await page.getByRole('button', { name: /Создать группу/i }).click();
 await page.waitForSelector('[role="dialog"]');
@@ -36,8 +61,15 @@ await page.locator('[role="dialog"] input[type="checkbox"]').first().check();
 await page.getByRole('button', { name: /^Сохранить$/ }).click();
 await page.waitForSelector('[role="dialog"]', { state: 'detached', timeout: 8000 });
 
-await page.waitForTimeout(700);
-const isCreated = await page.getByText(GROUP_NAME).isVisible();
+// Ждём карточку, а не спим наугад: список обновляется запросом, и с ростом
+// числа групп фиксированной паузы переставало хватать — проверка врала «НЕТ»
+// на успешно созданной группе. `.first()` — на случай оставшейся от прошлого
+// прогона тёзки: strict mode иначе роняет весь скрипт.
+const card = page.getByText(GROUP_NAME).first();
+const isCreated = await card
+  .waitFor({ state: 'visible', timeout: 8000 })
+  .then(() => true)
+  .catch(() => false);
 console.log('Группа создана и видна в списке:', isCreated ? 'да' : 'НЕТ');
 
 // --- метка у скилла ---
@@ -49,13 +81,26 @@ await page.waitForTimeout(500);
 await page.goto(`${BASE_URL}/groups`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
 await page.waitForTimeout(500);
-await page.getByRole('button', { name: new RegExp(`Удалить: ${GROUP_NAME}`, 'i') }).click();
-await page.waitForTimeout(800);
+await page
+  .getByRole('button', { name: new RegExp(`Удалить: ${GROUP_NAME}`, 'i') })
+  .first()
+  .click();
 
-const isDeleted = !(await page
+// Удаление — двухступенчатое: имя вводится дословно, иначе кнопка недоступна.
+// Раньше прогон об этой ступени не знал: кликал по корзине, видел, что карточка
+// «не видна» (её закрывал диалог), и рапортовал успех — а группа оставалась в
+// состоянии панели и копилась там от прогона к прогону.
+await page.getByPlaceholder(GROUP_NAME).fill(GROUP_NAME);
+await page.getByRole('button', { name: /^Удалить$/ }).click();
+
+// Пропажу карточки тоже ждём: «удалена» по одной паузе означало лишь «ещё не
+// нарисовалась», и прогон рапортовал успех, оставляя группу в состоянии панели.
+const isDeleted = await page
   .getByText(GROUP_NAME)
-  .isVisible()
-  .catch(() => false));
+  .first()
+  .waitFor({ state: 'detached', timeout: 8000 })
+  .then(() => true)
+  .catch(() => false);
 console.log('Группа удалена:', isDeleted ? 'да' : 'НЕТ');
 
 await browser.close();

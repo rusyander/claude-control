@@ -46,8 +46,13 @@ export interface HelpGroup {
  * читатель ищет объяснение там же, где привык искать сам раздел.
  *
  * Добавить документ — дописать сюда запись и положить рядом компонент в
- * topics/. Ничего другого править не нужно: индекс, адрес, переход к соседнему
- * разделу и кнопка «?» на странице подхватят его сами.
+ * topics/: индекс, адрес `?topic=` и переход к соседнему разделу подхватят его
+ * сами. А вот кнопку «?» на самой странице нужно поставить руками —
+ * `helpTopic` у её `PageHeader`. Автоматической она быть не может: заголовок
+ * живёт в `shared/ui` и о справке не знает, а знать не должен — слои идут вниз.
+ * Забыть её легко (так и случилось у истории, поиска и проектов), поэтому
+ * проверяет `node tools/qa/check-help.mjs`: он обходит страницы и требует
+ * кнопку там, где документ есть.
  */
 export const HELP_GROUPS: HelpGroup[] = [
   {
@@ -102,8 +107,8 @@ export const HELP_GROUPS: HelpGroup[] = [
       // Единственный сквозной документ: он объясняет не свой раздел, а почему
       // набор разделов вообще меняется. Своей страницы у него нет, поэтому
       // `pagePath` ведёт в «Настройки» — там стоит переключатель провайдера.
-      // Идёт ПОСЛЕ settings: кнопку «?» на самой странице настроек должен
-      // ловить документ настроек (findTopicByPagePath берёт первое совпадение).
+      // Идёт ПОСЛЕ settings: по этому порядку читают справку подряд, и документ
+      // про сам раздел должен встретиться раньше сквозного.
       { id: 'providers', icon: 'swap', pagePath: '/settings', Content: ProvidersTopic },
     ],
   },
@@ -113,11 +118,6 @@ const ALL_TOPICS = HELP_GROUPS.flatMap((group) => group.topics);
 
 export function findHelpTopic(id: string | undefined): HelpTopic | undefined {
   return id ? ALL_TOPICS.find((topic) => topic.id === id) : undefined;
-}
-
-/** Есть ли для раздела панели документ справки — по этому решается кнопка «?». */
-export function findTopicByPagePath(pagePath: string): HelpTopic | undefined {
-  return ALL_TOPICS.find((topic) => topic.pagePath === pagePath);
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   setAutoApprove,
   setOnBackgroundEvent,
   setOnFinished,
+  setOnHandoff,
   setOnPermissionRequest,
   stopAll,
   stopRun,
@@ -48,6 +49,7 @@ export const agentRuns = {
   setActiveId,
   setOnBackgroundEvent,
   setOnPermissionRequest,
+  setOnHandoff,
   setAutoApprove,
   decidePermission,
 };
@@ -60,6 +62,7 @@ export { shouldAutoRetry } from './agent-runs.retry';
 export { parseSseFrame } from './agent-runs.sse';
 export type {
   AgentRun,
+  HandoffEvent,
   PendingPermission,
   QueuedMessage,
   SendOutcome,

@@ -153,6 +153,8 @@ export const en: TranslationSchema = {
     title: 'Notifications',
     subtitle: 'Recent notifications — the ones shown as toasts',
     clear: 'Clear',
+    detailsTitle: 'Full notification text',
+    copy: 'Copy text',
     emptyTitle: 'No notifications yet',
     emptyText: 'Recent toasts will appear here: creations, errors, configuration changes.',
   },
@@ -233,6 +235,9 @@ export const en: TranslationSchema = {
 
     ruleTitle: 'Title',
     ruleBody: 'Rule text',
+    emptyTitle: 'No rules yet',
+    emptyText:
+      'The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above.',
   },
   claudeMd: {
     title: 'CLAUDE.md',
@@ -353,6 +358,51 @@ export const en: TranslationSchema = {
       add: 'Add to the queue',
       hint: 'The agent is busy — the message goes out as soon as the current turn ends',
       cancel: 'Remove from the queue',
+    },
+    split: {
+      title: 'Split the tasks: {{count}} groups',
+      apply: 'Split into {{count}} chats',
+      keepHere: 'Do it here, one by one',
+      keepHerePrompt: 'Do not split — do everything here, one task at a time.',
+      createOnly: 'Only create the chats, do not start the agents',
+      ask: 'Split the tasks across chats',
+      askFailed: 'Could not ask for a split',
+      done: 'Chats created: {{count}}',
+      failed: '“{{title}}” was not created: {{message}}',
+      failedAll: 'The split failed: {{message}}',
+      notParsed:
+        'The panel could not read this split proposal — the block is left above as it came, ' +
+        'so there are no buttons. Ask the agent to propose the split again.',
+    },
+    /** Продолжение в чистой сессии: карточка, кнопка и отказы автопродолжения. */
+    handoff: {
+      title: 'Stage closed — continue in a clean session',
+      chain: 'step {{depth}} of {{max}}',
+      pruned: 'Pruned: {{text}}',
+      checkpoint: 'Checkpoint: {{file}}',
+      apply: 'Continue in a new chat',
+      keepHere: 'Stay here',
+      keepHerePrompt: 'Do not start a new session — we continue in this conversation.',
+      createOnly: 'Only create the chat, do not start the agent',
+      auto: 'Keep going on your own',
+      ask: 'Close the stage and continue in a clean session',
+      askFailed: 'Could not ask to continue',
+      done: 'Work continued in a clean session',
+      doneDraft: 'Chat created — the task is in the input box',
+      failed: 'Could not continue: {{message}}',
+      autoDone: 'Work continued in a clean session — {{name}}',
+      autoFailed: 'Could not switch auto-continue',
+      notParsed:
+        'The panel could not read this hand-off proposal — the block is left above as it came, ' +
+        'so there are no buttons. Ask the agent to propose it again.',
+      /** Почему автопродолжение не сработало: коды приходят с сервера. */
+      refusal: {
+        run_failed: 'No continuation: the run ended with an error or was stopped',
+        chain_cap: 'No continuation: the chain reached its cap',
+        checkpoint_missing: 'No continuation: the checkpoint file is missing',
+        checkpoint_stale: 'No continuation: the checkpoint file was not updated in this run',
+        no_project: 'No continuation: the conversation runs outside a project',
+      },
     },
     attach: 'Attach a file',
     thinking: 'Thinking',
@@ -664,6 +714,12 @@ export const en: TranslationSchema = {
       checklistTitle: 'Check / checklist',
       checklistBody:
         '# {{name}}\n\n## When to apply\n\nBefore handing off work or during review … — describe the trigger moment.\n\n## Checklist\n\n- [ ] First check item\n- [ ] Second item\n- [ ] Third item\n\n## If something is off\n\nWhat to do when an item fails.\n',
+      // Заготовка про уборку рабочих файлов агента. Готовой её кладём не для
+      // красоты: контекст переставляется целиком на каждом ходу, и мусор в
+      // PROGRESS/TASKS оплачивается заново до конца разговора.
+      hygieneTitle: 'Tidying the agent working files',
+      hygieneBody:
+        "# {{name}}\n\n## When to apply\n\nBefore EVERY write to the agent's working files (`.agent/PROGRESS.md`, `TASKS.md`, notes) and always at the moment a task is closed.\n\n## Rule\n\nPrune first, then write. Anything appended on top of stale content is context that gets re-read and paid for on every later turn of the conversation.\n\n## Order\n\n1. Read the file in full and separate what is live from what is closed.\n2. Drop finished items from `TASKS.md`; drop closed stages, settled questions and plans that will never happen from `.agent/PROGRESS.md`.\n3. Move every dropped item to `.agent/ARCHIVE.md` as ONE line: date, what was done, where the result lives. The archive is never read whole — it exists for lookup, not for context.\n4. Keep only what is needed to continue from scratch: what is still open, the decisions taken and why, paths into the code, the traps already found.\n5. Only now write the current state.\n\n## What not to do\n\n- Never delete the only record of a decision — move it to the archive as a line instead.\n- Do not turn `PROGRESS.md` into a diary: it answers “what is done, what is left, what to continue with”, not “how the work went”.\n- Do not start a second file for the same purpose — prune this one.\n- Never keep secrets, tokens or keys in the working files.\n\n## How to verify\n\nRead the file as someone who knows nothing about the work: if it is not enough to continue, too much was pruned; if it holds lines that will never be needed again, too little.\n",
     },
     rename: 'Rename',
     renameLabel: 'New name (skill folder)',
@@ -1732,6 +1788,31 @@ export const en: TranslationSchema = {
     automationTrigger: 'When to run',
     automationAction: 'What to run',
     compiledInto: 'Compiles into a hook',
+    projectsTitle: 'Projects',
+    projectsHint:
+      'The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once.',
+    projectsEmpty: 'No projects in the panel registry yet — add them in the Projects section.',
+    projectsRemove: 'Remove binding',
+    projectsBadge: 'projects: {{count}}',
+    scenarioTitle: 'Working order',
+    scenarioBadge: 'steps: {{count}}',
+    scenarioWhen: 'When to apply',
+    scenarioWhenPlaceholder: 'for example: a task with a ticket number',
+    scenarioWhenHint:
+      'This line becomes the skill description — Claude decides by it whether to follow the working order.',
+    scenarioTrigger: 'Trigger on the prompt text',
+    scenarioTriggerHint:
+      'A regular expression. Filled in — the panel adds a hook that brings the working order up itself; empty — Claude picks the skill up by its description.',
+    scenarioTriggerError: 'Not a regular expression',
+    scenarioSteps: 'Steps',
+    scenarioStepTitle: 'What to do',
+    scenarioStepBody: 'Details',
+    scenarioStepGate: 'Done when',
+    scenarioStepGateHint: 'Proof of completion: without it the agent decides on its own.',
+    scenarioStepAdd: 'Add step',
+    scenarioStepRemove: 'Remove step',
+    scenarioHint:
+      'Steps compile into a skill (skills/scenario-…): it becomes a member of the group and goes dark with it.',
   },
   credentials: {
     title: 'Claude Code access',
@@ -1846,6 +1927,17 @@ export const en: TranslationSchema = {
     chatModelAuto: 'Whatever Claude picks (Opus 4.8, 1M)',
     chatEffort: 'Default thinking effort',
     chatEffortHint: 'How deeply the agent reasons about the answer.',
+    taskSplitInitiative: 'Offer to split tasks across chats',
+    taskSplitInitiativeHint:
+      'Given three or more independent tasks in one message, the agent first offers to spread them ' +
+      'across separate chats — each on its own branch and its own copy of the repository. Off means ' +
+      'no offer, but the “Split the tasks” button in the composer still works.',
+    handoffInitiative: 'Offer to continue in a clean session',
+    handoffInitiativeHint:
+      'Once a task is closed, the agent first tidies its working files (.agent/PROGRESS.md, ' +
+      'TASKS.md — finished items move to .agent/ARCHIVE.md, one line each) and then offers to ' +
+      'continue in a new conversation: an old context is paid for again on every turn. The move ' +
+      'itself is always your call — the card button, or auto-continue enabled in that conversation.',
     chatEffortAuto: 'CLI default',
     pricingTitle: 'Rates used to estimate cost',
     pricingHint:
@@ -1930,6 +2022,7 @@ export const en: TranslationSchema = {
     marketplaces: 'Marketplaces',
     marketplaceAdd: 'Add marketplace',
     marketplaceSource: 'Marketplace source',
+    marketplaceSourceHint: 'owner/repo, https://… or a path',
     installTitle: 'Install a plugin',
     installLabel: 'Plugin identifier',
     installHint:
@@ -2051,6 +2144,7 @@ export const en: TranslationSchema = {
       'Without it the check stays partial — the channel to the model is unconfirmed.',
     never: 'This provider has not been checked here yet.',
     lastRun: 'Last check {{date}} — {{passed}} of {{total}} passed',
+    steps: 'Check steps',
     doneVerified: 'Check passed: the provider works on this machine.',
     donePartial: 'Check passed partially — see the step list.',
     doneFailed: 'Check failed: some steps did not pass.',
@@ -2370,6 +2464,19 @@ export const en: TranslationSchema = {
     commitPlaceholder: 'What was done',
     commitAction: 'Commit',
     note: 'A commit takes every change in the working tree. Pull may merge — the panel does not resolve conflicts. Push sends the current branch only and only forward: --force is never passed. No branch deletions or rebases here',
+    worktrees: {
+      title: 'Parallel branches',
+      main: 'main copy',
+      locked: 'locked',
+      gone: 'directory gone',
+      open: 'Open as a tab',
+      remove: 'Remove',
+      removeForce: 'Remove with its changes',
+      busyHint: 'An agent is working in this copy — stop it first',
+      namePlaceholder: 'feature/branch-name',
+      add: 'Create a copy',
+      note: 'A copy is a separate directory next to the project with its own branch and shared history: its own agent works there without disturbing the others. The branch shown is the one the copy is on right now — inside it the agent is free to switch. The panel never merges branches',
+    },
   },
   remote: {
     title: 'Remote access',

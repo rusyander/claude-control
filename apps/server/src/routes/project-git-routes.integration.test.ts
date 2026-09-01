@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectGitInfo, ProjectGitResult } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
@@ -207,4 +207,140 @@ describe('project-git-routes', () => {
     });
     expect(res.statusCode).toBe(400);
   });
+});
+
+/**
+ * Параллельные рабочие копии по HTTP. Отдельный блок, потому что здесь важен
+ * третий параметр маршрутов — реестр прогонов: копию, в которой работает агент,
+ * не должен снести никто, включая телефон.
+ */
+describe('project-git-routes: рабочие копии', () => {
+  let app: FastifyInstance;
+  let dir: string;
+  let siblings: string;
+  /** Что «сейчас занято агентом» — подменяется в самом тесте. */
+  let busyPath: string | undefined;
+  /** Прогон в этой копии ещё идёт (иначе он лишь досиживает в буфере догона). */
+  let busyRunning = true;
+
+  const gitIn = (cwd: string, ...args: string[]): void => {
+    execFileSync('git', args, { cwd, stdio: 'ignore', windowsHide: true });
+  };
+
+  beforeEach(async () => {
+    // Длинная форма пути: git отвечает ею, а сравнение путей и есть защита.
+    dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-wt-routes-')));
+    siblings = join(dirname(dir), `${basename(dir)}-worktrees`);
+    busyPath = undefined;
+    busyRunning = true;
+    app = Fastify();
+    // Двойник реестра повторяет его существенное свойство: `active()` держит
+    // прогон ещё минуту ПОСЛЕ завершения (буфер догона), и «занято» решает не
+    // он, а `isRunning`.
+    registerProjectGitRoutes(app, {} as ServerContext, {
+      active: () => (busyPath ? [{ chatId: 'run-1', projectPath: busyPath }] : []),
+      isRunning: () => busyRunning,
+    });
+    await app.ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    dropTemp(siblings);
+    dropTemp(dir);
+  });
+
+  it('каталог без git — 200 и isRepo:false, а не ошибка запроса', async () => {
+    const res = await app.inject({ method: 'GET', url: `/api/project-git/worktrees?path=${dir}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ isRepo: boolean }>().isRepo).toBe(false);
+  });
+
+  it('создание без имени ветки — 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/project-git/worktrees/add',
+      payload: { path: dir },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('удаление без указания копии — 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/project-git/worktrees/remove',
+      payload: { path: dir, worktreePath: '   ' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it.skipIf(!GIT_AVAILABLE)(
+    'полный круг: завести копию, увидеть её в списке, убрать',
+    async () => {
+      gitIn(dir, 'init', '--initial-branch=main');
+      gitIn(dir, 'config', 'user.email', 'test@example.invalid');
+      gitIn(dir, 'config', 'user.name', 'Test');
+      gitIn(dir, 'config', 'commit.gpgsign', 'false');
+      writeFileSync(join(dir, 'file.txt'), 'первый\n');
+      gitIn(dir, 'add', '-A');
+      gitIn(dir, 'commit', '-m', 'первый');
+
+      const added = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/worktrees/add',
+        payload: { path: dir, name: 'feature/x' },
+      });
+      expect(added.statusCode).toBe(200);
+      const created = added.json<{ createdPath: string; info: { worktrees: unknown[] } }>();
+      expect(created.info.worktrees).toHaveLength(2);
+      expect(created.createdPath).toBe(join(siblings, 'feature-x'));
+
+      // Пока в копии работает агент, снести её нельзя — и это 409, а не 400:
+      // запрос верный, состояние мира против.
+      busyPath = created.createdPath;
+      const busy = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/worktrees/remove',
+        payload: { path: dir, worktreePath: created.createdPath },
+      });
+      expect(busy.statusCode).toBe(409);
+
+      // А вот прогон, который ТОЛЬКО ЧТО закончился, копию не держит: реестр
+      // помнит его ещё минуту, но останавливать уже некого — и удаление обязано
+      // пройти. Раньше здесь была ровно та минута, когда кнопка «убрать» врала.
+      busyRunning = false;
+      const afterFinish = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/worktrees/remove',
+        payload: { path: dir, worktreePath: created.createdPath },
+      });
+      expect(afterFinish.statusCode).toBe(200);
+
+      // Дальше копии уже нет — заводим её заново, чтобы проверить обычный путь.
+      const again = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/worktrees/add',
+        payload: { path: dir, name: 'feature/x' },
+      });
+      expect(again.statusCode).toBe(200);
+
+      busyPath = undefined;
+      const removed = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/worktrees/remove',
+        payload: { path: dir, worktreePath: created.createdPath },
+      });
+      expect(removed.statusCode).toBe(200);
+      expect(removed.json<{ info: { worktrees: unknown[] } }>().info.worktrees).toHaveLength(1);
+
+      // Основная копия не удаляется ничем: это отказ домена, 400.
+      const main = await app.inject({
+        method: 'POST',
+        url: '/api/project-git/worktrees/remove',
+        payload: { path: dir, worktreePath: dir },
+      });
+      expect(main.statusCode).toBe(400);
+    },
+    60_000,
+  );
 });

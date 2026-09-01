@@ -20,7 +20,27 @@ export function registerChatTranscriptRoutes(app: FastifyInstance, ctx: ServerCo
     entries: ctx.pricing.current().entries,
   }));
 
-  app.get('/api/chats', () => readChats(projectsDir(ctx)));
+  /**
+   * Список разговоров. Транскрипты — источник правды по содержимому, но не по
+   * происхождению: «этот чат выделен из того» знает только панель, и связь
+   * приклеивается здесь, на выдаче. Отдельным запросом это делать нельзя —
+   * дерево в списке рисуется сразу, а не вторым тактом.
+   */
+  app.get('/api/chats', () => {
+    const chats = readChats(projectsDir(ctx));
+    const links = ctx.store.getChatLinks();
+    if (Object.keys(links).length === 0) return chats;
+
+    return chats.map((chat) => {
+      const link = links[chat.id];
+      if (!link) return chat;
+      return {
+        ...chat,
+        parentId: link.parentChatId,
+        ...(link.branch ? { branch: link.branch } : {}),
+      };
+    });
+  });
 
   /**
    * Полнотекстовый поиск по телу переписки: в дополнение к фильтру списка по

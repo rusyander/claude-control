@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { HandoffRefusal } from '@claude-control/contracts/chat-handoff';
 import { safeSessionId, safeName, safeModel, safeEffort, shellArgs } from '../../lib/cli-args.ts';
 import { killChildTree } from '../../lib/process-tree.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
@@ -53,7 +54,19 @@ export type ChatEvent =
   | { kind: 'error'; message: string }
   // Интерактивные права: агент хочет применить инструмент — ждём решения человека.
   | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
-  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' };
+  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
+  /**
+   * Работа продолжена в чистой сессии (или не продолжена — тогда есть `reason`).
+   * Событие уходит в поток ЗАКРЫВАЕМОГО прогона последним: по нему вкладка
+   * переключается на новый разговор, а не остаётся смотреть на завершённый.
+   */
+  | {
+      kind: 'handoff';
+      chatId?: string;
+      path?: string;
+      chainDepth?: number;
+      reason?: HandoffRefusal;
+    };
 
 export interface RunOptions {
   prompt: string;
@@ -98,6 +111,15 @@ export interface RunOptions {
    * полном доступе (bypassPermissions) не нужно — там всё и так разрешено.
    */
   permissionPrompt?: { runId: string; baseUrl: string };
+  /**
+   * Дописка к системному промпту (`--append-system-prompt`). Сюда уходит строка
+   * про разделение задач по чатам, и только она.
+   *
+   * ОДНА СТРОКА, без переводов строки: на Windows аргументы уезжают через
+   * оболочку, а перевод строки внутри аргумента cmd.exe разрывает командную
+   * строку — остаток инструкции выполнился бы как отдельная команда.
+   */
+  appendSystemPrompt?: string;
   /**
    * Команда запуска CLI активного провайдера. Задаётся маршрутом чата через
    * реестр провайдеров; по умолчанию — команда провайдера Claude. Имя больше не
@@ -149,6 +171,11 @@ export class ChatRun {
     if (name) args.push('--name', name);
     if (model) args.push('--model', model);
     if (effort) args.push('--effort', effort);
+
+    // Переводы строки вырезаем здесь, а не полагаемся на дисциплину вызывающего:
+    // на Windows такой аргумент разорвал бы командную строку (см. RunOptions).
+    const appended = options.appendSystemPrompt?.replace(/[\r\n]+/g, ' ').trim();
+    if (appended) args.push('--append-system-prompt', appended);
 
     // Интерактивные права: добавляем свой MCP-сервер и указываем его инструмент
     // как обработчик запросов на разрешение. Конфиг сливается с настоящим (без

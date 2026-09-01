@@ -12,6 +12,7 @@ export const DEFAULT_STATE: AppState = {
   runnerPrefs: {},
   providerChecks: {},
   projectCodeViews: {},
+  chatLinks: {},
   settings: {
     theme: 'system',
     language: 'ru',
@@ -34,6 +35,8 @@ export const DEFAULT_STATE: AppState = {
     chatEffort: 'xhigh',
     modelPricing: {},
     encryptSecretBackups: false,
+    taskSplitInitiative: true,
+    handoffInitiative: true,
     autoUpdateModels: true,
     previewProviderWrites: true,
     endpointProfiles: [],

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useWorkspace, normalizeProjectPath } from '@shared/lib/workspace';
+import { useWorkspace } from '@shared/lib/workspace';
 import {
   agentRuns,
   useAgentRun,
@@ -43,12 +43,15 @@ import { useChatSession } from './model/useChatSession';
 import { useChatSend } from './model/useChatSend';
 import { useChatArtifacts } from './model/useChatArtifacts';
 import { useParallelLaunch } from './model/useParallelLaunch';
+import { useTaskSplit } from './model/useTaskSplit';
+import { useChatHandoff } from './model/useChatHandoff';
 import { useRunLifecycle } from './model/useRunLifecycle';
 import { useAgentNotifications } from './model/useAgentNotifications';
 import { usePreviewWidth } from './model/usePreviewWidth';
+import { visibleChats } from './lib/visibleChats';
 import { useStreamState } from './model/useStreamState';
 import { downloadChatExport } from './lib/downloadChatExport';
-import { plainTextOf } from './lib/plainTextOf';
+import { keepPending } from './lib/pending';
 import styles from './ChatPage.module.scss';
 
 /**
@@ -120,14 +123,10 @@ export function ChatPage() {
   const effectiveModel = modelOverride || defaultModel;
   const effectiveEffort = effortOverride || defaultEffort;
 
-  const visibleChats = useMemo(() => {
-    const all = chats.data ?? [];
-    if (ws.activeProject) {
-      const id = ws.activeProject.id;
-      return all.filter((chat) => !chat.isSandbox && normalizeProjectPath(chat.projectPath) === id);
-    }
-    return all.filter((chat) => chat.isSandbox);
-  }, [chats.data, ws.activeProject]);
+  const shownChats = useMemo(
+    () => visibleChats(chats.data ?? [], ws.activeProject?.id),
+    [chats.data, ws.activeProject],
+  );
 
   // Размер окна ленты. Растёт кнопкой «Загрузить ещё»: каждый шаг подтягивает
   // более ранние сообщения. При смене разговора возвращаемся к последнему окну.
@@ -161,14 +160,11 @@ export function ChatPage() {
 
   useAgentNotifications({ chatId, runId: run.id, runStatus: run.status });
 
+  // Снятие оптимистичных пузырей — правило целиком в `keepPending`, вместе с
+  // объяснением, почему одной сверки по тексту не хватает.
   useEffect(() => {
     if (pending.length === 0 || !messages.data) return;
-    const inHistory = new Set(
-      messageList.filter((message) => message.role === 'user').map(plainTextOf),
-    );
-    session.setPending((current) =>
-      current.filter((message) => !inHistory.has(plainTextOf(message))),
-    );
+    session.setPending((current) => keepPending(current, messageList));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.data]);
 
@@ -191,6 +187,33 @@ export function ChatPage() {
   const { isParallelOpen, setParallelOpen, launchParallel } = useParallelLaunch({
     model: effectiveModel,
     effort: effectiveEffort,
+  });
+
+  // Разделение списка задач по нескольким чатам: агент предлагает его блоком в
+  // ответе, панель показывает карточку, а копии заводит сервер одним запросом.
+  const taskSplit = useTaskSplit({
+    projectPath,
+    // Настоящий ключ разговора, а не черновик: под ним чат стоит в списке, и
+    // именно к нему дерево подвесит порождённые чаты.
+    parentChatId: activeChat?.id ?? run.sessionId,
+    allowEdits,
+    model: effectiveModel,
+    effort: effectiveEffort,
+    dispatch,
+  });
+
+  // Продолжение в чистой сессии: этап закрыт — работа уезжает в новый разговор
+  // того же проекта, а дорогой контекст остаётся позади. Заводит его сервер, в
+  // том числе сам, когда в разговоре включён автомат.
+  const handoff = useChatHandoff({
+    projectPath,
+    chatId,
+    sessionId: run.sessionId,
+    allowEdits,
+    model: effectiveModel,
+    effort: effectiveEffort,
+    dispatch,
+    showChat: session.viewRun,
   });
 
   // Автоподтверждение прав: запоминаем выбор для всех чатов и, если прогон уже
@@ -235,7 +258,7 @@ export function ChatPage() {
       >
         <ChatSidebar
           isHome={ws.isHome}
-          chats={visibleChats}
+          chats={shownChats}
           isChatsLoading={chats.isLoading}
           activeChatId={activeChat?.id}
           chatStatuses={chatStatuses}
@@ -320,6 +343,10 @@ export function ChatPage() {
               onRetry={chatId ? () => agentRuns.retry(chatId) : undefined}
               costUnit={costUnit}
               effort={run.effort}
+              onSplit={taskSplit.split}
+              onKeepHere={taskSplit.keepHere}
+              isSplitPending={taskSplit.isPending}
+              handoff={handoff.controls}
             />
           ) : (
             <ChatEmptyState
@@ -340,6 +367,8 @@ export function ChatPage() {
             onChange={setInput}
             onSend={send}
             onStop={() => chatId && agentRuns.stop(chatId)}
+            onSplitTasks={taskSplit.askSplit}
+            onHandoff={handoff.askHandoff}
           />
         </div>
 

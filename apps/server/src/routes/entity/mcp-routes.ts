@@ -41,9 +41,17 @@ export function registerMcpRoutes(app: FastifyInstance, ctx: ServerContext): voi
     throw error;
   };
 
-  app.post<{ Body: McpServerDraft }>('/api/mcp', (request, reply) => {
+  app.post<{ Body: Partial<McpServerDraft> }>('/api/mcp', (request, reply) => {
+    // Имя сервера — его идентификатор в конфиге Claude Code. Без него запись
+    // уходила в файл настоящего `~/.claude` и падала пятисоткой уже там.
+    if (!request.body.name) {
+      return reply.code(400).send({ message: 'Не указано имя MCP-сервера' });
+    }
+
     try {
-      return done(saveMcpServer(paths().mcpConfig, null, request.body, ctx.backupDir));
+      return done(
+        saveMcpServer(paths().mcpConfig, null, request.body as McpServerDraft, ctx.backupDir),
+      );
     } catch (error) {
       return mcpExists(reply, error);
     }
@@ -53,29 +61,27 @@ export function registerMcpRoutes(app: FastifyInstance, ctx: ServerContext): voi
   // записью в конфиге переезжают отметки состояния (группы, выключение) и
   // сохранённый OAuth-вход: иначе сервер выпадает из групп, а токен остаётся в
   // хранилище под мёртвым ключом.
-  app.put<{ Params: { id: string }; Body: McpServerDraft }>(
+  app.put<{ Params: { id: string }; Body: Partial<McpServerDraft> }>(
     '/api/mcp/:id',
     async (request, reply) => {
+      // То же, что и при создании: имя — идентификатор сервера в конфиге, и без
+      // него правка уходила в запись и падала пятисоткой уже там.
+      if (!request.body.name) {
+        return reply.code(400).send({ message: 'Не указано имя MCP-сервера' });
+      }
+
+      const draft = request.body as McpServerDraft;
+
       let backupPath: string | undefined;
       try {
-        backupPath = saveMcpServer(
-          paths().mcpConfig,
-          request.params.id,
-          request.body,
-          ctx.backupDir,
-        );
+        backupPath = saveMcpServer(paths().mcpConfig, request.params.id, draft, ctx.backupDir);
       } catch (error) {
         // Отказ до записи: перенос отметок и токена не запускаем — иначе
         // состояние переехало бы на имя, которого сервер так и не получил.
         return mcpExists(reply, error);
       }
 
-      await migrateMcpServerIdentity(
-        ctx.store,
-        paths().appData,
-        request.params.id,
-        request.body.name,
-      );
+      await migrateMcpServerIdentity(ctx.store, paths().appData, request.params.id, draft.name);
 
       return done(backupPath);
     },

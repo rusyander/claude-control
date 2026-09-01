@@ -17,6 +17,11 @@
   right: 0;
   z-index: 61;
   width: min(320px, calc(100vw - var(--spacing-xl)));
+  // Разделов в поповере шесть, и у двух свой список: на грязном репозитории он
+  // вырастал ниже экрана, унося за край и кнопку коммита, и параллельные ветки.
+  // Свой скролл держит его в окне при любой длине содержимого.
+  max-height: min(78vh, 720px);
+  overflow-y: auto;
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);

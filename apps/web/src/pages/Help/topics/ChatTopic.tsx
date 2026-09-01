@@ -10,6 +10,7 @@ import {
   CapabilityGrid,
   OptionCards,
 } from '../ui';
+import { ChatParallelSections } from './ChatParallelSections';
 
 /**
  * Документ раздела «Чат».
@@ -110,6 +111,7 @@ export function ChatTopic() {
             tr('canFreePort'),
             tr('canAutostart'),
             tr('canGit'),
+            tr('canWorktrees'),
             tr('canOpenFolder'),
             tr('canAttach'),
             tr('canVoice'),
@@ -149,6 +151,10 @@ export function ChatTopic() {
         />
         <Callout tone="info" title={tr('toolsNote')} />
       </HelpSection>
+
+      {/* Копии репозитория и разделение задач — соседним файлом: два раздела об
+          одном и том же, а документ и без них самый длинный в справке. */}
+      <ChatParallelSections />
 
       <HelpSection title={tr('codeTitle')} caption={tr('codeCaption')}>
         <OptionCards

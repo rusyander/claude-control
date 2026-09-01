@@ -24,7 +24,13 @@ import {
   setCodeLayout as writeCodeLayout,
   setCodeView as writeCodeView,
 } from './code-view.ts';
-import type { AppState, RunnerPrefs, RunnerTargetMeta } from './app-store.types.ts';
+import {
+  getChatLink as readChatLink,
+  getChatLinks as readChatLinks,
+  linkChatSession as moveChatLink,
+  setChatLink as writeChatLink,
+} from './chat-links.ts';
+import type { AppState, ChatLink, RunnerPrefs, RunnerTargetMeta } from './app-store.types.ts';
 import { mergeState, readStateFile, stateFilePath } from './state-file.ts';
 import {
   disablingGroups as entityDisablingGroups,
@@ -338,5 +344,28 @@ export class AppStore {
 
   forgetCodeView(path: string): void {
     if (dropCodeView(this.state, path)) this.persist();
+  }
+
+  /** Все связи «родитель → потомок»: списку чатов нужны разом, а не по одной. */
+  getChatLinks(): Record<string, ChatLink> {
+    return readChatLinks(this.state);
+  }
+
+  getChatLink(chatId: string): ChatLink | undefined {
+    return readChatLink(this.state, chatId);
+  }
+
+  setChatLink(chatId: string, link: ChatLink): void {
+    writeChatLink(this.state, chatId, link);
+    this.persist();
+  }
+
+  /**
+   * Прогон назвал настоящий `sessionId` — переносим на него связь с временного
+   * ключа. Зовётся на КАЖДОМ прогоне, поэтому молча ничего не делает, когда
+   * связи нет: сохранять что-то на каждый чат панели здесь незачем.
+   */
+  linkChatSession(chatId: string, sessionId: string): void {
+    if (moveChatLink(this.state, chatId, sessionId)) this.persist();
   }
 }

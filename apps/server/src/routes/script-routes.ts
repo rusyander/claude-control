@@ -45,9 +45,15 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
     }
   });
 
-  app.put<{ Params: { '*': string }; Body: { content: string } }>(
+  app.put<{ Params: { '*': string }; Body: { content?: string } }>(
     '/api/scripts/*',
     (request, reply) => {
+      // Тела нет — записывать нечего. Молча сохранить пустоту здесь означало бы
+      // затереть работающий хук пользователя оборвавшимся запросом.
+      if (typeof request.body.content !== 'string') {
+        return reply.code(400).send({ message: 'Не передано содержимое скрипта' });
+      }
+
       try {
         return {
           ok: true,
@@ -65,14 +71,19 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
     },
   );
 
-  app.post<{ Body: { name: string; content: string } }>('/api/scripts', (request, reply) => {
+  app.post<{ Body: { name?: string; content?: string } }>('/api/scripts', (request, reply) => {
+    // Имя обязательно и домыслить его нечем: без него запрос уходил в запись и
+    // возвращал 500 — «сломалась панель» вместо «не хватает поля».
+    const name = typeof request.body.name === 'string' ? request.body.name.trim() : '';
+    if (!name) return reply.code(400).send({ message: 'Не указано имя скрипта' });
+
     try {
       return {
         ok: true,
         backupPath: saveScript(
           ctx.location.paths.hooks,
-          request.body.name,
-          request.body.content,
+          name,
+          request.body.content ?? '',
           ctx.backupDir,
         ),
         needsRestart: true,

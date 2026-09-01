@@ -27,6 +27,24 @@ await bypassOnboarding(page);
 let awaiting = true;
 let target;
 
+/**
+ * Подставной разговор песочницы — на случай, когда в истории проверяющего их
+ * нет ни одного. Раньше прогон в такой ситуации просто выходил с ошибкой, хотя
+ * ломаться было нечему: на этой машине 109 чатов и все проектные. Обещание
+ * «воспроизводим на любой машине» держится только так.
+ */
+const STUB = {
+  id: 'qa-attention-stub',
+  title: 'Проверка сигнала ожидания',
+  project: 'sandbox',
+  projectPath: '',
+  isSandbox: true,
+  messageCount: 2,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  preview: 'Агент задал вопрос и ждёт ответа',
+};
+
 // Стоящим на вопросе объявляем один разговор — остальные оставляем как есть,
 // иначе проверка «лишнего не зажглось» ничего не значит. Берём чат песочницы:
 // на домашней вкладке список показывает именно их, у проектных чатов свой таб.
@@ -34,6 +52,7 @@ await page.route('**/api/chats', async (route) => {
   const response = await route.fetch();
   const chats = await response.json();
   if (Array.isArray(chats)) {
+    if (!chats.some((chat) => chat.isSandbox)) chats.unshift({ ...STUB });
     target ??= chats.find((chat) => chat.isSandbox)?.id;
     for (const chat of chats) chat.awaitingReply = chat.id === target ? awaiting : undefined;
   }
@@ -50,10 +69,18 @@ const check = (ok, text) => {
   if (!ok) bad += 1;
 };
 
-if (!target) {
-  console.log('В истории нет ни одного чата песочницы — списку нечего показать');
+// Перехват снимаем ДО закрытия браузера: страница успевает дозапросить список,
+// и обработчик, оставшийся в полёте, падал с TargetClosedError уже после того,
+// как проверка отработала, — прогон выглядел сломанным на ровном месте.
+const finish = async (code, message) => {
+  console.log(message);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
   await browser.close();
-  process.exit(1);
+  process.exit(code);
+};
+
+if (!target) {
+  await finish(1, 'Список чатов не пришёл — проверять нечего');
 }
 
 const dots = page.getByRole('img', { name: WAITING_LABEL });
@@ -69,6 +96,4 @@ await page.waitForTimeout(3000);
 check((await dots.count()) === 0, 'после ответа точка снята');
 check(!(await page.title()).startsWith('●'), 'после ответа заголовок вкладки чист');
 
-await browser.close();
-console.log(bad === 0 ? 'Сигнал ожидания работает' : `Проблем: ${bad}`);
-process.exit(bad === 0 ? 0 : 1);
+await finish(bad === 0 ? 0 : 1, bad === 0 ? 'Сигнал ожидания работает' : `Проблем: ${bad}`);

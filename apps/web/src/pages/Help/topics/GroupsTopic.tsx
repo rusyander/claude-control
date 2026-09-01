@@ -46,6 +46,8 @@ export function GroupsTopic() {
           cantTitle={t('help.common.cantTitle')}
           can={[
             tr('canCollect'),
+            tr('canBindProject'),
+            tr('canSteps'),
             tr('canToggleGroup'),
             tr('canGroupEnv'),
             tr('canToggleAutomation'),
@@ -67,6 +69,26 @@ export function GroupsTopic() {
             { title: tr('groupMembers'), text: tr('groupMembersText') },
             { title: tr('groupToggle'), text: tr('groupToggleText') },
             { title: tr('groupEnv'), text: tr('groupEnvText') },
+          ]}
+        />
+      </HelpSection>
+
+      <HelpSection title={tr('bindTitle')} caption={tr('bindCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('bindProject'), text: tr('bindProjectText') },
+            { title: tr('bindWorktree'), text: tr('bindWorktreeText') },
+            { title: tr('bindNoOff'), text: tr('bindNoOffText') },
+          ]}
+        />
+      </HelpSection>
+
+      <HelpSection title={tr('stepsTitle')} caption={tr('stepsCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('stepsSkill'), text: tr('stepsSkillText') },
+            { title: tr('stepsGate'), text: tr('stepsGateText') },
+            { title: tr('stepsTrigger'), text: tr('stepsTriggerText') },
           ]}
         />
       </HelpSection>
@@ -144,6 +166,9 @@ export function GroupsTopic() {
             { name: 'description', description: tr('fieldDescription') },
             { name: 'members', description: tr('fieldMembers') },
             { name: 'env', description: tr('fieldEnv') },
+            { name: 'projectPaths', description: tr('fieldProjectPaths') },
+            { name: 'scenario.steps', description: tr('fieldSteps') },
+            { name: 'scenario.trigger', description: tr('fieldScenarioTrigger') },
             { name: 'trigger', description: tr('fieldTrigger') },
             { name: 'action', description: tr('fieldAction') },
             {
@@ -170,6 +195,9 @@ export function GroupsTopic() {
         <Stack gap="var(--spacing-xs)">
           <Callout tone="danger" title={tr('noteDeleteTitle')}>
             {tr('noteDeleteText')}
+          </Callout>
+          <Callout tone="warning" title={tr('noteAutoOnTitle')}>
+            {tr('noteAutoOnText')}
           </Callout>
           <Callout tone="warning" title={tr('noteRebuildTitle')}>
             {tr('noteRebuildText')}

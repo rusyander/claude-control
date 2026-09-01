@@ -48,6 +48,13 @@ export interface ProviderChatRunOptions {
   appDataDir: string;
   /** Рабочий каталог CLI. Не задан — каталог сервера. */
   workdir?: string;
+  /**
+   * Указание, которое дописывается к переписке ПЕРЕД первой репликой, — у чужого
+   * CLI это единственный способ передать что-то вроде системного промпта:
+   * отдельного флага для него нет ни у одного из них, а контекст всё равно
+   * собирает панель. В переписку не пишется и человеку не показывается.
+   */
+  systemPrefix?: string;
   timeoutMs?: number;
   models?: ModelInfo[];
   /** Подменяемые зависимости: в тестах ничего настоящего не запускается. */
@@ -63,6 +70,11 @@ export interface ProviderChatRunLike {
     onEvent: (event: ProviderChatRunEvent) => void,
   ): Promise<void>;
   stop(): void;
+}
+
+/** Синтетическая реплика с указанием: в файл разговора она не попадает. */
+function prefixMessage(content: string): ProviderChatMessage {
+  return { id: 'system-prefix', role: 'user', content, at: new Date().toISOString() };
 }
 
 export class ProviderChatRun implements ProviderChatRunLike {
@@ -82,6 +94,13 @@ export class ProviderChatRun implements ProviderChatRunLike {
         reason: 'unsupported',
       });
       return;
+    }
+
+    // Указание встаёт первой репликой и дальше живёт как часть переписки: все
+    // пути ниже строят промпт из `history`, поэтому подмешать его надо ровно
+    // здесь — иначе про него пришлось бы помнить в каждом из них по отдельности.
+    if (options.systemPrefix) {
+      options = { ...options, history: [prefixMessage(options.systemPrefix), ...options.history] };
     }
 
     const resolution = resolveRunner(provider, appDataDir, options.detect);

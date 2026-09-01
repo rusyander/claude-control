@@ -48,6 +48,43 @@ export const groupMemberSchema = object({
 export type GroupMember = Infer<typeof groupMemberSchema>;
 
 /**
+ * Шаг сценария. `gate` — признак, по которому шаг считается закрытым: без него
+ * список шагов остаётся пожеланием, а с ним агенту есть что предъявить, прежде
+ * чем идти дальше.
+ */
+export const scenarioStepSchema = object({
+  title: string(),
+  body: string().default(''),
+  gate: string().default(''),
+});
+
+export type ScenarioStep = Infer<typeof scenarioStepSchema>;
+
+/**
+ * Сценарий группы — порядок работы над типовой задачей.
+ *
+ * Хранить шаги в самой группе бессмысленно: Claude о группах не знает. Поэтому
+ * панель компилирует их в обычный скилл (`~/.claude/skills/<id>/SKILL.md`) —
+ * единственную сущность, которую агент читает как инструкцию, — а скилл
+ * становится участником группы и гаснет вместе с ней.
+ *
+ * `trigger` добавляет к этому определённость: описание скилла лишь предлагает
+ * себя модели, а регулярное выражение по тексту запроса ставит хук
+ * `UserPromptSubmit`, который напоминает о сценарии сам.
+ */
+export const groupScenarioSchema = object({
+  /** Когда сценарий уместен — одна строка, уходит в description скилла. */
+  when: string().default(''),
+  steps: array(scenarioStepSchema).default([]),
+  /** Регулярное выражение по тексту запроса; пусто — хук не ставится. */
+  trigger: string().default(''),
+  /** Скилл, в который сценарий скомпилирован. Проставляет сервер. */
+  compiledSkillId: string().optional(),
+});
+
+export type GroupScenario = Infer<typeof groupScenarioSchema>;
+
+/**
  * Группа — способ пользователя навести свой порядок поверх файлов Claude Code.
  * Сам Claude о группах не знает: они живут в данных приложения, а на конфиг
  * влияют через включение/выключение входящих сущностей и общие env-переменные.
@@ -66,6 +103,18 @@ export const groupSchema = object({
    * и переключать их целиком.
    */
   env: record(string(), string()).default({}),
+  /**
+   * Проекты, при работе в которых группа включается сама (абсолютные пути).
+   * Пусто — только ручной тумблер. Включение автоматическое, выключение нет:
+   * файлы конфигурации общие, а чатов в разных проектах может идти несколько
+   * сразу — гашение под чужим прогоном сломало бы его на ходу.
+   *
+   * Поле необязательное, и это не послабление: группы, записанные до появления
+   * привязки, лежат в state.json без него — обязательный тип врал бы о данных
+   * на диске.
+   */
+  projectPaths: array(string()).optional(),
+  scenario: groupScenarioSchema.optional(),
   /** Выключение группы выключает все её сущности разом. */
   isEnabled: boolean().default(true),
   order: number().default(0),
@@ -80,6 +129,8 @@ export const groupDraftSchema = object({
   icon: string().default('folder'),
   members: array(groupMemberSchema).default([]),
   env: record(string(), string()).default({}),
+  projectPaths: array(string()).optional(),
+  scenario: groupScenarioSchema.optional(),
   isEnabled: boolean().default(true),
 });
 

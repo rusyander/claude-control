@@ -105,6 +105,7 @@ export function ProjectsPage() {
         subtitle={
           providerId === 'claude' ? t('projectConfig.subtitle') : t('providerProject.subtitle')
         }
+        helpTopic="projects"
         actions={
           <Button
             variant="primary"

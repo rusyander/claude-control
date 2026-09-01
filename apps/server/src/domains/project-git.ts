@@ -28,9 +28,15 @@
  * ветку из списка: иначе `checkout <что угодно>` отцепил бы HEAD на произвольный
  * коммит, чего никто не просил.
  *
+ * ПАРАЛЛЕЛЬНЫЕ КОПИИ (`git worktree`) живут отдельным модулем и отвечают на
+ * другой вопрос: как несколько агентов работают над одним репозиторием
+ * одновременно, каждый в своей ветке и своём каталоге. Слияния копий панель не
+ * делает — свести ветку обратно решает человек.
+ *
  * Модули: `project-git/exec.ts` — запуск git и его ошибка, `project-git/parse.ts`
  * — разбор вывода, `project-git/read.ts` — состояние репозитория,
- * `project-git/write.ts` — операции записи.
+ * `project-git/write.ts` — операции записи, `project-git/worktrees.ts` —
+ * параллельные рабочие копии.
  */
 
 export { CHANGED_FILES_MAX, COMMIT_MESSAGE_MAX } from './project-git/constants.ts';
@@ -41,7 +47,15 @@ export {
   parseStatus,
   pickRemote,
 } from './project-git/parse.ts';
-export { isGitRepo, readProjectGit } from './project-git/read.ts';
+export { isGitRepo, readProjectGit, requireRepo } from './project-git/read.ts';
+export {
+  addWorktree,
+  listWorktrees,
+  parseWorktrees,
+  removeWorktree,
+  worktreeDirFor,
+  worktreeDirName,
+} from './project-git/worktrees.ts';
 export {
   assertBranchName,
   checkoutBranch,

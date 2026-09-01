@@ -56,3 +56,16 @@ console.log('Текст заполнен:', bodyValue ? `${bodyValue.length} с�
 
 await browser.close();
 console.log(problems.length ? `ПРОБЛЕМЫ:\n  ${problems.join('\n  ')}` : 'Ошибок консоли нет.');
+
+// Код возврата обязателен: без него «НЕТ» в трёх строках выше видит только тот,
+// кто читает вывод глазами, а прогон при этом рапортует об успехе.
+const failed = [
+  !hasChat && 'панель помощника не открылась',
+  !titleValue && 'заголовок остался пустым',
+  !bodyValue && 'текст правила остался пустым',
+  problems.length > 0 && `ошибок консоли: ${problems.length}`,
+].filter(Boolean);
+if (failed.length > 0) {
+  console.log(`Помощник: ${failed.join('; ')}`);
+  process.exit(1);
+}

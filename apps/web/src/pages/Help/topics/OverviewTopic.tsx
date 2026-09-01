@@ -87,6 +87,9 @@ export function OverviewTopic() {
           <Callout tone="info" title={tr('noteMissingTitle')}>
             {tr('noteMissingText')}
           </Callout>
+          <Callout tone="info" title={tr('noteToastTitle')}>
+            {tr('noteToastText')}
+          </Callout>
         </Stack>
       </HelpSection>
     </>

@@ -15,8 +15,21 @@ import { readRules, saveRules, validateRules, DlpRulesError } from './rules-stor
  * значило бы проверять собственную заглушку, а не то, увидит ли модель фамилию.
  */
 
-const PORT = 5391;
-const UPSTREAM_PORT = 5392;
+/**
+ * Порты берём свободные, а не фиксированные. Пара 5391/5392 переживала 22
+ * цикла «поднять — погасить» на одном и том же номере, и в полном параллельном
+ * прогоне это регулярно давало ECONNRESET на ровном месте: соединение уходило в
+ * сокет, который только что закрыли и открыли заново. Продукт тут ни при чём —
+ * это гигиена самого стенда, но красный прогон выглядит одинаково.
+ */
+async function freePort(): Promise<number> {
+  const probe = createServer();
+  await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
+  const address = probe.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+  await new Promise<void>((resolve) => probe.close(() => resolve()));
+  return port;
+}
 
 function rule(patch: Partial<DlpRule> & Pick<DlpRule, 'id' | 'name'>): DlpRule {
   return {
@@ -52,8 +65,12 @@ describe('DlpProxy', () => {
   let seen: { path: string; body: string; headers: Record<string, string> }[];
   let reply: { status: number; type: string; body: string };
   let dir: string;
+  let PORT: number;
+  let UPSTREAM_PORT: number;
 
   beforeEach(async () => {
+    PORT = await freePort();
+    UPSTREAM_PORT = await freePort();
     dir = mkdtempSync(join(tmpdir(), 'dlp-proxy-'));
     seen = [];
     reply = { status: 200, type: 'application/json', body: '{"ok":true}' };

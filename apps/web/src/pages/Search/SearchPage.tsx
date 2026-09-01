@@ -31,7 +31,7 @@ export function SearchPage() {
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
-      <PageHeader title={t('search.title')} subtitle={t('search.subtitle')} />
+      <PageHeader title={t('search.title')} subtitle={t('search.subtitle')} helpTopic="search" />
 
       <SearchField
         value={query}

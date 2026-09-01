@@ -12,9 +12,33 @@ it works, but is not fully verified; **not yet** — worth doing, the adapter is
 ## CLIs other than Claude
 
 The panel configures more than Claude Code, but the honest phrasing is: **far from everything is
-universal.** The "section × provider" map lives in
-[README.md](../README.md#clis-other-than-claude), the format details in
+universal.** The map below says what exists where; format details are in
 [PROVIDERS.md](PROVIDERS.md); here are the boundaries.
+
+### The map: section × provider
+
+**✅ works** · **👁 read-only** — the section is there, but the panel never writes into it (why — in the footnote) · **🧪 experimental** · **— unsupported**, section hidden.
+
+|                                     | Claude | Codex | Gemini | Qwen | Continue | Goose | Kimi | Cursor | OpenCode | Aider |
+| ----------------------------------- | :----: | :---: | :----: | :--: | :------: | :---: | :--: | :----: | :------: | :---: |
+| Global instructions<sup>1</sup>     |   ✅   |  ✅   |   ✅   |  ✅  |    —     |  ✅   |  ✅  |  ✅ *  |    ✅    | ✅ *  |
+| MCP servers<sup>2</sup>             |   ✅   |  ✅   |   ✅   |  ✅  |    ✅    |  ✅   |  ✅  |   ✅   |    ✅    |   —   |
+| Environment<sup>3</sup>             |   ✅   |  ✅   |   ✅   |  ✅  |    ✅    |   —   |  —   |   —    |    —     |  ✅   |
+| Permissions / approvals<sup>4</sup> |   ✅   |  ✅   |   ✅   |  ✅  |    ✅    |  ✅   |  ✅  |   ✅   |    ✅    |   —   |
+| Chat<sup>5</sup>                    |   ✅   |  🧪   |   🧪   |  🧪  |    🧪    |  🧪   |  🧪  |   —    |    🧪    |  🧪   |
+| Rules (`## ПРАВИЛО:`)               |   ✅   |   —   |   —    |  —   |    —     |   —   |  —   |   —    |    —     |   —   |
+| Skills<sup>10</sup>                 |   ✅   |   —   |   —    |  ✅  |    —     |   —   |  ✅  |   —    |    ✅    |   —   |
+| Commands<sup>11</sup>               |   👁    |   —   |   👁    |  👁   |    —     |   —   |  —   |   —    |    👁     |   —   |
+| Hooks<sup>8</sup>                   |   ✅   |   —   |   —    |  ✅  |    —     |   —   |  ✅  |   —    |    👁     |   —   |
+| Scripts<sup>6</sup>                 |   ✅   |  ✅   |   ✅   |  ✅  |    ✅    |  ✅   |  ✅  |   ✅   |    ✅    |  ✅   |
+| Plugins<sup>9</sup>                 |   ✅   |   —   |   —    |  —   |    —     |   —   |  👁   |   —    |    ✅    |   —   |
+| Projects<sup>7</sup>                |   ✅   |  ✅   |   ✅   |  ✅  |    ✅    |  ✅   |  ✅  |   ✅   |    ✅    |  ✅   |
+| Analytics (tokens, cost)            |   ✅   |   —   |   —    |  —   |    —     |   —   |  —   |   —    |    —     |   —   |
+| Sandbox                             |   ✅   |   —   |   —    |  —   |    —     |   —   |  —   |   —    |    —     |   —   |
+
+**Overview, Search, Groups, History, Settings and Help are always there** — those are the panel's own sections. History and search do follow the active provider's files: foreign backups are named separately and never mix with Claude's.
+
+What each footnote stands for — the file path, the keys the panel edits, the reason behind the status — is in [Providers: format details](PROVIDERS.md).
 
 ### Claude-only by nature
 

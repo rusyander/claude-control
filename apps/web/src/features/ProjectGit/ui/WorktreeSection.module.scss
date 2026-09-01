@@ -1,0 +1,86 @@
+// Параллельные ветки внутри поповера git. Отбита сверху линией: это не ещё одна
+// строка пульта, а отдельный разговор — про копии репозитория, а не про текущую.
+.section {
+  padding-top: var(--spacing-2xs);
+  border-top: 1px solid var(--color-border);
+}
+
+// Свой скролл: копий может быть много, а поповер не должен расти на весь экран.
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  // Хватает на четыре копии без внутреннего скролла: больше — редкость, а два
+  // скролла подряд (список внутри поповера) читаются хуже одного.
+  max-height: 280px;
+  overflow-y: auto;
+  padding: var(--spacing-3xs);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--spacing-3xs);
+  border-radius: 6px;
+}
+
+.item + .item {
+  border-top: 1px solid var(--color-border);
+}
+
+.head {
+  min-width: 0;
+}
+
+// Ветка — главное в строке, поэтому она не сжимается до многоточия первой.
+.branch {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-fg);
+}
+
+// Путь длинный всегда: обрезаем с НАЧАЛА, потому что различает копии хвост.
+.path {
+  direction: rtl;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: var(--font-size-body-sm);
+}
+
+.input:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

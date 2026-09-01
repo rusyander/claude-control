@@ -10,6 +10,8 @@ export interface UseWorkspace {
   openProject: (path: string, name: string) => string;
   closeProject: (id: string) => void;
   activate: (id: string) => void;
+  /** Запомнить разговор, открытый в этой вкладке (пусто — забыть). */
+  rememberView: (tabId: string, chatId: string | undefined) => void;
 }
 
 /** Подписка на состояние рабочего пространства для интерфейса. */
@@ -24,5 +26,6 @@ export function useWorkspace(): UseWorkspace {
     openProject: workspace.openProject,
     closeProject: workspace.closeProject,
     activate: workspace.activate,
+    rememberView: workspace.rememberView,
   };
 }

@@ -25,6 +25,8 @@ export function ChatComposer({
   onStop,
   onRejectFiles,
   isRunning,
+  onSplitTasks,
+  onHandoff,
 }: ChatComposerProps) {
   const { t, i18n } = useTranslation();
   const [files, setFiles] = useState<AttachedFile[]>([]);
@@ -230,6 +232,34 @@ export function ChatComposer({
               accept={UPLOAD_ACCEPT_ATTRIBUTE}
               onChange={(event: ChangeEvent<HTMLInputElement>) => void attach(event.target.files)}
             />
+            {/* Разделить задачи можно и задним числом: агент предлагает это сам
+                только на трёх и более независимых задачах, а спросить вправе
+                кто угодно и когда угодно. */}
+            {onSplitTasks && (
+              <Button
+                variant="ghost"
+                iconOnly
+                icon={<Icon name="branch" size={24} />}
+                aria-label={t('chat.split.ask')}
+                title={t('chat.split.ask')}
+                onClick={onSplitTasks}
+                disabled={isRunning}
+              />
+            )}
+            {/* «Закрыть этап» — та же просьба, что агент иногда высказывает сам,
+                только высказанная человеком. Дальше решает он же: панель покажет
+                карточку и без его согласия контекст не сотрёт. */}
+            {onHandoff && (
+              <Button
+                variant="ghost"
+                iconOnly
+                icon={<Icon name="refresh" size={24} />}
+                aria-label={t('chat.handoff.ask')}
+                title={t('chat.handoff.ask')}
+                onClick={onHandoff}
+                disabled={isRunning}
+              />
+            )}
           </Stack>
 
           {/* Пока агент занят, рядом с остановкой остаётся и отправка: дописанное

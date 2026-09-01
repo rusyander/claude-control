@@ -23,7 +23,7 @@ export function HistoryPage() {
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
-      <PageHeader title={t('history.title')} subtitle={t('history.subtitle')} />
+      <PageHeader title={t('history.title')} subtitle={t('history.subtitle')} helpTopic="history" />
 
       <ExplainBox title={t('history.explainTitle')} text={t('history.explain')} />
 

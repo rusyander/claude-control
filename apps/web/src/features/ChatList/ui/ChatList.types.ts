@@ -19,6 +19,12 @@ export interface ChatRowData {
   chat: ChatSummary;
   snippet?: string;
   matchCount?: number;
+  /**
+   * Уровень вложенности: 0 — обычный разговор, 1 — чат, выделенный из него
+   * разделением задач. Глубже не бывает намеренно — порождённый чат сам делить
+   * уже не даёт, и дерево не превращается в лес отступов.
+   */
+  depth?: number;
 }
 
 export type TimeGroup = 'today' | 'yesterday' | 'thisWeek' | 'earlier';
@@ -39,4 +45,6 @@ export interface ChatRowProps {
   query?: string;
   /** Статус агента этого разговора; нет прогона — нет и точки. */
   status?: RunStatus;
+  /** Уровень вложенности в дереве: отступ и ветвь рисуются по нему. */
+  depth?: number;
 }

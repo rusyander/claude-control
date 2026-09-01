@@ -16,6 +16,7 @@ export type {
   PendingPermission,
   QueuedMessage,
   SendOutcome,
+  HandoffEvent,
 } from './agentRunsStore';
 export {
   useAgentRun,

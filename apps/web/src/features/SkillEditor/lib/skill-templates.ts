@@ -12,6 +12,6 @@
  */
 
 /** Идентификаторы встроенных заготовок тела SKILL.md, в порядке показа. */
-export const SKILL_BODY_TEMPLATE_IDS = ['blank', 'tool', 'rule', 'checklist'] as const;
+export const SKILL_BODY_TEMPLATE_IDS = ['blank', 'tool', 'rule', 'checklist', 'hygiene'] as const;
 
 export type SkillBodyTemplateId = (typeof SKILL_BODY_TEMPLATE_IDS)[number];

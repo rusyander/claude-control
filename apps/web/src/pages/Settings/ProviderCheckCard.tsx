@@ -110,7 +110,17 @@ export function ProviderCheckCard() {
                 total: score?.total ?? 0,
               })}
             </Typography>
-            <Stack gap="0" className={styles.list}>
+            {/* Список прокручивается (max-height в стилях), а прокручиваемая
+                область без фокуса недостижима с клавиатуры: мышью шаги видно
+                все, а клавишами — только те, что поместились. Поэтому область
+                фокусируемая и подписанная. */}
+            <Stack
+              gap="0"
+              className={styles.list}
+              tabIndex={0}
+              role="group"
+              aria-label={t('providerCheck.steps')}
+            >
               {check.steps.map((step) => (
                 <CheckStepRow key={step.id} step={step} />
               ))}

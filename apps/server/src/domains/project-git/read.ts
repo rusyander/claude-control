@@ -18,6 +18,20 @@ export function isGitRepo(projectDir: string): boolean {
   return Boolean(projectDir.trim()) && existsSync(join(projectDir, '.git'));
 }
 
+/**
+ * Каталог пригоден для операции записи — иначе GitError с причиной. Живёт
+ * здесь, а не рядом с операциями: копии (`worktrees.ts`) начинаются с той же
+ * проверки, и второй её экземпляр разошёлся бы с этим при первой же правке.
+ */
+export async function requireRepo(projectDir: string): Promise<ProjectGitInfo> {
+  if (!isGitRepo(projectDir)) {
+    throw new GitError('В каталоге проекта нет .git — это не репозиторий');
+  }
+  const info = await readProjectGit(projectDir);
+  if (info.error) throw new GitError(info.error);
+  return info;
+}
+
 /** Пустое состояние «это не репозиторий» — им же отвечаем и при отсутствии каталога. */
 function notARepo(): ProjectGitInfo {
   return {

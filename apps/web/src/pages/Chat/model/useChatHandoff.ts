@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import type { HandoffProposal } from '@claude-control/contracts/chat-handoff';
-import { HANDOFF_MAX_CHAIN } from '@claude-control/contracts/chat-handoff';
+import { HANDOFF_MAX_CHAIN, contextHandoffProposal } from '@claude-control/contracts/chat-handoff';
 import {
   workspace,
   getWorkspaceState,
@@ -84,6 +84,9 @@ export function useChatHandoff({
   openRef.current = { chatId, sessionId };
   const showRef = useRef(showChat);
   showRef.current = showChat;
+  // Продолжение по клику в уведомлении о размере окна: колбэк стора переживает
+  // рендер, поэтому берётся ссылкой — иначе он звал бы вчерашний разговор.
+  const continueRef = useRef<(proposal: HandoffProposal) => void>(() => undefined);
 
   // Состояние цепочки приходит с сервера: тумблер обязан пережить и перезагрузку
   // вкладки, и открытие того же разговора с телефона.
@@ -136,6 +139,24 @@ export function useChatHandoff({
   useEffect(() => {
     agentRuns.setOnHandoff((event, run) => {
       if (event.reason) {
+        const tokens = event.contextTokens ? Math.round(event.contextTokens / 1000) : 0;
+        // Повод по размеру окна — единственный отказ, который человек может снять
+        // одним движением, поэтому он не просто объявляется, а предлагается:
+        // уведомление кликабельно, и клик заводит продолжение. Живёт дольше
+        // обычных трёх секунд — на решение нужно время, но само уходит: висящее
+        // на экране предложение хуже, чем повторённое на следующем ходу.
+        if (event.reason === 'context_high' && event.contextTokens) {
+          const size = event.contextTokens;
+          toast.warning(t('chat.handoff.contextHigh', { tokens }), {
+            duration: 15_000,
+            onClick: () => continueRef.current(contextHandoffProposal(size)),
+          });
+          return;
+        }
+        if (event.reason === 'checkpoint_stale' && event.contextTokens) {
+          toast.warning(t('chat.handoff.contextStale', { tokens }), { duration: 15_000 });
+          return;
+        }
         toast.warning(t(`chat.handoff.refusal.${event.reason}`));
         return;
       }
@@ -216,6 +237,9 @@ export function useChatHandoff({
       },
     );
   };
+
+  continueRef.current = (proposal: HandoffProposal): void =>
+    continueHandoff(proposal, { startRun: true });
 
   return {
     ...(projectPath ? { askHandoff } : {}),

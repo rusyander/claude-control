@@ -52,6 +52,7 @@ export function ChatParallelSections() {
           minWidth={320}
           items={[
             { title: tr('handoffWhen'), text: tr('handoffWhenText') },
+            { title: tr('handoffSize'), text: tr('handoffSizeText') },
             { title: tr('handoffCard'), text: tr('handoffCardText') },
             { title: tr('handoffWhat'), text: tr('handoffWhatText') },
             { title: tr('handoffAuto'), text: tr('handoffAutoText') },

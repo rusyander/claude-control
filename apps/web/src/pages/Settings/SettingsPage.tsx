@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { AppSettings } from '@claude-control/contracts';
+import { HANDOFF_CONTEXT_LIMIT } from '@claude-control/contracts/chat-handoff';
 import { Stack } from '@shared/ui/stack';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
@@ -67,6 +68,20 @@ export function SettingsPage() {
   const effortOptions = EFFORT_LEVELS.map((level) => ({
     value: level,
     label: level ? t(`chat.effort_${level}`) : t('settings.chatEffortAuto'),
+  }));
+  // Порог — не свободное число, а выбор из немногих: полезных значений всего
+  // несколько, а опечатка в поле («20000» вместо «200000») дала бы предложение
+  // продолжить на каждом ходу. Ноль отдельным пунктом — это выключено, а не «0».
+  const contextLimitLabel = (limit: number): string => {
+    if (limit === 0) return t('settings.handoffContextLimitOff');
+    const tokens = limit / 1000;
+    return limit === HANDOFF_CONTEXT_LIMIT
+      ? t('settings.handoffContextLimitDefault', { tokens })
+      : t('settings.handoffContextLimitValue', { tokens });
+  };
+  const contextLimitOptions = [0, 150_000, HANDOFF_CONTEXT_LIMIT, 250_000].map((limit) => ({
+    value: String(limit),
+    label: contextLimitLabel(limit),
   }));
 
   // Перенос настроек панели: снимок state.json скачивается файлом и вливается
@@ -240,6 +255,18 @@ export function SettingsPage() {
             hint={t('settings.handoffInitiativeHint')}
             checked={settings.handoffInitiative}
             onChange={(handoffInitiative) => patch({ handoffInitiative })}
+          />
+          {/* Второй повод продолжить — не смысл, а размер окна. Инициатива выше
+              ждёт, пока агент СЧИТАЕТ задачу закрытой; порог смотрит на цену
+              разговора, которая растёт и у незакрытой работы. Ничего не стирает:
+              предохранители продолжения те же, а без включённого в разговоре
+              автомата панель только предлагает. */}
+          <SelectField
+            label={t('settings.handoffContextLimit')}
+            value={String(settings.handoffContextLimit)}
+            onChange={(value) => patch({ handoffContextLimit: Number(value) })}
+            options={contextLimitOptions}
+            hint={t('settings.handoffContextLimitHint')}
           />
         </Stack>
       </Card>

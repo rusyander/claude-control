@@ -177,6 +177,7 @@ chatRuns.setHandoffPlanner(
     runs: chatRuns,
     chains: handoffChains,
     selfBaseUrl: `http://127.0.0.1:${process.env.PORT ?? 5178}`,
+    contextLimit: () => ctx.store.getSettings().handoffContextLimit,
   }),
 );
 const providerChats = new ProviderChatService();

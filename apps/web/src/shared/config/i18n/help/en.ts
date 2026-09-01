@@ -386,6 +386,17 @@ export const helpEn: HelpSchema = {
         'nothing is created and nothing is started. You can ask for it yourself ' +
         'too — the “Close the stage and continue in a clean session” button in ' +
         'the composer, at any point in the conversation.',
+      handoffSize: 'The second reason: the conversation got expensive',
+      handoffSizeText:
+        'Besides a closed task there is a reason the agent will not see: the size ' +
+        'of the window. Context goes to the model in full on every turn, and by ' +
+        '200 thousand tokens almost the entire turn is resending the old one. ' +
+        'Settings → “Offer to continue once the window reaches”: the panel looks ' +
+        'at the run’s last turn and sends a notification with the size; clicking ' +
+        'it starts the continuation from .agent/PROGRESS.md. It will not remind ' +
+        'you again for the same conversation until the window grows noticeably ' +
+        'further, and with auto-continue enabled there it moves on its own — the ' +
+        'same safeguards apply.',
       handoffCard: 'What the card shows',
       handoffCardText:
         'What is closed, what was pruned from the working files, the checkpoint ' +
@@ -431,7 +442,9 @@ export const helpEn: HelpSchema = {
       handoffOffText:
         'Settings → “Offer to continue in a clean session”. Off means the agent no ' +
         'longer offers the move by itself, but the composer button still works: ' +
-        'the setting takes away the initiative, not the ability.',
+        'the setting takes away the initiative, not the ability. The window-size ' +
+        'threshold is turned off separately, by the neighbouring “Never offer”: ' +
+        'they are different reasons and must be able to go quiet independently.',
       handoffNote:
         'The panel never wipes context silently, whatever the toggles say: a move ' +
         'is always a NEW conversation, and the old one stays in the list in full. ' +

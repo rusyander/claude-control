@@ -37,6 +37,7 @@ export const DEFAULT_STATE: AppState = {
     encryptSecretBackups: false,
     taskSplitInitiative: true,
     handoffInitiative: true,
+    handoffContextLimit: 0,
     autoUpdateModels: true,
     previewProviderWrites: true,
     endpointProfiles: [],

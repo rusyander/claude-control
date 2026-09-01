@@ -34,7 +34,7 @@ export function SelectField({ label, value, onChange, options, hint }: SelectFie
       </select>
 
       {hint && (
-        <Typography variant="caption" color="subtle" id={hintId}>
+        <Typography variant="caption" color="subtle" id={hintId} className={styles.hint}>
           {hint}
         </Typography>
       )}

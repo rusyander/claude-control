@@ -10,6 +10,7 @@ import type { ServerContext } from '../../context.ts';
 import type { ChatEvent } from '../../domains/chat/ChatRunner.ts';
 import type { ChatRunRegistry, RunFinished } from '../../domains/chat/ChatRunRegistry.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
+import { planContextRotation } from '../../domains/chat/context-rotation.ts';
 import { activateGroupsQuietly } from '../../domains/group-activation.ts';
 import {
   evaluateHandoff,
@@ -52,6 +53,12 @@ export interface HandoffPlannerDeps {
   chains: HandoffChains;
   /** Адрес самой панели — его слушает мини-MCP-сервер прав нового прогона. */
   selfBaseUrl: string;
+  /**
+   * Порог контекста из настроек, читаемый на каждом завершении: настройку меняют
+   * при живом сервере, и запомненное при старте число врало бы до перезапуска.
+   * Ноль — за размером окна не следим.
+   */
+  contextLimit?: () => number;
   /** Время правки файла; подменяется в тестах. */
   stat?: StatFile;
 }
@@ -68,11 +75,23 @@ export function createHandoffPlanner({
   runs,
   chains,
   selfBaseUrl,
+  contextLimit,
   stat,
 }: HandoffPlannerDeps): (finished: RunFinished) => ChatEvent | undefined {
   return (finished) => {
-    const proposal = scanHandoffBlocks(finished.text).proposals.at(-1);
+    const own = scanHandoffBlocks(finished.text).proposals.at(-1);
     const aliases = aliasesOf(finished.chatId, finished.sessionId);
+
+    // Второй повод продолжить — размер окна. Предложение агента его перебивает:
+    // оно знает, ЧТО закрыто, а порог знает только «сколько накопилось».
+    const rotation = planContextRotation({
+      contextTokens: finished.contextTokens,
+      limit: contextLimit?.() ?? 0,
+      hasProposal: Boolean(own),
+      ok: finished.ok,
+      hasProject: Boolean(finished.projectPath),
+    });
+    const proposal = own ?? (rotation.kind === 'propose' ? rotation.proposal : undefined);
 
     const verdict = evaluateHandoff({
       ...(proposal ? { proposal } : {}),
@@ -85,7 +104,19 @@ export function createHandoffPlanner({
     });
 
     if (!verdict.ok) {
-      if (verdict.reason === 'no_block' || verdict.reason === 'auto_off') return undefined;
+      if (verdict.reason === 'no_block') return undefined;
+      // Повод по порогу молчать не должен, даже когда автомат выключен: человек
+      // не видит размера окна и узнать о нём может только отсюда. Но и повторять
+      // на каждом ходу нельзя — окно за порогом само не уменьшается.
+      if (rotation.kind === 'propose') {
+        if (!chains.shouldNoticeContext(aliases, rotation.contextTokens)) return undefined;
+        return {
+          kind: 'handoff',
+          reason: verdict.reason === 'auto_off' ? 'context_high' : verdict.reason,
+          contextTokens: rotation.contextTokens,
+        };
+      }
+      if (verdict.reason === 'auto_off') return undefined;
       return { kind: 'handoff', reason: verdict.reason };
     }
 
@@ -115,6 +146,7 @@ export function createHandoffPlanner({
       chatId: started.chatId,
       path: started.path,
       chainDepth: started.chainDepth,
+      ...(rotation.kind === 'propose' ? { contextTokens: rotation.contextTokens } : {}),
     };
   };
 }

@@ -39,7 +39,20 @@ interface ChainState {
   depth: number;
   /** Последнее касание — по нему выбрасываются самые старые записи. */
   touchedAt: number;
+  /**
+   * Окно, при котором о его размере уже говорили. Без этого предложение по
+   * порогу повторялось бы после КАЖДОГО хода: окно за порогом само по себе не
+   * уменьшается, и человек получал бы то же самое уведомление каждые полминуты.
+   */
+  noticedContext?: number;
 }
+
+/**
+ * Насколько окно должно вырасти, чтобы напомнить о себе снова. Шаг такой же, как
+ * у сторожа контекста в хуках, и по той же причине: реже — человек забудет, чаще
+ * — это шум.
+ */
+const NOTICE_STEP = 25_000;
 
 /** Сколько цепочек помним. Пульт держит десятки разговоров, не тысячи. */
 const MAX_CHAINS = 200;
@@ -86,6 +99,21 @@ export class HandoffChains {
     const depth = (parent?.depth ?? 0) + 1;
     this.write([toChatId], { auto: parent?.auto === true, depth, touchedAt: Date.now() });
     return depth;
+  }
+
+  /**
+   * Пора ли снова говорить о размере окна. Первый раз — да, дальше — только
+   * когда окно подросло ещё на шаг. Ответ ЗАПОМИНАЕТСЯ: метод и спрашивает, и
+   * отмечает, потому что второго вызова с тем же смыслом в потоке нет.
+   */
+  shouldNoticeContext(aliases: string[], tokens: number): boolean {
+    const state = this.stateOf(aliases) ?? { auto: false, depth: 0, touchedAt: Date.now() };
+    const previous = state.noticedContext;
+    if (previous !== undefined && tokens < previous + NOTICE_STEP) return false;
+    state.noticedContext = tokens;
+    state.touchedAt = Date.now();
+    this.write(aliases, state);
+    return true;
   }
 
   /** Забыть разговор: цепочка закрыта человеком. */

@@ -22,6 +22,12 @@ export const pluginSchema = object({
   description: string().optional(),
   /** Сколько раз плагин ставили — есть только у записей каталога. */
   installCount: number().optional(),
+  /**
+   * Каталог установки исчез с диска. CLI такой плагин всё равно перечисляет как
+   * установленный, поэтому о пропаже говорит панель — иначе «включённый» плагин
+   * без файлов выглядит рабочим.
+   */
+  installPathMissing: boolean().optional(),
 });
 
 export type Plugin = Infer<typeof pluginSchema>;
@@ -40,6 +46,11 @@ export const pluginsStateSchema = object({
   installed: array(pluginSchema),
   available: array(pluginSchema),
   marketplaces: array(marketplaceSchema),
+  /**
+   * Почему список может быть неполным: CLI не ответил или не найден. Пустой
+   * список без причины читался бы как «плагинов нет».
+   */
+  notes: array(string()),
 });
 
 export type PluginsState = Infer<typeof pluginsStateSchema>;

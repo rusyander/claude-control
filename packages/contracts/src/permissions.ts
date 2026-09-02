@@ -1,4 +1,4 @@
-import { object, string, array, enum as zodEnum, type infer as Infer } from 'zod';
+import { object, string, array, boolean, enum as zodEnum, type infer as Infer } from 'zod';
 import { settingsSourceSchema } from './settings-source';
 
 /** Решение по инструменту. Приоритет в Claude Code: deny > ask > allow. */
@@ -18,6 +18,13 @@ export const permissionRuleSchema = object({
   groupIds: array(string()),
   /** Из какого файла настроек прочитано право; локальные — только на чтение. */
   source: settingsSourceSchema,
+  /**
+   * Выключенного права в файле нет — Claude Code применял бы его. Оно хранится
+   * отметкой в состоянии панели (ручной или групповой) и подмешивается в список
+   * с `false`: иначе право, погашенное группой, просто исчезало бы со своей
+   * страницы, и вернуть его было бы нечем.
+   */
+  isEnabled: boolean(),
 });
 
 export type PermissionRule = Infer<typeof permissionRuleSchema>;

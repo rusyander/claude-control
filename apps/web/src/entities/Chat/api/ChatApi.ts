@@ -78,7 +78,13 @@ export function useChatMessages(chatId: string | undefined, limit = CHAT_PAGE_SI
       return data;
     },
     enabled: Boolean(chatId),
-    placeholderData: keepPreviousData,
+    // Прежнее окно держим, только пока разговор ТОТ ЖЕ. Ушли в новый черновик —
+    // `chatId` пуст, и лента обязана опустеть: иначе поверх чистого черновика
+    // висят сообщения прошлого разговора и «Новый чат» выглядит несработавшим.
+    // Прежнее окно держим, только пока разговор ТОТ ЖЕ. Ушли в новый черновик —
+    // `chatId` пуст, и лента обязана опустеть: иначе поверх чистого черновика
+    // висят сообщения прошлого разговора и «Новый чат» выглядит несработавшим.
+    placeholderData: chatId ? keepPreviousData : undefined,
   });
 }
 

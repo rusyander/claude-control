@@ -26,8 +26,15 @@ import styles from './ChatMessages.module.scss';
  * Ответ фиксируется МГНОВЕННО, не дожидаясь сервера: агент отвечает десятками
  * секунд, и всё это время карточка обязана выглядеть отправленной, иначе
  * человек честно решит, что клик не прошёл, и нажмёт ещё раз.
+ *
+ * ОТВЕЧАТЬ МОЖНО И ПОКА АГЕНТ РАБОТАЕТ. Раньше варианты гасились на время
+ * прогона — и это ломало ровно тот случай, ради которого карточка существует:
+ * `AskUserQuestion` в пакетном режиме возвращается ошибкой сразу, то есть
+ * вопрос задан ПОСРЕДИ хода и агент продолжает работать. Человек видел «нужен
+ * ваш выбор», по которому нельзя щёлкнуть. Занятость меняет теперь не
+ * доступность, а подпись: ответ уйдёт по концу хода (`busy`).
  */
-export function QuestionCard({ questions, onPick, disabled }: QuestionCardProps) {
+export function QuestionCard({ questions, onPick, busy }: QuestionCardProps) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState<PickedAnswers>({});
   // Подтверждённые множественные выборы: галочка ставится не одним щелчком, и
@@ -37,6 +44,10 @@ export function QuestionCard({ questions, onPick, disabled }: QuestionCardProps)
   // ответ у него уже есть.
   const [editing, setEditing] = useState<number | undefined>(undefined);
   const [isSent, setSent] = useState(false);
+  // Каким ответ ушёл: сразу или в очередь занятого агента. Считаем в момент
+  // клика — к перерисовке ход мог уже кончиться, и подпись соврала бы задним
+  // числом о том, что человек видел.
+  const [isQueued, setQueued] = useState(false);
   // Тот же признак, но доступный СРАЗУ. Двойной щелчок по варианту успевает
   // между событием и перерисовкой, и состояние во втором обработчике было бы
   // ещё прежним — а ответ ушёл бы дважды, то есть двумя ходами агента.
@@ -45,7 +56,7 @@ export function QuestionCard({ questions, onPick, disabled }: QuestionCardProps)
   const pending = nextQuestion(questions, picked, confirmed);
   const current = editing ?? pending;
   const isReadOnly = !onPick;
-  const isLocked = isSent || Boolean(disabled) || isReadOnly;
+  const isLocked = isSent || isReadOnly;
 
   const send = (answers: PickedAnswers): void => {
     const text = composeAnswer(questions, answers);
@@ -54,6 +65,7 @@ export function QuestionCard({ questions, onPick, disabled }: QuestionCardProps)
     // в стор синхронно, и второй клик по соседнему варианту не должен успеть.
     wasSent.current = true;
     setSent(true);
+    setQueued(Boolean(busy));
     setEditing(undefined);
     onPick(text);
   };
@@ -240,12 +252,7 @@ export function QuestionCard({ questions, onPick, disabled }: QuestionCardProps)
         до, а не после отправки.
       */}
       {!isReadOnly && !isSent && isComplete && questions.length > 1 && (
-        <Button
-          variant="primary"
-          className={styles.questionSubmit}
-          disabled={Boolean(disabled)}
-          onClick={() => send(picked)}
-        >
+        <Button variant="primary" className={styles.questionSubmit} onClick={() => send(picked)}>
           {t('chat.questionSubmit')}
         </Button>
       )}
@@ -259,7 +266,7 @@ export function QuestionCard({ questions, onPick, disabled }: QuestionCardProps)
         >
           <span className={styles.questionSpinner} />
           <Typography as="span" variant="body-sm" color="muted">
-            {t('chat.questionSentNote')}
+            {t(isQueued ? 'chat.questionQueuedNote' : 'chat.questionSentNote')}
           </Typography>
         </Stack>
       )}

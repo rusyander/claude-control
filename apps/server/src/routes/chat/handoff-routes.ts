@@ -246,7 +246,7 @@ export function registerChatHandoffRoutes(
       if (!created) return false;
       // У чужого CLI инициатива — первая реплика переписки, а не флаг запуска:
       // без неё продолжение вело бы себя не так, как обычный чат того же CLI.
-      const initiative = initiativePrompt(ctx.store.getSettings());
+      const initiative = initiativePrompt(ctx.store.getSettings(), { foreign: true });
       const outcome = deps.providerChats.send(
         appData,
         provider.id,

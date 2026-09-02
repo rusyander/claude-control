@@ -59,10 +59,11 @@ Fix without asking: project code, deps, build config, launch env. Ask first: fil
 the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
 QA runs live in `tools/qa/` and need `pnpm dev` up + `pnpm qa:setup`; each drives the real UI of one
-area. Six behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
-`check-project-code.mjs`, `check-task-split.mjs`, `check-handoff.mjs` stub their API and
-`check-worktrees.mjs` builds its own git repository in temp, so they depend on no particular history,
-on no installed CLI, and leave neither branches nor copies behind.
+area. Eight behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
+`check-project-code.mjs`, `check-task-split.mjs`, `check-handoff.mjs`, `check-parent-hub.mjs`,
+`check-new-chat.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
+so they depend on no particular history, on no installed CLI, and leave neither branches nor copies
+behind.
 
 ## Symptom → cause → fix
 
@@ -102,10 +103,38 @@ polling `/chat/active` (`pages/Chat/model/useRunLifecycle.ts`), not by one shot 
 `node tools/qa/check-live-sync.mjs`: it fires a run straight into the API, like the phone does, and
 never reloads the page.
 
+**"New chat" seems not to fire — the previous conversation stays on screen** — the click DID work:
+title, list selection and the URL all change. What does not change is the only thing the human looks
+at, the thread. `useChatMessages` (`entities/Chat/api/ChatApi.ts`) keeps the previous window through
+`placeholderData: keepPreviousData` — right while `limit` grows for "load more", wrong the moment the
+conversation is dropped for a draft and `chatId` empties, because react-query then serves the old
+query's data under the new key. Keep it conditional on `chatId`. Guard: `node
+tools/qa/check-new-chat.mjs`, both the project tab and the home one.
+
 **A group switched itself on and nobody touched the toggle** — by design. A group bound to project
 paths is ENABLED when a run starts in one of them (`domains/group-activation.ts`, called from
 `routes/chat/run-routes.ts`), a parallel copy `<repo>-worktrees/<branch>` included. It never disables
 anything, so nothing the user turned on is taken away; drop the path on the Groups page to stop it.
+
+**The agent answers something adjacent, or an initiative "never fires" (Windows)** — check what the
+CLI actually received before touching prompts. Text with quotes in argv is destroyed by
+`cmd.exe` → `claude.cmd` → `claude.exe`: `--append-system-prompt` was truncated and a fragment became
+a POSITIONAL argument, i.e. the prompt (`"контекст\n<what the human sent>"`, every message). Long text
+goes through a file (`--append-system-prompt-file`, `ChatRunner.run`), never argv; a fake `.cmd` over
+node parses it fine, so only a REAL run proves it. Detail + probe: `.claude/gotchas.md` §Sessions.
+
+**Task tabs all turn red; the agent inside a copy offers to "fix longpaths and restore"** — Windows
+260-char limit. Copies live at `<repo>-worktrees/<branch>/…`, longer than the original, and git
+without long paths reports real files as ` D` (`could not open directory … Filename too long`) — an
+agent's `git add -A` there would commit those deletions. The panel writes `core.longpaths` into the
+repository's own config on `worktree add` (`domains/project-git/worktrees.ts → ensureLongPaths`;
+`--local`, because a bare `--get` answers `true` through the panel's own `-c`). Machine-wide is the
+user's: `git config --global core.longpaths true` plus `git worktree prune`; `pnpm doctor` checks
+that key AND `LongPathsEnabled` in the registry. Reproduce end-to-end with
+`.agent/tmp/live-longpaths.mjs` — it neutralises the global config via `GIT_CONFIG_GLOBAL`, because
+on a machine where either switch is already on the failure cannot be shown at all. **Capture stderr
+when probing this**: git emits the warning and still exits 0, so a stdout-only check reads as "no
+problem".
 
 **A parallel working copy refuses to be removed (409)** — an agent is running inside it. That is why
 `routes/project-git-routes.ts` takes the run registry as its third argument, and the check holds for

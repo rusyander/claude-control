@@ -158,6 +158,12 @@ function matchesRule(pattern: string, toolName: string, input: unknown): boolean
 export function shouldAutoApprove(request: AutoApproveInput): boolean {
   const { toolName, input, guardedPatterns, allowEdits } = request;
 
+  // Вопрос человеку не подтверждается автоматически НИКОГДА. «Разрешить» здесь
+  // значит «пусть CLI спросит сам», а в режиме `-p` спрашивать ему не у кого:
+  // вызов вернётся ошибкой, и развилку агент решит за человека — молча. Тумблер
+  // автоподтверждения про инструменты, а не про право выбирать вместо него.
+  if (toolName === 'AskUserQuestion') return false;
+
   // Правки файлов при выключенном тумблере правок — только руками.
   if (!allowEdits && EDIT_TOOLS.has(toolName)) return false;
 

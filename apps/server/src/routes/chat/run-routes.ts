@@ -214,7 +214,9 @@ export function registerChatRunRoutes(
       allowEdits: workspace.isSandbox || allowEdits === true || fullAccess === true,
     });
 
-    const initiative = initiativePrompt(ctx.store.getSettings());
+    const initiative = initiativePrompt(ctx.store.getSettings(), {
+      splitMuted: registry.isSplitMuted(chatId),
+    });
 
     // Запускаем прогон в реестре и подключаемся к нему потоком. Обрыв этого
     // соединения агента не тронет.
@@ -240,7 +242,9 @@ export function registerChatRunRoutes(
         // продолжить» у агента, вставшего из-за отсутствия разрешения.
         permissionMode: fullAccess ? 'bypassPermissions' : permissionModeFor(workspace, allowEdits),
         // Интерактивные права: запрос на инструмент вне авторазрешённого уходит
-        // человеку кнопкой в чате (при полном доступе ChatRun это пропустит).
+        // человеку кнопкой в чате. При полном доступе прав не спрашивают, но
+        // брокер всё равно подключается — через него же приезжает ВОПРОС агента
+        // с вариантами, и без брокера отвечать на него было бы нечем.
         permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl },
       },
       // Каталог проекта — для группировки статусов и восстановления после F5;

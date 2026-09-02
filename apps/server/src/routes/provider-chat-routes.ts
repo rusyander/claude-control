@@ -144,8 +144,9 @@ export function registerProviderChatRoutes(
 
       const provider = getActiveProvider(ctx.store);
       // Инициативы панели — у чужого CLI это первая реплика переписки, а не
-      // флаг: системного промпта у них нет.
-      const initiative = initiativePrompt(ctx.store.getSettings());
+      // флаг: системного промпта у них нет. Правило про AskUserQuestion сюда не
+      // идёт: такого инструмента у чужого CLI нет вовсе.
+      const initiative = initiativePrompt(ctx.store.getSettings(), { foreign: true });
       const outcome = chats.send(
         appData(),
         providerId,

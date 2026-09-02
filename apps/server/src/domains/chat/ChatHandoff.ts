@@ -33,8 +33,12 @@ import {
 
 /** Состояние одной цепочки продолжений. */
 interface ChainState {
-  /** Продолжать автоматически, без кнопки. Ставится человеком в разговоре. */
-  auto: boolean;
+  /**
+   * Продолжать автоматически, без кнопки. Ставится человеком в разговоре.
+   * Не задан — разговор идёт за глобальной настройкой: иначе первое же касание
+   * цепочки по любому другому поводу молча заморозило бы её на «выключено».
+   */
+  auto?: boolean;
   /** Какой это шаг: исходный разговор — 0, первое продолжение — 1. */
   depth: number;
   /** Последнее касание — по нему выбрасываются самые старые записи. */
@@ -71,6 +75,19 @@ const MAX_CHAINS = 200;
  */
 export class HandoffChains {
   private states = new Map<string, ChainState>();
+  private autoByDefault: () => boolean;
+
+  /**
+   * Значение тумблера для разговора, в котором его не трогали, — настройка
+   * «продолжать во всех разговорах». Читается на каждый вопрос, а не при старте:
+   * настройку меняют при живом сервере, и запомненное число врало бы до
+   * перезапуска. Тумблер конкретного разговора всегда сильнее: выключенный
+   * руками остаётся выключенным, что бы ни стояло глобально.
+   */
+  constructor(autoByDefault: () => boolean = () => false) {
+    // Node в режиме strip-only не поддерживает parameter properties.
+    this.autoByDefault = autoByDefault;
+  }
 
   /** Включить или выключить автопродолжение для разговора (по всем ключам). */
   setAuto(aliases: string[], auto: boolean): void {
@@ -81,7 +98,7 @@ export class HandoffChains {
   }
 
   isAuto(aliases: string[]): boolean {
-    return this.stateOf(aliases)?.auto === true;
+    return this.stateOf(aliases)?.auto ?? this.autoByDefault();
   }
 
   depth(aliases: string[]): number {
@@ -97,7 +114,11 @@ export class HandoffChains {
   link(fromAliases: string[], toChatId: string): number {
     const parent = this.stateOf(fromAliases);
     const depth = (parent?.depth ?? 0) + 1;
-    this.write([toChatId], { auto: parent?.auto === true, depth, touchedAt: Date.now() });
+    this.write([toChatId], {
+      ...(parent?.auto === undefined ? {} : { auto: parent.auto }),
+      depth,
+      touchedAt: Date.now(),
+    });
     return depth;
   }
 
@@ -107,7 +128,7 @@ export class HandoffChains {
    * отмечает, потому что второго вызова с тем же смыслом в потоке нет.
    */
   shouldNoticeContext(aliases: string[], tokens: number): boolean {
-    const state = this.stateOf(aliases) ?? { auto: false, depth: 0, touchedAt: Date.now() };
+    const state = this.stateOf(aliases) ?? { depth: 0, touchedAt: Date.now() };
     const previous = state.noticedContext;
     if (previous !== undefined && tokens < previous + NOTICE_STEP) return false;
     state.noticedContext = tokens;

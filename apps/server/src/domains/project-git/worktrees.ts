@@ -222,10 +222,48 @@ export async function addWorktree(
     await undoFailedAdd(projectDir, target, existed ? undefined : value);
     throw explainAddFailure(error, target);
   }
+  await ensureLongPaths(projectDir);
   return {
     path: resolve(target),
     output: out.trim() || `Копия ${target} готова на ветке ${value}`,
   };
+}
+
+/**
+ * Разрешить длинные пути САМОМУ репозиторию, а не только своим вызовам.
+ *
+ * Панель кладёт `-c core.longpaths=true` в каждый свой запуск git, и копия
+ * выкладывается целиком. Но в копии дальше работает АГЕНТ, и его `git status`,
+ * `git add`, `git checkout` — это чужие процессы с обычным конфигом. Для них
+ * файл длиннее 260 символов не существует: git отвечает «could not open
+ * directory … Filename too long» и показывает эти файлы УДАЛЁННЫМИ, хотя они
+ * лежат на диске. Дальше агент честно видит грязное дерево, а `git add -A` в
+ * такой копии записал бы удаление настоящих файлов — то есть потерю.
+ *
+ * Поэтому при заведении копии включаем ключ в конфиге репозитория. Конфиг общий
+ * у всех копий (у рабочего дерева своего нет), значит одной записи хватает на
+ * все шесть. Ключ безобидный и обратимый, а без него параллельные копии на
+ * Windows просто нерабочие. Уже стоит — не трогаем; не Windows — не нужен.
+ */
+async function ensureLongPaths(projectDir: string): Promise<void> {
+  if (process.platform !== 'win32') return;
+  try {
+    // Именно `--local`: свои вызовы панель запускает с `-c core.longpaths=true`,
+    // и обычный `--get` вернул бы этот самый ключ запуска. Проверка тогда всегда
+    // говорит «уже стоит», в конфиг не пишется ничего, и агент внутри копии
+    // остаётся ровно с той же бедой. Поймано тестом, а не рассуждением.
+    const current = await git(projectDir, ['config', '--local', '--get', 'core.longpaths']);
+    if (current.trim() === 'true') return;
+  } catch {
+    // Ключа нет — `git config --get` выходит с ненулевым кодом. Это и значит
+    // «надо поставить», а не «сломалось».
+  }
+  try {
+    await git(projectDir, ['config', '--local', 'core.longpaths', 'true']);
+  } catch {
+    // Не смогли записать (конфиг только на чтение) — копия всё равно выложена
+    // целиком, а человеку об этом скажет первый же отказ git внутри неё.
+  }
 }
 
 /**

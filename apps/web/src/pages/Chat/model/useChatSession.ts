@@ -17,6 +17,7 @@ import type { ProjectInfo } from '@entities/Project';
 import { useClearRunnerAutostart } from '@entities/ProjectRunner';
 import { useForgetProjectCodeView } from '@entities/ProjectFile';
 import { draftKeyFor } from '../lib/draftKey';
+import { visibleChats } from '../lib/visibleChats';
 
 export interface ChatSessionInput {
   /** Все разговоры из истории Claude Code — по ним находится «повзрослевший» чат. */
@@ -83,9 +84,15 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
   const isRunning = run.status === 'running';
   const refresh = useRefreshChat(chatId);
 
+  // Каталог разговора важнее каталога вкладки, а не наоборот. Разделение задач
+  // заводит детей в КОПИЯХ репозитория, но показывает их деревом в той же
+  // вкладке, где человек согласился делить, — и прогон, пульт git и окно кода
+  // обязаны смотреть в каталог ОТКРЫТОГО ЧАТА, иначе ответ ребёнку ушёл бы
+  // работать в родительскую копию. Черновик проекта чата не имеет — тогда
+  // каталог даёт вкладка.
   const projectPath =
-    ws.activeProject?.path ??
-    (activeChat && !activeChat.isSandbox ? activeChat.projectPath : undefined);
+    (activeChat && !activeChat.isSandbox ? activeChat.projectPath : undefined) ??
+    ws.activeProject?.path;
   const isProjectContext = Boolean(projectPath);
 
   // Черновик поля ввода: у каждого разговора/проекта/домашнего чата — свой
@@ -265,6 +272,16 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
   // в проекте — открываем таб (эффект смены таба подхватит pendingViewRef и
   // покажет прогон); если уже в этом табе — показываем сразу.
   const viewRun = (activeRun: ViewTarget): void => {
+    // Ребёнок разделения работает в копии репозитория, но показан деревом в
+    // ЭТОЙ вкладке: открывать ради него отдельный проект — значит вернуть ряд
+    // одинаковых вкладок, от которого ушли. Видно здесь — открываем здесь, и
+    // каталог берётся из самого разговора.
+    const child = chats?.find((chat) => chat.id === activeRun.id && chat.parentId);
+    if (child && visibleChats(chats ?? [], ws.activeProject?.id).some((c) => c.id === child.id)) {
+      openChat(child);
+      return;
+    }
+
     if (activeRun.projectPath) {
       const id = normalizeProjectPath(activeRun.projectPath);
       if (ws.activeProject?.id === id) {

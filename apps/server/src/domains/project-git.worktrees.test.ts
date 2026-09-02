@@ -9,6 +9,7 @@ import {
   listWorktrees,
   parseWorktrees,
   removeWorktree,
+  stripGitProgress,
   worktreeDirFor,
   worktreeDirName,
 } from './project-git.ts';
@@ -110,6 +111,53 @@ describe('worktreeDirName: имя ветки → имя каталога', () =>
 
   it('имя, от которого ничего не осталось, не даёт каталога без названия', () => {
     expect(worktreeDirName('///')).toBe('wt');
+  });
+
+  /**
+   * Windows считает 260 символов на весь путь, и длинное имя ветки — та часть,
+   * которую панель выбирает сама. Проверяем и потолок, и то, что укорачивание
+   * не сводит разные ветки в один каталог: иначе второй агент пришёл бы работать
+   * в копию первого.
+   */
+  it('длинное имя укорачивается, но остаётся своим у каждой ветки', () => {
+    const long = 'task/e-inst-admin-ui-polzovateli-huki-plaginy-komandy';
+    const other = 'task/e-inst-admin-ui-polzovateli-huki-plaginy-komandy-2';
+
+    expect(long.length).toBeGreaterThan(40);
+    expect(worktreeDirName(long).length).toBeLessThanOrEqual(40);
+    expect(worktreeDirName(other).length).toBeLessThanOrEqual(40);
+    expect(worktreeDirName(long)).not.toBe(worktreeDirName(other));
+    // Укорачивание детерминировано: тот же путь и после перезапуска панели.
+    expect(worktreeDirName(long)).toBe(worktreeDirName(long));
+    // Начало имени остаётся читаемым — каталог должен узнаваться глазами.
+    expect(worktreeDirName(long).startsWith('task-e-inst-admin-ui')).toBe(true);
+  });
+
+  it('короткое имя не трогается вовсе', () => {
+    expect(worktreeDirName('task/d-inst-admin-ui-modeli-2')).toBe('task-d-inst-admin-ui-modeli-2');
+  });
+});
+
+describe('stripGitProgress: в отказе видно причину, а не полосу прогресса', () => {
+  it('строки прогресса выкидываются, сообщение об ошибке остаётся', () => {
+    const raw = [
+      "Preparing worktree (new branch 'task/d-inst-admin-ui-modeli-2')",
+      'Updating files:  20% (1614/7829)\rUpdating files:  33% (2584/7829)',
+      'Receiving objects:  50% (10/20)',
+      "warning: unable to access 'inst-admin-ui/src/features/…/.gitattributes': Filename too long",
+      "fatal: cannot create directory at 'inst-admin-ui/src/features/…/ui': Filename too long",
+    ].join('\n');
+
+    const clean = stripGitProgress(raw);
+
+    expect(clean).not.toMatch(/Updating files/);
+    expect(clean).not.toMatch(/Receiving objects/);
+    expect(clean).toMatch(/Preparing worktree/);
+    expect(clean).toMatch(/Filename too long/);
+  });
+
+  it('обычный вывод без прогресса не портится', () => {
+    expect(stripGitProgress('fatal: not a git repository')).toBe('fatal: not a git repository');
   });
 });
 

@@ -40,7 +40,7 @@
  */
 
 export { CHANGED_FILES_MAX, COMMIT_MESSAGE_MAX } from './project-git/constants.ts';
-export { GitError } from './project-git/exec.ts';
+export { GitError, stripGitProgress } from './project-git/exec.ts';
 export {
   parseBranches,
   parseRemoteBranches,

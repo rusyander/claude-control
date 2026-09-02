@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 /**
  * Кэш установленных плагинов. Список отдаёт CLI — запуск процесса, который в
@@ -69,5 +72,80 @@ describe('readInstalledPluginsCached', () => {
 
     forgetInstalledPlugins();
     expect(await readInstalledPluginsCached('claude', 1_100)).toHaveLength(1);
+  });
+});
+
+/**
+ * Чего `plugin list` не говорит: описание (лежит в манифесте по пути установки),
+ * пропавший каталог (CLI перечисляет плагин как ни в чём не бывало) и причина,
+ * по которой списка нет вовсе. Маркетплейс из папки подписывался словом
+ * «directory» — видом источника вместо адреса.
+ */
+describe('readPlugins: чего CLI не говорит', () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-plugins-'));
+    runClaude.mockReset();
+    forgetInstalledPlugins();
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('описание — из манифеста установленного плагина; пропавший каталог помечен', async () => {
+    const present = join(root, 'cache', 'm', 'a', '1.0.0');
+    mkdirSync(join(present, '.claude-plugin'), { recursive: true });
+    writeFileSync(
+      join(present, '.claude-plugin', 'plugin.json'),
+      JSON.stringify({ name: 'a', description: 'Из манифеста' }),
+    );
+    runClaude.mockResolvedValue({
+      stdout: JSON.stringify([
+        { id: 'a@m', enabled: true, installPath: present },
+        { id: 'b@m', enabled: true, installPath: join(root, 'cache', 'm', 'b', 'gone') },
+      ]),
+      stderr: '',
+    });
+
+    const { installed, notes } = await readPlugins(root, 'claude');
+
+    expect(installed[0]).toMatchObject({ id: 'a@m', description: 'Из манифеста' });
+    expect(installed[0]?.installPathMissing).toBeUndefined();
+    expect(installed[1]).toMatchObject({ id: 'b@m', installPathMissing: true });
+    expect(notes).toEqual([]);
+  });
+
+  it('отказ CLI — пустой список и причина, а не молчаливый ноль', async () => {
+    runClaude.mockRejectedValue(
+      Object.assign(new Error('Command failed'), { stderr: "'claude' is not recognized\n" }),
+    );
+
+    const { installed, notes } = await readPlugins(root, 'claude');
+
+    expect(installed).toEqual([]);
+    expect(notes).toEqual([expect.stringContaining("'claude' is not recognized")]);
+  });
+
+  it('источник маркетплейса: путь у папки, owner/repo у GitHub, URL у git', async () => {
+    runClaude.mockResolvedValue({ stdout: '[]', stderr: '' });
+    mkdirSync(join(root, 'plugins'), { recursive: true });
+    writeFileSync(
+      join(root, 'plugins', 'known_marketplaces.json'),
+      JSON.stringify({
+        dir: { source: { source: 'directory', path: 'C:\\market' }, installLocation: 'C:\\market' },
+        gh: { source: { source: 'github', repo: 'owner/repo' } },
+        url: { source: { source: 'git', url: 'https://example.com/m.git' } },
+      }),
+    );
+
+    const { marketplaces } = await readPlugins(root, 'claude');
+
+    expect(marketplaces.map((m) => [m.name, m.source])).toEqual([
+      ['dir', 'C:\\market'],
+      ['gh', 'owner/repo'],
+      ['url', 'https://example.com/m.git'],
+    ]);
   });
 });

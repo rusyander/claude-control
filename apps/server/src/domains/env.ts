@@ -1,4 +1,5 @@
-import type { EnvVar, EnvVarDraft } from '@claude-control/contracts';
+import type { EnvVar, EnvVarDraft, Group } from '@claude-control/contracts';
+import { ENV_KEY_PATTERN, isSecretEnvKey } from '@claude-control/contracts/env-secret';
 import { readTextFile, writeTextFile, readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
 
 /**
@@ -8,8 +9,72 @@ import { readTextFile, writeTextFile, readJsonFile, writeJsonFile } from '../lib
  * комментарии, потому что в них записано, где брать каждый токен.
  */
 
-/** По имени ключа решаем, прятать ли значение за маской. */
-const SECRET_HINT = /(TOKEN|SECRET|KEY|PASSWORD|PAT|CREDENTIAL)/i;
+/** Черновик не годится для записи; причина — человеку, маршрут отвечает 400. */
+export class InvalidEnvDraftError extends Error {}
+/** Переменной с таким ключом в этом файле нет; маршрут отвечает 404. */
+export class EnvVarNotFoundError extends Error {}
+/** В файле-приёмнике уже лежит переменная с таким ключом; маршрут отвечает 409. */
+export class EnvVarExistsError extends Error {}
+
+type WritableSource = 'settings' | 'settings-local' | 'secrets';
+
+const FILE_NAMES: Record<WritableSource, string> = {
+  settings: 'settings.json',
+  'settings-local': 'settings.local.json',
+  secrets: '.mcp-secrets.env',
+};
+
+const BAD_KEY_MESSAGE =
+  'Имя переменной — латинские буквы, цифры и подчёркивание, не с цифры: MY_TOKEN, а не «my token».';
+const BAD_SOURCE_MESSAGE =
+  'Куда сохранить: settings, settings-local или secrets. Переменные групп правятся на странице групп.';
+
+function isWritableSource(source: unknown): source is WritableSource {
+  return source === 'settings' || source === 'settings-local' || source === 'secrets';
+}
+
+/**
+ * Проверка черновика ДО записи. Пока её не было, маршрут писал всё, что пришло:
+ * ключ с пробелом ломал строку `KEY=value`, перевод строки в ключе или в
+ * значении секрета дописывал в .mcp-secrets.env ЧУЖУЮ строку (`A=1\nEVIL=2` —
+ * вторая становилась переменной), а source `group` или вовсе отсутствующий
+ * получал «ok», хотя ничего не сохранялось. В JSON-файлах перевод строки в
+ * значении допустим — JSON его экранирует; в env-файле строка и есть запись.
+ */
+export function assertEnvDraft(draft: unknown): asserts draft is EnvVarDraft {
+  if (!draft || typeof draft !== 'object') {
+    throw new InvalidEnvDraftError('Тело запроса пустое: нужны key, value и source.');
+  }
+  const { key, value, source, comment } = draft as Record<string, unknown>;
+  if (typeof key !== 'string' || !ENV_KEY_PATTERN.test(key)) {
+    throw new InvalidEnvDraftError(BAD_KEY_MESSAGE);
+  }
+  if (typeof value !== 'string') throw new InvalidEnvDraftError('Значение переменной — строка.');
+  if (!isWritableSource(source)) throw new InvalidEnvDraftError(BAD_SOURCE_MESSAGE);
+  if (source === 'secrets' && /[\r\n]/.test(value)) {
+    throw new InvalidEnvDraftError(
+      'Значение для .mcp-secrets.env — одна строка: перевод строки стал бы отдельной переменной.',
+    );
+  }
+  if (comment !== undefined && typeof comment !== 'string') {
+    throw new InvalidEnvDraftError('Комментарий — строка.');
+  }
+}
+
+/**
+ * Ключ и источник из строки запроса (чтение, удаление, перенос). Мягче, чем у
+ * черновика: имя, записанное в файл руками не по правилу, всё равно должно
+ * удаляться отсюда — иначе испорченная строка застряла бы в файле навсегда.
+ */
+function assertEnvRef(key: unknown, source: unknown): asserts source is WritableSource {
+  if (typeof key !== 'string' || key.trim() === '' || /[\r\n=]/.test(key)) {
+    throw new InvalidEnvDraftError(BAD_KEY_MESSAGE);
+  }
+  if (!isWritableSource(source)) throw new InvalidEnvDraftError(BAD_SOURCE_MESSAGE);
+}
+
+const notFound = (key: string, source: WritableSource): EnvVarNotFoundError =>
+  new EnvVarNotFoundError(`Переменной ${key} нет в ${FILE_NAMES[source]}.`);
 
 interface RawSettings {
   env?: Record<string, string>;
@@ -31,31 +96,85 @@ export function readEnvVars(
   return [...fromSettings, ...fromLocal, ...parseEnvFile(readTextFile(secretsPath))];
 }
 
+/**
+ * Переменные, которые задаёт ВКЛЮЧЁННАЯ группа, лежат в settings.json как обычные,
+ * но хозяин у них — группа: панель снимает и возвращает их вместе с ней. В списке
+ * они помечаются source `group` + groupId (контракт держал этот источник, но никто
+ * его не выдавал): страница показывает имя группы и не даёт править и удалять —
+ * удалённую здесь группа вернула бы при следующем включении. Записи из
+ * settings.local.json и файла секретов не трогаем; выключенная группа не в счёт —
+ * её ключи в файле уже пользовательские. Две группы с одним ключом: хозяин — первая
+ * по порядку применения.
+ */
+export function markGroupEnv(vars: EnvVar[], groups: Group[]): EnvVar[] {
+  const owners = new Map<string, string>();
+  for (const group of [...groups].sort((a, b) => a.order - b.order)) {
+    if (!group.isEnabled) continue;
+    for (const key of Object.keys(group.env)) if (!owners.has(key)) owners.set(key, group.id);
+  }
+  if (owners.size === 0) return vars;
+  return vars.map((item): EnvVar => {
+    const groupId = item.source === 'settings' ? owners.get(item.key) : undefined;
+    if (groupId === undefined) return item;
+    return { ...item, id: `group:${item.key}`, source: 'group', groupId };
+  });
+}
+
+/**
+ * Значения переменных ОТКРЫТЫМ текстом из всех трёх файлов — для подстановки
+ * ссылок ${VAR} в записи MCP-сервера при проверке связи (mcp-client.ts).
+ * Порядок наложения: settings.json, поверх него settings.local.json, поверх —
+ * файл секретов. В ответы API это не попадает.
+ */
+export function readEnvLookup(
+  settingsPath: string,
+  secretsPath: string,
+  settingsLocalPath?: string,
+): Record<string, string> {
+  const fromJson = (path?: string): Record<string, string> =>
+    path ? (readJsonFile<RawSettings>(path, {}).env ?? {}) : {};
+  const secrets = Object.fromEntries(
+    parseEnvFile(readTextFile(secretsPath), false).map((item) => [item.key, item.value]),
+  );
+
+  return { ...fromJson(settingsPath), ...fromJson(settingsLocalPath), ...secrets };
+}
+
 function readSettingsEnv(path: string, source: EnvVar['source']): EnvVar[] {
   const settings = readJsonFile<RawSettings>(path, {});
   return Object.entries(settings.env ?? {}).map(([key, value]) => toEnvVar(key, value, source));
 }
 
-/** Полное значение — отдельным запросом, по явному действию пользователя. */
+/**
+ * Полное значение — отдельным запросом, по явному действию пользователя.
+ * Нет такой переменной — EnvVarNotFoundError: маршрут, возвращавший здесь
+ * `undefined`, не отвечал вовсе (Fastify ждёт тело), и запрос висел до таймаута.
+ */
 export function revealEnvValue(
   settingsPath: string,
   secretsPath: string,
   key: string,
-  source: EnvVar['source'],
+  source: string | undefined,
   settingsLocalPath?: string,
-): string | undefined {
-  if (source === 'settings') {
-    return readJsonFile<RawSettings>(settingsPath, {}).env?.[key];
-  }
-  // Локальную переменную показать можно — это чтение; запись в этот файл
-  // закрыта, а прятать значение, которое лежит открытым текстом рядом,
-  // смысла нет.
-  if (source === 'settings-local') {
-    return settingsLocalPath
+): string {
+  // Переменная группы (source `group`, см. markGroupEnv) физически лежит в
+  // settings.json — показ читает оттуда; править и удалять её отсюда нельзя.
+  const file = source === 'group' ? 'settings' : source;
+  assertEnvRef(key, file);
+  let value: string | undefined;
+  if (file === 'settings') {
+    value = readJsonFile<RawSettings>(settingsPath, {}).env?.[key];
+  } else if (file === 'settings-local') {
+    // Локальную переменную показать можно — это чтение; прятать значение,
+    // которое лежит открытым текстом рядом, смысла нет.
+    value = settingsLocalPath
       ? readJsonFile<RawSettings>(settingsLocalPath, {}).env?.[key]
       : undefined;
+  } else {
+    value = parseEnvFile(readTextFile(secretsPath), false).find((item) => item.key === key)?.value;
   }
-  return parseEnvFile(readTextFile(secretsPath), false).find((item) => item.key === key)?.value;
+  if (value === undefined) throw notFound(key, file);
+  return value;
 }
 
 /** Имена переменных, уже лежащих в settings.json → env. */
@@ -94,6 +213,8 @@ export function saveEnvVar(
   backupDir?: string,
   settingsLocalPath?: string,
 ): string | undefined {
+  assertEnvDraft(draft);
+
   if (draft.source === 'settings-local') {
     if (!settingsLocalPath) throw new Error('Не задан путь к settings.local.json');
 
@@ -108,45 +229,43 @@ export function saveEnvVar(
     return writeJsonFile(settingsPath, settings, { backupDir });
   }
 
-  if (draft.source === 'secrets') {
-    return upsertEnvFileLine(secretsPath, draft.key, draft.value, draft.comment, backupDir);
-  }
-
-  // source === 'group' — служебный: env групп применяется маршрутами групп
-  // (applyGroupEnv), а не через /api/env. Прямая запись сюда — ошибка вызова;
-  // молча свалить переменную в .mcp-secrets.env (ветка секретов по умолчанию)
-  // нельзя, поэтому ничего не пишем.
-  return undefined;
+  // source === 'secrets' (assertEnvDraft отсёк всё прочее; env групп применяют
+  // маршруты групп через applyGroupEnv, а не /api/env).
+  return upsertEnvFileLine(secretsPath, draft.key, draft.value, draft.comment, backupDir);
 }
 
+/**
+ * Удаление. Ключа нет — EnvVarNotFoundError, а не «ok»: раньше маршрут отвечал
+ * успехом и ПЕРЕПИСЫВАЛ файл (с копией в backups) даже для чужого имени, и
+ * интерфейс не мог отличить удалённое от никогда не существовавшего.
+ */
 export function deleteEnvVar(
   settingsPath: string,
   secretsPath: string,
   key: string,
-  source: EnvVar['source'],
+  source: string | undefined,
   backupDir?: string,
   settingsLocalPath?: string,
 ): string | undefined {
+  assertEnvRef(key, source);
+
   if (source === 'settings-local') {
     if (!settingsLocalPath) throw new Error('Не задан путь к settings.local.json');
 
     const local = readJsonFile<RawSettings>(settingsLocalPath, {});
-    delete local.env?.[key];
+    if (local.env?.[key] === undefined) throw notFound(key, source);
+    delete local.env[key];
     return writeJsonFile(settingsLocalPath, local, { backupDir });
   }
 
   if (source === 'settings') {
     const settings = readJsonFile<RawSettings>(settingsPath, {});
-    delete settings.env?.[key];
+    if (settings.env?.[key] === undefined) throw notFound(key, source);
+    delete settings.env[key];
     return writeJsonFile(settingsPath, settings, { backupDir });
   }
 
-  if (source === 'secrets') {
-    return deleteSecretLine(secretsPath, key, backupDir);
-  }
-
-  // source === 'group' — служебный, см. saveEnvVar: не наша забота.
-  return undefined;
+  return deleteSecretLine(secretsPath, key, backupDir);
 }
 
 /**
@@ -161,28 +280,37 @@ export function moveEnvVar(
   settingsPath: string,
   secretsPath: string,
   key: string,
-  source: EnvVar['source'],
+  source: string | undefined,
   backupDir?: string,
   settingsLocalPath?: string,
 ): string | undefined {
   if (source !== 'settings' && source !== 'settings-local') {
-    throw new Error(
-      'Переносить между файлами настроек можно только переменные settings.json / settings.local.json',
+    throw new InvalidEnvDraftError(
+      'Переносить между файлами настроек можно только переменные settings.json / settings.local.json.',
     );
   }
+  assertEnvRef(key, source);
   if (!settingsLocalPath) throw new Error('Не задан путь к settings.local.json');
 
   const sourcePath = source === 'settings-local' ? settingsLocalPath : settingsPath;
-  const targetSource: EnvVar['source'] =
-    source === 'settings-local' ? 'settings' : 'settings-local';
+  const targetSource: WritableSource = source === 'settings-local' ? 'settings' : 'settings-local';
+  const targetPath = source === 'settings-local' ? settingsPath : settingsLocalPath;
 
   const value = readJsonFile<RawSettings>(sourcePath, {}).env?.[key];
-  if (value === undefined) return undefined; // переносить нечего
+  if (value === undefined) throw notFound(key, source);
+
+  // В приёмнике уже есть такой ключ — не затирать: значения разные по смыслу
+  // (общее и личное), и молчаливая перезапись уносила бы одно из них без следа.
+  if (readJsonFile<RawSettings>(targetPath, {}).env?.[key] !== undefined) {
+    throw new EnvVarExistsError(
+      `В ${FILE_NAMES[targetSource]} уже есть ${key} — сначала удалите или переименуйте её там.`,
+    );
+  }
 
   saveEnvVar(
     settingsPath,
     secretsPath,
-    { key, value, source: targetSource, isSecret: SECRET_HINT.test(key) },
+    { key, value, source: targetSource, isSecret: isSecretEnvKey(key) },
     backupDir,
     settingsLocalPath,
   );
@@ -198,7 +326,7 @@ export function moveEnvVar(
 function deleteSecretLine(path: string, key: string, backupDir?: string): string | undefined {
   const lines = readTextFile(path).split(/\r?\n/);
   const index = lines.findIndex((line) => startsWithKey(line, key));
-  if (index === -1) return writeTextFile(path, lines.join('\n'), { backupDir });
+  if (index === -1) throw notFound(key, 'secrets');
 
   // Забираем и непрерывный блок комментариев прямо над переменной (до пустой
   // строки или не-комментария) — ровно то, что parseEnvFile привязал к ней.
@@ -248,7 +376,7 @@ function toEnvVar(
   comment?: string,
   mask = true,
 ): EnvVar {
-  const isSecret = SECRET_HINT.test(key);
+  const isSecret = isSecretEnvKey(key);
   return {
     id: `${source}:${key}`,
     key,

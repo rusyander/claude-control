@@ -120,6 +120,14 @@ export function searchEntities(inputs: SearchInputs, query: string): SearchResul
     }
   }
 
+  // Группы панели: имя и описание. Файлов Claude Code у группы нет, но раздел
+  // есть, и «поиск по всем разделам» без него врал бы.
+  for (const group of inputs.groups) {
+    if (matchesAny([group.name, group.description], needle)) {
+      push('group', group.id, group.name, buildSnippet([group.description, group.name], needle));
+    }
+  }
+
   // Разделы активного провайдера (не Claude): те же виды результатов и те же
   // страницы — страницы сами роутятся по провайдеру, поэтому ссылки рабочие.
   const provider = inputs.provider;

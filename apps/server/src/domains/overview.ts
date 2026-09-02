@@ -38,7 +38,8 @@ export function buildOverview(paths: ClaudePaths, store: AppStore): Overview {
     skills: { total: skills.length, enabled: skills.filter((item) => item.isEnabled).length },
     scripts: {
       total: scripts.length,
-      unused: scripts.filter((item) => !item.isUsed).length,
+      // Тесты и фикстуры к хукам не привязывают по замыслу — они не «забытые».
+      unused: scripts.filter((item) => !item.isUsed && !item.isTest).length,
     },
     mcp: {
       total: servers.length,

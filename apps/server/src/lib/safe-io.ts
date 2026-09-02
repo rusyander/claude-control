@@ -21,6 +21,7 @@ export {
   MAX_BACKUP_KEEP,
   backupEntry,
   clampBackupKeep,
+  projectBackupName,
   providerBackupName,
   providerProjectBackupName,
   setBackupKeep,

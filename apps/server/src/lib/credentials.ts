@@ -8,6 +8,9 @@ import {
   chmodSync,
   openSync,
   closeSync,
+  statSync,
+  accessSync,
+  constants,
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -207,8 +210,18 @@ export function validatePanelCredentials(raw: string): { ok: true } | { ok: fals
   }
 
   if (parsed.readFrom) {
-    if (!existsSync(parsed.readFrom)) {
-      return { ok: false, error: `Файл не найден: ${parsed.readFrom}` };
+    if (typeof parsed.readFrom !== 'string' || !existsSync(parsed.readFrom)) {
+      return { ok: false, error: `Файл не найден: ${String(parsed.readFrom)}` };
+    }
+    // Каталог проходил как «существует», сохранялся и тут же читался как «не
+    // найден»: проверяем, что это файл и что его можно прочитать, — до записи.
+    try {
+      if (!statSync(parsed.readFrom).isFile()) {
+        return { ok: false, error: `Это каталог, а не файл: ${parsed.readFrom}` };
+      }
+      accessSync(parsed.readFrom, constants.R_OK);
+    } catch {
+      return { ok: false, error: `Файл не читается: ${parsed.readFrom}` };
     }
     return { ok: true };
   }

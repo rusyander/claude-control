@@ -58,7 +58,7 @@ export function buildHistory(backupDir: string, targets: TrackedFile[]): History
 
     snapshots.forEach((snapshot, index) => {
       const base = resolveBase(snapshots, index, target.path);
-      const { added, removed } = diffSnapshot(snapshot, base);
+      const { added, removed, skipped, reason } = diffSnapshot(snapshot, base);
       entries.push({
         name: snapshot.name,
         // Показываем basename файла, а не имя копии: префикс провайдера — деталь
@@ -68,6 +68,9 @@ export function buildHistory(backupDir: string, targets: TrackedFile[]): History
         at: snapshot.at,
         added,
         removed,
+        // Пропуск диффа (бинарный / слишком большой) едет в ленту: нули у такой
+        // записи — не «без изменений», и шапка должна назвать причину.
+        ...(skipped ? { skipped, reason } : {}),
         canRevert: target.canRevert,
         providerId: target.providerId,
         providerName: target.providerName,

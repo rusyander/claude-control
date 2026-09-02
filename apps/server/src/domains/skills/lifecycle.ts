@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { backupEntry, copyRecursive, removeEntry } from '../../lib/safe-io.ts';
 import type { AppStore } from '../../lib/app-store.ts';
-import { disabledSkillsDir, SKILLS_DISABLED_DIR } from './paths.ts';
+import { assertSkillId, disabledSkillsDir, SKILLS_DISABLED_DIR } from './paths.ts';
 
 /**
  * Судьба папки скилла: включение, переименование, удаление. Содержимое
@@ -11,6 +11,7 @@ import { disabledSkillsDir, SKILLS_DISABLED_DIR } from './paths.ts';
 
 /** Включение и выключение — перенос папки между skills/ и skills-disabled/. */
 export function setSkillEnabled(skillsDir: string, skillId: string, isEnabled: boolean): void {
+  assertSkillId(skillId);
   const disabledDir = disabledSkillsDir(skillsDir);
   const from = isEnabled ? join(disabledDir, skillId) : join(skillsDir, skillId);
   const to = isEnabled ? join(skillsDir, skillId) : join(disabledDir, skillId);
@@ -54,10 +55,12 @@ export function renameSkill(
   store: AppStore,
   backupDir?: string,
 ): string | undefined {
+  assertSkillId(oldId);
   const newId = newIdRaw.trim();
 
   // Имя станет именем папки: пустое, со слэшами или «..» перепишет чужую папку
   // или выведет за пределы skills/ — отвергаем до любых файловых операций.
+  // Ошибка своя, а не `InvalidSkillIdError`: текст уходит человеку в форму.
   if (!newId || /[/\\]/.test(newId) || newId === '.' || newId === '..' || newId.includes('\0')) {
     throw skillError('invalid_name', 'Недопустимое имя скилла.');
   }
@@ -111,6 +114,7 @@ export function deleteSkill(
   skillId: string,
   backupDir?: string,
 ): string | undefined {
+  assertSkillId(skillId);
   let backupPath: string | undefined;
 
   for (const dir of [

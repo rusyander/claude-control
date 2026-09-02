@@ -15,19 +15,22 @@ export function findProject(state: AppState, id: string): Project | undefined {
   return state.projects.find((project) => project.id === id);
 }
 
+/** Запись реестра по каталогу — регистр и слэши не различаются, как у `addProject`. */
+export function findProjectByPath(state: AppState, path: string): Project | undefined {
+  const wanted = normalizeProjectPath(path);
+  return state.projects.find((item) => normalizeProjectPath(item.path) === wanted);
+}
+
 /**
  * Добавить проект в реестр. Один и тот же каталог не заводим дважды: если он
- * уже запомнен, возвращаем существующую запись (и обновляем имя, если задано),
- * а не плодим дубликаты с разными id.
+ * уже запомнен, возвращаем существующую запись как есть, а не плодим дубликаты
+ * с разными id. Имя при этом НЕ переписывается: «создать» не должно молча
+ * переименовывать — маршрут отвечает на повтор 409, а этот путь остаётся для
+ * вызовов внутри сервера (активация групп по пути).
  */
 export function addProject(state: AppState, project: Project): Project {
-  const existing = state.projects.find(
-    (item) => normalizeProjectPath(item.path) === normalizeProjectPath(project.path),
-  );
-  if (existing) {
-    existing.name = project.name;
-    return existing;
-  }
+  const existing = findProjectByPath(state, project.path);
+  if (existing) return existing;
 
   state.projects.push(project);
   return project;

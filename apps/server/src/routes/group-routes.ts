@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type {
   Automation,
   Group,
@@ -24,6 +24,15 @@ import {
 } from '../domains/group-scenario.ts';
 import { activateGroupsForCwd } from '../domains/group-activation.ts';
 import { wouldCreateCycle } from '../domains/group-graph.ts';
+import { AUTOMATION_MARKER } from '../domains/compiled-markers.ts';
+import {
+  assertGroupDraft,
+  assertGroupNameFree,
+  AutomationNotFoundError,
+  GroupExistsError,
+  GroupNotFoundError,
+  InvalidGroupDraftError,
+} from '../domains/group-draft.ts';
 
 /**
  * Что доменные функции переключения берут от контекста. Собираем на каждом
@@ -32,6 +41,30 @@ import { wouldCreateCycle } from '../domains/group-graph.ts';
  */
 function toggleDeps(ctx: ServerContext): EntityToggleDeps {
   return { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir };
+}
+
+/**
+ * Ошибка домена → статус с причиной, как у MCP: черновик не по форме — 400
+ * (раньше участник без id или `env` строкой уезжали в state.json как есть, а
+ * страница падала на `paths.map`); группы нет — 404, а не молчаливое создание
+ * по PUT и не «ok» на DELETE; имя занято — 409: по имени группу находят и
+ * удаляют, двух одинаковых карточек быть не должно.
+ */
+function fail(reply: FastifyReply, error: unknown): FastifyReply {
+  if (
+    error instanceof InvalidGroupDraftError ||
+    error instanceof GroupNotFoundError ||
+    error instanceof GroupExistsError ||
+    error instanceof AutomationNotFoundError
+  ) {
+    return reply.code(error.statusCode).send({ error: error.code, message: error.message });
+  }
+  throw error;
+}
+
+/** Следующий порядковый номер: за наибольшим, а не «сколько групп» — после удалений это не одно и то же. */
+function nextOrder(groups: readonly Group[]): number {
+  return groups.reduce((max, group) => Math.max(max, group.order), -1) + 1;
 }
 
 /**
@@ -50,8 +83,8 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
    * запись без необязательного поля доходила до интерфейса неполной, и
    * страница групп падала на `Object.keys(undefined)`.
    */
-  const withDefaults = (body: Partial<Group>): Omit<Group, 'id' | 'order'> => ({
-    name: body.name ?? '',
+  const withDefaults = (body: GroupDraft): Omit<Group, 'id' | 'order'> => ({
+    name: body.name,
     description: body.description ?? '',
     color: body.color ?? 'accent',
     icon: body.icon ?? 'folder',
@@ -92,78 +125,87 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     return saved;
   };
 
-  app.post<{ Body: GroupDraft }>('/api/groups', (request, reply) => {
-    // Тело нормализуем один раз: Fastify отдаёт `undefined` на запрос без тела и
-    // `null` на литерал `null`, а `withDefaults` ниже читает поля напрямую —
-    // без этого пустой запрос падал бы пятисоткой вместо пустой группы.
-    const body = request.body ?? ({} as GroupDraft);
-    // Набор без имени человеку не опознать: в списке он безымянная строка,
-    // выключить которую можно только угадав. Оборванный запрос должен получить
-    // отказ, а не завести призрака в настоящем конфиге.
-    if (!body.name?.trim()) return reply.code(400).send({ error: 'Не указано имя набора' });
+  app.post<{ Body: unknown }>('/api/groups', (request, reply) => {
+    try {
+      // Fastify отдаёт `undefined` на запрос без тела и `null` на литерал `null`;
+      // оба — «нет описания», и отказ на них должен быть 400, а не пятисоткой.
+      const body: unknown = request.body ?? {};
+      assertGroupDraft(body);
+      const groups = ctx.store.getGroups();
+      assertGroupNameFree(groups, body.name);
 
-    const id = randomUUID();
-    // Вложенная группа может замкнуть цикл (A→B→A) — тогда обход состава не
-    // завершился бы. Отвергаем ещё до сохранения, а не чиним на обходе.
-    if (wouldCreateCycle(ctx.store.getGroups(), id, body.members ?? [])) {
-      return reply.code(400).send({ error: 'Вложение групп образует цикл' });
+      const id = randomUUID();
+      // Вложенная группа может замкнуть цикл (A→B→A) — тогда обход состава не
+      // завершился бы. Отвергаем ещё до сохранения, а не чиним на обходе.
+      if (wouldCreateCycle(groups, id, body.members ?? [])) {
+        return reply.code(400).send({ error: 'Вложение групп образует цикл' });
+      }
+      const invalid = triggerError(body.scenario);
+      if (invalid) return reply.code(400).send({ error: invalid });
+
+      const saved = persist({ ...withDefaults(body), id, order: nextOrder(groups) }, []);
+      // Переменные включённой группы применяются сразу при создании. Раньше POST
+      // их не трогал: карточка показывала «env: 1», а в settings.json ключа не
+      // было до первого выключения-включения — и PUT с тем же env его не
+      // приносил (набор не изменился).
+      if (saved.isEnabled) applyGroupEnvState(toggleDeps(ctx), saved, true);
+      return saved;
+    } catch (error) {
+      return fail(reply, error);
     }
-    const invalid = triggerError(body.scenario);
-    if (invalid) return reply.code(400).send({ error: invalid });
-
-    const group: Group = {
-      ...withDefaults(body),
-      id,
-      order: ctx.store.getGroups().length,
-    };
-    return persist(group, []);
   });
 
-  app.put<{ Params: { id: string }; Body: Group }>('/api/groups/:id', (request, reply) => {
-    // Причина та же, что и у создания: запрос без тела — это 400 по существу
-    // («править нечем»), а не поломка сервера.
-    const body = request.body ?? ({} as Group);
-    // Имя обязательно и здесь: PUT по неизвестному id ЗАВОДИТ набор, поэтому
-    // без проверки оборванный запрос создавал безымянного — ровно как POST.
-    if (!body.name?.trim()) return reply.code(400).send({ error: 'Не указано имя набора' });
+  app.put<{ Params: { id: string }; Body: unknown }>('/api/groups/:id', (request, reply) => {
+    try {
+      const body: unknown = request.body ?? {};
+      assertGroupDraft(body);
+      const groups = ctx.store.getGroups();
+      const existing = groups.find((item) => item.id === request.params.id);
+      if (!existing) throw new GroupNotFoundError(request.params.id);
+      assertGroupNameFree(groups, body.name, existing.id);
 
-    // Группа не может входить сама в себя ни напрямую, ни через цепочку вложенных
-    // — иначе включение/выключение зациклилось бы по ветке.
-    if (wouldCreateCycle(ctx.store.getGroups(), request.params.id, body.members ?? [])) {
-      return reply.code(400).send({ error: 'Вложение групп образует цикл' });
+      // Группа не может входить сама в себя ни напрямую, ни через цепочку вложенных
+      // — иначе включение/выключение зациклилось бы по ветке.
+      if (wouldCreateCycle(groups, existing.id, body.members ?? [])) {
+        return reply.code(400).send({ error: 'Вложение групп образует цикл' });
+      }
+      const invalid = triggerError(body.scenario);
+      if (invalid) return reply.code(400).send({ error: invalid });
+
+      // Скомпилированный скилл держится за группой, а не за телом запроса:
+      // клиент про его id не знает, и без этого каждая правка заводила бы новый.
+      const scenario = normalizeScenario(body.scenario ?? undefined, existing.scenario);
+      // Клиент шлёт GroupDraft без поля order: берём прежний, иначе правка любой
+      // группы перекидывала бы её в начало списка.
+      const { order } = body as { order?: unknown };
+
+      const saved = persist(
+        {
+          ...withDefaults(body),
+          scenario,
+          id: existing.id,
+          order: typeof order === 'number' ? order : existing.order,
+          // Состояние группы правкой не меняется: включает и выключает только
+          // POST /:id/enabled — он же двигает участников. Флаг из тела (форма
+          // шлёт сохранённый, телефон и скрипты — что угодно) раньше переключал
+          // одну лишь группу: карточка читалась «включено», а её скилл оставался
+          // в skills-disabled.
+          isEnabled: existing.isEnabled,
+        },
+        existing.members,
+      );
+      // Правка переменных у включённой группы применяется сразу: снимаем прежние
+      // свои ключи и накладываем заново — но только когда набор реально
+      // изменился. Правка без изменения env (переименование, смена цвета) не
+      // должна зря переписывать settings.json.
+      if (saved.isEnabled && !sameEnv(existing.env, saved.env)) {
+        applyGroupEnvState(toggleDeps(ctx), saved, false);
+        applyGroupEnvState(toggleDeps(ctx), saved, true);
+      }
+      return saved;
+    } catch (error) {
+      return fail(reply, error);
     }
-    const invalid = triggerError(body.scenario);
-    if (invalid) return reply.code(400).send({ error: invalid });
-
-    // Клиент шлёт GroupDraft без поля order, поэтому при правке порядок нельзя
-    // сбрасывать в 0 (иначе редактирование любой группы перекидывало бы её в
-    // начало списка и сталкивало по order с уже существующей нулевой). Берём
-    // прежний order группы, если тело его не прислало.
-    const existing = ctx.store.getGroups().find((item) => item.id === request.params.id);
-    // Скомпилированный скилл держится за группой, а не за телом запроса:
-    // клиент про его id не знает, и без этого каждая правка заводила бы новый.
-    const scenario = normalizeScenario(body.scenario, existing?.scenario);
-
-    const saved = persist(
-      {
-        ...withDefaults(body),
-        scenario,
-        id: request.params.id,
-        order: body.order ?? existing?.order ?? 0,
-      },
-      existing?.members ?? [],
-    );
-    // Правка переменных у включённой группы применяется сразу: снимаем прежние
-    // свои ключи и накладываем заново. Но переприменяем только когда есть за чем:
-    // набор env реально изменился ЛИБО группу этим же PUT включили (её ключи
-    // были сняты при выключении и их надо вернуть). Правка без изменения env
-    // (переименование, смена цвета) не должна зря переписывать settings.json.
-    const envChanged = !sameEnv(existing?.env, saved.env);
-    if (saved.isEnabled && (envChanged || !existing?.isEnabled)) {
-      applyGroupEnvState(toggleDeps(ctx), saved, false);
-      applyGroupEnvState(toggleDeps(ctx), saved, true);
-    }
-    return saved;
   });
 
   app.post<{ Params: { id: string }; Body: { isEnabled: boolean } }>(
@@ -203,19 +245,20 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     activateGroupsForCwd(toggleDeps(ctx), request.body?.path ?? ''),
   );
 
-  app.delete<{ Params: { id: string } }>('/api/groups/:id', (request) => {
-    // Группа уходит — её отметки должны уйти вместе с ней, иначе участники
-    // остались бы погашенными навсегда, без видимой причины.
+  app.delete<{ Params: { id: string } }>('/api/groups/:id', (request, reply) => {
     const group = ctx.store.getGroups().find((item) => item.id === request.params.id);
+    if (!group) return fail(reply, new GroupNotFoundError(request.params.id));
     const deps = toggleDeps(ctx);
 
-    if (group && !group.isEnabled) releaseGroupMembers(deps, group);
+    // Группа уходит — её отметки должны уйти вместе с ней, иначе участники
+    // остались бы погашенными навсегда, без видимой причины.
+    if (!group.isEnabled) releaseGroupMembers(deps, group);
 
     // Снимаем переменные окружения, которые держала эта группа (кроме общих с
     // другими). Работает и для включённой группы: её ключи не должны пережить её.
-    if (group) applyGroupEnvState(deps, group, false);
+    applyGroupEnvState(deps, group, false);
 
-    ctx.store.deleteGroup(request.params.id);
+    ctx.store.deleteGroup(group.id);
     // Скилл сценария остаётся на диске: это обычный скилл, и удалять чужую
     // работу вместе с группой панель не вправе. А вот триггер уходит — он
     // ссылался на группу, которой больше нет.
@@ -237,6 +280,9 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     return undefined;
   };
 
+  const hasAutomation = (id: string): boolean =>
+    ctx.store.getAutomations().some((item) => item.id === id);
+
   app.post<{ Body: Partial<Omit<Automation, 'id'>> }>('/api/automations', (request, reply) => {
     const invalid = automationError(request.body);
     if (invalid) return reply.code(400).send({ error: invalid });
@@ -253,8 +299,14 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
   app.put<{ Params: { id: string }; Body: Partial<Automation> }>(
     '/api/automations/:id',
     (request, reply) => {
+      // Сначала тело (400), потом адресат (404) — тот же порядок, что у PUT группы:
+      // пустой запрос получает один ответ независимо от того, есть ли такой id.
+      // Правка неизвестного сценария — 404, а не создание под чужим id.
       const invalid = automationError(request.body);
       if (invalid) return reply.code(400).send({ error: invalid });
+      if (!hasAutomation(request.params.id)) {
+        return fail(reply, new AutomationNotFoundError(request.params.id));
+      }
 
       const automation = ctx.store.saveAutomation({
         ...(request.body as Automation),
@@ -265,7 +317,10 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     },
   );
 
-  app.delete<{ Params: { id: string } }>('/api/automations/:id', (request) => {
+  app.delete<{ Params: { id: string } }>('/api/automations/:id', (request, reply) => {
+    if (!hasAutomation(request.params.id)) {
+      return fail(reply, new AutomationNotFoundError(request.params.id));
+    }
     ctx.store.deleteAutomation(request.params.id);
     compileAutomations(ctx);
     return { ok: true };
@@ -306,11 +361,11 @@ function triggerError(scenario?: Partial<GroupScenario>): string | undefined {
  * скомпилированные записи помечены маркером в команде, поэтому их можно
  * отличить от хуков, написанных руками, и пересобрать, не задев чужое.
  */
-const MARKER = '# claude-control:automation';
-
 function compileAutomations(ctx: ServerContext): void {
   const { settings } = ctx.location.paths;
-  const manual = readHooks(settings, ctx.store).filter((hook) => !hook.command.includes(MARKER));
+  const manual = readHooks(settings, ctx.store).filter(
+    (hook) => !hook.command.includes(AUTOMATION_MARKER),
+  );
 
   const compiled = ctx.store
     .getAutomations()
@@ -319,7 +374,7 @@ function compileAutomations(ctx: ServerContext): void {
       id: `automation:${automation.id}`,
       event: automation.trigger.event as HookEvent,
       matcher: automation.trigger.matcher,
-      command: `${automation.action.command} ${MARKER}:${automation.id}`,
+      command: `${automation.action.command} ${AUTOMATION_MARKER}:${automation.id}`,
       timeout: automation.action.timeout,
       isEnabled: true,
       groupIds: automation.groupIds,

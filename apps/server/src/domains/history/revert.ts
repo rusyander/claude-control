@@ -31,7 +31,7 @@ export function revertHunk(
   backupTargetDir?: string,
 ): RevertHunkResult {
   if (basename(name) !== name || !BACKUP_NAME.test(name)) {
-    return { ok: false, error: 'Копия не найдена' };
+    return { ok: false, notFound: true, error: 'Копия не найдена' };
   }
 
   const byFile = collectSnapshots(backupDir, targets);
@@ -40,7 +40,7 @@ export function revertHunk(
     if (!snapshot) continue;
 
     const target = targets.find((item) => item.backupBase === file);
-    if (!target) return { ok: false, error: 'Копия не найдена' };
+    if (!target) return { ok: false, notFound: true, error: 'Копия не найдена' };
     if (!target.canRevert) {
       return {
         ok: false,
@@ -74,5 +74,5 @@ export function revertHunk(
     return { ok: true, restoredTo: currentPath, backupPath };
   }
 
-  return { ok: false, error: 'Копия не найдена' };
+  return { ok: false, notFound: true, error: 'Копия не найдена' };
 }

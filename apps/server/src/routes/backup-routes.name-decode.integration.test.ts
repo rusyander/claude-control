@@ -76,6 +76,16 @@ describe('backup-routes: имя копии с процентом', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  it('откат неизвестной копии — 404, как у удаления, а не 400', async () => {
+    const missing = encodeURIComponent('settings.json.2026-01-01T00-00-00-000Z.bak');
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/backups/${missing}/restore`,
+      payload: {},
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
   it('откат находит копию и возвращает содержимое, а не падает с 500', async () => {
     const response = await app.inject({ method: 'POST', url: url('/restore'), payload: {} });
 

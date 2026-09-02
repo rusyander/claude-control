@@ -27,6 +27,7 @@ function makeCtx(root: string, provider: string): ServerContext {
       paths: {
         root,
         settings: join(root, 'settings.json'),
+        settingsLocal: join(root, 'settings.local.json'),
         hooks: join(root, 'hooks'),
         appData: join(root, 'claude-control'),
       },
@@ -179,5 +180,55 @@ describe('роуты скриптов: работают при любом акт
     expect(saved.json<{ error: string }>().error).toBe('unsafe_path');
     expect(existsSync(join(root, 'hooks', 'evil.mjs'))).toBe(false);
     expect(existsSync(join(root, 'evil.mjs'))).toBe(false);
+  });
+
+  /**
+   * Аудит страницы 2026-09-02. POST — только новый файл: заготовка «Брифинг при
+   * старте» называется как настоящий session-brief.mjs и молча затирала его.
+   */
+  it('POST с существующим именем — 409 script_exists, файл не тронут', async () => {
+    await bootWith('claude');
+    writeFileSync(join(root, 'hooks', 'session-brief.mjs'), 'настоящий', 'utf8');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/scripts',
+      payload: { name: 'session-brief.mjs', content: 'заготовка' },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ error: 'script_exists' });
+    expect(readFileSync(join(root, 'hooks', 'session-brief.mjs'), 'utf8')).toBe('настоящий');
+  });
+
+  it('имя без расширения скрипта или с двоеточием — 400, в папке ничего не появилось', async () => {
+    await bootWith('claude');
+    for (const name of ['noext', '.mjs', 'bad:name.mjs']) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/scripts',
+        payload: { name, content: 'x' },
+      });
+      expect(res.statusCode, name).toBe(400);
+      expect(res.json(), name).toMatchObject({ error: 'unsafe_path' });
+    }
+    expect(existsSync(join(root, 'hooks', 'noext'))).toBe(false);
+    expect(existsSync(join(root, 'hooks', 'bad'))).toBe(false);
+  });
+
+  it('скрипт, привязанный только хуком из settings.local.json, — используется', async () => {
+    writeFileSync(
+      join(root, 'settings.local.json'),
+      JSON.stringify({
+        hooks: { Stop: [{ hooks: [{ type: 'command', command: 'node hooks/local-only.mjs' }] }] },
+      }),
+      'utf8',
+    );
+    await bootWith('claude');
+    writeFileSync(join(root, 'hooks', 'local-only.mjs'), '// local\n', 'utf8');
+
+    const rows = await app.inject({ method: 'GET', url: '/api/scripts' });
+    const row = rows.json<ScriptRow[]>().find((item) => item.id === 'local-only.mjs');
+    expect(row?.isUsed).toBe(true);
   });
 });

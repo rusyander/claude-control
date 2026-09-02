@@ -39,6 +39,21 @@ function unreadable(filePath: string): SideRead {
   };
 }
 
+/**
+ * Файла ещё нет — раздел у CLI поддержан, записей ноль, и колонка ГОВОРИТ об
+ * этом, а не стоит пустой. Раньше отсутствие файла (CLI не установлен или ничего
+ * не настроил) выглядело ровно как «настроено, но пусто». Сторона остаётся
+ * `supported`: перенос СЮДА возможен — запись создаст файл.
+ */
+function absent(filePath: string): SideRead {
+  return {
+    supported: true,
+    filePath,
+    note: 'Файла нет — CLI не установлен или ещё ничего не настроил. Перенос сюда создаст файл.',
+    rows: [],
+  };
+}
+
 export function mcpSide(providerId: string, deps: CompareDeps): SideRead {
   if (providerId === 'claude') {
     const servers = deps.claude.readMcp();
@@ -53,6 +68,7 @@ export function mcpSide(providerId: string, deps: CompareDeps): SideRead {
     providerSettingsSource(providerId, deps.claudeDirOverride),
   );
   if (!target) return unsupported('У этого CLI панель не ведёт MCP-серверы.');
+  if (!existsSync(target.filePath)) return absent(target.filePath);
 
   try {
     return {
@@ -113,6 +129,7 @@ export function envSide(providerId: string, deps: CompareDeps): SideRead {
   if (providerId === 'claude') {
     return {
       supported: true,
+      filePath: deps.claude.settingsPath,
       rows: deps.claude.readEnv().map((item) => ({
         key: item.key,
         // Значение приходит уже замаскированным, если это секрет, — маскировать
@@ -127,6 +144,7 @@ export function envSide(providerId: string, deps: CompareDeps): SideRead {
     providerSettingsSource(providerId, deps.claudeDirOverride),
   );
   if (!target) return unsupported('У этого CLI панель не ведёт переменные окружения.');
+  if (!existsSync(target.filePath)) return absent(target.filePath);
 
   try {
     return {
@@ -150,6 +168,7 @@ export function permissionsSide(providerId: string, deps: CompareDeps): SideRead
   if (providerId === 'claude') {
     return {
       supported: true,
+      filePath: deps.claude.settingsPath,
       rows: deps.claude.readPermissions().map((rule) => ({
         key: rule.pattern,
         display: rule.decision,
@@ -161,6 +180,7 @@ export function permissionsSide(providerId: string, deps: CompareDeps): SideRead
     providerSettingsSource(providerId, deps.claudeDirOverride),
   );
   if (!target) return unsupported('У этого CLI панель не ведёт права.');
+  if (!existsSync(target.filePath)) return absent(target.filePath);
 
   try {
     const values = readProviderPermissions(target) as unknown as Record<string, unknown>;
@@ -214,8 +234,14 @@ export function instructionsSide(providerId: string, deps: CompareDeps): SideRea
     return unsupported('У этого CLI глобальные инструкции устроены иначе — не одним файлом.');
   }
 
-  const exists = existsSync(target.filePath);
-  const content = exists ? readTextFile(target.filePath) : '';
+  // Файла нет — записей нет: строка появится только у стороны, где файл есть,
+  // как «только слева/справа», и перенос в пустую сторону остаётся доступным
+  // (запись создаст файл — ровно то, что обещает справка). Раньше отсутствие
+  // приёмника блокировало строку целиком: `blocked` считался на СТОРОНЕ, а
+  // применялся к записи без учёта направления — переносить CLAUDE.md в ещё не
+  // созданный AGENTS.md было нельзя, хотя сервер это умеет.
+  if (!existsSync(target.filePath)) return absent(target.filePath);
+  const content = readTextFile(target.filePath);
 
   return {
     supported: true,
@@ -223,13 +249,10 @@ export function instructionsSide(providerId: string, deps: CompareDeps): SideRea
     rows: [
       {
         key: INSTRUCTIONS_KEY,
-        display: exists
-          ? `${target.fileName} · ${sizeOf(content)}`
-          : `${target.fileName} · нет файла`,
+        display: `${target.fileName} · ${sizeOf(content)}`,
         // Сравниваем СОДЕРЖИМОЕ: имена файлов у CLI разные всегда, и разница имён
         // не новость. Интересно, одинаков ли текст.
         compare: content,
-        blocked: exists ? undefined : 'Файла нет — переносить нечего.',
       },
     ],
   };

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import type { Group } from '@claude-control/contracts';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
+import { readHooks } from '../domains/hooks.ts';
 import { registerGroupRoutes } from './group-routes.ts';
 
 /**
@@ -95,6 +96,17 @@ describe('маршруты групп: сценарий и привязка к �
     // Триггер — хук на запрос пользователя, со скриптом рядом со скиллом.
     expect(existsSync(join(skillDir('scenario-zadacha-iz-jira'), 'trigger.mjs'))).toBe(true);
     expect(JSON.stringify(readSettings().hooks)).toContain('claude-control:scenario');
+  });
+
+  it('скомпилированный триггер читается участником группы, как и скилл', async () => {
+    const group = (await createGroup(scenarioPayload)).json<Group>();
+
+    // Триггер в состав не входит — его принадлежность записана меткой в команде.
+    // Без этого на странице хуков он шёл без бейджа группы.
+    const trigger = readHooks(settingsPath(), store).find((hook) =>
+      hook.command.includes('claude-control:scenario'),
+    );
+    expect(trigger?.groupIds).toEqual([group.id]);
   });
 
   it('негодное выражение триггера отвергается до записи', async () => {

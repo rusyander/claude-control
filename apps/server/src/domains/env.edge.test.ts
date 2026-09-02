@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { saveEnvVar, deleteEnvVar, readEnvVars } from './env.ts';
+import { saveEnvVar, deleteEnvVar, readEnvVars, InvalidEnvDraftError } from './env.ts';
 
 /**
  * Краевые случаи переменных окружения, вскрытые аудитом: маршрутизация по
@@ -47,24 +47,30 @@ describe('env — краевые случаи', () => {
    * переменную в .mcp-secrets.env. Тест фиксирует ЖЕЛАЕМОЕ поведение.
    */
   it('source "group" не должен молча писаться в .mcp-secrets.env (BUG-6)', () => {
-    saveEnvVar(settingsPath, secretsPath, {
-      key: 'GRP',
-      value: 'v',
-      source: 'group',
-      isSecret: false,
-    });
+    // Аудит 2026-09-02: не «тихо ничего», а отказ — иначе маршрут отвечал ok
+    // на запись, которой не было.
+    expect(() =>
+      saveEnvVar(settingsPath, secretsPath, {
+        key: 'GRP',
+        value: 'v',
+        source: 'group',
+        isSecret: false,
+      }),
+    ).toThrow(InvalidEnvDraftError);
     expect(readFileSync(secretsPath, 'utf8')).not.toContain('GRP=');
   });
 
   it('source "group" не пишет ни в один из штатных файлов (BUG-6)', () => {
     const before = { settings: '{}', secrets: '' };
-    saveEnvVar(
-      settingsPath,
-      secretsPath,
-      { key: 'GRP', value: 'v', source: 'group', isSecret: false },
-      undefined,
-      localPath,
-    );
+    expect(() =>
+      saveEnvVar(
+        settingsPath,
+        secretsPath,
+        { key: 'GRP', value: 'v', source: 'group', isSecret: false },
+        undefined,
+        localPath,
+      ),
+    ).toThrow(InvalidEnvDraftError);
 
     // Ни secrets, ни settings, ни local не получили переменную группы.
     expect(readFileSync(secretsPath, 'utf8')).toBe(before.secrets);

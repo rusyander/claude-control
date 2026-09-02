@@ -16,4 +16,5 @@ export const PAGE_PATH: Record<SearchResultKind, string> = {
   // Раздел глобальных инструкций живёт на том же пути у всех провайдеров —
   // страница сама роутится по активному (CLAUDE.md / AGENTS.md / GEMINI.md).
   instructions: 'claude-md',
+  group: 'groups',
 };

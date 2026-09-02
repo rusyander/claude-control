@@ -61,11 +61,14 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     }
 
     const result = ctx.relocate(path);
-    if (result.isValid) ctx.store.updateSettings({ claudeDirOverride: path });
+    // Запоминаем там, откуда путь прочитает следующий запуск (хранилище
+    // каталога старта), а не в `ctx.store` — после переезда это уже хранилище
+    // НОВОГО каталога, и панель после перезапуска забывала ручной путь.
+    if (result.isValid) ctx.rememberDirOverride(path);
     return result;
   });
 
-  app.get('/api/settings', () => ctx.store.getSettings());
+  app.get('/api/settings', () => ctx.effectiveSettings());
 
   /**
    * Провайдеры конфигурации: активный id и список известных с картой статусов
@@ -133,10 +136,23 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       });
     }
 
-    const patch: Partial<AppSettings> = parsed.data;
-    const settings = ctx.store.updateSettings(patch);
+    const { claudeDirOverride, ...patch }: Partial<AppSettings> = parsed.data;
     // Смена каталога через настройки применяется сразу же, а не после перезапуска.
-    if (patch.claudeDirOverride !== undefined) ctx.relocate(patch.claudeDirOverride);
+    // Сначала переезд, потом память: отказанный путь не должен осесть в
+    // настройках (раньше PATCH с несуществующим каталогом отвечал 200, и
+    // настройки называли один каталог, а /api/location — другой). Пустая
+    // строка — возврат к автоопределению, ему отказа не бывает.
+    if (claudeDirOverride !== undefined) {
+      const result = ctx.relocate(claudeDirOverride);
+      if (claudeDirOverride && !result.isValid) {
+        return reply.code(400).send({
+          error: 'invalid_path',
+          message: result.problem ?? 'Каталог конфигурации не подходит.',
+        });
+      }
+      ctx.rememberDirOverride(claudeDirOverride);
+    }
+    const settings = ctx.store.updateSettings(patch);
     // Глубина ротации копий действует сразу для следующих записей.
     if (patch.backupKeep !== undefined) setBackupKeep(settings.backupKeep);
     // Режим шифрования копий секретов — тоже сразу. Парольную фразу этим не
@@ -145,7 +161,7 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     if (patch.encryptSecretBackups !== undefined) {
       setEncryptSecretBackups(settings.encryptSecretBackups);
     }
-    return settings;
+    return ctx.effectiveSettings();
   });
 
   // Перенос настроек панели (группы, сценарии, отметки, настройки) — снимок
@@ -193,11 +209,16 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     };
   });
 
-  app.post<{ Body: { value: string } }>('/api/credentials', (request, reply) => {
-    const check = validatePanelCredentials(request.body.value ?? '');
+  app.post<{ Body: { value?: unknown } }>('/api/credentials', (request, reply) => {
+    // Не строка (число, объект) роняла `.trim()` пятисоткой — это 400.
+    const value = request.body?.value;
+    if (typeof value !== 'string') {
+      return reply.code(400).send({ message: 'Пусто: вставьте JSON или ключ API.' });
+    }
+    const check = validatePanelCredentials(value);
     if (!check.ok) return reply.code(400).send({ message: check.error });
 
-    savePanelCredentials(request.body.value);
+    savePanelCredentials(value);
     const found = readClaudeCredentials(ctx.location.paths.root);
 
     return { source: found.source, reason: found.reason, hasManual: true };

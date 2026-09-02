@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Hook, HookDraft } from '@claude-control/contracts';
 import { AppStore } from '../lib/app-store.ts';
-import { readHooks, writeHooks, upsertHook, deleteHook } from './hooks.ts';
+import { readHooks, readHooksFromFiles, writeHooks, upsertHook, deleteHook } from './hooks.ts';
 
 /**
  * Полный state.json со свежими массивами — изолирует AppStore от процесс-глобального
@@ -191,6 +191,24 @@ describe('hooks', () => {
 
       expect(hook?.scriptPath).toBe('C:/nope/missing.mjs');
       expect(hook?.scriptExists).toBe(false);
+    });
+
+    it('относительный путь скрипта проекта проверяется от корня проекта, а не от cwd сервера', () => {
+      mkdirSync(join(dir, 'hooks-rel'), { recursive: true });
+      writeFileSync(join(dir, 'hooks-rel', 'guard.mjs'), '// guard\n');
+      writeSettings({
+        hooks: {
+          PreToolUse: [{ hooks: [{ type: 'command', command: 'node hooks-rel/guard.mjs' }] }],
+        },
+      });
+
+      const [withRoot] = readHooksFromFiles(settingsPath, undefined, dir);
+      expect(withRoot?.scriptPath).toBe('hooks-rel/guard.mjs');
+      expect(withRoot?.scriptExists).toBe(true);
+
+      // Без корня — прежнее поведение: от cwd процесса, где такого файла нет.
+      const [withoutRoot] = readHooksFromFiles(settingsPath);
+      expect(withoutRoot?.scriptExists).toBe(false);
     });
   });
 

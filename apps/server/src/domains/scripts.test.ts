@@ -6,9 +6,11 @@ import {
   readScripts,
   readScriptContent,
   saveScript,
+  createScript,
   deleteScript,
   UnsafeScriptPathError,
   ScriptNotFoundError,
+  ScriptExistsError,
 } from './scripts.ts';
 
 /**
@@ -147,6 +149,66 @@ describe('scripts', () => {
       const scripts = readScripts(hooksDir, ['C:/Users/me/.claude/hooks/predeploy.mjs']);
 
       expect(scripts.find((s) => s.id === 'deploy.mjs')?.isUsed).toBe(false);
+    });
+  });
+
+  describe('readScripts — импорты используемых скриптов', () => {
+    const hooked = ['C:/Users/me/.claude/hooks/dispatch.mjs'];
+
+    it('модуль, который импортирует привязанный скрипт, тоже используется', () => {
+      mkdirSync(join(hooksDir, 'lib'), { recursive: true });
+      writeFileSync(
+        join(hooksDir, 'dispatch.mjs'),
+        "import { run } from './lib/guard.mjs';\nrun();\n",
+      );
+      writeFileSync(join(hooksDir, 'lib', 'guard.mjs'), 'export const run = () => {};\n');
+      writeFileSync(join(hooksDir, 'lib', 'orphan.mjs'), 'export const x = 1;\n');
+
+      const byId = Object.fromEntries(readScripts(hooksDir, hooked).map((s) => [s.id, s]));
+
+      expect(byId['lib/guard.mjs']?.isUsed).toBe(true);
+      expect(byId['lib/orphan.mjs']?.isUsed).toBe(false);
+    });
+
+    it('идёт по цепочке импортов и понимает import()/require', () => {
+      mkdirSync(join(hooksDir, 'lib'), { recursive: true });
+      writeFileSync(join(hooksDir, 'dispatch.mjs'), "const m = await import('./lib/a.mjs');\n");
+      writeFileSync(join(hooksDir, 'lib', 'a.mjs'), "import './b.mjs';\n");
+      writeFileSync(join(hooksDir, 'lib', 'b.mjs'), "const c = require('../c.cjs');\n");
+      writeFileSync(join(hooksDir, 'c.cjs'), 'module.exports = {};\n');
+
+      const byId = Object.fromEntries(readScripts(hooksDir, hooked).map((s) => [s.id, s]));
+
+      expect(byId['lib/a.mjs']?.isUsed).toBe(true);
+      expect(byId['lib/b.mjs']?.isUsed).toBe(true);
+      expect(byId['c.cjs']?.isUsed).toBe(true);
+    });
+
+    it('импорт из НЕпривязанного файла (тест) модуль используемым не делает', () => {
+      mkdirSync(join(hooksDir, 'lib'), { recursive: true });
+      mkdirSync(join(hooksDir, 'tests'), { recursive: true });
+      writeFileSync(join(hooksDir, 'dispatch.mjs'), '// no imports\n');
+      writeFileSync(join(hooksDir, 'lib', 'helper.mjs'), 'export const h = 1;\n');
+      writeFileSync(join(hooksDir, 'tests', 'helper.test.mjs'), "import '../lib/helper.mjs';\n");
+
+      const byId = Object.fromEntries(readScripts(hooksDir, hooked).map((s) => [s.id, s]));
+
+      expect(byId['dispatch.mjs']?.isUsed).toBe(true);
+      expect(byId['lib/helper.mjs']?.isUsed).toBe(false);
+      expect(byId['tests/helper.test.mjs']?.isUsed).toBe(false);
+    });
+
+    it('пакеты и импорты за пределы каталога не ломают разбор', () => {
+      writeFileSync(
+        join(hooksDir, 'dispatch.mjs'),
+        "import fs from 'node:fs';\nimport x from 'some-package';\nimport y from '../../outside.mjs';\n",
+      );
+      writeFileSync(join(hooksDir, 'free.mjs'), '// free\n');
+
+      const byId = Object.fromEntries(readScripts(hooksDir, hooked).map((s) => [s.id, s]));
+
+      expect(byId['dispatch.mjs']?.isUsed).toBe(true);
+      expect(byId['free.mjs']?.isUsed).toBe(false);
     });
   });
 
@@ -315,6 +377,81 @@ describe('scripts', () => {
 
       expect(existsSync(join(hooksDir, 'nobackup.mjs'))).toBe(false);
       expect(backup).toBeUndefined();
+    });
+  });
+
+  /**
+   * Аудит страницы 2026-09-02. Имя, под которым файл не попадёт в список, или
+   * которое Windows не примет, раньше доходило до записи: «Сохранено» — и пустота
+   * в списке, либо 500 посреди rename и лишний файл в папке.
+   */
+  describe('resolveScriptPath — имена, которые нельзя принимать', () => {
+    it('без расширения скрипта и из одного расширения — 400, файла нет', () => {
+      expect(() => saveScript(hooksDir, 'sub/noext', 'x')).toThrow(UnsafeScriptPathError);
+      expect(() => saveScript(hooksDir, 'sub/.mjs', 'x')).toThrow(UnsafeScriptPathError);
+      expect(() => saveScript(hooksDir, 'notes.txt', 'x')).toThrow(UnsafeScriptPathError);
+      expect(existsSync(join(hooksDir, 'sub'))).toBe(false);
+    });
+
+    it('символы, запрещённые в Windows, — 400 на любой системе', () => {
+      for (const bad of ['bad:name.mjs', 'a<b.mjs', 'q?.mjs', 'pipe|x.sh']) {
+        expect(() => saveScript(hooksDir, bad, 'x')).toThrow(UnsafeScriptPathError);
+      }
+      expect(existsSync(join(hooksDir, 'bad'))).toBe(false);
+    });
+
+    it('.mts и .cts — скрипты: перечисляются и открываются', () => {
+      writeFileSync(join(hooksDir, 'mod.mts'), '// Модуль .mts\nexport {};\n');
+      writeFileSync(join(hooksDir, 'common.cts'), '// Модуль .cts\n');
+
+      const ids = readScripts(hooksDir, []).map((s) => s.id);
+      expect(ids).toEqual(['common.cts', 'mod.mts']);
+      expect(readScriptContent(hooksDir, 'mod.mts')).toContain('.mts');
+    });
+  });
+
+  describe('createScript — только новый файл', () => {
+    it('существующее имя — ScriptExistsError, содержимое не тронуто', () => {
+      writeFileSync(join(hooksDir, 'session-brief.mjs'), 'настоящий');
+
+      expect(() => createScript(hooksDir, 'session-brief.mjs', 'заготовка')).toThrow(
+        ScriptExistsError,
+      );
+      expect(readFileSync(join(hooksDir, 'session-brief.mjs'), 'utf8')).toBe('настоящий');
+    });
+
+    it('новое имя создаёт файл вместе с вложенными папками', () => {
+      createScript(hooksDir, 'new/dir/fresh.mjs', '// новый\n');
+      expect(readFileSync(join(hooksDir, 'new', 'dir', 'fresh.mjs'), 'utf8')).toBe('// новый\n');
+    });
+  });
+
+  describe('readScripts — тесты и описание', () => {
+    it('tests/ и *.test.* помечены isTest; остальные — нет', () => {
+      mkdirSync(join(hooksDir, 'tests'), { recursive: true });
+      mkdirSync(join(hooksDir, 'lib'), { recursive: true });
+      writeFileSync(join(hooksDir, 'tests', 'guard.test.mjs'), '');
+      writeFileSync(join(hooksDir, 'tests', 'all.mjs'), '');
+      writeFileSync(join(hooksDir, 'lib', 'x.spec.ts'), '');
+      writeFileSync(join(hooksDir, 'lib', 'x.ts'), '');
+      writeFileSync(join(hooksDir, 'guard.mjs'), '');
+
+      const byId = new Map(readScripts(hooksDir, []).map((s) => [s.id, s.isTest]));
+      expect(byId.get('tests/guard.test.mjs')).toBe(true);
+      expect(byId.get('tests/all.mjs')).toBe(true);
+      expect(byId.get('lib/x.spec.ts')).toBe(true);
+      expect(byId.get('lib/x.ts')).toBe(false);
+      expect(byId.get('guard.mjs')).toBe(false);
+    });
+
+    it('описание из блочного комментария — без хвоста « /»', () => {
+      writeFileSync(
+        join(hooksDir, 'doc.mjs'),
+        '#!/usr/bin/env node\n/**\n * Описание модуля.\n */\nexport {};\n',
+      );
+      expect(readScripts(hooksDir, []).find((s) => s.id === 'doc.mjs')?.description).toBe(
+        'Описание модуля.',
+      );
     });
   });
 });

@@ -59,6 +59,20 @@ function endOfLocalDay(start: number): number {
  * Мусор или неполная пара («только from») — не диапазон: возвращаем undefined и
  * маршрут молча падает на период по дням, вместо 500 на NaN.
  */
+/**
+ * Пресет в N дней — календарные сутки: сегодня и N−1 предыдущих, от местной
+ * полуночи. Скользящие N×24 часа давали лишний, частичный день в начале ряда:
+ * «7 дней» рисовались восемью точками, первая — обрезок вчерашнего вечера.
+ */
+function presetRange(days: number): { since: number; until: number } {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (days - 1));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return { since: start.getTime(), until: endOfLocalDay(today.getTime()) };
+}
+
 function parseRange(from?: string, to?: string): { since: number; until: number } | undefined {
   const start = parseLocalDay(from);
   const end = parseLocalDay(to);
@@ -101,9 +115,11 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
         : normalized === 0
           ? 36_500
           : Math.min(Math.max(normalized, 1), 3650);
-      // Явный диапазон перебивает пресет; у остальных периодов границ нет —
-      // сканер сам отсчитает `days` назад от текущего момента.
-      const bounds = range ?? (isToday ? todayRange() : undefined);
+      // Явный диапазон перебивает пресет; пресеты в днях — календарные, от
+      // местной полуночи; границ нет только у «за всё время» — сканер сам
+      // отсчитает `days` назад от текущего момента.
+      const bounds =
+        range ?? (isToday ? todayRange() : normalized === 0 ? undefined : presetRange(days));
       const since = bounds?.since;
       const until = bounds?.until;
       const snapshot = ctx.pricing.current();

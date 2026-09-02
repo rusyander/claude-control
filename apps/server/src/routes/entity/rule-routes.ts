@@ -31,15 +31,30 @@ export function registerRuleRoutes(app: FastifyInstance, ctx: ServerContext): vo
   // --- Правила (CLAUDE.md) ---
   app.get('/api/rules', () => readRules(paths().claudeMd, ctx.store));
 
-  app.put<{ Params: { id: string }; Body: RuleDraft }>('/api/rules/:id', (request) =>
-    done(saveRule(paths().claudeMd, request.params.id, request.body, ctx.store, ctx.backupDir)),
-  );
+  /**
+   * Id правила выводится из заголовка при каждом разборе, поэтому у клиента он
+   * легко устаревает (переименование в соседней вкладке, удаление тёзки). С
+   * устаревшим id `saveRule` создавал бы НОВОЕ правило-дубликат, а
+   * `deleteRule` — молча переписывал файл, оставляя лишнюю копию и запись в
+   * истории. Неизвестный id — 404, файл не трогаем.
+   */
+  const NOT_FOUND = { error: 'rule_not_found', message: 'Правило не найдено' } as const;
+  const hasRule = (id: string): boolean =>
+    readRules(paths().claudeMd, ctx.store).some((rule) => rule.id === id);
+
+  app.put<{ Params: { id: string }; Body: RuleDraft }>('/api/rules/:id', (request, reply) => {
+    if (!hasRule(request.params.id)) return reply.code(404).send(NOT_FOUND);
+    return done(
+      saveRule(paths().claudeMd, request.params.id, request.body, ctx.store, ctx.backupDir),
+    );
+  });
 
   app.post<{ Body: RuleDraft }>('/api/rules', (request) =>
     done(saveRule(paths().claudeMd, '', request.body, ctx.store, ctx.backupDir)),
   );
 
-  app.delete<{ Params: { id: string } }>('/api/rules/:id', (request) => {
+  app.delete<{ Params: { id: string } }>('/api/rules/:id', (request, reply) => {
+    if (!hasRule(request.params.id)) return reply.code(404).send(NOT_FOUND);
     // След в state.json снимаем ДО удаления: `deleteRule` сдвигает id уцелевших
     // тёзок («foo-2» → «foo»), и после него отметки удалённого «foo» уже
     // принадлежали бы выжившему правилу.

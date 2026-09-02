@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectTestsView } from '@claude-control/contracts';
@@ -17,6 +17,7 @@ import { registerProjectTestsRoutes } from './project-tests-routes.ts';
 describe('project-tests-routes', () => {
   let app: FastifyInstance;
   let project = '';
+  let backupDir = '';
 
   const view = async (path = project): Promise<ProjectTestsView> => {
     const response = await app.inject({
@@ -28,14 +29,21 @@ describe('project-tests-routes', () => {
 
   beforeEach(async () => {
     project = mkdtempSync(join(tmpdir(), 'cc-tests-routes-'));
+    backupDir = mkdtempSync(join(tmpdir(), 'cc-tests-backups-'));
     app = Fastify();
-    registerProjectTestsRoutes(app, {} as unknown as ServerContext, new ProjectTestRunRegistry());
+    registerProjectTestsRoutes(
+      app,
+      // Реестр проектов пуст: имя копии соглашения строится из пути каталога.
+      { backupDir, store: { getProjectByPath: () => undefined } } as unknown as ServerContext,
+      new ProjectTestRunRegistry(),
+    );
     await app.ready();
   });
 
   afterEach(async () => {
     await app.close();
     rmSync(project, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    rmSync(backupDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it('пустой проект отдаёт пустой список, а не ошибку', async () => {
@@ -137,6 +145,34 @@ describe('project-tests-routes', () => {
       payload: { path: project },
     });
     expect(readFileSync(join(project, 'CLAUDE.md'), 'utf8')).toBe(written);
+  });
+
+  it('соглашение дописывается в существующий CLAUDE.md с резервной копией, как PUT /rules', async () => {
+    writeFileSync(join(project, 'CLAUDE.md'), '# Проект\n', 'utf8');
+    expect(readdirSync(backupDir)).toHaveLength(0);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/convention',
+      payload: { path: project },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const backups = readdirSync(backupDir);
+    expect(backups).toHaveLength(1);
+    // Имя ПРОЕКТНОЙ копии (`project-<ключ>-CLAUDE.md`), не пользовательской:
+    // иначе она попадала бы в ленту истории и восстановление ~/.claude/CLAUDE.md.
+    expect(backups[0]).toMatch(/^project-[0-9a-f]{12}-CLAUDE\.md\./);
+    expect(readFileSync(join(backupDir, backups[0]!), 'utf8')).toBe('# Проект\n');
+  });
+
+  it('удаление несуществующей группы → 404, а не молчаливое ок', async () => {
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/project-tests/group?path=${encodeURIComponent(project)}&id=nope`,
+    });
+    expect(response.statusCode).toBe(404);
+    expect((response.json() as { message: string }).message).toContain('nope');
   });
 
   it('чужой текст CLAUDE.md остаётся на месте', async () => {

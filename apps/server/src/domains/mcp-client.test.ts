@@ -383,30 +383,25 @@ describe('mcp-client', () => {
   });
 
   describe('checkMcpHealth', () => {
+    // Итог всегда несёт checkedAt: по нему карточка и состояние панели знают,
+    // когда проверка проводилась (аудит 2026-09-02).
+    const connected = { health: 'connected', toolCount: 2, checkedAt: expect.any(String) };
+
     it('stdio: отвечает и считает инструменты', async () => {
-      expect(await checkMcpHealth(stdioServer(), BUDGET)).toEqual({
-        health: 'connected',
-        toolCount: 2,
-      });
+      expect(await checkMcpHealth(stdioServer(), BUDGET)).toEqual(connected);
     });
 
     it('http: toolCount заполняется — раньше для сети его не было вовсе', async () => {
-      expect(await checkMcpHealth(httpServer(), BUDGET)).toEqual({
-        health: 'connected',
-        toolCount: 2,
-      });
+      expect(await checkMcpHealth(httpServer(), BUDGET)).toEqual(connected);
     });
 
     it('sse: toolCount заполняется', async () => {
-      expect(await checkMcpHealth(sseServer(), BUDGET)).toEqual({
-        health: 'connected',
-        toolCount: 2,
-      });
+      expect(await checkMcpHealth(sseServer(), BUDGET)).toEqual(connected);
     });
 
     it('выключенный сервер не проверяется вовсе', async () => {
       const result = await checkMcpHealth(makeServer({ isEnabled: false }), BUDGET);
-      expect(result).toEqual({ health: 'disabled' });
+      expect(result).toEqual({ health: 'disabled', checkedAt: expect.any(String) });
     });
 
     it('закрытый порт — не «отвечает», а внятная неудача', async () => {

@@ -1,4 +1,4 @@
-import { existsSync, accessSync, constants } from 'node:fs';
+import { existsSync, accessSync, constants, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import type { ClaudeLocation, ClaudePaths, DetectionSource } from '@claude-control/contracts';
@@ -55,6 +55,13 @@ export function detectClaudeLocation(override?: string): ClaudeLocation {
 /** Возвращает описание проблемы или null, если каталог пригоден. */
 function checkDirectory(dir: string): string | null {
   if (!existsSync(dir)) return `Каталог не существует: ${dir}`;
+  // Файл вместо каталога проходил проверку «существует и читается», а дальше
+  // `mkdir <файл>/claude-control` падал ENOTDIR уже после смены расположения.
+  try {
+    if (!statSync(dir).isDirectory()) return `Это файл, а не каталог: ${dir}`;
+  } catch {
+    return `Каталог недоступен: ${dir}`;
+  }
   try {
     accessSync(dir, constants.R_OK);
   } catch {

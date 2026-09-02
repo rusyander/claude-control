@@ -162,8 +162,34 @@ describe('scanAnalytics', () => {
     ]);
 
     const result = await scanAnalytics(projectsDir, options);
-    expect(result.byDay).toHaveLength(1);
-    expect(result.byDay[0]?.date).toBe(day);
+    const active = result.byDay.filter((bucket) => bucket.totals.requests > 0);
+    expect(active).toHaveLength(1);
+    expect(active[0]?.date).toBe(day);
+  });
+
+  it('дни без записей входят нулями: ряд по дням непрерывен от начала периода', async () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const since = new Date(Date.now() - 5 * DAY);
+    since.setHours(0, 0, 0, 0);
+    writeTranscript('proj-a', 'sess1', [
+      assistant({ ts: recentIso(4 * DAY), model: 'claude-opus-4-8', cwd: '/work/a', sessionId: 's1', input: 1 }),
+      assistant({ ts: recentIso(DAY), model: 'claude-opus-4-8', cwd: '/work/a', sessionId: 's1', input: 1 }),
+    ]);
+
+    const result = await scanAnalytics(projectsDir, {
+      days: 30,
+      since: since.getTime(),
+      until: Date.now(),
+      recentSessionsLimit: 10,
+    });
+    const expected = Array.from({ length: 6 }, (_, i) => {
+      const day = new Date(since);
+      day.setDate(day.getDate() + i);
+      return localDay(day.toISOString());
+    });
+    expect(result.byDay.map((bucket) => bucket.date)).toEqual(expected);
+    expect(result.byDay.filter((bucket) => bucket.totals.requests > 0)).toHaveLength(2);
+    expect(result.byDay.filter((bucket) => bucket.totals.requests === 0)).toHaveLength(4);
   });
 
   it('разные проекты учитываются отдельно; сессии считаются', async () => {
@@ -189,6 +215,39 @@ describe('scanAnalytics', () => {
     const result = await scanAnalytics(projectsDir, options);
     expect(result.byProject).toHaveLength(2);
     expect(result.byProject.every((p) => p.sessions === 1)).toBe(true);
+  });
+
+  it('cd внутри сессии не плодит проектов: проект — каталог запуска (регрессия)', async () => {
+    // Первая запись файла старше окна: проект всё равно берётся из неё, а не
+    // из первой записи, попавшей в период.
+    const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
+    writeTranscript('proj-a', 'sess1', [
+      assistant({ ts: old, model: 'claude-opus-4-8', cwd: '/work/alpha', sessionId: 's1', input: 1 }),
+      assistant({
+        ts: recentIso(),
+        model: 'claude-opus-4-8',
+        cwd: '/work/alpha/apps/server',
+        sessionId: 's1',
+        input: 100,
+      }),
+      assistant({
+        ts: recentIso(),
+        model: 'claude-opus-4-8',
+        cwd: '/work/alpha/node_modules/x/dist',
+        sessionId: 's1',
+        input: 100,
+      }),
+    ]);
+
+    const result = await scanAnalytics(projectsDir, options);
+    expect(result.byProject).toHaveLength(1);
+    expect(result.byProject[0]).toMatchObject({
+      project: '/work/alpha',
+      displayName: 'work/alpha',
+      sessions: 1,
+    });
+    expect(result.byProject[0]?.totals.requests).toBe(2);
+    expect(result.recentSessions[0]?.project).toBe('/work/alpha');
   });
 
   it('считает вызовы инструментов в topTools', async () => {
@@ -526,7 +585,7 @@ describe('scanAnalytics', () => {
     expect(result.overall.cacheCreation).toBe(5);
     // Дедуп обязан дойти до всех срезов, а не только до overall.
     expect(result.byModel[0]?.totals.requests).toBe(2);
-    expect(result.byDay[0]?.totals.requests).toBe(2);
+    expect(result.byDay.find((bucket) => bucket.totals.requests > 0)?.totals.requests).toBe(2);
     expect(result.byProject[0]?.totals.requests).toBe(2);
     expect(result.byHour.reduce((sum, bucket) => sum + bucket.requests, 0)).toBe(2);
     expect(result.recentSessions[0]?.totals.requests).toBe(2);

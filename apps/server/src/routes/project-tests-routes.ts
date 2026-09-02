@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import type {
   ProjectTestCaseInput,
@@ -7,10 +8,12 @@ import type {
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../context.ts';
 import { checkProjectDir } from '../domains/projects.ts';
+import { projectBackupName } from '../lib/safe-io.ts';
 import {
   DEFAULT_GROUPS,
   ProjectTestRunRegistry,
   ProjectTestsError,
+  ProjectTestsNotFoundError,
   TESTS_DIR,
   createGroup,
   hasConvention,
@@ -34,7 +37,7 @@ import {
  */
 export function registerProjectTestsRoutes(
   app: FastifyInstance,
-  _ctx: ServerContext,
+  ctx: ServerContext,
   registry: ProjectTestRunRegistry,
 ): void {
   const requireRoot = (path: unknown, reply: FastifyReply): string | undefined => {
@@ -46,13 +49,14 @@ export function registerProjectTestsRoutes(
     return resolve(String(path));
   };
 
-  /** Ошибка домена — это 400 с человеческим текстом, а не падение маршрута. */
+  /** Ошибка домена — это 400 (404 для отсутствующей группы) с человеческим текстом, а не падение маршрута. */
   const guard = <T>(reply: FastifyReply, action: () => T): T | FastifyReply => {
     try {
       return action();
     } catch (error) {
       if (error instanceof ProjectTestsError) {
-        return reply.code(400).send({ message: error.message });
+        const status = error instanceof ProjectTestsNotFoundError ? 404 : 400;
+        return reply.code(status).send({ message: error.message });
       }
       throw error;
     }
@@ -181,7 +185,14 @@ export function registerProjectTestsRoutes(
   app.post<{ Body: { path?: string } }>('/api/project-tests/convention', (request, reply) => {
     const root = requireRoot(request.body?.path, reply);
     if (!root) return reply;
-    installConvention(root);
+    // Копия под именем ПРОЕКТНОГО файла, как у вкладки «Правила»; окно тестов
+    // работает по пути, поэтому id берём из реестра, а незарегистрированный
+    // каталог получает устойчивый ключ из своего пути.
+    const claudeMd = resolve(root, 'CLAUDE.md');
+    const projectId =
+      ctx.store.getProjectByPath(root)?.id ??
+      createHash('sha1').update(claudeMd).digest('hex').slice(0, 12);
+    installConvention(root, ctx.backupDir, projectBackupName(projectId, claudeMd));
     return view(root);
   });
 

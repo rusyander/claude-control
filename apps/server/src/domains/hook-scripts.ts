@@ -28,7 +28,9 @@ try {
 
 function header(description: string, event: string): string {
   const text = description.trim() || 'Хук Claude Code.';
-  return `// ${text}\n// Событие: ${event}. Файл создан через Claude Control, его можно свободно править.\n\n`;
+  // Описание — отдельным блоком: карточка хука показывает первый блок
+  // комментария, и служебная строка про событие ей не нужна.
+  return `// ${text}\n\n// Событие: ${event}. Файл создан через Claude Control, его можно свободно править.\n\n`;
 }
 
 function buildMessage(draft: HookDraft): string {
@@ -110,6 +112,11 @@ export function normalizeScriptName(name: string): string {
   return `${base || 'hook'}.mjs`;
 }
 
+/** Путь файла, который `generateHookScript` создаст для этого имени. */
+export function hookScriptPath(hooksDir: string, scriptName: string): string {
+  return join(hooksDir, normalizeScriptName(scriptName));
+}
+
 export interface GeneratedScript {
   path: string;
   command: string;
@@ -126,8 +133,7 @@ export function generateHookScript(
 ): GeneratedScript {
   mkdirSync(hooksDir, { recursive: true });
 
-  const fileName = normalizeScriptName(draft.scriptName ?? '');
-  const path = join(hooksDir, fileName);
+  const path = hookScriptPath(hooksDir, draft.scriptName ?? '');
   const build = BUILDERS[draft.template ?? 'blank'] ?? buildBlank;
 
   writeTextFile(path, build(draft), { backupDir });

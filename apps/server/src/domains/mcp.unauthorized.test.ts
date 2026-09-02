@@ -96,6 +96,11 @@ describe('признак отказа по авторизации', () => {
       BUDGET,
     );
 
-    expect(result).toEqual({ health: 'failed', detail: expect.stringContaining(OAUTH_HINT) });
+    expect(result).toEqual({
+      health: 'failed',
+      detail: expect.stringContaining(OAUTH_HINT),
+      // Итог проверки хранится в state.json с отметкой времени (аудит MCP 2026-09-02).
+      checkedAt: expect.any(String),
+    });
   });
 });

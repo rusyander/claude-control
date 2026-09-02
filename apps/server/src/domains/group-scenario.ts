@@ -5,6 +5,7 @@ import { writeTextFile } from '../lib/safe-io.ts';
 import { slugify } from '../lib/slug.ts';
 import { saveSkill, SKILLS_DISABLED_DIR } from './skills.ts';
 import { readHooks, writeHooks } from './hooks.ts';
+import { SCENARIO_MARKER } from './compiled-markers.ts';
 import type { EntityToggleDeps } from './entity-toggle.ts';
 
 /**
@@ -24,8 +25,12 @@ import type { EntityToggleDeps } from './entity-toggle.ts';
  * компилируются сценарии-автоматизации, включая маркер в команде.
  */
 
-/** Метка скомпилированного триггера в команде хука — по ней он и опознаётся. */
-export const SCENARIO_MARKER = '# claude-control:scenario';
+/**
+ * Метка скомпилированного триггера в команде хука — по ней он и опознаётся.
+ * Живёт в `compiled-markers.ts`: её читает и `hooks.ts`, который этот модуль
+ * импортирует сам. Реэкспорт — ради прежних импортов.
+ */
+export { SCENARIO_MARKER };
 
 /** Имя скрипта-триггера в папке скилла. */
 const TRIGGER_FILE = 'trigger.mjs';

@@ -6,6 +6,7 @@ import { allowedOrigins, isOAuthCallback, isRequestAllowed } from './lib/origin-
 import { isValidApiToken, presentedToken, readApiToken } from './lib/api-token.ts';
 import { createConfigWatcher } from './lib/config-watcher.ts';
 import { registerEmptyBodyGuard } from './lib/empty-body.ts';
+import { detectProviders } from './providers/detect.ts';
 import { registerConfigRoutes } from './routes/config-routes.ts';
 import { registerEnvTransferRoutes } from './routes/env-transfer-routes.ts';
 import { registerEntityRoutes } from './routes/entity-routes.ts';
@@ -360,6 +361,16 @@ process.on('SIGTERM', () => {
 });
 
 await app.listen({ port: PORT, host: HOST });
+
+// Прогрев кеша поиска CLI: первый `where`/`which` по всем провайдерам блокирует
+// цикл событий ~1,5 с — лучше сразу после старта, чем на первом запросе панели.
+setImmediate(() => {
+  try {
+    detectProviders(ctx.store);
+  } catch {
+    // Детект никогда не роняет сервер; прогрев — тем более.
+  }
+});
 
 // Цели с включённым тумблером автозапуска поднимаются сами и БЕЗ браузера —
 // панель уже открыта там, где нужно.

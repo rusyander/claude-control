@@ -6,8 +6,45 @@ import type {
   ProjectUsage,
   ToolUsage,
 } from '@claude-control/contracts';
-import { shortenProject } from './keys.ts';
+import { localDay, shortenProject } from './keys.ts';
+import { emptyTotals } from './totals.ts';
 import type { Accumulator, ScanOptions } from './types.ts';
+
+/** Начало местных суток для даты `YYYY-MM-DD`. */
+function dayStart(date: string): number {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year!, month! - 1, day!).getTime();
+}
+
+/**
+ * Дни без записей входят в ряд нулями. График по дням рисует точки подряд, и
+ * без нулей выходные между двумя рабочими днями выглядели бы ровной полкой
+ * расхода. Явно заданный период (`anchored`) заполняется от своего начала —
+ * «7 дней» = семь точек; скользящее окно от `days` (в том числе «за всё
+ * время») — от первого дня с данными, а не сто лет нулей. Без данных ряд пуст.
+ */
+function fillDays(
+  byDay: DailyUsage[],
+  since: number,
+  until: number,
+  anchored: boolean,
+): DailyUsage[] {
+  const first = byDay[0];
+  if (!first) return byDay;
+  const known = new Map(byDay.map((day) => [day.date, day]));
+  const cursor = new Date(anchored ? since : dayStart(first.date));
+  cursor.setHours(0, 0, 0, 0);
+  const end = new Date(Math.min(until, Date.now()));
+  end.setHours(0, 0, 0, 0);
+
+  const rows: DailyUsage[] = [];
+  for (; cursor.getTime() <= end.getTime(); cursor.setDate(cursor.getDate() + 1)) {
+    const date = localDay(cursor.toISOString());
+    rows.push(known.get(date) ?? { date, totals: emptyTotals(), estimatedCost: 0 });
+  }
+  // Записи позже `until` в ряд не попадают, а данные — есть: ряд не короче данных.
+  return rows.length >= byDay.length ? rows : byDay;
+}
 
 /** Накопленные разрезы → готовый отчёт: сортировка, отсечки и производные числа. */
 export function buildResult(
@@ -22,9 +59,14 @@ export function buildResult(
     .map(([model, bucket]) => ({ model, totals: bucket.totals, estimatedCost: bucket.cost }))
     .sort((a, b) => b.totals.total - a.totals.total);
 
-  const byDay: DailyUsage[] = [...acc.byDay.entries()]
-    .map(([date, bucket]) => ({ date, totals: bucket.totals, estimatedCost: bucket.cost }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const byDay = fillDays(
+    [...acc.byDay.entries()]
+      .map(([date, bucket]) => ({ date, totals: bucket.totals, estimatedCost: bucket.cost }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    since,
+    until,
+    options.since !== undefined && Number.isFinite(options.since),
+  );
 
   const byProject: ProjectUsage[] = [...acc.byProject.entries()]
     .map(([project, bucket]) => ({

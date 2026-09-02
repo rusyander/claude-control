@@ -61,8 +61,82 @@ export interface McpSession {
  * адрес, не ответивший за десяток секунд, не ответит и за минуту, а держать
  * пользователя перед крутилкой всё это время незачем.
  */
-/** Потолок рукопожатия stdio — там в него входит запуск процесса. */
-const STDIO_CONNECT_CAP = 45_000;
+/**
+ * Потолок рукопожатия stdio — там в него входит запуск процесса. Экспортирован,
+ * потому что общий бюджет разговора считает вызывающий (`domains/mcp.ts`): без
+ * этого он оставался на 30 с, из которых рукопожатию доставалось 20, и обещанных
+ * справкой 45 секунд `npx -y` на первом запуске не получал никогда.
+ */
+export const STDIO_CONNECT_CAP = 45_000;
+
+/** Откуда брать значения для ссылок вида ${VAR} в записи сервера. */
+export type EnvLookup = Record<string, string | undefined>;
+
+const ENV_REF = /\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g;
+
+/**
+ * Подстановка ссылок `${VAR}` и `${VAR:-значение по умолчанию}` — так же, как
+ * это делает сам Claude Code с записями .mcp.json. Без неё проверка связи шла к
+ * серверу с буквальной строкой `Bearer ${MY_TOKEN}` в заголовке, честно получала
+ * 401, а карточка объясняла это как «требуется авторизация OAuth». Неизвестное
+ * имя без значения по умолчанию собирается в `missing` — вызывающий назовёт их
+ * пользователю все разом, а не по одному за проверку.
+ */
+export function expandEnvRefs(value: string, lookup: EnvLookup, missing: Set<string>): string {
+  return value.replace(ENV_REF, (whole: string, name: string, fallback: string | undefined) => {
+    const found = lookup[name];
+    if (found !== undefined) return found;
+    if (fallback !== undefined) return fallback;
+    missing.add(name);
+    return whole;
+  });
+}
+
+/** Запись сервера с подставленными ссылками; незаданная переменная — ошибка с её именем. */
+export function resolveServerRefs(server: McpServer, lookup: EnvLookup): McpServer {
+  const missing = new Set<string>();
+  const expand = (value: string): string => expandEnvRefs(value, lookup, missing);
+  const expandRecord = (record: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(Object.entries(record).map(([key, value]) => [key, expand(value)]));
+
+  const resolved: McpServer = {
+    ...server,
+    command: server.command === undefined ? undefined : expand(server.command),
+    args: server.args.map(expand),
+    url: server.url === undefined ? undefined : expand(server.url),
+    env: expandRecord(server.env),
+    headers: expandRecord(server.headers),
+  };
+
+  if (missing.size > 0) {
+    const names = [...missing]
+      .sort()
+      .map((name) => '${' + name + '}')
+      .join(', ');
+    throw new Error(
+      `Не заданы переменные ${names}: добавьте их в разделе «Переменные» ` +
+        '(settings.json → env или .mcp-secrets.env) либо в окружение, из которого запущена панель',
+    );
+  }
+
+  return resolved;
+}
+
+/**
+ * stderr процесса — текст, но в какой кодировке, процесс не сообщает. На Windows
+ * консольные программы (node при падении, cmd, python) пишут в кодовой странице
+ * консоли — у русской системы это CP866, и чтение как UTF-8 показывало
+ * пользователю «������» вместо причины. Сначала строгий UTF-8 (так пишут почти
+ * все серверы), не сошлось — ibm866. Декодируем целиком, а не по кускам: граница
+ * чанка режет многобайтный символ пополам.
+ */
+export function decodeStderr(raw: Buffer, platform: NodeJS.Platform = process.platform): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(raw);
+  } catch {
+    return new TextDecoder(platform === 'win32' ? 'ibm866' : 'utf-8').decode(raw);
+  }
+}
 
 /** Дефолтный потолок подключения к сетевым серверам, если настройка не передана. */
 export const DEFAULT_NETWORK_TIMEOUT_MS = 10_000;
@@ -107,10 +181,14 @@ export async function openMcpSession(
   totalMs: number,
   authProvider?: OAuthClientProvider,
   networkTimeoutMs: number = DEFAULT_NETWORK_TIMEOUT_MS,
+  envLookup?: EnvLookup,
 ): Promise<McpSession> {
   const { connectMs, requestMs } = splitBudget(server.transport, totalMs, networkTimeoutMs);
 
-  const { transport, readStderr } = createTransport(server, authProvider);
+  // Ссылки ${VAR} подставляются до сборки транспорта. Без lookup запись идёт как
+  // есть — так ведут себя вызовы, у которых нет доступа к файлам настроек.
+  const target = envLookup ? resolveServerRefs(server, envLookup) : server;
+  const { transport, readStderr } = createTransport(target, authProvider);
   const client = new Client({ name: 'claude-control', version: '0.1.0' }, { capabilities: {} });
 
   try {
@@ -245,12 +323,13 @@ function createStdioTransport(server: McpServer): PreparedTransport {
     stderr: 'pipe',
   });
 
-  let stderr = '';
+  // Байты копим как есть и декодируем при чтении — см. decodeStderr.
+  const chunks: Buffer[] = [];
   transport.stderr?.on('data', (chunk: Buffer) => {
-    stderr += chunk.toString();
+    chunks.push(chunk);
   });
 
-  return { transport, readStderr: () => stderr };
+  return { transport, readStderr: () => decodeStderr(Buffer.concat(chunks)) };
 }
 
 /** Сообщение об ошибке: своё, если есть, иначе — то, что сказал процесс. */

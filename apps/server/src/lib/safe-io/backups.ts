@@ -108,3 +108,21 @@ export function providerBackupName(providerId: string, filePath: string): string
 export function providerProjectBackupName(providerId: string, filePath: string): string {
   return `${providerId}-project-${basename(filePath)}`;
 }
+
+/**
+ * Имя резервной копии файла ЗАРЕГИСТРИРОВАННОГО ПРОЕКТА (раздел «Проекты»):
+ * `project-<id проекта>-<basename>`.
+ *
+ * Basename проектных файлов совпадает с пользовательскими: `<проект>/CLAUDE.md`
+ * ↔ `~/.claude/CLAUDE.md`, `<проект>/.claude/settings.json` ↔ `~/.claude/settings.json`.
+ * Без префикса копии ложились под ОДНИМ именем: лента истории показывала правку
+ * проекта как правку пользовательского файла (трёхстрочный CLAUDE.md проекта
+ * «против» пользовательского на 77 строк), их ротация вытесняла пользовательские
+ * копии, а «Восстановить» в настройках писало файл проекта поверх `~/.claude/CLAUDE.md`.
+ * Id проекта в имени разводит и проекты между собой — у каждого своя ротация.
+ * Такие копии восстановлению не подлежат (цель по basename не находится), как
+ * и копии провайдеров.
+ */
+export function projectBackupName(projectId: string, filePath: string): string {
+  return `project-${projectId}-${basename(filePath)}`;
+}

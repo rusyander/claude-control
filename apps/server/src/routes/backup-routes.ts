@@ -86,7 +86,9 @@ export function registerBackupRoutes(app: FastifyInstance, ctx: ServerContext): 
         request.body?.passphrase,
       );
 
-      if (!result.ok) return reply.code(400).send({ error: result.error });
+      // Неизвестная копия — 404, как у DELETE ниже; 400 остаётся за плохим
+      // запросом (нет фразы, копию некуда возвращать).
+      if (!result.ok) return reply.code(result.notFound ? 404 : 400).send({ error: result.error });
 
       return { ...result, needsRestart: true };
     },

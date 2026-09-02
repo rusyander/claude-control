@@ -24,6 +24,7 @@ import { listMcpTools, callMcpTool } from '../domains/sandbox/McpProbe.ts';
 import { ChatRun, type ChatEvent } from '../domains/chat/ChatRunner.ts';
 import { readClaudeCredentials } from '../lib/credentials.ts';
 import { readHooks } from '../domains/hooks.ts';
+import { readEnvLookup } from '../domains/env.ts';
 import { readMcpServers } from '../domains/mcp.ts';
 import { hasOAuthTokens, oauthProviderFor } from '../domains/mcp-oauth.ts';
 import { readArtifacts } from '../domains/chat/ChatArtifacts.ts';
@@ -211,6 +212,17 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       ? oauthProviderFor(server, ctx.location.paths.appData)
       : undefined;
 
+  // Ссылки ${VAR} в записи сервера подставляются так же, как при проверке связи
+  // на странице MCP: окружение панели плюс переменные из её файлов настроек.
+  const mcpEnvLookup = (): Record<string, string | undefined> => ({
+    ...process.env,
+    ...readEnvLookup(
+      ctx.location.paths.settings,
+      ctx.location.paths.secretsEnv,
+      ctx.location.paths.settingsLocal,
+    ),
+  });
+
   app.post<{ Body: { mcpId: string } }>('/api/sandbox/mcp-tools', async (request) => {
     const server = readMcpServers(ctx.location.paths.mcpConfig, ctx.store).find(
       (item) => item.id === request.body.mcpId,
@@ -218,7 +230,9 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
     if (!server) return { tools: [], error: 'Сервер не найден' };
 
     try {
-      return { tools: await listMcpTools(server, undefined, mcpAuthProvider(server)) };
+      return {
+        tools: await listMcpTools(server, undefined, mcpAuthProvider(server), mcpEnvLookup()),
+      };
     } catch (error) {
       return { tools: [], error: error instanceof Error ? error.message : String(error) };
     }
@@ -238,6 +252,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
         request.body.args ?? {},
         undefined,
         mcpAuthProvider(server),
+        mcpEnvLookup(),
       );
     },
   );

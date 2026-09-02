@@ -60,6 +60,8 @@ describe('config-routes: POST /api/location', () => {
       backupDir: join(root, 'claude-control', 'backups'),
       applyIoSettings: () => {},
       relocate: (path: string) => detectClaudeLocation(path),
+      rememberDirOverride: (value: string) => store.updateSettings({ claudeDirOverride: value }),
+      effectiveSettings: () => store.getSettings(),
     } as unknown as ServerContext;
 
     app = Fastify();

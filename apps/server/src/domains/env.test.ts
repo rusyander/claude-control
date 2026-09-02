@@ -2,7 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readEnvVars, revealEnvValue, saveEnvVar, deleteEnvVar, moveEnvVar } from './env.ts';
+import type { Group } from '@claude-control/contracts';
+import {
+  readEnvVars,
+  revealEnvValue,
+  saveEnvVar,
+  deleteEnvVar,
+  moveEnvVar,
+  markGroupEnv,
+} from './env.ts';
 
 /**
  * Тесты переменных окружения. Главное здесь — секреты: значение с виду
@@ -246,6 +254,69 @@ describe('env', () => {
         moveEnvVar(settingsPath, secretsPath, 'GITLAB_TOKEN', 'secrets', undefined, localPath),
       ).toThrow();
       expect(readFileSync(secretsPath, 'utf8')).toContain('GITLAB_TOKEN=glpat-x');
+    });
+  });
+
+  // Аудит «Группы» 2026-09-03: контракт держал source `group`, но список отдавал
+  // ключи групп как обычные settings — и страница давала их править и удалять.
+  describe('переменные групп', () => {
+    const group = (over: Partial<Group>): Group => ({
+      id: 'g',
+      name: 'g',
+      description: '',
+      color: 'accent',
+      icon: 'folder',
+      members: [],
+      env: {},
+      isEnabled: true,
+      order: 0,
+      ...over,
+    });
+
+    it('ключ включённой группы получает source group и groupId; остальные не тронуты', () => {
+      writeFileSync(settingsPath, JSON.stringify({ env: { FROM_GROUP: '1', MINE: '2' } }));
+      const vars = markGroupEnv(readEnvVars(settingsPath, secretsPath), [
+        group({ id: 'g1', env: { FROM_GROUP: '1' } }),
+      ]);
+      expect(vars.find((v) => v.key === 'FROM_GROUP')).toMatchObject({
+        id: 'group:FROM_GROUP',
+        source: 'group',
+        groupId: 'g1',
+      });
+      expect(vars.find((v) => v.key === 'MINE')).toMatchObject({ source: 'settings' });
+      expect(vars.find((v) => v.key === 'MINE')?.groupId).toBeUndefined();
+    });
+
+    it('выключенная группа не хозяин: её ключ в файле — пользовательский', () => {
+      writeFileSync(settingsPath, JSON.stringify({ env: { FROM_GROUP: '1' } }));
+      const vars = markGroupEnv(readEnvVars(settingsPath, secretsPath), [
+        group({ id: 'g1', env: { FROM_GROUP: '1' }, isEnabled: false }),
+      ]);
+      expect(vars[0]).toMatchObject({ source: 'settings' });
+    });
+
+    it('локальный файл и секреты группе не приписываются; из двух групп хозяин — первая по порядку', () => {
+      const localPath = join(dir, 'settings.local.json');
+      writeFileSync(settingsPath, JSON.stringify({ env: { SHARED: 'a' } }));
+      writeFileSync(localPath, JSON.stringify({ env: { SHARED: 'b' } }));
+      writeFileSync(secretsPath, 'SHARED=c\n');
+      const vars = markGroupEnv(readEnvVars(settingsPath, secretsPath, localPath), [
+        group({ id: 'later', env: { SHARED: 'a' }, order: 5 }),
+        group({ id: 'first', env: { SHARED: 'a' }, order: 1 }),
+      ]);
+      expect(vars.map((v) => [v.source, v.groupId])).toEqual([
+        ['group', 'first'],
+        ['settings-local', undefined],
+        ['secrets', undefined],
+      ]);
+    });
+
+    it('показ значения по source group читает settings.json', () => {
+      writeFileSync(settingsPath, JSON.stringify({ env: { GROUP_TOKEN: 'secret-value-1' } }));
+      expect(revealEnvValue(settingsPath, secretsPath, 'GROUP_TOKEN', 'group')).toBe(
+        'secret-value-1',
+      );
+      expect(() => revealEnvValue(settingsPath, secretsPath, 'NOPE', 'group')).toThrow();
     });
   });
 });

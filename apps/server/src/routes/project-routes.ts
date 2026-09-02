@@ -7,7 +7,7 @@ import type {
   SettingsSource,
 } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
-import { readTextFile, writeTextFile } from '../lib/safe-io.ts';
+import { projectBackupName, readTextFile, writeTextFile } from '../lib/safe-io.ts';
 import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 import {
   readMcpServers,
@@ -16,9 +16,17 @@ import {
   setMcpServerEnabled,
   McpServerExistsError,
 } from '../domains/mcp.ts';
-import { readPermissions, savePermission, deletePermission } from '../domains/permissions.ts';
 import {
-  checkProjectDir,
+  readPermissions,
+  savePermission,
+  deletePermission,
+  hasPermission,
+  assertPermissionDraft,
+  PermissionExistsError,
+  PermissionNotFoundError,
+} from '../domains/permissions.ts';
+import {
+  checkProjectDraft,
   makeProject,
   resolveProjectPaths,
   type ProjectPaths,
@@ -53,6 +61,14 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
   const pathsOf = (project: Project): ProjectPaths => resolveProjectPaths(project.path);
 
   /**
+   * Имя резервной копии проектного файла — `project-<id>-<basename>`. Без него
+   * копия `<проект>/CLAUDE.md` ложилась под именем пользовательской и попадала в
+   * её ленту истории, ротацию и кнопку «Восстановить» (см. `projectBackupName`).
+   */
+  const backupNameOf = (project: Project, filePath: string): string =>
+    projectBackupName(project.id, filePath);
+
+  /**
    * В какой файл настроек проекта писать запись с этим id: локальные записи
    * (`local:`) уходят обратно в `settings.local.json`, остальные — в основной
    * `settings.json`. Так же, как на пользовательском уровне (см. entity-routes).
@@ -70,16 +86,31 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
   app.get('/api/projects', () => ctx.store.getProjects());
 
   app.post<{ Body: ProjectDraft }>('/api/projects', (request, reply) => {
-    const draft = request.body ?? ({} as ProjectDraft);
-    const problem = checkProjectDir(String(draft.path ?? ''));
+    const problem = checkProjectDraft(request.body);
     if (problem) {
       return reply.code(400).send({ error: 'invalid_project', message: problem });
+    }
+    const draft = request.body;
+    // Повтор того же каталога — не «создано»: раньше ответ 200 возвращал старую
+    // запись и молча переименовывал её, а панель показывала тост о создании.
+    const existing = ctx.store.getProjectByPath(draft.path);
+    if (existing) {
+      return reply.code(409).send({
+        error: 'project_exists',
+        message: `Этот каталог уже добавлен как «${existing.name}».`,
+        project: existing,
+      });
     }
 
     return ctx.store.addProject(makeProject(draft));
   });
 
-  app.delete<{ Params: { id: string } }>('/api/projects/:id', (request) => {
+  app.delete<{ Params: { id: string } }>('/api/projects/:id', (request, reply) => {
+    if (!ctx.store.getProject(request.params.id)) {
+      return reply
+        .code(404)
+        .send({ error: 'not_found', message: 'Проекта с таким id нет в реестре.' });
+    }
     ctx.store.removeProject(request.params.id);
     return { ok: true };
   });
@@ -108,7 +139,13 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
         });
       }
 
-      return done(writeTextFile(pathsOf(project).claudeMd, content, { backupDir: ctx.backupDir }));
+      const claudeMd = pathsOf(project).claudeMd;
+      return done(
+        writeTextFile(claudeMd, content, {
+          backupDir: ctx.backupDir,
+          backupName: backupNameOf(project, claudeMd),
+        }),
+      );
     },
   );
 
@@ -135,8 +172,13 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
     (request, reply) => {
       const project = requireProject(request.params.id, reply);
       if (!project) return reply;
+      const mcpConfig = pathsOf(project).mcpConfig;
       try {
-        return done(saveMcpServer(pathsOf(project).mcpConfig, null, request.body, ctx.backupDir));
+        return done(
+          saveMcpServer(mcpConfig, null, request.body, ctx.backupDir, {
+            backupName: backupNameOf(project, mcpConfig),
+          }),
+        );
       } catch (error) {
         return mcpExists(reply, error);
       }
@@ -148,14 +190,12 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
     (request, reply) => {
       const project = requireProject(request.params.id, reply);
       if (!project) return reply;
+      const mcpConfig = pathsOf(project).mcpConfig;
       try {
         return done(
-          saveMcpServer(
-            pathsOf(project).mcpConfig,
-            request.params.serverId,
-            request.body,
-            ctx.backupDir,
-          ),
+          saveMcpServer(mcpConfig, request.params.serverId, request.body, ctx.backupDir, {
+            backupName: backupNameOf(project, mcpConfig),
+          }),
         );
       } catch (error) {
         return mcpExists(reply, error);
@@ -168,8 +208,14 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
     (request, reply) => {
       const project = requireProject(request.params.id, reply);
       if (!project) return reply;
+      const mcpConfig = pathsOf(project).mcpConfig;
       return done(
-        deleteMcpServer(pathsOf(project).mcpConfig, request.params.serverId, ctx.backupDir),
+        deleteMcpServer(
+          mcpConfig,
+          request.params.serverId,
+          ctx.backupDir,
+          backupNameOf(project, mcpConfig),
+        ),
       );
     },
   );
@@ -180,12 +226,14 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
     (request, reply) => {
       const project = requireProject(request.params.id, reply);
       if (!project) return reply;
+      const mcpConfig = pathsOf(project).mcpConfig;
       return done(
         setMcpServerEnabled(
-          pathsOf(project).mcpConfig,
+          mcpConfig,
           request.params.serverId,
           Boolean(request.body?.isEnabled),
           ctx.backupDir,
+          backupNameOf(project, mcpConfig),
         ),
       );
     },
@@ -205,7 +253,20 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
     (request, reply) => {
       const project = requireProject(request.params.id, reply);
       if (!project) return reply;
-      return done(savePermission(pathsOf(project).settings, null, request.body, ctx.backupDir));
+      // Та же проверка, что у пользовательских прав: решение из трёх известных,
+      // шаблон не пустой — иначе в settings.json проекта заводился список
+      // `undefined` из null-ов.
+      const draft = assertPermissionDraft(request.body);
+      // Дубль и незнакомый id — как на пользовательском уровне: 409 / 404 без
+      // записи. Раньше маршрут писал файл в любом случае: settings.json проекта
+      // лежит в его гите и переформатировался ради ничего, а тост говорил «Создано».
+      const settings = pathsOf(project).settings;
+      if (hasPermission(settings, `${draft.decision}:${draft.pattern}`)) {
+        throw new PermissionExistsError(draft.pattern);
+      }
+      return done(
+        savePermission(settings, null, draft, ctx.backupDir, backupNameOf(project, settings)),
+      );
     },
   );
 
@@ -215,12 +276,18 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
       const project = requireProject(request.params.id, reply);
       if (!project) return reply;
       const target = targetSettings(pathsOf(project), request.params.permId);
+      const draft = assertPermissionDraft(request.body);
+      const bareId = stripLocalPrefix(request.params.permId);
+      if (!hasPermission(target.path, bareId)) {
+        throw new PermissionNotFoundError(request.params.permId);
+      }
       return done(
         savePermission(
           target.path,
-          stripLocalPrefix(request.params.permId),
-          request.body,
+          bareId,
+          draft,
           ctx.backupDir,
+          backupNameOf(project, target.path),
         ),
       );
     },
@@ -232,8 +299,12 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
       const project = requireProject(request.params.id, reply);
       if (!project) return reply;
       const target = targetSettings(pathsOf(project), request.params.permId);
+      const bareId = stripLocalPrefix(request.params.permId);
+      if (!hasPermission(target.path, bareId)) {
+        throw new PermissionNotFoundError(request.params.permId);
+      }
       return done(
-        deletePermission(target.path, stripLocalPrefix(request.params.permId), ctx.backupDir),
+        deletePermission(target.path, bareId, ctx.backupDir, backupNameOf(project, target.path)),
       );
     },
   );

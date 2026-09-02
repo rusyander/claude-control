@@ -11,7 +11,12 @@ import type {
 } from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
 import type { AppStore } from '../lib/app-store.ts';
-import { openMcpSession, DEFAULT_NETWORK_TIMEOUT_MS } from './mcp-client.ts';
+import {
+  openMcpSession,
+  DEFAULT_NETWORK_TIMEOUT_MS,
+  STDIO_CONNECT_CAP,
+  type EnvLookup,
+} from './mcp-client.ts';
 import { hasOAuthTokens, renameOAuth } from './mcp-oauth.ts';
 
 /**
@@ -27,6 +32,11 @@ interface RawMcpServer {
   url?: string;
   env?: Record<string, string>;
   headers?: Record<string, string>;
+  /**
+   * Чужие ключи записи (`disabled`, `timeout`, `alwaysAllow` других клиентов и
+   * будущих версий Claude Code) — правка переносит их как есть, а не стирает.
+   */
+  [key: string]: unknown;
 }
 
 interface RawMcpConfig {
@@ -36,6 +46,9 @@ interface RawMcpConfig {
 
 /** Секция, куда приложение прячет выключенные серверы. Claude Code её игнорирует. */
 const DISABLED_KEY = 'mcpServersDisabled';
+
+/** Ключи записи, которые пишет сама панель; всё остальное в записи — чужое и сохраняется. */
+const OWN_KEYS = new Set(['type', 'command', 'args', 'url', 'env', 'headers']);
 
 /**
  * Список повторяет mcpTransportSchema из contracts, а не берёт его оттуда:
@@ -68,9 +81,13 @@ export function readMcpServers(
   const config = readJsonFile<RawMcpConfig>(mcpConfigPath, {});
   const active = config.mcpServers ?? {};
   const disabled = (config[DISABLED_KEY] as Record<string, RawMcpServer> | undefined) ?? {};
+  // Итог прошлой проверки связи — из состояния панели: карточка показывает его
+  // сразу, а обзор по нему считает отвечающие и упавшие серверы.
+  const lastChecks = store.getMcpHealth();
 
   const toServer = (name: string, raw: RawMcpServer, isEnabled: boolean): McpServer => {
     const transport = readTransport(raw);
+    const last = isEnabled ? lastChecks[name] : undefined;
     return {
       id: name,
       name,
@@ -80,7 +97,10 @@ export function readMcpServers(
       url: raw.url,
       env: raw.env ?? {},
       headers: raw.headers ?? {},
-      health: isEnabled ? 'unknown' : 'disabled',
+      health: isEnabled ? (last?.health ?? 'unknown') : 'disabled',
+      healthDetail: last?.detail,
+      checkedAt: last?.checkedAt,
+      toolCount: last?.toolCount,
       isEnabled,
       groupIds: store.getGroupIdsFor('mcp', name),
       // Кнопку «Авторизоваться» показываем только у сетевых серверов и только
@@ -104,16 +124,151 @@ export function readMcpServers(
   ].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/*
+ * Ошибки домена несут `statusCode` и `code`: их читает Fastify, так что любой
+ * маршрут, который не перехватил ошибку сам (проектные MCP-серверы в
+ * project-routes, перенос конфигурации между провайдерами), всё равно ответит
+ * 400/404/409 с причиной, а не 500. Явные поля, а не parameter properties:
+ * рантайм сервера читает TypeScript через strip-types, и тот их не поддерживает.
+ */
+
+/** Черновик не годится для записи; причина — человеку, маршрут отвечает 400. */
+export class InvalidMcpDraftError extends Error {
+  readonly statusCode = 400;
+  readonly code = 'invalid_mcp_draft';
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidMcpDraftError';
+  }
+}
+
+/** Сервера с таким именем нет ни среди включённых, ни среди выключенных — 404. */
+export class McpServerNotFoundError extends Error {
+  readonly statusCode = 404;
+  readonly code = 'not_found';
+  readonly serverName: string;
+
+  constructor(serverName: string) {
+    super(`MCP-сервера «${serverName}» нет в конфигурации.`);
+    this.name = 'McpServerNotFoundError';
+    this.serverName = serverName;
+  }
+}
+
 /** Имя MCP-сервера уже занято — маршрут отвечает 409, а не пишет поверх чужой записи. */
 export class McpServerExistsError extends Error {
+  readonly statusCode = 409;
+  readonly code = 'server_exists';
   readonly serverName: string;
 
   constructor(serverName: string) {
     super(`MCP-сервер «${serverName}» уже есть в конфигурации.`);
-    // Явное поле, а не parameter property: рантайм сервера читает TypeScript
-    // через strip-types, а их он не поддерживает.
     this.name = 'McpServerExistsError';
     this.serverName = serverName;
+  }
+}
+
+/**
+ * Имя сервера — ключ в конфиге и половина права `mcp__<сервер>__<инструмент>`:
+ * пробелы и косые черты ломают первое, двойное подчёркивание — второе.
+ */
+const NAME_PATTERN = /^[^\s/\\]+$/;
+const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const HEADER_NAME_PATTERN = /^[^\s:]+$/;
+
+function stringList(value: unknown, field: string): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    throw new InvalidMcpDraftError(`Поле ${field} должно быть списком строк.`);
+  }
+  return value as string[];
+}
+
+function stringRecord(value: unknown, field: string, keyPattern: RegExp): Record<string, string> {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new InvalidMcpDraftError(`Поле ${field} должно быть объектом «имя → строка».`);
+  }
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (!keyPattern.test(key) || typeof item !== 'string') {
+      throw new InvalidMcpDraftError(
+        `Поле ${field}: имя «${key}» без пробелов и служебных символов, значение — строкой.`,
+      );
+    }
+  }
+  return value as Record<string, string>;
+}
+
+/**
+ * Проверка черновика ДО записи. Тело приходит от формы, от пакетного импорта
+ * JSON и от телефона, и до этого всё, что не упало пятисоткой, уезжало в
+ * ~/.claude.json как есть: сервер без транспорта, stdio без команды, адрес
+ * «not a url». Claude Code такую запись потом молча пропускает — и сервер
+ * «не появляется» без единого слова о причине. Заодно нормализует
+ * необязательные поля: `args`/`env`/`headers`/`groupIds` дальше читаются без
+ * проверок на undefined.
+ */
+export function assertMcpDraft(draft: unknown): asserts draft is McpServerDraft {
+  if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
+    throw new InvalidMcpDraftError('Тело запроса должно быть объектом с описанием сервера.');
+  }
+  const body = draft as Record<string, unknown>;
+
+  if (typeof body.name !== 'string' || body.name.trim() === '') {
+    throw new InvalidMcpDraftError('Не указано имя MCP-сервера');
+  }
+  const name = body.name.trim();
+  if (!NAME_PATTERN.test(name) || name.includes('__')) {
+    throw new InvalidMcpDraftError(
+      `Имя «${name}» не годится: без пробелов, косых черт и двойного подчёркивания — ` +
+        'по нему строятся права вида mcp__сервер__инструмент.',
+    );
+  }
+  body.name = name;
+
+  const transport = TRANSPORTS.find((item) => item === body.transport);
+  if (!transport) {
+    throw new InvalidMcpDraftError(`Транспорт должен быть одним из: ${TRANSPORTS.join(', ')}.`);
+  }
+
+  if (transport === 'stdio') {
+    if (typeof body.command !== 'string' || body.command.trim() === '') {
+      throw new InvalidMcpDraftError('Для stdio нужна команда запуска.');
+    }
+    body.command = body.command.trim();
+  } else {
+    if (typeof body.url !== 'string' || body.url.trim() === '') {
+      throw new InvalidMcpDraftError(`Для ${transport} нужен адрес сервера.`);
+    }
+    const url = body.url.trim();
+    body.url = url;
+    // Адрес со ссылкой ${VAR} разбирается только после подстановки — при проверке связи.
+    if (!url.includes('${') && !isHttpUrl(url)) {
+      throw new InvalidMcpDraftError(`Адрес «${url}» не разбирается как http(s)-URL.`);
+    }
+  }
+
+  body.args = stringList(body.args, 'args');
+  body.env = stringRecord(body.env, 'env', ENV_KEY_PATTERN);
+  body.headers = stringRecord(body.headers, 'headers', HEADER_NAME_PATTERN);
+  body.groupIds = stringList(body.groupIds, 'groupIds');
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    return /^https?:$/.test(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
+/** Есть ли сервер с таким именем в любой из двух секций; нет — McpServerNotFoundError. */
+export function assertMcpServerExists(mcpConfigPath: string, serverId: string): void {
+  const config = readJsonFile<RawMcpConfig>(mcpConfigPath, {});
+  const disabled = config[DISABLED_KEY] as Record<string, RawMcpServer> | undefined;
+  if (config.mcpServers?.[serverId] === undefined && disabled?.[serverId] === undefined) {
+    throw new McpServerNotFoundError(serverId);
   }
 }
 
@@ -122,19 +277,33 @@ export class McpServerExistsError extends Error {
  *
  * Создание с занятым именем и переименование в занятое — ОТКАЗ
  * (`McpServerExistsError` → 409), как у скиллов и у MCP чужих провайдеров.
+ * Правка сервера, которого нет (удалён из другой вкладки) — ОТКАЗ
+ * (`McpServerNotFoundError` → 404), а не создание под видом правки.
  * Осознанная замена (перенос конфигурации между провайдерами) передаёт
- * `allowOverwrite` явно.
+ * `allowOverwrite` явно и обходит обе проверки.
  */
 export function saveMcpServer(
   mcpConfigPath: string,
   serverId: string | null,
   draft: McpServerDraft,
   backupDir?: string,
-  options?: { allowOverwrite?: boolean },
+  // `backupName` — имя копии, когда basename не уникален (`.mcp.json` ПРОЕКТА):
+  // иначе копии всех проектов делят одну ротацию (`projectBackupName`).
+  options?: { allowOverwrite?: boolean; backupName?: string },
 ): string | undefined {
+  // Проверяем здесь, а не только в маршруте: сюда же ведут проектный .mcp.json и
+  // перенос между провайдерами, и все они писали в файл что угодно.
+  assertMcpDraft(draft);
+
   const config = readJsonFile<RawMcpConfig>(mcpConfigPath, {});
   config.mcpServers ??= {};
   const disabled = config[DISABLED_KEY] as Record<string, RawMcpServer> | undefined;
+
+  const previous =
+    serverId === null ? undefined : (config.mcpServers[serverId] ?? disabled?.[serverId]);
+  if (serverId !== null && previous === undefined && !options?.allowOverwrite) {
+    throw new McpServerNotFoundError(serverId);
+  }
 
   // Занятое имя — отказ, а не запись поверх. Запись шла по имени безусловно:
   // «ctx7» из формы молча замещал настроенный «ctx7», а если тёзка лежал в
@@ -163,7 +332,12 @@ export function saveMcpServer(
     if (disabled) delete disabled[serverId];
   }
 
+  // Чужие ключи прежней записи переезжают как есть: файл общий, и ключ,
+  // которого панель не знает, — не мусор, а чьё-то рабочее поле.
   const raw: RawMcpServer = { type: draft.transport };
+  for (const [key, value] of Object.entries(previous ?? {})) {
+    if (!OWN_KEYS.has(key)) raw[key] = value;
+  }
   if (draft.command) raw.command = draft.command;
   if (draft.args.length > 0) raw.args = draft.args;
   if (draft.url) raw.url = draft.url;
@@ -174,18 +348,19 @@ export function saveMcpServer(
     ((config[DISABLED_KEY] as Record<string, RawMcpServer>) ??= {})[draft.name] = raw;
   else config.mcpServers[draft.name] = raw;
 
-  return writeJsonFile(mcpConfigPath, config, { backupDir });
+  return writeJsonFile(mcpConfigPath, config, { backupDir, backupName: options?.backupName });
 }
 
 /**
  * Перенос идентичности сервера при переименовании.
  *
  * Имя MCP-сервера — это его идентификатор, и по нему ключуется не только запись
- * в ~/.claude.json: в state.json по нему висят состав групп и отметка ручного
- * выключения, а в отдельном файле с правами 600 — сохранённый OAuth-вход.
- * Раньше правился только конфиг, поэтому после переименования сервер выпадал из
- * своих групп (группа продолжала гасить несуществующий id), а токен оставался в
- * mcp-oauth.json под мёртвым ключом — пользователь заходил заново.
+ * в ~/.claude.json: в state.json по нему висят состав групп, отметка ручного
+ * выключения и итог прошлой проверки связи, а в отдельном файле с правами 600 —
+ * сохранённый OAuth-вход. Раньше правился только конфиг, поэтому после
+ * переименования сервер выпадал из своих групп (группа продолжала гасить
+ * несуществующий id), а токен оставался в mcp-oauth.json под мёртвым ключом —
+ * пользователь заходил заново.
  *
  * Асинхронность — из-за очереди записи хранилища токенов: перенос обязан встать
  * в ту же цепочку, что и сохранение токена при обновлении.
@@ -202,12 +377,17 @@ export async function migrateMcpServerIdentity(
   if (appData !== undefined) await renameOAuth(appData, oldId, newId);
 }
 
-/** Включение и выключение — перенос записи между двумя секциями файла. */
+/**
+ * Включение и выключение — перенос записи между двумя секциями файла.
+ * Запись уже в нужной секции — ничего не пишем (повторный клик, гонка двух
+ * вкладок); нет ни в одной — McpServerNotFoundError, а не тихий «ok».
+ */
 export function setMcpServerEnabled(
   mcpConfigPath: string,
   serverId: string,
   isEnabled: boolean,
   backupDir?: string,
+  backupName?: string,
 ): string | undefined {
   const config = readJsonFile<RawMcpConfig>(mcpConfigPath, {});
   config.mcpServers ??= {};
@@ -216,28 +396,68 @@ export function setMcpServerEnabled(
   const from = isEnabled ? disabled : config.mcpServers;
   const to = isEnabled ? config.mcpServers : disabled;
   const entry = from[serverId];
-  if (!entry) return undefined;
+  if (!entry) {
+    if (to[serverId] !== undefined) return undefined;
+    throw new McpServerNotFoundError(serverId);
+  }
 
   delete from[serverId];
   to[serverId] = entry;
-  return writeJsonFile(mcpConfigPath, config, { backupDir });
+  dropEmptyDisabledSection(config);
+  return writeJsonFile(mcpConfigPath, config, { backupDir, backupName });
 }
 
+/**
+ * Пустая секция отключённых — наш ключ в чужом файле. После «выключить → включить»
+ * ~/.claude.json должен вернуться к прежнему виду байт в байт, иначе у пользователя
+ * в файле, который правит сам Claude Code, остаётся `"mcpServersDisabled": {}`.
+ */
+function dropEmptyDisabledSection(config: RawMcpConfig): void {
+  const disabled = config[DISABLED_KEY] as Record<string, unknown> | undefined;
+  if (disabled !== undefined && Object.keys(disabled).length === 0) delete config[DISABLED_KEY];
+}
+
+/** Удаление из обеих секций; сервера нет — McpServerNotFoundError, файл не переписывается. */
 export function deleteMcpServer(
   mcpConfigPath: string,
   serverId: string,
   backupDir?: string,
+  backupName?: string,
 ): string | undefined {
   const config = readJsonFile<RawMcpConfig>(mcpConfigPath, {});
+  const disabled = config[DISABLED_KEY] as Record<string, RawMcpServer> | undefined;
+  if (config.mcpServers?.[serverId] === undefined && disabled?.[serverId] === undefined) {
+    throw new McpServerNotFoundError(serverId);
+  }
+
   delete config.mcpServers?.[serverId];
-  delete (config[DISABLED_KEY] as Record<string, RawMcpServer> | undefined)?.[serverId];
-  return writeJsonFile(mcpConfigPath, config, { backupDir });
+  delete disabled?.[serverId];
+  dropEmptyDisabledSection(config);
+  return writeJsonFile(mcpConfigPath, config, { backupDir, backupName });
 }
 
 export interface HealthResult {
   health: McpHealth;
   detail?: string;
   toolCount?: number;
+  /** Когда проверка проводилась (ISO) — карточка показывает, обзор хранит. */
+  checkedAt: string;
+}
+
+/**
+ * Общий бюджет разговора. Сетевой растягивается под настроенный потолок
+ * подключения: иначе большой таймаут упёрся бы в фиксированные 30 с и не
+ * подействовал. stdio — под свой потолок запуска процесса: раньше он оставался
+ * на тех же 30 с, из которых рукопожатию доставалось 20, и обещанные справкой
+ * 45 секунд `npx -y` на первом запуске не получал никогда.
+ */
+function sessionBudget(
+  transport: McpTransport,
+  timeoutMs: number,
+  networkTimeoutMs: number,
+): number {
+  const cap = transport === 'stdio' ? STDIO_CONNECT_CAP : networkTimeoutMs;
+  return Math.max(timeoutMs, Math.ceil(cap / 0.67) + 1_000);
 }
 
 /**
@@ -256,31 +476,26 @@ export async function checkMcpHealth(
   timeoutMs = 30_000,
   authProvider?: OAuthClientProvider,
   networkTimeoutMs: number = DEFAULT_NETWORK_TIMEOUT_MS,
+  envLookup?: EnvLookup,
 ): Promise<HealthResult> {
-  if (!server.isEnabled) return { health: 'disabled' };
+  const checkedAt = new Date().toISOString();
+  if (!server.isEnabled) return { health: 'disabled', checkedAt };
 
   try {
-    // Общий бюджет для сетевого сервера растягиваем под настроенный потолок
-    // подключения: иначе большой таймаут упёрся бы в фиксированные 30с и не
-    // подействовал. stdio живёт на своём (процессном) потолке — его не трогаем.
-    const totalMs =
-      server.transport === 'stdio'
-        ? timeoutMs
-        : Math.max(timeoutMs, Math.ceil(networkTimeoutMs / 0.67) + 1_000);
-    const session = await openMcpSession(server, totalMs, authProvider, networkTimeoutMs);
+    const session = await openMcpSession(
+      server,
+      sessionBudget(server.transport, timeoutMs, networkTimeoutMs),
+      authProvider,
+      networkTimeoutMs,
+      envLookup,
+    );
     try {
-      return { health: 'connected', toolCount: (await session.listTools()).length };
+      return { health: 'connected', toolCount: (await session.listTools()).length, checkedAt };
     } finally {
       await session.close();
     }
   } catch (error) {
-    // Отказ по авторизации объясняем прямо: без этого пользователь видит
-    // «сервер не ответил на рукопожатие» и не понимает, что нужно войти.
-    if (isUnauthorized(error, server.transport)) {
-      return { health: 'failed', detail: 'Требуется авторизация OAuth — нажмите «Авторизоваться»' };
-    }
-    const detail = error instanceof Error ? error.message : String(error);
-    return { health: 'failed', detail: detail.slice(0, 400) };
+    return { health: 'failed', detail: failureDetail(error, server), checkedAt };
   }
 }
 
@@ -298,18 +513,19 @@ export async function listMcpServerTools(
   timeoutMs = 30_000,
   authProvider?: OAuthClientProvider,
   networkTimeoutMs: number = DEFAULT_NETWORK_TIMEOUT_MS,
+  envLookup?: EnvLookup,
 ): Promise<McpToolsResult> {
   if (!server.isEnabled)
     return { tools: [], error: 'Сервер выключен — включите его, чтобы увидеть инструменты' };
 
   try {
-    // Бюджет считаем так же, как в checkMcpHealth: сетевой потолок не должен
-    // упереться в фиксированные 30с, stdio живёт на своём процессном потолке.
-    const totalMs =
-      server.transport === 'stdio'
-        ? timeoutMs
-        : Math.max(timeoutMs, Math.ceil(networkTimeoutMs / 0.67) + 1_000);
-    const session = await openMcpSession(server, totalMs, authProvider, networkTimeoutMs);
+    const session = await openMcpSession(
+      server,
+      sessionBudget(server.transport, timeoutMs, networkTimeoutMs),
+      authProvider,
+      networkTimeoutMs,
+      envLookup,
+    );
     try {
       const tools = await session.listTools();
       return { tools: tools.map((tool) => ({ name: tool.name, description: tool.description })) };
@@ -317,12 +533,29 @@ export async function listMcpServerTools(
       await session.close();
     }
   } catch (error) {
-    if (isUnauthorized(error, server.transport)) {
-      return { tools: [], error: 'Требуется авторизация OAuth — нажмите «Авторизоваться»' };
-    }
-    const detail = error instanceof Error ? error.message : String(error);
-    return { tools: [], error: detail.slice(0, 400) };
+    return { tools: [], error: failureDetail(error, server) };
   }
+}
+
+/**
+ * Причина отказа словами для карточки. Отказ по авторизации объясняем прямо —
+ * иначе пользователь видит «сервер не ответил на рукопожатие» и не понимает,
+ * что делать. Но совет «нажмите Авторизоваться» верен только там, где своего
+ * заголовка Authorization нет: если он настроен, 401 значит «токен отвергнут»,
+ * и отправлять человека в OAuth — увести его от настоящей причины.
+ */
+function failureDetail(error: unknown, server: McpServer): string {
+  if (isUnauthorized(error, server.transport)) {
+    return hasOwnAuthorization(server)
+      ? 'Сервер отверг заголовок Authorization (401) — проверьте токен в заголовках'
+      : 'Требуется авторизация OAuth — нажмите «Авторизоваться»';
+  }
+  const detail = error instanceof Error ? error.message : String(error);
+  return detail.slice(0, 400);
+}
+
+function hasOwnAuthorization(server: McpServer): boolean {
+  return Object.keys(server.headers).some((key) => key.toLowerCase() === 'authorization');
 }
 
 /**

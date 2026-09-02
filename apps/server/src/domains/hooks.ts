@@ -1,10 +1,70 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { basename, resolve } from 'node:path';
 import type { Hook, HookDraft, HookEvent, SettingsSource } from '@claude-control/contracts';
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
 import { hookContentId as hookId } from '../lib/hook-id.ts';
 import { LOCAL_ID_PREFIX } from '../lib/settings-source.ts';
 import type { AppStore } from '../lib/app-store.ts';
-import { generateHookScript } from './hook-scripts.ts';
+import { generateHookScript, hookScriptPath } from './hook-scripts.ts';
+import { compiledHookOrigin } from './compiled-markers.ts';
+import { readScriptDescription } from '../lib/script-description.ts';
+
+/**
+ * Имя файла из формы совпало с существующим скриптом. Маршрут отвечает 409:
+ * под таким именем может лежать чужой, давно правленный руками скрипт —
+ * пресеты называются как популярные хуки (`session-brief`, `destructive-guard`).
+ */
+export class HookScriptExistsError extends Error {
+  readonly statusCode = 409;
+  readonly code = 'script_exists';
+
+  constructor(fileName: string) {
+    super(
+      `Файл hooks/${fileName} уже есть. Укажите другое имя файла или оставьте поле пустым и задайте команду.`,
+    );
+    this.name = 'HookScriptExistsError';
+  }
+}
+
+/** Один ли это файл: Windows не различает регистр и вид слэшей. */
+function samePath(a: string, b: string): boolean {
+  const normalize = (path: string): string => path.replace(/\\/g, '/');
+  return process.platform === 'win32'
+    ? normalize(a).toLowerCase() === normalize(b).toLowerCase()
+    : normalize(a) === normalize(b);
+}
+
+/**
+ * Выключенные хуки — обратно на свои места. Снимок помнит позицию среди хуков
+ * своего события (`position`); без неё хук встаёт после последнего хука
+ * того же события. Позиции применяются по возрастанию, поэтому два
+ * выключенных подряд возвращаются в исходном взаимном порядке.
+ */
+function withRemembered(own: Hook[], remembered: Hook[]): Hook[] {
+  const result = [...own];
+  const ordered = [...remembered].sort(
+    (a, b) => (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER),
+  );
+
+  for (const hook of ordered) {
+    let seen = 0;
+    let at = -1;
+    let lastSame = -1;
+    for (let i = 0; i < result.length; i += 1) {
+      if (result[i]!.event !== hook.event) continue;
+      if (hook.position !== undefined && seen === hook.position) {
+        at = i;
+        break;
+      }
+      seen += 1;
+      lastSame = i;
+    }
+    if (at < 0) at = lastSame >= 0 ? lastSame + 1 : result.length;
+    result.splice(at, 0, hook);
+  }
+
+  return result;
+}
 
 /**
  * В settings.json хуки лежат в три уровня: событие → группы matcher → команды.
@@ -46,7 +106,7 @@ function legacyHookId(event: string, groupIndex: number, commandIndex: number): 
  */
 interface HookOverlay {
   isEnabled: (id: string, legacyId: string) => boolean;
-  groupIds: (id: string, legacyId: string) => string[];
+  groupIds: (id: string, legacyId: string, command: string) => string[];
 }
 
 const NEUTRAL_OVERLAY: HookOverlay = {
@@ -57,7 +117,19 @@ const NEUTRAL_OVERLAY: HookOverlay = {
 function storeOverlay(store: AppStore): HookOverlay {
   return {
     isEnabled: (id, legacyId) => !store.isDisabled('hook', id, legacyId),
-    groupIds: (id, legacyId) => store.getGroupIdsFor('hook', id, legacyId),
+    // Скомпилированный панелью хук участником группы не числится — его
+    // принадлежность записана меткой в команде. Без этого триггер сценария шёл
+    // без бейджа группы, хотя скомпилированный рядом скилл его носит.
+    groupIds: (id, legacyId, command) => {
+      const origin = compiledHookOrigin(command);
+      if (origin?.kind === 'scenario') return [origin.groupId];
+      if (origin?.kind === 'automation') {
+        return (
+          store.getAutomations().find((item) => item.id === origin.automationId)?.groupIds ?? []
+        );
+      }
+      return store.getGroupIdsFor('hook', id, legacyId);
+    },
   };
 }
 
@@ -66,6 +138,7 @@ function parseHooksFile(
   settingsPath: string,
   source: SettingsSource,
   overlay: HookOverlay,
+  root?: string,
 ): Hook[] {
   const settings = readJsonFile<RawSettings>(settingsPath, {});
   const result: Hook[] = [];
@@ -86,6 +159,10 @@ function parseHooksFile(
 
         const legacyId = `${prefix}${legacyHookId(event, groupIndex, commandIndex)}`;
         const scriptPath = extractScriptPath(command.command);
+        // Claude Code запускает хук с cwd = каталог проекта, поэтому относительный
+        // путь скрипта в `.claude` проекта — норма. Проверяем его от корня проекта,
+        // а не от cwd сервера: иначе живой `.claude/hooks/x.mjs` шёл как «не найден».
+        const scriptFile = scriptPath ? resolve(root ?? process.cwd(), scriptPath) : undefined;
 
         result.push({
           id,
@@ -98,9 +175,9 @@ function parseHooksFile(
           // поэтому он всегда показан включённым — как оно и есть на деле.
           isEnabled: source === 'settings-local' || overlay.isEnabled(id, legacyId),
           scriptPath,
-          scriptExists: scriptPath ? existsSync(scriptPath) : undefined,
-          description: scriptPath ? readScriptDescription(scriptPath) : undefined,
-          groupIds: overlay.groupIds(id, legacyId),
+          scriptExists: scriptFile ? existsSync(scriptFile) : undefined,
+          description: scriptFile ? readScriptDescription(scriptFile) : undefined,
+          groupIds: overlay.groupIds(id, legacyId, command.command),
           source,
         });
       });
@@ -120,9 +197,15 @@ function readHooksFrom(settingsPath: string, store: AppStore, source: SettingsSo
  * подмешиваются. Так читается `.claude` проекта — файлы принадлежат гиту
  * проекта, и отметки владельца машины к ним отношения не имеют.
  */
-export function readHooksFromFiles(settingsPath: string, localPath?: string): Hook[] {
-  const own = parseHooksFile(settingsPath, 'settings', NEUTRAL_OVERLAY);
-  const local = localPath ? parseHooksFile(localPath, 'settings-local', NEUTRAL_OVERLAY) : [];
+export function readHooksFromFiles(
+  settingsPath: string,
+  localPath?: string,
+  projectRoot?: string,
+): Hook[] {
+  const own = parseHooksFile(settingsPath, 'settings', NEUTRAL_OVERLAY, projectRoot);
+  const local = localPath
+    ? parseHooksFile(localPath, 'settings-local', NEUTRAL_OVERLAY, projectRoot)
+    : [];
   return [...own, ...local];
 }
 
@@ -153,7 +236,7 @@ export function readHooks(settingsPath: string, store: AppStore, localPath?: str
       isEnabled: !store.isDisabled('hook', hook.id, hook.legacyId),
     }));
 
-  return [...own, ...remembered, ...local];
+  return [...withRemembered(own, remembered), ...local];
 }
 
 /**
@@ -262,10 +345,17 @@ export function upsertHook(
 
   // Если указано имя скрипта, файл создаётся автоматически, а команда
   // собирается из пути к нему: пользователю не нужно ни создавать файл,
-  // ни помнить синтаксис запуска.
-  const generated = draft.scriptName?.trim()
-    ? generateHookScript(hooksDir, draft, backupDir)
-    : undefined;
+  // ни помнить синтаксис запуска. СОЗДАЁТСЯ, а не перезаписывается: под этим
+  // именем может лежать чужой скрипт. Исключение — собственный файл правимого
+  // хука: его перегенерация и есть цель правки.
+  const scriptName = draft.scriptName?.trim();
+  if (scriptName) {
+    const path = hookScriptPath(hooksDir, scriptName);
+    const ownScript = hooks[index]?.scriptPath;
+    const isOwn = ownScript !== undefined && samePath(ownScript, path);
+    if (existsSync(path) && !isOwn) throw new HookScriptExistsError(basename(path));
+  }
+  const generated = scriptName ? generateHookScript(hooksDir, draft, backupDir) : undefined;
 
   const command = generated?.command ?? draft.command;
   // Несколько фильтров объединяются в одно регулярное выражение —
@@ -311,32 +401,11 @@ export function deleteHook(
  * Нужен, чтобы показать, существует ли файл, и дать открыть его на редактирование.
  */
 function extractScriptPath(command: string): string | undefined {
-  const quoted = /["']([^"']+\.(?:mjs|cjs|js|ts|sh|ps1|py))["']/.exec(command);
+  const quoted = /["']([^"']+\.(?:mjs|cjs|js|ts|mts|cts|sh|ps1|py))["']/.exec(command);
   if (quoted?.[1]) return quoted[1];
 
-  const bare = /(?:^|\s)((?:[A-Za-z]:)?[^\s"']+\.(?:mjs|cjs|js|ts|sh|ps1|py))/.exec(command);
+  const bare = /(?:^|\s)((?:[A-Za-z]:)?[^\s"']+\.(?:mjs|cjs|js|ts|mts|cts|sh|ps1|py))/.exec(
+    command,
+  );
   return bare?.[1];
-}
-
-/** Первые строки комментария в шапке скрипта — краткое описание для списка. */
-function readScriptDescription(scriptPath: string): string | undefined {
-  if (!existsSync(scriptPath)) return undefined;
-
-  try {
-    const head = readFileSync(scriptPath, 'utf8').split(/\r?\n/).slice(0, 10);
-    const comments: string[] = [];
-
-    for (const line of head) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('//') || trimmed.startsWith('#')) {
-        comments.push(trimmed.replace(/^(\/\/|#)\s?/, ''));
-        continue;
-      }
-      if (comments.length > 0) break;
-    }
-
-    return comments.join(' ').trim() || undefined;
-  } catch {
-    return undefined;
-  }
 }

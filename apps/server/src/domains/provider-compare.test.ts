@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { EnvVar, McpServer, PermissionRule } from '@claude-control/contracts';
@@ -55,6 +55,7 @@ describe('compareProviders / migrateProvider', () => {
 
   const claudeSide = (over: Partial<ClaudeSide> = {}): ClaudeSide => ({
     mcpConfigPath: join(home, 'claude.json'),
+    settingsPath: join(home, 'settings.json'),
     claudeMdPath: claudeMd,
     readMcp: () => [claudeServer(), claudeServer({ id: 'claude-only', name: 'claude-only' })],
     readEnv: (): EnvVar[] => [
@@ -68,7 +69,14 @@ describe('compareProviders / migrateProvider', () => {
       },
     ],
     readPermissions: (): PermissionRule[] => [
-      { id: '1', pattern: 'Bash(git push:*)', decision: 'ask', groupIds: [], source: 'settings' },
+      {
+        id: '1',
+        pattern: 'Bash(git push:*)',
+        decision: 'ask',
+        groupIds: [],
+        source: 'settings',
+        isEnabled: true,
+      },
     ],
     writeMcp: (path, server) => {
       written.push({ path, name: server.name });
@@ -215,5 +223,52 @@ describe('compareProviders / migrateProvider', () => {
       CompareRequestError,
     );
     expect(existsSync(join(home, 'config.toml'))).toBe(true);
+  });
+
+  it('приёмник без файла инструкций: строка «только слева», перенос туда разрешён и создаёт файл', () => {
+    rmSync(join(home, 'AGENTS.md'));
+
+    const result = compareProviders('claude', 'codex', { claude: claudeSide() });
+    const instructions = result.sections.find((section) => section.section === 'instructions')!;
+    const entry = instructions.entries[0]!;
+
+    // Раньше отсутствие приёмника блокировало строку целиком («differs» +
+    // blocked), хотя сервер умеет создать AGENTS.md — и справка это обещает.
+    expect(entry.state).toBe('left-only');
+    expect(entry.blocked).toBeUndefined();
+    expect(entry.right).toBeUndefined();
+    expect(instructions.right.supported).toBe(true);
+    expect(instructions.right.note).toMatch(/Файла нет/);
+    expect(instructions.migratable).toBe(true);
+
+    migrateProvider(
+      { from: 'claude', to: 'codex', section: 'instructions', mode: 'apply' },
+      { claude: claudeSide() },
+    );
+    expect(readFileSync(join(home, 'AGENTS.md'), 'utf8')).toBe('правила claude\n');
+  });
+
+  it('колонка Claude называет свой файл и в env, и в правах', () => {
+    const result = compareProviders('claude', 'codex', { claude: claudeSide() });
+    for (const name of ['env', 'permissions'] as const) {
+      const section = result.sections.find((item) => item.section === name)!;
+      expect(section.left.filePath).toBe(join(home, 'settings.json'));
+    }
+  });
+
+  it('тело переноса проверяется: строка вместо ключей, чужой режим, пропущенный раздел — отказ', () => {
+    const before = readFileSync(join(home, 'config.toml'), 'utf8');
+    const bodies: unknown[] = [
+      { from: 'claude', to: 'codex', section: 'mcp', keys: 'shared', mode: 'apply' },
+      { from: 'claude', to: 'codex', section: 'mcp', keys: ['shared'], mode: 'bogus' },
+      { from: 'claude', to: 'codex' },
+      { from: 'claude', to: 'codex', section: 'instructions', mode: 42 },
+    ];
+    for (const body of bodies) {
+      expect(() =>
+        migrateProvider(body as Parameters<typeof migrateProvider>[0], { claude: claudeSide() }),
+      ).toThrow(CompareRequestError);
+    }
+    expect(readFileSync(join(home, 'config.toml'), 'utf8')).toBe(before);
   });
 });

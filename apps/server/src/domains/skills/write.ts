@@ -5,14 +5,16 @@ import type { SkillDraft } from '@claude-control/contracts';
 import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
 import { slugify } from '../../lib/slug.ts';
 import { splitFrontmatter } from './frontmatter.ts';
-import { disabledSkillsDir } from './paths.ts';
+import { assertSkillId, disabledSkillsDir } from './paths.ts';
 
 /** Имя нового скилла уже занято — маршрут отвечает 409, а не пишет поверх. */
 export class SkillExistsError extends Error {
   readonly skillId: string;
 
-  constructor(skillId: string) {
-    super(`Скилл «${skillId}» уже существует и сейчас выключен`);
+  constructor(skillId: string, isDisabled: boolean) {
+    // Текст уходит человеку в тост: «сейчас выключен» — только когда это правда,
+    // иначе про включённый скилл сообщалось бы, что он выключен.
+    super(`Скилл «${skillId}» уже существует${isDisabled ? ' и сейчас выключен' : ''}`);
     this.name = 'SkillExistsError';
     this.skillId = skillId;
   }
@@ -24,7 +26,8 @@ export function saveSkill(
   draft: SkillDraft,
   backupDir?: string,
 ): string | undefined {
-  const id = skillId ?? slugifyName(draft.name);
+  // Слаг безопасен по построению; явный id пришёл из адреса — проверяем.
+  const id = skillId === null ? slugifyName(draft.name) : assertSkillId(skillId);
 
   // Выключенный скилл физически лежит в skills-disabled/. Запись правки в
   // skills/ создала бы вторую, включённую копию: панель по-прежнему считает
@@ -40,7 +43,7 @@ export function saveSkill(
   // режутся до 60 символов, так что «…руководство по стилю, часть первая» и
   // «…часть вторая» дают один и тот же id.
   if (skillId === null && (livesDisabled || existsSync(join(skillsDir, id))))
-    throw new SkillExistsError(id);
+    throw new SkillExistsError(id, livesDisabled);
 
   const base = livesDisabled ? disabledDir : skillsDir;
   const skillDir = join(base, id);

@@ -78,11 +78,18 @@ export function hasConvention(root: string): boolean {
  * Дописать соглашение в конец `CLAUDE.md`. Повторный вызов ничего не делает —
  * значит, кнопку можно нажать дважды без последствий.
  */
-export function installConvention(root: string): boolean {
+export function installConvention(root: string, backupDir?: string, backupName?: string): boolean {
   if (hasConvention(root)) return false;
   const path = join(root, 'CLAUDE.md');
   const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
   const separator = current.length === 0 || current.endsWith('\n\n') ? '' : '\n';
-  writeTextFile(path, `${current}${separator}\n${BLOCK}`);
+  // Тот же CLAUDE.md правит вкладка «Правила» — с резервной копией и под ИМЕНЕМ
+  // проектной копии (`project-<id>-CLAUDE.md`), а не пользовательской; дописывать
+  // без копии значило бы, что одна кнопка бережёт файл, а другая нет.
+  writeTextFile(
+    path,
+    `${current}${separator}\n${BLOCK}`,
+    backupDir ? { backupDir, backupName } : {},
+  );
   return true;
 }

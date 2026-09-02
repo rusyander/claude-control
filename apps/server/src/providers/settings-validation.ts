@@ -65,6 +65,13 @@ const promptGateSettingsSchema = object({
   action: zodEnum(['block', 'warn']),
 });
 
+/** Удалённый доступ — только для снимка (см. `importSettingsSchema`). */
+const remoteAccessSettingsSchema = object({
+  enabled: boolean(),
+  publicUrl: string(),
+  notify: boolean(),
+});
+
 /** Поля настроек без дефолтов — для частичной проверки PATCH. */
 export const settingsPatchSchema = object({
   theme: zodEnum(['light', 'dark', 'system']),
@@ -88,6 +95,12 @@ export const settingsPatchSchema = object({
   mcpAutoCheck: boolean(),
   chatModel: string(),
   chatEffort: zodEnum(['', 'low', 'medium', 'high', 'xhigh', 'max']),
+  // Инициативы чата (аудит «Настройки» 2026-09-03): без этих четырёх полей PATCH
+  // отвечал 200 со СТАРЫМ значением, и тумблер на странице отскакивал назад.
+  taskSplitInitiative: boolean(),
+  handoffInitiative: boolean(),
+  handoffContextLimit: number().int().nonnegative(),
+  handoffAutoDefault: boolean(),
   modelPricing: record(string(), modelPricingSchema),
   encryptSecretBackups: boolean(),
   autoUpdateModels: boolean(),
@@ -97,6 +110,16 @@ export const settingsPatchSchema = object({
   dlp: dlpSettingsSchema,
   promptGate: promptGateSettingsSchema,
 }).partial();
+
+/**
+ * Настройки внутри снимка: то же, что PATCH, плюс удалённый доступ. В PATCH его
+ * НЕТ намеренно — единственный писатель этого блока `/api/remote` (он же ведёт
+ * токен и гейт), а снимок обязан его сохранить: без поля в схеме zod вырезал
+ * его, и после переноса гейт по токену молча оказывался выключенным.
+ */
+const importSettingsSchema = settingsPatchSchema.extend({
+  remoteAccess: remoteAccessSettingsSchema.optional(),
+});
 
 /**
  * Импорт `state.json` с чужой машины. Проверяем структуру: тело — объект,
@@ -121,8 +144,16 @@ export const importStateSchema = object({
   runnerCommands: record(string(), string()),
   runnerPrefs: record(string(), unknown()),
   providerChecks: record(string(), unknown()),
+  // Аудит «Настройки» 2026-09-03: без этих полей экспорт→импорт терял связи
+  // чатов с сессиями (десятки записей), итоги проверок MCP, окна кода проектов
+  // и спаренные телефоны — молча, снимок при этом «проходил проверку».
+  mcpHealth: record(string(), unknown()),
+  projectCodeViews: record(string(), unknown()),
+  projectCodeLayout: unknown(),
+  chatLinks: record(string(), unknown()),
+  pushDevices: array(unknown()),
   // `secretBackupVerifier` намеренно НЕ импортируем: это отпечаток парольной
   // фразы, которая есть только в голове у владельца исходной машины. Чужой
   // verifier заблокировал бы шифрование копий здесь навсегда.
-  settings: settingsPatchSchema,
+  settings: importSettingsSchema,
 }).partial();

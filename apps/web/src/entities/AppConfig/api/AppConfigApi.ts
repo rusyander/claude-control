@@ -125,6 +125,7 @@ export function useSetLocation() {
       // Смена каталога меняет вообще всё, что показывает приложение.
       void queryClient.invalidateQueries();
     },
-    meta: { successMessage: 'toasts.locationChanged' },
+    // Тост об успехе — у вызывающего: сервер отвечает 200 и на отказанный путь
+    // (`isValid: false` с причиной), а общий `successMessage` хвалил и его.
   });
 }

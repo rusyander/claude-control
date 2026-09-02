@@ -913,7 +913,8 @@ export const helpEn: HelpSchema = {
         'between the numbers is what sits disabled and has no effect.',
       tileScripts: 'Scripts',
       tileScriptsText:
-        'How many files are in the directory and how many are bound to no hook. An ' +
+        'How many files are in the directory and how many are bound to no hook. A ' +
+        'module imported by a bound script (say, from lib/) counts as bound with it. An ' +
         'unbound file is usually a forgotten setting. When every one is bound, the ' +
         'caption says so.',
       tileHooksBroken: 'Hooks in red',
@@ -946,7 +947,7 @@ export const helpEn: HelpSchema = {
       noteToastText:
         'A notification in the bottom-right corner lives for three seconds, shows at most ' +
         'three lines and closes with the ×; hovering pauses the timer. Long command output ' +
-        'is not cut off: clicking the card opens a window with the full text and a Copy ' +
+        'is not cut off: clicking the card opens a window with the full text and a “Copy text” ' +
         'button. Missed ones stay under “Notifications” at the bottom of the sidebar — same ' +
         'window on click.',
     },
@@ -1132,7 +1133,9 @@ export const helpEn: HelpSchema = {
       canWatch: 'Watch the files and refresh the interface when they change outside the panel',
 
       cantLogin: 'Sign in to a Claude account: authentication is the CLI’s job',
-      cantToken: 'See the token: the server reports only the source of access, never the value',
+      cantToken:
+        'See the Claude Code access token: the server reports only the source, never the value. ' +
+        'The remote-access token is a different one; the panel shows it behind the pairing button',
       cantSync:
         'Sync settings between machines automatically: there is no live sync, only a ' +
         'manual file transfer',
@@ -1149,7 +1152,10 @@ export const helpEn: HelpSchema = {
       storageApply: 'When it applies',
       storageApplyValue: 'at once: changing the directory needs no restart',
 
-      cardsTitle: 'The cards',
+      cardsTitle: 'The main cards',
+      cardsCaption:
+        'The four cards at the top of the section. The rest — remote access, models, provider ' +
+        'check, format check, transfer — have their own sections below.',
       cardAccount: 'Account',
       cardAccountText:
         'Whose account is in use: email, organisation, subscription type. Taken from the same ' +
@@ -1182,10 +1188,14 @@ export const helpEn: HelpSchema = {
         '“Not logged in” in the sandbox while the chat works is not an account problem.',
 
       fieldsTitle: 'What you can switch',
-      fieldsCaption: 'Every switch saves immediately; there is no save button here.',
+      fieldsCaption:
+        'Switches save immediately. Only text fields have a button — the directory path, ' +
+        'a custom editor command, manual access.',
       fieldTheme: 'The colour theme: light, dark, or follow the system.',
       fieldLanguage: 'The interface language.',
-      fieldDir: 'The path to the configuration directory. Empty means detect it automatically.',
+      fieldDir:
+        'The path to the configuration directory. Empty means detect it automatically — the ' +
+        '“Auto-detect” button in the card returns to it.',
       fieldReveal: 'Show secret values straight away, without clicking the eye.',
       fieldBackup: 'Make a backup of the file before every write.',
       fieldEncrypt:
@@ -1604,7 +1614,7 @@ export const helpEn: HelpSchema = {
       recipesTitle: 'Assembling a bundle for a job',
       recipe1: 'Create a group and say what it is for',
       recipe1Text:
-        'The “New group” button, a name and one sentence about the purpose. A worked ' +
+        'The “Create group” button, a name and one sentence about the purpose. A worked ' +
         'example for this whole recipe: a “Frontend review” group.',
       recipe2: 'Add the contents',
       recipe2Text:
@@ -1758,6 +1768,12 @@ export const helpEn: HelpSchema = {
       noteManualText:
         'Installing by identifier is collapsed and sits after the catalogue: it is worth ' +
         'checking the list first.',
+      noteMarketplaceTitle: 'Removing a marketplace takes its plugins with it',
+      noteMarketplaceText:
+        'When a source is removed, Claude Code drops every plugin installed from it — with ' +
+        'no question of its own. The panel asks first and lists exactly what goes. A plugin ' +
+        'whose folder vanished from disk is still "installed" to the CLI: the card marks it ' +
+        '"folder missing".',
       noteProviderTitle: "Other providers' plugins are their own",
       noteProviderText:
         "Everything described here is about Claude Code's plugins and marketplaces. With " +
@@ -1829,7 +1845,9 @@ export const helpEn: HelpSchema = {
       storageWhoReadsValue:
         'the first file is read by Claude Code, the second by the MCP server launcher',
       storageDetect: 'How a secret is detected',
-      storageDetectValue: 'by name: TOKEN, SECRET, KEY, PASSWORD, PAT, CREDENTIAL',
+      storageDetectValue:
+        'by name, as a whole word between underscores: TOKEN, SECRET, KEY, PASSWORD, PAT, ' +
+        'CREDENTIAL — GIT_BASH_PATH and MAX_TOKENS are not secrets',
 
       flowTitle: 'Where a variable ends up',
       flowCaption:
@@ -1861,7 +1879,9 @@ export const helpEn: HelpSchema = {
       fieldValue:
         'The value. When editing a secret the field is empty: the panel does not know the ' +
         'old one.',
-      fieldSource: 'Where to save it: settings — visible to Claude Code, secrets — the token file.',
+      fieldSource:
+        'Where to save it — chosen on creation: settings — visible to Claude Code, secrets — ' +
+        'the token file. When editing, the file follows the record and does not change.',
       fieldIsSecret:
         'Whether the variable counts as a secret. Not set by hand — detected from the name.',
       fieldComment:
@@ -1891,17 +1911,23 @@ export const helpEn: HelpSchema = {
       noteDetectTitle: 'Secret detection works by name',
       noteDetectText:
         'A variable called API_ENDPOINT lands in ordinary settings even if you keep ' +
-        'something sensitive in it. Check the chosen file before saving: the word lists ' +
-        'used by the form and by the server do not match exactly, and a name containing ' +
-        'CREDENTIAL may be offered as an ordinary setting.',
-      noteLocalTitle: 'Variables from settings.local.json are shown, nothing more',
+        'something sensitive in it — check the chosen file before saving. The word counts ' +
+        'only as a whole: GIT_BASH_PATH and MAX_THINKING_TOKENS stay ordinary settings, ' +
+        'GITHUB_PAT and ANTHROPIC_API_KEY are secrets. The rule is the same for the form, ' +
+        'bulk add and the server: the file the form proposes matches the mask in the list.',
+      noteLocalTitle: 'Variables from settings.local.json are edited right here',
       noteLocalText:
         'The panel reads both the main settings.json and the personal ' +
         'settings.local.json, so the list shows everything that will really reach the ' +
-        'environment. Entries from the personal file carry a “local” badge: the value ' +
-        'can be revealed, but editing and deleting them is closed, and trying it ' +
-        'through the API is refused. The panel never writes to that file — edit it by ' +
-        'hand.',
+        'environment. Entries from the personal file carry a “local” badge, and an edit ' +
+        'goes back to exactly the file it came from. The file cannot be picked by hand: ' +
+        'it follows the record — otherwise a variable would quietly split in two.',
+      noteGroupTitle: 'Group variables are marked and edited in the group',
+      noteGroupText:
+        'A variable set by an enabled group lives in settings.json, but the list marks it ' +
+        'with a “group: name” badge and shows no edit or delete buttons: deleted here, the ' +
+        'group would bring it back the next time it is enabled. Change it in the group card ' +
+        '(the Groups section); it is removed there too, together with disabling the group.',
       noteCommentsTitle: 'Comments in the token file survive',
       noteCommentsText:
         'The panel rewrites the file but carries the comments above variables across. Hand ' +
@@ -2060,7 +2086,9 @@ export const helpEn: HelpSchema = {
         'file is shared, and parallel writes would overwrite each other.',
 
       fieldsTitle: 'Fields of a server',
-      fieldsCaption: 'Names match the mcpServerDraftSchema schema.',
+      fieldsCaption:
+        'Names match the mcpServerDraftSchema schema. Health and tools are response fields ' +
+        '(mcpServerSchema): the form has none, they appear after a check.',
       fieldName:
         'The server name in the configuration. Also the identifier and the prefix used in ' +
         'permissions.',
@@ -2070,10 +2098,13 @@ export const helpEn: HelpSchema = {
       fieldUrl: 'The server address. For sse and http only.',
       fieldEnv:
         'Environment variables, one KEY=VALUE per line. What belongs here are references ' +
-        'to variables, not the secrets themselves.',
+        'to variables, not the secrets themselves: ${VAR} or ${VAR:-default}. During a ' +
+        'connection check the panel expands them the way Claude Code does — from its own ' +
+        'environment and from the Environment section (settings.json → env, ' +
+        'settings.local.json, .mcp-secrets.env). An unset variable is named in the failure reason.',
       fieldHeaders:
         'Request headers, one Name=value per line — the same shape as environment ' +
-        'variables. For http and sse only: for stdio the form clears them.',
+        'variables, with the same ${VAR} expansion. For http and sse only: for stdio the form clears them.',
       fieldHealth: 'Connection state from the last check, plus the reason if it failed. Read only.',
       fieldTools: 'How many tools the server reported during the check. Read only.',
 
@@ -2100,20 +2131,25 @@ export const helpEn: HelpSchema = {
         'Server configuration lives in a shared file that easily leaks along with a ' +
         'settings dump. The variables field takes the name of a key, while the value ' +
         'itself stays in the Environment section.',
-      noteWindowsTitle: 'On Windows npx runs through a shell',
+      noteWindowsTitle: 'On Windows the command is looked up the way a terminal does it',
       noteWindowsText:
-        'The panel does that itself, and escapes the arguments itself too: a path with ' +
-        'spaces would otherwise split into two arguments.',
+        'npx, node and uvx are .cmd shims there, and a plain process spawn cannot find them. ' +
+        'The panel starts a stdio server through cross-spawn — the same library the official ' +
+        'MCP client uses: the command is resolved via PATH and PATHEXT, arguments are escaped ' +
+        'by the library, a path with spaces stays one argument. No separate cmd shell is ' +
+        'involved, and the stderr of a crashed process is also read in the console code page ' +
+        '(CP866), so the reason does not turn into question marks.',
       noteProjectTitle: 'These are the global MCP servers; project ones live in Projects',
       noteProjectText:
         'This section manages the shared ~/.claude.json. A specific project’s MCP servers ' +
-        'live in its .mcp.json and are edited in the Projects section — but that is still ' +
-        'raw there: no connection check, no OAuth, no soft-disable toggle.',
+        'live in its .mcp.json and are edited in the Projects section: adding, editing and ' +
+        'the disable toggle are there, but not the connection check or OAuth.',
       noteTimeoutTitle: 'The connection timeout is configurable',
       noteTimeoutText:
         'The timeout for network servers (http/sse) is set in Settings via ' +
         'mcpNetworkTimeoutMs (2000–120000 ms). Launching local stdio servers stays ' +
-        'hard-capped at 45 seconds.',
+        'hard-capped at 45 seconds for the handshake including process start-up: ' +
+        '`npx -y` still downloads the package on its first run.',
       noteHandshakeTitle: 'The connection check is a handshake, not a port ping',
       noteHandshakeText:
         'The panel greets the server over the MCP protocol using the official library ' +
@@ -2124,8 +2160,12 @@ export const helpEn: HelpSchema = {
         'beside it is what it actually reported.',
       noteHealthTitle: 'The connection check does not run by itself',
       noteHealthText:
-        'Starting a server costs time, so opening the page shows the state from the last ' +
-        'check. A fresh one is a button away.',
+        'Starting a server costs time, so opening the page shows the outcome of the last ' +
+        'check on the card — status, reason, tool count and time. The outcome is kept in ' +
+        'the panel state and survives a page reload; the Overview counts responding and ' +
+        'failed servers from it. A fresh one is a button away, or enable the automatic ' +
+        'check on open in Settings (mcpAutoCheck). A 401 from a server with its own ' +
+        'Authorization header means a rejected token, not a need for OAuth — the card says so.',
       noteRestartTitle: 'Tools appear after a restart',
       noteRestartText:
         'Claude Code asks for the tool list when a session starts. A server connected just ' +
@@ -2178,11 +2218,17 @@ export const helpEn: HelpSchema = {
         'the whole list',
       canMcp: 'Manage permissions for MCP server tools on a separate tab',
       canMove: 'Move a permission between settings.json and settings.local.json with a button',
+      canToggle:
+        'Switch a permission off without deleting it: it leaves settings.json but stays in the ' +
+        'list marked “disabled” — a permission held by a group looks the same',
       canSee: 'See which common actions are still unconfigured',
       canValidate:
         'Get a warning when a pattern does not look like the known forms: ' +
         'Bash(…), mcp__server__tool, Read(…)',
       canAssistant: 'Fill the form with the assistant by describing the rule in words',
+      canShadow:
+        'See which rules are not in effect: a stronger decision with the same or a wider ' +
+        'pattern overrides them — deny on all of Bash silences allow on Bash(git status:*)',
 
       cantWhy: 'Find out why Claude asked for confirmation of a particular action',
       cantOrderCustom: 'Set your own resolution order: the priority of decisions is fixed',
@@ -2236,11 +2282,11 @@ export const helpEn: HelpSchema = {
         'Common actions by category: files, shell, network, git, tools. Each has a risk ' +
         'rating and its current state. “Not set” means there is no rule and Claude Code ' +
         'decides by its own defaults.',
-      tabMcp: 'MCP',
+      tabMcp: 'MCP servers',
       tabMcpText:
         'Permissions for the tools of connected servers, grouped by server. Kept apart ' +
         'because otherwise they swamp the general list.',
-      tabAll: 'All',
+      tabAll: 'All rules',
       tabAllText:
         'A flat list of every rule with a filter by decision and a search by pattern. This ' +
         'is where you go to find one specific rule.',
@@ -2372,8 +2418,9 @@ export const helpEn: HelpSchema = {
         'and editable right in the card, next to the file tree.',
       whyOrphans: 'Unused files are visible',
       whyOrphansText:
-        'The panel matches files against hooks and marks the ones nothing points to. ' +
-        'Such a file was either never wired up or is left over from a deleted hook.',
+        'The panel matches files against hooks — together with whatever the bound ' +
+        'scripts import — and marks the ones nothing points to. Such a file was either ' +
+        'never wired up or is left over from a deleted hook.',
       whyTest: 'Tested without the model',
       whyTestText:
         'A script can be run against a prepared event straight from its card: you see ' +
@@ -2402,11 +2449,13 @@ export const helpEn: HelpSchema = {
 
       storageFolder: 'Directory',
       storageExt: 'What counts as a script',
-      storageExtValue: 'files with the extensions .mjs .cjs .js .ts .sh .ps1 .py',
+      storageExtValue: 'files with the extensions .mjs .cjs .js .ts .mts .cts .sh .ps1 .py',
       storageDesc: 'Where the description comes from',
       storageDescValue: 'the first comment lines at the top of the file',
       storageUsed: 'How “in use” is decided',
-      storageUsedValue: 'the file name appears in the command of at least one hook',
+      storageUsedValue:
+        'the file name appears in a hook command — or the file is imported by a bound ' +
+        'script (following relative import/require chains)',
 
       flowTitle: 'How a script receives an event and answers',
       flowCaption:
@@ -2469,8 +2518,8 @@ export const helpEn: HelpSchema = {
       fieldContent: 'The full script code.',
       fieldPath: 'The path on disk. Read only.',
       fieldIsUsed:
-        'Whether the file is bound to at least one hook. Worked out by matching against ' +
-        'hook commands.',
+        'Whether the file is bound to at least one hook: straight from a hook command or ' +
+        'through an import from a bound script (relative import/require, transitively).',
       fieldSize: 'File size and last modification date. Shown in the list row.',
 
       recipesTitle: 'Writing your own script',
@@ -2492,8 +2541,10 @@ export const helpEn: HelpSchema = {
       notesTitle: 'Things people trip over',
       noteUnusedTitle: '“Unused” is not an error, but worth a look',
       noteUnusedText:
-        'That mark goes on files whose name appears in no hook command. Usually it means ' +
-        'a forgotten binding or a leftover from a deleted hook.',
+        'That mark goes on files no hook reaches: neither directly from its command nor ' +
+        'through an import from a bound script. Usually it means a forgotten binding or a ' +
+        'leftover from a deleted hook. Tests and fixtures (the tests/ folder, *.test.* ' +
+        'names) are marked separately and stay out of the count.',
       noteDeleteTitle: 'Deleting a script in use breaks its hook silently',
       noteDeleteText:
         'The hook stays in the settings but has nothing to run — and no error appears. The ' +
@@ -2678,7 +2729,8 @@ export const helpEn: HelpSchema = {
         'a vertical bar — syntax you do not need to remember.',
       fieldScriptName:
         'The script file name without an extension. If set, the panel creates the file ' +
-        'in hooks/ and fills in the launch command itself.',
+        'in hooks/ and fills in the launch command itself. If a file with that name already ' +
+        'exists, the panel refuses rather than overwrites: the other script stays intact.',
       fieldTemplate: 'What the hook does: message, guard, shell command, or a blank scaffold.',
       fieldDescription:
         'One sentence about what the hook is for. It goes into the header of the ' +
@@ -2925,11 +2977,13 @@ export const helpEn: HelpSchema = {
       noteNestedText:
         'Claude Code does not walk the skill folder by itself. If nothing in SKILL.md ' +
         'links to references/rules.md, that file is never read — it just sits there.',
-      noteNameTitle: 'The name cannot be changed',
+      noteNameTitle: 'The name changes only via the "Rename" button',
       noteNameText:
-        'The skill name is the directory name and the identifier. For an existing ' +
-        'skill the field is locked: changing it would create a second folder rather ' +
-        'than rename the first.',
+        'The skill name is the directory name and the identifier. In the form the ' +
+        'field is locked for an existing skill: editing it there would create a second ' +
+        'folder rather than rename the first. Renaming is a separate button on the ' +
+        'card: the panel moves the folder and rewrites references to the skill in ' +
+        'groups and marks.',
       noteDeleteTitle: 'Deleting wipes the whole folder, but takes a backup first',
       noteDeleteText:
         'Every nested file goes at once. Before that the folder is copied whole into ' +
@@ -3296,6 +3350,8 @@ export const helpEn: HelpSchema = {
       canRevert: 'Discard unsaved edits and go back to what is on disk',
       canFixParse:
         'Repair the file by hand if edits made outside the panel left it parsing wrongly',
+      canFollow:
+        'See an edit made outside the panel: a clean editor picks the file up from disk by itself, and over unfinished edits it warns and offers to load the newer version',
 
       cantProject: 'Open a project CLAUDE.md — this is the global one from ~/.claude only',
       cantPreview: 'Get a markdown preview or syntax highlighting: this is a plain text field',
@@ -3538,8 +3594,9 @@ export const helpEn: HelpSchema = {
 
       whyWhat: 'You can see what changed',
       whyWhatText:
-        'The feed collects edits per configuration file: settings.json, CLAUDE.md, ' +
-        '.mcp.json and their local pairs.',
+        'The feed collects edits per configuration file: settings.json and its local pair, ' +
+        'CLAUDE.md, ~/.claude.json (MCP servers). Project files and other CLIs’ files are ' +
+        'stored under their own names and never enter the user-level feed.',
       whyDiff: 'A line-by-line diff',
       whyDiffText:
         'For each edit you see the added and removed lines, not just the fact that ' +
@@ -3551,7 +3608,7 @@ export const helpEn: HelpSchema = {
 
       storageSource: 'Source',
       storageTracked: 'Tracked',
-      storageTrackedValue: 'settings.json, settings.local.json, CLAUDE.md, .mcp.json',
+      storageTrackedValue: 'settings.json, settings.local.json, CLAUDE.md, ~/.claude.json',
       storageSecrets: 'Excluded',
       storageDir: 'When available',
       storageDirValue: 'even when backup creation is off — the old backups are still there',

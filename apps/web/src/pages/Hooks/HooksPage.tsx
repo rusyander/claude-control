@@ -12,6 +12,7 @@ import { Toggle } from '@shared/ui/toggle';
 import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
+import { EmptyState } from '@shared/ui/empty-state';
 import { Button } from '@shared/ui/button';
 import { HookFormModal } from '@features/HookEditor';
 import { DeleteButton } from '@features/EntityDelete';
@@ -53,6 +54,10 @@ export function HooksPage() {
     if (!open) writeUrl(undefined);
   };
 
+  /** Подпись хука для кнопок и диалогов: событие и фильтр, если он есть. */
+  const titleOf = (hook: Hook): string =>
+    `${hook.event}${hook.matcher ? ` · ${hook.matcher}` : ''}`;
+
   // Группируем по событию: так видно, что происходит в каждой точке жизненного цикла.
   const byEvent = hooks.reduce<Record<string, typeof hooks>>((acc, hook) => {
     (acc[hook.event] ??= []).push(hook);
@@ -76,6 +81,10 @@ export function HooksPage() {
 
       {isLoading && <SkeletonList rows={5} />}
 
+      {!isLoading && hooks.length === 0 && (
+        <EmptyState icon="hooks" title={t('hooks.emptyTitle')} text={t('hooks.emptyText')} />
+      )}
+
       {Object.entries(byEvent).map(([event, eventHooks]) => (
         <Stack key={event} gap="var(--spacing-xs)">
           <Typography variant="body-sm" weight="semibold" color="accent">
@@ -88,6 +97,7 @@ export function HooksPage() {
                 <Stack gap="var(--spacing-2xs)" flex={1} minWidth={0}>
                   <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
                     {hook.matcher && <Badge tone="accent">{hook.matcher}</Badge>}
+                    {!hook.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
                     {hook.scriptExists === false && (
                       <Badge tone="danger" withDot>
                         {t('hooks.scriptMissing')}
@@ -140,7 +150,7 @@ export function HooksPage() {
                   )}
                   <SandboxButton
                     kind="hook"
-                    title={`${hook.event}${hook.matcher ? ` · ${hook.matcher}` : ''}`}
+                    title={titleOf(hook)}
                     hookId={hook.id}
                     selection={{ hookIds: [hook.id] }}
                     context={{ event: hook.event, matcher: hook.matcher }}
@@ -150,11 +160,14 @@ export function HooksPage() {
                     size="sm"
                     iconOnly
                     icon={<Icon name="edit" size={24} />}
-                    aria-label={`${t('common.edit')}: ${hook.event}`}
+                    aria-label={`${t('common.edit')}: ${titleOf(hook)}`}
                     onClick={() => openEdit(hook)}
                   />
+                  {/* Подтверждение — именем события: полную подпись с «·» и «|»
+                      с клавиатуры не набрать. */}
                   <DeleteButton
-                    entityName={`${hook.event}${hook.matcher ? ` · ${hook.matcher}` : ''}`}
+                    entityName={titleOf(hook)}
+                    confirmationName={hook.event}
                     description={
                       hook.source === 'settings-local'
                         ? t('common.deleteHookLocal')
@@ -170,7 +183,7 @@ export function HooksPage() {
                     <Toggle
                       checked={hook.isEnabled}
                       onCheckedChange={(isEnabled) => setEnabled.mutate({ id: hook.id, isEnabled })}
-                      aria-label={`${hook.event} ${hook.matcher ?? ''}`}
+                      aria-label={titleOf(hook)}
                     />
                   )}
                 </Stack>

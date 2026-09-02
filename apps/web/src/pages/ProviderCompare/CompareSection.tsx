@@ -58,7 +58,7 @@ export function CompareSection({ section, busy, onMigrate }: CompareSectionProps
         </Stack>
 
         {section.note && (
-          <Typography variant="body-sm" color="subtle">
+          <Typography variant="body-sm" color="subtle" className="prose">
             {section.note}
           </Typography>
         )}

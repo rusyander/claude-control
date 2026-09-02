@@ -24,6 +24,8 @@ export const SEARCH_KIND_ORDER: readonly SearchResultKind[] = [
   'mcp',
   'permission',
   'env',
+  // Группы — раздел приложения, в навигации он идёт после разделов конфигурации.
+  'group',
 ];
 
 export function groupResults(results: readonly SearchResult[]): SearchGroup[] {

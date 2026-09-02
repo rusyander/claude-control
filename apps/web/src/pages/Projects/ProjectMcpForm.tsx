@@ -8,6 +8,7 @@ import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
 import { Typography } from '@shared/ui/typography';
 import { envToText, textToEnv, parseArgs, formatArgs } from '@shared/lib/env-text';
+import { toErrorMessage } from '@shared/api/client';
 import { MCP_TRANSPORTS } from '@entities/McpServer';
 import { useCreateProjectMcp, useUpdateProjectMcp } from '@entities/Project';
 import type { ProjectMcpFormProps } from './ProjectMcpForm.types';
@@ -153,7 +154,7 @@ export function ProjectMcpForm({ isOpen, onOpenChange, projectId, server }: Proj
 
         {(create.isError || update.isError) && (
           <Typography variant="body-sm" color="danger">
-            {t('errors.saveFailed')}
+            {toErrorMessage(create.error ?? update.error)}
           </Typography>
         )}
       </Stack>

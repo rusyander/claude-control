@@ -9,6 +9,7 @@ import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
 import { sourceLabel } from '@shared/lib/location-label';
 import { FolderPicker } from '@features/FolderPicker';
+import { toast } from '@shared/lib/toast';
 import { useLocation, useSetLocation, useSettings, useUpdateSettings } from '@entities/AppConfig';
 import {
   useProviderDetect,
@@ -230,7 +231,12 @@ export function OnboardingWizard() {
         isOpen={pickerOpen}
         onOpenChange={setPickerOpen}
         onPick={(path) => {
-          setLocation.mutate(path);
+          setLocation.mutate(path, {
+            // Сервер отвечает 200 и на отказанный путь — хвалим только принятый.
+            onSuccess: (result) => {
+              if (result.isValid) toast.success(t('toasts.locationChanged'));
+            },
+          });
           setPickerOpen(false);
         }}
       />

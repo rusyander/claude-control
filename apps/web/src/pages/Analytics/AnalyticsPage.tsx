@@ -188,6 +188,7 @@ export function AnalyticsPage() {
                     seriesIndex: index + 1,
                     hint: `${formatNumber(model.totals.requests, locale)} · ${formatMoney(model.estimatedCost, locale)}`,
                   }))}
+                  formatValue={(value) => formatCompact(value, locale)}
                   onItemClick={(id) => setDetail({ kind: 'model', id })}
                 />
               </Stack>
@@ -208,6 +209,7 @@ export function AnalyticsPage() {
                     hint: project.project,
                   }))}
                   limit={8}
+                  formatValue={(value) => formatCompact(value, locale)}
                   onItemClick={(id) => setDetail({ kind: 'project', id })}
                 />
               </Stack>
@@ -303,6 +305,7 @@ export function AnalyticsPage() {
                     seriesIndex: 5,
                   }))}
                   limit={10}
+                  formatValue={(value) => formatNumber(value, locale)}
                 />
               </Stack>
             </Card>
@@ -321,6 +324,7 @@ export function AnalyticsPage() {
                     seriesIndex: 2,
                   }))}
                   limit={10}
+                  formatValue={(value) => formatNumber(value, locale)}
                 />
               </Stack>
             </Card>

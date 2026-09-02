@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Skeleton } from './Skeleton';
 import type { SkeletonListProps } from './skeleton.types';
 import styles from './skeleton.module.scss';
@@ -7,8 +8,9 @@ import styles from './skeleton.module.scss';
  * скиллы, хуки, серверы выглядят одинаково.
  */
 export function SkeletonList({ rows = 4, withActions = true, className }: SkeletonListProps) {
+  const { t } = useTranslation();
   return (
-    <div className={`${styles.list} ${className ?? ''}`} role="status" aria-label="Загрузка">
+    <div className={`${styles.list} ${className ?? ''}`} role="status" aria-label={t('common.loading')}>
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className={styles.card}>
           <div className={styles.cardBody}>

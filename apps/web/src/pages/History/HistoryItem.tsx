@@ -23,6 +23,11 @@ export function HistoryItem({ entry }: HistoryItemProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const hasChanges = entry.added > 0 || entry.removed > 0;
+  // Пропущенный дифф (бинарный файл, слишком большой) — это НЕ «без изменений»:
+  // лента несёт причину пропуска, и шапка называет её, а не врёт про нули.
+  const summaryKey = entry.skipped
+    ? `history.skip_${entry.reason ?? 'binary'}`
+    : 'history.noChanges';
 
   return (
     <Card padding="none">
@@ -50,7 +55,7 @@ export function HistoryItem({ entry }: HistoryItemProps) {
           </Stack>
 
           <Stack direction="row" align="center" gap="var(--spacing-xs)">
-            {hasChanges ? (
+            {hasChanges && !entry.skipped ? (
               <>
                 {entry.added > 0 && (
                   <Typography variant="mono" color="success" as="span">
@@ -65,7 +70,7 @@ export function HistoryItem({ entry }: HistoryItemProps) {
               </>
             ) : (
               <Typography variant="caption" color="subtle" as="span">
-                {t('history.noChanges')}
+                {t(summaryKey)}
               </Typography>
             )}
           </Stack>

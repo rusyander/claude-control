@@ -13,7 +13,14 @@ import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
-import { permissionApi, PERMISSION_DECISIONS, RISK_TONE } from '@entities/Permission';
+import { toErrorMessage } from '@shared/api/client';
+import {
+  permissionApi,
+  PERMISSION_DECISIONS,
+  RISK_TONE,
+  shadowedBy,
+  findDuplicate,
+} from '@entities/Permission';
 import { BulkCreate } from '@shared/ui/bulk-create';
 import type { PermissionFormModalProps } from './PermissionFormModal.types';
 import { looksLikePermission } from '../model/looksLikePermission';
@@ -40,6 +47,7 @@ export function PermissionFormModal({
 
   const create = permissionApi.useCreate();
   const update = permissionApi.useUpdate();
+  const { data: rules = [] } = permissionApi.useList();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -49,7 +57,20 @@ export function PermissionFormModal({
   }, [isOpen, rule, initialPattern]);
 
   const isPending = create.isPending || update.isPending;
-  const canSave = pattern.trim().length > 0 && !isPending;
+
+  // Новое право уходит в settings.json; правимое остаётся в своём файле.
+  // Дубль сохранять нечего (сервер ответит 409), а перекрытое — предупредить:
+  // deny сильнее ask, ask сильнее allow, и правило иначе не подействует.
+  const trimmed = pattern.trim();
+  const source = rule?.source ?? 'settings';
+  const duplicate = trimmed
+    ? findDuplicate({ pattern: trimmed, decision, source }, rules, rule?.id)
+    : undefined;
+  const shadow =
+    trimmed && !duplicate
+      ? shadowedBy({ id: rule?.id ?? '', pattern: trimmed, decision }, rules)
+      : undefined;
+  const canSave = trimmed.length > 0 && !isPending && !duplicate;
 
   const categories = [...new Set(PERMISSION_PRESETS.map((preset) => preset.category))];
   const visiblePresets = PERMISSION_PRESETS.filter((preset) => preset.category === category);
@@ -136,6 +157,9 @@ export function PermissionFormModal({
             const open = (line.match(/\(/g) ?? []).length;
             const close = (line.match(/\)/g) ?? []).length;
             if (open !== close) return { raw: line, error: t('bulk.unbalanced') };
+            if (findDuplicate({ pattern: line, decision, source: 'settings' }, rules)) {
+              return { raw: line, error: t('permissions.formDuplicate') };
+            }
             return { raw: line, draft: { pattern: line, decision, groupIds: [] } };
           }}
           createOne={(draft) => create.mutateAsync(draft)}
@@ -270,9 +294,24 @@ export function PermissionFormModal({
               </Typography>
             </Stack>
 
+            {duplicate && (
+              <Typography variant="caption" color="warning" as="span">
+                {t('permissions.formDuplicate')}
+              </Typography>
+            )}
+            {shadow && (
+              <Typography variant="caption" color="warning" as="span">
+                {t('permissions.formShadowed', {
+                  decision: t(`permissions.${shadow.decision}`),
+                  pattern: shadow.pattern,
+                })}
+              </Typography>
+            )}
+
+            {/* Причину — в форму: тост всплывает под курсором поверх кнопок. */}
             {(create.isError || update.isError) && (
               <Typography variant="body-sm" color="danger">
-                {t('errors.saveFailed')}
+                {toErrorMessage(create.error ?? update.error ?? t('errors.saveFailed'))}
               </Typography>
             )}
           </Stack>

@@ -35,3 +35,9 @@
 .chevronOpen {
   transform: rotate(90deg);
 }
+
+// Поиск делит строку со сводкой: без пола он ужимался бы до ширины подсказки.
+.search {
+  flex: 1 1 260px;
+  max-width: 420px;
+}

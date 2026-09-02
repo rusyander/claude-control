@@ -23,20 +23,20 @@ export function ProjectsTopic() {
         <StorageCard
           title={tr('title')}
           rows={[
-            { label: tr('storageRules'), value: '<проект>/CLAUDE.md', isMono: true },
-            { label: tr('storageMcp'), value: '<проект>/.mcp.json', isMono: true },
-            { label: tr('storagePerms'), value: '<проект>/.claude/settings.json', isMono: true },
+            { label: tr('storageRules'), value: '<project>/CLAUDE.md', isMono: true },
+            { label: tr('storageMcp'), value: '<project>/.mcp.json', isMono: true },
+            { label: tr('storagePerms'), value: '<project>/.claude/settings.json', isMono: true },
             {
               label: tr('storageSkills'),
-              value: '<проект>/.claude/skills/*/SKILL.md',
+              value: '<project>/.claude/skills/*/SKILL.md',
               isMono: true,
             },
             {
               label: tr('storageHooks'),
-              value: '<проект>/.claude/settings.json → hooks',
+              value: '<project>/.claude/settings.json → hooks',
               isMono: true,
             },
-            { label: tr('storageRuleFiles'), value: '<проект>/.claude/rules/*.md', isMono: true },
+            { label: tr('storageRuleFiles'), value: '<project>/.claude/rules/*.md', isMono: true },
             { label: tr('storageCreate'), value: tr('storageCreateValue') },
           ]}
         />

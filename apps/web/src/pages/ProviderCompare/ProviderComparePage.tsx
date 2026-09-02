@@ -10,6 +10,7 @@ import { Card } from '@shared/ui/card';
 import { PageHeader } from '@shared/ui/page-header';
 import { SelectField } from '@shared/ui/select-field';
 import { SkeletonList } from '@shared/ui/skeleton';
+import { LoadErrorCard } from '@shared/ui/load-error';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { EmptyState } from '@shared/ui/empty-state';
 import { toast } from '@shared/lib/toast';
@@ -36,8 +37,8 @@ import styles from './ProviderComparePage.module.scss';
 export function ProviderComparePage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { data: settings } = useSettings();
-  const { data: providers } = useProviders();
+  const { data: settings, isError: settingsFailed, refetch: refetchSettings } = useSettings();
+  const { data: providers, isError: providersFailed, refetch: refetchProviders } = useProviders();
 
   const [left, setLeft] = useState('');
   const [right, setRight] = useState('');
@@ -89,13 +90,34 @@ export function ProviderComparePage() {
           else toast.success(t('providerCompare.migrateDone', { count: result.applied.length }));
           for (const skip of result.skipped) toast.info(`${skip.key}: ${skip.reason}`);
         },
+        // Тост об ошибке даёт глобальный MutationCache (`app/queryClient.ts`) —
+        // с причиной от сервера («формат приёмника не распознан»); свой второй,
+        // общий «не удалось», только дублировал его. Здесь — лишь сброс состояния.
         onError: () => {
           migrate.reset();
-          toast.error(t('providerCompare.migrateError'));
         },
       },
     );
   };
+
+  // Отказ сервера — не вечный скелет: заголовок с «?» и кнопка повторить.
+  if ((settingsFailed || providersFailed) && (!settings || !providers)) {
+    return (
+      <Stack gap="var(--spacing-md)">
+        <PageHeader
+          title={t('providerCompare.title')}
+          subtitle={t('providerCompare.subtitle')}
+          helpTopic="compare"
+        />
+        <LoadErrorCard
+          onRetry={() => {
+            void refetchSettings();
+            void refetchProviders();
+          }}
+        />
+      </Stack>
+    );
+  }
 
   if (!settings || !providers) return <SkeletonList rows={4} />;
 

@@ -8,7 +8,7 @@ import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import { RISK_TONE, DECISION_TONE } from '@entities/Permission';
+import { RISK_TONE, DECISION_TONE, effectiveRuleFor } from '@entities/Permission';
 import type { SystemPermissionsProps } from './SystemPermissions.types';
 import styles from './PermissionsPage.module.scss';
 
@@ -35,7 +35,11 @@ export function SystemPermissions({ rules, onEdit, onCreate }: SystemPermissions
     },
   });
 
-  /** Ищем действующее правило для заготовки: точное совпадение шаблона. */
+  /**
+   * Точное правило заготовки — его и предлагаем править. Но плашка показывает
+   * то, что действует: deny того же шаблона или всего инструмента побеждает
+   * allow, и «Разрешено» на карточке было бы неправдой.
+   */
   const findRule = (pattern: string): PermissionRule | undefined =>
     rules.find((rule) => rule.pattern === pattern);
 
@@ -66,7 +70,8 @@ export function SystemPermissions({ rules, onEdit, onCreate }: SystemPermissions
 
           <Stack gap="var(--spacing-xs)">
             {PERMISSION_PRESETS.filter((preset) => preset.category === category).map((preset) => {
-              const rule = findRule(preset.pattern);
+              const effective = effectiveRuleFor(preset.pattern, rules);
+              const rule = findRule(preset.pattern) ?? effective;
 
               return (
                 <Card key={preset.id} padding="md">
@@ -95,11 +100,18 @@ export function SystemPermissions({ rules, onEdit, onCreate }: SystemPermissions
                     </Stack>
 
                     <Stack direction="row" align="center" gap="var(--spacing-xs)">
-                      {rule ? (
+                      {rule && effective ? (
                         <>
-                          <Badge tone={DECISION_TONE[rule.decision]} withDot>
-                            {t(`permissions.${rule.decision}`)}
+                          <Badge tone={DECISION_TONE[effective.decision]} withDot>
+                            {t(`permissions.${effective.decision}`)}
                           </Badge>
+                          {effective.id !== rule.id && (
+                            <Badge tone="neutral">
+                              {t('permissions.shadowed', {
+                                decision: t(`permissions.${effective.decision}`),
+                              })}
+                            </Badge>
+                          )}
                           <Button size="sm" onClick={() => onEdit(rule)}>
                             {t('common.edit')}
                           </Button>

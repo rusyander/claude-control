@@ -44,7 +44,7 @@ export function SkillCard({ skill, onToggle, onEdit, onDelete, isDeleting }: Ski
                   size={14}
                   className={`${styles.filesChevron} ${isExpanded ? styles.filesChevronOpen : ''}`}
                 />
-                {skill.files.length} {t('skills.files')}
+                {t('skills.files', { count: skill.files.length })}
               </button>
             )}
             <Typography variant="caption" color="subtle" as="span">

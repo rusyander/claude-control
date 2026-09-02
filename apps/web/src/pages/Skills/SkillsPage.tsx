@@ -4,9 +4,9 @@ import { Stack } from '@shared/ui/stack';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { useCreateParam } from '@shared/hooks/use-create-param';
 import { SkeletonList } from '@shared/ui/skeleton';
-import { Typography } from '@shared/ui/typography';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
+import { EmptyState } from '@shared/ui/empty-state';
 import { SearchField } from '@shared/ui/search-field';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
@@ -96,8 +96,18 @@ export function SkillsPage() {
         ))}
       </Stack>
 
-      {!isLoading && filtered.length === 0 && (
-        <Typography color="subtle">{t('common.empty')}</Typography>
+      {/* Два разных «пусто», как у правил: промах поиска показывает запрос,
+          настоящая пустота объясняет, откуда берутся скиллы. Одно слово «Пусто»
+          на оба случая не говорило ни того, ни другого. */}
+      {!isLoading && filtered.length === 0 && query.trim() && (
+        <EmptyState
+          icon="search"
+          title={t('skills.noMatchTitle')}
+          text={t('skills.noMatchText', { query: query.trim() })}
+        />
+      )}
+      {!isLoading && skills.length === 0 && !query.trim() && (
+        <EmptyState icon="skills" title={t('skills.emptyTitle')} text={t('skills.emptyText')} />
       )}
 
       <SkillFormModal isOpen={isFormOpen} onOpenChange={closeForm} skill={editing} />

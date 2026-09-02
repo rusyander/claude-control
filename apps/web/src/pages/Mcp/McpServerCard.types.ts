@@ -10,9 +10,15 @@ export interface McpServerCardProps {
   autoCheck?: boolean;
 }
 
-/** Ответ проверки связи: сервер поднимается и опрашивается по протоколу MCP. */
+/**
+ * Ответ проверки связи: сервер поднимается и опрашивается по протоколу MCP.
+ * Та же форма приходит и в самом McpServer (итог прошлой проверки, сохранённый
+ * панелью), поэтому карточка показывает его ещё до нажатия кнопки.
+ */
 export interface HealthResult {
   health: McpHealth;
   detail?: string;
   toolCount?: number;
+  /** Когда проверка проводилась (ISO); нет у отказа, собранного на клиенте. */
+  checkedAt?: string;
 }

@@ -6,7 +6,6 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { toast } from '@shared/lib/toast';
-import { toErrorMessage } from '@shared/api/client';
 import {
   useProjectGit,
   useCheckoutBranch,
@@ -60,17 +59,18 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
   const branchLabel = info.branch ?? (info.detached ? t('git.detached') : t('git.noBranch'));
   const behind = info.behind ?? 0;
 
-  /** Общий разбор ответа: успех — тост с выводом git, ошибка — тост с причиной. */
+  /**
+   * Успех — тост с выводом git. Ошибку здесь не показываем: её уже показывает
+   * общий MutationCache (`app/queryClient.ts`), и второй тост с тем же текстом
+   * выглядел как две ошибки.
+   */
   const done = (result: { output: string }): void => {
     toast.success(result.output);
-  };
-  const failed = (error: unknown): void => {
-    toast.error(toErrorMessage(error));
   };
 
   const onCheckout = (branch: string): void => {
     if (!branch || branch === info.branch) return;
-    checkout.mutate({ path, branch }, { onSuccess: done, onError: failed });
+    checkout.mutate({ path, branch }, { onSuccess: done });
   };
 
   const onCreate = (): void => {
@@ -83,17 +83,16 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
           setNewBranch('');
           done(result);
         },
-        onError: failed,
       },
     );
   };
 
   const onPull = (): void => {
-    pull.mutate(pullBody(path, pullFrom), { onSuccess: done, onError: failed });
+    pull.mutate(pullBody(path, pullFrom), { onSuccess: done });
   };
 
   const onPush = (): void => {
-    push.mutate({ path }, { onSuccess: done, onError: failed });
+    push.mutate({ path }, { onSuccess: done });
   };
 
   const onCommit = (): void => {
@@ -106,7 +105,6 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
           setMessage('');
           done(result);
         },
-        onError: failed,
       },
     );
   };
@@ -245,7 +243,9 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
                       текущая ветка; выбирать нечего, поэтому и селекта нет.
                       Кнопка выключена там, где push невозможен по существу:
                       нет удалённого, нет коммитов, HEAD отцеплен от ветки. */}
-                  <label className={styles.row}>
+                  {/* Не <label>: в этой строке нет поля ввода, и label назначал бы
+                      кнопке имя из всей строки («Отправить ветку нечего отправлять Push»). */}
+                  <div className={styles.row}>
                     <Typography variant="body-sm" weight="medium" as="span">
                       {t('git.push')}
                     </Typography>
@@ -263,7 +263,7 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
                         {t('git.pushAction')}
                       </Button>
                     </Stack>
-                  </label>
+                  </div>
 
                   <label className={styles.row}>
                     <Typography variant="body-sm" weight="medium" as="span">

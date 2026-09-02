@@ -6,6 +6,7 @@ import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
+import { toErrorMessage } from '@shared/api/client';
 import { PERMISSION_DECISIONS } from '@entities/Permission';
 import { useCreateProjectPermission, useUpdateProjectPermission } from '@entities/Project';
 import type { ProjectPermissionFormProps } from './ProjectPermissionForm.types';
@@ -92,7 +93,7 @@ export function ProjectPermissionForm({
 
         {(create.isError || update.isError) && (
           <Typography variant="body-sm" color="danger">
-            {t('errors.saveFailed')}
+            {toErrorMessage(create.error ?? update.error)}
           </Typography>
         )}
       </Stack>

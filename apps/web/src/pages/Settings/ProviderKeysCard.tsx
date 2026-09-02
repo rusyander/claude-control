@@ -30,7 +30,7 @@ export function ProviderKeysCard() {
           <Typography variant="body" weight="medium">
             {t('providerKeys.title')}
           </Typography>
-          <Typography variant="body-sm" color="subtle">
+          <Typography variant="body-sm" color="subtle" className="prose">
             {t('providerKeys.hint')}
           </Typography>
         </Stack>

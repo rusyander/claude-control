@@ -18,6 +18,15 @@ export function PluginCard({ plugin, onToggle, onUninstall, onUpdate, isBusy }: 
   const { t, i18n } = useTranslation();
   const [isFilesOpen, setIsFilesOpen] = useState(false);
 
+  // Дата обновления — только когда она отличается от даты установки: после
+  // «обновить» видно, что версия действительно сменилась, а в день установки
+  // вторая одинаковая дата была бы шумом.
+  const installedOn = plugin.installedAt
+    ? formatDate(plugin.installedAt, i18n.language)
+    : undefined;
+  const updatedOn = plugin.lastUpdated ? formatDate(plugin.lastUpdated, i18n.language) : undefined;
+  const showUpdated = Boolean(updatedOn && installedOn && updatedOn !== installedOn);
+
   return (
     <Card padding="md">
       <Stack gap="var(--spacing-sm)" width="100%">
@@ -33,6 +42,11 @@ export function PluginCard({ plugin, onToggle, onUninstall, onUpdate, isBusy }: 
                   {t('plugins.version')} {plugin.version}
                 </Badge>
               )}
+              {/* Область установки видна только когда она не обычная пользовательская. */}
+              {plugin.scope !== 'user' && <Badge tone="neutral">{plugin.scope}</Badge>}
+              {plugin.installPathMissing && (
+                <Badge tone="warning">{t('plugins.installPathMissing')}</Badge>
+              )}
               {!plugin.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
             </Stack>
 
@@ -40,9 +54,10 @@ export function PluginCard({ plugin, onToggle, onUninstall, onUpdate, isBusy }: 
               <TruncatedText text={plugin.description} variant="body-sm" color="muted" />
             )}
 
-            {plugin.installedAt && (
+            {installedOn && (
               <Typography variant="caption" color="subtle" as="span">
-                {t('plugins.installedAt')}: {formatDate(plugin.installedAt, i18n.language)}
+                {t('plugins.installedAt')}: {installedOn}
+                {showUpdated && ` · ${t('plugins.updatedAt')}: ${updatedOn}`}
               </Typography>
             )}
           </Stack>

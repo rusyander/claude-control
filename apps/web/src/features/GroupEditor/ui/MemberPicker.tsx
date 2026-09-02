@@ -11,6 +11,7 @@ import { ruleApi } from '@entities/Rule';
 import { skillApi } from '@entities/Skill';
 import { hookApi } from '@entities/Hook';
 import { mcpServerApi } from '@entities/McpServer';
+import { permissionApi } from '@entities/Permission';
 import { useGroups } from '@entities/Group';
 import type { MemberPickerProps, PickerItem } from './MemberPicker.types';
 import { KIND_FILTERS } from './MemberPicker.constants';
@@ -33,7 +34,11 @@ export function MemberPicker({ value, onChange, excludeGroupId }: MemberPickerPr
   const skills = skillApi.useList().data ?? [];
   const hooks = hookApi.useList().data ?? [];
   const servers = mcpServerApi.useList().data ?? [];
+  const permissions = permissionApi.useList().data ?? [];
   const { data: groups = [] } = useGroups();
+
+  const hookLabel = (item: { event: string; matcher?: string }): string =>
+    `${item.event}${item.matcher ? ` · ${item.matcher}` : ''}`;
 
   const items: PickerItem[] = [
     ...rules.map((item) => ({ kind: 'rule' as const, id: item.id, label: item.title })),
@@ -44,19 +49,26 @@ export function MemberPicker({ value, onChange, excludeGroupId }: MemberPickerPr
     // переключении группы честно пропускаются (см. POST /groups/:id/enabled).
     ...hooks
       .filter((item) => item.source !== 'settings-local')
-      .map((item) => ({
-        kind: 'hook' as const,
-        id: item.id,
-        label: `${item.event}${item.matcher ? ` · ${item.matcher}` : ''}`,
-      })),
+      .map((item) => ({ kind: 'hook' as const, id: item.id, label: hookLabel(item) })),
     ...servers.map((item) => ({ kind: 'mcp' as const, id: item.id, label: item.name })),
+    // Право — пятый вид участника: группа снимает его из settings.json и
+    // возвращает, как и остальных. Подпись — решение и шаблон, id здесь нечитаем.
+    ...permissions.map((item) => ({
+      kind: 'permission' as const,
+      id: item.id,
+      label: `${item.decision} · ${item.pattern}`,
+    })),
     // Себя в участники добавить нельзя — исключаем правящуюся группу из списка.
     ...groups
       .filter((item) => item.id !== excludeGroupId)
       .map((item) => ({ kind: 'group' as const, id: item.id, label: item.name })),
   ];
 
+  // Подписи упорядоченного списка — по ВСЕМ сущностям, а не только по тем, что
+  // предлагает выбор: локальный хук в выбор не попадает, но, будучи уже в
+  // составе, должен читаться событием, а не «local:Event:hash».
   const labelByKey = new Map(items.map((item) => [`${item.kind}:${item.id}`, item.label]));
+  for (const item of hooks) labelByKey.set(`hook:${item.id}`, hookLabel(item));
   const labelOf = (member: GroupMember): string =>
     labelByKey.get(`${member.kind}:${member.id}`) ?? member.id;
 

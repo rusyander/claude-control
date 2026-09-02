@@ -13,7 +13,7 @@ export interface RuleSection {
   items: string[];
 }
 
-/** Стартовый набор: три типовых блока, каждый с одним пустым пунктом. */
+/** Стартовый набор: два типовых блока («можно», «нельзя»), каждый с одним пустым пунктом. */
 export function defaultSections(): RuleSection[] {
   return [
     { kind: 'allow', items: [''] },

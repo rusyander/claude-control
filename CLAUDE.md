@@ -85,8 +85,13 @@ universal route is Settings → Claude Code access (`claudeAiOauth` | `apiKey` |
 **`claude not found`** — panel spawns `claude.cmd` on Windows, `claude` elsewhere; must be in the
 PATH of the process that started the server.
 
-**MCP server won't connect** — on Windows `npx` needs a shell (`mcp.ts`, `McpProbe.ts`); args with
-spaces are escaped via `shellArgs` (`cli-args.ts`), else `C:\Program Files\…` splits in two.
+**MCP server won't connect** — the probe is the official SDK client (`domains/mcp-client.ts`): stdio
+spawns via cross-spawn (finds `.cmd` shims by PATHEXT, escapes args itself — no shell, no
+`shellArgs`); `${VAR}` / `${VAR:-default}` in command/args/env/url/headers are expanded from
+process env + settings env + `.mcp-secrets.env` (`readEnvLookup`), a missing one is NAMED in the
+detail; stderr is decoded UTF-8 with a CP866 fallback on win32. A 401 with an own `Authorization`
+header reads «token rejected», without one «OAuth needed». The result is persisted in
+`state.json → mcpHealth` (card + Overview counts); stdio gets the full 45 s handshake budget.
 
 **403 on requests** — origin allowlist + `Sec-Fetch-Site` (`index.ts`); only `localhost:WEB_PORT`
 and `127.0.0.1:WEB_PORT`. Changed the front port → set `WEB_PORT` for the server too.
@@ -142,18 +147,15 @@ the phone too. Copies live NEXT to the repo (`<parent>/<repo>-worktrees/<branch>
 watchers and bundlers would recurse), and the panel never merges anything: merging stays with the
 user.
 
-**Panel "switched itself off" after a few idle hours; sometimes only one half** — nothing in the
-panel crashed. The machine's own janitor (`~/.claude/tools/proc-reaper`, scheduled task `ProcReaper`,
-every 4 h) reaped the stand: `pnpm dev` grows from a shell that has long exited, so the whole tree
-reads as orphaned, and the reaper spared only the two PIDs holding a socket — the `pnpm` / `cmd` /
-`node --watch` above them died, which is exactly why one half kept serving and the other vanished.
-Fixed 2026-09-01 on both sides. Janitor: `ProtectPorts` (5178/8888 — listener, its subtree AND its
-ancestor chain, no age cap) plus ancestor immunity for every young listener, so no stand is
-decapitated again. Repo: `pnpm keepalive:install` — TCP-probes both ports every 20 s, restarts the
-silent half, adopts a stand that is already up instead of fighting it for the port. Autostart is
-user-level (Startup folder + a 5-minute pickup task; `/sc ONLOGON` needs admin and is not used).
-Log `%LOCALAPPDATA%\claude-control\keepalive.log`, state `pnpm keepalive:status`. The probe is a TCP
-connect, never HTTP: with the remote token gate on, a live panel answers 401.
+**Panel "switched itself off" after a few idle hours; sometimes only one half** — nothing crashed.
+The machine's janitor (`~/.claude/tools/proc-reaper`, task `ProcReaper`, every 4 h) reaped the
+stand: `pnpm dev` grows from a shell that has exited, the tree reads as orphaned, and only the two
+PIDs holding a socket survived — hence one half serving, the other gone. Fixed 2026-09-01: janitor
+`ProtectPorts` (5178/8888 — listener, subtree AND ancestor chain, no age cap); repo `pnpm
+keepalive:install` — TCP-probes both ports every 20 s (never HTTP: with the token gate on a live
+panel answers 401), restarts the silent half, adopts a stand already up. Autostart is user-level
+(Startup folder + 5-minute pickup task). Log `%LOCALAPPDATA%\claude-control\keepalive.log`, state
+`pnpm keepalive:status`.
 
 ## Working rules
 

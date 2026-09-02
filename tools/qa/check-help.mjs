@@ -65,8 +65,15 @@ for (const path of PAGES) {
   const page = await browser.newPage();
   await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('nav');
-  await page.waitForTimeout(400);
-  const found = await page.locator('a[href*="/help?topic="]').count();
+  // У части разделов заголовок с «?» сидит за загрузкой данных (настройки,
+  // CLAUDE.md, сравнение) и появляется через 0,4–5 с: фиксированная пауза
+  // в 400 мс давала ложные «нет кнопки». Ждём саму ссылку, с потолком.
+  const found = await page
+    .locator('a[href*="/help?topic="]')
+    .first()
+    .waitFor({ timeout: 10_000 })
+    .then(() => 1)
+    .catch(() => 0);
   if (found === 0) {
     noButton++;
     console.log(`${path}: нет кнопки «?», хотя документ справки для раздела есть`);

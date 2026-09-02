@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./chat-handoff": "./src/chat-handoff.ts",
+    "./env-secret": "./src/env-secret.ts",
     "./project-code": "./src/project-code.ts",
     "./task-split": "./src/task-split.ts",
     "./uploads": "./src/uploads.ts",

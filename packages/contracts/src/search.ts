@@ -33,6 +33,8 @@ export const searchResultKindSchema = zodEnum([
   'mcp',
   'plugin',
   'instructions',
+  /** Группа панели — надстройка, файлов Claude Code у неё нет, но раздел на странице есть. */
+  'group',
 ]);
 
 export type SearchResultKind = Infer<typeof searchResultKindSchema>;

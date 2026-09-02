@@ -68,6 +68,14 @@ export const historyEntrySchema = object({
   providerId: string().optional(),
   /** Человекочитаемое имя провайдера — для бейджа в ленте. */
   providerName: string().optional(),
+  /**
+   * Дифф не считался (бинарный файл, слишком большой) — тогда `added`/`removed`
+   * равны нулю НЕ потому, что правки не было. Лента показывает причину, а не
+   * «без изменений».
+   */
+  skipped: boolean().optional(),
+  /** Причина пропуска: `binary` | `too-large`. */
+  reason: string().optional(),
 });
 
 export type HistoryEntry = Infer<typeof historyEntrySchema>;

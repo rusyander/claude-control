@@ -9,3 +9,10 @@
 .description {
   max-width: 72ch;
 }
+
+/* Блок «Из проекта» под шапкой карточки привязанной группы: отделён линией,
+   чтобы набор проекта не читался как продолжение описания группы. */
+.local {
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+}

@@ -50,6 +50,8 @@ export interface OpencodeServeDeps {
   readyTimeoutMs?: number;
   /** Таймаут одного HTTP-запроса к серверу, мс. */
   requestTimeoutMs?: number;
+  /** Внешняя отмена запроса — кнопка «Стоп» в чате. Сервер при этом не гасится. */
+  signal?: AbortSignal;
 }
 
 const DEFAULT_READY_TIMEOUT = 20_000;
@@ -257,7 +259,7 @@ export class OpencodeServe {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(payload),
-        signal: controller.signal,
+        signal: deps.signal ? AbortSignal.any([controller.signal, deps.signal]) : controller.signal,
       });
       if (!res.ok) return undefined;
       return (await res.json()) as unknown;

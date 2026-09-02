@@ -26,6 +26,17 @@ export function ProjectsTopic() {
             { label: tr('storageRules'), value: '<проект>/CLAUDE.md', isMono: true },
             { label: tr('storageMcp'), value: '<проект>/.mcp.json', isMono: true },
             { label: tr('storagePerms'), value: '<проект>/.claude/settings.json', isMono: true },
+            {
+              label: tr('storageSkills'),
+              value: '<проект>/.claude/skills/*/SKILL.md',
+              isMono: true,
+            },
+            {
+              label: tr('storageHooks'),
+              value: '<проект>/.claude/settings.json → hooks',
+              isMono: true,
+            },
+            { label: tr('storageRuleFiles'), value: '<проект>/.claude/rules/*.md', isMono: true },
             { label: tr('storageCreate'), value: tr('storageCreateValue') },
           ]}
         />
@@ -35,8 +46,15 @@ export function ProjectsTopic() {
         <CapabilityGrid
           canTitle={t('help.common.canTitle')}
           cantTitle={t('help.common.cantTitle')}
-          can={[tr('canRegister'), tr('canRules'), tr('canMcp'), tr('canPerms'), tr('canAdditive')]}
-          cant={[tr('cantGroups'), tr('cantHooks'), tr('cantHealth')]}
+          can={[
+            tr('canRegister'),
+            tr('canRules'),
+            tr('canMcp'),
+            tr('canPerms'),
+            tr('canLocal'),
+            tr('canAdditive'),
+          ]}
+          cant={[tr('cantGroups'), tr('cantHealth')]}
         />
       </HelpSection>
 
@@ -60,6 +78,9 @@ export function ProjectsTopic() {
         <Stack gap="var(--spacing-xs)">
           <Callout tone="warning" title={tr('noteRawTitle')}>
             {tr('noteRawText')}
+          </Callout>
+          <Callout tone="info" title={tr('noteLocalTitle')}>
+            {tr('noteLocalText')}
           </Callout>
           <Callout tone="info" title={tr('noteUserTitle')}>
             {tr('noteUserText')}

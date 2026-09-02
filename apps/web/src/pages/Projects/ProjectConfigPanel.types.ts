@@ -5,5 +5,5 @@ export interface ProjectConfigPanelProps {
   project: Project;
 }
 
-/** Разделы конфига проекта. */
-export type ProjectTab = 'rules' | 'mcp' | 'permissions';
+/** Разделы конфига проекта; `local` — собственный `.claude` проекта, только чтение. */
+export type ProjectTab = 'rules' | 'mcp' | 'permissions' | 'local';

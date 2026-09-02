@@ -86,6 +86,10 @@ export const queryKeys = {
   projectMcp: (id: string) => ['projects', id, 'mcp'] as const,
   /** Права конкретного проекта (.claude/settings.json). */
   projectPermissions: (id: string) => ['projects', id, 'permissions'] as const,
+  /** Собственный `.claude` проекта из реестра: скиллы, хуки, правила — только чтение. */
+  projectLocal: (id: string) => ['projects', id, 'local'] as const,
+  /** То же по абсолютному пути — для карточки группы, где привязка хранит путь. */
+  projectLocalByPath: (path: string) => ['projects', 'local', 'by-path', path] as const,
   /** Что активный провайдер умеет на уровне проекта (COMMON-2). */
   projectProvider: (id: string) => ['projects', id, 'provider'] as const,
   /** Инструкции проекта у активного провайдера (AGENTS.md / GEMINI.md). */

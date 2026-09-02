@@ -37,6 +37,11 @@ export interface RunAssistantDeps {
   appDataDir: string;
   detect?: (command: string) => boolean;
   fetchImpl?: typeof fetch;
+  /**
+   * Сигнал отмены HTTP-запроса к модели. Кнопка «Стоп» в чате обрывает запрос,
+   * а не ждёт ответа, который потом пришлось бы выбросить.
+   */
+  signal?: AbortSignal;
   spawnImpl?: typeof nodeSpawn;
   /** Таймаут CLI one-shot, мс (по умолчанию 180000). */
   timeoutMs?: number;

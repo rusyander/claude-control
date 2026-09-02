@@ -79,6 +79,11 @@ A group can name one or more project paths. After that you no longer switch it o
   someone else's live agent. Switching off is manual only. If you do not want the automation, remove
   the path from the bindings on the Groups page.
 
+A bound group's card carries a «From the project» block: the own set of every bound directory —
+skills from `.claude/skills`, hooks from `.claude/settings.json` and rules from `.claude/rules`.
+Claude Code loads them together with the user-level ones, which is why a bound group looked empty
+without it. The panel only shows them: the set belongs to the project's git and is edited there.
+
 One consequence looks like a bug unless you know it: **a group can switch itself on without you.** If
 you find a group enabled that you never touched, a run started in a directory bound to it.
 

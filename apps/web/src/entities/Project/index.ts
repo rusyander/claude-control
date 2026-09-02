@@ -35,6 +35,12 @@ export {
   useDeleteProjectPermission,
 } from './api/ProjectConfigApi';
 
+// Собственный `.claude` проекта (скиллы, хуки, правила) — только чтение, два адреса
+// одного ответа: по id из реестра и по абсолютному пути привязки группы.
+export { useProjectLocal, useProjectLocalByPath } from './api/ProjectLocalApi';
+export { ProjectLocalConfigView } from './ui/ProjectLocalConfigView';
+export type { ProjectLocalConfigViewProps } from './ui/ProjectLocalConfigView.types';
+
 // Проектный уровень НЕ-Claude провайдеров (COMMON-2 + GEMINI-2/3): инструкции,
 // MCP, а у Gemini ещё переменные окружения и права проекта.
 export {

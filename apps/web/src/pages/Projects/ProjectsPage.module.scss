@@ -54,6 +54,11 @@
   font-size: 11px;
 }
 
+// Подпись «только чтение» пишется абзацем: мера строки держит его читаемым.
+.hint {
+  max-width: 72ch;
+}
+
 .tabs {
   border-bottom: 1px solid var(--color-border);
   padding-bottom: var(--spacing-2xs);

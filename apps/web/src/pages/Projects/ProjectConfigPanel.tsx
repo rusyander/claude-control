@@ -8,15 +8,17 @@ import { Icon } from '@shared/ui/icon';
 import { ProjectRulesTab } from './ProjectRulesTab';
 import { ProjectMcpTab } from './ProjectMcpTab';
 import { ProjectPermissionsTab } from './ProjectPermissionsTab';
+import { ProjectLocalTab } from './ProjectLocalTab';
 import type { ProjectConfigPanelProps, ProjectTab } from './ProjectConfigPanel.types';
 import styles from './ProjectsPage.module.scss';
 
-const TABS: ProjectTab[] = ['rules', 'mcp', 'permissions'];
+const TABS: ProjectTab[] = ['rules', 'mcp', 'permissions', 'local'];
 
 /**
  * Конфиг выбранного проекта: заголовок с путём и бейджем «проектный уровень» и
- * разделы — правила (CLAUDE.md), MCP-серверы (.mcp.json) и права
- * (.claude/settings.json). Разделы переключаются табами.
+ * разделы — правила (CLAUDE.md), MCP-серверы (.mcp.json), права
+ * (.claude/settings.json) и «Из проекта» — собственный .claude проекта, который
+ * панель только показывает. Разделы переключаются табами.
  */
 export function ProjectConfigPanel({ project }: ProjectConfigPanelProps) {
   const { t } = useTranslation();
@@ -52,6 +54,7 @@ export function ProjectConfigPanel({ project }: ProjectConfigPanelProps) {
       {tab === 'rules' && <ProjectRulesTab projectId={project.id} />}
       {tab === 'mcp' && <ProjectMcpTab projectId={project.id} />}
       {tab === 'permissions' && <ProjectPermissionsTab projectId={project.id} />}
+      {tab === 'local' && <ProjectLocalTab projectId={project.id} />}
     </Stack>
   );
 }

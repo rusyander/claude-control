@@ -39,6 +39,7 @@ import { registerBackupRoutes } from './routes/backup-routes.ts';
 import { registerHistoryRoutes } from './routes/history-routes.ts';
 import { registerSearchRoutes } from './routes/search-routes.ts';
 import { registerProjectRoutes } from './routes/project-routes.ts';
+import { registerProjectLocalRoutes } from './routes/project-local-routes.ts';
 import { registerProviderProjectRoutes } from './routes/provider-project-routes.ts';
 import { registerProjectRunnerRoutes } from './routes/project-runner-routes.ts';
 import { registerProjectGitRoutes } from './routes/project-git-routes.ts';
@@ -229,6 +230,7 @@ const ROUTES: RouteRegistrar[] = [
   registerHistoryRoutes,
   registerSearchRoutes,
   registerProjectRoutes,
+  registerProjectLocalRoutes,
   registerProviderProjectRoutes,
   // Реестр прогонов git-маршрутам нужен ровно за одним: не дать снести рабочую
   // копию, в которой прямо сейчас работает агент.

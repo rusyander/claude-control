@@ -39,6 +39,7 @@ export * from './models';
 export * from './plugins';
 export * from './chat';
 export * from './projects';
+export * from './project-local';
 export * from './project-runner';
 export * from './project-git';
 export * from './project-files';

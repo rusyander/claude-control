@@ -80,6 +80,8 @@ function prefixMessage(content: string): ProviderChatMessage {
 export class ProviderChatRun implements ProviderChatRunLike {
   private child?: ChildProcessWithoutNullStreams;
   private stopped = false;
+  /** Отмена HTTP-путей (`api`, `session`): у них нет процесса, который можно снять. */
+  private readonly abort = new AbortController();
 
   async start(
     options: ProviderChatRunOptions,
@@ -107,6 +109,12 @@ export class ProviderChatRun implements ProviderChatRunLike {
 
     if (resolution.mode === 'cli') {
       const session = await this.runSession(options, resolution.cliCommandFound);
+      // Остановили, пока сессия отвечала: разговор закрыт тем, что успело
+      // прийти (обычно ничем), и ни к одиночному запуску, ни к API дальше не идём.
+      if (this.stopped) {
+        onEvent({ type: 'done', reply: session ?? '', transport: 'session' });
+        return;
+      }
       if (session) {
         onEvent({ type: 'delta', text: session });
         onEvent({ type: 'done', reply: session, transport: 'session' });
@@ -138,9 +146,14 @@ export class ProviderChatRun implements ProviderChatRunLike {
     });
   }
 
-  /** Снять ответ на полуслове: процесс валится целиком, вместе с детьми. */
+  /**
+   * Снять ответ на полуслове: процесс валится целиком, вместе с детьми, а
+   * HTTP-запрос к модели или к сессии обрывается — иначе ответ пришёл бы после
+   * остановки и лёг в переписку так, будто её и не было.
+   */
   stop(): void {
     this.stopped = true;
+    this.abort.abort();
     if (this.child) killChildTree(this.child);
   }
 
@@ -165,6 +178,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
       spawnImpl: options.spawnImpl,
       fetchImpl: options.fetchImpl,
       requestTimeoutMs: options.timeoutMs,
+      signal: this.abort.signal,
     });
 
     return result?.reply;
@@ -185,10 +199,17 @@ export class ProviderChatRun implements ProviderChatRunLike {
       {
         appDataDir: options.appDataDir,
         fetchImpl: options.fetchImpl,
+        signal: this.abort.signal,
         ...(options.models ? { models: options.models } : {}),
         ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
       },
     );
+
+    // Обрыв по кнопке — не ошибка модели: ответа нет, и разговор закрывается пустым.
+    if (this.stopped) {
+      onEvent({ type: 'done', reply: '', transport: 'api' });
+      return;
+    }
 
     if (!result.ok) {
       onEvent({
@@ -214,6 +235,12 @@ export class ProviderChatRun implements ProviderChatRunLike {
     cliCommand: string | undefined,
     onEvent: (event: ProviderChatRunEvent) => void,
   ): Promise<void> {
+    // Остановили раньше, чем процесс успел стартовать, — стартовать уже незачем.
+    if (this.stopped) {
+      onEvent({ type: 'done', reply: '', transport: 'stream' });
+      return Promise.resolve();
+    }
+
     const command = cliCommand ?? providerCliCommand(options.provider);
     const spawned = spawnCliProcess(command, args, {
       spawnImpl: options.spawnImpl,

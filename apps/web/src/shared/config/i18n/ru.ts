@@ -2589,6 +2589,7 @@ export const ru = {
     tab_rules: 'Правила',
     tab_mcp: 'MCP-серверы',
     tab_permissions: 'Права',
+    tab_local: 'Из проекта',
     rulesHint: 'CLAUDE.md в корне проекта целиком — как его читает Claude в этом проекте.',
     mcpHint: 'MCP-серверы проекта из корневого .mcp.json.',
     mcpEmpty: 'В .mcp.json проекта пока нет серверов.',
@@ -2596,6 +2597,35 @@ export const ru = {
     permissionsHint: 'Права проекта из .claude/settings.json (и settings.local.json).',
     permissionsEmpty: 'В settings.json проекта пока нет правил доступа.',
     addPermission: 'Добавить право',
+  },
+  // Собственный .claude проекта — вкладка «Из проекта» и блок на карточке группы. Только чтение.
+  projectLocal: {
+    hint: 'Скиллы, хуки и правила из каталога .claude этого проекта — Claude Code загружает их вместе с пользовательскими. Панель их только показывает: набор принадлежит гиту проекта и правится там, как остальной код.',
+    readOnly: 'только чтение',
+    fromProject: 'Из проекта',
+    skills: 'Скиллы',
+    hooks: 'Хуки',
+    rules: 'Правила',
+    countSkills: 'скиллов: {{count}}',
+    countHooks: 'хуков: {{count}}',
+    countRules: 'правил: {{count}}',
+    noDir: 'В проекте нет каталога .claude',
+    noDirText:
+      'Отсюда Claude Code берёт собственные скиллы, хуки и правила проекта. Пока каталога нет, в проекте действует только пользовательский набор.',
+    emptySkills: 'В .claude/skills скиллов нет',
+    emptyHooks: 'В .claude/settings.json хуков нет',
+    emptyRules: 'В .claude/rules правил нет',
+    files: 'файлов: {{count}}',
+    skillDisabled: 'выключен',
+    localSourceHint:
+      'Хук из личного .claude/settings.local.json проекта — Claude Code читает его наравне с общим settings.json.',
+    scriptMissing: 'скрипт не найден',
+    pathsHint: 'Правило действует только на файлы по этим маскам',
+    showBody: 'Показать текст',
+    hideBody: 'Свернуть текст',
+    expand: 'Показать набор',
+    collapse: 'Свернуть набор',
+    loadError: 'Не удалось прочитать .claude проекта',
   },
   // Проектный уровень у НЕ-Claude провайдеров: их проектные файлы (COMMON-2).
   providerProject: {

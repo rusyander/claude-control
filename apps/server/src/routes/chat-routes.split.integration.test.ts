@@ -7,6 +7,7 @@ import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerChatSplitRoutes } from './chat/split-routes.ts';
 import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry.ts';
+import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { ProviderChatService } from '../domains/provider-chat.ts';
 
 /**
@@ -20,6 +21,7 @@ describe('POST /api/chat/split', () => {
   let app: FastifyInstance;
   let store: AppStore;
   let registry: ChatRunRegistry;
+  let session: ChatSession;
   let started: { chatId: string; prompt: string; cwd: string; appendSystemPrompt?: string }[];
 
   beforeEach(async () => {
@@ -62,7 +64,12 @@ describe('POST /api/chat/split', () => {
     } as unknown as ServerContext;
 
     app = Fastify();
-    registerChatSplitRoutes(app, ctx, { runs: registry, providerChats: new ProviderChatService() });
+    session = new ChatSession(registry);
+    registerChatSplitRoutes(app, ctx, {
+      runs: registry,
+      providerChats: new ProviderChatService(),
+      session,
+    });
     await app.ready();
   });
 
@@ -120,6 +127,38 @@ describe('POST /api/chat/split', () => {
     });
 
     expect(store.getGroups()[0]?.isEnabled).toBe(true);
+  });
+
+  it('автоподтверждение прав наследуется от родителя', async () => {
+    // Ради этого и делят: шесть агентов работают сами. Без наследования каждый
+    // встал бы на первом же инструменте, ожидая человека, который смотрит в
+    // другую вкладку.
+    registry.start('parent', { prompt: 'задача', cwd: project }, {});
+    session.armAutoApprove('parent', { enabled: true, allowEdits: true });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true, parentChatId: 'parent' },
+    });
+
+    const body = response.json() as { chats: { chatId: string }[] };
+    for (const chat of body.chats) {
+      expect(session.autoApproveFor(chat.chatId)).toEqual({ enabled: true, allowEdits: true });
+    }
+  });
+
+  it('родитель без автоподтверждения ничего детям не навязывает', async () => {
+    registry.start('parent', { prompt: 'задача', cwd: project }, {});
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true, parentChatId: 'parent' },
+    });
+
+    const body = response.json() as { chats: { chatId: string }[] };
+    for (const chat of body.chats) expect(session.autoApproveFor(chat.chatId)).toBeUndefined();
   });
 
   it('«только завести чаты» не запускает ни одного прогона', async () => {

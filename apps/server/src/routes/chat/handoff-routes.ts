@@ -9,6 +9,7 @@ import {
 import type { ServerContext } from '../../context.ts';
 import type { ChatEvent } from '../../domains/chat/ChatRunner.ts';
 import type { ChatRunRegistry, RunFinished } from '../../domains/chat/ChatRunRegistry.ts';
+import type { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
 import { planContextRotation } from '../../domains/chat/context-rotation.ts';
 import { activateGroupsQuietly } from '../../domains/group-activation.ts';
@@ -22,6 +23,7 @@ import { createChat, type ProviderChatService } from '../../domains/provider-cha
 import { checkProjectDir } from '../../domains/projects.ts';
 import { getActiveProvider } from '../../providers/registry.ts';
 import { activeCliCommand } from '../../providers/cli.ts';
+import { apiTokenPath } from '../../lib/api-token.ts';
 
 /**
  * Продолжение работы в чистой сессии — маршруты и планировщик.
@@ -51,6 +53,8 @@ function aliasesOf(chatId?: string, sessionId?: string): string[] {
 export interface HandoffPlannerDeps {
   runs: ChatRunRegistry;
   chains: HandoffChains;
+  /** Тумблеры прав сервера: новый разговор наследует их у закрытого. */
+  session: ChatSession;
   /** Адрес самой панели — его слушает мини-MCP-сервер прав нового прогона. */
   selfBaseUrl: string;
   /**
@@ -74,6 +78,7 @@ export interface HandoffPlannerDeps {
 export function createHandoffPlanner({
   runs,
   chains,
+  session,
   selfBaseUrl,
   contextLimit,
   stat,
@@ -136,7 +141,13 @@ export function createHandoffPlanner({
         delete options.sessionId;
         delete options.fork;
         delete options.name;
-        options.permissionPrompt = { runId: chatId, baseUrl: selfBaseUrl };
+        options.permissionPrompt = { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() };
+        // Тумблеры и молчание про разделение — тоже от закрытого разговора:
+        // системная дописка скопирована с его состоянием, а автоподтверждение
+        // без наследования встало бы на первом же запросе прав, пока человека
+        // нет у панели, — ради чего цепочка и заводилась.
+        if (runs.isSplitMuted(finished.chatId)) runs.muteSplit(chatId);
+        session.inherit(aliases, chatId);
         return runs.start(chatId, options, { projectPath: cwd });
       },
     });
@@ -154,7 +165,13 @@ export function createHandoffPlanner({
 export function registerChatHandoffRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
-  deps: { runs: ChatRunRegistry; chains: HandoffChains; providerChats: ProviderChatService },
+  deps: {
+    runs: ChatRunRegistry;
+    chains: HandoffChains;
+    providerChats: ProviderChatService;
+    /** Тумблеры прав сервера: продолжение наследует их у закрытого разговора. */
+    session: ChatSession;
+  },
 ): void {
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
 
@@ -223,6 +240,8 @@ export function registerChatHandoffRoutes(
       // здесь только «свою» значило бы, что после первого же продолжения
       // разделение задач молча перестаёт работать.
       const initiative = initiativePrompt(settings);
+      // Тумблеры закрытого разговора — новому (см. планировщик выше).
+      deps.session.inherit(aliasesOf(chatId, sessionId), nextId);
       return deps.runs.start(
         nextId,
         {
@@ -232,7 +251,7 @@ export function registerChatHandoffRoutes(
           model: model || settings.chatModel,
           effort: effort || settings.chatEffort,
           permissionMode: allowEdits ? 'acceptEdits' : 'default',
-          permissionPrompt: { runId: nextId, baseUrl: selfBaseUrl },
+          permissionPrompt: { runId: nextId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
           ...(initiative ? { appendSystemPrompt: initiative } : {}),
         },
         { projectPath: cwd },

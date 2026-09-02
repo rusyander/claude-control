@@ -4,10 +4,11 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { HandoffRefusal } from '@claude-control/contracts/chat-handoff';
+import type { ChatEvent, RawEvent } from './chat-events.ts';
 import { safeSessionId, safeName, safeModel, safeEffort, shellArgs } from '../../lib/cli-args.ts';
 import { killChildTree } from '../../lib/process-tree.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
+import { TurnTracker } from './stream-usage.ts';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
 const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs', import.meta.url));
@@ -24,55 +25,8 @@ const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs'
 
 const isWindows = process.platform === 'win32';
 
-/** Событие для интерфейса — уже разобранное, без служебного шума CLI. */
-export type ChatEvent =
-  | { kind: 'session'; sessionId: string; model: string; tools: number }
-  | { kind: 'text'; text: string }
-  | { kind: 'thinking'; text: string }
-  | { kind: 'tool'; name: string; input: unknown; id: string }
-  | { kind: 'limit'; resetsAt: number; type: string; status: string }
-  /**
-   * Расход одного шага модели. `toolIds` — вызовы, рождённые ЭТИМ шагом: по ним
-   * интерфейс ставит цифру у конкретного действия. Вызовов бывает несколько
-   * (модель зовёт инструменты параллельно одним сообщением) — тогда расход у них
-   * общий, и делить его между ними нельзя: раздельного счёта модель не даёт.
-   */
-  | {
-      kind: 'usage';
-      input: number;
-      output: number;
-      cacheRead: number;
-      cacheCreation: number;
-      cacheCreation1h?: number;
-      model?: string;
-      /** Пусто — шаг закончился одним текстом, привязывать расход не к чему. */
-      toolIds?: string[];
-      /** Оценка стоимости шага; проставляет реестр — тарифы знает только он. */
-      costUsd?: number;
-    }
-  | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
-  | { kind: 'error'; message: string }
-  // Интерактивные права: агент хочет применить инструмент — ждём решения человека.
-  | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
-  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
-  /**
-   * Работа продолжена в чистой сессии (или не продолжена — тогда есть `reason`).
-   * Событие уходит в поток ЗАКРЫВАЕМОГО прогона последним: по нему вкладка
-   * переключается на новый разговор, а не остаётся смотреть на завершённый.
-   */
-  | {
-      kind: 'handoff';
-      chatId?: string;
-      path?: string;
-      chainDepth?: number;
-      reason?: HandoffRefusal;
-      /**
-       * Окно, из-за размера которого зашла речь о продолжении. Есть только у
-       * повода по порогу: у предложения агента причина смысловая, и число тут
-       * сбивало бы с толку.
-       */
-      contextTokens?: number;
-    };
+export type { ChatEvent, RawEvent, RawUsage } from './chat-events.ts';
+
 
 export interface RunOptions {
   prompt: string;
@@ -115,8 +69,14 @@ export interface RunOptions {
    * уходит человеку кнопкой в чате. `runId` связывает запрос с разговором,
    * `baseUrl` — адрес приложения, куда MCP-сервер стучится за решением. При
    * полном доступе (bypassPermissions) не нужно — там всё и так разрешено.
+   * `tokenFile` — ПУТЬ к ключу доступа: при включённом удалённом доступе гейт
+   * требует ключ и от собственного MCP-сервера (по HTTP тот — такой же клиент,
+   * как телефон), а без ключа каждый запрос прав получал 401 и превращался в
+   * отказ. Именно путь, а не значение: файл читается на каждый запрос, поэтому
+   * смена ключа посреди прогона не ломает права до конца работы, а на машине,
+   * где удалённый доступ не включали, ключ и не заводится.
    */
-  permissionPrompt?: { runId: string; baseUrl: string };
+  permissionPrompt?: { runId: string; baseUrl: string; tokenFile?: string };
   /**
    * Дописка к системному промпту: правда про вопрос человеку, разделение задач
    * по чатам и продолжение в чистой сессии — тем составом, который включён.
@@ -235,6 +195,9 @@ export class ChatRun {
               env: {
                 PERM_RUN_ID: options.permissionPrompt.runId,
                 PERM_BASE_URL: options.permissionPrompt.baseUrl,
+                ...(options.permissionPrompt.tokenFile
+                  ? { PERM_TOKEN_FILE: options.permissionPrompt.tokenFile }
+                  : {}),
               },
             },
           },
@@ -289,37 +252,18 @@ export class ChatRun {
     const stderr: string[] = [];
     child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk.toString()));
 
+    // Расход хода и границы блоков — у трекера: по одной строке их не разобрать,
+    // правда размазана по нескольким (см. stream-usage.ts). С потоковыми
+    // событиями расход хода приходит ПОСЛЕ его вызовов (message_delta замыкает
+    // ход), без них — до; интерфейсу порядок не важен, он сводит их по id.
+    const tracker = new TurnTracker();
     const lines = createInterface({ input: child.stdout });
     for await (const line of lines) {
       if (!line.trim()) continue;
 
       try {
         const raw = JSON.parse(line) as RawEvent;
-
-        // Токены расхода приходят в usage сообщений ассистента — отдаём их
-        // отдельным событием, чтобы показать расход в токенах, а не только в деньгах.
-        //
-        // Вместе с расходом отдаём и вызовы этого же сообщения: без них цифра
-        // осталась бы «расходом за прогон вообще», и понять, во что обошёлся
-        // конкретный Bash, было бы нельзя. Событие идёт ПЕРЕД самими вызовами —
-        // порядок не важен, интерфейс сводит их по id.
-        const usage = raw.message?.usage;
-        if (usage) {
-          const long = usage.cache_creation?.ephemeral_1h_input_tokens;
-          onEvent({
-            kind: 'usage',
-            input: usage.input_tokens ?? 0,
-            output: usage.output_tokens ?? 0,
-            cacheRead: usage.cache_read_input_tokens ?? 0,
-            cacheCreation: usage.cache_creation_input_tokens ?? 0,
-            cacheCreation1h: long || undefined,
-            model: raw.message?.model,
-            toolIds: (raw.message?.content ?? [])
-              .filter((block) => block.type === 'tool_use' && block.id)
-              .map((block) => block.id ?? ''),
-          });
-        }
-
+        for (const event of tracker.track(raw)) onEvent(event);
         for (const event of translate(raw)) onEvent(event);
       } catch {
         // Строка не JSON — предупреждение CLI, для чата это шум.
@@ -376,36 +320,6 @@ export class ChatRun {
   }
 }
 
-interface RawEvent {
-  type: string;
-  subtype?: string;
-  session_id?: string;
-  model?: string;
-  tools?: unknown[];
-  message?: {
-    /** Модель ЭТОГО шага: в разговоре они чередуются (переключение, субагенты). */
-    model?: string;
-    content?: { type: string; text?: string; name?: string; input?: unknown; id?: string }[];
-    usage?: {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_read_input_tokens?: number;
-      cache_creation_input_tokens?: number;
-      /** Разбивка записи в кэш по сроку жизни: часовая стоит вдвое дороже. */
-      cache_creation?: { ephemeral_1h_input_tokens?: number };
-    };
-  };
-  event?: {
-    type: string;
-    delta?: { type: string; text?: string; thinking?: string };
-  };
-  rate_limit_info?: { resetsAt?: number; rateLimitType?: string; status?: string };
-  total_cost_usd?: number;
-  duration_ms?: number;
-  is_error?: boolean;
-  result?: string;
-  hook_name?: string;
-}
 
 /**
  * Перевод событий CLI в события интерфейса. Текст берём из потоковых дельт,

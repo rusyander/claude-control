@@ -61,7 +61,8 @@ export function WorkspaceTabs({
                 tone={statusTone(status)}
                 // Пульсируем не только у «работает», но и у «ждёт ответа»/«ошибка»:
                 // это те состояния, где от тебя что-то нужно — пусть бросаются в глаза.
-                pulse={status !== 'idle'}
+                // Молчащий не пульсирует: событий нет — и точка стоит ровно.
+                pulse={status !== 'idle' && status !== 'quiet'}
                 label={status !== 'idle' ? t(`workspace.status.${status}`) : undefined}
               />
               <Icon name="folder" size={16} />

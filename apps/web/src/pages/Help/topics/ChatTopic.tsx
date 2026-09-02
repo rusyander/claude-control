@@ -215,6 +215,7 @@ export function ChatTopic() {
           descriptionHeader={t('help.common.fieldPurpose')}
           rows={[
             { name: tr('dotGreen'), description: tr('dotGreenText'), isMono: false },
+            { name: tr('dotGrey'), description: tr('dotGreyText'), isMono: false },
             { name: tr('dotYellow'), description: tr('dotYellowText'), isMono: false },
             { name: tr('dotRed'), description: tr('dotRedText'), isMono: false },
             { name: tr('dotNone'), description: tr('dotNoneText'), isMono: false },

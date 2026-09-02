@@ -1,5 +1,5 @@
 import type { ChatSummary } from '@claude-control/contracts';
-import type { RunStatus } from '@shared/lib/agent-runs';
+import { isLive, type RunStatus } from '@shared/lib/agent-runs';
 
 /**
  * Разговоры, где агент ждёт человека, а живого прогона за ними нет.
@@ -18,7 +18,7 @@ export function selectAwaitingChats(
   return chats.filter((chat) => {
     if (!chat.awaitingReply) return false;
     const live = statuses.get(chat.id);
-    return live !== 'running' && live !== 'waiting';
+    return live === undefined || (!isLive(live) && live !== 'waiting');
   });
 }
 

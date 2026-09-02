@@ -8,6 +8,7 @@ import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { createHandoffPlanner, registerChatHandoffRoutes } from './chat/handoff-routes.ts';
 import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry.ts';
+import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { HandoffChains } from '../domains/chat/ChatHandoff.ts';
 import { ProviderChatService } from '../domains/provider-chat.ts';
 
@@ -77,6 +78,7 @@ describe('маршруты продолжения в чистой сессии',
       runs: registry,
       chains: new HandoffChains(),
       providerChats: new ProviderChatService(),
+      session: new ChatSession(registry),
     });
     await app.ready();
   });
@@ -200,6 +202,7 @@ describe('планировщик продолжения', () => {
       createHandoffPlanner({
         runs: registry,
         chains,
+        session: new ChatSession(registry),
         selfBaseUrl: 'http://127.0.0.1:5178',
         contextLimit: () => contextLimit,
         stat: () => mtime,
@@ -233,6 +236,7 @@ describe('планировщик продолжения', () => {
       createHandoffPlanner({
         runs: registry,
         chains,
+        session: new ChatSession(registry),
         selfBaseUrl: 'http://127.0.0.1:5178',
         contextLimit: () => limit,
         stat: () => mtime,

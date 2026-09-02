@@ -504,6 +504,8 @@ export const en: TranslationSchema = {
     autoApproveHint:
       'The panel approves safe requests itself. Git writes (commit, push, merge), deletions, migrations, MCP writes and anything covered by ask/deny rules from settings.json still ask.',
     retry: 'Retry',
+    continueAfterDrop:
+      'Continue from where you stopped: the connection dropped and the last answer may be unfinished. Do not redo what is already done.',
     retryHint: 'Restart with the same prompt',
     continue: 'Continue',
     continueWord: 'continue',
@@ -2287,6 +2289,7 @@ export const en: TranslationSchema = {
     closeTab: 'Close {{name}}',
     status: {
       running: 'agent working',
+      quiet: 'agent quiet for five minutes',
       waiting: 'agent waiting for a reply',
       error: 'error or limit',
     },

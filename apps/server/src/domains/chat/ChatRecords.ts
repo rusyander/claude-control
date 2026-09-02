@@ -30,6 +30,8 @@ export interface Record {
   toolUseResult?: unknown;
   isSidechain?: boolean;
   message?: {
+    /** Ход модели: его блоки лежат отдельными строками с одним `id`. */
+    id?: string;
     role?: string;
     model?: string;
     content?: string | ContentBlock[];
@@ -121,6 +123,27 @@ export function isAwaitingReply(records: Record[]): boolean {
   }
 
   return false;
+}
+
+/**
+ * Сколько реплик в записях. Ход модели лежит в транскрипте НЕСКОЛЬКИМИ строками
+ * — по одной на блок содержимого (размышление, вызов, текст), с одним
+ * `message.id`, — и считать строки значило бы завышать число реплик в разы.
+ * Лента (`readChatMessages`) сводит их так же.
+ */
+export function countDialogMessages(records: Record[]): number {
+  let count = 0;
+  let lastId: string | undefined;
+
+  for (const record of records) {
+    if (!isDialogMessage(record)) continue;
+    const id = record.type === 'assistant' ? record.message?.id : undefined;
+    if (id && id === lastId) continue;
+    lastId = id;
+    count += 1;
+  }
+
+  return count;
 }
 
 export function isDialogMessage(record: Record): boolean {

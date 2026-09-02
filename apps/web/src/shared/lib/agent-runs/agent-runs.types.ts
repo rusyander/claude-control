@@ -42,6 +42,11 @@ export interface AgentRun {
   /** Стабильный id прогона — chatId, с которым он стартовал. */
   id: string;
   sessionId?: string;
+  /**
+   * Когда сервер завёл прогон, по его часам. По нему лента отличает ход, что
+   * прямо сейчас рисует поток, от записанного в транскрипт раньше.
+   */
+  startedAt?: number;
   /** Каталог проекта — для группировки статусов (undefined = домашний чат). */
   projectPath?: string;
   status: RunStatus;
@@ -137,7 +142,14 @@ export interface HandoffEvent {
 }
 
 export type ChatEvent =
-  | { kind: 'session'; sessionId: string; model: string; tools: number }
+  | {
+      kind: 'session';
+      sessionId: string;
+      model: string;
+      tools: number;
+      /** Когда сервер завёл прогон — по ЕГО часам, тем же, что пишут транскрипт. */
+      startedAt?: number;
+    }
   | { kind: 'text'; text: string }
   | { kind: 'thinking'; text: string }
   | { kind: 'tool'; name: string; input: unknown; id: string }
@@ -153,6 +165,11 @@ export type ChatEvent =
       costUsd?: number;
       /** Вызовы, рождённые этим шагом; пусто — шаг закончился одним текстом. */
       toolIds?: string[];
+      /**
+       * Остаток сверки с итогом прогона: расход, который не удалось разнести по
+       * шагам. Идёт в счётчик токенов, но не в цену чьего-то действия.
+       */
+      remainder?: boolean;
     }
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
   // `retriable` ставит сервер: временный ли сбой, решает он, а не разбор текста.

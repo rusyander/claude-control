@@ -44,7 +44,12 @@ export function ChatRow({
               быть несколько, и «кто-то ждёт ответа» без адреса бесполезно.
               Пульсирует — тот же язык, что и в пульте агентов. */}
           {status && (
-            <StatusDot tone={statusTone(status)} pulse label={t(`workspace.status.${status}`)} />
+            <StatusDot
+              tone={statusTone(status)}
+              // Молчащий не пульсирует: событий нет — и точка стоит ровно.
+              pulse={status !== 'quiet'}
+              label={t(`workspace.status.${status}`)}
+            />
           )}
           <Typography variant="body-sm" weight="medium" className={styles.title}>
             {chat.title}

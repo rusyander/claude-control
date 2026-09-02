@@ -13,18 +13,83 @@
 // Само решение принимает человек в интерфейсе: сервер приложения (PERM_BASE_URL)
 // по запросу /api/chat/permission-request держит ответ, пока пользователь не
 // нажмёт «Разрешить»/«Запретить». Сюда prompt-tool просто проксирует запрос и
-// возвращает решение. Связь с нужным разговором — через PERM_RUN_ID.
+// возвращает решение. Связь с нужным разговором — через PERM_RUN_ID; ключ
+// доступа к API нужен, когда включён удалённый доступ: гейт приложения требует
+// его от любого клиента, и этот сервер по HTTP — тоже клиент. Передаётся ПУТЬ
+// к файлу ключа (PERM_TOKEN_FILE), а не значение: файл читается на каждый
+// запрос, поэтому смена ключа посреди долгого прогона не превращает каждое
+// следующее разрешение в молчаливый отказ, а без файла (удалённый доступ
+// выключен) заголовка просто нет.
 //
 // Самодостаточный .mjs: его спавнит claude, импортов из пакета сервера тут быть
 // не может. Ошибку связи трактуем как «запретить» — это безопасный дефолт.
 
-/* global process, fetch */
+/* global process, Buffer, URL */
 import readline from 'node:readline';
+import { readFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 
 const RUN_ID = process.env.PERM_RUN_ID ?? '';
 const BASE_URL = process.env.PERM_BASE_URL ?? '';
+const TOKEN_FILE = process.env.PERM_TOKEN_FILE ?? '';
+
+/** Ключ доступа на момент запроса; файла нет — гейт выключен, ключ не нужен. */
+function readToken() {
+  if (!TOKEN_FILE) return '';
+  try {
+    return readFileSync(TOKEN_FILE, 'utf8').trim();
+  } catch {
+    return '';
+  }
+}
 
 const send = (message) => process.stdout.write(JSON.stringify(message) + '\n');
+
+/**
+ * POST JSON и ждать ответа столько, сколько потребуется.
+ *
+ * Не `fetch`: у него (undici) заголовки ответа ждутся не дольше пяти минут, а
+ * решение человека приложение держит до тридцати — на долгом раздумье запрос
+ * рвался, и агент получал «запретить», хотя человек ещё ничего не нажимал.
+ * У `node:http` таймаута по умолчанию нет, а соединение с локальным сервером
+ * само не рвётся.
+ */
+function postJson(url, body) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const token = readToken();
+    const payload = Buffer.from(JSON.stringify(body), 'utf8');
+    const request = (target.protocol === 'https:' ? httpsRequest : httpRequest)(
+      target,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': payload.length,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      },
+      (response) => {
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('error', reject);
+        response.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          let json;
+          try {
+            json = text ? JSON.parse(text) : undefined;
+          } catch {
+            json = undefined;
+          }
+          resolve({ status: response.statusCode ?? 0, json });
+        });
+      },
+    );
+    request.on('error', reject);
+    request.end(payload);
+  });
+}
 
 /** Спросить у приложения решение пользователя (длинный запрос — держит ответ). */
 async function askUser(args) {
@@ -35,20 +100,15 @@ async function askUser(args) {
     };
   }
   try {
-    const response = await fetch(`${BASE_URL}/api/chat/permission-request`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        runId: RUN_ID,
-        toolName: args.tool_name,
-        input: args.input ?? {},
-        toolUseId: args.tool_use_id ?? '',
-      }),
+    const { status, json: decision } = await postJson(`${BASE_URL}/api/chat/permission-request`, {
+      runId: RUN_ID,
+      toolName: args.tool_name,
+      input: args.input ?? {},
+      toolUseId: args.tool_use_id ?? '',
     });
-    if (!response.ok) {
-      return { behavior: 'deny', message: `Не удалось запросить разрешение (${response.status}).` };
+    if (status < 200 || status >= 300) {
+      return { behavior: 'deny', message: `Не удалось запросить разрешение (${status}).` };
     }
-    const decision = await response.json();
     if (decision && decision.behavior === 'allow') {
       return { behavior: 'allow', updatedInput: decision.updatedInput ?? args.input ?? {} };
     }

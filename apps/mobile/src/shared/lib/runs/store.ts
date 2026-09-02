@@ -118,6 +118,9 @@ export function applyEvent(id: string, event: ChatEvent): void {
       break;
     case 'usage': {
       next.tokens = run.tokens + event.input + event.output + event.cacheRead + event.cacheCreation;
+      // Остаток сверки с итогом прогона — не шаг: к тексту ответа он не
+      // относится, панель его тоже не приписывает. Только счётчик.
+      if (event.remainder) break;
       const step: MessageUsage = {
         input: event.input,
         output: event.output,

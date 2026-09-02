@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useWorkspace } from '@shared/lib/workspace';
+import { isStreamShown } from '@shared/lib/chat-stream';
 import {
   agentRuns,
   useAgentRun,
@@ -54,6 +55,7 @@ import { answerChild } from './lib/answerChild';
 import { useStreamState } from './model/useStreamState';
 import { downloadChatExport } from './lib/downloadChatExport';
 import { keepPending } from './lib/pending';
+import { withoutLiveTurn } from './lib/liveTurn';
 import styles from './ChatPage.module.scss';
 
 /**
@@ -163,6 +165,11 @@ export function ChatPage() {
 
   const messages = useChatMessages(activeChat?.id, messagesLimit);
   const messageList = messages.data?.messages ?? [];
+  // Пока потоковый пузырь на экране, текущий ход агента рисует он один: из
+  // истории такой ход убираем, иначе перечитка ленты посреди прогона
+  // показывает те же вызовы дважды — по разу из каждого источника.
+  const streamShown = isStreamShown(stream);
+  const shownHistory = withoutLiveTurn(messageList, run.startedAt, streamShown);
   // Разговор мог продолжиться мимо панели — из терминала или расширения
   // редактора. Такой ход не даёт потока событий, и лента жила бы снимком на
   // момент открытия: вопрос агента человек увидел бы только после F5.
@@ -363,7 +370,7 @@ export function ChatPage() {
 
           {hasContent ? (
             <ChatMessages
-              messages={[...messageList, ...pending]}
+              messages={[...shownHistory, ...pending]}
               conversationId={activeChat?.id}
               stream={stream}
               isLoading={messages.isLoading}

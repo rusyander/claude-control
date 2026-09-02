@@ -8,7 +8,7 @@ import { Badge } from '@shared/ui/badge';
 import { toast } from '@shared/lib/toast';
 import { toErrorMessage } from '@shared/api/client';
 import { workspace, normalizeProjectPath, projectShortName } from '@shared/lib/workspace';
-import { useProjectStatuses } from '@shared/lib/agent-runs';
+import { isLive, useProjectStatuses } from '@shared/lib/agent-runs';
 import { useProjectWorktrees, useAddWorktree, useRemoveWorktree } from '@entities/ProjectGit';
 import type { ProjectWorktree } from '@entities/ProjectGit';
 import type { WorktreeSectionProps } from './WorktreeSection.types';
@@ -34,6 +34,7 @@ import styles from './WorktreeSection.module.scss';
 /** Тон значка по состоянию агента в копии — тот же язык цвета, что и в пульте. */
 const STATUS_TONE = {
   running: 'info',
+  quiet: 'neutral',
   waiting: 'warning',
   error: 'danger',
   idle: 'neutral',
@@ -106,7 +107,7 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
       <div className={styles.list} aria-label={t('git.worktrees.title')}>
         {list.map((worktree) => {
           const status = statuses.get(normalizeProjectPath(worktree.path));
-          const isBusy = status === 'running' || status === 'waiting';
+          const isBusy = status !== undefined && (isLive(status) || status === 'waiting');
           return (
             <div key={worktree.path} className={styles.item}>
               <Stack

@@ -157,10 +157,12 @@ export function ChatComposer({
             gap="var(--spacing-2xs)"
             padding="var(--spacing-xs) var(--spacing-md) 0"
           >
-            {files.map((file) => (
+            {files.map((file, index) => (
               <Stack
                 as="span"
-                key={file.name}
+                // Одно имя у двух файлов из разных папок — обычное дело,
+                // ключ по имени сливал бы их в один чип.
+                key={`${index}:${file.name}`}
                 direction="row"
                 align="center"
                 gap="var(--spacing-3xs)"
@@ -188,6 +190,10 @@ export function ChatComposer({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
+            // Enter во время набора через IME (японский, китайский, корейский)
+            // лишь подтверждает кандидата — отправлять по нему нельзя, иначе
+            // уходит половина слова.
+            if (event.nativeEvent.isComposing) return;
             // Enter отправляет, Shift+Enter переносит строку.
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();

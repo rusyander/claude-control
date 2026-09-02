@@ -3,6 +3,7 @@ import type { ServerContext } from '../../context.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
 import { ChatSession } from '../../domains/chat/ChatSession.ts';
+import { apiTokenPath } from '../../lib/api-token.ts';
 import { shouldAutoApprove } from '../../domains/chat/auto-approve.ts';
 import { createGuardedPatternsReader } from '../../domains/permissions.ts';
 import { chatDirectory } from '../../domains/chat/ChatArtifacts.ts';
@@ -53,10 +54,12 @@ export function registerChatRunRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
   registry: ChatRunRegistry,
+  // Права и автоподтверждение — на сервер, не на модуль: два сервера в одном
+  // процессе не должны делить висящие запросы и тумблеры. Сервер отдаёт свой
+  // объект (его делит и продолжение в чистой сессии); тесты, поднимающие одни
+  // эти маршруты, получают собственный.
+  session: ChatSession,
 ): void {
-  // Права и автоподтверждение — на эту регистрацию маршрутов, не на модуль:
-  // два сервера в одном процессе не должны делить висящие запросы и тумблеры.
-  const session = new ChatSession(registry);
 
   // Реестр считает расход, но тарифов не знает: прайс и свои цены пользователя
   // доступны только здесь. Отдаём ему саму функцию, а не таблицу, — тогда правка
@@ -245,7 +248,7 @@ export function registerChatRunRoutes(
         // человеку кнопкой в чате. При полном доступе прав не спрашивают, но
         // брокер всё равно подключается — через него же приезжает ВОПРОС агента
         // с вариантами, и без брокера отвечать на него было бы нечем.
-        permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl },
+        permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
       },
       // Каталог проекта — для группировки статусов и восстановления после F5;
       // у песочницы/домашнего чата проекта нет.

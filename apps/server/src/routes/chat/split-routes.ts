@@ -7,6 +7,8 @@ import {
 } from '@claude-control/contracts/task-split';
 import type { ServerContext } from '../../context.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
+import type { ChatSession } from '../../domains/chat/ChatSession.ts';
+import { apiTokenPath } from '../../lib/api-token.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
 import { activateGroupsQuietly } from '../../domains/group-activation.ts';
 import { splitTasks } from '../../domains/chat/ChatSplit.ts';
@@ -32,7 +34,7 @@ import { activeCliCommand } from '../../providers/cli.ts';
 export function registerChatSplitRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
-  deps: { runs: ChatRunRegistry; providerChats: ProviderChatService },
+  deps: { runs: ChatRunRegistry; providerChats: ProviderChatService; session: ChatSession },
 ): void {
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
 
@@ -133,6 +135,12 @@ export function registerChatSplitRoutes(
       // «Разделить задачи» в самом чате, кнопка работает и при молчащей
       // инициативе.
       deps.runs.muteSplit(chatId);
+      // Автоподтверждение наследуется от родителя. Иначе веером заведённые дети
+      // встают на первом же инструменте и ждут человека, который по построению
+      // смотрит в другую вкладку: делят как раз для того, чтобы не сидеть над
+      // каждым. Тумблер родителя известен по любому его ключу — временному или
+      // настоящему.
+      if (parentChatId) deps.session.inherit([parentChatId], chatId);
       const initiative = initiativePrompt(settings, { splitMuted: true });
       return deps.runs.start(
         chatId,
@@ -143,7 +151,7 @@ export function registerChatSplitRoutes(
           model: model || settings.chatModel,
           effort: effort || settings.chatEffort,
           permissionMode: allowEdits ? 'acceptEdits' : 'default',
-          permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl },
+          permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
           ...(initiative ? { appendSystemPrompt: initiative } : {}),
         },
         { projectPath: cwd },

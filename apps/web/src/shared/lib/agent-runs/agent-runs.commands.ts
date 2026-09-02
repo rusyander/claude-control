@@ -62,7 +62,13 @@ export async function resumeActive(): Promise<void> {
   // Заодно подтягиваем накопленный расход — чтобы счётчик не был нулём после F5.
   void loadSpend();
 
-  let active: { chatId: string; sessionId?: string; projectPath?: string; seq: number }[];
+  let active: {
+    chatId: string;
+    sessionId?: string;
+    projectPath?: string;
+    seq: number;
+    startedAt?: number;
+  }[];
   try {
     const response = await apiClient.get('/chat/active');
     active = response.data as typeof active;
@@ -80,6 +86,7 @@ export async function resumeActive(): Promise<void> {
       id: info.chatId,
       sessionId: info.sessionId,
       projectPath: info.projectPath,
+      startedAt: info.startedAt,
       status: 'running',
       text: '',
       thinking: '',
@@ -239,7 +246,10 @@ export function setAutoApprove(id: string, enabled: boolean): void {
     emit();
   }
   if (run.status !== 'running') return;
-  void apiClient.post(`/chat/${key}/auto-approve`, { enabled }).catch(() => undefined);
+  // Прогон мог быть заведён другой вкладкой под своим ключом (serverRunId) —
+  // тумблер должен дойти именно до него, как и остановка.
+  const target = current?.serverRunId ?? key;
+  void apiClient.post(`/chat/${target}/auto-approve`, { enabled }).catch(() => undefined);
 }
 
 /** Ответить на запрос прав (клик «Разрешить»/«Запретить»). */
@@ -263,8 +273,9 @@ export function decidePermission(
   }
   // …но если решение до брокера не дошло, об этом надо сказать: карточки уже
   // нет, а агент всё ещё стоит и ждёт — молчание здесь выглядит как «ответил».
+  const target = current?.serverRunId ?? key;
   void apiClient
-    .post(`/chat/${key}/permission-decision`, { toolUseId, behavior, message })
+    .post(`/chat/${target}/permission-decision`, { toolUseId, behavior, message })
     .then(({ data }) => permissionDeliveryProblem(data as { ok?: unknown }))
     .catch((error: unknown) => permissionDeliveryProblem(undefined, error ?? 'network'))
     .then((problem) => {

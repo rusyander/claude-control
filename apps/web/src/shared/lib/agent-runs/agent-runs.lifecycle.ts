@@ -1,5 +1,13 @@
+import { apiClient } from '@shared/api/client';
+import { i18n } from '@shared/config/i18n';
 import { MAX_AUTO_RETRIES, MAX_RECONNECT } from './agent-runs.constants';
-import { autoRetries, autoRetryTimers, shouldAutoRetry, stoppedByUser } from './agent-runs.retry';
+import {
+  autoRetries,
+  autoRetryTimers,
+  pickRetryPrompt,
+  shouldAutoRetry,
+  stoppedByUser,
+} from './agent-runs.retry';
 import { loadSpend } from './agent-runs.spend';
 import { sleep } from './agent-runs.sse';
 import {
@@ -209,9 +217,14 @@ export async function runStream(
       autoRetryTimers.set(
         id,
         setTimeout(() => {
-          autoRetryTimers.delete(id);
-          if (stoppedByUser.has(id)) return;
-          retryRun(id, { auto: true });
+          if (stoppedByUser.has(id)) {
+            autoRetryTimers.delete(id);
+            return;
+          }
+          // Запись в таймерах держим до самого рестарта: авто-повтор сперва
+          // читает транскрипт, и до startRun у прогона нет ни контроллера, ни
+          // таймера — «Остановить всех» искало бы его и не нашло.
+          void retryRun(id, { auto: true }).finally(() => autoRetryTimers.delete(id));
         }, delay),
       );
     } else {
@@ -284,6 +297,8 @@ export function startRun(input: StartInput): Promise<SendOutcome> {
     permissions: [],
     // Запоминаем запрос, права, модель и глубину — для кнопки «Повторить».
     lastPrompt: input.prompt,
+    // Старт по часам сервера придёт с событием session.
+    startedAt: undefined,
     allowEdits: input.allowEdits,
     autoApprove: input.autoApprove,
     model: input.model,
@@ -312,14 +327,23 @@ export function startRun(input: StartInput): Promise<SendOutcome> {
  * автоматический перезапуск после временного сбоя: бюджет авто-попыток он не
  * обнуляет, а ручной («Повторить») — начинает счёт заново.
  */
-export function retryRun(id: string, options?: { fullAccess?: boolean; auto?: boolean }): void {
+export async function retryRun(
+  id: string,
+  options?: { fullAccess?: boolean; auto?: boolean },
+): Promise<void> {
   const run = getRun(id);
   if (!run.lastPrompt) return;
   const key = run.id || id;
   if (!options?.auto) autoRetries.delete(key);
+  // Авто-повтор не переотправляет задачу вслепую: если реплика уже в
+  // транскрипте, просим продолжить с места обрыва (см. pickRetryPrompt).
+  // Ручной «Повторить» — это решение человека, его отправляем как есть.
+  const prompt = options?.auto ? await retryPromptFor(run) : run.lastPrompt;
+  // Пока смотрели транскрипт, человек мог нажать «Остановить».
+  if (options?.auto && stoppedByUser.has(key)) return;
   void startRun({
     chatId: key,
-    prompt: run.lastPrompt,
+    prompt,
     sessionId: run.sessionId,
     projectPath: run.projectPath,
     allowEdits: run.allowEdits,
@@ -328,4 +352,28 @@ export function retryRun(id: string, options?: { fullAccess?: boolean; auto?: bo
     effort: run.effort,
     fullAccess: options?.fullAccess,
   });
+}
+
+/** Хвост транскрипта: своя реплика — последняя из реплик человека, дальше смотреть незачем. */
+const RETRY_TAIL = 5;
+
+/** Задача заново или «продолжай» — по тому, дожила ли реплика до транскрипта. */
+async function retryPromptFor(run: AgentRun): Promise<string> {
+  const lastPrompt = run.lastPrompt ?? '';
+  if (!run.sessionId || run.startedAt === undefined) return lastPrompt;
+  try {
+    const { data } = await apiClient.get<{ messages: { role: string; timestamp: string }[] }>(
+      `/chats/${run.sessionId}/messages`,
+      { params: { limit: RETRY_TAIL } },
+    );
+    return pickRetryPrompt({
+      lastPrompt,
+      startedAt: run.startedAt,
+      history: data.messages,
+      continuation: i18n.t('chat.continueAfterDrop'),
+    });
+  } catch {
+    // Транскрипт не прочитался — ведём себя как раньше: задача заново.
+    return lastPrompt;
+  }
 }

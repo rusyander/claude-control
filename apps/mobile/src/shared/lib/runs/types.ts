@@ -94,6 +94,8 @@ export type ChatEvent =
       model?: string;
       costUsd?: number;
       toolIds?: string[];
+      /** Остаток сверки с итогом прогона — в счётчик, но не к действию. */
+      remainder?: boolean;
     }
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
   | { kind: 'error'; message: string; retriable?: boolean }

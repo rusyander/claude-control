@@ -86,6 +86,7 @@ describe('ключи не утекают в разделы панели', () => 
         envVars: [],
         mcpServers: [],
         plugins: [],
+        groups: [],
       },
       'секретный',
     );

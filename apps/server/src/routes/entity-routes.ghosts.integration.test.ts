@@ -98,7 +98,8 @@ describe('маршруты сущностей: удаление не остав�
     });
     expect(created.statusCode).toBe(200);
 
-    const id = 'Bash(git push:*)';
+    // Идентификатор права — решение и шаблон; несуществующий id теперь 404.
+    const id = 'deny:Bash(git push:*)';
     store.saveGroup(group([{ kind: 'permission', id }]));
     store.setEnabled('permission', id, false);
     store.setGroupDisabled('permission', id, 'g1', true);

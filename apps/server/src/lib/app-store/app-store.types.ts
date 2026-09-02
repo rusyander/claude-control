@@ -4,6 +4,7 @@ import type {
   EntityKind,
   Group,
   Hook,
+  McpHealth,
   Project,
   ProjectCodeLayout,
   ProjectCodeView,
@@ -36,6 +37,17 @@ export interface ChatLink {
  * монорепы это сам корень, поэтому записи, сделанные до появления подпапок,
  * читаются как есть: `projectPath`/`dir` у них пусты и означают «корень».
  */
+/** Итог одной проверки связи с MCP-сервером — то, что показывает карточка и считает обзор. */
+export interface McpHealthRecord {
+  health: McpHealth;
+  /** Причина отказа, если health = failed. */
+  detail?: string;
+  /** Сколько инструментов отдал сервер при успешной проверке. */
+  toolCount?: number;
+  /** Когда проверка проводилась (ISO). */
+  checkedAt: string;
+}
+
 export interface RunnerPrefs {
   /** Абсолютный каталог запуска (ключ карты — его нормализованный вид). */
   path: string;
@@ -128,6 +140,13 @@ export interface AppState {
    * берётся бейдж «проверен» вместо вечного «экспериментальный».
    */
   providerChecks: Record<string, ProviderCheckResult>;
+  /**
+   * Итог последней проверки связи MCP-сервера: имя сервера → статус, причина,
+   * число инструментов и время проверки. Раньше жил только в состоянии карточки
+   * в браузере: обновление страницы возвращало «не проверялся», а обзор считал
+   * отвечающие серверы по списку, где health всегда было `unknown`.
+   */
+  mcpHealth: Record<string, McpHealthRecord>;
   /**
    * Что открыто в окне кода у таба проекта: нормализованный путь → снимок
    * (дерево, файл, режимы показа).

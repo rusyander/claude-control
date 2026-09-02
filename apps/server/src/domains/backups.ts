@@ -232,6 +232,8 @@ export interface RestoreResult {
   /** Копия состояния, которое заменили: откат тоже должен быть обратимым. */
   backupPath?: string;
   error?: string;
+  /** Копии с таким именем нет — маршрут отвечает 404, как DELETE, а не 400. */
+  notFound?: boolean;
 }
 
 /**
@@ -255,10 +257,10 @@ export function restoreBackup(
 ): RestoreResult {
   const source = join(backupDir, name);
   if (!BACKUP_NAME.test(name) || !existsSync(source))
-    return { ok: false, error: 'Копия не найдена' };
+    return { ok: false, notFound: true, error: 'Копия не найдена' };
 
   const entry = listBackups(backupDir, knownPaths, skillsDir).find((item) => item.name === name);
-  if (!entry) return { ok: false, error: 'Копия не найдена' };
+  if (!entry) return { ok: false, notFound: true, error: 'Копия не найдена' };
 
   const isDirectory = statSync(source).isDirectory();
   // Разбор имени делаем ОДИН раз: дальше мы сами меняем диск (снимаем копии,

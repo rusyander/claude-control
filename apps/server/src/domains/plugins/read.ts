@@ -60,8 +60,15 @@ export async function readPlugins(
   claudeRoot: string,
   command: string = defaultCliCommand(),
 ): Promise<PluginsState> {
-  const installed = await readInstalled(command);
-  return { installed, available: [], marketplaces: readMarketplaces(claudeRoot) };
+  const { plugins: installed, error } = await readInstalled(command);
+  return {
+    installed,
+    available: [],
+    marketplaces: readMarketplaces(claudeRoot),
+    // Отказ CLI — не «плагинов нет», а «список не получен». Молчаливый ноль
+    // читался бы как правда и отправлял бы человека искать пропавшие плагины.
+    notes: error ? [`Список плагинов не получен: ${error}`] : [],
+  };
 }
 
 /**
@@ -99,7 +106,7 @@ export async function readInstalledPluginsCached(
     return installedCache.plugins;
   }
 
-  const plugins = await readInstalled(command);
+  const { plugins } = await readInstalled(command);
   installedCache = { command, at: now, plugins };
 
   return plugins;
@@ -114,17 +121,63 @@ export function forgetInstalledPlugins(): void {
 export async function readAvailablePlugins(
   command: string = defaultCliCommand(),
 ): Promise<Plugin[]> {
-  return readAvailable(command, await readInstalled(command));
+  return readAvailable(command, (await readInstalled(command)).plugins);
 }
 
-async function readInstalled(command: string): Promise<Plugin[]> {
+async function readInstalled(command: string): Promise<{ plugins: Plugin[]; error?: string }> {
   try {
     const { stdout } = await runClaude(command, ['plugin', 'list', '--json'], 60_000);
-    return parseList(stdout, 'installed').map((item) => toPlugin(item, true));
-  } catch {
-    // CLI недоступен или сменил формат — раздел покажет пустой список,
+    return {
+      plugins: parseList(stdout, 'installed').map((item) =>
+        describeInstalled(toPlugin(item, true)),
+      ),
+    };
+  } catch (error) {
+    // CLI недоступен или сменил формат — раздел покажет пустой список и причину,
     // но приложение не должно из-за этого падать целиком.
-    return [];
+    return { plugins: [], error: cliErrorText(error) };
+  }
+}
+
+/** Что сказал CLI перед смертью: stderr, иначе текст исключения. */
+function cliErrorText(error: unknown): string {
+  const stderr = (error as { stderr?: unknown }).stderr;
+  const text =
+    typeof stderr === 'string' && stderr.trim()
+      ? stderr
+      : error instanceof Error
+        ? error.message
+        : String(error);
+  return text.trim().split('\n')[0]?.slice(0, 300) ?? '';
+}
+
+/**
+ * Чего `plugin list` о плагине не говорит: описание и есть ли он на диске.
+ *
+ * Путь установки CLI отдаёт, а описание — нет; оно лежит в манифесте
+ * `.claude-plugin/plugin.json` внутри этого пути. И плагин с пропавшим каталогом
+ * CLI перечисляет как ни в чём не бывало (проверено на 2.1.177): без пометки
+ * «включённый» плагин, от которого не осталось файлов, выглядит рабочим.
+ */
+function describeInstalled(plugin: Plugin): Plugin {
+  if (!plugin.installPath) return plugin;
+  if (!existsSync(plugin.installPath)) return { ...plugin, installPathMissing: true };
+  return {
+    ...plugin,
+    description: plugin.description ?? readManifestDescription(plugin.installPath),
+  };
+}
+
+function readManifestDescription(installPath: string): string | undefined {
+  try {
+    const manifest = JSON.parse(
+      readFileSync(join(installPath, '.claude-plugin', 'plugin.json'), 'utf8'),
+    ) as { description?: unknown };
+    return typeof manifest.description === 'string' && manifest.description
+      ? manifest.description
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -173,15 +226,19 @@ function readMarketplaces(claudeRoot: string): Marketplace[] {
     const parsed = JSON.parse(readFileSync(file, 'utf8')) as Record<
       string,
       {
-        source?: { source?: string; repo?: string };
+        source?: { source?: string; repo?: string; path?: string; url?: string };
         installLocation?: string;
         lastUpdated?: string;
       }
     >;
 
+    // `source.source` — это ВИД источника (github / directory / git), а не адрес.
+    // Адрес лежит в соседнем поле, своём для каждого вида: репозиторий, путь
+    // или URL. Без этого маркетплейс из папки подписывался словом «directory».
     return Object.entries(parsed).map(([name, value]) => ({
       name,
-      source: value.source?.repo ?? value.source?.source ?? '',
+      source:
+        value.source?.repo ?? value.source?.path ?? value.source?.url ?? value.source?.source ?? '',
       installLocation: value.installLocation,
       lastUpdated: value.lastUpdated,
     }));

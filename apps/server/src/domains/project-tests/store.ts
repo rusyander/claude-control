@@ -56,9 +56,19 @@ interface GroupFile {
 }
 
 export class ProjectTestsError extends Error {
+  statusCode = 400;
   constructor(message: string) {
     super(message);
     this.name = 'ProjectTestsError';
+  }
+}
+
+/** Группы с таким id нет — 404, а не молчаливое «ок» на удаление несуществующего. */
+export class ProjectTestsNotFoundError extends ProjectTestsError {
+  override statusCode = 404;
+  constructor(message: string) {
+    super(message);
+    this.name = 'ProjectTestsNotFoundError';
   }
 }
 
@@ -247,6 +257,7 @@ export function createGroup(
 /** Удалить группу вместе с файлом — это осознанное действие человека. */
 export function removeGroup(root: string, id: string): void {
   const path = groupPath(root, assertGroupId(id));
+  if (!existsSync(path)) throw new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`);
   rmSync(path, { force: true });
 }
 

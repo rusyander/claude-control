@@ -46,6 +46,22 @@ export function checkProjectDir(path: string): string | null {
   return null;
 }
 
+/**
+ * Тело `POST /api/projects` целиком: путь — как у `checkProjectDir`, имя — строка
+ * или ничего. Раньше проверялся только путь, и `name: 123` падал 500 на `.trim()`.
+ */
+export function checkProjectDraft(draft: unknown): string | null {
+  if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
+    return 'Тело запроса должно быть объектом с путём к проекту';
+  }
+  const { path, name } = draft as { path?: unknown; name?: unknown };
+  if (typeof path !== 'string') return 'Путь к проекту не задан';
+  if (name !== undefined && name !== null && typeof name !== 'string') {
+    return 'Имя проекта должно быть строкой';
+  }
+  return checkProjectDir(path);
+}
+
 /** Короткое имя проекта — последний непустой сегмент пути. */
 export function projectName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() || path;

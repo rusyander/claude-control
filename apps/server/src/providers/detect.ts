@@ -36,6 +36,16 @@ import type { ConfigProvider } from './types.ts';
 const LOOKUP_TIMEOUT_MS = 4000;
 
 /**
+ * Кеш ответов `where`/`which` на процесс. Поиск синхронный и блокирует цикл
+ * событий: десять CLI × два имени давали ~1,5 с, в которые не отвечал ни один
+ * маршрут — на холодной вкладке заголовок «Настроек» появлялся через три
+ * секунды. PATH меняется редко, поэтому результат живёт несколько минут;
+ * первый холодный вызов делает `warmCliLookup` сразу после старта сервера.
+ */
+const LOOKUP_CACHE_MS = 5 * 60_000;
+const lookupCache = new Map<string, { found: boolean; at: number }>();
+
+/**
  * Кроссплатформенный детект бинаря CLI в PATH через `where` (Windows) / `which`
  * (POSIX). Обёрнут так, чтобы НИКОГДА не падать: любая ошибка/таймаут → `false`.
  *
@@ -43,6 +53,19 @@ const LOOKUP_TIMEOUT_MS = 4000;
  * (`domains/provider-keys.ts`) — второй реализации детекта в коде нет.
  */
 export function detectCliOnPath(command: string): boolean {
+  const cached = lookupCache.get(command);
+  if (cached && Date.now() - cached.at < LOOKUP_CACHE_MS) return cached.found;
+  const found = lookupCliOnPath(command);
+  lookupCache.set(command, { found, at: Date.now() });
+  return found;
+}
+
+/** Сбросить кеш поиска — после установки CLI ответ должен обновиться сразу. */
+export function resetCliLookupCache(): void {
+  lookupCache.clear();
+}
+
+function lookupCliOnPath(command: string): boolean {
   try {
     const finder = process.platform === 'win32' ? 'where' : 'which';
     // Вывод НЕ разбираем (`stdio: 'ignore'`) — смотрим только код возврата.
@@ -135,9 +158,8 @@ export function detectProvider(
 
 /**
  * Детект по ВСЕМ известным провайдерам (Claude первым) + id активного —
- * полезная нагрузка `GET /api/providers/detect`. Операция дешёвая (несколько
- * `where`/`which` и `existsSync`), поэтому кеша нет: ответ всегда актуален,
- * например сразу после установки CLI.
+ * полезная нагрузка `GET /api/providers/detect`. Пути проверяются каждый раз
+ * (`existsSync` дёшев), поиск бинарей — через кеш `detectCliOnPath`.
  */
 export function detectProviders(
   store: DetectSettingsSource,

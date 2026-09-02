@@ -9,6 +9,8 @@ import type {
 export interface ClaudeSide {
   /** `~/.claude.json` — там же живут MCP-серверы. */
   mcpConfigPath: string;
+  /** `~/.claude/settings.json` — переменные окружения и права; подпись колонки. */
+  settingsPath: string;
   /** Путь CLAUDE.md выбирается обнаружением каталога, а не строится заново. */
   claudeMdPath: string;
   readMcp: () => McpServer[];

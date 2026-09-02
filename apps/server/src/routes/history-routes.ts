@@ -51,7 +51,9 @@ export function registerHistoryRoutes(app: FastifyInstance, ctx: ServerContext):
       }
 
       const result = revertHunk(ctx.store.backupDir, name, hunk, trackedTargets(), ctx.backupDir);
-      if (!result.ok) return reply.code(400).send({ error: result.error });
+      // Неизвестная копия — 404, как у `GET /history/diff`; 400 — за отказом
+      // по существу (файл провайдера, бинарный, ханка нет).
+      if (!result.ok) return reply.code(result.notFound ? 404 : 400).send({ error: result.error });
 
       return { ...result, needsRestart: true };
     },

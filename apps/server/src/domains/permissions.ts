@@ -23,7 +23,71 @@ interface RawSettings {
   [key: string]: unknown;
 }
 
-const MCP_PATTERN = /^mcp__([^_]+(?:[^_]|_(?!_))*)__(.+)$/;
+// Инструмент необязателен: `mcp__server` — право на весь сервер, оно тоже
+// принадлежит вкладке MCP, а раньше туда не попадало.
+const MCP_PATTERN = /^mcp__([^_]+(?:[^_]|_(?!_))*)(?:__(.+))?$/;
+
+const DECISIONS: readonly PermissionDecision[] = ['allow', 'ask', 'deny'];
+
+/** Черновик права не прошёл проверку: неизвестное решение или пустой шаблон. */
+export class InvalidPermissionError extends Error {
+  statusCode = 400;
+  code = 'invalid_permission';
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidPermissionError';
+  }
+}
+
+/** Такое право уже есть в этом файле: ни файл, ни список не изменились бы. */
+export class PermissionExistsError extends Error {
+  statusCode = 409;
+  code = 'permission_exists';
+
+  constructor(pattern: string) {
+    super(`Правило «${pattern}» с таким решением уже есть`);
+    this.name = 'PermissionExistsError';
+  }
+}
+
+/** Права с таким id в файле нет — нечего править, переносить или удалять. */
+export class PermissionNotFoundError extends Error {
+  statusCode = 404;
+  code = 'permission_not_found';
+
+  constructor(id: string) {
+    super(`Право «${id}» не найдено`);
+    this.name = 'PermissionNotFoundError';
+  }
+}
+
+/**
+ * Тело запроса как черновик. Маршруты прав без схемы, поэтому решение
+ * проверяется здесь: `decision: "zzz"` заводил в settings.json список, которого
+ * Claude Code не знает. Шаблон обрезается — пробелы по краям не часть правила.
+ */
+export function assertPermissionDraft(draft: unknown): PermissionDraft {
+  const value = (draft ?? {}) as Partial<PermissionDraft>;
+  const pattern = typeof value.pattern === 'string' ? value.pattern.trim() : '';
+  if (!pattern) throw new InvalidPermissionError('Пустой шаблон права');
+  if (!DECISIONS.includes(value.decision as PermissionDecision)) {
+    throw new InvalidPermissionError(`Неизвестное решение: ${String(value.decision)}`);
+  }
+  const groupIds = Array.isArray(value.groupIds)
+    ? value.groupIds.filter((id): id is string => typeof id === 'string')
+    : [];
+
+  return { pattern, decision: value.decision as PermissionDecision, groupIds };
+}
+
+/** Есть ли право `decision:pattern` в этом файле настроек. */
+export function hasPermission(settingsPath: string, ruleId: string): boolean {
+  const settings = readJsonFile<RawSettings>(settingsPath, {});
+  const [decision, ...rest] = ruleId.split(':');
+
+  return (settings.permissions?.[decision as PermissionDecision] ?? []).includes(rest.join(':'));
+}
 
 function readPermissionsFrom(
   settingsPath: string,
@@ -37,18 +101,69 @@ function readPermissionsFrom(
   for (const decision of ['allow', 'ask', 'deny'] as const) {
     for (const pattern of settings.permissions?.[decision] ?? []) {
       const id = `${prefix}${decision}:${pattern}`;
-      const mcp = MCP_PATTERN.exec(pattern);
+      rules.push(ruleOf(id, pattern, decision, source, store, true));
+    }
+  }
 
-      rules.push({
+  return rules;
+}
+
+function ruleOf(
+  id: string,
+  pattern: string,
+  decision: PermissionDecision,
+  source: SettingsSource,
+  store: AppStore,
+  isEnabled: boolean,
+): PermissionRule {
+  const mcp = MCP_PATTERN.exec(pattern);
+  return {
+    id,
+    pattern,
+    decision,
+    mcpServer: mcp?.[1],
+    mcpTool: mcp?.[2],
+    groupIds: store.getGroupIdsFor('permission', id),
+    source,
+    isEnabled,
+  };
+}
+
+/**
+ * Выключенные права, которых в файлах уже нет. Выключение права — это его
+ * удаление из списка settings.json (иначе Claude Code продолжал бы его
+ * применять), а всё нужное для возврата лежит в самом id (`[local:]decision:
+ * pattern`). Без подмешивания право, погашенное группой или вручную, исчезало
+ * бы со своей страницы: группа говорила «5 участников», список показывал 4, и
+ * включить его обратно можно было только через тумблер группы.
+ */
+function rememberedPermissions(
+  store: AppStore,
+  inFile: ReadonlySet<string>,
+  hasLocal: boolean,
+): PermissionRule[] {
+  const rules: PermissionRule[] = [];
+
+  for (const id of store.getDisabledIds('permission')) {
+    if (inFile.has(id)) continue;
+    const local = id.startsWith(LOCAL_ID_PREFIX);
+    // Локальное право без локального файла показать некуда — и нечем включить.
+    if (local && !hasLocal) continue;
+
+    const [decision, ...rest] = (local ? id.slice(LOCAL_ID_PREFIX.length) : id).split(':');
+    const pattern = rest.join(':');
+    if (!pattern || !DECISIONS.includes(decision as PermissionDecision)) continue;
+
+    rules.push(
+      ruleOf(
         id,
         pattern,
-        decision,
-        mcpServer: mcp?.[1],
-        mcpTool: mcp?.[2],
-        groupIds: store.getGroupIdsFor('permission', id),
-        source,
-      });
-    }
+        decision as PermissionDecision,
+        local ? 'settings-local' : 'settings',
+        store,
+        false,
+      ),
+    );
   }
 
   return rules;
@@ -57,7 +172,8 @@ function readPermissionsFrom(
 /**
  * Все действующие права. Локальный файл читается наравне с основным — иначе
  * список врал бы: запрет, живущий в `settings.local.json`, действует ровно
- * так же, а в панели его не было видно вовсе.
+ * так же, а в панели его не было видно вовсе. Выключенные подмешиваются из
+ * отметок панели (`rememberedPermissions`).
  */
 export function readPermissions(
   settingsPath: string,
@@ -65,9 +181,16 @@ export function readPermissions(
   localPath?: string,
 ): PermissionRule[] {
   const own = readPermissionsFrom(settingsPath, store, 'settings');
-  if (!localPath) return own;
+  const local = localPath ? readPermissionsFrom(localPath, store, 'settings-local') : [];
+  const inFile = new Set([...own, ...local].map((rule) => rule.id));
+  const remembered = rememberedPermissions(store, inFile, Boolean(localPath));
 
-  return [...own, ...readPermissionsFrom(localPath, store, 'settings-local')];
+  return [
+    ...own,
+    ...remembered.filter((rule) => rule.source === 'settings'),
+    ...local,
+    ...remembered.filter((rule) => rule.source === 'settings-local'),
+  ];
 }
 
 /** Что читателю охраняемых шаблонов нужно знать прямо сейчас. */
@@ -125,6 +248,10 @@ export function savePermission(
   ruleId: string | null,
   draft: PermissionDraft,
   backupDir?: string,
+  // Имя копии, когда basename файла не уникален (settings.json ПРОЕКТА):
+  // без него копия проекта делила бы имя, ротацию и восстановление с
+  // пользовательской (`projectBackupName`).
+  backupName?: string,
 ): string | undefined {
   const settings = readJsonFile<RawSettings>(settingsPath, {});
   settings.permissions ??= {};
@@ -141,16 +268,26 @@ export function savePermission(
     }
   }
 
-  // Сортируем только когда реально добавили правило: список приложение и так
-  // держит отсортированным, поэтому повторное сохранение (переезд, дубль)
-  // не нужно переупорядочивать — незачем трогать порядок, который уже на месте.
+  // Новое правило встаёт на своё место по алфавиту, но соседей не трогает:
+  // повторное сохранение (переезд, дубль) ничего не переупорядочивает, а
+  // список, выстроенный руками, остаётся в порядке хозяина (`insertSorted`).
   const target = (settings.permissions[draft.decision] ??= []);
-  if (!target.includes(draft.pattern)) {
-    target.push(draft.pattern);
-    target.sort();
-  }
+  insertSorted(target, draft.pattern);
 
-  return writeJsonFile(settingsPath, settings, { backupDir });
+  return writeJsonFile(settingsPath, settings, { backupDir, backupName });
+}
+
+/**
+ * Вставка шаблона на алфавитное место БЕЗ пересортировки остального. `sort()`
+ * всего списка переупорядочивал бы правила, выстроенные человеком руками: одно
+ * выключение-включение группы оставляло в settings.json дифф, которого никто не
+ * просил. На уже отсортированном списке результат тот же, что и у `sort()`.
+ */
+function insertSorted(list: string[], pattern: string): void {
+  if (list.includes(pattern)) return;
+  const at = list.findIndex((item) => item > pattern);
+  if (at < 0) list.push(pattern);
+  else list.splice(at, 0, pattern);
 }
 
 /**
@@ -186,17 +323,20 @@ export function deletePermission(
   settingsPath: string,
   ruleId: string,
   backupDir?: string,
+  backupName?: string,
 ): string | undefined {
   const settings = readJsonFile<RawSettings>(settingsPath, {});
   const [decision, ...rest] = ruleId.split(':');
   const pattern = rest.join(':');
   const list = settings.permissions?.[decision as PermissionDecision];
 
-  if (list && settings.permissions) {
-    settings.permissions[decision as PermissionDecision] = list.filter((item) => item !== pattern);
-  }
+  // Нечего удалять — нечего и переписывать: иначе каждое такое удаление
+  // оставляло резервную копию неизменённого файла.
+  if (!list?.includes(pattern) || !settings.permissions) return undefined;
 
-  return writeJsonFile(settingsPath, settings, { backupDir });
+  settings.permissions[decision as PermissionDecision] = list.filter((item) => item !== pattern);
+
+  return writeJsonFile(settingsPath, settings, { backupDir, backupName });
 }
 
 /**
@@ -227,11 +367,7 @@ export function setPermissionsEnabled(
     if (!pattern) continue;
 
     if (isEnabled) {
-      const list = (settings.permissions[decision] ??= []);
-      if (!list.includes(pattern)) {
-        list.push(pattern);
-        list.sort();
-      }
+      insertSorted((settings.permissions[decision] ??= []), pattern);
     } else {
       const list = settings.permissions[decision];
       if (list) settings.permissions[decision] = list.filter((item) => item !== pattern);

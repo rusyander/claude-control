@@ -13,6 +13,6 @@
  */
 
 export { deleteSkill, renameSkill, setSkillEnabled } from './skills/lifecycle.ts';
-export { SKILLS_DISABLED_DIR } from './skills/paths.ts';
+export { SKILLS_DISABLED_DIR, InvalidSkillIdError, assertSkillId } from './skills/paths.ts';
 export { readSkills } from './skills/read.ts';
 export { saveSkill, SkillExistsError } from './skills/write.ts';

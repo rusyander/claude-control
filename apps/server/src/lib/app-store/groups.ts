@@ -35,6 +35,13 @@ export function saveGroup(state: AppState, group: Group): Group {
 
 export function deleteGroup(state: AppState, id: string): void {
   state.groups = state.groups.filter((group) => group.id !== id);
+  // Удалённая вложенная группа уходит и из состава родителей: иначе там
+  // оставался бы участник-призрак — «N участников» врало на единицу, а в
+  // редакторе висела строка с голым uuid, которую нечем опознать.
+  for (const group of state.groups) {
+    const kept = group.members.filter((member) => !(member.kind === 'group' && member.id === id));
+    if (kept.length !== group.members.length) group.members = kept;
+  }
 }
 
 /** Какие ключи env применила группа (записала в settings.json). */

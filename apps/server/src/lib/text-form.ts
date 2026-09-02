@@ -22,10 +22,18 @@
 /** Метка порядка байтов UTF-8 в виде символа (в JS BOM читается как U+FEFF). */
 export const BOM_CHAR = '﻿';
 
-/** Форма файла: был ли BOM и какими переводами строк он размечен. */
+/**
+ * Форма файла: был ли BOM, какими переводами строк он размечен и кончался ли
+ * переводом строки. Последнее — для файлов, которые целиком переписываются из
+ * структуры (writeJsonFile): ~/.claude.json Claude Code пишет БЕЗ хвостового
+ * перевода строки, и после «выключить → включить» файл должен совпасть байт в
+ * байт, а не отличаться одним байтом. Пустой файл формы не задаёт — считаем «с».
+ */
 export interface TextForm {
   bom: boolean;
   eol: '\n' | '\r\n';
+  /** Не задан — считаем «с переводом строки» (форма, собранная руками, без хвоста не спорит). */
+  trailingNewline?: boolean;
 }
 
 /** Начинается ли текст с BOM. */
@@ -50,9 +58,13 @@ export function detectEol(raw: string): '\n' | '\r\n' {
   return crlf >= lf ? '\r\n' : '\n';
 }
 
-/** Форма текста: BOM + стиль переводов строк. */
+/** Форма текста: BOM + стиль переводов строк + хвостовой перевод строки. */
 export function detectTextForm(raw: string): TextForm {
-  return { bom: hasBom(raw), eol: detectEol(raw) };
+  return {
+    bom: hasBom(raw),
+    eol: detectEol(raw),
+    trailingNewline: raw.length === 0 || raw.endsWith('\n'),
+  };
 }
 
 /**

@@ -26,7 +26,12 @@ export function readProjectLocalConfig(projectRoot: string, store: AppStore): Pr
     // `readSkills` заглядывает и в `skills-disabled/` — для проекта это так же
     // осмысленно: выключенный скилл лежит рядом и виден в списке с пометкой.
     skills: readSkills(join(root, 'skills'), store).map((skill) => ({ ...skill, groupIds: [] })),
-    hooks: readHooksFromFiles(join(root, 'settings.json'), join(root, 'settings.local.json')),
+    // Корень проекта нужен хукам: относительный путь скрипта считается от него.
+    hooks: readHooksFromFiles(
+      join(root, 'settings.json'),
+      join(root, 'settings.local.json'),
+      resolve(projectRoot),
+    ),
     rules: readRuleFiles(join(root, 'rules')),
   };
 }

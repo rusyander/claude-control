@@ -36,6 +36,7 @@ function emptyInputs(): SearchInputs {
     envVars: [],
     mcpServers: [],
     plugins: [],
+    groups: [],
   };
 }
 
@@ -172,8 +173,11 @@ function providerPermissionEntries(
 export async function collectSearchInputs(sources: SearchSources): Promise<SearchInputs> {
   const { paths, store } = sources;
 
+  // Группы — данные панели, не провайдера: ищутся при любом активном CLI.
+  const groups = store.getGroups();
+
   if (getActiveProvider(store).id !== 'claude') {
-    return { ...emptyInputs(), provider: collectProviderInputs(sources) };
+    return { ...emptyInputs(), groups, provider: collectProviderInputs(sources) };
   }
 
   const hooks = readHooks(paths.settings, store, paths.settingsLocal);
@@ -196,6 +200,7 @@ export async function collectSearchInputs(sources: SearchSources): Promise<Searc
     envVars: readEnvVars(paths.settings, paths.secretsEnv, paths.settingsLocal),
     mcpServers: readMcpServers(paths.mcpConfig, store),
     plugins: installed,
+    groups,
   };
 }
 

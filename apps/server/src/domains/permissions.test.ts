@@ -139,6 +139,54 @@ describe('permissions', () => {
       const [rule] = readPermissions(settingsPath, store);
       expect(rule?.groupIds).toEqual(['g1']);
     });
+
+    it('право из файла читается включённым', () => {
+      writeSettings({ permissions: { allow: ['Read(a)'] } });
+
+      expect(readPermissions(settingsPath, store)[0]?.isEnabled).toBe(true);
+    });
+
+    it('погашенное группой право остаётся в списке выключенным', () => {
+      // Выключение убирает шаблон из файла — иначе Claude Code применял бы его.
+      // Без подмешивания из отметок право просто исчезало со своей страницы.
+      writeSettings({ permissions: { allow: ['Read(a)', 'Read(b)'] } });
+      store.setGroupDisabled('permission', 'allow:Read(b)', 'g1', true);
+      setPermissionsEnabled(settingsPath, [{ id: 'allow:Read(b)', isEnabled: false }]);
+
+      const rules = readPermissions(settingsPath, store);
+      expect(rules.map((rule) => [rule.id, rule.isEnabled])).toEqual([
+        ['allow:Read(a)', true],
+        ['allow:Read(b)', false],
+      ]);
+      expect(rules[1]).toMatchObject({ pattern: 'Read(b)', decision: 'allow', source: 'settings' });
+    });
+
+    it('выключенное вручную право тоже в списке; локальное — только при локальном файле', () => {
+      writeSettings({ permissions: {} });
+      store.setEnabled('permission', 'deny:Bash(rm:*)', false);
+      store.setEnabled('permission', 'local:ask:Write(x)', false);
+
+      const own = readPermissions(settingsPath, store);
+      expect(own.map((rule) => rule.id)).toEqual(['deny:Bash(rm:*)']);
+      expect(own[0]?.isEnabled).toBe(false);
+
+      const localPath = join(dir, 'settings.local.json');
+      writeFileSync(localPath, '{}');
+      const withLocal = readPermissions(settingsPath, store, localPath);
+      expect(withLocal.map((rule) => [rule.id, rule.source])).toEqual([
+        ['deny:Bash(rm:*)', 'settings'],
+        ['local:ask:Write(x)', 'settings-local'],
+      ]);
+    });
+
+    it('право, вернувшееся в файл, не дублируется отметкой', () => {
+      writeSettings({ permissions: { allow: ['Read(a)'] } });
+      store.setEnabled('permission', 'allow:Read(a)', false);
+
+      expect(readPermissions(settingsPath, store).map((rule) => rule.id)).toEqual([
+        'allow:Read(a)',
+      ]);
+    });
   });
 
   describe('savePermission — добавление и перемещение', () => {
@@ -176,6 +224,29 @@ describe('permissions', () => {
 
       const saved = JSON.parse(readFileSync(settingsPath, 'utf8'));
       expect(saved.permissions.allow).toEqual(['Read(c)', 'Read(a)', 'Read(b)']);
+    });
+
+    it('новое правило встаёт на алфавитное место, не пересортировывая чужой порядок', () => {
+      // Список выстроен руками. Раньше добавление вызывало sort() всего списка,
+      // и одно сохранение переписывало порядок хозяина целиком.
+      writeSettings({ permissions: { allow: ['Read(c)', 'Read(a)', 'Read(d)'] } });
+
+      savePermission(settingsPath, null, draft({ pattern: 'Read(b)', decision: 'allow' }));
+
+      const saved = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      expect(saved.permissions.allow).toEqual(['Read(b)', 'Read(c)', 'Read(a)', 'Read(d)']);
+    });
+
+    it('включение права обратно (setPermissionsEnabled) тоже не трогает соседей', () => {
+      writeSettings({ permissions: { allow: ['Read(c)', 'Read(a)', 'Read(b)'] } });
+
+      setPermissionsEnabled(settingsPath, [{ id: 'allow:Read(a)', isEnabled: false }]);
+      setPermissionsEnabled(settingsPath, [{ id: 'allow:Read(a)', isEnabled: true }]);
+
+      const saved = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      // Read(a) вернулся на алфавитное место относительно соседей; Read(c) и
+      // Read(b) остались в порядке хозяина.
+      expect(saved.permissions.allow).toEqual(['Read(a)', 'Read(c)', 'Read(b)']);
     });
 
     it('перемещает правило между списками, убирая его из старого', () => {

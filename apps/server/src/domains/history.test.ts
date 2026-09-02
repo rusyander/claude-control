@@ -272,4 +272,46 @@ describe('История изменений', () => {
       expect(items.map((item) => item.name)).toEqual([CLAUDE_COPY]);
     });
   });
+
+  describe('копии проектов и пропущенные диффы', () => {
+    let dir: string;
+    let backupDir: string;
+    let settingsPath: string;
+    const USER_COPY = 'settings.json.2026-07-19T10-00-00-000Z.bak';
+    // Копия `<проект>/.claude/settings.json` — под именем проекта (`projectBackupName`).
+    const PROJECT_COPY = 'project-0f1e2d3c-settings.json.2026-07-19T11-00-00-000Z.bak';
+
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), 'cc-history-project-'));
+      backupDir = join(dir, 'backups');
+      settingsPath = join(dir, 'settings.json');
+      mkdirSync(backupDir, { recursive: true });
+      writeFileSync(settingsPath, 'user-1\nuser-2\n');
+      writeFileSync(join(backupDir, USER_COPY), 'user-1\n');
+      writeFileSync(join(backupDir, PROJECT_COPY), '{ "permissions": {} }\n');
+    });
+
+    afterEach(() => {
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('копия проектного файла в ленту пользовательского уровня не попадает и не диффится', () => {
+      const targets = [claudeTarget(settingsPath)];
+      expect(buildHistory(backupDir, targets).map((item) => item.name)).toEqual([USER_COPY]);
+      expect(buildDiff(backupDir, PROJECT_COPY, targets)).toBeUndefined();
+      const revert = revertHunk(backupDir, PROJECT_COPY, 0, targets, backupDir);
+      expect(revert.ok).toBe(false);
+      expect(revert.notFound).toBe(true);
+      expect(readFileSync(settingsPath, 'utf8')).toBe('user-1\nuser-2\n');
+    });
+
+    it('бинарная копия едет в ленту с причиной пропуска, а не как «без изменений»', () => {
+      writeFileSync(join(backupDir, USER_COPY), Buffer.from([0x75, 0x00, 0x01, 0x02]));
+      const [entry] = buildHistory(backupDir, [claudeTarget(settingsPath)]);
+      expect(entry?.added).toBe(0);
+      expect(entry?.removed).toBe(0);
+      expect(entry?.skipped).toBe(true);
+      expect(entry?.reason).toBe('binary');
+    });
+  });
 });

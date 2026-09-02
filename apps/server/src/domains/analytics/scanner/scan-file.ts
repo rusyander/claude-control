@@ -47,8 +47,19 @@ export async function scanFile(
     { entry: RawEntry; usage: RawUsage; time: number; stamp: string }
   >();
 
+  /**
+   * Проект сессии — каталог, из которого её запустили: cwd ПЕРВОЙ записи файла,
+   * до всякого отбора по периоду. У каждой строки свой cwd, и он меняется с
+   * каждым `cd` агента внутри сессии; считать проектом cwd строки значило
+   * рассыпать один разговор на десятки «проектов» вроде `node_modules/x/dist`
+   * и учитывать сессию в каждом из них (замер на реальном ~/.claude: 64
+   * «проекта» из 13 файлов за день).
+   */
+  let launchCwd: string | undefined;
+
   /** Учесть один ответ модели во всех разрезах сразу. */
   const count = (entry: RawEntry, usage: RawUsage, time: number, stamp: string): void => {
+    const cwd = launchCwd ?? entry.cwd ?? 'unknown';
     const model = entry.message?.model ?? 'unknown';
     const tokens = {
       input: usage.input_tokens ?? 0,
@@ -83,8 +94,8 @@ export async function scanFile(
     hourly.tokens += tokens.input + tokens.output + tokens.cacheRead + tokens.cacheCreation;
     acc.byHour.set(hour, hourly);
 
-    trackProject(acc, entry, usage, cost);
-    trackSession(acc, entry, usage, cost, model, isActive, file.path);
+    trackProject(acc, entry, cwd, usage, cost);
+    trackSession(acc, entry, cwd, usage, cost, model, isActive, file.path);
   };
 
   for await (const line of lines) {
@@ -96,6 +107,8 @@ export async function scanFile(
     } catch {
       continue; // недописанная строка активной сессии
     }
+
+    launchCwd ??= entry.cwd;
 
     // Период отсекается ДО счётчика инструментов. Раньше инструменты считались
     // по всем строкам файлов, переживших фильтр по mtime: долгоживущий транскрипт
@@ -137,8 +150,14 @@ export async function scanFile(
   for (const item of pending.values()) count(item.entry, item.usage, item.time, item.stamp);
 }
 
-function trackProject(acc: Accumulator, entry: RawEntry, usage: RawUsage, cost: number): void {
-  const project = normalizeProject(entry.cwd ?? 'unknown');
+function trackProject(
+  acc: Accumulator,
+  entry: RawEntry,
+  cwd: string,
+  usage: RawUsage,
+  cost: number,
+): void {
+  const project = normalizeProject(cwd);
   const bucket = acc.byProject.get(project) ?? {
     totals: emptyTotals(),
     cost: 0,
@@ -158,6 +177,7 @@ function trackProject(acc: Accumulator, entry: RawEntry, usage: RawUsage, cost: 
 function trackSession(
   acc: Accumulator,
   entry: RawEntry,
+  cwd: string,
   usage: RawUsage,
   cost: number,
   model: string,
@@ -172,8 +192,8 @@ function trackSession(
     addUsage(totals, usage);
     acc.sessions.set(sessionId, {
       sessionId,
-      project: normalizeProject(entry.cwd ?? 'unknown'),
-      displayName: shortenProject(entry.cwd ?? 'unknown'),
+      project: normalizeProject(cwd),
+      displayName: shortenProject(cwd),
       startedAt: entry.timestamp ?? '',
       lastActivity: entry.timestamp ?? '',
       totals,

@@ -30,9 +30,22 @@ import {
   linkChatSession as moveChatLink,
   setChatLink as writeChatLink,
 } from './chat-links.ts';
-import type { AppState, ChatLink, RunnerPrefs, RunnerTargetMeta } from './app-store.types.ts';
+import type {
+  AppState,
+  ChatLink,
+  McpHealthRecord,
+  RunnerPrefs,
+  RunnerTargetMeta,
+} from './app-store.types.ts';
 import { mergeState, readStateFile, stateFilePath } from './state-file.ts';
 import {
+  forgetMcpHealth as dropMcpHealth,
+  getMcpHealth as readMcpHealth,
+  renameMcpHealth as moveMcpHealth,
+  saveMcpHealth as writeMcpHealth,
+} from './mcp-health.ts';
+import {
+  disabledIds as entityDisabledIds,
   disablingGroups as entityDisablingGroups,
   isDisabled as isEntityDisabled,
   isDisabledManually as isEntityDisabledManually,
@@ -58,6 +71,7 @@ import {
 import {
   addProject as addProjectRecord,
   findProject,
+  findProjectByPath,
   listProjects,
   removeProject as removeProjectRecord,
 } from './projects.ts';
@@ -184,17 +198,47 @@ export class AppStore {
     return entityDisablingGroups(this.state, kind, id);
   }
 
+  /** Все погашенные идентификаторы вида — ручные и групповые отметки вместе. */
+  getDisabledIds(kind: EntityKind): string[] {
+    return entityDisabledIds(this.state, kind);
+  }
+
   setEnabled(kind: EntityKind, id: string, isEnabled: boolean, legacyId?: string): void {
     setEntityEnabled(this.state, kind, id, isEnabled, legacyId);
     this.persist();
   }
 
   renameEntity(kind: EntityKind, oldId: string, newId: string): void {
-    if (renameEntityMarks(this.state, kind, oldId, newId)) this.persist();
+    const marksMoved = renameEntityMarks(this.state, kind, oldId, newId);
+    // Итог проверки связи ключуется тем же именем — переезжает вместе с отметками.
+    const healthMoved = kind === 'mcp' && moveMcpHealth(this.state, oldId, newId);
+    if (marksMoved || healthMoved) this.persist();
   }
 
   removeEntity(kind: EntityKind, id: string): void {
-    if (removeEntityMarks(this.state, kind, id)) this.persist();
+    const marksDropped = removeEntityMarks(this.state, kind, id);
+    const healthDropped = kind === 'mcp' && dropMcpHealth(this.state, id);
+    if (marksDropped || healthDropped) this.persist();
+  }
+
+  /** Итог последней проверки связи MCP-серверов: имя → запись (копия, не внутренний объект). */
+  getMcpHealth(): Record<string, McpHealthRecord> {
+    return readMcpHealth(this.state);
+  }
+
+  /** Запомнить итог проверки связи сервера, заменив предыдущий. */
+  saveMcpHealth(id: string, record: McpHealthRecord): void {
+    writeMcpHealth(this.state, id, record);
+    this.persist();
+  }
+
+  /**
+   * Забыть итог проверки. Нужен при создании сервера под именем, которое раньше носил другой
+   * (удалён руками в ~/.claude.json или через `claude mcp remove`, минуя панель): новый сервер
+   * не должен наследовать чужое «отвечает, 3 инструмента, проверено вчера».
+   */
+  forgetMcpHealth(id: string): void {
+    if (dropMcpHealth(this.state, id)) this.persist();
   }
 
   setGroupDisabled(kind: EntityKind, id: string, groupId: string, isDisabled: boolean): void {
@@ -273,6 +317,11 @@ export class AppStore {
 
   getProject(id: string): Project | undefined {
     return findProject(this.state, id);
+  }
+
+  /** Тот же каталог под другим регистром или слэшами — тот же проект. */
+  getProjectByPath(path: string): Project | undefined {
+    return findProjectByPath(this.state, path);
   }
 
   addProject(project: Project): Project {

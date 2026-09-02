@@ -27,6 +27,11 @@ import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
  */
 export interface ApplyResult {
   needsHookRewrite: boolean;
+  /**
+   * Копия файла, переписанного при применении (сейчас — ~/.claude.json у MCP):
+   * маршрут отдаёт её в ответе, и тост называет копию, как у остальных записей.
+   */
+  backupPath?: string;
 }
 
 /**
@@ -123,7 +128,8 @@ export function applyEntityState(
   // У скиллов и MCP-серверов выключение физическое: перенос папки или
   // секции конфига. Остальное хранится отметкой в состоянии приложения.
   if (kind === 'skill') setSkillEnabled(paths.skills, id, isEnabled);
-  if (kind === 'mcp') setMcpServerEnabled(paths.mcpConfig, id, isEnabled, backupDir);
+  const backupPath =
+    kind === 'mcp' ? setMcpServerEnabled(paths.mcpConfig, id, isEnabled, backupDir) : undefined;
 
   // Правило физически уезжает в раздел отключённых — перезаписью CLAUDE.md.
   // Состояние передаём явно: при чтении оно берётся из расположения правила в
@@ -166,11 +172,19 @@ export function applyEntityState(
     // файле — и первая же перезапись перенесла бы личный хук в settings.json,
     // то есть включила бы его всем, кто читает этот конфиг.
     if (hook && hook.source !== 'settings-local') {
-      store.rememberDisabledHook({ ...hook, isEnabled: false });
+      // Место в событии запоминаем вместе с командой: без него включённый
+      // обратно хук вставал в конец события, и порядок, выставленный
+      // стрелками, терялся. Считаем по списку readHooks — там выключенные
+      // уже стоят на своих местах, так что и второй выключенный подряд
+      // вернётся туда, где был.
+      const position = readHooks(paths.settings, store, paths.settingsLocal)
+        .filter((item) => item.event === hook.event && item.source === hook.source)
+        .findIndex((item) => item.id === hook.id);
+      store.rememberDisabledHook({ ...hook, isEnabled: false, position: Math.max(position, 0) });
     }
   }
 
-  return { needsHookRewrite: kind === 'hook' };
+  return { needsHookRewrite: kind === 'hook', backupPath };
 }
 
 /**

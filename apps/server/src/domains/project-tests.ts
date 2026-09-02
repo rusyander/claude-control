@@ -7,6 +7,7 @@
 export {
   DEFAULT_GROUPS,
   ProjectTestsError,
+  ProjectTestsNotFoundError,
   TESTS_DIR,
   createGroup,
   groupFile,

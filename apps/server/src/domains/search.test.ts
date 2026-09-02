@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type {
   EnvVar,
+  Group,
   Hook,
   McpServer,
   PermissionRule,
@@ -62,12 +63,14 @@ const script = (over: Partial<ScriptFile>): ScriptFile => ({
   sizeBytes: 0,
   modifiedAt: '2026-01-01T00:00:00.000Z',
   isUsed: true,
+  isTest: false,
   ...over,
 });
 
 const permission = (over: Partial<PermissionRule>): PermissionRule => ({
   id: 'allow:Bash(ls:*)',
   pattern: 'Bash(ls:*)',
+  isEnabled: true,
   decision: 'allow',
   groupIds: [],
   source: 'settings',
@@ -117,9 +120,38 @@ const empty: SearchInputs = {
   envVars: [],
   mcpServers: [],
   plugins: [],
+  groups: [],
 };
 
 const inputs = (over: Partial<SearchInputs>): SearchInputs => ({ ...empty, ...over });
+
+const group = (over: Partial<Group>): Group => ({
+  id: 'g1',
+  name: 'Ревью фронтенда',
+  description: 'правила и скиллы под ревью',
+  color: 'accent',
+  icon: 'folder',
+  members: [],
+  env: {},
+  isEnabled: true,
+  order: 0,
+  ...over,
+});
+
+describe('searchEntities — группы панели', () => {
+  it('группа находится по имени и ведёт на страницу групп', () => {
+    const results = searchEntities(inputs({ groups: [group({})] }), 'ревью');
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ kind: 'group', id: 'g1', pagePath: 'groups' });
+  });
+
+  it('группа находится и по описанию', () => {
+    const results = searchEntities(inputs({ groups: [group({})] }), 'скиллы под');
+
+    expect(results.map((item) => item.kind)).toEqual(['group']);
+  });
+});
 
 describe('searchEntities', () => {
   describe('пустой и короткий запрос', () => {

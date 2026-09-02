@@ -53,6 +53,8 @@ describe('config-routes: валидация настроек и импорта',
         relocated.push(path);
         return { isValid: true };
       },
+      rememberDirOverride: (value: string) => store.updateSettings({ claudeDirOverride: value }),
+      effectiveSettings: () => store.getSettings(),
     } as unknown as ServerContext;
 
     app = Fastify();

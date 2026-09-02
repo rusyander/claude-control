@@ -7,6 +7,8 @@ import {
   findHook,
   type EntityToggleDeps,
 } from '../../domains/entity-toggle.ts';
+import { assertSkillId } from '../../domains/skills.ts';
+import { assertMcpServerExists } from '../../domains/mcp.ts';
 import { done } from '../write-result.ts';
 
 /** Включение и выключение любой сущности — один маршрут на все виды. */
@@ -32,6 +34,14 @@ export function registerEntityToggleRoutes(app: FastifyInstance, ctx: ServerCont
       const id = hook?.id ?? request.params.id;
       const legacyId = hook?.legacyId;
 
+      // Id скилла — имя папки, и применение его отвергнет (400). Но отметка
+      // ставится ДО применения, и с таким id в state.json оседал бы мусор.
+      if (kind === 'skill') assertSkillId(id);
+      // Так же у MCP: сервера с таким именем нет — 404 (statusCode на ошибке)
+      // ДО отметки, иначе в state.json оседал бы след несуществующего сервера,
+      // а ответ был «ok».
+      if (kind === 'mcp') assertMcpServerExists(deps.paths.mcpConfig, id);
+
       // Отметку ставим до применения: разбор файлов опирается на неё, чтобы
       // вернуть сущность уже с новым состоянием.
       ctx.store.setEnabled(kind, id, isEnabled, legacyId);
@@ -40,9 +50,10 @@ export function registerEntityToggleRoutes(app: FastifyInstance, ctx: ServerCont
       // одиночный переключатель включить не может — иначе состояние в панели
       // разошлось бы с состоянием группы.
       const effective = !ctx.store.isDisabled(kind, id, legacyId);
-      const { needsHookRewrite } = applyEntityState(deps, kind, id, effective);
+      const { needsHookRewrite, backupPath } = applyEntityState(deps, kind, id, effective);
 
-      return done(needsHookRewrite ? rewriteHooks(deps) : undefined);
+      // У MCP переключение — перезапись ~/.claude.json с копией: тост называет её.
+      return done(needsHookRewrite ? rewriteHooks(deps) : backupPath);
     },
   );
 }

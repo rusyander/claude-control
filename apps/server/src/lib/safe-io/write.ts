@@ -1,4 +1,4 @@
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { applyTextForm } from '../text-form.ts';
 import { backupEntry } from './backups.ts';
@@ -26,9 +26,37 @@ function writeAtomic(path: string, payload: string | Buffer): void {
   mkdirSync(dirname(target), { recursive: true });
 
   const tmp = `${target}.tmp-${process.pid}-${(tmpCounter += 1)}`;
-  writeFileSync(tmp, payload);
-  renameSync(tmp, target);
+  try {
+    writeFileSync(tmp, payload);
+    renameWithRetry(tmp, target);
+  } catch (error) {
+    // Не вышло — временный файл не должен остаться лежать рядом с конфигом:
+    // на стенде такие `state.json.tmp-*` копились после отказов переименования.
+    rmSync(tmp, { force: true });
+    throw error;
+  }
   applyFileMode(target, mode, path);
+}
+
+/** Коды, с которыми Windows отдаёт «файл занят»: антивирус или индексатор держит цель долю секунды. */
+const TRANSIENT_RENAME_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+
+/**
+ * Переименование с несколькими попытками. Атомарной записи это не отменяет —
+ * цель либо прежняя, либо новая, — но однократная попытка на Windows
+ * проигрывала сканеру файлов и роняла запрос 500 на здоровом конфиге.
+ */
+function renameWithRetry(from: string, to: string): void {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? '';
+      if (attempt >= 4 || !TRANSIENT_RENAME_CODES.has(code)) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 * (attempt + 1));
+    }
+  }
 }
 
 /** Копия перед разрушающей записью — если запрошена каталогом копий. */
@@ -57,7 +85,12 @@ export function writeJsonFile(
   data: unknown,
   options: WriteOptions = {},
 ): string | undefined {
-  return writeTextFile(path, `${JSON.stringify(data, null, 2)}\n`, options);
+  // Хвостовой перевод строки — тоже форма чужого файла: ~/.claude.json Claude Code
+  // пишет без него. Только для JSON, который мы переписываем целиком из структуры:
+  // у текста, набранного человеком в редакторе, хвост — его решение, не наше.
+  const form = options.preserveForm === false ? undefined : readTextForm(path);
+  const tail = form?.trailingNewline === false ? '' : '\n';
+  return writeTextFile(path, `${JSON.stringify(data, null, 2)}${tail}`, options);
 }
 
 /**

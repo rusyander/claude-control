@@ -20,4 +20,6 @@ export interface RevertHunkResult {
   restoredTo?: string;
   backupPath?: string;
   error?: string;
+  /** Копии с таким именем нет — маршрут отвечает 404, как `GET /history/diff`, а не 400. */
+  notFound?: boolean;
 }

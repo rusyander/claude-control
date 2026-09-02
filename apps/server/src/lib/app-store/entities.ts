@@ -34,6 +34,19 @@ export function disablingGroups(state: AppState, kind: EntityKind, id: string): 
 }
 
 /**
+ * Все идентификаторы вида, погашенные хоть одной отметкой — ручной или
+ * групповой. Нужно читалкам сущностей, которых выключение физически убирает из
+ * файла (права): иначе списку неоткуда узнать, что показать выключенным.
+ */
+export function disabledIds(state: AppState, kind: EntityKind): string[] {
+  const ids = new Set(state.disabled[kind]);
+  for (const [id, groups] of Object.entries(state.disabledByGroup[kind])) {
+    if (groups.length > 0) ids.add(id);
+  }
+  return [...ids];
+}
+
+/**
  * `legacyId` убирается из отметок при любой правке: переключили сущность —
  * значит её состояние записано уже по новому идентификатору, и старая
  * запись только копила бы мусор и мешала бы включению.

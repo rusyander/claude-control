@@ -27,8 +27,7 @@ export function migrateProvider(
   request: ProviderMigrateRequest,
   deps: CompareDeps,
 ): ProviderMigrateResponse {
-  const { from, to, section } = request;
-  const mode = request.mode ?? 'preview';
+  const { from, to, section, mode } = assertMigrateRequest(request);
 
   if (from === to) throw new CompareRequestError('Источник и приёмник совпадают.');
   if (section !== 'mcp' && section !== 'instructions') {
@@ -42,6 +41,49 @@ export function migrateProvider(
   return section === 'mcp'
     ? migrateMcp(from, to, request.keys ?? [], mode, deps)
     : migrateInstructions(from, to, mode, deps);
+}
+
+const SECTIONS: ReadonlySet<string> = new Set(['mcp', 'env', 'permissions', 'instructions']);
+const MODES: ReadonlySet<string> = new Set(['preview', 'apply']);
+
+/**
+ * Тело переноса приходит по HTTP и типу не верит. Раньше оно не проверялось:
+ * `keys: 'telegram-inbox'` (строка) обходился ПОСИМВОЛЬНО и давал 14 «пропусков»,
+ * `mode: 'bogus'` молча считался предпросмотром и возвращался как режим, а
+ * пропущенный раздел падал в ветку «права не переносятся». Fail-closed: всё,
+ * что не по контракту, — `CompareRequestError` → 400 с внятной причиной.
+ */
+export function assertMigrateRequest(
+  body: unknown,
+): ProviderMigrateRequest & { mode: 'preview' | 'apply' } {
+  const raw = (body ?? {}) as Record<string, unknown>;
+  const { from, to, section, keys, mode } = raw;
+
+  if (typeof from !== 'string' || typeof to !== 'string' || !from || !to) {
+    throw new CompareRequestError('Поля from и to обязаны быть непустыми строками.');
+  }
+  if (typeof section !== 'string' || !SECTIONS.has(section)) {
+    throw new CompareRequestError(
+      'Поле section обязано быть одним из: mcp, env, permissions, instructions.',
+    );
+  }
+  if (mode !== undefined && (typeof mode !== 'string' || !MODES.has(mode))) {
+    throw new CompareRequestError('Поле mode обязано быть preview или apply.');
+  }
+  if (
+    keys !== undefined &&
+    (!Array.isArray(keys) || keys.some((key) => typeof key !== 'string' || !key))
+  ) {
+    throw new CompareRequestError('Поле keys обязано быть списком непустых строк.');
+  }
+
+  return {
+    from,
+    to,
+    section: section as ProviderMigrateRequest['section'],
+    keys: keys as string[] | undefined,
+    mode: (mode as 'preview' | 'apply' | undefined) ?? 'preview',
+  };
 }
 
 function migrateMcp(

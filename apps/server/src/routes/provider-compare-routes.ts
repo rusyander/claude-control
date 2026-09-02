@@ -32,6 +32,7 @@ import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 export function registerProviderCompareRoutes(app: FastifyInstance, ctx: ServerContext): void {
   const claudeSide = (): ClaudeSide => ({
     mcpConfigPath: ctx.location.paths.mcpConfig,
+    settingsPath: ctx.location.paths.settings,
     claudeMdPath: ctx.location.paths.claudeMd,
     readMcp: () => readMcpServers(ctx.location.paths.mcpConfig, ctx.store),
     readEnv: () =>
@@ -104,11 +105,13 @@ export function registerProviderCompareRoutes(app: FastifyInstance, ctx: ServerC
       return migrateProvider(body, {
         claudeDirOverride: ctx.store.getSettings().claudeDirOverride,
         claude: claudeSide(),
-        // Копии делаются только при настоящей записи: предпросмотр не должен
-        // вытеснять историю из ротации.
-        backupDir: ctx.store.getSettings().backupBeforeWrite
-          ? ctx.location.paths.appData
-          : undefined,
+        // Копии делаются только при настоящей записи (домен: предпросмотр не
+        // должен вытеснять историю из ротации) и ложатся в ОБЩИЙ каталог копий
+        // `ctx.backupDir` (= `<appData>/backups`, пусто при выключенных копиях).
+        // Раньше сюда шёл корень appData: копии `.claude.json` и `AGENTS.md`
+        // ложились рядом со state.json — мимо ленты истории, страницы «Копии»,
+        // ротации и шифрования секретов.
+        backupDir: ctx.backupDir,
       }) satisfies ProviderMigrateResponse;
     } catch (error) {
       if (error instanceof CompareRequestError) {

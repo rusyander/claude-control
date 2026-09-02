@@ -46,6 +46,15 @@ describe('Выборочный откат ханка', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('неизвестная копия — отказ с признаком notFound (маршрут отвечает 404, а не 400)', () => {
+    for (const name of ['settings.json.2026-01-01T00-00-00-000Z.bak', 'nope', '../x.bak']) {
+      const result = revertHunk(backupDir, name, 0, knownPaths, backupDir);
+      expect(result.ok).toBe(false);
+      expect(result.notFound).toBe(true);
+    }
+    expect(readFileSync(settingsPath, 'utf8')).toBe(CURRENT);
+  });
+
   it('дифф самой свежей копии нумерует ханки — два блока правок', () => {
     const diff = buildDiff(backupDir, NAME, knownPaths)!;
     expect(diff.label).toBe('current');

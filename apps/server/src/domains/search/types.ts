@@ -1,6 +1,7 @@
 import type {
   ClaudePaths,
   EnvVar,
+  Group,
   Hook,
   McpServer,
   PermissionRule,
@@ -42,6 +43,8 @@ export interface SearchInputs {
   envVars: EnvVar[];
   mcpServers: McpServer[];
   plugins: Plugin[];
+  /** Группы панели: у них нет файлов Claude Code, поэтому они есть при любом провайдере. */
+  groups: Group[];
   /** Разделы активного провайдера — задано, только когда активен НЕ Claude. */
   provider?: ProviderSearchInputs;
 }

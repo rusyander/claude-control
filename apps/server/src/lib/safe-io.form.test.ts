@@ -78,7 +78,7 @@ describe('запись: форма существующего файла сох�
     writeTextFile(path, 'раз\r\nдва\n');
 
     expect(readFileSync(path, 'utf8')).toBe('раз\r\nдва\n');
-    expect(readTextForm(path)).toEqual({ bom: false, eol: '\r\n' });
+    expect(readTextForm(path)).toMatchObject({ bom: false, eol: '\r\n' });
   });
 
   it('preserveForm:false пишет текст байт-в-байт (для хирургических правок)', () => {
@@ -137,5 +137,34 @@ describe('резервные копии: имя провайдера разде�
     const names = readdirSync(backupDir);
     expect(names.filter((n) => n.startsWith('settings.json.')).length).toBe(3);
     expect(names.filter((n) => n.startsWith('gemini-settings.json.')).length).toBe(3);
+  });
+});
+
+// Аудит «Группы» 2026-09-03: ~/.claude.json Claude Code пишет без хвостового
+// перевода строки; после «выключить → включить» MCP-сервер файл отличался одним байтом.
+describe('запись JSON: хвостовой перевод строки — форма файла', () => {
+  it('файл без хвостового перевода строки переписывается без него', () => {
+    const path = join(dir, 'claude.json');
+    writeFileSync(path, '{\n  "a": 1\n}', 'utf8');
+    writeJsonFile(path, { a: 1 });
+    expect(readFileSync(path, 'utf8')).toBe('{\n  "a": 1\n}');
+  });
+
+  it('файл с хвостовым переводом строки и новый файл — с ним', () => {
+    const withTail = join(dir, 'settings.json');
+    writeFileSync(withTail, '{}\n', 'utf8');
+    writeJsonFile(withTail, { a: 1 });
+    expect(readFileSync(withTail, 'utf8')).toBe('{\n  "a": 1\n}\n');
+
+    const fresh = join(dir, 'fresh.json');
+    writeJsonFile(fresh, { a: 1 });
+    expect(readFileSync(fresh, 'utf8')).toBe('{\n  "a": 1\n}\n');
+  });
+
+  it('CRLF-файл без хвоста: переводы строк CRLF, хвоста нет', () => {
+    const path = join(dir, 'crlf.json');
+    writeFileSync(path, '{\r\n  "a": 1\r\n}', 'utf8');
+    writeJsonFile(path, { a: 2 });
+    expect(readFileSync(path, 'utf8')).toBe('{\r\n  "a": 2\r\n}');
   });
 });

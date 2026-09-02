@@ -54,6 +54,14 @@ function skillCommands(skillsDir: string, store: AppStore): SlashCommand[] {
 }
 
 /**
+ * Единственная версия реестра, которую читает сам CLI: `claude plugin list`
+ * (2.1.177) на реестре без версии, версии 1 или 3 отвечает пустым списком.
+ * Панель обязана видеть то же самое, иначе здесь появятся команды, которых в
+ * палитре нет, а раздел «Плагины» (он спрашивает CLI) покажет ноль.
+ */
+const REGISTRY_VERSION = 2;
+
+/**
  * Команды и скиллы установленных плагинов.
  *
  * Реестр установленного (`plugins/installed_plugins.json`) говорит, где лежит
@@ -66,9 +74,17 @@ function pluginCommands(
   settingsPath: string,
   notes: string[],
 ): SlashCommand[] {
-  const registry = readJson(join(pluginsRoot, 'installed_plugins.json'));
-  const plugins = (registry as { plugins?: Record<string, unknown> })?.plugins;
+  const registry = readJson(join(pluginsRoot, 'installed_plugins.json')) as
+    { version?: unknown; plugins?: Record<string, unknown> } | undefined;
+  const plugins = registry?.plugins;
   if (!plugins || typeof plugins !== 'object') return [];
+  if (registry.version !== REGISTRY_VERSION) {
+    notes.push(
+      `Реестр плагинов installed_plugins.json версии ${String(registry.version ?? 'без номера')}: ` +
+        `Claude Code читает только версию ${REGISTRY_VERSION}, команды этих плагинов в палитру не попадают.`,
+    );
+    return [];
+  }
 
   const enabled = (readJson(settingsPath) as { enabledPlugins?: Record<string, boolean> })
     ?.enabledPlugins;
@@ -83,7 +99,11 @@ function pluginCommands(
     }
 
     const slug = id.split('@')[0] ?? id;
-    const isEnabled = enabled?.[id] !== false;
+    // Нет записи в enabledPlugins — плагин выключен: так отвечает сам CLI
+    // (`claude plugin list`), и раздел «Плагины» показывает именно его ответ.
+    // Установка через CLI всегда пишет явное `true`, так что «нет записи» —
+    // это не забытый ключ, а плагин, которого палитра не видит.
+    const isEnabled = enabled?.[id] === true;
     const owner = id;
 
     const own = [

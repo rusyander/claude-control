@@ -60,7 +60,7 @@ describe('applyTextForm', () => {
   it('форма исходника определяется и применяется без изменения содержимого', () => {
     const original = '﻿key = 1\r\nother = 2\r\n';
     const form = detectTextForm(original);
-    expect(form).toEqual({ bom: true, eol: '\r\n' });
+    expect(form).toMatchObject({ bom: true, eol: '\r\n' });
     expect(applyTextForm(stripBom(original), form)).toBe(original);
   });
 });

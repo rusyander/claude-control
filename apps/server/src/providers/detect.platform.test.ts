@@ -13,14 +13,19 @@ vi.mock('node:child_process', () => ({
   spawnSync: (...args: unknown[]) => spawnSyncMock(...args),
 }));
 
-const { detectCliOnPath, findCliOnPath, detectProvider } = await import('./detect.ts');
+const { detectCliOnPath, findCliOnPath, detectProvider, resetCliLookupCache } =
+  await import('./detect.ts');
 const { getProvider } = await import('../providers/registry.ts');
 
 function withPlatform(platform: NodeJS.Platform): void {
   vi.stubGlobal('process', { ...process, platform });
 }
 
-beforeEach(() => spawnSyncMock.mockReset());
+beforeEach(() => {
+  spawnSyncMock.mockReset();
+  // Кеш поиска живёт на процесс — между кейсами его надо сбрасывать.
+  resetCliLookupCache();
+});
 // Сбрасываем мок и ПОСЛЕ теста: с оставшейся «бросающей» реализацией собственная
 // уборка vitest сама наткнулась бы на неё и уронила тест.
 afterEach(() => {
@@ -39,6 +44,8 @@ describe('detectCliOnPath: искатель по платформе', () => {
 
     for (const platform of ['darwin', 'linux'] as const) {
       spawnSyncMock.mockClear();
+      // Одна команда на двух платформах подряд — только в тесте; кеш ответа сбрасываем.
+      resetCliLookupCache();
       withPlatform(platform);
       expect(detectCliOnPath('codex')).toBe(true);
       expect(spawnSyncMock.mock.calls[0]![0]).toBe('which');

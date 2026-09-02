@@ -116,8 +116,9 @@ describe('команды Claude', () => {
     );
     put(
       'plugins/installed_plugins.json',
-      JSON.stringify({ plugins: { 'commit-commands@official': [{ installPath }] } }),
+      JSON.stringify({ version: 2, plugins: { 'commit-commands@official': [{ installPath }] } }),
     );
+    put('settings.json', JSON.stringify({ enabledPlugins: { 'commit-commands@official': true } }));
 
     const { commands } = readClaudeCommands(paths, store);
 
@@ -138,13 +139,56 @@ describe('команды Claude', () => {
     writeFileSync(join(installPath, 'commands', 'scan.md'), '---\ndescription: Скан\n---\n');
     put(
       'plugins/installed_plugins.json',
-      JSON.stringify({ plugins: { 'semgrep@market': [{ installPath }] } }),
+      JSON.stringify({ version: 2, plugins: { 'semgrep@market': [{ installPath }] } }),
     );
     put('settings.json', JSON.stringify({ enabledPlugins: { 'semgrep@market': false } }));
 
     const { commands } = readClaudeCommands(paths, store);
 
     expect(commands[0]).toMatchObject({ invocation: '/semgrep:scan', isEnabled: false });
+  });
+
+  /**
+   * Нет записи в enabledPlugins — `claude plugin list` отвечает `enabled: false`,
+   * и раздел «Плагины» показывает ровно это. Страница команд не должна спорить.
+   */
+  it('плагин без записи в enabledPlugins считается выключенным, как в CLI', () => {
+    const installPath = join(root, 'plugins', 'cache', 'dormant');
+    mkdirSync(join(installPath, 'commands'), { recursive: true });
+    writeFileSync(join(installPath, 'commands', 'sleep.md'), '---\ndescription: Сон\n---\n');
+    put(
+      'plugins/installed_plugins.json',
+      JSON.stringify({ version: 2, plugins: { 'dormant@market': [{ installPath }] } }),
+    );
+    put('settings.json', JSON.stringify({ enabledPlugins: {} }));
+
+    const { commands } = readClaudeCommands(paths, store);
+
+    expect(commands[0]).toMatchObject({ invocation: '/dormant:sleep', isEnabled: false });
+  });
+
+  /**
+   * CLI 2.1.177 читает реестр только версии 2: без номера, с 1 или 3 он отдаёт
+   * пустой список. Показать команды из такого реестра = показать то, чего в
+   * палитре нет; вместо этого — пометка с причиной.
+   */
+  it('реестр другой версии CLI не читает — команд нет, причина названа', () => {
+    const installPath = join(root, 'plugins', 'cache', 'old');
+    mkdirSync(join(installPath, 'commands'), { recursive: true });
+    writeFileSync(join(installPath, 'commands', 'go.md'), '---\ndescription: Старое\n---\n');
+    put('settings.json', JSON.stringify({ enabledPlugins: { 'old@market': true } }));
+
+    for (const version of [undefined, 1, 3]) {
+      put(
+        'plugins/installed_plugins.json',
+        JSON.stringify({ version, plugins: { 'old@market': [{ installPath }] } }),
+      );
+
+      const { commands, notes } = readClaudeCommands(paths, store);
+
+      expect(commands).toEqual([]);
+      expect(notes).toEqual([expect.stringContaining('читает только версию 2')]);
+    }
   });
 
   it('скилл плагина — тоже команда с префиксом плагина', () => {
@@ -156,7 +200,7 @@ describe('команды Claude', () => {
     );
     put(
       'plugins/installed_plugins.json',
-      JSON.stringify({ plugins: { 'frontend-design@official': [{ installPath }] } }),
+      JSON.stringify({ version: 2, plugins: { 'frontend-design@official': [{ installPath }] } }),
     );
 
     const { commands } = readClaudeCommands(paths, store);

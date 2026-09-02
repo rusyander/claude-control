@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { ProjectWorktree, ProjectWorktreesInfo } from '@claude-control/contracts';
@@ -41,6 +42,23 @@ function samePath(a: string, b: string): boolean {
 }
 
 /**
+ * Потолок имени каталога копии. Windows считает 260 символов на ВЕСЬ путь, а
+ * тратит его в основном чужой репозиторий: у настоящего фронтенда вложенность
+ * каталогов сама по себе бывает под две сотни символов. Имя ветки — та часть,
+ * которую панель выбирает сама, поэтому она и обязана быть короткой; длинное
+ * дописывается хвостом от его же хеша, чтобы две разные ветки не сошлись в один
+ * каталог.
+ */
+const DIR_NAME_MAX = 40;
+
+function shortenDirName(value: string): string {
+  if (value.length <= DIR_NAME_MAX) return value;
+  const tag = createHash('sha1').update(value).digest('hex').slice(0, 6);
+  const head = value.slice(0, DIR_NAME_MAX - tag.length - 1).replace(/[-.]+$/, '');
+  return `${head}-${tag}`;
+}
+
+/**
  * Имя каталога из имени ветки: `feature/parallel` → `feature-parallel`. Буквы
  * любого алфавита остаются как есть (кириллическая ветка — обычное дело), а всё,
  * что путает файловую систему, схлопывается в дефис.
@@ -54,7 +72,8 @@ export function worktreeDirName(name: string): string {
   // Пустое имя оставило бы каталог без названия, а зарезервированные имена
   // Windows (CON, PRN, COM1…) не создаются вовсе — обе беды лечит суффикс.
   if (!safe) return 'wt';
-  return /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(safe) ? `${safe}-wt` : safe;
+  const named = /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(safe) ? `${safe}-wt` : safe;
+  return shortenDirName(named);
 }
 
 /**
@@ -189,17 +208,75 @@ export async function addWorktree(
     throw new GitError(`Каталог ${target} уже существует — выберите другое имя ветки`);
   }
 
-  const args = info.branches.includes(value)
+  const existed = info.branches.includes(value);
+  const args = existed
     ? ['worktree', 'add', target, value]
     : info.remote && info.remoteBranches.includes(value)
       ? ['worktree', 'add', '--track', '-b', value, target, `${info.remote}/${value}`]
       : ['worktree', 'add', '-b', value, target];
 
-  const out = await git(projectDir, args, GIT_NETWORK_TIMEOUT_MS);
+  let out: string;
+  try {
+    out = await git(projectDir, args, GIT_NETWORK_TIMEOUT_MS);
+  } catch (error) {
+    await undoFailedAdd(projectDir, target, existed ? undefined : value);
+    throw explainAddFailure(error, target);
+  }
   return {
     path: resolve(target),
     output: out.trim() || `Копия ${target} готова на ветке ${value}`,
   };
+}
+
+/**
+ * Откат недоделанной копии. `worktree add` падает ПОСРЕДИ выкладки файлов:
+ * ветка уже заведена, запись о копии уже есть, каталог наполовину полон. Без
+ * отката следующая попытка натыкается на «ветка уже открыта копией» и человек
+ * упирается в последствие своей же первой ошибки.
+ *
+ * Убираем ровно то, что создала эта попытка, и ровно теми командами, которым
+ * это положено: копию — только если git сам её перечислил (правило 3 наверху),
+ * ветку — только если её здесь же и завели. Любой сбой уборки проглатываем:
+ * наверх должна уйти ПЕРВАЯ причина, а не вторая.
+ */
+async function undoFailedAdd(
+  projectDir: string,
+  target: string,
+  createdBranch: string | undefined,
+): Promise<void> {
+  try {
+    const list = await readWorktrees(projectDir);
+    if (list.some((item) => !item.isMain && samePath(item.path, target))) {
+      await git(projectDir, ['worktree', 'remove', '--force', target], GIT_NETWORK_TIMEOUT_MS);
+    }
+    await git(projectDir, ['worktree', 'prune']);
+    if (createdBranch) await git(projectDir, ['branch', '-D', createdBranch]);
+  } catch {
+    // Уборка — вежливость, а не обязанность: причина отказа важнее.
+  }
+}
+
+/**
+ * Отказ по длине пути объясняем словами. Windows считает 260 символов на весь
+ * путь, и у глубокого репозитория запас съеден его собственными каталогами:
+ * сообщение git («Filename too long») называет симптом, но не то единственное,
+ * что человек может сделать — включить длинные пути в самой системе.
+ */
+function explainAddFailure(error: unknown, target: string): unknown {
+  if (!(error instanceof GitError) || !/filename too long/i.test(error.message)) return error;
+  return new GitError(
+    [
+      `Windows не дал создать копию в ${target}: путь длиннее 260 символов.`,
+      'Панель уже просит git о длинных путях и укорачивает имя каталога, но глубину самого',
+      'репозитория выбирает не она. Включите длинные пути в системе — «Редактор локальной',
+      'групповой политики» → Конфигурация компьютера → Административные шаблоны → Система →',
+      'Файловая система → «Включить длинные пути Win32», либо в реестре',
+      'HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\\LongPathsEnabled = 1, — и повторите.',
+      'Быстрый обходной путь: перенести репозиторий ближе к корню диска.',
+      '',
+      `Ответ git: ${error.message}`,
+    ].join('\n'),
+  );
 }
 
 /**

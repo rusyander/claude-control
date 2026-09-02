@@ -7,10 +7,12 @@ import {
   fileSessionId,
   findTranscript,
   readRecords,
+  readTailRecords,
   streamLines,
 } from './ChatTranscriptFile.ts';
 import {
   cleanText,
+  countDialogMessages,
   firstMeaningfulText,
   isAwaitingReply,
   isDialogMessage,
@@ -97,7 +99,7 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
     project: projectName,
     projectPath,
     isSandbox: Boolean(projectPath) && isSandboxPath(projectPath),
-    messageCount: records.filter(isDialogMessage).length,
+    messageCount: countDialogMessages(records),
     // Большой файл прочитан началом и хвостом (см. readRecords) — значит
     // середина не сосчитана. Отдаём это признаком, а не выдаём частичное число
     // за итог: в списке оно рисуется как «38+».
@@ -147,6 +149,12 @@ export async function readChatMessages(
 
   const ring: ChatMessage[] = [];
   let total = 0;
+  // Ход модели — несколько строк с одним `message.id`, по одной на блок
+  // содержимого (см. countDialogMessages). В ленте это ОДНА реплика: иначе
+  // размышление, вызов и текст одного хода шли тремя сообщениями, и у каждого
+  // стоял свой бейдж с тем же самым расходом — в разы больше, чем потрачено.
+  // Расход берём из последней строки хода: все они несут одинаковый.
+  let tailId: string | undefined;
 
   for await (const line of streamLines(path)) {
     const trimmed = line.trim();
@@ -164,6 +172,18 @@ export async function readChatMessages(
     const blocks = toBlocks(record);
     if (blocks.length === 0) continue;
 
+    const messageId = record.type === 'assistant' ? record.message?.id : undefined;
+    const tail = ring.at(-1);
+    if (messageId && tail && tailId === messageId) {
+      ring[ring.length - 1] = {
+        ...tail,
+        blocks: [...tail.blocks, ...blocks],
+        usage: toUsage(record) ?? tail.usage,
+      };
+      continue;
+    }
+
+    tailId = messageId;
     total += 1;
     ring.push({
       id: record.uuid ?? String(total - 1),
@@ -200,6 +220,12 @@ export async function readChatMessages(
 export function findSessionCwd(projectsDir: string, sessionId: string): string | undefined {
   const path = findTranscript(projectsDir, sessionId);
   if (!path) return undefined;
+
+  // Хвоста хватает: `cwd` записан в КАЖДОЙ строке, а читать ради него весь
+  // транскрипт (до четырёх мегабайт на каждую отправку) незачем. В хвосте
+  // пусто — последние строки без `cwd` — тогда уже целиком.
+  const fromTail = lastValue(readTailRecords(path), (record) => record.cwd);
+  if (fromTail) return fromTail;
 
   const records = readRecords(path, statSync(path).size);
   return lastValue(records, (record) => record.cwd);

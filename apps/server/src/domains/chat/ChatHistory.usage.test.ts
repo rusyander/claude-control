@@ -129,6 +129,36 @@ describe('readChatMessages — расход шага', () => {
     expect(page.messages[1]?.usage).toBeUndefined();
   });
 
+  it('ход модели из нескольких строк с одним message.id — одна реплика и один расход', async () => {
+    // Так пишет сам Claude Code: по строке на блок (размышление, вызов, текст),
+    // расход в каждой одинаковый. Три бейджа на один ход — втрое больше правды.
+    const usage = { input_tokens: 2, output_tokens: 866, cache_read_input_tokens: 20713 };
+    const line = (uuid: string, block: unknown) => ({
+      type: 'assistant',
+      uuid,
+      timestamp: '2026-07-18T10:00:05.000Z',
+      message: { id: 'msg_1', role: 'assistant', model: 'claude-opus-4-8', content: [block], usage },
+    });
+    write([
+      ask,
+      line('a1', { type: 'thinking', thinking: 'подумаю' }),
+      line('a2', { type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'ls' } }),
+      line('a3', { type: 'text', text: 'готово' }),
+    ]);
+
+    const page = await readChatMessages(projectsDir, 's');
+
+    expect(page.total).toBe(2);
+    expect(page.messages).toHaveLength(2);
+    expect(page.messages[1]?.id).toBe('a1');
+    expect(page.messages[1]?.blocks.map((block) => block.type)).toEqual([
+      'thinking',
+      'tool',
+      'text',
+    ]);
+    expect(page.messages[1]?.usage?.output).toBe(866);
+  });
+
   it('у каждого шага свой расход — соседние не смешиваются', async () => {
     write([
       ask,

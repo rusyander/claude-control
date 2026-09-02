@@ -24,8 +24,9 @@ export function AgentRow({ run, costUnit, statusLabel, chatLabel, onOpen, onStop
       className={styles.row}
     >
       <button type="button" className={styles.rowMain} onClick={onOpen} title={run.projectPath}>
-        {/* Все активные прогоны пульсируют: работает — виден, ждёт/упал — зовёт. */}
-        <StatusDot tone={statusTone(run.status)} pulse />
+        {/* Активные прогоны пульсируют: работает — виден, ждёт/упал — зовёт.
+            Молчащий стоит ровно: событий нет — и движения нет. */}
+        <StatusDot tone={statusTone(run.status)} pulse={run.status !== 'quiet'} />
 
         <Stack gap="0" className={styles.rowText}>
           <Typography variant="body-sm" as="span" truncate>

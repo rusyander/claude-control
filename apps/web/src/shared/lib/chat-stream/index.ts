@@ -38,3 +38,14 @@ export interface StreamState {
   /** Момент сброса окна лимитов, unix-секунды. */
   limitResetsAt?: number;
 }
+
+/**
+ * Рисует ли поток текущий ход прямо сейчас.
+ *
+ * Одно условие на двоих: по нему лента показывает потоковый пузырь, и по нему
+ * же тот же ход прячется из истории (`pages/Chat/lib/liveTurn.ts`). Разойдись
+ * они — и ход либо покажется дважды, либо исчезнет совсем.
+ */
+export function isStreamShown(stream: Pick<StreamState, 'isRunning' | 'text'>): boolean {
+  return stream.isRunning || Boolean(stream.text);
+}

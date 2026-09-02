@@ -18,35 +18,36 @@ describe('selectActiveRuns', () => {
     expect(active).toEqual([]);
   });
 
-  it('оставляет работающие/ждущие/упавшие и сортирует по тревожности', () => {
+  it('оставляет работающие/молчащие/ждущие/упавшие и сортирует по тревожности', () => {
     const active = selectActiveRuns(
       [
         run({ id: 'r', status: 'running', projectPath: 'C:/r' }),
+        run({ id: 'q', status: 'running', lastEventAt: NOW - STALL_MS - 1, projectPath: 'C:/q' }),
         run({ id: 'w', status: 'waiting', projectPath: 'C:/w' }),
         run({ id: 'e', status: 'error', projectPath: 'C:/e' }),
       ],
       NOW,
     );
-    expect(active.map((a) => a.id)).toEqual(['e', 'w', 'r']);
+    expect(active.map((a) => a.id)).toEqual(['e', 'w', 'q', 'r']);
   });
 
-  it('зависший работающий превращается в error', () => {
+  it('молчащий работающий становится quiet, а не error', () => {
     const active = selectActiveRuns(
       [run({ id: 'stuck', status: 'running', lastEventAt: NOW - STALL_MS - 1 })],
       NOW,
     );
-    expect(active[0]?.status).toBe('error');
+    expect(active[0]?.status).toBe('quiet');
   });
 });
 
 describe('countRunning', () => {
-  it('считает только реально работающие (не зависшие)', () => {
+  it('считает работающих вместе с молчащими: процесс жив в обоих случаях', () => {
     const runs = [
       run({ id: 'a', status: 'running' }),
-      run({ id: 'b', status: 'running', lastEventAt: NOW - STALL_MS - 1 }), // завис → не running
+      run({ id: 'b', status: 'running', lastEventAt: NOW - STALL_MS - 1 }), // молчит → всё ещё работает
       run({ id: 'c', status: 'waiting' }),
       run({ id: 'd', status: 'idle' }),
     ];
-    expect(countRunning(runs, NOW)).toBe(1);
+    expect(countRunning(runs, NOW)).toBe(2);
   });
 });

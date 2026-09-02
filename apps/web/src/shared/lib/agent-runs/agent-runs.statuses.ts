@@ -58,7 +58,7 @@ export function rebuildStatuses(): void {
   activeRunsSnapshot = selectActiveRuns([...runs.values()], now);
 }
 
-/** Таймер зависания: раз в 20 c пересобираем статусы, чтобы «молчащий» стал красным. */
+/** Таймер молчания: раз в 20 c пересобираем статусы, чтобы замолчавший стал серым. */
 export function ensureWatchdog(): void {
   if (watchdog || typeof window === 'undefined') return;
   watchdog = setInterval(() => {

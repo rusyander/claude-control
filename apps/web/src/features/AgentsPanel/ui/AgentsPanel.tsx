@@ -9,6 +9,7 @@ import { Toggle } from '@shared/ui/toggle';
 import { useChatPrefs, MIN_SOUND_VOLUME, MAX_SOUND_VOLUME } from '@shared/lib/chat-prefs';
 import { playNotification } from '@shared/lib/notify-sound';
 import { formatSpend } from '@shared/lib/format';
+import { isLive } from '@shared/lib/agent-runs';
 import { worstTone } from '../lib/worstTone';
 import { AgentRow } from './AgentRow';
 import type { AgentsPanelProps } from './AgentsPanel.types';
@@ -32,7 +33,8 @@ export function AgentsPanel({
   const [isOpen, setOpen] = useState(false);
   const { sound, setSound, soundVolume, setSoundVolume } = useChatPrefs();
 
-  const running = activeRuns.filter((run) => run.status === 'running').length;
+  // Молчащий — тоже работает: процесс жив, просто событий давно не было.
+  const running = activeRuns.filter((run) => isLive(run.status)).length;
   const worst = worstTone(activeRuns);
 
   return (

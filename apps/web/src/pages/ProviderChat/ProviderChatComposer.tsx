@@ -27,6 +27,9 @@ export function ProviderChatComposer({
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    // Enter во время набора через IME лишь подтверждает кандидата — по нему
+    // не отправляем, иначе уходит половина слова.
+    if (event.nativeEvent.isComposing) return;
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       submit();

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
 import type { ChatRunRegistry } from '../domains/chat/ChatRunRegistry.ts';
+import type { ChatSession } from '../domains/chat/ChatSession.ts';
 import { registerChatTranscriptRoutes } from './chat/transcript-routes.ts';
 import { registerChatBrowseRoutes } from './chat/browse-routes.ts';
 import { registerChatRunRoutes } from './chat/run-routes.ts';
@@ -34,9 +35,15 @@ export function registerChatRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
   registry: ChatRunRegistry,
+  /**
+   * Права и автоподтверждение — общие на сервер: тумблер, щёлкнутый в чате, и
+   * решение по правам должны попадать в тот же объект, что читает прогон.
+   * Обязателен нарочно: забытый аргумент завёл бы второе, молчаливое состояние.
+   */
+  session: ChatSession,
 ): void {
   registerChatTranscriptRoutes(app, ctx);
   registerChatBrowseRoutes(app, ctx);
-  registerChatRunRoutes(app, ctx, registry);
+  registerChatRunRoutes(app, ctx, registry, session);
   registerChatArtifactRoutes(app, ctx);
 }

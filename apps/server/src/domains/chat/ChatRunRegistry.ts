@@ -49,6 +49,16 @@ export interface RunFinished {
 }
 
 /** Событие с порядковым номером — по нему клиент догоняет пропущенное. */
+/** Идущий прогон глазами вкладки, которая его подхватывает после перезагрузки. */
+export interface ActiveRunInfo {
+  chatId: string;
+  sessionId?: string;
+  projectPath?: string;
+  seq: number;
+  /** Когда прогон заведён, по часам сервера — тем же, что пишут транскрипт. */
+  startedAt: number;
+}
+
 export interface BufferedEvent {
   seq: number;
   event: ChatEvent;
@@ -334,7 +344,10 @@ export class ChatRunRegistry {
    * переподключение. false — если прогона нет.
    */
   emitExternal(chatId: string, event: ChatEvent): boolean {
-    const run = this.runs.get(chatId);
+    // По ключу-синониму тоже: запрос прав приходит с ключом, под которым прогон
+    // заведён, но решение о нём могла принять вкладка, знающая разговор по
+    // sessionId, — оба написания обязаны попасть в тот же буфер.
+    const run = this.runs.get(this.resolveKey(chatId));
     if (!run) return false;
     this.emit(run, event);
     return true;
@@ -362,6 +375,11 @@ export class ChatRunRegistry {
     // самом прогоне (spent*) — чтобы при ретрае упавшей попытки откатить именно
     // её долю из общего счётчика, а не гадать.
     let outgoing = event;
+    // Время старта уезжает вкладке вместе с ключом сессии: по нему лента
+    // отличает ход, который прямо сейчас рисует поток, от записанного в
+    // транскрипт раньше. Часы серверные — те же, что у транскрипта; часам
+    // телефона в этом доверять нельзя.
+    if (event.kind === 'session') outgoing = { ...event, startedAt: run.startedAt };
     if (event.kind === 'usage') {
       const tokens = event.input + event.output + event.cacheRead + event.cacheCreation;
       run.spentTokens += tokens;
@@ -370,7 +388,10 @@ export class ChatRunRegistry {
       // Размер окна берём по ПОСЛЕДНЕМУ шагу, а не по максимуму: окно может и
       // уменьшиться — после автосжатия в самом CLI следующий запрос несёт уже
       // сводку, и предлагать продолжение по устаревшему пику было бы неправдой.
-      run.contextTokens = event.input + event.cacheRead + event.cacheCreation;
+      // Остаток сверки с итогом прогона — не шаг: окна он не описывает.
+      if (!event.remainder) {
+        run.contextTokens = event.input + event.cacheRead + event.cacheCreation;
+      }
 
       // Цена шага — чтобы разбивка по действию была видна сразу, а не после
       // перечитывания ленты из транскрипта: по одним токенам дешёвый шаг от
@@ -501,9 +522,9 @@ export class ChatRunRegistry {
    * перечитала историю. Упавшие сюда не берём: заново отдавать поток с ошибкой
    * (и, возможно, ловить авто-ретрай) незачем.
    */
-  active(): { chatId: string; sessionId?: string; projectPath?: string; seq: number }[] {
+  active(): ActiveRunInfo[] {
     const now = Date.now();
-    const list: { chatId: string; sessionId?: string; projectPath?: string; seq: number }[] = [];
+    const list: ActiveRunInfo[] = [];
     for (const run of this.runs.values()) {
       const recentlyDone =
         run.status === 'done' && run.finishedAt !== undefined && now - run.finishedAt <= GRACE_MS;
@@ -513,6 +534,7 @@ export class ChatRunRegistry {
         sessionId: run.sessionId,
         projectPath: run.meta.projectPath,
         seq: run.seq,
+        startedAt: run.startedAt,
       });
     }
     return list;

@@ -136,9 +136,13 @@ export function useChatAutoRefresh(chatId: string | undefined, isRunning: boolea
     }
     if (seen.current === stamp) return;
     seen.current = stamp;
-    void queryClient.invalidateQueries({ queryKey: chatKeys.messages(chatId) });
     void queryClient.invalidateQueries({ queryKey: chatKeys.list });
-  }, [chatId, stamp, queryClient]);
+    // Пока идёт свой прогон, транскрипт меняется на каждом шаге агента, а ход
+    // рисует поток — перечитывать ленту на каждый шаг незачем: это полная
+    // страница сообщений раз в две секунды. Ленту перечитают по завершении.
+    if (isRunning) return;
+    void queryClient.invalidateQueries({ queryKey: chatKeys.messages(chatId) });
+  }, [chatId, stamp, isRunning, queryClient]);
 
   // Смена разговора начинает счёт заново — иначе первый же отпечаток нового
   // чата выглядел бы изменением и дёргал ленту сразу после открытия.

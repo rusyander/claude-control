@@ -26,6 +26,8 @@ export const FULL_READ_LIMIT = 4 * 1024 * 1024;
 const TAIL_BYTES = 1024 * 1024;
 /** Сколько первых строк достаточно, чтобы найти первую реплику человека. */
 const HEAD_LINES = 300;
+/** Сколько байт хвоста хватает на несколько последних строк (ради `cwd`). */
+const TAIL_RECORDS_BYTES = 64 * 1024;
 
 export function findTranscript(projectsDir: string, chatId: string): string | undefined {
   if (!existsSync(projectsDir)) return undefined;
@@ -52,6 +54,16 @@ export function readRecords(path: string, sizeHint: number): Record[] {
   if (size <= FULL_READ_LIMIT) return parseLines(readWholeFile(path));
 
   return [...parseLines(readHead(path)), ...parseLines(readTail(path, size))];
+}
+
+/**
+ * Только последние строки файла — когда нужна одна из них (рабочая папка
+ * сессии). Обрезанную первую строку куска разбор отбрасывает сам.
+ */
+export function readTailRecords(path: string, bytes = TAIL_RECORDS_BYTES): Record[] {
+  const size = statSync(path).size;
+  if (size <= bytes) return parseLines(readChunk(path, 0, size));
+  return parseLines(readChunk(path, size - bytes, bytes));
 }
 
 function parseLines(text: string): Record[] {

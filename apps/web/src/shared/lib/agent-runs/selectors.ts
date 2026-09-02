@@ -1,4 +1,4 @@
-import { runStatus, type RunStatus } from './status';
+import { isLive, runStatus, type RunStatus } from './status';
 import type { PendingPermission, StreamedTool } from './agent-runs.types';
 
 /**
@@ -38,9 +38,9 @@ export interface ActiveRunView {
 }
 
 /**
- * Активные прогоны — те, у кого есть что показать точкой: работает, ждёт ответа
- * или упал. Завершённые (idle) отсеиваем. Порядок по тревожности: сначала
- * ошибки, потом ждущие, потом работающие.
+ * Активные прогоны — те, у кого есть что показать точкой: работает, молчит,
+ * ждёт ответа или упал. Завершённые (idle) отсеиваем. Порядок по тревожности:
+ * сначала ошибки, потом ждущие, потом молчащие, потом работающие.
  */
 export function selectActiveRuns(runs: RunLike[], now: number): ActiveRunView[] {
   const active: ActiveRunView[] = [];
@@ -65,19 +65,28 @@ export function selectActiveRuns(runs: RunLike[], now: number): ActiveRunView[] 
     });
   }
 
-  const order: Record<Exclude<RunStatus, 'idle'>, number> = { error: 0, waiting: 1, running: 2 };
+  const order: Record<Exclude<RunStatus, 'idle'>, number> = {
+    error: 0,
+    waiting: 1,
+    quiet: 2,
+    running: 3,
+  };
   return active.sort((a, b) => order[a.status] - order[b.status]);
 }
 
-/** Сколько активных прогонов сейчас работает (для бейджа-счётчика). */
+/**
+ * Сколько активных прогонов сейчас работает (для бейджа-счётчика). Молчащий —
+ * тоже работает: процесс жив, просто событий давно не было.
+ */
 export function countRunning(runs: RunLike[], now: number): number {
-  return runs.filter(
-    (run) =>
+  return runs.filter((run) =>
+    isLive(
       runStatus({
         status: run.status,
         lastEventAt: run.lastEventAt,
         now,
         pendingPermission: (run.permissions?.length ?? 0) > 0,
-      }) === 'running',
+      }),
+    ),
   ).length;
 }

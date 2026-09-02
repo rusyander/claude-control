@@ -51,6 +51,7 @@ import { registerRemoteRoutes } from './routes/remote-routes.ts';
 import { createRunNotifier } from './domains/remote-notify.ts';
 import type { RouteRegistrar } from './routes/register.ts';
 import { ChatRunRegistry } from './domains/chat/ChatRunRegistry.ts';
+import { ChatSession } from './domains/chat/ChatSession.ts';
 import { ProviderChatService } from './domains/provider-chat.ts';
 import { ProjectRunnerRegistry, autostartProjects } from './domains/project-runner.ts';
 import { ProjectTestRunRegistry } from './domains/project-tests.ts';
@@ -140,6 +141,12 @@ const projectRunner = new ProjectRunnerRegistry({
   },
 });
 const chatRuns = new ChatRunRegistry();
+/**
+ * Права и автоподтверждение чатов — один объект на сервер, а не на маршрут:
+ * продолжение в чистой сессии заводит прогон мимо маршрута отправки, и
+ * тумблеры закрытого разговора должны достаться новому.
+ */
+const chatSession = new ChatSession(chatRuns);
 // Прогоны тестов — третий такой объект: агент ходит по кейсам минутами, и
 // оборванный при выходе панели процесс остался бы висеть с полным доступом.
 const projectTestRuns = new ProjectTestRunRegistry();
@@ -176,6 +183,7 @@ chatRuns.setHandoffPlanner(
   createHandoffPlanner({
     runs: chatRuns,
     chains: handoffChains,
+    session: chatSession,
     selfBaseUrl: `http://127.0.0.1:${process.env.PORT ?? 5178}`,
     contextLimit: () => ctx.store.getSettings().handoffContextLimit,
   }),
@@ -226,18 +234,23 @@ const ROUTES: RouteRegistrar[] = [
   // копию, в которой прямо сейчас работает агент.
   (instance, context) => registerProjectGitRoutes(instance, context, chatRuns),
   registerProjectFilesRoutes,
-  (instance, context) => registerChatRoutes(instance, context, chatRuns),
+  (instance, context) => registerChatRoutes(instance, context, chatRuns, chatSession),
   // Разделение задач по чатам заводит копии репозитория и открывает разговоры —
   // у Claude через реестр прогонов, у чужого CLI через его собственный сервис.
   // Поэтому оба живут дольше запроса и приходят сюда параметром.
   (instance, context) =>
-    registerChatSplitRoutes(instance, context, { runs: chatRuns, providerChats }),
+    registerChatSplitRoutes(instance, context, {
+      runs: chatRuns,
+      providerChats,
+      session: chatSession,
+    }),
   // Продолжение в чистой сессии: маршруты заводят новый разговор по кнопке, а
   // цепочки (тумблер автомата и номер шага) переживают запрос — как и реестр.
   (instance, context) =>
     registerChatHandoffRoutes(instance, context, {
       runs: chatRuns,
       chains: handoffChains,
+      session: chatSession,
       providerChats,
     }),
   (instance, context) => registerProviderChatRoutes(instance, context, providerChats),
@@ -323,10 +336,13 @@ syncConfigWatcher();
 // открывали, брошенная копия доступа лежала до следующего перезапуска.
 const sandboxSweep = startSandboxHousekeeping();
 
-// Спавненные dev-серверы проектов и CLI чужих чатов живут в памяти процесса.
-// Гасим их при выходе, чтобы дочерние процессы не осиротели и не держали
-// занятыми порты.
+// Спавненные dev-серверы проектов, CLI чатов и прогоны тестов живут в памяти
+// процесса. Гасим их при выходе, чтобы дочерние процессы не осиротели и не
+// держали занятыми порты.
 const shutdownRunners = (): void => {
+  // Чаты Claude — тоже: без этого перезапуск панели оставлял их CLI сиротами,
+  // и агент дописывал транскрипт, которого никто уже не читал, тратя лимит.
+  chatRuns.stopAll();
   projectRunner.stopAll();
   providerChats.stopAll();
   projectTestRuns.stopAll();

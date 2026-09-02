@@ -616,6 +616,11 @@ export const helpEn: HelpSchema = {
         'several runs, the most alarming state is shown.',
       dotGreen: 'Green',
       dotGreenText: 'The agent is working. The dot pulses while events keep arriving.',
+      dotGrey: 'Grey',
+      dotGreyText:
+        'The agent is working, but no events have arrived for five minutes — a long ' +
+        'command or a test run, say. Not an error: the run goes on and still counts ' +
+        'as running; the dot only asks for a glance.',
       dotYellow: 'Yellow',
       dotYellowText:
         'The agent asked a question or wants permission and is waiting. A question ' +
@@ -623,8 +628,8 @@ export const helpEn: HelpSchema = {
         'the transcript, so an agent in a terminal or another window calls too.',
       dotRed: 'Red',
       dotRedText:
-        'An error, a rate limit — or a stalled run: if no events arrive for two ' +
-        'minutes, the panel treats the run as broken and turns the dot red.',
+        'An error, a rate limit, or the panel lost its connection to the run. Long ' +
+        'silence is never painted red: that is the grey dot.',
       dotNone: 'No dot',
       dotNoneText: 'Nothing is running in this project right now.',
 

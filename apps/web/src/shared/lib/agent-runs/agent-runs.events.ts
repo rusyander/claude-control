@@ -18,6 +18,7 @@ export function applyEvent(id: string, event: ChatEvent): void {
   switch (event.kind) {
     case 'session':
       next.sessionId = event.sessionId;
+      next.startedAt = event.startedAt ?? run.startedAt;
       break;
     case 'text':
       next.text = run.text + event.text;
@@ -47,9 +48,14 @@ export function applyEvent(id: string, event: ChatEvent): void {
       // считает сервер (см. loadSpend), чтобы он не слетал на перезагрузке.
       const spent = event.input + event.output + event.cacheRead + event.cacheCreation;
       next.tokens = run.tokens + spent;
+      // Остаток сверки — не шаг: у него нет ни действия, ни текста, к которым
+      // его можно было бы приписать. Только счётчик.
+      if (event.remainder) break;
 
-      // Тот же расход — ещё и адресно, к действиям этого шага. Событие обгоняет
-      // сами вызовы, поэтому кладём его в отложенные: их разберёт case 'tool'.
+      // Тот же расход — ещё и адресно, к действиям этого шага. Порядок не
+      // гарантирован: с потоковыми событиями расход замыкает ход и приходит
+      // после вызовов, без них — раньше. Поэтому и отложенные (их разберёт
+      // case 'tool'), и дополнение уже показанных вызовов ниже.
       const step: MessageUsage = {
         input: event.input,
         output: event.output,

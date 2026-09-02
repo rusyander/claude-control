@@ -9,6 +9,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
+import { isStreamShown } from '@shared/lib/chat-stream';
 import { parseQuestions } from '../lib/parseQuestions';
 import { MessageBubble } from './MessageBubble';
 import { QuestionCard } from './QuestionCard';
@@ -139,7 +140,7 @@ export function ChatMessages({
         />
       ))}
 
-      {(stream.isRunning || stream.text) && (
+      {isStreamShown(stream) && (
         <div className={styles.row}>
           <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>
             {stream.thinking && (

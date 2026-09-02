@@ -26,7 +26,7 @@ export {
   useTotalCost,
   useTotalTokens,
 } from './useAgentRuns';
-export { runStatus, aggregateStatus, statusTone, STALL_MS } from './status';
+export { runStatus, aggregateStatus, statusTone, isLive, STALL_MS } from './status';
 export type { RunStatus } from './status';
 export { selectActiveRuns, countRunning } from './selectors';
 export type { ActiveRunView, RunLike } from './selectors';

@@ -7,6 +7,7 @@ import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerChatRoutes, isRetriableRunError } from './chat-routes.ts';
 import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry.ts';
+import { ChatSession } from '../domains/chat/ChatSession.ts';
 
 /**
  * Интеграционные тесты маршрутов проектов и файловой системы: реальный Fastify,
@@ -43,7 +44,8 @@ describe('маршруты чата: проекты и ФС', () => {
     } as unknown as ServerContext;
 
     app = Fastify();
-    registerChatRoutes(app, ctx, new ChatRunRegistry());
+    const empty = new ChatRunRegistry();
+    registerChatRoutes(app, ctx, empty, new ChatSession(empty));
     await app.ready();
   });
 
@@ -182,7 +184,7 @@ describe('маршруты чата: отказы отправки и смена
     } as unknown as ServerContext;
 
     app = Fastify();
-    registerChatRoutes(app, ctx, registry);
+    registerChatRoutes(app, ctx, registry, new ChatSession(registry));
     await app.ready();
   });
 

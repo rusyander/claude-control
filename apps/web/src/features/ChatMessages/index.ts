@@ -10,4 +10,4 @@ export type { TaskSplitCardProps } from './ui/TaskSplitCard.types';
 /** Карточка продолжения в чистой сессии — по той же причине, что и соседняя. */
 export { HandoffCard } from './ui/HandoffCard';
 export type { HandoffCardProps } from './ui/HandoffCard.types';
-export type { HandoffControls } from './ui/ChatMessages.types';
+export type { ChildQuestion, HandoffControls } from './ui/ChatMessages.types';

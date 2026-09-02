@@ -150,6 +150,66 @@ describe('цепочки', () => {
   });
 });
 
+/**
+ * Настройка «продолжать во всех разговорах» — это ЗНАЧЕНИЕ ПО УМОЛЧАНИЮ, а не
+ * приказ: тумблер, тронутый руками, сильнее её в обе стороны. Проверяем именно
+ * это, потому что перепутать легко, а цена ошибки — стёртый контекст в
+ * разговоре, где человек автомат сознательно выключил.
+ */
+describe('глобальное «продолжать самой»', () => {
+  it('нетронутый разговор продолжает сам, когда настройка включена', () => {
+    const chains = new HandoffChains(() => true);
+    expect(chains.isAuto(['sess-1'])).toBe(true);
+  });
+
+  it('выключенный руками остаётся выключенным', () => {
+    const chains = new HandoffChains(() => true);
+    chains.setAuto(['sess-1'], false);
+    expect(chains.isAuto(['sess-1'])).toBe(false);
+  });
+
+  it('включённый руками работает и при выключенной настройке', () => {
+    const chains = new HandoffChains(() => false);
+    chains.setAuto(['sess-1'], true);
+    expect(chains.isAuto(['sess-1'])).toBe(true);
+  });
+
+  it('настройка читается на каждый вопрос: её меняют при живом сервере', () => {
+    let global = false;
+    const chains = new HandoffChains(() => global);
+    expect(chains.isAuto(['sess-1'])).toBe(false);
+    global = true;
+    expect(chains.isAuto(['sess-1'])).toBe(true);
+  });
+
+  /**
+   * Разговор попадает в память цепочек и до всякого тумблера — на первом же
+   * рассказе о размере окна. Если бы этот путь записывал «выключено», разговор
+   * навсегда выпадал бы из глобальной настройки, и понять почему было бы нечем.
+   */
+  it('рассказ о размере окна не отменяет глобальную настройку', () => {
+    const chains = new HandoffChains(() => true);
+    chains.shouldNoticeContext(['sess-1'], 150_000);
+    expect(chains.isAuto(['sess-1'])).toBe(true);
+  });
+
+  it('продолжение нетронутого разговора тоже следует за настройкой', () => {
+    let global = true;
+    const chains = new HandoffChains(() => global);
+    chains.link(['sess-1'], 'new-2');
+    expect(chains.isAuto(['new-2'])).toBe(true);
+    global = false;
+    expect(chains.isAuto(['new-2'])).toBe(false);
+  });
+
+  it('выключенный руками не оживает в продолжении', () => {
+    const chains = new HandoffChains(() => true);
+    chains.setAuto(['sess-1'], false);
+    chains.link(['sess-1'], 'new-2');
+    expect(chains.isAuto(['new-2'])).toBe(false);
+  });
+});
+
 describe('предохранители автопродолжения', () => {
   const base = {
     proposal: PROPOSAL,

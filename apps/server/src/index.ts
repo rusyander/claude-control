@@ -166,7 +166,7 @@ chatRuns.setSessionListener((chatId, sessionId) => ctx.store.linkChatSession(cha
  * переживает запрос — тумблер ставится в одном обращении, а срабатывает при
  * завершении прогона, возможно, уже без открытой вкладки.
  */
-const handoffChains = new HandoffChains();
+const handoffChains = new HandoffChains(() => ctx.store.getSettings().handoffAutoDefault);
 /**
  * Кто решает, продолжать ли работу самому. Реестр знает только, что прогон
  * кончился; предохранители (свежесть файла-опоры, потолок цепочки, успешное

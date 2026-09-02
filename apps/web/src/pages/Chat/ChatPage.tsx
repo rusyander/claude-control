@@ -49,6 +49,8 @@ import { useRunLifecycle } from './model/useRunLifecycle';
 import { useAgentNotifications } from './model/useAgentNotifications';
 import { usePreviewWidth } from './model/usePreviewWidth';
 import { visibleChats } from './lib/visibleChats';
+import { collectChildQuestions } from './lib/childQuestions';
+import { answerChild } from './lib/answerChild';
 import { useStreamState } from './model/useStreamState';
 import { downloadChatExport } from './lib/downloadChatExport';
 import { keepPending } from './lib/pending';
@@ -128,6 +130,30 @@ export function ChatPage() {
     [chats.data, ws.activeProject],
   );
 
+  // Вопросы дочерних разговоров — тех, что выделило разделение задач. Показываем
+  // их в родителе, чтобы один и тот же выбор не приходилось раздавать, обходя
+  // шесть чатов. Прогон ребёнка может быть зарегистрирован под временным ключом,
+  // поэтому сверяем и по нему, и по sessionId — иначе вопрос виден в списке
+  // агентов, а в родителе нет.
+  const childQuestions = useMemo(
+    () => collectChildQuestions(chats.data ?? [], activeChat?.id, activeRuns),
+    [chats.data, activeChat?.id, activeRuns],
+  );
+
+  // Дети открытого чата — чтобы их вопрос не звал тостом «сходите в другой
+  // проект»: он показан прямо здесь, и переход открыл бы отдельную вкладку, от
+  // которой мы как раз ушли. Название нужно тостам про «упал» и «закончил»:
+  // человек ищет ребёнка по имени разговора, а не по имени его копии.
+  const childChats = useMemo(
+    () =>
+      activeChat?.id
+        ? (chats.data ?? [])
+            .filter((chat) => chat.parentId === activeChat.id)
+            .map((chat) => ({ id: chat.id, title: chat.title || chat.id }))
+        : [],
+    [chats.data, activeChat?.id],
+  );
+
   // Размер окна ленты. Растёт кнопкой «Загрузить ещё»: каждый шаг подтягивает
   // более ранние сообщения. При смене разговора возвращаемся к последнему окну.
   const [messagesLimit, setMessagesLimit] = useState(CHAT_PAGE_SIZE);
@@ -158,7 +184,18 @@ export function ChatPage() {
     messagesData: messages.data,
   });
 
-  useAgentNotifications({ chatId, runId: run.id, runStatus: run.status });
+  useAgentNotifications({
+    chatId,
+    children: childChats,
+    // Ребёнок открывается ЗДЕСЬ же — тем же путём, что и клик по нему в пульте
+    // агентов: его каталог лежит в самом разговоре, вкладка не нужна.
+    onOpenChild: (id) => {
+      const child = (chats.data ?? []).find((chat) => chat.id === id);
+      if (child) session.openChat(child);
+    },
+    runId: run.id,
+    runStatus: run.status,
+  });
 
   // Снятие оптимистичных пузырей — правило целиком в `keepPending`, вместе с
   // объяснением, почему одной сверки по тексту не хватает.
@@ -337,8 +374,26 @@ export function ChatPage() {
               onPickOption={answerQuestion}
               isRunning={isRunning}
               permissions={run.permissions}
-              onPermissionDecide={(toolUseId, behavior) =>
-                chatId && agentRuns.decidePermission(chatId, toolUseId, behavior)
+              onPermissionDecide={(toolUseId, behavior, message) =>
+                chatId && agentRuns.decidePermission(chatId, toolUseId, behavior, message)
+              }
+              childQuestions={childQuestions}
+              // Ответ уходит в ЧАТ РЕБЁНКА обычным сообщением: другого канала
+              // нет — вызов `AskUserQuestion` в пакетном режиме возвращается
+              // ошибкой сразу и никого не ждёт. Ребёнок ещё работает — ответ
+              // встаёт в его очередь и уйдёт по концу хода. Родительский
+              // разговор при этом не трогается: ни хода, ни строки в его ленте.
+              onChildAnswer={(childId, answer) =>
+                answerChild(childId, answer, {
+                  chats: chats.data ?? [],
+                  runs: activeRuns,
+                  options: {
+                    allowEdits,
+                    autoApprove,
+                    model: effectiveModel,
+                    effort: effectiveEffort,
+                  },
+                })
               }
               onRetry={chatId ? () => agentRuns.retry(chatId) : undefined}
               costUnit={costUnit}

@@ -321,8 +321,11 @@ export const helpEn: HelpSchema = {
         'The agent proposes a split on its own once it sees three or more tasks in ' +
         'one message that do not depend on each other. The proposal comes instead of ' +
         'the work: until you press a button nothing is created and nothing is ' +
-        'started. You can also ask for it yourself — the “Split tasks across chats” ' +
-        'button in the composer, at any point in the conversation.',
+        'started. A conversation is asked at most once: refuse and it will not ask ' +
+        'again, split and there is nothing left to ask. The same edit across ten ' +
+        'files stays one task and is no reason to propose anything. You can also ' +
+        'ask for it yourself — the “Split tasks across chats” button in the ' +
+        'composer, at any point in the conversation: it works after a refusal too.',
       splitCard: 'What the card shows',
       splitCardText:
         'Shared context on top, then the groups: a name, the branch that will be ' +
@@ -338,25 +341,36 @@ export const helpEn: HelpSchema = {
       splitWhatText:
         'Each group gets its own copy of the repository on its own branch (as in ' +
         '“Parallel branches”), its own chat inside it and its own running agent; the ' +
-        'task given to it is the shared context plus that group’s tasks. A branch ' +
-        'name already taken gets a suffix rather than a refusal. If the project is ' +
-        'not a repository, the chats are created in the same directory, with no ' +
-        'copies. One group failing does not cancel the rest: a separate toast says ' +
-        'so, and the other chats stay.',
+        'task given to it is the shared context plus that group’s tasks. No new tabs ' +
+        'appear: the project stays one, and the groups’ chats stand as a tree under ' +
+        'the conversation the proposal came from. A branch name already taken gets a ' +
+        'suffix rather than a refusal. If the project is not a repository, the chats ' +
+        'are created in the same directory, with no copies. One group failing does ' +
+        'not cancel the rest: a separate toast says so, and the other chats stay.',
       splitTree: 'Where the new chats are',
       splitTreeText:
-        'In the list on the left they stand as a tree: the chat the proposal came ' +
-        'from, and under it, indented and joined by a line, the ones it spawned. That ' +
-        'is how you see four conversations came from one request instead of finding ' +
-        'them scattered among the rest. The branch is not broken by the “Today” and ' +
-        '“Earlier” headings: children stay with their parent wherever its date puts ' +
-        'it. If the parent is not in the list at all (a search matched only a child), ' +
-        'the row stays an ordinary one — nothing is hidden.',
+        'In the list on the left, in the same tab: the chat the proposal came from, ' +
+        'and under it, indented and joined by a line, the ones it spawned. The parent ' +
+        'is clickable as usual, a child opens on a click and works inside its own ' +
+        'copy — the directory comes from the conversation itself, not from the tab. ' +
+        'The branch is not broken by the “Today” and “Earlier” headings: children ' +
+        'stay with their parent wherever its date puts it. If the parent is not in ' +
+        'the list at all (a search matched only a child), the row stays an ordinary ' +
+        'one — nothing is hidden.',
+      splitParent: 'Every child’s question, answered in the parent',
+      splitParentText:
+        'A split spreads the work across several agents, but you are still one ' +
+        'person. So a question asked by a child chat also shows up in the parent, ' +
+        'labelled with who is asking. The answer goes INTO THAT CHAT as the next ' +
+        'message: if the child is busy it queues up and arrives when its turn ends; ' +
+        'if it is idle it goes out at once, continuing the same session in the same ' +
+        'copy of the repository. The parent conversation spends nothing — no turn, no ' +
+        'reply — and walking six chats for one and the same choice is not needed.',
       splitButton: 'Create the chats only',
       splitButtonText:
-        'A toggle in the card. On, the copies, branches and tabs appear but no agent ' +
-        'starts: each group’s task lands in the composer of its tab, where you can ' +
-        'read it through and edit it before sending. This is also the rescue when ' +
+        'A toggle in the card. On, the copies, branches and chats appear but no agent ' +
+        'starts: each group’s task lands in the composer of its own chat, where you ' +
+        'can read it through and edit it before sending. This is also the rescue when ' +
         'four agents starting at once is not what you wanted.',
       splitOff: 'How to turn the proposals off',
       splitOffText:
@@ -426,7 +440,10 @@ export const helpEn: HelpSchema = {
         'morning. A conversation continues at most five times in a row, after ' +
         'which the panel stops and says so. A move that did not happen is ' +
         'explained by a toast too: the run failed, the checkpoint was not ' +
-        'updated, the chain ran out.',
+        'updated, the chain ran out. If you want that everywhere rather than per ' +
+        'conversation, Settings → “Continue by itself in every conversation” sets ' +
+        'the toggle’s default value, and one switched off by hand stays off. ' +
+        'Neither of them waives the safeguards.',
       handoffTidy: 'Tidying the working files — half the point',
       handoffTidyText:
         'A clean session reads exactly the checkpoint file (.agent/PROGRESS.md by ' +
@@ -577,9 +594,16 @@ export const helpEn: HelpSchema = {
         'there is nothing to confirm there.',
       askSent: 'Sent — and it shows',
       askSentText:
-        'Once sent, the card dims and says “Answer sent — the agent is thinking”. That ' +
-        'happens on the click, not on the server reply: the agent answers in tens of ' +
-        'seconds, and all that time it must be obvious the click went through.',
+        'Once sent, the card dims and says what became of the answer: “the agent is ' +
+        'thinking” or “queued — it will be sent when the agent finishes its turn”. The ' +
+        'note appears on the click, not on the server reply: the agent answers in tens ' +
+        'of seconds, and all that time it must be obvious the click went through.',
+      askBusy: 'The agent is busy — you can still answer',
+      askBusyText:
+        'The question arrives MID-turn: the agent asks it and goes right back to ' +
+        'writing code. That is why the options are not dimmed while a run is going — ' +
+        'the choice is needed exactly now. An answer to a busy agent queues up above ' +
+        'the composer and is sent as soon as the turn ends; the turn is not interrupted.',
       askOldTitle: 'An old question cannot be answered',
       askOldText:
         'Only the LAST message in the feed is answerable. In a question from the ' +
@@ -779,9 +803,9 @@ export const helpEn: HelpSchema = {
       noteQuestionTitle: 'An option is picked with a click',
       noteQuestionText:
         'The card draws the options as buttons: a click sends the chosen text as an ' +
-        'ordinary message into the same conversation. While the agent is busy the ' +
-        'buttons are disabled — wait for the reply or stop the run. If none of the ' +
-        'options fits, type your own answer as usual.',
+        'ordinary message into the same conversation. A busy agent is no obstacle — it ' +
+        'asks mid-turn and keeps working, and the answer waits its turn in the queue ' +
+        'above the composer. If none of the options fits, type your own answer as usual.',
       noteOutsideTitle: 'A question calls even from a conversation the panel did not start',
       noteOutsideText:
         'The dot, the browser badge and the sound are raised from the transcript, so ' +

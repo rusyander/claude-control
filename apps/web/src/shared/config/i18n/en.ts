@@ -443,6 +443,8 @@ export const en: TranslationSchema = {
     questionNext: 'Next',
     questionSubmit: 'Send answers',
     questionSentNote: 'Answer sent — the agent is thinking',
+    questionQueuedNote: 'Answer queued — it will be sent when the agent finishes its turn',
+    questionFromChild: 'Asked by “{{title}}”',
     pickOption: 'Answer with this option',
     permissionTitle: 'The agent needs permission',
     permissionLost:
@@ -1955,6 +1957,14 @@ export const en: TranslationSchema = {
     handoffContextLimitOff: 'Never offer',
     handoffContextLimitValue: '{{tokens}} thousand tokens',
     handoffContextLimitDefault: '{{tokens}} thousand tokens (recommended)',
+    handoffAutoDefault: 'Continue on its own in every conversation',
+    handoffAutoDefaultHint:
+      'Auto-continue is normally armed per conversation — by the card toggle, once you have seen ' +
+      'what the panel is about to do. Turn this on to get that behaviour everywhere at once: in ' +
+      'conversations where the toggle was never touched, the panel continues by itself. A toggle ' +
+      'switched off by hand beats the setting and stays off, and nothing waives the safeguards — a ' +
+      'fresh mark in the checkpoint file, a successfully finished turn, no more than five ' +
+      'continuations in a row.',
     chatEffortAuto: 'CLI default',
     pricingTitle: 'Rates used to estimate cost',
     pricingHint:
@@ -2297,6 +2307,8 @@ export const en: TranslationSchema = {
     notifyPermission: 'Project "{{name}}": agent needs permission',
     notifyError: 'Project "{{name}}": error or limit',
     notifyDone: 'Project "{{name}}": agent finished',
+    notifyChildDone: 'Chat "{{title}}": agent finished',
+    notifyChildError: 'Chat "{{title}}": error or limit',
     starterPrompt:
       'You are working in the project "{{name}}". Read-only for now. Look around and briefly say what this project is and what you suggest starting with.',
     introHint:

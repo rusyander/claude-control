@@ -118,12 +118,16 @@ export interface RunOptions {
    */
   permissionPrompt?: { runId: string; baseUrl: string };
   /**
-   * Дописка к системному промпту (`--append-system-prompt`). Сюда уходит строка
-   * про разделение задач по чатам, и только она.
+   * Дописка к системному промпту: правда про вопрос человеку, разделение задач
+   * по чатам и продолжение в чистой сессии — тем составом, который включён.
    *
    * ОДНА СТРОКА, без переводов строки: на Windows аргументы уезжают через
    * оболочку, а перевод строки внутри аргумента cmd.exe разрывает командную
    * строку — остаток инструкции выполнился бы как отдельная команда.
+   *
+   * Кавычки внутри одной строки та же оболочка тоже не переживает, поэтому на
+   * Windows значение уходит ФАЙЛОМ (`--append-system-prompt-file`) — разбор
+   * этого случая в `run()`.
    */
   appendSystemPrompt?: string;
   /**
@@ -137,7 +141,12 @@ export interface RunOptions {
 export class ChatRun {
   private child: ChildProcessWithoutNullStreams | undefined;
   private isStopped = false;
-  private mcpConfigDir: string | undefined;
+  /**
+   * Временная папка прогона: конфиг MCP для брокера прав и дописка к системному
+   * промпту. Одна на прогон, потому что убирать её надо одинаково и в один
+   * момент — при любом исходе.
+   */
+  private tempDir: string | undefined;
 
   /** Запускает CLI и вызывает onEvent по мере поступления событий. */
   async start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
@@ -181,15 +190,41 @@ export class ChatRun {
     // Переводы строки вырезаем здесь, а не полагаемся на дисциплину вызывающего:
     // на Windows такой аргумент разорвал бы командную строку (см. RunOptions).
     const appended = options.appendSystemPrompt?.replace(/[\r\n]+/g, ' ').trim();
-    if (appended) args.push('--append-system-prompt', appended);
+    if (appended) {
+      if (isWindows) {
+        // ФАЙЛОМ, а не аргументом, и это не перестраховка. Замерено 2 сентября
+        // 2026 на claude 2.1.177 настоящим запуском: в тексте инициатив есть
+        // примеры JSON (`{"done":"что закрыто","next":"чем продолжить"}`), а
+        // цепочка `cmd.exe` → `claude.cmd` → `claude.exe` разбирает кавычки
+        // по-разному. Удвоение кавычек, которое понимает cmd.exe, до `claude.exe`
+        // доезжает уже развалившимся: системная строка обрезалась на первом
+        // пробеле после кавычки, а её ОБЛОМОК становился позиционным аргументом,
+        // то есть промптом. В транскрипте это выглядело так:
+        // `"контекст\nВот три независимые задачи…"` — человек отправлял одно, а
+        // агент получал другое, и так на КАЖДОМ сообщении.
+        //
+        // Путь через файл кавычек в командной строке не создаёт вовсе. Проверено
+        // тем же запуском: системная строка действует, промпт доезжает дословно.
+        const file = join(this.ensureTempDir(), 'append-system-prompt.txt');
+        writeFileSync(file, appended, 'utf8');
+        args.push('--append-system-prompt-file', file);
+      } else {
+        args.push('--append-system-prompt', appended);
+      }
+    }
 
     // Интерактивные права: добавляем свой MCP-сервер и указываем его инструмент
     // как обработчик запросов на разрешение. Конфиг сливается с настоящим (без
     // --strict-mcp-config), поэтому пользовательские MCP-серверы остаются. При
     // полном доступе не подключаем — там подтверждать нечего.
+    //
+    // ВОПРОС ЧЕЛОВЕКУ СЮДА НЕ ПРИХОДИТ. Замерено на claude 2.1.177, оба режима
+    // прав: `AskUserQuestion` до брокера не доходит вовсе — в пакетном режиме
+    // вызов сразу возвращается ошибкой `Answer questions?`, а `-p` спросить не
+    // у кого. Отвечать на вопрос поэтому можно только следующим сообщением, и
+    // весь путь ответа живёт на стороне панели (см. `QUESTION_PROMPT`).
     if (options.permissionPrompt && options.permissionMode !== 'bypassPermissions') {
-      this.mcpConfigDir = mkdtempSync(join(tmpdir(), 'cc-perm-'));
-      const mcpConfigPath = join(this.mcpConfigDir, 'mcp.json');
+      const mcpConfigPath = join(this.ensureTempDir(), 'mcp.json');
       writeFileSync(
         mcpConfigPath,
         JSON.stringify({
@@ -324,14 +359,20 @@ export class ChatRun {
   }
 
   /** Убрать временный mcp-config сервера прав. */
+  /** Папка прогона по требованию: заводится один раз, убирается вместе с прогоном. */
+  private ensureTempDir(): string {
+    this.tempDir ??= mkdtempSync(join(tmpdir(), 'cc-perm-'));
+    return this.tempDir;
+  }
+
   private cleanup(): void {
-    if (!this.mcpConfigDir) return;
+    if (!this.tempDir) return;
     try {
-      rmSync(this.mcpConfigDir, { recursive: true, force: true });
+      rmSync(this.tempDir, { recursive: true, force: true });
     } catch {
       // Временную папку подчистит и сама ОС — не критично.
     }
-    this.mcpConfigDir = undefined;
+    this.tempDir = undefined;
   }
 }
 

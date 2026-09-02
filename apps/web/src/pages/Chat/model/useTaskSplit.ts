@@ -1,13 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TaskSplitProposal } from '@claude-control/contracts/task-split';
-import { workspace, projectShortName, normalizeProjectPath } from '@shared/lib/workspace';
 import { agentRuns } from '@shared/lib/agent-runs';
 import { saveDraft } from '@shared/lib/draft';
 import { toast } from '@shared/lib/toast';
 import { chatKeys } from '@entities/Chat';
 import { projectGitKey } from '@entities/ProjectGit';
-import { useSplitTasks, fetchSplitRequestPrompt } from '@entities/ChatSplit';
+import { useSplitTasks, fetchSplitRequestPrompt, declineSplit } from '@entities/ChatSplit';
 
 export interface TaskSplitInput {
   /** Каталог проекта: без него делить нечего — копию заводить не из чего. */
@@ -35,13 +34,16 @@ export interface TaskSplitApi {
 /**
  * Разделение списка задач по нескольким чатам — сторона панели.
  *
- * Работы здесь ровно на «попросить и открыть вкладки»: копии репозитория заводит
- * и агентов запускает сервер одним запросом. Так же это выглядит и с телефона —
- * он ходит тем же маршрутом и получает готовые чаты.
+ * Работы здесь ровно на «попросить»: копии репозитория заводит и агентов
+ * запускает сервер одним запросом. Так же это выглядит и с телефона — он ходит
+ * тем же маршрутом и получает готовые чаты.
  *
- * Вкладка каждой группы сразу ЗАПОМИНАЕТ свой разговор (`rememberView`): без
- * этого возврат на вкладку показывал бы пустой черновик вместо агента, который
- * в ней работает, — ровно та беда, ради которой заводилась память вкладок.
+ * ВКЛАДОК НЕ ЗАВОДИМ. Раньше каждая группа открывала свою вкладку проекта, и
+ * разделение на шесть частей превращало один проект в семь — человек оставался
+ * с рядом одинаковых вкладок вместо одной задачи. Дети живут деревом под
+ * родителем в ЕГО же вкладке (`visibleChats` подмешивает их к своим,
+ * `withTree` рисует ветку), а каталог копии берётся из самого разговора
+ * (`useChatSession`), поэтому ответ ребёнку уходит работать в его копию.
  */
 export function useTaskSplit({
   projectPath,
@@ -62,6 +64,11 @@ export function useTaskSplit({
   };
 
   const keepHere = (): void => {
+    // Отказ уходит агенту репликой — и одновременно гасит инициативу разговора
+    // на сервере. Одной репликой не обойтись: она живёт ровно один ход, а
+    // инструкция «предложи разделение» дописывается к каждому прогону, и
+    // следующий же предложил бы то же самое.
+    if (parentChatId) void declineSplit(parentChatId);
     void dispatch(t('chat.split.keepHerePrompt'), []);
   };
 
@@ -83,13 +90,11 @@ export function useTaskSplit({
       {
         onSuccess: (result) => {
           for (const chat of result.chats) {
-            const tabId = workspace.openProject(chat.path, projectShortName(chat.path));
-            workspace.rememberView(tabId, chat.chatId);
-            // Прогон не запускали — кладём задание в поле ввода этой вкладки.
-            // Ключ черновика у разговора, которого ещё нет, строится по ПУТИ
-            // проекта (см. `draftKeyFor`), поэтому он же и здесь.
+            // Прогон не запускали — кладём задание в поле ввода САМОГО разговора.
+            // Разговор уже заведён сервером, поэтому ключ черновика у него свой
+            // (`chat:<id>`, см. `draftKeyFor`), а не по каталогу копии.
             if (!chat.started) {
-              saveDraft(`project:${normalizeProjectPath(chat.path)}`, chat.prompt);
+              saveDraft(`chat:${chat.chatId}`, chat.prompt);
             }
           }
 

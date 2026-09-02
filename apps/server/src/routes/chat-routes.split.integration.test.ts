@@ -19,6 +19,7 @@ describe('POST /api/chat/split', () => {
   let project: string;
   let app: FastifyInstance;
   let store: AppStore;
+  let registry: ChatRunRegistry;
   let started: { chatId: string; prompt: string; cwd: string; appendSystemPrompt?: string }[];
 
   beforeEach(async () => {
@@ -29,7 +30,7 @@ describe('POST /api/chat/split', () => {
     started = [];
     // Прогон-заглушка: запоминает запуск и немедленно завершается, чтобы реестр
     // не держал висящих процессов между тестами.
-    const registry = new ChatRunRegistry((): RunLike => ({
+    registry = new ChatRunRegistry((): RunLike => ({
       start: async (options) => {
         started.push({
           chatId: options.permissionPrompt?.runId ?? '',
@@ -158,10 +159,12 @@ describe('POST /api/chat/split', () => {
     expect(started).toHaveLength(0);
   });
 
-  it('в порождённый чат уходят ОБЕ инициативы, а не только разделение', async () => {
-    // Тумблеры два, и они складываются. Если брать здесь только «свою»
-    // инициативу, то включённое продолжение в чистой сессии молча переставало бы
-    // работать во всех чатах, заведённых разделением, — а человек его включал.
+  it('порождённый чат получает продолжение, но делиться дальше не предлагает', async () => {
+    // Чат, только что выделенный под ОДНУ группу, уже разделён: предлагать ему
+    // дробиться снова значит спрашивать то же самое по второму разу, и сразу в
+    // шести местах — так живые прогоны и вышли. Продолжение в чистой сессии —
+    // другое решение и другой тумблер, его человек включал отдельно, и молча
+    // отключаться во всех порождённых чатах оно не должно.
     await app.inject({
       method: 'POST',
       url: '/api/chat/split',
@@ -169,13 +172,16 @@ describe('POST /api/chat/split', () => {
     });
 
     const appended = started[0]?.appendSystemPrompt ?? '';
-    expect(appended).toContain('claude-control:split');
+    expect(appended).not.toContain('claude-control:split');
     expect(appended).toContain('claude-control:handoff');
     // Одна строка: перевод строки внутри аргумента рвёт командную строку cmd.exe.
     expect(appended).not.toMatch(/[\r\n]/);
   });
 
   it('выключенная инициатива в порождённый чат не уходит', async () => {
+    // Разделение здесь и так молчит, продолжение выключено тумблером — из
+    // склейки остаётся только правило про вопрос человеку, у которого тумблера
+    // нет и быть не должно.
     store.updateSettings({ handoffInitiative: false });
 
     await app.inject({
@@ -185,8 +191,25 @@ describe('POST /api/chat/split', () => {
     });
 
     const appended = started[0]?.appendSystemPrompt ?? '';
-    expect(appended).toContain('claude-control:split');
+    expect(appended).not.toContain('claude-control:split');
     expect(appended).not.toContain('claude-control:handoff');
+    expect(appended).toContain('AskUserQuestion');
+  });
+
+  /**
+   * Отказ «работаем здесь» гасит инициативу и в РОДИТЕЛЬСКОМ разговоре: реплика
+   * отказа живёт один ход, а инструкция дописывается к каждому прогону.
+   */
+  it('отказ от разделения помечает разговор', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/split/decline',
+      payload: { chatId: 'chat-1' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(registry.isSplitMuted('chat-1')).toBe(true);
+    expect(registry.isSplitMuted('chat-2')).toBe(false);
   });
 
   it('текст просьбы отдаётся сервером — второй копии инструкции в клиенте нет', async () => {

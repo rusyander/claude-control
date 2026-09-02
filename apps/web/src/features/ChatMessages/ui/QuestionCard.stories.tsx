@@ -28,7 +28,7 @@ const meta = {
   },
   args: {
     onPick: () => undefined,
-    disabled: false,
+    busy: false,
     questions: [
       {
         header: 'Редактор',
@@ -102,11 +102,15 @@ export const ТолькоЧтение: Story = {
 };
 
 export const ПрогонИдёт: Story = {
-  args: { disabled: true },
+  args: { questions: meta.args.questions.slice(0, 1), busy: true },
   parameters: {
     docs: {
       description: {
-        story: 'Пока агент занят, отвечать нельзя: ход всё равно не прервать.',
+        story:
+          'Агент занят — и это выбору не мешает: вопрос он задал посреди хода и уже ' +
+          'работает дальше (`AskUserQuestion` в пакетном режиме возвращается ошибкой ' +
+          'сразу). Меняется только подпись после ответа: тот встанет в очередь и ' +
+          'уйдёт по концу хода.',
       },
     },
   },

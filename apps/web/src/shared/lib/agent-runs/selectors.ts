@@ -1,4 +1,5 @@
 import { runStatus, type RunStatus } from './status';
+import type { PendingPermission, StreamedTool } from './agent-runs.types';
 
 /**
  * Чистые выборки поверх прогонов — для пульта агентов и суммарной стоимости.
@@ -15,7 +16,9 @@ export interface RunLike {
   costUsd?: number;
   tokens?: number;
   /** Запросы прав, ждущие ответа — влияют на статус (жёлтая точка). */
-  permissions?: { toolUseId: string }[];
+  permissions?: PendingPermission[];
+  /** Вызовы этого хода: среди них и вопрос человеку. */
+  tools?: StreamedTool[];
 }
 
 export interface ActiveRunView {
@@ -26,6 +29,12 @@ export interface ActiveRunView {
   status: Exclude<RunStatus, 'idle'>;
   costUsd?: number;
   tokens?: number;
+  /**
+   * Вызовы прогона. Нужны не только его собственной ленте: вопрос дочернего
+   * чата (`AskUserQuestion`) показывается и в РОДИТЕЛЬСКОМ разговоре, чтобы
+   * человек отвечал всем из одного места, а не обходил шесть чатов по кругу.
+   */
+  tools?: StreamedTool[];
 }
 
 /**
@@ -50,6 +59,9 @@ export function selectActiveRuns(runs: RunLike[], now: number): ActiveRunView[] 
       status,
       costUsd: run.costUsd,
       tokens: run.tokens,
+      // Вопросы носим только у тех, кто спрашивал: у остальных это лишний
+      // массив на каждый пересчёт пульта агентов.
+      ...(run.tools?.some((tool) => tool.name === 'AskUserQuestion') ? { tools: run.tools } : {}),
     });
   }
 

@@ -239,6 +239,8 @@ The tool sits on sensitive files by construction: full access to `~/.claude`, in
 
 **Requirements:** Node.js 22.6+ (for TypeScript type stripping), pnpm 10+, and the `claude` CLI installed, logged in, and on your `PATH`.
 
+**On Windows, one more line, once per machine:** `git config --global core.longpaths true`. Parallel working copies live at a path longer than the original, and without permission for long paths git reports real files as deleted — `git add -A` inside such a copy would record those deletions. `pnpm doctor` checks this and tells you if it is off; the full story is in [SETUP.md → Parallel copies show files as deleted](docs/SETUP.md#parallel-copies-show-files-as-deleted).
+
 ```bash
 pnpm install
 pnpm dev

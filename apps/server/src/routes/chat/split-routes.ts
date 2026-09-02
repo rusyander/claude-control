@@ -114,6 +114,9 @@ export function registerChatSplitRoutes(
           createdAt,
         });
       }
+      // Разделили — значит этот разговор своё решение принял. Предлагать ему то
+      // же самое в каждом следующем прогоне не помощь, а навязчивость.
+      deps.runs.muteSplit(parentChatId);
     }
 
     return result;
@@ -121,12 +124,16 @@ export function registerChatSplitRoutes(
     /** Прогон Claude — тот же путь, что и у обычной отправки в чат проекта. */
     function startClaude(chatId: string, prompt: string, cwd: string): boolean {
       const settings = ctx.store.getSettings();
-      // Инициативы уходят в порождённые чаты ОБЕ и общей склейкой, а не «своя
-      // здесь, чужая мимо»: агент в копии может обнаружить, что его собственная
-      // группа опять распадается, и ровно так же вправе закрыть этап. Взяли бы
-      // только разделение — тумблер продолжения молча не действовал бы во всех
-      // чатах, заведённых разделением.
-      const initiative = initiativePrompt(settings);
+      // Продолжение в чистой сессии порождённому чату уезжает, а РАЗДЕЛЕНИЕ —
+      // нет, и это разные вещи по существу. Чат, только что выделенный под одну
+      // группу, получил задание уже разделённым: предлагать дробить его дальше
+      // значит спрашивать про то же самое по второму разу, только теперь в
+      // шести местах сразу. Живые прогоны 2 сентября так и вышли — каждый агент
+      // просил делить на всякое расхождение. Понадобится — человек нажмёт
+      // «Разделить задачи» в самом чате, кнопка работает и при молчащей
+      // инициативе.
+      deps.runs.muteSplit(chatId);
+      const initiative = initiativePrompt(settings, { splitMuted: true });
       return deps.runs.start(
         chatId,
         {
@@ -154,8 +161,12 @@ export function registerChatSplitRoutes(
       if (!created) return false;
       // У чужого CLI инициатива — первая реплика переписки, а не флаг запуска.
       // Без неё порождённый чат вёл бы себя иначе, чем тот же чат после первого
-      // же вопроса из панели, — а тумблер в настройках один.
-      const initiative = initiativePrompt(ctx.store.getSettings());
+      // же вопроса из панели, — а тумблер в настройках один. Разделение из неё
+      // выключено по той же причине, что и у Claude: этот чат уже выделен.
+      const initiative = initiativePrompt(ctx.store.getSettings(), {
+        splitMuted: true,
+        foreign: true,
+      });
       const outcome = deps.providerChats.send(
         appData,
         provider.id,
@@ -183,4 +194,16 @@ export function registerChatSplitRoutes(
       'Раздели задачи из этого разговора на независимые группы и предложи разделение. ' +
       SPLIT_SYSTEM_PROMPT,
   }));
+
+  /**
+   * «Работаем здесь» — отказ от разделения. Отказ уходит агенту и репликой, но
+   * реплика живёт ровно один ход, а инициатива дописывается к КАЖДОМУ прогону:
+   * без этой отметки следующий же прогон предложил бы ровно то же самое, и так
+   * до бесконечности. Кнопка «Разделить задачи» после отказа работает по-прежнему.
+   */
+  app.post<{ Body: { chatId?: string } }>('/api/chat/split/decline', (request) => {
+    const chatId = String(request.body?.chatId ?? '').trim();
+    if (chatId) deps.runs.muteSplit(chatId);
+    return { ok: Boolean(chatId) };
+  });
 }

@@ -147,6 +147,57 @@ for (const [label, port] of ports) {
 if (existsSync(join(process.cwd(), 'node_modules'))) ok('Зависимости установлены');
 else fail('Зависимости не установлены', 'Выполните: pnpm install');
 
+// === Длинные пути Windows: без них параллельные копии показывают ложные удаления ===
+//
+// Замерено 2 сентября 2026 на живом прогоне в gorgona: агент внутри копии
+// получал «could not open directory …: Filename too long» и видел настоящие
+// файлы УДАЛЁННЫМИ, а `git add -A` в такой копии записал бы эти удаления.
+// Панель включает ключ в конфиге каждого репозитория, где заводит копию, но
+// защищает это только те репозитории и только после первой копии — общесистемная
+// настройка шире и делается один раз, поэтому о ней и говорим.
+if (platform() === 'win32') {
+  const registryOn = (() => {
+    try {
+      const out = execFileSync(
+        'reg',
+        ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem', '/v', 'LongPathsEnabled'],
+        { encoding: 'latin1', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] },
+      );
+      return /LongPathsEnabled\s+REG_DWORD\s+0x1/i.test(out);
+    } catch {
+      return false;
+    }
+  })();
+
+  const gitOn = (() => {
+    try {
+      return (
+        execFileSync('git', ['config', '--get', 'core.longpaths'], {
+          encoding: 'utf8',
+          timeout: 10_000,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim() === 'true'
+      );
+    } catch {
+      return false;
+    }
+  })();
+
+  if (registryOn || gitOn) {
+    ok(
+      'Длинные пути разрешены',
+      [registryOn && 'настройкой Windows', gitOn && 'ключом git core.longpaths']
+        .filter(Boolean)
+        .join(' и '),
+    );
+  } else {
+    warn(
+      'Длинные пути не разрешены — параллельные копии будут показывать ложные удаления',
+      'Выполните: git config --global core.longpaths true. Надёжнее — включить и в самой Windows: «Редактор локальной групповой политики» → Конфигурация компьютера → Административные шаблоны → Система → Файловая система → «Включить длинные пути Win32» (или HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\\LongPathsEnabled = 1, нужны права администратора). Подробности в docs/SETUP.ru.md → Параллельные копии показывают удалённые файлы.',
+    );
+  }
+}
+
 // === Место под телефонное приложение ===
 // Нативная сборка оставляет объектные файлы внутри node_modules — гигабайты,
 // которых нет ни в APK, ни в репозитории. Сборка убирает их за собой, но

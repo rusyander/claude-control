@@ -38,6 +38,7 @@ export const DEFAULT_STATE: AppState = {
     taskSplitInitiative: true,
     handoffInitiative: true,
     handoffContextLimit: 0,
+    handoffAutoDefault: false,
     autoUpdateModels: true,
     previewProviderWrites: true,
     endpointProfiles: [],

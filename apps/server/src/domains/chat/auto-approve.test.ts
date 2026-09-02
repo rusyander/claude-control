@@ -70,6 +70,20 @@ describe('shouldAutoApprove', () => {
     expect(shouldAutoApprove({ ...base, toolName: 'mcp__jira__get_issue', input: {} })).toBe(true);
   });
 
+  /**
+   * Вопрос человеку — не инструмент, и «разрешить» для него значит «пусть CLI
+   * спросит сам». В режиме `-p` спрашивать ему не у кого: вызов возвращается
+   * ошибкой, и развилку агент решает за человека молча, а карточка выбора
+   * приезжает в ленту, когда нажимать на неё уже поздно. Поэтому автоподтверждение
+   * его не касается ни при каких тумблерах — включая полный доступ к правкам.
+   */
+  it('вопрос человеку не подтверждается автоматически никогда', () => {
+    const ask = { toolName: 'AskUserQuestion', input: { questions: [{ question: 'Как?' }] } };
+    expect(shouldAutoApprove({ ...base, ...ask })).toBe(false);
+    expect(shouldAutoApprove({ ...base, allowEdits: false, ...ask })).toBe(false);
+    expect(shouldAutoApprove({ ...base, guardedPatterns: [], ...ask })).toBe(false);
+  });
+
   it('при выключенных правках правка файла остаётся за человеком', () => {
     expect(
       shouldAutoApprove({

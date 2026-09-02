@@ -56,3 +56,27 @@ describe('parseQuestions', () => {
     expect(parseQuestions('"строка"')).toBeUndefined();
   });
 });
+
+/**
+ * Один и тот же вызов приезжает в панель дважды и в разных видах: из потока —
+ * строкой JSON, из запроса прав perm-guard — уже объектом. Карточка одна, значит
+ * и разбор обязан принимать оба, иначе живой вопрос (тот, на котором агент
+ * стоит) просто не нарисуется.
+ */
+describe('parseQuestions: input объектом, как его отдаёт perm-guard', () => {
+  it('объект разбирается так же, как строка', () => {
+    const payload = {
+      questions: [{ question: 'Какой формат?', options: [{ label: 'ISO' }, { label: 'Локальный' }] }],
+    };
+    expect(parseQuestions(payload)).toEqual(payload.questions);
+    expect(parseQuestions(payload)).toEqual(parseQuestions(JSON.stringify(payload)));
+  });
+
+  it('объект без вопросов и не-объект → undefined', () => {
+    expect(parseQuestions({ questions: [] })).toBeUndefined();
+    expect(parseQuestions({ foo: 'bar' })).toBeUndefined();
+    expect(parseQuestions(undefined)).toBeUndefined();
+    expect(parseQuestions(null)).toBeUndefined();
+    expect(parseQuestions(42)).toBeUndefined();
+  });
+});

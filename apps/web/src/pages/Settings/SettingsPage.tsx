@@ -268,6 +268,15 @@ export function SettingsPage() {
             options={contextLimitOptions}
             hint={t('settings.handoffContextLimitHint')}
           />
+          {/* Значение тумблера на карточке для разговоров, где его не трогали.
+              Отдельно от порога выше: порог решает, КОГДА зайдёт речь, а этот —
+              спрашивать ли вообще. Тумблер конкретного разговора сильнее. */}
+          <SettingToggleRow
+            label={t('settings.handoffAutoDefault')}
+            hint={t('settings.handoffAutoDefaultHint')}
+            checked={settings.handoffAutoDefault}
+            onChange={(handoffAutoDefault) => patch({ handoffAutoDefault })}
+          />
         </Stack>
       </Card>
 

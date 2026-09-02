@@ -77,6 +77,8 @@ page.on('console', (message) => {
 /** Что ушло на сервер: по этому и судим, а не по виду кнопок. */
 let sent;
 let splitBody;
+/** Отказ от разделения: он же гасит инициативу разговора. */
+let declined;
 
 // Каталога проекта на диске нет — настоящий git-пульт ответил бы отказом и
 // засорил консоль. Проверяем не его, поэтому отвечаем «не репозиторий».
@@ -121,6 +123,14 @@ await page.route('**/api/chat/send', (route) => {
 await page.route('**/api/chat/split/request', (route) =>
   route.fulfill({ json: { prompt: 'Разбей задачи блоком claude-control:split.' } }),
 );
+
+// Отказ гасит инициативу разговора на сервере: реплика живёт один ход, а
+// инструкция «предложи разделение» дописывается к КАЖДОМУ прогону — без отметки
+// следующий же предложил бы то же самое, и так до бесконечности.
+await page.route('**/api/chat/split/decline', (route) => {
+  declined = route.request().postDataJSON();
+  return route.fulfill({ json: { ok: true } });
+});
 
 await page.route('**/api/chat/split', (route) => {
   splitBody = route.request().postDataJSON();
@@ -197,6 +207,10 @@ await page.getByRole('button', { name: 'Делать здесь по очере�
 await page.waitForTimeout(1500);
 check(sent?.prompt?.includes('Не разделяй'), 'отказ ушёл репликой в тот же разговор');
 check(splitBody === undefined, 'отказ не заводит ни чатов, ни веток');
+check(
+  declined?.chatId === CHAT_ID,
+  `отказ погасил инициативу этого разговора: ${JSON.stringify(declined)}`,
+);
 check((await apply.count()) === 0, 'после ответа предложение отработано: кнопок нет');
 
 // Просьба разделить задним числом: кнопка в поле ввода, текст — с сервера.
@@ -218,6 +232,9 @@ await page.waitForSelector('nav');
 await page.waitForTimeout(1800);
 check(await waitEnabled(apply), 'вкладка вернулась к тому же разговору с предложением');
 
+// Вкладок до разделения: одна домашняя плюс открытый проект.
+const tabsBefore = await page.getByRole('tab').count();
+
 // «Только завести чаты»: заготовки без стартовавших агентов.
 const createOnly = page.getByRole('switch', { name: 'Только завести чаты, не запускать агентов' });
 await waitEnabled(createOnly);
@@ -235,6 +252,11 @@ check(
   (await page.getByText('Заведено чатов: 2').count()) > 0,
   'о заведённых чатах сказано человеку',
 );
+
+// Разделение на две группы раньше открывало две новые вкладки проекта, и один
+// проект превращался в три. Дети живут деревом в этой же вкладке.
+const tabsAfter = await page.getByRole('tab').count();
+check(tabsAfter === tabsBefore, `вкладок не прибавилось: было ${tabsBefore}, стало ${tabsAfter}`);
 
 check(errors.length === 0, errors.length === 0 ? 'ошибок консоли нет' : errors.join(' | '));
 

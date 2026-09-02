@@ -37,6 +37,22 @@ Everything needed to get Claude Control running, and what to do when it does not
 
 The repo ships an `.nvmrc`, so `nvm use` picks the right Node by itself.
 
+**Windows, on its own line — long paths.** The panel creates parallel working copies of a repository
+(`git worktree`) next to the project, and a path inside a copy is longer than the original. In a
+deeply nested frontend it easily passes 260 characters, and without permission for long paths git
+does not see those files at all — it reports them as **deleted**, and `git add -A` inside the copy
+would record those deletions as real. Once per machine:
+
+```bash
+git config --global core.longpaths true
+```
+
+Better still, enable long paths in Windows itself (needs administrator rights): Local Group Policy
+Editor → Computer Configuration → Administrative Templates → System → Filesystem → **"Enable Win32
+long paths"**, or `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1`.
+`pnpm doctor` checks both and stays quiet if either one is on. Symptoms and details —
+[Parallel copies show files as deleted](#parallel-copies-show-files-as-deleted).
+
 Claude Code must be **logged in**, not merely installed: run `claude` once in a terminal and
 authenticate. The panel cannot log you in — without it chat, the assistant, sandbox conversations
 and plugins do not work.
@@ -440,6 +456,39 @@ A sandbox is a deliberately near-empty Claude Code: ~30 tools instead of 165, no
 third-party hooks. Behaviour that depends on your usual setup will not reproduce there — that is
 the point. If the model says it cannot write files, the temp directory probably did not assemble
 fully: close the sandbox and open it again.
+
+#### Parallel copies show files as deleted
+
+**Symptom.** Task tabs all turn red at once; the agent inside a parallel copy reports a dirty tree
+and offers to "fix longpaths and restore". The git output shows
+
+```
+warning: could not open directory 'some/deep/path/…': Filename too long
+ D some/deep/path/…/Component.tsx
+```
+
+**Cause.** Windows counts 260 characters for the whole path. A copy lives at
+`<parent>/<repo>-worktrees/<branch>/…`, i.e. longer than the original repository, and a deeply
+nested frontend has no headroom left. The files are on disk, but git cannot open them and honestly
+treats them as deleted. The danger is not the red colour: `git add -A` in such a copy would record
+the deletion of real files.
+
+**What the panel does.** When it creates a copy it turns `core.longpaths` on in the repository's own
+config — the config is shared by every working copy, so one write covers the main copy and all the
+parallel ones. The panel always allows long paths for its own git calls, but the agent inside a copy
+is a foreign process with its own config, and that would not have covered it.
+
+**What to do yourself.** Allow long paths once per machine — that protects every repository,
+including those where no copy has been created yet:
+
+```bash
+git config --global core.longpaths true
+git worktree prune          # in a repository whose copies already broke
+```
+
+The system-wide Windows setting (the "Enable Win32 long paths" policy, or `LongPathsEnabled = 1` in
+the registry) lifts the limit more broadly — not only for git. `pnpm doctor` shows whether either of
+the two is on.
 
 #### A sandbox says "Not logged in"
 

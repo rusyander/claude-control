@@ -36,6 +36,8 @@ export function ChatMessages({
   isRunning,
   permissions,
   onPermissionDecide,
+  childQuestions,
+  onChildAnswer,
   onRetry,
   costUnit,
   effort,
@@ -168,11 +170,15 @@ export function ChatMessages({
               if (questions) {
                 return (
                   <div key={`${tool.name}-${index}`} className={styles.block}>
-                    <QuestionCard
-                      questions={questions}
-                      onPick={onPickOption}
-                      disabled={isRunning}
-                    />
+                    {/*
+                      Отвечать можно СРАЗУ, не дожидаясь конца хода. Вызов уже
+                      вернулся ошибкой (в пакетном режиме `AskUserQuestion`
+                      иначе не умеет), агент про вопрос больше не помнит и
+                      продолжает работу — а человеку выбор нужен именно сейчас.
+                      Ответ занятому агенту уходит в очередь и доедет, как
+                      только он закончит ход.
+                    */}
+                    <QuestionCard questions={questions} onPick={onPickOption} busy={isRunning} />
                     {spend}
                   </div>
                 );
@@ -281,6 +287,30 @@ export function ChatMessages({
       {permissions && permissions.length > 0 && onPermissionDecide && (
         <PermissionCard permissions={permissions} onDecide={onPermissionDecide} />
       )}
+
+      {/*
+        Вопросы дочерних разговоров. Ответ уходит в ИХ чат — этот разговор о нём
+        не узнает и хода себе не добавит. Подпись обязательна: одинаковых
+        вопросов от шести агентов бывает шесть, и без имени чата человек отвечает
+        вслепую.
+      */}
+      {onChildAnswer &&
+        (childQuestions ?? []).map((child) => {
+          const questions = parseQuestions(child.input);
+          if (!questions) return null;
+          return (
+            <div key={`${child.chatId}-${child.toolUseId ?? 'ask'}`} className={styles.childAsk}>
+              <Typography variant="caption" color="subtle" className={styles.childAskFrom}>
+                {t('chat.questionFromChild', { title: child.title })}
+              </Typography>
+              <QuestionCard
+                questions={questions}
+                onPick={(answer) => onChildAnswer(child.chatId, answer)}
+                busy={child.isRunning}
+              />
+            </div>
+          );
+        })}
 
       {/*
         Ошибка — такое же событие разговора, как ответ, и место ей в ленте.

@@ -236,4 +236,70 @@ describe('ProviderChatRun', () => {
 
     expect(events.at(-1)).toEqual({ type: 'done', reply: 'из сессии', transport: 'session' });
   });
+
+  it('остановка на пути API обрывает запрос, и поздний ответ не попадает в переписку', async () => {
+    setStoredKey(dir, 'gemini', 'test-key');
+    const run = new ProviderChatRun();
+    const events: ProviderChatRunEvent[] = [];
+    let aborted = false;
+
+    // Запрос «висит», пока его не отменят сигналом, — как настоящая сеть.
+    const fetchImpl = ((_url: string, init: { signal?: AbortSignal }) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          aborted = true;
+          reject(new Error('aborted'));
+        });
+      })) as unknown as typeof fetch;
+
+    setTimeout(() => run.stop(), 0);
+    await run.start(
+      {
+        provider: getProvider('gemini'),
+        history: history('Вопрос'),
+        chatId: 'chat',
+        appDataDir: dir,
+        detect: noCli,
+        fetchImpl,
+      },
+      (event) => events.push(event),
+    );
+
+    expect(aborted).toBe(true);
+    expect(events).toEqual([{ type: 'done', reply: '', transport: 'api' }]);
+  });
+
+  it('остановка сессии OpenCode не уходит ни в одиночный запуск, ни в API', async () => {
+    setStoredKey(dir, 'opencode', 'test-key');
+    const run = new ProviderChatRun();
+    const events: ProviderChatRunEvent[] = [];
+    const spawn = fakeSpawn({ chunks: ['лишний ответ'] });
+    let sawSignal: AbortSignal | undefined;
+
+    const sessionServe = {
+      ask: (_id: string, _text: string, deps: { signal?: AbortSignal }) =>
+        new Promise<undefined>((resolve) => {
+          sawSignal = deps.signal;
+          deps.signal?.addEventListener('abort', () => resolve(undefined));
+        }),
+    } as unknown as NonNullable<Parameters<ProviderChatRun['start']>[0]['sessionServe']>;
+
+    setTimeout(() => run.stop(), 0);
+    await run.start(
+      {
+        provider: getProvider('opencode'),
+        history: history('Вопрос'),
+        chatId: 'chat',
+        appDataDir: dir,
+        detect: yesCli,
+        spawnImpl: spawn.fn,
+        sessionServe,
+      },
+      (event) => events.push(event),
+    );
+
+    expect(sawSignal?.aborted).toBe(true);
+    expect(spawn.handles).toHaveLength(0);
+    expect(events).toEqual([{ type: 'done', reply: '', transport: 'session' }]);
+  });
 });

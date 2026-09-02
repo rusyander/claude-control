@@ -23,7 +23,7 @@ import {
   resolveProjectPaths,
   type ProjectPaths,
 } from '../domains/projects.ts';
-import { getActiveProvider } from '../providers/registry.ts';
+import { requireProject as requireProjectAccess, type ErrorReply } from './project-access.ts';
 import { done } from './write-result.ts';
 
 /**
@@ -42,33 +42,12 @@ import { done } from './write-result.ts';
  */
 export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext): void {
   /**
-   * Запись реестра по id или 404-ответ. Возвращает undefined, отправив ответ.
-   *
-   * Дополнительно fail-closed по провайдеру (COMMON-2): эти маршруты пишут файлы
-   * ПРОЕКТНОГО УРОВНЯ CLAUDE (CLAUDE.md, .claude/settings.json, .mcp.json).
-   * Активен другой провайдер → 400: его проектные файлы обслуживает
-   * `/api/projects/:id/provider/*`, а конфиг Claude панель трогать не должна.
-   * При активном Claude поведение прежнее (регресс-ноль).
+   * Запись реестра по id или ответ 404/400 — общий с `project-local-routes.ts`
+   * помощник (`project-access.ts`): гейт провайдера и поиск в реестре одни на
+   * все проектные маршруты Claude.
    */
-  const requireProject = (
-    id: string,
-    reply: { code: (n: number) => { send: (b: unknown) => unknown } },
-  ): Project | undefined => {
-    if (getActiveProvider(ctx.store).id !== 'claude') {
-      reply.code(400).send({
-        error: 'section_unsupported',
-        message: 'Проектные файлы Claude доступны только при активном провайдере Claude.',
-      });
-      return undefined;
-    }
-
-    const project = ctx.store.getProject(id);
-    if (!project) {
-      reply.code(404).send({ error: 'not_found', message: 'Проект не найден в реестре' });
-      return undefined;
-    }
-    return project;
-  };
+  const requireProject = (id: string, reply: ErrorReply): Project | undefined =>
+    requireProjectAccess(ctx, id, reply);
 
   /** Пути к конфигам проекта по id из реестра. */
   const pathsOf = (project: Project): ProjectPaths => resolveProjectPaths(project.path);

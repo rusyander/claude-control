@@ -1,0 +1,49 @@
+// Строки набора разделены линией, а не карточками: блок стоит и во вкладке
+// проекта, и внутри карточки группы, где вложенная карточка читалась бы тяжело.
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  min-width: 0;
+  padding: var(--spacing-xs) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+// Описания пишет автор скилла, и длина их ничем не ограничена: мера строки
+// держит текст читаемым на широком экране.
+.text {
+  max-width: 72ch;
+}
+
+// Тело правила — markdown как есть: переносы сохраняются, длинные строки
+// заворачиваются, а высота ограничена, чтобы одно правило не заняло экран.
+.body {
+  max-width: 72ch;
+  max-height: 360px;
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chevron {
+  transition: transform var(--duration-fast);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+  transition: transform var(--duration-fast);
+}

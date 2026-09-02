@@ -47,6 +47,7 @@ export function GroupsTopic() {
           can={[
             tr('canCollect'),
             tr('canBindProject'),
+            tr('canLocal'),
             tr('canSteps'),
             tr('canToggleGroup'),
             tr('canGroupEnv'),

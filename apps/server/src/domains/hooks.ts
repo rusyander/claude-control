@@ -38,7 +38,35 @@ function legacyHookId(event: string, groupIndex: number, commandIndex: number): 
   return `${event}:${groupIndex}:${commandIndex}`;
 }
 
-function readHooksFrom(settingsPath: string, store: AppStore, source: SettingsSource): Hook[] {
+/**
+ * Что панель накладывает поверх файла: отметки «выключено» и членство в
+ * группах. Для пользовательского `~/.claude` это состояние панели; для чужого
+ * `.claude` (проектного) — нейтральный оверлей, иначе отметки владельца машины
+ * протекли бы в файлы проекта, к которым они не относятся.
+ */
+interface HookOverlay {
+  isEnabled: (id: string, legacyId: string) => boolean;
+  groupIds: (id: string, legacyId: string) => string[];
+}
+
+const NEUTRAL_OVERLAY: HookOverlay = {
+  isEnabled: () => true,
+  groupIds: () => [],
+};
+
+function storeOverlay(store: AppStore): HookOverlay {
+  return {
+    isEnabled: (id, legacyId) => !store.isDisabled('hook', id, legacyId),
+    groupIds: (id, legacyId) => store.getGroupIdsFor('hook', id, legacyId),
+  };
+}
+
+/** Разворачивает один файл настроек в плоский список хуков. */
+function parseHooksFile(
+  settingsPath: string,
+  source: SettingsSource,
+  overlay: HookOverlay,
+): Hook[] {
   const settings = readJsonFile<RawSettings>(settingsPath, {});
   const result: Hook[] = [];
   // Локальные записи помечаются префиксом: два файла могут содержать
@@ -68,11 +96,11 @@ function readHooksFrom(settingsPath: string, store: AppStore, source: SettingsSo
           timeout: command.timeout,
           // Локальный хук выключить нечем: панель в этот файл не пишет,
           // поэтому он всегда показан включённым — как оно и есть на деле.
-          isEnabled: source === 'settings-local' || !store.isDisabled('hook', id, legacyId),
+          isEnabled: source === 'settings-local' || overlay.isEnabled(id, legacyId),
           scriptPath,
           scriptExists: scriptPath ? existsSync(scriptPath) : undefined,
           description: scriptPath ? readScriptDescription(scriptPath) : undefined,
-          groupIds: store.getGroupIdsFor('hook', id, legacyId),
+          groupIds: overlay.groupIds(id, legacyId),
           source,
         });
       });
@@ -80,6 +108,22 @@ function readHooksFrom(settingsPath: string, store: AppStore, source: SettingsSo
   }
 
   return result;
+}
+
+function readHooksFrom(settingsPath: string, store: AppStore, source: SettingsSource): Hook[] {
+  return parseHooksFile(settingsPath, source, storeOverlay(store));
+}
+
+/**
+ * Хуки ровно так, как они лежат в файлах, без состояния панели: все включены
+ * (выключенного хука в файле не бывает), групп нет, снимки выключенных не
+ * подмешиваются. Так читается `.claude` проекта — файлы принадлежат гиту
+ * проекта, и отметки владельца машины к ним отношения не имеют.
+ */
+export function readHooksFromFiles(settingsPath: string, localPath?: string): Hook[] {
+  const own = parseHooksFile(settingsPath, 'settings', NEUTRAL_OVERLAY);
+  const local = localPath ? parseHooksFile(localPath, 'settings-local', NEUTRAL_OVERLAY) : [];
+  return [...own, ...local];
 }
 
 /**

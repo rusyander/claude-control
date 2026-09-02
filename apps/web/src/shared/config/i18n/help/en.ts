@@ -1446,6 +1446,9 @@ export const helpEn: HelpSchema = {
       canAutomation: 'Describe a scenario in words and get a working hook',
       canAssistant: 'Fill the group or scenario form with the assistant',
       canBindProject: 'Bind a group to projects — it switches itself on when you work in them',
+      canLocal:
+        'See the project’s own set on a bound group’s card — skills, hooks and rules from ' +
+        'its .claude, read-only',
       canSteps: 'Describe the working order as steps: the panel builds a skill out of them',
 
       bindTitle: 'Binding to a project',
@@ -3604,16 +3607,21 @@ export const helpEn: HelpSchema = {
       storagePerms: 'Permissions',
       storageCreate: 'The .claude directory',
       storageCreateValue: 'created on the first write if the project does not have it yet',
+      storageSkills: 'Project skills',
+      storageHooks: 'Project hooks',
+      storageRuleFiles: 'Rule files',
 
       canRegister: 'Register a project folder by its absolute path',
       canRules: 'Edit the project’s CLAUDE.md',
       canMcp: 'Manage the project’s MCP servers in its .mcp.json',
       canPerms: 'Configure the project’s permissions in .claude/settings.json',
       canAdditive: 'Work with a project without touching the user level',
+      canLocal:
+        'See the project’s own set — skills, hooks and rules from its .claude — on the ' +
+        '«From the project» tab',
 
       cantGroups:
         'Groups, soft-disable, the health check, OAuth and the sandbox — not on projects yet',
-      cantHooks: 'Project hooks — they are not surfaced in the UI yet',
       cantHealth:
         'Check the connection to a project’s MCP server — health is available on the ' +
         'user level only',
@@ -3628,6 +3636,12 @@ export const helpEn: HelpSchema = {
         'Here you edit a project’s rules, MCP servers and permissions. Groups, ' +
         'soft-disable, the health check, OAuth and the sandbox are not on the project ' +
         'level yet.',
+      noteLocalTitle: '«From the project» is read-only',
+      noteLocalText:
+        'The panel shows the skills, hooks and rules from the project’s .claude but does ' +
+        'not edit them: they belong to the project’s git and change there — in the editor ' +
+        'and by commit, like the rest of the code. That is why the tab has no toggles or ' +
+        'forms, and a hook from settings.local.json is marked with the file name.',
       noteUserTitle: 'The user level is separate',
       noteUserText:
         'The Rules, MCP and Permissions sections still manage ~/.claude. The project ' +

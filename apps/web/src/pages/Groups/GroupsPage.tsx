@@ -26,6 +26,7 @@ import {
   useDeleteAutomation,
 } from '@entities/Group';
 import { selectionOfGroup } from './GroupsPage.lib';
+import { GroupProjectLocal } from './GroupProjectLocal';
 import styles from './GroupsPage.module.scss';
 
 /** Группы и сценарии: пользовательская структура поверх сущностей Claude Code. */
@@ -92,74 +93,81 @@ export function GroupsPage() {
       <Stack gap="var(--spacing-sm)">
         {groups.map((group) => (
           <Card key={group.id} padding="md">
-            <Stack
-              direction="row"
-              align="start"
-              justify="between"
-              gap="var(--spacing-md)"
-              width="100%"
-            >
-              <Stack gap="var(--spacing-2xs)">
-                <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-                  <Typography variant="body" weight="medium" as="span">
-                    {group.name}
-                  </Typography>
-                  <Badge tone="accent">
-                    {group.members.length} {t('groups.members')}
-                  </Badge>
-                  {Object.keys(group.env ?? {}).length > 0 && (
-                    <Badge tone="info">env: {Object.keys(group.env ?? {}).length}</Badge>
-                  )}
-                  {/* Привязка и сценарий видны прямо на карточке: набор, который
+            <Stack gap="var(--spacing-sm)">
+              <Stack
+                direction="row"
+                align="start"
+                justify="between"
+                gap="var(--spacing-md)"
+                width="100%"
+              >
+                <Stack gap="var(--spacing-2xs)">
+                  <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+                    <Typography variant="body" weight="medium" as="span">
+                      {group.name}
+                    </Typography>
+                    <Badge tone="accent">
+                      {group.members.length} {t('groups.members')}
+                    </Badge>
+                    {Object.keys(group.env ?? {}).length > 0 && (
+                      <Badge tone="info">env: {Object.keys(group.env ?? {}).length}</Badge>
+                    )}
+                    {/* Привязка и сценарий видны прямо на карточке: набор, который
                       включается сам, человек обязан отличать от обычного. */}
-                  {(group.projectPaths ?? []).length > 0 && (
-                    <Badge tone="success">
-                      {t('groups.projectsBadge', { count: (group.projectPaths ?? []).length })}
-                    </Badge>
+                    {(group.projectPaths ?? []).length > 0 && (
+                      <Badge tone="success">
+                        {t('groups.projectsBadge', { count: (group.projectPaths ?? []).length })}
+                      </Badge>
+                    )}
+                    {group.scenario && group.scenario.steps.length > 0 && (
+                      <Badge tone="warning">
+                        {t('groups.scenarioBadge', { count: group.scenario.steps.length })}
+                      </Badge>
+                    )}
+                    {!group.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
+                  </Stack>
+                  {group.description && (
+                    <Typography variant="body-sm" color="muted" className={styles.description}>
+                      {group.description}
+                    </Typography>
                   )}
-                  {group.scenario && group.scenario.steps.length > 0 && (
-                    <Badge tone="warning">
-                      {t('groups.scenarioBadge', { count: group.scenario.steps.length })}
-                    </Badge>
-                  )}
-                  {!group.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
                 </Stack>
-                {group.description && (
-                  <Typography variant="body-sm" color="muted" className={styles.description}>
-                    {group.description}
-                  </Typography>
-                )}
-              </Stack>
 
-              <Stack direction="row" align="center" gap="var(--spacing-2xs)" flexShrink={0}>
-                <SandboxButton
-                  kind="group"
-                  title={group.name}
-                  selection={selectionOfGroup(group.members)}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon={<Icon name="edit" size={24} />}
-                  aria-label={`${t('common.edit')}: ${group.name}`}
-                  onClick={() => openEditGroup(group)}
-                />
-                <DeleteButton
-                  entityName={group.name}
-                  description={t('common.deleteGroup')}
-                  onDelete={() => deleteGroup.mutate(group.id)}
-                  isPending={deleteGroup.isPending}
-                />
-                <Toggle
-                  checked={group.isEnabled}
-                  onCheckedChange={(isEnabled) =>
-                    setGroupEnabled.mutate({ id: group.id, isEnabled })
-                  }
-                  disabled={setGroupEnabled.isPending}
-                  aria-label={`${t('common.enabled')}: ${group.name}`}
-                />
+                <Stack direction="row" align="center" gap="var(--spacing-2xs)" flexShrink={0}>
+                  <SandboxButton
+                    kind="group"
+                    title={group.name}
+                    selection={selectionOfGroup(group.members)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    icon={<Icon name="edit" size={24} />}
+                    aria-label={`${t('common.edit')}: ${group.name}`}
+                    onClick={() => openEditGroup(group)}
+                  />
+                  <DeleteButton
+                    entityName={group.name}
+                    description={t('common.deleteGroup')}
+                    onDelete={() => deleteGroup.mutate(group.id)}
+                    isPending={deleteGroup.isPending}
+                  />
+                  <Toggle
+                    checked={group.isEnabled}
+                    onCheckedChange={(isEnabled) =>
+                      setGroupEnabled.mutate({ id: group.id, isEnabled })
+                    }
+                    disabled={setGroupEnabled.isPending}
+                    aria-label={`${t('common.enabled')}: ${group.name}`}
+                  />
+                </Stack>
               </Stack>
+              {/* Собственный набор привязанного проекта: без него группа с привязкой
+                выглядела пустой, хотя агент в ней работает с его правилами и скиллами. */}
+              {(group.projectPaths ?? []).length > 0 && (
+                <GroupProjectLocal paths={group.projectPaths ?? []} />
+              )}
             </Stack>
           </Card>
         ))}

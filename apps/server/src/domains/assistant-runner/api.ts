@@ -80,6 +80,7 @@ export async function runProviderApi(
       const res = await fetchImpl(endpoint ? endpointUrl(endpoint, model) : ANTHROPIC_URL, {
         method: 'POST',
         headers,
+        signal: deps.signal,
         body: JSON.stringify({
           model,
           max_tokens: 2048,
@@ -105,6 +106,7 @@ export async function runProviderApi(
       const res = await fetchImpl(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
+        signal: deps.signal,
         body: JSON.stringify({
           contents: messages.map((m) => ({
             role: m.role === 'assistant' ? 'model' : 'user',
@@ -134,6 +136,7 @@ export async function runProviderApi(
     const res = await fetchImpl(url, {
       method: 'POST',
       headers,
+      signal: deps.signal,
       body: JSON.stringify({
         model: endpoint ? model : (process.env.OPENAI_MODEL ?? model),
         messages: messages.map((m) => ({ role: m.role, content: m.content })),

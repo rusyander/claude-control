@@ -39,7 +39,7 @@ The panel answers them: a visible shape, a switch that deletes nothing, and a sa
 - **Permissions** — allow / ask / deny, `mcp__*` patterns included; entries move between `settings.json` and `settings.local.json`
 - **Environment** — from `settings.json` and `.mcp-secrets.env`, secrets masked
 - **Plugins** — installed ones and the marketplace catalog, source management, a scaffolder for your own
-- **Projects** — the project level of a chosen folder (`CLAUDE.md`, `.mcp.json`, `.claude/settings.json`) on top of the user level
+- **Projects** — the project level of a chosen folder (`CLAUDE.md`, `.mcp.json`, `.claude/settings.json`) on top of the user level; the «From the project» tab shows the project's own set — skills, hooks and rules from its `.claude` — read-only, it is edited in the project's git
 
 </td><td width="50%" valign="top">
 

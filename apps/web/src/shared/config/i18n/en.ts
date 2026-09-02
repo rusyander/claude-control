@@ -2560,6 +2560,7 @@ export const en: TranslationSchema = {
     tab_rules: 'Rules',
     tab_mcp: 'MCP servers',
     tab_permissions: 'Permissions',
+    tab_local: 'From the project',
     rulesHint: "The project's root CLAUDE.md in full — as Claude reads it in this project.",
     mcpHint: "The project's MCP servers from the root .mcp.json.",
     mcpEmpty: "The project's .mcp.json has no servers yet.",
@@ -2568,6 +2569,35 @@ export const en: TranslationSchema = {
       "The project's permissions from .claude/settings.json (and settings.local.json).",
     permissionsEmpty: "The project's settings.json has no permission rules yet.",
     addPermission: 'Add permission',
+  },
+  // The project's own .claude — the «From the project» tab and the block on a group card. Read-only.
+  projectLocal: {
+    hint: "Skills, hooks and rules from this project's .claude directory — Claude Code loads them together with the user-level ones. The panel only shows them: the set belongs to the project's git and is edited there, like the rest of the code.",
+    readOnly: 'read-only',
+    fromProject: 'From the project',
+    skills: 'Skills',
+    hooks: 'Hooks',
+    rules: 'Rules',
+    countSkills: 'skills: {{count}}',
+    countHooks: 'hooks: {{count}}',
+    countRules: 'rules: {{count}}',
+    noDir: 'The project has no .claude directory',
+    noDirText:
+      "This is where Claude Code takes the project's own skills, hooks and rules from. Until the directory exists, only the user-level set applies in the project.",
+    emptySkills: 'No skills in .claude/skills',
+    emptyHooks: 'No hooks in .claude/settings.json',
+    emptyRules: 'No rules in .claude/rules',
+    files: 'files: {{count}}',
+    skillDisabled: 'disabled',
+    localSourceHint:
+      "A hook from the project's personal .claude/settings.local.json — Claude Code reads it alongside the shared settings.json.",
+    scriptMissing: 'script not found',
+    pathsHint: 'The rule applies only to files matching these globs',
+    showBody: 'Show text',
+    hideBody: 'Hide text',
+    expand: 'Show the set',
+    collapse: 'Hide the set',
+    loadError: "Could not read the project's .claude",
   },
   // Project level for non-Claude providers: their own project files (COMMON-2).
   providerProject: {

@@ -8,8 +8,11 @@ import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { SkeletonList } from '@shared/ui/skeleton';
+import { LoadErrorCard } from '@shared/ui/load-error';
 import { useClaudeMd, useUpdateClaudeMd } from '@entities/AppConfig';
 import { instructionsView } from './model/instructionsView';
+import { hasConflict, isDirty, syncWithDisk } from './model/editorSync';
+import type { EditorSync } from './model/editorSync';
 import styles from './ClaudeMdPage.module.scss';
 
 /**
@@ -22,21 +25,37 @@ import styles from './ClaudeMdPage.module.scss';
  */
 export function ClaudeMdPage() {
   const { t } = useTranslation();
-  const { data, isLoading } = useClaudeMd();
+  const { data, isLoading, isError, refetch } = useClaudeMd();
   const update = useUpdateClaudeMd();
-  const [value, setValue] = useState<string | undefined>(undefined);
+  const [editor, setEditor] = useState<EditorSync | undefined>(undefined);
 
-  // Подхватываем содержимое, как только оно загрузилось.
+  // Каждая версия с диска — первая загрузка, правка мимо панели, своё
+  // сохранение — проходит сверку (`editorSync`): чистое поле следует за
+  // файлом, поверх своих правок расхождение показывается, а не гасится.
   useEffect(() => {
-    if (data !== undefined && value === undefined) setValue(data.content);
-  }, [data, value]);
+    if (data !== undefined) setEditor((current) => syncWithDisk(current, data.content));
+  }, [data]);
 
-  if (isLoading || value === undefined || data === undefined) {
+  // Отказ сервера — не вечный скелет: заголовок с «?» и кнопка повторить.
+  if (isError && data === undefined) {
+    return (
+      <Stack gap="var(--spacing-lg)" className={styles.page}>
+        <PageHeader title={t('nav.claudeMd')} helpTopic="claudeMd" />
+        <LoadErrorCard onRetry={() => void refetch()} />
+      </Stack>
+    );
+  }
+
+  if (isLoading || editor === undefined || data === undefined) {
     return <SkeletonList rows={6} withActions={false} />;
   }
 
   const view = instructionsView(data);
-  const dirty = value !== data.content;
+  const value = editor.value;
+  const dirty = isDirty(editor, data.content);
+  const conflict = hasConflict(editor, data.content);
+  const setValue = (next: string): void => setEditor({ ...editor, value: next });
+  const takeDisk = (): void => setEditor({ value: data.content, baseline: data.content });
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
@@ -62,6 +81,22 @@ export function ClaudeMdPage() {
         </Card>
       )}
 
+      {conflict && (
+        <Card padding="sm">
+          <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
+            <Stack direction="row" align="center" gap="var(--spacing-xs)">
+              <Icon name="info" size={18} />
+              <Typography variant="body-sm" color="muted">
+                {t('claudeMd.changedOnDisk')}
+              </Typography>
+            </Stack>
+            <Button variant="secondary" size="sm" onClick={takeDisk}>
+              {t('claudeMd.loadFromDisk')}
+            </Button>
+          </Stack>
+        </Card>
+      )}
+
       <Card padding="md">
         <Stack gap="var(--spacing-sm)">
           <textarea
@@ -82,7 +117,7 @@ export function ClaudeMdPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setValue(data.content)}
+                onClick={takeDisk}
                 disabled={!dirty || update.isPending}
               >
                 {t('claudeMd.revert')}

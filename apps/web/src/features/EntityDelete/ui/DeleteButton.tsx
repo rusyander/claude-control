@@ -10,7 +10,13 @@ import type { DeleteButtonProps } from './DeleteButton.types';
  * потому что удаление есть в четырёх разделах, а забыть про диалог в одном
  * из них — значит однажды снести конфиг случайным кликом.
  */
-export function DeleteButton({ entityName, description, onDelete, isPending }: DeleteButtonProps) {
+export function DeleteButton({
+  entityName,
+  confirmationName,
+  description,
+  onDelete,
+  isPending,
+}: DeleteButtonProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -36,7 +42,7 @@ export function DeleteButton({ entityName, description, onDelete, isPending }: D
         onConfirm={handleConfirm}
         title={t('common.deleteTitle')}
         description={description}
-        confirmationName={entityName}
+        confirmationName={confirmationName ?? entityName}
         confirmLabel={t('common.delete')}
         isPending={isPending}
       />

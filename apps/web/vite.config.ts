@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
@@ -12,23 +12,24 @@ const API_PORT = Number(process.env.API_PORT ?? 5178);
  * ВСЕХ — иначе проверка не защищала бы ни от чего (Origin подделывает любой
  * не-браузерный клиент). Браузеру токен взять неоткуда, а прокси живёт на той же
  * машине и читает тот же файл, что и сервер, поэтому подставляет заголовок сам.
- * Кэш на несколько секунд: смена токена подхватывается без перезапуска Vite.
+ * Кэш по времени изменения файла, а не по TTL: после «Сменить токен» сервер уже
+ * ждёт новый, и с пятисекундным кэшем каждый клик в это окно получал 401.
+ * `stat` на запрос стоит копейки, а окна не остаётся вовсе.
  */
 const TOKEN_PATH = join(homedir(), '.claude-control', 'api-token');
-const TOKEN_TTL_MS = 5_000;
-let tokenCache = { value: '', readAt: 0 };
+let tokenCache = { value: '', mtimeMs: -1 };
 
 function apiToken(): string {
-  const now = Date.now();
-  if (now - tokenCache.readAt < TOKEN_TTL_MS) return tokenCache.value;
-  let value = '';
   try {
-    if (existsSync(TOKEN_PATH)) value = readFileSync(TOKEN_PATH, 'utf8').trim();
+    const { mtimeMs } = statSync(TOKEN_PATH);
+    if (mtimeMs !== tokenCache.mtimeMs) {
+      tokenCache = { value: readFileSync(TOKEN_PATH, 'utf8').trim(), mtimeMs };
+    }
   } catch {
     // Файла нет или он недоступен — значит удалённый доступ не настраивали.
+    tokenCache = { value: '', mtimeMs: -1 };
   }
-  tokenCache = { value, readAt: now };
-  return value;
+  return tokenCache.value;
 }
 
 export default defineConfig({

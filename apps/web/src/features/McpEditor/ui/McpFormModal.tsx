@@ -7,7 +7,7 @@ import {
   type McpPreset,
   type McpTransport,
 } from '@claude-control/contracts';
-import { apiClient } from '@shared/api/client';
+import { apiClient, toErrorMessage } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
@@ -280,9 +280,12 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
               isMono
             />
 
+            {/* Причина словами сервера (занятое имя, негодный адрес), а не общее
+                «не удалось»: тост с ней всплывает под курсором над футером и
+                гаснет, а форма остаётся открытой — читать надо здесь. */}
             {(create.isError || update.isError) && (
-              <Typography variant="body-sm" color="danger">
-                {t('errors.saveFailed')}
+              <Typography variant="body-sm" color="danger" role="alert">
+                {toErrorMessage(create.error ?? update.error)}
               </Typography>
             )}
           </Stack>

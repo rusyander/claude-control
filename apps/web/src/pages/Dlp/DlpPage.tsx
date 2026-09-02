@@ -9,6 +9,7 @@ import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { EmptyState } from '@shared/ui/empty-state';
 import { SkeletonList } from '@shared/ui/skeleton';
+import { LoadErrorCard } from '@shared/ui/load-error';
 import { toast } from '@shared/lib/toast';
 import { useSettings, useUpdateSettings } from '@entities/AppConfig';
 import {
@@ -41,7 +42,7 @@ export function DlpPage() {
   const { t } = useTranslation();
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
-  const { data, isLoading } = useDlp();
+  const { data, isLoading, isError, refetch } = useDlp();
   const saveRules = useSaveDlpRules();
   const setRunning = useSetDlpRunning();
 
@@ -52,6 +53,16 @@ export function DlpPage() {
   useEffect(() => {
     if (data && !draft) setDraft(data.rules);
   }, [data, draft]);
+
+  // Отказ сервера — не вечный скелет: заголовок с «?» и кнопка повторить.
+  if (isError && !data) {
+    return (
+      <Stack gap="var(--spacing-lg)">
+        <PageHeader title={t('dlp.title')} subtitle={t('dlp.subtitle')} helpTopic="dlp" />
+        <LoadErrorCard onRetry={() => void refetch()} />
+      </Stack>
+    );
+  }
 
   if (isLoading || !data || !settings) return <SkeletonList rows={3} />;
 

@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { Plugin } from '@claude-control/contracts';
+import { useEntityUrl } from '@shared/hooks/use-entity-url';
 import { Stack } from '@shared/ui/stack';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
@@ -10,6 +12,7 @@ import { TextField } from '@shared/ui/text-field';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { Icon } from '@shared/ui/icon';
+import { DeleteButton } from '@features/EntityDelete';
 import {
   usePlugins,
   useAvailablePlugins,
@@ -31,8 +34,22 @@ export function PluginsPage() {
   const [installId, setInstallId] = useState('');
   const [marketplaceSource, setMarketplaceSource] = useState('');
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  // Плагин, на который привела ссылка /plugins?id=… (поиск): у карточек нет
+  // формы, поэтому «открыть» здесь — подвести к карточке и подсветить её.
+  const [highlightedId, setHighlightedId] = useState<string | undefined>(undefined);
 
   const { data, isLoading } = usePlugins();
+  useEntityUrl<Plugin>({
+    items: data?.installed,
+    getId: (plugin) => plugin.id,
+    onOpen: (plugin) => setHighlightedId(plugin.id),
+  });
+  useEffect(() => {
+    if (!highlightedId) return;
+    document
+      .getElementById(`plugin-${highlightedId}`)
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [highlightedId]);
   const catalog = useAvailablePlugins(isCatalogOpen);
   const install = useInstallPlugin();
   const uninstall = useUninstallPlugin();
@@ -48,11 +65,27 @@ export function PluginsPage() {
   // о том, что пошло не так при установке.
   const lastResult = install.data ?? uninstall.data ?? update.data ?? setEnabled.data ?? undefined;
 
+  const marketplaceDeleteText = (name: string): string => {
+    const names = (data?.installed ?? [])
+      .filter((plugin) => plugin.marketplace === name)
+      .map((plugin) => plugin.name);
+    return names.length > 0
+      ? t('plugins.deleteMarketplaceWithPlugins', { names: names.join(', ') })
+      : t('plugins.deleteMarketplace');
+  };
+
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
       <PageHeader title={t('plugins.title')} subtitle={t('plugins.subtitle')} helpTopic="plugins" />
 
       <ExplainBox title={t('plugins.explainTitle')} text={t('plugins.explain')} />
+
+      {/* CLI не ответил — список неполный, и человек должен видеть причину, а не ноль. */}
+      {data?.notes.map((note) => (
+        <Typography key={note} variant="body-sm" color="warning">
+          {note}
+        </Typography>
+      ))}
 
       {isLoading && <SkeletonList rows={5} />}
 
@@ -62,14 +95,20 @@ export function PluginsPage() {
         </Typography>
 
         {data?.installed.map((plugin) => (
-          <PluginCard
+          <div
             key={plugin.id}
-            plugin={plugin}
-            isBusy={isBusy}
-            onToggle={(isEnabled) => setEnabled.mutate({ id: plugin.id, isEnabled })}
-            onUninstall={() => uninstall.mutate(plugin.id)}
-            onUpdate={() => update.mutate(plugin.id)}
-          />
+            id={`plugin-${plugin.id}`}
+            data-highlighted={plugin.id === highlightedId ? 'true' : undefined}
+            className={plugin.id === highlightedId ? styles.highlighted : undefined}
+          >
+            <PluginCard
+              plugin={plugin}
+              isBusy={isBusy}
+              onToggle={(isEnabled) => setEnabled.mutate({ id: plugin.id, isEnabled })}
+              onUninstall={() => uninstall.mutate(plugin.id)}
+              onUpdate={() => update.mutate(plugin.id)}
+            />
+          </div>
         ))}
 
         {data && data.installed.length === 0 && (
@@ -183,36 +222,45 @@ export function PluginsPage() {
           </Button>
         </Stack>
 
-        <Card padding="none">
-          <Stack>
-            {data?.marketplaces.map((marketplace) => (
-              <Stack
-                key={marketplace.name}
-                direction="row"
-                align="center"
-                justify="between"
-                gap="var(--spacing-sm)"
-                className={styles.marketplaceRow}
-              >
-                <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap minWidth={0}>
-                  <Typography variant="body-sm" weight="medium" as="span">
-                    {marketplace.name}
-                  </Typography>
-                  <Badge tone="neutral">{marketplace.source}</Badge>
+        {data && data.marketplaces.length === 0 && (
+          <Typography color="subtle">{t('plugins.noMarketplaces')}</Typography>
+        )}
+
+        {data && data.marketplaces.length > 0 && (
+          <Card padding="none">
+            <Stack>
+              {data.marketplaces.map((marketplace) => (
+                <Stack
+                  key={marketplace.name}
+                  direction="row"
+                  align="center"
+                  justify="between"
+                  gap="var(--spacing-sm)"
+                  className={styles.marketplaceRow}
+                >
+                  <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap minWidth={0}>
+                    <Typography variant="body-sm" weight="medium" as="span">
+                      {marketplace.name}
+                    </Typography>
+                    <Badge tone="neutral">{marketplace.source}</Badge>
+                  </Stack>
+                  {/*
+                    Удаление источника — не косметика: Claude Code вместе с ним
+                    убирает из установленных все его плагины, молча. Поэтому здесь
+                    тот же диалог с вводом имени, что у плагина, и в нём перечислено,
+                    что именно пропадёт.
+                  */}
+                  <DeleteButton
+                    entityName={marketplace.name}
+                    description={marketplaceDeleteText(marketplace.name)}
+                    onDelete={() => removeMarketplace.mutate(marketplace.name)}
+                    isPending={removeMarketplace.isPending}
+                  />
                 </Stack>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon={<Icon name="trash" size={20} />}
-                  aria-label={`${t('common.delete')}: ${marketplace.name}`}
-                  isLoading={removeMarketplace.isPending}
-                  onClick={() => removeMarketplace.mutate(marketplace.name)}
-                />
-              </Stack>
-            ))}
-          </Stack>
-        </Card>
+              ))}
+            </Stack>
+          </Card>
+        )}
       </Stack>
     </Stack>
   );

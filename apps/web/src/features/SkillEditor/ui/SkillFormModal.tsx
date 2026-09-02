@@ -10,6 +10,7 @@ import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { slugify } from '@shared/lib/slug';
 import { ResourceFileTree } from '@features/ResourceFiles';
 import { useResourceTemplates, useApplyTemplate } from '@entities/Resource';
+import { toErrorMessage } from '@shared/api/client';
 import { skillApi, useRenameSkill } from '@entities/Skill';
 import { SKILL_BODY_TEMPLATE_IDS, type SkillBodyTemplateId } from '../lib/skill-templates';
 import { primaryLabelKey } from './SkillFormModal.lib';
@@ -274,9 +275,10 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
             hint={t('skills.skillBodyHint')}
           />
 
+          {/* Причину — в форму: занятое имя объясняется здесь, а не только тостом. */}
           {(create.isError || update.isError) && (
             <Typography variant="body-sm" color="danger">
-              {t('errors.saveFailed')}
+              {toErrorMessage(create.error ?? update.error ?? t('errors.saveFailed'))}
             </Typography>
           )}
 

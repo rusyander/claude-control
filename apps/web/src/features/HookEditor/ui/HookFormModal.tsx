@@ -11,6 +11,7 @@ import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { BulkPresets } from '@shared/ui/bulk-presets';
+import { toErrorMessage } from '@shared/api/client';
 import { hookApi } from '@entities/Hook';
 import { HOOK_PRESETS, type HookPreset } from '../model/hookPresets';
 import { MatcherPicker } from './MatcherPicker';
@@ -34,6 +35,8 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
   const [message, setMessage] = useState('');
   const [guardPatterns, setGuardPatterns] = useState('');
   const [command, setCommand] = useState('');
+  // Таймаут в секундах, строкой: пусто — умолчание Claude Code.
+  const [timeoutSec, setTimeoutSec] = useState('');
   // Конструктор (одно) или набор заготовок сразу.
   const [mode, setMode] = useState<'constructor' | 'bulk'>('constructor');
 
@@ -50,6 +53,7 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
     setMessage('');
     setGuardPatterns('');
     setCommand(hook?.command ?? '');
+    setTimeoutSec(hook?.timeout === undefined ? '' : String(hook.timeout));
     setMode('constructor');
   }, [isOpen, hook]);
 
@@ -89,8 +93,10 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
   };
 
   const isPending = create.isPending || update.isPending;
+  const timeoutOk = timeoutSec.trim() === '' || /^[1-9]\d*$/.test(timeoutSec.trim());
   // Либо создаём файл по имени, либо задаём команду напрямую — что-то одно.
-  const canSave = (scriptName.trim().length > 0 || command.trim().length > 0) && !isPending;
+  const canSave =
+    (scriptName.trim().length > 0 || command.trim().length > 0) && timeoutOk && !isPending;
 
   const handleSave = (): void => {
     const draft = {
@@ -107,6 +113,8 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
         .map((pattern) => pattern.trim())
         .filter(Boolean),
       command: command.trim(),
+      // Таймаут раньше формой не передавался, и правка молча стирала его из файла.
+      timeout: timeoutSec.trim() === '' ? undefined : Number(timeoutSec.trim()),
     };
 
     const onDone = { onSuccess: () => onOpenChange(false) };
@@ -290,20 +298,47 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
               placeholder={t('hooks.descriptionPlaceholder')}
             />
 
-            <TemplateFields
-              template={template}
-              onTemplateChange={setTemplate}
-              message={message}
-              onMessageChange={setMessage}
-              guardPatterns={guardPatterns}
-              onGuardPatternsChange={setGuardPatterns}
-              command={command}
-              onCommandChange={setCommand}
+            {/* У существующего хука в файле лежит только команда — её и правим.
+                Раньше форма её прятала: шаблон сбрасывался на «подсказку», а поле
+                команды показывалось лишь у шаблона «команда». Шаблоны — только
+                когда просят создать новый файл (введено имя скрипта). */}
+            {hook && (
+              <TextField
+                label={t('hooks.command')}
+                value={command}
+                onChange={setCommand}
+                hint={t('hooks.commandHint')}
+                isMono
+              />
+            )}
+
+            <TextField
+              label={t('hooks.timeout')}
+              value={timeoutSec}
+              onChange={setTimeoutSec}
+              placeholder="60"
+              hint={t('hooks.timeoutHint')}
+              isMono
             />
 
+            {(!hook || scriptName.trim().length > 0) && (
+              <TemplateFields
+                template={template}
+                onTemplateChange={setTemplate}
+                message={message}
+                onMessageChange={setMessage}
+                guardPatterns={guardPatterns}
+                onGuardPatternsChange={setGuardPatterns}
+                command={command}
+                onCommandChange={setCommand}
+              />
+            )}
+
+            {/* Причину — в форму: тост с ней всплывает поверх кнопок и под
+                курсором, а общий «Не удалось сохранить» не говорит, что менять. */}
             {(create.isError || update.isError) && (
               <Typography variant="body-sm" color="danger">
-                {t('errors.saveFailed')}
+                {toErrorMessage(create.error ?? update.error ?? t('errors.saveFailed'))}
               </Typography>
             )}
           </Stack>

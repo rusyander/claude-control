@@ -23,6 +23,13 @@
 .head {
   padding: 0 var(--spacing-xs) var(--spacing-2xs);
   border-bottom: 1px solid var(--color-border-subtle);
+
+  // Шапки колонок несут абсолютные пути к файлам. Без min-width: 0 ячейка сетки
+  // растягивается под самый длинный путь, и два пути налезают друг на друга;
+  // с ним TruncatedText обрезает путь многоточием (полный — в подсказке).
+  > * {
+    min-width: 0;
+  }
 }
 
 .rows {

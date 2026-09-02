@@ -10,6 +10,7 @@ import { TabButton } from '@shared/ui/tab-button';
 import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { EmptyState } from '@shared/ui/empty-state';
+import { toErrorMessage } from '@shared/api/client';
 import { useTestsBoard } from '../model/useTestsBoard';
 import { ProjectTestRow } from './ProjectTestRow';
 import { ProjectTestCaseDialog } from './ProjectTestCaseDialog';
@@ -32,6 +33,7 @@ export function ProjectTestsModal({ isOpen, onOpenChange, projectPath }: Project
   const [scope, setScope] = useState('');
   const [isGroupOpen, setGroupOpen] = useState(false);
   const [groupId, setGroupId] = useState('');
+  const [groupError, setGroupError] = useState<string | undefined>();
   const [editing, setEditing] = useState<ProjectTestCase | undefined>();
   const [isCaseOpen, setCaseOpen] = useState(false);
   const [removingCase, setRemovingCase] = useState<ProjectTestCase | undefined>();
@@ -43,7 +45,15 @@ export function ProjectTestsModal({ isOpen, onOpenChange, projectPath }: Project
   };
 
   const addGroup = async (): Promise<void> => {
-    await board.addGroup(groupId.trim().toLowerCase());
+    setGroupError(undefined);
+    try {
+      await board.addGroup(groupId.trim().toLowerCase());
+    } catch (error) {
+      // Причина — под полем, а не только в тосте за модалкой: раньше отказ
+      // (400 на негодный id) уходил необработанным отклонением промиса.
+      setGroupError(toErrorMessage(error));
+      return;
+    }
     setGroupId('');
     setGroupOpen(false);
   };
@@ -182,7 +192,11 @@ export function ProjectTestsModal({ isOpen, onOpenChange, projectPath }: Project
           label={t('projectTests.groupId')}
           hint={t('projectTests.groupIdHint')}
           value={groupId}
-          onChange={setGroupId}
+          onChange={(next) => {
+            setGroupId(next);
+            setGroupError(undefined);
+          }}
+          error={groupError}
           autoFocus
           isMono
         />

@@ -89,6 +89,7 @@ export function ClaudeMdTopic() {
             tr('canOrder'),
             tr('canRevert'),
             tr('canFixParse'),
+            tr('canFollow'),
           ]}
           cant={[tr('cantProject'), tr('cantPreview'), tr('cantToggle'), tr('cantHistory')]}
         />

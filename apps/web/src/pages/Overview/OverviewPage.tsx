@@ -37,7 +37,8 @@ export function OverviewPage() {
 
       <ChangesSummary />
 
-      {isLoading && <SkeletonTiles count={7} />}
+      {/* Столько же, сколько плиток ниже: иначе сетка «прыгает» на восьмой. */}
+      {isLoading && <SkeletonTiles count={8} />}
 
       {overview && (
         <div className={styles.grid}>
@@ -133,10 +134,15 @@ export function OverviewPage() {
               overview.permissions.allow + overview.permissions.ask + overview.permissions.deny
             }
             // Раньше здесь стояло «119 / 7» — два числа без пояснения, гадать
-            // приходилось каждый раз. Подписываем.
-            hint={`${overview.permissions.allow} ${t(
-              'permissions.allow',
-            ).toLowerCase()} · ${overview.permissions.deny} ${t('permissions.deny').toLowerCase()}`}
+            // приходилось каждый раз. Подписываем; «спросить» показываем только
+            // когда такие правила есть, иначе сумма сверху не сходилась бы с подписью.
+            hint={[
+              `${overview.permissions.allow} ${t('permissions.allow').toLowerCase()}`,
+              ...(overview.permissions.ask > 0
+                ? [`${overview.permissions.ask} ${t('overview.permissionsAsk')}`]
+                : []),
+              `${overview.permissions.deny} ${t('permissions.deny').toLowerCase()}`,
+            ].join(' · ')}
             to="/permissions"
           />
           <StatTile
@@ -145,7 +151,7 @@ export function OverviewPage() {
             value={overview.groups.total}
             hint={
               overview.groups.total > 0
-                ? `${overview.groups.total} ${t('overview.groupsHint')}`
+                ? t('overview.groupsHint', { count: overview.groups.total })
                 : t('overview.groupsEmpty')
             }
             to="/groups"

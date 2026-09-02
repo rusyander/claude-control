@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
 import type { RemotePairing } from '@claude-control/contracts';
@@ -32,7 +32,7 @@ import styles from './RemoteAccessCard.module.scss';
  */
 export function RemoteAccessCard() {
   const { t } = useTranslation();
-  const { data: status } = useRemoteAccess();
+  const { data: status, isError, refetch } = useRemoteAccess();
   const update = useUpdateRemoteAccess();
   const rotate = useRotateRemoteToken();
   const forget = useForgetRemoteDevice();
@@ -40,8 +40,19 @@ export function RemoteAccessCard() {
 
   const [qr, setQr] = useState('');
   const [shown, setShown] = useState(false);
+  // Адрес набирают руками, а не переключают: PATCH на каждый символ отправлял
+  // «https», «https:», «https:/»… — десяток записей в state.json за одно слово
+  // и подставленный сервером промежуточный адрес в QR. Черновик живёт в поле,
+  // на диск уходит по Enter или когда поле теряет фокус.
+  const [urlDraft, setUrlDraft] = useState<string | undefined>(undefined);
+  const urlTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Синхронный замок на смену токена: два клика подряд приходят до того, как
+  // React перерисует кнопку заблокированной, и `isPending` их не разделяет.
+  const rotating = useRef(false);
 
   const address = status?.publicUrl || status?.detectedUrl || '';
+
+  useEffect(() => () => clearTimeout(urlTimer.current), []);
 
   // Код перерисовывается на смену токена или адреса: показанный старый увёл бы
   // телефон в панель, которой уже нет.
@@ -56,13 +67,74 @@ export function RemoteAccessCard() {
       .catch(() => setQr(''));
   }, [status, shown, address]);
 
-  if (!status) return null;
+  // Сервер не ответил — говорим об этом, а не прячем карточку целиком: раньше
+  // при ошибке она исчезала, и удалённый доступ казался просто отсутствующим.
+  if (isError) {
+    return (
+      <Card padding="md">
+        <Stack gap="var(--spacing-sm)">
+          <Typography variant="body" weight="medium">
+            {t('remote.title')}
+          </Typography>
+          <Typography variant="body-sm" color="danger">
+            {t('remote.loadError')}
+          </Typography>
+          <div>
+            <Button variant="secondary" size="sm" onClick={() => void refetch()}>
+              {t('settings.retry')}
+            </Button>
+          </div>
+        </Stack>
+      </Card>
+    );
+  }
+
+  // Пока состояние грузится, карточка стоит на месте с заголовком: исчезающая и
+  // появляющаяся карточка читалась как «удалённого доступа тут нет».
+  if (!status) {
+    return (
+      <Card padding="md">
+        <Stack gap="var(--spacing-sm)">
+          <Typography variant="body" weight="medium">
+            {t('remote.title')}
+          </Typography>
+          <Typography variant="body-sm" color="subtle">
+            {t('common.loading')}
+          </Typography>
+        </Stack>
+      </Card>
+    );
+  }
 
   const onRotate = (): void => {
+    if (rotating.current) return;
+    rotating.current = true;
     rotate.mutate(undefined, {
       onSuccess: () => toast.success(t('remote.tokenRotated')),
       onError: (error) => toast.error(toErrorMessage(error)),
+      onSettled: () => {
+        rotating.current = false;
+      },
     });
+  };
+
+  // Адрес уходит на диск сам через паузу после последнего символа, а по Enter
+  // или уходу из поля — сразу: кнопки «сохранить» у текстовых полей этой
+  // карточки нет, и ждать её никто не станет.
+  const saveUrl = (raw: string): void => {
+    clearTimeout(urlTimer.current);
+    const next = raw.trim();
+    if (next !== status.publicUrl) update.mutate({ publicUrl: next });
+  };
+  const commitUrl = (): void => {
+    if (urlDraft === undefined) return;
+    setUrlDraft(undefined);
+    saveUrl(urlDraft);
+  };
+  const onUrlChange = (raw: string): void => {
+    setUrlDraft(raw);
+    clearTimeout(urlTimer.current);
+    urlTimer.current = setTimeout(() => saveUrl(raw), 700);
   };
 
   return (
@@ -79,7 +151,7 @@ export function RemoteAccessCard() {
           )}
         </Stack>
 
-        <Typography variant="body-sm" color="subtle">
+        <Typography variant="body-sm" color="subtle" className="prose">
           {t('remote.explain')}
         </Typography>
 
@@ -109,10 +181,22 @@ export function RemoteAccessCard() {
           )}
           <input
             className={styles.input}
-            value={status.publicUrl}
+            value={urlDraft ?? status.publicUrl}
             placeholder={status.detectedUrl || 'https://…'}
-            onChange={(event) => update.mutate({ publicUrl: event.target.value })}
+            aria-label={t('remote.address')}
+            spellCheck={false}
+            onChange={(event) => onUrlChange(event.target.value)}
+            onBlur={commitUrl}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                commitUrl();
+              }
+            }}
           />
+          <Typography variant="caption" color="subtle">
+            {t('remote.addressHint')}
+          </Typography>
         </Stack>
 
         <Stack gap="var(--spacing-xs)">
@@ -126,14 +210,23 @@ export function RemoteAccessCard() {
             >
               {shown ? t('remote.hidePairing') : t('remote.showPairing')}
             </Button>
-            <Button variant="secondary" size="sm" isLoading={rotate.isPending} onClick={onRotate}>
+            {/* Второй клик во время смены токена выпускал второй токен: первый,
+                уже показанный на QR, становился недействительным до того, как
+                телефон его считал. */}
+            <Button
+              variant="secondary"
+              size="sm"
+              isLoading={rotate.isPending}
+              disabled={rotate.isPending}
+              onClick={onRotate}
+            >
               {t('remote.rotate')}
             </Button>
             <Button
               variant="secondary"
               size="sm"
               isLoading={test.isPending}
-              disabled={status.devices.length === 0}
+              disabled={test.isPending || status.devices.length === 0}
               onClick={() =>
                 test.mutate(undefined, {
                   onSuccess: (result) =>
@@ -193,6 +286,7 @@ export function RemoteAccessCard() {
                   variant="ghost"
                   size="sm"
                   isLoading={forget.isPending}
+                  disabled={forget.isPending}
                   onClick={() => forget.mutate(device.token)}
                 >
                   {t('remote.forget')}

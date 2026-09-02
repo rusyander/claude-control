@@ -11,7 +11,6 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { SelectField } from '@shared/ui/select-field';
-import { apiClient } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
 import {
   MODEL_OPTIONS,
@@ -33,6 +32,7 @@ import { BackupsCard } from './BackupsCard';
 import { EnvTransferCard } from './EnvTransferCard';
 import { SecretEncryptionCard } from './SecretEncryptionCard';
 import { SettingToggleRow } from './SettingToggleRow';
+import { SettingsLoadError } from './SettingsLoadError';
 import { NumberSettingRow } from './NumberSettingRow';
 import { ProviderSelectorCard } from './ProviderSelectorCard';
 import { ProviderCheckCard } from './ProviderCheckCard';
@@ -40,16 +40,31 @@ import { ProviderKeysCard } from './ProviderKeysCard';
 import { ModelCatalogCard } from './ModelCatalogCard';
 import { EndpointCard } from './EndpointCard';
 import { FormatCheckCard } from './FormatCheckCard';
+import { exportPanelState, importPanelState } from './model/transfer';
 import styles from './SettingsPage.module.scss';
 
 /** Настройки приложения: оформление, доступность, путь к конфигурации, безопасность правок. */
 export function SettingsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { data: settings } = useSettings();
+  const { data: settings, isError, refetch } = useSettings();
   const { data: modelCatalog } = useModelCatalog();
   const updateSettings = useUpdateSettings();
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Сервер не ответил — говорим об этом, а не крутим скелет без конца.
+  if (isError && !settings) {
+    return (
+      <Stack gap="var(--spacing-lg)" className={styles.page}>
+        <PageHeader
+          title={t('settings.title')}
+          subtitle={t('settings.subtitle')}
+          helpTopic="settings"
+        />
+        <SettingsLoadError onRetry={() => void refetch()} />
+      </Stack>
+    );
+  }
 
   if (!settings) return <SkeletonList rows={4} withActions={false} />;
 
@@ -84,24 +99,11 @@ export function SettingsPage() {
     label: contextLimitLabel(limit),
   }));
 
-  // Перенос настроек панели: снимок state.json скачивается файлом и вливается
-  // обратно на другой машине — раньше это делали только копированием руками.
-  const exportState = async (): Promise<void> => {
-    const { data } = await apiClient.get('/settings/export');
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'claude-control-settings.json';
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  const exportState = exportPanelState;
 
   const importState = async (file: File): Promise<void> => {
     try {
-      const parsed: unknown = JSON.parse(await file.text());
-      await apiClient.post('/settings/import', parsed);
-      await queryClient.invalidateQueries();
+      await importPanelState(file, queryClient);
       toast.success(t('settings.transferImported'));
     } catch {
       toast.error(t('settings.transferImportError'));
@@ -149,6 +151,7 @@ export function SettingsPage() {
               <Button
                 key={theme}
                 variant={settings.theme === theme ? 'primary' : 'secondary'}
+                aria-pressed={settings.theme === theme}
                 size="sm"
                 onClick={() => patch({ theme })}
               >
@@ -169,6 +172,7 @@ export function SettingsPage() {
               <Button
                 key={accent}
                 variant={settings.accent === accent ? 'primary' : 'secondary'}
+                aria-pressed={settings.accent === accent}
                 size="sm"
                 onClick={() => patch({ accent })}
               >
@@ -186,6 +190,7 @@ export function SettingsPage() {
               <Button
                 key={language}
                 variant={settings.language === language ? 'primary' : 'secondary'}
+                aria-pressed={settings.language === language}
                 size="sm"
                 onClick={() => patch({ language })}
               >

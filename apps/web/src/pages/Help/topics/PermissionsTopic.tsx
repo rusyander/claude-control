@@ -72,7 +72,9 @@ export function PermissionsTopic() {
             tr('canBulk'),
             tr('canMcp'),
             tr('canMove'),
+            tr('canToggle'),
             tr('canSee'),
+            tr('canShadow'),
             tr('canValidate'),
             tr('canAssistant'),
           ]}

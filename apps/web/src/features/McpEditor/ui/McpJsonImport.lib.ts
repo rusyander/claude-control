@@ -11,13 +11,17 @@ interface RawServer {
 }
 
 /**
- * Транспорт сервера: без url это всегда stdio, а при url поле type лишь
- * уточняет http против sse.
+ * Транспорт сервера: без url это всегда stdio, а при url поле type (в некоторых
+ * источниках — transport) лишь уточняет sse против http. Адрес без type — http:
+ * так же его прочитает сервер панели из ~/.claude.json (`readTransport` в
+ * domains/mcp.ts), и так его понимает сам Claude Code. Раньше импорт угадывал
+ * здесь sse, и предпросмотр показывал не тот транспорт, что получился бы у той
+ * же записи, положенной в файл руками.
  */
 function transportOf(raw: RawServer, hasUrl: boolean): McpServerDraft['transport'] {
   if (!hasUrl) return 'stdio';
-  if (raw.type === 'http') return 'http';
-  return 'sse';
+  if ((raw.type ?? raw.transport) === 'sse') return 'sse';
+  return 'http';
 }
 
 /**

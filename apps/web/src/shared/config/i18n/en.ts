@@ -7,6 +7,12 @@ export const en: TranslationSchema = {
 
   common: {
     appName: 'Claude Control',
+    loadError: 'Could not load this section',
+    loadErrorText: 'The server did not answer. Check that it is running and retry.',
+    retry: 'Retry',
+    notFoundTitle: 'No such page',
+    notFoundText: 'The link may be outdated. Open the overview and pick a section in the sidebar.',
+    notFoundHome: 'To the overview',
     collapseSidebar: 'Collapse the sidebar',
     expandSidebar: 'Expand the sidebar',
     save: 'Save',
@@ -93,7 +99,6 @@ export const en: TranslationSchema = {
     toLeft: 'Move into {{name}}',
     migrateDone: 'Entries moved: {{count}}',
     migrateNothing: 'There turned out to be nothing to move',
-    migrateError: 'The transfer failed',
     section: {
       mcp: 'MCP servers',
       env: 'Environment variables',
@@ -140,6 +145,7 @@ export const en: TranslationSchema = {
       permission: 'Permissions',
       env: 'Environment variables',
       instructions: 'Global instructions',
+      group: 'Groups',
     },
   },
   palette: {
@@ -197,7 +203,12 @@ export const en: TranslationSchema = {
     brokenHooks: 'hooks with a broken path',
     mcpFailed: 'servers not responding',
     unusedScripts: 'not bound to any event',
-    groupsHint: 'setting bundles',
+    // English has one/other only; few/many exist to mirror the Russian key set.
+    groupsHint_one: '{{count}} setting bundle',
+    groupsHint_few: '{{count}} setting bundles',
+    groupsHint_many: '{{count}} setting bundles',
+    groupsHint_other: '{{count}} setting bundles',
+    permissionsAsk: 'ask first',
     groupsEmpty: 'none yet',
     allScriptsUsed: 'all bound to hooks',
     backups: 'Backups',
@@ -238,6 +249,8 @@ export const en: TranslationSchema = {
     emptyTitle: 'No rules yet',
     emptyText:
       'The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above.',
+    noMatchTitle: 'Nothing found',
+    noMatchText: 'No rule title or body matches “{{query}}”.',
   },
   claudeMd: {
     title: 'CLAUDE.md',
@@ -257,6 +270,9 @@ export const en: TranslationSchema = {
     unsaved: 'unsaved changes',
     revert: 'Revert changes',
     saved: 'CLAUDE.md saved',
+    changedOnDisk:
+      'The file changed on disk while you were editing. Your edits are kept; “Save” will overwrite the newer file.',
+    loadFromDisk: 'Load from disk',
   },
   bulk: {
     modeSingle: 'One',
@@ -589,6 +605,13 @@ export const en: TranslationSchema = {
     code: 'Script code',
     used: 'In use',
     unused: 'Not bound',
+    test: 'Test',
+    summary: '{{total}} files · {{unused}} not bound to any event',
+    summaryAllUsed: '{{total}} files · all bound to hooks',
+    summaryNoHooks: '{{total}} files',
+    search: 'Search scripts',
+    searchPlaceholder: 'File name or description',
+    noMatches: 'Nothing found for “{{query}}”.',
     formHint: 'The file is saved to the hooks/ folder. A backup is made first.',
     deleteScript: 'The file will be removed from the hooks/ folder.',
     deleteUsedWarning:
@@ -604,6 +627,12 @@ export const en: TranslationSchema = {
     matcher: 'Matcher',
     command: 'Command',
     scriptMissing: 'Script file not found',
+    timeout: 'Timeout, seconds',
+    timeoutHint:
+      'How many seconds to wait for the script before cutting it off. Empty — the Claude Code default (60).',
+    emptyTitle: 'No hooks yet',
+    emptyText:
+      'settings.json has no hooks section. Add one with the button above — from a preset or the builder — or write it into the file by hand: the list updates on its own.',
     addHook: 'Add hook',
     moveUp: 'Move up in the event order',
     moveDown: 'Move down in the event order',
@@ -687,7 +716,15 @@ export const en: TranslationSchema = {
     explain:
       'A skill is a folder with a SKILL.md file. The description field decides when Claude applies it, so it must describe the situation precisely. A disabled skill moves to skills-disabled and becomes invisible.',
     addSkill: 'Create skill',
-    files: 'files',
+    files_one: '{{count}} file',
+    files_few: '{{count}} files',
+    files_many: '{{count}} files',
+    files_other: '{{count}} files',
+    emptyTitle: 'No skills yet',
+    emptyText:
+      'The skills/ folder has no folder with a SKILL.md. Create the first skill with the button above or drop a folder in by hand — the list updates on its own.',
+    noMatchTitle: 'Nothing found',
+    noMatchText: 'No skill name or description matches “{{query}}”.',
     newFile: 'New file',
     treeHint: 'Skill files — open, edit, create or delete them here',
     description: 'Description — when to apply',
@@ -1657,6 +1694,7 @@ export const en: TranslationSchema = {
     failed: 'Not responding',
     unknown: 'Not checked',
     tools: 'tools',
+    checkedAt: 'Checked: {{time}}',
     authorize: 'Authorize',
     authorized: 'Authorized',
     signOut: 'Sign out',
@@ -1674,6 +1712,8 @@ export const en: TranslationSchema = {
       'Understands both a {{"mcpServers": …}} wrapper and a plain servers object. Transport is detected automatically.',
     importFound: 'servers found',
     importAll: 'Add all ({{count}})',
+    importFailed:
+      'Added: {{added}}, failed: {{failed}}. Fix the entries below and retry — the added ones need no change',
     presetsTitle: 'Ready-made servers',
     presetsHint: 'Click one — the fields fill in. Then put in your own variable values and tokens.',
     serverName: 'Server name',
@@ -1684,7 +1724,8 @@ export const en: TranslationSchema = {
     argsHint: 'Space separated. Arguments containing spaces go in quotes',
     url: 'Address',
     env: 'Environment variables',
-    envHint: 'One KEY=VALUE per line. Do not put secrets here — they belong in .mcp-secrets.env',
+    envHint:
+      'One KEY=VALUE per line. Do not put secrets here — keep them in the Environment section and reference them as ${VAR}',
     headers: 'Request headers',
     headersHint:
       'One Name=value per line. Needed by servers behind auth: without them the check stops at 401',
@@ -1732,9 +1773,13 @@ export const en: TranslationSchema = {
     risk_medium: 'medium risk',
     risk_high: 'high risk',
     deletePermission:
-      'The rule is removed from settings.json. The tool returns to the default behaviour — confirmation on every call.',
+      'The rule is removed from {{file}}. The tool returns to the default behaviour — confirmation on every call.',
     moveToLocal: 'To local (settings.local.json)',
     moveToShared: 'To shared (settings.json)',
+    shadowed: 'Not in effect: overridden by “{{decision}}”',
+    formShadowed:
+      '“{{decision}}” already exists for {{pattern}} — it is stronger, so this rule would have no effect.',
+    formDuplicate: 'This rule already exists in this file.',
   },
   env: {
     title: 'Environment variables',
@@ -1756,6 +1801,12 @@ export const en: TranslationSchema = {
       'The variable will be removed from the file. Servers using it will stop receiving this value.',
     moveToLocal: 'To local (settings.local.json)',
     moveToShared: 'To shared (settings.json)',
+    file: 'File',
+    groupBadge: 'group: {{name}}',
+    sourceLocked: 'The file follows the record: the variable goes back where it came from.',
+    badKey:
+      'A variable name is Latin letters, digits and underscores, not starting with a digit: MY_TOKEN, not “my token”.',
+    alreadyExists: '{{key}} already exists in {{file}} — open it for editing instead of creating a second one.',
   },
   groups: {
     title: 'Groups',
@@ -1825,6 +1876,7 @@ export const en: TranslationSchema = {
       'Steps compile into a skill (skills/scenario-…): it becomes a member of the group and goes dark with it.',
   },
   credentials: {
+    loadError: 'Could not read the access state — the server did not answer.',
     title: 'Claude Code access',
     purpose:
       'Only sandboxes need this: they run Claude against a separate settings directory, which your normal login does not reach. Chat, plugins and MCP use your real directory and need nothing here.',
@@ -1884,6 +1936,11 @@ export const en: TranslationSchema = {
     claudeDirHint:
       'Detected automatically. Fill this in if the directory is non-standard or detection failed.',
     claudeDirPlaceholder: 'For example, ~/.claude or C:\\Users\\name\\.claude',
+    claudeDirReset: 'Auto-detect',
+    locationLoadError: 'Could not read the configuration location — the server did not answer.',
+    loadError: 'Could not load the settings',
+    loadErrorText: 'The server did not answer the settings request. Check that it is running and retry.',
+    retry: 'Retry',
     apply: 'Apply',
     accessibility: 'Accessibility',
     largeText: 'Large text',
@@ -2097,6 +2154,13 @@ export const en: TranslationSchema = {
     },
     scaffoldCreate: 'Create plugin',
     scaffoldDone: 'Plugin skeleton created',
+    installPathMissing: 'folder missing',
+    updatedAt: 'updated',
+    noMarketplaces: 'No marketplaces connected — add a source and its plugins appear in the catalogue',
+    deleteMarketplace:
+      'The marketplace will be disconnected. No installed plugin comes from it, so nothing else changes; the source can be added back at any time.',
+    deleteMarketplaceWithPlugins:
+      'Removing the marketplace makes Claude Code drop every plugin installed from it: {{names}}. Their commands and skills leave the palette; add the source back and reinstall to recover them.',
   },
   models: {
     title: 'Provider models',
@@ -2520,6 +2584,8 @@ export const en: TranslationSchema = {
     enableHint:
       'While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer.',
     address: 'Outside address',
+    addressHint: 'Saved on Enter or when the field loses focus.',
+    loadError: 'Could not read the remote access state — the server did not answer.',
     serveOn: 'tailscale serve is running',
     serveOff: 'tailscale serve is not running',
     noTailscale: 'Tailscale not found — there is no outside address. Run tools/tailscale-serve.mjs',
@@ -2544,7 +2610,8 @@ export const en: TranslationSchema = {
   projectConfig: {
     title: 'Projects — configuration',
     subtitle:
-      "A specific project's rules, permissions, hooks and MCP servers: its CLAUDE.md, .claude/settings.json and .mcp.json",
+      "A specific project's rules, permissions and MCP servers: its CLAUDE.md, .claude/settings.json and .mcp.json. " +
+      'Hooks, skills and rule files from .claude are shown read-only',
     addProject: 'Add project',
     explainTitle: 'What is this',
     explain:

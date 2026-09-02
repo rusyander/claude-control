@@ -1,8 +1,23 @@
 import type { EnvSource, EnvVar, EnvVarDraft } from '@claude-control/contracts';
+import { isSecretEnvKey } from '@claude-control/contracts/env-secret';
 import { apiClient } from '@shared/api/client';
 
-/** Похоже ли имя на секрет — по нему решаем, куда класть и маскировать ли. */
-export const looksSecret = (name: string): boolean => /(TOKEN|SECRET|KEY|PASSWORD|PAT)/i.test(name);
+/**
+ * Похоже ли имя на секрет — по нему форма решает, куда класть и маскировать ли.
+ * Правило ОДНО с сервером (contracts/env-secret): пока форма держала свою копию,
+ * списки слов расходились — CREDENTIAL знал только сервер, и такая переменная
+ * уезжала в settings.json открытым текстом, а в списке показывалась под маской.
+ */
+export const looksSecret = isSecretEnvKey;
+
+const ENV_FILE_NAMES: Partial<Record<EnvSource, string>> = {
+  settings: 'settings.json',
+  'settings-local': 'settings.local.json',
+  secrets: '.mcp-secrets.env',
+};
+
+/** Имя файла за источником — то, что человек видит в бейдже и в форме, а не слово из enum. */
+export const envFileName = (source: EnvSource): string => ENV_FILE_NAMES[source] ?? source;
 
 /**
  * Тело запроса на сохранение. Вынесено из компонента, потому что здесь лежит

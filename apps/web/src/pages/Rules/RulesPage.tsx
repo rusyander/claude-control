@@ -63,6 +63,9 @@ export function RulesPage() {
     );
   }, [rules, query]);
 
+  const isEmpty = !isLoading && filtered.length === 0;
+  const hasQuery = query.trim().length > 0;
+
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
       <PageHeader
@@ -135,12 +138,21 @@ export function RulesPage() {
         ))}
       </Stack>
 
-      {/* Пусто здесь означает две очень разные вещи, и серое «Пусто» их путало:
-          либо не совпал поиск, либо в CLAUDE.md нет ни одного заголовка
-          «## ПРАВИЛО:» — а он там и не обязан быть, панель считает правилами
-          только их (domains/rules.ts). Второй случай выглядит как поломка
+      {/* Пусто здесь означает две очень разные вещи, и одна заглушка на обе
+          путала: при промахе поиска страница уверяла, что «правил пока нет» и
+          звала добавить первое, хотя правила есть. Промах — своя заглушка с
+          запросом. Настоящая пустота — когда в CLAUDE.md нет ни одного
+          заголовка «## ПРАВИЛО:», а он там и не обязан быть: панель считает
+          правилами только их (domains/rules.ts). Это выглядит как поломка
           счётчика, поэтому объясняем прямо. */}
-      {!isLoading && filtered.length === 0 && (
+      {isEmpty && hasQuery && (
+        <EmptyState
+          icon="search"
+          title={t('rules.noMatchTitle')}
+          text={t('rules.noMatchText', { query: query.trim() })}
+        />
+      )}
+      {isEmpty && !hasQuery && (
         <EmptyState icon="rules" title={t('rules.emptyTitle')} text={t('rules.emptyText')} />
       )}
 

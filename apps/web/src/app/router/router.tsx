@@ -23,8 +23,10 @@ import { HelpPage } from '@pages/Help/HelpPage';
 import { SearchPage } from '@pages/Search/SearchPage';
 import { gated } from './gated';
 import { validateSearch } from './validateSearch';
+import { NotFoundPage } from './NotFoundPage';
 
-const rootRoute = createRootRoute({ component: MainLayout });
+// Свой «не найдено» внутри макета: дефолт роутера — голое английское «Not Found».
+const rootRoute = createRootRoute({ component: MainLayout, notFoundComponent: NotFoundPage });
 
 /** Маршруты объявлены кодом: страниц немного, генератор файловых роутов избыточен. */
 const routes = [

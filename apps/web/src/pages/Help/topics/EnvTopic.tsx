@@ -153,6 +153,9 @@ export function EnvTopic() {
           <Callout tone="info" title={tr('noteLocalTitle')}>
             {tr('noteLocalText')}
           </Callout>
+          <Callout tone="info" title={tr('noteGroupTitle')}>
+            {tr('noteGroupText')}
+          </Callout>
           <Callout tone="info" title={tr('noteRevealTitle')}>
             {tr('noteRevealText')}
           </Callout>

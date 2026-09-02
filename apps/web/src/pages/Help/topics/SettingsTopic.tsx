@@ -56,7 +56,7 @@ export function SettingsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('cardsTitle')}>
+      <HelpSection title={tr('cardsTitle')} caption={tr('cardsCaption')}>
         <OptionCards
           items={[
             { title: tr('cardAccount'), text: tr('cardAccountText') },

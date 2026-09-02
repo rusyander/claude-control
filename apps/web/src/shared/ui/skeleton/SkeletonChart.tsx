@@ -1,11 +1,13 @@
+import { useTranslation } from 'react-i18next';
 import { Skeleton } from './Skeleton';
 import type { SkeletonChartProps } from './skeleton.types';
 import styles from './skeleton.module.scss';
 
 /** Заглушка графика — прямоугольник в пропорциях будущей диаграммы. */
 export function SkeletonChart({ height = 220 }: SkeletonChartProps) {
+  const { t } = useTranslation();
   return (
-    <div className={styles.chart} style={{ height }} role="status" aria-label="Загрузка">
+    <div className={styles.chart} style={{ height }} role="status" aria-label={t('common.loading')}>
       {Array.from({ length: 16 }, (_, index) => (
         <Skeleton
           key={index}

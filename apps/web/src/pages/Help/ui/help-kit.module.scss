@@ -241,7 +241,8 @@
 
 .capabilities {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  // `min(…, 100%)`: на 375 px колонка уже минимума, и без него сетка вылезала за <main>.
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: var(--spacing-sm);
 }
 
@@ -301,7 +302,8 @@
 
 .optionGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(var(--option-min, 260px), 1fr));
+  // `min(…, 100%)`: карточки с minWidth 320 на телефоне (375 px) давали горизонтальный скролл.
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--option-min, 260px), 100%), 1fr));
   gap: var(--spacing-sm);
   align-items: stretch;
 

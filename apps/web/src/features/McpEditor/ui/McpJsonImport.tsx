@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toErrorMessage } from '@shared/api/client';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -10,6 +11,12 @@ import type { McpJsonImportProps } from './McpJsonImport.types';
 import { parseServers } from './McpJsonImport.lib';
 import { PLACEHOLDER } from './McpJsonImport.constants';
 import styles from './McpFormModal.module.scss';
+
+/** Сервер из пачки, которого записать не удалось, и причина словами сервера. */
+interface ImportFailure {
+  name: string;
+  message: string;
+}
 
 /**
  * Пакетное добавление MCP-серверов из JSON.
@@ -23,19 +30,40 @@ export function McpJsonImport({ onDone }: McpJsonImportProps) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [failures, setFailures] = useState<ImportFailure[]>([]);
+  const [addedCount, setAddedCount] = useState(0);
   const create = mcpServerApi.useCreate();
 
   const parsed = useMemo(() => parseServers(text), [text]);
 
   const importAll = async (): Promise<void> => {
     setIsCreating(true);
-    // По одному по порядку: конфиг MCP — общий файл, параллельная запись
-    // затирала бы одни серверы другими.
-    for (const draft of parsed.drafts) {
-      await create.mutateAsync(draft);
+    setFailures([]);
+    const failed: ImportFailure[] = [];
+    let added = 0;
+
+    try {
+      // По одному по порядку: конфиг MCP — общий файл, параллельная запись
+      // затирала бы одни серверы другими. Отказ одного (409 у тёзки, 400 у
+      // негодной записи) не останавливает остальных: раньше цикл обрывался на
+      // первом же, кнопка оставалась «в загрузке», а что успело записаться —
+      // было неизвестно.
+      for (const draft of parsed.drafts) {
+        try {
+          await create.mutateAsync(draft);
+          added += 1;
+        } catch (error) {
+          failed.push({ name: draft.name, message: toErrorMessage(error) });
+        }
+      }
+    } finally {
+      setIsCreating(false);
     }
-    setIsCreating(false);
-    onDone();
+
+    setAddedCount(added);
+    setFailures(failed);
+    // Есть отказы — окно остаётся открытым со списком причин; всё легло — закрываем.
+    if (failed.length === 0) onDone();
   };
 
   return (
@@ -47,7 +75,10 @@ export function McpJsonImport({ onDone }: McpJsonImportProps) {
         <textarea
           className={styles.jsonInput}
           value={text}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            setText(event.target.value);
+            setFailures([]);
+          }}
           placeholder={PLACEHOLDER}
           rows={12}
           spellCheck={false}
@@ -90,6 +121,19 @@ export function McpJsonImport({ onDone }: McpJsonImportProps) {
               </Stack>
             ))}
           </div>
+        </Stack>
+      )}
+
+      {failures.length > 0 && (
+        <Stack gap="var(--spacing-3xs)" role="alert">
+          <Typography variant="body-sm" color="danger">
+            {t('mcp.importFailed', { added: addedCount, failed: failures.length })}
+          </Typography>
+          {failures.map((failure) => (
+            <Typography key={failure.name} variant="caption" color="danger">
+              {failure.name}: {failure.message}
+            </Typography>
+          ))}
         </Stack>
       )}
 

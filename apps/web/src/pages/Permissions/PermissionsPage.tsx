@@ -17,7 +17,8 @@ import { ExplainBox } from '@shared/ui/explain-box';
 import { SearchField } from '@shared/ui/search-field';
 import { VirtualList } from '@shared/ui/virtual-list';
 import { TruncatedText } from '@shared/ui/truncated-text';
-import { permissionApi, useMovePermission, DECISION_TONE } from '@entities/Permission';
+import { Toggle } from '@shared/ui/toggle';
+import { permissionApi, useMovePermission, DECISION_TONE, shadowedBy } from '@entities/Permission';
 import { SystemPermissions } from './SystemPermissions';
 import styles from './PermissionsPage.module.scss';
 
@@ -33,7 +34,13 @@ export function PermissionsPage() {
 
   const { data: rules = [], isLoading } = permissionApi.useList();
   const deleteRule = permissionApi.useDelete();
+  const setEnabled = permissionApi.useSetEnabled();
   const moveRule = useMovePermission();
+
+  // Действует только то, что лежит в файле: выключенное право (вручную или
+  // группой) показывается в списке, но не перекрывает соседей и не считается
+  // системному разделу «настроенным».
+  const activeRules = useMemo(() => rules.filter((rule) => rule.isEnabled), [rules]);
 
   const openCreate = (pattern?: string): void => {
     setEditing(undefined);
@@ -56,6 +63,13 @@ export function PermissionsPage() {
     setIsFormOpen(open);
     if (!open) writeUrl(undefined);
   };
+
+  // Кем перекрыто каждое право: deny того же (или более широкого) шаблона
+  // гасит allow, и такая строка иначе врала бы зелёной плашкой.
+  const shadows = useMemo(
+    () => new Map(rules.map((rule) => [rule.id, shadowedBy(rule, activeRules)])),
+    [rules, activeRules],
+  );
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -101,7 +115,7 @@ export function PermissionsPage() {
       </Stack>
 
       {tab === 'system' && (
-        <SystemPermissions rules={rules} onEdit={openEdit} onCreate={openCreate} />
+        <SystemPermissions rules={activeRules} onEdit={openEdit} onCreate={openCreate} />
       )}
 
       {tab !== 'system' && (
@@ -151,6 +165,17 @@ export function PermissionsPage() {
                   <Badge tone={DECISION_TONE[rule.decision]} withDot>
                     {t(`permissions.${rule.decision}`)}
                   </Badge>
+                  {/* Выключенного права в файле нет — Claude Code его не применяет.
+                      Строка остаётся в списке, чтобы было видно, что погашено, и
+                      чем вернуть: тумблером ниже или тумблером группы. */}
+                  {!rule.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
+                  {shadows.get(rule.id) && (
+                    <Badge tone="neutral">
+                      {t('permissions.shadowed', {
+                        decision: t(`permissions.${shadows.get(rule.id)!.decision}`),
+                      })}
+                    </Badge>
+                  )}
                   <SourceBadge source={rule.source} />
                   {/* Перенос в противоположный файл: общий ↔ локальный. Направление
                       и подпись зависят от текущего источника права. */}
@@ -179,10 +204,22 @@ export function PermissionsPage() {
                   />
                   <DeleteButton
                     entityName={rule.pattern}
-                    description={t('permissions.deletePermission')}
+                    description={t('permissions.deletePermission', {
+                      file:
+                        rule.source === 'settings-local' ? 'settings.local.json' : 'settings.json',
+                    })}
                     onDelete={() => deleteRule.mutate(rule.id)}
                     isPending={deleteRule.isPending}
                   />
+                  {/* Тумблер только у общих записей, как у хуков: локальный файл
+                      панель правит лишь по явной просьбе (перенос, правка). */}
+                  {rule.source !== 'settings-local' && (
+                    <Toggle
+                      checked={rule.isEnabled}
+                      onCheckedChange={(isEnabled) => setEnabled.mutate({ id: rule.id, isEnabled })}
+                      aria-label={`${t(`permissions.${rule.decision}`)}: ${rule.pattern}`}
+                    />
+                  )}
                 </Stack>
               </Stack>
             )}

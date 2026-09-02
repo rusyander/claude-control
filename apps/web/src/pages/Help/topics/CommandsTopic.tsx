@@ -24,7 +24,7 @@ export function CommandsTopic() {
         <StorageCard
           title={tr('title')}
           rows={[
-            { label: tr('storageSkills'), value: '~/.claude/skills/<имя>/SKILL.md', isMono: true },
+            { label: tr('storageSkills'), value: '~/.claude/skills/<name>/SKILL.md', isMono: true },
             { label: tr('storageFiles'), value: '~/.claude/commands/**/*.md', isMono: true },
             { label: tr('storagePlugins'), value: '~/.claude/plugins/', isMono: true },
             { label: tr('storageBuiltin'), value: tr('storageBuiltinValue') },
@@ -73,9 +73,9 @@ export function CommandsTopic() {
           nameHeader={t('help.common.fieldName')}
           descriptionHeader={t('help.common.fieldPurpose')}
           rows={[
-            { name: '/имя-скилла', description: tr('sourceSkill'), badge: tr('badgeSkill') },
-            { name: '/папка:имя', description: tr('sourceCommand'), badge: tr('badgeCommand') },
-            { name: '/плагин:имя', description: tr('sourcePlugin'), badge: tr('badgePlugin') },
+            { name: '/skill-name', description: tr('sourceSkill'), badge: tr('badgeSkill') },
+            { name: '/folder:name', description: tr('sourceCommand'), badge: tr('badgeCommand') },
+            { name: '/plugin:name', description: tr('sourcePlugin'), badge: tr('badgePlugin') },
             {
               name: '/help, /clear, …',
               description: tr('sourceBuiltin'),

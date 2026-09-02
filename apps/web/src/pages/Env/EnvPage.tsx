@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { EnvVar } from '@claude-control/contracts';
-import { apiClient } from '@shared/api/client';
+import { apiClient, toErrorMessage } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
+import { toast } from '@shared/lib/toast';
 import { Stack } from '@shared/ui/stack';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
@@ -14,14 +15,53 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
-import { EnvFormModal } from '@features/EnvEditor';
+import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
+import { useSettings } from '@entities/AppConfig';
+import { useGroups } from '@entities/Group';
+import { EnvFormModal, envFileName } from '@features/EnvEditor';
 import { DeleteButton } from '@features/EntityDelete';
 import styles from './EnvPage.module.scss';
 
 /**
+ * Полное значение секрета — отдельным запросом. Тело читаем сырым текстом:
+ * обычный разбор axios пробует JSON.parse на любом теле, и чисто числовой
+ * секрет приезжал бы числом, а секрет вида `{"a":1}` — объектом.
+ */
+async function fetchRevealed(item: EnvVar): Promise<string> {
+  const { data } = await apiClient.get<unknown>('/env/reveal', {
+    params: { key: item.key, source: item.source },
+    transformResponse: [(raw: unknown) => raw],
+  });
+  return typeof data === 'string' ? data : String(data);
+}
+
+/**
+ * Бейдж источника. Локальный файл — общим бейджем с его объяснением; переменная
+ * включённой группы — именем группы: она лежит в settings.json, но её хозяин —
+ * группа, и правится она там (удалённую здесь группа вернула бы при следующем
+ * включении). Остальные — именем файла, а не словом из enum: человек ищет
+ * глазами settings.json, не «settings».
+ */
+function EnvSourceBadge({ item, groupName }: { item: EnvVar; groupName?: string }) {
+  const { t } = useTranslation();
+  if (item.source === 'settings-local') return <SourceBadge source="settings-local" />;
+  if (item.source === 'group') {
+    return (
+      <Badge tone="accent">{t('env.groupBadge', { name: groupName ?? item.groupId ?? '' })}</Badge>
+    );
+  }
+  return (
+    <Badge tone={item.source === 'secrets' ? 'warning' : 'neutral'}>
+      {envFileName(item.source)}
+    </Badge>
+  );
+}
+
+/**
  * Переменные окружения. Значения секретов приходят с сервера уже
- * замаскированными — полное значение запрашивается отдельно и только
- * по явному действию пользователя.
+ * замаскированными — полное значение запрашивается отдельно: по клику или,
+ * если так решено в настройках приложения («показывать секреты сразу»), при
+ * загрузке списка.
  */
 export function EnvPage() {
   const { t } = useTranslation();
@@ -29,21 +69,30 @@ export function EnvPage() {
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<EnvVar | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  // Имена групп для бейджа «группа: …»: в ответе /api/env есть только groupId.
+  const { data: groups = [] } = useGroups();
 
   const removeVar = useMutation({
     mutationFn: async (item: EnvVar) => {
-      await apiClient.delete('/env', { params: { key: item.key, source: item.source } });
+      const { data } = await apiClient.delete('/env', {
+        params: { key: item.key, source: item.source },
+      });
+      return data;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.env });
     },
+    meta: { successMessage: 'toasts.deleted' },
   });
 
   // Перенос переменной между settings.json и settings.local.json. Секреты из
   // .mcp-secrets.env так не переносятся — для них кнопки нет (см. ниже).
   const moveVar = useMutation({
     mutationFn: async (item: EnvVar) => {
-      await apiClient.post(`/env/${encodeURIComponent(item.key)}/move`, { source: item.source });
+      const { data } = await apiClient.post(`/env/${encodeURIComponent(item.key)}/move`, {
+        source: item.source,
+      });
+      return data;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.env });
@@ -59,8 +108,47 @@ export function EnvPage() {
     },
   });
 
+  // «Показывать секреты сразу» из настроек приложения: каждый секрет
+  // раскрывается один раз, когда впервые появился в списке. Один раз — чтобы
+  // кнопка «скрыть» по-прежнему работала, а не проигрывала эффекту.
+  const { data: appSettings } = useSettings();
+  const revealByDefault = appSettings?.revealSecretsByDefault ?? false;
+  const autoRevealed = useRef(new Set<string>());
+  useEffect(() => {
+    if (!revealByDefault) return;
+    const pending = vars.filter((item) => item.isSecret && !autoRevealed.current.has(item.id));
+    if (pending.length === 0) return;
+    for (const item of pending) autoRevealed.current.add(item.id);
+
+    void Promise.all(
+      pending.map(
+        async (item) => [item.id, await fetchRevealed(item).catch(() => undefined)] as const,
+      ),
+    ).then((pairs) => {
+      setRevealed((current) => {
+        const next = { ...current };
+        for (const [id, text] of pairs) if (text !== undefined) next[id] = text;
+        return next;
+      });
+    });
+  }, [revealByDefault, vars]);
+
+  // Ссылка /env?id=<источник:ключ> — так сюда приводит поиск — открывает
+  // переменную на правку; открытие дописывает id в адрес, закрытие снимает.
+  const writeUrl = useEntityUrlWriter();
+  const openEdit = (item: EnvVar): void => {
+    setEditing(item);
+    setIsFormOpen(true);
+    writeUrl(item.id);
+  };
+  const closeForm = (open: boolean): void => {
+    setIsFormOpen(open);
+    if (!open) writeUrl(undefined);
+  };
+  useEntityUrl<EnvVar>({ items: vars, getId: (item) => item.id, onOpen: openEdit });
+
   const reveal = async (item: EnvVar): Promise<void> => {
-    if (revealed[item.id]) {
+    if (revealed[item.id] !== undefined) {
       setRevealed((current) => {
         const next = { ...current };
         delete next[item.id];
@@ -69,10 +157,12 @@ export function EnvPage() {
       return;
     }
 
-    const { data } = await apiClient.get<string>('/env/reveal', {
-      params: { key: item.key, source: item.source },
-    });
-    setRevealed((current) => ({ ...current, [item.id]: data }));
+    try {
+      const text = await fetchRevealed(item);
+      setRevealed((current) => ({ ...current, [item.id]: text }));
+    } catch (error) {
+      toast.error(toErrorMessage(error));
+    }
   };
 
   return (
@@ -115,15 +205,10 @@ export function EnvPage() {
                   <Typography variant="mono" weight="medium" as="span">
                     {item.key}
                   </Typography>
-                  {/* Локальный источник показываем общим бейджем: у него своё
-                      объяснение, почему запись нельзя править. */}
-                  {item.source === 'settings-local' ? (
-                    <SourceBadge source="settings-local" />
-                  ) : (
-                    <Badge tone={item.source === 'secrets' ? 'warning' : 'neutral'}>
-                      {item.source}
-                    </Badge>
-                  )}
+                  <EnvSourceBadge
+                    item={item}
+                    groupName={groups.find((group) => group.id === item.groupId)?.name}
+                  />
                 </Stack>
 
                 <Typography variant="mono" color="subtle" as="span" truncate>
@@ -143,8 +228,12 @@ export function EnvPage() {
                     size="sm"
                     variant="ghost"
                     iconOnly
-                    icon={<Icon name={revealed[item.id] ? 'eyeOff' : 'eye'} size={24} />}
-                    aria-label={revealed[item.id] ? t('env.hideValue') : t('env.revealValue')}
+                    icon={
+                      <Icon name={revealed[item.id] !== undefined ? 'eyeOff' : 'eye'} size={24} />
+                    }
+                    aria-label={
+                      revealed[item.id] !== undefined ? t('env.hideValue') : t('env.revealValue')
+                    }
                     onClick={() => void reveal(item)}
                   />
                 )}
@@ -165,23 +254,27 @@ export function EnvPage() {
                     onClick={() => moveVar.mutate(item)}
                   />
                 )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  iconOnly
-                  icon={<Icon name="edit" size={24} />}
-                  aria-label={`${t('common.edit')}: ${item.key}`}
-                  onClick={() => {
-                    setEditing(item);
-                    setIsFormOpen(true);
-                  }}
-                />
-                <DeleteButton
-                  entityName={item.key}
-                  description={t('env.deleteVar')}
-                  onDelete={() => removeVar.mutate(item)}
-                  isPending={removeVar.isPending}
-                />
+                {/* Переменную группы здесь не правят и не удаляют: сервер такой
+                    черновик отвергает (400), а удалённую группа вернула бы при
+                    следующем включении. Её место — карточка группы. */}
+                {item.source !== 'group' && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      iconOnly
+                      icon={<Icon name="edit" size={24} />}
+                      aria-label={`${t('common.edit')}: ${item.key}`}
+                      onClick={() => openEdit(item)}
+                    />
+                    <DeleteButton
+                      entityName={item.key}
+                      description={t('env.deleteVar')}
+                      onDelete={() => removeVar.mutate(item)}
+                      isPending={removeVar.isPending}
+                    />
+                  </>
+                )}
               </Stack>
             </Stack>
           ))}
@@ -192,7 +285,7 @@ export function EnvPage() {
         <Typography color="subtle">{t('common.empty')}</Typography>
       )}
 
-      <EnvFormModal isOpen={isFormOpen} onOpenChange={setIsFormOpen} envVar={editing} />
+      <EnvFormModal isOpen={isFormOpen} onOpenChange={closeForm} envVar={editing} />
     </Stack>
   );
 }

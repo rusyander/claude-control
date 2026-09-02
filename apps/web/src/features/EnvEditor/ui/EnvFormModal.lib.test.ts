@@ -10,7 +10,7 @@ vi.mock('@shared/api/client', () => ({
 
 import { apiClient } from '@shared/api/client';
 import type { EnvVar } from '@claude-control/contracts';
-import { buildEnvDraft } from './EnvFormModal.lib';
+import { buildEnvDraft, envFileName, looksSecret } from './EnvFormModal.lib';
 
 /**
  * Правка секрета не должна стирать его значение.
@@ -156,5 +156,49 @@ describe('buildEnvDraft', () => {
     );
 
     expect(draft.comment).toBe('');
+  });
+});
+
+/**
+ * Аудит 2026-09-02: секрет определяется ЦЕЛЫМ словом и одним правилом с
+ * сервером. Своя копия регулярки у формы искала подстроку (PAT внутри PATH,
+ * TOKEN внутри TOKENS) и не знала CREDENTIAL — переменная с этим словом
+ * уезжала в settings.json открытым текстом, а в списке шла под маской.
+ */
+describe('looksSecret — общее правило с сервером', () => {
+  it('слово целиком между подчёркиваниями — секрет', () => {
+    for (const key of [
+      'GITLAB_PERSONAL_ACCESS_TOKEN',
+      'ANTHROPIC_API_KEY',
+      'GITHUB_PAT',
+      'DB_PASSWORD',
+      'CLIENT_SECRET',
+      'AWS_CREDENTIALS',
+      'gitlab_token',
+      'TOKEN',
+    ]) {
+      expect(looksSecret(key), key).toBe(true);
+    }
+  });
+
+  it('подстрока не считается: PATH — не PAT, TOKENS — не TOKEN', () => {
+    for (const key of [
+      'CLAUDE_CODE_GIT_BASH_PATH',
+      'MAX_THINKING_TOKENS',
+      'KEYBOARD_LAYOUT',
+      'API_ENDPOINT',
+      'PATTERN',
+    ]) {
+      expect(looksSecret(key), key).toBe(false);
+    }
+  });
+});
+
+describe('envFileName', () => {
+  it('источник показывается именем файла, а не словом из enum', () => {
+    expect(envFileName('settings')).toBe('settings.json');
+    expect(envFileName('settings-local')).toBe('settings.local.json');
+    expect(envFileName('secrets')).toBe('.mcp-secrets.env');
+    expect(envFileName('group')).toBe('group');
   });
 });

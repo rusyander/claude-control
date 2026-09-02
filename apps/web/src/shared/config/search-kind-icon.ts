@@ -18,4 +18,5 @@ export const KIND_ICON: Record<SearchResultKind, IconName> = {
   // Файл глобальных инструкций провайдера (AGENTS.md/GEMINI.md) — та же иконка,
   // что и у раздела инструкций в навигации.
   instructions: 'file',
+  group: 'groups',
 };

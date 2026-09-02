@@ -24,7 +24,7 @@ export function SkillsTopic() {
         <StorageCard
           title={tr('title')}
           rows={[
-            { label: tr('storageFolder'), value: '~/.claude/skills/<имя>/', isMono: true },
+            { label: tr('storageFolder'), value: '~/.claude/skills/<name>/', isMono: true },
             { label: tr('storageMain'), value: tr('storageMainValue') },
             { label: tr('storageDisabled'), value: '~/.claude/skills-disabled/', isMono: true },
             { label: tr('storageOff'), value: tr('storageOffValue') },

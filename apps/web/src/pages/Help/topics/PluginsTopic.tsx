@@ -127,6 +127,9 @@ export function PluginsTopic() {
           <Callout tone="warning" title={tr('noteCliTitle')}>
             {tr('noteCliText')}
           </Callout>
+          <Callout tone="warning" title={tr('noteMarketplaceTitle')}>
+            {tr('noteMarketplaceText')}
+          </Callout>
           <Callout tone="info" title={tr('noteSlowTitle')}>
             {tr('noteSlowText')}
           </Callout>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, LONG_TIMEOUTS } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
+import { formatDateTime } from '@shared/lib/format';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
@@ -23,7 +24,9 @@ import styles from './McpServerCard.module.scss';
  * Карточка MCP-сервера. Проверка связи по умолчанию запускается по кнопке, а не
  * при открытии страницы: поднять сервер стоит времени, а серверов может быть
  * много. Автопроверку при открытии включает настройка mcpAutoCheck (prop
- * `autoCheck`).
+ * `autoCheck`). До нажатия карточка показывает итог ПРОШЛОЙ проверки — его
+ * хранит сервер панели и присылает вместе с записью (`health`, `healthDetail`,
+ * `toolCount`, `checkedAt`); раньше F5 возвращал «не проверялся».
  */
 export function McpServerCard({
   server,
@@ -33,7 +36,7 @@ export function McpServerCard({
   isDeleting,
   autoCheck,
 }: McpServerCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [health, setHealth] = useState<HealthResult | null>(null);
   const [isChecking, setIsChecking] = useState(false);
@@ -49,15 +52,17 @@ export function McpServerCard({
   const checkHealth = async (): Promise<void> => {
     setIsChecking(true);
     try {
-      // Свой таймаут: серверный бюджет проверки сетевого сервера доходит до
-      // ~180 c (растёт вместе с настройкой «Таймаут сети MCP»), и общие 60 c
-      // рвали запрос раньше ответа.
+      // Свой таймаут: серверный бюджет проверки доходит до ~180 c (растёт вместе
+      // с настройкой «Таймаут сети MCP»), и общие 60 c рвали запрос раньше ответа.
       const { data } = await apiClient.post<HealthResult>(
         `/mcp/${encodeURIComponent(server.id)}/health`,
         undefined,
         { timeout: LONG_TIMEOUTS.mcpHealth },
       );
       setHealth(data);
+      // Итог сохранён на сервере — список перечитываем, чтобы он (и обзор)
+      // показывали то же, что карточка.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mcp });
     } catch (error) {
       // Без этого отказ терялся: кнопка переставала крутиться, и на карточке
       // не появлялось ни статуса, ни причины.
@@ -122,7 +127,13 @@ export function McpServerCard({
     });
   };
 
-  const status = health?.health ?? server.health;
+  // Свежий ответ кнопки побеждает; без него — итог прошлой проверки из записи.
+  const shown: HealthResult = health ?? {
+    health: server.health,
+    detail: server.healthDetail,
+    toolCount: server.toolCount,
+    checkedAt: server.checkedAt,
+  };
 
   return (
     <>
@@ -141,13 +152,13 @@ export function McpServerCard({
                 {server.name}
               </Typography>
               <Badge tone="neutral">{server.transport}</Badge>
-              {status === 'connected' && (
+              {shown.health === 'connected' && (
                 <Badge tone="success" withDot>
                   {t('mcp.connected')}
-                  {health?.toolCount !== undefined && `: ${health.toolCount} ${t('mcp.tools')}`}
+                  {shown.toolCount !== undefined && `: ${shown.toolCount} ${t('mcp.tools')}`}
                 </Badge>
               )}
-              {status === 'failed' && (
+              {shown.health === 'failed' && (
                 <Badge tone="danger" withDot>
                   {t('mcp.failed')}
                 </Badge>
@@ -162,9 +173,15 @@ export function McpServerCard({
                 : (server.url ?? '')}
             </Typography>
 
-            {health?.detail && (
+            {shown.detail && (
               <Typography variant="caption" color="danger">
-                {health.detail}
+                {shown.detail}
+              </Typography>
+            )}
+
+            {shown.checkedAt && server.isEnabled && (
+              <Typography variant="caption" color="subtle">
+                {t('mcp.checkedAt', { time: formatDateTime(shown.checkedAt, i18n.language) })}
               </Typography>
             )}
 
@@ -245,7 +262,7 @@ export function McpServerCard({
             <Toggle
               checked={server.isEnabled}
               onCheckedChange={onToggle}
-              aria-label={server.name}
+              aria-label={`${t('common.enabled')}: ${server.name}`}
             />
           </Stack>
         </Stack>

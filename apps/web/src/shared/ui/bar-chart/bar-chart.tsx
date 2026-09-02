@@ -14,7 +14,7 @@ import type { BarChartProps } from './bar-chart.types';
  * Длинный хвост по умолчанию свёрнут в одну строку, но раскрывается целиком:
  * прятать данные насовсем нельзя, а показывать сотню строк сразу — бесполезно.
  */
-export function BarChart({ items, limit = 8, otherLabel, onItemClick }: BarChartProps) {
+export function BarChart({ items, limit = 8, otherLabel, formatValue, onItemClick }: BarChartProps) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -22,14 +22,17 @@ export function BarChart({ items, limit = 8, otherLabel, onItemClick }: BarChart
   const visible = isExpanded ? items : items.slice(0, limit);
   const rest = isExpanded ? [] : items.slice(limit);
 
+  // Строка «Прочее» — сумма хвоста в единицах колонки: число свёрнутых строк
+  // и так стоит на кнопке «Показать все», а колонка значений одна на всех.
+  const restValue = rest.reduce((sum, item) => sum + item.value, 0);
   const rows = rest.length
     ? [
         ...visible,
         {
           id: '__other__',
           label: restLabel,
-          value: rest.reduce((sum, item) => sum + item.value, 0),
-          valueLabel: `${rest.length}`,
+          value: restValue,
+          valueLabel: formatValue ? formatValue(restValue) : String(restValue),
           seriesIndex: 0,
         },
       ]

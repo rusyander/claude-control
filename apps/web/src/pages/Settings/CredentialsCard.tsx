@@ -80,14 +80,24 @@ export function CredentialsCard() {
           <Typography variant="body" weight="medium" as="span">
             {t('credentials.title')}
           </Typography>
-          <Badge tone={TONE[source]} withDot>
-            {t(`credentials.source_${source}`)}
-          </Badge>
+          {/* При ошибке запроса бейдж молчит: «не найден» там был бы неправдой —
+              мы просто не знаем. */}
+          {!status.isError && (
+            <Badge tone={TONE[source]} withDot>
+              {t(`credentials.source_${source}`)}
+            </Badge>
+          )}
         </Stack>
 
         <Typography variant="caption" color="subtle" className="prose">
           {t('credentials.purpose')}
         </Typography>
+
+        {status.isError && (
+          <Typography variant="body-sm" color="danger" className="prose">
+            {t('credentials.loadError')}
+          </Typography>
+        )}
 
         {status.data?.reason && (
           <Typography variant="body-sm" color="warning" className="prose">

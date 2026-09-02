@@ -8,6 +8,7 @@ import { Typography } from '@shared/ui/typography';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { Card } from '@shared/ui/card';
 import { BulkPresets } from '@shared/ui/bulk-presets';
+import { toErrorMessage } from '@shared/api/client';
 import { useSaveScript, useScriptContent } from '@entities/Script';
 import { useIsCapabilityReady } from '@entities/Provider';
 import { scriptTemplatesFor, newScriptTemplateFor } from '../model/ScriptTemplate';
@@ -180,9 +181,12 @@ export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModa
               placeholder={loaded.isLoading ? t('common.loading') : ''}
             />
 
+            {/* Причина — из ответа сервера (занятое имя, недопустимый путь):
+                тост с ней всплывает под курсором над кнопками и от наведения
+                замирает, поэтому текст стоит и здесь, в форме. */}
             {save.isError && (
               <Typography variant="body-sm" color="danger">
-                {t('errors.saveFailed')}
+                {toErrorMessage(save.error ?? t('errors.saveFailed'))}
               </Typography>
             )}
           </Stack>

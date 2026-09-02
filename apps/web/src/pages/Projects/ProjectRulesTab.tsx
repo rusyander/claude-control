@@ -6,6 +6,7 @@ import { Card } from '@shared/ui/card';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { SkeletonList } from '@shared/ui/skeleton';
+import { sameText } from '@shared/lib/same-text';
 import { useProjectRules, useUpdateProjectRules } from '@entities/Project';
 import type { ProjectTabProps } from './ProjectRulesTab.types';
 import styles from './ProjectsPage.module.scss';
@@ -31,7 +32,10 @@ export function ProjectRulesTab({ projectId }: ProjectTabProps) {
 
   if (isLoading || value === undefined) return <SkeletonList rows={6} withActions={false} />;
 
-  const dirty = value !== data;
+  // Без учёта переносов: textarea отдаёт LF, файл на Windows — CRLF, и после
+  // сохранения GET приносит CRLF обратно — строгое сравнение держало бы
+  // «несохранённые правки» вечно.
+  const dirty = !sameText(value, data ?? '');
 
   return (
     <Card padding="md">

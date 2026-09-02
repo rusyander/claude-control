@@ -157,14 +157,25 @@ export function isProviderScopedKey(key: readonly unknown[]): boolean {
 
 /** Какие ключи обновлять при изменении конкретного домена на диске. */
 export const DOMAIN_KEYS: Record<string, readonly (readonly string[])[]> = {
-  // История зависит от резервных копий, а копия создаётся при любой записи в
-  // конфиг, — поэтому лента обновляется вместе с каждым файловым доменом.
-  rules: [queryKeys.rules, queryKeys.overview, queryKeys.history],
-  hooks: [queryKeys.hooks, queryKeys.overview, queryKeys.history],
-  skills: [queryKeys.skills, queryKeys.overview],
-  mcp: [queryKeys.mcp, queryKeys.overview, queryKeys.history],
-  permissions: [queryKeys.permissions, queryKeys.overview, queryKeys.history],
-  env: [queryKeys.env, queryKeys.history],
+  // История и список копий зависят от резервных копий, а копия создаётся при
+  // любой записи в конфиг, — поэтому оба обновляются вместе с каждым файловым
+  // доменом. Без `backups` плитка копий на обзоре стояла на вчерашней дате,
+  // пока соседняя карточка изменений уже показывала новую правку.
+  // Сырой файл открыт на странице CLAUDE.md: без этого ключа правка мимо панели
+  // (или из раздела «Правила» в соседней вкладке) до неё не доходила.
+  rules: [
+    queryKeys.rules,
+    queryKeys.claudeMd,
+    queryKeys.overview,
+    queryKeys.history,
+    queryKeys.backups,
+  ],
+  hooks: [queryKeys.hooks, queryKeys.overview, queryKeys.history, queryKeys.backups],
+  // У скиллов ленты истории нет (копия — папка целиком), а копия есть.
+  skills: [queryKeys.skills, queryKeys.overview, queryKeys.backups],
+  mcp: [queryKeys.mcp, queryKeys.overview, queryKeys.history, queryKeys.backups],
+  permissions: [queryKeys.permissions, queryKeys.overview, queryKeys.history, queryKeys.backups],
+  env: [queryKeys.env, queryKeys.history, queryKeys.backups],
   overview: [queryKeys.overview],
   // Транскриптов здесь намеренно нет: разговоров сотни, и правка одного не
   // повод перечитывать открытый — обновление идёт адресно, по пути из события

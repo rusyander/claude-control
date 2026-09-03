@@ -714,15 +714,23 @@ export const helpEn: HelpSchema = {
       autoApproveTitle: 'Auto-approving permissions',
       autoApproveText:
         'The second toggle in the chat header — «Permissions auto» — takes the routine ' +
-        'away: a safe request is approved by the panel itself, and no ' +
-        '«Allow/Deny» card appears. What still asks: git writes (commit, push, merge, ' +
-        'reset), deleting and overwriting files, migrations and database queries, ' +
-        'deployment, MCP writes (issue, MR, wiki page) — and anything covered by your ' +
-        'own ask and deny rules from settings.json. An unclear case goes to a human ' +
-        'too: a command the panel could not parse counts as dangerous. With edits ' +
-        'switched off, file edits stay yours even when auto-approval is on. The ' +
-        'toggle takes effect immediately, mid-run included, and its position is ' +
-        'remembered.',
+        'away: a reversible request is approved by the panel itself, and no ' +
+        '«Allow/Deny» card appears. The border is irreversibility, not «writing»: a ' +
+        'commit, a push, a branch, moving a file, restarting a process and an API ' +
+        'call go to the agent, because there is something to undo them with. What ' +
+        'still asks is what leaves nothing to roll back to: deleting files (rm, ' +
+        'Remove-Item), wiping work and history (git reset --hard, clean, restore, ' +
+        'force push, deleting a branch), tearing down data (DROP, TRUNCATE, DELETE ' +
+        'FROM, rolling migrations back), tearing down containers and infrastructure ' +
+        '(docker rm and prune, kubectl delete, helm uninstall, terraform destroy), ' +
+        'publishing to someone else’s registry (npm publish), deleting and merging ' +
+        'on a repository host, shutting the machine down — and deleting MCP calls. ' +
+        'On top of that your own ask and deny rules from settings.json still ask: ' +
+        'where you wrote «ask me», the toggle does not decide for you. An unclear ' +
+        'case goes to a human too: a command the panel could not parse counts as ' +
+        'irreversible. With edits switched off, file edits stay yours even when ' +
+        'auto-approval is on. The toggle takes effect immediately, mid-run included, ' +
+        'its position is remembered, and split chats inherit it from the parent.',
 
       historyTitle: 'How a conversation continues',
       historyCaption:

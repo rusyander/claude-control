@@ -536,7 +536,7 @@ export const en: TranslationSchema = {
     autoApproveOn: 'Permissions auto',
     autoApproveOff: 'Permissions manual',
     autoApproveHint:
-      'The panel approves safe requests itself. Git writes (commit, push, merge), deletions, migrations, MCP writes and anything covered by ask/deny rules from settings.json still ask.',
+      'The panel itself approves anything that can be undone — commit, push, branch, moving a file, an API call. What still asks is the irreversible: deleting, wiping history, tearing down data and infrastructure, publishing — plus anything covered by ask/deny rules from settings.json.',
     retry: 'Retry',
     continueAfterDrop:
       'Continue from where you stopped: the connection dropped and the last answer may be unfinished. Do not redo what is already done.',

@@ -2,15 +2,25 @@
  * Автоподтверждение прав в чате.
  *
  * Тумблер в шапке чата снимает с человека рутину: запрос агента на инструмент
- * разрешается сам, и карточка «Разрешить/Запретить» не появляется. Но не любой:
- * решение остаётся за человеком там, где ошибка необратима — записи в git
- * (push/commit/merge), удаление, миграции и прочее «и всякое такое», — а также
- * везде, где сам пользователь просил спрашивать, то есть в правилах `ask`/`deny`
- * из settings.json.
+ * разрешается сам, и карточка «Разрешить/Запретить» не появляется.
  *
- * Логика намеренно осторожная: непонятный случай (нет команды, незнакомая форма
- * ввода, инструмент под правилом) считается опасным и уходит человеку. Ложное
- * «спросить» стоит одного клика, ложное «разрешить» — потерянной работы.
+ * ГРАНИЦА — БЕЗВОЗВРАТНОСТЬ, а не «запись» (решение владельца, 03.09.2026;
+ * заменяет прежнюю осторожную границу). Прежний список считал опасной любую
+ * запись: коммит, пуш, перенос файла, `kill`, `ssh`, POST-запрос, любой
+ * MCP-инструмент с глаголом записи, — и агент вставал по десятку раз за прогон
+ * на том, что человек всё равно разрешал. «Ложное спросить стоит одного клика»
+ * оказалось неправдой: пока клика нет, работа СТОИТ, а человек в этот момент
+ * смотрит в другую вкладку — ради чего разделение и заводили. Поэтому спрашиваем
+ * ровно там, где отменить сделанное нечем: удаление, затирание истории, снос
+ * данных и инфраструктуры, публикация в чужой реестр. Коммит, ветка, пуш,
+ * перенос, перезапуск процесса, запрос к API — уходят агенту.
+ *
+ * Два предохранителя сверх этого не тронуты: правила `ask`/`deny` из
+ * settings.json (человек сам сказал «спрашивай» — здесь это перевешивает всё) и
+ * выключенный тумблер правок, который значит «только чтение».
+ *
+ * Непонятный случай (нет команды, незнакомая форма ввода) по-прежнему уходит
+ * человеку: гадать, что именно исполнится, нельзя.
  *
  * Права `deny` сюда обычно не доходят (их Claude Code режет сам, не спрашивая),
  * но в список охраняемых они всё равно входят: страховка ничего не стоит.
@@ -32,51 +42,64 @@ export interface AutoApproveInput {
 const EDIT_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 
 /**
- * Инструмент MCP, меняющий что-то на той стороне (issue, MR, страница вики).
- * Имена у серверов разные, поэтому смотрим на глагол в названии.
+ * Инструмент MCP, который на той стороне что-то СНОСИТ. Имена у серверов разные,
+ * поэтому смотрим на глагол в названии. Создать задачу, написать комментарий,
+ * повесить метку — обычная работа: это правится там же, где сделано. Удаление
+ * страницы и слияние запроса правится уже не отсюда.
  */
-const MCP_WRITE =
-  /(create|update|edit|delete|remove|write|push|merge|commit|comment|post|send|upload|attach|add|set|move|transition|assign|close|approve|rename|archive|publish)/i;
+const MCP_DESTRUCTIVE = /(delete|remove|destroy|purge|drop|merge|unpublish|revoke)/i;
 
 /**
- * Опасные команды оболочки. Проверяются по каждому звену конвейера, поэтому
- * `ls && git push` не проскочит из-за безобидного начала.
+ * Безвозвратные команды оболочки. Проверяются по каждому звену конвейера,
+ * поэтому `ls && rm -rf dist` не проскочит из-за безобидного начала.
  */
-const DANGEROUS_SEGMENT: RegExp[] = [
-  // Записи в git: коммит, пуш, слияние, перенос и переписывание истории.
-  /\bgit\s+(push|commit|merge|rebase|reset|revert|checkout|switch|branch|tag|cherry-pick|stash|clean|am|apply|remote|submodule|filter-branch|gc|prune|restore|worktree)\b/i,
-  // Удаление и перезапись на диске.
-  /\b(rm|rmdir|unlink|shred|truncate|mv|dd|mkfs|diskpart)\b/i,
-  /(^|[\s(])(del|rd|erase|move|Remove-Item|Clear-Content)\b/i,
-  // Права, владение, процессы, питание машины.
-  /\b(sudo|doas|runas|chmod|chown|chattr|icacls|attrib|takeown)\b/i,
-  /\b(kill|killall|pkill|taskkill|shutdown|reboot|halt)\b/i,
-  /\breg\s+(add|delete|import)\b/i,
-  // Публикация пакетов и вход по токену.
-  /\b(npm|pnpm|yarn|bun)\s+(publish|unpublish|deprecate|login|adduser|token)\b/i,
-  // Хостинги репозиториев: всё, что не чтение, — через человека.
-  /\b(gh|glab)\s+(pr|mr|issue|release|repo|api|workflow|run|label|variable|secret|auth)\b/i,
-  // Контейнеры, кластер, инфраструктура.
-  /\b(docker|podman)\s+(rm|rmi|prune|kill|stop|system|push)\b/i,
-  /\bdocker-compose\s+(down|rm)\b/i,
-  /\bkubectl\s+(delete|apply|scale|rollout|drain|cordon|patch|edit|exec|create)\b/i,
-  /\b(terraform|tofu|pulumi)\s+(apply|destroy|import)\b/i,
+const IRREVERSIBLE_SEGMENT: RegExp[] = [
+  // Удаление и затирание на диске. Слева требуем начало звена или пробел, а не
+  // просто границу слова: иначе `docker run --rm` — стандартный одноразовый
+  // запуск — читается как `rm` и останавливает прогон на ровном месте.
+  /(^|[\s(])(rm|rmdir|unlink|shred|truncate|dd|mkfs|diskpart)\b/i,
+  /(^|[\s(])(del|rd|erase|Remove-Item|Clear-Content)\b/i,
+  /\breg\s+delete\b/i,
+  // Git — только то, что стирает работу или историю. Коммит, ветка, пуш, перенос
+  // и перебазирование здесь не значатся: они восстанавливаются из reflog и с
+  // удалённого, а стоят агенту остановки на каждом шаге.
+  /\bgit\s+(clean|filter-branch)\b/i,
+  /\bgit\s+reset\b[^\n]*--hard\b/i,
+  /\bgit\s+restore\b/i,
+  /\bgit\s+checkout\s+--\s/i,
+  /\bgit\s+(branch|tag)\b[^\n]*\s(-D|-d|--delete)\b/i,
+  /\bgit\s+stash\s+(drop|clear)\b/i,
+  /\bgit\s+worktree\s+(remove|prune)\b/i,
+  /\bgit\s+reflog\s+(expire|delete)\b/i,
   // База данных: схема и данные.
-  /\b(drop|truncate|alter\s+table|grant|revoke)\b/i,
+  /\b(drop|truncate)\b/i,
   /\bdelete\s+from\b/i,
-  /\b(migrate|migration)\b.*\b(up|down|deploy|reset|fresh)\b/i,
-  /\bprisma\s+(migrate|db)\b/i,
-  // Сеть с записью и удалённые хосты.
-  /\bcurl\b[^\n]*\s-X\s*['"]?(POST|PUT|PATCH|DELETE)/i,
-  /\b(ssh|scp|sftp|rsync)\b/i,
+  /\b(migrate|migration)\b.*\b(down|reset|fresh)\b/i,
+  /\bprisma\s+migrate\s+reset\b/i,
+  // Контейнеры, кластер, инфраструктура — снос, а не запуск. Подкоманда идёт
+  // сразу за именем: `docker run --rm` тем же `rm` не является.
+  /\b(docker|podman)\s+(rm|rmi|prune)\b/i,
+  /\b(docker|podman)\s+(system|image|volume|container|network)\s+(prune|rm)\b/i,
+  /\bdocker-compose\s+down\b[^\n]*\s-v\b/i,
+  /\bkubectl\s+delete\b/i,
+  /\bhelm\s+(delete|uninstall)\b/i,
+  /\b(terraform|tofu|pulumi)\s+destroy\b/i,
+  // Публикация в чужой реестр: снять её уже не отсюда.
+  /\b(npm|pnpm|yarn|bun)\s+(publish|unpublish|deprecate)\b/i,
+  // Хостинги репозиториев: удаление и слияние. Остальное — обычная работа.
+  /\b(gh|glab)\s+[a-z-]+\s+(delete|merge)\b/i,
+  // Удаление по сети и остановка машины.
+  /\bcurl\b[^\n]*\s-X\s*['"]?DELETE/i,
+  /\b(shutdown|reboot|halt)\b/i,
 ];
 
 /** Проверяется по команде целиком: конвейер сам по себе и есть признак. */
-const DANGEROUS_WHOLE: RegExp[] = [
-  // Скачал и сразу исполнил.
+const IRREVERSIBLE_WHOLE: RegExp[] = [
+  // Скачал и сразу исполнил. Не удаление, но и не то, что подтверждают молча:
+  // что именно исполнится, до запуска не знает никто.
   /\b(curl|wget|iwr|Invoke-WebRequest)\b[^\n]*\|\s*(sudo\s+)?(ba|z|fi)?sh\b/i,
-  // Принудительный пуш в любой записи (`git push --force`, `-f`).
-  /\bgit\s+push\b[^\n]*(--force|-f)\b/i,
+  // Принудительный пуш: чужая работа исчезает из ветки.
+  /\bgit\s+push\b[^\n]*(--force|--force-with-lease|-f)\b/i,
 ];
 
 /** Команда оболочки из ввода инструмента Bash; undefined — форма незнакомая. */
@@ -94,9 +117,11 @@ function segments(command: string): string[] {
     .filter(Boolean);
 }
 
-function isDangerousCommand(command: string): boolean {
-  if (DANGEROUS_WHOLE.some((rule) => rule.test(command))) return true;
-  return segments(command).some((segment) => DANGEROUS_SEGMENT.some((rule) => rule.test(segment)));
+function isIrreversibleCommand(command: string): boolean {
+  if (IRREVERSIBLE_WHOLE.some((rule) => rule.test(command))) return true;
+  return segments(command).some((segment) =>
+    IRREVERSIBLE_SEGMENT.some((rule) => rule.test(segment)),
+  );
 }
 
 /** Паттерн `Tool(spec)` → части; без скобок spec отсутствует. */
@@ -167,13 +192,13 @@ export function shouldAutoApprove(request: AutoApproveInput): boolean {
   // Правки файлов при выключенном тумблере правок — только руками.
   if (!allowEdits && EDIT_TOOLS.has(toolName)) return false;
 
-  // Записи через MCP (issue, MR, страница) — всегда через человека.
-  if (toolName.startsWith('mcp__') && MCP_WRITE.test(toolName)) return false;
+  // Сносящее через MCP (удалить страницу, слить запрос) — через человека.
+  if (toolName.startsWith('mcp__') && MCP_DESTRUCTIVE.test(toolName)) return false;
 
   if (toolName === 'Bash') {
     const command = bashCommand(input);
     if (command === undefined) return false;
-    if (isDangerousCommand(command)) return false;
+    if (isIrreversibleCommand(command)) return false;
   }
 
   return !guardedPatterns.some((pattern) => matchesRule(pattern, toolName, input));

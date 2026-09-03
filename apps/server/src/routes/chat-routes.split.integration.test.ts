@@ -22,7 +22,14 @@ describe('POST /api/chat/split', () => {
   let store: AppStore;
   let registry: ChatRunRegistry;
   let session: ChatSession;
-  let started: { chatId: string; prompt: string; cwd: string; appendSystemPrompt?: string }[];
+  let started: {
+    chatId: string;
+    prompt: string;
+    cwd: string;
+    appendSystemPrompt?: string;
+    /** Родитель, известный хранилищу В МОМЕНТ запуска, — см. тест про гонку. */
+    parentAtStart?: string;
+  }[];
 
   beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), 'cc-split-'));
@@ -34,11 +41,15 @@ describe('POST /api/chat/split', () => {
     // не держал висящих процессов между тестами.
     registry = new ChatRunRegistry((): RunLike => ({
       start: async (options) => {
+        const chatId = options.permissionPrompt?.runId ?? '';
         started.push({
-          chatId: options.permissionPrompt?.runId ?? '',
+          chatId,
           prompt: options.prompt,
           cwd: options.cwd,
           ...(options.appendSystemPrompt ? { appendSystemPrompt: options.appendSystemPrompt } : {}),
+          ...(store.getChatLink(chatId)?.parentChatId
+            ? { parentAtStart: store.getChatLink(chatId)?.parentChatId }
+            : {}),
         });
       },
       stop: () => undefined,
@@ -159,6 +170,38 @@ describe('POST /api/chat/split', () => {
 
     const body = response.json() as { chats: { chatId: string }[] };
     for (const chat of body.chats) expect(session.autoApproveFor(chat.chatId)).toBeUndefined();
+  });
+
+  /**
+   * Связь с родителем обязана лежать в хранилище УЖЕ на запуске прогона.
+   *
+   * Прогон называет настоящий `sessionId` через пару секунд после старта, и
+   * перенос связи на него ищет запись по временному ключу: не найдя — молча
+   * ничего не делает. Пока связи писались после всего разделения, копия большого
+   * репозитория заводилась дольше, чем стартовал предыдущий CLI, и родство
+   * доставалось только последней группе (живое разделение 3 сентября: четыре
+   * ветки, дерево — у одной).
+   */
+  it('связь с родителем записана до запуска прогона, а не после разделения', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true, parentChatId: 'parent' },
+    });
+
+    expect(started).toHaveLength(2);
+    for (const run of started) expect(run.parentAtStart).toBe('parent');
+  });
+
+  it('без родителя связей не заводим — разделение бывает и без разговора', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true },
+    });
+
+    const body = response.json() as { chats: { chatId: string }[] };
+    for (const chat of body.chats) expect(store.getChatLink(chat.chatId)).toBeUndefined();
   });
 
   it('«только завести чаты» не запускает ни одного прогона', async () => {

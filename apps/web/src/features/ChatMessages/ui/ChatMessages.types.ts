@@ -39,6 +39,16 @@ export interface ChildQuestion {
   isRunning?: boolean;
 }
 
+/** Запросы прав дочернего разговора и подпись, чей он. */
+export interface ChildPermission {
+  /** Ключ прогона ребёнка — по нему уходит решение. */
+  chatId: string;
+  /** Как назван этот чат в списке: человеку нужно понимать, кого он разрешает. */
+  title: string;
+  /** Всё, на чём ребёнок сейчас стоит: за один ход запросов бывает несколько. */
+  permissions: PendingPermission[];
+}
+
 export interface ChatMessagesProps {
   messages: ChatMessage[];
   /**
@@ -79,6 +89,14 @@ export interface ChatMessagesProps {
   childQuestions?: ChildQuestion[];
   /** Ответ на вопрос дочернего разговора — уходит в ЕГО чат, не в этот. */
   onChildAnswer?: (chatId: string, answer: string) => void;
+  /**
+   * Запросы прав ДОЧЕРНИХ разговоров. На них агент стоит и ничего не делает,
+   * поэтому в родителе они нужнее вопросов: без них человек узнаёт об
+   * остановленном ребёнке, только зайдя в его вкладку.
+   */
+  childPermissions?: ChildPermission[];
+  /** Решение по правам ребёнка — уходит в ЕГО прогон, не в этот. */
+  onChildPermissionDecide?: (chatId: string, toolUseId: string, behavior: 'allow' | 'deny') => void;
   /** Повторить упавший запрос — кнопка прямо в карточке ошибки. */
   onRetry?: () => void;
   /** Единицы расхода из настроек: объём в токенах или деньги. */

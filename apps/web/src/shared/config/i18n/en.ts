@@ -480,6 +480,7 @@ export const en: TranslationSchema = {
     questionFromChild: 'Asked by “{{title}}”',
     pickOption: 'Answer with this option',
     permissionTitle: 'The agent needs permission',
+    permissionFromChild: 'Requested by “{{title}}”',
     permissionLost:
       'The decision never reached the agent: the request had already been dropped — it timed out or the conversation was restarted. If the agent is still waiting, send the prompt again.',
     permissionUnreachable:

@@ -362,7 +362,7 @@ export const helpEn: HelpSchema = {
         'stay with their parent wherever its date puts it. If the parent is not in ' +
         'the list at all (a search matched only a child), the row stays an ordinary ' +
         'one — nothing is hidden.',
-      splitParent: 'Every child’s question, answered in the parent',
+      splitParent: 'Every child’s question and permission, answered in the parent',
       splitParentText:
         'A split spreads the work across several agents, but you are still one ' +
         'person. So a question asked by a child chat also shows up in the parent, ' +
@@ -370,7 +370,13 @@ export const helpEn: HelpSchema = {
         'message: if the child is busy it queues up and arrives when its turn ends; ' +
         'if it is idle it goes out at once, continuing the same session in the same ' +
         'copy of the repository. The parent conversation spends nothing — no turn, no ' +
-        'reply — and walking six chats for one and the same choice is not needed.',
+        'reply — and walking six chats for one and the same choice is not needed. ' +
+        'A child’s permission request arrives the same way — Allow/Deny right here, ' +
+        'labelled with who is asking. It matters more than a question: on a question ' +
+        'the agent keeps working, on a permission it STOPS, and without a shared hub ' +
+        'you learn about the halt only by opening its tab. Auto-approval is inherited ' +
+        'from the parent, so only dangerous calls and whatever your rules mark as ' +
+        '“ask” reach you.',
       splitButton: 'Create the chats only',
       splitButtonText:
         'A toggle in the card. On, the copies, branches and chats appear but no agent ' +

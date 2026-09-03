@@ -17,7 +17,28 @@ const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 /** Разделы, по которым идём. Путь + маркер готовности (что должно отрисоваться). */
 const PAGES = [
   { path: '/', name: 'Обзор' },
-  { path: '/chat', name: 'Чат' },
+  {
+    path: '/chat',
+    name: 'Чат',
+    // Лента вкладок проектов появляется только когда проект открыт, а это самый
+    // насыщенный ролями кусок страницы: tablist, вкладки, точки статуса. Без
+    // этого шага аудит смотрел на чат без ленты и её нарушений не видел.
+    // Состояние кладём прямо в хранилище ленты: так проверка не зависит ни от
+    // какой истории и не открывает настоящий проект.
+    prepare: async (page) => {
+      await page.evaluate(() => {
+        localStorage.setItem(
+          'claude-control:workspace',
+          JSON.stringify({
+            projectTabs: [{ id: 'c:/a11y', path: 'C:/a11y', name: 'Проверка ленты' }],
+            activeTabId: 'home',
+            views: {},
+          }),
+        );
+      });
+    },
+    ready: '[role="tablist"][aria-label="Рабочие пространства"]',
+  },
   { path: '/mcp', name: 'MCP' },
   { path: '/permissions', name: 'Права' },
   { path: '/settings', name: 'Настройки' },
@@ -40,9 +61,19 @@ for (const scheme of ['light', 'dark']) {
   const page = await context.newPage();
   await bypassOnboarding(page); // иначе модалка онбординга прячет страницу
 
-  for (const { path, name } of PAGES) {
+  for (const { path, name, prepare, ready } of PAGES) {
     await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('nav', { timeout: 15000 });
+    if (prepare) {
+      // Раздел, который сам себя не показывает целиком: доводим до нужного вида
+      // и перезагружаем, чтобы страница поднялась уже с ним. Результат ждём
+      // явно: молча не сработавший шаг оставил бы «чисто» пустым словом —
+      // аудит смотрел бы ровно на ту же страницу, что и без подготовки.
+      await prepare(page);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('nav', { timeout: 15000 });
+      await page.waitForSelector(ready, { timeout: 15000 });
+    }
     await page.waitForTimeout(1200); // даём догрузиться данным раздела
 
     const results = await new AxeBuilder({ page })

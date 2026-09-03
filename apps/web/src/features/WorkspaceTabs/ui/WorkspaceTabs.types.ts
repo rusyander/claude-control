@@ -8,4 +8,8 @@ export interface WorkspaceTabsProps {
   statuses?: Map<string, RunStatus>;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
+  /** Новый порядок табов после перетаскивания — id в порядке ленты. */
+  onReorder: (orderedIds: string[]) => void;
+  /** Шаг табу с клавиатуры: −1 влево, +1 вправо. */
+  onMove: (id: string, delta: number) => void;
 }

@@ -6,6 +6,8 @@ import {
   closeProjectTab,
   activateTab,
   rememberTabView,
+  reorderProjectTabs,
+  moveProjectTab,
   sanitizeState,
 } from './workspaceStore';
 
@@ -82,6 +84,60 @@ describe('activateTab', () => {
   it('несуществующий id игнорируется', () => {
     const state = withTabs('C:/a');
     expect(activateTab(state, 'c:/нет')).toBe(state);
+  });
+});
+
+describe('reorderProjectTabs: порядок табов задаёт человек', () => {
+  it('переставляет табы в названный порядок, активный таб не трогая', () => {
+    const state = withTabs('C:/a', 'C:/b', 'C:/c'); // активен c
+    const next = reorderProjectTabs(state, ['c:/c', 'c:/a', 'c:/b']);
+    expect(next.projectTabs.map((t) => t.id)).toEqual(['c:/c', 'c:/a', 'c:/b']);
+    expect(next.activeTabId).toBe('c:/c');
+  });
+
+  it('тот же порядок — то же состояние (хранилище не переписываем)', () => {
+    const state = withTabs('C:/a', 'C:/b');
+    expect(reorderProjectTabs(state, ['c:/a', 'c:/b'])).toBe(state);
+  });
+
+  it('не перестановка — состояние не меняем: неполный список, лишние и дубли', () => {
+    const state = withTabs('C:/a', 'C:/b', 'C:/c');
+    expect(reorderProjectTabs(state, ['c:/b', 'c:/a'])).toBe(state);
+    expect(reorderProjectTabs(state, ['c:/c', 'c:/b', 'c:/нет'])).toBe(state);
+    expect(reorderProjectTabs(state, ['c:/a', 'c:/a', 'c:/b', 'c:/c'])).toBe(state);
+    expect(reorderProjectTabs(state, [])).toBe(state);
+  });
+
+  it('открытые разговоры вкладок переезд переживают', () => {
+    const state = rememberTabView(withTabs('C:/a', 'C:/b'), 'c:/a', 'chat-1');
+    expect(reorderProjectTabs(state, ['c:/b', 'c:/a']).views['c:/a']).toBe('chat-1');
+  });
+});
+
+describe('moveProjectTab: шаг табу с клавиатуры', () => {
+  it('двигает влево и вправо', () => {
+    const state = withTabs('C:/a', 'C:/b', 'C:/c');
+    expect(moveProjectTab(state, 'c:/c', -1).projectTabs.map((t) => t.id)).toEqual([
+      'c:/a',
+      'c:/c',
+      'c:/b',
+    ]);
+    expect(moveProjectTab(state, 'c:/a', 1).projectTabs.map((t) => t.id)).toEqual([
+      'c:/b',
+      'c:/a',
+      'c:/c',
+    ]);
+  });
+
+  it('у краёв ленты шаг никуда не ведёт', () => {
+    const state = withTabs('C:/a', 'C:/b');
+    expect(moveProjectTab(state, 'c:/a', -1)).toBe(state);
+    expect(moveProjectTab(state, 'c:/b', 1)).toBe(state);
+  });
+
+  it('несуществующий таб игнорируется', () => {
+    const state = withTabs('C:/a');
+    expect(moveProjectTab(state, 'c:/нет', 1)).toBe(state);
   });
 });
 

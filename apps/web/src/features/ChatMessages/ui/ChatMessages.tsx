@@ -39,6 +39,8 @@ export function ChatMessages({
   onPermissionDecide,
   childQuestions,
   onChildAnswer,
+  childPermissions,
+  onChildPermissionDecide,
   onRetry,
   costUnit,
   effort,
@@ -288,6 +290,27 @@ export function ChatMessages({
       {permissions && permissions.length > 0 && onPermissionDecide && (
         <PermissionCard permissions={permissions} onDecide={onPermissionDecide} />
       )}
+
+      {/*
+        Запросы прав дочерних разговоров. Показываются рядом со своими и по
+        более веской причине: на запросе прав агент СТОИТ. Подпись обязательна —
+        разрешать «удалить каталог» вслепую, не зная, кто из шести просит,
+        человек не должен.
+      */}
+      {onChildPermissionDecide &&
+        (childPermissions ?? []).map((child) => (
+          <div key={child.chatId} className={styles.childAsk}>
+            <Typography variant="caption" color="subtle" className={styles.childAskFrom}>
+              {t('chat.permissionFromChild', { title: child.title })}
+            </Typography>
+            <PermissionCard
+              permissions={child.permissions}
+              onDecide={(toolUseId, behavior) =>
+                onChildPermissionDecide(child.chatId, toolUseId, behavior)
+              }
+            />
+          </div>
+        ))}
 
       {/*
         Вопросы дочерних разговоров. Ответ уходит в ИХ чат — этот разговор о нём

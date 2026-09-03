@@ -84,6 +84,25 @@ export function registerChatSplitRoutes(
       projectPath: dir,
       proposal,
       startRuns: wantRuns,
+      /**
+       * Дерево в списке чатов. Пишем ДО запуска прогона и только по удавшимся
+       * группам: ветвь, ведущая в чат, которого не завелось, — это не дерево, а
+       * ложь о состоянии, а связь, записанная после запуска, не успевает к
+       * переносу ключа и пропадает целиком (см. `SplitLink`).
+       *
+       * Ключ здесь временный (`new-…`), и это правильно: под ним чат уже
+       * открывается, а на настоящий `sessionId` связь переедет сама, как только
+       * прогон его назовёт (слушатель в `bootstrap/runtime.ts`).
+       */
+      link: parentChatId
+        ? ({ chatId, title, branch }) =>
+            ctx.store.setChatLink(chatId, {
+              parentChatId,
+              title,
+              branch,
+              createdAt: new Date().toISOString(),
+            })
+        : undefined,
       start: ({ chatId, prompt, cwd }) => {
         // Набор, привязанный к проекту, включается и здесь: агент, которого
         // завело разделение, работает в том же проекте и должен получить те же
@@ -101,25 +120,9 @@ export function registerChatSplitRoutes(
       },
     });
 
-    // Дерево в списке чатов. Записываем ПОСЛЕ разделения и только по удачным
-    // группам: ветвь, ведущая в чат, которого не завелось, — это не дерево, а
-    // ложь о состоянии. Ключ здесь временный (`new-…`), и это правильно: под
-    // ним чат уже открывается, а на настоящий `sessionId` связь переедет сама,
-    // как только прогон его назовёт (слушатель в `index.ts`).
-    if (parentChatId) {
-      const createdAt = new Date().toISOString();
-      for (const chat of result.chats) {
-        ctx.store.setChatLink(chat.chatId, {
-          parentChatId,
-          title: chat.title,
-          branch: chat.branch,
-          createdAt,
-        });
-      }
-      // Разделили — значит этот разговор своё решение принял. Предлагать ему то
-      // же самое в каждом следующем прогоне не помощь, а навязчивость.
-      deps.runs.muteSplit(parentChatId);
-    }
+    // Разделили — значит этот разговор своё решение принял. Предлагать ему то
+    // же самое в каждом следующем прогоне не помощь, а навязчивость.
+    if (parentChatId) deps.runs.muteSplit(parentChatId);
 
     return result;
 

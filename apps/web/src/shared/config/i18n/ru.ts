@@ -486,6 +486,7 @@ export const ru = {
     questionFromChild: 'Спрашивает «{{title}}»',
     pickOption: 'Ответить этим вариантом',
     permissionTitle: 'Агент просит разрешение',
+    permissionFromChild: 'Просит «{{title}}»',
     permissionLost:
       'Решение не дошло до агента: запрос уже снят — истекло время ожидания или разговор был перезапущен. Если агент всё ещё ждёт, отправьте запрос заново.',
     permissionUnreachable:

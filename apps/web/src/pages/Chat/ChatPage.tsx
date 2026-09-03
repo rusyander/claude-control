@@ -50,7 +50,7 @@ import { useRunLifecycle } from './model/useRunLifecycle';
 import { useAgentNotifications } from './model/useAgentNotifications';
 import { usePreviewWidth } from './model/usePreviewWidth';
 import { visibleChats } from './lib/visibleChats';
-import { collectChildQuestions } from './lib/childQuestions';
+import { useChildHub } from './model/useChildHub';
 import { answerChild } from './lib/answerChild';
 import { useStreamState } from './model/useStreamState';
 import { downloadChatExport } from './lib/downloadChatExport';
@@ -132,29 +132,9 @@ export function ChatPage() {
     [chats.data, ws.activeProject],
   );
 
-  // Вопросы дочерних разговоров — тех, что выделило разделение задач. Показываем
-  // их в родителе, чтобы один и тот же выбор не приходилось раздавать, обходя
-  // шесть чатов. Прогон ребёнка может быть зарегистрирован под временным ключом,
-  // поэтому сверяем и по нему, и по sessionId — иначе вопрос виден в списке
-  // агентов, а в родителе нет.
-  const childQuestions = useMemo(
-    () => collectChildQuestions(chats.data ?? [], activeChat?.id, activeRuns),
-    [chats.data, activeChat?.id, activeRuns],
-  );
-
-  // Дети открытого чата — чтобы их вопрос не звал тостом «сходите в другой
-  // проект»: он показан прямо здесь, и переход открыл бы отдельную вкладку, от
-  // которой мы как раз ушли. Название нужно тостам про «упал» и «закончил»:
-  // человек ищет ребёнка по имени разговора, а не по имени его копии.
-  const childChats = useMemo(
-    () =>
-      activeChat?.id
-        ? (chats.data ?? [])
-            .filter((chat) => chat.parentId === activeChat.id)
-            .map((chat) => ({ id: chat.id, title: chat.title || chat.id }))
-        : [],
-    [chats.data, activeChat?.id],
-  );
+  // Родительский чат как пульт над детьми разделения: их вопросы, их запросы
+  // прав и они сами — по именам (подробности и почему именно так — в хуке).
+  const child = useChildHub(chats.data, activeChat?.id, activeRuns);
 
   // Размер окна ленты. Растёт кнопкой «Загрузить ещё»: каждый шаг подтягивает
   // более ранние сообщения. При смене разговора возвращаемся к последнему окну.
@@ -193,7 +173,7 @@ export function ChatPage() {
 
   useAgentNotifications({
     chatId,
-    children: childChats,
+    children: child.list,
     // Ребёнок открывается ЗДЕСЬ же — тем же путём, что и клик по нему в пульте
     // агентов: его каталог лежит в самом разговоре, вкладка не нужна.
     onOpenChild: (id) => {
@@ -382,7 +362,14 @@ export function ChatPage() {
               onPermissionDecide={(toolUseId, behavior, message) =>
                 chatId && agentRuns.decidePermission(chatId, toolUseId, behavior, message)
               }
-              childQuestions={childQuestions}
+              childPermissions={child.permissions}
+              // Решение по правам ребёнка уходит в ЕГО прогон — тем же путём,
+              // что и своё: брокер ждёт ответа по ключу прогона, и родительский
+              // разговор об этом не узнаёт вовсе.
+              onChildPermissionDecide={(childId, toolUseId, behavior) =>
+                agentRuns.decidePermission(childId, toolUseId, behavior)
+              }
+              childQuestions={child.questions}
               // Ответ уходит в ЧАТ РЕБЁНКА обычным сообщением: другого канала
               // нет — вызов `AskUserQuestion` в пакетном режиме возвращается
               // ошибкой сразу и никого не ждёт. Ребёнок ещё работает — ответ

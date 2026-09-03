@@ -35,6 +35,12 @@ export interface ActiveRunView {
    * человек отвечал всем из одного места, а не обходил шесть чатов по кругу.
    */
   tools?: StreamedTool[];
+  /**
+   * Запросы прав, ждущие решения. Как и вызовы, нужны не только своей ленте:
+   * на запросе прав агент СТОИТ, поэтому запрос дочернего чата показывается и в
+   * родительском разговоре — иначе про остановку узнают, обойдя все вкладки.
+   */
+  permissions?: PendingPermission[];
 }
 
 /**
@@ -62,6 +68,8 @@ export function selectActiveRuns(runs: RunLike[], now: number): ActiveRunView[] 
       // Вопросы носим только у тех, кто спрашивал: у остальных это лишний
       // массив на каждый пересчёт пульта агентов.
       ...(run.tools?.some((tool) => tool.name === 'AskUserQuestion') ? { tools: run.tools } : {}),
+      // Права носим только у стоящих на них — по той же причине.
+      ...(run.permissions?.length ? { permissions: run.permissions } : {}),
     });
   }
 

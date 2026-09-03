@@ -12,6 +12,8 @@
  *    прерывает ход.
  * 3. Вопрос ДОЧЕРНЕГО чата виден и отвечается в родителе, с подписью, чей он, и
  *    ответ уходит в чат ребёнка — не в родительский.
+ * 4. ЗАПРОС ПРАВ ребёнка — там же и по более веской причине: на вопросе агент
+ *    работает дальше, а на правах стоит. Решение уходит брокеру ЕГО прогона.
  *
  * Данные подменяются целиком: ни настоящих копий, ни запущенных агентов прогон
  * не создаёт. Поток отдаётся готовым телом SSE — этого хватает, чтобы прогон
@@ -29,6 +31,13 @@ const PARENT = 'qa-hub-parent';
 const CHILD = 'qa-hub-child';
 const PARENT_TOOL = 'toolu_parent_1';
 const CHILD_TOOL = 'toolu_child_1';
+/**
+ * Второй ребёнок стоит на ПРАВАХ: ход не закрыт, решения брокеру никто не дал.
+ * Это состояние в живом разделении и было самым дорогим — агент не работает, а
+ * узнать об этом можно было, только зайдя в его вкладку.
+ */
+const KID2 = 'qa-hub-child-2';
+const KID2_TOOL = 'toolu_child2_perm';
 
 const parentQuestion = {
   questions: [
@@ -79,6 +88,11 @@ const CHATS = [
     // Ребёнок работает в КОПИИ репозитория — другой каталог, тот же проект.
     projectPath: `${PROJECT.path}-worktrees/feature-login`,
   }),
+  chat(KID2, {
+    title: 'Сборка',
+    parentId: PARENT,
+    projectPath: `${PROJECT.path}-worktrees/feature-build`,
+  }),
 ];
 
 /** Лента родителя: вопрос в ней есть и вызовом инструмента — дубля быть не должно. */
@@ -109,6 +123,16 @@ const frame = (event, seq) => `data: ${JSON.stringify({ ...event, seq })}\n\n`;
 const streamBody = (toolUseId, payload, finished) =>
   frame({ kind: 'tool', name: 'AskUserQuestion', input: payload, id: toolUseId }, 1) +
   (finished ? frame({ kind: 'done' }, 2) : '');
+
+const permissionStream = frame(
+  {
+    kind: 'permission',
+    toolName: 'Bash',
+    input: { command: 'rm -rf dist' },
+    toolUseId: KID2_TOOL,
+  },
+  1,
+);
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
@@ -147,6 +171,9 @@ await page.route(`**/api/chats/${PARENT}/messages*`, (route) => route.fulfill({ 
 await page.route(`**/api/chats/${CHILD}/messages*`, (route) =>
   route.fulfill({ json: { messages: [], total: 0, hasMore: false } }),
 );
+await page.route(`**/api/chats/${KID2}/messages*`, (route) =>
+  route.fulfill({ json: { messages: [], total: 0, hasMore: false } }),
+);
 await page.route('**/api/chat/*/progress*', (route) =>
   route.fulfill({ json: { steps: [], isComplete: false } }),
 );
@@ -158,6 +185,7 @@ await page.route('**/api/chat/active', (route) =>
     json: [
       { chatId: PARENT, seq: 0 },
       { chatId: CHILD, seq: 0 },
+      { chatId: KID2, seq: 0 },
     ],
   }),
 );
@@ -184,6 +212,29 @@ await page.route(`**/api/chat/${CHILD}/stream*`, (route) =>
     body: streamBody(CHILD_TOOL, childQuestion, true),
   }),
 );
+// Второй ребёнок ход не закрывает: он стоит на правах, и стоять должен до конца
+// проверки — иначе карточка исчезла бы сама, без нашего решения.
+let kid2StreamHits = 0;
+await page.route(`**/api/chat/${KID2}/stream*`, (route) => {
+  kid2StreamHits += 1;
+  if (kid2StreamHits > 1) return;
+  return route.fulfill({
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+    body: permissionStream,
+  });
+});
+
+// Решение по правам уходит брокеру ПРОГОНА, а не сообщением в чат.
+const decisions = [];
+await page.route('**/api/chat/*/permission-decision', (route) => {
+  const url = new URL(route.request().url());
+  decisions.push({
+    chatId: url.pathname.split('/').at(-2),
+    ...route.request().postDataJSON(),
+  });
+  return route.fulfill({ json: { ok: true } });
+});
 
 // Ответ на вопрос уходит обычным сообщением: другого канала у него нет — вызов
 // `AskUserQuestion` в пакетном режиме возвращается ошибкой сразу и никого не ждёт.
@@ -237,6 +288,22 @@ check(
   'вопрос ребёнка подписан, чей он',
 );
 
+// Права ребёнка — здесь же. Пока их показывал только его собственный чат, агент
+// стоял, а человек об этом не знал: тост про ребёнка открытого чата не зовут
+// намеренно, считая, что запрос уже на экране.
+check(
+  (await page.getByText('Агент просит разрешение').count()) === 1,
+  'запрос прав ребёнка виден в родительском чате',
+);
+check(
+  (await page.getByText(/Просит .*Сборка/).count()) === 1,
+  'запрос прав подписан, кто именно просит',
+);
+check(
+  (await page.getByText(/rm -rf dist/).count()) === 1,
+  'видно, что именно агент собирается сделать',
+);
+
 // Снимки для отчёта: `SHOTS=<каталог> node tools/qa/check-parent-hub.mjs`.
 // Снимаются из того же прогона, что и проверяет, — иначе картинка и вердикт
 // расходятся при первой же правке.
@@ -246,6 +313,24 @@ const shot = async (name) => {
 };
 
 await shot('01_вопросы-родителя-и-ребёнка_AFTER');
+
+// Решение по правам ребёнка — из родителя, и уходит брокеру ЕГО прогона: ответ
+// сообщением здесь не годится вовсе, агент стоит на вызове и ждёт вердикта.
+// Раньше остальных проверок намеренно: тосты про конец хода ребёнка живут
+// считаные секунды, и лишняя минута кликов до них ломала бы не поведение, а
+// таймер.
+await page.getByRole('button', { name: 'Разрешить' }).first().click();
+await page.waitForTimeout(600);
+check(decisions.length === 1, `решение ушло одним запросом: ${decisions.length}`);
+check(decisions[0]?.chatId === KID2, `решение адресовано РЕБЁНКУ: ${decisions[0]?.chatId}`);
+check(decisions[0]?.toolUseId === KID2_TOOL, `решение про его вызов: ${decisions[0]?.toolUseId}`);
+check(decisions[0]?.behavior === 'allow', `ушло «разрешить»: ${decisions[0]?.behavior}`);
+check(sent.length === 0, 'решение по правам не превратилось в сообщение в чат');
+check(
+  (await page.getByText(/Просит .*Сборка/).count()) === 0,
+  'решённый запрос прав убран из родительской ленты',
+);
+await shot('05_права-ребёнка-решены-из-родителя_AFTER');
 
 // Главное: прогон ИДЁТ, и выбор при этом доступен.
 const own = page.getByRole('button', { name: /Escape и клик вне/ });

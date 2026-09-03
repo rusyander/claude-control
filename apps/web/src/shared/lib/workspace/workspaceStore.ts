@@ -76,6 +76,51 @@ export function rememberTabView(
   return { ...state, views: { ...state.views, [tabId]: chatId } };
 }
 
+/**
+ * Переставить табы в названный порядок — это перетаскивание мышью.
+ *
+ * Принимаем только перестановку: список должен назвать ровно те же табы, что
+ * открыты. Пришло что-то другое (таб успел закрыться, в хранилище мусор) —
+ * возвращаем прежнее состояние, а не собираем порядок наполовину.
+ */
+export function reorderProjectTabs(state: WorkspaceState, orderedIds: string[]): WorkspaceState {
+  const byId = new Map(state.projectTabs.map((tab) => [tab.id, tab]));
+  const projectTabs: ProjectTab[] = [];
+  const seen = new Set<string>();
+
+  for (const id of orderedIds) {
+    const tab = byId.get(id);
+    if (!tab || seen.has(id)) continue;
+    seen.add(id);
+    projectTabs.push(tab);
+  }
+
+  if (projectTabs.length !== state.projectTabs.length) return state;
+  // Порядок не изменился — отдаём тот же объект: подписчики не дёрнутся,
+  // а localStorage не будет переписан на каждое движение мыши.
+  if (projectTabs.every((tab, index) => tab === state.projectTabs[index])) return state;
+  return { ...state, projectTabs };
+}
+
+/**
+ * Сдвинуть таб на шаг: −1 влево, +1 вправо. Клавиатурная замена перетаскиванию
+ * (Alt+←/→) — порядок табов не должен быть доступен только с мышью. У края
+ * ленты шаг никуда не ведёт и состояние не меняет.
+ */
+export function moveProjectTab(state: WorkspaceState, id: string, delta: number): WorkspaceState {
+  const from = state.projectTabs.findIndex((tab) => tab.id === id);
+  if (from < 0) return state;
+
+  const to = from + delta;
+  if (to < 0 || to >= state.projectTabs.length) return state;
+
+  const projectTabs = [...state.projectTabs];
+  const [moved] = projectTabs.splice(from, 1);
+  if (!moved) return state;
+  projectTabs.splice(to, 0, moved);
+  return { ...state, projectTabs };
+}
+
 /** Сделать таб активным. Несуществующий id игнорируем — состояние не портим. */
 export function activateTab(state: WorkspaceState, id: string): WorkspaceState {
   if (id === HOME_TAB_ID || state.projectTabs.some((tab) => tab.id === id)) {
@@ -173,6 +218,14 @@ export const workspace = {
   },
   activate(id: string): void {
     commit(activateTab(state, id));
+  },
+  /** Переставить табы проектов в новый порядок (перетаскивание ленты). */
+  reorderProjects(orderedIds: string[]): void {
+    commit(reorderProjectTabs(state, orderedIds));
+  },
+  /** Сдвинуть таб на шаг: −1 влево, +1 вправо (Alt+←/→). */
+  moveProject(id: string, delta: number): void {
+    commit(moveProjectTab(state, id, delta));
   },
   /** Запомнить разговор, открытый во вкладке (пусто — забыть). */
   rememberView(tabId: string, chatId: string | undefined): void {

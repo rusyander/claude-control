@@ -289,6 +289,8 @@ export function ChatPage() {
           statuses={projectStatuses}
           onActivate={ws.activate}
           onClose={session.closeProjectTab}
+          onReorder={ws.reorderProjects}
+          onMove={ws.moveProject}
         />
       )}
 
@@ -307,11 +309,7 @@ export function ChatPage() {
           activeChatId={activeChat?.id}
           chatStatuses={chatStatuses}
           onSelectChat={session.openChat}
-          onCreateChat={
-            ws.activeProject
-              ? () => ws.activeProject && session.enterProjectDraft()
-              : session.startNewChat
-          }
+          onCreateChat={ws.activeProject ? () => session.enterProjectDraft() : session.startNewChat}
           projects={projects.data ?? []}
           isProjectsLoading={projects.isLoading}
           activeProjectId={ws.activeProject?.id}

@@ -209,9 +209,14 @@ export const helpEn: HelpSchema = {
       tabAddText:
         'The button in the project list opens a directory picker across your drives. ' +
         'That is how you start in a folder Claude has never run in.',
+      tabOrder: 'Your own tab order',
+      tabOrderText:
+        'Drag a project tab to the place you want it, or move it a step at a time ' +
+        'from the keyboard with Alt+← and Alt+→; Delete closes the focused tab. The ' +
+        'home tab takes no part in the reordering and always stays first.',
       tabsNote:
-        'Tabs survive a page reload, and closing a tab closes only the tab — neither ' +
-        'chats nor files are touched.',
+        'Tabs and their order survive a page reload, and closing a tab closes only ' +
+        'the tab — neither chats nor files are touched.',
 
       toolsTitle: 'The project row: dev server and git',
       toolsCaption:

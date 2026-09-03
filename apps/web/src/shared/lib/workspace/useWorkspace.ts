@@ -10,6 +10,10 @@ export interface UseWorkspace {
   openProject: (path: string, name: string) => string;
   closeProject: (id: string) => void;
   activate: (id: string) => void;
+  /** Новый порядок табов проектов после перетаскивания. */
+  reorderProjects: (orderedIds: string[]) => void;
+  /** Сдвинуть таб на шаг: −1 влево, +1 вправо. */
+  moveProject: (id: string, delta: number) => void;
   /** Запомнить разговор, открытый в этой вкладке (пусто — забыть). */
   rememberView: (tabId: string, chatId: string | undefined) => void;
 }
@@ -26,6 +30,8 @@ export function useWorkspace(): UseWorkspace {
     openProject: workspace.openProject,
     closeProject: workspace.closeProject,
     activate: workspace.activate,
+    reorderProjects: workspace.reorderProjects,
+    moveProject: workspace.moveProject,
     rememberView: workspace.rememberView,
   };
 }

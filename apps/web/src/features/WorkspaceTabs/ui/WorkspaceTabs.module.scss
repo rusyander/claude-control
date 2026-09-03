@@ -39,13 +39,27 @@
   font-weight: 500;
 }
 
-// Таб проекта — контейнер с подписью и кнопкой закрытия.
+// Таб проекта — контейнер с подписью и кнопкой закрытия. Его же и тянут:
+// курсор-рука обещает перетаскивание, и обещание выполняется по всему табу.
 .project {
+  position: relative;
   gap: var(--spacing-3xs);
   padding-right: var(--spacing-3xs);
+  cursor: grab;
+  user-select: none;
+  // Свой жест по горизонтали, вертикальный скролл страницы оставляем браузеру.
+  touch-action: pan-y;
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .tabLabel {
+  // Курсор наследуем от таба: рука тянущего важнее пальца нажимающего,
+  // а кликом таб всё равно остаётся.
+  cursor: inherit;
+
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-2xs);
@@ -55,7 +69,6 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  cursor: pointer;
 }
 
 .name {

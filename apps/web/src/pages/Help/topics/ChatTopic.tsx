@@ -132,6 +132,7 @@ export function ChatTopic() {
             { title: tr('tabHome'), text: tr('tabHomeText') },
             { title: tr('tabProject'), text: tr('tabProjectText') },
             { title: tr('tabAdd'), text: tr('tabAddText') },
+            { title: tr('tabOrder'), text: tr('tabOrderText') },
           ]}
         />
         <Callout tone="info" title={tr('tabsNote')} />

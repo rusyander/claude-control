@@ -87,6 +87,13 @@ export interface ProviderInfo {
   capabilities: Record<Capability, CapabilityStatus>;
   /** Модель раздела инструкций: один файл, список ссылок или раздела нет. */
   instructionsModel: ProviderInstructionsModel;
+  /**
+   * Имя глобального файла инструкций (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`) при
+   * модели `file`, иначе отсутствует. Нужно меню: подпись раздела совпадает с
+   * файлом, который страница правит, — иначе меню обещало CLAUDE.md, а
+   * редактировался AGENTS.md.
+   */
+  instructionsFileName?: string;
   /** Модель раздела хуков: богатая claude-овская или ключ в конфиге CLI. */
   hooksModel: ProviderHooksModel;
   /** Модель раздела плагинов: расширения панели или плагины самого CLI. */

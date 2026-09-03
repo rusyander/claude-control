@@ -11,6 +11,7 @@
     "./chat-handoff": "./src/chat-handoff.ts",
     "./env-secret": "./src/env-secret.ts",
     "./project-code": "./src/project-code.ts",
+    "./rule-format": "./src/rule-format.ts",
     "./task-split": "./src/task-split.ts",
     "./uploads": "./src/uploads.ts",
     "./vocabulary": "./src/vocabulary.ts"

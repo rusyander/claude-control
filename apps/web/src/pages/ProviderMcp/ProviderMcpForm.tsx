@@ -21,6 +21,7 @@ import type { ProviderMcpFormProps } from './ProviderMcpForm.types';
 export function ProviderMcpForm({
   isOpen,
   onOpenChange,
+  providerName,
   server,
   onSave,
   isPending,
@@ -72,7 +73,7 @@ export function ProviderMcpForm({
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       title={server ? `${t('common.edit')}: ${server.name}` : t('mcp.addServer')}
-      description={t('common.needsRestart')}
+      description={t('providers.needsRestartFor', { provider: providerName })}
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>

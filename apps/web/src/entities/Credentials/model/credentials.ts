@@ -1,14 +1,16 @@
+import type { CredentialsSource } from './credentials.types';
+
 /** Цвет бейджа по источнику доступа: нет доступа — не ошибка, а предупреждение. */
-export const TONE = {
+export const CREDENTIALS_TONE: Record<CredentialsSource, 'success' | 'info' | 'warning'> = {
   file: 'success',
   keychain: 'success',
   panel: 'info',
   apiKey: 'info',
   none: 'warning',
-} as const;
+};
 
 /** Заготовки для ручного ввода: чаще всего достаточно подставить своё. */
-export const TEMPLATES = {
+export const CREDENTIALS_TEMPLATES = {
   oauth: `{
   "claudeAiOauth": {
     "accessToken": "sk-ant-oat01-…",
@@ -23,4 +25,6 @@ export const TEMPLATES = {
   readFrom: `{
   "readFrom": "/полный/путь/к/вашему/credentials.json"
 }`,
-};
+} as const;
+
+export type CredentialsTemplateKind = keyof typeof CREDENTIALS_TEMPLATES;

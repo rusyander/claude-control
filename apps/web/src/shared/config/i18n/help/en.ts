@@ -1173,6 +1173,33 @@ export const helpEn: HelpSchema = {
         'Editors installed on the system are highlighted, missing ones are dimmed. “Auto” ' +
         'takes the first one found, but you can give your own command.',
 
+      firstRunTitle: 'First run',
+      firstRunCaption:
+        'A four-step wizard on top of the panel until it is closed with “Done” or “Skip”. ' +
+        'The same trio as the main cards: folder, provider, access.',
+      firstRunStep1: '“Welcome to Claude Control”',
+      firstRunStep1Text: 'Three points on what the panel does with your files. The “Next” button.',
+      firstRunStep2: '“Configuration folder”',
+      firstRunStep2Text:
+        'The source badge and the current path. Type a path and confirm with “Apply” (or Enter), ' +
+        'pick one with “Choose folder”, or return to the detected one with “Auto-detect”. A refusal ' +
+        '— “folder does not exist”, “this is a file, not a folder” — shows next to the field. ' +
+        'Without a working folder “Next” stays disabled.',
+      firstRunStep3: '“Detected CLIs”',
+      firstRunStep3Text:
+        'Which CLIs are installed. “Choose” switches the provider at once; the step is optional — ' +
+        'by default the panel works with Claude Code. If none is found, the panel still opens.',
+      firstRunStep4: '“Claude Code access”',
+      firstRunStep4Text:
+        'Where the sandbox access comes from. “Set manually” opens the same form as the card in ' +
+        'this section; “Remove manual” returns to automatic lookup. “Done” closes the wizard.',
+      firstRunReturnTitle: 'The wizard comes back if the folder becomes unavailable',
+      firstRunReturnText:
+        'The completion flag lives in the panel settings (onboardingDone) and is written once. ' +
+        '“Skip”, Escape and the × equal “Done” while the folder is fine; F5 keeps the current step. ' +
+        'If the configuration folder disappears or becomes unreadable, the wizard opens again ' +
+        'straight on the folder step, and it cannot be closed without a working folder.',
+
       credsTitle: 'Where sandbox access comes from',
       credsCaption:
         'Checked in order; the first one found wins. The difference between systems matters ' +
@@ -1230,7 +1257,11 @@ export const helpEn: HelpSchema = {
         'EVERY request must carry the token — including requests from the browser on this ' +
         'same computer. The browser neither knows nor should know: the dev proxy adds the ' +
         'header, reading the same token file. The token lives in ~/.claude-control/api-token ' +
-        'with mode 0600 and never enters the panel’s backups.',
+        'with mode 0600 and never enters the panel’s backups. It travels in the ' +
+        'Authorization: Bearer header; in the URL (?token=) only the event stream /api/events ' +
+        'accepts it — the one route the browser opens by address. On every other route a token ' +
+        'in the URL is rejected as missing: an address ends up in proxy logs and browser ' +
+        'history, a header does not.',
       remotePair: 'Pairing code',
       remotePairText:
         'The button shows a QR code with the address and the token — in the app it is ' +
@@ -3183,7 +3214,7 @@ export const helpEn: HelpSchema = {
 
       storageFile: 'File',
       storageUnit: 'One rule',
-      storageUnitValue: 'a markdown section starting with ##',
+      storageUnitValue: 'a markdown section headed «## ПРАВИЛО: …»',
       storageReader: 'Who reads it',
       storageReaderValue: 'Claude Code, when a session starts',
       storageBackup: 'Backups',
@@ -3196,7 +3227,7 @@ export const helpEn: HelpSchema = {
       flowForm: 'Form in the panel',
       flowFormCaption: 'title and text',
       flowFile: 'CLAUDE.md',
-      flowFileCaption: 'a ## Heading section',
+      flowFileCaption: 'a «## ПРАВИЛО: Heading» section',
       flowStart: 'Session start',
       flowStartCaption: 'Claude Code reads the file',
       flowAnswer: 'Every answer',
@@ -3221,7 +3252,7 @@ export const helpEn: HelpSchema = {
         'One line per rule in the form “Title :: text”. Creates a batch at once — ' +
         'handy for moving over a ready-made set.',
       modesNote:
-        'All three modes produce the same thing — ## sections in CLAUDE.md. The ' +
+        'All three modes produce the same thing — «## ПРАВИЛО: …» sections in CLAUDE.md. The ' +
         'mode only changes how comfortable it is to type.',
 
       fieldsTitle: 'Fields of a rule',
@@ -3319,6 +3350,26 @@ export const helpEn: HelpSchema = {
       noteWordingText:
         'A rule applies in every conversation. “Answer in Russian” can be checked, ' +
         '“write well” cannot — and Claude has no way to comply with the second.',
+
+      formatTitle: 'The heading format is the only thing that makes a section a rule',
+      formatCaption:
+        'CLAUDE.md may be laid out any way you like: the panel turns into cards only the ' +
+        'sections headed «## ПРАВИЛО: …». The preamble and ordinary sections stay in the file ' +
+        'untouched and never appear in the list.',
+      formatRule: 'A rule',
+      formatRuleText:
+        '«## ПРАВИЛО: Отвечать по-русски» — a level-two heading, the word ПРАВИЛО in any case, ' +
+        'the colon is mandatory; extra spaces around do no harm.',
+      formatPlain: 'An ordinary section',
+      formatPlainText:
+        '«## Язык общения», «### ПРАВИЛО: …» (level three) or «## ПРАВИЛО без двоеточия» ' +
+        '(no colon) are not rules: the panel leaves such text alone and makes no card of it.',
+      formatZero: 'Why the page says “0 rules”',
+      formatZeroText:
+        'A file laid out with ordinary «## » sections yields an empty list — that is not a ' +
+        'fault. The page then names how many such sections there are and shows the expected ' +
+        'heading; rename the section you need after the example on the CLAUDE.md page and it ' +
+        'appears as a card.',
     },
 
     claudeMd: {
@@ -3698,7 +3749,9 @@ export const helpEn: HelpSchema = {
         'The panel shows the skills, hooks and rules from the project’s .claude but does ' +
         'not edit them: they belong to the project’s git and change there — in the editor ' +
         'and by commit, like the rest of the code. That is why the tab has no toggles or ' +
-        'forms, and a hook from settings.local.json is marked with the file name.',
+        'forms, and a hook from settings.local.json is marked with the file name. Rule files ' +
+        'are read recursively — .claude/rules/**/*.md, a nested folder shows in the file path; ' +
+        'a disabled skill from .claude/skills-disabled is listed too, marked “disabled”.',
       noteUserTitle: 'The user level is separate',
       noteUserText:
         'The Rules, MCP and Permissions sections still manage ~/.claude. The project ' +
@@ -3745,7 +3798,7 @@ export const helpEn: HelpSchema = {
         'usually leak — not what was typed by hand.',
       whyBack: 'The placeholder is restored',
       whyBackText:
-        'A surname becomes [ИМЯ_1] in the request; [ИМЯ_1] becomes the surname again in the ' +
+        'A surname becomes [NAME_1] in the request; [NAME_1] becomes the surname again in the ' +
         'reply. The model works with the placeholder, the human reads the real text — including ' +
         'in a streamed reply where the placeholder is split across frames.',
       whyNoTls: 'No TLS interception',
@@ -3794,7 +3847,9 @@ export const helpEn: HelpSchema = {
       step4: 'Start the proxy',
       step4Text:
         'Say where to forward: the vendor cloud, a local model or an endpoint profile. With no ' +
-        'address the proxy will not start — it will not guess the vendor cloud for you.',
+        'address the proxy will not start — it will not guess the vendor cloud for you. Port and ' +
+        'address are saved on Enter or when the field loses focus; any settings change restarts ' +
+        'a running proxy, and placeholder numbering starts over.',
       step5: 'Point the CLI at the proxy',
       step5Text:
         'An address like http://127.0.0.1:5179 goes into the CLI as the model address — most ' +
@@ -3829,6 +3884,7 @@ export const helpEn: HelpSchema = {
       actionMaskText:
         'The value becomes [LABEL_N] — one number per value — and the placeholder is restored ' +
         'in the model reply. Numbers live as long as the proxy runs: stop it and they are gone.',
+      actionMaskBadge: '[NAME_1]',
       actionBlock: 'Refuse the request',
       actionBlockText:
         'The request goes nowhere. The CLI gets a refusal shaped like its own API, so the ' +
@@ -3880,7 +3936,7 @@ export const helpEn: HelpSchema = {
         'section still says "running".',
       limitParaphraseTitle: 'The model may paraphrase a placeholder',
       limitParaphraseText:
-        'Restoration works on exact text. If the reply says "name 1" instead of [ИМЯ_1], or ' +
+        'Restoration works on exact text. If the reply says "name 1" instead of [NAME_1], or ' +
         'translates the placeholder, there is nothing to substitute into: the human sees the ' +
         'placeholder. It is visible immediately and risks no data, but it looks broken.',
       limitShapeTitle: 'An unfamiliar shape is refused, not passed',
@@ -3924,7 +3980,8 @@ export const helpEn: HelpSchema = {
       gateWhereText:
         'The script sits in the configuration hooks directory, its registration in settings.json ' +
         'as an ordinary hook. It is visible in the Hooks section and can be disabled or deleted ' +
-        'there; the panel keeps no hidden mechanism.',
+        'there; the panel keeps no hidden mechanism. Changing the action rewrites the panel’s ' +
+        'script; a hand-edited file is left alone — “Restore the panel’s script” brings it back.',
 
       gateLimitTitle: 'A second to bypass — and that is fine',
       gateLimitText:

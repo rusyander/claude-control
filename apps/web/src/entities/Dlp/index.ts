@@ -16,4 +16,6 @@ export {
   replaceRule,
   removeRule,
   isRuleComplete,
+  type BuiltinNames,
 } from './model/rules';
+export { dlpErrorMessage } from './model/errors';

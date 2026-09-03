@@ -133,6 +133,7 @@ export function ProviderProjectMcpTab({ projectId }: ProjectTabProps) {
 
       <ProviderMcpForm
         isOpen={isFormOpen}
+        providerName={data.providerName}
         onOpenChange={setIsFormOpen}
         server={editing}
         onSave={(draft, serverId, onDone) => {

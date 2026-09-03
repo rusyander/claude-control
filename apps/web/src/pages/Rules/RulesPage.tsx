@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from '@tanstack/react-router';
+import { RULE_HEADING_EXAMPLE } from '@claude-control/contracts/rule-format';
+import { HELP_ROUTE } from '@shared/config/routes';
 import { Stack } from '@shared/ui/stack';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { useCreateParam } from '@shared/hooks/use-create-param';
@@ -18,8 +21,14 @@ import { RuleFormModal } from '@features/RuleEditor';
 import { DeleteButton } from '@features/EntityDelete';
 import { SandboxButton } from '@features/SandboxRunner';
 import { ruleApi } from '@entities/Rule';
+import { useClaudeMd } from '@entities/AppConfig';
+import { useProviders, activeProvider } from '@entities/Provider';
 import type { Rule } from '@claude-control/contracts';
+import { resolveRulesEmptyState } from './model/rulesEmptyState';
 import styles from './RulesPage.module.scss';
+
+/** Адрес страницы файла целиком — на неё ведёт объясняющая заглушка. */
+const CLAUDE_MD_ROUTE: string = '/claude-md';
 
 /** Раздел личных правил из CLAUDE.md. */
 export function RulesPage() {
@@ -65,6 +74,19 @@ export function RulesPage() {
 
   const isEmpty = !isLoading && filtered.length === 0;
   const hasQuery = query.trim().length > 0;
+
+  // Тот же файл, что открыт на странице CLAUDE.md (общий ключ запроса, обновляется
+  // наблюдателем вместе с правилами): по нему решаем, какую пустоту показывать.
+  // Файл есть только у модели инструкций `file`: у Continue раздел «готов», но
+  // это СПИСОК файлов, и сервер отвечал 400 на каждый заход в правила. Решает
+  // модель, не возможность и не id провайдера.
+  const { data: providers } = useProviders();
+  const hasInstructionsFile = activeProvider(providers)?.instructionsModel === 'file';
+  const { data: instructions } = useClaudeMd({ enabled: hasInstructionsFile });
+  const emptyState = useMemo(
+    () => resolveRulesEmptyState(instructions?.content),
+    [instructions?.content],
+  );
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
@@ -138,13 +160,14 @@ export function RulesPage() {
         ))}
       </Stack>
 
-      {/* Пусто здесь означает две очень разные вещи, и одна заглушка на обе
-          путала: при промахе поиска страница уверяла, что «правил пока нет» и
-          звала добавить первое, хотя правила есть. Промах — своя заглушка с
-          запросом. Настоящая пустота — когда в CLAUDE.md нет ни одного
-          заголовка «## ПРАВИЛО:», а он там и не обязан быть: панель считает
-          правилами только их (domains/rules.ts). Это выглядит как поломка
-          счётчика, поэтому объясняем прямо. */}
+      {/* Пусто здесь означает три разные вещи, и одна заглушка на все путала.
+          Промах поиска — своя заглушка с запросом (раньше страница уверяла, что
+          «правил пока нет», хотя правила есть). Пустой или отсутствующий файл —
+          обычное «правил пока нет». А самый частый случай на живом CLAUDE.md —
+          файл непустой, но размечен обычными «## » разделами: панель считает
+          правилами только «## ПРАВИЛО: …» (contracts/rule-format), и голый «0»
+          читался как сломанный счётчик. Поэтому здесь — сколько таких разделов
+          в файле, какой заголовок ждёт панель, и куда идти править. */}
       {isEmpty && hasQuery && (
         <EmptyState
           icon="search"
@@ -152,8 +175,39 @@ export function RulesPage() {
           text={t('rules.noMatchText', { query: query.trim() })}
         />
       )}
-      {isEmpty && !hasQuery && (
+      {isEmpty && !hasQuery && emptyState.kind === 'blank' && (
         <EmptyState icon="rules" title={t('rules.emptyTitle')} text={t('rules.emptyText')} />
+      )}
+      {isEmpty && !hasQuery && emptyState.kind === 'unformatted' && (
+        <EmptyState
+          icon="rules"
+          title={t('rules.emptyPlainTitle')}
+          text={
+            emptyState.plainSections > 0
+              ? t('rules.emptyPlainText', { count: emptyState.plainSections })
+              : t('rules.emptyPlainNoSections')
+          }
+          action={
+            <Stack align="center" gap="var(--spacing-sm)" data-testid="rules-unformatted">
+              <Typography variant="mono" as="code" className={styles.example}>
+                {RULE_HEADING_EXAMPLE}
+              </Typography>
+              <Typography variant="body-sm" color="muted" className={styles.hint}>
+                {t('rules.emptyPlainHint')}
+              </Typography>
+              <Stack direction="row" gap="var(--spacing-xs)" justify="center" wrap>
+                <Link to={CLAUDE_MD_ROUTE} className={styles.link}>
+                  <Icon name="edit" size={20} />
+                  {t('rules.openClaudeMd')}
+                </Link>
+                <Link to={HELP_ROUTE} search={{ topic: 'rules' }} className={styles.link}>
+                  <Icon name="help" size={20} />
+                  {t('rules.openRulesHelp')}
+                </Link>
+              </Stack>
+            </Stack>
+          }
+        />
       )}
 
       <RuleFormModal isOpen={isFormOpen} onOpenChange={closeForm} rule={editing} />

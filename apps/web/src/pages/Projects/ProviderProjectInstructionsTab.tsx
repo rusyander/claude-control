@@ -86,7 +86,7 @@ export function ProviderProjectInstructionsTab({ projectId }: ProjectTabProps) {
         </Stack>
 
         <Typography variant="caption" color="subtle">
-          {t('common.needsRestart')}
+          {t('providers.needsRestartFor', { provider: data.providerName })}
         </Typography>
       </Stack>
     </Card>

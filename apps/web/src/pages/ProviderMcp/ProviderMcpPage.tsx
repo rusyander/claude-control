@@ -175,6 +175,7 @@ export function ProviderMcpPage() {
 
       <ProviderMcpForm
         isOpen={isFormOpen}
+        providerName={data.providerName}
         onOpenChange={setIsFormOpen}
         server={editing}
         onSave={(draft, serverId, onDone) => {

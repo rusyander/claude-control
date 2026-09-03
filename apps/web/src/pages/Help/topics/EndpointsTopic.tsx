@@ -116,10 +116,10 @@ export function EndpointsTopic() {
           <StorageCard
             title={tr('filePanelTitle')}
             rows={[
-              { label: tr('fileProfiles'), value: '~/.claude-control/state.json', isMono: true },
+              { label: tr('fileProfiles'), value: '~/.claude/claude-control/state.json', isMono: true },
               {
                 label: tr('fileToken'),
-                value: '~/.claude-control/provider-keys.enc',
+                value: '~/.claude/claude-control/provider-keys.enc',
                 isMono: true,
               },
             ]}

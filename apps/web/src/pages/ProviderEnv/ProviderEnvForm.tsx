@@ -15,6 +15,7 @@ import type { ProviderEnvFormProps } from './ProviderEnvForm.types';
 export function ProviderEnvForm({
   isOpen,
   onOpenChange,
+  providerName,
   envVar,
   existingKeys,
   onSubmit,
@@ -46,7 +47,7 @@ export function ProviderEnvForm({
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       title={envVar ? `${t('common.edit')}: ${envVar.key}` : t('providerEnv.addVar')}
-      description={t('common.needsRestart')}
+      description={t('providers.needsRestartFor', { provider: providerName })}
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>

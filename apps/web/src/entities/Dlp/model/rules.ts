@@ -8,6 +8,10 @@ import type { DlpBuiltinPattern, DlpRule } from '@claude-control/contracts';
  * проверки — то есть ложное спокойствие вместо защиты. Поэтому первый заход
  * предлагает готовые образцы с контрольными суммами, а свои словари человек
  * добавляет к ним.
+ *
+ * Названия и метки правил приходят снаружи (из словаря интерфейса): метка
+ * попадает в текст запроса и в ответ модели, и в английском интерфейсе она
+ * должна быть английской — зашитое «ДАННЫЕ» там читалось как утечка.
  */
 
 /** Встроенные образцы в порядке, в котором их показываем. */
@@ -20,15 +24,7 @@ export const DLP_BUILTINS: DlpBuiltinPattern[] = [
   'secret_key',
 ];
 
-/** Метка по умолчанию для каждого образца — она попадёт в текст вместо значения. */
-const BUILTIN_LABELS: Record<DlpBuiltinPattern, string> = {
-  email: 'ПОЧТА',
-  phone_ru: 'ТЕЛЕФОН',
-  inn: 'ИНН',
-  snils: 'СНИЛС',
-  card: 'КАРТА',
-  secret_key: 'КЛЮЧ',
-};
+export type BuiltinNames = Record<DlpBuiltinPattern, string>;
 
 export function newRuleId(): string {
   // `crypto.randomUUID` требует защищённого контекста, а панель открывают и по
@@ -36,7 +32,7 @@ export function newRuleId(): string {
   return `dlp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function newTermsRule(name: string): DlpRule {
+export function newTermsRule(name: string, label: string): DlpRule {
   return {
     id: newRuleId(),
     name,
@@ -45,11 +41,11 @@ export function newTermsRule(name: string): DlpRule {
     terms: [],
     pattern: '',
     action: 'mask',
-    label: 'ДАННЫЕ',
+    label,
   };
 }
 
-export function newBuiltinRule(builtin: DlpBuiltinPattern, name: string): DlpRule {
+export function newBuiltinRule(builtin: DlpBuiltinPattern, name: string, label: string): DlpRule {
   return {
     id: newRuleId(),
     name,
@@ -62,11 +58,11 @@ export function newBuiltinRule(builtin: DlpBuiltinPattern, name: string): DlpRul
     // осмысленный запрос, но модель всё равно не сможет им воспользоваться, а
     // человек решил бы, что ключ ушёл безопасно.
     action: builtin === 'secret_key' ? 'block' : 'mask',
-    label: BUILTIN_LABELS[builtin],
+    label,
   };
 }
 
-export function newRegexRule(name: string): DlpRule {
+export function newRegexRule(name: string, label: string): DlpRule {
   return {
     id: newRuleId(),
     name,
@@ -75,16 +71,17 @@ export function newRegexRule(name: string): DlpRule {
     terms: [],
     pattern: '',
     action: 'mask',
-    label: 'ДАННЫЕ',
+    label,
   };
 }
 
-/** Стартовый набор: все встроенные образцы плюс пустой словарь под свои имена. */
-export function starterRules(names: Record<DlpBuiltinPattern | 'terms', string>): DlpRule[] {
-  return [
-    ...DLP_BUILTINS.map((builtin) => newBuiltinRule(builtin, names[builtin])),
-    newTermsRule(names.terms),
-  ];
+/**
+ * Стартовый набор: все встроенные образцы. Словаря здесь нет намеренно —
+ * пустой словарь сервер не сохраняет (правило без слов не работает), поэтому
+ * страница добавляет его отдельно, черновиком, чтобы человек его заполнил.
+ */
+export function starterRules(names: BuiltinNames, labels: BuiltinNames): DlpRule[] {
+  return DLP_BUILTINS.map((builtin) => newBuiltinRule(builtin, names[builtin], labels[builtin]));
 }
 
 export function replaceRule(rules: DlpRule[], next: DlpRule): DlpRule[] {

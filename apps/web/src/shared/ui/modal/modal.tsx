@@ -23,6 +23,7 @@ export function Modal({
   footer,
   size = 'md',
   bodyFill = false,
+  dismissible = true,
 }: ModalProps) {
   const { t } = useTranslation();
   const isReduced = useReducedMotion();
@@ -30,8 +31,17 @@ export function Modal({
   const fade = withReducedMotion({ duration: DURATION.normal, ease: EASE }, isReduced);
   const dialog = withReducedMotion({ duration: DURATION.normal, ease: EASE }, isReduced);
 
+  // Недискриминируемое окно не закрывается ни Escape, ни кликом мимо: Radix
+  // сообщил бы onOpenChange(false), а мы его глушим здесь и запрещаем сами
+  // события ниже — иначе крестика нет, а окно всё равно пропадает по Escape.
+  const handleOpenChange = (next: boolean): void => {
+    if (!next && !dismissible) return;
+    onOpenChange(next);
+  };
+  const block = dismissible ? undefined : (event: Event): void => event.preventDefault();
+
   return (
-    <Root open={isOpen} onOpenChange={onOpenChange}>
+    <Root open={isOpen} onOpenChange={handleOpenChange}>
       {/*
         forceMount отдаёт управление показом AnimatePresence: без него Radix
         снимает окно с экрана мгновенно, и анимации закрытия не существует —
@@ -51,7 +61,13 @@ export function Modal({
               />
             </Overlay>
 
-            <Content asChild forceMount>
+            <Content
+              asChild
+              forceMount
+              onEscapeKeyDown={block}
+              onPointerDownOutside={block}
+              onInteractOutside={block}
+            >
               <motion.div
                 className={[styles.content, styles[size]].join(' ')}
                 variants={DIALOG}
@@ -73,16 +89,18 @@ export function Modal({
                   )}
                 </Stack>
 
-                <Close asChild>
-                  <Button
-                    className={styles.closeButton}
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    icon={<Icon name="close" size={24} />}
-                    aria-label={t('common.close')}
-                  />
-                </Close>
+                {dismissible && (
+                  <Close asChild>
+                    <Button
+                      className={styles.closeButton}
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      icon={<Icon name="close" size={24} />}
+                      aria-label={t('common.close')}
+                    />
+                  </Close>
+                )}
 
                 <div
                   className={[styles.body, bodyFill && styles.bodyFill].filter(Boolean).join(' ')}

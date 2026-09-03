@@ -63,6 +63,7 @@ export const en: TranslationSchema = {
     chat: 'Chat',
     rules: 'Rules',
     claudeMd: 'CLAUDE.md',
+    instructions: 'Instructions',
     hooks: 'Hooks',
     scripts: 'Scripts',
     skills: 'Skills',
@@ -79,7 +80,7 @@ export const en: TranslationSchema = {
     dlp: 'Data protection',
     help: 'Help',
     sectionMain: 'Main',
-    sectionBehavior: 'Claude behaviour',
+    sectionBehavior: 'Agent behaviour',
     sectionIntegrations: 'Integrations and access',
     sectionApp: 'Application',
   },
@@ -113,6 +114,7 @@ export const en: TranslationSchema = {
     },
   },
   providers: {
+    needsRestartFor: 'Changes apply after restarting {{provider}}',
     inDevelopment: 'in development',
     inDevelopmentShort: 'soon',
     unsupported: 'unavailable',
@@ -249,6 +251,21 @@ export const en: TranslationSchema = {
     emptyTitle: 'No rules yet',
     emptyText:
       'The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above.',
+    emptyPlainTitle: 'CLAUDE.md has no rules in the panel’s format',
+    emptyPlainText_one:
+      'The file is not empty: it has {{count}} «## …» section, but the panel counts a section as a rule only when its heading looks like this:',
+    emptyPlainText_few:
+      'The file is not empty: it has {{count}} «## …» sections, but the panel counts a section as a rule only when its heading looks like this:',
+    emptyPlainText_many:
+      'The file is not empty: it has {{count}} «## …» sections, but the panel counts a section as a rule only when its heading looks like this:',
+    emptyPlainText_other:
+      'The file is not empty: it has {{count}} «## …» sections, but the panel counts a section as a rule only when its heading looks like this:',
+    emptyPlainNoSections:
+      'The file is not empty but has no «## …» headings at all, and the panel counts a section as a rule only when its heading looks like this:',
+    emptyPlainHint:
+      'The rest of the file is left alone and never listed. Rename the heading of the section you need after the example, or add the first rule with the button above.',
+    openClaudeMd: 'Open CLAUDE.md',
+    openRulesHelp: 'How rules work',
     noMatchTitle: 'Nothing found',
     noMatchText: 'No rule title or body matches “{{query}}”.',
   },
@@ -871,6 +888,7 @@ export const en: TranslationSchema = {
   providerHooks: {
     title: 'Hooks · {{provider}}',
     subtitle: '{{provider}} hooks: the experimental.hook key in opencode.json',
+    subtitleRules: '{{provider}} hooks: the hooks key in settings.json - event, matcher, command',
     explainTitle: 'How it works',
     explain:
       '{{provider}} organises hooks differently from Claude: they live in the experimental.hook key of {{filePath}}. There are exactly two events. "File edited" (file_edited) maps a file pattern to a list of actions: edit a file matching the pattern and the actions run. "Session completed" (session_completed) is simply a list of actions to run when work finishes. A command is given as a LIST OF ARGUMENTS, not a shell string: the program first, then its arguments one per field - so spaces inside an argument are safe. The panel edits only this key: the rest of the file, other experimental keys and unknown events stay put, and a backup is made before writing. Changes take effect after the CLI restarts.',
@@ -1479,7 +1497,7 @@ export const en: TranslationSchema = {
       'A local proxy between the CLI and the model: it sees every request body and rewrites it by rules',
     explainTitle: 'What this section does — and what it does not',
     explainText:
-      'The proxy listens on 127.0.0.1. Point a CLI at this address instead of the model address and the panel sees the BODY of every request: the prompt, the contents of files the agent read, tool output. Whatever the rules match is replaced by a placeholder ([ИМЯ_1]) and restored in the response — the model works with the placeholder, you read the real name. A "block" rule stops the request entirely. What it does not do: it does not guess anything the rules do not describe; it does not intercept TLS (the hop upstream is ordinary https, no substituted certificates); it cannot help if the model paraphrases a placeholder in its reply — then there is nothing left to substitute back. Three different things: your own endpoint decides WHERE a request goes; this proxy decides WHAT goes in it; the prompt gate sees only what a human typed by hand.',
+      'The proxy listens on 127.0.0.1. Point a CLI at this address instead of the model address and the panel sees the BODY of every request: the prompt, the contents of files the agent read, tool output. Whatever the rules match is replaced by a placeholder ([NAME_1]) and restored in the response — the model works with the placeholder, you read the real name. A "block" rule stops the request entirely. What it does not do: it does not guess anything the rules do not describe; it does not intercept TLS (the hop upstream is ordinary https, no substituted certificates); it cannot help if the model paraphrases a placeholder in its reply — then there is nothing left to substitute back. Three different things: your own endpoint decides WHERE a request goes; this proxy decides WHAT goes in it; the prompt gate sees only what a human typed by hand.',
     statusTitle: 'Proxy',
     running: 'running',
     stopped: 'stopped',
@@ -1490,10 +1508,17 @@ export const en: TranslationSchema = {
       'Put this address into the CLI as the model address — for example, via a profile on the settings page.',
     counters: 'requests: {{requests}} · masked: {{masked}} · blocked: {{blocked}}',
     port: 'Port',
-    portHint: 'The listener binds 127.0.0.1 only — it is never published outside.',
+    portHint:
+      'The listener binds 127.0.0.1 only — it is never published outside. Saved on Enter or when the field loses focus.',
+    portInvalid: 'The port is an integer between 1024 and 65535.',
     upstreamUrl: 'Forward to',
     upstreamHint:
-      'The real model address: the vendor cloud, a local model or a corporate gateway. Empty — taken from the endpoint profile selected below.',
+      'The real model address: the vendor cloud, a local model or a corporate gateway. Empty — taken from the endpoint profile selected below. Saved on Enter or when the field loses focus.',
+    upstreamInvalid: 'The address must start with http:// or https://.',
+    settingsFailed: 'Could not save the proxy settings.',
+    restartFailed: 'Could not restart the proxy with the new settings — it is stopped.',
+    restartOnChange:
+      'Any settings change restarts a running proxy; placeholder numbering starts over.',
     upstreamProfile: 'Endpoint profile',
     upstreamProfileNone: 'do not use',
     upstreamProfileHint:
@@ -1510,8 +1535,10 @@ export const en: TranslationSchema = {
     addStarter: 'Add the ready-made set',
     addTerms: 'Own dictionary',
     addRegex: 'Own expression',
+    addBuiltin: 'Built-in pattern',
     newTermsName: 'Own dictionary',
     newRegexName: 'Own expression',
+    defaultLabel: 'DATA',
     ruleName: 'Rule name',
     ruleEnabled: 'Rule "{{name}}" enabled',
     ruleIncomplete: 'incomplete',
@@ -1525,13 +1552,22 @@ export const en: TranslationSchema = {
       card: 'Card number',
       secret_key: 'Secret keys',
     },
+    builtinLabel: {
+      email: 'EMAIL',
+      phone_ru: 'PHONE',
+      inn: 'INN',
+      snils: 'SNILS',
+      card: 'CARD',
+      secret_key: 'KEY',
+    },
     builtinHint: {
       email: 'Email addresses.',
       phone_ru: 'Russian numbers: +7, 8, with and without separators.',
       inn: 'Ten and twelve digits, control digits verified by the tax-service coefficients.',
       snils: 'Eleven digits with the remainder-rule check digit.',
       card: 'Thirteen to nineteen digits verified by the Luhn algorithm.',
-      secret_key: 'Keys shaped like sk-…, ghp_…, AKIA… and authorization headers.',
+      secret_key:
+        'Keys shaped like sk-…, ghp_…, AKIA…, Slack tokens (xox…) and PEM private-key blocks inside the request text.',
     },
     terms: 'Dictionary',
     termsHint:
@@ -1567,10 +1603,12 @@ export const en: TranslationSchema = {
     previewMasked: 'replacements: {{count}}',
     previewBlocked: 'the request would be refused',
     previewHit: '{{rule}} → {{placeholder}} ×{{count}}',
+    previewFailed: 'Could not run the check.',
     journalTitle: 'Match journal',
     journalClear: 'Clear',
     journalEmpty: 'Empty so far.',
     journalOff: 'The journal is switched off in the settings above.',
+    journalError: 'Could not read the journal.',
     decision: {
       passed: 'passed',
       masked: 'masked',
@@ -1599,6 +1637,7 @@ export const en: TranslationSchema = {
     applied: 'Gate installed.',
     removed: 'Gate removed.',
     applyFailed: 'Could not change the gate.',
+    loadError: 'Could not read the gate state.',
   },
   assistantKey: {
     title: '{{provider}} assistant needs access',
@@ -2715,6 +2754,27 @@ export const en: TranslationSchema = {
     next: 'Next',
     back: 'Back',
     done: 'Done',
+    skip: 'Skip',
+    stepOf: 'Step {{current}} of {{total}}',
+    cannotSkip:
+      'Point the panel at a working .claude folder first — without it there is nothing to show.',
+    pathLabel: 'Path to the .claude folder',
+    pathPlaceholder: 'For example ~/.claude or C:\\Users\\name\\.claude',
+    apply: 'Apply',
+    resetAuto: 'Auto-detect',
+    pickerTitle: 'The .claude configuration folder',
+    pickerHint: 'Find the .claude folder — it usually sits in your home directory.',
+    providersLoading: 'Looking for installed CLIs…',
+    providersError: 'Could not check the installed CLIs — the server did not answer.',
+    providersChooseNamed: 'Choose {{name}}',
+    accessTitle: 'Claude Code access',
+    accessSubtitle: 'Needed only by the sandbox — chat and the sections work without it.',
+    accessHint:
+      'The panel checked where Claude Code takes its account access from. A green badge means it was found and nothing needs doing. If there is none, log in with the claude command in a terminal or set it by hand. This step can be skipped.',
+    accessLoading: 'Checking access…',
+    loadErrorTitle: 'The panel did not load',
+    loadErrorText:
+      'Could not read the panel settings — the server did not answer. Check that it is running and retry.',
   },
   envTransfer: {
     title: 'Environment transfer',

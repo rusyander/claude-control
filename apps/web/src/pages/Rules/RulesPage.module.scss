@@ -6,3 +6,38 @@
   white-space: pre-wrap; // правила пишутся списками, переносы значимы
   max-width: var(--text-measure);
 }
+
+// Объясняющая заглушка «файл непустой, правил в формате панели нет»: образец
+// заголовка выделен как код, чтобы его можно было прочитать и скопировать буквально.
+.example {
+  display: inline-block;
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.hint {
+  max-width: 46ch;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-radius: 6px;
+  font-size: var(--font-size-body-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+  transition:
+    color var(--duration-fast),
+    background-color var(--duration-fast);
+
+  &:hover {
+    background-color: var(--color-accent-subtle);
+  }
+}

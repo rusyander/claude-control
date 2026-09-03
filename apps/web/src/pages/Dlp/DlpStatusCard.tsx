@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DlpSettings, DlpStatus, EndpointProfile } from '@claude-control/contracts';
 import { Card } from '@shared/ui/card';
@@ -20,6 +21,23 @@ interface Props {
   onToggleRunning: (running: boolean) => void;
 }
 
+const PORT_MIN = 1024;
+const PORT_MAX = 65535;
+
+function parsePort(raw: string): number | undefined {
+  const value = Number(raw.trim());
+  return Number.isInteger(value) && value >= PORT_MIN && value <= PORT_MAX ? value : undefined;
+}
+
+function isHttpUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Состояние прокси и его настройки: адрес для CLI, куда пересылать, что делать
  * с неразобранным.
@@ -27,6 +45,13 @@ interface Props {
  * Адрес, который вписывают в CLI, показан крупно и первым: это единственное,
  * что нужно сделать снаружи панели, и пока он не прописан, прокси не видит
  * ничего — а раздел при этом выглядит работающим.
+ *
+ * Порт и адрес наверх набирают руками, а не переключают, поэтому они живут
+ * черновиком и уходят на сервер по Enter или когда поле теряет фокус. PATCH на
+ * каждый символ отправлял «5», «52», «526» (все ниже 1024 — отказ), а
+ * управляемое поле после каждого ответа сервера теряло набранное. Автосохранения
+ * по паузе здесь нет намеренно: половина адреса или порта при работающем прокси
+ * означала бы перезапуск в никуда.
  */
 export function DlpStatusCard({
   settings,
@@ -38,6 +63,39 @@ export function DlpStatusCard({
   onToggleRunning,
 }: Props) {
   const { t } = useTranslation();
+  const [portDraft, setPortDraft] = useState<string | undefined>(undefined);
+  const [portError, setPortError] = useState<string | undefined>(undefined);
+  const [urlDraft, setUrlDraft] = useState<string | undefined>(undefined);
+  const [urlError, setUrlError] = useState<string | undefined>(undefined);
+
+  const commitPort = (): void => {
+    if (portDraft === undefined) return;
+    const value = parsePort(portDraft);
+    if (value === undefined) {
+      setPortError(t('dlp.portInvalid'));
+      return;
+    }
+    setPortError(undefined);
+    setPortDraft(undefined);
+    if (value !== settings.port) onChange({ port: value });
+  };
+
+  const commitUrl = (): void => {
+    if (urlDraft === undefined) return;
+    const next = urlDraft.trim();
+    if (next && !isHttpUrl(next)) {
+      setUrlError(t('dlp.upstreamInvalid'));
+      return;
+    }
+    setUrlError(undefined);
+    setUrlDraft(undefined);
+    if (next !== settings.upstreamUrl) onChange({ upstreamUrl: next });
+  };
+
+  const submit = (commit: () => void) => (event: FormEvent) => {
+    event.preventDefault();
+    commit();
+  };
 
   return (
     <Card padding="md">
@@ -85,22 +143,37 @@ export function DlpStatusCard({
           </Typography>
         )}
 
-        <TextField
-          label={t('dlp.port')}
-          value={String(settings.port)}
-          onChange={(value) => onChange({ port: Number(value) || settings.port })}
-          hint={t('dlp.portHint')}
-          isMono
-        />
+        {/* Форма ради Enter: у текстового поля нет своего обработчика клавиш, а
+            отправка формы — стандартный способ сказать «готово». onBlur всплывает
+            от поля к форме, поэтому уход из поля тоже сохраняет. */}
+        <form onSubmit={submit(commitPort)} onBlur={commitPort} noValidate>
+          <TextField
+            label={t('dlp.port')}
+            value={portDraft ?? String(settings.port)}
+            onChange={(value) => {
+              setPortDraft(value);
+              setPortError(undefined);
+            }}
+            hint={t('dlp.portHint')}
+            error={portError}
+            isMono
+          />
+        </form>
 
-        <TextField
-          label={t('dlp.upstreamUrl')}
-          value={settings.upstreamUrl}
-          onChange={(upstreamUrl) => onChange({ upstreamUrl })}
-          placeholder="https://api.anthropic.com"
-          hint={t('dlp.upstreamHint')}
-          isMono
-        />
+        <form onSubmit={submit(commitUrl)} onBlur={commitUrl} noValidate>
+          <TextField
+            label={t('dlp.upstreamUrl')}
+            value={urlDraft ?? settings.upstreamUrl}
+            onChange={(value) => {
+              setUrlDraft(value);
+              setUrlError(undefined);
+            }}
+            placeholder="https://api.anthropic.com"
+            hint={t('dlp.upstreamHint')}
+            error={urlError}
+            isMono
+          />
+        </form>
 
         {profiles.length > 0 && (
           <SelectField
@@ -142,6 +215,12 @@ export function DlpStatusCard({
             aria-label={t('dlp.journal')}
           />
         </Stack>
+
+        {status.running && (
+          <Typography variant="caption" color="subtle">
+            {t('dlp.restartOnChange')}
+          </Typography>
+        )}
       </Stack>
     </Card>
   );

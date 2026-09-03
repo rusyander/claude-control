@@ -71,7 +71,7 @@ export function DlpTopic() {
               name: tr('actionMask'),
               description: tr('actionMaskText'),
               isMono: false,
-              badge: '[ИМЯ_1]',
+              badge: tr('actionMaskBadge'),
               badgeTone: 'info',
             },
             {
@@ -135,7 +135,11 @@ export function DlpTopic() {
                 value: '~/.claude/claude-control/dlp-journal.jsonl',
                 isMono: true,
               },
-              { label: tr('fileSettings'), value: '~/.claude-control/state.json', isMono: true },
+              {
+                label: tr('fileSettings'),
+                value: '~/.claude/claude-control/state.json',
+                isMono: true,
+              },
             ]}
           />
           <StorageCard

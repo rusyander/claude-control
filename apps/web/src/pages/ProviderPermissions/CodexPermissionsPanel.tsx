@@ -70,7 +70,10 @@ export function CodexPermissionsPanel({ data, save }: CodexPermissionsPanelProps
 
       <ExplainBox
         title={t('providerPermissions.explainTitle')}
-        text={t('providerPermissions.explain', { fileName: data.filePath })}
+        text={t('providerPermissions.explain', {
+          provider: data.providerName,
+          fileName: data.filePath,
+        })}
       />
 
       {!data.cliDetected && (

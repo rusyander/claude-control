@@ -11,7 +11,6 @@ import { PageHeader } from '@shared/ui/page-header';
 import { SelectField } from '@shared/ui/select-field';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { LoadErrorCard } from '@shared/ui/load-error';
-import { ExplainBox } from '@shared/ui/explain-box';
 import { EmptyState } from '@shared/ui/empty-state';
 import { toast } from '@shared/lib/toast';
 import { useSettings } from '@entities/AppConfig';
@@ -126,11 +125,16 @@ export function ProviderComparePage() {
   const renderResult = (): ReactNode => {
     if (leftId === rightId) return <EmptyState icon="swap" title={t('providerCompare.samePair')} />;
     if (compare.isLoading) return <SkeletonList rows={4} />;
+    // Отказ самого сравнения — та же карточка с повтором, что и у настроек выше:
+    // пояснение без кнопки оставляло страницу без выхода, кроме F5.
     if (compare.isError) {
       return (
-        <ExplainBox
+        <LoadErrorCard
           title={t('providerCompare.loadError')}
           text={t('providerCompare.loadErrorText')}
+          onRetry={() => {
+            void compare.refetch();
+          }}
         />
       );
     }

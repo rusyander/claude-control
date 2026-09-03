@@ -21,6 +21,8 @@ export interface TextKey {
 }
 
 export interface InstructionsView {
+  /** Подпись под редактором: чей перезапуск нужен — Claude Code или чужого CLI. */
+  restartHint: TextKey;
   /** Активный провайдер — Claude (быстрый путь, тексты как раньше). */
   isClaude: boolean;
   title: TextKey;
@@ -37,6 +39,7 @@ export function instructionsView(info: InstructionsFileInfo): InstructionsView {
       title: { key: 'claudeMd.title' },
       subtitle: { key: 'claudeMd.subtitle' },
       explain: { key: 'claudeMd.explain' },
+      restartHint: { key: 'common.needsRestart' },
     };
   }
 
@@ -48,6 +51,7 @@ export function instructionsView(info: InstructionsFileInfo): InstructionsView {
     },
     subtitle: { key: 'claudeMd.subtitleFor', params: { provider: info.providerName } },
     explain: { key: 'claudeMd.explainFor', params: { path: info.filePath } },
+    restartHint: { key: 'providers.needsRestartFor', params: { provider: info.providerName } },
     cliHint: info.cliDetected
       ? undefined
       : {

@@ -26,17 +26,8 @@
   }
 }
 
-// Предупреждение о секрете в окне ручного ввода: должно читаться как
-// предупреждение, а не как ещё одна подпись поля.
-.credentialsWarning {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-left: 2px solid var(--color-warning);
-  background: var(--color-warning-subtle);
-  border-radius: var(--radius-sm);
-}
-
 // Предупреждение о выбранном экспериментальном провайдере: заметное, но не
-// алармирующее — та же логика, что у предупреждения о секрете.
+// алармирующее.
 .providerNotice {
   display: flex;
   flex-direction: column;

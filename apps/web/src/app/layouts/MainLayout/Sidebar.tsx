@@ -9,9 +9,14 @@ import { Icon } from '@shared/ui/icon';
 import { NotificationCenter } from '@shared/ui/notification-center';
 import { Badge } from '@shared/ui/badge';
 import { useOverview } from '@entities/AppConfig';
-import { useProviders, activeCapabilities, gateNavSections } from '@entities/Provider';
+import {
+  useProviders,
+  activeProvider,
+  activeCapabilities,
+  gateNavSections,
+} from '@entities/Provider';
 import { NAV_SECTIONS, COLLAPSED_WIDTH, EXPANDED_WIDTH } from './Sidebar.constants';
-import { navItemTitle } from './Sidebar.lib';
+import { navItemLabel, navItemTitle } from './Sidebar.lib';
 import { AppMark } from './AppMark';
 import type { SidebarProps } from './Sidebar.types';
 import styles from './MainLayout.module.scss';
@@ -35,6 +40,7 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
   // убраны, `planned` помечены. Пока данные не загружены — показываем всё (для
   // дефолтного Claude всё `ready`, так что при Claude вид не меняется).
   const sections = gateNavSections(NAV_SECTIONS, activeCapabilities(providers));
+  const active = activeProvider(providers);
 
   const counts: Record<string, number | undefined> = {
     rules: overview?.rules.total,
@@ -129,13 +135,13 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
                 to={item.path}
                 className={styles.navLink}
                 // В свёрнутом виде подписи не видно — подсказка браузера её заменяет.
-                title={navItemTitle(item, isCollapsed, t)}
+                title={navItemTitle(item, navItemLabel(item, active, t), isCollapsed, t)}
               >
                 <Icon name={item.icon} size={24} />
 
                 {label(
                   <>
-                    {t(item.label)}
+                    {navItemLabel(item, active, t)}
                     {item.access === 'inDevelopment' ? (
                       // Раздел провайдера ещё в разработке: помечаем, счётчик не
                       // показываем (за ним нет реальных данных).

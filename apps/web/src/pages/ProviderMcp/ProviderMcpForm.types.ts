@@ -3,6 +3,8 @@ import type { UniversalMcpServer, UniversalMcpServerDraft } from '@claude-contro
 export interface ProviderMcpFormProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Имя CLI — для подсказки «изменения применятся после перезапуска …». */
+  providerName: string;
   server?: UniversalMcpServer;
   /**
    * Сохранение: черновик, прежнее имя сервера (при правке) и колбэк «готово»

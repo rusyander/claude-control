@@ -1152,10 +1152,40 @@ export const helpEn: HelpSchema = {
       storageApply: 'When it applies',
       storageApplyValue: 'at once: changing the directory needs no restart',
 
+      tabsTitle: 'Sections of the page',
+      tabsCaption:
+        'Settings are split across seven tabs — exactly one section is open at a time. The ' +
+        'chosen one goes into the address (/settings?tab=…): the link can be shared and ' +
+        'survives a reload. Tabs work from the keyboard too: Tab enters the strip, arrows ' +
+        'switch sections, Home and End jump to the edges.',
+      tabGeneral: 'General',
+      tabGeneralText: 'Theme, accent, language, accessibility and the editor files open in.',
+      tabAccess: 'Access',
+      tabAccessText:
+        'The Claude Code account, the access source, the configuration directory and remote ' +
+        'access from the phone.',
+      tabProviders: 'Providers',
+      tabProvidersText:
+        'Choosing a CLI, checking it on this machine, provider keys and the config format check.',
+      tabModels: 'Models',
+      tabModelsText:
+        'Default model and effort, the model catalog, a custom endpoint and MCP server checks.',
+      tabSpend: 'Spend',
+      tabSpendText: 'Spend units — tokens or money — and the rates it is counted by.',
+      tabSafety: 'Safety',
+      tabSafetyText:
+        'Backups before every write and how many are kept, the diff before writing into another ' +
+        'CLI, file watching, revealing secrets, backup encryption and the backups themselves.',
+      tabTransfer: 'Transfer',
+      tabTransferText:
+        'A snapshot of the panel settings and moving a provider environment to another machine ' +
+        'as an archive.',
+
       cardsTitle: 'The main cards',
       cardsCaption:
-        'The four cards at the top of the section. The rest — remote access, models, provider ' +
-        'check, format check, transfer — have their own sections below.',
+        'The four cards people usually start with: the first is on the General tab, the other ' +
+        'three on Access. The rest — remote access, models, provider check, format check, ' +
+        'transfer — have their own sections below.',
       cardAccount: 'Account',
       cardAccountText:
         'Whose account is in use: email, organisation, subscription type. Taken from the same ' +

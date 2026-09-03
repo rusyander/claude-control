@@ -1943,6 +1943,26 @@ export const en: TranslationSchema = {
   settings: {
     title: 'Settings',
     subtitle: 'Application, accessibility and configuration path',
+    tabsLabel: 'Settings sections',
+    tab_general: 'General',
+    tabHint_general: 'Theme, accent, language, accessibility and the editor project files open in.',
+    tab_access: 'Access',
+    tabHint_access:
+      'The Claude Code account, where the panel takes access from, which configuration directory it reads and who it lets in from outside.',
+    tab_providers: 'Providers',
+    tabHint_providers:
+      'Which CLI the panel manages, whether it is installed, how it authenticates and whether its config formats match the published schemas.',
+    tab_models: 'Models',
+    tabHint_models:
+      'Default model and thinking effort, the model catalog, a custom endpoint and MCP server checks.',
+    tab_spend: 'Spend',
+    tabHint_spend: 'Which units to show spend in and which rates to count it by.',
+    tab_safety: 'Safety',
+    tabHint_safety:
+      'What the panel does before writing to the configuration and what stays on disk afterwards.',
+    tab_transfer: 'Transfer',
+    tabHint_transfer:
+      'A snapshot of the panel settings and moving a provider environment to another machine.',
     account: 'Claude Code account',
     subscription: 'Subscription',
     limitsNote:

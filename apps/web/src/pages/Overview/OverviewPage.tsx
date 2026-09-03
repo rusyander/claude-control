@@ -166,6 +166,9 @@ export function OverviewPage() {
                 : t('overview.backupsNone')
             }
             to="/settings"
+            // Копии живут во вкладке «Безопасность» — плитка ведёт прямо в неё,
+            // а не на первый раздел настроек.
+            search={{ tab: 'safety' }}
             actions={[{ label: t('overview.quickHistory'), to: '/history', icon: 'history' }]}
           />
         </div>

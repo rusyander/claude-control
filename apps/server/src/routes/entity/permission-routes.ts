@@ -34,18 +34,35 @@ export function registerPermissionRoutes(app: FastifyInstance, ctx: ServerContex
     return done(savePermission(paths().settings, null, draft, ctx.backupDir));
   });
 
+  // Право, выключенное тумблером, в файле отсутствует — его помнит только
+  // отметка панели (см. rememberedPermissions), а список показывает его с теми
+  // же кнопками, что и живое. Правка, удаление и перенос обязаны работать и для
+  // него: раньше все три отвечали 404, отметка оставалась — строка становилась
+  // неубиваемой. Для такого права меняется только отметка, файл не трогаем.
+  const isRemembered = (id: string): boolean => ctx.store.getDisabledIds('permission').includes(id);
+
   app.put<{ Params: { id: string }; Body: PermissionDraft }>('/api/permissions/:id', (request) => {
     const { id } = request.params;
     const draft = assertPermissionDraft(request.body);
     const bareId = stripLocalPrefix(id);
     const target = targetOf(ctx, id).path;
-    if (!hasPermission(target, bareId)) throw new PermissionNotFoundError(id);
-
-    const backupPath = savePermission(target, bareId, draft, ctx.backupDir);
     // Идентификатор права — решение и шаблон, правка его меняет. Отметки и
     // состав групп ключуются им: переносим, иначе группа теряла участника, а в
     // state.json оставался призрак.
     const newId = `${isLocalId(id) ? LOCAL_ID_PREFIX : ''}${draft.decision}:${draft.pattern}`;
+
+    if (!hasPermission(target, bareId)) {
+      if (!isRemembered(id)) throw new PermissionNotFoundError(id);
+      // Отметку нельзя перевесить на живую запись: та читалась бы выключенной,
+      // хотя Claude Code продолжает её применять.
+      if (newId !== id && hasPermission(target, stripLocalPrefix(newId))) {
+        throw new PermissionExistsError(draft.pattern);
+      }
+      if (newId !== id) ctx.store.renameEntity('permission', id, newId);
+      return done();
+    }
+
+    const backupPath = savePermission(target, bareId, draft, ctx.backupDir);
     if (newId !== id) ctx.store.renameEntity('permission', id, newId);
 
     return done(backupPath);
@@ -55,7 +72,11 @@ export function registerPermissionRoutes(app: FastifyInstance, ctx: ServerContex
     const { id } = request.params;
     const bareId = stripLocalPrefix(id);
     const target = targetOf(ctx, id).path;
-    if (!hasPermission(target, bareId)) throw new PermissionNotFoundError(id);
+    if (!hasPermission(target, bareId)) {
+      if (!isRemembered(id)) throw new PermissionNotFoundError(id);
+      ctx.store.removeEntity('permission', id);
+      return done();
+    }
 
     const backupPath = deletePermission(target, bareId, ctx.backupDir);
     // Отметки и состав групп ключуются id в том виде, в каком он пришёл (с
@@ -70,16 +91,16 @@ export function registerPermissionRoutes(app: FastifyInstance, ctx: ServerContex
   app.post<{ Params: { id: string } }>('/api/permissions/:id/move', (request) => {
     const { id } = request.params;
     const bareId = stripLocalPrefix(id);
-    if (!hasPermission(targetOf(ctx, id).path, bareId)) throw new PermissionNotFoundError(id);
-
-    const backupPath = movePermission(
-      paths().settings,
-      paths().settingsLocal,
-      id,
-      ctx.backupDir,
-    );
     // Перенос меняет префикс id — участие в группах и отметки едут следом.
-    ctx.store.renameEntity('permission', id, isLocalId(id) ? bareId : `${LOCAL_ID_PREFIX}${bareId}`);
+    const movedId = isLocalId(id) ? bareId : `${LOCAL_ID_PREFIX}${bareId}`;
+    if (!hasPermission(targetOf(ctx, id).path, bareId)) {
+      if (!isRemembered(id)) throw new PermissionNotFoundError(id);
+      ctx.store.renameEntity('permission', id, movedId);
+      return done();
+    }
+
+    const backupPath = movePermission(paths().settings, paths().settingsLocal, id, ctx.backupDir);
+    ctx.store.renameEntity('permission', id, movedId);
 
     return done(backupPath);
   });

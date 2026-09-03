@@ -19,7 +19,8 @@ import {
   deleteOpencodeServer,
 } from './opencode-format.ts';
 import { readContinueServers } from '../../lib/continue-yaml.ts';
-import { McpServerExistsError } from './draft.ts';
+import { readGooseExtensions } from '../../lib/goose-yaml.ts';
+import { McpServerExistsError, McpServerNotFoundError } from './draft.ts';
 import { sortByName } from './values.ts';
 import type { ProviderMcpSection, ProviderMcpTarget } from './types.ts';
 
@@ -76,6 +77,19 @@ export function readProviderMcpSection(target: ProviderMcpTarget): ProviderMcpSe
 /** Прочитать список серверов раздела (основной файл + блоки). */
 export function readProviderMcpServers(target: ProviderMcpTarget): UniversalMcpServer[] {
   return readProviderMcpSection(target).servers;
+}
+
+/**
+ * Есть ли у провайдера запись с таким именем. Встроенные расширения Goose в
+ * списке серверов не показываются, но в файле есть — их удаление отвергает сам
+ * формат (422 «не редактируется»), а не «нет такого».
+ */
+function isKnownServer(target: ProviderMcpTarget, serverId: string): boolean {
+  if (readProviderMcpServers(target).some((server) => server.name === serverId)) return true;
+  return (
+    target.format === 'goose-yaml' &&
+    readGooseExtensions(readTextFile(target.filePath)).has(serverId)
+  );
 }
 
 /**
@@ -160,6 +174,10 @@ export function deleteProviderMcpServer(
   serverId: string,
   backupDir: string | undefined,
 ): string | undefined {
+  // Несуществующее имя — 404, а не тихое «удалено»: иначе опечатка в имени
+  // выглядела бы как успех (у Claude `/api/mcp/:id` отвечает так же).
+  if (!isKnownServer(target, serverId)) throw new McpServerNotFoundError(serverId);
+
   // Удаляем оттуда же, где запись лежит: убрать её из основного конфига,
   // оставив в блоке, значит «удалить» сервер, который Continue продолжит грузить.
   const blockPath = blockPathOf(target, serverId);

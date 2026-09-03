@@ -74,16 +74,26 @@ function buildJsonMcpRaw(
   httpUrlKey: 'httpUrl' | 'url',
   existing?: RawJsonMcpServer,
 ): RawJsonMcpServer {
-  const raw: RawJsonMcpServer = preserveUnmodelled(existing, JSON_MODELLED_KEYS);
+  const managed: RawJsonMcpServer = {};
   if (draft.transport === 'stdio') {
-    if (draft.command) raw.command = draft.command;
-    if (draft.args.length > 0) raw.args = draft.args;
-    if (Object.keys(draft.env).length > 0) raw.env = draft.env;
+    if (draft.command) managed.command = draft.command;
+    if (draft.args.length > 0) managed.args = draft.args;
+    if (Object.keys(draft.env).length > 0) managed.env = draft.env;
   } else {
     // Ключ адреса задаёт провайдер: gemini — httpUrl, cursor — url.
-    if (draft.url) raw[httpUrlKey] = draft.url;
-    if (Object.keys(draft.headers).length > 0) raw.headers = draft.headers;
+    if (draft.url) managed[httpUrlKey] = draft.url;
+    if (Object.keys(draft.headers).length > 0) managed.headers = draft.headers;
   }
+  // Порядок ключей — прежний: чужие поля остаются на своих местах, наши подменяются
+  // по месту, новые дописываются в конец. Иначе правка сервера переставляла бы
+  // `cwd`/`type` в начало записи, и в истории изменений мелькал бы ложный дифф.
+  const preserved = preserveUnmodelled(existing, JSON_MODELLED_KEYS);
+  const raw: RawJsonMcpServer = {};
+  for (const key of Object.keys(existing ?? {})) {
+    if (key in preserved) raw[key] = preserved[key];
+    else if (key in managed) raw[key] = managed[key];
+  }
+  for (const [key, value] of Object.entries(managed)) if (!(key in raw)) raw[key] = value;
   return raw;
 }
 

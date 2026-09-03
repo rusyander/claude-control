@@ -158,6 +158,20 @@ describe('маршруты групп: форма тела, 404/409 и согл�
       expect((await put(second.id, { name: 'первая' })).statusCode).toBe(409);
       expect((await put(second.id, { name: 'Вторая', description: 'та же' })).statusCode).toBe(200);
     });
+
+    it('«Dev» и «dev» из старого state.json: правка каждой под своим именем — 200', async () => {
+      const first = await create({ name: 'Dev' });
+      // До проверки уникальности такое состояние записывалось свободно —
+      // воспроизводим напрямую в хранилище, минуя POST.
+      store.saveGroup({ ...first, id: 'legacy-dup', name: 'dev' });
+
+      expect((await put(first.id, { name: 'Dev', description: 'обновлено' })).statusCode).toBe(200);
+      expect((await put('legacy-dup', { name: 'dev', description: 'тоже' })).statusCode).toBe(200);
+
+      // Занять имя соседа по-прежнему нельзя.
+      const third = await create({ name: 'Third' });
+      expect((await put(third.id, { name: 'dev' })).statusCode).toBe(409);
+    });
   });
 
   describe('PUT не переключает группу', () => {

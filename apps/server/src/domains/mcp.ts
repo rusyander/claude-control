@@ -209,7 +209,14 @@ function stringRecord(value: unknown, field: string, keyPattern: RegExp): Record
  * необязательные поля: `args`/`env`/`headers`/`groupIds` дальше читаются без
  * проверок на undefined.
  */
-export function assertMcpDraft(draft: unknown): asserts draft is McpServerDraft {
+export function assertMcpDraft(
+  draft: unknown,
+  // `currentName` — имя правимого сервера. Запись, заведённая до правила имён
+  // (пробел, `__` — `claude mcp add` их не запрещает), остаётся правимой под
+  // своим именем: иначе ей нельзя было бы сменить даже адрес, не переименовав.
+  // Новое имя проверяется как обычно.
+  options?: { currentName?: string },
+): asserts draft is McpServerDraft {
   if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
     throw new InvalidMcpDraftError('Тело запроса должно быть объектом с описанием сервера.');
   }
@@ -219,7 +226,8 @@ export function assertMcpDraft(draft: unknown): asserts draft is McpServerDraft 
     throw new InvalidMcpDraftError('Не указано имя MCP-сервера');
   }
   const name = body.name.trim();
-  if (!NAME_PATTERN.test(name) || name.includes('__')) {
+  const keepsName = options?.currentName !== undefined && name === options.currentName;
+  if (!keepsName && (!NAME_PATTERN.test(name) || name.includes('__'))) {
     throw new InvalidMcpDraftError(
       `Имя «${name}» не годится: без пробелов, косых черт и двойного подчёркивания — ` +
         'по нему строятся права вида mcp__сервер__инструмент.',
@@ -293,7 +301,7 @@ export function saveMcpServer(
 ): string | undefined {
   // Проверяем здесь, а не только в маршруте: сюда же ведут проектный .mcp.json и
   // перенос между провайдерами, и все они писали в файл что угодно.
-  assertMcpDraft(draft);
+  assertMcpDraft(draft, { currentName: serverId ?? undefined });
 
   const config = readJsonFile<RawMcpConfig>(mcpConfigPath, {});
   config.mcpServers ??= {};

@@ -75,7 +75,7 @@ export function registerMcpRoutes(app: FastifyInstance, ctx: ServerContext): voi
     let saved: { backupPath: string | undefined; name: string };
     try {
       const draft = request.body;
-      assertMcpDraft(draft);
+      assertMcpDraft(draft, { currentName: request.params.id });
       saved = {
         backupPath: saveMcpServer(paths().mcpConfig, request.params.id, draft, ctx.backupDir),
         name: draft.name,

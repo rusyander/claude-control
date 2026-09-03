@@ -86,6 +86,23 @@ describe('маршруты групп: переменные окружения �
       { id: string; order: number }[]
     >();
 
+  // Участник-MCP, которого в ~/.claude.json уже нет (убран через `claude mcp
+  // remove`, а в группе остался): переключение и правка группы обязаны пережить
+  // его, а не падать на полпути с уже записанной отметкой.
+  it('группа переживает участника-MCP, которого нет в конфиге', async () => {
+    const id = await createGroup({ name: 'stale', members: [{ kind: 'mcp', id: 'ghost' }] });
+
+    expect((await toggle(id, false)).statusCode).toBe(200);
+    expect(store.getGroups().find((group) => group.id === id)?.isEnabled).toBe(false);
+    expect(store.isDisabled('mcp', 'ghost')).toBe(true);
+
+    // Выключенная группа отпускает убранного участника — тот же путь на диск.
+    expect((await putGroup(id, { name: 'stale', members: [] })).statusCode).toBe(200);
+    expect(store.isDisabled('mcp', 'ghost')).toBe(false);
+
+    expect((await toggle(id, true)).statusCode).toBe(200);
+  });
+
   it('общий ключ двух групп остаётся, пока его держит хотя бы одна', async () => {
     const g1 = await createGroup({ name: 'g1', members: [] });
     const g2 = await createGroup({ name: 'g2', members: [] });

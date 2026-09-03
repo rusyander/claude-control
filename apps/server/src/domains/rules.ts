@@ -1,4 +1,5 @@
 import type { Rule, RuleDraft } from '@claude-control/contracts';
+import { RULE_HEADING, RULE_PREFIX, DISABLED_SECTION } from '@claude-control/contracts/rule-format';
 import { readTextFile, writeTextFile } from '../lib/safe-io.ts';
 import { slugify } from '../lib/slug.ts';
 import type { AppStore } from '../lib/app-store.ts';
@@ -11,17 +12,15 @@ import type { AppStore } from '../lib/app-store.ts';
  */
 
 /**
- * Заголовок правила — только «## ПРАВИЛО: …». Прочие h2 (`## Обзор`) и любые
- * под-заголовки (`##`/`###`) внутри тела правилами НЕ считаются: иначе сборка
- * навесила бы им префикс «ПРАВИЛО:» и молча испортила соседний markdown, а
- * граница правила рвалась бы о разметку в его же теле.
+ * Заголовок правила — только «## ПРАВИЛО: …» (`RULE_HEADING`). Прочие h2
+ * (`## Обзор`) и любые под-заголовки (`##`/`###`) внутри тела правилами НЕ
+ * считаются: иначе сборка навесила бы им префикс «ПРАВИЛО:» и молча испортила
+ * соседний markdown, а граница правила рвалась бы о разметку в его же теле.
+ * Сами выражения лежат в `contracts/rule-format`: той же линейкой клиент
+ * считает обычные разделы, объясняя «0 правил» в непустом файле.
  */
-const RULE_HEADING = /^##\s+ПРАВИЛО:\s*(.+)$/i;
 /** Заголовок выключенного правила внутри служебного раздела — на уровень глубже. */
 const DISABLED_HEADING = /^###\s+(.+)$/;
-const RULE_PREFIX = /^ПРАВИЛО:\s*/i;
-/** Раздел, куда складываются выключенные правила, чтобы не терять их текст. */
-const DISABLED_SECTION = '## Отключённые правила (Claude Control)';
 
 interface ParsedFile {
   preamble: string;

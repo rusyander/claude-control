@@ -20,6 +20,12 @@ export interface GateScriptConfig {
   rulesPath: string;
   /** Куда писать журнал; пусто — не писать вовсе. */
   journalPath: string;
+  /**
+   * `state.json` панели: тумблер «Вести журнал» читается отсюда в момент
+   * срабатывания, а не зашивается в скрипт — иначе каждое переключение
+   * оставляло бы на диске устаревший файл. Пусто — журнал ведётся всегда.
+   */
+  statePath?: string;
   action: PromptGateAction;
 }
 
@@ -49,9 +55,20 @@ const CONFIG = ${JSON.stringify(config, null, 2)};
 
 ${coreSource()}
 
+/** Ведём ли журнал: флаг прокси из state.json, прочитанный сейчас, а не при установке. */
+function journalEnabled() {
+  if (!CONFIG.journalPath) return false;
+  if (!CONFIG.statePath) return true;
+  try {
+    return JSON.parse(readFileSync(CONFIG.statePath, 'utf8')).settings?.dlp?.journal !== false;
+  } catch {
+    return true;
+  }
+}
+
 /** Журнал общий с прокси. Значений в нём нет — только правило и счётчик. */
 function journal(entry) {
-  if (!CONFIG.journalPath) return;
+  if (!journalEnabled()) return;
   try {
     appendFileSync(CONFIG.journalPath, JSON.stringify(entry) + '\\n', 'utf8');
     if (statSync(CONFIG.journalPath).size > 2000000) {

@@ -44,7 +44,11 @@ export type {
   ProviderMcpTarget,
 } from './provider-mcp/types.ts';
 export { resolveProviderMcpTarget } from './provider-mcp/target.ts';
-export { McpServerExistsError, parseUniversalDraft } from './provider-mcp/draft.ts';
+export {
+  McpServerExistsError,
+  McpServerNotFoundError,
+  parseUniversalDraft,
+} from './provider-mcp/draft.ts';
 export {
   deleteProviderMcpServer,
   readProviderMcpSection,

@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import type { AppSettings, ProviderInfo, ProvidersResponse } from '@claude-control/contracts';
 import { claudeProvider } from './claude.ts';
 import { CATALOG_PROVIDERS } from './catalog.ts';
@@ -22,7 +23,9 @@ const PROVIDERS = new Map<string, ConfigProvider>(
 
 /** Минимум, что нужно реестру от хранилища настроек, — без импорта AppStore. */
 export interface SettingsSource {
-  getSettings(): Pick<AppSettings, 'provider'>;
+  // Каталог Claude нужен одному месту — имени файла инструкций в карточке; для
+  // источника, знающего только провайдера, он необязателен.
+  getSettings(): Pick<AppSettings, 'provider'> & Partial<Pick<AppSettings, 'claudeDirOverride'>>;
 }
 
 /** Все известные провайдеры (Claude первым). */
@@ -89,6 +92,10 @@ export function describeProviders(store: SettingsSource): ProvidersResponse {
           : provider.instructionsFile
             ? 'file'
             : 'none',
+      // Имя файла — для подписи в меню: раздел называется тем, что правит.
+      instructionsFileName: provider.instructionsFile
+        ? basename(provider.instructionsFile(store.getSettings().claudeDirOverride))
+        : undefined,
       // Хуки и плагины — тоже МОДЕЛЬЮ, а не id провайдера. У Claude обе модели
       // свои и богатые (события settings.json / расширения самой панели), у
       // OpenCode — ключ конфига `experimental.hook` и каталог файлов + список

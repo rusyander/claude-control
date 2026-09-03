@@ -247,6 +247,18 @@ describe('env', () => {
       expect(env(settingsPath)).toEqual({});
     });
 
+    // Review 2026-09-03: перенос шёл через saveEnvVar → assertEnvDraft и отвергал
+    // имя не по правилу (400), хотя удаление того же ключа было мягким. Имя уже
+    // лежит в файле — переезжает как есть.
+    it('переносит устаревший ключ не по правилу имени: он уже записан в файл', () => {
+      writeFileSync(settingsPath, JSON.stringify({ env: { 'FOO-BAR': 'legacy' } }));
+
+      moveEnvVar(settingsPath, secretsPath, 'FOO-BAR', 'settings', undefined, localPath);
+
+      expect(env(localPath)['FOO-BAR']).toBe('legacy');
+      expect(env(settingsPath)).toEqual({});
+    });
+
     it('секрет из .mcp-secrets.env перенести нельзя — источник не тронут', () => {
       writeFileSync(secretsPath, 'GITLAB_TOKEN=glpat-x');
 
@@ -309,6 +321,13 @@ describe('env', () => {
         ['settings-local', undefined],
         ['secrets', undefined],
       ]);
+    });
+
+    it('группа из старого state.json без поля env не роняет список', () => {
+      writeFileSync(settingsPath, JSON.stringify({ env: { MINE: '2' } }));
+      const legacy = group({ id: 'old' });
+      delete (legacy as Partial<Group>).env;
+      expect(() => markGroupEnv(readEnvVars(settingsPath, secretsPath), [legacy])).not.toThrow();
     });
 
     it('показ значения по source group читает settings.json', () => {

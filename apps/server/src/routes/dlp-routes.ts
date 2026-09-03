@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { DlpInfo, DlpPreviewResult, DlpRule } from '@claude-control/contracts';
+import type { DlpInfo, DlpPreviewResult } from '@claude-control/contracts';
 import type { ServerContext } from '../context.ts';
 import {
   buildDlpRuntime,
@@ -7,6 +7,7 @@ import {
   describeDlp,
   DlpConfigError,
   DlpRulesError,
+  parseRules,
   readJournal,
   readRules,
   previewDlp,
@@ -42,6 +43,8 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
       return reply.code(400).send({ error: 'invalid_body', message: 'Ожидается список правил.' });
     }
 
+    // Форма проверяется до всего остального: `null` вместо правила или словарь
+    // без поля `terms` раньше падали в 500 уже внутри смысловой проверки.
     const problem = validateRules(rules);
     if (problem) return reply.code(400).send({ error: 'invalid_rule', message: problem });
 
@@ -68,14 +71,38 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
     }
 
     // Правила можно прислать в теле — тогда видно результат ЧЕРНОВИКА, до
-    // сохранения. Без них берём сохранённые.
-    const rules = rulesOf(body) ?? safeRules(appDataDir());
+    // сохранения. Черновик может быть незаполненным (пустой словарь, выражение
+    // без закрытой скобки) — такое правило просто ничего не найдёт; отказ
+    // только на неверную форму. Без правил в теле берём сохранённые.
+    const draft = rulesOf(body);
+    let rules;
+    if (draft) {
+      const parsed = parseRules(draft);
+      if (parsed instanceof DlpRulesError) {
+        return reply.code(400).send({ error: 'invalid_rule', message: parsed.message });
+      }
+      rules = parsed;
+    } else {
+      rules = safeRules(appDataDir());
+    }
     return previewDlp(body.text, rules) satisfies DlpPreviewResult;
   });
+
+  // Тумблер «включено» в настройках и живой слушатель — одно состояние, но
+  // страница шлёт их двумя запросами. Связь закрепляет сервер: клиент, знающий
+  // только /dlp/start, иначе получал бы прокси, который не переживёт перезапуск
+  // панели (на старте читается settings.dlp.enabled), а не дошедший PATCH —
+  // тумблер «выключено» при работающем слушателе.
+  const rememberEnabled = (enabled: boolean): void => {
+    const settings = ctx.store.getSettings();
+    if (settings.dlp.enabled === enabled) return;
+    ctx.store.updateSettings({ dlp: { ...settings.dlp, enabled } });
+  };
 
   app.post('/api/dlp/start', async (_request, reply) => {
     try {
       await proxy.start(buildDlpRuntime(ctx.store, appDataDir()));
+      rememberEnabled(true);
     } catch (error) {
       if (error instanceof DlpConfigError || error instanceof DlpRulesError) {
         return reply.code(400).send({ error: 'dlp_misconfigured', message: error.message });
@@ -92,12 +119,17 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
 
   app.post('/api/dlp/stop', async () => {
     await proxy.stop();
+    rememberEnabled(false);
     return describeDlp(ctx.store, appDataDir(), proxy) satisfies DlpInfo;
   });
 
   app.get<{ Querystring: { limit?: string } }>('/api/dlp/journal', (request) => {
-    const limit = Number(request.query.limit);
-    return { entries: readJournal(appDataDir(), Number.isFinite(limit) ? limit : undefined) };
+    // Ноль и отрицательное — не «ничего» и не «всё, кроме первых»: лимит либо
+    // положительное число, либо значение по умолчанию.
+    const limit = Math.floor(Number(request.query.limit));
+    return {
+      entries: readJournal(appDataDir(), Number.isFinite(limit) && limit > 0 ? limit : undefined),
+    };
   });
 
   app.delete('/api/dlp/journal', () => {
@@ -107,14 +139,14 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
 }
 
 /** Правила из тела запроса. Не массив — отказ, а не «считаем, что правил нет». */
-function rulesOf(body: unknown): DlpRule[] | undefined {
-  if (!body || typeof body !== 'object') return undefined;
+function rulesOf(body: unknown): unknown[] | undefined {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return undefined;
   const rules = (body as { rules?: unknown }).rules;
-  return Array.isArray(rules) ? (rules as DlpRule[]) : undefined;
+  return Array.isArray(rules) ? rules : undefined;
 }
 
 /** Правила для предпросмотра: битый файл здесь не повод отказывать в проверке текста. */
-function safeRules(appDataDir: string): DlpRule[] {
+function safeRules(appDataDir: string) {
   try {
     return readRules(appDataDir);
   } catch {

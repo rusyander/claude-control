@@ -15,7 +15,13 @@ import { readRules } from './dlp/rules-store.ts';
 
 export { DlpProxy } from './dlp/DlpProxy.ts';
 export type { DlpRuntime } from './dlp/DlpProxy.ts';
-export { readRules, saveRules, validateRules, DlpRulesError } from './dlp/rules-store.ts';
+export {
+  readRules,
+  saveRules,
+  parseRules,
+  validateRules,
+  DlpRulesError,
+} from './dlp/rules-store.ts';
 export { readJournal, clearJournal } from './dlp/journal.ts';
 export { AliasVault, maskText } from './dlp/mask.ts';
 export { scanText } from './dlp/rules.ts';

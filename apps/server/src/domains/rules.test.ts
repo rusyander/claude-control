@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { summarizeRuleFile } from '@claude-control/contracts/rule-format';
 import { AppStore } from '../lib/app-store.ts';
-import { readRules, saveRule, deleteRule } from './rules.ts';
+import { readRules, saveRule, deleteRule, parseRules } from './rules.ts';
 
 /**
  * Тесты правил. CLAUDE.md — это markdown, который читает сам Claude, а правила
@@ -199,6 +200,54 @@ describe('rules', () => {
       const rules = readRules(claudeMdPath, store);
       expect(rules.find((r) => r.id === 'moy-zagolovok')?.isEnabled).toBe(false);
       expect(rules.find((r) => r.id === 'vtoroe-pravilo')?.isEnabled).toBe(true);
+    });
+  });
+
+  /**
+   * Границы формата заголовка. Живой CLAUDE.md чаще всего размечен обычными
+   * `## ` разделами — они правилами не являются и остаются в преамбуле как
+   * есть; страница объясняет «0 правил» счётчиком таких разделов, поэтому
+   * разбор и `summarizeRuleFile` из contracts/rule-format обязаны сходиться.
+   */
+  describe('границы разбора заголовка', () => {
+    const parse = (md: string) => parseRules(md, 'global', store);
+
+    it('обычные «## » разделы — не правила; файл целиком остаётся преамбулой', () => {
+      const md = '# Личные правила\n\n## Язык\n\nПо-русски.\n\n## Git\n\nПо просьбе.\n';
+      const parsed = parse(md);
+      expect(parsed.rules).toHaveLength(0);
+      expect(parsed.preamble).toBe(md.trimEnd());
+      expect(summarizeRuleFile(md)).toMatchObject({ ruleHeadings: 0, plainSections: 2 });
+    });
+
+    it('смешанный файл: обычный раздел до правила — преамбула, после — часть тела', () => {
+      const md = '## Обзор\n\nвводная\n\n## ПРАВИЛО: Одно\n\nтело\n\n## Ещё раздел\n\nхвост\n';
+      const parsed = parse(md);
+      expect(parsed.rules).toHaveLength(1);
+      expect(parsed.preamble).toBe('## Обзор\n\nвводная');
+      expect(parsed.rules[0]?.body).toBe('тело\n\n## Ещё раздел\n\nхвост');
+      expect(summarizeRuleFile(md).ruleHeadings).toBe(parsed.rules.length);
+    });
+
+    it('слово «правило» в любом регистре и хвостовые пробелы — то же правило', () => {
+      const parsed = parse('## Правило: Строчными  \n\nа\n\n##   ПРАВИЛО:   Хвост   \n\nб\n');
+      expect(parsed.rules.map((rule) => rule.title)).toEqual(['Строчными', 'Хвост']);
+    });
+
+    it('без двоеточия, слитно с ## или на третьем уровне — не правило', () => {
+      const md = '## ПРАВИЛО Без двоеточия\n\n##ПРАВИЛО: Слитно\n\n### ПРАВИЛО: Глубже\n';
+      expect(parse(md).rules).toHaveLength(0);
+      expect(summarizeRuleFile(md)).toMatchObject({ ruleHeadings: 0, plainSections: 1 });
+    });
+
+    it('пустой файл — ни правил, ни преамбулы', () => {
+      expect(parse('')).toEqual({ preamble: '', rules: [] });
+      expect(summarizeRuleFile('').hasContent).toBe(false);
+    });
+
+    it('CRLF-файл разбирается как LF: тела без \\r', () => {
+      const parsed = parse('## ПРАВИЛО: Один\r\n\r\nтело\r\n\r\n## ПРАВИЛО: Два\r\n\r\nещё\r\n');
+      expect(parsed.rules.map((rule) => rule.body)).toEqual(['тело', 'ещё']);
     });
   });
 });

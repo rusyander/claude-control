@@ -110,7 +110,10 @@ export function markGroupEnv(vars: EnvVar[], groups: Group[]): EnvVar[] {
   const owners = new Map<string, string>();
   for (const group of [...groups].sort((a, b) => a.order - b.order)) {
     if (!group.isEnabled) continue;
-    for (const key of Object.keys(group.env)) if (!owners.has(key)) owners.set(key, group.id);
+    // Группа из старого state.json может прийти без поля env (хранилище записи
+    // не нормализует) — Object.keys(undefined) валил бы весь список переменных.
+    const env: Record<string, string> = group.env ?? {};
+    for (const key of Object.keys(env)) if (!owners.has(key)) owners.set(key, group.id);
   }
   if (owners.size === 0) return vars;
   return vars.map((item): EnvVar => {
@@ -202,6 +205,21 @@ export function applyGroupEnv(
 }
 
 /**
+ * Запись в env одного из файлов настроек. Без проверки черновика: у переноса
+ * ключ уже лежит на диске, проверяет его вызывающий.
+ */
+function writeSettingsEnv(
+  path: string,
+  key: string,
+  value: string,
+  backupDir?: string,
+): string | undefined {
+  const settings = readJsonFile<RawSettings>(path, {});
+  settings.env = { ...settings.env, [key]: value };
+  return writeJsonFile(path, settings, { backupDir });
+}
+
+/**
  * Запись переменной. Локальная уходит в свой файл: панель показывает оба и
  * правит каждый на месте — переезд в общий конфиг сделал бы личную настройку
  * общей, чего никто не просил.
@@ -217,16 +235,11 @@ export function saveEnvVar(
 
   if (draft.source === 'settings-local') {
     if (!settingsLocalPath) throw new Error('Не задан путь к settings.local.json');
-
-    const local = readJsonFile<RawSettings>(settingsLocalPath, {});
-    local.env = { ...local.env, [draft.key]: draft.value };
-    return writeJsonFile(settingsLocalPath, local, { backupDir });
+    return writeSettingsEnv(settingsLocalPath, draft.key, draft.value, backupDir);
   }
 
   if (draft.source === 'settings') {
-    const settings = readJsonFile<RawSettings>(settingsPath, {});
-    settings.env = { ...settings.env, [draft.key]: draft.value };
-    return writeJsonFile(settingsPath, settings, { backupDir });
+    return writeSettingsEnv(settingsPath, draft.key, draft.value, backupDir);
   }
 
   // source === 'secrets' (assertEnvDraft отсёк всё прочее; env групп применяют
@@ -273,7 +286,10 @@ export function deleteEnvVar(
  * .mcp-secrets.env и env групп так не переносятся — у них своя природа, вызов с
  * таким источником отвергается. Значение берётся из файла-источника как есть: в
  * settings оно лежит открытым текстом (маскировка — только в списке), поэтому
- * переносим ровно то, что реально хранится. Переиспользует save/delete.
+ * переносим ровно то, что реально хранится. Приёмник пишем напрямую, минуя
+ * проверку черновика: имя, записанное в файл руками не по правилу, уже лежит на
+ * диске и должно переезжать так же мягко, как удаляется (assertEnvRef), — иначе
+ * перенос отвечал 400, а удаление того же ключа «ок». Удаление — deleteEnvVar.
  * Возвращает путь резервной копии.
  */
 export function moveEnvVar(
@@ -307,13 +323,7 @@ export function moveEnvVar(
     );
   }
 
-  saveEnvVar(
-    settingsPath,
-    secretsPath,
-    { key, value, source: targetSource, isSecret: isSecretEnvKey(key) },
-    backupDir,
-    settingsLocalPath,
-  );
+  writeSettingsEnv(targetPath, key, value, backupDir);
   return deleteEnvVar(settingsPath, secretsPath, key, source, backupDir, settingsLocalPath);
 }
 

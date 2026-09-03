@@ -5,7 +5,7 @@ import type { AppStore } from '../lib/app-store.ts';
 import { writeTextFile } from '../lib/safe-io.ts';
 import { readHooks, writeHooks } from './hooks.ts';
 import { readRules } from './dlp/rules-store.ts';
-import { buildGateScript } from './prompt-gate/script.ts';
+import { buildGateScript, type GateScriptConfig } from './prompt-gate/script.ts';
 
 /**
  * Гейт на промпте: установка и снятие хука `UserPromptSubmit`.
@@ -22,6 +22,7 @@ import { buildGateScript } from './prompt-gate/script.ts';
 const SCRIPT_NAME = 'claude-control-prompt-gate.mjs';
 const RULES_FILE = 'dlp-rules.json';
 const JOURNAL_FILE = 'dlp-journal.jsonl';
+const STATE_FILE = 'state.json';
 
 export interface GateLocation {
   hooksDir: string;
@@ -42,23 +43,43 @@ function isGateHook(hook: Hook): boolean {
   return hook.event === 'UserPromptSubmit' && hook.command.includes(SCRIPT_NAME);
 }
 
-function expectedScript(
-  location: GateLocation,
-  settings: PromptGateSettings,
-  journal: boolean,
-): string {
+/**
+ * Скрипт, который панель положила бы при этих настройках. Флаг журнала в него
+ * не зашит: хук читает его из `state.json` в момент срабатывания, поэтому
+ * тумблер «Вести журнал» не оставляет на диске устаревший скрипт.
+ */
+function expectedScript(location: GateLocation, settings: PromptGateSettings): string {
   return buildGateScript({
     rulesPath: join(location.appDataDir, RULES_FILE),
-    // Журнал у хука и у прокси один. Выключен в настройках прокси — выключен и
-    // здесь: два разных ответа на вопрос «ведём ли журнал» запутали бы.
-    journalPath: journal ? join(location.appDataDir, JOURNAL_FILE) : '',
+    journalPath: join(location.appDataDir, JOURNAL_FILE),
+    statePath: join(location.appDataDir, STATE_FILE),
     action: settings.action,
   });
 }
 
+/**
+ * Свой ли это скрипт — независимо от настроек, с которыми его генерировали.
+ * Конфигурация вписана в файл одним JSON-блоком: разбираем её и собираем скрипт
+ * заново; совпал байт в байт — значит, файл панели (пусть и со старым
+ * действием), и его можно переписать. Иначе файл правили руками.
+ *
+ * Раньше сравнивали с ожидаемым для ТЕКУЩИХ настроек, и смена действия в
+ * панели читалась как чужая правка: скрипт не перезаписывался и продолжал
+ * блокировать при выбранном «предупредить».
+ */
+export function isPanelScript(source: string): boolean {
+  const match = /^const CONFIG = (\{[\s\S]*?\n\});$/m.exec(source);
+  if (!match?.[1]) return false;
+  try {
+    const config = JSON.parse(match[1]) as GateScriptConfig;
+    return buildGateScript(config) === source;
+  } catch {
+    return false;
+  }
+}
+
 export function describePromptGate(store: AppStore, location: GateLocation): PromptGateInfo {
-  const appSettings = store.getSettings();
-  const settings = appSettings.promptGate;
+  const settings = store.getSettings().promptGate;
   const scriptPath = gateScriptPath(location.hooksDir);
 
   const registered = readHooks(location.settingsPath, store).some(
@@ -68,13 +89,8 @@ export function describePromptGate(store: AppStore, location: GateLocation): Pro
 
   let customized = false;
   if (exists) {
-    try {
-      customized =
-        readFileSync(scriptPath, 'utf8') !==
-        expectedScript(location, settings, appSettings.dlp.journal);
-    } catch {
-      customized = true;
-    }
+    const current = safeRead(scriptPath);
+    customized = current === undefined || !isPanelScript(current);
   }
 
   let rulesCount = 0;
@@ -109,6 +125,8 @@ export function describePromptGate(store: AppStore, location: GateLocation): Pro
  * Скрипт, который человек правил руками, НЕ перезаписывается: об этом сообщает
  * `customized`, а перезапись — отдельное явное действие. Панель, молча
  * затирающая чужую правку в чужом конфиге, теряет доверие один раз и навсегда.
+ * Свой же скрипт (хоть и собранный при других настройках) переписывается
+ * свободно — иначе смена действия не доходила бы до диска.
  */
 export function applyPromptGate(
   store: AppStore,
@@ -117,12 +135,12 @@ export function applyPromptGate(
   options: { force?: boolean; backupDir?: string } = {},
 ): PromptGateInfo {
   const scriptPath = gateScriptPath(location.hooksDir);
-  const journal = store.getSettings().dlp.journal;
+  const current = existsSync(scriptPath) ? safeRead(scriptPath) : undefined;
+  const ours = current !== undefined && isPanelScript(current);
 
   if (settings.enabled) {
-    const wanted = expectedScript(location, settings, journal);
-    const current = existsSync(scriptPath) ? safeRead(scriptPath) : undefined;
-    if (current === undefined || options.force || current === wanted) {
+    const wanted = expectedScript(location, settings);
+    if ((current === undefined || options.force || ours) && current !== wanted) {
       writeTextFile(scriptPath, wanted, { backupDir: options.backupDir });
     }
     registerHook(store, location, true, options.backupDir);
@@ -130,12 +148,7 @@ export function applyPromptGate(
     registerHook(store, location, false, options.backupDir);
     // Свою правку не выбрасываем: снятие регистрации уже выключило хук, а файл
     // человек может забрать себе.
-    if (
-      existsSync(scriptPath) &&
-      safeRead(scriptPath) === expectedScript(location, settings, journal)
-    ) {
-      rmSync(scriptPath, { force: true });
-    }
+    if (ours) rmSync(scriptPath, { force: true });
   }
 
   return describePromptGate(store, location);
@@ -147,7 +160,13 @@ function registerHook(
   present: boolean,
   backupDir?: string,
 ): void {
-  const hooks = readHooks(location.settingsPath, store).filter((hook) => !isGateHook(hook));
+  const all = readHooks(location.settingsPath, store);
+  const hooks = all.filter((hook) => !isGateHook(hook));
+  const registered = all.some((hook) => isGateHook(hook) && hook.isEnabled);
+
+  // Нечего менять — не трогаем settings.json: смена действия при выключенном
+  // гейте иначе переписывала бы чужой конфиг (и плодила резервные копии) зря.
+  if (registered === present) return;
 
   if (present) {
     hooks.push({

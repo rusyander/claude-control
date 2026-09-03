@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { isValidApiToken, presentedToken } from './api-token.ts';
+import { acceptsQueryToken, isValidApiToken, presentedToken } from './api-token.ts';
 
 /**
  * Токен доступа. Чтение и ротация трогают `~/.claude-control` — настоящий
  * каталог пользователя, поэтому здесь проверяется то, что от файла не зависит:
- * КАК токен извлекается из запроса и КАК сравнивается. Ошибка ровно здесь и
- * означала бы дыру: принятый пустой токен, принятый префикс, принятый чужой.
+ * КАК токен извлекается из запроса, ГДЕ он принимается строкой запроса и КАК
+ * сравнивается. Ошибка ровно здесь и означала бы дыру: принятый пустой токен,
+ * принятый префикс, принятый чужой, токен в адресе там, где он осядет в логах.
  */
 
 describe('presentedToken: откуда берётся предъявленный токен', () => {
@@ -23,16 +24,49 @@ describe('presentedToken: откуда берётся предъявленный
     expect(presentedToken('abc123', undefined)).toBeUndefined();
   });
 
-  it('строка запроса — запасной путь для потоков', () => {
-    expect(presentedToken(undefined, { token: 'abc123' })).toBe('abc123');
-    expect(presentedToken(undefined, { token: '' })).toBeUndefined();
-    expect(presentedToken(undefined, { token: 42 })).toBeUndefined();
-    expect(presentedToken(undefined, {})).toBeUndefined();
-    expect(presentedToken(undefined, undefined)).toBeUndefined();
+  it('строка запроса читается только там, где маршрут ей доверяет', () => {
+    expect(presentedToken(undefined, { token: 'abc123' }, true)).toBe('abc123');
+    expect(presentedToken(undefined, { token: '' }, true)).toBeUndefined();
+    expect(presentedToken(undefined, { token: 42 }, true)).toBeUndefined();
+    expect(presentedToken(undefined, {}, true)).toBeUndefined();
+    expect(presentedToken(undefined, undefined, true)).toBeUndefined();
+  });
+
+  it('по умолчанию строка запроса не читается вовсе — забытый параметр закрывает, а не открывает', () => {
+    expect(presentedToken(undefined, { token: 'abc123' })).toBeUndefined();
+    expect(presentedToken(undefined, { token: 'abc123' }, false)).toBeUndefined();
   });
 
   it('заголовок сильнее строки запроса: адрес попадает в логи, заголовок нет', () => {
-    expect(presentedToken('Bearer fromHeader', { token: 'fromQuery' })).toBe('fromHeader');
+    expect(presentedToken('Bearer fromHeader', { token: 'fromQuery' }, true)).toBe('fromHeader');
+    // Присланный заголовок решает всё: неверный Bearer не «спасается» верным ?token=.
+    expect(presentedToken('Bearer wrong', { token: 'fromQuery' }, true)).toBe('wrong');
+  });
+});
+
+describe('acceptsQueryToken: где токен принимается строкой запроса', () => {
+  it('только поток событий — его браузер открывает адресом (EventSource без заголовков)', () => {
+    expect(acceptsQueryToken('GET', '/api/events')).toBe(true);
+    expect(acceptsQueryToken('GET', '/api/events?token=abc')).toBe(true);
+  });
+
+  it('обычные маршруты — нет, в том числе GET', () => {
+    expect(acceptsQueryToken('GET', '/api/system')).toBe(false);
+    expect(acceptsQueryToken('GET', '/api/settings?token=abc')).toBe(false);
+    expect(acceptsQueryToken('GET', '/api/projects')).toBe(false);
+  });
+
+  it('потоки, которые клиенты читают fetch-ом с заголовком, — нет', () => {
+    expect(acceptsQueryToken('GET', '/api/chat/abc/stream?from=0')).toBe(false);
+    expect(acceptsQueryToken('GET', '/api/provider-chat/chats/abc/stream')).toBe(false);
+    expect(acceptsQueryToken('GET', '/api/sandbox/run')).toBe(false);
+  });
+
+  it('другой метод или похожий путь — нет', () => {
+    expect(acceptsQueryToken('POST', '/api/events')).toBe(false);
+    expect(acceptsQueryToken('GET', '/api/events/extra')).toBe(false);
+    expect(acceptsQueryToken('GET', '/api/eventsX')).toBe(false);
+    expect(acceptsQueryToken('GET', '/api/Events')).toBe(false);
   });
 });
 

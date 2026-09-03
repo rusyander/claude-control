@@ -682,6 +682,23 @@ describe('реестр провайдеров', () => {
     }
   });
 
+  it('имя файла инструкций уходит клиенту вместе с моделью — меню подписывает раздел им', () => {
+    const names = Object.fromEntries(
+      describeProviders(fakeStore('claude')).providers.map((info) => [
+        info.id,
+        info.instructionsFileName,
+      ]),
+    );
+    expect(names.claude).toBe('CLAUDE.md');
+    expect(names.codex).toBe('AGENTS.md');
+    expect(names.gemini).toBe('GEMINI.md');
+    expect(names.qwen).toBe('QWEN.md');
+    expect(names.opencode).toBe('AGENTS.md');
+    // Список ссылок и каталог правил — единого файла нет, подпись общая.
+    expect(names.cursor).toBeUndefined();
+    expect(names.aider).toBeUndefined();
+  });
+
   it('модель инструкций отдаётся клиенту явно: file / list / rules', () => {
     const models = Object.fromEntries(
       describeProviders(fakeStore('claude')).providers.map((info) => [

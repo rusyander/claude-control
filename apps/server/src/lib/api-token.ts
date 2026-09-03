@@ -68,14 +68,39 @@ export function isValidApiToken(presented: string | undefined, expected: string)
   return timingSafeEqual(a, b);
 }
 
-/** `Authorization: Bearer <токен>` или `?token=` — второе для потоков SSE. */
+/**
+ * Маршруты, где токен принимается и строкой запроса (`?token=`). Список закрыт
+ * и короткий намеренно: адрес оседает в журналах прокси, истории браузера и
+ * заголовке Referer, поэтому строкой запроса токен ходит только там, где
+ * клиент физически не может поставить заголовок — `EventSource` открывает
+ * поток АДРЕСОМ и заголовков не умеет. Всё остальное, включая потоки чата и
+ * песочницы (их читают `fetch`-ом с заголовком, и телефон тоже), — только
+ * `Authorization: Bearer`.
+ */
+const QUERY_TOKEN_ROUTES: ReadonlySet<string> = new Set(['/api/events']);
+
+/** Принимает ли маршрут токен строкой запроса: сверяется путь без query, только GET. */
+export function acceptsQueryToken(method: string, url: string): boolean {
+  const [path = url] = url.split('?', 1);
+  return method === 'GET' && QUERY_TOKEN_ROUTES.has(path);
+}
+
+/**
+ * `Authorization: Bearer <токен>`; строка запроса `?token=` — только если
+ * маршрут ей доверяет (`allowQuery`, см. `acceptsQueryToken`). Заголовок
+ * сильнее: присланный заголовок решает всё, и до строки запроса дело не
+ * доходит даже на разрешённом маршруте. По умолчанию строка запроса не
+ * читается — забытый параметр закрывает дверь, а не открывает.
+ */
 export function presentedToken(
   headerValue: string | undefined,
   query: unknown,
+  allowQuery = false,
 ): string | undefined {
   if (typeof headerValue === 'string' && headerValue.startsWith('Bearer ')) {
     return headerValue.slice('Bearer '.length).trim();
   }
+  if (!allowQuery) return undefined;
   if (query && typeof query === 'object' && 'token' in query) {
     const value = (query as { token?: unknown }).token;
     if (typeof value === 'string' && value) return value;

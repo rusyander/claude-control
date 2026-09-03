@@ -61,7 +61,10 @@ function buildContinueRaw(
 
   const raw: ContinueRawServer = { name: draft.name };
   if (draft.transport === 'stdio') {
-    raw.type = 'stdio';
+    // `type` у stdio по документации необязателен (подразумевается по `command`):
+    // новая запись его не получает, а у прежней он остаётся ровно если был —
+    // правка не меняет форму чужой записи.
+    if (existing?.type !== undefined) raw.type = 'stdio';
     if (draft.command) raw.command = draft.command;
     if (draft.args.length > 0) raw.args = draft.args;
     if (Object.keys(draft.env).length > 0) raw.env = draft.env;

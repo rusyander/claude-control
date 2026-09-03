@@ -62,6 +62,11 @@ function fail(reply: FastifyReply, error: unknown): FastifyReply {
   throw error;
 }
 
+/** То же имя с точностью до регистра и краёв — так же его сравнивает assertGroupNameFree. */
+function sameGroupName(a: string, b: string): boolean {
+  return a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
+}
+
 /** Следующий порядковый номер: за наибольшим, а не «сколько групп» — после удалений это не одно и то же. */
 function nextOrder(groups: readonly Group[]): number {
   return groups.reduce((max, group) => Math.max(max, group.order), -1) + 1;
@@ -162,7 +167,12 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
       const groups = ctx.store.getGroups();
       const existing = groups.find((item) => item.id === request.params.id);
       if (!existing) throw new GroupNotFoundError(request.params.id);
-      assertGroupNameFree(groups, body.name, existing.id);
+      // Имя не менялось (регистр и края не в счёт) — уникальность не проверяем:
+      // state.json, записанный до этой проверки, может держать «Dev» и «dev»
+      // рядом, и иначе ни одну из них нельзя было бы даже переописать.
+      if (!sameGroupName(body.name, existing.name)) {
+        assertGroupNameFree(groups, body.name, existing.id);
+      }
 
       // Группа не может входить сама в себя ни напрямую, ни через цепочку вложенных
       // — иначе включение/выключение зациклилось бы по ветке.

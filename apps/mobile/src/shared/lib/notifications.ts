@@ -81,7 +81,7 @@ export async function registerForPush(label: string): Promise<PushRegistration> 
       token: data,
       platform: Platform.OS === 'ios' ? 'ios' : 'android',
       label,
-      registeredAt: '',
+      // Время регистрации ставит сервер своими часами — из тела он его не читает.
     });
     return { token: data };
   } catch (error) {

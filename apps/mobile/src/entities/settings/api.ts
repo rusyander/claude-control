@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import type { AppSettings } from '@claude-control/contracts';
 import { api } from '../../shared/api/client';
 import type { CostUnit } from '../../shared/lib/format';
 
@@ -8,9 +9,11 @@ import type { CostUnit } from '../../shared/lib/format';
  * считать так же, иначе одна и та же работа выглядит на двух экранах по-разному.
  */
 
-interface PanelSettings {
-  costUnit?: CostUnit;
-}
+/**
+ * Ровно то, что телефон читает из настроек панели, — типом из контрактов, чтобы
+ * переименование ключа на сервере ломало сборку, а не показ.
+ */
+type PanelSettings = Pick<AppSettings, 'costUnit'>;
 
 export function useCostUnit(): CostUnit {
   const settings = useQuery({

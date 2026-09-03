@@ -1,4 +1,5 @@
 import type { MessageUsage } from '@claude-control/contracts';
+import type { HandoffRefusal } from '@claude-control/contracts/chat-handoff';
 
 /**
  * Модель прогона — та же, что в панели: события потока одни и те же, и
@@ -64,6 +65,14 @@ export interface AgentRun {
   model?: string;
   effort?: string;
   lastEventAt: number;
+  /**
+   * Когда сервер завёл прогон, по его часам. По нему опрос `/chat/active`
+   * отличает НОВЫЙ ход в том же разговоре от только что законченного, который
+   * сервер ещё минуту держит в списке для догона.
+   */
+  startedAt?: number;
+  /** Разговор, в котором работа продолжена чистой сессией: экран уходит в него. */
+  handoffTo?: string;
 }
 
 export interface StartInput {
@@ -79,7 +88,7 @@ export interface StartInput {
 }
 
 export type ChatEvent =
-  | { kind: 'session'; sessionId: string; model: string; tools: number }
+  | { kind: 'session'; sessionId: string; model: string; tools: number; startedAt?: number }
   | { kind: 'text'; text: string }
   | { kind: 'thinking'; text: string }
   | { kind: 'tool'; name: string; input: unknown; id: string }
@@ -100,7 +109,20 @@ export type ChatEvent =
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
   | { kind: 'error'; message: string; retriable?: boolean }
   | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
-  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' };
+  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
+  /**
+   * Работа продолжена в чистой сессии (или не продолжена — тогда есть `reason`).
+   * Приходит последним кадром закрываемого прогона; по `chatId` экран уходит в
+   * новый разговор, а не остаётся смотреть на завершённый — как вкладка панели.
+   */
+  | {
+      kind: 'handoff';
+      chatId?: string;
+      path?: string;
+      chainDepth?: number;
+      reason?: HandoffRefusal;
+      contextTokens?: number;
+    };
 
 /** Итог приёма отправки: поле ввода очищается только после `ok`. */
 export type SendOutcome = { ok: true } | { ok: false; code?: string; message: string };

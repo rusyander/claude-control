@@ -1,22 +1,22 @@
-import { Link } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import type { ComponentProps } from 'react';
-import { Platform } from 'react-native';
+import * as Linking from 'expo-linking';
+import type { ReactNode } from 'react';
+import { Pressable, type PressableProps } from 'react-native';
 
-export function ExternalLink(props: Omit<ComponentProps<typeof Link>, 'href'> & { href: string }) {
+/**
+ * Ссылка наружу — в системный браузер через `expo-linking`, который в сборке
+ * есть. Шаблон Expo открывал её через `expo-web-browser`, но этой зависимости
+ * в приложении нет, а типизированные маршруты `expo-router` не принимают
+ * произвольную строку в `href` — файл ломал проверку типов. Компонент остался
+ * от шаблона и экранами не используется; удаление не согласовано.
+ */
+export function ExternalLink({
+  href,
+  children,
+  ...props
+}: Omit<PressableProps, 'onPress' | 'children'> & { href: string; children?: ReactNode }) {
   return (
-    <Link
-      target="_blank"
-      {...props}
-      href={props.href}
-      onPress={(e) => {
-        if (Platform.OS !== 'web') {
-          // Prevent the default behavior of linking to the default browser on native.
-          e.preventDefault();
-          // Open the link in an in-app browser.
-          WebBrowser.openBrowserAsync(props.href as string);
-        }
-      }}
-    />
+    <Pressable {...props} accessibilityRole="link" onPress={() => void Linking.openURL(href)}>
+      {children}
+    </Pressable>
   );
 }

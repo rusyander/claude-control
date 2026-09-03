@@ -1,5 +1,6 @@
 import { AppState } from 'react-native';
 import { api } from '../../api/client';
+import { isConfigured } from '../../api/connection';
 import { dict } from '../../config/i18n';
 import { notifyLocally } from '../notifications';
 import { openStream } from './stream';
@@ -62,7 +63,35 @@ async function keepStreaming(
     currentMode = 'attach';
     settle = undefined;
 
-    if (outcome === 'clean' || outcome === 'refused') break;
+    if (outcome === 'clean') break;
+    if (outcome === 'refused') {
+      // Отказ «прогон уже идёт»: на сервере он ЖИВОЙ — его начали с компьютера
+      // или из другого окна, а телефон о нём не знал. Оставить человека с одним
+      // отказом нельзя: кнопки «Стоп» у ошибки нет. Подхватываем прогон потоком
+      // по ключу из отказа (`serverRunId`) — возвращаются и живой текст, и
+      // «Стоп». Набранное сообщение остаётся в поле: сервер его не принял.
+      const refused = getRun(id);
+      if (
+        refused.errorCode === 'run_busy' &&
+        !stoppedByUser.has(id) &&
+        !controller.signal.aborted
+      ) {
+        lastSeqs.set(id, 0);
+        setRun(id, {
+          status: 'running',
+          error: undefined,
+          errorCode: undefined,
+          errorRetriable: undefined,
+          // Непринятый промпт — не «своя задача» над чужим ответом.
+          lastPrompt: undefined,
+          lastEventAt: Date.now(),
+        });
+        emit();
+        attempts = 0;
+        continue;
+      }
+      break;
+    }
     if (outcome === 'gone') {
       forgetRun(id);
       return;
@@ -156,9 +185,25 @@ export async function send(input: StartInput): Promise<SendOutcome> {
   });
 }
 
-/** Подключиться к прогону, который идёт на сервере (после запуска приложения). */
-export function attach(id: string, meta: { sessionId?: string; projectPath?: string }): void {
+/**
+ * Подключиться к прогону, который идёт на сервере (после запуска приложения и
+ * по опросу `/chat/active`).
+ *
+ * Уже известный прогон не трогаем: идущий — поток за ним и так открыт; законченный
+ * с тем же `startedAt` — это он же, ещё минуту висящий в списке для догона, а не
+ * новый ход. Подхватывать его заново значило бы каждые пять секунд стирать ответ
+ * и печатать его с нуля. Новый ход в том же разговоре приходит с другим
+ * `startedAt` — его берём.
+ */
+export function attach(
+  id: string,
+  meta: { sessionId?: string; projectPath?: string; startedAt?: number },
+): void {
   if (controllers.has(id)) return;
+  const known = runs.get(id);
+  if (known?.status === 'running') return;
+  if (known && meta.startedAt !== undefined && known.startedAt === meta.startedAt) return;
+
   const controller = new AbortController();
   controllers.set(id, controller);
   lastSeqs.set(id, 0);
@@ -167,6 +212,7 @@ export function attach(id: string, meta: { sessionId?: string; projectPath?: str
     id,
     sessionId: meta.sessionId,
     projectPath: meta.projectPath,
+    startedAt: meta.startedAt,
     status: 'running',
     lastEventAt: Date.now(),
   });
@@ -179,7 +225,15 @@ export function attach(id: string, meta: { sessionId?: string; projectPath?: str
  * возвращении из фона: пока телефон спал, прогон мог и начаться, и кончиться.
  */
 export async function resumeActive(): Promise<void> {
-  let active: { chatId: string; sessionId?: string; projectPath?: string; seq: number }[];
+  // Без адреса панели спрашивать некого — и ошибку «не настроено» плодить незачем.
+  if (!isConfigured()) return;
+  let active: {
+    chatId: string;
+    sessionId?: string;
+    projectPath?: string;
+    seq: number;
+    startedAt: number;
+  }[];
   try {
     active = await api.get('/chat/active');
   } catch {
@@ -202,29 +256,32 @@ export async function stop(id: string): Promise<void> {
   emit();
 }
 
-/** Ответить на запрос прав. Карточка исчезнет по событию от сервера. */
+/**
+ * Ответить на запрос прав. Карточка исчезнет по событию от сервера.
+ *
+ * `ok: false` в ответе — решение не дошло: запрос уже закрыт или прогон завершён.
+ * Молчать здесь нельзя: карточка при этом выглядит так, будто ответ принят.
+ */
 export async function decidePermission(
   id: string,
   toolUseId: string,
   behavior: 'allow' | 'deny',
 ): Promise<void> {
-  await api.post(`/chat/${encodeURIComponent(serverKey(id))}/permission-decision`, {
-    toolUseId,
-    behavior,
-  });
+  const result = await api.post<{ ok?: boolean }>(
+    `/chat/${encodeURIComponent(serverKey(id))}/permission-decision`,
+    { toolUseId, behavior },
+  );
+  if (result?.ok === false) throw new Error(dict().chat.permissionLost);
 }
 
-/** Автоподтверждение безопасных запросов прав для этого прогона. */
-export async function setAutoApprove(
-  id: string,
-  enabled: boolean,
-  allowEdits: boolean,
-): Promise<void> {
-  await api.post(`/chat/${encodeURIComponent(serverKey(id))}/auto-approve`, {
-    enabled,
-    allowEdits,
-  });
-  setRun(id, { autoApprove: enabled, allowEdits });
+/**
+ * Автоподтверждение безопасных запросов прав — тумблер, щёлкнутый во время
+ * прогона. Сервер читает из тела только `enabled`: «правки разрешены» решаются
+ * при отправке сообщения и посреди хода не меняются.
+ */
+export async function setAutoApprove(id: string, enabled: boolean): Promise<void> {
+  await api.post(`/chat/${encodeURIComponent(serverKey(id))}/auto-approve`, { enabled });
+  setRun(id, { autoApprove: enabled });
   emit();
 }
 

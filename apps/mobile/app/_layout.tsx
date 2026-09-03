@@ -22,6 +22,9 @@ export {
 
 export const unstable_settings = { initialRouteName: '(tabs)' };
 
+/** Как часто спрашивать сервер о чужих прогонах — как панель: ответ из памяти, не с диска. */
+const ADOPT_INTERVAL_MS = 5_000;
+
 SplashScreen.preventAutoHideAsync();
 
 /**
@@ -70,6 +73,18 @@ export default function RootLayout() {
       void queryClient.invalidateQueries();
     });
     return () => subscription.remove();
+  }, []);
+
+  // Раз при входе и при возвращении из фона мало: ход начинают и с компьютера,
+  // и из терминала — ПОСЛЕ того, как приложение открылось. Своего события у
+  // чужого хода нет, сервер рассказывает о нём только тому, кто спросил, —
+  // поэтому спрашиваем, пока экран активен. Уже известные прогоны опрос не
+  // трогает (`attach` отсеивает их по `startedAt`).
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (AppState.currentState === 'active') void resumeActive();
+    }, ADOPT_INTERVAL_MS);
+    return () => clearInterval(timer);
   }, []);
 
   if (!ready) return null;

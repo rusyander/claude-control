@@ -39,6 +39,7 @@ export const en: Dictionary = {
     allow: 'Allow',
     deny: 'Deny',
     permissionFailed: 'Could not answer',
+    permissionLost: 'The decision did not reach the agent: the request is already closed or the run has finished',
     usage: {
       title: 'Step spend',
       input: 'Fresh input',
@@ -280,5 +281,16 @@ export const en: Dictionary = {
     failed: 'The run failed',
     homeChat: 'home chat',
     needToken: 'The panel requires a token: pair the app again.',
+    notSent: {
+      busy:
+        'The previous answer is still being generated — the message was not sent. ' +
+        'Showing the running answer: interrupt it with the Stop button.',
+      files: (names: string, supported: string) =>
+        `The panel cannot pass such attachments: ${names}. The message was not sent. ` +
+        `Allowed extensions: ${supported}.`,
+      workspaceMissing: (cwd: string) =>
+        `The working folder of this conversation was not found: ${cwd}. It can only be continued from there.`,
+      other: (message: string) => `The message was not sent: ${message}`,
+    },
   },
 };

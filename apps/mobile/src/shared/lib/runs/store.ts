@@ -94,6 +94,7 @@ export function applyEvent(id: string, event: ChatEvent): void {
   switch (event.kind) {
     case 'session':
       next.sessionId = event.sessionId;
+      next.startedAt = event.startedAt ?? run.startedAt;
       break;
     case 'text':
       next.text = run.text + event.text;
@@ -166,6 +167,12 @@ export function applyEvent(id: string, event: ChatEvent): void {
     }
     case 'permissionResolved':
       next.permissions = run.permissions.filter((item) => item.toolUseId !== event.toolUseId);
+      break;
+    case 'handoff':
+      // Продолжение заведено сервером — запоминаем, куда: экран разговора
+      // переключится по окончании этого прогона. Отказ (`reason` без `chatId`)
+      // ничего не меняет: разговор просто продолжается здесь.
+      if (event.chatId) next.handoffTo = event.chatId;
       break;
   }
 

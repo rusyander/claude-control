@@ -65,19 +65,54 @@ async function pump(
   return sawTerminal ? 'clean' : 'dirty';
 }
 
-async function readRefusal(
-  response: Response,
-): Promise<{ code?: string; message: string; runId?: string }> {
+/** Отказ сервера на отправку: структурный код, текст для человека и ключ живого прогона. */
+interface Refusal {
+  code?: string;
+  message: string;
+  runId?: string;
+}
+
+/**
+ * Текст отказа — по структурному `code`, а не по сообщению сервера: то написано
+ * по-русски независимо от языка приложения, а имена файлов и путь приходят
+ * отдельными полями, из которых строка собирается на своём языке. Гейт токена
+ * отвечает `{error}`, а не `{message}`, — читаем оба.
+ */
+async function readRefusal(response: Response): Promise<Refusal> {
+  const t = dict();
+  let body: {
+    code?: string;
+    message?: string;
+    error?: string;
+    runId?: string;
+    files?: string[];
+    supported?: string[];
+    cwd?: string;
+  } = {};
   try {
-    const body = (await response.json()) as { code?: string; message?: string; runId?: string };
+    body = (await response.json()) as typeof body;
+  } catch {
+    // Тело не JSON — остаётся статус.
+  }
+
+  if (response.status === 401) return { code: 'unauthorized', message: t.api.tokenRejected };
+  if (body.code === 'run_busy') {
+    return { code: body.code, message: t.run.notSent.busy, runId: body.runId };
+  }
+  if (body.code === 'unsupported_upload') {
     return {
       code: body.code,
-      message: body.message || dict().run.answered(response.status),
-      runId: body.runId,
+      message: t.run.notSent.files(
+        (body.files ?? []).join(', '),
+        (body.supported ?? []).join(', '),
+      ),
     };
-  } catch {
-    return { message: dict().run.answered(response.status) };
   }
+  if (body.code === 'workspace_missing') {
+    return { code: body.code, message: t.run.notSent.workspaceMissing(body.cwd ?? '') };
+  }
+  const detail = body.message || body.error || t.run.answered(response.status);
+  return { code: body.code, message: t.run.notSent.other(detail), runId: body.runId };
 }
 
 /**
@@ -114,7 +149,16 @@ export async function openStream(
   }
 
   if (!response.ok) {
-    if (mode !== 'send') return 'dirty';
+    if (mode !== 'send') {
+      // Токен отозван (панель сменила его) — переподключаться бессмысленно:
+      // каждая попытка кончится тем же 401, а человеку нужно спарить телефон
+      // заново. Обрыв же (любой другой статус) — повод догнать поток.
+      if (response.status === 401) {
+        setRun(id, { status: 'error', error: dict().api.tokenRejected, errorCode: 'unauthorized' });
+        return 'refused';
+      }
+      return 'dirty';
+    }
     const refusal = await readRefusal(response);
     setRun(id, {
       status: 'error',

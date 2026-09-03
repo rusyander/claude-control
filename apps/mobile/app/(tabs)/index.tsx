@@ -99,8 +99,14 @@ export default function ChatScreen() {
       void queryClient.invalidateQueries({ queryKey: ['project-files'] });
       void queryClient.invalidateQueries({ queryKey: ['project-git'] });
 
+      // Работа продолжена чистой сессией — уходим в новый разговор, как вкладка
+      // панели: оставаться на закрытом значило бы смотреть на его конец, пока
+      // агент работает в другом месте. Сам прогон подхватит опрос `/chat/active`.
+      const handoffTo = run.handoffTo;
       const sessionId = run.sessionId;
-      if (sessionId && sessionId !== chatId && isDraft(chatId)) {
+      if (handoffTo) {
+        openChat(handoffTo, run.projectPath ?? workspace.projectPath);
+      } else if (sessionId && sessionId !== chatId && isDraft(chatId)) {
         void queryClient
           .fetchQuery(chatMessagesQuery(sessionId))
           .then(() => openChat(sessionId))
@@ -108,7 +114,15 @@ export default function ChatScreen() {
       }
     }
     wasRunning.current = isRunning;
-  }, [isRunning, queryClient, chatId, run.sessionId]);
+  }, [
+    isRunning,
+    queryClient,
+    chatId,
+    run.sessionId,
+    run.handoffTo,
+    run.projectPath,
+    workspace.projectPath,
+  ]);
 
   // Лента перечиталась уже после конца хода и ответ в ней есть — значит поток
   // договорил своё и обязан замолчать: иначе один и тот же ответ стоит на

@@ -72,7 +72,7 @@ module.exports = {
       },
     },
     // --- Сервер: слои объявлены только прозой в CLAUDE.md, здесь они становятся проверкой.
-    // Направление: context → routes → domains → providers → lib → contracts.
+    // Направление: index/bootstrap/context → routes → domains → providers → lib → contracts.
     // Обратные рёбра ниже и запрещены; `no-circular` выше ловит остальное.
     // Тесты из правил исключены намеренно: тест собирает сцену из любого слоя — это его работа.
     {
@@ -83,7 +83,7 @@ module.exports = {
       severity: 'error',
       from: { path: '^apps/server/src/lib/', pathNot: '\\.test\\.ts$' },
       to: {
-        path: '^apps/server/src/(domains|routes|providers)/|^apps/server/src/(context|index)\\.ts$',
+        path: '^apps/server/src/(domains|routes|providers|bootstrap)/|^apps/server/src/(context|index)\\.ts$',
       },
     },
     {
@@ -92,7 +92,9 @@ module.exports = {
         'providers/ — каталог возможностей и путей CLI; он ниже доменов и не тянет их обратно.',
       severity: 'error',
       from: { path: '^apps/server/src/providers/', pathNot: '\\.test\\.ts$' },
-      to: { path: '^apps/server/src/(domains|routes)/|^apps/server/src/(context|index)\\.ts$' },
+      to: {
+        path: '^apps/server/src/(domains|routes|bootstrap)/|^apps/server/src/(context|index)\\.ts$',
+      },
     },
     {
       name: 'server-domains-below-routes',
@@ -101,7 +103,17 @@ module.exports = {
         '(paths, store, backupDir), а не ServerContext.',
       severity: 'error',
       from: { path: '^apps/server/src/domains/', pathNot: '\\.test\\.ts$' },
-      to: { path: '^apps/server/src/routes/|^apps/server/src/(context|index)\\.ts$' },
+      to: { path: '^apps/server/src/(routes|bootstrap)/|^apps/server/src/(context|index)\\.ts$' },
+    },
+    {
+      name: 'server-routes-below-bootstrap',
+      comment:
+        'bootstrap/ — сборка приложения (рантайм, таблица маршрутов, баннер), самый верхний слой ' +
+        'вместе с index.ts и context.ts. Маршрут не тянет сборку обратно: иначе цикл и скрытая ' +
+        'зависимость от порядка регистрации.',
+      severity: 'error',
+      from: { path: '^apps/server/src/routes/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/server/src/bootstrap/|^apps/server/src/index\\.ts$' },
     },
   ],
   options: {

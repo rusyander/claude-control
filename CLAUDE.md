@@ -183,7 +183,8 @@ needs no resolver (no default exports, no nested ternaries, `max-lines` 400 as a
 - **Web**: `app → pages → features → entities → shared`, downward only, cross-feature forbidden
   (one exception, `features/ResourceFiles`, documented in the config); a foreign slice is reachable
   only through its `index.ts`.
-- **Server**: `context → routes → domains → providers → lib → contracts`, downward only. A domain
+- **Server**: `index/bootstrap/context → routes → domains → providers → lib → contracts`, downward
+  only (`bootstrap/` = runtime, route table, banner — the assembly index.ts delegates to). A domain
   takes primitives (`paths`, `store`, `backupDir`), never `ServerContext`. `lib/` is format and OS
   helpers with no knowledge of the registry — anything that needs the provider registry lives in
   `providers/`. Tests are exempt: a test may reach into any layer.

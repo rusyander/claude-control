@@ -14,11 +14,11 @@ import styles from './OverviewPage.module.scss';
  * недопустимы). Сами действия логики не несут: ведут в раздел с осмысленным
  * параметром (создать, открыть историю), а выполняет их уже целевая страница.
  */
-export function StatTile({ icon, label, value, hint, tone, to, actions }: StatTileProps) {
+export function StatTile({ icon, label, value, hint, tone, to, search, actions }: StatTileProps) {
   return (
     <Card padding="md" className={styles.tile}>
       <Stack gap="var(--spacing-xs)" className={styles.tileBody}>
-        <Link to={to} className={styles.tileMain}>
+        <Link to={to} search={search ?? {}} className={styles.tileMain}>
           <Stack gap="var(--spacing-xs)">
             <Stack direction="row" align="center" gap="var(--spacing-xs)">
               <Icon name={icon} size={24} />

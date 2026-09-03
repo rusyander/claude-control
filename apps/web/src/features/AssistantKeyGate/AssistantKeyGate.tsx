@@ -71,7 +71,12 @@ export function AssistantKeyGate() {
           <Button variant="secondary" onClick={() => setDismissed(true)}>
             {t('common.close')}
           </Button>
-          <Link to={SETTINGS_ROUTE} onClick={() => setDismissed(true)}>
+          {/* Ключи провайдеров лежат во вкладке «Провайдеры» — ведём сразу туда. */}
+          <Link
+            to={SETTINGS_ROUTE}
+            search={{ tab: 'providers' }}
+            onClick={() => setDismissed(true)}
+          >
             <Button variant="ghost">{t('assistantKey.openSettings')}</Button>
           </Link>
           {!isUnsupported && (

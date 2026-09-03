@@ -22,6 +22,8 @@ export interface StatTileProps {
   /** Тревожный тон подсказки — например, когда есть сломанные хуки. */
   tone?: 'danger';
   to: string;
+  /** Параметры адреса раздела — например `{ tab: 'safety' }` для настроек. */
+  search?: Record<string, unknown>;
   /** Быстрые действия под сводкой: «Добавить», «Открыть историю» и т. п. */
   actions?: QuickAction[];
 }

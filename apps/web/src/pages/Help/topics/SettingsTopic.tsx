@@ -64,6 +64,20 @@ export function SettingsTopic() {
         />
       </HelpSection>
 
+      <HelpSection title={tr('tabsTitle')} caption={tr('tabsCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('tabGeneral'), text: tr('tabGeneralText') },
+            { title: tr('tabAccess'), text: tr('tabAccessText') },
+            { title: tr('tabProviders'), text: tr('tabProvidersText') },
+            { title: tr('tabModels'), text: tr('tabModelsText') },
+            { title: tr('tabSpend'), text: tr('tabSpendText') },
+            { title: tr('tabSafety'), text: tr('tabSafetyText') },
+            { title: tr('tabTransfer'), text: tr('tabTransferText') },
+          ]}
+        />
+      </HelpSection>
+
       <HelpSection title={tr('cardsTitle')} caption={tr('cardsCaption')}>
         <OptionCards
           items={[

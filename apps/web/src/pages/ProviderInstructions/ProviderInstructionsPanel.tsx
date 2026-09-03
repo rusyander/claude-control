@@ -224,7 +224,7 @@ export function ProviderInstructionsPanel({ projectId }: ProviderInstructionsPan
       )}
 
       <Typography variant="caption" color="subtle">
-        {t('common.needsRestart')}
+        {t('providers.needsRestartFor', { provider: data.providerName })}
       </Typography>
 
       {dialog}

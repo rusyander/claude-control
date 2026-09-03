@@ -44,7 +44,10 @@ export function CursorPermissionsPanel({ data, save }: CursorPermissionsPanelPro
 
           <ExplainBox
             title={t('providerPermissions.explainTitle')}
-            text={t('providerPermissions.cursor.explain', { fileName: data.filePath })}
+            text={t('providerPermissions.cursor.explain', {
+              fileName: data.filePath,
+              provider: data.providerName,
+            })}
           />
 
           {!data.cliDetected && (

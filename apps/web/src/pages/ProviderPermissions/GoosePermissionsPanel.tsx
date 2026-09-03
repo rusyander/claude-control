@@ -44,7 +44,10 @@ export function GoosePermissionsPanel({ data, save }: GoosePermissionsPanelProps
 
           <ExplainBox
             title={t('providerPermissions.explainTitle')}
-            text={t('providerPermissions.goose.explain', { fileName: data.filePath })}
+            text={t('providerPermissions.goose.explain', {
+              provider: data.providerName,
+              fileName: data.filePath,
+            })}
           />
 
           {!data.cliDetected && (

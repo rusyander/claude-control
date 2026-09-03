@@ -136,7 +136,7 @@ export function ClaudeMdPage() {
           </Stack>
 
           <Typography variant="caption" color="subtle">
-            {t('common.needsRestart')}
+            {t(view.restartHint.key, view.restartHint.params)}
           </Typography>
         </Stack>
       </Card>

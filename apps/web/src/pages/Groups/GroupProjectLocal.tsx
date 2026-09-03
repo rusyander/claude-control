@@ -4,6 +4,7 @@ import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { Skeleton } from '@shared/ui/skeleton';
 import { ProjectLocalConfigView, useProjectLocalByPath } from '@entities/Project';
+import { useProviders, activeProvider } from '@entities/Provider';
 import type { GroupProjectLocalPathProps, GroupProjectLocalProps } from './GroupProjectLocal.types';
 import styles from './GroupsPage.module.scss';
 
@@ -15,6 +16,13 @@ import styles from './GroupsPage.module.scss';
  */
 export function GroupProjectLocal({ paths }: GroupProjectLocalProps) {
   const { t } = useTranslation();
+  const { data: providers } = useProviders();
+
+  // Набор `.claude` проекта есть только у Claude: сервер отвечает 400 любому
+  // другому провайдеру (`requireClaudeProvider`), и страница проектов показывает
+  // эту панель тем же правилом. Пока провайдеры не загружены — тоже ничего.
+  const active = activeProvider(providers);
+  if (active?.id !== 'claude') return null;
 
   return (
     <Stack gap="var(--spacing-xs)" className={styles.local}>

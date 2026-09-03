@@ -62,8 +62,17 @@ export function useOverview() {
   return useQuery({ queryKey: queryKeys.overview, queryFn: getOverview });
 }
 
-export function useClaudeMd() {
-  return useQuery({ queryKey: queryKeys.claudeMd, queryFn: getClaudeMd });
+/**
+ * Файл инструкций активного провайдера. `enabled: false` — не запрашивать:
+ * у провайдера без глобальных инструкций (Continue) сервер отвечает 400, и
+ * страница, которой файл нужен лишь для подсказки, не должна его дёргать.
+ */
+export function useClaudeMd(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: queryKeys.claudeMd,
+    queryFn: getClaudeMd,
+    enabled: options.enabled ?? true,
+  });
 }
 
 export function useUpdateClaudeMd() {

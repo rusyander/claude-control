@@ -73,7 +73,9 @@ export function ProjectPermissionsTab({ projectId }: ProjectTabProps) {
               />
               <DeleteButton
                 entityName={rule.pattern}
-                description={t('permissions.deletePermission')}
+                description={t('permissions.deletePermission', {
+                  file: rule.source === 'settings-local' ? 'settings.local.json' : 'settings.json',
+                })}
                 onDelete={() => deleteRule.mutate(rule.id)}
                 isPending={deleteRule.isPending}
               />

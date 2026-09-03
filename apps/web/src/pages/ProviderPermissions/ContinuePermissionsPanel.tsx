@@ -44,7 +44,10 @@ export function ContinuePermissionsPanel({ data, save }: ContinuePermissionsPane
 
           <ExplainBox
             title={t('providerPermissions.explainTitle')}
-            text={t('providerPermissions.continue.explain', { fileName: data.filePath })}
+            text={t('providerPermissions.continue.explain', {
+              provider: data.providerName,
+              fileName: data.filePath,
+            })}
           />
 
           {!data.cliDetected && (

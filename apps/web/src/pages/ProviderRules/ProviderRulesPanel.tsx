@@ -181,7 +181,7 @@ export function ProviderRulesPanel({ projectId }: ProviderRulesPanelProps) {
       )}
 
       <Typography variant="caption" color="subtle">
-        {t('common.needsRestart')}
+        {t('providers.needsRestartFor', { provider: data.providerName })}
       </Typography>
     </Stack>
   );

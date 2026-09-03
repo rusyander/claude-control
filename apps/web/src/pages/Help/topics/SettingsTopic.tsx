@@ -1,7 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { PriorityLadder } from '@shared/ui/diagram';
-import { HelpSection, StorageCard, FieldTable, Callout, CapabilityGrid, OptionCards } from '../ui';
+import {
+  HelpSection,
+  StorageCard,
+  FieldTable,
+  Callout,
+  CapabilityGrid,
+  OptionCards,
+  StepList,
+} from '../ui';
 
 /** Документ раздела «Настройки». */
 export function SettingsTopic() {
@@ -65,6 +73,22 @@ export function SettingsTopic() {
             { title: tr('cardEditor'), text: tr('cardEditorText') },
           ]}
         />
+      </HelpSection>
+
+      <HelpSection title={tr('firstRunTitle')} caption={tr('firstRunCaption')}>
+        <Stack gap="var(--spacing-xs)">
+          <StepList
+            steps={[
+              { title: tr('firstRunStep1'), text: tr('firstRunStep1Text') },
+              { title: tr('firstRunStep2'), text: tr('firstRunStep2Text') },
+              { title: tr('firstRunStep3'), text: tr('firstRunStep3Text') },
+              { title: tr('firstRunStep4'), text: tr('firstRunStep4Text') },
+            ]}
+          />
+          <Callout tone="info" title={tr('firstRunReturnTitle')}>
+            {tr('firstRunReturnText')}
+          </Callout>
+        </Stack>
       </HelpSection>
 
       <HelpSection title={tr('credsTitle')} caption={tr('credsCaption')}>

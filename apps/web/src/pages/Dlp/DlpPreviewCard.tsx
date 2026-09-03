@@ -8,7 +8,8 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Badge, type BadgeTone } from '@shared/ui/badge';
 import { TextField } from '@shared/ui/text-field';
-import { useDlpPreview } from '@entities/Dlp';
+import { toast } from '@shared/lib/toast';
+import { dlpErrorMessage, useDlpPreview } from '@entities/Dlp';
 
 interface Props {
   rules: DlpRule[];
@@ -35,7 +36,15 @@ export function DlpPreviewCard({ rules }: Props) {
   const preview = useDlpPreview();
 
   const run = (): void => {
-    preview.mutate({ text, rules }, { onSuccess: setResult });
+    preview.mutate(
+      { text, rules },
+      {
+        onSuccess: setResult,
+        // Молчание здесь читалось бы как «ничего не найдено» — худший ответ
+        // для проверки защиты.
+        onError: (error) => toast.error(dlpErrorMessage(error, t('dlp.previewFailed'))),
+      },
+    );
   };
 
   return (

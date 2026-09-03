@@ -235,7 +235,7 @@ export function ProviderHookRulesEditor({ data, projectId }: ProviderHookRulesEd
       )}
 
       <Typography variant="caption" color="subtle">
-        {t('common.needsRestart')}
+        {t('providers.needsRestartFor', { provider: data.providerName })}
       </Typography>
     </Stack>
   );

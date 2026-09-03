@@ -116,10 +116,10 @@ export function EndpointsTopic() {
           <StorageCard
             title={tr('filePanelTitle')}
             rows={[
-              { label: tr('fileProfiles'), value: '~/.agentdeck/state.json', isMono: true },
+              { label: tr('fileProfiles'), value: '~/.claude/agentdeck/state.json', isMono: true },
               {
                 label: tr('fileToken'),
-                value: '~/.agentdeck/provider-keys.enc',
+                value: '~/.claude/agentdeck/provider-keys.enc',
                 isMono: true,
               },
             ]}

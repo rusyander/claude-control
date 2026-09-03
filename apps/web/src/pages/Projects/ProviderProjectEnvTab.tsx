@@ -128,6 +128,7 @@ export function ProviderProjectEnvTab({ projectId }: ProjectTabProps) {
 
       <ProviderEnvForm
         isOpen={isFormOpen}
+        providerName={data.providerName}
         onOpenChange={setIsFormOpen}
         envVar={editing}
         existingKeys={vars.map((v) => v.key)}

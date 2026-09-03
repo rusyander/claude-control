@@ -339,7 +339,7 @@ export function ProviderPluginsPanel({ projectId }: ProviderPluginsPanelProps) {
       </Card>
 
       <Typography variant="caption" color="subtle">
-        {t('common.needsRestart')}
+        {t('providers.needsRestartFor', { provider: data.providerName })}
       </Typography>
     </Stack>
   );

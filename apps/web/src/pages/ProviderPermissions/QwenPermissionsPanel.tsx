@@ -44,7 +44,10 @@ export function QwenPermissionsPanel({ data, save }: QwenPermissionsPanelProps) 
 
           <ExplainBox
             title={t('providerPermissions.explainTitle')}
-            text={t('providerPermissions.qwen.explain', { fileName: data.filePath })}
+            text={t('providerPermissions.qwen.explain', {
+              provider: data.providerName,
+              fileName: data.filePath,
+            })}
           />
 
           {!data.cliDetected && (

@@ -366,7 +366,7 @@ export function ProviderHooksPanel({ projectId }: ProviderHooksPanelProps) {
       )}
 
       <Typography variant="caption" color="subtle">
-        {t('common.needsRestart')}
+        {t('providers.needsRestartFor', { provider: data.providerName })}
       </Typography>
     </Stack>
   );

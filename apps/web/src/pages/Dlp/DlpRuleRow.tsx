@@ -9,10 +9,13 @@ import { Badge } from '@shared/ui/badge';
 import { Toggle } from '@shared/ui/toggle';
 import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
-import { DLP_BUILTINS, isRuleComplete } from '@entities/Dlp';
+import { DLP_BUILTINS, isRuleComplete, type BuiltinNames } from '@entities/Dlp';
 
 interface Props {
   rule: DlpRule;
+  /** Названия и метки образцов по умолчанию — из словаря интерфейса. */
+  builtinNames: BuiltinNames;
+  builtinLabels: BuiltinNames;
   onChange: (next: DlpRule) => void;
   onRemove: (id: string) => void;
 }
@@ -26,9 +29,23 @@ const ACTIONS: DlpAction[] = ['mask', 'block', 'flag'];
  * не годится: в названиях компаний и адресах запятая встречается сама по себе,
  * и правило молча разъехалось бы на куски.
  */
-export function DlpRuleRow({ rule, onChange, onRemove }: Props) {
+export function DlpRuleRow({ rule, builtinNames, builtinLabels, onChange, onRemove }: Props) {
   const { t } = useTranslation();
   const complete = isRuleComplete(rule);
+
+  // Смена образца тянет за собой название и метку, если человек их не трогал:
+  // правило «Почта» с образцом «Номер карты» и меткой [ПОЧТА_1] путало бы всех.
+  const changeBuiltin = (value: DlpBuiltinPattern): void => {
+    const previous = rule.builtin;
+    const untouchedName = previous ? rule.name === builtinNames[previous] : false;
+    const untouchedLabel = previous ? rule.label === builtinLabels[previous] : false;
+    onChange({
+      ...rule,
+      builtin: value,
+      name: untouchedName ? builtinNames[value] : rule.name,
+      label: untouchedLabel ? builtinLabels[value] : rule.label,
+    });
+  };
 
   return (
     <Card padding="md">
@@ -69,10 +86,10 @@ export function DlpRuleRow({ rule, onChange, onRemove }: Props) {
           <SelectField
             label={t('dlp.builtin')}
             value={rule.builtin ?? ''}
-            onChange={(value) => onChange({ ...rule, builtin: value as DlpBuiltinPattern })}
+            onChange={(value) => changeBuiltin(value as DlpBuiltinPattern)}
             options={DLP_BUILTINS.map((builtin) => ({
               value: builtin,
-              label: t(`dlp.builtinName.${builtin}`),
+              label: builtinNames[builtin],
             }))}
             hint={rule.builtin ? t(`dlp.builtinHint.${rule.builtin}`) : undefined}
           />
@@ -118,7 +135,7 @@ export function DlpRuleRow({ rule, onChange, onRemove }: Props) {
                 label={t('dlp.label')}
                 value={rule.label}
                 onChange={(label) => onChange({ ...rule, label })}
-                hint={t('dlp.labelHint', { label: rule.label || 'ДАННЫЕ' })}
+                hint={t('dlp.labelHint', { label: rule.label || t('dlp.defaultLabel') })}
                 isMono
               />
             </Stack>

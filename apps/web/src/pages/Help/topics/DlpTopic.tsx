@@ -71,7 +71,7 @@ export function DlpTopic() {
               name: tr('actionMask'),
               description: tr('actionMaskText'),
               isMono: false,
-              badge: '[ИМЯ_1]',
+              badge: tr('actionMaskBadge'),
               badgeTone: 'info',
             },
             {
@@ -135,7 +135,11 @@ export function DlpTopic() {
                 value: '~/.claude/agentdeck/dlp-journal.jsonl',
                 isMono: true,
               },
-              { label: tr('fileSettings'), value: '~/.agentdeck/state.json', isMono: true },
+              {
+                label: tr('fileSettings'),
+                value: '~/.claude/agentdeck/state.json',
+                isMono: true,
+              },
             ]}
           />
           <StorageCard

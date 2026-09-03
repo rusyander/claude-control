@@ -18,9 +18,13 @@ import {
   useSetDlpRunning,
   newTermsRule,
   newRegexRule,
+  newBuiltinRule,
   starterRules,
   replaceRule,
   removeRule,
+  dlpErrorMessage,
+  DLP_BUILTINS,
+  type BuiltinNames,
 } from '@entities/Dlp';
 import { DlpStatusCard } from './DlpStatusCard';
 import { DlpRuleRow } from './DlpRuleRow';
@@ -37,10 +41,14 @@ import { PromptGateCard } from './PromptGateCard';
  * описано правилами: незаписанную фамилию он не угадает, а перефразированную
  * моделью метку не вернёт обратно. Раздел с этим и живёт — обещать полноту
  * значило бы продавать спокойствие вместо защиты.
+ *
+ * Настройки прокси берутся из общих настроек панели (`useSettings`), а не из
+ * ответа `/api/dlp`: после PATCH обновляется именно кеш настроек, и карточка,
+ * читавшая снимок `/api/dlp`, отскакивала тумблером назад до следующего F5.
  */
 export function DlpPage() {
   const { t } = useTranslation();
-  const { data: settings } = useSettings();
+  const { data: settings, isError: isSettingsError, refetch: refetchSettings } = useSettings();
   const updateSettings = useUpdateSettings();
   const { data, isLoading, isError, refetch } = useDlp();
   const saveRules = useSaveDlpRules();
@@ -55,46 +63,96 @@ export function DlpPage() {
   }, [data, draft]);
 
   // Отказ сервера — не вечный скелет: заголовок с «?» и кнопка повторить.
-  if (isError && !data) {
+  if ((isError && !data) || (isSettingsError && !settings)) {
     return (
       <Stack gap="var(--spacing-lg)">
         <PageHeader title={t('dlp.title')} subtitle={t('dlp.subtitle')} helpTopic="dlp" />
-        <LoadErrorCard onRetry={() => void refetch()} />
+        <LoadErrorCard
+          onRetry={() => {
+            void refetch();
+            void refetchSettings();
+          }}
+        />
       </Stack>
     );
   }
 
   if (isLoading || !data || !settings) return <SkeletonList rows={3} />;
 
+  const dlp = settings.dlp;
+  const running = data.status.running;
   const rules = draft ?? data.rules;
   const dirty = JSON.stringify(rules) !== JSON.stringify(data.rules);
   const active = rules.filter((rule) => rule.enabled).length;
+  const defaultLabel = t('dlp.defaultLabel');
+  const builtinNames = Object.fromEntries(
+    DLP_BUILTINS.map((builtin) => [builtin, t(`dlp.builtinName.${builtin}`)]),
+  ) as BuiltinNames;
+  const builtinLabels = Object.fromEntries(
+    DLP_BUILTINS.map((builtin) => [builtin, t(`dlp.builtinLabel.${builtin}`)]),
+  ) as BuiltinNames;
 
-  const patchSettings = (patch: Partial<DlpSettings>): void => {
-    updateSettings.mutate({ dlp: { ...data.settings, ...patch } });
+  /**
+   * Работающий прокси живёт со снимком настроек, снятым при запуске. Настройку
+   * поменяли — перезапускаем сразу, как это делает сохранение правил: иначе
+   * тумблер показывал бы одну политику, а слушатель применял другую.
+   */
+  const restartProxy = (): void => {
+    setRunning.mutate(true, {
+      onError: (error) => {
+        patchSettings({ enabled: false }, { restart: false });
+        toast.error(dlpErrorMessage(error, t('dlp.restartFailed')));
+      },
+    });
   };
 
-  const commit = (next: DlpRule[]): void => {
+  const patchSettings = (
+    patch: Partial<DlpSettings>,
+    options: { restart?: boolean } = {},
+  ): void => {
+    updateSettings.mutate(
+      { dlp: { ...dlp, ...patch } },
+      {
+        onSuccess: () => {
+          if (options.restart !== false && running) restartProxy();
+        },
+        onError: (error) => toast.error(dlpErrorMessage(error, t('dlp.settingsFailed'))),
+      },
+    );
+  };
+
+  const commit = (next: DlpRule[], afterSave?: () => void): void => {
     saveRules.mutate(next, {
       onSuccess: () => {
         setDraft(undefined);
+        afterSave?.();
         toast.success(t('dlp.saved'));
       },
-      onError: (error) => toast.error(messageOf(error, t('dlp.saveFailed'))),
+      onError: (error) => toast.error(dlpErrorMessage(error, t('dlp.saveFailed'))),
     });
   };
 
-  const toggleRunning = (running: boolean): void => {
+  const toggleRunning = (next: boolean): void => {
     // Тумблер в настройках и живой слушатель — одно и то же состояние: иначе
     // после перезапуска панели прокси не поднялся бы, а раздел показывал бы,
     // что защита включена.
-    patchSettings({ enabled: running });
-    setRunning.mutate(running, {
+    patchSettings({ enabled: next }, { restart: false });
+    setRunning.mutate(next, {
       onError: (error) => {
-        patchSettings({ enabled: false });
-        toast.error(messageOf(error, t('dlp.startFailed')));
+        patchSettings({ enabled: false }, { restart: false });
+        toast.error(dlpErrorMessage(error, t('dlp.startFailed')));
       },
     });
+  };
+
+  // Готовый набор — шесть встроенных образцов, сохранённых сразу, плюс пустой
+  // словарь черновиком: без слов сервер его не примет, а без него человек не
+  // узнает, что своё добавляется именно здесь.
+  const addStarter = (): void => {
+    const builtins = starterRules(builtinNames, builtinLabels);
+    commit(builtins, () =>
+      setDraft([...builtins, newTermsRule(t('dlp.newTermsName'), defaultLabel)]),
+    );
   };
 
   return (
@@ -104,20 +162,36 @@ export function DlpPage() {
         subtitle={t('dlp.subtitle')}
         helpTopic="dlp"
         actions={
-          <Stack direction="row" gap="var(--spacing-xs)">
+          <Stack direction="row" gap="var(--spacing-xs)" wrap>
             <Button
               variant="secondary"
               leftIcon={<Icon name="plus" size={24} />}
-              onClick={() => setDraft([...rules, newTermsRule(t('dlp.newTermsName'))])}
+              onClick={() =>
+                setDraft([...rules, newTermsRule(t('dlp.newTermsName'), defaultLabel)])
+              }
             >
               {t('dlp.addTerms')}
             </Button>
             <Button
               variant="secondary"
               leftIcon={<Icon name="plus" size={24} />}
-              onClick={() => setDraft([...rules, newRegexRule(t('dlp.newRegexName'))])}
+              onClick={() =>
+                setDraft([...rules, newRegexRule(t('dlp.newRegexName'), defaultLabel)])
+              }
             >
               {t('dlp.addRegex')}
+            </Button>
+            <Button
+              variant="secondary"
+              leftIcon={<Icon name="plus" size={24} />}
+              onClick={() =>
+                setDraft([
+                  ...rules,
+                  newBuiltinRule('email', builtinNames.email, builtinLabels.email),
+                ])
+              }
+            >
+              {t('dlp.addBuiltin')}
             </Button>
           </Stack>
         }
@@ -126,7 +200,7 @@ export function DlpPage() {
       <ExplainBox title={t('dlp.explainTitle')} text={t('dlp.explainText')} />
 
       <DlpStatusCard
-        settings={data.settings}
+        settings={dlp}
         status={data.status}
         profiles={settings.endpointProfiles}
         canStart={active > 0}
@@ -150,19 +224,8 @@ export function DlpPage() {
             <Button
               variant="primary"
               leftIcon={<Icon name="plus" size={24} />}
-              onClick={() =>
-                commit(
-                  starterRules({
-                    email: t('dlp.builtinName.email'),
-                    phone_ru: t('dlp.builtinName.phone_ru'),
-                    inn: t('dlp.builtinName.inn'),
-                    snils: t('dlp.builtinName.snils'),
-                    card: t('dlp.builtinName.card'),
-                    secret_key: t('dlp.builtinName.secret_key'),
-                    terms: t('dlp.newTermsName'),
-                  }),
-                )
-              }
+              onClick={addStarter}
+              isLoading={saveRules.isPending}
             >
               {t('dlp.addStarter')}
             </Button>
@@ -174,6 +237,8 @@ export function DlpPage() {
             <DlpRuleRow
               key={rule.id}
               rule={rule}
+              builtinNames={builtinNames}
+              builtinLabels={builtinLabels}
               onChange={(next) => setDraft(replaceRule(rules, next))}
               onRemove={(id) => setDraft(removeRule(rules, id))}
             />
@@ -194,7 +259,7 @@ export function DlpPage() {
                 {t('dlp.discard')}
               </Button>
             )}
-            {dirty && data.status.running && (
+            {dirty && running && (
               <Typography variant="caption" color="warning">
                 {t('dlp.dirtyWhileRunning')}
               </Typography>
@@ -204,7 +269,7 @@ export function DlpPage() {
       )}
 
       <DlpPreviewCard rules={rules} />
-      <DlpJournalCard enabled={data.settings.journal} />
+      <DlpJournalCard enabled={dlp.journal} live={running} />
       {/*
        * Гейт — второй, независимый механизм на тех же правилах, и стоит он
        * последним намеренно: он видит только набранный руками текст, то есть
@@ -213,11 +278,4 @@ export function DlpPage() {
       <PromptGateCard />
     </Stack>
   );
-}
-
-/** Текст отказа сервера, если он его прислал: он точнее общей формулировки. */
-function messageOf(error: unknown, fallback: string): string {
-  const message = (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message;
-  return message ?? fallback;
 }

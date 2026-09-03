@@ -77,7 +77,10 @@ export function GeminiPermissionsPanel({ data, save }: GeminiPermissionsPanelPro
 
       <ExplainBox
         title={t('providerPermissions.explainTitle')}
-        text={t('providerPermissions.gemini.explain', { fileName: data.filePath })}
+        text={t('providerPermissions.gemini.explain', {
+          provider: data.providerName,
+          fileName: data.filePath,
+        })}
       />
 
       {!data.cliDetected && (

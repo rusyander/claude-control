@@ -38,17 +38,33 @@ async function clearJournal(): Promise<void> {
   await apiClient.delete('/dlp/journal');
 }
 
+/**
+ * Пока слушатель работает, счётчики и журнал растут без участия панели — CLI
+ * ходит через прокси сам. Опрашиваем раз в несколько секунд, иначе раздел
+ * показывал бы «запросов: 0» до F5, как будто через прокси ничего не идёт.
+ */
+const LIVE_INTERVAL_MS = 4000;
+
 /** Настройки, правила и состояние прокси. В сеть этот запрос не ходит. */
 export function useDlp() {
-  return useQuery({ queryKey: queryKeys.dlp, queryFn: getDlp });
+  return useQuery({
+    queryKey: queryKeys.dlp,
+    queryFn: getDlp,
+    refetchInterval: (query) => (query.state.data?.status.running ? LIVE_INTERVAL_MS : false),
+  });
 }
 
 /**
- * Лента срабатываний. Отдельным запросом и с более коротким кэшем: сводка
- * открывается один раз, а лента интересна именно свежая.
+ * Лента срабатываний. Отдельным запросом: сводка открывается один раз, а лента
+ * интересна именно свежая — при работающем прокси она обновляется сама.
  */
-export function useDlpJournal(enabled: boolean) {
-  return useQuery({ queryKey: queryKeys.dlpJournal, queryFn: getJournal, enabled });
+export function useDlpJournal(enabled: boolean, live = false) {
+  return useQuery({
+    queryKey: queryKeys.dlpJournal,
+    queryFn: getJournal,
+    enabled,
+    refetchInterval: enabled && live ? LIVE_INTERVAL_MS : false,
+  });
 }
 
 export function useSaveDlpRules() {
@@ -56,6 +72,9 @@ export function useSaveDlpRules() {
 
   return useMutation({
     mutationFn: saveRules,
+    // Промис возвращается намеренно: страница сбрасывает черновик в своём
+    // onSuccess, и к тому моменту в кеше уже должны лежать новые правила —
+    // иначе черновик пересеялся бы старыми.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.dlp }),
   });
 }

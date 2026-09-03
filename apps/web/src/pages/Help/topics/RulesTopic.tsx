@@ -58,6 +58,22 @@ export function RulesTopic() {
         />
       </HelpSection>
 
+      {/* Формат заголовка — контракт панели (contracts/rule-format). Ровно на него
+          опирается объясняющая заглушка «0 правил» на странице раздела, и сюда она
+          ведёт ссылкой, поэтому раздел стоит раньше схемы: читатель приходит
+          именно за этим. */}
+      <HelpSection title={tr('formatTitle')} caption={tr('formatCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('formatRule'), text: tr('formatRuleText') },
+            { title: tr('formatPlain'), text: tr('formatPlainText') },
+          ]}
+        />
+        <Callout tone="info" title={tr('formatZero')}>
+          {tr('formatZeroText')}
+        </Callout>
+      </HelpSection>
+
       <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
         <FlowDiagram
           ariaLabel={tr('flowTitle')}

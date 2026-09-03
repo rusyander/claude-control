@@ -45,7 +45,10 @@ export function OpencodePermissionsPanel({ data, save }: OpencodePermissionsPane
 
             <ExplainBox
               title={t('providerPermissions.explainTitle')}
-              text={t('providerPermissions.opencode.explain', { fileName: data.filePath })}
+              text={t('providerPermissions.opencode.explain', {
+                fileName: data.filePath,
+                provider: data.providerName,
+              })}
             />
 
             {!data.cliDetected && (

@@ -75,7 +75,7 @@ export function ProviderSkillsPanel({ projectId }: ProviderSkillsPanelProps) {
               </Typography>
             </Stack>
             <Typography variant="caption" color="subtle">
-              {t('providerSkills.externalExplain')}
+              {t('providerSkills.externalExplain', { provider: data.providerName })}
             </Typography>
             {externalDirs.map((dir) => (
               <Stack key={dir.path} direction="row" align="center" gap="var(--spacing-2xs)" wrap>
@@ -206,7 +206,7 @@ export function ProviderSkillsPanel({ projectId }: ProviderSkillsPanelProps) {
       )}
 
       <Typography variant="caption" color="subtle">
-        {t('common.needsRestart')}
+        {t('providers.needsRestartFor', { provider: data.providerName })}
       </Typography>
     </Stack>
   );

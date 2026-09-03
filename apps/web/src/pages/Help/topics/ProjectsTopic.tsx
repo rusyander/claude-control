@@ -36,7 +36,11 @@ export function ProjectsTopic() {
               value: '<project>/.claude/settings.json → hooks',
               isMono: true,
             },
-            { label: tr('storageRuleFiles'), value: '<project>/.claude/rules/*.md', isMono: true },
+            {
+              label: tr('storageRuleFiles'),
+              value: '<project>/.claude/rules/**/*.md',
+              isMono: true,
+            },
             { label: tr('storageCreate'), value: tr('storageCreateValue') },
           ]}
         />

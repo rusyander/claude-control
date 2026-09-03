@@ -153,12 +153,15 @@ exclude:
     expect(
       parseProviderPermissionsDraft({ allow: [' Read(**) ', 'Read(**)', ''] }, 'continue-yaml'),
     ).toEqual({ allow: ['Read(**)'], ask: [], exclude: [] });
-    // Лишний ключ режима просто игнорируется: у Continue его нет.
-    expect(parseProviderPermissionsDraft({ approvalMode: 'yolo' }, 'continue-yaml')).toEqual({
-      allow: [],
-      ask: [],
-      exclude: [],
-    });
+    // Лишний ключ режима игнорируется, но тело БЕЗ единого списка — не черновик:
+    // иначе `{}` или чужой черновик прочитались бы как «всё пусто» и стёрли файл.
+    expect(
+      parseProviderPermissionsDraft({ approvalMode: 'yolo', ask: [] }, 'continue-yaml'),
+    ).toEqual({ allow: [], ask: [], exclude: [] });
+    expect(
+      parseProviderPermissionsDraft({ approvalMode: 'yolo' }, 'continue-yaml'),
+    ).toBeUndefined();
+    expect(parseProviderPermissionsDraft({}, 'continue-yaml')).toBeUndefined();
     expect(parseProviderPermissionsDraft({ allow: 'Read' }, 'continue-yaml')).toBeUndefined();
     expect(parseProviderPermissionsDraft({ exclude: [42] }, 'continue-yaml')).toBeUndefined();
   });

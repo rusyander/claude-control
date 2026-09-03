@@ -192,4 +192,77 @@ describe('/api/permissions — id переезжает вместе с прав�
     expect(perms(settingsPath()).allow).not.toContain(GS);
     expect(members()).not.toContain(`allow:${GS}`);
   });
+
+  /**
+   * Право, выключенное тумблером, в файле отсутствует — его помнит только
+   * отметка панели, а список показывает его как «выключено» с теми же кнопками
+   * правки, удаления и переноса. Раньше все три отвечали 404 (`hasPermission`
+   * смотрит в файл), отметка оставалась — строка становилась неубиваемой.
+   */
+  describe('право, выключенное тумблером: в файле нет, есть отметка', () => {
+    const OFF = 'ask:WebSearch';
+
+    const listed = async (): Promise<Array<{ id: string; isEnabled: boolean; source: string }>> =>
+      (await app.inject({ method: 'GET', url: '/api/permissions' })).json();
+
+    beforeEach(() => {
+      store.setEnabled('permission', OFF, false);
+    });
+
+    it('GET показывает его выключенным', async () => {
+      expect(await listed()).toContainEqual(expect.objectContaining({ id: OFF, isEnabled: false }));
+    });
+
+    it('DELETE снимает отметку: строка исчезает, файл не тронут', async () => {
+      const before = readFileSync(settingsPath(), 'utf8');
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/api/permissions/${encodeURIComponent(OFF)}`,
+      });
+      expect(res.statusCode).toBe(200);
+      expect((await listed()).some((rule) => rule.id === OFF)).toBe(false);
+      expect(store.getDisabledIds('permission')).not.toContain(OFF);
+      expect(readFileSync(settingsPath(), 'utf8')).toBe(before);
+    });
+
+    it('PUT переносит отметку на новый id, в файл ничего не пишет', async () => {
+      const before = readFileSync(settingsPath(), 'utf8');
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/permissions/${encodeURIComponent(OFF)}`,
+        payload: { pattern: 'WebSearch', decision: 'allow', groupIds: [] },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(store.getDisabledIds('permission')).toContain('allow:WebSearch');
+      expect(store.getDisabledIds('permission')).not.toContain(OFF);
+      expect(await listed()).toContainEqual(
+        expect.objectContaining({ id: 'allow:WebSearch', isEnabled: false }),
+      );
+      expect(readFileSync(settingsPath(), 'utf8')).toBe(before);
+    });
+
+    it('PUT под id живого правила → 409: отметка не гасит чужую запись', async () => {
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/permissions/${encodeURIComponent(OFF)}`,
+        payload: { pattern: 'Read', decision: 'allow', groupIds: [] },
+      });
+      expect(res.statusCode).toBe(409);
+      expect(store.getDisabledIds('permission')).toContain(OFF);
+      expect(store.getDisabledIds('permission')).not.toContain('allow:Read');
+    });
+
+    it('move переводит отметку в локальный файл, записи не создаёт', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/permissions/${encodeURIComponent(OFF)}/move`,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(store.getDisabledIds('permission')).toContain(`local:${OFF}`);
+      expect(perms(localPath()).ask ?? []).not.toContain('WebSearch');
+      expect(await listed()).toContainEqual(
+        expect.objectContaining({ id: `local:${OFF}`, source: 'settings-local', isEnabled: false }),
+      );
+    });
+  });
 });

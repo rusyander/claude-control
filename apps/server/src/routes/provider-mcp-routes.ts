@@ -8,6 +8,7 @@ import {
   deleteProviderMcpServer,
   parseUniversalDraft,
   McpServerExistsError,
+  McpServerNotFoundError,
   type ProviderMcpTarget,
 } from '../domains/provider-mcp.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
@@ -134,6 +135,10 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
     try {
       return done(deleteProviderMcpServer(target, request.params.id, ctx.backupDir));
     } catch (error) {
+      // Нет такого имени — 404, как у `/api/mcp/:id` Claude, а не «удалено».
+      if (error instanceof McpServerNotFoundError) {
+        return reply.code(404).send({ error: 'not_found', message: error.message });
+      }
       if (error instanceof UnrecognizedFormatError)
         return reply.code(422).send(FORMAT_UNRECOGNIZED);
       throw error;

@@ -3,7 +3,7 @@ import type { AppStore } from '../lib/app-store.ts';
 import { readRules, saveRule, setRulesEnabled } from './rules.ts';
 import { readHooks, writeHooks } from './hooks.ts';
 import { setSkillEnabled } from './skills.ts';
-import { setMcpServerEnabled } from './mcp.ts';
+import { setMcpServerEnabled, McpServerNotFoundError } from './mcp.ts';
 import { savePermission, deletePermission, setPermissionsEnabled } from './permissions.ts';
 import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 
@@ -117,6 +117,27 @@ export function applyEntityStates(deps: EntityToggleDeps, states: EntityState[])
   return { needsHookRewrite };
 }
 
+/**
+ * MCP-сервер, которого в конфиге уже нет (убран через `claude mcp remove`, а в
+ * группе остался участником): переключать нечего. Поштучный маршрут отказывает
+ * заранее (`assertMcpServerExists`, 404); здесь, на пути группы, такой участник
+ * пропускается — иначе один устаревший id валил переключение всей группы на
+ * полпути, когда её состояние и отметки уже записаны.
+ */
+function toggleMcpServer(
+  mcpConfigPath: string,
+  id: string,
+  isEnabled: boolean,
+  backupDir?: string,
+): string | undefined {
+  try {
+    return setMcpServerEnabled(mcpConfigPath, id, isEnabled, backupDir);
+  } catch (error) {
+    if (error instanceof McpServerNotFoundError) return undefined;
+    throw error;
+  }
+}
+
 export function applyEntityState(
   deps: EntityToggleDeps,
   kind: EntityKind,
@@ -129,7 +150,7 @@ export function applyEntityState(
   // секции конфига. Остальное хранится отметкой в состоянии приложения.
   if (kind === 'skill') setSkillEnabled(paths.skills, id, isEnabled);
   const backupPath =
-    kind === 'mcp' ? setMcpServerEnabled(paths.mcpConfig, id, isEnabled, backupDir) : undefined;
+    kind === 'mcp' ? toggleMcpServer(paths.mcpConfig, id, isEnabled, backupDir) : undefined;
 
   // Правило физически уезжает в раздел отключённых — перезаписью CLAUDE.md.
   // Состояние передаём явно: при чтении оно берётся из расположения правила в

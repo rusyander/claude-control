@@ -60,9 +60,36 @@ export function readRules(appDataDir: string): DlpRule[] {
   return result.data.rules;
 }
 
-/** Проверить набор до записи: своё выражение обязано разбираться. */
-export function validateRules(rules: readonly DlpRule[]): string | undefined {
-  for (const rule of rules) {
+/**
+ * Разобрать присланный список по схеме — только форма, без смысловых проверок.
+ * Для предпросмотра этого достаточно: черновик с пустым словарём просто ничего
+ * не найдёт, а вот `null` вместо правила раньше ронял маршрут в 500.
+ */
+export function parseRules(rules: readonly unknown[]): DlpRule[] | DlpRulesError {
+  const out: DlpRule[] = [];
+  for (const [index, raw] of rules.entries()) {
+    const parsed = ruleSchema.safeParse(raw);
+    if (!parsed.success) return new DlpRulesError(`${nameOf(raw, index)}: не соответствует схеме`);
+    out.push(parsed.data);
+  }
+  return out;
+}
+
+/**
+ * Проверить набор до записи: форма по схеме, своё выражение разбирается,
+ * встроенный образец выбран, словарь не пуст, идентификаторы не повторяются.
+ * Повтор идентификатора не «косметика»: панель правит и удаляет правила по
+ * id, и две карточки с одним id двигались бы вместе.
+ */
+export function validateRules(rules: readonly unknown[]): string | undefined {
+  const parsed = parseRules(rules);
+  if (parsed instanceof DlpRulesError) return parsed.message;
+
+  const seen = new Set<string>();
+  for (const rule of parsed) {
+    if (seen.has(rule.id)) return `правило «${rule.name}»: идентификатор повторяется`;
+    seen.add(rule.id);
+
     if (rule.kind === 'regex' && !compileRulePattern(rule.pattern)) {
       return `правило «${rule.name}»: выражение не разбирается`;
     }
@@ -76,7 +103,7 @@ export function validateRules(rules: readonly DlpRule[]): string | undefined {
   return undefined;
 }
 
-export function saveRules(appDataDir: string, rules: readonly DlpRule[]): void {
+export function saveRules(appDataDir: string, rules: readonly unknown[]): void {
   const problem = validateRules(rules);
   if (problem) throw new DlpRulesError(problem);
 
@@ -85,4 +112,9 @@ export function saveRules(appDataDir: string, rules: readonly DlpRule[]): void {
   const parsed = fileSchema.safeParse({ version: 1, rules });
   if (!parsed.success) throw new DlpRulesError('правила не соответствуют схеме');
   writeJsonFile(rulesPath(appDataDir), parsed.data);
+}
+
+function nameOf(raw: unknown, index: number): string {
+  const name = (raw as { name?: unknown } | null)?.name;
+  return typeof name === 'string' && name ? `правило «${name}»` : `правило №${index + 1}`;
 }

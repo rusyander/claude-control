@@ -10,6 +10,7 @@ import {
   upsertProviderMcpServer,
   deleteProviderMcpServer,
   UnrecognizedFormatError,
+  McpServerNotFoundError,
   type ProviderMcpTarget,
 } from './provider-mcp.ts';
 
@@ -138,9 +139,9 @@ mcpServers:
       'remote-docs',
       'added',
     ]);
+    // `type` у stdio по документации необязателен — новая запись его не получает.
     expect(config.mcpServers[2]).toEqual({
       name: 'added',
-      type: 'stdio',
       command: 'npx',
       args: ['-y', 'pkg'],
       env: { KEY: 'v' },
@@ -169,15 +170,25 @@ mcpServers:
     );
 
     const config = parsed(filePath);
+    // Форма записи не меняется: `type` у неё не было — и после правки нет.
     expect(config.mcpServers[0]).toEqual({
       name: 'sqlite',
-      type: 'stdio',
       command: 'uvx',
       args: ['mcp-server-sqlite'],
       // Немоделируемое поле перенесено по значению.
       cwd: '/home/user/project',
     });
     expect(config.mcpServers[1].name).toBe('remote-docs');
+  });
+
+  it('удаление несуществующего имени — отказ McpServerNotFoundError, файл не тронут', () => {
+    const filePath = join(root, 'config.yaml');
+    writeConfig(filePath);
+
+    expect(() => deleteProviderMcpServer(targetFor(filePath), 'nope', backupDir)).toThrow(
+      McpServerNotFoundError,
+    );
+    expect(readFileSync(filePath, 'utf8')).toBe(CONFIG);
   });
 
   it('правка удалённой записи: тип sse НЕ переписывается, прочий requestOptions цел', () => {

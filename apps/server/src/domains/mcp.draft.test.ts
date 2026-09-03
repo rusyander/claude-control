@@ -79,6 +79,33 @@ describe('mcp: черновик, 404 и чужие ключи', () => {
       }
     });
 
+    it('старое имя, не проходящее правило, при правке под тем же именем не отклоняется', () => {
+      for (const name of ['gitlab__tools', 'my server']) {
+        expect(() => assertMcpDraft(stdio({ name }), { currentName: name }), name).not.toThrow();
+      }
+      // Переименование — уже новое имя, правило действует.
+      expect(() =>
+        assertMcpDraft(stdio({ name: 'a b' }), { currentName: 'gitlab__tools' }),
+      ).toThrow(InvalidMcpDraftError);
+      // Создание под таким именем по-прежнему отказ.
+      expect(() => assertMcpDraft(stdio({ name: 'gitlab__tools' }))).toThrow(InvalidMcpDraftError);
+    });
+
+    it('saveMcpServer правит сервер «gitlab__tools» из старого конфига без переименования', () => {
+      writeFileSync(
+        configPath,
+        JSON.stringify({ mcpServers: { gitlab__tools: { command: 'old' } } }),
+      );
+      expect(() =>
+        saveMcpServer(
+          configPath,
+          'gitlab__tools',
+          stdio({ name: 'gitlab__tools', command: 'new' }),
+        ),
+      ).not.toThrow();
+      expect(readConfig().mcpServers?.gitlab__tools?.command).toBe('new');
+    });
+
     it('stdio без команды и сетевой без адреса — отказ', () => {
       expect(() => assertMcpDraft(stdio({ command: '' }))).toThrow(/команда/);
       expect(() => assertMcpDraft(stdio({ command: undefined }))).toThrow(InvalidMcpDraftError);

@@ -40,3 +40,14 @@ export class McpServerExistsError extends Error {
     this.serverName = serverName;
   }
 }
+
+/** Сервера с таким именем нет — маршрут отвечает 404 (как `/api/mcp/:id` у Claude), а не «удалено». */
+export class McpServerNotFoundError extends Error {
+  readonly serverName: string;
+
+  constructor(serverName: string) {
+    super(`MCP-сервера «${serverName}» нет в конфигурации.`);
+    this.name = 'McpServerNotFoundError';
+    this.serverName = serverName;
+  }
+}

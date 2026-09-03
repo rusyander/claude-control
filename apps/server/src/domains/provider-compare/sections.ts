@@ -207,7 +207,7 @@ function flattenValues(values: Record<string, unknown>): Row[] {
       if (Array.isArray(value)) {
         return {
           key,
-          display: value.length ? value.map(String).join(', ') : '—',
+          display: value.length ? value.map(describeItem).join(', ') : '—',
           compare: sortedJson(value),
         };
       }
@@ -222,7 +222,19 @@ function flattenValues(values: Record<string, unknown>): Row[] {
 function summarizeObject(value: object): string {
   const entries = Object.entries(value as Record<string, unknown>);
   if (entries.length === 0) return '—';
-  return entries.map(([key, item]) => `${key}: ${String(item)}`).join(', ');
+  return entries.map(([key, item]) => `${key}: ${describeItem(item)}`).join(', ');
+}
+
+/**
+ * Элемент списка или поля. Права kimi (`rules: [{decision, pattern}]`) и opencode
+ * (`entries: [{tool, mode, …}]`) — списки ОБЪЕКТОВ: `String(item)` дал бы
+ * «[object Object]» на странице сравнения, поэтому объект раскладывается в свои
+ * пары в скобках, вложенный список — через запятую, скаляр — собой.
+ */
+function describeItem(item: unknown): string {
+  if (Array.isArray(item)) return item.map(describeItem).join(', ');
+  if (item && typeof item === 'object') return `(${summarizeObject(item)})`;
+  return String(item);
 }
 
 export function instructionsSide(providerId: string, deps: CompareDeps): SideRead {

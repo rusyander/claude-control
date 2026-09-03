@@ -122,7 +122,9 @@ export function writeContinueServers(text: string, servers: ContinueRawServer[])
   else draft.set(CONTINUE_MCP_KEY, servers);
 
   // lineWidth: 0 — длинные аргументы и адреса не переносятся на следующую строку.
-  const next = draft.toString({ lineWidth: 0 });
+  // flowCollectionPadding: false — чужие потоковые списки (`roles: [chat, edit]`)
+  // остаются в стиле документации Continue, а не превращаются в `[ chat, edit ]`.
+  const next = draft.toString({ lineWidth: 0, flowCollectionPadding: false });
 
   const check = parseContinueDocument(next);
   if (JSON.stringify(servers) !== JSON.stringify(readContinueServers(next))) {
@@ -205,7 +207,7 @@ export function writeContinuePermissions(text: string, lists: ContinuePermission
     else draft.set(key, [...lists[key]]);
   }
 
-  const next = draft.toString({ lineWidth: 0 });
+  const next = draft.toString({ lineWidth: 0, flowCollectionPadding: false });
 
   const check = parseContinueDocument(next);
   if (JSON.stringify(lists) !== JSON.stringify(readContinuePermissions(next))) {

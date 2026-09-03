@@ -140,7 +140,9 @@ export function writeGooseExtensions(
   else draft.set(GOOSE_EXTENSIONS_KEY, Object.fromEntries(extensions));
 
   // lineWidth: 0 — длинные аргументы и адреса не переносятся на следующую строку.
-  const next = draft.toString({ lineWidth: 0 });
+  // flowCollectionPadding: false — потоковые списки вне блока не получают лишних
+  // пробелов внутри скобок (serde_yaml самого Goose их не ставит).
+  const next = draft.toString({ lineWidth: 0, flowCollectionPadding: false });
 
   const check = parseGooseDocument(next);
   const intent = JSON.stringify(Object.fromEntries(extensions));
@@ -185,7 +187,7 @@ export function writeGooseMode(text: string, mode: GooseMode): string {
   const draft = parseGooseDocument(text);
   draft.set(GOOSE_MODE_KEY, mode);
 
-  const next = draft.toString({ lineWidth: 0 });
+  const next = draft.toString({ lineWidth: 0, flowCollectionPadding: false });
 
   const check = parseGooseDocument(next);
   if (readGooseMode(next) !== mode) throw new UnrecognizedFormatError();

@@ -149,6 +149,9 @@ export function resolveProviderEnvTargetFor(
 
 // --- Разбор черновика (валидация на стороне сервера) -------------------------
 
+/** Допустимое имя переменной окружения (то же правило, что у dotenv-писалки). */
+const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 /**
  * Разобрать желаемый набор переменных из тела запроса. Схему contracts (zod) в
  * рантайме сервера использовать нельзя (значение из contracts роняет node ESM),
@@ -166,7 +169,9 @@ export function parseProviderEnvDraft(body: unknown): ProviderEnvVar[] | undefin
     const rec = item as Record<string, unknown>;
     const key = typeof rec.key === 'string' ? rec.key.trim() : '';
     const value = typeof rec.value === 'string' ? rec.value : undefined;
-    if (!key || value === undefined) return undefined;
+    // Имя переменной — по правилу оболочки, для всех форматов сразу: dotenv-писалка
+    // такое отвергла бы сама, а TOML Codex принял бы `1bad = "x"` как обычный ключ.
+    if (!key || value === undefined || !ENV_KEY_PATTERN.test(key)) return undefined;
     byKey.set(key, value);
   }
   return [...byKey.entries()].map(([key, value]) => ({ key, value }));

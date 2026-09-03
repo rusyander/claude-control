@@ -77,6 +77,14 @@ describe('parseProviderEnvDraft: валидация набора', () => {
   it('значение не строка → отклоняется', () => {
     expect(parseProviderEnvDraft({ vars: [{ key: 'X', value: 5 }] })).toBeUndefined();
   });
+  it('имя не по правилу оболочки → отклоняется для любого формата (TOML Codex принял бы его)', () => {
+    for (const key of ['1bad', 'A-B', 'A B', 'a.b', 'ключ']) {
+      expect(parseProviderEnvDraft({ vars: [{ key, value: 'x' }] })).toBeUndefined();
+    }
+    expect(parseProviderEnvDraft({ vars: [{ key: '_OK_1', value: 'x' }] })).toEqual([
+      { key: '_OK_1', value: 'x' },
+    ]);
+  });
   it('не массив vars → отклоняется', () => {
     expect(parseProviderEnvDraft({})).toBeUndefined();
     expect(parseProviderEnvDraft(null)).toBeUndefined();

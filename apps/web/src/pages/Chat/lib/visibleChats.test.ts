@@ -76,6 +76,37 @@ describe('видимые чаты проекта', () => {
     expect(rows.map((row) => row.id)).toEqual(['родитель', 'дитя']);
   });
 
+  /**
+   * Проект у Claude Code — рабочий каталог запуска. Разговор, начатый на этаж
+   * глубже, заводит собственную запись, и вкладка корня показывала «0 из 0» при
+   * открытом в ней же разговоре.
+   */
+  it('разговор из подкаталога проекта виден во вкладке его корня', () => {
+    const rows = visibleChats(
+      [chat({ id: 'в-корне' }), chat({ id: 'в-подкаталоге', projectPath: 'D:/work/demo/widget' })],
+      PROJECT,
+    );
+
+    expect(rows.map((row) => row.id)).toEqual(['в-корне']);
+
+    const nested = visibleChats(
+      [chat({ id: 'в-корне' }), chat({ id: 'в-подкаталоге', projectPath: 'C:/work/demo/widget' })],
+      PROJECT,
+    );
+
+    expect(nested.map((row) => row.id)).toEqual(['в-корне', 'в-подкаталоге']);
+  });
+
+  it('сосед с тем же началом пути остаётся в своей вкладке', () => {
+    // `demo` и `demo-admin` — разные проекты: сравнение идёт по границе сегмента.
+    const rows = visibleChats(
+      [chat({ id: 'свой' }), chat({ id: 'соседний', projectPath: 'C:/work/demo-admin' })],
+      PROJECT,
+    );
+
+    expect(rows.map((row) => row.id)).toEqual(['свой']);
+  });
+
   it('чужой чат из копии не подтягивается: родителя в этом проекте нет', () => {
     const rows = visibleChats(
       [

@@ -202,9 +202,12 @@ export const helpEn: HelpSchema = {
         'Claude Code treats ~/.claude as protected and will not write inside it.',
       tabProject: 'A project tab',
       tabProjectText:
-        'The conversation runs right inside the project directory. Only that ' +
-        "project's chats are listed, and a new chat is pre-filled with “look around " +
-        'and tell me what this project is”.',
+        'The conversation runs right inside the project directory. The list holds ' +
+        'its chats and those of nested folders: for Claude Code a project is the ' +
+        'directory it was started in, so a conversation begun in a subfolder would ' +
+        'otherwise not show in the tab at all. A neighbour whose name starts the same ' +
+        'stays its own project. A new chat is pre-filled with “look around and tell ' +
+        'me what this project is”.',
       tabAdd: 'Add a folder',
       tabAddText:
         'The button in the project list opens a directory picker across your drives. ' +

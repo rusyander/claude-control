@@ -51,6 +51,10 @@ curl http://127.0.0.1:5178/api/system      # platform, home, shell
 curl http://127.0.0.1:5178/api/credentials # access source (token is NEVER returned)
 ```
 
+`{"error":"Нужен токен доступа"}` (401) on all four is not a fault: the remote gate is on, and these
+need `-H "Authorization: Bearer $(cat ~/.claude-control/api-token)"`. The browser is exempt — it passes
+the origin allowlist instead.
+
 `/api/location` answers most questions on its own. No match below → narrow: server vs front (`curl`
 the API), panel vs CLI (`claude --version` in the terminal that started the server). Fixed →
 **verify by running**, then report what was verified and what stayed unverified.

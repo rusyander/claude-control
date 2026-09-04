@@ -20,7 +20,10 @@ import styles from './ChatMessages.module.scss';
  * ответ немедленно, то есть первый же щелчок закрывал карточку, а два
  * оставшихся вопроса уходили в никуда — и при этом ничто не мешало ткнуть
  * сначала в третий. Теперь карточка ведёт по одному: активен ровно один вопрос,
- * отвеченные свёрнуты и их можно переспросить, следующие показаны, но погашены.
+ * отвеченные свёрнуты и их можно переспросить, а до которых не дошли — свёрнуты
+ * СТРОКОЙ, без вариантов. Погашенные варианты вместо строки читались как
+ * «спросили всё сразу»: от активных они почти не отличались, человек тыкал в
+ * середину и не понимал, почему не срабатывает.
  * Отправка одна на всю карточку — одно сообщение, один ход агента.
  *
  * Ответ фиксируется МГНОВЕННО, не дожидаясь сервера: агент отвечает десятками
@@ -33,10 +36,20 @@ import styles from './ChatMessages.module.scss';
  * вопрос задан ПОСРЕДИ хода и агент продолжает работать. Человек видел «нужен
  * ваш выбор», по которому нельзя щёлкнуть. Занятость меняет теперь не
  * доступность, а подпись: ответ уйдёт по концу хода (`busy`).
+ *
+ * СВОЙ ВАРИАНТ есть у каждого вопроса, даже когда агент его не предложил.
+ * Варианты пишет модель, и ни один из них может не подходить; без своей строки
+ * человеку оставалось молча выбрать «наименее неверный» или уходить в поле
+ * ввода, потеряв связь ответа с вопросом. Текст встаёт на место выбранной
+ * подписи — дальше он живёт как обычный вариант: его видно, его можно
+ * переспросить, он уезжает тем же одним сообщением.
  */
-export function QuestionCard({ questions, onPick, busy }: QuestionCardProps) {
+export function QuestionCard({ questions, onPick, busy, target }: QuestionCardProps) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState<PickedAnswers>({});
+  // Открытое поле своего варианта и набранный в нём текст — по вопросам.
+  const [otherOpen, setOtherOpen] = useState<Record<number, boolean>>({});
+  const [otherText, setOtherText] = useState<Record<number, string>>({});
   // Подтверждённые множественные выборы: галочка ставится не одним щелчком, и
   // закрыть такой вопрос может только «Дальше».
   const [confirmed, setConfirmed] = useState<Record<number, boolean>>({});
@@ -91,6 +104,27 @@ export function QuestionCard({ questions, onPick, busy }: QuestionCardProps) {
     if (questions.length === 1) send(answers);
   };
 
+  /**
+   * Свой вариант вместо предложенных. Прежний свой вариант заменяется, а не
+   * копится: иначе во множественном выборе после трёх правок ответ уехал бы с
+   * тремя редакциями одной и той же мысли.
+   */
+  const applyCustom = (index: number): void => {
+    if (isLocked || wasSent.current) return;
+    const value = (otherText[index] ?? '').trim();
+    if (!value) return;
+
+    const question = questions[index];
+    const labels = (question?.options ?? []).map((option) => option.label);
+    const chosen = (picked[index] ?? []).filter((label) => labels.includes(label));
+    const answers = { ...picked, [index]: question?.multiSelect ? [...chosen, value] : [value] };
+
+    setPicked(answers);
+    setOtherOpen({ ...otherOpen, [index]: false });
+    setEditing(undefined);
+    if (questions.length === 1 && !question?.multiSelect) send(answers);
+  };
+
   const isComplete = pending === undefined;
 
   return (
@@ -117,10 +151,39 @@ export function QuestionCard({ questions, onPick, busy }: QuestionCardProps) {
 
       {questions.map((item, index) => {
         const chosen = picked[index] ?? [];
+        // Ответ своими словами: он же выбранный вариант, только подписи такой
+        // среди предложенных нет.
+        const optionLabels = (item.options ?? []).map((option) => option.label);
+        const custom = chosen.find((label) => !optionLabels.includes(label));
         const state: QuestionState = stateOf(index, current, chosen.length > 0);
         // Только для чтения — старый вопрос из ленты: показываем как есть,
         // без шагов и без блокировок, отвечать на него уже некуда.
         const shown = isReadOnly ? 'current' : state;
+
+        // До вопроса ещё не дошли: показываем строкой, без вариантов. Развёрнутые
+        // варианты погашенного вопроса от активных почти не отличались — карточка
+        // читалась как «спросили всё сразу», человек тыкал в середину и не
+        // понимал, почему не срабатывает. Строка же прямо говорит, что этот
+        // вопрос будет следующим.
+        if (shown === 'locked') {
+          return (
+            <div
+              key={index}
+              className={`${styles.questionItem} ${styles.questionLocked}`}
+              aria-disabled
+            >
+              <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
+                {item.header && <span className={styles.questionBadge}>{item.header}</span>}
+                <Typography as="span" variant="body-sm" color="muted">
+                  {item.question}
+                </Typography>
+                <Typography as="span" variant="caption" color="subtle">
+                  {t('chat.questionWait')}
+                </Typography>
+              </Stack>
+            </div>
+          );
+        }
 
         if (shown === 'done' && !isSent) {
           return (
@@ -146,14 +209,9 @@ export function QuestionCard({ questions, onPick, busy }: QuestionCardProps) {
         return (
           <div
             key={index}
-            className={[
-              styles.questionItem,
-              shown === 'locked' && styles.questionLocked,
-              shown === 'done' && styles.questionDoneOpen,
-            ]
+            className={[styles.questionItem, shown === 'done' && styles.questionDoneOpen]
               .filter(Boolean)
               .join(' ')}
-            aria-disabled={shown === 'locked' || undefined}
           >
             {item.header && <span className={styles.questionBadge}>{item.header}</span>}
             {item.question && (
@@ -165,11 +223,6 @@ export function QuestionCard({ questions, onPick, busy }: QuestionCardProps) {
             {item.multiSelect && shown === 'current' && (
               <Typography variant="caption" color="muted" className={styles.questionHint}>
                 {t('chat.questionMulti')}
-              </Typography>
-            )}
-            {shown === 'locked' && (
-              <Typography variant="caption" color="muted" className={styles.questionHint}>
-                {t('chat.questionWait')}
               </Typography>
             )}
 
@@ -226,7 +279,85 @@ export function QuestionCard({ questions, onPick, busy }: QuestionCardProps) {
                   </li>
                 );
               })}
+
+              {/* Свой ответ — такой же выбранный вариант, только текст его
+                  написан человеком. Без этой строки во множественном выборе он
+                  просто исчезал бы из виду. */}
+              {custom && (
+                <li>
+                  <div className={`${styles.option} ${styles.optionChosen}`}>
+                    <Typography
+                      as="span"
+                      variant="body-sm"
+                      weight="semibold"
+                      className={styles.optionLabel}
+                    >
+                      {custom}
+                    </Typography>
+                    <span className={styles.optionText}>{t('chat.questionOtherMine')}</span>
+                  </div>
+                </li>
+              )}
             </Stack>
+
+            {/*
+              Свой вариант. Показан как ещё одна строка выбора — и когда он
+              задан, стоит на месте варианта: иначе во множественном выборе
+              собственный ответ не было видно среди отмеченных.
+            */}
+            {!isReadOnly &&
+              shown === 'current' &&
+              !isLocked &&
+              (otherOpen[index] ? (
+                <div className={styles.questionOther}>
+                  <textarea
+                    className={styles.questionOtherInput}
+                    rows={2}
+                    autoFocus
+                    value={otherText[index] ?? ''}
+                    placeholder={t('chat.questionOtherPlaceholder')}
+                    aria-label={t('chat.questionOther')}
+                    onChange={(event) =>
+                      setOtherText({ ...otherText, [index]: event.target.value })
+                    }
+                    onKeyDown={(event) => {
+                      // Enter отправляет, Shift+Enter переносит строку — как в
+                      // поле ввода чата, чтобы привычка работала и здесь.
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        applyCustom(index);
+                      }
+                    }}
+                  />
+                  <Stack direction="row" gap="var(--spacing-2xs)">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={(otherText[index] ?? '').trim().length === 0}
+                      onClick={() => applyCustom(index)}
+                    >
+                      {t('chat.questionOtherApply')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setOtherOpen({ ...otherOpen, [index]: false })}
+                    >
+                      {t('common.cancel')}
+                    </Button>
+                  </Stack>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={styles.questionOtherOpen}
+                  leftIcon={<Icon name="edit" size={16} />}
+                  onClick={() => setOtherOpen({ ...otherOpen, [index]: true })}
+                >
+                  {custom ? t('chat.questionOtherEdit') : t('chat.questionOther')}
+                </Button>
+              ))}
 
             {item.multiSelect && shown === 'current' && !isLocked && (
               <Button
@@ -266,7 +397,13 @@ export function QuestionCard({ questions, onPick, busy }: QuestionCardProps) {
         >
           <span className={styles.questionSpinner} />
           <Typography as="span" variant="body-sm" color="muted">
-            {t(isQueued ? 'chat.questionQueuedNote' : 'chat.questionSentNote')}
+            {/* Ответ на вопрос ребёнка уходит в ЕГО разговор: без имени
+                человек, ответивший шестерым, не помнит, кому именно. */}
+            {target
+              ? t(isQueued ? 'chat.questionQueuedToNote' : 'chat.questionSentToNote', {
+                  title: target,
+                })
+              : t(isQueued ? 'chat.questionQueuedNote' : 'chat.questionSentNote')}
           </Typography>
         </Stack>
       )}

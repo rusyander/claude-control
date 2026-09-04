@@ -47,6 +47,7 @@ export function ChatMessages({
   onSplit,
   onKeepHere,
   isSplitPending,
+  childBranches,
   handoff,
 }: ChatMessagesProps) {
   const { t } = useTranslation();
@@ -96,6 +97,31 @@ export function ChatMessages({
   const streamed = useMemo(() => scanSplitBlocks(stream.text), [stream.text]);
   const streamedHandoff = useMemo(() => scanHandoffBlocks(streamed.text), [streamed.text]);
 
+  /**
+   * Сообщение с вопросом, который ещё ЖДЁТ ответа.
+   *
+   * Отвечать раньше можно было только на последнее сообщение ленты — и это
+   * ломалось само по себе, без чужого участия. `AskUserQuestion` в пакетном
+   * режиме сразу возвращается ошибкой, поэтому агент задаёт вопрос ПОСРЕДИ хода
+   * и продолжает писать: через несколько секунд карточка переставала быть
+   * последней и молча становилась нечитаемой картинкой — варианты на экране
+   * есть, нажать нельзя. Человек при этом успевал ответить на один вопрос из
+   * четырёх и терял остальные.
+   *
+   * Ищем с конца: реплика человека закрывает вопрос (ответил — не важно, кнопкой
+   * или текстом), ответ агента — нет.
+   */
+  const openQuestionIndex = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (!message) continue;
+      if (message.role === 'user') return undefined;
+      if (message.blocks.some((block) => block.type === 'tool' && block.name === 'AskUserQuestion'))
+        return index;
+    }
+    return undefined;
+  }, [messages]);
+
   const loadMore = (): void => {
     if (listRef.current) restoreScroll.current = listRef.current.scrollHeight;
     onLoadMore?.();
@@ -133,11 +159,13 @@ export function ChatMessages({
           onEdit={onEdit}
           onPickOption={onPickOption}
           isLast={index === messages.length - 1}
+          isQuestionOpen={index === openQuestionIndex}
           isRunning={isRunning}
           costUnit={costUnit}
           onSplit={onSplit}
           onKeepHere={onKeepHere}
           isSplitPending={isSplitPending}
+          childBranches={childBranches}
           handoff={handoff}
         />
       ))}
@@ -331,6 +359,9 @@ export function ChatMessages({
                 questions={questions}
                 onPick={(answer) => onChildAnswer(child.chatId, answer)}
                 busy={child.isRunning}
+                // Подпись сохраняется и ПОСЛЕ ответа: «отправлено» без имени
+                // разговора не говорит, кому именно из шестерых человек ответил.
+                target={child.title}
               />
             </div>
           );

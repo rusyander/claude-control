@@ -30,6 +30,12 @@ export function answerChild(
     chats: ChatSummary[];
     runs: ActiveRunView[];
     options: AnswerChildOptions;
+    /**
+     * Чем отозваться человеку. Родительская лента ответом не пополняется — ход
+     * тратит ребёнок, — и без этой строки выбор проваливается без следа: карточка
+     * уезжает сразу, а КОМУ из шестерых ушёл ответ, вспомнить уже нечем.
+     */
+    notify?: (title: string, queued: boolean) => void;
   },
 ): void {
   const prompt = answer.trim();
@@ -39,11 +45,14 @@ export function answerChild(
   const chat = input.chats.find(
     (item) => item.id === chatId || (run?.sessionId && item.id === run.sessionId),
   );
+  const title = chat?.title || chatId;
 
   if (run?.status === 'running') {
     agentRuns.enqueue(chatId, { prompt, files: [], ...input.options });
+    input.notify?.(title, true);
     return;
   }
+  input.notify?.(title, false);
 
   void agentRuns.start({
     chatId,

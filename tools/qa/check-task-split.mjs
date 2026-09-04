@@ -258,6 +258,43 @@ check(
 const tabsAfter = await page.getByRole('tab').count();
 check(tabsAfter === tabsBefore, `вкладок не прибавилось: было ${tabsBefore}, стало ${tabsAfter}`);
 
+// Разделение уже состоялось — кнопка обязана уйти.
+//
+// Предложение остаётся последним сообщением ленты сколько угодно долго, и по
+// одному «последнее ли оно» карточка живая даже после того, как чаты заведены:
+// второе нажатие завело бы те же копии ещё раз, суффиксом занятости. Отработку
+// видно по детям разговора: их ветки совпадают с ветками групп.
+await page.route('**/api/chats', (route) =>
+  route.fulfill({
+    json: [
+      CHAT,
+      ...PROPOSAL.groups.map((group, index) => ({
+        ...CHAT,
+        id: `child-${index}`,
+        title: group.title,
+        parentId: CHAT_ID,
+        branch: group.branch,
+        preview: group.tasks[0],
+      })),
+    ],
+  }),
+);
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('nav');
+await page.waitForTimeout(1800);
+
+check(
+  (await page.getByText('Уже разделено: 2 из 2').count()) > 0,
+  'карточка говорит, что предложение отработано',
+);
+check((await apply.count()) === 0, 'повторно разделить нельзя: кнопки нет');
+check(
+  (await page
+    .getByRole('switch', { name: 'Только завести чаты, не запускать агентов' })
+    .count()) === 0,
+  'переключателя запуска у отработанной карточки тоже нет',
+);
+
 check(errors.length === 0, errors.length === 0 ? 'ошибок консоли нет' : errors.join(' | '));
 
 await browser.close();

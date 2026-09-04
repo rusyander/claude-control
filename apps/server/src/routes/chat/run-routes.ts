@@ -104,6 +104,16 @@ export function registerChatRunRoutes(
       autoApprove?: boolean;
       /** Каталог проекта для нового разговора — когда чат открыт из списка проектов. */
       projectPath?: string;
+      /**
+       * Разговор, из которого этот запущен. Не «откуда нажали», а РОДИТЕЛЬ: по
+       * нему чат встаёт ветвью в дереве списка, а его вопросы и запросы прав
+       * показываются в родителе. Так работает разделение задач; параллельный
+       * запуск ходит тем же путём, иначе каждый его агент заводил бы отдельную
+       * вкладку проекта и терялся вместе со своим вопросом.
+       */
+      parentChatId?: string;
+      /** Подпись ветви в дереве: имя проекта или группы. */
+      parentTitle?: string;
       /** Модель для этого разговора (алиас или полное имя); пусто = по умолчанию. */
       model?: string;
       /** Глубина продумывания (--effort); пусто = по умолчанию. */
@@ -121,6 +131,8 @@ export function registerChatRunRoutes(
       fullAccess,
       autoApprove: autoApproveRequested,
       projectPath,
+      parentChatId,
+      parentTitle,
       model,
       effort,
     } = request.body;
@@ -219,6 +231,23 @@ export function registerChatRunRoutes(
     const initiative = initiativePrompt(ctx.store.getSettings(), {
       splitMuted: registry.isSplitMuted(chatId),
     });
+
+    // Связь с родителем — СТРОГО до запуска. Прогон называет свой настоящий
+    // `sessionId` через пару секунд, и перенос связи ищет запись по временному
+    // ключу: не найдя, он молча ничего не делает, и чат уезжает в список
+    // отдельным разговором вместе со своими вопросами (3 сентября так потерялись
+    // трое детей из четырёх, см. `SplitLink` в `domains/chat/ChatSplit.ts`).
+    //
+    // Только для НОВОГО разговора: продолжение уже существующего родителя себе
+    // не назначает — иначе обычная переписка в чате-ребёнке переписывала бы
+    // дерево на каждом сообщении.
+    if (parentChatId && parentChatId !== chatId && !ctx.store.getChatLink(chatId)) {
+      ctx.store.setChatLink(chatId, {
+        parentChatId,
+        ...(parentTitle ? { title: parentTitle } : {}),
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     // Запускаем прогон в реестре и подключаемся к нему потоком. Обрыв этого
     // соединения агента не тронет.

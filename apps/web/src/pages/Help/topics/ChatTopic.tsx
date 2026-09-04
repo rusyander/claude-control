@@ -200,6 +200,7 @@ export function ChatTopic() {
           minWidth={320}
           items={[
             { title: tr('askOrder'), text: tr('askOrderText') },
+            { title: tr('askOwn'), text: tr('askOwnText') },
             { title: tr('askChange'), text: tr('askChangeText') },
             { title: tr('askBusy'), text: tr('askBusyText') },
             { title: tr('askSent'), text: tr('askSentText') },
@@ -230,6 +231,7 @@ export function ChatTopic() {
           items={[
             { title: tr('panelAgents'), text: tr('panelAgentsText') },
             { title: tr('panelParallel'), text: tr('panelParallelText') },
+            { title: tr('panelParallelTree'), text: tr('panelParallelTreeText') },
           ]}
         />
         <Callout tone="info" title={tr('panelNote')} />

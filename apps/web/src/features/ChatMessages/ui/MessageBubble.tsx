@@ -24,11 +24,13 @@ export function MessageBubble({
   onEdit,
   onPickOption,
   isLast,
+  isQuestionOpen,
   isRunning,
   costUnit,
   onSplit,
   onKeepHere,
   isSplitPending,
+  childBranches,
   handoff,
 }: MessageBubbleProps) {
   const { t } = useTranslation();
@@ -132,6 +134,7 @@ export function MessageBubble({
                       onKeepHere={isLast ? onKeepHere : undefined}
                       isPending={isSplitPending}
                       disabled={isRunning}
+                      childBranches={childBranches}
                     />
                   ))}
                   {/* Блок предложения, который панель не поняла, остаётся выше
@@ -201,19 +204,21 @@ export function MessageBubble({
               return (
                 <div key={index} className={styles.block}>
                   {/*
-                    Отвечать можно только на ПОСЛЕДНЕЕ сообщение ленты: вопрос
-                    из середины истории давно закрыт, и клик по нему отправил бы
-                    агенту реплику ни с того ни с сего.
+                    Отвечать можно, пока вопрос ОТКРЫТ, — а закрывает его ответ
+                    человека, не следующая реплика агента. В пакетном режиме
+                    вызов `AskUserQuestion` сразу возвращается ошибкой, агент
+                    спрашивает посреди хода и продолжает писать ещё минуту:
+                    привязка к последнему сообщению отбирала кнопки через
+                    несколько секунд, посреди наполовину заполненной формы.
+                    Вопрос из середины истории по-прежнему только для чтения —
+                    после него человек уже говорил.
 
-                    А вот «идёт прогон» карточку больше не гасит. В пакетном
-                    режиме вызов `AskUserQuestion` сразу возвращается ошибкой,
-                    агент задаёт вопрос посреди работы и продолжает её ещё
-                    минуту — именно в это время выбор и нужен. Занятому агенту
-                    ответ уходит в очередь и доедет, как только он закончит ход.
+                    «Идёт прогон» карточку тоже не гасит: занятому агенту ответ
+                    уходит в очередь и доедет, как только он закончит ход.
                   */}
                   <QuestionCard
                     questions={questions}
-                    onPick={isLast ? onPickOption : undefined}
+                    onPick={isLast || isQuestionOpen ? onPickOption : undefined}
                     busy={isRunning}
                   />
                   {spend}

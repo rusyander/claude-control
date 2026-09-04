@@ -18,6 +18,12 @@ export interface ChildHub {
    * «закончил» сказать надо, но именем разговора, а не именем его ветки.
    */
   list: { id: string; title: string }[];
+  /**
+   * Ветки уже заведённых детей. По ним карточка разделения понимает, что
+   * предложение отработано, и убирает кнопку: иначе она остаётся живой до
+   * следующей реплики агента, и второе нажатие заводит те же копии ещё раз.
+   */
+  branches: string[];
 }
 
 /**
@@ -36,14 +42,12 @@ export function useChildHub(
 ): ChildHub {
   return useMemo(() => {
     const all = chats ?? [];
+    const children = parentChatId ? all.filter((chat) => chat.parentId === parentChatId) : [];
     return {
       questions: collectChildQuestions(all, parentChatId, runs),
       permissions: collectChildPermissions(all, parentChatId, runs),
-      list: parentChatId
-        ? all
-            .filter((chat) => chat.parentId === parentChatId)
-            .map((chat) => ({ id: chat.id, title: chat.title || chat.id }))
-        : [],
+      list: children.map((chat) => ({ id: chat.id, title: chat.title || chat.id })),
+      branches: children.map((chat) => chat.branch ?? '').filter(Boolean),
     };
   }, [chats, parentChatId, runs]);
 }

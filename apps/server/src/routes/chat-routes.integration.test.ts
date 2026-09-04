@@ -310,3 +310,103 @@ describe('маршруты чата: отказы отправки и смена
     }
   });
 });
+
+/**
+ * Родитель у запущенного из чата агента.
+ *
+ * Параллельный запуск ходит тем же маршрутом, что и обычная отправка, и связь
+ * обязана лечь в хранилище ДО старта: прогон переименовывается в свой настоящий
+ * `sessionId` через пару секунд, а перенос связи ищет запись по временному ключу
+ * и, не найдя её, молча ничего не делает. Тогда чат уезжает в список отдельным
+ * разговором — отдельной вкладкой проекта, вместе со своими вопросами и
+ * запросами прав, которых в родителе уже не видно.
+ */
+describe('POST /api/chat/send: связь с родителем', () => {
+  let root: string;
+  let project: string;
+  let app: FastifyInstance;
+  let store: AppStore;
+  /** Родитель, известный хранилищу В МОМЕНТ запуска, — ради него весь тест. */
+  let parentAtStart: (string | undefined)[];
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), 'cc-parent-'));
+    project = mkdtempSync(join(tmpdir(), 'cc-parent-proj-'));
+    mkdirSync(join(root, 'claude-control'), { recursive: true });
+
+    parentAtStart = [];
+    const registry = new ChatRunRegistry((): RunLike => ({
+      start: async (options) => {
+        const chatId = options.permissionPrompt?.runId ?? '';
+        parentAtStart.push(store.getChatLink(chatId)?.parentChatId);
+      },
+      stop: () => undefined,
+    }));
+
+    store = new AppStore(join(root, 'claude-control'));
+    const ctx = {
+      location: { paths: { root } },
+      store,
+    } as unknown as ServerContext;
+
+    app = Fastify();
+    registerChatRoutes(app, ctx, registry, new ChatSession(registry));
+    await app.ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    rmSync(root, { recursive: true, force: true });
+    rmSync(project, { recursive: true, force: true });
+  });
+
+  const send = (payload: Record<string, unknown>) =>
+    app.inject({ method: 'POST', url: '/api/chat/send', payload });
+
+  it('запуск из чата встаёт ветвью: связь записана раньше прогона', async () => {
+    await send({
+      chatId: 'new-child',
+      prompt: 'посмотри код',
+      projectPath: project,
+      parentChatId: 'parent-1',
+      parentTitle: 'widget-app',
+    });
+
+    expect(parentAtStart).toEqual(['parent-1']);
+    expect(store.getChatLink('new-child')?.title).toBe('widget-app');
+  });
+
+  it('обычная переписка ребёнка дерево не переписывает', async () => {
+    store.setChatLink('new-child', {
+      parentChatId: 'parent-1',
+      title: 'widget-app',
+      createdAt: '2026-09-03T10:00:00.000Z',
+    });
+
+    // Второе сообщение пришло с ДРУГИМ родителем — так выглядит переписка из
+    // вкладки, открытой на другом проекте. Готовая связь важнее: перевешивать
+    // ветвь на каждом сообщении никто не просил.
+    await send({
+      chatId: 'new-child',
+      prompt: 'дальше',
+      projectPath: project,
+      parentChatId: 'parent-2',
+      parentTitle: 'src',
+    });
+
+    expect(parentAtStart).toEqual(['parent-1']);
+    expect(store.getChatLink('new-child')?.title).toBe('widget-app');
+  });
+
+  it('сам себе родителем чат не становится', async () => {
+    await send({
+      chatId: 'solo',
+      prompt: 'привет',
+      projectPath: project,
+      parentChatId: 'solo',
+    });
+
+    expect(parentAtStart).toEqual([undefined]);
+    expect(store.getChatLink('solo')).toBeUndefined();
+  });
+});

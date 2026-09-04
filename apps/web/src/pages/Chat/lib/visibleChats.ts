@@ -17,13 +17,18 @@ import { normalizeProjectPath } from '@shared/lib/workspace';
  * каталоге, и тогда они уже отобраны как свои. Без проверки такой разговор
  * попадал в список ДВАЖДЫ — та же строка, тот же ключ React, а дерево под
  * родителем оказывалось вдвое гуще, чем чатов на самом деле.
+ *
+ * Дети достраиваются к ОБЕИМ вкладкам, домашней в том числе: параллельный
+ * запуск живёт как раз в её списке проектов, порождает разговоры настоящих
+ * проектов и вкладок под них больше не открывает. Без этой достройки они не
+ * попали бы в список ни здесь (не песочница), ни там (проект не открыт).
  */
 export function visibleChats(all: ChatSummary[], activeProjectId?: string): ChatSummary[] {
-  if (!activeProjectId) return all.filter((chat) => chat.isSandbox);
-
-  const own = all.filter(
-    (chat) => !chat.isSandbox && normalizeProjectPath(chat.projectPath) === activeProjectId,
-  );
+  const own = activeProjectId
+    ? all.filter(
+        (chat) => !chat.isSandbox && normalizeProjectPath(chat.projectPath) === activeProjectId,
+      )
+    : all.filter((chat) => chat.isSandbox);
 
   const roots = new Set(own.map((chat) => chat.id));
   const children = all.filter(

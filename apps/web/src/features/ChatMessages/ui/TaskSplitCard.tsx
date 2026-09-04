@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { branchTaken } from '@claude-control/contracts/task-split';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -27,6 +28,7 @@ export function TaskSplitCard({
   onKeepHere,
   isPending,
   disabled,
+  childBranches,
 }: TaskSplitCardProps) {
   const { t } = useTranslation();
   // «Только завести чаты» — для случая, когда сначала хочется прочитать задания
@@ -35,6 +37,17 @@ export function TaskSplitCard({
 
   const count = proposal.groups.length;
   const isLocked = Boolean(isPending || disabled);
+
+  // Сколько групп уже стали чатами. Считаем по веткам, а не по названиям: имя
+  // ветки — единственное, что переживает и заведение копии, и перезагрузку
+  // страницы, и переход с телефона.
+  const done = childBranches?.length
+    ? proposal.groups.filter((group) => branchTaken(group.branch, childBranches)).length
+    : 0;
+  // Хотя бы одна группа заведена — предложение отработано. Именно «хотя бы
+  // одна», а не «все»: при частичном сбое (три ветки из четырёх) повтор завёл
+  // бы три удавшиеся заново, вторыми копиями, а четвёртую — снова уронил.
+  const isDone = done > 0;
 
   return (
     <div className={styles.card}>
@@ -77,7 +90,19 @@ export function TaskSplitCard({
         ))}
       </Stack>
 
-      {onSplit && (
+      {/* Предложение уже отработано: вместо кнопок — итог. Карточка остаётся на
+          месте (по ней читают, что и куда уехало), но заводить по ней второй раз
+          нечего, а молча погашенная кнопка выглядела бы поломкой. */}
+      {isDone && (
+        <Stack direction="row" align="center" gap="var(--spacing-2xs)" className={styles.option}>
+          <Icon name="check" size={18} />
+          <Typography variant="body-sm" color="muted" as="span">
+            {t('chat.split.alreadyDone', { done, count })}
+          </Typography>
+        </Stack>
+      )}
+
+      {onSplit && !isDone && (
         <Stack direction="row" align="center" gap="var(--spacing-2xs)" className={styles.option}>
           <Toggle
             size="sm"
@@ -92,7 +117,7 @@ export function TaskSplitCard({
         </Stack>
       )}
 
-      {onSplit && (
+      {onSplit && !isDone && (
         <Stack direction="row" gap="var(--spacing-2xs)" wrap className={styles.actions}>
           <Button
             variant="primary"

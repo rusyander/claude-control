@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
+  branchTaken,
   buildGroupPrompt,
   parseSplitProposal,
+  safeBranchName,
   scanSplitBlocks,
   type TaskSplitProposal,
 } from '@claude-control/contracts/task-split';
-import { safeBranchName, splitTasks, type SplitGit } from './ChatSplit.ts';
+import { splitTasks, type SplitGit } from './ChatSplit.ts';
 
 /**
  * Разделение задач по чатам. Проверяем ровно то, из-за чего эта штука может
@@ -233,6 +235,20 @@ describe('имя ветки из заголовка модели', () => {
 
   it('пустое имя не оставляет ветку без названия', () => {
     expect(safeBranchName('   ')).toBe('task');
+  });
+
+  /**
+   * По этой же проверке карточка в ленте понимает, что предложение УЖЕ
+   * разделено. Занятое имя разделение не отвергает, а дополняет суффиксом,
+   * поэтому сверять «в лоб» нельзя: повторное нажатие искало бы среди имён,
+   * которых само никогда не создаёт, ничего не находило и заводило копии заново.
+   */
+  it('заведённую ветку узнаёт и с суффиксом занятости', () => {
+    expect(branchTaken('Правки формы входа', ['Правки-формы-входа'])).toBe(true);
+    expect(branchTaken('feature/auth', ['feature/auth-2'])).toBe(true);
+    expect(branchTaken('feature/auth', ['feature/auth-x'])).toBe(false);
+    expect(branchTaken('feature/auth', ['feature/authorization'])).toBe(false);
+    expect(branchTaken('feature/auth', [])).toBe(false);
   });
 });
 

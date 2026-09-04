@@ -13,6 +13,7 @@ import {
 } from '@shared/lib/agent-runs';
 import { useChatPrefs } from '@shared/lib/chat-prefs';
 import { useDraft } from '@shared/lib/draft';
+import { toast } from '@shared/lib/toast';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
 import { ParallelLaunch } from '@features/ParallelLaunch';
 import { FolderPicker } from '@features/FolderPicker';
@@ -211,6 +212,9 @@ export function ChatPage() {
   const { isParallelOpen, setParallelOpen, launchParallel } = useParallelLaunch({
     model: effectiveModel,
     effort: effectiveEffort,
+    // Тот же ключ, что и у разделения: запущенные встают ветвями этого
+    // разговора, а не отдельными вкладками проектов.
+    parentChatId: activeChat?.id ?? run.sessionId,
   });
 
   // Разделение списка задач по нескольким чатам: агент предлагает его блоком в
@@ -385,6 +389,16 @@ export function ChatPage() {
                     model: effectiveModel,
                     effort: effectiveEffort,
                   },
+                  // Ответ ребёнку не оставляет следа в этой ленте — намеренно,
+                  // ход тратит он. След нужен человеку: тост называет разговор,
+                  // в который ушёл выбор, иначе после шести ответов подряд не
+                  // вспомнить, кому именно ответил.
+                  notify: (title, queued) =>
+                    toast.success(
+                      t(queued ? 'chat.answerQueuedForChild' : 'chat.answerSentToChild', {
+                        title,
+                      }),
+                    ),
                 })
               }
               onRetry={chatId ? () => agentRuns.retry(chatId) : undefined}
@@ -393,6 +407,9 @@ export function ChatPage() {
               onSplit={taskSplit.split}
               onKeepHere={taskSplit.keepHere}
               isSplitPending={taskSplit.isPending}
+              // Ветки уже заведённых детей — по ним карточка предложения
+              // понимает, что разделение состоялось, и убирает кнопку.
+              childBranches={child.branches}
               handoff={handoff.controls}
             />
           ) : (

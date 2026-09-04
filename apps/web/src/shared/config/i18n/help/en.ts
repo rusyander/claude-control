@@ -371,12 +371,22 @@ export const helpEn: HelpSchema = {
         'if it is idle it goes out at once, continuing the same session in the same ' +
         'copy of the repository. The parent conversation spends nothing — no turn, no ' +
         'reply — and walking six chats for one and the same choice is not needed. ' +
+        'The label survives the answer: the card says which conversation it went to, ' +
+        'so after answering six in a row you can see whom you answered. ' +
         'A child’s permission request arrives the same way — Allow/Deny right here, ' +
         'labelled with who is asking. It matters more than a question: on a question ' +
         'the agent keeps working, on a permission it STOPS, and without a shared hub ' +
         'you learn about the halt only by opening its tab. Auto-approval is inherited ' +
         'from the parent, so only dangerous calls and whatever your rules mark as ' +
         '“ask” reach you.',
+      splitDone: 'The same proposal is not split twice',
+      splitDoneText:
+        'Once the group chats exist, the buttons in the card give way to an “Already ' +
+        'split: N of N groups became chats” line. The proposal stays the last message ' +
+        'in the feed indefinitely, and without this check a second press would create ' +
+        'the same copies again — under a suffixed branch name. The panel sees it is ' +
+        'done from the conversation’s children: their branches are matched against the ' +
+        'branches of the groups.',
       splitButton: 'Create the chats only',
       splitButtonText:
         'A toggle in the card. On, the copies, branches and chats appear but no agent ' +
@@ -593,10 +603,22 @@ export const helpEn: HelpSchema = {
         'once. You can answer right in the chat instead of switching to the terminal.',
       askOrder: 'One question at a time',
       askOrderText:
-        'Exactly one question is active; the next ones are visible but dimmed. The ' +
-        'answer to the whole card goes out as ONE message, so answering out of order ' +
-        'would drop the remaining questions on the way. A question marked “multiple ' +
-        'choices allowed” is closed by the “Next” button, not by the first tick.',
+        'Exactly one question is active — “question 2 of 4” in its header says where ' +
+        'you are. The ones not reached yet collapse into an “Answer the previous ' +
+        'question” line with no options shown at all, so you cannot pick in something ' +
+        'that would not be accepted anyway. The answer to the whole card goes out as ' +
+        'ONE message, so answering out of order would drop the remaining questions on ' +
+        'the way. A question marked “multiple choices allowed” is closed by the “Next” ' +
+        'button, not by the first tick.',
+      askOwn: 'Your own answer, when none of the options fit',
+      askOwnText:
+        'The options are invented by the model, and sometimes the right one is not ' +
+        'among them. Below the list there is “Answer in your own words”: type it, ' +
+        'press Enter, and it takes the place of a chosen option, marked “your ' +
+        'answer”. From there it behaves like any option — visible, editable, and ' +
+        'sent in the same single message together with the answers to the other ' +
+        'questions. Better than the composer: there the answer loses its link to the ' +
+        'question, and the card stays unanswered.',
       askChange: 'A misclick is fixable',
       askChangeText:
         'An answered question collapses into a “what was asked — what was chosen” ' +
@@ -615,11 +637,14 @@ export const helpEn: HelpSchema = {
         'writing code. That is why the options are not dimmed while a run is going — ' +
         'the choice is needed exactly now. An answer to a busy agent queues up above ' +
         'the composer and is sent as soon as the turn ends; the turn is not interrupted.',
-      askOldTitle: 'An old question cannot be answered',
+      askOldTitle: 'Your answer closes the question — the agent’s next message does not',
       askOldText:
-        'Only the LAST message in the feed is answerable. In a question from the ' +
-        'middle of the history the options are plain text rather than buttons: it was ' +
-        'closed long ago, and a click would send the agent a remark out of nowhere.',
+        'Having asked, the agent keeps writing: it does not wait for the answer, and ' +
+        'within seconds the card stops being the last message in the feed. The buttons ' +
+        'stay anyway — otherwise the form would go dead mid-way, on question two of ' +
+        'four. The card closes when YOU have answered: in a question followed by a ' +
+        'message of yours the options are plain text rather than buttons — it is done, ' +
+        'and a click would send the agent a choice out of nowhere.',
 
       dotsTitle: 'Coloured dots: what the agent is doing',
       dotsCaption:
@@ -658,6 +683,16 @@ export const helpEn: HelpSchema = {
         'request goes to several projects at once: tick the projects, write the task, ' +
         'and an agent starts in each. The window has its own edit toggle, switched off ' +
         'every time it opens. Handy for sweeps like “check every repository for X”.',
+      panelParallelTree: 'What you launch becomes a tree, not tabs',
+      panelParallelTreeText:
+        'The launched agents’ conversations hang as branches under the chat they were ' +
+        'started from — exactly as with task splitting. No separate project tabs ' +
+        'appear: three ticked projects used to mean three tabs, while an agent’s ' +
+        'question or permission request lived only in ITS OWN, which from the outside ' +
+        'looked like a stalled run. Now everything the agent is stuck on shows up in ' +
+        'the parent chat and is decided there. Launching with no conversation selected ' +
+        'is the exception: there is nothing to hang them under, so the tabs open as ' +
+        'before — otherwise the run would be visible only in the agent panel.',
       panelNote:
         'Projects missing from disk are not listed at all and never reach a parallel ' +
         'launch: there is nowhere to work in a folder that no longer exists. The ' +

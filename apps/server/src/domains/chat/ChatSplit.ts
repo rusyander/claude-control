@@ -1,5 +1,8 @@
 import {
   buildGroupPrompt,
+  // Приведение имени ветки живёт в контрактах: по нему же панель узнаёт, что
+  // предложение уже разделено, и второй реализации быть не должно.
+  safeBranchName,
   type TaskSplitFailure,
   type TaskSplitProposal,
   type TaskSplitResult,
@@ -89,33 +92,6 @@ export interface SplitTasksInput {
   git?: SplitGit;
   /** Часы — в тесте фиксируются, чтобы ключи чатов были предсказуемы. */
   now?: () => number;
-}
-
-/**
- * Имя ветки, пригодное для git. Модель пишет заголовками («Правки формы входа»),
- * а `git check-ref-format` таких имён не принимает — и отказывать из-за пробела
- * в предложении, которое человек уже одобрил, было бы издевательством. Поэтому
- * имя приводится к допустимому виду здесь, а проверка git остаётся страховкой.
- */
-export function safeBranchName(raw: string): string {
-  const value = raw
-    .trim()
-    .replace(/\s+/g, '-')
-    // Запрещённое самим git: ~ ^ : ? * [ \ и управляющие символы, а также `..`,
-    // `@{`, точка и дефис в начале сегмента, `.lock` и слэш на конце.
-    // eslint-disable-next-line no-control-regex
-    .replace(/[~^:?*[\]\\\u0000-\u001f]/g, '-')
-    .replace(/@\{/g, '-')
-    .replace(/\.{2,}/g, '.')
-    .replace(/\/{2,}/g, '/')
-    .split('/')
-    .map((part) => part.replace(/^[-.]+/, '').replace(/[-.]+$/, ''))
-    .filter(Boolean)
-    .join('/')
-    .replace(/\.lock$/i, '')
-    .slice(0, 100)
-    .replace(/[-./]+$/, '');
-  return value || 'task';
 }
 
 /** Свободное имя: занятое получает суффикс `-2`, `-3`, … — как вкладки проводника. */

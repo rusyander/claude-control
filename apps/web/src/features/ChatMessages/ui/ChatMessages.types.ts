@@ -2,7 +2,7 @@ import type { ChatMessage } from '@claude-control/contracts';
 import type { TaskSplitProposal } from '@claude-control/contracts/task-split';
 import type { HandoffProposal } from '@claude-control/contracts/chat-handoff';
 import type { StreamState } from '@entities/Chat';
-import type { PendingPermission } from '@shared/lib/agent-runs';
+import type { PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
 
 /**
  * Всё, что карточке продолжения нужно от страницы, одним объектом. Плоскими
@@ -99,6 +99,14 @@ export interface ChatMessagesProps {
   onChildPermissionDecide?: (chatId: string, toolUseId: string, behavior: 'allow' | 'deny') => void;
   /** Повторить упавший запрос — кнопка прямо в карточке ошибки. */
   onRetry?: () => void;
+  /**
+   * Продолжить с места обрыва — не переспрашивая исходную задачу. У упавшего
+   * хода это чаще нужного «Повторить»: часть работы уже сделана, и повтор
+   * заставил бы агента делать её заново.
+   */
+  onContinue?: () => void;
+  /** Перечитать переписку из транскрипта — когда поток потерян, правда там. */
+  onRefresh?: () => void;
   /** Единицы расхода из настроек: объём в токенах или деньги. */
   costUnit?: 'tokens' | 'money';
   /** Глубина продумывания текущего прогона — идёт в разбивку расхода. */
@@ -117,6 +125,13 @@ export interface ChatMessagesProps {
   childBranches?: readonly string[];
   /** Продолжение в чистой сессии (карточка в ответе агента). */
   handoff?: HandoffControls;
+  /**
+   * Дописанное, ждущее конца хода. Показывается в самой ленте пузырём-призраком:
+   * ответ занятому агенту иначе не оставляет на экране никакого следа.
+   */
+  queued?: QueuedMessage[];
+  /** Убрать сообщение из очереди, пока оно не ушло. */
+  onCancelQueued?: (queuedId: string) => void;
 }
 
 export interface MessageBubbleProps {

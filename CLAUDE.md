@@ -63,9 +63,9 @@ Fix without asking: project code, deps, build config, launch env. Ask first: fil
 the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
 QA runs live in `tools/qa/` and need `pnpm dev` up + `pnpm qa:setup`; each drives the real UI of one
-area. Eight behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
+area. Nine behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
 `check-project-code.mjs`, `check-task-split.mjs`, `check-handoff.mjs`, `check-parent-hub.mjs`,
-`check-new-chat.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
+`check-new-chat.mjs`, `check-stream-cap.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
 so they depend on no particular history, on no installed CLI, and leave neither branches nor copies
 behind.
 

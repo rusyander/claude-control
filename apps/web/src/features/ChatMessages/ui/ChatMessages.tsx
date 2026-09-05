@@ -9,13 +9,17 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
+import { toast } from '@shared/lib/toast';
 import { isStreamShown } from '@shared/lib/chat-stream';
+import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
 import { parseQuestions } from '../lib/parseQuestions';
+import { liveQuestionKey } from '../lib/questionKey';
 import { MessageBubble } from './MessageBubble';
 import { QuestionCard } from './QuestionCard';
 import { TaskSplitCard } from './TaskSplitCard';
 import { HandoffCard } from './HandoffCard';
 import { PermissionCard } from './PermissionCard';
+import { QueuedBubbles } from './QueuedBubbles';
 import type { ChatMessagesProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 
@@ -42,6 +46,8 @@ export function ChatMessages({
   childPermissions,
   onChildPermissionDecide,
   onRetry,
+  onContinue,
+  onRefresh,
   costUnit,
   effort,
   onSplit,
@@ -49,8 +55,14 @@ export function ChatMessages({
   isSplitPending,
   childBranches,
   handoff,
+  queued,
+  onCancelQueued,
 }: ChatMessagesProps) {
   const { t } = useTranslation();
+  // Отвеченные вопросы детей: пока прогон ребёнка жив, источник отдаёт тот же
+  // последний `AskUserQuestion`, и без общей памяти он воскресал на каждый
+  // возврат на вкладку — а второй ответ стоит ещё одного хода агента.
+  const answered = useAnsweredQuestions();
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -79,7 +91,7 @@ export function ChatMessages({
     // отдельный layout-эффект восстановления позиции.
     if (restoreScroll.current !== undefined) return;
     if (isPinned.current) bottomRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length, stream.text, stream.tools.length, permissions?.length]);
+  }, [messages.length, stream.text, stream.tools.length, stream.stalled, permissions?.length]);
 
   // Восстановление позиции после подгрузки более ранних: держим на экране то же
   // сообщение, что и было, компенсируя прокрутку приростом высоты сверху.
@@ -199,6 +211,9 @@ export function ChatMessages({
               ) : null;
 
               if (questions) {
+                // Имя живого вопроса — id вызова, без имени разговора: оно у
+                // разговора меняется (черновое → sessionId), id — нет.
+                const key = liveQuestionKey(conversationId ?? 'stream', tool.id, tool.input);
                 return (
                   <div key={`${tool.name}-${index}`} className={styles.block}>
                     {/*
@@ -209,7 +224,18 @@ export function ChatMessages({
                       Ответ занятому агенту уходит в очередь и доедет, как
                       только он закончит ход.
                     */}
-                    <QuestionCard questions={questions} onPick={onPickOption} busy={isRunning} />
+                    <QuestionCard
+                      questions={questions}
+                      onPick={
+                        onPickOption &&
+                        ((answer) => {
+                          markQuestionAnswered(key);
+                          onPickOption(answer);
+                        })
+                      }
+                      busy={isRunning}
+                      isAnswered={answered.has(key)}
+                    />
                     {spend}
                   </div>
                 );
@@ -315,6 +341,50 @@ export function ChatMessages({
         </div>
       )}
 
+      {/*
+        Связь с потоком потеряна. Пузырь при этом погашен нарочно — он оборван
+        на полуслове, а полный ответ агент дописывает в транскрипт, откуда лента
+        его и показывает. Без этой строки происходящее выглядело бы как ход,
+        исчезнувший без следа; с ней видно и что связь чинится, и что работа
+        идёт: прогон живёт на сервере, а не во вкладке.
+      */}
+      {stream.stalled && !stream.dropped && (
+        <div className={styles.reconnecting} role="status">
+          <span className={styles.dots} aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          {t('chat.reconnecting')}
+        </div>
+      )}
+
+      {/*
+        Переподключаться больше нечем — попытки исчерпаны. Молчать здесь нельзя:
+        от «агент думает» это неотличимо, и человек ждёт ответа, которого никто
+        не пришлёт. Прогон при этом мог спокойно доработать на сервере, поэтому
+        и предлагаем не «повторить», а перечитать переписку: ответ, если он
+        дописался, лежит в транскрипте.
+      */}
+      {stream.dropped && (
+        <div className={styles.reconnecting} role="status">
+          <Icon name="warning" size={18} />
+          {t('chat.connectionLost')}
+          {onRefresh && (
+            <Button size="sm" variant="secondary" onClick={onRefresh}>
+              {t('chat.showFromHistory')}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/*
+        Дописанное, ждущее конца хода, — в ленте, а не только полоской над
+        полем ввода. Ответ занятому агенту иначе не оставлял на экране следа
+        вовсе: ни реплики, ни пометки, и минутами непонятно, ушёл ли он.
+      */}
+      <QueuedBubbles items={queued ?? []} onCancel={onCancelQueued} />
+
       {permissions && permissions.length > 0 && onPermissionDecide && (
         <PermissionCard permissions={permissions} onDecide={onPermissionDecide} />
       )}
@@ -350,6 +420,7 @@ export function ChatMessages({
         (childQuestions ?? []).map((child) => {
           const questions = parseQuestions(child.input);
           if (!questions) return null;
+          const key = liveQuestionKey(child.chatId, child.toolUseId, child.input);
           return (
             <div key={`${child.chatId}-${child.toolUseId ?? 'ask'}`} className={styles.childAsk}>
               <Typography variant="caption" color="subtle" className={styles.childAskFrom}>
@@ -357,8 +428,12 @@ export function ChatMessages({
               </Typography>
               <QuestionCard
                 questions={questions}
-                onPick={(answer) => onChildAnswer(child.chatId, answer)}
+                onPick={(answer) => {
+                  markQuestionAnswered(key);
+                  onChildAnswer(child.chatId, answer);
+                }}
                 busy={child.isRunning}
+                isAnswered={answered.has(key)}
                 // Подпись сохраняется и ПОСЛЕ ответа: «отправлено» без имени
                 // разговора не говорит, кому именно из шестерых человек ответил.
                 target={child.title}
@@ -384,8 +459,16 @@ export function ChatMessages({
               </Typography>
             </Stack>
             <div className={styles.errorText}>{stream.error}</div>
-            {onRetry && (
-              <Stack direction="row" gap="var(--spacing-2xs)">
+            {/*
+              Три действия вместо одного. «Повторить» отправляет задачу заново —
+              но часть работы уже сделана, и переделывать её незачем: «Продолжить»
+              просит агента доделать с места обрыва. Текст ошибки нужен целиком —
+              его несут в тикет или в поиск, а выделять мышью из ленты неудобно.
+              Раньше эти две кнопки жили только в шапке, где их не связать с
+              карточкой, из-за которой их ищут.
+            */}
+            <Stack direction="row" gap="var(--spacing-2xs)" wrap>
+              {onRetry && (
                 <Button
                   size="sm"
                   variant="secondary"
@@ -394,8 +477,25 @@ export function ChatMessages({
                 >
                   {t('chat.retry')}
                 </Button>
-              </Stack>
-            )}
+              )}
+              {onContinue && (
+                <Button size="sm" variant="secondary" onClick={onContinue}>
+                  {t('chat.continue')}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                leftIcon={<Icon name="copy" size={18} />}
+                onClick={() =>
+                  void navigator.clipboard.writeText(stream.error ?? '').then(() => {
+                    toast.success(t('toasts.copied'));
+                  })
+                }
+              >
+                {t('chat.copyError')}
+              </Button>
+            </Stack>
           </div>
         </div>
       )}

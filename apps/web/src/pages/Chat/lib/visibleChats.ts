@@ -42,10 +42,22 @@ export function visibleChats(all: ChatSummary[], activeProjectId?: string): Chat
     ? all.filter((chat) => !chat.isSandbox && insideProject(chat.projectPath, activeProjectId))
     : all.filter((chat) => chat.isSandbox);
 
-  const roots = new Set(own.map((chat) => chat.id));
-  const children = all.filter(
-    (chat) => chat.parentId && roots.has(chat.parentId) && !roots.has(chat.id),
-  );
+  // Ветвь достраиваем ЦЕЛИКОМ, ярус за ярусом. Один ярус — это только прямые
+  // дети, а разделение внутри ребёнка рождает внука: он не попадал ни в один
+  // список (не свой каталог — не отобран; родитель сам достроен — значит, не
+  // корень), и разговор существовал, но найти его было нельзя. Идём слоями,
+  // пока слой приносит новое: так и глубина любая, и петля в родителях
+  // (разговор сам себе предок) не зациклит — повторно никто не добавляется.
+  const shown = new Set(own.map((chat) => chat.id));
+  const children: ChatSummary[] = [];
+  for (;;) {
+    const layer = all.filter(
+      (chat) => chat.parentId && shown.has(chat.parentId) && !shown.has(chat.id),
+    );
+    if (layer.length === 0) break;
+    for (const chat of layer) shown.add(chat.id);
+    children.push(...layer);
+  }
 
   return children.length > 0 ? [...own, ...children] : own;
 }

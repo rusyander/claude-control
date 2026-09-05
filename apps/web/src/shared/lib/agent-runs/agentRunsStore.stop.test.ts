@@ -33,6 +33,21 @@ function sseResponse(frames: string[]): Response {
 }
 
 /**
+ * Открытый поток, который живёт, пока запрос не отменят: как настоящий `fetch`,
+ * он роняет чтение причиной отмены, а не молчит.
+ */
+function liveResponse(init?: RequestInit): Response {
+  const body = new ReadableStream<Uint8Array>({
+    start(ctrl) {
+      init?.signal?.addEventListener('abort', () => ctrl.error(init.signal?.reason), {
+        once: true,
+      });
+    },
+  });
+  return { ok: true, status: 200, body } as unknown as Response;
+}
+
+/**
  * Временный сбой помечает СЕРВЕР флагом `retriable` — клиент текст ошибки не
  * разбирает (иначе имя вложения вроде `network.zip` выпрашивало бы ретрай).
  */
@@ -129,5 +144,33 @@ describe('agentRuns.stop — остановка сильнее авто-рест
     await settle();
 
     expect(getRun('fin-1').status).not.toBe('running');
+  });
+
+  /**
+   * Гонка перезапуска. Прежний поток дочитывается ПОЗЖЕ, чем заводится новый
+   * прогон под тем же id, — и раньше его `finally` выбрасывал контроллер уже не
+   * свой, а нового прогона, и объявлял законченным его: кнопка «Остановить»
+   * пропадала посреди работы, лента перечитывалась на полуслове, а очередь
+   * уходила в занятый прогон и возвращалась с 409.
+   */
+  it('«Остановить», затем сразу новая отправка: старый поток не хоронит новый прогон', async () => {
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => liveResponse(init));
+
+    void agentRuns.start({ chatId: 'race-1', prompt: 'первый' });
+    await settle();
+    expect(getRun('race-1').status).toBe('running');
+
+    // Ровно тот порядок, что ловится руками: остановил и тут же отправил снова,
+    // не дожидаясь, пока прежний поток договорит.
+    agentRuns.stop('race-1');
+    void agentRuns.start({ chatId: 'race-1', prompt: 'второй' });
+    await settle();
+
+    expect(getRun('race-1').status).toBe('running');
+    expect(getRun('race-1').lastPrompt).toBe('второй');
+    // Остановка не «зависла» на прошлом прогоне: новый останавливается штатно.
+    agentRuns.stop('race-1');
+    await settle();
+    expect(getRun('race-1').status).not.toBe('running');
   });
 });

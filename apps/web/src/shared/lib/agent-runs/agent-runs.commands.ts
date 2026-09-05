@@ -1,20 +1,22 @@
 import { apiClient } from '@shared/api/client';
 import { i18n } from '@shared/config/i18n';
 import { toast } from '@shared/lib/toast';
-import { finalize, runStream, startRun } from './agent-runs.lifecycle';
+import { drainQueue, finalize, startRun } from './agent-runs.lifecycle';
 import { autoRetries, autoRetryTimers, cancelAutoRetry, stoppedByUser } from './agent-runs.retry';
 import { loadSpend } from './agent-runs.spend';
 import {
   callbacks,
+  caughtUp,
   controllers,
   emit,
   findKey,
   getRun,
-  lastSeqs,
   nextQueueSeq,
   runs,
   setRun,
 } from './agent-runs.state';
+import { loadQueue, persistQueue } from './agent-runs.queue-store';
+import { ensureSlotsWatch, rebalance } from './agent-runs.slots';
 import { ensureWatchdog, rebuildStatuses } from './agent-runs.statuses';
 import type { AgentRun, HandoffEvent, QueuedMessage } from './agent-runs.types';
 import { permissionDeliveryProblem } from './permissionDelivery';
@@ -40,6 +42,7 @@ export function enqueue(id: string, message: Omit<QueuedMessage, 'id'>): string 
     id: run?.id || key,
     queued: [...(run?.queued ?? []), { ...message, id: queuedId }],
   });
+  persistQueue(key);
   emit();
   return queuedId;
 }
@@ -51,7 +54,56 @@ export function cancelQueued(id: string, queuedId: string): void {
   const run = runs.get(key);
   if (!run) return;
   runs.set(key, { ...run, queued: run.queued.filter((item) => item.id !== queuedId) });
+  persistQueue(key);
   emit();
+}
+
+/**
+ * Вернуть в стор очередь, сохранённую до перезагрузки страницы.
+ *
+ * Зовётся при открытии разговора. Прогон при этом может и идти (тогда очередь
+ * просто снова видна и уйдёт по концу хода), а может и не существовать вовсе —
+ * страницу перезагрузили уже после того, как агент договорил. Во втором случае
+ * досылаем сразу: очередь и значит «скажи ему это, как освободится», и он
+ * свободен. Память вкладки всегда свежее хранилища, поэтому непустую очередь не
+ * трогаем.
+ *
+ * `sessionId` — id, которым продолжается разговор (у нового чата его ещё нет).
+ */
+export async function restoreQueue(id: string, sessionId?: string): Promise<void> {
+  const items = loadQueue(sessionId, id);
+  if (items.length === 0) return;
+
+  // Прогон этого разговора может идти на сервере, а вкладка (только что
+  // открытая) о нём ещё не знать. Сперва подхват, потом очередь: заведи мы
+  // здесь свою запись прогона раньше, `resumeActive` счёл бы разговор уже
+  // известным и живой прогон остался бы невидимым — без вывода, без точки и
+  // без «Остановить».
+  let key = findKey(id) ?? findKey(sessionId);
+  if (!key) {
+    await resumeActive();
+    key = findKey(id) ?? findKey(sessionId);
+  }
+  // Подхваченный прогон свою очередь уже восстановил — она уйдёт по концу хода.
+  if (key && (runs.get(key)?.queued.length ?? 0) > 0) return;
+
+  const target = key ?? id;
+  const run = runs.get(target);
+  setRun(target, {
+    id: run?.id || target,
+    sessionId: run?.sessionId ?? sessionId,
+    queued: items,
+  });
+  emit();
+  // Агент свободен — значит момент, ради которого очередь и заводилась, уже
+  // наступил: досылаем, как дослали бы без перезагрузки страницы.
+  if (runs.get(target)?.status !== 'running') drainQueue(target);
+}
+
+/** Знаем ли мы прогон по СЕРВЕРНОМУ ключу — тому, под которым его завела чужая вкладка. */
+function ownerOfServerKey(key: string): string | undefined {
+  for (const [own, run] of runs) if (run.serverRunId === key) return own;
+  return undefined;
 }
 
 /**
@@ -68,6 +120,8 @@ export async function resumeActive(): Promise<void> {
     projectPath?: string;
     seq: number;
     startedAt?: number;
+    /** `done` — прогон закончился и лежит в grace-буфере ради догона хвоста. */
+    status?: 'running' | 'done';
   }[];
   try {
     const response = await apiClient.get('/chat/active');
@@ -76,18 +130,53 @@ export async function resumeActive(): Promise<void> {
     return;
   }
 
+  ensureSlotsWatch();
+  // Кого сервер назвал в этот раз — по нашим ключам. Припаркованный прогон, не
+  // названный никем, кончился и вышел из grace-буфера, пока у него не было
+  // потока: закрываем его ниже, иначе он «работал» бы вечно.
+  const listed = new Set<string>();
+
   for (const info of active) {
-    if (runs.has(info.chatId) || controllers.has(info.chatId)) continue;
+    // Один разговор живёт в двух написаниях: временное `new-…`, под которым он
+    // стартовал, и настоящий `sessionId`, под которым его знает сервер. Сверять
+    // только `info.chatId` мало — вкладка, начавшая разговор, помнит его под
+    // первым, а `/chat/active` называет вторым (или наоборот, после F5). Отсюда
+    // и брались две строки в пульте на один разговор, две точки и два потока к
+    // одному прогону; `findKey` сводит написания, для того и заведён. Третье
+    // написание — ключ, под которым прогон завела чужая вкладка: мы его знаем
+    // (по нему идут поток и остановка), но своим именем зовём разговор иначе.
+    const known = findKey(info.chatId) ?? findKey(info.sessionId) ?? ownerOfServerKey(info.chatId);
+    if (known) {
+      listed.add(known);
+      // Припаркованный кончился: поток ему теперь нужен только за хвостом —
+      // цена, расход, вопрос, — а «работает» у законченного не показываем.
+      const run = runs.get(known);
+      if (run?.parked && info.status === 'done' && !run.tailOnly) {
+        setRun(known, { tailOnly: true, status: 'idle', text: '', thinking: '' });
+        rebuildStatuses();
+        emit();
+      }
+      continue;
+    }
+    if (controllers.has(info.chatId)) continue;
+    // Законченный прогон, чей хвост уже дотянут (тем же `startedAt`), — это не
+    // новый ход, а всё та же минута grace: пропускаем, иначе он подхватывался
+    // бы заново на каждом такте опроса.
+    const finished = info.status === 'done';
+    if (finished && caughtUp.get(info.chatId) === info.startedAt) continue;
     ensureWatchdog();
-    const controller = new AbortController();
-    controllers.set(info.chatId, controller);
-    lastSeqs.set(info.chatId, 0);
+    listed.add(info.chatId);
+    // Поток не открываем здесь: прогон встаёт припаркованным, а поток ему
+    // раздаёт `rebalance` ниже — по приоритету и в пределах бюджета.
     setRun(info.chatId, {
       id: info.chatId,
       sessionId: info.sessionId,
       projectPath: info.projectPath,
       startedAt: info.startedAt,
-      status: 'running',
+      // Законченный заводим сразу законченным: «работает» у него не будет ни
+      // секунды, а поток ниже дотянет только хвост — цену, расход, вопрос.
+      status: finished ? 'idle' : 'running',
+      tailOnly: finished,
       text: '',
       thinking: '',
       tools: [],
@@ -98,11 +187,25 @@ export async function resumeActive(): Promise<void> {
       askedQuestion: false,
       permissions: [],
       lastEventAt: Date.now(),
+      // Дописанное, пережившее перезагрузку: прогон тот же, значит и очередь
+      // его — уйдёт по концу хода, как ушла бы без перезагрузки.
+      queued: loadQueue(info.sessionId, info.chatId),
+      parked: true,
     });
     rebuildStatuses();
     emit();
-    void runStream(info.chatId, { chatId: info.chatId, prompt: '' }, controller, 'attach');
   }
+
+  // Припаркованные, которых сервер больше не называет, кончились без нас.
+  // Обрывок текста у такого не правда — правда в транскрипте, поэтому
+  // закрываем его как потерявший связь: лента покажет историю целиком.
+  for (const [key, run] of runs) {
+    if (!run.parked || controllers.has(key) || listed.has(key)) continue;
+    setRun(key, { parked: undefined, stalled: true });
+    finalize(key);
+  }
+
+  rebalance();
 }
 
 /**
@@ -120,7 +223,10 @@ export function stopRun(id: string): void {
   // Остановка гасит и очередь: человек прервал работу, а дописанное ушло бы
   // сразу после — получилось бы, что кнопка «Остановить» ничего не остановила.
   const queuedRun = runs.get(key);
-  if (queuedRun && queuedRun.queued.length > 0) runs.set(key, { ...queuedRun, queued: [] });
+  if (queuedRun && queuedRun.queued.length > 0) {
+    runs.set(key, { ...queuedRun, queued: [] });
+    persistQueue(key);
+  }
   cancelAutoRetry(key);
   cancelAutoRetry(id);
   // Прогон мог быть заведён другой вкладкой под своим ключом (serverRunId) —
@@ -194,13 +300,17 @@ export function clearRun(id: string): void {
  * Спрятать потоковый текст прогона, сохранив статус: когда ответ уже есть в
  * истории, дубль на экране не нужен, но жёлтая/красная точка (вопрос/ошибка)
  * должна остаться.
+ *
+ * Здесь же снимается метка потерянного потока: она говорит «ответ ищите в
+ * переписке», а переписка только что показана — дальше это была бы строка о
+ * беде, которой уже нет.
  */
 export function quietRun(id: string): void {
   const key = findKey(id);
   if (!key) return;
   const run = runs.get(key);
   if (!run) return;
-  runs.set(key, { ...run, text: '', thinking: '', tools: [] });
+  runs.set(key, { ...run, text: '', thinking: '', tools: [], dropped: undefined });
   emit();
 }
 
@@ -212,6 +322,8 @@ export function setOnFinished(callback: (() => void) | undefined): void {
 /** Какой чат открыт на экране — чтобы не уведомлять о его же завершении. */
 export function setActiveId(id: string | undefined): void {
   callbacks.activeId = id;
+  // Открытый разговор — первый в очереди за потоком.
+  rebalance();
 }
 
 /** Колбэк по завершении ФОНОВОГО проектного прогона — для тоста-уведомления. */

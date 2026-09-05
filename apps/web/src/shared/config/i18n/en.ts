@@ -391,6 +391,8 @@ export const en: TranslationSchema = {
       add: 'Add to the queue',
       hint: 'The agent is busy — the message goes out as soon as the current turn ends',
       cancel: 'Remove from the queue',
+      next: 'Goes out next',
+      later: 'Goes out after that',
     },
     split: {
       title: 'Split the tasks: {{count}} groups',
@@ -449,7 +451,11 @@ export const en: TranslationSchema = {
     /** Пока ответа ещё нет: без этого пустая лента выглядит зависшей. */
     pending: 'Claude is thinking',
     pendingTools: 'Claude is working with files',
+    reconnecting: 'Lost the connection to the answer — reconnecting',
     errorTitle: 'The agent stopped with an error',
+    copyError: 'Copy the error',
+    connectionLost: 'Lost the connection to the run. The agent may have finished — look in the history.',
+    showFromHistory: 'Show from the history',
     progress: {
       title: "The agent's plan",
       count: '{{done}} of {{total}} done',

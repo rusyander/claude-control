@@ -209,6 +209,11 @@ export function ChatTopic() {
         <Callout tone="info" title={tr('askOldTitle')}>
           {tr('askOldText')}
         </Callout>
+        {/* Потерянная связь стоит здесь же: человек ищет объяснение там, где
+            ждал ответа, — в разделе про вопросы и ожидание. */}
+        <Callout tone="warning" title={tr('lostTitle')}>
+          {tr('lostText')}
+        </Callout>
       </HelpSection>
 
       <HelpSection title={tr('dotsTitle')} caption={tr('dotsCaption')}>

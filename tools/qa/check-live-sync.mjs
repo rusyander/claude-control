@@ -90,6 +90,10 @@ const response = await fetch(`${API}/api/chat/send`, {
     chatId: `new-${MARK}`,
     prompt: `Ответь одним словом: ок. Метка ${MARK}`,
     projectPath: process.cwd(),
+    // Модель по умолчанию берётся из `~/.claude/settings.json`, и CLI в PATH
+    // может её не знать (2.1.177 не умеет `claude-fable-5-1`): тогда прогон
+    // падает до ответа, а проверка ложно краснеет. `QA_MODEL=sonnet` обходит.
+    ...(process.env.QA_MODEL ? { model: process.env.QA_MODEL } : {}),
   }),
 });
 check(response.ok, `сервер принял чужой ход (${response.status})`);

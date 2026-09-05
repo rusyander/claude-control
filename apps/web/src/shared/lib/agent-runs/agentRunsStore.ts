@@ -5,6 +5,7 @@ import {
   decidePermission,
   enqueue,
   quietRun,
+  restoreQueue,
   resumeActive,
   setActiveId,
   setAutoApprove,
@@ -16,7 +17,12 @@ import {
   stopRun,
 } from './agent-runs.commands';
 import { retryRun, startRun } from './agent-runs.lifecycle';
+import { ensureSlotsWatch, setWatched } from './agent-runs.slots';
 import { loadSpend } from './agent-runs.spend';
+
+// Бюджет потоков действует с первой отправки, а не с первого опроса
+// `/chat/active`: колбэк перераспределения ставится при сборке стора.
+ensureSlotsWatch();
 
 /**
  * Стор прогонов агента. В отличие от одного стрима на страницу, здесь их может
@@ -37,6 +43,7 @@ export const agentRuns = {
   start: startRun,
   enqueue,
   cancelQueued,
+  restoreQueue,
   resumeActive,
   loadSpend,
   stop: stopRun,
@@ -47,6 +54,7 @@ export const agentRuns = {
   quiet: quietRun,
   setOnFinished,
   setActiveId,
+  setWatched,
   setOnBackgroundEvent,
   setOnPermissionRequest,
   setOnHandoff,
@@ -59,6 +67,7 @@ export { getRun, subscribeRuns } from './agent-runs.state';
 export { getActiveRuns, getChatStatuses, getProjectStatuses } from './agent-runs.statuses';
 export { getTotalCost, getTotalTokens } from './agent-runs.spend';
 export { shouldAutoRetry } from './agent-runs.retry';
+export { getAnsweredQuestions, markQuestionAnswered } from './answered-questions';
 export { parseSseFrame } from './agent-runs.sse';
 export type {
   AgentRun,

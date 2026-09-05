@@ -16,6 +16,37 @@ import type { FileWatchProviderProps } from './FileWatchProvider.types';
  * возвращение к вкладке подключается заново независимо от того, что думает
  * `readyState` — полуоткрытый сокет выглядит живым до первой попытки записи.
  */
+/**
+ * Сколько отсутствия делает переподключение осмысленным (мс).
+ *
+ * Полминуты — это уже не переключение окна, а сон машины, спящая вкладка или
+ * отвалившаяся сеть: там сокет и умирает молча, оставаясь на вид живым. Всё,
+ * что короче, чинить нечего — и незачем платить полной перечиткой разделов.
+ */
+const WAKE_RECONNECT_MS = 30_000;
+
+/**
+ * Переподключаться ли, когда человек вернулся к вкладке.
+ *
+ * Раньше поток пересоздавался на каждый `visibilitychange`, а `onopen` считал
+ * это переподключением и перечитывал ВСЕ разделы разом: Alt-Tab туда-обратно
+ * стоил панели полной перезагрузки данных. Между тем за секунду отсутствия с
+ * сокетом ничего не случается — молча он умирает там, где машина спала или сеть
+ * отваливалась надолго. Поэтому смотрим не на факт возвращения, а на
+ * длительность отсутствия; закрытому потоку длительность не нужна — он мёртв
+ * и так, и `readyState` в этом случае не врёт (врёт он в обратную сторону,
+ * показывая живым полуоткрытый сокет).
+ */
+export function shouldReconnectOnWake({
+  awayMs,
+  closed,
+}: {
+  awayMs: number;
+  closed: boolean;
+}): boolean {
+  return closed || awayMs > WAKE_RECONNECT_MS;
+}
+
 export function FileWatchProvider({ children }: FileWatchProviderProps) {
   const queryClient = useQueryClient();
 
@@ -23,6 +54,8 @@ export function FileWatchProvider({ children }: FileWatchProviderProps) {
     let source: EventSource | undefined;
     /** Первое подключение за жизнь провайдера: данные на экране только что прочитаны. */
     let first = true;
+    /** Когда вкладку свернули; пусто — она на виду. */
+    let hiddenAt: number | undefined;
 
     const onMessage = (event: MessageEvent<string>): void => {
       const payload = JSON.parse(event.data) as { domains?: string[]; path?: string };
@@ -60,18 +93,29 @@ export function FileWatchProvider({ children }: FileWatchProviderProps) {
       };
     };
 
-    // Вернулись к вкладке или в сеть — подключаемся заново, не веря `readyState`.
     const wake = (): void => {
-      if (document.visibilityState === 'visible') connect();
+      if (document.visibilityState !== 'visible') {
+        hiddenAt = Date.now();
+        return;
+      }
+      const awayMs = hiddenAt === undefined ? 0 : Date.now() - hiddenAt;
+      hiddenAt = undefined;
+      if (shouldReconnectOnWake({ awayMs, closed: source?.readyState === EventSource.CLOSED })) {
+        connect();
+      }
     };
+
+    // Сеть вернулась — это уже событие про связь, а не про внимание человека:
+    // подключаемся заново независимо от того, сколько нас не было.
+    const reconnect = (): void => connect();
 
     connect();
     document.addEventListener('visibilitychange', wake);
-    window.addEventListener('online', wake);
+    window.addEventListener('online', reconnect);
 
     return () => {
       document.removeEventListener('visibilitychange', wake);
-      window.removeEventListener('online', wake);
+      window.removeEventListener('online', reconnect);
       source?.close();
     };
   }, [queryClient]);

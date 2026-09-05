@@ -1,4 +1,5 @@
 import type { MessageUsage } from '@claude-control/contracts';
+import { persistQueue } from './agent-runs.queue-store';
 import { callbacks, emit, pendingUsage, runs } from './agent-runs.state';
 import { rebuildStatuses } from './agent-runs.statuses';
 import type { AgentRun, ChatEvent, HandoffEvent } from './agent-runs.types';
@@ -21,10 +22,11 @@ export function applyEvent(id: string, event: ChatEvent): void {
       next.startedAt = event.startedAt ?? run.startedAt;
       break;
     case 'text':
-      next.text = run.text + event.text;
+      // Хвост завершённого прогона: ответ уже в истории, пузырю он не нужен.
+      if (!run.tailOnly) next.text = run.text + event.text;
       break;
     case 'thinking':
-      next.thinking = run.thinking + event.text;
+      if (!run.tailOnly) next.thinking = run.thinking + event.text;
       break;
     case 'tool':
       next.tools = [
@@ -116,8 +118,27 @@ export function applyEvent(id: string, event: ChatEvent): void {
       break;
   }
   runs.set(id, next);
-  // Запрос/ответ прав меняют «важность» прогона (жёлтая точка) — пересобираем.
-  if (event.kind === 'permission' || event.kind === 'permissionResolved') rebuildStatuses();
+  // Разговор обзавёлся настоящим id — переписываем под него сохранённую
+  // очередь. Под временным `new-…` она после перезагрузки недостижима: этого
+  // написания больше не существует ни у кого.
+  if (next.sessionId !== run.sessionId && next.queued.length > 0) persistQueue(id);
+  // Снимок пульта пересобираем только на событиях, которые в нём ВИДНЫ.
+  //
+  // Запрос и ответ прав меняют «важность» прогона (жёлтая точка). Вопрос
+  // человеку — то же самое, и вдобавок родительский разговор читает вопросы
+  // детей именно из снимка: пока пересборки не было, карточка не появлялась
+  // нигде — ни у ребёнка, ни у родителя — до случайного соседнего события или
+  // сторожевого таймера, то есть до двадцати секунд, всё это время агент стоял.
+  // Расход — цифры того же пульта, и отставать на двадцать секунд им незачем.
+  //
+  // Текст и размышления в снимок не входят: пересборка на каждую букву ответа
+  // перерисовывала бы ленту табов, ради чего кэш и заводился.
+  const shownInSnapshot =
+    event.kind === 'permission' ||
+    event.kind === 'permissionResolved' ||
+    event.kind === 'usage' ||
+    (event.kind === 'tool' && event.name === 'AskUserQuestion');
+  if (shownInSnapshot) rebuildStatuses();
   emit();
   if (firePermission) callbacks.onPermissionRequest?.(next);
   if (fireHandoff) callbacks.onHandoff?.(fireHandoff, next);

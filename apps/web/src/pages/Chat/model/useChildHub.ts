@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { ChatSummary } from '@claude-control/contracts';
-import type { ActiveRunView } from '@shared/lib/agent-runs';
+import { agentRuns, type ActiveRunView } from '@shared/lib/agent-runs';
 import type { ChildPermission, ChildQuestion } from '@features/ChatMessages';
 import { collectChildQuestions } from '../lib/childQuestions';
 import { collectChildPermissions } from '../lib/childPermissions';
@@ -40,7 +40,7 @@ export function useChildHub(
   parentChatId: string | undefined,
   runs: ActiveRunView[],
 ): ChildHub {
-  return useMemo(() => {
+  const hub = useMemo(() => {
     const all = chats ?? [];
     const children = parentChatId ? all.filter((chat) => chat.parentId === parentChatId) : [];
     return {
@@ -50,4 +50,14 @@ export function useChildHub(
       branches: children.map((chat) => chat.branch ?? '').filter(Boolean),
     };
   }, [chats, parentChatId, runs]);
+
+  // Ветви открытого разговора важнее прочих фоновых: их вопросы и запросы прав
+  // показываются здесь, а приходят они только потоком — потоков же на всех не
+  // хватает (`MAX_STREAMS`), и стор раздаёт их по важности.
+  const watchedIds = hub.list.map((child) => child.id).join('\n');
+  useEffect(() => {
+    agentRuns.setWatched(watchedIds ? watchedIds.split('\n') : []);
+  }, [watchedIds]);
+
+  return hub;
 }

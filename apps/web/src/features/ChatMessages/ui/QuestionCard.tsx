@@ -44,7 +44,7 @@ import styles from './ChatMessages.module.scss';
  * подписи — дальше он живёт как обычный вариант: его видно, его можно
  * переспросить, он уезжает тем же одним сообщением.
  */
-export function QuestionCard({ questions, onPick, busy, target }: QuestionCardProps) {
+export function QuestionCard({ questions, onPick, busy, target, isAnswered }: QuestionCardProps) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState<PickedAnswers>({});
   // Открытое поле своего варианта и набранный в нём текст — по вопросам.
@@ -69,11 +69,14 @@ export function QuestionCard({ questions, onPick, busy, target }: QuestionCardPr
   const pending = nextQuestion(questions, picked, confirmed);
   const current = editing ?? pending;
   const isReadOnly = !onPick;
-  const isLocked = isSent || isReadOnly;
+  // Отправленной карточку делает и своё состояние, и память стора: своё умирает
+  // вместе с перемонтажом, а вопрос из транскрипта переживает и его, и F5.
+  const sent = isSent || Boolean(isAnswered);
+  const isLocked = sent || isReadOnly;
 
   const send = (answers: PickedAnswers): void => {
     const text = composeAnswer(questions, answers);
-    if (!onPick || !text || wasSent.current) return;
+    if (!onPick || !text || wasSent.current || isAnswered) return;
     // Порядок важен: сначала гасим карточку, потом отправляем. Отправка уходит
     // в стор синхронно, и второй клик по соседнему варианту не должен успеть.
     wasSent.current = true;
@@ -128,7 +131,7 @@ export function QuestionCard({ questions, onPick, busy, target }: QuestionCardPr
   const isComplete = pending === undefined;
 
   return (
-    <div className={`${styles.question} ${isSent ? styles.questionSent : ''}`}>
+    <div className={`${styles.question} ${sent ? styles.questionSent : ''}`}>
       <Stack
         direction="row"
         align="center"
@@ -139,7 +142,7 @@ export function QuestionCard({ questions, onPick, busy, target }: QuestionCardPr
         <Typography as="span" variant="body-sm" weight="semibold" color="accent">
           {t('chat.questionTitle')}
         </Typography>
-        {questions.length > 1 && !isSent && (
+        {questions.length > 1 && !sent && (
           <span className={styles.questionStep}>
             {t('chat.questionStep', {
               current: Math.min((current ?? questions.length - 1) + 1, questions.length),
@@ -185,7 +188,7 @@ export function QuestionCard({ questions, onPick, busy, target }: QuestionCardPr
           );
         }
 
-        if (shown === 'done' && !isSent) {
+        if (shown === 'done' && !sent) {
           return (
             <div key={index} className={`${styles.questionItem} ${styles.questionDone}`}>
               <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
@@ -382,13 +385,13 @@ export function QuestionCard({ questions, onPick, busy, target }: QuestionCardPr
         отправляют одним нажатием, чтобы промах по варианту можно было исправить
         до, а не после отправки.
       */}
-      {!isReadOnly && !isSent && isComplete && questions.length > 1 && (
+      {!isReadOnly && !sent && isComplete && questions.length > 1 && (
         <Button variant="primary" className={styles.questionSubmit} onClick={() => send(picked)}>
           {t('chat.questionSubmit')}
         </Button>
       )}
 
-      {isSent && (
+      {sent && (
         <Stack
           direction="row"
           align="center"

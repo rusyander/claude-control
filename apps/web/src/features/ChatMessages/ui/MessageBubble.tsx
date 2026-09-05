@@ -7,7 +7,9 @@ import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { toast } from '@shared/lib/toast';
 import { scanSplitBlocks } from '@claude-control/contracts/task-split';
 import { scanHandoffBlocks } from '@claude-control/contracts/chat-handoff';
+import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
 import { parseQuestions } from '../lib/parseQuestions';
+import { questionKey } from '../lib/questionKey';
 import { QuestionCard } from './QuestionCard';
 import { TaskSplitCard } from './TaskSplitCard';
 import { HandoffCard } from './HandoffCard';
@@ -35,6 +37,9 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const { t } = useTranslation();
   const isUser = message.role === 'user';
+  // Отвеченные вопросы помнит стор: своё «отправлено» карточки не переживает
+  // ухода на другую вкладку, а вопрос из транскрипта — переживает.
+  const answered = useAnsweredQuestions();
 
   const plainText = useMemo(
     () =>
@@ -200,7 +205,10 @@ export function MessageBubble({
             const questions =
               block.name === 'AskUserQuestion' ? parseQuestions(block.input) : undefined;
 
-            if (questions)
+            if (questions) {
+              // Имя вопроса: у блока транскрипта своего идентификатора нет,
+              // поэтому берём сообщение и номер блока в нём.
+              const key = questionKey(message.id, String(index));
               return (
                 <div key={index} className={styles.block}>
                   {/*
@@ -218,12 +226,21 @@ export function MessageBubble({
                   */}
                   <QuestionCard
                     questions={questions}
-                    onPick={isLast || isQuestionOpen ? onPickOption : undefined}
+                    onPick={
+                      onPickOption && (isLast || isQuestionOpen)
+                        ? (answer) => {
+                            markQuestionAnswered(key);
+                            onPickOption(answer);
+                          }
+                        : undefined
+                    }
                     busy={isRunning}
+                    isAnswered={answered.has(key)}
                   />
                   {spend}
                 </div>
               );
+            }
 
             return (
               <div key={index} className={styles.block}>

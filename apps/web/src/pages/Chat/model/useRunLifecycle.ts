@@ -10,6 +10,8 @@ const ADOPT_INTERVAL_MS = 5000;
 export interface RunLifecycleInput {
   /** Разговор, открытый прямо сейчас: его прогон стор не считает фоновым. */
   chatId?: string;
+  /** Настоящий id разговора (у черновика его ещё нет) — им продолжается сессия. */
+  activeChatId?: string;
   isRunning: boolean;
   runText: string;
   runStatus: RunStatus;
@@ -27,6 +29,7 @@ export interface RunLifecycleInput {
  */
 export function useRunLifecycle({
   chatId,
+  activeChatId,
   isRunning,
   runText,
   runStatus,
@@ -69,6 +72,15 @@ export function useRunLifecycle({
   useEffect(() => {
     agentRuns.setActiveId(chatId);
   }, [chatId]);
+
+  // Очередь дописанного, пережившая перезагрузку страницы. Живёт она в
+  // localStorage, а в стор возвращается при открытии разговора: сам стор о
+  // том, какой разговор сейчас на экране, не знает, а поднимать разом очереди
+  // всех чатов незачем.
+  useEffect(() => {
+    if (!chatId) return;
+    void agentRuns.restoreQueue(chatId, activeChatId);
+  }, [chatId, activeChatId]);
 
   // Завершение прогона активного чата — перечитываем его переписку из истории.
   const wasRunningRef = useRef(false);

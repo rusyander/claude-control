@@ -8,16 +8,19 @@ import {
   shouldAutoRetry,
   stoppedByUser,
 } from './agent-runs.retry';
+import { persistQueue } from './agent-runs.queue-store';
 import { loadSpend } from './agent-runs.spend';
 import { sleep } from './agent-runs.sse';
 import {
   callbacks,
+  caughtUp,
   controllers,
   emit,
   getRun,
   lastSeqs,
   pendingUsage,
   runs,
+  sending,
   setRun,
 } from './agent-runs.state';
 import { ensureWatchdog, rebuildStatuses } from './agent-runs.statuses';
@@ -56,10 +59,38 @@ export function finalize(id: string): void {
   // знает — вычисти мы здесь всё, вопрос ребёнка исчез бы у родителя ровно в тот
   // момент, когда ребёнок замолчал и ответа ждать стало некому.
   const asked = run.tools.filter((tool) => tool.name === 'AskUserQuestion');
-  const finalized: AgentRun = isActive
-    ? { ...run, status, permissions: [] }
-    : { ...run, status, text: '', thinking: '', tools: asked, permissions: [] };
+  // Связь с потоком так и не восстановилась. Набранное в пузыре оборвано на
+  // полуслове, а полный ответ агент дописал в транскрипт — там теперь и правда.
+  // Поэтому такой прогон убираем, как фоновый: пузырь исчезает, лента перестаёт
+  // прятать этот ход и показывает его целиком. Оставь мы обрывок — он бы и
+  // остался на экране вместо ответа, ровно как до починки.
+  const lostStream = run.stalled === true;
+  const finalized: AgentRun =
+    isActive && !lostStream
+      ? {
+          ...run,
+          status,
+          permissions: [],
+          stalled: undefined,
+          sentFromQueue: undefined,
+          // Законченному поток не нужен — из очереди за ним выходит.
+          parked: undefined,
+        }
+      : {
+          ...run,
+          status,
+          text: '',
+          thinking: '',
+          tools: asked,
+          permissions: [],
+          stalled: undefined,
+          sentFromQueue: undefined,
+          parked: undefined,
+        };
   runs.set(id, finalized);
+  // Сервер ещё минуту будет называть этот прогон в `/chat/active` — помечаем,
+  // что его хвост у нас уже есть, иначе опрос подхватил бы его заново.
+  caughtUp.set(run.serverRunId ?? run.id, run.startedAt);
   // Ход закончен — все вызовы уже пришли, ждать больше нечему.
   pendingUsage.delete(id);
   rebuildStatuses();
@@ -88,13 +119,16 @@ export function finalize(id: string): void {
  * дописанное исчезло бы совсем: из очереди оно уже вынуто, а в ленту не попало.
  * Возвращаем его в НАЧАЛО очереди — досылка повторится по концу того хода.
  */
-function drainQueue(id: string): void {
+export function drainQueue(id: string): void {
   const run = runs.get(id);
   if (!run || run.queued.length === 0) return;
 
   const next = run.queued[0];
   if (!next) return;
-  runs.set(id, { ...run, queued: run.queued.slice(1) });
+  // Метка «ушло из очереди» переживает `startRun` (он её сохраняет): лента по
+  // ней держит реплику на экране, пока транскрипт её не покажет.
+  runs.set(id, { ...run, queued: run.queued.slice(1), sentFromQueue: next });
+  persistQueue(id);
   emit();
 
   void startRun({
@@ -111,7 +145,9 @@ function drainQueue(id: string): void {
     if (outcome.ok || outcome.code !== 'run_busy') return;
     const current = runs.get(id);
     if (!current) return;
-    runs.set(id, { ...current, queued: [next, ...current.queued] });
+    // Не ушло — значит, и не «ушедшее»: метку снимаем вместе с возвратом.
+    runs.set(id, { ...current, queued: [next, ...current.queued], sentFromQueue: undefined });
+    persistQueue(id);
     emit();
   });
 }
@@ -129,8 +165,17 @@ export async function runStream(
   initial: 'send' | 'attach',
   settle?: (outcome: SendOutcome) => void,
 ): Promise<void> {
+  /**
+   * Этот ли поток сейчас ведёт разговор. Запись в реестре контроллеров —
+   * единственное надёжное «кто здесь главный»: `startRun` меняет её ДО того,
+   * как прежний поток дочитается, и по ней старый узнаёт, что его сменили.
+   */
+  const isCurrentStream = (): boolean => controllers.get(id) === controller;
+
   try {
     let outcome = await openStream(id, input, controller, initial, settle);
+    // Ответ сервера пришёл — сообщение принято, поток можно и отпускать.
+    sending.delete(id);
     let attempt = 0;
     while (outcome === 'dirty' && !controller.signal.aborted && attempt < MAX_RECONNECT) {
       attempt += 1;
@@ -138,9 +183,16 @@ export async function runStream(
       if (controller.signal.aborted) break;
       outcome = await openStream(id, input, controller, 'attach');
     }
+    // Попытки кончились, а поток так и не ожил. Метку ставим до `finalize` — он
+    // гасит `stalled`, и без неё разговор возвращался бы к виду «ход просто
+    // закончился»: ни строки о потерянной связи, ни способа перечитать ленту.
+    if (outcome === 'dirty' && !controller.signal.aborted && isCurrentStream()) {
+      setRun(id, { dropped: true });
+      emit();
+    }
   } catch (error) {
     // Прерывание кнопкой — не ошибка.
-    if (!(error instanceof DOMException && error.name === 'AbortError')) {
+    if (!(error instanceof DOMException && error.name === 'AbortError') && isCurrentStream()) {
       const run = runs.get(id);
       if (run) {
         runs.set(id, {
@@ -153,90 +205,122 @@ export async function runStream(
       }
     }
   } finally {
-    controllers.delete(id);
-    lastSeqs.delete(id);
+    // Прогон могли перезапустить, пока этот поток дочитывался: `startRun` рвёт
+    // наш контроллер и тут же ставит под тем же id свой. Тогда всё дальнейшее
+    // относится не к нам, а к чужому — живому — прогону: выброси мы его
+    // контроллер, у человека пропадёт «Остановить»; позови `finalize` — только
+    // что начатый ход объявят законченным, лента перечитается на полуслове, а
+    // очередь уйдёт в занятый прогон и вернётся с 409. Отвечаем только за свою
+    // отправку и уходим молча.
+    sending.delete(id);
+    // Поток мог быть отпущен ради другого (`parkRun` снимает контроллер сразу):
+    // тогда мы тоже «не ведём» разговор — и уходим молча, прогон живёт дальше.
+    if (isCurrentStream()) afterStream(id, input, controller, settle);
+    else settle?.({ ok: false, message: 'Отправка отменена: разговор перезапущен' });
+    // Место освободилось — отдать его тому, кто ждёт потока.
+    callbacks.rebalance?.();
+  }
+}
 
-    const run = runs.get(id);
-    const spent = autoRetries.get(id) ?? 0;
+/**
+ * Чем закончить прогон, чей поток дочитан. Вызывается только тем потоком,
+ * который на этот момент ведёт разговор (см. `isCurrentStream`): подхватить
+ * чужой живой прогон, перезапустить свой упавший по временной причине — или
+ * закрыть ход и отдать очередь.
+ */
+function afterStream(
+  id: string,
+  input: StartInput,
+  controller: AbortController,
+  settle?: (outcome: SendOutcome) => void,
+): void {
+  controllers.delete(id);
+  lastSeqs.delete(id);
 
-    // Отказ «прогон уже идёт»: на сервере он ЖИВОЙ, просто эта вкладка о нём не
-    // знала — сдалась после MAX_RECONNECT переподключений или открыта второй.
-    // Оставить человека с одним отказом нельзя: кнопки «Остановить» на такой
-    // странице нет (она появляется только у идущего прогона), и деть чужой
-    // прогон было бы некуда, кроме F5. Поэтому подхватываем его потоком —
-    // возвращаются и живой текст, и статус «идёт», а с ним и «Остановить».
-    const takeover = Boolean(
-      run?.errorCode === 'run_busy' && !controller.signal.aborted && !stoppedByUser.has(id),
+  const run = runs.get(id);
+  const spent = autoRetries.get(id) ?? 0;
+
+  // Отказ «прогон уже идёт»: на сервере он ЖИВОЙ, просто эта вкладка о нём не
+  // знала — сдалась после MAX_RECONNECT переподключений или открыта второй.
+  // Оставить человека с одним отказом нельзя: кнопки «Остановить» на такой
+  // странице нет (она появляется только у идущего прогона), и деть чужой
+  // прогон было бы некуда, кроме F5. Поэтому подхватываем его потоком —
+  // возвращаются и живой текст, и статус «идёт», а с ним и «Остановить».
+  const takeover = Boolean(
+    run?.errorCode === 'run_busy' && !controller.signal.aborted && !stoppedByUser.has(id),
+  );
+
+  // Упал по временной причине (сеть моргнула, перегрузка) — сами перезапускаем
+  // тем же запросом, продолжая сессию. Пользователю ошибку не показываем и не
+  // пищим: для него это просто «агент чуть задумался». Бюджет попыток ограничен.
+  const willAutoRetry =
+    !takeover &&
+    shouldAutoRetry({
+      error: run?.error,
+      errorCode: run?.errorCode,
+      errorRetriable: run?.errorRetriable,
+      lastPrompt: run?.lastPrompt,
+      spentRetries: spent,
+      maxRetries: MAX_AUTO_RETRIES,
+      stoppedByUser: stoppedByUser.has(id),
+    });
+
+  if (takeover) {
+    const next = new AbortController();
+    controllers.set(id, next);
+    lastSeqs.set(id, 0);
+    setRun(id, {
+      status: 'running',
+      error: undefined,
+      errorCode: undefined,
+      errorRetriable: undefined,
+      stalled: undefined,
+      dropped: undefined,
+      lastEventAt: Date.now(),
+    });
+    rebuildStatuses();
+    emit();
+    // С нулевого seq: буфер прогона отдадут заново, и ответ виден с начала.
+    void runStream(id, input, next, 'attach');
+  } else if (willAutoRetry) {
+    // Промпт остаётся у стора — он же его и переотправит; для поля ввода это
+    // «принято», очищать текст можно.
+    settle?.({ ok: true });
+    autoRetries.set(id, spent + 1);
+    setRun(id, {
+      status: 'running',
+      error: undefined,
+      errorCode: undefined,
+      errorRetriable: undefined,
+      stalled: undefined,
+      dropped: undefined,
+      lastEventAt: Date.now(),
+    });
+    rebuildStatuses();
+    emit();
+    const delay = Math.min(1000 * 2 ** (spent + 1), 4000);
+    autoRetryTimers.set(
+      id,
+      setTimeout(() => {
+        if (stoppedByUser.has(id)) {
+          autoRetryTimers.delete(id);
+          return;
+        }
+        // Запись в таймерах держим до самого рестарта: авто-повтор сперва
+        // читает транскрипт, и до startRun у прогона нет ни контроллера, ни
+        // таймера — «Остановить всех» искало бы его и не нашло.
+        void retryRun(id, { auto: true }).finally(() => autoRetryTimers.delete(id));
+      }, delay),
     );
-
-    // Упал по временной причине (сеть моргнула, перегрузка) — сами перезапускаем
-    // тем же запросом, продолжая сессию. Пользователю ошибку не показываем и не
-    // пищим: для него это просто «агент чуть задумался». Бюджет попыток ограничен.
-    const willAutoRetry =
-      !takeover &&
-      shouldAutoRetry({
-        error: run?.error,
-        errorCode: run?.errorCode,
-        errorRetriable: run?.errorRetriable,
-        lastPrompt: run?.lastPrompt,
-        spentRetries: spent,
-        maxRetries: MAX_AUTO_RETRIES,
-        stoppedByUser: stoppedByUser.has(id),
-      });
-
-    if (takeover) {
-      const next = new AbortController();
-      controllers.set(id, next);
-      lastSeqs.set(id, 0);
-      setRun(id, {
-        status: 'running',
-        error: undefined,
-        errorCode: undefined,
-        errorRetriable: undefined,
-        lastEventAt: Date.now(),
-      });
-      rebuildStatuses();
-      emit();
-      // С нулевого seq: буфер прогона отдадут заново, и ответ виден с начала.
-      void runStream(id, input, next, 'attach');
-    } else if (willAutoRetry) {
-      // Промпт остаётся у стора — он же его и переотправит; для поля ввода это
-      // «принято», очищать текст можно.
-      settle?.({ ok: true });
-      autoRetries.set(id, spent + 1);
-      setRun(id, {
-        status: 'running',
-        error: undefined,
-        errorCode: undefined,
-        errorRetriable: undefined,
-        lastEventAt: Date.now(),
-      });
-      rebuildStatuses();
-      emit();
-      const delay = Math.min(1000 * 2 ** (spent + 1), 4000);
-      autoRetryTimers.set(
-        id,
-        setTimeout(() => {
-          if (stoppedByUser.has(id)) {
-            autoRetryTimers.delete(id);
-            return;
-          }
-          // Запись в таймерах держим до самого рестарта: авто-повтор сперва
-          // читает транскрипт, и до startRun у прогона нет ни контроллера, ни
-          // таймера — «Остановить всех» искало бы его и не нашло.
-          void retryRun(id, { auto: true }).finally(() => autoRetryTimers.delete(id));
-        }, delay),
-      );
-    } else {
-      // Поток оборвался, не дойдя даже до ответа сервера (сеть) — считаем
-      // отправку непринятой, чтобы набранный текст не пропал зря.
-      settle?.({ ok: false, message: run?.error ?? 'Отправить сообщение не удалось' });
-      autoRetries.delete(id);
-      finalize(id);
-      callbacks.onFinished?.();
-      // Прогон завершён — обновляем накопленный расход с сервера.
-      void loadSpend();
-    }
+  } else {
+    // Поток оборвался, не дойдя даже до ответа сервера (сеть) — считаем
+    // отправку непринятой, чтобы набранный текст не пропал зря.
+    settle?.({ ok: false, message: run?.error ?? 'Отправить сообщение не удалось' });
+    autoRetries.delete(id);
+    finalize(id);
+    callbacks.onFinished?.();
+    // Прогон завершён — обновляем накопленный расход с сервера.
+    void loadSpend();
   }
 }
 
@@ -295,6 +379,13 @@ export function startRun(input: StartInput): Promise<SendOutcome> {
     serverRunId: undefined,
     askedQuestion: false,
     permissions: [],
+    // Замолчавшим считался прошлый ход — этот только начинается.
+    stalled: undefined,
+    dropped: undefined,
+    // Ушедшее из очереди помечает `drainQueue` перед самым стартом — оставляем.
+    sentFromQueue: prev?.sentFromQueue,
+    // Своя отправка — всегда с потоком: парковка снимается.
+    parked: undefined,
     // Запоминаем запрос, права, модель и глубину — для кнопки «Повторить».
     lastPrompt: input.prompt,
     // Старт по часам сервера придёт с событием session.
@@ -317,6 +408,10 @@ export function startRun(input: StartInput): Promise<SendOutcome> {
       settled = true;
       resolve(outcome);
     };
+    // Отправку не отпускают, пока сервер не ответил; место под неё, если
+    // потоков уже полный бюджет, освобождает менее важный.
+    sending.add(id);
+    callbacks.rebalance?.();
     void runStream(id, input, controller, 'send', settle);
   });
 }

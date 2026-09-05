@@ -114,6 +114,43 @@ describe('agentRuns — очередь дописанного', () => {
   });
 
   /**
+   * Регрессия: досланное исчезало из ленты на несколько секунд. Призрак «Уйдёт
+   * следующим» пропал вместе с очередью, а транскрипт реплику ещё не знает —
+   * страница ставит на это время свой пузырь по метке `sentFromQueue`. Метка
+   * живёт ровно ход: с досылки до конца потока.
+   */
+  it('ушедшее из очереди помечено до конца хода, потом метка снимается', async () => {
+    // Первый ход закончится сразу, второй — живой поток, закрываем его сами.
+    let second: ReadableStreamDefaultController<Uint8Array> | undefined;
+    fetchMock.mockImplementationOnce(async () => sseResponse([DONE]));
+    fetchMock.mockImplementation(
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          body: new ReadableStream<Uint8Array>({
+            start(controller) {
+              second = controller;
+            },
+          }),
+        }) as unknown as Response,
+    );
+
+    void agentRuns.start({ chatId: 'q-6', prompt: 'первое' });
+    agentRuns.enqueue('q-6', { prompt: 'второе' });
+    await settle();
+
+    expect(getRun('q-6').status).toBe('running');
+    expect(getRun('q-6').sentFromQueue?.prompt).toBe('второе');
+
+    second?.enqueue(new TextEncoder().encode(`${DONE}\n\n`));
+    second?.close();
+    await settle();
+    expect(getRun('q-6').status).toBe('idle');
+    expect(getRun('q-6').sentFromQueue).toBeUndefined();
+  });
+
+  /**
    * Регрессия, ради которой очередь и гасится в `stop`: иначе «Остановить»
    * останавливало текущий ход, а следом само поднимало агента дописанным — то
    * есть кнопка не останавливала ничего.

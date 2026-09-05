@@ -107,7 +107,13 @@ describe('ChatRunRegistry', () => {
 
     const active = registry.active();
     expect(active).toHaveLength(1);
-    expect(active[0]).toMatchObject({ chatId: 'c1', sessionId: 'sess-1', projectPath: '/proj' });
+    expect(active[0]).toMatchObject({
+      chatId: 'c1',
+      sessionId: 'sess-1',
+      projectPath: '/proj',
+      status: 'running',
+    });
+    expect(active[0]?.finishedAt).toBeUndefined();
   });
 
   it('завершение закрывает живых слушателей, но буфер живёт для догона', async () => {
@@ -406,7 +412,11 @@ describe('ChatRunRegistry — emitExternal и grace-период', () => {
       // Прогон уже не идёт, но лежит в grace-буфере — active() его отдаёт, чтобы
       // клиент дотянул терминальный хвост, если вкладка была закрыта в финиш.
       expect(registry.isRunning('c1')).toBe(false);
-      expect(registry.active().map((r) => r.chatId)).toContain('c1');
+      // И называет его законченным: клиент заводит такой прогон сразу без
+      // «работает» и дотягивает лишь хвост, а не печатает ответ заново.
+      const [info] = registry.active();
+      expect(info).toMatchObject({ chatId: 'c1', status: 'done' });
+      expect(info?.finishedAt).toBeTypeOf('number');
 
       // За пределами grace прогон убран из буфера — возвращать больше нечего.
       await vi.advanceTimersByTimeAsync(61_000);

@@ -5,32 +5,20 @@ import { isStreamShown } from '@shared/lib/chat-stream';
 import {
   agentRuns,
   useAgentRun,
-  useProjectStatuses,
-  useChatStatuses,
   useActiveRuns,
   useTotalCost,
   useTotalTokens,
 } from '@shared/lib/agent-runs';
 import { useChatPrefs } from '@shared/lib/chat-prefs';
 import { useDraft } from '@shared/lib/draft';
-import { toast } from '@shared/lib/toast';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
-import { ParallelLaunch } from '@features/ParallelLaunch';
-import { FolderPicker } from '@features/FolderPicker';
-import { ProjectCodeModal } from '@features/ProjectCode';
-import { ProjectTestsModal } from '@features/ProjectTests';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
-import { ConfirmDialog } from '@shared/ui/confirm-dialog';
-import { ChatMessages } from '@features/ChatMessages';
 import {
   useChats,
   useChatMessages,
   useChatAutoRefresh,
   useChatProgress,
   CHAT_PAGE_SIZE,
-  useAwaitingChats,
-  mergeAwaitingStatuses,
-  mergeAwaitingProjectStatuses,
 } from '@entities/Chat';
 import { useProjects, useOpenInEditor } from '@entities/Project';
 import { useSettings } from '@entities/AppConfig';
@@ -38,7 +26,8 @@ import { useModelCatalog } from '@entities/ModelCatalog';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatHeader } from './ChatHeader';
 import { ChatArtifactsBar } from './ChatArtifactsBar';
-import { ChatEmptyState } from './ChatEmptyState';
+import { ChatThread } from './ChatThread';
+import { ChatOverlays } from './ChatOverlays';
 import { ChatDock } from './ChatDock';
 import { ChatPreviewPane } from './ChatPreviewPane';
 import { useChatSession } from './model/useChatSession';
@@ -48,11 +37,13 @@ import { useParallelLaunch } from './model/useParallelLaunch';
 import { useTaskSplit } from './model/useTaskSplit';
 import { useChatHandoff } from './model/useChatHandoff';
 import { useRunLifecycle } from './model/useRunLifecycle';
+import { useQueuedAsPending } from './model/useQueuedAsPending';
 import { useAgentNotifications } from './model/useAgentNotifications';
 import { usePreviewWidth } from './model/usePreviewWidth';
 import { visibleChats } from './lib/visibleChats';
 import { useChildHub } from './model/useChildHub';
-import { answerChild } from './lib/answerChild';
+import { useChatDots } from './model/useChatDots';
+import { useChatModelPrefs } from './model/useChatModelPrefs';
 import { useStreamState } from './model/useStreamState';
 import { downloadChatExport } from './lib/downloadChatExport';
 import { keepPending } from './lib/pending';
@@ -87,25 +78,11 @@ export function ChatPage() {
   const chats = useChats();
   const projects = useProjects();
   const ws = useWorkspace();
-  const liveProjectStatuses = useProjectStatuses();
-  // Точки в списке чатов: в одном проекте агентов может быть несколько, и по
-  // точке на табе не понять, который из разговоров зовёт.
-  const liveChatStatuses = useChatStatuses();
-  // Разговор мог стоять на вопросе задолго до того, как открыли панель, — или
-  // идти вовсе мимо неё. Такие видны только по транскрипту, и точку им ставит
-  // тот же механизм, что и живым прогонам.
-  const awaitingChats = useAwaitingChats();
-  const chatStatuses = useMemo(
-    () => mergeAwaitingStatuses(liveChatStatuses, awaitingChats),
-    [liveChatStatuses, awaitingChats],
-  );
-  const projectStatuses = useMemo(
-    () => mergeAwaitingProjectStatuses(liveProjectStatuses, awaitingChats),
-    [liveProjectStatuses, awaitingChats],
-  );
+  // Цветные точки по разговорам и проектам — живые прогоны плюс те, что стоят
+  // на вопросе мимо панели (подробности и почему их два источника — в хуке).
+  const { chatStatuses, projectStatuses } = useChatDots();
   const activeRuns = useActiveRuns();
-  const totalCost = useTotalCost();
-  const totalTokens = useTotalTokens();
+  const spend = { cost: useTotalCost(), tokens: useTotalTokens() };
 
   // Какой разговор открыт, в каком каталоге он идёт и как между разговорами
   // ходят: всё это живёт в одном месте — здесь только читаем.
@@ -113,20 +90,16 @@ export function ChatPage() {
   const { activeChat, chatId, projectPath, isProjectContext, draftKey, preview, pending } = session;
 
   const run = useAgentRun(chatId);
+  // Досланное из очереди сразу встаёт в ленту своим пузырём (см. хук).
+  useQueuedAsPending(run.sentFromQueue, session.setPending);
   const isRunning = run.status === 'running';
   const stream = useStreamState(run, isRunning);
 
   const [input, setInput] = useDraft(draftKey);
 
-  // Модель и глубина продумывания. Глобальный дефолт — из настроек; в конкретном
-  // чате его можно переопределить локально (пер-чат оверрайд в localStorage,
-  // пусто = брать из настроек). Настройки этим не меняются.
-  const defaultModel = settings?.chatModel ?? '';
-  const defaultEffort = settings?.chatEffort ?? 'xhigh';
-  const [modelOverride, setModelOverride] = useDraft(`chat-model:${draftKey}`);
-  const [effortOverride, setEffortOverride] = useDraft(`chat-effort:${draftKey}`);
-  const effectiveModel = modelOverride || defaultModel;
-  const effectiveEffort = effortOverride || defaultEffort;
+  // Модель и глубина продумывания: общий дефолт из настроек плюс выбор этого
+  // разговора (подробности — в хуке).
+  const models = useChatModelPrefs(draftKey, settings);
 
   const shownChats = useMemo(
     () => visibleChats(chats.data ?? [], ws.activeProject?.id),
@@ -153,8 +126,9 @@ export function ChatPage() {
   const shownHistory = withoutLiveTurn(messageList, run.startedAt, streamShown);
   // Разговор мог продолжиться мимо панели — из терминала или расширения
   // редактора. Такой ход не даёт потока событий, и лента жила бы снимком на
-  // момент открытия: вопрос агента человек увидел бы только после F5.
-  useChatAutoRefresh(activeChat?.id, isRunning);
+  // момент открытия: вопрос агента человек увидел бы только после F5. То же
+  // с припаркованным прогоном — потока к нему нет, правда в транскрипте.
+  useChatAutoRefresh(activeChat?.id, isRunning, run.stalled === true || run.parked === true);
   // Прогресс агента читается из транскрипта, поэтому нужен настоящий id сессии:
   // у нового разговора он появляется только с первым событием потока.
   const progress = useChatProgress(activeChat?.id ?? run.sessionId, isRunning);
@@ -164,6 +138,7 @@ export function ChatPage() {
 
   useRunLifecycle({
     chatId,
+    activeChatId: activeChat?.id,
     isRunning,
     runText: run.text,
     runStatus: run.status,
@@ -177,10 +152,7 @@ export function ChatPage() {
     children: child.list,
     // Ребёнок открывается ЗДЕСЬ же — тем же путём, что и клик по нему в пульте
     // агентов: его каталог лежит в самом разговоре, вкладка не нужна.
-    onOpenChild: (id) => {
-      const child = (chats.data ?? []).find((chat) => chat.id === id);
-      if (child) session.openChat(child);
-    },
+    onOpenChild: session.openChatById,
     runId: run.id,
     runStatus: run.status,
   });
@@ -205,13 +177,11 @@ export function ChatPage() {
     setPending: session.setPending,
     allowEdits,
     autoApprove,
-    model: effectiveModel,
-    effort: effectiveEffort,
+    ...models.effective,
   });
 
   const { isParallelOpen, setParallelOpen, launchParallel } = useParallelLaunch({
-    model: effectiveModel,
-    effort: effectiveEffort,
+    ...models.effective,
     // Тот же ключ, что и у разделения: запущенные встают ветвями этого
     // разговора, а не отдельными вкладками проектов.
     parentChatId: activeChat?.id ?? run.sessionId,
@@ -225,8 +195,7 @@ export function ChatPage() {
     // именно к нему дерево подвесит порождённые чаты.
     parentChatId: activeChat?.id ?? run.sessionId,
     allowEdits,
-    model: effectiveModel,
-    effort: effectiveEffort,
+    ...models.effective,
     dispatch,
   });
 
@@ -238,8 +207,7 @@ export function ChatPage() {
     chatId,
     sessionId: run.sessionId,
     allowEdits,
-    model: effectiveModel,
-    effort: effectiveEffort,
+    ...models.effective,
     dispatch,
     showChat: session.viewRun,
   });
@@ -251,14 +219,6 @@ export function ChatPage() {
     setAutoApprove(enabled);
     if (chatId) agentRuns.setAutoApprove(chatId, enabled);
   };
-
-  const hasContent =
-    messageList.length > 0 ||
-    pending.length > 0 ||
-    messages.isLoading ||
-    isRunning ||
-    Boolean(run.text) ||
-    Boolean(run.error);
 
   return (
     <div className={styles.shell}>
@@ -311,19 +271,19 @@ export function ChatPage() {
             isProjectContext={isProjectContext}
             chatId={chatId}
             activeRuns={activeRuns}
-            totalCost={totalCost}
-            totalTokens={totalTokens}
+            totalCost={spend.cost}
+            totalTokens={spend.tokens}
             costUnit={costUnit}
             onStopRun={agentRuns.stop}
             onStopAllRuns={agentRuns.stopAll}
             onViewRun={session.viewRun}
-            model={modelOverride}
-            effort={effortOverride}
-            defaultModel={defaultModel}
-            defaultEffort={defaultEffort}
+            model={models.modelOverride}
+            effort={models.effortOverride}
+            defaultModel={models.defaultModel}
+            defaultEffort={models.defaultEffort}
             models={modelCatalog?.models}
-            onModelChange={setModelOverride}
-            onEffortChange={setEffortOverride}
+            onModelChange={models.setModelOverride}
+            onEffortChange={models.setEffortOverride}
             isEditorPending={openEditor.isPending}
             onOpenEditor={(path) => openEditor.mutate(path)}
             onOpenCode={() => setCodeOpen(true)}
@@ -350,77 +310,40 @@ export function ChatPage() {
             onDelete={askDelete}
           />
 
-          {hasContent ? (
-            <ChatMessages
-              messages={[...shownHistory, ...pending]}
-              conversationId={activeChat?.id}
-              stream={stream}
-              isLoading={messages.isLoading}
-              hasMore={messages.data?.hasMore}
-              isLoadingMore={messages.isFetching}
-              onLoadMore={() => setMessagesLimit((limit) => limit + CHAT_PAGE_SIZE)}
-              onEdit={editMessage}
-              onPickOption={answerQuestion}
-              isRunning={isRunning}
-              permissions={run.permissions}
-              onPermissionDecide={(toolUseId, behavior, message) =>
-                chatId && agentRuns.decidePermission(chatId, toolUseId, behavior, message)
-              }
-              childPermissions={child.permissions}
-              // Решение по правам ребёнка уходит в ЕГО прогон — тем же путём,
-              // что и своё: брокер ждёт ответа по ключу прогона, и родительский
-              // разговор об этом не узнаёт вовсе.
-              onChildPermissionDecide={(childId, toolUseId, behavior) =>
-                agentRuns.decidePermission(childId, toolUseId, behavior)
-              }
-              childQuestions={child.questions}
-              // Ответ уходит в ЧАТ РЕБЁНКА обычным сообщением: другого канала
-              // нет — вызов `AskUserQuestion` в пакетном режиме возвращается
-              // ошибкой сразу и никого не ждёт. Ребёнок ещё работает — ответ
-              // встаёт в его очередь и уйдёт по концу хода. Родительский
-              // разговор при этом не трогается: ни хода, ни строки в его ленте.
-              onChildAnswer={(childId, answer) =>
-                answerChild(childId, answer, {
-                  chats: chats.data ?? [],
-                  runs: activeRuns,
-                  options: {
-                    allowEdits,
-                    autoApprove,
-                    model: effectiveModel,
-                    effort: effectiveEffort,
-                  },
-                  // Ответ ребёнку не оставляет следа в этой ленте — намеренно,
-                  // ход тратит он. След нужен человеку: тост называет разговор,
-                  // в который ушёл выбор, иначе после шести ответов подряд не
-                  // вспомнить, кому именно ответил.
-                  notify: (title, queued) =>
-                    toast.success(
-                      t(queued ? 'chat.answerQueuedForChild' : 'chat.answerSentToChild', {
-                        title,
-                      }),
-                    ),
-                })
-              }
-              onRetry={chatId ? () => agentRuns.retry(chatId) : undefined}
-              costUnit={costUnit}
-              effort={run.effort}
-              onSplit={taskSplit.split}
-              onKeepHere={taskSplit.keepHere}
-              isSplitPending={taskSplit.isPending}
-              // Ветки уже заведённых детей — по ним карточка предложения
-              // понимает, что разделение состоялось, и убирает кнопку.
-              childBranches={child.branches}
-              handoff={handoff.controls}
-            />
-          ) : (
-            <ChatEmptyState
-              isProjectContext={isProjectContext}
-              projectName={ws.activeProject?.name}
-              projectPath={projectPath}
-              onOpenEditor={(path) => openEditor.mutate(path)}
-              onPick={setInput}
-            />
-          )}
+          <ChatThread
+            messages={[...shownHistory, ...pending]}
+            conversationId={activeChat?.id}
+            stream={stream}
+            isLoading={messages.isLoading}
+            hasMore={messages.data?.hasMore}
+            isLoadingMore={messages.isFetching}
+            onLoadMore={() => setMessagesLimit((limit) => limit + CHAT_PAGE_SIZE)}
+            onEdit={editMessage}
+            onPickOption={answerQuestion}
+            isRunning={isRunning}
+            chatId={chatId}
+            permissions={run.permissions}
+            queued={run.queued}
+            onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
+            child={child}
+            chats={chats.data ?? []}
+            activeRuns={activeRuns}
+            childAnswerOptions={{ allowEdits, autoApprove, ...models.effective }}
+            costUnit={costUnit}
+            effort={run.effort}
+            taskSplit={taskSplit}
+            onContinue={() => chatId && agentRuns.continue(chatId, t('chat.continueWord'))}
+            onRefresh={() => {
+              session.refresh();
+              if (chatId) agentRuns.quiet(chatId);
+            }}
+            handoff={handoff.controls}
+            isProjectContext={isProjectContext}
+            projectName={ws.activeProject?.name}
+            projectPath={projectPath}
+            onOpenEditor={(path) => openEditor.mutate(path)}
+            onPickPrompt={setInput}
+          />
 
           <ChatDock
             progress={progress.data}
@@ -447,49 +370,26 @@ export function ChatPage() {
         )}
       </div>
 
-      <FolderPicker
-        isOpen={isFolderPickerOpen}
-        onOpenChange={setFolderPickerOpen}
-        onPick={(path, name) => {
+      <ChatOverlays
+        isFolderPickerOpen={isFolderPickerOpen}
+        onFolderPickerOpenChange={setFolderPickerOpen}
+        onPickFolder={(path, name) => {
           session.openProjectPath(path, name);
           setFolderPickerOpen(false);
         }}
-      />
-
-      <ConfirmDialog
-        isOpen={Boolean(artifactToDelete)}
-        onOpenChange={(open) => !open && cancelDelete()}
-        onConfirm={confirmDelete}
-        title={t('chat.deleteArtifactTitle')}
-        description={t('chat.deleteArtifactConfirm', { name: artifactToDelete?.name ?? '' })}
-        confirmLabel={t('common.delete')}
-        isPending={isDeleting}
-      />
-
-      {/* Код проекта. Разговор передаём, чтобы дифф показывал правки ИМЕННО
-          этого чата; в песочнице кнопки нет — окно живёт только у проекта. */}
-      {isProjectContext && projectPath && (
-        <ProjectCodeModal
-          isOpen={isCodeOpen}
-          onOpenChange={setCodeOpen}
-          projectPath={projectPath}
-          chatId={activeChat?.id}
-        />
-      )}
-
-      {/* Тест-кейсы живут в самом проекте, поэтому окно знает только его путь:
-          к конкретному разговору они не привязаны. */}
-      {isProjectContext && projectPath && (
-        <ProjectTestsModal
-          isOpen={isTestsOpen}
-          onOpenChange={setTestsOpen}
-          projectPath={projectPath}
-        />
-      )}
-
-      <ParallelLaunch
-        isOpen={isParallelOpen}
-        onOpenChange={setParallelOpen}
+        artifactToDelete={artifactToDelete}
+        onCancelDelete={cancelDelete}
+        onConfirmDelete={confirmDelete}
+        isDeleting={isDeleting}
+        isProjectContext={isProjectContext}
+        projectPath={projectPath}
+        activeChatId={activeChat?.id}
+        isCodeOpen={isCodeOpen}
+        onCodeOpenChange={setCodeOpen}
+        isTestsOpen={isTestsOpen}
+        onTestsOpenChange={setTestsOpen}
+        isParallelOpen={isParallelOpen}
+        onParallelOpenChange={setParallelOpen}
         projects={projects.data ?? []}
         onLaunch={launchParallel}
       />

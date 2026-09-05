@@ -54,6 +54,8 @@ export interface ChatSession {
   enterProjectDraft: () => void;
   startNewChat: () => void;
   openChat: (chat: ChatSummary) => void;
+  /** Открыть разговор по ключу — когда на руках только id, а не сам чат. */
+  openChatById: (id: string) => void;
   openProject: (project: ProjectInfo) => void;
   openProjectPath: (path: string, name: string) => void;
   viewRun: (run: ViewTarget) => void;
@@ -262,6 +264,17 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     writeUrl(chat.id);
   };
 
+  /**
+   * Открыть разговор по одному лишь ключу. Нужно там, где id приходит от
+   * механизма, а не от клика по списку: уведомление о ребёнке, переезд в
+   * продолженную сессию. Разговоры хук и так держит — искать их снаружи значило
+   * бы носить весь список за собой ради одной строки.
+   */
+  const openChatById = (id: string): void => {
+    const found = (chats ?? []).find((chat) => chat.id === id);
+    if (found) openChat(found);
+  };
+
   const openProject = (project: ProjectInfo): void => {
     const wasActive = ws.activeProject?.id === normalizeProjectPath(project.path);
     ws.openProject(project.path, project.name);
@@ -343,6 +356,7 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     enterProjectDraft,
     startNewChat,
     openChat,
+    openChatById,
     openProject,
     openProjectPath,
     viewRun,

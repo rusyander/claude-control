@@ -7,6 +7,7 @@ export {
   getTotalCost,
   getTotalTokens,
   subscribeRuns,
+  markQuestionAnswered,
   EMPTY_RUN,
 } from './agentRunsStore';
 export type {
@@ -25,6 +26,7 @@ export {
   useActiveRuns,
   useTotalCost,
   useTotalTokens,
+  useAnsweredQuestions,
 } from './useAgentRuns';
 export { runStatus, aggregateStatus, statusTone, isLive, STALL_MS } from './status';
 export type { RunStatus } from './status';

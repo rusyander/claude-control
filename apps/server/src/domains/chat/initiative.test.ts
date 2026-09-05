@@ -19,6 +19,7 @@ describe('строка инициатив для прогона', () => {
 
     expect(bare).toContain('AskUserQuestion');
     expect(bare).toContain('Answer questions?');
+    expect(bare).toContain('отказ панели');
     expect(bare).not.toContain('agentdeck:split');
     expect(bare).not.toContain('agentdeck:handoff');
     expect(bare).not.toMatch(/[\r\n]/);

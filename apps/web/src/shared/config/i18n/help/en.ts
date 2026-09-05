@@ -104,8 +104,9 @@ export const helpEn: HelpSchema = {
       canParallel: 'Hold several conversations at once, across different projects',
       canQueue:
         'Add messages while the agent is busy: the send button no longer locks, the ' +
-        'addition joins a queue above the input and goes into the same conversation ' +
-        'as soon as the current turn ends',
+        'addition shows both as a strip above the input and in the feed itself — a ' +
+        'faint bubble marked “goes out next” — survives a page reload, and goes into ' +
+        'the same conversation as soon as the current turn ends',
       canProgress:
         "Watch the agent's plan: the strip above the input shows its own checkpoints " +
         '(done, in progress) and the tree of subagents it handed work to, together ' +
@@ -633,13 +634,24 @@ export const helpEn: HelpSchema = {
         'Once sent, the card dims and says what became of the answer: “the agent is ' +
         'thinking” or “queued — it will be sent when the agent finishes its turn”. The ' +
         'note appears on the click, not on the server reply: the agent answers in tens ' +
-        'of seconds, and all that time it must be obvious the click went through.',
+        'of seconds, and all that time it must be obvious the click went through. An ' +
+        'answered question stays answered: switching tabs and reloading the page do ' +
+        'not revive it, and it cannot be answered twice — that would be a second turn.',
       askBusy: 'The agent is busy — you can still answer',
       askBusyText:
         'The question arrives MID-turn: the agent asks it and goes right back to ' +
         'writing code. That is why the options are not dimmed while a run is going — ' +
         'the choice is needed exactly now. An answer to a busy agent queues up above ' +
         'the composer and is sent as soon as the turn ends; the turn is not interrupted.',
+      lostTitle: 'The connection to a run can be lost — and you will be told',
+      lostText:
+        'The event stream lives in the browser while the agent lives on the server, so ' +
+        'a sleeping machine or a blinking network breaks the view, not the work. Half ' +
+        'a minute of silence and the feed says “connection lost, reconnecting”; the ' +
+        'half-written bubble goes dark on purpose — it is cut mid-sentence, while the ' +
+        'full answer is being written to the transcript the feed reads from. If the ' +
+        'reconnects do not help, instead of silence you get “show from the history” — ' +
+        'reread the conversation, where the answer already is.',
       askOldTitle: 'Your answer closes the question — the agent’s next message does not',
       askOldText:
         'Having asked, the agent keeps writing: it does not wait for the answer, and ' +
@@ -860,8 +872,14 @@ export const helpEn: HelpSchema = {
         'F5 only detaches the listener. Come back and a running job is picked up, with ' +
         'the stream catching up on what you missed. The accumulated session spend now ' +
         'survives a reload too: the server keeps the count and the tab just pulls it. A ' +
-        'run that finished while the page was away comes back to the feed if you return ' +
-        'within a grace minute; later, look for the answer in the conversation history.',
+        'run that finished while the page was away never shows as running, not even for ' +
+        'a second: its answer is already in the conversation history, and the panel only ' +
+        'pulls the tail — cost, tokens and the question, if the agent asked one. A tab ' +
+        'keeps at most three live streams: the open conversation, runs waiting for an ' +
+        'answer and the branches of the open one come first, the other running jobs are ' +
+        'followed by polling and get a stream as soon as a slot frees. That is why a ' +
+        'message into a seventh conversation goes out at once instead of waiting in the ' +
+        "browser's connection queue.",
       noteQuestionTitle: 'An option is picked with a click',
       noteQuestionText:
         'The card draws the options as buttons: a click sends the chosen text as an ' +

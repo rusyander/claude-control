@@ -46,6 +46,33 @@
   }
 }
 
+/*
+  Пузырь дописанного, которое ещё не ушло. Место и выравнивание — как у реплики
+  человека (там она и встанет), а вид нарочно другой: пунктир и приглушённый
+  текст говорят «принято, но агент этого пока не видел». Сплошной фон здесь
+  читался бы как отправленное сообщение — ровно та ложь, из-за которой очередь
+  сперва и держали вне ленты.
+*/
+.bubbleQueued {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px dashed var(--color-border);
+  background: transparent;
+}
+
+.queuedText {
+  color: var(--color-fg-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.queuedFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-2xs);
+}
+
 .bubbleAssistant {
   width: 100%;
   // Колонка расхода вынесена ЗА ширину чтения, а не отрезана от неё: цифры
@@ -594,6 +621,25 @@
   карточка здесь пугала бы там, где ничего не потеряно.
 */
 .splitRejected {
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+/*
+  Потерянная связь. Негромко и без красного: агент продолжает работать на
+  сервере, терять человеку нечего — тревожная карточка здесь обещала бы беду,
+  которой нет. Ширину держим по мерке текста, чтобы строка читалась как реплика
+  ленты, а не как полосу во всю её ширину.
+*/
+.reconnecting {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  max-width: min(var(--text-measure), 100%);
+  margin-bottom: var(--spacing-xl);
   padding: var(--spacing-2xs) var(--spacing-xs);
   border: 1px dashed var(--color-border);
   border-radius: 8px;

@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { RunStatus } from './status';
 import type { ActiveRunView } from './selectors';
 import {
+  getAnsweredQuestions,
   getProjectStatuses,
   getChatStatuses,
   getActiveRuns,
@@ -34,6 +35,15 @@ export function useChatStatuses(): Map<string, RunStatus> {
 /** Активные прогоны (работают/ждут/упали) — для пульта агентов. */
 export function useActiveRuns(): ActiveRunView[] {
   return useSyncExternalStore(subscribeRuns, getActiveRuns, getActiveRuns);
+}
+
+/**
+ * Вопросы, на которые уже ответили. Память общая: карточка переживает и уход на
+ * другую вкладку, и перезагрузку — иначе тот же вопрос выглядит неотвеченным, а
+ * второй ответ стоит ещё одного хода агента.
+ */
+export function useAnsweredQuestions(): ReadonlySet<string> {
+  return useSyncExternalStore(subscribeRuns, getAnsweredQuestions, getAnsweredQuestions);
 }
 
 /** Накопленная стоимость всех прогонов за сессию. */

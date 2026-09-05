@@ -57,6 +57,15 @@ export interface ActiveRunInfo {
   seq: number;
   /** Когда прогон заведён, по часам сервера — тем же, что пишут транскрипт. */
   startedAt: number;
+  /**
+   * Идёт ли прогон ещё. `done` — уже завершился, но лежит в grace-буфере:
+   * клиент дотягивает из него хвост (расход, вопрос человеку), а «работает»
+   * не показывает — иначе после F5 законченный разговор минуту выглядел бы
+   * идущим, и его ответ печатался бы заново.
+   */
+  status: 'running' | 'done';
+  /** Момент завершения (мс) — только у `done`. */
+  finishedAt?: number;
 }
 
 export interface BufferedEvent {
@@ -535,6 +544,8 @@ export class ChatRunRegistry {
         projectPath: run.meta.projectPath,
         seq: run.seq,
         startedAt: run.startedAt,
+        status: recentlyDone ? 'done' : 'running',
+        finishedAt: run.finishedAt,
       });
     }
     return list;

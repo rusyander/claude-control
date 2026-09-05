@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../../context.ts';
-import { initiativePrompt } from '../../domains/chat/initiative.ts';
+import { initiativePrompt, QUESTION_DENIED } from '../../domains/chat/initiative.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
 import { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
@@ -352,6 +352,14 @@ export function registerChatRunRoutes(
     Body: { runId: string; toolName: string; input: unknown; toolUseId: string };
   }>('/api/chat/permission-request', async (request, reply) => {
     const { runId, toolName, input, toolUseId } = request.body;
+
+    // Вопрос человеку — не запрос прав: карточку с вопросом лента уже рисует
+    // по самому вызову, а ответ едет следующим сообщением. Показать здесь ещё
+    // и карточку прав значило бы повесить прогон до клика по кнопке, которая
+    // ничего не решает (см. `QUESTION_DENIED`).
+    if (toolName === 'AskUserQuestion') {
+      return reply.send({ behavior: 'deny', message: QUESTION_DENIED });
+    }
 
     // Автоподтверждение: обратимый запрос разрешаем молча, не показывая
     // карточку. Человеку остаётся безвозвратное (удаление, затирание истории,

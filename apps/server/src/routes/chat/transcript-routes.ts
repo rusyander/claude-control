@@ -8,6 +8,7 @@ import { listProjects } from '../../domains/chat/ChatProjects.ts';
 import { buildChatExport, type ExportFormat } from '../../domains/chat/ChatExport.ts';
 import { createStepCost } from '../../domains/chat/ChatCost.ts';
 import { clampInt, DEFAULT_MESSAGE_PAGE, MAX_MESSAGE_PAGE } from '../../domains/chat/constants.ts';
+import { sendConditional } from '../../lib/conditional-get.ts';
 import { projectsDir } from './paths.ts';
 
 /** Список разговоров, поиск по ним и чтение самой переписки — только чтение. */
@@ -25,21 +26,26 @@ export function registerChatTranscriptRoutes(app: FastifyInstance, ctx: ServerCo
    * происхождению: «этот чат выделен из того» знает только панель, и связь
    * приклеивается здесь, на выдаче. Отдельным запросом это делать нельзя —
    * дерево в списке рисуется сразу, а не вторым тактом.
+   *
+   * Ответ условный (ETag): список перечитывается на каждое событие наблюдателя
+   * и по возврату в окно, а меняется реже, чем спрашивается.
    */
-  app.get('/api/chats', () => {
+  app.get('/api/chats', (request, reply) => {
     const chats = readChats(projectsDir(ctx));
     const links = ctx.store.getChatLinks();
-    if (Object.keys(links).length === 0) return chats;
-
-    return chats.map((chat) => {
-      const link = links[chat.id];
-      if (!link) return chat;
-      return {
-        ...chat,
-        parentId: link.parentChatId,
-        ...(link.branch ? { branch: link.branch } : {}),
-      };
-    });
+    const withLinks =
+      Object.keys(links).length === 0
+        ? chats
+        : chats.map((chat) => {
+            const link = links[chat.id];
+            if (!link) return chat;
+            return {
+              ...chat,
+              parentId: link.parentChatId,
+              ...(link.branch ? { branch: link.branch } : {}),
+            };
+          });
+    return sendConditional(request, reply, withLinks);
   });
 
   /**
@@ -53,7 +59,9 @@ export function registerChatTranscriptRoutes(app: FastifyInstance, ctx: ServerCo
   );
 
   /** Проекты, с которыми работал Claude Code, — для таба «Проекты» в чате. */
-  app.get('/api/chats/projects', () => listProjects(projectsDir(ctx)));
+  app.get('/api/chats/projects', (request, reply) =>
+    sendConditional(request, reply, listProjects(projectsDir(ctx))),
+  );
 
   /**
    * Лента переписки окном. По умолчанию — последние сообщения; более ранние

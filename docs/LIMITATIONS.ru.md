@@ -7,7 +7,7 @@
 [LIMITATIONS-PROVIDERS.ru.md](LIMITATIONS-PROVIDERS.ru.md).
 
 🇬🇧 [English version](LIMITATIONS.md) · 📖 [Описание проекта](../README.ru.md) ·
-🔧 [Установка и починка](SETUP.ru.md) · 🔌 [Провайдеры: детали форматов](PROVIDERS.ru.md)
+🔧 [Установка](SETUP.ru.md) · 🛠 [Починка](TROUBLESHOOTING.ru.md) · 🔌 [Провайдеры: детали форматов](PROVIDERS.ru.md)
 
 ---
 

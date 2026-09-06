@@ -6,7 +6,7 @@ data and is there for you, so that these can be switched on and off in bundles i
 individually.
 
 🇷🇺 [Русская версия](GROUPS.ru.md) · 📖 [Project overview](../README.md) ·
-🔧 [Setup and troubleshooting](SETUP.md) · 🚫 [What the panel does not do](LIMITATIONS.md)
+🔧 [Setup](SETUP.md) · 🛠 [Troubleshooting](TROUBLESHOOTING.md) · 🚫 [What the panel does not do](LIMITATIONS.md)
 
 ---
 

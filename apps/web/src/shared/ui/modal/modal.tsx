@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { Root, Portal, Overlay, Content, Title, Description, Close } from '@radix-ui/react-dialog';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
@@ -30,6 +31,24 @@ export function Modal({
 
   const fade = withReducedMotion({ duration: DURATION.normal, ease: EASE }, isReduced);
   const dialog = withReducedMotion({ duration: DURATION.normal, ease: EASE }, isReduced);
+
+  // Окно открывается состоянием, а не Radix-триггером, поэтому после закрытия
+  // Radix не знает, куда вернуть фокус, и тот падает на body: с клавиатуры
+  // человек оказывается в начале страницы. Запоминаем, что держало фокус в
+  // момент открытия, и возвращаем его сами. Layout-эффект — потому что
+  // фокус-ловушка Radix забирает фокус в обычном эффекте, то есть позже.
+  const openerRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const active = document.activeElement;
+    openerRef.current = active instanceof HTMLElement ? active : null;
+  }, [isOpen]);
+  const restoreOpenerFocus = (event: Event): void => {
+    const opener = openerRef.current;
+    if (!opener?.isConnected) return;
+    event.preventDefault();
+    opener.focus();
+  };
 
   // Недискриминируемое окно не закрывается ни Escape, ни кликом мимо: Radix
   // сообщил бы onOpenChange(false), а мы его глушим здесь и запрещаем сами
@@ -67,6 +86,7 @@ export function Modal({
               onEscapeKeyDown={block}
               onPointerDownOutside={block}
               onInteractOutside={block}
+              onCloseAutoFocus={restoreOpenerFocus}
             >
               <motion.div
                 className={[styles.content, styles[size]].join(' ')}

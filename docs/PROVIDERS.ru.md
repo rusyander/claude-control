@@ -10,7 +10,7 @@
 [Провайдеры: инструменты панели](PROVIDER-TOOLS.ru.md).
 
 🇬🇧 [English version](PROVIDERS.md) · 📖 [Описание проекта](../README.ru.md) ·
-🚫 [Чего панель не делает](LIMITATIONS.ru.md) · 🔧 [Установка и починка](SETUP.ru.md)
+🚫 [Чего панель не делает](LIMITATIONS.ru.md) · 🔧 [Установка](SETUP.ru.md) · 🛠 [Починка](TROUBLESHOOTING.ru.md)
 
 ---
 

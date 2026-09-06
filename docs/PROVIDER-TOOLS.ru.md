@@ -6,7 +6,7 @@
 со схемами и свой эндпоинт вместо облака вендора.
 
 🇬🇧 [English version](PROVIDER-TOOLS.md) · 📖 [Описание проекта](../README.ru.md) ·
-🚫 [Чего панель не делает](LIMITATIONS.ru.md) · 🔧 [Установка и починка](SETUP.ru.md)
+🚫 [Чего панель не делает](LIMITATIONS.ru.md) · 🔧 [Установка](SETUP.ru.md) · 🛠 [Починка](TROUBLESHOOTING.ru.md)
 
 ---
 

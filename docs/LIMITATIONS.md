@@ -8,7 +8,7 @@ The per-CLI boundaries live in their own file:
 [LIMITATIONS-PROVIDERS.md](LIMITATIONS-PROVIDERS.md).
 
 🇷🇺 [Русская версия](LIMITATIONS.ru.md) · 📖 [What this project is](../README.md) ·
-🔧 [Setup and troubleshooting](SETUP.md) · 🔌 [Providers: format details](PROVIDERS.md)
+🔧 [Setup](SETUP.md) · 🛠 [Troubleshooting](TROUBLESHOOTING.md) · 🔌 [Providers: format details](PROVIDERS.md)
 
 ---
 

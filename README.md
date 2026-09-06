@@ -8,7 +8,7 @@ Runs entirely on your machine: no account, no server, no telemetry.
 
 By default the panel configures Claude Code, where everything is available; it also edits the configuration of Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, Cursor, OpenCode and Aider — each in its native format, see [CLIs other than Claude](#clis-other-than-claude).
 
-🇷🇺 [Русская версия](README.ru.md) · 🔧 [Setup and troubleshooting](docs/SETUP.md) · 💬 [Chat and parallel agents](docs/CHAT.md) · 👥 [Groups](docs/GROUPS.md) · 🚫 [What the panel does not do](docs/LIMITATIONS.md)
+🇷🇺 [Русская версия](README.ru.md) · 🔧 [Setup](docs/SETUP.md) · 🛠 [Troubleshooting](docs/TROUBLESHOOTING.md) · 🏗 [How it works](docs/ARCHITECTURE.md) · 🔒 [Security](docs/SECURITY.md) · 📱 [Access from a phone](docs/REMOTE.md) · 💬 [Chat and parallel agents](docs/CHAT.md) · 👥 [Groups](docs/GROUPS.md) · 🧑‍💻 [Development](docs/DEVELOPMENT.md) · 🚫 [What the panel does not do](docs/LIMITATIONS.md)
 
 > [!TIP]
 > **Won't start?** `pnpm doctor` explains every finding. Still stuck — open Claude Code in this
@@ -77,106 +77,6 @@ Disabling never deletes: a rule moves into a service section of `CLAUDE.md`, a s
 
 A group toggles as a whole. The group mark is stored separately from the manual one: a member you disabled by hand does not come back when the group is enabled, and a member of two groups returns only when both release it.
 
-## How it works
-
-There is no database. The panel is a view over the files Claude Code already reads, and edits go back to those same files.
-
-```mermaid
-flowchart LR
-    subgraph browser["Browser · localhost:8888"]
-        UI["React UI<br/>20 sections"]
-    end
-
-    subgraph server["Node server · 127.0.0.1:5178"]
-        API["Fastify API"]
-        WATCH["File watcher"]
-        SAFE["Backup +<br/>atomic write"]
-    end
-
-    subgraph disk["Your disk"]
-        CFG["~/.claude<br/>CLAUDE.md · settings.json<br/>skills/ · hooks/"]
-        MCP["~/.claude.json<br/>MCP servers · account"]
-        TR["~/.claude/projects<br/>transcripts"]
-    end
-
-    CLI["claude CLI"]
-
-    UI <-->|"/api"| API
-    API --> SAFE --> CFG
-    API --> SAFE --> MCP
-    API -->|read only| TR
-    API -->|spawn| CLI
-    CFG -.->|change| WATCH
-    MCP -.->|change| WATCH
-    WATCH -.->|"SSE /api/events"| UI
-
-    style browser fill:#e8f0fe,stroke:#4285f4
-    style server fill:#e6f4ea,stroke:#34a853
-    style disk fill:#fef7e0,stroke:#fbbc04
-```
-
-Three things follow:
-
-- **Nothing is cached behind your back.** You and Claude Code edit those same files; a watcher (chokidar) pushes changes to the UI over SSE, so an edit made in your editor shows up without a refresh.
-- **Writes are defensive.** A backup into `~/.claude/claude-control/backups/`, then an atomic write through a temp file — an interrupted save cannot leave a half-written `settings.json`.
-- **Restart is honest.** Claude Code reads its configuration at startup, so almost every mutation returns `needsRestart: true` and the UI says so.
-
-The AI features (form assistant, skill generator, chat) shell out to the `claude` CLI you already have installed and logged in. No API key to configure, none stored anywhere.
-
-## Where your data lives
-
-Everything is under your home directory. The panel creates no files inside the repository.
-
-| Path                                  | Access        | What it is                                                  |
-| ------------------------------------- | ------------- | ----------------------------------------------------------- |
-| `~/.claude/CLAUDE.md`                 | read / write  | Rules                                                       |
-| `~/.claude/settings.json`             | read / write  | Hooks, permissions, env                                     |
-| `~/.claude/settings.local.json`       | read / write  | The same, personal — tagged "local"                         |
-| `~/.claude/skills/`                   | read / write  | Skills                                                      |
-| `~/.claude/skills-disabled/`          | read / write  | Disabled skills                                             |
-| `~/.claude/hooks/`                    | read / write  | Hook scripts                                                |
-| `~/.claude.json`                      | read / write  | MCP servers, account (note: _beside_ `.claude`, not inside) |
-| `~/.claude/.mcp-secrets.env`          | read / write  | MCP secrets                                                 |
-| `~/.claude/projects/`                 | **read only** | Transcripts — the source for chat and analytics             |
-| `~/.claude/.credentials.json`         | **read only** | Copied into a sandbox so the CLI is logged in               |
-| `~/.claude/claude-control/state.json` | read / write  | The panel's own state: groups, automations, settings        |
-| `~/.claude/claude-control/backups/`   | write         | Timestamped backups                                         |
-| `~/.claude-control/chats/`            | read / write  | Working folders for chats started in the panel              |
-| `~/.claude-control/sandboxes/`        | read / write  | Temporary sandbox config and working dirs                   |
-
-The last two sit outside `~/.claude` deliberately: Claude Code treats its own directory as protected and refuses to write there, so chat artifacts would silently fail to appear.
-
-Configuration root discovery, in order: the path set in the panel's Settings → `CLAUDE_CONFIG_DIR` → `~/.claude`. If none resolves, the UI asks instead of guessing.
-
-## The sandbox
-
-Answering "what does this rule actually do?" without making it your daily setup.
-
-Claude Code reads everything from the directory named by `CLAUDE_CONFIG_DIR`. The sandbox builds a temporary directory, puts **only the thing under test** into it, and launches the CLI pointed at that directory.
-
-```mermaid
-flowchart TD
-    PICK["What to test<br/>rule · skill · hook · MCP"] --> BUILD["Build a temp config dir"]
-    BUILD --> COPY["Copy in the selection<br/>+ .credentials.json, so the CLI is logged in"]
-    COPY --> DENY["Deny rules: real ~/.claude<br/>read-only,<br/>token files unreadable"]
-    DENY --> RUN{"How to test?"}
-    RUN -->|"hook / script"| PROBE["Event replay — no model<br/>9 fixtures, ~80 ms, free"]
-    RUN -->|"MCP server"| TOOLS["Start it, list<br/>and call tools"]
-    RUN -->|"rule / skill"| CHAT["A real conversation"]
-    PROBE --> DROP["Everything deleted on close"]
-    TOOLS --> DROP
-    CHAT --> DROP
-
-    style DENY fill:#fce8e6,stroke:#ea4335
-    style DROP fill:#e6f4ea,stroke:#34a853
-```
-
-Measured in such a run: **30 tools instead of 165, zero MCP servers, and not one third-party hook fires.** The only thing carried over from the real directory is `.credentials.json` — without it the CLI answers "Not logged in"; `.mcp-secrets.env` is never copied.
-
-A second line of defence is the sandbox's own `settings.json`: `~/.claude/**` denied for writing, token files denied for reading. Verified in practice — a prompt asking Claude to read `settings.json` and write `PROBE.txt` into `~/.claude` was refused on both counts, and no file appeared.
-
-Hooks and scripts are tested with no model at all: nine prepared events (a harmless command, `rm -rf`, `git push`, a secret being written, and so on) are replayed straight at the script and the verdict compared against what the fixture expects. Free, under a tenth of a second — practical to run on every edit.
-
 ## Chat and parallel agents
 
 Not a separate bot and not an API wrapper: the same `claude` you run in the terminal, with the conversation kept in ordinary Claude Code transcripts. A chat started in the terminal shows up in the panel, and the other way round.
@@ -218,28 +118,11 @@ Keys you do enter are stored encrypted (AES-256-GCM) in `claude-control/provider
 - **Surgical edits.** Codex: only the relevant region of `config.toml` changes, comments, profiles and key order stay byte-for-byte; Aider's YAML keeps its comments; `CRLF`/`LF` is preserved and a BOM is stripped on read and restored on write.
 - **Fail-closed.** An unfamiliar or broken file is no reason to guess: the section returns an error and stays read-only. An unsupported capability simply has no section.
 
-## Security
-
-The tool sits on sensitive files by construction: full access to `~/.claude`, including `.credentials.json` and `.mcp-secrets.env`, plus the ability to spawn processes. It is a single-user tool for your own machine — not a service, not something you expose. Within that model, verified:
-
-**Your keys do not reach git.** A dry run of the commit a contributor would make: `git add -An --all` picks up sources only, the history is clean, and the app writes nothing inside the repository at all — every write path leads to `~/.claude` or `~/.claude-control`. One consequence: chat attachments live in the panel's own folder, so `git add -A` will not sweep them up.
-
-**Nothing is sent anywhere.** No telemetry, no analytics, no error reporting — zero mentions of Sentry, PostHog, GA, Mixpanel or Segment in the code and the lock file; no CDN, no external font, no third-party script on the page. Analytics reads your local transcripts and computes in memory. The server's only outbound request is the MCP handshake with a server you configured yourself. Secrets never reach command-line arguments (the prompt goes through stdin, tokens through the environment), so they are invisible in `ps`. Indirect traffic is expected: `claude` talks to the Anthropic API, `claude plugin` fetches marketplaces, MCP servers do what they do.
-
-**The API is closed to everything but your own UI.** Listening on `127.0.0.1` alone is not enough — a request from a page in your browser already comes from inside the loopback. So CORS is restricted to the panel's own origin (`localhost:8888` / `127.0.0.1:8888`, anything else gets 403 before the handler), requests marked `Sec-Fetch-Site: cross-site` are rejected (that covers forms and `<img>` tags aimed at foreign addresses), and values that end up in CLI arguments (session id, model, chat name, plugin id) are checked against an allowlist rather than escaped — `cmd.exe` quoting rules cannot be trusted. Verified against a live server: with a foreign `Origin`, reading configuration, reading secrets and installing a hook are all refused.
-
-**Remote access is the one deliberate exception, and it is off until you turn it on.** With it on, a request that does not come from the panel's own origin is served only if it carries the Bearer token generated on this machine — shown once as a QR code for the phone, never returned by the API afterwards, revoked by rotating it. The listen address does not change: the tunnel (Tailscale Serve) terminates on the machine itself and proxies to `127.0.0.1`, so nothing is published to the internet and there is no second account system to trust.
-
-> [!IMPORTANT]
-> Do not change the listen address to `0.0.0.0`, do not publish the port from a container, do not park the API behind a proxy that drops the token check. With remote access off the API has no authentication by design: whoever reaches it reads your tokens and installs a hook — and a hook is a command Claude Code will run itself. With it on, that token is the only thing standing in the way: keep it inside your own tailnet and rotate it the moment a device is lost.
-
-**Worth knowing.** Sandboxes under `~/.claude-control/sandboxes/` hold a copy of `.credentials.json` and MCP `env` values in plain text; they are deleted on close, and ones abandoned after a crash are swept at the next server start (folders younger than a minute are left alone so two servers starting at once do not fight). Backups of `.mcp-secrets.env` are plain text too, with the original's permissions. `HookProbe.ts` contains a synthetic, non-working `glpat-…` string — bait for verifying that the secret-blocking hook fires. It is not a leak, but GitHub secret scanning will react to it.
-
 ## Quick start
 
 **Requirements:** Node.js 22.6+ (for TypeScript type stripping), pnpm 10+, and the `claude` CLI installed, logged in, and on your `PATH`.
 
-**On Windows, one more line, once per machine:** `git config --global core.longpaths true`. Parallel working copies live at a path longer than the original, and without permission for long paths git reports real files as deleted — `git add -A` inside such a copy would record those deletions. `pnpm doctor` checks this and tells you if it is off; the full story is in [SETUP.md → Parallel copies show files as deleted](docs/SETUP.md#parallel-copies-show-files-as-deleted).
+**On Windows, one more line, once per machine:** `git config --global core.longpaths true`. Parallel working copies live at a path longer than the original, and without permission for long paths git reports real files as deleted — `git add -A` inside such a copy would record those deletions. `pnpm doctor` checks this and tells you if it is off; the full story is in [TROUBLESHOOTING.md → Parallel copies show files as deleted](docs/TROUBLESHOOTING.md#parallel-copies-show-files-as-deleted).
 
 ```bash
 pnpm install
@@ -266,38 +149,6 @@ The core is portable: the home directory is always resolved through `os.homedir(
 | `.sh` hook scripts in sandbox  | ⚠️ needs Git Bash | ✅            | ✅            |
 
 ⚠️ **Running agents** is best-effort: agents are matched by their command line, because a CLI installed through npm runs under the name `node`, not `claude`. If listing processes is not permitted, the section stays empty.
-
-## Development
-
-```
-apps/
-  server/     Fastify API · TypeScript run directly by Node, no build step
-  web/        React 19 + Vite · FSD layout, SCSS modules
-  mobile/     Expo + React Native · its own toolchain (npm, not the pnpm workspace)
-packages/
-  contracts/  Shared zod schemas and types
-tools/qa/     Playwright scripts — screenshots, layout audit, flow checks
-```
-
-| Command                  | What it does                                                                                             |
-| ------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`               | Server and frontend together                                                                             |
-| `pnpm check`             | The full gate: format, types, lint, module boundaries, build                                             |
-| `pnpm type-check`        | TypeScript across all packages                                                                           |
-| `pnpm lint`              | ESLint                                                                                                   |
-| `pnpm test`              | Vitest for server and web; coverage is measured every run and a drop below the threshold fails it        |
-| `pnpm depcruise`         | FSD layer boundaries                                                                                     |
-| `pnpm qa:setup`          | Install the Chromium build the QA scripts need (once)                                                    |
-| `pnpm keepalive:install` | Watchdog: TCP-probes both ports every 20 s and brings back the half that went silent (`:status`, `:off`) |
-| `pnpm mobile`            | Build the phone app and install it on a device or emulator                                               |
-| `pnpm mobile:apk`        | Release APK into the repository root                                                                     |
-| `pnpm mobile:clean`      | Drop leftover native build intermediates (`--dry` to only measure)                                       |
-
-The phone app has its own chain because Gradle keeps every native library's intermediates inside `node_modules/<package>/android/{build,.cxx}` — about 10 GB per release build, reaching neither the APK nor the repository. `pnpm mobile:apk` wipes them itself once the APK is copied (`--keep-build` keeps them for a faster rebuild); `pnpm mobile:clean` is the manual route.
-
-The same gate runs by itself in two places. A pre-commit hook (husky + lint-staged, installed by `pnpm install`) runs ESLint and a Prettier check on the staged files and rejects a commit that carries CRLF line endings (`tools/check-lf.mjs`). GitHub Actions (`.github/workflows/ci.yml`) repeats format check, types, lint, tests with coverage thresholds and module boundaries on every push and pull request, plus the phone app's type-check and tests; browser QA and the APK build stay local because they need a live panel and a CLI.
-
-QA scripts run against a live panel (`node tools/qa/audit-layout.mjs` and friends); point them elsewhere with `APP_URL`. FSD layer boundaries are machine-enforced by dependency-cruiser: imports only go downward, cross-feature imports are rejected. The server has no build step — Node runs TypeScript via `--experimental-strip-types`, which is why the Node floor is 22.6 and constructs needing real compilation (parameter properties, enums) are avoided.
 
 ## Known limitations
 

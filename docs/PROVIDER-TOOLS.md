@@ -7,7 +7,7 @@ configuration comparison, the format check against published schemas, and your o
 of the vendor cloud.
 
 🇷🇺 [Русская версия](PROVIDER-TOOLS.ru.md) · 📖 [What this project is](../README.md) ·
-🚫 [What the panel does not do](LIMITATIONS.md) · 🔧 [Setup and troubleshooting](SETUP.md)
+🚫 [What the panel does not do](LIMITATIONS.md) · 🔧 [Setup](SETUP.md) · 🛠 [Troubleshooting](TROUBLESHOOTING.md)
 
 ---
 

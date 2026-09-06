@@ -5,7 +5,7 @@
 человеку, чтобы включать и выключать их наборами, а не по одному.
 
 🇬🇧 [English version](GROUPS.md) · 📖 [Описание проекта](../README.ru.md) ·
-🔧 [Установка и починка](SETUP.ru.md) · 🚫 [Чего панель не делает](LIMITATIONS.ru.md)
+🔧 [Установка](SETUP.ru.md) · 🛠 [Починка](TROUBLESHOOTING.ru.md) · 🚫 [Чего панель не делает](LIMITATIONS.ru.md)
 
 ---
 

@@ -10,7 +10,7 @@ on-your-machine check, the write preview, comparison and the format check agains
 [Providers: panel-side tools](PROVIDER-TOOLS.md).
 
 🇷🇺 [Русская версия](PROVIDERS.ru.md) · 📖 [What this project is](../README.md) ·
-🚫 [What the panel does not do](LIMITATIONS.md) · 🔧 [Setup and troubleshooting](SETUP.md)
+🚫 [What the panel does not do](LIMITATIONS.md) · 🔧 [Setup](SETUP.md) · 🛠 [Troubleshooting](TROUBLESHOOTING.md)
 
 ---
 

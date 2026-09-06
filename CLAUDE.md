@@ -1,6 +1,7 @@
 # claude-control — agent map
 
-Auto-loaded every session → tight and English. Humans read [docs/SETUP.ru.md](docs/SETUP.ru.md);
+Auto-loaded every session → tight and English. Humans read [docs/SETUP.ru.md](docs/SETUP.ru.md) and
+[docs/TROUBLESHOOTING.ru.md](docs/TROUBLESHOOTING.ru.md);
 answers to the user stay Russian.
 
 **Read on demand** (working notes, kept out of git — absent in a fresh clone):
@@ -67,7 +68,9 @@ area. Nine behave unlike the rest — `check-attention.mjs`, `check-provider-cha
 `check-project-code.mjs`, `check-task-split.mjs`, `check-handoff.mjs`, `check-parent-hub.mjs`,
 `check-new-chat.mjs`, `check-stream-cap.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
 so they depend on no particular history, on no installed CLI, and leave neither branches nor copies
-behind.
+behind. `panel-pages.mjs` is the ONE route list the a11y (axe, both themes, create modals) and
+keyboard (Tab order, focus ring, Escape + focus return) sweeps share — a new section goes there or
+neither audit ever sees it.
 
 ## Symptom → cause → fix
 
@@ -173,7 +176,9 @@ panel answers 401), restarts the silent half, adopts a stand already up. Autosta
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
 
 Gate before "done": `pnpm type-check && pnpm lint && pnpm test && pnpm depcruise && node
-tools/qa/audit-layout.mjs`. `pnpm test` measures coverage every run and fails below the thresholds
+tools/qa/audit-layout.mjs && node tools/qa/check-a11y.mjs && node tools/qa/check-keyboard.mjs && node
+tools/qa/check-etag.mjs` (the last four drive the live stand; `check-etag` reads the wire status through CDP,
+because Playwright reports a 304 revalidation as the cached 200). `pnpm test` measures coverage every run and fails below the thresholds
 pinned in each `vitest.config.ts` (raise them when coverage grows, never lower silently). The same
 gate runs unattended: pre-commit (husky + lint-staged: eslint, prettier check, LF check —
 `tools/check-lf.mjs`) and `.github/workflows/ci.yml` (format:check → type-check → lint → test →

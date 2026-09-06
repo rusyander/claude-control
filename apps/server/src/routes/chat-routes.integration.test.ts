@@ -54,6 +54,23 @@ describe('маршруты чата: проекты и ФС', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  it('GET /api/chats и /api/chats/projects отвечают 304 на совпавший If-None-Match', async () => {
+    for (const url of ['/api/chats', '/api/chats/projects']) {
+      const first = await app.inject({ method: 'GET', url });
+      expect(first.statusCode).toBe(200);
+      expect(first.headers.etag).toMatch(/^W\/"/);
+      expect(first.headers['cache-control']).toBe('no-cache');
+
+      const again = await app.inject({
+        method: 'GET',
+        url,
+        headers: { 'if-none-match': String(first.headers.etag) },
+      });
+      expect(again.statusCode).toBe(304);
+      expect(again.body).toBe('');
+    }
+  });
+
   it('GET /api/chats/projects возвращает проект из истории', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/chats/projects' });
     expect(res.statusCode).toBe(200);

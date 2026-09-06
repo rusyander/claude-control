@@ -34,8 +34,8 @@ export function PageHeader({ title, subtitle, actions, helpTopic }: PageHeaderPr
               to={HELP_ROUTE}
               search={{ topic: helpTopic }}
               className={styles.help}
-              title={t('help.common.openHelp')}
-              aria-label={t('help.common.openHelp')}
+              title={t('common.openHelp')}
+              aria-label={t('common.openHelp')}
             >
               <Icon name="help" size={24} />
             </Link>

@@ -66,7 +66,9 @@ describe('parseQuestions', () => {
 describe('parseQuestions: input объектом, как его отдаёт perm-guard', () => {
   it('объект разбирается так же, как строка', () => {
     const payload = {
-      questions: [{ question: 'Какой формат?', options: [{ label: 'ISO' }, { label: 'Локальный' }] }],
+      questions: [
+        { question: 'Какой формат?', options: [{ label: 'ISO' }, { label: 'Локальный' }] },
+      ],
     };
     expect(parseQuestions(payload)).toEqual(payload.questions);
     expect(parseQuestions(payload)).toEqual(parseQuestions(JSON.stringify(payload)));

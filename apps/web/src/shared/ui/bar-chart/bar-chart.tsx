@@ -14,7 +14,13 @@ import type { BarChartProps } from './bar-chart.types';
  * Длинный хвост по умолчанию свёрнут в одну строку, но раскрывается целиком:
  * прятать данные насовсем нельзя, а показывать сотню строк сразу — бесполезно.
  */
-export function BarChart({ items, limit = 8, otherLabel, formatValue, onItemClick }: BarChartProps) {
+export function BarChart({
+  items,
+  limit = 8,
+  otherLabel,
+  formatValue,
+  onItemClick,
+}: BarChartProps) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
 

@@ -92,7 +92,9 @@ describe('TurnTracker — края', () => {
       assistant('m1', [{ type: 'tool_use', id: 't2', name: 'Bash' }]),
       delta(40),
     ]);
-    expect(usages(events)).toEqual([expect.objectContaining({ output: 40, toolIds: ['t1', 't2'] })]);
+    expect(usages(events)).toEqual([
+      expect.objectContaining({ output: 40, toolIds: ['t1', 't2'] }),
+    ]);
   });
 
   it('без потоковых событий расход берётся из assistant — один раз на ход', () => {

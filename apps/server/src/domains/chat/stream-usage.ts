@@ -198,10 +198,7 @@ export class TurnTracker {
       cacheCreation: Math.max(0, final.cacheCreation - this.total.cacheCreation),
       cacheCreation1h: Math.max(0, final.cacheCreation1h - this.total.cacheCreation1h),
     };
-    if (
-      rest.input + rest.output + rest.cacheRead + rest.cacheCreation + rest.cacheCreation1h ===
-      0
-    )
+    if (rest.input + rest.output + rest.cacheRead + rest.cacheCreation + rest.cacheCreation1h === 0)
       return [];
 
     // Модель остатка известна, только когда в прогоне она была одна.

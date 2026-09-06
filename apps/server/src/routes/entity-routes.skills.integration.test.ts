@@ -83,18 +83,15 @@ describe('/api/skills с id вне skills/', () => {
     expect(snapshot()).toEqual(before);
   });
 
-  it.each(BAD)(
-    'DELETE /api/skills/%s → 400, каталог и копии не тронуты',
-    async (id) => {
-      const before = snapshot();
-      const res = await app.inject({ method: 'DELETE', url: `/api/skills/${id}` });
+  it.each(BAD)('DELETE /api/skills/%s → 400, каталог и копии не тронуты', async (id) => {
+    const before = snapshot();
+    const res = await app.inject({ method: 'DELETE', url: `/api/skills/${id}` });
 
-      expect(res.statusCode).toBe(400);
-      expect(existsSync(join(root, 'hooks', 'keep.txt'))).toBe(true);
-      expect(backups()).toEqual([]);
-      expect(snapshot()).toEqual(before);
-    },
-  );
+    expect(res.statusCode).toBe(400);
+    expect(existsSync(join(root, 'hooks', 'keep.txt'))).toBe(true);
+    expect(backups()).toEqual([]);
+    expect(snapshot()).toEqual(before);
+  });
 
   it.each(BAD)('POST /api/entities/skill/%s/enabled → 400, отметки нет', async (id) => {
     const before = snapshot();

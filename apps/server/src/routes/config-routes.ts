@@ -2,7 +2,6 @@ import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import type { AppSettings, Overview, ProviderDetectResponse } from '@claude-control/contracts';
-import type { ZodError } from 'zod';
 import { settingsPatchSchema, importStateSchema } from '../providers/settings-validation.ts';
 import type { ServerContext } from '../context.ts';
 import { describeProviders } from '../providers/registry.ts';
@@ -23,14 +22,7 @@ import {
   setSecretsBasename,
 } from '../lib/safe-io.ts';
 import { basename } from 'node:path';
-
-/** Разбор ошибки zod в список «поле → что не так» — для понятного ответа 400. */
-function issuesOf(error: ZodError): Array<{ path: string; message: string }> {
-  return error.issues.map((issue) => ({
-    path: issue.path.join('.'),
-    message: issue.message,
-  }));
-}
+import { issuesOf } from '../lib/request-body.ts';
 
 /** Маршруты про само приложение: расположение конфигов, настройки, сводка. */
 export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): void {

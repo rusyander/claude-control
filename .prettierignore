@@ -6,3 +6,8 @@ coverage/
 apps/*/coverage/
 dist/
 .qa-screenshots/
+# Телефон: generated Expo files (typed routes, env shim) — их пишет expo, не человек.
+apps/mobile/.expo/
+apps/mobile/expo-env.d.ts
+# Локальный рабочий слой агента — вне git (.git/info/exclude), prettier его не видит через .gitignore.
+.agent/

@@ -1,10 +1,7 @@
 import type { TranslationSchema } from './ru';
-import { helpEn } from './help/en';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
-  help: helpEn,
-
   common: {
     appName: 'Claude Control',
     loadError: 'Could not load this section',
@@ -13,6 +10,15 @@ export const en: TranslationSchema = {
     notFoundTitle: 'No such page',
     notFoundText: 'The link may be outdated. Open the overview and pick a section in the sidebar.',
     notFoundHome: 'To the overview',
+    openHelp: 'Help for this section',
+    crashTitle: 'This section failed to render',
+    crashText:
+      'A bug in the panel code, not in your data. Try again or reload the page; ' +
+      'the error text can be copied for a report.',
+    crashRetry: 'Try again',
+    crashReload: 'Reload page',
+    crashCopy: 'Copy error',
+    crashCopied: 'Copied',
     collapseSidebar: 'Collapse the sidebar',
     expandSidebar: 'Expand the sidebar',
     save: 'Save',
@@ -454,7 +460,9 @@ export const en: TranslationSchema = {
     reconnecting: 'Lost the connection to the answer — reconnecting',
     errorTitle: 'The agent stopped with an error',
     copyError: 'Copy the error',
-    connectionLost: 'Lost the connection to the run. The agent may have finished — look in the history.',
+    connectionLost:
+      'Lost the connection to the run. The agent may have finished — look in the history.',
+    messageCrash: 'This message could not be rendered. The rest of the conversation is intact.',
     showFromHistory: 'Show from the history',
     progress: {
       title: "The agent's plan",
@@ -1862,7 +1870,8 @@ export const en: TranslationSchema = {
     sourceLocked: 'The file follows the record: the variable goes back where it came from.',
     badKey:
       'A variable name is Latin letters, digits and underscores, not starting with a digit: MY_TOKEN, not “my token”.',
-    alreadyExists: '{{key}} already exists in {{file}} — open it for editing instead of creating a second one.',
+    alreadyExists:
+      '{{key}} already exists in {{file}} — open it for editing instead of creating a second one.',
   },
   groups: {
     title: 'Groups',
@@ -2015,7 +2024,8 @@ export const en: TranslationSchema = {
     claudeDirReset: 'Auto-detect',
     locationLoadError: 'Could not read the configuration location — the server did not answer.',
     loadError: 'Could not load the settings',
-    loadErrorText: 'The server did not answer the settings request. Check that it is running and retry.',
+    loadErrorText:
+      'The server did not answer the settings request. Check that it is running and retry.',
     retry: 'Retry',
     apply: 'Apply',
     accessibility: 'Accessibility',
@@ -2232,7 +2242,8 @@ export const en: TranslationSchema = {
     scaffoldDone: 'Plugin skeleton created',
     installPathMissing: 'folder missing',
     updatedAt: 'updated',
-    noMarketplaces: 'No marketplaces connected — add a source and its plugins appear in the catalogue',
+    noMarketplaces:
+      'No marketplaces connected — add a source and its plugins appear in the catalogue',
     deleteMarketplace:
       'The marketplace will be disconnected. No installed plugin comes from it, so nothing else changes; the source can be added back at any time.',
     deleteMarketplaceWithPlugins:

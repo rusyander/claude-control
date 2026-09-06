@@ -15,6 +15,16 @@ import {
   removeWorktree,
 } from '../domains/project-git.ts';
 import { checkProjectDir } from '../domains/projects.ts';
+import { parseBody } from '../lib/request-body.ts';
+import {
+  gitBranchBodySchema,
+  gitCheckoutBodySchema,
+  gitCommitBodySchema,
+  gitPathBodySchema,
+  gitPullBodySchema,
+  gitWorktreeAddBodySchema,
+  gitWorktreeRemoveBodySchema,
+} from '@claude-control/contracts/request-bodies';
 
 /**
  * Ровно та часть реестра прогонов, которая нужна маршрутам git: где сейчас
@@ -124,72 +134,54 @@ export function registerProjectGitRoutes(
   });
 
   /** Переключиться на существующую локальную ветку. */
-  app.post<{ Body: { path?: string; branch?: string } }>(
-    '/api/project-git/checkout',
-    async (request, reply) => {
-      const path = requirePath(request.body?.path, reply);
-      if (!path) return reply;
-      const branch = request.body.branch;
-      if (typeof branch !== 'string') {
-        return reply.code(400).send({ message: 'Не указана ветка' });
-      }
-      return write(path, reply, () => checkoutBranch(path, branch));
-    },
-  );
+  app.post<{ Body: unknown }>('/api/project-git/checkout', async (request, reply) => {
+    const body = parseBody(gitCheckoutBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    return write(path, reply, () => checkoutBranch(path, body.branch));
+  });
 
   /** Создать ветку от текущего HEAD и перейти на неё. */
-  app.post<{ Body: { path?: string; name?: string } }>(
-    '/api/project-git/branch',
-    async (request, reply) => {
-      const path = requirePath(request.body?.path, reply);
-      if (!path) return reply;
-      const name = request.body.name;
-      if (typeof name !== 'string') {
-        return reply.code(400).send({ message: 'Не указано имя ветки' });
-      }
-      return write(path, reply, () => createBranch(path, name));
-    },
-  );
+  app.post<{ Body: unknown }>('/api/project-git/branch', async (request, reply) => {
+    const body = parseBody(gitBranchBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    return write(path, reply, () => createBranch(path, body.name));
+  });
 
   /** Закоммитить все изменения рабочего дерева. */
-  app.post<{ Body: { path?: string; message?: string } }>(
-    '/api/project-git/commit',
-    async (request, reply) => {
-      const path = requirePath(request.body?.path, reply);
-      if (!path) return reply;
-      const message = request.body.message;
-      if (typeof message !== 'string') {
-        return reply.code(400).send({ message: 'Не указано сообщение коммита' });
-      }
-      return write(path, reply, () => commitAll(path, message));
-    },
-  );
+  app.post<{ Body: unknown }>('/api/project-git/commit', async (request, reply) => {
+    const body = parseBody(gitCommitBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    return write(path, reply, () => commitAll(path, body.message));
+  });
 
   /**
    * Подтянуть чужие коммиты. Без `branch` — обычный `git pull` в текущей ветке;
    * с `branch` — из соответствующей ветки удалённого. Пустая строка приходит от
    * селекта «текущая ветка», поэтому она равнозначна отсутствию поля.
    */
-  app.post<{ Body: { path?: string; branch?: string } }>(
-    '/api/project-git/pull',
-    async (request, reply) => {
-      const path = requirePath(request.body?.path, reply);
-      if (!path) return reply;
-      const branch = request.body.branch;
-      if (branch !== undefined && typeof branch !== 'string') {
-        return reply.code(400).send({ message: 'Ветка задана неверно' });
-      }
-      return write(path, reply, () => pullChanges(path, branch));
-    },
-  );
+  app.post<{ Body: unknown }>('/api/project-git/pull', async (request, reply) => {
+    const body = parseBody(gitPullBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    return write(path, reply, () => pullChanges(path, body.branch));
+  });
 
   /**
    * Отправить текущую ветку. Тела сверх пути нет намеренно: что отправлять,
    * решает состояние репозитория, а не запрос, — иначе кнопка «отправить»
    * умела бы больше, чем показывает.
    */
-  app.post<{ Body: { path?: string } }>('/api/project-git/push', async (request, reply) => {
-    const path = requirePath(request.body?.path, reply);
+  app.post<{ Body: unknown }>('/api/project-git/push', async (request, reply) => {
+    const body = parseBody(gitPathBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
     if (!path) return reply;
     return write(path, reply, () => pushBranch(path));
   });
@@ -224,45 +216,36 @@ export function registerProjectGitRoutes(
   );
 
   /** Завести копию под ветку: своя папка, своя ветка, общая история. */
-  app.post<{ Body: { path?: string; name?: string } }>(
-    '/api/project-git/worktrees/add',
-    async (request, reply) => {
-      const path = requirePath(request.body?.path, reply);
-      if (!path) return reply;
-      const name = request.body.name;
-      if (typeof name !== 'string') {
-        return reply.code(400).send({ message: 'Не указано имя ветки' });
-      }
-      return worktreeWrite(path, reply, async () => {
-        const created = await addWorktree(path, name);
-        return { output: created.output, createdPath: created.path };
-      });
-    },
-  );
+  app.post<{ Body: unknown }>('/api/project-git/worktrees/add', async (request, reply) => {
+    const body = parseBody(gitWorktreeAddBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    return worktreeWrite(path, reply, async () => {
+      const created = await addWorktree(path, body.name);
+      return { output: created.output, createdPath: created.path };
+    });
+  });
 
   /**
    * Убрать копию. Отказ приходит раньше git в одном случае — в этой копии
    * работает агент: снести каталог из-под живого процесса значит потерять его
    * работу молча, а починить это потом нечем.
    */
-  app.post<{ Body: { path?: string; worktreePath?: string; force?: boolean } }>(
-    '/api/project-git/worktrees/remove',
-    async (request, reply) => {
-      const path = requirePath(request.body?.path, reply);
-      if (!path) return reply;
-      const target = request.body.worktreePath;
-      if (typeof target !== 'string' || !target.trim()) {
-        return reply.code(400).send({ message: 'Не указана рабочая копия' });
-      }
-      if (isBusy(target)) {
-        return reply
-          .code(409)
-          .send({ message: 'В этой копии работает агент — остановите его и повторите' });
-      }
-      const force = request.body.force === true;
-      return worktreeWrite(path, reply, async () => ({
-        output: await removeWorktree(path, target, force),
-      }));
-    },
-  );
+  app.post<{ Body: unknown }>('/api/project-git/worktrees/remove', async (request, reply) => {
+    const body = parseBody(gitWorktreeRemoveBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    const target = body.worktreePath;
+    if (isBusy(target)) {
+      return reply
+        .code(409)
+        .send({ message: 'В этой копии работает агент — остановите его и повторите' });
+    }
+    const force = body.force === true;
+    return worktreeWrite(path, reply, async () => ({
+      output: await removeWorktree(path, target, force),
+    }));
+  });
 }

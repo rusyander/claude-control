@@ -137,7 +137,13 @@ describe('readChatMessages — расход шага', () => {
       type: 'assistant',
       uuid,
       timestamp: '2026-07-18T10:00:05.000Z',
-      message: { id: 'msg_1', role: 'assistant', model: 'claude-opus-4-8', content: [block], usage },
+      message: {
+        id: 'msg_1',
+        role: 'assistant',
+        model: 'claude-opus-4-8',
+        content: [block],
+        usage,
+      },
     });
     write([
       ask,

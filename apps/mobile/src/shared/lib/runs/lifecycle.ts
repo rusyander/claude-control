@@ -3,9 +3,16 @@ import { api } from '../../api/client';
 import { isConfigured } from '../../api/connection';
 import { dict } from '../../config/i18n';
 import { notifyLocally } from '../notifications';
+import { loadQueue, persistQueue } from './queue-store';
 import { openStream } from './stream';
-import { controllers, emit, forgetRun, getRun, lastSeqs, runs, setRun } from './store';
-import { EMPTY_RUN, type QueuedMessage, type SendOutcome, type StartInput } from './types';
+import { controllers, emit, findRunKey, forgetRun, getRun, lastSeqs, runs, setRun } from './store';
+import {
+  EMPTY_RUN,
+  type ActiveRunInfo,
+  type QueuedMessage,
+  type SendOutcome,
+  type StartInput,
+} from './types';
 
 /**
  * Жизненный цикл прогона: запуск, переподключение, остановка, очередь.
@@ -98,7 +105,11 @@ async function keepStreaming(
     }
     if (stoppedByUser.has(id) || controller.signal.aborted) break;
     if (++attempts > RECONNECT_LIMIT) {
-      setRun(id, { status: 'error', error: dict().run.connectionLost });
+      // Переподключения исчерпаны: прогон, может, и жив, но связи с ним нет.
+      // Ошибка со словами «связь потеряна» честнее вечного «работает», а конец
+      // хода заставит экран перечитать историю — ответ, если он есть, там.
+      setRun(id, { status: 'error', error: dict().run.connectionLost, stalled: undefined });
+      controllers.delete(id);
       emit();
       return;
     }
@@ -113,15 +124,23 @@ function finish(id: string): void {
   const run = getRun(id);
   const status = stoppedByUser.has(id) ? 'stopped' : run.error ? 'error' : 'done';
   const wasStopped = stoppedByUser.has(id);
-  setRun(id, { status });
+  setRun(id, { status, stalled: undefined });
   controllers.delete(id);
   stoppedByUser.delete(id);
   emit();
+  // К концу хода сессия уже известна — очередь переезжает под её имя.
+  void persistQueue(id);
 
   // Сигнал в шторку — только если экран не смотрят и остановку не просили сами.
   // Это запасной путь к push-уведомлениям: он работает, пока приложение живо в
-  // фоне, и молчит, когда человек и так видит ленту.
-  if (!wasStopped && AppState.currentState !== 'active' && run.queued.length === 0) {
+  // фоне, и молчит, когда человек и так видит ленту. Прогон, подхваченный уже
+  // законченным, не событие: он кончился до того, как приложение посмотрело.
+  if (
+    !wasStopped &&
+    !run.tailOnly &&
+    AppState.currentState !== 'active' &&
+    run.queued.length === 0
+  ) {
     const t = dict().run;
     const name = run.projectPath?.split(/[\\/]/).filter(Boolean).pop() ?? t.homeChat;
     void notifyLocally(
@@ -189,35 +208,47 @@ export async function send(input: StartInput): Promise<SendOutcome> {
  * Подключиться к прогону, который идёт на сервере (после запуска приложения и
  * по опросу `/chat/active`).
  *
- * Уже известный прогон не трогаем: идущий — поток за ним и так открыт; законченный
- * с тем же `startedAt` — это он же, ещё минуту висящий в списке для догона, а не
- * новый ход. Подхватывать его заново значило бы каждые пять секунд стирать ответ
- * и печатать его с нуля. Новый ход в том же разговоре приходит с другим
+ * Разговор ищем под любым его написанием (`findRunKey`): временный `new-…`,
+ * сессия, серверный ключ — иначе один прогон заводился бы дважды. Уже
+ * известный не трогаем: идущий — поток за ним и так открыт; законченный с тем
+ * же `startedAt` — это он же, ещё минуту висящий в списке для догона, а не
+ * новый ход. Подхватывать его заново значило бы каждые пять секунд стирать
+ * ответ и печатать его с нуля. Новый ход в том же разговоре приходит с другим
  * `startedAt` — его берём.
+ *
+ * Прогон, который сервер называет законченным (`status: 'done'`), заводим сразу
+ * законченным: ни одного мгновения «работает», текст в пузырь не набирается —
+ * ответ давно в истории; поток дотягивает лишь хвост (расход, вопрос).
  */
 export function attach(
   id: string,
-  meta: { sessionId?: string; projectPath?: string; startedAt?: number },
+  meta: Omit<ActiveRunInfo, 'chatId' | 'seq'> & { seq?: number },
 ): void {
-  if (controllers.has(id)) return;
-  const known = runs.get(id);
+  const key = findRunKey(id, meta.sessionId) ?? id;
+  if (controllers.has(key)) return;
+  const known = runs.get(key);
   if (known?.status === 'running') return;
   if (known && meta.startedAt !== undefined && known.startedAt === meta.startedAt) return;
 
+  const finished = meta.status === 'done';
   const controller = new AbortController();
-  controllers.set(id, controller);
-  lastSeqs.set(id, 0);
-  setRun(id, {
+  controllers.set(key, controller);
+  lastSeqs.set(key, 0);
+  setRun(key, {
     ...EMPTY_RUN,
-    id,
-    sessionId: meta.sessionId,
-    projectPath: meta.projectPath,
+    id: key,
+    sessionId: meta.sessionId ?? known?.sessionId,
+    projectPath: meta.projectPath ?? known?.projectPath,
+    // Сервер зовёт разговор иначе, чем телефон, — поток и команды идут по его имени.
+    serverRunId: key === id ? known?.serverRunId : id,
     startedAt: meta.startedAt,
-    status: 'running',
+    status: finished ? 'done' : 'running',
+    tailOnly: finished || undefined,
+    queued: known?.queued ?? [],
     lastEventAt: Date.now(),
   });
   emit();
-  void keepStreaming(id, { chatId: id, prompt: '' }, controller, 'attach');
+  void keepStreaming(key, { chatId: key, prompt: '' }, controller, 'attach');
 }
 
 /**
@@ -227,13 +258,7 @@ export function attach(
 export async function resumeActive(): Promise<void> {
   // Без адреса панели спрашивать некого — и ошибку «не настроено» плодить незачем.
   if (!isConfigured()) return;
-  let active: {
-    chatId: string;
-    sessionId?: string;
-    projectPath?: string;
-    seq: number;
-    startedAt: number;
-  }[];
+  let active: ActiveRunInfo[];
   try {
     active = await api.get('/chat/active');
   } catch {
@@ -252,7 +277,7 @@ export async function stop(id: string): Promise<void> {
   }
   controllers.get(id)?.abort();
   controllers.delete(id);
-  setRun(id, { status: 'stopped' });
+  setRun(id, { status: 'stopped', stalled: undefined });
   emit();
 }
 
@@ -290,6 +315,7 @@ export function enqueue(id: string, message: Omit<QueuedMessage, 'id'>): string 
   const queuedId = `q-${Date.now()}-${run.queued.length}`;
   setRun(id, { queued: [...run.queued, { ...message, id: queuedId }] });
   emit();
+  void persistQueue(id);
   return queuedId;
 }
 
@@ -297,16 +323,47 @@ export function cancelQueued(id: string, queuedId: string): void {
   const run = getRun(id);
   setRun(id, { queued: run.queued.filter((item) => item.id !== queuedId) });
   emit();
+  void persistQueue(id);
 }
 
-/** Агент освободился — отправляем первое из дописанного тем же разговором. */
+/**
+ * Поднять очередь, сохранённую до перезапуска приложения. Зовётся при открытии
+ * разговора: агент ещё занят — дописанное встаёт в очередь и уйдёт по концу
+ * хода; уже свободен — уходит сразу. Прежде чем решать, спрашиваем сервер:
+ * пока приложение спало, прогон мог начаться, и досылка вслепую упёрлась бы в
+ * «занят», потеряв сообщение.
+ */
+export async function restoreQueue(id: string): Promise<void> {
+  const items = await loadQueue(getRun(id).sessionId, id);
+  if (items.length === 0) return;
+  await resumeActive();
+  const key = findRunKey(id, getRun(id).sessionId) ?? id;
+  const current = getRun(key);
+  const known = new Set(current.queued.map((item) => item.id));
+  const fresh = items.filter((item) => !known.has(item.id));
+  if (fresh.length === 0) return;
+  setRun(key, { queued: [...current.queued, ...fresh] });
+  emit();
+  if (getRun(key).status === 'running') {
+    await persistQueue(key);
+    return;
+  }
+  await flushQueue(key);
+}
+
+/**
+ * Агент освободился — отправляем первое из дописанного тем же разговором.
+ * Не принятое сервером возвращается в голову очереди: отказ («занят», сеть)
+ * не повод потерять написанное.
+ */
 async function flushQueue(id: string): Promise<void> {
   const run = getRun(id);
   const [next, ...rest] = run.queued;
   if (!next) return;
   setRun(id, { queued: rest });
   emit();
-  await send({
+  await persistQueue(id);
+  const outcome = await send({
     chatId: id,
     prompt: next.prompt,
     sessionId: run.sessionId,
@@ -317,4 +374,9 @@ async function flushQueue(id: string): Promise<void> {
     effort: next.effort,
     files: next.files,
   });
+  if (outcome.ok) return;
+  const after = getRun(id);
+  setRun(id, { queued: [next, ...after.queued] });
+  emit();
+  await persistQueue(id);
 }

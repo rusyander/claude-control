@@ -27,7 +27,6 @@ const isWindows = process.platform === 'win32';
 
 export type { ChatEvent, RawEvent, RawUsage } from './chat-events.ts';
 
-
 export interface RunOptions {
   prompt: string;
   /** Продолжение существующей сессии. */
@@ -320,7 +319,6 @@ export class ChatRun {
     this.tempDir = undefined;
   }
 }
-
 
 /**
  * Перевод событий CLI в события интерфейса. Текст берём из потоковых дельт,

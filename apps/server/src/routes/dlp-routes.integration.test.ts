@@ -77,7 +77,8 @@ describe('dlp routes — start/stop и settings.dlp.enabled', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  const enabled = (): boolean => new AppStore(join(root, 'claude-control')).getSettings().dlp.enabled;
+  const enabled = (): boolean =>
+    new AppStore(join(root, 'claude-control')).getSettings().dlp.enabled;
 
   it('успешный запуск запоминается как «включено» — прокси переживёт перезапуск панели', async () => {
     expect(enabled()).toBe(false);

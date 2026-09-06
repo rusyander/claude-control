@@ -27,7 +27,7 @@ default and the only verified one. No database — **source of truth = Claude Co
 - `apps/server` — Fastify :5178, reads/writes `~/.claude`, spawns `claude`
 - `apps/web` — React + Vite :8888, proxies `/api`
 - `apps/mobile` — Expo (SDK 57 / RN 0.86) phone app over the same API, own toolchain (`npm`, not
-  the pnpm workspace); `pnpm mobile`, `pnpm mobile:type-check`, `pnpm mobile:apk` (release APK to
+  the pnpm workspace); `pnpm mobile`, `pnpm mobile:type-check`, `pnpm mobile:test`, `pnpm mobile:apk` (release APK to
   the repo root, gitignored, replaces the previous one), `pnpm mobile:clean`. Expo's API moves
   between SDKs — check https://docs.expo.dev/versions/v57.0.0/ before writing native code
 - `packages/contracts` — shared types + zod schemas
@@ -173,7 +173,11 @@ panel answers 401), restarts the silent half, adopts a stand already up. Autosta
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
 
 Gate before "done": `pnpm type-check && pnpm lint && pnpm test && pnpm depcruise && node
-tools/qa/audit-layout.mjs`. Touched help → also `node tools/qa/check-help.mjs`: it looks for on-page
+tools/qa/audit-layout.mjs`. `pnpm test` measures coverage every run and fails below the thresholds
+pinned in each `vitest.config.ts` (raise them when coverage grows, never lower silently). The same
+gate runs unattended: pre-commit (husky + lint-staged: eslint, prettier check, LF check —
+`tools/check-lf.mjs`) and `.github/workflows/ci.yml` (format:check → type-check → lint → test →
+depcruise, plus mobile type-check + tests). Touched help → also `node tools/qa/check-help.mjs`: it looks for on-page
 `help.…` strings, i.e. a key called under a name that doesn't exist (`tsc` checks the dictionary, not
 call sites).
 

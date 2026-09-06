@@ -39,7 +39,8 @@ export const en: Dictionary = {
     allow: 'Allow',
     deny: 'Deny',
     permissionFailed: 'Could not answer',
-    permissionLost: 'The decision did not reach the agent: the request is already closed or the run has finished',
+    permissionLost:
+      'The decision did not reach the agent: the request is already closed or the run has finished',
     usage: {
       title: 'Step spend',
       input: 'Fresh input',
@@ -276,6 +277,7 @@ export const en: Dictionary = {
   run: {
     serverUnreachable: 'The server is unreachable',
     connectionLost: 'Lost the connection to the panel',
+    reconnecting: 'Connection lost, reconnecting…',
     answered: (status: number) => `The server answered ${status}`,
     finished: 'Work is finished',
     failed: 'The run failed',

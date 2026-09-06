@@ -10,7 +10,11 @@ import styles from './skeleton.module.scss';
 export function SkeletonList({ rows = 4, withActions = true, className }: SkeletonListProps) {
   const { t } = useTranslation();
   return (
-    <div className={`${styles.list} ${className ?? ''}`} role="status" aria-label={t('common.loading')}>
+    <div
+      className={`${styles.list} ${className ?? ''}`}
+      role="status"
+      aria-label={t('common.loading')}
+    >
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className={styles.card}>
           <div className={styles.cardBody}>

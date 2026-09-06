@@ -73,6 +73,17 @@ export interface AgentRun {
   startedAt?: number;
   /** Разговор, в котором работа продолжена чистой сессией: экран уходит в него. */
   handoffTo?: string;
+  /**
+   * Поток замолчал дольше срока и переподключается с последнего `seq`. Пока
+   * метка стоит, экран говорит об этом словами, а не крутит «работает».
+   */
+  stalled?: boolean;
+  /**
+   * Прогон подхвачен уже законченным: поток дотягивает только хвост — расход,
+   * вопрос, — а текст в пузырь не набирается, он давно в истории. Иначе после
+   * запуска приложения ответ печатался бы с нуля поверх прочитанного.
+   */
+  tailOnly?: boolean;
 }
 
 export interface StartInput {
@@ -85,6 +96,21 @@ export interface StartInput {
   model?: string;
   effort?: string;
   files?: Upload[];
+}
+
+/**
+ * Строка ответа `/chat/active`: что сервер ведёт сейчас и что закончил в окне
+ * догона (60 с). `status` отличает одно от другого — без него законченный
+ * прогон выглядел бы идущим до конца окна.
+ */
+export interface ActiveRunInfo {
+  chatId: string;
+  sessionId?: string;
+  projectPath?: string;
+  seq: number;
+  startedAt: number;
+  status?: 'running' | 'done';
+  finishedAt?: number;
 }
 
 export type ChatEvent =

@@ -343,4 +343,26 @@ describe('project-git-routes: рабочие копии', () => {
     },
     60_000,
   );
+  it('битое тело записи — 400 с именем поля, до git дело не доходит', async () => {
+    const checkout = await app.inject({
+      method: 'POST',
+      url: '/api/project-git/checkout',
+      payload: { path: dir, branch: 42 },
+    });
+    expect(checkout.statusCode).toBe(400);
+    expect(checkout.json()).toMatchObject({ code: 'invalid_body', issues: [{ path: 'branch' }] });
+
+    const remove = await app.inject({
+      method: 'POST',
+      url: '/api/project-git/worktrees/remove',
+      payload: { path: dir, worktreePath: '   ', force: 'yes' },
+    });
+    expect(remove.statusCode).toBe(400);
+    const fields = (remove.json() as { issues: { path: string }[] }).issues.map((i) => i.path);
+    expect(fields).toEqual(['worktreePath', 'force']);
+
+    // Совсем без тела — тоже 400, а не 500 из `undefined.path`.
+    const empty = await app.inject({ method: 'POST', url: '/api/project-git/push' });
+    expect(empty.statusCode).toBe(400);
+  });
 });

@@ -55,7 +55,6 @@ export const helpEn: HelpSchema = {
   common: {
     back: 'All sections',
     openSection: 'Go to the section',
-    openHelp: 'Help for this section',
     storageTitle: 'Where this lives',
     fieldName: 'Field',
     fieldPurpose: 'What it controls',
@@ -1018,6 +1017,12 @@ export const helpEn: HelpSchema = {
       noteMissingText:
         'Some configuration files are created on first use. An empty rule list only means ' +
         'CLAUDE.md has not been started yet.',
+      noteCrashTitle: 'A section failed to render',
+      noteCrashText:
+        'A card with that title in place of a section means a bug in the panel code, not in your data. ' +
+        'Navigation and the other sections keep working; “Try again” re-renders the section without a ' +
+        'reload, “Copy error” puts the text with its stack on the clipboard for a report. In the chat feed ' +
+        'the same holds per message: a broken record hides only itself, the rest of the conversation stays.',
       noteToastTitle: 'Notifications are not lost',
       noteToastText:
         'A notification in the bottom-right corner lives for three seconds, shows at most ' +

@@ -285,6 +285,7 @@ tools/qa/     Playwright scripts — screenshots, layout audit, flow checks
 | `pnpm check`             | The full gate: format, types, lint, module boundaries, build                                             |
 | `pnpm type-check`        | TypeScript across all packages                                                                           |
 | `pnpm lint`              | ESLint                                                                                                   |
+| `pnpm test`              | Vitest for server and web; coverage is measured every run and a drop below the threshold fails it        |
 | `pnpm depcruise`         | FSD layer boundaries                                                                                     |
 | `pnpm qa:setup`          | Install the Chromium build the QA scripts need (once)                                                    |
 | `pnpm keepalive:install` | Watchdog: TCP-probes both ports every 20 s and brings back the half that went silent (`:status`, `:off`) |
@@ -293,6 +294,8 @@ tools/qa/     Playwright scripts — screenshots, layout audit, flow checks
 | `pnpm mobile:clean`      | Drop leftover native build intermediates (`--dry` to only measure)                                       |
 
 The phone app has its own chain because Gradle keeps every native library's intermediates inside `node_modules/<package>/android/{build,.cxx}` — about 10 GB per release build, reaching neither the APK nor the repository. `pnpm mobile:apk` wipes them itself once the APK is copied (`--keep-build` keeps them for a faster rebuild); `pnpm mobile:clean` is the manual route.
+
+The same gate runs by itself in two places. A pre-commit hook (husky + lint-staged, installed by `pnpm install`) runs ESLint and a Prettier check on the staged files and rejects a commit that carries CRLF line endings (`tools/check-lf.mjs`). GitHub Actions (`.github/workflows/ci.yml`) repeats format check, types, lint, tests with coverage thresholds and module boundaries on every push and pull request, plus the phone app's type-check and tests; browser QA and the APK build stay local because they need a live panel and a CLI.
 
 QA scripts run against a live panel (`node tools/qa/audit-layout.mjs` and friends); point them elsewhere with `APP_URL`. FSD layer boundaries are machine-enforced by dependency-cruiser: imports only go downward, cross-feature imports are rejected. The server has no build step — Node runs TypeScript via `--experimental-strip-types`, which is why the Node floor is 22.6 and constructs needing real compilation (parameter properties, enums) are avoided.
 

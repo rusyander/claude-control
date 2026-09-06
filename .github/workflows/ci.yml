@@ -1,0 +1,61 @@
+# Гейт проверок на каждый push и PR: тот же набор, что `pnpm check` руками, плюс тесты с
+# порогом покрытия и границы модулей. Красный шаг = красный статус на коммите.
+# Не входит: сборка APK и браузерные прогоны `tools/qa/` — им нужны живая панель и CLI.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Гейту хватает чтения репозитория; токену workflow больше прав не выдаём.
+permissions:
+  contents: read
+
+env:
+  # На CI git-хуки не нужны: `prepare` (husky) их не ставит.
+  HUSKY: 0
+
+jobs:
+  gate:
+    name: format · types · lint · tests · boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      # Версия pnpm берётся из `packageManager` в package.json.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm type-check
+      - run: pnpm lint
+      # Покрытие считается и проверяется по порогу в каждом прогоне (vitest.config).
+      - run: pnpm test
+      - run: pnpm depcruise
+
+  mobile:
+    name: mobile · types · tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      # Телефон живёт на своём npm, не в pnpm-workspace (см. CLAUDE.md).
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm test

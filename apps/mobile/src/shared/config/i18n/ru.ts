@@ -277,6 +277,7 @@ export const ru = {
   run: {
     serverUnreachable: 'Сервер недоступен',
     connectionLost: 'Связь с панелью потеряна',
+    reconnecting: 'Связь прервалась, переподключаемся…',
     answered: (status: number) => `Сервер ответил ${status}`,
     finished: 'Работа закончена',
     failed: 'Прогон упал',

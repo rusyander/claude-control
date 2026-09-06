@@ -141,7 +141,11 @@ export function createHandoffPlanner({
         delete options.sessionId;
         delete options.fork;
         delete options.name;
-        options.permissionPrompt = { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() };
+        options.permissionPrompt = {
+          runId: chatId,
+          baseUrl: selfBaseUrl,
+          tokenFile: apiTokenPath(),
+        };
         // Тумблеры и молчание про разделение — тоже от закрытого разговора:
         // системная дописка скопирована с его состоянием, а автоподтверждение
         // без наследования встало бы на первом же запросе прав, пока человека

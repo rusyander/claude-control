@@ -30,8 +30,18 @@
     "keepalive:status": "node tools/keepalive.mjs --status",
     "mobile": "npm --prefix apps/mobile run android",
     "mobile:type-check": "npm --prefix apps/mobile run type-check",
+    "mobile:test": "npm --prefix apps/mobile run test",
     "mobile:apk": "node tools/build-mobile-apk.mjs",
-    "mobile:clean": "node tools/clean-mobile-build.mjs"
+    "mobile:clean": "node tools/clean-mobile-build.mjs",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "eslint --no-warn-ignored",
+      "prettier --check --ignore-unknown"
+    ],
+    "*.{json,md,scss,css,yml,yaml,html}": "prettier --check --ignore-unknown",
+    "*": "node tools/check-lf.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
@@ -46,6 +56,8 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.0",
     "playwright": "^1.61.1",
     "prettier": "^3.9.5",
     "typescript": "^5.9.3",

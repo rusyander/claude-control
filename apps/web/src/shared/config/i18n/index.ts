@@ -1,21 +1,8 @@
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import { ru } from './ru';
-import { en } from './en';
-
 /**
- * Ключи разбиты на неймспейсы по разделам, но подключаются одним бандлом:
- * словарь небольшой, а ленивая загрузка ради него добавила бы мигание
- * непереведённого текста при первом открытии раздела.
+ * Словарь панели. Русский — в главном чанке, английский и обе справки — ленивые
+ * чанки (`instance.ts`, `help-loader.ts`). Снаружи — один вход.
  */
-void i18n.use(initReactI18next).init({
-  resources: {
-    ru: { translation: ru },
-    en: { translation: en },
-  },
-  lng: 'ru',
-  fallbackLng: 'ru',
-  interpolation: { escapeValue: false },
-});
-
-export { i18n };
+export { i18n, toLanguage } from './instance';
+export type { Language } from './instance';
+export { hasHelp, loadHelp } from './help-loader';
+export { useHelpDictionary } from './useHelpDictionary';

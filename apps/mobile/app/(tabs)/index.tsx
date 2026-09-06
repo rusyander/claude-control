@@ -17,6 +17,7 @@ import { isConfigured, useConnection } from '../../src/shared/api/connection';
 import { newChatId, openChat, useWorkspace } from '../../src/shared/lib/workspace';
 import {
   cancelQueued,
+  restoreQueue,
   quietRun,
   send,
   stop,
@@ -60,6 +61,12 @@ export default function ChatScreen() {
 
   const chatId = workspace.chatId;
   const run = useRun(chatId);
+
+  // Очередь дописанного пережила перезапуск приложения: досылаем, если агент
+  // свободен, иначе показываем — она уйдёт по концу хода.
+  useEffect(() => {
+    if (chatId) void restoreQueue(chatId);
+  }, [chatId]);
   const status = visibleStatus(run);
   const isRunning = run.status === 'running';
 
@@ -261,6 +268,8 @@ export default function ChatScreen() {
           ))}
 
           {run.error ? <Text style={styles.error}>{run.error}</Text> : null}
+          {/* Мёртвый сокет неотличим от думающего агента — говорим словами. */}
+          {run.stalled ? <Text style={styles.thinking}>{t.run.reconnecting}</Text> : null}
           {failed ? <Text style={styles.error}>{failed}</Text> : null}
 
           {isBlank ? <Empty text={t.chat.blank} /> : null}

@@ -87,8 +87,8 @@ export function ChatHeader({
           to={HELP_ROUTE}
           search={{ topic: 'chat' }}
           className={styles.help}
-          title={t('help.common.openHelp')}
-          aria-label={t('help.common.openHelp')}
+          title={t('common.openHelp')}
+          aria-label={t('common.openHelp')}
         >
           <Icon name="help" size={24} />
         </Link>

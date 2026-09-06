@@ -1,7 +1,8 @@
 import { fetch as streamingFetch } from 'expo/fetch';
 import { apiUrl, authHeaders } from '../../api/client';
 import { dict } from '../../config/i18n';
-import { applyEvent, lastSeqs, runs, setRun } from './store';
+import { STREAM_CONNECT_MS, STREAM_STALL_MS } from './constants';
+import { applyEvent, lastSeqs, markLive, markStalled, runs, setRun } from './store';
 import type { ChatEvent, SendOutcome, StartInput } from './types';
 
 /**
@@ -17,6 +18,12 @@ import type { ChatEvent, SendOutcome, StartInput } from './types';
 
 type StreamOutcome = 'clean' | 'dirty' | 'gone' | 'refused';
 
+interface StreamInit {
+  method: 'GET' | 'POST';
+  headers: Record<string, string>;
+  body?: string;
+}
+
 /** Разбор кадра SSE: строка `data: {...}` либо комментарий-пинг. */
 function parseFrame(part: string): (ChatEvent & { seq?: number }) | undefined {
   const line = part.split('\n').find((item) => item.startsWith('data:'));
@@ -25,6 +32,29 @@ function parseFrame(part: string): (ChatEvent & { seq?: number }) | undefined {
     return JSON.parse(line.slice('data:'.length).trim()) as ChatEvent & { seq?: number };
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Открыть запрос со сроком на ответ. Свой контроллер нужен, чтобы истёкший
+ * срок прервал только этот запрос, а не весь прогон: сверху обрыв уходит как
+ * обычный повод переподключиться. Кнопка «Стоп» при этом обязана доходить и
+ * после снятия таймера — поэтому подписка на родительский сигнал не снимается.
+ */
+async function openResponse(
+  url: string,
+  init: StreamInit,
+  controller: AbortController,
+): Promise<Response> {
+  const connect = new AbortController();
+  if (controller.signal.aborted) connect.abort();
+  else controller.signal.addEventListener('abort', () => connect.abort(), { once: true });
+
+  const timer = setTimeout(() => connect.abort(), STREAM_CONNECT_MS);
+  try {
+    return (await streamingFetch(url, { ...init, signal: connect.signal })) as unknown as Response;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -40,29 +70,49 @@ async function pump(
   let buffer = '';
   let sawTerminal = false;
 
-  for (;;) {
-    let chunk: ReadableStreamReadResult<Uint8Array>;
-    try {
-      chunk = await reader.read();
-    } catch (error) {
-      if (controller.signal.aborted) throw error;
-      return 'dirty';
-    }
-    if (chunk.done) break;
+  // Сторож простоя. Отсчёт ведём от последнего БАЙТА, а не события: между
+  // шагами агента событий нет минутами, а пульс `: ping` идёт всегда. Сработал
+  // — отменяем читателя, ожидающее чтение завершается «концом потока», наверх
+  // это уходит как `dirty`, то есть обычный повод переподключиться. Прогон при
+  // этом не трогаем — он живёт на сервере.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const armStall = (): void => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      markStalled(id);
+      void reader.cancel().catch(() => undefined);
+    }, STREAM_STALL_MS);
+  };
 
-    buffer += decoder.decode(chunk.value, { stream: true });
-    const parts = buffer.split('\n\n');
-    buffer = parts.pop() ?? '';
-    for (const part of parts) {
-      const parsed = parseFrame(part);
-      if (!parsed) continue;
-      if (typeof parsed.seq === 'number') lastSeqs.set(id, parsed.seq);
-      if ((parsed as { kind: string }).kind === 'gone') return 'gone';
-      if (parsed.kind === 'done' || parsed.kind === 'error') sawTerminal = true;
-      applyEvent(id, parsed);
+  try {
+    for (;;) {
+      armStall();
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        return 'dirty';
+      }
+      if (chunk.done) break;
+      markLive(id);
+
+      buffer += decoder.decode(chunk.value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() ?? '';
+      for (const part of parts) {
+        const parsed = parseFrame(part);
+        if (!parsed) continue;
+        if (typeof parsed.seq === 'number') lastSeqs.set(id, parsed.seq);
+        if ((parsed as { kind: string }).kind === 'gone') return 'gone';
+        if (parsed.kind === 'done' || parsed.kind === 'error') sawTerminal = true;
+        applyEvent(id, parsed);
+      }
     }
+    return sawTerminal ? 'clean' : 'dirty';
+  } finally {
+    clearTimeout(timer);
   }
-  return sawTerminal ? 'clean' : 'dirty';
 }
 
 /** Отказ сервера на отправку: структурный код, текст для человека и ключ живого прогона. */
@@ -129,23 +179,23 @@ export async function openStream(
 ): Promise<StreamOutcome> {
   let response: Response;
   if (mode === 'send') {
-    response = (await streamingFetch(apiUrl('/chat/send'), {
-      method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-      signal: controller.signal,
-    })) as unknown as Response;
+    response = await openResponse(
+      apiUrl('/chat/send'),
+      {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+      controller,
+    );
   } else {
     const from = lastSeqs.get(id) ?? 0;
     const target = runs.get(id)?.serverRunId ?? id;
-    response = (await streamingFetch(
+    response = await openResponse(
       apiUrl(`/chat/${encodeURIComponent(target)}/stream`, { from }),
-      {
-        method: 'GET',
-        headers: authHeaders(),
-        signal: controller.signal,
-      },
-    )) as unknown as Response;
+      { method: 'GET', headers: authHeaders() },
+      controller,
+    );
   }
 
   if (!response.ok) {

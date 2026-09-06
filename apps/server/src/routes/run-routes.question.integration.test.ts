@@ -59,7 +59,11 @@ describe('POST /api/chat/permission-request: вопрос человеку', () 
    * не ответа, а регистрации.
    */
   const startRun = async (prompt: string): Promise<void> => {
-    void app.inject({ method: 'POST', url: '/api/chat/send', payload: { chatId: 'q-run', prompt } });
+    void app.inject({
+      method: 'POST',
+      url: '/api/chat/send',
+      payload: { chatId: 'q-run', prompt },
+    });
     await new Promise((done) => setTimeout(done, 30));
   };
 

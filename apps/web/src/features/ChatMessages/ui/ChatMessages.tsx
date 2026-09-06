@@ -8,6 +8,7 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { TokenBadge } from '@shared/ui/token-badge';
+import { CrashCard, ErrorBoundary } from '@shared/ui/error-boundary';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { toast } from '@shared/lib/toast';
 import { isStreamShown } from '@shared/lib/chat-stream';
@@ -165,21 +166,30 @@ export function ChatMessages({
       {isLoading && <SkeletonList rows={3} withActions={false} />}
 
       {messages.map((message, index) => (
-        <MessageBubble
+        // Битое сообщение (неожиданный формат транскрипта) прячет только себя,
+        // а не всю переписку с полем ввода.
+        <ErrorBoundary
           key={message.id}
-          message={message}
-          onEdit={onEdit}
-          onPickOption={onPickOption}
-          isLast={index === messages.length - 1}
-          isQuestionOpen={index === openQuestionIndex}
-          isRunning={isRunning}
-          costUnit={costUnit}
-          onSplit={onSplit}
-          onKeepHere={onKeepHere}
-          isSplitPending={isSplitPending}
-          childBranches={childBranches}
-          handoff={handoff}
-        />
+          scope={`сообщение ${message.id}`}
+          fallback={(error, reset) => (
+            <CrashCard compact error={error} text={t('chat.messageCrash')} onRetry={reset} />
+          )}
+        >
+          <MessageBubble
+            message={message}
+            onEdit={onEdit}
+            onPickOption={onPickOption}
+            isLast={index === messages.length - 1}
+            isQuestionOpen={index === openQuestionIndex}
+            isRunning={isRunning}
+            costUnit={costUnit}
+            onSplit={onSplit}
+            onKeepHere={onKeepHere}
+            isSplitPending={isSplitPending}
+            childBranches={childBranches}
+            handoff={handoff}
+          />
+        </ErrorBoundary>
       ))}
 
       {isStreamShown(stream) && (

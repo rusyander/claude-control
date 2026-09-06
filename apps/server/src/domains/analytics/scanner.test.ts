@@ -172,8 +172,20 @@ describe('scanAnalytics', () => {
     const since = new Date(Date.now() - 5 * DAY);
     since.setHours(0, 0, 0, 0);
     writeTranscript('proj-a', 'sess1', [
-      assistant({ ts: recentIso(4 * DAY), model: 'claude-opus-4-8', cwd: '/work/a', sessionId: 's1', input: 1 }),
-      assistant({ ts: recentIso(DAY), model: 'claude-opus-4-8', cwd: '/work/a', sessionId: 's1', input: 1 }),
+      assistant({
+        ts: recentIso(4 * DAY),
+        model: 'claude-opus-4-8',
+        cwd: '/work/a',
+        sessionId: 's1',
+        input: 1,
+      }),
+      assistant({
+        ts: recentIso(DAY),
+        model: 'claude-opus-4-8',
+        cwd: '/work/a',
+        sessionId: 's1',
+        input: 1,
+      }),
     ]);
 
     const result = await scanAnalytics(projectsDir, {
@@ -222,7 +234,13 @@ describe('scanAnalytics', () => {
     // из первой записи, попавшей в период.
     const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
     writeTranscript('proj-a', 'sess1', [
-      assistant({ ts: old, model: 'claude-opus-4-8', cwd: '/work/alpha', sessionId: 's1', input: 1 }),
+      assistant({
+        ts: old,
+        model: 'claude-opus-4-8',
+        cwd: '/work/alpha',
+        sessionId: 's1',
+        input: 1,
+      }),
       assistant({
         ts: recentIso(),
         model: 'claude-opus-4-8',

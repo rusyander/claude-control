@@ -3,6 +3,7 @@ export {
   cancelQueued,
   decidePermission,
   enqueue,
+  restoreQueue,
   resumeActive,
   send,
   setAutoApprove,
@@ -10,6 +11,7 @@ export {
 } from './lifecycle';
 export { getRun, quietRun, useRun, useRuns, visibleStatus } from './store';
 export type {
+  ActiveRunInfo,
   AgentRun,
   PendingPermission,
   QueuedMessage,

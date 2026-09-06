@@ -5,6 +5,8 @@ import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Button } from '@shared/ui/button';
 import { PageHeader } from '@shared/ui/page-header';
+import { SkeletonList } from '@shared/ui/skeleton';
+import { useHelpDictionary } from '@shared/config/i18n';
 import { HELP_ROUTE, findHelpTopic } from './model/topics';
 import { HelpIndex } from './HelpIndex';
 import { HelpTopicView } from './HelpTopicView';
@@ -20,7 +22,11 @@ export function HelpPage() {
   const { t } = useTranslation();
   const { topic: topicId } = useSearch({ strict: false }) as { topic?: string };
   const topic = findHelpTopic(topicId);
+  // Первый заход словарь получает от лоадера маршрута; хук дотягивает его при
+  // смене языка на открытой странице. Без словаря рисовать нечего — скелет.
+  const ready = useHelpDictionary();
 
+  if (!ready) return <SkeletonList rows={4} withActions={false} />;
   if (topic) return <HelpTopicView topic={topic} />;
 
   // Ссылка на несуществующий раздел — не пустой экран: показываем, что

@@ -23,7 +23,12 @@ export default mergeConfig(
         // отношения не имеют: их проверяют Storybook и функциональные прогоны.
         include: ['src/**/model/**', 'src/shared/lib/**', 'src/shared/api/**'],
         exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.types.ts', 'src/**/*.stories.tsx'],
-        reporter: ['text', 'html'],
+        // Считается в каждом прогоне: порог — часть гейта, а не отдельный режим.
+        // Уровень зафиксирован по замеру 06.09.2026 (52,9 / 56,9 / 50,0 / 52,4):
+        // падение ниже делает `pnpm test` красным, рост — повод поднять порог.
+        enabled: true,
+        reporter: ['text-summary', 'html'],
+        thresholds: { statements: 52, branches: 56, functions: 49, lines: 52 },
       },
     },
   }),

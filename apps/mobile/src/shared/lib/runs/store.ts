@@ -47,6 +47,25 @@ export function setRun(id: string, patch: Partial<AgentRun>): AgentRun {
   return next;
 }
 
+/**
+ * Ключ, под которым разговор уже известен стору, — по любому из его написаний.
+ *
+ * Один разговор живёт под несколькими именами: временный `new-…` до первого
+ * ответа сервера, `sessionId` после, серверный ключ — если чат начали в другом
+ * месте. Опрос `/chat/active` называет его как угодно, и сверка по одному
+ * `chatId` заводила бы вторую запись и второй поток на тот же прогон.
+ */
+export function findRunKey(...names: (string | undefined)[]): string | undefined {
+  const wanted = names.filter((name): name is string => Boolean(name));
+  if (wanted.length === 0) return undefined;
+  for (const [key, run] of runs) {
+    if (wanted.includes(key)) return key;
+    if (run.sessionId && wanted.includes(run.sessionId)) return key;
+    if (run.serverRunId && wanted.includes(run.serverRunId)) return key;
+  }
+  return undefined;
+}
+
 /** Хук подписки: возвращает прогон и перерисовывает экран на каждое событие. */
 export function useRun(id: string): AgentRun {
   useSyncExternalStore(subscribe, getVersion, getVersion);
@@ -85,11 +104,16 @@ function addUsage(base: MessageUsage | undefined, step: MessageUsage): MessageUs
 /**
  * Применить событие потока. Разбор один в один с панелью: расхождение здесь
  * значило бы, что телефон и браузер показывают разный ход одного разговора.
+ *
+ * У прогона, подхваченного законченным (`tailOnly`), текст, размышления и
+ * вызовы инструментов в пузырь не идут — они уже в истории; из потока берём
+ * только то, чего в ней нет: расход, вопрос, права.
  */
 export function applyEvent(id: string, event: ChatEvent): void {
   const run = runs.get(id);
   if (!run) return;
 
+  const tailOnly = run.tailOnly === true;
   const next: AgentRun = { ...run, lastEventAt: Date.now() };
   switch (event.kind) {
     case 'session':
@@ -97,12 +121,14 @@ export function applyEvent(id: string, event: ChatEvent): void {
       next.startedAt = event.startedAt ?? run.startedAt;
       break;
     case 'text':
-      next.text = run.text + event.text;
+      if (!tailOnly) next.text = run.text + event.text;
       break;
     case 'thinking':
-      next.thinking = run.thinking + event.text;
+      if (!tailOnly) next.thinking = run.thinking + event.text;
       break;
     case 'tool':
+      if (event.name === 'AskUserQuestion') next.askedQuestion = true;
+      if (tailOnly) break;
       next.tools = [
         ...run.tools,
         {
@@ -112,7 +138,6 @@ export function applyEvent(id: string, event: ChatEvent): void {
           usage: event.id ? pendingUsage.get(id)?.get(event.id) : undefined,
         },
       ];
-      if (event.name === 'AskUserQuestion') next.askedQuestion = true;
       break;
     case 'limit':
       next.limitResetsAt = event.resetsAt;
@@ -177,6 +202,26 @@ export function applyEvent(id: string, event: ChatEvent): void {
   }
 
   runs.set(id, next);
+  emit();
+}
+
+/**
+ * Поток замолчал дольше срока. Метка живёт до первого байта после
+ * переподключения; экран по ней показывает «переподключаемся» вместо точки
+ * «работает» — иначе мёртвый сокет неотличим от думающего агента.
+ */
+export function markStalled(id: string): void {
+  const run = runs.get(id);
+  if (!run || run.stalled) return;
+  runs.set(id, { ...run, stalled: true });
+  emit();
+}
+
+/** Байты снова идут — связь восстановлена, метка снимается. */
+export function markLive(id: string): void {
+  const run = runs.get(id);
+  if (!run?.stalled) return;
+  runs.set(id, { ...run, stalled: undefined });
   emit();
 }
 

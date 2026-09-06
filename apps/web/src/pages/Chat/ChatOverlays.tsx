@@ -1,10 +1,17 @@
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FolderPicker } from '@features/FolderPicker';
 import { ParallelLaunch } from '@features/ParallelLaunch';
-import { ProjectCodeModal } from '@features/ProjectCode';
 import { ProjectTestsModal } from '@features/ProjectTests';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import type { ChatOverlaysProps } from './ChatOverlays.types';
+
+// Редактор кода — это CodeMirror, ~400 КБ поверх чата. Нужен только тем, кто
+// открыл окно «Код проекта», поэтому чанк едет при первом открытии, а не с
+// первой отрисовкой чата.
+const ProjectCodeModal = lazy(() =>
+  import('@features/ProjectCode').then((m) => ({ default: m.ProjectCodeModal })),
+);
 
 /**
  * Окна поверх чата. Собраны вместе не по смыслу, а по месту: каждое живёт
@@ -33,6 +40,10 @@ export function ChatOverlays({
   onLaunch,
 }: ChatOverlaysProps) {
   const { t } = useTranslation();
+  // Окно монтируется при первом открытии и дальше живёт как раньше: закрытие
+  // не сбрасывает его состояние, а до первого клика чанк не качается.
+  const [codeMounted, setCodeMounted] = useState(isCodeOpen);
+  if (isCodeOpen && !codeMounted) setCodeMounted(true);
 
   return (
     <>
@@ -54,13 +65,15 @@ export function ChatOverlays({
 
       {/* Код проекта. Разговор передаём, чтобы дифф показывал правки ИМЕННО
           этого чата; в песочнице кнопки нет — окно живёт только у проекта. */}
-      {isProjectContext && projectPath && (
-        <ProjectCodeModal
-          isOpen={isCodeOpen}
-          onOpenChange={onCodeOpenChange}
-          projectPath={projectPath}
-          chatId={activeChatId}
-        />
+      {isProjectContext && projectPath && codeMounted && (
+        <Suspense fallback={null}>
+          <ProjectCodeModal
+            isOpen={isCodeOpen}
+            onOpenChange={onCodeOpenChange}
+            projectPath={projectPath}
+            chatId={activeChatId}
+          />
+        </Suspense>
       )}
 
       {/* Тест-кейсы живут в самом проекте, поэтому окно знает только его путь:

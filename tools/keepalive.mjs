@@ -294,9 +294,13 @@ function install() {
   // пользовательская, просить ради неё UAC не за что.
   const startup = startupFile();
   mkdirSync(dirname(startup), { recursive: true });
+  // Строковый литерал VBScript: кавычка внутри удваивается, обратные слеши
+  // не экранируются. JSON.stringify здесь давал \" и \\ — WSH падал с ошибкой
+  // компиляции 800A0401 при каждом входе в систему (06.09.2026).
+  const vbsString = (s) => `"${s.replace(/"/g, '""')}"`;
   writeFileSync(
     startup,
-    `CreateObject("WScript.Shell").Run ${JSON.stringify(action)}, 0, False\r\n`,
+    `CreateObject("WScript.Shell").Run ${vbsString(action)}, 0, False\r\n`,
     'utf8',
   );
 

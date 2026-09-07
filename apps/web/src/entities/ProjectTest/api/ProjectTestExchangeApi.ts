@@ -1,5 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ProjectTestImportFormat, ProjectTestImportResult } from '@agentdeck/contracts';
+import type {
+  IntegrationPublishResult,
+  ProjectTestImportFormat,
+  ProjectTestImportResult,
+} from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { testKeys } from './keys';
 
@@ -81,7 +85,43 @@ export function exportUrl(
  * Адрес отчёта по одному прогону. Отдельно от выгрузки кейсов: там срез набора
  * «как он выглядит сейчас», здесь событие «вот что было в этот раз».
  */
-export function runExportUrl(path: string | undefined, id: string, format: 'md' | 'csv'): string {
+export function runExportUrl(
+  path: string | undefined,
+  id: string,
+  format: RunExportFormat,
+): string {
   const query = new URLSearchParams({ path: path ?? '', id, format });
   return `/api/project-tests/run/export?${query.toString()}`;
+}
+
+/**
+ * PDF рядом с md и csv: отчёт уходит приёмке и заказчику, а туда посылают не
+ * markdown. Рисует его браузер, найденный на машине, — нет браузера, сервер
+ * честно отвечает отказом, и ссылка приводит к его тексту, а не к битому файлу.
+ */
+export type RunExportFormat = 'md' | 'csv' | 'pdf';
+
+/** Куда публикуется отчёт прогона: страницей Confluence или комментарием в Jira. */
+export type PublishTarget = 'confluence' | 'jira';
+
+/**
+ * Публикация отчёта наружу.
+ *
+ * Отдельно от выгрузки файлом: файл человек уносит сам, а публикация пишет в
+ * ЧУЖУЮ систему — и делается только по явному нажатию, с адресом созданного в
+ * ответе. Куда именно писать, решает привязка проекта, а не эта кнопка.
+ */
+export function usePublishTestRun(path: string | undefined) {
+  return useMutation({
+    mutationFn: async (payload: {
+      id: string;
+      target: PublishTarget;
+    }): Promise<IntegrationPublishResult> => {
+      const { data } = await apiClient.post<IntegrationPublishResult>(
+        '/project-tests/run/publish',
+        { path, ...payload },
+      );
+      return data;
+    },
+  });
 }

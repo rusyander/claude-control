@@ -61,13 +61,7 @@ export function TestRunnerDefect({
   const submit = async (): Promise<void> => {
     setError(undefined);
     try {
-      const created = await create.mutateAsync({
-        groupId,
-        caseId,
-        target: target as 'github' | 'gitlab',
-        title,
-        body,
-      });
+      const created = await create.mutateAsync({ groupId, caseId, target, title, body });
       setUrl(created);
     } catch (cause) {
       setError(toErrorMessage(cause));
@@ -88,6 +82,15 @@ export function TestRunnerDefect({
               {error}
             </Typography>
           )}
+          {/* Черновик — всегда доступная цель: трекера может не быть вовсе, а
+              описание провала, собранное сервером, нужно в любом случае. */}
+          <Button
+            variant="ghost"
+            onClick={() => void navigator.clipboard.writeText(`${title}\n\n${body}`)}
+            disabled={!body}
+          >
+            {t('tests.runner.defectCopy')}
+          </Button>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
@@ -126,7 +129,14 @@ export function TestRunnerDefect({
             label={t('tests.runner.defectTarget')}
             value={target}
             onChange={setTarget}
-            options={draft.targets.map((item) => ({ value: item, label: item }))}
+            hint={t('tests.runner.defectTargetHint')}
+            // Список целей приходит с сервера и растёт вместе с ним (Jira,
+            // фордж по токену). Незнакомую подписываем её собственным именем —
+            // это честнее, чем спрятать её или соврать чужим ярлыком.
+            options={draft.targets.map((item) => ({
+              value: item,
+              label: t(`tests.runner.defectTargetName.${item}`, { defaultValue: item }),
+            }))}
           />
         )}
 

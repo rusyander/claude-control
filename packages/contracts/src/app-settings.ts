@@ -70,6 +70,65 @@ export interface AnalyticsPricing {
   custom: Record<string, ModelPricing>;
 }
 
+/**
+ * Внешние интеграции: адреса, почта, ключи проектов — всё, что человек ВИДИТ.
+ *
+ * Токенов здесь нет и быть не может: они лежат в зашифрованном хранилище панели
+ * (`lib/provider-keys.ts`, идентификаторы `int:*`), а `state.json` — открытый
+ * текст, который уезжает с машины на машину экспортом настроек. Формы полей
+ * описаны типами в `integrations.ts`; значения (эта схема) живут здесь, потому
+ * что сервер идёт под `--experimental-strip-types` и ЗНАЧЕНИЕ из бочки
+ * контрактов взять не может.
+ */
+export const atlassianSettingsSchema = object({
+  enabled: boolean().default(false),
+  baseUrl: string().default(''),
+  email: string().default(''),
+  // Пусто — определить живой проверкой: облако отвечает на /rest/api/3, своя
+  // установка — нет. Записывается тем, что ответил сервер, а не выбором в форме.
+  deployment: zodEnum(['', 'cloud', 'server']).default(''),
+  confluenceUrl: string().default(''),
+});
+
+export const forgeSettingsSchema = object({
+  enabled: boolean().default(false),
+  kind: zodEnum(['', 'github', 'gitlab']).default(''),
+  baseUrl: string().default(''),
+  repo: string().default(''),
+});
+
+export const telegramSettingsSchema = object({
+  enabled: boolean().default(false),
+  chatId: string().default(''),
+  events: array(zodEnum(['runDone', 'runError', 'permission', 'question', 'testFailed'])).default([
+    'runError',
+    'testFailed',
+  ]),
+});
+
+export const tmsSettingsSchema = object({
+  enabled: boolean().default(false),
+  kind: zodEnum(['', 'zephyr', 'xray']).default(''),
+  projectKey: string().default(''),
+  groupId: string().default(''),
+});
+
+export const ciSettingsSchema = object({
+  enabled: boolean().default(false),
+  kind: zodEnum(['', 'github', 'gitlab']).default(''),
+  repo: string().default(''),
+  workflow: string().default(''),
+  artifact: string().default(''),
+});
+
+export const integrationsSettingsSchema = object({
+  atlassian: atlassianSettingsSchema.default(() => atlassianSettingsSchema.parse({})),
+  forge: forgeSettingsSchema.default(() => forgeSettingsSchema.parse({})),
+  telegram: telegramSettingsSchema.default(() => telegramSettingsSchema.parse({})),
+  tms: tmsSettingsSchema.default(() => tmsSettingsSchema.parse({})),
+  ci: ciSettingsSchema.default(() => ciSettingsSchema.parse({})),
+});
+
 export const themeSchema = zodEnum(['light', 'dark', 'system']);
 export type Theme = Infer<typeof themeSchema>;
 
@@ -267,6 +326,12 @@ export const appSettingsSchema = object({
    * прокси Vite, потому что он на той же машине и читает файл токена сам).
    */
   remoteAccess: remoteAccessSettingsSchema.default(() => remoteAccessSettingsSchema.parse({})),
+  /**
+   * Внешние системы: Atlassian, фордж по токену, Telegram, тест-менеджмент, CI.
+   * Здесь только видимая половина настройки — токен каждой из пяти лежит в
+   * зашифрованном хранилище панели и в снимок настроек не попадает никогда.
+   */
+  integrations: integrationsSettingsSchema.default(() => integrationsSettingsSchema.parse({})),
 });
 
 export type AppSettings = Infer<typeof appSettingsSchema>;

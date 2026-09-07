@@ -1,5 +1,7 @@
 import type { RemoteNotifyKind } from '@agentdeck/contracts';
+import type { LoweredRunRecord } from '@agentdeck/contracts/model-cascade';
 import { ChatRun, type ChatEvent, type RunOptions } from './ChatRunner.ts';
+import { looksLikeCheck } from './lowered-journal.ts';
 
 /**
  * Реестр прогонов Claude Code, отвязанный от HTTP-запроса.
@@ -94,6 +96,14 @@ export interface RunMeta {
   projectPath?: string;
   /** Идентификатор сессии на старте (для продолжения разговора). */
   sessionId?: string;
+  /**
+   * Прогон уехал ступенью НИЖЕ потолка разговора (веер параллельного запуска).
+   * Само присутствие поля и означает понижение; внутри — чем именно ведут, уже
+   * развёрнутым именем. По этой отметке прогон попадает в журнал сдачи: без неё
+   * `lowered` умирал в маршруте, и спросить «окупается ли понижение» было не у
+   * кого.
+   */
+  lowered?: { model: string; effort: string };
 }
 
 /**
@@ -142,6 +152,12 @@ interface RegisteredRun {
    * числу видно, что разговор пора продолжать с чистого листа.
    */
   contextTokens: number;
+  /**
+   * Замеченные команды проверок проекта — только у понижённого прогона, которому
+   * дописана планка сдачи. Копим ВО ВРЕМЯ прогона: после завершения буфер живёт
+   * минуту и уходит, а журналу нужен итог.
+   */
+  checks: string[];
 }
 
 /** Токены одного шага — то, из чего считается его цена. */
@@ -169,6 +185,14 @@ const TEXT_TAIL = 32_768;
  * прогон, за сеанс сервера их сотни — предел нужен от бесконечного роста.
  */
 const MAX_RETIRED = 200;
+
+/**
+ * Сколько замеченных проверок держим на прогон и какой длины хвост команды
+ * пишем. Журналу нужен факт «проверки видели» и повод их узнать, а не полная
+ * стенограмма: агент, гоняющий тесты в цикле, иначе раздул бы файл журнала.
+ */
+const MAX_CHECKS = 12;
+const CHECK_TEXT_MAX = 200;
 
 export class ChatRunRegistry {
   private runs = new Map<string, RegisteredRun>();
@@ -249,6 +273,18 @@ export class ChatRunRegistry {
 
   setHandoffPlanner(plan: (finished: RunFinished) => ChatEvent | undefined): void {
     this.planHandoff = plan;
+  }
+
+  /**
+   * Куда записать завершившийся ПОНИЖЕННЫЙ прогон. Снаружи по той же причине,
+   * что и остальные крючки: файл журнала живёт в каталоге данных панели, а
+   * реестр про каталоги не знает. Не задан — журнал не ведётся, и прогоны от
+   * этого не меняются.
+   */
+  private journal?: (record: LoweredRunRecord) => void;
+
+  setLoweredJournal(write: (record: LoweredRunRecord) => void): void {
+    this.journal = write;
   }
 
   /**
@@ -358,6 +394,7 @@ export class ChatRunRegistry {
       spentCostUsd: 0,
       spentTokens: 0,
       contextTokens: 0,
+      checks: [],
     };
     this.runs.set(chatId, registered);
 
@@ -457,6 +494,22 @@ export class ChatRunRegistry {
       this.notify?.({ kind: 'question', chatId: run.chatId, projectPath: run.meta.projectPath });
     }
 
+    // Планка сдачи требует прогнать проверки проекта — и до сих пор это была
+    // просьба, которую никто не сверял. Смотрим, что понижённый прогон
+    // ЗАПУСКАЛ: видно только `Bash`, поэтому пустой список означает «панель не
+    // видела», а не «агент не делал» (см. `looksLikeCheck`). Копим только у
+    // понижённых: у остальных планки нет и сверять нечего.
+    if (run.meta.lowered && event.kind === 'tool' && event.name === 'Bash') {
+      const command = (event.input as { command?: unknown } | null)?.command;
+      if (
+        typeof command === 'string' &&
+        looksLikeCheck(command) &&
+        run.checks.length < MAX_CHECKS
+      ) {
+        run.checks.push(command.slice(0, CHECK_TEXT_MAX));
+      }
+    }
+
     const buffered: BufferedEvent = { seq: ++run.seq, event: outgoing };
     run.events.push(buffered);
     for (const subscriber of run.subscribers) subscriber.send(buffered);
@@ -487,6 +540,28 @@ export class ChatRunRegistry {
         if (event) this.emit(run, event);
       } catch {
         // Молча: причина отказа человеку не поможет, а прогон обязан закрыться.
+      }
+    }
+
+    // Понижённый прогон закончился — записываем, чем его вели и видела ли
+    // панель проверки. Пишет чужой код (файл в каталоге данных), поэтому его
+    // падение не имеет права утащить завершение прогона: слушатели ниже обязаны
+    // закрыться в любом случае.
+    if (run.meta.lowered && this.journal) {
+      try {
+        this.journal({
+          chatId: run.chatId,
+          ...(run.sessionId ? { sessionId: run.sessionId } : {}),
+          ...(run.meta.projectPath ? { projectPath: run.meta.projectPath } : {}),
+          model: run.meta.lowered.model,
+          effort: run.meta.lowered.effort,
+          startedAt: run.startedAt,
+          finishedAt: run.finishedAt,
+          ok: !run.errored,
+          checks: run.checks,
+        });
+      } catch {
+        // Молча: журнал — наблюдение, а не часть работы прогона.
       }
     }
 

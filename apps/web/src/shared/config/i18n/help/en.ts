@@ -794,6 +794,21 @@ export const helpEn: HelpSchema = {
         'and stop when the work turns out to be of another class. No review at the ' +
         'ceiling is started here — the stage pipeline only runs for split children, in ' +
         'their own copy of the branch, and promising it to the fan-out would be a lie.',
+      panelParallelCost: 'From the third agent the window names the price',
+      panelParallelCostText:
+        'Pick three projects or more and leave the ceiling in place — a warning appears ' +
+        'under the button: this is the most expensive launch the panel makes, and it ' +
+        'eats the rate window faster than anything else. The warning forbids nothing; it ' +
+        'names the price before the click and disappears the moment the rung goes down. ' +
+        'It counts the SELECTED projects, not the available ones: two agents at the ' +
+        'ceiling are an ordinary working launch and nothing gets in their way.',
+      panelParallelJournal: 'Where you later see how it ended',
+      panelParallelJournalText:
+        'Lowered runs land in a journal, and the journal in the “Lowered fan-out runs” ' +
+        'card on the analytics page: a row per run with its directory, its model and ' +
+        'whether the panel saw the checks run. That is the only way to learn whether the ' +
+        'delivery bar was met: the panel cannot force an agent, but it can show what the ' +
+        'agent started. Details are in the analytics help.',
       panelParallelTree: 'What you launch becomes a tree, not tabs',
       panelParallelTreeText:
         'The launched agents’ conversations hang as branches under the chat they were ' +
@@ -1261,6 +1276,51 @@ export const helpEn: HelpSchema = {
         'actually running, with their memory use and start time. Agents are recognised ' +
         'by their command line rather than by process name, so runs of a CLI installed ' +
         'through npm show up too.',
+
+      loweredTitle: 'Lowered fan-out runs',
+      loweredCaption:
+        'The block appears only when there were lowerings: runs that went a rung below ' +
+        'the ceiling of their conversation, and how they ended. It counts delivery rather ' +
+        'than spend — the one place in the panel where you can see whether a lowering was ' +
+        'paid for with checks.',
+      loweredWhen: 'Where the rows come from',
+      loweredWhenText:
+        'Two places: the “Run in several projects” window, where you lowered the rung by ' +
+        'hand, and split groups whose rung the panel picked itself. A run at the ceiling ' +
+        'never lands here — it was given no delivery bar, so there is nothing to ask of ' +
+        'it. The journal keeps the last two hundred records in its own file in the ' +
+        'panel’s data directory.',
+      loweredRow: 'What a row says',
+      loweredRowText:
+        'The run’s directory, the model with its effort — already expanded to a concrete ' +
+        'name rather than “sonnet” — and an outcome badge. The model shown is the one the ' +
+        'run actually used: both the lowering and the expansion of a rung into a name ' +
+        'happen before the record is written, so the journal also shows what the panel ' +
+        'substituted for your choice.',
+      loweredSeen: '“No checks seen” is about the panel, not the agent',
+      loweredSeenText:
+        'The panel counts as checks the commands started through Bash: `pnpm test`, `npm ' +
+        'run lint`, `npx tsc`, `go test`, `pytest` and their like. A check run by a ' +
+        'wrapper script or through an MCP server never reaches this list, so an empty one ' +
+        'means exactly “the panel did not see it”, not “the agent skipped it”. The ' +
+        'opposite error is possible too: a command that merely looks like a check counts, ' +
+        'even when it verified nothing.',
+      loweredCrash: 'A failed run is counted separately',
+      loweredCrashText:
+        'A run that never finished gets its own badge — “run failed” — and stays out of ' +
+        '“no checks seen”. It started no checks not because it ignored the bar but ' +
+        'because it never got that far, and folding the two cases into one number would ' +
+        'blame the agent for someone else’s fault.',
+      loweredWhere: 'What to do about it',
+      loweredWhereText:
+        'A row with no checks seen is a reason to open that conversation and look, not a ' +
+        'verdict. If lowerings regularly arrive without checks, the rung for that class ' +
+        'of task is set too low: the picker is switched off in the chat menu, and the ' +
+        'fan-out rung is set by hand in the launch window itself.',
+      loweredNote:
+        'The journal only covers the time since it appeared: runs from before that are ' +
+        'not in it, and an empty card on an old project means “no lowerings since then”, ' +
+        'not “never any”.',
 
       notesTitle: 'Things people trip over',
       noteLimitsTitle: 'Remaining subscription limits cannot be shown',
@@ -4199,6 +4259,30 @@ export const helpEn: HelpSchema = {
         'under your name. The link to it is stored in the case. Neither installed — the panel ' +
         'says plainly what is missing.',
 
+      externalTitle: 'Outward: tracker, wiki, reports',
+      externalCaption:
+        'Four buttons that appear once the integrations are configured and the project is ' +
+        'attached to something. How to set that up is in the Integrations article.',
+      externalDefect: 'Where a defect goes',
+      externalDefectText:
+        'The list of targets in the defect window comes from the server: Jira, the token ' +
+        'forge, gh, glab. With no target at all the draft is still assembled, and a “Copy” ' +
+        'button sits next to it.',
+      externalPublish: 'Publish the report',
+      externalPublishText:
+        'Inside an expanded run record: as a Confluence page or a Jira comment. Where ' +
+        'exactly is decided by the project attachment, and the answer carries the address.',
+      externalPdf: 'Download a PDF',
+      externalPdfText:
+        'Next to md and csv — for the people you cannot send markdown to. It is rendered by ' +
+        'a browser on this machine; with none installed the panel refuses and names what to ' +
+        'install.',
+      externalBaseline: 'Compare against a baseline',
+      externalBaselineText:
+        'A result with screenshots shows before / after / diff side by side and an “Accept ' +
+        'baseline” button. Accepting is manual only: otherwise every difference silently ' +
+        'becomes the new normal.',
+
       canLibrary: 'Keep the library: groups, sections, cases, checklists, shared steps, parameters',
       canPlans: 'Assemble test plans and environments and expand them into test points',
       canManual: 'Walk cases by hand with per-step marks, notes and attachments',
@@ -4995,6 +5079,146 @@ export const helpEn: HelpSchema = {
         'tests, but the first real write into each newly touched file is worth opening and ' +
         'looking at. The backup of the previous version is already taken, so there is ' +
         'somewhere to roll back to.',
+    },
+
+    integrations: {
+      title: 'Integrations',
+      summary: 'Jira, Confluence, a token forge, Telegram, test management and CI reports',
+      lead:
+        'The panel can already run tests, but everything it produced stayed on this ' +
+        'machine: defects needed gh or glab on PATH, reports were files, and requirements ' +
+        'lived in a Confluence neither the human nor the agent could see from here. ' +
+        'Integrations give the panel ONE credential per external system — and the human in ' +
+        'the interface and the agent over MCP then work through the same code path.',
+
+      whyOne: 'One credential per system',
+      whyOneText:
+        'The token is entered once, in the connector card. From then on the panel buttons ' +
+        'and the agent both use it — except the agent never gets the token itself, only ' +
+        'the panel’s own MCP server, which goes outside on its behalf.',
+      whyBoth: 'Cloud and self-hosted alike',
+      whyBothText:
+        'Which Atlassian is on the other end is detected by a live check and remembered: ' +
+        'the cloud takes Basic auth with an email, Server/DC takes a Bearer token, and ' +
+        'their API paths differ. None of that has to be chosen by hand.',
+      whySecret: 'The secret is never shown and never forwarded',
+      whySecretText:
+        'The token is stored encrypted on this machine. What leaves it — in a response, a ' +
+        'log or an MCP config — is only a mask like abc…4f21, enough for the owner to ' +
+        'recognise their key without seeing it.',
+
+      stepsTitle: 'How to connect',
+      stepsCaption: 'The Integrations tab in settings, five cards in one column.',
+      step1: 'Fill in the address and account details',
+      step1Text:
+        'For Atlassian that is the site address and an email (cloud only), for the forge — ' +
+        'its kind and repository, for Telegram — the chat id. A missing required field is ' +
+        'named under the card, and the connector cannot be switched on until it is filled.',
+      step2: 'Paste the token and save',
+      step2Text:
+        'The token field is always empty: the server never hands the value back. Empty is ' +
+        'what it sends, and that means “keep the current one”. Replace a key by typing a ' +
+        'new one; drop it with “Forget token”.',
+      step3: 'Press “Check connection”',
+      step3Text:
+        'The only honest answer to “does it work”: the settings can be perfect while the ' +
+        'token has already been revoked. The result stays in the card — who you are signed ' +
+        'in as, cloud or self-hosted, and when it was checked.',
+      step4: 'Attach a project',
+      step4Text:
+        'The Testing section and the project card carry an “Attach” button: a Jira issue, ' +
+        'the Confluence page with the requirements, the project new defects go into. This ' +
+        'is exactly what reaches the agent as a line in its task — it cannot know it itself.',
+
+      cardsTitle: 'The five connectors',
+      cardsCaption: 'Each is enabled separately; a disabled one gets in nobody’s way.',
+      cardsHeader: 'Connector',
+      cardsWhat: 'What it gives',
+      cardAtlassian: 'Atlassian',
+      cardAtlassianText:
+        'Searching Jira issues and Confluence pages, reading requirements, filing defects, ' +
+        'publishing a run report as a page or a comment.',
+      cardForge: 'Token forge',
+      cardForgeText:
+        'GitHub or GitLab without gh and glab installed: a defect, a comment, an MR linked ' +
+        'to a run. Installed CLIs stay as the fallback.',
+      cardTelegram: 'Telegram',
+      cardTelegramText:
+        'A message when a run ends, fails, asks for permission, asks a question, or a test ' +
+        'fails. Off by default; sending never delays the work itself.',
+      cardTms: 'Test management',
+      cardTmsText:
+        'Zephyr Scale or Xray: pull cases into a panel group and push a run as a cycle. ' +
+        'The source of truth for cases stays in Jira, not in the panel.',
+      cardCi: 'CI',
+      cardCiText:
+        'The last build’s report is fetched by token and goes into the same results import ' +
+        'as a file picked by hand.',
+
+      linksTitle: 'What an attachment holds',
+      linksCaption:
+        'The project has one, and every test group has its own on top: the “Payments” set ' +
+        'is tracked in one epic, “Profile” in another.',
+      fieldIssue: 'The issue or epic the work belongs to. Shown as a link.',
+      fieldProject: 'The Jira project NEW defects are filed into.',
+      fieldPage: 'A Confluence page: both the requirements and the place for the report.',
+      fieldRepo: 'The forge repository, when it cannot be derived from the project origin.',
+      fieldNote: 'A human note: what exactly lives here.',
+
+      testsTitle: 'What appears in Testing',
+      testsCaption: 'An attached project changes four places in the Testing section.',
+      testsDefect: 'Choosing a defect target',
+      testsDefectText:
+        'In the defect window the list of targets comes from the server: Jira, the token ' +
+        'forge, gh, glab. With no target at all the draft is still assembled, and a button ' +
+        'copies it.',
+      testsPublish: 'Publishing a report',
+      testsPublishText:
+        'Inside an expanded run record: pick the system and press. Where exactly to write ' +
+        'is decided by the attachment, and the answer carries the address — so you can see ' +
+        'whether a page was updated or a new one created.',
+      testsPdf: 'A run as PDF',
+      testsPdfText:
+        'Next to md and csv. It is rendered by a browser found on this machine; with no ' +
+        'browser the panel answers with an honest refusal naming what to install, rather ' +
+        'than a broken file.',
+      testsBaseline: 'Comparing against a baseline',
+      testsBaselineText:
+        'A result with screenshots carries a compare button: before, after and the diff ' +
+        'side by side. A baseline is only ever accepted by hand — accepting automatically ' +
+        'turns the comparison into its own absence.',
+
+      filesCaption:
+        'Settings are visible, the secret is not; everything about cases lives in the ' +
+        'tested project itself.',
+      filePanelTitle: 'The panel',
+      fileSettings: 'Connector settings and attachments',
+      fileToken: 'Tokens (encrypted)',
+      fileProjectTitle: 'The tested project',
+      fileBaselines: 'Baseline screenshots',
+      fileAttachments: 'Run screenshots',
+
+      noteTokenTitle: 'The token never leaves',
+      noteTokenText:
+        'Not in an API response, not in a log, not in a prompt, not in an MCP config. The ' +
+        'agent reaches Jira through the panel’s own MCP server, and that server through the ' +
+        'panel’s own API; the key itself is never handed to the CLI process.',
+      noteWritesTitle: 'Writing outward happens on a click',
+      noteWritesText:
+        'Reads are free: searching issues, reading a page. The agent is allowed three ' +
+        'writes — file a defect, comment on it, attach a run result. Creating a Confluence ' +
+        'page and transitioning an issue are done by a human in the panel. Nothing is ever ' +
+        'deleted.',
+      noteOfflineTitle: 'A dead integration stops nothing',
+      noteOfflineText:
+        'Every outward call has its own timeout and a single retry. No answer is a state ' +
+        'of the card with a human reason, not a crash: neither a test run, nor a ' +
+        'conversation, nor the panel’s startup suffers for it.',
+      noteMcpTitle: 'The MCP server is registered by hand',
+      noteMcpText:
+        'The button in the Atlassian card adds the server to the MCP page as an ordinary ' +
+        'one, with a health probe. After that the panel enables it itself when a run starts ' +
+        'in an attached project, but it never disables anything — switching off stays yours.',
     },
   },
 };

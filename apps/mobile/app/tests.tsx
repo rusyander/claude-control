@@ -29,6 +29,7 @@ import {
 import { formatWhen } from '../src/entities/tests/status';
 import { TestCaseEditor } from '../src/features/tests/TestCaseEditor';
 import { TestCaseRow } from '../src/features/tests/TestCaseRow';
+import { TestLinks } from '../src/features/tests/TestLinks';
 import {
   EMPTY_FILTER,
   TestFilters,
@@ -133,6 +134,9 @@ export default function TestsScreen() {
       >
         <Card>
           <Muted>{t.tests.where(tests.data?.dir ?? '.agent/tests')}</Muted>
+          {/* К чему привязан проект — до кнопок запуска: требования открывают
+              ПЕРЕД прогоном, а не после того, как что-то покраснело. */}
+          <TestLinks projectPath={projectPath} groupId={active?.id} />
           <Field
             value={scope}
             onChangeText={setScope}

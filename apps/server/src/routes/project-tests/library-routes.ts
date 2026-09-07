@@ -28,7 +28,7 @@ import {
   updateGroup,
   upsertCase,
 } from '../../domains/project-tests.ts';
-import { buildView, guard, idList, requireRoot, type TestsDeps } from './shared.ts';
+import { assertUnlocked, buildView, guard, idList, requireRoot, type TestsDeps } from './shared.ts';
 
 /**
  * Библиотека: группы, кейсы, общие шаги, окружения, свои поля и статусы,
@@ -84,12 +84,9 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
       const root = requireRoot(request.body?.path, reply);
       if (!root) return reply;
       return guard(reply, () => {
-        updateGroup(
-          root,
-          String(request.body?.id ?? ''),
-          request.body?.title,
-          request.body?.description,
-        );
+        const id = String(request.body?.id ?? '');
+        assertUnlocked(deps, root, id);
+        updateGroup(root, id, request.body?.title, request.body?.description);
         return buildView(root, deps);
       });
     },
@@ -102,7 +99,9 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
       return guard(reply, () => {
-        removeGroup(root, String(request.query.id ?? ''));
+        const id = String(request.query.id ?? '');
+        assertUnlocked(deps, root, id);
+        removeGroup(root, id);
         return buildView(root, deps);
       });
     },
@@ -119,7 +118,9 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
         return reply.code(400).send({ message: 'Нужно описание теста.' });
       }
       return guard(reply, () => {
-        upsertCase(root, String(request.body?.groupId ?? ''), input, now());
+        const groupId = String(request.body?.groupId ?? '');
+        assertUnlocked(deps, root, groupId);
+        upsertCase(root, groupId, input, now());
         return buildView(root, deps);
       });
     },
@@ -132,7 +133,9 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
       return guard(reply, () => {
-        removeCase(root, String(request.query.groupId ?? ''), String(request.query.caseId ?? ''));
+        const groupId = String(request.query.groupId ?? '');
+        assertUnlocked(deps, root, groupId);
+        removeCase(root, groupId, String(request.query.caseId ?? ''));
         return buildView(root, deps);
       });
     },
@@ -155,14 +158,13 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
       if (!action) return reply.code(400).send({ message: 'Не указано, что сделать.' });
 
       return guard(reply, () => {
+        const groupId = String(request.body?.groupId ?? '');
+        assertUnlocked(deps, root, groupId);
+        // Перенос трогает и группу-приёмник: её тоже мог занять прогон.
+        if (action === 'move') assertUnlocked(deps, root, request.body?.value?.trim());
         const touched = bulkCases(
           root,
-          {
-            groupId: String(request.body?.groupId ?? ''),
-            caseIds,
-            action,
-            value: request.body?.value,
-          },
+          { groupId, caseIds, action, value: request.body?.value },
           now(),
         );
         return { touched, view: buildView(root, deps) };

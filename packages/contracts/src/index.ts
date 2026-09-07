@@ -13,6 +13,7 @@ export * from './skills';
 export * from './commands';
 export * from './mcp';
 export * from './mcp-presets';
+export * from './integrations';
 export * from './provider-mcp';
 export * from './provider-env';
 export * from './provider-instructions';

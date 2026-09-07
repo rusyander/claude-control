@@ -172,7 +172,11 @@ describe('toInput', () => {
       ...input,
       id: 'a',
       type: 'case',
-      steps: input.steps.map((step) => (typeof step === 'string' ? { action: step } : step)),
+      // Шаги во входном формате необязательны — частичное сохранение их не шлёт;
+      // здесь они заведомо есть, но пустой список честнее, чем восклицательный знак.
+      steps: (input.steps ?? []).map((step) =>
+        typeof step === 'string' ? { action: step } : step,
+      ),
       status: 'unknown',
       source: 'human',
     });

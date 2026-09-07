@@ -308,7 +308,22 @@ export function registerChatRunRoutes(
         },
         // Каталог проекта — для группировки статусов и восстановления после F5;
         // у песочницы/домашнего чата проекта нет.
-        { projectPath: workspace.isSandbox ? undefined : cwd, sessionId },
+        {
+          projectPath: workspace.isSandbox ? undefined : cwd,
+          sessionId,
+          // Понижение доезжает до реестра, а не умирает здесь: по нему прогон
+          // попадёт в журнал сдачи вместе с тем, видела ли панель проверки.
+          // Модель кладём УЖЕ РАЗВЁРНУТУЮ — журнал должен отвечать, чем прогон
+          // шёл на самом деле, а не каким алиасом его попросили.
+          ...(lowered
+            ? {
+                lowered: {
+                  model: runModel || assigned?.model || '',
+                  effort: effort || assigned?.effort || '',
+                },
+              }
+            : {}),
+        },
       );
 
       // Страховка на случай, если прогон успел появиться между проверкой выше и

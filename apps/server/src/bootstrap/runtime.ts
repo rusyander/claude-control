@@ -1,6 +1,8 @@
 import { join } from 'node:path';
+import type { ProjectTestRun, ProjectTestRunRequest } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
-import { ChatRunRegistry } from '../domains/chat/ChatRunRegistry.ts';
+import { ChatRunRegistry, type RunNotice } from '../domains/chat/ChatRunRegistry.ts';
+import { appendLoweredRun } from '../domains/chat/lowered-journal.ts';
 import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { HandoffChains } from '../domains/chat/ChatHandoff.ts';
 import { ProviderChatService } from '../domains/provider-chat.ts';
@@ -8,6 +10,9 @@ import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/project-tests.ts';
 import { DlpProxy } from '../domains/dlp.ts';
 import { createRunNotifier } from '../domains/remote-notify.ts';
+import { createTelegramNotifier, type TelegramNotice } from '../domains/notify/telegram.ts';
+import { activateAtlassianMcp } from '../domains/integrations/mcp-server.ts';
+import { readToken } from '../domains/integrations/store.ts';
 import { hasWorkSince } from '../domains/project-git.ts';
 import { createHandoffPlanner } from '../routes/chat/handoff-routes.ts';
 import { createEventHub, type EventHub } from '../lib/event-hub.ts';
@@ -40,6 +45,8 @@ export interface Runtime {
   dlpProxy: DlpProxy;
   /** Подписчики `/api/events` и рассылка об изменениях файлов. */
   events: EventHub;
+  /** Адрес самой панели: его получает переходник MCP при регистрации. */
+  selfBaseUrl: string;
   /** Погасить всё, что спавнит процессы. Идемпотентно. */
   shutdown: () => void;
 }
@@ -64,7 +71,21 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   const chatSession = new ChatSession(chatRuns);
   // Прогоны тестов — третий такой объект: агент ходит по кейсам минутами, и
   // оборванный при выходе панели процесс остался бы висеть с полным доступом.
-  const projectTestRuns = new ProjectTestRunRegistry();
+  //
+  // Обёртка над реестром вместо правки самого реестра: включение MCP —
+  // обстоятельство внешнего мира, а реестр знает только про свои прогоны. Так же
+  // сюда подаются уведомления и оценка стоимости.
+  const projectTestRuns = new ActivatingTestRunRegistry((projectPath) => {
+    activateAtlassianMcp(
+      {
+        paths: ctx.location.paths,
+        store: ctx.store,
+        backupDir: ctx.backupDir,
+      },
+      ctx.store,
+      projectPath,
+    );
+  });
   // Ручной прогон живёт в памяти (его открывает один человек в одном окне), но
   // каждый отмеченный результат уходит на диск сразу. При выходе панели
   // незакрытая сессия помечается брошенной — иначе в истории остался бы прогон,
@@ -80,10 +101,36 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     devices: () => ctx.store.getPushDevices(),
     forget: (token) => ctx.store.removePushDevice(token),
   });
-  chatRuns.setNotifier(notifyRun);
-  // Прогон тестов уведомляет тем же отправителем: он идёт десятки минут, и
-  // сидеть перед панелью всё это время незачем.
-  projectTestRuns.setNotifier(notifyRun);
+  /**
+   * Второй адресат тех же событий — Telegram.
+   *
+   * Push от Expo приходит в ПРИЛОЖЕНИЕ панели, и его видит только тот, у кого
+   * оно установлено и спарено. Telegram получает и владелец без приложения, и
+   * общий чат команды. Наружу уходит ровно заголовок — вид события и имя папки
+   * проекта, — как и в push: содержимому разговора незачем покидать машину.
+   */
+  const telegram = createTelegramNotifier({
+    settings: () => ctx.store.getSettings().integrations.telegram,
+    token: () => readToken(ctx.location.paths.appData, 'telegram'),
+  });
+  const notifyBoth = (notice: RunNotice): void => {
+    notifyRun(notice);
+    telegram(notice);
+  };
+  chatRuns.setNotifier(notifyBoth);
+  /**
+   * Прогон тестов уведомляет тем же отправителем: он идёт десятки минут, и
+   * сидеть перед панелью всё это время незачем.
+   *
+   * Для Telegram у него есть СВОЙ повод — «тесты провалены». Реестр о нём не
+   * знает и знать не должен: он сообщает «прогон кончился», а провалы лежат в
+   * итоге прогона, который он же и посчитал. Пересобирается это здесь, потому
+   * что подписка на события — вопрос настройки, а не работы реестра.
+   */
+  projectTestRuns.setNotifier((notice) => {
+    notifyRun(notice);
+    telegram(testNotice(notice, projectTestRuns.get(notice.projectPath ?? '')));
+  });
   /**
    * Дерево чатов переживает смену ключа. Разделение заводит чат под временным
    * `new-<ts>-<n>`, а настоящий `sessionId` Claude Code выдаёт уже в прогоне —
@@ -91,6 +138,12 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * бы ровно в момент, когда чат становится настоящим.
    */
   chatRuns.setSessionListener((chatId, sessionId) => ctx.store.linkChatSession(chatId, sessionId));
+  /**
+   * Журнал понижённых прогонов: чем вели и видела ли панель проверки. Путь до
+   * каталога данных знает bootstrap, а не реестр, — тем же приёмом, что и
+   * уведомления.
+   */
+  chatRuns.setLoweredJournal((record) => appendLoweredRun(ctx.location.paths.appData, record));
   /**
    * Цепочки продолжений в чистой сессии: тумблер автомата и номер шага. Объект
    * переживает запрос — тумблер ставится в одном обращении, а срабатывает при
@@ -169,7 +222,52 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     providerChats,
     dlpProxy,
     events,
+    selfBaseUrl,
     shutdown,
+  };
+}
+
+/**
+ * Реестр прогонов тестов, включающий переходник MCP на старте.
+ *
+ * Наследование, а не правка реестра: включение — обстоятельство внешнего мира
+ * (есть ли привязка, зарегистрирован ли сервер), и реестру прогонов о нём знать
+ * нечего. Включаем ДО запуска: агент стартует тут же, и запись, включённая
+ * после, досталась бы только следующему прогону.
+ */
+class ActivatingTestRunRegistry extends ProjectTestRunRegistry {
+  private readonly onStart: (projectPath: string) => void;
+
+  constructor(onStart: (projectPath: string) => void) {
+    super();
+    this.onStart = onStart;
+  }
+
+  override start(request: ProjectTestRunRequest, now: string): ProjectTestRun {
+    // `activateAtlassianMcp` не бросает по своему устройству: интеграция не
+    // главнее работы, и прогон обязан пойти даже с мёртвым переходником.
+    this.onStart(request.projectPath);
+    return super.start(request, now);
+  }
+}
+
+/**
+ * Уведомление о прогоне тестов для Telegram: провалы важнее самого факта
+ * завершения.
+ *
+ * Итог прогона уже посчитан реестром к моменту рассылки, поэтому число берётся
+ * из него, а не считается заново. Провалов нет — уходит обычное «работа
+ * закончена».
+ */
+function testNotice(notice: RunNotice, run: ProjectTestRun | undefined): TelegramNotice {
+  const failed = run?.summary?.failed ?? 0;
+  if (failed === 0) return notice;
+  return {
+    kind: 'testFailed',
+    chatId: notice.chatId,
+    projectPath: notice.projectPath,
+    failed,
+    total: run?.summary?.total,
   };
 }
 

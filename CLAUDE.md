@@ -65,10 +65,11 @@ Fix without asking: project code, deps, build config, launch env. Ask first: fil
 the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
 QA runs live in `tools/qa/` and need `pnpm dev` up + `pnpm qa:setup`; each drives the real UI of one
-area. Thirteen behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
+area. Sixteen behave unlike the rest — `check-integrations.mjs`, `check-attention.mjs`, `check-provider-chat.mjs`,
 `check-project-code.mjs`, `check-task-split.mjs`, `check-handoff.mjs`, `check-parent-hub.mjs`,
 `check-new-chat.mjs`, `check-stream-cap.mjs`, `check-cascade-stages.mjs`, `check-project-tests.mjs`,
-`check-tests-runner.mjs`, `check-tests-report.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
+`check-tests-runner.mjs`, `check-tests-report.mjs`, `check-parallel-model.mjs`,
+`check-lowered-runs.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
 so they depend on no particular history, on no installed CLI, and leave neither branches nor copies
 behind. `panel-pages.mjs` is the ONE route list the a11y (axe, both themes, create modals) and
 keyboard (Tab order, focus ring, Escape + focus return) sweeps share — a new section goes there or
@@ -101,6 +102,16 @@ process env + settings env + `.mcp-secrets.env` (`readEnvLookup`), a missing one
 detail; stderr is decoded UTF-8 with a CP866 fallback on win32. A 401 with an own `Authorization`
 header reads «token rejected», without one «OAuth needed». The result is persisted in
 `state.json → mcpHealth` (card + Overview counts); stdio gets the full 45 s handshake budget.
+
+**Jira/Confluence answers «не подключена», or the agent's Atlassian tools say the panel is down** —
+one credential, two consumers, and they fail differently. The token lives ONLY in the encrypted store
+(`lib/provider-keys.ts`, key `int:<id>`) and is never in a response, a prompt or `.claude.json`;
+`requireConnected` refuses before any request when settings or token are missing (404, not a 502).
+The agent's side is `tools/mcp/atlassian.mjs` — a proxy holding NO secret: it calls this panel's own
+API, so a dead panel, a disabled integration and a network failure all read as one Russian sentence
+with `isError`. Cloud vs Server/DC (Basic + `/rest/api/3` vs Bearer + `/rest/api/2`) is DETECTED by
+`POST /api/integrations/atlassian/check` (the `:id/check` route) and remembered. Detail: `.agent/code-map.agent.md`
+§Integrations.
 
 **403 on requests** — origin allowlist + `Sec-Fetch-Site` (`index.ts`); only `localhost:WEB_PORT`
 and `127.0.0.1:WEB_PORT`. Changed the front port → set `WEB_PORT` for the server too.

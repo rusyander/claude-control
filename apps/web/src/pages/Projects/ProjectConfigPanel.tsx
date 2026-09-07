@@ -5,6 +5,7 @@ import { Typography } from '@shared/ui/typography';
 import { Badge } from '@shared/ui/badge';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { IntegrationLinksBar } from '@features/IntegrationLinks';
 import { ProjectRulesTab } from './ProjectRulesTab';
 import { ProjectMcpTab } from './ProjectMcpTab';
 import { ProjectPermissionsTab } from './ProjectPermissionsTab';
@@ -38,6 +39,10 @@ export function ProjectConfigPanel({ project }: ProjectConfigPanelProps) {
           {project.path}
         </Typography>
       </Stack>
+
+      {/* Внешний контекст проекта: он не в файлах проекта, а в панели, поэтому
+          стоит рядом с путём, а не среди вкладок конфигурации. */}
+      <IntegrationLinksBar projectPath={project.path} />
 
       <Stack direction="row" gap="var(--spacing-2xs)" wrap className={styles.tabs}>
         {TABS.map((value) => (

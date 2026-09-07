@@ -8,7 +8,11 @@ import { Typography } from '@shared/ui/typography';
 import { EmptyState } from '@shared/ui/empty-state';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { CHAT_ROUTE } from '@shared/config/routes';
+import { Button } from '@shared/ui/button';
+import { Icon } from '@shared/ui/icon';
 import { STATUS_TONE, runExportUrl, useTestRun, useTestRuns } from '@entities/ProjectTest';
+import { BaselineViewer } from '@features/TestBaselines';
+import { TestsRunPublish } from './TestsRunPublish';
 import { formatRunDuration } from './model/reportMetrics';
 import type { TestsRunsTabProps } from './TestsRunsTab.types';
 import styles from './TestsPage.module.scss';
@@ -29,6 +33,9 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
   const runs = useTestRuns(projectPath, true, isRunning);
   const [openId, setOpenId] = useState('');
   const run = useTestRun(projectPath, openId || undefined);
+  // Сверка эталонов открывается по КЕЙСУ: у одного кейса несколько точек, и
+  // разбирают их подряд, а не по одной из разных мест.
+  const [baselineCase, setBaselineCase] = useState('');
 
   const titleOf = (groupId: string, caseId: string): string =>
     groups.find((group) => group.id === groupId)?.cases.find((item) => item.id === caseId)?.title ??
@@ -120,6 +127,12 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
                 <a className={styles.runLink} href={runExportUrl(projectPath, record.id, 'csv')}>
                   {t('tests.runs.exportCsv')}
                 </a>
+                {/* PDF — то, что уходит приёмке и заказчику: markdown им не
+                    посылают. Рисует его браузер на этой машине, поэтому ссылка
+                    может привести к честному отказу, а не к файлу. */}
+                <a className={styles.runLink} href={runExportUrl(projectPath, record.id, 'pdf')}>
+                  {t('tests.runs.exportPdf')}
+                </a>
               </Stack>
 
               {record.error && (
@@ -134,6 +147,10 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
                   gap="var(--spacing-2xs)"
                   className={styles.runBody}
                 >
+                  {/* Публикация — внутри раскрытой записи: её делают, посмотрев
+                      на результат, а не пробегая список глазами. */}
+                  <TestsRunPublish projectPath={projectPath} runId={record.id} />
+
                   {run.data.results.length === 0 && (
                     <Typography variant="caption" color="subtle">
                       {t('tests.runs.noResults')}
@@ -166,12 +183,21 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
                         </Typography>
                       )}
                       {(result.attachments ?? []).length > 0 && (
-                        <Stack direction="row" gap="var(--spacing-3xs)" wrap>
+                        <Stack direction="row" gap="var(--spacing-3xs)" align="center" wrap>
                           {(result.attachments ?? []).map((file) => (
                             <Badge key={file} tone="neutral">
                               {file}
                             </Badge>
                           ))}
+                          {/* Снимки есть — значит есть с чем сверять эталон. */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            leftIcon={<Icon name="image" size={16} />}
+                            onClick={() => setBaselineCase(result.caseId)}
+                          >
+                            {t('tests.baseline.open')}
+                          </Button>
                         </Stack>
                       )}
                       {(result.defects ?? []).length > 0 && (
@@ -191,6 +217,13 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
           </Card>
         );
       })}
+
+      <BaselineViewer
+        isOpen={Boolean(baselineCase)}
+        onOpenChange={(next) => !next && setBaselineCase('')}
+        projectPath={projectPath}
+        caseId={baselineCase || undefined}
+      />
     </Stack>
   );
 }

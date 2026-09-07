@@ -2072,6 +2072,9 @@ export const en: TranslationSchema = {
     tab_models: 'Models',
     tabHint_models:
       'Default model and thinking effort, the model catalog, a custom endpoint and MCP server checks.',
+    tab_integrations: 'Integrations',
+    tabHint_integrations:
+      'Jira and Confluence, a forge by token, Telegram, test management and CI reports: where the panel takes outside context from and where it hands results back.',
     tab_spend: 'Spend',
     tabHint_spend: 'Which units to show spend in and which rates to count it by.',
     tab_safety: 'Safety',
@@ -2479,6 +2482,20 @@ export const en: TranslationSchema = {
     liveAgentsHint:
       'Claude Code processes running on this machine. There is no agent registry, so we count processes.',
     noAgents: 'No running Claude Code processes found',
+    lowered: {
+      title: 'Lowered fan-out runs',
+      hint:
+        'Runs that went a rung below the ceiling: they carry a delivery bar — run the project ' +
+        'checks and verify the result point by point. The panel only sees commands started ' +
+        'through Bash, so «no checks seen» means exactly that, not «the agent skipped them»: a ' +
+        'check run by a wrapper script or through an MCP server never reaches this list.',
+      withoutChecks: 'no checks seen: {{count}}',
+      failed: 'failed: {{count}}',
+      checksSeen: 'checks: {{count}}',
+      checksUnseen: 'no checks seen',
+      crashed: 'run failed',
+      noProject: 'no project',
+    },
     agentsSummary: 'Show processes — {{count}}, {{memory}}',
     activeSessions: 'active sessions',
     memory: 'memory',
@@ -2879,6 +2896,15 @@ export const en: TranslationSchema = {
       defectTarget: 'Where',
       defectTitle: 'Title',
       defectBody: 'Description',
+      defectCopy: 'Copy draft',
+      defectTargetHint:
+        'gh and glab need no key in the panel. Forge and Jira go by the token saved in Integrations — they work where the CLI cannot be installed.',
+      defectTargetName: {
+        github: 'GitHub (gh)',
+        gitlab: 'GitLab (glab)',
+        forge: 'Forge by token',
+        jira: 'Jira',
+      },
       prev: 'Back',
       next: 'Next',
       verdict: {
@@ -2947,6 +2973,7 @@ export const en: TranslationSchema = {
       openChat: 'Open the conversation',
       exportMd: 'Report .md',
       exportCsv: 'Report .csv',
+      exportPdf: 'Report .pdf',
       noResults: 'This run has no per-case results.',
       pointDuration: '{{seconds}} s',
     },
@@ -2980,6 +3007,199 @@ export const en: TranslationSchema = {
         'Failures grouped by what the executor wrote down: one breakage usually reddens several cases at once.',
       failuresEmpty: 'No failures with a stated reason.',
       failuresCases: 'cases: {{count}} — {{names}}',
+    },
+    publish: {
+      target: 'Publish to',
+      confluence: 'As a Confluence page',
+      jira: 'As a Jira comment',
+      action: 'Publish report',
+      created: 'Published: {{url}}',
+      updated: 'Updated: {{url}}',
+    },
+    baseline: {
+      title: 'Baseline screenshots',
+      open: 'Screenshots',
+      accept: 'Accept baseline',
+      accepted: 'Baseline updated',
+      emptyTitle: 'No screenshots for this case',
+      emptyText:
+        'They appear after a run that captures the screen. With no baseline there is nothing to compare against — the first shot becomes one.',
+      ratio: 'difference {{value}} against a {{limit}} limit',
+      noShot: 'no screenshot',
+      pane: {
+        baseline: 'Baseline',
+        actual: 'Now',
+        diff: 'Difference',
+      },
+      state: {
+        match: 'matches the baseline',
+        diff: 'differs from the baseline',
+        new: 'baseline just recorded',
+        error: 'comparison failed',
+      },
+    },
+  },
+  integrations: {
+    explainTitle: 'What the panel does with these keys',
+    explain:
+      'A token goes into the same encrypted store as provider keys and never comes back out — not in a server response, not on this screen: only a mask is shown. Connector settings (URL, email, repository) stay in the open, in the panel settings. "Check connection" really calls your system and remembers who the panel signed in as.',
+    loadErrorTitle: 'Could not read integrations',
+    loadErrorText: 'The server did not answer. Check that it is running and retry.',
+    state: {
+      ok: 'connected',
+      error: 'no connection',
+      unchecked: 'not checked',
+    },
+    deployment: {
+      cloud: 'cloud',
+      server: 'self-hosted',
+    },
+    card: {
+      enabled: 'Enabled',
+      enabledAria: 'Enable "{{name}}"',
+      token: 'Token',
+      tokenPlaceholder: 'Paste the key',
+      tokenSaved: 'Key saved: {{mask}}. A new value replaces it, an empty field leaves it alone.',
+      tokenEmpty: 'No key yet. It goes into the encrypted store and never returns to this screen.',
+      check: 'Check connection',
+      forget: 'Forget key',
+      missing: 'Not filled in: {{fields}}',
+      account: 'signed in as {{name}}',
+      checkedAt: 'checked {{time}}',
+      fieldRequired: 'The connector cannot be enabled without this field',
+      atlassian: {
+        title: 'Jira and Confluence',
+        hint: 'Where requirements come from and where defects and reports go. One key for both systems when they share a site.',
+        tokenHint:
+          'Cloud: an API token from id.atlassian.com together with the email below. Server/DC: a personal access token, leave the email empty.',
+      },
+      forge: {
+        title: 'Forge by token',
+        hint: 'GitHub or GitLab directly, without gh and glab installed: needed where the CLI cannot be installed.',
+        tokenHint:
+          'GitHub: a personal access token with issue rights. GitLab: a project or personal token with the api scope.',
+      },
+      telegram: {
+        title: 'Telegram',
+        hint: 'Where the panel writes about finished runs, agent questions and permission requests.',
+        tokenHint:
+          'A bot token from @BotFather. The bot must be added to the chat, otherwise it cannot post there.',
+      },
+      tms: {
+        title: 'Test management',
+        hint: 'Zephyr or Xray in Jira: pull cases into a panel group and push run results back.',
+        tokenHint:
+          'Zephyr Scale: its own API key. Xray: key and secret in one line separated by a colon. Empty — the Atlassian key is used.',
+      },
+      ci: {
+        title: 'CI reports',
+        hint: 'Where to pull the latest build report from, so no file has to be uploaded by hand.',
+        tokenHint: 'The same forge token, but allowed to read build artifacts.',
+      },
+    },
+    field: {
+      atlassian: {
+        baseUrl: 'Site URL',
+        email: 'Email',
+        deployment: 'Deployment',
+        confluenceUrl: 'Confluence URL',
+      },
+      forge: { kind: 'System', baseUrl: 'Installation URL', repo: 'Repository' },
+      telegram: { chatId: 'Chat' },
+      tms: { kind: 'System', projectKey: 'Jira project', groupId: 'Test group' },
+      ci: { kind: 'System', repo: 'Repository', workflow: 'Workflow', artifact: 'Artifact' },
+    },
+    hint: {
+      atlassian: {
+        baseUrl: 'https://name.atlassian.net for cloud, your own URL for Server/DC.',
+        email:
+          'Cloud only: the key works there in a pair with the email. Leave empty for Server/DC.',
+        deployment: 'Unset — detected by a live check and remembered.',
+        confluenceUrl: 'Fill in when Confluence does not live on the Jira host.',
+      },
+      forge: {
+        kind: 'What is on the other end: GitHub or GitLab.',
+        baseUrl: 'Own GitLab — the installation URL. Empty = github.com or gitlab.com.',
+        repo: 'owner/repo or a numeric project id. Empty — derived from the checked project origin.',
+      },
+      telegram: { chatId: 'A numeric chat id or a @channel name.' },
+      tms: {
+        kind: 'Zephyr Scale or Xray — the case format follows from it.',
+        projectKey: 'Key of the Jira project holding the cases and cycles.',
+        groupId: 'Which panel group to sync with. Empty — the panel asks at exchange time.',
+      },
+      ci: {
+        kind: 'GitHub Actions or GitLab CI.',
+        repo: 'owner/repo or a project id. Empty — derived from origin.',
+        workflow: 'Workflow or job name. Empty — the last finished run.',
+        artifact: 'Artifact name or the path to the report inside it.',
+      },
+    },
+    option: {
+      unset: 'Not set',
+      atlassian: { deployment: { cloud: 'Cloud', server: 'Server / Data Center' } },
+      forge: { kind: { github: 'GitHub', gitlab: 'GitLab' } },
+      tms: { kind: { zephyr: 'Zephyr Scale', xray: 'Xray' } },
+      ci: { kind: { github: 'GitHub Actions', gitlab: 'GitLab CI' } },
+    },
+    telegram: {
+      eventsTitle: 'What to write about',
+      event: {
+        runDone: 'Run finished',
+        runError: 'Run failed',
+        testFailed: 'Case failed',
+        permission: 'Agent asks for rights',
+        question: 'Agent asked a question',
+      },
+      test: 'Send a test message',
+      sent: 'Test message sent',
+    },
+    mcp: {
+      connect: 'Connect Atlassian MCP',
+      disconnect: 'Disconnect Atlassian MCP',
+      hint: 'The same site and the same key, but available to the agent inside a conversation. The server is added to the MCP section — it can be removed from there too.',
+    },
+    picker: {
+      jira: {
+        search: 'Search Jira issues',
+        placeholder: 'Issue key or words from the summary',
+      },
+      confluence: {
+        search: 'Search Confluence pages',
+        placeholder: 'Words from the page title',
+      },
+      find: 'Find',
+      chosen: 'selected',
+      clear: 'Clear selection',
+      nothing: 'Nothing found',
+    },
+    links: {
+      title: 'External links',
+      description:
+        'What the agent cannot know on its own: which issue the work belongs to, where the requirements live and where defects go. This is what reaches it as a line in the task.',
+      scope: 'What to link',
+      scopeHint: 'A group link overrides the project link for that group cases.',
+      scopeProject: 'Whole project',
+      jiraTitle: 'Jira',
+      confluenceTitle: 'Confluence',
+      jiraProject: 'Project for defects',
+      jiraProjectHint: 'Where new defects for failed cases are filed.',
+      forgeRepo: 'Forge repository',
+      forgeRepoHint: 'Fill in when it cannot be derived from the checked project origin.',
+      note: 'Note',
+      noteHint: 'In your own words: what exactly lives here. Reaches the agent as is.',
+      detach: 'Remove link',
+      attach: 'Link',
+      barTitle: 'External links',
+      barGroup: 'Group "{{title}}"',
+      empty: 'Nothing linked',
+      kind: {
+        jiraIssue: 'Issue',
+        jiraProject: 'Defects in',
+        confluencePage: 'Requirements',
+        forgeRepo: 'Repository',
+        note: 'Note',
+      },
     },
   },
   runner: {
@@ -3291,12 +3511,28 @@ export const en: TranslationSchema = {
   },
   parallel: {
     button: 'Run in several',
+    noProjects: 'Nowhere to run: the panel has not seen a single project with chats yet',
     title: 'Run in several projects',
     hint: 'One request — a separate agent in each selected project. Track them in the panel and by the tab dots.',
     prompt: 'What to do',
     promptPlaceholder: 'For example: do a code review and suggest fixes',
     pickProjects: 'Projects selected: {{count}}',
     launch: 'Run in {{count}}',
+    cascade: {
+      label: 'Run with:',
+      model: 'Model for every run of the fan-out',
+      effort: 'Effort for every run of the fan-out',
+      loweredHint:
+        'The model is below the conversation ceiling: the task gets a delivery bar — ' +
+        'run the project checks, verify the result point by point, and stop and say so ' +
+        'when the work turns out to be of another class. ' +
+        'No review at the ceiling is started here: the stage pipeline only runs for ' +
+        'split children, in their own copy of the branch.',
+      ceilingWarn:
+        'Agents at the ceiling at once: {{count}}. This is the most expensive launch ' +
+        'the panel makes — nothing else eats the rate window faster. A lower rung adds ' +
+        'a delivery bar to the task and leaves the window for the next piece of work.',
+    },
   },
   bulkPresets: {
     hint: 'Tick the presets you need — I will create them all at once. Each can be edited afterwards.',

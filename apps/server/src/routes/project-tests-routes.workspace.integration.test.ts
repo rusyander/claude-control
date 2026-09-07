@@ -46,7 +46,14 @@ describe('project-tests-routes: рабочее место', () => {
     app = Fastify();
     registerProjectTestsRoutes(
       app,
-      { backupDir, store: { getProjectByPath: () => undefined } } as unknown as ServerContext,
+      {
+        backupDir,
+        // Каталог данных панели нужен маршруту дефектов: по нему он смотрит,
+        // подключены ли Jira и фордж по токену. Здесь их нет — и черновик
+        // обязан собраться всё равно, только с пустым списком назначений.
+        location: { paths: { appData: backupDir } },
+        store: { getProjectByPath: () => undefined },
+      } as unknown as ServerContext,
       new ProjectTestRunRegistry(),
       new ProjectTestManualRegistry(),
     );

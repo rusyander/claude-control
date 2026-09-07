@@ -38,6 +38,8 @@ import { registerProjectRunnerRoutes } from '../routes/project-runner-routes.ts'
 import { registerProjectGitRoutes } from '../routes/project-git-routes.ts';
 import { registerProjectFilesRoutes } from '../routes/project-files-routes.ts';
 import { registerProjectTestsRoutes } from '../routes/project-tests-routes.ts';
+import { registerProjectTestsPublishRoutes } from '../routes/project-tests/publish-routes.ts';
+import { registerIntegrationsRoutes } from '../routes/integrations-routes.ts';
 import { registerProviderChatRoutes } from '../routes/provider-chat-routes.ts';
 import { registerDlpRoutes } from '../routes/dlp-routes.ts';
 import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
@@ -63,6 +65,7 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     dlpProxy,
     notifyRun,
     events,
+    selfBaseUrl,
   } = runtime;
 
   return [
@@ -129,6 +132,12 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     // переживают запрос — вкладку закрывают, а прогон идёт дальше.
     (instance, context) =>
       registerProjectTestsRoutes(instance, context, projectTestRuns, projectTestManual),
+    // Публикация отчёта наружу — часть интеграций, а не раздела тестов: ей нужны
+    // токен, привязка и живая сеть, а раздел обязан работать и без всего этого.
+    registerProjectTestsPublishRoutes,
+    // Внешние интеграции. Адрес панели известен только здесь (порт задаётся
+    // переменной окружения), а переходнику MCP он нужен, чтобы знать, куда идти.
+    (instance, context) => registerIntegrationsRoutes(instance, context, selfBaseUrl),
     (instance, context) => registerDlpRoutes(instance, context, dlpProxy),
     (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
     registerPromptGateRoutes,

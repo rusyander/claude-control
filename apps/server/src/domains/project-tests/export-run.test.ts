@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectTestRunRecord } from '@agentdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { exportRun } from './export-run.ts';
+import { exportRun, exportRunPdf } from './export-run.ts';
 import { writeRun } from './runs-store.ts';
 import { createGroup, upsertCase } from './store.ts';
 
@@ -95,7 +95,45 @@ describe('project-tests/export-run', () => {
     expect(text.trim().split('\r\n')).toHaveLength(3);
   });
 
+  it('html — готовая к печати страница без единой внешней загрузки', () => {
+    const file = exportRun(project, 'run-1', 'html');
+    const text = file.body.toString('utf8');
+
+    expect(file.filename).toBe('run-202609071000.html');
+    expect(file.contentType).toContain('text/html');
+    // Разметка страницы A4: из этого же html печатается PDF.
+    expect(text).toContain('@page');
+    expect(text).toContain('A4');
+    expect(text).toContain('Вход с верными данными');
+    expect(text).toContain('кнопка осталась серой');
+    // Ничего не тянется из сети и ниоткуда: браузер печатает страницу без
+    // доступа наружу, и любая внешняя ссылка означала бы дыру в отчёте.
+    expect(text).not.toContain('<script');
+    expect(text).not.toMatch(/(?:src|href)="https?:/);
+  });
+
+  it('чужой текст в отчёте остаётся текстом, а не разметкой', () => {
+    const broken = run();
+    broken.results[0]!.note = 'сломалось <b>жирно</b> & "с кавычками"';
+    writeRun(project, broken);
+
+    const text = exportRun(project, 'run-1', 'html').body.toString('utf8');
+
+    expect(text).toContain('&lt;b&gt;жирно&lt;/b&gt;');
+    expect(text).toContain('&amp;');
+  });
+
   it('несуществующий прогон — 404, а не пустой файл', () => {
     expect(() => exportRun(project, 'нет-такого', 'md')).toThrow(/не найден/);
+  });
+
+  it('PDF несуществующего прогона отказывает ДО поиска браузера', async () => {
+    // Иначе на машине без браузера человек получил бы «поставь Chrome» вместо
+    // «такого прогона нет» и пошёл бы чинить не то.
+    await expect(exportRunPdf(project, 'нет-такого')).rejects.toThrow(/не найден/);
+  });
+
+  it('неизвестный формат называет допустимые', () => {
+    expect(() => exportRun(project, 'run-1', 'docx' as 'md')).toThrow(/md, csv или html/);
   });
 });

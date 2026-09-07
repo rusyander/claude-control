@@ -1,9 +1,12 @@
 import type {
   AppSettings,
   Automation,
+  AtlassianDeployment,
   EntityKind,
   Group,
   Hook,
+  IntegrationLinks,
+  IntegrationState,
   McpHealth,
   Project,
   ProjectCodeLayout,
@@ -94,6 +97,23 @@ export interface McpHealthRecord {
   toolCount?: number;
   /** Когда проверка проводилась (ISO). */
   checkedAt: string;
+}
+
+/**
+ * Итог последней живой проверки связи с внешней системой — зеркало
+ * `McpHealthRecord`, и не случайно: вопрос тот же («отвечает ли и кем мы там
+ * представились»), а ответ обязан переживать F5 и перезапуск сервера. Токена
+ * здесь нет — ни целиком, ни куском: в записи только то, что можно показать.
+ */
+export interface IntegrationHealthRecord {
+  state: IntegrationState;
+  /** Человеческая причина отказа или короткое «кем вошли». */
+  detail: string;
+  checkedAt: string;
+  /** Имя учётной записи, которым панель представилась. */
+  account?: string;
+  /** Что ответил Atlassian про себя: облако или своя установка. */
+  deployment?: AtlassianDeployment;
 }
 
 export interface RunnerPrefs {
@@ -241,4 +261,21 @@ export interface AppState {
    * технический артефакт, и в схему настроек (contracts) ему попадать незачем.
    */
   secretBackupVerifier?: string;
+  /**
+   * Итог последней проверки связи с внешними системами: id интеграции →
+   * запись. Ровно то же место и та же причина, что у `mcpHealth`: без него
+   * страница настроек после перезагрузки показывала бы «не проверялось» по
+   * работающей связи, а карточка — пустой статус.
+   */
+  integrationHealth?: Record<string, IntegrationHealthRecord>;
+  /**
+   * Что человек привязал к проверяемому проекту: абсолютный путь проекта →
+   * задачи Jira, страницы Confluence и репозиторий форджа (у самого проекта и
+   * у каждой его группы тестов).
+   *
+   * Живёт в состоянии панели, а не в `.agent/tests/` проекта, намеренно: это
+   * знание О ЧЕЛОВЕКЕ и его трекере, а не о наборе тестов, и в чужой репозиторий
+   * такому знанию попадать незачем — оно уехало бы в git вместе с кейсами.
+   */
+  integrationLinks?: Record<string, IntegrationLinks>;
 }

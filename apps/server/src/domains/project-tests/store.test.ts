@@ -185,4 +185,117 @@ describe('project-tests store', () => {
     expect(() => createGroup(root, '../../etc')).toThrow(ProjectTestsError);
     expect(() => createGroup(root, 'ГУИ')).toThrow(ProjectTestsError);
   });
+
+  /**
+   * Встречная запись. Между тем, как панель показала список, и тем, как человек
+   * нажал «Сохранить», проходят минуты — и всё это время в тот же файл пишет
+   * агент. Здесь это воспроизведено буквально: запись агента вклинивается между
+   * чтением и сохранением, и ни одна сторона не должна потерять своё.
+   */
+  describe('встречная запись панели и агента', () => {
+    it('результат прогона переживает сохранение описания', () => {
+      writeGroupFile(root, 'gui', {
+        version: 1,
+        cases: [{ id: 'gui-001', title: 'Отправка', steps: ['открыть'] }],
+      });
+      // Панель показала список; человек открыл форму.
+      expect(only(root).cases[0]?.status).toBe('unknown');
+
+      // Пока форма открыта, агент прошёл кейс и переписал файл целиком.
+      writeGroupFile(root, 'gui', {
+        version: 1,
+        cases: [
+          {
+            id: 'gui-001',
+            title: 'Отправка',
+            steps: ['открыть'],
+            status: 'failed',
+            note: 'кнопка не нажимается',
+            lastRunAt: '2026-08-09T11:00:00.000Z',
+            lastRunId: 'run-7',
+            attachments: ['.agent/tests/attachments/gui-001/shot.png'],
+            defects: [{ url: 'https://jira/ABC-1', title: 'Кнопка мертва' }],
+          },
+        ],
+      });
+
+      // Человек сохраняет ТОЛЬКО описание: про результат форма не знает вовсе.
+      upsertCase(root, 'gui', { id: 'gui-001', title: 'Отправка сообщения' }, NOW);
+
+      const saved = only(root).cases[0];
+      expect(saved).toMatchObject({
+        title: 'Отправка сообщения',
+        status: 'failed',
+        note: 'кнопка не нажимается',
+        lastRunAt: '2026-08-09T11:00:00.000Z',
+        lastRunId: 'run-7',
+      });
+      expect(saved?.attachments).toEqual(['.agent/tests/attachments/gui-001/shot.png']);
+      expect(saved?.defects).toEqual([{ url: 'https://jira/ABC-1', title: 'Кнопка мертва' }]);
+    });
+
+    it('кейс, заведённый агентом между чтением и сохранением, не исчезает', () => {
+      createGroup(root, 'gui');
+      const mine = upsertCase(root, 'gui', { title: 'Мой кейс', steps: [] }, NOW);
+
+      // Агент дописал в файл свой кейс — панель о нём ещё не знает.
+      writeGroupFile(root, 'gui', {
+        version: 1,
+        cases: [
+          { id: mine.id, title: 'Мой кейс' },
+          { id: 'gui-777', title: 'Кейс агента', status: 'passed' },
+        ],
+      });
+
+      upsertCase(root, 'gui', { id: mine.id, title: 'Мой кейс, поправленный' }, NOW);
+
+      // Сохранение по `id` сводится с диском, а не заменяет файл видом панели.
+      expect(only(root).cases.map((item) => item.id)).toEqual([mine.id, 'gui-777']);
+      expect(only(root).cases[1]?.status).toBe('passed');
+    });
+
+    it('поля, которых в запросе нет, берутся с диска, а явно пустые — стираются', () => {
+      writeGroupFile(root, 'gui', {
+        version: 1,
+        cases: [
+          {
+            id: 'gui-001',
+            title: 'Кейс',
+            area: 'Чат',
+            priority: 'high',
+            tags: ['smoke', 'регресс'],
+            codePaths: ['apps/web/src/pages/Chat'],
+          },
+        ],
+      });
+
+      upsertCase(root, 'gui', { id: 'gui-001', title: 'Кейс' }, NOW);
+      expect(only(root).cases[0]).toMatchObject({
+        area: 'Чат',
+        priority: 'high',
+        tags: ['smoke', 'регресс'],
+      });
+
+      // Пустой список — это «очисти», а не «не трогай»: иначе снять тег было бы нечем.
+      upsertCase(root, 'gui', { id: 'gui-001', title: 'Кейс', tags: [] }, NOW);
+      expect(only(root).cases[0]?.tags).toBeUndefined();
+      expect(only(root).cases[0]?.codePaths).toEqual(['apps/web/src/pages/Chat']);
+    });
+
+    it('порог сравнения скриншотов читается долей, а чужая опечатка отбрасывается', () => {
+      writeGroupFile(root, 'gui', {
+        version: 1,
+        cases: [
+          { id: 'gui-001', title: 'Свой порог', maxDiffRatio: 0.03 },
+          { id: 'gui-002', title: 'Проценты по ошибке', maxDiffRatio: 30 },
+        ],
+      });
+
+      const cases = only(root).cases;
+
+      expect(cases[0]?.maxDiffRatio).toBe(0.03);
+      // 30 — это не доля: лучше общий порог, чем «сойдётся что угодно».
+      expect(cases[1]?.maxDiffRatio).toBeUndefined();
+    });
+  });
 });

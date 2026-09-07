@@ -5,6 +5,8 @@ import type {
   EntityKind,
   Group,
   Hook,
+  IntegrationLink,
+  IntegrationLinks,
   Project,
   ProjectCodeLayout,
   ProjectCodeView,
@@ -37,10 +39,22 @@ import {
 import type {
   AppState,
   ChatLink,
+  IntegrationHealthRecord,
   McpHealthRecord,
   RunnerPrefs,
   RunnerTargetMeta,
 } from './app-store.types.ts';
+import {
+  forgetIntegrationHealth as dropIntegrationHealth,
+  getIntegrationHealth as readIntegrationHealth,
+  saveIntegrationHealth as writeIntegrationHealth,
+} from './integration-health.ts';
+import {
+  getAllIntegrationLinks as readAllIntegrationLinks,
+  getIntegrationLinks as readIntegrationLinks,
+  removeIntegrationLink as dropIntegrationLink,
+  setIntegrationLink as writeIntegrationLink,
+} from './integration-links.ts';
 import { mergeState, readStateFile, stateFilePath } from './state-file.ts';
 import {
   forgetMcpHealth as dropMcpHealth,
@@ -434,5 +448,47 @@ export class AppStore {
    */
   linkChatSession(chatId: string, sessionId: string): void {
     if (moveChatLink(this.state, chatId, sessionId)) this.persist();
+  }
+
+  // --- Внешние интеграции: итог проверки связи и привязки проектов ---
+
+  /** Итоги последних проверок связи: id интеграции → запись (копия, не внутренний объект). */
+  getIntegrationHealth(): Record<string, IntegrationHealthRecord> {
+    return readIntegrationHealth(this.state);
+  }
+
+  saveIntegrationHealth(id: string, record: IntegrationHealthRecord): void {
+    writeIntegrationHealth(this.state, id, record);
+    this.persist();
+  }
+
+  /** Интеграцию забыли (сняли токен) — след проверки уходит вместе с ней. */
+  forgetIntegrationHealth(id: string): void {
+    if (dropIntegrationHealth(this.state, id)) this.persist();
+  }
+
+  getIntegrationLinks(path: string): IntegrationLinks {
+    return readIntegrationLinks(this.state, path);
+  }
+
+  /** Все привязки разом: активация MCP по началу прогона спрашивает именно так. */
+  getAllIntegrationLinks(): Record<string, IntegrationLinks> {
+    return readAllIntegrationLinks(this.state);
+  }
+
+  setIntegrationLink(
+    path: string,
+    groupId: string | undefined,
+    link: IntegrationLink,
+  ): IntegrationLinks {
+    const links = writeIntegrationLink(this.state, path, groupId, link);
+    this.persist();
+    return links;
+  }
+
+  removeIntegrationLink(path: string, groupId?: string): IntegrationLinks {
+    const links = dropIntegrationLink(this.state, path, groupId);
+    this.persist();
+    return links;
   }
 }

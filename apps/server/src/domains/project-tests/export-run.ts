@@ -2,6 +2,7 @@ import type { ProjectTestGroup, ProjectTestRunRecord } from '@agentdeck/contract
 import { ProjectTestsNotFoundError, ProjectTestsError } from './files.ts';
 import { readGroups } from './store.ts';
 import { readRun } from './runs-store.ts';
+import { renderPdf } from './pdf.ts';
 import type { ExportedFile } from './export-cases.ts';
 
 /**
@@ -12,13 +13,14 @@ import type { ExportedFile } from './export-cases.ts';
  * читают файл, а не чужой localhost. Поэтому здесь ровно то, что нужно на
  * стороне: чем гоняли, на какой ветке, что упало и что при этом видели.
  *
- * Форматов два и оба текстовые. Markdown читают глазами (и он же печатается в
- * PDF браузером), CSV открывают в Excel и сводят с чем угодно. Своего PDF
- * панель не рисует намеренно: это был бы третий генератор вёрстки ради одной
- * страницы.
+ * Форматов четыре, и все — один и тот же отчёт. Markdown читают глазами и
+ * кладут в MR, CSV открывают в Excel, HTML сверстан под ПЕЧАТЬ (A4, поля,
+ * неразрываемые строки таблицы), а PDF из него печатает браузер машины
+ * (`pdf.ts`). Своего движка вёрстки панель не заводит: страница одна, а
+ * Chromium с печатью в PDF стоит у всех.
  */
 
-export type RunExportFormat = 'md' | 'csv';
+export type RunExportFormat = 'md' | 'csv' | 'html';
 
 const STATUS_TEXT: Record<string, string> = {
   passed: 'пройден',
@@ -163,6 +165,97 @@ export function runToMarkdown(run: ProjectTestRunRecord, groups: ProjectTestGrou
   return [...head, ...failures, ...table].join('\n');
 }
 
+/** Экранирование для HTML: в заметках прогона бывает и `<`, и `&`. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Тот же отчёт, свёрстанный под печать.
+ *
+ * Стили внутри страницы и без единого внешнего файла: печатать её будет
+ * браузер во временной папке, где ни шрифтов, ни картинок рядом нет, а
+ * страница, ждущая сеть, печатается пустой. `@page` задаёт A4 и поля,
+ * `break-inside: avoid` не даёт разорвать строку таблицы между листами —
+ * без этого половина провала уезжает на следующую страницу.
+ */
+export function runToHtml(run: ProjectTestRunRecord, groups: ProjectTestGroup[]): string {
+  const titles = titlesOf(groups);
+  const broken = run.results.filter(
+    (result) => result.status === 'failed' || result.status === 'blocked',
+  );
+  const facts = [
+    ['Начат', run.startedAt],
+    ['Завершён', run.finishedAt ?? 'не завершался'],
+    ['Исполнитель', ACTOR_TEXT[run.actor] ?? run.actor],
+    ['Ветка', run.branch ?? '—'],
+    ['Коммит', run.commit ? run.commit.slice(0, 12) : '—'],
+    ['Окружение', run.environmentId ?? '—'],
+    ['План', run.planId ?? '—'],
+  ];
+
+  const rows = runRows(run, groups)
+    .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
+    .join('\n');
+
+  const failures = broken.length
+    ? broken
+        .map((result) => {
+          const title = titles.get(`${result.groupId}:${result.caseId}`) ?? result.caseId;
+          const note = result.note ? ` — ${result.note}` : '';
+          return `<li><b>${escapeHtml(title)}</b> [${STATUS_TEXT[result.status] ?? result.status}]${escapeHtml(note)}</li>`;
+        })
+        .join('\n')
+    : '<li>Провалов нет.</li>';
+
+  return `<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Прогон ${escapeHtml(run.startedAt)}</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  body { font: 11pt/1.45 "Segoe UI", Arial, sans-serif; color: #111; margin: 0; }
+  h1 { font-size: 18pt; margin: 0 0 4mm; }
+  h2 { font-size: 13pt; margin: 6mm 0 2mm; }
+  dl { display: grid; grid-template-columns: 34mm 1fr; gap: 1mm 4mm; margin: 0 0 4mm; }
+  dt { color: #555; }
+  dd { margin: 0; }
+  .summary { border: 1px solid #ccc; padding: 3mm; margin: 0 0 4mm; }
+  ul { margin: 0; padding-left: 6mm; }
+  li { break-inside: avoid; margin-bottom: 1.5mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  th, td { border: 1px solid #ccc; padding: 1.5mm 2mm; text-align: left; vertical-align: top; }
+  th { background: #f3f3f3; }
+  tr { break-inside: avoid; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<h1>Прогон: ${escapeHtml(MODE_TEXT[run.mode] ?? run.mode)}</h1>
+<dl>${facts.map(([name, value]) => `<dt>${name}</dt><dd>${escapeHtml(String(value))}</dd>`).join('')}</dl>
+${run.error ? `<p class="error">Сорвался: ${escapeHtml(run.error)}</p>` : ''}
+<p class="summary"><b>Итог:</b> пройдено ${run.summary.passed} · провалено ${run.summary.failed} · пропущено ${run.summary.skipped} · заблокировано ${run.summary.blocked} (всего ${run.summary.total})</p>
+<h2>Что упало</h2>
+<ul>
+${failures}
+</ul>
+<h2>Проходы</h2>
+${
+  rows
+    ? `<table><thead><tr>${COLUMNS.map((name) => `<th>${name}</th>`).join('')}</tr></thead><tbody>
+${rows}
+</tbody></table>`
+    : '<p>Результатов в записи нет.</p>'
+}
+</body>
+</html>`;
+}
+
 /** Отчёт по прогону файлом. Прогон ищется и по имени файла, и по своему id. */
 export function exportRun(root: string, runId: string, format: RunExportFormat): ExportedFile {
   const run = readRun(root, runId);
@@ -185,5 +278,25 @@ export function exportRun(root: string, runId: string, format: RunExportFormat):
       body: Buffer.from(runToCsv(run, groups), 'utf8'),
     };
   }
-  throw new ProjectTestsError(`Формат отчёта по прогону: md или csv.`);
+  if (format === 'html') {
+    return {
+      filename: `run-${stamp}.html`,
+      contentType: 'text/html; charset=utf-8',
+      body: Buffer.from(runToHtml(run, groups), 'utf8'),
+    };
+  }
+  throw new ProjectTestsError(`Формат отчёта по прогону: md, csv или html.`);
+}
+
+/**
+ * Тот же отчёт в PDF. Печатает браузер машины; браузера нет — 501 с именем
+ * того, что поставить (`pdf.ts`), а не пустой файл.
+ */
+export async function exportRunPdf(root: string, runId: string): Promise<ExportedFile> {
+  const html = exportRun(root, runId, 'html');
+  return {
+    filename: html.filename.replace(/\.html$/, '.pdf'),
+    contentType: 'application/pdf',
+    body: await renderPdf(html.body.toString('utf8')),
+  };
 }

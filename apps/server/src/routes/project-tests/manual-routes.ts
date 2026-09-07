@@ -1,6 +1,11 @@
 import type { ProjectTestManualResultInput, ProjectTestStatus } from '@agentdeck/contracts';
 import type { FastifyInstance } from 'fastify';
-import { saveAttachment } from '../../domains/project-tests.ts';
+import {
+  acceptBaseline,
+  compareBaseline,
+  readBaselines,
+  saveAttachment,
+} from '../../domains/project-tests.ts';
 import { guard, idList, requireRoot, type TestsDeps } from './shared.ts';
 
 /** Статусы прохода. Список повторён здесь нарочно: приводить чужой ввод к
@@ -126,6 +131,72 @@ export function registerTestManualRoutes(app: FastifyInstance, deps: TestsDeps):
       }
       return guard(reply, () => ({
         file: saveAttachment(root, caseId, name, contentBase64, now()),
+      }));
+    },
+  );
+
+  /**
+   * Снимок на сравнение с эталоном.
+   *
+   * Эталона ещё нет — снимок им и становится; не сошлось — рядом ложатся снимок
+   * и картинка-разница, а решение принимает человек кнопкой «Принять эталон».
+   * Сами картинки клиент тянет обычным `/api/project-files/raw`: гнать PNG
+   * через JSON значит раздуть его в base64 и лишить браузер своего показа.
+   */
+  app.post<{
+    Body: {
+      path?: string;
+      caseId?: string;
+      pointId?: string;
+      contentBase64?: string;
+      maxDiffRatio?: number;
+    };
+  }>('/api/project-tests/baseline', (request, reply) => {
+    const root = requireRoot(request.body?.path, reply);
+    if (!root) return reply;
+    const { caseId, pointId, contentBase64, maxDiffRatio } = request.body ?? {};
+    if (!caseId || !pointId || !contentBase64) {
+      return reply.code(400).send({ message: 'Нужен кейс, тест-поинт и сам снимок.' });
+    }
+    if (
+      maxDiffRatio !== undefined &&
+      (typeof maxDiffRatio !== 'number' || maxDiffRatio < 0 || maxDiffRatio > 1)
+    ) {
+      return reply.code(400).send({ message: 'Порог расхождения — доля от 0 до 1.' });
+    }
+    return guard(reply, () => ({
+      baseline: compareBaseline(root, {
+        caseId,
+        pointId,
+        png: Buffer.from(contentBase64, 'base64'),
+        maxDiffRatio,
+        now: now(),
+      }),
+    }));
+  });
+
+  /** Принять последний снимок эталоном — единственный способ его сменить. */
+  app.post<{ Body: { path?: string; caseId?: string; pointId?: string } }>(
+    '/api/project-tests/baseline/accept',
+    (request, reply) => {
+      const root = requireRoot(request.body?.path, reply);
+      if (!root) return reply;
+      const { caseId, pointId } = request.body ?? {};
+      if (!caseId || !pointId) {
+        return reply.code(400).send({ message: 'Нужен кейс и тест-поинт.' });
+      }
+      return guard(reply, () => ({ baseline: acceptBaseline(root, caseId, pointId, now()) }));
+    },
+  );
+
+  /** Эталоны проекта: все или одного кейса — по ним рисуется «было/стало». */
+  app.get<{ Querystring: { path?: string; caseId?: string } }>(
+    '/api/project-tests/baselines',
+    (request, reply) => {
+      const root = requireRoot(request.query.path, reply);
+      if (!root) return reply;
+      return guard(reply, () => ({
+        baselines: readBaselines(root, request.query.caseId?.trim() || undefined),
       }));
     },
   );

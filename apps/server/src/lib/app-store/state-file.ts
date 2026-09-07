@@ -37,7 +37,20 @@ export function mergeState(loaded: Partial<AppState>): AppState {
     projectCodeViews: { ...base.projectCodeViews, ...loaded.projectCodeViews },
     projectCascade: { ...base.projectCascade, ...loaded.projectCascade },
     chatLinks: { ...base.chatLinks, ...loaded.chatLinks },
-    settings: { ...base.settings, ...loaded.settings },
+    integrationHealth: { ...base.integrationHealth, ...loaded.integrationHealth },
+    integrationLinks: { ...base.integrationLinks, ...loaded.integrationLinks },
+    settings: {
+      ...base.settings,
+      ...loaded.settings,
+      // Интеграции сливаем ОТДЕЛЬНО: снимок со старой машины (и любой state.json,
+      // записанный до этой партии) не знает о них вовсе, а частичный объект из
+      // импорта иначе стёр бы недостающие карточки — и связь «Настройки → пять
+      // карточек всегда» перестала бы выполняться.
+      integrations: {
+        ...base.settings.integrations,
+        ...loaded.settings?.integrations,
+      },
+    },
   };
 }
 

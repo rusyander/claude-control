@@ -72,6 +72,64 @@ const remoteAccessSettingsSchema = object({
   notify: boolean(),
 });
 
+/**
+ * Внешние интеграции: видимая половина настройки. ТОКЕНОВ здесь нет — они живут
+ * в зашифрованном хранилище панели и правятся отдельным маршрутом
+ * (`PUT /api/integrations/:id`). Схема повторяет `integrationsSettingsSchema`
+ * из contracts: расходиться им нельзя, иначе PATCH молча срежет поле и тумблер
+ * на карточке отскочит назад.
+ *
+ * Блок целиком необязателен, а внутри него обязательны все поля: карточка
+ * присылает свою настройку одним объектом, и частичный объект здесь означал бы
+ * «остальные поля стереть» — ровно то, чего форма не имела в виду.
+ */
+export const integrationSettingsSchemas = {
+  atlassian: object({
+    enabled: boolean(),
+    baseUrl: string(),
+    email: string(),
+    deployment: zodEnum(['', 'cloud', 'server']),
+    confluenceUrl: string(),
+  }),
+  forge: object({
+    enabled: boolean(),
+    kind: zodEnum(['', 'github', 'gitlab']),
+    baseUrl: string(),
+    repo: string(),
+  }),
+  telegram: object({
+    enabled: boolean(),
+    chatId: string(),
+    events: array(zodEnum(['runDone', 'runError', 'permission', 'question', 'testFailed'])),
+  }),
+  tms: object({
+    enabled: boolean(),
+    kind: zodEnum(['', 'zephyr', 'xray']),
+    projectKey: string(),
+    groupId: string(),
+  }),
+  ci: object({
+    enabled: boolean(),
+    kind: zodEnum(['', 'github', 'gitlab']),
+    repo: string(),
+    workflow: string(),
+    artifact: string(),
+  }),
+};
+
+/**
+ * Тот же набор одним блоком настроек. Схемы карточек вынесены выше и отдаются
+ * наружу поимённо: маршрут `PUT /api/integrations/:id` проверяет ОДНУ карточку,
+ * и второе описание тех же полей рядом с первым разошлось бы с ним на первой же
+ * правке формы.
+ *
+ * Блок целиком необязателен (об этом `.partial()` всей схемы PATCH), но ВНУТРИ
+ * него обязательны все пять: карточки правятся своим маршрутом, а сюда блок
+ * попадает только целиком — снимком состояния. Половина блока здесь означала бы
+ * «остальные карточки стереть».
+ */
+const integrationsSettingsSchema = object(integrationSettingsSchemas);
+
 /** Поля настроек без дефолтов — для частичной проверки PATCH. */
 export const settingsPatchSchema = object({
   theme: zodEnum(['light', 'dark', 'system']),
@@ -113,6 +171,7 @@ export const settingsPatchSchema = object({
   assistantEndpointId: string(),
   dlp: dlpSettingsSchema,
   promptGate: promptGateSettingsSchema,
+  integrations: integrationsSettingsSchema,
 }).partial();
 
 /**
@@ -156,6 +215,11 @@ export const importStateSchema = object({
   projectCodeLayout: unknown(),
   chatLinks: record(string(), unknown()),
   pushDevices: array(unknown()),
+  // Итоги проверок внешних систем и привязки проектов к Jira/Confluence: без
+  // этих двух ключей снимок увозил бы настройки интеграций, но терял бы всё,
+  // ради чего они заведены, — какая задача относится к какому проекту.
+  integrationHealth: record(string(), unknown()),
+  integrationLinks: record(string(), unknown()),
   // `secretBackupVerifier` намеренно НЕ импортируем: это отпечаток парольной
   // фразы, которая есть только в голове у владельца исходной машины. Чужой
   // verifier заблокировал бы шифрование копий здесь навсегда.

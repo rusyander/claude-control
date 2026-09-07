@@ -6,10 +6,12 @@
  * отдельно разбор файлов, отдельно текст задания, отдельно реестры прогонов.
  * Каждый модуль сам решает, что показывать наружу; здесь только сборка.
  */
+export { ProjectTestsLockedError, ProjectTestsUnavailableError } from './project-tests/files.ts';
 export {
   DEFAULT_GROUPS,
   ProjectTestsError,
   ProjectTestsNotFoundError,
+  SECTION_SPLIT_THRESHOLD,
   TESTS_DIR,
   applyResults,
   bulkCases,
@@ -61,6 +63,12 @@ export { historyOf } from './project-tests/history.ts';
 export { ProjectTestManualRegistry, remainingPoints } from './project-tests/manual.ts';
 export { availableTargets, buildDraft, createDefect } from './project-tests/defects.ts';
 export { saveAttachment } from './project-tests/attachments.ts';
+export {
+  DEFAULT_MAX_DIFF_RATIO,
+  acceptBaseline,
+  compareBaseline,
+  readBaselines,
+} from './project-tests/baselines.ts';
 export { buildPrompt } from './project-tests/prompt.ts';
 export { hasConvention, installConvention } from './project-tests/convention.ts';
 export { ProjectTestRunRegistry } from './project-tests/runs.ts';

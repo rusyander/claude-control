@@ -202,6 +202,20 @@ export function TestsTopic() {
         />
       </HelpSection>
 
+      {/* Что раздел умеет ТОЛЬКО с настроенными интеграциями. Подробности —
+          отдельный документ; здесь достаточно знать, что эти кнопки есть и
+          откуда они берутся, иначе их ищут в разделе и не находят. */}
+      <HelpSection title={tr('externalTitle')} caption={tr('externalCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('externalDefect'), text: tr('externalDefectText') },
+            { title: tr('externalPublish'), text: tr('externalPublishText') },
+            { title: tr('externalPdf'), text: tr('externalPdfText') },
+            { title: tr('externalBaseline'), text: tr('externalBaselineText') },
+          ]}
+        />
+      </HelpSection>
+
       <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
         <CapabilityGrid
           canTitle={t('help.common.canTitle')}

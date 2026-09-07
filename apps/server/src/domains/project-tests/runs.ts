@@ -21,6 +21,12 @@ import { readEnvironments, readSharedSteps } from './library.ts';
 import { planCases, readPlan } from './plans.ts';
 import { gitContext, impactOf } from './impact.ts';
 import { writeRun } from './runs-store.ts';
+import {
+  runScope,
+  startPermissionGate,
+  type RunPermissionGate,
+  type RunScope,
+} from './run-permissions.ts';
 
 /**
  * Прогоны тестов: генерация кейсов, их проверка, свободный поиск, автоматизация.
@@ -45,7 +51,10 @@ const MAX_LOG = 200_000;
 
 /** Одновременно идущий прогон на проект — один. */
 export class ProjectTestRunRegistry {
-  private readonly runs = new Map<string, { view: ProjectTestRun; run: ChatRun }>();
+  private readonly runs = new Map<
+    string,
+    { view: ProjectTestRun; run: ChatRun; gate?: RunPermissionGate }
+  >();
 
   /**
    * Куда сообщить, что прогон кончился. Тот же отправитель, что у чатов:
@@ -66,6 +75,24 @@ export class ProjectTestRunRegistry {
   /** Все прогоны — по ним панель узнаёт, что где-то ещё идёт работа. */
   list(): ProjectTestRun[] {
     return [...this.runs.values()].map((entry) => entry.view);
+  }
+
+  /**
+   * Прогон, который держит эту группу прямо сейчас, — его id или ничего.
+   *
+   * Пока агент идёт по кейсам, он переписывает файл группы после КАЖДОГО из них.
+   * Правка из панели в этот момент либо потеряется под его записью, либо сотрёт
+   * его результаты: обе стороны честно пишут файл целиком. Поэтому на время
+   * прогона группа занята, а человек получает 409 с именем прогона — его видно
+   * в панели и его можно остановить.
+   *
+   * Прогон без группы (`groupId` пуст) идёт по всем файлам сразу и держит любую.
+   */
+  holds(projectPath: string, groupId?: string): string | undefined {
+    const entry = this.runs.get(projectPath);
+    if (!entry || entry.view.status !== 'running') return undefined;
+    if (entry.view.groupId && groupId && entry.view.groupId !== groupId) return undefined;
+    return entry.view.id;
   }
 
   /**
@@ -145,24 +172,66 @@ export class ProjectTestRunRegistry {
     this.runs.set(root, { view, run });
     this.persist(root, view);
 
-    void run
-      .start(
+    const scope = runScope(
+      root,
+      request.mode,
+      scoped.flatMap((group) => group.cases),
+    );
+    void this.launch(root, run, prompt, runName(request, scoped), scope);
+
+    return view;
+  }
+
+  /**
+   * Запуск агента с правами прогона.
+   *
+   * Прав спрашивать не у кого — человек прогон не сторожит, — поэтому решения
+   * принимает сама панель: под прогон поднимается приёмник брокера прав
+   * (`run-permissions.ts`), и каждый вызов инструмента сверяется с границами
+   * режима. `bypassPermissions` остаётся ТОЛЬКО аварийным запасным путём: если
+   * приёмник не поднялся, прогон должен всё равно состояться — иначе безопасность
+   * превращается в «панель больше не гоняет тесты».
+   */
+  private async launch(
+    root: string,
+    run: ChatRun,
+    prompt: string,
+    name: string,
+    scope: RunScope,
+  ): Promise<void> {
+    let gate: RunPermissionGate | undefined;
+    try {
+      gate = await startPermissionGate(scope, (tool, message) => this.note(root, tool, message));
+      const entry = this.runs.get(root);
+      if (entry) entry.gate = gate;
+    } catch (error) {
+      this.note(root, 'права', `приёмник прав не поднялся (${(error as Error).message})`);
+    }
+
+    try {
+      await run.start(
         {
           prompt,
           cwd: root,
-          name: runName(request, scoped),
-          // Прогон идёт без человека: спросить разрешение не у кого, а отказ на
-          // каждый вызов превратил бы любой тест в «не удалось проверить».
-          // Границы держит задание — трогать разрешено только .agent/tests.
-          permissionMode: 'bypassPermissions',
+          name,
+          // С приёмником — обычный режим: каждый вызов инструмента проходит через
+          // границы прогона. Без него — прежний полный доступ, но об этом сказано
+          // в логе прогона, а не молчком.
+          permissionMode: gate ? 'default' : 'bypassPermissions',
+          ...(gate ? { permissionPrompt: { runId: gate.runId, baseUrl: gate.baseUrl } } : {}),
         },
         (event) => this.consume(root, event),
-      )
-      .catch((error: unknown) => {
-        this.finish(root, 'error', (error as Error).message);
-      });
+      );
+    } catch (error) {
+      this.finish(root, 'error', (error as Error).message);
+    }
+  }
 
-    return view;
+  /** Строка от панели в лог прогона — отказ прав или причина, почему их нет. */
+  private note(projectPath: string, tool: string, message: string): void {
+    const entry = this.runs.get(projectPath);
+    if (!entry) return;
+    entry.view.log = tail(`${entry.view.log}\n· панель: ${tool} — ${message}\n`);
   }
 
   /** Остановить прогон человеком. Уже записанные статусы остаются. */
@@ -238,6 +307,10 @@ export class ProjectTestRunRegistry {
   private finish(projectPath: string, status: ProjectTestRun['status'], error?: string): void {
     const entry = this.runs.get(projectPath);
     if (!entry || entry.view.status !== 'running') return;
+    // Приёмник прав живёт ровно столько, сколько прогон: открытый порт после
+    // конца работы — это чужая дверь в решения о правах.
+    entry.gate?.close();
+    entry.gate = undefined;
     entry.view.status = status;
     entry.view.finishedAt = new Date().toISOString();
     if (error) entry.view.error = error;

@@ -151,6 +151,11 @@ export const en: Dictionary = {
     stop: 'Stop',
     scope: 'What to focus on: chat only, for example',
     onComputer: 'The run happens on the computer: the agent starts the app where the code lives.',
+    links: {
+      title: 'Linked to',
+      issue: 'Issue',
+      page: 'Requirements',
+    },
     running: 'Run in progress',
     generating: 'The agent is writing cases',
     done: 'Run finished',

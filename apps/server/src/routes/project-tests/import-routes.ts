@@ -91,8 +91,11 @@ export function registerProjectTestsImportRoutes(app: FastifyInstance, _ctx: Ser
       if (!root) return reply;
 
       const format = (request.query.format ?? 'md') as RunExportFormat;
-      if (format !== 'md' && format !== 'csv') {
-        return reply.code(400).send({ message: 'Формат отчёта по прогону: md или csv.' });
+      // `html` — та же вёрстка, из которой печатается PDF: она нужна и сама по
+      // себе, когда браузера для печати на машине нет, а показать отчёт человеку
+      // всё равно надо.
+      if (format !== 'md' && format !== 'csv' && format !== 'html') {
+        return reply.code(400).send({ message: 'Формат отчёта по прогону: md, csv или html.' });
       }
       const id = request.query.id?.trim();
       if (!id) return reply.code(400).send({ message: 'Не указан прогон.' });

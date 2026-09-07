@@ -1,0 +1,16 @@
+/* Три снимка в ряд: сравнивают их глазами, а не переключателем. На узком
+   экране колонки схлопываются сами — сверка с телефона тоже нужна. */
+.panes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--spacing-xs);
+}
+
+.shot {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  /* Шахматка под прозрачными участками: иначе прозрачность неотличима от белого. */
+  background-color: var(--color-surface-sunken);
+}

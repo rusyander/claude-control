@@ -13,6 +13,9 @@ export const SETTINGS_TABS = [
   { id: 'access', icon: 'lock' },
   { id: 'providers', icon: 'swap' },
   { id: 'models', icon: 'link' },
+  // Интеграции стоят сразу за провайдерами и моделями: это тоже «с чем панель
+  // разговаривает наружу», только не про модель, а про трекер и мессенджер.
+  { id: 'integrations', icon: 'plug' },
   { id: 'spend', icon: 'analytics' },
   { id: 'safety', icon: 'permissions' },
   { id: 'transfer', icon: 'file' },

@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../context.ts';
 import { cascadeProjectKey, isCascadeEnabled } from '../../domains/model-cascade.ts';
+import { readLoweredRuns, summarizeLoweredRuns } from '../../domains/chat/lowered-journal.ts';
 
 /**
  * Правило «Подбирать модель под задачу» — чтение и запись положения тумблера.
@@ -30,5 +31,15 @@ export function registerChatCascadeRoutes(app: FastifyInstance, ctx: ServerConte
     const project = cascadeProjectKey(resolve(path));
     ctx.store.setProjectCascade(project, request.body?.enabled !== false);
     return { enabled: request.body?.enabled !== false, project };
+  });
+
+  /**
+   * Журнал понижённых прогонов веера. Свежие первыми — читают его сверху вниз,
+   * а на диске он лежит в порядке записи. Сводка считается на сервере: правило
+   * «что считать проверкой» одно и живёт рядом со списком образцов.
+   */
+  app.get('/api/chat/lowered-runs', () => {
+    const records = readLoweredRuns(ctx.location.paths.appData);
+    return { runs: [...records].reverse(), summary: summarizeLoweredRuns(records) };
   });
 }

@@ -123,7 +123,13 @@ export function useCreateTestDefect(path: string | undefined) {
     mutationFn: async (payload: {
       groupId: string;
       caseId: string;
-      target: 'github' | 'gitlab';
+      /**
+       * Куда заводить. Строка, а не закрытый список: целей у сервера стало
+       * больше, чем `gh`/`glab` (Jira, фордж по токену), и держать их перечень
+       * на фронте значит обновлять его вслед за сервером в двух местах. Что
+       * доступно на самом деле, говорит `draft.targets`.
+       */
+      target: string;
       title: string;
       body: string;
     }) => {

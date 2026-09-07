@@ -36,6 +36,37 @@ export class ProjectTestsNotFoundError extends ProjectTestsError {
   }
 }
 
+/**
+ * Файл занят чужой работой: по этой группе прямо сейчас идёт прогон.
+ *
+ * 409, а не «сохранили и разъехались»: агент пишет в тот же файл десятки раз в
+ * минуту, и правка из панели поверх его записи потеряется молча — человек
+ * увидит своё изменение в форме и не увидит его на диске.
+ */
+export class ProjectTestsLockedError extends ProjectTestsError {
+  override statusCode = 409;
+  /** Прогон, который держит группу, — по нему его и открывают в панели. */
+  readonly runId: string;
+
+  constructor(message: string, runId: string) {
+    super(message);
+    this.name = 'ProjectTestsLockedError';
+    this.runId = runId;
+  }
+}
+
+/**
+ * Возможности нет на ЭТОЙ машине (нет браузера для PDF) — 501, а не 500 и не
+ * пустой файл: человек должен прочитать, чего не хватает, и поставить это.
+ */
+export class ProjectTestsUnavailableError extends ProjectTestsError {
+  override statusCode = 501;
+  constructor(message: string) {
+    super(message);
+    this.name = 'ProjectTestsUnavailableError';
+  }
+}
+
 /** Идентификатор файла или сущности = имя файла: диапазон сужен намеренно. */
 export function assertId(id: string, what = 'Идентификатор'): string {
   if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(id)) {

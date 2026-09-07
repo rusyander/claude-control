@@ -9,7 +9,8 @@ import {
   readRun,
   readRuns,
 } from '../../domains/project-tests.ts';
-import { buildView, guard, idList, requireRoot, type TestsDeps } from './shared.ts';
+import { exportRunPdf } from '../../domains/project-tests/export-run.ts';
+import { buildView, guard, guardAsync, idList, requireRoot, type TestsDeps } from './shared.ts';
 
 /** Режимы прогона: чужое слово в теле не должно запускать неизвестно что. */
 const MODES: ProjectTestRunMode[] = ['generate', 'run', 'explore', 'automate'];
@@ -99,6 +100,29 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
         const run = readRun(root, id);
         if (!run) throw new ProjectTestsNotFoundError(`Прогона «${id}» в истории нет.`);
         return { run };
+      });
+    },
+  );
+
+  /**
+   * Отчёт по прогону в PDF — печатает браузер машины (`domains/project-tests/pdf.ts`).
+   *
+   * Отдельным маршрутом, а не форматом у общего экспорта: печать асинхронная и
+   * может честно ответить «нечем» (501 с именем того, что поставить). Остальные
+   * форматы того же отчёта (md, csv, html) отдаёт `GET /run/export`.
+   */
+  app.get<{ Querystring: { path?: string; id?: string } }>(
+    '/api/project-tests/run/pdf',
+    async (request, reply) => {
+      const root = requireRoot(request.query.path, reply);
+      if (!root) return reply;
+      return guardAsync(reply, async () => {
+        const file = await exportRunPdf(root, String(request.query.id ?? ''));
+        return reply
+          .type(file.contentType)
+          .header('Content-Disposition', `attachment; filename="${file.filename}"`)
+          .header('Cache-Control', 'no-store')
+          .send(file.body);
       });
     },
   );

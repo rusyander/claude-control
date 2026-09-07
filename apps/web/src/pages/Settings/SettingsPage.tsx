@@ -12,6 +12,7 @@ import { GeneralTab } from './GeneralTab';
 import { AccessTab } from './AccessTab';
 import { ProvidersTab } from './ProvidersTab';
 import { ModelsTab } from './ModelsTab';
+import { IntegrationsTab } from './IntegrationsTab';
 import { SpendTab } from './SpendTab';
 import { SafetyTab } from './SafetyTab';
 import { TransferTab } from './TransferTab';
@@ -88,6 +89,7 @@ export function SettingsPage() {
           {activeTab === 'access' && <AccessTab />}
           {activeTab === 'providers' && <ProvidersTab />}
           {activeTab === 'models' && <ModelsTab settings={settings} patch={patch} />}
+          {activeTab === 'integrations' && <IntegrationsTab />}
           {activeTab === 'spend' && <SpendTab settings={settings} patch={patch} />}
           {activeTab === 'safety' && <SafetyTab settings={settings} patch={patch} />}
           {activeTab === 'transfer' && <TransferTab />}

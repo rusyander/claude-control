@@ -1,0 +1,23 @@
+/* Список найденного: длинный ответ трекера не должен растягивать окно. */
+.results {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.resultRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--color-surface-sunken);
+  }
+}

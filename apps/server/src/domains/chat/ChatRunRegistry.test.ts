@@ -6,6 +6,7 @@ import {
   type RunSubscriber,
 } from './ChatRunRegistry.ts';
 import type { ChatEvent, RunOptions } from './ChatRunner.ts';
+import type { LoweredRunRecord } from '@agentdeck/contracts/model-cascade';
 
 /**
  * Реестр прогонов, отвязанный от HTTP-запроса. Настоящий CLI не запускаем —
@@ -527,4 +528,109 @@ const DONE_EVENT: ChatEvent = { kind: 'done', costUsd: 0, durationMs: 1, session
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+/**
+ * Журнал понижённых прогонов. До него отметка `lowered` умирала в маршруте:
+ * сервер разворачивал по ней алиас, дописывал планку сдачи — и забывал, кто и
+ * чем шёл. Реестр — единственное место, где виден ВЕСЬ прогон целиком, поэтому
+ * запись собирается здесь, а куда её класть, знает bootstrap.
+ */
+describe('ChatRunRegistry — журнал понижённых прогонов', () => {
+  const bash = (command: string): ChatEvent => ({
+    kind: 'tool',
+    name: 'Bash',
+    input: { command },
+    id: `t-${command}`,
+  });
+
+  it('записывает понижённый прогон с замеченными проверками', async () => {
+    const fake = new FakeRun();
+    const registry = new ChatRunRegistry(() => fake);
+    const written: LoweredRunRecord[] = [];
+    registry.setLoweredJournal((entry) => written.push(entry));
+
+    registry.start('c1', OPTIONS, {
+      projectPath: '/tmp/proj',
+      lowered: { model: 'claude-sonnet-5', effort: 'high' },
+    });
+    fake.emit({ kind: 'session', sessionId: 'sess-9', model: 'claude-sonnet-5', tools: 1 });
+    fake.emit(bash('pnpm test'));
+    fake.emit(bash('ls src'));
+    fake.emit(bash('npx tsc --noEmit'));
+    fake.finish();
+    await flush();
+
+    expect(written).toHaveLength(1);
+    expect(written[0]?.model).toBe('claude-sonnet-5');
+    expect(written[0]?.effort).toBe('high');
+    expect(written[0]?.sessionId).toBe('sess-9');
+    expect(written[0]?.projectPath).toBe('/tmp/proj');
+    expect(written[0]?.ok).toBe(true);
+    // Записаны ТОЛЬКО похожие на проверки: `ls src` в список не попал.
+    expect(written[0]?.checks).toEqual(['pnpm test', 'npx tsc --noEmit']);
+  });
+
+  it('прогон без проверок пишется с пустым списком, а не пропускается', async () => {
+    const fake = new FakeRun();
+    const registry = new ChatRunRegistry(() => fake);
+    const written: LoweredRunRecord[] = [];
+    registry.setLoweredJournal((entry) => written.push(entry));
+
+    registry.start('c1', OPTIONS, { lowered: { model: 'claude-haiku-4-5', effort: '' } });
+    fake.emit(bash('git status'));
+    fake.finish();
+    await flush();
+
+    // Именно это и есть вопрос, ради которого журнал заведён: понижение было,
+    // а прогона проверок панель не видела.
+    expect(written).toHaveLength(1);
+    expect(written[0]?.checks).toEqual([]);
+  });
+
+  it('прогон на потолке в журнал не попадает', async () => {
+    const fake = new FakeRun();
+    const registry = new ChatRunRegistry(() => fake);
+    const written: LoweredRunRecord[] = [];
+    registry.setLoweredJournal((entry) => written.push(entry));
+
+    registry.start('c1', OPTIONS, { projectPath: '/tmp/proj' });
+    fake.emit(bash('pnpm test'));
+    fake.finish();
+    await flush();
+
+    expect(written).toEqual([]);
+  });
+
+  it('упавший прогон записан как упавший', async () => {
+    const fake = new FakeRun();
+    const registry = new ChatRunRegistry(() => fake);
+    const written: LoweredRunRecord[] = [];
+    registry.setLoweredJournal((entry) => written.push(entry));
+
+    registry.start('c1', OPTIONS, { lowered: { model: 'claude-sonnet-5', effort: 'high' } });
+    fake.emit({ kind: 'error', message: 'сломалось' });
+    fake.finish();
+    await flush();
+
+    expect(written[0]?.ok).toBe(false);
+  });
+
+  it('падение журнала не мешает прогону закрыться', async () => {
+    const fake = new FakeRun();
+    const registry = new ChatRunRegistry(() => fake);
+    registry.setLoweredJournal(() => {
+      throw new Error('диск кончился');
+    });
+
+    registry.start('c1', OPTIONS, { lowered: { model: 'claude-sonnet-5', effort: 'high' } });
+    const live = collector();
+    registry.attach('c1', 0, live.sub);
+    fake.finish();
+    await flush();
+
+    // Слушателя закрыли, прогон завершён — наблюдение не имеет права ломать работу.
+    expect(live.state.closed).toBe(true);
+    expect(registry.isRunning('c1')).toBe(false);
+  });
 });

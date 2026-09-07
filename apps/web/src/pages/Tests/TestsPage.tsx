@@ -14,6 +14,7 @@ import { useStartManualRun } from '@entities/ProjectTest';
 import { useTestsBoard } from '@features/ProjectTests';
 import { TestRunnerModal } from '@features/TestRunner';
 import { TestPlansPanel } from '@features/TestPlans';
+import { IntegrationLinksBar } from '@features/IntegrationLinks';
 import { useTestsProject } from '@entities/Project';
 import { TestsLibraryTab } from './TestsLibraryTab';
 import { TestsRunsTab } from './TestsRunsTab';
@@ -127,6 +128,15 @@ export function TestsPage() {
               </Typography>
             )}
           </Stack>
+
+          {/* Чем этот проект связан с внешним миром: куда заводить дефекты и
+              где лежат требования. Стоит НАД вкладками — это свойство всей
+              работы над проектом, а не одной её вкладки. */}
+          <IntegrationLinksBar
+            projectPath={projectPath}
+            activeScope={board.activeId}
+            scopes={board.groups.map((group) => ({ id: group.id, title: group.title }))}
+          />
 
           <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
             {TABS.map((item) => (

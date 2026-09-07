@@ -17,6 +17,9 @@ export const DEFAULT_STATE: AppState = {
   // где человек его ВЫКЛЮЧИЛ.
   projectCascade: {},
   chatLinks: {},
+  // Пусто — ни одна внешняя система ещё не проверялась и ничего не привязано.
+  integrationHealth: {},
+  integrationLinks: {},
   settings: {
     theme: 'system',
     language: 'ru',
@@ -67,5 +70,16 @@ export const DEFAULT_STATE: AppState = {
     // Доступ с телефона выключен по умолчанию: пока его не включили, панель
     // остаётся тем, чем была, — местным приложением на одну машину.
     remoteAccess: { enabled: false, publicUrl: '', notify: true },
+    // Ни одна внешняя система не подключена: панель остаётся тем, чем была, —
+    // местным приложением, которое никуда не ходит, пока его не попросили.
+    // Telegram по умолчанию слушает только то, ради чего его и заводят: упавший
+    // прогон и провал теста. «Работа закончена» на каждый чат — это спам.
+    integrations: {
+      atlassian: { enabled: false, baseUrl: '', email: '', deployment: '', confluenceUrl: '' },
+      forge: { enabled: false, kind: '', baseUrl: '', repo: '' },
+      telegram: { enabled: false, chatId: '', events: ['runError', 'testFailed'] },
+      tms: { enabled: false, kind: '', projectKey: '', groupId: '' },
+      ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
+    },
   },
 };

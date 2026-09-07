@@ -23,6 +23,7 @@ import { CompareTopic } from '../topics/CompareTopic';
 import { ProvidersTopic } from '../topics/ProvidersTopic';
 import { EndpointsTopic } from '../topics/EndpointsTopic';
 import { DlpTopic } from '../topics/DlpTopic';
+import { IntegrationsTopic } from '../topics/IntegrationsTopic';
 
 export { HELP_ROUTE } from '@shared/config/routes';
 
@@ -92,6 +93,15 @@ export const HELP_GROUPS: HelpGroup[] = [
         Content: PermissionsTopic,
       },
       { id: 'env', icon: 'env', pagePath: '/env', Content: EnvTopic },
+      // Вкладка настроек, а не свой раздел: `pagePath` ведёт в «Настройки»,
+      // где стоят карточки коннекторов. Кнопка «?» там уже есть — своя ей не
+      // нужна, документов на одной странице может быть несколько.
+      {
+        id: 'integrations',
+        icon: 'plug',
+        pagePath: '/settings',
+        Content: IntegrationsTopic,
+      },
       { id: 'projects', icon: 'folder', pagePath: '/projects', Content: ProjectsTopic },
     ],
   },

@@ -1,4 +1,3 @@
-import { existsSync, rmSync } from 'node:fs';
 import type {
   ProjectTestAutomation,
   ProjectTestBulkInput,
@@ -20,15 +19,20 @@ import {
   ProjectTestsNotFoundError,
   TESTS_DIR,
   assertId,
-  listFiles,
   optional,
-  readJson,
   stringList,
-  testsFile,
-  testsPath,
   text,
-  writeJson,
 } from './files.ts';
+import {
+  SECTION_SPLIT_THRESHOLD,
+  assertNotPart,
+  groupFileExists,
+  groupIndexFile,
+  listGroupIds,
+  readGroupSource,
+  removeGroupFiles,
+  writeGroupSource,
+} from './group-files.ts';
 import { readSchema } from './library.ts';
 
 /**
@@ -48,10 +52,7 @@ import { readSchema } from './library.ts';
  * Обратная совместимость здесь не любезность: файлы уже лежат в чужих проектах.
  */
 
-export { TESTS_DIR, ProjectTestsError, ProjectTestsNotFoundError };
-
-/** Суффикс файла группы: по нему группа и опознаётся среди прочего в папке. */
-const SUFFIX = '.tests.json';
+export { TESTS_DIR, ProjectTestsError, ProjectTestsNotFoundError, SECTION_SPLIT_THRESHOLD };
 
 /** Группы, которые панель заводит сама, если в проекте ещё ничего нет. */
 export const DEFAULT_GROUPS: { id: string; title: string; description: string }[] = [
@@ -67,14 +68,6 @@ export const DEFAULT_GROUPS: { id: string; title: string; description: string }[
   },
 ];
 
-/** Содержимое файла группы на диске. */
-interface GroupFile {
-  version: number;
-  title?: string;
-  description?: string;
-  cases?: unknown;
-}
-
 /** Идентификатор группы = имя файла. */
 export function assertGroupId(id: string): string {
   return assertId(id, 'Идентификатор группы');
@@ -82,11 +75,7 @@ export function assertGroupId(id: string): string {
 
 /** Путь файла группы от корня проекта — человеку видно, что где лежит. */
 export function groupFile(id: string): string {
-  return testsFile(`${id}${SUFFIX}`);
-}
-
-function groupPath(root: string, id: string): string {
-  return testsPath(root, `${assertGroupId(id)}${SUFFIX}`);
+  return groupIndexFile(id);
 }
 
 const KINDS: ProjectTestKind[] = ['case', 'checklist'];
@@ -193,6 +182,7 @@ function parseCase(raw: unknown, index: number): ProjectTestCase | undefined {
 
   const steps = toSteps(item.steps) as ProjectTestStep[];
   const duration = Number(item.duration);
+  const maxDiffRatio = Number(item.maxDiffRatio);
 
   return {
     id: text(item.id).trim() || `case-${index + 1}`,
@@ -217,6 +207,12 @@ function parseCase(raw: unknown, index: number): ProjectTestCase | undefined {
     automation: parseAutomation(item.automation),
     codePaths: stringList(item.codePaths).length > 0 ? stringList(item.codePaths) : undefined,
     defects: parseDefects(item.defects),
+    // Порог сравнения скриншотов — доля, а не проценты: значение вне 0–1 это
+    // чужая опечатка, и лучше общий порог, чем «сойдётся что угодно».
+    maxDiffRatio:
+      Number.isFinite(maxDiffRatio) && maxDiffRatio >= 0 && maxDiffRatio <= 1
+        ? maxDiffRatio
+        : undefined,
     status: toStatus(item.status) as ProjectTestStatus,
     statusId: optional(item.statusId),
     note: optional(item.note),
@@ -240,58 +236,60 @@ function withUniqueIds(cases: ProjectTestCase[]): ProjectTestCase[] {
   });
 }
 
-/** Одна группа с диска. Файл сломан → группа с `error` и пустым списком. */
+/**
+ * Одна группа с диска. Файл сломан → группа с `error` и пустым списком.
+ * Большой набор собирается из нескольких файлов (см. `group-files.ts`), но
+ * наружу это одна вкладка — разложенность видна только полем `files`.
+ */
 export function readGroup(root: string, id: string): ProjectTestGroup {
   const file = groupFile(id);
   const base: ProjectTestGroup = { id, title: id.toUpperCase(), file, cases: [] };
 
-  const { data, error } = readJson(root, `${id}${SUFFIX}`);
-  if (error) return { ...base, error };
-  if (data === undefined) return { ...base, error: 'Файл не читается: файла нет.' };
+  const source = readGroupSource(root, assertGroupId(id));
+  if (source.error) return { ...base, error: source.error };
 
-  const group = data as GroupFile;
-  const cases = Array.isArray(group?.cases)
-    ? withUniqueIds(
-        group.cases
-          .map((item, index) => parseCase(item, index))
-          .filter((item): item is ProjectTestCase => item !== undefined),
-      )
-    : [];
+  const cases = withUniqueIds(
+    source.cases
+      .map((item, index) => parseCase(item, index))
+      .filter((item): item is ProjectTestCase => item !== undefined),
+  );
 
   return {
     id,
-    title: text(group?.title).trim() || base.title,
-    description: optional(group?.description),
+    title: text(source.title).trim() || base.title,
+    description: optional(source.description),
     file,
+    files: source.files.length > 1 ? source.files : undefined,
     cases,
   };
 }
 
-/** Идентификаторы групп, найденные в папке, в алфавитном порядке. */
-function groupIds(root: string): string[] {
-  return listFiles(root, '', SUFFIX);
-}
-
 /** Все группы проекта. Пустой список — тестов в проекте ещё нет. */
 export function readGroups(root: string): ProjectTestGroup[] {
-  return groupIds(root).map((id) => readGroup(root, id));
+  return listGroupIds(root).map((id) => readGroup(root, id));
 }
 
 /** Запись группы целиком. Сломанную группу писать нельзя — иначе затрём файл. */
 export function writeGroup(root: string, group: ProjectTestGroup): void {
   if (group.error) throw new ProjectTestsError(group.error);
-  writeJson(root, `${assertGroupId(group.id)}${SUFFIX}`, {
-    version: 1,
+  writeGroupSource(root, assertGroupId(group.id), {
     title: group.title,
     description: group.description,
     cases: group.cases,
   });
 }
 
-/** Группа, готовая к правке: сломанную возвращаем ошибкой, а не пустышкой. */
+/**
+ * Группа, готовая к правке: сломанную возвращаем ошибкой, а не пустышкой.
+ *
+ * Читается ПРЯМО ПЕРЕД записью, а не берётся из ответа, показанного человеку:
+ * между показом списка и нажатием «Сохранить» проходят минуты, и всё это время
+ * в тот же файл пишет агент.
+ */
 export function loadForWrite(root: string, id: string): ProjectTestGroup {
-  const group = readGroup(root, assertGroupId(id));
-  if (group.error && existsSync(groupPath(root, id))) throw new ProjectTestsError(group.error);
+  assertNotPart(root, assertGroupId(id));
+  const group = readGroup(root, id);
+  if (group.error && groupFileExists(root, id)) throw new ProjectTestsError(group.error);
   return { ...group, error: undefined };
 }
 
@@ -303,7 +301,7 @@ export function createGroup(
   description?: string,
 ): ProjectTestGroup {
   const groupId = assertGroupId(id);
-  if (existsSync(groupPath(root, groupId))) return readGroup(root, groupId);
+  if (groupFileExists(root, groupId)) return readGroup(root, groupId);
   const known = DEFAULT_GROUPS.find((item) => item.id === groupId);
   const group: ProjectTestGroup = {
     id: groupId,
@@ -328,7 +326,7 @@ export function updateGroup(
   description?: string,
 ): ProjectTestGroup {
   const group = loadForWrite(root, assertGroupId(id));
-  if (!existsSync(groupPath(root, group.id))) {
+  if (!groupFileExists(root, group.id)) {
     throw new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`);
   }
   const next: ProjectTestGroup = {
@@ -340,11 +338,13 @@ export function updateGroup(
   return next;
 }
 
-/** Удалить группу вместе с файлом — это осознанное действие человека. */
+/** Удалить группу вместе с её файлами — это осознанное действие человека. */
 export function removeGroup(root: string, id: string): void {
-  const path = groupPath(root, assertGroupId(id));
-  if (!existsSync(path)) throw new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`);
-  rmSync(path, { force: true });
+  const groupId = assertGroupId(id);
+  if (!groupFileExists(root, groupId)) {
+    throw new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`);
+  }
+  removeGroupFiles(root, groupId);
 }
 
 /** Свободный идентификатор кейса внутри группы. */
@@ -401,9 +401,30 @@ function assertAttributes(root: string, attributes?: Record<string, string>): vo
 }
 
 /**
+ * Поле, которого в запросе НЕТ, берётся с диска.
+ *
+ * В этом вся разница между «сохранить кейс» и «перезаписать кейс». Форма панели
+ * знает не про все поля (их два десятка, и агент заполняет часть сам), а пока
+ * человек держал её открытой, тот же кейс мог дополнить прогон. Отсутствующее
+ * поле — «не трогай», явно пустое (`""`, `[]`) — «очисти».
+ */
+function patchText(value: unknown, previous?: string): string | undefined {
+  return value === undefined ? previous : optional(value);
+}
+
+function patchList<T>(value: T[] | undefined, previous?: T[]): T[] | undefined {
+  if (value === undefined) return previous;
+  return value.length > 0 ? value : undefined;
+}
+
+/**
  * Создать или обновить кейс. Правка из панели помечает кейс человеческим:
  * агенту велено такие не удалять, иначе он снесёт то, что человек только что
  * дописал, посчитав это своим устаревшим кейсом.
+ *
+ * Правка сводится ПО `id` с тем, что лежит на диске ПРЯМО СЕЙЧАС, а не заменяет
+ * кейс целиком: результат прогона (`status`, `note`, `lastRunAt`, вложения,
+ * дефекты) принадлежит тому, кто гонял, и сохранение описания его не стирает.
  */
 export function upsertCase(
   root: string,
@@ -417,35 +438,42 @@ export function upsertCase(
   const group = loadForWrite(root, groupId);
   const existing = input.id ? group.cases.find((item) => item.id === input.id) : undefined;
   if (input.id && !existing) throw new ProjectTestsError('Тест не найден.');
-  assertAttributes(root, input.attributes);
+  assertAttributes(root, input.attributes ?? existing?.attributes);
 
   const next: ProjectTestCase = {
     id: existing?.id ?? nextCaseId(group),
     type: input.type ?? existing?.type ?? 'case',
     title,
-    purpose: optional(input.purpose),
-    area: optional(input.area),
-    section: optional(input.section),
-    precondition: optional(input.precondition),
-    steps: inputSteps(input.steps),
-    expected: optional(input.expected),
-    postcondition: optional(input.postcondition),
-    oracle: optional(input.oracle),
+    purpose: patchText(input.purpose, existing?.purpose),
+    area: patchText(input.area, existing?.area),
+    section: patchText(input.section, existing?.section),
+    precondition: patchText(input.precondition, existing?.precondition),
+    steps: input.steps === undefined ? (existing?.steps ?? []) : inputSteps(input.steps),
+    expected: patchText(input.expected, existing?.expected),
+    postcondition: patchText(input.postcondition, existing?.postcondition),
+    oracle: patchText(input.oracle, existing?.oracle),
     priority: input.priority ?? existing?.priority,
     readiness: input.readiness ?? existing?.readiness,
     duration: input.duration ?? existing?.duration,
-    tags: input.tags?.length ? input.tags : undefined,
-    links: input.links?.length ? input.links : undefined,
+    tags: patchList(input.tags, existing?.tags),
+    links: patchList(input.links, existing?.links),
     attributes:
-      input.attributes && Object.keys(input.attributes).length ? input.attributes : undefined,
-    parameters: input.parameters?.length ? input.parameters : undefined,
-    attachments: input.attachments?.length ? input.attachments : existing?.attachments,
+      input.attributes === undefined
+        ? existing?.attributes
+        : Object.keys(input.attributes).length > 0
+          ? input.attributes
+          : undefined,
+    parameters: patchList(input.parameters, existing?.parameters),
+    // Вложения и дефекты пишет прогон: форма про них не знает и стереть их
+    // сохранением описания не может.
+    attachments: patchList(input.attachments, existing?.attachments),
     automation: input.automation ?? existing?.automation,
-    codePaths: input.codePaths?.length ? input.codePaths : existing?.codePaths,
+    codePaths: patchList(input.codePaths, existing?.codePaths),
     defects: existing?.defects,
+    maxDiffRatio: input.maxDiffRatio ?? existing?.maxDiffRatio,
     status: input.status ?? existing?.status ?? 'unknown',
     statusId: input.statusId ?? existing?.statusId,
-    note: optional(input.note) ?? existing?.note,
+    note: patchText(input.note, existing?.note),
     lastRunAt: existing?.lastRunAt,
     lastRunId: existing?.lastRunId,
     source: 'human',

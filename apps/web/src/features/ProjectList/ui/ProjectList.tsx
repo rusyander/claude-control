@@ -67,12 +67,21 @@ export function ProjectList({
               {t('projects.addFolder')}
             </Button>
           )}
-          {onParallelLaunch && present.length > 0 && (
+          {/*
+            Пустой список гасит кнопку, но НЕ убирает её. Исчезающий орган
+            управления человек читает как поломку панели: запускали веером
+            вчера, сегодня кнопки нет — и непонятно, дело в реестре проектов
+            или в самой панели. Выключенная кнопка с подсказкой отвечает на
+            этот вопрос сразу, а объяснение пустоты уже стоит ниже (EmptyState).
+          */}
+          {onParallelLaunch && (
             <Button
               variant="secondary"
               size="sm"
               leftIcon={<Icon name="send" size={20} />}
               onClick={onParallelLaunch}
+              disabled={present.length === 0}
+              title={present.length === 0 ? t('parallel.noProjects') : undefined}
               fullWidth
             >
               {t('parallel.button')}

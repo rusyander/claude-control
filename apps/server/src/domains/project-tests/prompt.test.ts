@@ -118,6 +118,18 @@ describe('project-tests/prompt', () => {
     expect(prompt).toContain('тур «плохой ввод»');
   });
 
+  it('задание предупреждает, что границы держит панель, а спрашивать некого', () => {
+    // Права теперь проверяет код (`run-permissions.ts`), но слова остаются:
+    // правило, о котором модель знает, она соблюдает сама, а отказ посреди
+    // работы стоит ей целого хода и выглядит как поломка инструмента.
+    for (const mode of ['generate', 'run', 'explore', 'automate'] as const) {
+      const prompt = buildPrompt([group], { projectPath: '/p', mode });
+      expect(prompt).toContain('панель отклоняет');
+      expect(prompt).toContain('Спрашивать разрешение');
+      expect(prompt).toContain('note');
+    }
+  });
+
   it('имя сессии называет режим и место — по нему прогон находят в списке чатов', () => {
     expect(runName({ projectPath: '/p', mode: 'run', groupId: 'gui' }, [group])).toContain('GUI');
     expect(runName({ projectPath: '/p', mode: 'generate' }, [group])).toContain('генерация');

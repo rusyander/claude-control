@@ -6,6 +6,7 @@ import { Badge } from '@shared/ui/badge';
 import { Typography } from '@shared/ui/typography';
 import { SearchField } from '@shared/ui/search-field';
 import { SelectField } from '@shared/ui/select-field';
+import { IntegrationLinkRows, useIntegrationLinks } from '@entities/Integration';
 import type { ProjectTestsRunBarProps } from './ProjectTestsRunBar.types';
 import styles from './ProjectTests.module.scss';
 
@@ -30,6 +31,13 @@ export function ProjectTestsRunBar({
   const run = board.run;
   const isRunning = run?.status === 'running';
   const cases = board.active?.cases ?? [];
+
+  // Внешний контекст показываем ТОЛЬКО чтением: правят его в разделе тестов и
+  // в карточке проекта, а из чата важно одно — увидеть, куда уедут дефекты,
+  // прежде чем запускать прогон.
+  const links = useIntegrationLinks(board.path);
+  const groupLink = board.activeId ? links.data?.groups?.[board.activeId] : undefined;
+  const contextLink = groupLink ?? links.data?.project;
 
   const counts = {
     passed: cases.filter((item) => item.status === 'passed').length,
@@ -152,6 +160,8 @@ export function ProjectTestsRunBar({
           </Typography>
         )}
       </Stack>
+
+      <IntegrationLinkRows link={contextLink} />
 
       <Typography variant="caption" color="subtle">
         {t('projectTests.fullAccessNote')}

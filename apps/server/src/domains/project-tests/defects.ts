@@ -1,12 +1,19 @@
 import { spawnSync } from 'node:child_process';
 import type {
+  DefectDraft,
+  DefectTarget,
   ProjectTestCase,
-  ProjectTestDefectDraft,
   ProjectTestPointResult,
   ProjectTestStep,
 } from '@agentdeck/contracts';
 import { stepText } from '@agentdeck/contracts/test-format';
+import type { AppStore } from '../../lib/app-store.ts';
 import { findCliOnPath } from '../../providers/detect.ts';
+import { toAccess } from '../integrations/atlassian/client.ts';
+import { createIssue } from '../integrations/atlassian/jira.ts';
+import { createForgeIssue, toForgeAccess } from '../integrations/forge.ts';
+import { linkForCwd } from '../integrations/links.ts';
+import { readIntegrations, readToken, requireConnected } from '../integrations/store.ts';
 import { ProjectTestsError } from './files.ts';
 
 /**
@@ -16,9 +23,19 @@ import { ProjectTestsError } from './files.ts';
  * увидел на самом деле. Это половина работы тестировщика, и она не должна
  * зависеть от того, подключён ли трекер.
  *
- * Заводить задачу панель умеет только тем, что уже стоит у человека: `gh` для
- * GitHub, `glab` для GitLab. Своих токенов она не просит и в сеть сама не
- * ходит — иначе пришлось бы хранить чужие секреты ради одной кнопки.
+ * Путей заведения теперь четыре, и они не равнозначны:
+ *
+ * - `github`/`gitlab` — установленные у человека `gh`/`glab`. Панель не хранит
+ *   ради них ни одного секрета, поэтому этот путь остаётся НАВСЕГДА и работает
+ *   там, где токена нет и не будет;
+ * - `forge` — тот же фордж, но по сохранённому токену: на машине без CLI это
+ *   единственный способ, а второго секрета он не требует — тот же токен уже
+ *   заведён ради подхвата отчётов CI;
+ * - `jira` — трекер, в котором дефект и живёт у команды.
+ *
+ * Список доступного считается ЖИВЫМ (`availableTargets`), а не берётся из
+ * настройки: CLI ставят и сносят, токен выкидывают, и предложить кнопку,
+ * которая заведомо откажет, хуже, чем не предложить её вовсе.
  */
 
 /** Кандидаты имён CLI: на Windows это ещё и `.cmd`-обёртка npm. */
@@ -28,6 +45,20 @@ const GLAB = process.platform === 'win32' ? ['glab.cmd', 'glab'] : ['glab'];
 /** Шаги в нумерованный список — так их читают в задаче. */
 function stepsBlock(steps: ProjectTestStep[]): string {
   return steps.map((step, index) => `${index + 1}. ${stepText(step)}`).join('\n');
+}
+
+/**
+ * Что нужно, чтобы узнать про подключённые по токену системы.
+ *
+ * Не обязательно: черновик собирается и без них — тогда в списке остаются
+ * только CLI. Так `buildDraft` продолжает работать там, где интеграций нет
+ * вовсе, и не тащит за собой состояние панели ради текста задачи.
+ */
+export interface DefectDeps {
+  store: AppStore;
+  appDataDir: string;
+  /** Каталог проверяемого проекта: по нему находится привязка к Jira. */
+  root?: string;
 }
 
 /** Черновик дефекта: заголовок и тело задачи. */
@@ -40,8 +71,9 @@ export function buildDraft(
     commit?: string;
     result?: ProjectTestPointResult;
     logTail?: string;
+    deps?: DefectDeps;
   },
-): ProjectTestDefectDraft {
+): DefectDraft {
   const actual = context.result?.note ?? testCase.note ?? 'не описано';
   const lines = [
     `**Кейс:** ${context.groupId}/${testCase.id} — ${testCase.title}`,
@@ -69,25 +101,106 @@ export function buildDraft(
   return {
     title: `[${testCase.area ?? context.groupId}] ${testCase.title}`,
     body: lines.filter((line) => line !== '').join('\n'),
-    targets: availableTargets(),
-    hint: hintOf(),
+    targets: availableTargets(context.deps),
+    hint: hintOf(context.deps),
   };
 }
 
-/** Куда можно завести задачу прямо отсюда. */
-export function availableTargets(): ProjectTestDefectDraft['targets'] {
-  const targets: ProjectTestDefectDraft['targets'] = [];
+/**
+ * Куда можно завести задачу ПРЯМО СЕЙЧАС. Порядок — от самого специфичного к
+ * запасному: команда, у которой есть Jira, ждёт дефект именно там.
+ */
+export function availableTargets(deps?: DefectDeps): DefectTarget[] {
+  const targets: DefectTarget[] = [];
+  if (jiraProjectOf(deps)) targets.push('jira');
+  if (forgeReady(deps)) targets.push('forge');
   if (findCliOnPath(GH)) targets.push('github');
   if (findCliOnPath(GLAB)) targets.push('gitlab');
   return targets;
 }
 
 /** Чем именно панель заведёт задачу — это видно человеку до нажатия. */
-function hintOf(): string | undefined {
-  const gh = findCliOnPath(GH);
-  const glab = findCliOnPath(GLAB);
-  if (gh && glab) return `${gh} / ${glab}`;
-  return gh ?? glab;
+function hintOf(deps?: DefectDeps): string | undefined {
+  const parts = [
+    jiraProjectOf(deps) ? `Jira ${jiraProjectOf(deps)}` : '',
+    forgeReady(deps) ? forgeTitle(deps) : '',
+    findCliOnPath(GH) ?? '',
+    findCliOnPath(GLAB) ?? '',
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' / ') : undefined;
+}
+
+/**
+ * Проект Jira для дефектов: только из привязки, сделанной человеком.
+ *
+ * Угадывать его нельзя ни при каких условиях: дефект, улетевший в чужой проект,
+ * увидит не та команда, а забрать его обратно панель не умеет.
+ */
+function jiraProjectOf(deps?: DefectDeps): string | undefined {
+  if (!deps?.root) return undefined;
+  try {
+    const settings = readIntegrations(deps.store).atlassian;
+    if (!settings.enabled || !readToken(deps.appDataDir, 'atlassian')) return undefined;
+    return linkForCwd(deps.store, deps.root)?.link.jiraProjectKey || undefined;
+  } catch {
+    // Состояние панели недоступно (нерасшифрованное хранилище, битый файл) —
+    // назначения просто нет. Черновик от этого не страдает, а он и есть главное.
+    return undefined;
+  }
+}
+
+function forgeReady(deps?: DefectDeps): boolean {
+  if (!deps) return false;
+  try {
+    const settings = readIntegrations(deps.store).forge;
+    if (!settings.enabled || !settings.kind) return false;
+    return Boolean(readToken(deps.appDataDir, 'forge'));
+  } catch {
+    return false;
+  }
+}
+
+function forgeTitle(deps?: DefectDeps): string {
+  try {
+    return deps && readIntegrations(deps.store).forge.kind === 'gitlab'
+      ? 'GitLab по токену'
+      : 'GitHub по токену';
+  } catch {
+    return 'фордж по токену';
+  }
+}
+
+/**
+ * Завести задачу по СОХРАНЁННОМУ токену — Jira или фордж.
+ *
+ * Отдельно от `createDefect`: тот запускает чужой CLI и ничего не знает про
+ * сеть, этот ходит наружу сам и потому асинхронный. Общего у них ровно текст
+ * задачи, и склеивать их в одну функцию значило бы получить третью, которая
+ * умеет и то, и другое наполовину.
+ */
+export async function createTokenDefect(
+  deps: DefectDeps,
+  target: 'jira' | 'forge',
+  title: string,
+  body: string,
+): Promise<string> {
+  if (target === 'jira') {
+    const projectKey = jiraProjectOf(deps);
+    if (!projectKey) {
+      throw new ProjectTestsError(
+        'К проекту не привязан проект Jira — привяжите его на карточке проекта.',
+      );
+    }
+    const token = requireConnected(deps.store, deps.appDataDir, 'atlassian', 'Atlassian');
+    const access = toAccess(readIntegrations(deps.store).atlassian, token);
+    const issue = await createIssue(access, { projectKey, summary: title, description: body });
+    return issue.url;
+  }
+
+  const token = requireConnected(deps.store, deps.appDataDir, 'forge', 'Фордж');
+  const access = toForgeAccess(readIntegrations(deps.store).forge, token, deps.root);
+  const issue = await createForgeIssue(access, title, body);
+  return issue.url;
 }
 
 /**

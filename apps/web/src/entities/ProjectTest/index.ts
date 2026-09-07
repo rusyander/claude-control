@@ -50,6 +50,7 @@ export type { StartManualPayload } from './api/ProjectTestManualApi';
 export {
   useImportTestResults,
   useImportTestCases,
+  usePublishTestRun,
   exportUrl,
   runExportUrl,
 } from './api/ProjectTestExchangeApi';
@@ -58,7 +59,11 @@ export type {
   ImportCasesPayload,
   ResultsFormat,
   CasesFormat,
+  RunExportFormat,
+  PublishTarget,
 } from './api/ProjectTestExchangeApi';
+
+export { useTestBaselines, useAcceptBaseline } from './api/ProjectTestBaselineApi';
 
 export {
   matchesFilter,

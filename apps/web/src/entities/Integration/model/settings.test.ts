@@ -1,0 +1,80 @@
+import { describe, it, expect } from 'vitest';
+import type { AppSettings } from '@agentdeck/contracts';
+import { DEFAULT_INTEGRATIONS, isLinkEmpty, readIntegration, readIntegrations } from './settings';
+
+/** Настройки панели без секции интеграций — конфиг, заведённый прошлой версией. */
+const bare = {} as AppSettings;
+
+describe('readIntegrations', () => {
+  it('без секции интеграций отдаёт умолчания, а не падает', () => {
+    expect(readIntegrations(bare)).toEqual(DEFAULT_INTEGRATIONS);
+    expect(readIntegrations(undefined)).toEqual(DEFAULT_INTEGRATIONS);
+  });
+
+  it('половина секции — вторая половина берётся из умолчаний', () => {
+    const settings = {
+      integrations: { atlassian: { enabled: true, baseUrl: 'https://site.atlassian.net' } },
+    } as unknown as AppSettings;
+
+    const result = readIntegrations(settings);
+    expect(result.atlassian.enabled).toBe(true);
+    expect(result.atlassian.baseUrl).toBe('https://site.atlassian.net');
+    expect(result.atlassian.email).toBe('');
+    expect(result.forge).toEqual(DEFAULT_INTEGRATIONS.forge);
+  });
+
+  it('чужое значение в закрытом списке читается как «не задано»', () => {
+    const settings = {
+      integrations: { forge: { kind: 'bitbucket' }, tms: { kind: 'zephyr' } },
+    } as unknown as AppSettings;
+
+    expect(readIntegrations(settings).forge.kind).toBe('');
+    expect(readIntegrations(settings).tms.kind).toBe('zephyr');
+  });
+
+  it('события Telegram отбираются по списку и приходят в известном порядке', () => {
+    const settings = {
+      integrations: { telegram: { events: ['question', 'выдумка', 'runDone'] } },
+    } as unknown as AppSettings;
+
+    expect(readIntegrations(settings).telegram.events).toEqual(['runDone', 'question']);
+  });
+
+  it('не-строка и не-массив на месте значения не протекают наружу', () => {
+    const settings = {
+      integrations: { ci: { repo: 42, artifact: null }, telegram: { events: 'runDone' } },
+    } as unknown as AppSettings;
+
+    expect(readIntegrations(settings).ci.repo).toBe('');
+    expect(readIntegrations(settings).ci.artifact).toBe('');
+    expect(readIntegrations(settings).telegram.events).toEqual([]);
+  });
+});
+
+describe('readIntegration', () => {
+  it('отдаёт настройки одного коннектора', () => {
+    const settings = {
+      integrations: { telegram: { enabled: true, chatId: '@qa' } },
+    } as unknown as AppSettings;
+
+    expect(readIntegration(settings, 'telegram')).toEqual({
+      enabled: true,
+      chatId: '@qa',
+      events: [],
+    });
+  });
+});
+
+describe('isLinkEmpty', () => {
+  it('нет привязки или все поля пусты — показывать нечего', () => {
+    expect(isLinkEmpty(undefined)).toBe(true);
+    expect(isLinkEmpty({})).toBe(true);
+    expect(isLinkEmpty({ jiraIssueTitle: 'Заголовок без ключа' })).toBe(true);
+  });
+
+  it('любое содержательное поле делает привязку видимой', () => {
+    expect(isLinkEmpty({ jiraIssueKey: 'QA-1' })).toBe(false);
+    expect(isLinkEmpty({ confluencePageId: '42' })).toBe(false);
+    expect(isLinkEmpty({ note: 'требования тут' })).toBe(false);
+  });
+});

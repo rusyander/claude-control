@@ -7,8 +7,9 @@ const report = (part: Partial<ProjectTestReport>): ProjectTestReport => ({
   automation: { manual: 0, toAutomate: 0, automated: 0 },
   flaky: [],
   failures: [],
+  releases: [],
   runs: [],
-  totals: { runs: 0, tokens: 0, costUsd: 0, durationMs: 0 },
+  totals: { runs: 0, tokens: 0, costUsd: 0, durationMs: 0, muted: 0 },
   ...part,
 });
 

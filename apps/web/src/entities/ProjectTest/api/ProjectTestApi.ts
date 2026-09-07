@@ -210,6 +210,8 @@ export interface StartTestRunPayload {
   planId?: string;
   environmentId?: string;
   scope?: string;
+  /** Веха прогона; пусто — сервер возьмёт ближайший тег git. */
+  release?: string;
   full?: boolean;
   changedOnly?: boolean;
 }

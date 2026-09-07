@@ -1,10 +1,11 @@
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { fetchCiReport } from '../../domains/integrations/ci.ts';
-import { readIntegrations, requireConnected } from '../../domains/integrations/store.ts';
+import { readIntegrations, readToken, requireConnected } from '../../domains/integrations/store.ts';
 import { tmsClient } from '../../domains/integrations/tms/index.ts';
 import { pullIntoGroup, pushRunToTms } from '../../domains/integrations/tms/sync.ts';
 import { sendTelegramMessage } from '../../domains/notify/telegram.ts';
+import { sendWebhook } from '../../domains/notify/webhook.ts';
 import { importResults } from '../../domains/project-tests/import-results.ts';
 import {
   appDataOf,
@@ -92,6 +93,27 @@ export function registerIntegrationExchangeRoutes(
       const settings = readIntegrations(deps.ctx.store).telegram;
       const chatId = requireString(settings.chatId, 'chatId', 'не указан чат для уведомлений');
       await sendTelegramMessage(token, chatId, '🔔 Проверка связи из панели agentdeck.');
+      return { ok: true };
+    }),
+  );
+
+  /**
+   * Проверка вебхука тем же способом — настоящим POST на указанный адрес.
+   *
+   * Событие помечено `test`, чтобы приёмник мог его отличить и не завести по
+   * нему дежурство. Секрет не обязателен: вебхук без подписи — обычный случай
+   * внутренней шины, и требовать ключ там, где его негде взять, значит
+   * заставить человека выключить проверку вовсе.
+   */
+  app.post('/api/integrations/webhook/test', (_request, reply) =>
+    guard(reply, async () => {
+      const settings = readIntegrations(deps.ctx.store).webhook;
+      const url = requireString(settings.url, 'url', 'не указан адрес вебхука');
+      await sendWebhook(url, readToken(appDataOf(deps), 'webhook'), {
+        event: 'test',
+        text: 'Проверка связи из панели agentdeck.',
+        at: new Date().toISOString(),
+      });
       return { ok: true };
     }),
   );

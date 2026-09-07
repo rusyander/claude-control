@@ -11,6 +11,7 @@ import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/pr
 import { DlpProxy } from '../domains/dlp.ts';
 import { createRunNotifier } from '../domains/remote-notify.ts';
 import { createTelegramNotifier, type TelegramNotice } from '../domains/notify/telegram.ts';
+import { createWebhookNotifier } from '../domains/notify/webhook.ts';
 import { activateAtlassianMcp } from '../domains/integrations/mcp-server.ts';
 import { readToken } from '../domains/integrations/store.ts';
 import { hasWorkSince } from '../domains/project-git.ts';
@@ -113,9 +114,20 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     settings: () => ctx.store.getSettings().integrations.telegram,
     token: () => readToken(ctx.location.paths.appData, 'telegram'),
   });
+  /**
+   * Третий адресат — вебхук: тот же заголовок, но своим адресом. Он закрывает
+   * всё, чего нет у первых двух: Slack, Mattermost, дежурного бота, внутреннюю
+   * шину. Подписка у него собственная, поэтому молчащий Telegram не означает
+   * молчащий вебхук.
+   */
+  const webhook = createWebhookNotifier({
+    settings: () => ctx.store.getSettings().integrations.webhook,
+    secret: () => readToken(ctx.location.paths.appData, 'webhook'),
+  });
   const notifyBoth = (notice: RunNotice): void => {
     notifyRun(notice);
     telegram(notice);
+    webhook(notice);
   };
   chatRuns.setNotifier(notifyBoth);
   /**
@@ -129,7 +141,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    */
   projectTestRuns.setNotifier((notice) => {
     notifyRun(notice);
-    telegram(testNotice(notice, projectTestRuns.get(notice.projectPath ?? '')));
+    const outward = testNotice(notice, projectTestRuns.get(notice.projectPath ?? ''));
+    telegram(outward);
+    webhook(outward);
   });
   /**
    * Дерево чатов переживает смену ключа. Разделение заводит чат под временным

@@ -65,6 +65,9 @@ export type {
 
 export { useTestBaselines, useAcceptBaseline } from './api/ProjectTestBaselineApi';
 
+export { useTestCoverage, useRefreshDefects } from './api/ProjectTestCoverageApi';
+export type { DefectRecheckItem, DefectRefreshResult } from './api/ProjectTestCoverageApi';
+
 export {
   matchesFilter,
   collectFacets,

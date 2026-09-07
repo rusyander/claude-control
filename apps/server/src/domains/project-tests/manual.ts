@@ -11,7 +11,7 @@ import { ProjectTestsError, ProjectTestsNotFoundError } from './files.ts';
 import { applyResults, readGroups, selectCases } from './store.ts';
 import { readEnvironments } from './library.ts';
 import { buildPoints, planCases, readPlan } from './plans.ts';
-import { gitContext } from './impact.ts';
+import { gitContext, releaseTag } from './impact.ts';
 import { writeRun } from './runs-store.ts';
 
 /**
@@ -191,6 +191,8 @@ export class ProjectTestManualRegistry {
       environmentId: session.environmentId,
       branch,
       commit,
+      // Ручной проход тоже попадает в веху: релиз проверяют и руками.
+      release: releaseTag(root),
       status,
       startedAt: session.startedAt,
       finishedAt: session.finishedAt,

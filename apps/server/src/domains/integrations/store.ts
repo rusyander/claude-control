@@ -29,14 +29,26 @@ import { readHealth } from './health.ts';
  * этого модуля не возвращает значение целиком.
  */
 
-/** Все пять — всегда, даже неподключённые: страница настроек рисует пять карточек. */
+/** Все — всегда, даже неподключённые: страница настроек рисует карточку на каждую. */
 export const INTEGRATION_IDS: readonly IntegrationId[] = [
   'atlassian',
   'forge',
   'telegram',
   'tms',
   'ci',
+  'webhook',
 ];
+
+/**
+ * Интеграции, живущие БЕЗ токена. У вебхука секрет подписи необязателен: адрес
+ * во внутренней сети — законная настройка, и требовать ключ там, где приёмник
+ * его не проверяет, значило бы запретить самый частый случай.
+ */
+const TOKENLESS: readonly IntegrationId[] = ['webhook'];
+
+export function needsToken(id: IntegrationId): boolean {
+  return !TOKENLESS.includes(id);
+}
 
 /** Ключ токена в общем хранилище секретов панели. */
 export function tokenId(id: IntegrationId): string {
@@ -118,7 +130,7 @@ export function describeIntegration(
   };
 }
 
-/** Все пять карточек — то, чем отвечает `GET /api/integrations`. */
+/** Все карточки — то, чем отвечает `GET /api/integrations`. */
 export function describeIntegrations(store: AppStore, appDataDir: string): IntegrationStatus[] {
   return INTEGRATION_IDS.map((id) => describeIntegration(store, appDataDir, id));
 }
@@ -149,11 +161,11 @@ export function requireConnected(
 ): string {
   const settings = readIntegrations(store)[id];
   const token = readToken(appDataDir, id);
-  if (!settings.enabled || !token) {
+  if (!settings.enabled || (needsToken(id) && !token)) {
     throw new IntegrationError(
       'integration_not_found',
       `${title} не подключена: включите её и сохраните токен в настройках панели.`,
     );
   }
-  return token;
+  return token ?? '';
 }

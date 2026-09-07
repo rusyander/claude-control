@@ -5,6 +5,7 @@ import type {
 } from '@agentdeck/contracts';
 import type { AppStore } from '../../lib/app-store.ts';
 import { telegramMe } from '../notify/telegram.ts';
+import { sendWebhook } from '../notify/webhook.ts';
 import { detectDeployment, trimUrl } from './atlassian/client.ts';
 import { IntegrationError } from './errors.ts';
 import { toForgeIdentity, whoAmI } from './forge.ts';
@@ -59,6 +60,21 @@ async function probeIntegration(
 ): Promise<Probe> {
   const settings = readIntegrations(store);
   const token = readToken(appDataDir, id);
+
+  // Вебхук проверяется ДО требования токена: секрет подписи у него
+  // необязателен. И проверка у него единственно возможная — настоящая
+  // отправка: «кто я» у произвольного адреса не спросишь, поэтому приёмник
+  // получает тело с событием `test`, по которому его и отличит от боевого.
+  if (id === 'webhook') {
+    const url = settings.webhook.url;
+    await sendWebhook(url, token, {
+      event: 'test',
+      text: 'Проверка связи из панели AgentDeck.',
+      at: new Date().toISOString(),
+    });
+    return { detail: `Приёмник ответил на пробное событие${token ? ' (тело подписано)' : ''}.` };
+  }
+
   if (!token) {
     throw new IntegrationError('integration_not_found', 'Токен не сохранён.');
   }

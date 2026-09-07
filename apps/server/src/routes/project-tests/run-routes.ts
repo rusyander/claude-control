@@ -42,6 +42,7 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       scope?: string;
       full?: boolean;
       changedOnly?: boolean;
+      release?: string;
     };
   }>('/api/project-tests/run', (request, reply) => {
     const root = requireRoot(request.body?.path, reply);
@@ -61,6 +62,7 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
           scope: request.body?.scope?.trim() || undefined,
           full: request.body?.full === true,
           changedOnly: request.body?.changedOnly === true,
+          release: request.body?.release?.trim() || undefined,
         },
         new Date().toISOString(),
       );

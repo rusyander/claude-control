@@ -68,11 +68,11 @@ Fix without asking: project code, deps, build config, launch env. Ask first: fil
 the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
 QA runs live in `tools/qa/` and need `pnpm dev` up + `pnpm qa:setup`; each drives the real UI of one
-area. Sixteen behave unlike the rest — `check-integrations.mjs`, `check-attention.mjs`, `check-provider-chat.mjs`,
+area. Seventeen behave unlike the rest — `check-integrations.mjs`, `check-attention.mjs`, `check-provider-chat.mjs`,
 `check-project-code.mjs`, `check-task-split.mjs`, `check-handoff.mjs`, `check-parent-hub.mjs`,
 `check-new-chat.mjs`, `check-stream-cap.mjs`, `check-cascade-stages.mjs`, `check-project-tests.mjs`,
-`check-tests-runner.mjs`, `check-tests-report.mjs`, `check-parallel-model.mjs`,
-`check-lowered-runs.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
+`check-tests-runner.mjs`, `check-tests-report.mjs`, `check-tests-coverage.mjs`,
+`check-parallel-model.mjs`, `check-lowered-runs.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
 so they depend on no particular history, on no installed CLI, and leave neither branches nor copies
 behind. `panel-pages.mjs` is the ONE route list the a11y (axe, both themes, create modals) and
 keyboard (Tab order, focus ring, Escape + focus return) sweeps share — a new section goes there or
@@ -176,6 +176,19 @@ an agent that forgot `lastRunAt` leaves checkmarks and an empty record. Impact =
 --porcelain -uall` (without `-uall` a new folder collapses to `src/` and matches no `codePaths`) →
 `codePaths` → the `area` word; nothing attributed ⇒ empty list, never "run everything".
 Detail: `.agent/code-map-projects.agent.md` §QA workspace.
+
+**A red case does not fail `pnpm tests report`, or a CI junit shows it as skipped** — quarantine, by
+design. `muted` removes exactly one right, colouring the run: the case still runs, keeps its real
+status, stays visible, `muteReason` says why. `export-cases.ts` → `<skipped>` with that reason;
+`tools/tests-cli.mjs report` neither counts it nor exits 1. Want the gate red → clear the flag, do
+not delete the case.
+
+**Coverage matrix shows only what is already linked / a requirement reads «uncovered»** — by design,
+and stated on screen. Requirements = case links (`links[type=requirement|issue]`, key parsed out of
+the URL so one issue is one row) + JQL from the project attachment when Atlassian is on — only the
+second source can surface an issue nobody linked, and its absence comes back as a `warning`.
+Archived cases excluded: a requirement covered only by an archived case is covered by nothing.
+`domains/project-tests/coverage.ts`; sweep `check-tests-coverage.mjs`.
 
 **Panel "switched itself off" after a few idle hours; sometimes only one half** — nothing crashed:
 the machine's janitor (`~/.claude/tools/proc-reaper`, task `ProcReaper`, every 4 h) reaped the stand

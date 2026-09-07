@@ -88,4 +88,10 @@ describe('dropEmpty', () => {
   it('включённый показ архива — тоже фильтр', () => {
     expect(dropEmpty({ includeArchived: true })).toEqual({ includeArchived: true });
   });
+
+  it('«без карантина» переживает очистку: у него ложь значима', () => {
+    expect(dropEmpty({ muted: false })).toEqual({ muted: false });
+    expect(dropEmpty({ muted: true })).toEqual({ muted: true });
+    expect(dropEmpty({ muted: undefined })).toEqual({});
+  });
 });

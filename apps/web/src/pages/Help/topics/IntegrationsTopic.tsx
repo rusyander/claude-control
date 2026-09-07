@@ -45,6 +45,7 @@ export function IntegrationsTopic() {
             { name: tr('cardAtlassian'), description: tr('cardAtlassianText'), isMono: false },
             { name: tr('cardForge'), description: tr('cardForgeText'), isMono: false },
             { name: tr('cardTelegram'), description: tr('cardTelegramText'), isMono: false },
+            { name: tr('cardWebhook'), description: tr('cardWebhookText'), isMono: false },
             { name: tr('cardTms'), description: tr('cardTmsText'), isMono: false },
             { name: tr('cardCi'), description: tr('cardCiText'), isMono: false },
           ]}
@@ -69,6 +70,8 @@ export function IntegrationsTopic() {
         <OptionCards
           items={[
             { title: tr('testsDefect'), text: tr('testsDefectText') },
+            { title: tr('testsDefectState'), text: tr('testsDefectStateText') },
+            { title: tr('testsCoverage'), text: tr('testsCoverageText') },
             { title: tr('testsPublish'), text: tr('testsPublishText') },
             { title: tr('testsPdf'), text: tr('testsPdfText') },
             { title: tr('testsBaseline'), text: tr('testsBaselineText') },
@@ -116,6 +119,11 @@ export function IntegrationsTopic() {
           </Callout>
           <Callout tone="info" title={tr('noteMcpTitle')}>
             {tr('noteMcpText')}
+          </Callout>
+          {/* Подпись — единственное, чем приёмник отличает панель от того, кто
+              просто узнал адрес: без неё вебхук принимает кто угодно. */}
+          <Callout tone="info" title={tr('noteSignatureTitle')}>
+            {tr('noteSignatureText')}
           </Callout>
         </Stack>
       </HelpSection>

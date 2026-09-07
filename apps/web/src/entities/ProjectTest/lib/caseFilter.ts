@@ -20,6 +20,7 @@ import { stepText } from '@agentdeck/contracts/test-format';
 /** Попал ли кейс под отбор. */
 export function matchesFilter(testCase: ProjectTestCase, filter: ProjectTestFilter): boolean {
   if (!filter.includeArchived && testCase.archived) return false;
+  if (filter.muted !== undefined && (testCase.muted === true) !== filter.muted) return false;
   if (filter.areas?.length && !filter.areas.includes(testCase.area ?? '')) return false;
   if (filter.types?.length && !filter.types.includes(testCase.type)) return false;
   if (filter.priorities?.length && !filter.priorities.includes(testCase.priority ?? 'medium')) {

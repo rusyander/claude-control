@@ -121,12 +121,26 @@ export const ciSettingsSchema = object({
   artifact: string().default(''),
 });
 
+/**
+ * Вебхук: адрес и подписка. Секрет подписи — токен, поэтому его здесь нет: он
+ * лежит в зашифрованном хранилище под тем же `int:webhook`, что и прочие ключи.
+ */
+export const webhookSettingsSchema = object({
+  enabled: boolean().default(false),
+  url: string().default(''),
+  events: array(zodEnum(['runDone', 'runError', 'permission', 'question', 'testFailed'])).default([
+    'runError',
+    'testFailed',
+  ]),
+});
+
 export const integrationsSettingsSchema = object({
   atlassian: atlassianSettingsSchema.default(() => atlassianSettingsSchema.parse({})),
   forge: forgeSettingsSchema.default(() => forgeSettingsSchema.parse({})),
   telegram: telegramSettingsSchema.default(() => telegramSettingsSchema.parse({})),
   tms: tmsSettingsSchema.default(() => tmsSettingsSchema.parse({})),
   ci: ciSettingsSchema.default(() => ciSettingsSchema.parse({})),
+  webhook: webhookSettingsSchema.default(() => webhookSettingsSchema.parse({})),
 });
 
 export const themeSchema = zodEnum(['light', 'dark', 'system']);

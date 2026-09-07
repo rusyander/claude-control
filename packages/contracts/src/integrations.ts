@@ -35,13 +35,47 @@ export interface ForgeSettings {
   repo: string;
 }
 
-export type TelegramEvent = 'runDone' | 'runError' | 'permission' | 'question' | 'testFailed';
+/** Событие панели, на которое можно подписаться наружу. */
+export type NotifyEvent = 'runDone' | 'runError' | 'permission' | 'question' | 'testFailed';
+
+/** Прежнее имя того же списка: подписка у Telegram и у вебхука одна и та же. */
+export type TelegramEvent = NotifyEvent;
 
 export interface TelegramSettings {
   enabled: boolean;
   /** Куда слать: id чата или канала (`@name` тоже принимается). */
   chatId: string;
   events: TelegramEvent[];
+}
+
+/**
+ * Вебхук: те же события, но своим адресом.
+ *
+ * Существует потому, что Telegram закрывает ровно одного адресата, а спрашивают
+ * про Slack, Mattermost, дежурного бота и внутреннюю шину. Один POST с JSON
+ * закрывает их все, и панели не нужно знать ни одного из них.
+ *
+ * Секрет подписи живёт в зашифрованном хранилище рядом с прочими токенами: если
+ * он задан, тело подписывается заголовком `X-AgentDeck-Signature`
+ * (HMAC-SHA256, hex) — иначе приёмник не отличит панель от любого, кто узнал
+ * адрес.
+ */
+export interface WebhookSettings {
+  enabled: boolean;
+  /** Куда слать POST с JSON. Только http(s). */
+  url: string;
+  events: NotifyEvent[];
+}
+
+/** Тело вебхука. Ровно то же, что уходит в Telegram, — заголовок без содержимого. */
+export interface WebhookPayload {
+  event: NotifyEvent;
+  /** Текст события по-русски — тот же, что читает человек в Telegram. */
+  text: string;
+  /** Имя папки проекта; у домашнего чата пусто. */
+  project?: string;
+  /** Момент отправки, ISO. */
+  at: string;
 }
 
 /** Тест-менеджмент в Jira. Место истины по кейсам остаётся там, а не в панели. */
@@ -72,6 +106,7 @@ export interface IntegrationsSettings {
   telegram: TelegramSettings;
   tms: TmsSettings;
   ci: CiSettings;
+  webhook: WebhookSettings;
 }
 
 export type IntegrationId = keyof IntegrationsSettings;
@@ -106,6 +141,14 @@ export interface JiraIssue {
   key: string;
   summary: string;
   status: string;
+  /**
+   * Куда статус относится по мнению самой Jira: `new`, `indeterminate`, `done`.
+   *
+   * Названия статусов у каждой команды свои («Готово», «Verified», «Закрыт»), и
+   * судить о закрытости по строке — гадание. Категорию Jira считает сама, и
+   * только по ней панель имеет право сказать «дефект закрыт».
+   */
+  statusCategory?: 'new' | 'indeterminate' | 'done';
   type: string;
   assignee?: string;
   updatedAt?: string;

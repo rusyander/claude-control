@@ -117,6 +117,14 @@ export function TestsReportTab({ projectPath }: { projectPath: string | undefine
                 minutes: Math.round(data.totals.durationMs / 60000),
               })}
             </Typography>
+            {/* Карантин показывается ТОЛЬКО когда он есть: строка «в карантине
+                0» приучает не читать это место, а именно из него сборка узнаёт,
+                почему она зелёная при красном кейсе. */}
+            {data.totals.muted > 0 && (
+              <Typography variant="body-sm">
+                {t('tests.report.muted', { count: data.totals.muted })}
+              </Typography>
+            )}
             {data.totals.lastRunAt && (
               <Typography variant="caption" color="subtle">
                 {t('tests.report.lastRun', {
@@ -210,6 +218,49 @@ export function TestsReportTab({ projectPath }: { projectPath: string | undefine
           ))}
         </Stack>
       </Card>
+
+      {/* Вехи: что проверено к релизу. Главное число здесь — непроверенное:
+          именно оно отвечает на «можно ли отдавать», а «прогонов 12» не
+          отвечает ни на что. Прогоны без вехи сюда не попадают. */}
+      {(data.releases ?? []).length > 0 && (
+        <Card padding="md">
+          <Stack gap="var(--spacing-2xs)">
+            <Typography variant="body-sm" weight="medium">
+              {t('tests.report.releases')}
+            </Typography>
+            <Typography variant="caption" color="subtle">
+              {t('tests.report.releasesHint')}
+            </Typography>
+            {(data.releases ?? []).map((item) => (
+              <Stack
+                key={item.release}
+                direction="row"
+                gap="var(--spacing-2xs)"
+                align="center"
+                wrap
+                className={styles.failureRow}
+              >
+                <Badge tone="info">{item.release}</Badge>
+                <Typography variant="caption" color="subtle" as="span">
+                  {t('tests.report.releaseCounts', {
+                    runs: item.runs,
+                    passed: item.passed,
+                    failed: item.failed,
+                  })}
+                </Typography>
+                <Badge tone={item.untested > 0 ? 'warning' : 'success'}>
+                  {t('tests.report.releaseUntested', { count: item.untested })}
+                </Badge>
+                {item.lastRunAt && (
+                  <Typography variant="caption" color="subtle" as="span">
+                    {new Date(item.lastRunAt).toLocaleString()}
+                  </Typography>
+                )}
+              </Stack>
+            ))}
+          </Stack>
+        </Card>
+      )}
 
       {/* Провалы, сведённые по причине: одна упавшая авторизация красит
           половину набора, и без этой сводки она читается как полсотни разных

@@ -79,6 +79,19 @@ describe('buildSettings', () => {
   });
 });
 
+describe('buildSettings: подписка вебхука', () => {
+  it('вебхук уходит вместе со списком событий — как Telegram', () => {
+    expect(
+      buildSettings({
+        id: 'webhook',
+        draft: { url: ' https://hooks.acme/x ' },
+        enabled: true,
+        events: ['runError'],
+      }),
+    ).toEqual({ enabled: true, url: 'https://hooks.acme/x', events: ['runError'] });
+  });
+});
+
 describe('isDraftDirty', () => {
   it('форма, равная сохранённому, правкой не считается', () => {
     const saved = { ...DEFAULT_INTEGRATIONS.forge, kind: 'github' as const, repo: 'org/app' };

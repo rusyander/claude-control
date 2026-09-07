@@ -9,6 +9,7 @@ import { registerTestPlanRoutes } from './project-tests/plan-routes.ts';
 import { registerTestRunRoutes } from './project-tests/run-routes.ts';
 import { registerTestManualRoutes } from './project-tests/manual-routes.ts';
 import { registerTestDefectRoutes } from './project-tests/defect-routes.ts';
+import { registerTestCoverageRoutes } from './project-tests/coverage-routes.ts';
 import { registerProjectTestsImportRoutes } from './project-tests/import-routes.ts';
 import type { TestsDeps } from './project-tests/shared.ts';
 
@@ -38,6 +39,7 @@ export function registerProjectTestsRoutes(
   registerTestRunRoutes(app, deps);
   registerTestManualRoutes(app, deps);
   registerTestDefectRoutes(app, deps);
+  registerTestCoverageRoutes(app, deps);
   // Импорт и выгрузка ходят только по пути проекта, реестры им не нужны.
   registerProjectTestsImportRoutes(app, ctx);
 }

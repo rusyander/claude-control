@@ -2778,6 +2778,7 @@ export const ru = {
       plans: 'Планы',
       runs: 'Прогоны',
       report: 'Отчёт',
+      coverage: 'Покрытие',
     },
     kind: { case: 'кейс', checklist: 'чек-лист' },
     priority: { blocker: 'блокер', high: 'высокая', medium: 'средняя', low: 'низкая' },
@@ -2795,6 +2796,9 @@ export const ru = {
       area: 'Зона',
       tag: 'Тег',
       archived: 'Показывать архив',
+      muted: 'Карантин',
+      mutedOnly: 'только карантин',
+      mutedWithout: 'без карантина',
       reset: 'Сбросить отбор',
       views: 'Наборы:',
       viewsEmpty: 'пока ни одного',
@@ -2836,9 +2840,13 @@ export const ru = {
         duplicate: 'размножить',
         archive: 'убрать в архив',
         restore: 'вернуть из архива',
+        mute: 'в карантин',
+        unmute: 'вернуть из карантина',
         delete: 'удалить',
       },
       tagValue: 'Тег',
+      muteReason: 'Причина карантина',
+      muteReasonHint: 'Чего ждём, чтобы вернуть кейс. Без причины его не снимут никогда.',
       sectionValue: 'Секция',
       groupValue: 'Группа-приёмник',
       pickGroup: 'выберите группу',
@@ -2895,6 +2903,10 @@ export const ru = {
       automation: 'Автоматизация',
       automationFile: 'Файл теста',
       automationTestName: 'Имя теста',
+      automationExternalId: 'Идентификатор автотеста',
+      automationExternalIdHint:
+        'По нему результат прогона находит кейс, даже если файл переехал: свойство junit, ' +
+        'метка allure (@allure.id) или строка «case: gui-001» в имени теста.',
       attachments: 'Вложения',
       attachmentsEmpty: 'Вложений нет — они появляются во время ручного прохода.',
       archived: 'В архиве',
@@ -3013,6 +3025,8 @@ export const ru = {
       environment: 'Окружение',
       environmentDefault: 'по умолчанию',
       environmentAll: 'все',
+      release: 'Веха',
+      releaseHint: 'Веха: v1.4',
       changedOnly: 'Только изменённое',
       changedOnlyHint:
         'Прогнать лишь те кейсы, которых касаются несохранённые правки рабочей копии.',
@@ -3071,6 +3085,43 @@ export const ru = {
         'Провалы, сведённые по тому, что записал исполнитель: одна поломка обычно красит сразу несколько кейсов.',
       failuresEmpty: 'Провалов с описанием причины нет.',
       failuresCases: 'кейсов: {{count}} — {{names}}',
+      muted: 'В карантине: {{count}}',
+      releases: 'Вехи',
+      releasesHint:
+        'Прогоны, сведённые по вехе. Непроверенное — кейсы, которых не коснулся ни один её прогон.',
+      releaseCounts: 'прогонов: {{runs}} · зелёных {{passed}} · красных {{failed}}',
+      releaseUntested: 'не проверено: {{count}}',
+    },
+    coverage: {
+      jql: 'Запрос требований (JQL)',
+      jqlPlaceholder: 'project = QA AND statusCategory != Done',
+      jqlHint:
+        'Пусто — берётся привязка проекта: дети привязанного эпика или открытые задачи проекта.',
+      apply: 'Показать',
+      refreshDefects: 'Обновить статусы дефектов',
+      defects: 'Дефекты',
+      defectsChecked: 'спрошено: {{count}}',
+      defectsClosed: 'закрыто: {{count}}',
+      defectsError: 'Статусы дефектов спросить не удалось — проверьте карточки интеграций.',
+      defect: 'дефект',
+      openDefect: 'открыть',
+      recheckHint: 'Дефект закрыт, а кейс всё ещё красный — эти стоит перепроверить.',
+      recheckEmpty: 'Перепроверять нечего: закрытых дефектов на красных кейсах нет.',
+      empty: 'Требований не видно',
+      emptyHint:
+        'Матрица собирается из ссылок кейсов (тип «требование» или «задача») и из задач Jira, ' +
+        'если Atlassian подключён и проект привязан.',
+      cases: 'кейсов: {{count}}',
+      uncovered: 'не покрыто',
+      uncoveredHint: 'На это требование не ссылается ни один живой кейс.',
+      orphans: 'Кейсы без требования: {{count}}',
+      orphansHint:
+        'Они проверяют что-то, но ответить, зачем, по ним нельзя: ссылки на требование нет.',
+    },
+    muted: {
+      badge: 'карантин',
+      badgeWhy: 'карантин: {{reason}}',
+      short: 'карантин',
     },
     publish: {
       target: 'Куда опубликовать',
@@ -3151,6 +3202,13 @@ export const ru = {
         tokenHint:
           'Токен бота от @BotFather. Бот должен быть добавлен в чат, иначе он туда не напишет.',
       },
+      webhook: {
+        title: 'Вебхук',
+        hint: 'Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON.',
+        tokenHint:
+          'Секрет подписи, не токен доступа. Задан — тело подписывается заголовком ' +
+          'X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи.',
+      },
       tms: {
         title: 'Тест-менеджмент',
         hint: 'Zephyr или Xray в Jira: забрать кейсы в группу панели и отправить туда результат прогона.',
@@ -3172,6 +3230,7 @@ export const ru = {
       },
       forge: { kind: 'Система', baseUrl: 'Адрес установки', repo: 'Репозиторий' },
       telegram: { chatId: 'Чат' },
+      webhook: { url: 'Адрес приёмника' },
       tms: { kind: 'Система', projectKey: 'Проект Jira', groupId: 'Группа тестов' },
       ci: { kind: 'Система', repo: 'Репозиторий', workflow: 'Сборка', artifact: 'Артефакт' },
     },
@@ -3189,6 +3248,7 @@ export const ru = {
         repo: 'owner/repo или числовой id проекта. Пусто — выведется из origin проверяемого проекта.',
       },
       telegram: { chatId: 'Числовой id чата или @имя канала.' },
+      webhook: { url: 'Куда слать POST с JSON. Только http(s).' },
       tms: {
         kind: 'Zephyr Scale или Xray — от этого зависит формат кейсов.',
         projectKey: 'Ключ проекта Jira, в котором лежат кейсы и циклы.',
@@ -3219,6 +3279,12 @@ export const ru = {
       },
       test: 'Отправить пробное',
       sent: 'Пробное сообщение отправлено',
+    },
+    webhook: {
+      test: 'Отправить пробное',
+      sent: 'Пробное событие отправлено',
+      signature:
+        'Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей.',
     },
     mcp: {
       connect: 'Подключить MCP Atlassian',

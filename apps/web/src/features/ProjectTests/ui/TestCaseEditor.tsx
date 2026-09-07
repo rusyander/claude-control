@@ -288,6 +288,18 @@ export function TestCaseEditor({
                 isMono
               />
             </div>
+            {/* Устойчивый идентификатор автотеста: по нему результат прогона
+                находит кейс, даже когда файл переехал, а тест переименовали.
+                Имя файла на эту роль не годится — оно меняется чаще всего. */}
+            <div className={styles.halfField}>
+              <TextField
+                label={t('tests.editor.automationExternalId')}
+                hint={t('tests.editor.automationExternalIdHint')}
+                value={draft.automationExternalId}
+                onChange={(value) => patch({ automationExternalId: value })}
+                isMono
+              />
+            </div>
           </Stack>
         </Stack>
 

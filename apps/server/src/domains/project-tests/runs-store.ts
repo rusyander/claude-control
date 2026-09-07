@@ -3,6 +3,7 @@ import type {
   ProjectTestFailureGroup,
   ProjectTestFlaky,
   ProjectTestGroup,
+  ProjectTestReleaseSummary,
   ProjectTestReport,
   ProjectTestRunRecord,
   ProjectTestRunSummary,
@@ -102,6 +103,7 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     branch: optional(record.branch),
     commit: optional(record.commit),
     scope: optional(record.scope),
+    release: optional(record.release),
     status: (optional(record.status) ?? 'done') as ProjectTestRunRecord['status'],
     startedAt,
     finishedAt: optional(record.finishedAt),
@@ -262,11 +264,15 @@ export function buildReport(
     { total: number; passed: number; failed: number; unknown: number }
   >();
   const automation = { manual: 0, toAutomate: 0, automated: 0 };
+  let muted = 0;
+  let liveCases = 0;
 
   for (const group of groups) {
     if (group.error) continue;
     for (const testCase of group.cases) {
       if (testCase.archived) continue;
+      liveCases += 1;
+      if (testCase.muted) muted += 1;
       const key = testCase.area ?? 'без зоны';
       const row = areas.get(key) ?? { total: 0, passed: 0, failed: 0, unknown: 0 };
       row.total += 1;
@@ -297,6 +303,49 @@ export function buildReport(
     automation,
     flaky: flakyCases(runs, groups),
     failures: failureGroups(runs, groups),
-    totals,
+    releases: releaseSummaries(runs, liveCases),
+    totals: { ...totals, muted },
   };
+}
+
+/**
+ * Прогоны, сведённые по вехам.
+ *
+ * Непроверенное считается по УНИКАЛЬНЫМ кейсам вехи: один и тот же кейс,
+ * пройденный в трёх прогонах релиза, проверен один раз, а не трижды, — иначе
+ * «проверено 40 из 30» стало бы обычным ответом отчёта.
+ */
+function releaseSummaries(
+  runs: ProjectTestRunRecord[],
+  liveCases: number,
+): ProjectTestReleaseSummary[] {
+  const byRelease = new Map<
+    string,
+    { runs: number; passed: number; failed: number; touched: Set<string>; lastRunAt?: string }
+  >();
+
+  for (const run of runs) {
+    const release = run.release?.trim();
+    if (!release) continue;
+    const row = byRelease.get(release) ?? { runs: 0, passed: 0, failed: 0, touched: new Set() };
+    row.runs += 1;
+    row.passed += run.summary?.passed ?? 0;
+    row.failed += run.summary?.failed ?? 0;
+    for (const result of run.results) row.touched.add(`${result.groupId}:${result.caseId}`);
+    // Прогоны приходят от новых к старым, поэтому первая дата вехи и есть
+    // последняя по времени.
+    row.lastRunAt = row.lastRunAt ?? run.startedAt;
+    byRelease.set(release, row);
+  }
+
+  return [...byRelease.entries()]
+    .map(([release, row]) => ({
+      release,
+      runs: row.runs,
+      passed: row.passed,
+      failed: row.failed,
+      untested: Math.max(liveCases - row.touched.size, 0),
+      lastRunAt: row.lastRunAt,
+    }))
+    .sort((left, right) => (right.lastRunAt ?? '').localeCompare(left.lastRunAt ?? ''));
 }

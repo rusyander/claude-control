@@ -22,7 +22,9 @@
  *   node tools/tests-cli.mjs report --reporter junit --out report.xml
  *
  * Коды возврата рассчитаны на CI: `report` отвечает 1, если есть провалённые
- * или заблокированные кейсы, `run` — кодом самой команды прогона.
+ * или заблокированные кейсы ВНЕ карантина, `run` — кодом самой команды прогона.
+ * Кейс в карантине печатается отдельным списком и сборку не роняет: команда уже
+ * решила, что он сейчас не сторожевой.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -421,18 +423,34 @@ async function report(project, options) {
   }
   console.log(`\n${summaryLine(groups)}`);
 
-  const failing = groups.flatMap((group) =>
-    group.cases
-      .filter((item) => !item.archived && (item.status === 'failed' || item.status === 'blocked'))
-      .map(
-        (item) => `  X ${group.id}/${item.id} ${item.title}${item.note ? ` — ${item.note}` : ''}`,
-      ),
+  const red = groups.flatMap((group) =>
+    group.cases.filter((item) => !item.archived && isRed(item)).map((item) => ({ group, item })),
   );
+  const failing = red.filter(({ item }) => !item.muted);
+  const muted = red.filter(({ item }) => item.muted);
+
   if (failing.length > 0) {
     console.log('\nКрасные кейсы:');
-    for (const line of failing) console.log(line);
+    for (const { group, item } of failing) console.log(redLine(group, item));
+  }
+  if (muted.length > 0) {
+    // Карантин печатается отдельно и НИЖЕ: это не «ещё немного красного», а
+    // список, к которому надо вернуться, — и сборку он не роняет намеренно.
+    console.log('\nВ карантине (сборку не роняют):');
+    for (const { group, item } of muted) {
+      const why = item.muteReason ? ` — ${item.muteReason}` : '';
+      console.log(`  ~ ${group.id}/${item.id} ${item.title}${why}`);
+    }
   }
   process.exit(failing.length > 0 ? 1 : 0);
+}
+
+function isRed(item) {
+  return item.status === 'failed' || item.status === 'blocked';
+}
+
+function redLine(group, item) {
+  return `  X ${group.id}/${item.id} ${item.title}${item.note ? ` — ${item.note}` : ''}`;
 }
 
 function countOf(cases) {
@@ -440,18 +458,27 @@ function countOf(cases) {
   return {
     total: live.length,
     passed: live.filter((item) => item.status === 'passed').length,
-    failed: live.filter((item) => item.status === 'failed' || item.status === 'blocked').length,
+    // Красный кейс в карантине остаётся красным в таблице — врать о статусе
+    // нельзя. Из счёта, которым гейтят CI (`failedCount`), он вычтен.
+    failed: live.filter((item) => isRed(item)).length,
+    muted: live.filter((item) => item.muted).length,
     skipped: live.filter((item) => item.status === 'skipped').length,
     unknown: live.filter((item) => item.status === 'unknown' || item.status === 'running').length,
   };
 }
 
+/** Провалы, которыми гейтят CI: карантин сюда не входит — в этом его смысл. */
 function failedCount(groups) {
-  return groups.reduce((sum, group) => sum + countOf(group.cases).failed, 0);
+  return groups.reduce(
+    (sum, group) =>
+      sum + group.cases.filter((item) => !item.archived && isRed(item) && !item.muted).length,
+    0,
+  );
 }
 
 function summaryLine(groups) {
   const all = groups.flatMap((group) => group.cases);
   const counts = countOf(all);
-  return `Всего кейсов: ${counts.total} · зелёных ${counts.passed} · красных ${counts.failed} · пропущено ${counts.skipped} · не гоняли ${counts.unknown}`;
+  const quarantine = counts.muted > 0 ? ` · в карантине ${counts.muted}` : '';
+  return `Всего кейсов: ${counts.total} · зелёных ${counts.passed} · красных ${counts.failed} · пропущено ${counts.skipped} · не гоняли ${counts.unknown}${quarantine}`;
 }

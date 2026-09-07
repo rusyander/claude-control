@@ -116,6 +116,20 @@ export function TestFilterBar({ filters, views, onSaveView, onRemoveView }: Test
           options={plainOptions(facets.tags)}
         />
 
+        {/* Карантин отдельным списком, а не переключателем: спрашивают о нём
+            три разных вопроса — «покажи всё», «покажи только карантин» (чтобы
+            его разобрать) и «спрячь карантин» (чтобы видеть настоящую картину). */}
+        <SelectField
+          label={t('tests.library.muted')}
+          value={mutedValue(filter.muted)}
+          onChange={(value) => patch({ muted: mutedFilter(value) })}
+          options={[
+            anyOption,
+            { value: 'only', label: t('tests.library.mutedOnly') },
+            { value: 'without', label: t('tests.library.mutedWithout') },
+          ]}
+        />
+
         <Stack direction="row" gap="var(--spacing-2xs)" align="center" className={styles.archived}>
           <Toggle
             checked={Boolean(filter.includeArchived)}
@@ -207,6 +221,19 @@ const PRIORITIES: readonly string[] = ['blocker', 'high', 'medium', 'low'];
 const KINDS: readonly string[] = ['case', 'checklist'];
 const READINESS: readonly string[] = ['draft', 'ready', 'obsolete'];
 const AUTOMATION: readonly string[] = ['manual', 'toAutomate', 'automated'];
+
+/** Трёхзначный отбор карантина в значение `select` и обратно. */
+function mutedValue(muted: boolean | undefined): string {
+  if (muted === true) return 'only';
+  if (muted === false) return 'without';
+  return '';
+}
+
+function mutedFilter(value: string): boolean | undefined {
+  if (value === 'only') return true;
+  if (value === 'without') return false;
+  return undefined;
+}
 
 /** Первое значение списка фильтра — `select` показывает одно. */
 function first(list: readonly string[] | undefined): string {

@@ -115,6 +115,11 @@ export const integrationSettingsSchemas = {
     workflow: string(),
     artifact: string(),
   }),
+  webhook: object({
+    enabled: boolean(),
+    url: string(),
+    events: array(zodEnum(['runDone', 'runError', 'permission', 'question', 'testFailed'])),
+  }),
 };
 
 /**
@@ -124,7 +129,7 @@ export const integrationSettingsSchemas = {
  * правке формы.
  *
  * Блок целиком необязателен (об этом `.partial()` всей схемы PATCH), но ВНУТРИ
- * него обязательны все пять: карточки правятся своим маршрутом, а сюда блок
+ * него обязательны все карточки: они правятся своим маршрутом, а сюда блок
  * попадает только целиком — снимком состояния. Половина блока здесь означала бы
  * «остальные карточки стереть».
  */

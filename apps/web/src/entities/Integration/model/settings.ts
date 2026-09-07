@@ -22,9 +22,14 @@ import type {
  */
 
 /** Порядок карточек на вкладке: сверху то, без чего остальное бессмысленно. */
-export const INTEGRATION_IDS = ['atlassian', 'forge', 'telegram', 'tms', 'ci'] as const;
+export const INTEGRATION_IDS = ['atlassian', 'forge', 'telegram', 'webhook', 'tms', 'ci'] as const;
 
-/** События, о которых умеет писать Telegram, — в порядке от частого к редкому. */
+/**
+ * События уведомлений в порядке от частого к редкому.
+ *
+ * Список ОДИН на Telegram и вебхук намеренно: это одни и те же события панели,
+ * и разойтись им было бы не в чем — разное здесь только то, куда они уходят.
+ */
 export const TELEGRAM_EVENTS: readonly TelegramEvent[] = [
   'runDone',
   'runError',
@@ -39,6 +44,7 @@ export const DEFAULT_INTEGRATIONS: IntegrationsSettings = {
   telegram: { enabled: false, chatId: '', events: [] },
   tms: { enabled: false, kind: '', projectKey: '', groupId: '' },
   ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
+  webhook: { enabled: false, url: '', events: [] },
 };
 
 /**
@@ -65,7 +71,7 @@ function readTelegramEvents(value: unknown): TelegramEvent[] {
   return TELEGRAM_EVENTS.filter((event) => value.includes(event));
 }
 
-/** Настройки всех пяти коннекторов с умолчаниями вместо дыр. */
+/** Настройки всех коннекторов с умолчаниями вместо дыр. */
 export function readIntegrations(settings: AppSettings | undefined): IntegrationsSettings {
   const raw: PartialIntegrations = settings?.integrations ?? {};
   const atlassian: PartialIntegrations['atlassian'] = raw.atlassian ?? {};
@@ -73,6 +79,7 @@ export function readIntegrations(settings: AppSettings | undefined): Integration
   const telegram: PartialIntegrations['telegram'] = raw.telegram ?? {};
   const tms: PartialIntegrations['tms'] = raw.tms ?? {};
   const ci: PartialIntegrations['ci'] = raw.ci ?? {};
+  const webhook: PartialIntegrations['webhook'] = raw.webhook ?? {};
 
   return {
     atlassian: {
@@ -105,6 +112,11 @@ export function readIntegrations(settings: AppSettings | undefined): Integration
       repo: asText(ci.repo),
       workflow: asText(ci.workflow),
       artifact: asText(ci.artifact),
+    },
+    webhook: {
+      enabled: asFlag(webhook.enabled),
+      url: asText(webhook.url),
+      events: readTelegramEvents(webhook.events),
     },
   };
 }

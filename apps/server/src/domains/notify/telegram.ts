@@ -43,8 +43,13 @@ export interface TelegramDeps {
   onError?: (error: unknown) => void;
 }
 
-/** Вид события панели → имя события в настройке подписки. */
-function eventOf(notice: TelegramNotice): TelegramEvent {
+/**
+ * Вид события панели → имя события в настройке подписки. Общий для всех
+ * адресатов: подписка у Telegram и у вебхука одна и та же, и раздваивать это
+ * правило нельзя — иначе «мне приходит в Telegram, а в вебхук нет» станет
+ * законным поведением.
+ */
+export function noticeEvent(notice: TelegramNotice): TelegramEvent {
   switch (notice.kind) {
     case 'done':
       return 'runDone';
@@ -134,7 +139,7 @@ export function createTelegramNotifier(deps: TelegramDeps): (notice: TelegramNot
   return (notice) => {
     const settings = deps.settings();
     if (!settings.enabled || !settings.chatId) return;
-    if (!settings.events.includes(eventOf(notice))) return;
+    if (!settings.events.includes(noticeEvent(notice))) return;
     const token = deps.token();
     if (!token) return;
 

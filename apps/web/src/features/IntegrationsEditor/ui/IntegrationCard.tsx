@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BadgeTone } from '@shared/ui/badge';
-import type { TelegramEvent } from '@agentdeck/contracts';
+import type { IntegrationId, IntegrationsSettings, TelegramEvent } from '@agentdeck/contracts';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Badge } from '@shared/ui/badge';
@@ -20,6 +20,13 @@ import { buildSettings, draftFrom, isDraftDirty, missingFields } from '../model/
 import { IntegrationFields } from './IntegrationFields';
 import { IntegrationCardExtras } from './IntegrationCardExtras';
 import type { IntegrationCardProps } from './IntegrationCard.types';
+
+/** На что подписана карточка. У коннекторов без подписки список пуст. */
+function eventsOf(settings: IntegrationsSettings, id: IntegrationId): TelegramEvent[] {
+  if (id === 'telegram') return settings.telegram.events;
+  if (id === 'webhook') return settings.webhook.events;
+  return [];
+}
 
 /** Итог проверки цветом: настроено, отвалилось, ещё не спрашивали. */
 const STATE_TONE: Record<string, BadgeTone> = {
@@ -50,7 +57,10 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
   const forget = useForgetIntegration();
 
   const [draft, setDraft] = useState(() => draftFrom(id, saved as never));
-  const [events, setEvents] = useState<TelegramEvent[]>(() => settings.telegram.events);
+  // События подписаны у двух карточек, и у каждой свои: подписка на вебхук не
+  // должна меняться от правки Telegram и наоборот.
+  const subscribed = eventsOf(settings, id);
+  const [events, setEvents] = useState<TelegramEvent[]>(() => subscribed);
   const [token, setToken] = useState('');
 
   // Настройки приезжают запросом: до их прихода форма собрана из умолчаний, и
@@ -62,14 +72,16 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
   }, [id, JSON.stringify(saved)]);
 
   useEffect(() => {
-    setEvents(settings.telegram.events);
-  }, [settings.telegram.events]);
+    setEvents(subscribed);
+    // Пересобираем по значению, а не по ссылке массива: она новая на каждом ответе.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, subscribed.join(',')]);
 
   const missing = missingFields(id, draft);
   const isDirty =
     isDraftDirty(id, draft, saved) ||
     Boolean(token.trim()) ||
-    (id === 'telegram' && events.join(',') !== settings.telegram.events.join(','));
+    events.join(',') !== subscribed.join(',');
 
   const onFieldChange = (key: string, value: string): void => {
     setDraft((current) => ({ ...current, [key]: value }));

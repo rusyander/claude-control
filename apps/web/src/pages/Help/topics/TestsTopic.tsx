@@ -106,6 +106,9 @@ export function TestsTopic() {
             { name: 'links', description: tr('fieldLinks') },
             { name: 'parameters', description: tr('fieldParameters') },
             { name: 'automation', description: tr('fieldAutomation') },
+            { name: 'automation.externalId', description: tr('fieldExternalId') },
+            { name: 'muted / muteReason', description: tr('fieldMuted') },
+            { name: 'defects', description: tr('fieldDefects') },
             { name: 'codePaths', description: tr('fieldCodePaths') },
             { name: 'status / note / lastRunAt', description: tr('fieldStatus') },
             { name: 'source', description: tr('fieldSource') },
@@ -179,6 +182,46 @@ export function TestsTopic() {
         />
       </HelpSection>
 
+      {/* Единственный вид, отвечающий на «что мы вообще не проверяем»: список
+          кейсов отвечает на обратный вопрос, и дыру по нему не видно. */}
+      <HelpSection title={tr('coverageTitle')} caption={tr('coverageCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('coverageLinks'), text: tr('coverageLinksText') },
+            { title: tr('coverageJira'), text: tr('coverageJiraText') },
+            { title: tr('coverageOrder'), text: tr('coverageOrderText') },
+            { title: tr('coverageOrphans'), text: tr('coverageOrphansText') },
+          ]}
+        />
+        <Callout tone="info" title={tr('coverageArchivedTitle')}>
+          {tr('coverageArchivedText')}
+        </Callout>
+      </HelpSection>
+
+      <HelpSection title={tr('quarantineTitle')} caption={tr('quarantineCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('quarantineWhat'), text: tr('quarantineWhatText') },
+            { title: tr('quarantineReason'), text: tr('quarantineReasonText') },
+            { title: tr('quarantineCi'), text: tr('quarantineCiText') },
+            { title: tr('quarantineFilter'), text: tr('quarantineFilterText') },
+          ]}
+        />
+        <Callout tone="warning" title={tr('quarantineNotArchiveTitle')}>
+          {tr('quarantineNotArchiveText')}
+        </Callout>
+      </HelpSection>
+
+      <HelpSection title={tr('releaseTitle')} caption={tr('releaseCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('releaseSet'), text: tr('releaseSetText') },
+            { title: tr('releaseTag'), text: tr('releaseTagText') },
+            { title: tr('releaseUntested'), text: tr('releaseUntestedText') },
+          ]}
+        />
+      </HelpSection>
+
       <HelpSection title={tr('importTitle')} caption={tr('importCaption')}>
         <OptionCards
           items={[
@@ -209,6 +252,7 @@ export function TestsTopic() {
         <OptionCards
           items={[
             { title: tr('externalDefect'), text: tr('externalDefectText') },
+            { title: tr('externalDefectState'), text: tr('externalDefectStateText') },
             { title: tr('externalPublish'), text: tr('externalPublishText') },
             { title: tr('externalPdf'), text: tr('externalPdfText') },
             { title: tr('externalBaseline'), text: tr('externalBaselineText') },
@@ -227,6 +271,9 @@ export function TestsTopic() {
             tr('canAgent'),
             tr('canImport'),
             tr('canDefect'),
+            tr('canCoverage'),
+            tr('canQuarantine'),
+            tr('canRelease'),
             tr('canPhone'),
           ]}
           cant={[tr('cantDatabase'), tr('cantSchedule'), tr('cantMerge'), tr('cantUsers')]}

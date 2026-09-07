@@ -2714,6 +2714,7 @@ export const en: TranslationSchema = {
       plans: 'Plans',
       runs: 'Runs',
       report: 'Report',
+      coverage: 'Coverage',
     },
     kind: { case: 'case', checklist: 'checklist' },
     priority: { blocker: 'blocker', high: 'high', medium: 'medium', low: 'low' },
@@ -2731,6 +2732,9 @@ export const en: TranslationSchema = {
       area: 'Area',
       tag: 'Tag',
       archived: 'Show archived',
+      muted: 'Quarantine',
+      mutedOnly: 'quarantine only',
+      mutedWithout: 'without quarantine',
       reset: 'Clear the filter',
       views: 'Saved views:',
       viewsEmpty: 'none yet',
@@ -2772,9 +2776,13 @@ export const en: TranslationSchema = {
         duplicate: 'duplicate',
         archive: 'archive',
         restore: 'restore from the archive',
+        mute: 'quarantine',
+        unmute: 'release from quarantine',
         delete: 'delete',
       },
       tagValue: 'Tag',
+      muteReason: 'Quarantine reason',
+      muteReasonHint: 'What we are waiting for. Without a reason nobody ever lifts it.',
       sectionValue: 'Section',
       groupValue: 'Target group',
       pickGroup: 'pick a group',
@@ -2832,6 +2840,10 @@ export const en: TranslationSchema = {
       automation: 'Automation',
       automationFile: 'Test file',
       automationTestName: 'Test name',
+      automationExternalId: 'Automated test id',
+      automationExternalIdHint:
+        'Matches a run result to this case even after the file moved: a junit property, ' +
+        'an allure label (@allure.id) or “case: gui-001” inside the test name.',
       attachments: 'Attachments',
       attachmentsEmpty: 'No attachments — they appear during a manual run.',
       archived: 'Archived',
@@ -2950,6 +2962,8 @@ export const en: TranslationSchema = {
       environment: 'Environment',
       environmentDefault: 'default',
       environmentAll: 'all',
+      release: 'Release',
+      releaseHint: 'Milestone: v1.4',
       changedOnly: 'Changed only',
       changedOnlyHint: 'Run only the cases touched by the uncommitted edits of the working copy.',
       branch: 'branch {{branch}}',
@@ -3007,6 +3021,41 @@ export const en: TranslationSchema = {
         'Failures grouped by what the executor wrote down: one breakage usually reddens several cases at once.',
       failuresEmpty: 'No failures with a stated reason.',
       failuresCases: 'cases: {{count}} — {{names}}',
+      muted: 'In quarantine: {{count}}',
+      releases: 'Releases',
+      releasesHint:
+        'Runs grouped by release. Untested — cases no run of that release ever touched.',
+      releaseCounts: 'runs: {{runs}} · passed {{passed}} · failed {{failed}}',
+      releaseUntested: 'untested: {{count}}',
+    },
+    coverage: {
+      jql: 'Requirements query (JQL)',
+      jqlPlaceholder: 'project = QA AND statusCategory != Done',
+      jqlHint: 'Empty — the project link is used: children of the linked epic or its open issues.',
+      apply: 'Show',
+      refreshDefects: 'Refresh defect states',
+      defects: 'Defects',
+      defectsChecked: 'asked: {{count}}',
+      defectsClosed: 'closed: {{count}}',
+      defectsError: 'Defect states could not be read — check the integration cards.',
+      defect: 'defect',
+      openDefect: 'open',
+      recheckHint: 'The defect is closed while the case is still red — these are worth a recheck.',
+      recheckEmpty: 'Nothing to recheck: no closed defects on red cases.',
+      empty: 'No requirements in sight',
+      emptyHint:
+        'The matrix is built from case links (type “requirement” or “issue”) and from Jira ' +
+        'issues when Atlassian is connected and the project is linked.',
+      cases: 'cases: {{count}}',
+      uncovered: 'uncovered',
+      uncoveredHint: 'No live case points at this requirement.',
+      orphans: 'Cases without a requirement: {{count}}',
+      orphansHint: 'They check something, but why they exist cannot be answered from them.',
+    },
+    muted: {
+      badge: 'quarantine',
+      badgeWhy: 'quarantine: {{reason}}',
+      short: 'quarantine',
     },
     publish: {
       target: 'Publish to',
@@ -3085,6 +3134,13 @@ export const en: TranslationSchema = {
         tokenHint:
           'A bot token from @BotFather. The bot must be added to the chat, otherwise it cannot post there.',
       },
+      webhook: {
+        title: 'Webhook',
+        hint: 'The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON.',
+        tokenHint:
+          'A signing secret, not an access token. Set — the body is signed with the ' +
+          'X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned.',
+      },
       tms: {
         title: 'Test management',
         hint: 'Zephyr or Xray in Jira: pull cases into a panel group and push run results back.',
@@ -3106,6 +3162,7 @@ export const en: TranslationSchema = {
       },
       forge: { kind: 'System', baseUrl: 'Installation URL', repo: 'Repository' },
       telegram: { chatId: 'Chat' },
+      webhook: { url: 'Receiver URL' },
       tms: { kind: 'System', projectKey: 'Jira project', groupId: 'Test group' },
       ci: { kind: 'System', repo: 'Repository', workflow: 'Workflow', artifact: 'Artifact' },
     },
@@ -3123,6 +3180,7 @@ export const en: TranslationSchema = {
         repo: 'owner/repo or a numeric project id. Empty — derived from the checked project origin.',
       },
       telegram: { chatId: 'A numeric chat id or a @channel name.' },
+      webhook: { url: 'Where to POST the JSON. http(s) only.' },
       tms: {
         kind: 'Zephyr Scale or Xray — the case format follows from it.',
         projectKey: 'Key of the Jira project holding the cases and cycles.',
@@ -3153,6 +3211,12 @@ export const en: TranslationSchema = {
       },
       test: 'Send a test message',
       sent: 'Test message sent',
+    },
+    webhook: {
+      test: 'Send a test event',
+      sent: 'Test event sent',
+      signature:
+        'Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths.',
     },
     mcp: {
       connect: 'Connect Atlassian MCP',

@@ -506,9 +506,13 @@ export const helpEn: HelpSchema = {
         'tier would choose a vendor for you, Kimi’s `-m` takes a name from your own ' +
         'model table, and Aider, Goose and Continue are shells over any model at all. ' +
         'The chosen model is shown in the conversation header and applies to every ' +
-        'message in it, not just the first. There is no work → review → fixes ' +
-        'pipeline for other CLIs — no review will be started, and the lowered task ' +
-        'says so outright.',
+        'message in it, not just the first. The work → review → fixes pipeline runs ' +
+        'here too, but the reviewer is the CLI itself: the panel starts the check ' +
+        'WITHOUT the chosen tier, that is, on the model the work would have run on ' +
+        'without the panel at all. The links show up in the provider’s conversation ' +
+        'list as “‹group› · ревью” and “‹group› · правки”; there is no chat tree and ' +
+        'no pipeline summary for other CLIs — the panel keeps those links for Claude ' +
+        'only.',
       cascadeOff: 'How to turn it off',
       cascadeOffText:
         'Chat menu (the “···” button in the header) → “Match the model to the task”. ' +
@@ -4082,6 +4086,15 @@ export const helpEn: HelpSchema = {
       fieldLinks: 'Links to a requirement, an issue, an MR or a document',
       fieldParameters: 'Parameter names and values the passes are expanded from',
       fieldAutomation: 'manual, toAutomate, automated plus the file and the test name',
+      fieldExternalId:
+        'A stable marker of the test in the code itself (@TC-14, a junit property, an ' +
+        'allure label). Checked before the name: a name does not survive every refactor, ' +
+        'and after a rename the CI result silently went to “unmatched”',
+      fieldMuted:
+        'Quarantine: the failure is known and does not colour the run. A reason is ' +
+        'mandatory — in a month nobody remembers it',
+      fieldDefects:
+        'Issues filed for a failure: the address, the key and what the tracker last said',
       fieldCodePaths: 'Code files the case touches: the diff-based selection is computed from them',
       fieldStatus: 'The last result, what was actually seen and when that was',
       fieldSource: 'agent or human: the agent is forbidden to delete what a human wrote',
@@ -4241,6 +4254,81 @@ export const helpEn: HelpSchema = {
         'panel lists the unmatched ones outright instead of staying silent: a quietly lost ' +
         'result is worse than a missing one.',
 
+      coverageTitle: 'Coverage matrix',
+      coverageCaption:
+        'The only view that answers “what are we not testing at all”. The case list answers ' +
+        'the opposite question, and a hole is invisible in it: a case that does not exist is ' +
+        'not in the list of cases by definition.',
+      coverageLinks: 'Requirements from links',
+      coverageLinksText:
+        'A row is a requirement at least one case links to (a link of type requirement or ' +
+        'issue). The Jira key is taken out of the address, so /browse/QA-42 and a link from ' +
+        'an email are one requirement, not two half-covered columns.',
+      coverageJira: 'Requirements from Jira',
+      coverageJiraText:
+        'With Atlassian connected the panel pulls issues by the JQL of the project ' +
+        'attachment. Those bring the important part: issues nobody linked to. Not connected ' +
+        '— the matrix says plainly that it shows only what is already linked.',
+      coverageOrder: 'Rows ordered by risk',
+      coverageOrderText:
+        'Uncovered first, then failed and blocked, then untested, then green. The top rows ' +
+        'are what the matrix is opened for.',
+      coverageOrphans: 'Cases without a requirement',
+      coverageOrphansText:
+        'A separate list below. Not an error: regression and robustness checks often belong ' +
+        'to no issue. But until a case links to something, no release-readiness report will ' +
+        'ever see it.',
+      coverageArchivedTitle: 'An archived case covers nothing',
+      coverageArchivedText:
+        'Archived cases are out of the matrix. A requirement covered only by an archived ' +
+        'case is covered by nothing — showing it as closed would lie exactly where the ' +
+        'reader came to look.',
+
+      quarantineTitle: 'Quarantine',
+      quarantineCaption:
+        'A known breakage must not colour every run: otherwise the report stops being read ' +
+        'at all, and the real failures go with it.',
+      quarantineWhat: 'What it does',
+      quarantineWhatText:
+        'The case runs as usual, gets its real status and stays visible in the list. Exactly ' +
+        'one right is taken away — colouring the run.',
+      quarantineReason: 'The reason is mandatory',
+      quarantineReasonText:
+        'Stored next to the flag: why and until when. Without it, in a month nobody ' +
+        'remembers whether a login fix was expected here or people just got tired of red.',
+      quarantineCi: 'CI does not fail on it',
+      quarantineCiText:
+        'In the junit export a quarantined case goes out as skipped with its reason, and ' +
+        '“pnpm tests report” does not count it as a failure and does not exit 1. The gate ' +
+        'stays on and keeps catching everything else.',
+      quarantineFilter: 'Quarantine is visible',
+      quarantineFilterText:
+        'The library has a quarantine filter and a mark on the row, the report has a ' +
+        'counter. A silent quarantine is no better than a deleted case.',
+      quarantineNotArchiveTitle: 'Not an archive, not a skip',
+      quarantineNotArchiveText:
+        'Archiving removes the case from work, skipping removes it from the run. Quarantine ' +
+        'keeps both: the case is checked, the result is visible, and a known breakage does ' +
+        'not block the release. One click clears the flag and a failure counts again.',
+
+      releaseTitle: 'Milestones and releases',
+      releaseCaption:
+        'Without a milestone the report only answers “how are things now”. The question ' +
+        'asked is “what has been tested in this release” — a different one.',
+      releaseSet: 'A milestone on the run',
+      releaseSetText:
+        'A field at start: v1.4, “sprint 12”, a release name. Runs without one work as ' +
+        'before and simply stay out of the release summary.',
+      releaseTag: 'Taken from a git tag',
+      releaseTagText:
+        'Not filled in by hand — the nearest tag on the run’s commit is used. A team that ' +
+        'already tags does nothing extra for the report.',
+      releaseUntested: 'The number that matters is untested',
+      releaseUntestedText:
+        'The report tab shows per milestone: how many runs, how many passed, how many ' +
+        'failed, and how many cases no run of that milestone touched. The last one answers ' +
+        '“can we ship”.',
+
       defectsTitle: 'Defects',
       defectsCaption:
         'A failure should turn into an issue while it is still fresh in your head what exactly ' +
@@ -4268,6 +4356,11 @@ export const helpEn: HelpSchema = {
         'The list of targets in the defect window comes from the server: Jira, the token ' +
         'forge, gh, glab. With no target at all the draft is still assembled, and a “Copy” ' +
         'button sits next to it.',
+      externalDefectState: 'Is the defect already closed?',
+      externalDefectStateText:
+        'The “Check defects” button asks Jira or the forge about the issues attached to the ' +
+        'red cases and builds the “recheck” list. The case status is not touched: only a run ' +
+        'sets it.',
       externalPublish: 'Publish the report',
       externalPublishText:
         'Inside an expanded run record: as a Confluence page or a Jira comment. Where ' +
@@ -4289,6 +4382,9 @@ export const helpEn: HelpSchema = {
       canAgent: 'Start the agent: generate, run, explore, automate',
       canImport: 'Pull automated results from CI and exchange cases as files',
       canDefect: 'File a defect for a failure in GitHub or GitLab',
+      canCoverage: 'Read the coverage matrix: requirement → cases → result, holes on top',
+      canQuarantine: 'Keep a known breakage in quarantine without failing the run or CI',
+      canRelease: 'Count what a milestone covered: its runs and the cases it never touched',
       canPhone: 'Do all of it from the phone: the same project, the same manual session',
 
       cantDatabase: 'A case database of its own — the source of truth is the project files',
@@ -5146,6 +5242,11 @@ export const helpEn: HelpSchema = {
       cardTelegramText:
         'A message when a run ends, fails, asks for permission, asks a question, or a test ' +
         'fails. Off by default; sending never delays the work itself.',
+      cardWebhook: 'Webhook',
+      cardWebhookText:
+        'The same events at an address of your own: one POST with JSON. It covers Slack, ' +
+        'Mattermost, an on-call bot and an internal bus at once — the panel needs to know ' +
+        'none of them. With a secret set, the body is signed.',
       cardTms: 'Test management',
       cardTmsText:
         'Zephyr Scale or Xray: pull cases into a panel group and push a run as a cycle. ' +
@@ -5166,12 +5267,22 @@ export const helpEn: HelpSchema = {
       fieldNote: 'A human note: what exactly lives here.',
 
       testsTitle: 'What appears in Testing',
-      testsCaption: 'An attached project changes four places in the Testing section.',
+      testsCaption: 'An attached project changes six places in the Testing section.',
       testsDefect: 'Choosing a defect target',
       testsDefectText:
         'In the defect window the list of targets comes from the server: Jira, the token ' +
         'forge, gh, glab. With no target at all the draft is still assembled, and a button ' +
         'copies it.',
+      testsDefectState: 'What became of a filed defect',
+      testsDefectStateText:
+        'The “Check defects” button asks the tracker whether the issues attached to red ' +
+        'cases are closed and shows the “recheck” list. The case status does not change: ' +
+        'the tracker answers “was it fixed”, not “does it work”.',
+      testsCoverage: 'Requirements in the coverage matrix',
+      testsCoverageText:
+        'A connected Jira brings issues nobody linked a case to into the matrix — the real ' +
+        'holes. Without it only what is already linked is visible: requirements from case ' +
+        'links are enough for “what is tested”, never for “what is untested at all”.',
       testsPublish: 'Publishing a report',
       testsPublishText:
         'Inside an expanded run record: pick the system and press. Where exactly to write ' +
@@ -5219,6 +5330,12 @@ export const helpEn: HelpSchema = {
         'The button in the Atlassian card adds the server to the MCP page as an ordinary ' +
         'one, with a health probe. After that the panel enables it itself when a run starts ' +
         'in an attached project, but it never disables anything — switching off stays yours.',
+      noteSignatureTitle: 'The webhook signature',
+      noteSignatureText:
+        'With a secret set, X-AgentDeck-Signature carries an HMAC-SHA256 of the body in ' +
+        'hex: the receiver verifies exactly what arrived. With no secret we send unsigned — ' +
+        'an internal bus usually expects nothing else, and demanding a key where there is ' +
+        'none to be had means turning notifications off altogether.',
     },
   },
 };

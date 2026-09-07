@@ -64,13 +64,13 @@ describe('integrations-routes: поверхность', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('список отдаёт все пять карточек и ни одного токена', async () => {
+  it('список отдаёт все карточки и ни одного токена', async () => {
     await connect();
     const response = await app.inject({ method: 'GET', url: '/api/integrations' });
     expect(response.statusCode).toBe(200);
     expect(response.body).not.toContain(SECRET);
     const cards = response.json() as { id: string; hasToken: boolean }[];
-    expect(cards).toHaveLength(5);
+    expect(cards).toHaveLength(6);
     expect(cards.find((card) => card.id === 'atlassian')?.hasToken).toBe(true);
   });
 

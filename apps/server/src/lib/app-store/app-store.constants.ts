@@ -80,6 +80,7 @@ export const DEFAULT_STATE: AppState = {
       telegram: { enabled: false, chatId: '', events: ['runError', 'testFailed'] },
       tms: { enabled: false, kind: '', projectKey: '', groupId: '' },
       ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
+      webhook: { enabled: false, url: '', events: ['runError', 'testFailed'] },
     },
   },
 };

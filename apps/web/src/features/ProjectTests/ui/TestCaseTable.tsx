@@ -123,6 +123,15 @@ export function TestCaseTable({
                     {item.type === 'checklist' && (
                       <Badge tone="neutral">{t('tests.kind.checklist')}</Badge>
                     )}
+                    {/* Карантин виден в строке, а не только в фильтре: красный
+                        кейс, не роняющий сборку, обязан объяснять это на месте. */}
+                    {item.muted && (
+                      <Badge tone="warning">
+                        {item.muteReason
+                          ? t('tests.muted.badgeWhy', { reason: item.muteReason })
+                          : t('tests.muted.badge')}
+                      </Badge>
+                    )}
                     {(item.tags ?? []).map((tag) => (
                       <Badge key={tag} tone="neutral">
                         {tag}

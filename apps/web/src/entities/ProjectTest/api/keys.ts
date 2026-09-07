@@ -26,6 +26,10 @@ export const testKeys = {
   runs: (path: string | undefined) => [ROOT, 'runs', path ?? ''],
   run: (path: string | undefined, id: string | undefined) => [ROOT, 'run', path ?? '', id ?? ''],
   report: (path: string | undefined) => [ROOT, 'report', path ?? ''],
+  /** Все матрицы покрытия проекта — для сброса разом, каким бы ни был запрос. */
+  coverageAll: (path: string | undefined) => [ROOT, 'coverage', path ?? ''],
+  /** Матрица покрытия: запрос JQL входит в ключ — это разный вопрос к Jira. */
+  coverage: (path: string | undefined, jql: string) => [ROOT, 'coverage', path ?? '', jql],
   impact: (path: string | undefined) => [ROOT, 'impact', path ?? ''],
   /** История файла группы из git — ключ по группе: у каждой свой файл. */
   history: (path: string | undefined, groupId: string | undefined) => [

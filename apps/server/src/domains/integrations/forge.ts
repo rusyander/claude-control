@@ -163,6 +163,51 @@ export async function createForgeIssue(
   };
 }
 
+/** Судьба заведённого issue: открыт он ещё или уже закрыт. */
+export interface ForgeIssueState {
+  /** `open` | `closed`; у GitLab `opened`/`closed` приводится к тому же. */
+  state: 'open' | 'closed';
+  title?: string;
+  url?: string;
+}
+
+/**
+ * Прочитать issue. Нужен ровно для одного: узнать, закрыт ли заведённый по
+ * провалу дефект, — иначе кейс остаётся красным и после починки, до следующего
+ * полного прогона.
+ */
+export async function readForgeIssue(
+  access: ForgeAccess,
+  issueNumber: number,
+): Promise<ForgeIssueState> {
+  const path =
+    access.kind === 'github'
+      ? `/repos/${projectRef(access)}/issues/${issueNumber}`
+      : `/projects/${projectRef(access)}/issues/${issueNumber}`;
+  const response = await sendRequest({
+    url: `${access.api}${path}`,
+    system: systemName(access),
+    headers: { ...headers(access), Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw unreachable(describeFailure(systemName(access), response), response.text.slice(0, 300));
+  }
+  const issue = parseJson<{
+    state?: string;
+    title?: string;
+    html_url?: string;
+    web_url?: string;
+  }>(systemName(access), response);
+  return {
+    // GitHub отвечает `open`/`closed`, GitLab — `opened`/`closed`/`locked`.
+    // Всё, что не закрыто, для панели открыто: промежуточных состояний у
+    // вопроса «чинить ли кейс» не бывает.
+    state: issue.state === 'closed' ? 'closed' : 'open',
+    title: issue.title,
+    url: issue.html_url ?? issue.web_url,
+  };
+}
+
 /** Комментарий к задаче. */
 export async function commentForgeIssue(
   access: ForgeAccess,

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
@@ -31,6 +32,9 @@ export function ProjectTestsRunBar({
   const run = board.run;
   const isRunning = run?.status === 'running';
   const cases = board.active?.cases ?? [];
+  // Веха живёт здесь, а не в состоянии страницы: её читает только запуск, и
+  // пустая она означает не «без вехи», а «возьми тег git» — это решает сервер.
+  const [release, setRelease] = useState('');
 
   // Внешний контекст показываем ТОЛЬКО чтением: правят его в разделе тестов и
   // в карточке проекта, а из чата важно одно — увидеть, куда уедут дефекты,
@@ -50,6 +54,7 @@ export function ProjectTestsRunBar({
     groupId: board.activeId || undefined,
     scope,
     environmentId: environmentId || undefined,
+    release: release.trim() || undefined,
   };
 
   return (
@@ -64,6 +69,18 @@ export function ProjectTestsRunBar({
             placeholder={t('projectTests.scopeHint')}
             value={scope}
             onChange={onScopeChange}
+          />
+        </div>
+
+        {/* Веха прогона: `v1.4`, «спринт 12». Пусто — сервер подставит
+            ближайший тег git, поэтому поле узкое и без обязательности: оно
+            нужно там, где релиз называется не так, как тег. */}
+        <div className={styles.release}>
+          <SearchField
+            label={t('tests.runs.release')}
+            placeholder={t('tests.runs.releaseHint')}
+            value={release}
+            onChange={setRelease}
           />
         </div>
 

@@ -1,7 +1,16 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import type { UniversalMcpServerDraft } from '@agentdeck/contracts';
 import type { AppStore } from '../../lib/app-store.ts';
 import { applyEntityState, type EntityToggleDeps } from '../entity-toggle.ts';
+import {
+  deleteProviderMcpServer,
+  readProviderMcpServers,
+  resolveProviderMcpTarget,
+  upsertProviderMcpServer,
+  McpServerNotFoundError as ProviderMcpServerNotFoundError,
+} from '../provider-mcp.ts';
+import type { ProviderMcpSettingsSource, ProviderMcpTarget } from '../provider-mcp/types.ts';
 import {
   McpServerNotFoundError,
   assertMcpServerExists,
@@ -44,6 +53,39 @@ export interface McpRegistration {
   backupDir?: string;
   /** Адрес самой панели: `http://127.0.0.1:5178`. */
   selfBaseUrl: string;
+  /**
+   * Настройки панели — по ним определяется АКТИВНЫЙ провайдер.
+   *
+   * Не задан — работаем как раньше, с конфигом Claude. Так роуты и тесты, где
+   * речь только о Claude, остаются прежними, а девять остальных CLI получают
+   * ту же кнопку без второй копии всей регистрации.
+   */
+  store?: ProviderMcpSettingsSource;
+}
+
+/**
+ * Куда писать запись: в свой раздел универсального провайдера или в конфиг
+ * Claude.
+ *
+ * Разделения по имени CLI здесь нет намеренно — вопрос решает способность
+ * провайдера (`capabilities.mcp` + `mcpConfig`), которую он объявляет сам.
+ * Провайдер без MCP не получает записи вовсе, а не молча получает её в чужой
+ * файл.
+ */
+function providerTarget(options: McpRegistration): ProviderMcpTarget | undefined {
+  return options.store ? resolveProviderMcpTarget(options.store) : undefined;
+}
+
+/** Переходник в универсальной модели: та же команда, тот же единственный адрес. */
+function universalDraft(script: string, selfBaseUrl: string): UniversalMcpServerDraft {
+  return {
+    name: ATLASSIAN_MCP_ID,
+    transport: 'stdio',
+    command: process.execPath,
+    args: [script],
+    env: { AGENTDECK_URL: selfBaseUrl },
+    headers: {},
+  };
 }
 
 /**
@@ -60,6 +102,18 @@ export function registerAtlassianMcp(options: McpRegistration): string {
       'integration_not_found',
       'Не найден скрипт переходника tools/mcp/atlassian.mjs — панель запущена не из своего репозитория.',
     );
+  }
+
+  const target = providerTarget(options);
+  if (target) {
+    upsertProviderMcpServer(
+      target,
+      isRegisteredIn(target) ? ATLASSIAN_MCP_ID : null,
+      universalDraft(script, options.selfBaseUrl),
+      options.backupDir,
+      { allowOverwrite: true },
+    );
+    return ATLASSIAN_MCP_ID;
   }
 
   const draft = {
@@ -82,8 +136,30 @@ export function registerAtlassianMcp(options: McpRegistration): string {
   return ATLASSIAN_MCP_ID;
 }
 
+/** Есть ли запись в разделе провайдера. Нечитаемый чужой конфиг — «нет». */
+function isRegisteredIn(target: ProviderMcpTarget): boolean {
+  try {
+    return readProviderMcpServers(target).some((server) => server.name === ATLASSIAN_MCP_ID);
+  } catch {
+    // Чужой файл может не разбираться вовсе — это его дело, а не повод падать
+    // на вопросе «подключено ли»: раздел ответит честным «нет».
+    return false;
+  }
+}
+
 /** Убрать запись. Нет её — не ошибка: кнопку могли нажать дважды. */
 export function unregisterAtlassianMcp(options: McpRegistration): boolean {
+  const target = providerTarget(options);
+  if (target) {
+    try {
+      deleteProviderMcpServer(target, ATLASSIAN_MCP_ID, options.backupDir);
+      return true;
+    } catch (error) {
+      if (error instanceof ProviderMcpServerNotFoundError) return false;
+      throw error;
+    }
+  }
+
   try {
     deleteMcpServer(options.mcpConfigPath, ATLASSIAN_MCP_ID, options.backupDir);
     return true;
@@ -93,8 +169,19 @@ export function unregisterAtlassianMcp(options: McpRegistration): boolean {
   }
 }
 
-/** Зарегистрирован ли переходник — по нему рисуется кнопка «Подключить/Убрать». */
-export function isAtlassianMcpRegistered(mcpConfigPath: string): boolean {
+/**
+ * Зарегистрирован ли переходник — по нему рисуется кнопка «Подключить/Убрать».
+ *
+ * Спрашивается о ТОМ ЖЕ файле, в который пишет регистрация: у активного
+ * провайдера — о его конфиге, у Claude — о `~/.claude.json`. Иначе кнопка
+ * говорила бы о чужой конфигурации.
+ */
+export function isAtlassianMcpRegistered(
+  mcpConfigPath: string,
+  store?: ProviderMcpSettingsSource,
+): boolean {
+  const target = store ? resolveProviderMcpTarget(store) : undefined;
+  if (target) return isRegisteredIn(target);
   return existing(mcpConfigPath) !== null;
 }
 

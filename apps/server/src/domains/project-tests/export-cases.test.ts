@@ -194,6 +194,29 @@ describe('выгрузка кейсов', () => {
     );
   });
 
+  it('карантин в отчёте CI — пропуск с причиной, а не падение', () => {
+    writeGroupFile(root, [
+      {
+        id: 'gui-010',
+        title: 'Красный в карантине',
+        steps: [],
+        status: 'failed',
+        muted: true,
+        muteReason: 'ждём починки входа',
+      },
+      { id: 'gui-011', title: 'Красный обычный', steps: [], status: 'failed' },
+    ]);
+
+    const xml = buildJUnitReport(readGroups(root));
+
+    // Ради этой строки карантин и существует: сборку роняет ровно один кейс.
+    expect(xml).toContain('tests="2" failures="1" skipped="1"');
+    expect(xml).toContain('<skipped message="Карантин: ждём починки входа"/>');
+    expect(xml).toContain(
+      '<testcase name="[gui-011] Красный обычный" classname="gui" time="0"><failure',
+    );
+  });
+
   it('сломанная группа не попадает в отчёт и не роняет его', () => {
     writeFileSync(join(root, '.agent', 'tests', 'broken.tests.json'), '{ сломано');
 

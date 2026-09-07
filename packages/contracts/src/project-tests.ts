@@ -106,13 +106,40 @@ export interface ProjectTestAutomation {
   file?: string;
   /** Имя теста внутри файла — по нему сходятся результаты из CI. */
   testName?: string;
+  /**
+   * Устойчивый ключ, которым тест помечен в самом коде (`@TC-14`, свойство
+   * junit, метка allure). Сильнее имени и проверяется первым.
+   *
+   * Имя теста — плохой ключ: его меняют при первом же рефакторинге, и импорт
+   * молча кладёт результат в «несопоставленные», а история кейса обрывается без
+   * единой ошибки. Ключ переживает переименование, потому что живёт рядом с
+   * тестом и меняется только осознанно.
+   */
+  externalId?: string;
 }
+
+/** Как трекер отвечает про судьбу заведённого дефекта. */
+export type ProjectTestDefectState = 'open' | 'closed' | 'unknown';
 
 /** Заведённый по провалу дефект. */
 export interface ProjectTestDefect {
   url: string;
   title?: string;
   createdAt?: string;
+  /** Ключ задачи (`QA-42`) или номер issue — по нему спрашивают статус. */
+  key?: string;
+  /**
+   * Открыт дефект или уже закрыт. Пусто — статуса ещё не спрашивали.
+   *
+   * Ради этого поля дефект и связывают: закрытый дефект на красном кейсе
+   * означает «перепроверь», и без ответа трекера этот момент не наступает
+   * никогда — кейс так и остаётся красным до следующего полного прогона.
+   */
+  state?: ProjectTestDefectState;
+  /** Как статус называется у команды: «Готово», «Closed», «В работе». */
+  stateLabel?: string;
+  /** Когда статус спрашивали последний раз, ISO. */
+  stateCheckedAt?: string;
 }
 
 /** Один тест-кейс. */
@@ -162,6 +189,18 @@ export interface ProjectTestCase {
   status: ProjectTestStatus;
   /** Пользовательский статус проекта (`schema.json`), если он используется. */
   statusId?: string;
+  /**
+   * Карантин: провал этого кейса известен и не считается провалом прогона.
+   *
+   * Не архив и не «пропустить»: кейс гоняется, статус ему ставится настоящий и
+   * виден в списке — снимается только право красить прогон и валить `pnpm tests
+   * report`, которым гейтят CI. Иначе у команды остаётся ровно два выхода:
+   * терпеть вечно красный отчёт (и перестать его читать) или удалить кейс (и
+   * забыть о поломке совсем).
+   */
+  muted?: boolean;
+  /** Почему в карантине и до каких пор — иначе через месяц никто не вспомнит. */
+  muteReason?: string;
   /** Что агент или человек увидел на самом деле — заполняется прогоном. */
   note?: string;
   /** Момент последнего прогона, ISO. */
@@ -293,6 +332,13 @@ export interface ProjectTestFilter {
   query?: string;
   /** Показывать ли убранное в архив. */
   includeArchived?: boolean;
+  /**
+   * Карантин: `true` — только он, `false` — всё кроме него, пусто — вперемешку.
+   *
+   * Без этого фильтра карантин необратим на практике: кейс перестаёт ронять
+   * сборку, теряется среди сотни зелёных и не возвращается уже никогда.
+   */
+  muted?: boolean;
 }
 
 /** Сохранённый фильтр: он же динамический набор тест-плана. */
@@ -419,6 +465,14 @@ export interface ProjectTestRun {
   commit?: string;
   /** Зона или пожелание человека словами («только чат», «добавь тесты на аналитику»). */
   scope?: string;
+  /**
+   * Веха, к которой относится прогон: `v1.4`, `спринт 12`, имя релиза.
+   *
+   * Задаётся человеком или берётся из ближайшего тега git на коммите прогона.
+   * Без неё отчёт отвечает только на «как дела сейчас», а вопрос «что проверено
+   * в этом релизе» остаётся без ответа — а спрашивают именно его.
+   */
+  release?: string;
   status: ProjectTestRunStatus;
   startedAt: string;
   finishedAt?: string;
@@ -445,6 +499,8 @@ export interface ProjectTestRunRecord {
   branch?: string;
   commit?: string;
   scope?: string;
+  /** Веха прогона: задана человеком или снята с тега git. */
+  release?: string;
   status: ProjectTestRunStatus;
   startedAt: string;
   finishedAt?: string;
@@ -488,6 +544,21 @@ export interface ProjectTestFailureGroup {
 }
 
 /** Отчёт по истории: тренды, покрытие, нестабильные, деньги и время. */
+/**
+ * Веха глазами отчёта: сколько прогонов на неё пришлось и сколько кейсов она
+ * так и не тронула. Непроверенное — главное число: оно и есть ответ на «можно
+ * ли отдавать релиз».
+ */
+export interface ProjectTestReleaseSummary {
+  release: string;
+  runs: number;
+  passed: number;
+  failed: number;
+  /** Кейсы, которых не коснулся ни один прогон вехи. */
+  untested: number;
+  lastRunAt?: string;
+}
+
 export interface ProjectTestReport {
   /** Прогоны от новых к старым. */
   runs: ProjectTestRunRecord[];
@@ -498,6 +569,8 @@ export interface ProjectTestReport {
   flaky: ProjectTestFlaky[];
   /** Провалы, сведённые по причине, — от самой частой к редкой. */
   failures: ProjectTestFailureGroup[];
+  /** Вехи от свежей к старой; прогоны без вехи сюда не попадают. */
+  releases: ProjectTestReleaseSummary[];
   /** Суммарно по последним прогонам. */
   totals: {
     runs: number;
@@ -505,6 +578,8 @@ export interface ProjectTestReport {
     costUsd: number;
     durationMs: number;
     lastRunAt?: string;
+    /** Кейсов в карантине — их провалы в счёт прогона не идут. */
+    muted: number;
   };
 }
 
@@ -565,6 +640,9 @@ export interface ProjectTestCaseInput {
   maxDiffRatio?: number;
   status?: ProjectTestStatus;
   statusId?: string;
+  /** Карантин: провал кейса известен и не красит прогон. */
+  muted?: boolean;
+  muteReason?: string;
   note?: string;
   archived?: boolean;
 }
@@ -585,6 +663,9 @@ export interface ProjectTestBulkInput {
     | 'duplicate'
     | 'archive'
     | 'restore'
+    /** В карантин: провалы перестают красить прогон. Значение — причина. */
+    | 'mute'
+    | 'unmute'
     | 'delete';
   /** Значение действия: тег, приоритет, секция, группа-приёмник. */
   value?: string;
@@ -606,6 +687,53 @@ export interface ProjectTestRunRequest {
   full?: boolean;
   /** Гнать только то, чего касаются несохранённые правки рабочей копии. */
   changedOnly?: boolean;
+  /** Веха, к которой отнести прогон; пусто — снять с тега git, если он есть. */
+  release?: string;
+}
+
+/** Кейс в матрице покрытия: чем требование проверено и чем это кончилось. */
+export interface ProjectTestCoverageCase {
+  groupId: string;
+  caseId: string;
+  title: string;
+  status: ProjectTestStatus;
+  muted?: boolean;
+  lastRunAt?: string;
+}
+
+/**
+ * Одно требование и всё, что его проверяет.
+ *
+ * Ключ — то, чем требование названо в ссылке кейса: ключ задачи Jira (`QA-42`)
+ * или адрес, если ключа из него не вывести. Требование без единого кейса
+ * остаётся в списке с пустым `cases` — оно и есть ответ на вопрос, ради
+ * которого матрицу открывают.
+ */
+export interface ProjectTestCoverageItem {
+  key: string;
+  url?: string;
+  title?: string;
+  /** Статус требования в трекере, если про него спрашивали. */
+  status?: string;
+  cases: ProjectTestCoverageCase[];
+  counts: { passed: number; failed: number; blocked: number; skipped: number; unknown: number };
+}
+
+/** Матрица покрытия: требования → кейсы → последний результат. */
+export interface ProjectTestCoverage {
+  items: ProjectTestCoverageItem[];
+  /** Кейсы, не привязанные ни к одному требованию. */
+  orphans: ProjectTestCoverageCase[];
+  /**
+   * Откуда взят список требований: только из ссылок кейсов или ещё и из Jira.
+   * От этого зависит смысл пустого `cases` — без Jira панель просто не знает о
+   * требованиях, на которые никто не сослался.
+   */
+  source: 'links' | 'jira';
+  /** Запрос, которым требования брались из Jira. */
+  jql?: string;
+  /** Почему список требований неполон: интеграция выключена, Jira не ответила. */
+  warning?: string;
 }
 
 /**

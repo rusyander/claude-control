@@ -150,6 +150,7 @@ export const en: Dictionary = {
     runFull: 'Full retest',
     stop: 'Stop',
     scope: 'What to focus on: chat only, for example',
+    release: 'Milestone: v1.4 · empty — from a git tag',
     onComputer: 'The run happens on the computer: the agent starts the app where the code lives.',
     links: {
       title: 'Linked to',
@@ -210,6 +211,8 @@ export const en: Dictionary = {
     },
     lastRun: (when: string) => `Last run: ${when}`,
     lastRunNever: 'Never run',
+    muted: 'quarantine',
+    muteReason: (reason: string) => `Quarantine: ${reason}`,
     selected: (count: number) => `Selected: ${count}`,
     clearSelection: 'Clear the selection',
     runs: {

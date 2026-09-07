@@ -39,6 +39,7 @@ export const INTEGRATION_FIELDS: Record<IntegrationId, readonly IntegrationField
     { key: 'repo', kind: 'text' },
   ],
   telegram: [{ key: 'chatId', kind: 'text', isRequired: true }],
+  webhook: [{ key: 'url', kind: 'text', isRequired: true }],
   tms: [
     { key: 'kind', kind: 'select', options: ['', 'zephyr', 'xray'], isRequired: true },
     { key: 'projectKey', kind: 'text', isRequired: true },
@@ -79,7 +80,7 @@ export interface BuildSettingsInput {
   id: IntegrationId;
   draft: IntegrationDraft;
   enabled: boolean;
-  /** Только у Telegram: о чём писать. У остальных не читается. */
+  /** У Telegram и вебхука: о чём писать. У остальных не читается. */
   events?: TelegramEvent[];
 }
 
@@ -98,7 +99,7 @@ export function buildSettings({
   for (const field of INTEGRATION_FIELDS[id]) {
     result[field.key] = (draft[field.key] ?? '').trim();
   }
-  if (id === 'telegram') result.events = events ?? [];
+  if (id === 'telegram' || id === 'webhook') result.events = events ?? [];
   return result;
 }
 
@@ -114,7 +115,7 @@ export function isDraftDirty(
   );
 }
 
-/** Переключение одного события Telegram с сохранением известного порядка. */
+/** Переключение одного события подписки с сохранением известного порядка. */
 export function toggleEvent(
   events: readonly TelegramEvent[],
   all: readonly TelegramEvent[],

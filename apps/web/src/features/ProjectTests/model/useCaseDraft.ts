@@ -45,6 +45,7 @@ export interface CaseDraft {
   automationStatus: ProjectTestAutomationStatus;
   automationFile: string;
   automationTestName: string;
+  automationExternalId: string;
   archived: boolean;
 }
 
@@ -70,6 +71,7 @@ const BLANK: CaseDraft = {
   automationStatus: 'manual',
   automationFile: '',
   automationTestName: '',
+  automationExternalId: '',
   archived: false,
 };
 
@@ -103,6 +105,7 @@ export function fromCase(testCase: ProjectTestCase | undefined): CaseDraft {
     automationStatus: testCase.automation?.status ?? 'manual',
     automationFile: testCase.automation?.file ?? '',
     automationTestName: testCase.automation?.testName ?? '',
+    automationExternalId: testCase.automation?.externalId ?? '',
     archived: Boolean(testCase.archived),
   };
 }
@@ -174,6 +177,7 @@ export function toInput(draft: CaseDraft): ProjectTestCaseInput {
       status: draft.automationStatus,
       file: draft.automationFile.trim(),
       testName: draft.automationTestName.trim(),
+      externalId: draft.automationExternalId.trim(),
     },
     archived: draft.archived,
   };

@@ -65,6 +65,7 @@ export default function TestsScreen() {
 
   const [groupId, setGroupId] = useState('');
   const [scope, setScope] = useState('');
+  const [release, setRelease] = useState('');
   const [filter, setFilter] = useState<TestFilterState>(EMPTY_FILTER);
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<ProjectTestCase | undefined>();
@@ -143,10 +144,20 @@ export default function TestsScreen() {
             placeholder={t.tests.scope}
             autoCapitalize="sentences"
           />
+          {/* Веха прогона: без неё отчёт отвечает только на «как дела сейчас»,
+              а спрашивают «что проверено в этом релизе». */}
+          <Field
+            value={release}
+            onChangeText={setRelease}
+            placeholder={t.tests.release}
+            autoCapitalize="none"
+          />
           <Row gap={space.xs}>
             <Button
               title={t.tests.generate}
-              onPress={() => start.mutate({ mode: 'generate', groupId: active?.id, scope })}
+              onPress={() =>
+                start.mutate({ mode: 'generate', groupId: active?.id, scope, release })
+              }
               disabled={isRunning}
               busy={start.isPending && !isRunning}
               style={styles.grow}
@@ -160,6 +171,7 @@ export default function TestsScreen() {
                   groupId: active?.id,
                   caseIds: selected.length > 0 ? selected : undefined,
                   scope,
+                  release,
                 })
               }
               disabled={isRunning || cases.length === 0}
@@ -169,7 +181,9 @@ export default function TestsScreen() {
           <Row gap={space.xs}>
             <Button
               title={t.tests.runFull}
-              onPress={() => start.mutate({ mode: 'run', groupId: active?.id, scope, full: true })}
+              onPress={() =>
+                start.mutate({ mode: 'run', groupId: active?.id, scope, release, full: true })
+              }
               disabled={isRunning || cases.length === 0}
               style={styles.grow}
             />

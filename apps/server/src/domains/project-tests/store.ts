@@ -3,6 +3,8 @@ import type {
   ProjectTestBulkInput,
   ProjectTestCase,
   ProjectTestCaseInput,
+  ProjectTestDefect,
+  ProjectTestDefectState,
   ProjectTestFilter,
   ProjectTestGroup,
   ProjectTestKind,
@@ -83,6 +85,7 @@ const PRIORITIES: ProjectTestPriority[] = ['blocker', 'high', 'medium', 'low'];
 const READINESS: ProjectTestReadiness[] = ['draft', 'ready', 'obsolete'];
 const AUTOMATION: ProjectTestAutomation['status'][] = ['manual', 'toAutomate', 'automated'];
 const LINK_TYPES: ProjectTestLink['type'][] = ['requirement', 'issue', 'mr', 'doc'];
+const DEFECT_STATES: ProjectTestDefectState[] = ['open', 'closed', 'unknown'];
 
 /** Значение из списка допустимых — или ничего. */
 function oneOf<T extends string>(value: unknown, allowed: T[]): T | undefined {
@@ -143,15 +146,16 @@ function parseAutomation(raw: unknown): ProjectTestAutomation | undefined {
   const status = oneOf(record.status, AUTOMATION);
   const file = optional(record.file);
   const testName = optional(record.testName);
-  if (!status && !file && !testName) return undefined;
-  return { status: status ?? (file ? 'automated' : 'manual'), file, testName };
+  const externalId = optional(record.externalId);
+  if (!status && !file && !testName && !externalId) return undefined;
+  return { status: status ?? (file ? 'automated' : 'manual'), file, testName, externalId };
 }
 
 /** Дефекты, заведённые по провалам. */
 function parseDefects(raw: unknown): ProjectTestCase['defects'] {
   if (!Array.isArray(raw)) return undefined;
   const defects = raw
-    .map((item) => {
+    .map((item): ProjectTestDefect | undefined => {
       if (typeof item === 'string') {
         const url = item.trim();
         return url ? { url } : undefined;
@@ -160,12 +164,18 @@ function parseDefects(raw: unknown): ProjectTestCase['defects'] {
       const record = item as Record<string, unknown>;
       const url = optional(record.url);
       return url
-        ? { url, title: optional(record.title), createdAt: optional(record.createdAt) }
+        ? {
+            url,
+            title: optional(record.title),
+            createdAt: optional(record.createdAt),
+            key: optional(record.key),
+            state: oneOf(record.state, DEFECT_STATES),
+            stateLabel: optional(record.stateLabel),
+            stateCheckedAt: optional(record.stateCheckedAt),
+          }
         : undefined;
     })
-    .filter(
-      (item): item is { url: string; title?: string; createdAt?: string } => item !== undefined,
-    );
+    .filter((item): item is NonNullable<ProjectTestCase['defects']>[number] => item !== undefined);
   return defects.length > 0 ? defects : undefined;
 }
 
@@ -215,6 +225,8 @@ function parseCase(raw: unknown, index: number): ProjectTestCase | undefined {
         : undefined,
     status: toStatus(item.status) as ProjectTestStatus,
     statusId: optional(item.statusId),
+    muted: item.muted === true ? true : undefined,
+    muteReason: optional(item.muteReason),
     note: optional(item.note),
     lastRunAt: optional(item.lastRunAt),
     lastRunId: optional(item.lastRunId),
@@ -473,6 +485,11 @@ export function upsertCase(
     maxDiffRatio: input.maxDiffRatio ?? existing?.maxDiffRatio,
     status: input.status ?? existing?.status ?? 'unknown',
     statusId: input.statusId ?? existing?.statusId,
+    // Карантин снимается явным `false` — иначе форма, не сказавшая о нём ни
+    // слова (кнопка «в архив», правка с телефона), молча выпускала бы кейс из
+    // карантина и красила прогон.
+    muted: input.muted ?? existing?.muted,
+    muteReason: patchText(input.muteReason, existing?.muteReason),
     note: patchText(input.note, existing?.note),
     lastRunAt: existing?.lastRunAt,
     lastRunId: existing?.lastRunId,
@@ -562,6 +579,57 @@ export function applyResults(root: string, patches: CaseResultPatch[], now: stri
   return applied;
 }
 
+/** Ответ трекера про один дефект — его надо положить обратно в файл кейса. */
+export interface DefectStatePatch {
+  groupId: string;
+  caseId: string;
+  /** Адрес дефекта — им он и опознаётся в списке кейса. */
+  url: string;
+  state: ProjectTestDefectState;
+  stateLabel?: string;
+  key?: string;
+}
+
+/**
+ * Записать судьбу дефектов в файлы кейсов.
+ *
+ * Отдельно от `applyResults`: там результат прохода, здесь ответ чужой системы.
+ * Статус кейса при этом НЕ трогается — закрытый дефект означает «перепроверь»,
+ * а не «пройдено»: решает это прогон, а не трекер.
+ */
+export function applyDefectStates(root: string, patches: DefectStatePatch[], now: string): number {
+  const byGroup = new Map<string, DefectStatePatch[]>();
+  for (const patch of patches) {
+    const list = byGroup.get(patch.groupId) ?? [];
+    list.push(patch);
+    byGroup.set(patch.groupId, list);
+  }
+
+  let applied = 0;
+  for (const [groupId, list] of byGroup) {
+    const group = loadForWrite(root, groupId);
+    const cases = group.cases.map((item) => {
+      const mine = list.filter((patch) => patch.caseId === item.id);
+      if (mine.length === 0 || !item.defects) return item;
+      const defects = item.defects.map((defect) => {
+        const patch = mine.find((one) => one.url === defect.url);
+        if (!patch) return defect;
+        applied += 1;
+        return {
+          ...defect,
+          key: patch.key ?? defect.key,
+          state: patch.state,
+          stateLabel: patch.stateLabel,
+          stateCheckedAt: now,
+        };
+      });
+      return { ...item, defects };
+    });
+    writeGroup(root, { ...group, cases });
+  }
+  return applied;
+}
+
 /** Совпал ли кейс с фильтром. Пустой фильтр пропускает всё, кроме архива. */
 export function matchesFilter(
   item: ProjectTestCase,
@@ -569,6 +637,7 @@ export function matchesFilter(
   filter: ProjectTestFilter,
 ): boolean {
   if (item.archived && !filter.includeArchived) return false;
+  if (filter.muted !== undefined && (item.muted === true) !== filter.muted) return false;
   if (filter.groupIds?.length && !filter.groupIds.includes(groupId)) return false;
   if (filter.types?.length && !filter.types.includes(item.type)) return false;
   if (filter.statuses?.length && !filter.statuses.includes(item.status)) return false;
@@ -700,6 +769,16 @@ export function bulkCases(root: string, input: ProjectTestBulkInput, now: string
     if (input.action === 'section') next.section = value || undefined;
     if (input.action === 'archive') next.archived = true;
     if (input.action === 'restore') next.archived = undefined;
+    if (input.action === 'mute') {
+      next.muted = true;
+      // Причина — значение действия: карантин без объяснения через месяц никто
+      // не решится снять, потому что неизвестно, чего он ждал.
+      next.muteReason = value || item.muteReason;
+    }
+    if (input.action === 'unmute') {
+      next.muted = undefined;
+      next.muteReason = undefined;
+    }
     return next;
   });
   writeGroup(root, { ...group, cases });

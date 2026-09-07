@@ -16,7 +16,7 @@ type BulkAction = ProjectTestBulkInput['action'];
 
 const VALUE_FROM: Record<
   BulkAction,
-  'none' | 'text' | 'priority' | 'readiness' | 'automation' | 'section' | 'group'
+  'none' | 'text' | 'reason' | 'priority' | 'readiness' | 'automation' | 'section' | 'group'
 > = {
   tag: 'text',
   untag: 'text',
@@ -28,6 +28,10 @@ const VALUE_FROM: Record<
   duplicate: 'none',
   archive: 'none',
   restore: 'none',
+  // Причина карантина не обязательна технически, но без неё через месяц никто
+  // не решится снять карантин — поэтому поле есть, а кнопку оно не блокирует.
+  mute: 'reason',
+  unmute: 'none',
   delete: 'none',
 };
 
@@ -55,7 +59,7 @@ export function TestBulkToolbar({
   if (checked.length === 0) return null;
 
   const kind = VALUE_FROM[action];
-  const needsValue = kind !== 'none';
+  const needsValue = kind !== 'none' && kind !== 'reason';
 
   const run = async (next: BulkAction, nextValue?: string): Promise<void> => {
     setBusy(true);
@@ -88,6 +92,14 @@ export function TestBulkToolbar({
 
       {kind === 'text' && (
         <TextField label={t('tests.bulk.tagValue')} value={value} onChange={setValue} />
+      )}
+      {kind === 'reason' && (
+        <TextField
+          label={t('tests.bulk.muteReason')}
+          hint={t('tests.bulk.muteReasonHint')}
+          value={value}
+          onChange={setValue}
+        />
       )}
       {kind === 'priority' && (
         <SelectField
@@ -145,7 +157,11 @@ export function TestBulkToolbar({
             setRemoving(true);
             return;
           }
-          void run(action, needsValue ? normalized(kind, value) : undefined);
+          const text = value.trim();
+          void run(
+            action,
+            needsValue || (kind === 'reason' && text) ? normalized(kind, value) : undefined,
+          );
         }}
       >
         {t('tests.bulk.apply')}
@@ -186,6 +202,8 @@ const ACTIONS: readonly BulkAction[] = [
   'duplicate',
   'archive',
   'restore',
+  'mute',
+  'unmute',
   'delete',
 ];
 const PRIORITIES: readonly string[] = ['blocker', 'high', 'medium', 'low'];

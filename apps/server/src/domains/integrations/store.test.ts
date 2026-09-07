@@ -57,9 +57,16 @@ function everythingOnDisk(root: string): string {
 }
 
 describe('domains/integrations/store: настройки и токены', () => {
-  it('пять карточек показываются всегда, даже пустыми', () => {
+  it('карточки показываются всегда, даже пустыми', () => {
     const cards = describeIntegrations(store, dir);
-    expect(cards.map((card) => card.id)).toEqual(['atlassian', 'forge', 'telegram', 'tms', 'ci']);
+    expect(cards.map((card) => card.id)).toEqual([
+      'atlassian',
+      'forge',
+      'telegram',
+      'tms',
+      'ci',
+      'webhook',
+    ]);
     expect(cards.every((card) => card.hasToken === false && card.state === 'unchecked')).toBe(true);
   });
 

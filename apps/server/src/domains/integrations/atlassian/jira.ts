@@ -16,7 +16,7 @@ interface RawIssue {
   key: string;
   fields?: {
     summary?: string;
-    status?: { name?: string };
+    status?: { name?: string; statusCategory?: { key?: string } };
     issuetype?: { name?: string };
     assignee?: { displayName?: string; name?: string };
     updated?: string;
@@ -27,12 +27,26 @@ interface RawIssue {
 /** Поля, которые панель показывает в списке и в карточке задачи. */
 const ISSUE_FIELDS = 'summary,status,issuetype,assignee,updated,description';
 
+/**
+ * Категория статуса — единственное, по чему можно судить о закрытости.
+ *
+ * Названия статусов у каждой команды свои («Готово», «Verified», «Закрыт», «Не
+ * воспроизводится»), и сравнивать строки — гадание с любым исходом. Категорию
+ * («new» / «indeterminate» / «done») Jira считает сама по своему рабочему
+ * процессу, и незнакомое значение честнее выбросить, чем подогнать.
+ */
+function toCategory(key: string | undefined): JiraIssue['statusCategory'] {
+  if (key === 'done' || key === 'new' || key === 'indeterminate') return key;
+  return undefined;
+}
+
 function toIssue(access: AtlassianAccess, issue: RawIssue): JiraIssue {
   const fields = issue.fields ?? {};
   return {
     key: issue.key,
     summary: fields.summary ?? '',
     status: fields.status?.name ?? '',
+    statusCategory: toCategory(fields.status?.statusCategory?.key),
     type: fields.issuetype?.name ?? '',
     assignee: fields.assignee?.displayName ?? fields.assignee?.name,
     updatedAt: fields.updated,

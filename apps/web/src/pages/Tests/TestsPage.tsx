@@ -19,10 +19,11 @@ import { useTestsProject } from '@entities/Project';
 import { TestsLibraryTab } from './TestsLibraryTab';
 import { TestsRunsTab } from './TestsRunsTab';
 import { TestsReportTab } from './TestsReportTab';
+import { TestsCoverageTab } from './TestsCoverageTab';
 import styles from './TestsPage.module.scss';
 
 /** Вкладки раздела в порядке рабочего дня: что проверяем → чем → что вышло. */
-const TABS = ['library', 'plans', 'runs', 'report'] as const;
+const TABS = ['library', 'plans', 'runs', 'report', 'coverage'] as const;
 type TestsTab = (typeof TABS)[number];
 
 /**
@@ -182,6 +183,8 @@ export function TestsPage() {
           )}
 
           {active === 'report' && <TestsReportTab projectPath={projectPath} />}
+
+          {active === 'coverage' && <TestsCoverageTab projectPath={projectPath} />}
         </>
       )}
 

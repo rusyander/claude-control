@@ -33,10 +33,15 @@ import { applyResults, readGroups, type CaseResultPatch } from './store.ts';
  *   - каталог результатов Allure (`*-result.json`) — по файлу на тест, так его
  *     кладут прогоны, ещё не собранные в отчёт.
  *
- * Сопоставление результата с кейсом идёт по трём правилам подряд, от точного к
- * догадке: `automation.testName` кейса совпал с именем теста → маркер `[gui-001]`
- * внутри имени → точное совпадение с названием кейса. Не сошлось — имя уходит в
- * `unmatched`, а НЕ в чей-нибудь чужой кейс: ложно зелёный кейс хуже серого.
+ * Сопоставление результата с кейсом идёт по правилам подряд, от точного к
+ * догадке: `automation.externalId` (свойство junit, метка allure, аннотация
+ * Playwright или маркер `@TC-14` в имени) → `automation.testName` совпал с именем
+ * теста → маркер `[gui-001]` внутри имени → точное совпадение с названием кейса.
+ * Не сошлось — имя уходит в `unmatched`, а НЕ в чей-нибудь чужой кейс: ложно
+ * зелёный кейс хуже серого.
+ *
+ * Ключ идёт первым не из вкуса: имя теста меняется при первом рефакторинге, и
+ * сопоставление по нему обрывает историю кейса молча, без единой ошибки.
  *
  * Импорт всегда оставляет след: запись прогона `runs/<id>.run.json` с
  * `mode:'import'` и `actor:'ci'`. Без неё в истории был бы разрыв — статусы
@@ -49,6 +54,11 @@ export interface ImportedTestResult {
   name: string;
   /** Другие написания того же имени: с классом, с файлом, с сюитами. */
   aliases?: string[];
+  /**
+   * Устойчивый ключ теста, если отчёт его принёс: свойство junit, метка allure,
+   * аннотация Playwright. Сильнее любого имени и проверяется первым.
+   */
+  externalId?: string;
   status: ProjectTestStatus;
   durationMs?: number;
   /** Текст падения — он ложится в заметку кейса. */
@@ -123,6 +133,7 @@ function junitCase(
   const name = (attributes.name ?? '').trim();
   const className = (attributes.classname ?? attributes.class ?? '').trim();
   const failure = findElements(body, 'failure')[0] ?? findElements(body, 'error')[0];
+  const externalId = junitProperty(body) ?? markerIn(name);
   const skipped = findElements(body, 'skipped')[0];
 
   let status: ProjectTestStatus = 'passed';
@@ -139,10 +150,41 @@ function junitCase(
   return {
     name,
     aliases: nameAliases(name, className, suiteName),
+    externalId,
     status,
     durationMs: Number.isFinite(seconds) && seconds >= 0 ? Math.round(seconds * 1000) : undefined,
     message: message ? message.slice(0, MAX_MESSAGE) : undefined,
   };
+}
+
+/**
+ * Имена свойств junit, которыми адаптеры TMS помечают тест. Их несколько,
+ * потому что единого стандарта нет: pytest пишет `test_id`, JUnit 5 — `testId`,
+ * адаптеры Zephyr и Xray — `tms` и `externalId`.
+ */
+const ID_PROPERTIES = new Set(['externalid', 'testid', 'test_id', 'tms', 'tms_id', 'case_id']);
+
+/** Ключ теста из `<properties>` случая junit. */
+function junitProperty(body: string): string | undefined {
+  for (const element of findElements(body, 'property')) {
+    const name = (element.attributes.name ?? '').trim().toLowerCase();
+    const value = (element.attributes.value ?? '').trim();
+    if (value && ID_PROPERTIES.has(name)) return value;
+  }
+  return undefined;
+}
+
+/**
+ * Ключ из имени теста: `@TC-14` или `[TC-14]`.
+ *
+ * Так помечают тест там, где репортёр своих полей не даёт, — а это самый частый
+ * случай: приписать `@QA-42` к названию может кто угодно и в любом фреймворке.
+ */
+function markerIn(name: string): string | undefined {
+  const at = name.match(/@([A-Za-z][\w-]{1,40})/);
+  if (at?.[1]) return at[1];
+  const bracket = name.match(/\[([^\]]{1,60})]/);
+  return bracket?.[1]?.trim() || undefined;
 }
 
 /** Форма отчёта Playwright ровно в тех полях, которые нам нужны. */
@@ -152,15 +194,21 @@ interface PlaywrightResult {
   error?: { message?: string };
   errors?: { message?: string }[];
 }
+interface PlaywrightAnnotation {
+  type?: string;
+  description?: string;
+}
 interface PlaywrightTest {
   status?: string;
   results?: PlaywrightResult[];
+  annotations?: PlaywrightAnnotation[];
 }
 interface PlaywrightSpec {
   title?: string;
   file?: string;
   ok?: boolean;
   tests?: PlaywrightTest[];
+  annotations?: PlaywrightAnnotation[];
 }
 interface PlaywrightSuite {
   title?: string;
@@ -217,10 +265,26 @@ function playwrightSpec(spec: PlaywrightSpec, titles: string[], file: string): I
   return {
     name,
     aliases: [path, file ? `${file} › ${path}` : '', spec.file ? `${spec.file} › ${name}` : ''],
+    // Аннотация спека и аннотация прогона — одно и то же поле в разных версиях
+    // репортёра; берём ту, что есть, иначе метку из имени.
+    externalId:
+      annotationId(spec.annotations) ??
+      attempts.map((attempt) => annotationId(attempt.annotations)).find(Boolean) ??
+      markerIn(name),
     status,
     durationMs: duration > 0 ? Math.round(duration) : undefined,
     message: note ? note.slice(0, MAX_MESSAGE) : undefined,
   };
+}
+
+/** Ключ теста из аннотаций Playwright. */
+function annotationId(annotations?: PlaywrightAnnotation[]): string | undefined {
+  for (const annotation of annotations ?? []) {
+    const type = (annotation.type ?? '').trim().toLowerCase();
+    const value = (annotation.description ?? '').trim();
+    if (value && ID_PROPERTIES.has(type)) return value;
+  }
+  return undefined;
 }
 
 /** Одна запись Allure (`*-result.json`) — тоже только нужные поля. */
@@ -232,6 +296,22 @@ interface AllureResult {
   start?: number;
   stop?: number;
   labels?: { name?: string; value?: string }[];
+  links?: { type?: string; name?: string; url?: string }[];
+}
+
+/**
+ * Ключ теста из Allure: метка (`as_id`, `tms`, `testId`) или ссылка типа `tms`.
+ * У ссылки берётся имя, а не адрес: адрес ведёт в сам TMS, а сопоставляемся мы
+ * с ключом, который в этом имени и записан.
+ */
+function allureId(record: AllureResult): string | undefined {
+  for (const label of record.labels ?? []) {
+    const name = (label.name ?? '').trim().toLowerCase();
+    const value = (label.value ?? '').trim();
+    if (value && (ID_PROPERTIES.has(name) || name === 'as_id')) return value;
+  }
+  const link = (record.links ?? []).find((item) => (item.type ?? '').toLowerCase() === 'tms');
+  return link?.name?.trim() || undefined;
 }
 
 export function parseAllure(contents: string[]): ImportedTestResult[] {
@@ -254,6 +334,7 @@ export function parseAllure(contents: string[]): ImportedTestResult[] {
       results.push({
         name,
         aliases: nameAliases(name, record.fullName ?? '', suite),
+        externalId: allureId(record) ?? markerIn(name),
         status: toStatus(record.status) as ProjectTestStatus,
         durationMs,
         message: record.statusDetails?.message?.slice(0, MAX_MESSAGE),
@@ -380,15 +461,21 @@ function readSources(root: string, input: ImportResultsInput): string[] {
   return [readFileSync(path, 'utf8')];
 }
 
-/** Три указателя на кейсы — по одному на каждое правило сопоставления. */
+/** Указатели на кейсы — по одному на каждое правило сопоставления. */
 interface CaseIndex {
+  byExternalId: Map<string, CaseRef>;
   byTestName: Map<string, CaseRef>;
   byId: Map<string, CaseRef>;
   byTitle: Map<string, CaseRef>;
 }
 
 function buildIndex(groups: ProjectTestGroup[]): CaseIndex {
-  const index: CaseIndex = { byTestName: new Map(), byId: new Map(), byTitle: new Map() };
+  const index: CaseIndex = {
+    byExternalId: new Map(),
+    byTestName: new Map(),
+    byId: new Map(),
+    byTitle: new Map(),
+  };
   for (const group of groups) {
     if (group.error) continue;
     for (const item of group.cases) {
@@ -397,6 +484,9 @@ function buildIndex(groups: ProjectTestGroup[]): CaseIndex {
       // переписывать уже найденный кейс более поздним.
       remember(index.byId, item.id, ref);
       remember(index.byTitle, item.title, ref);
+      if (item.automation?.externalId) {
+        remember(index.byExternalId, item.automation.externalId, ref);
+      }
       if (item.automation?.testName) remember(index.byTestName, item.automation.testName, ref);
     }
   }
@@ -411,6 +501,11 @@ function remember(map: Map<string, CaseRef>, key: string, ref: CaseRef): void {
 function matchCase(result: ImportedTestResult, index: CaseIndex): CaseRef | undefined {
   const names = [result.name, ...(result.aliases ?? [])].filter(Boolean);
 
+  // Ключ первым: он и заведён ради того, чтобы пережить переименование теста.
+  if (result.externalId) {
+    const hit = index.byExternalId.get(normalize(result.externalId));
+    if (hit) return hit;
+  }
   for (const name of names) {
     const hit = index.byTestName.get(normalize(name));
     if (hit) return hit;

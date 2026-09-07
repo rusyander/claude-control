@@ -99,6 +99,20 @@ export function useTestTelegram() {
 }
 
 /**
+ * Проверка вебхука — настоящий POST на указанный адрес: «панель настроена»
+ * и «приёмник принял» — разные утверждения, и человеку нужно второе.
+ */
+export function useTestWebhook() {
+  return useMutation({
+    mutationFn: async (): Promise<{ ok: boolean }> => {
+      const { data } = await apiClient.post<{ ok: boolean }>('/integrations/webhook/test', {});
+      return data;
+    },
+    meta: { successMessage: 'integrations.webhook.sent' },
+  });
+}
+
+/**
  * Собственный MCP-сервер панели над Atlassian: регистрация — действие ЧЕЛОВЕКА.
  * Автоматически панель чужой CLI не переписывает, поэтому это кнопка, а не
  * следствие включённого коннектора.

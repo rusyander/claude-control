@@ -65,6 +65,8 @@ export interface StartTestRun {
   planId?: string;
   environmentId?: string;
   scope?: string;
+  /** Веха прогона; пусто — сервер снимет её с ближайшего тега git. */
+  release?: string;
   full?: boolean;
   changedOnly?: boolean;
 }

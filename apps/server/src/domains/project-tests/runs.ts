@@ -19,7 +19,7 @@ import {
 import { buildPrompt, runName, type PromptContext } from './prompt.ts';
 import { readEnvironments, readSharedSteps } from './library.ts';
 import { planCases, readPlan } from './plans.ts';
-import { gitContext, impactOf } from './impact.ts';
+import { gitContext, impactOf, releaseTag } from './impact.ts';
 import { writeRun } from './runs-store.ts';
 import {
   runScope,
@@ -134,6 +134,9 @@ export class ProjectTestRunRegistry {
       request.environmentId ??
       (request.planId ? readPlan(root, request.planId)?.environmentIds?.[0] : undefined);
     const { branch, commit } = gitContext(root);
+    // Веху называет человек, а если не назвал — берём метку git: релиз,
+    // помеченный тегом, отчёт узнаёт сам, и просить об этом ещё раз незачем.
+    const release = request.release?.trim() || releaseTag(root);
 
     const view: ProjectTestRun = {
       id: randomUUID(),
@@ -147,6 +150,7 @@ export class ProjectTestRunRegistry {
       branch,
       commit,
       scope: request.scope,
+      release,
       status: 'running',
       startedAt: now,
       log: '',
@@ -342,6 +346,7 @@ export class ProjectTestRunRegistry {
       branch: view.branch,
       commit: view.commit,
       scope: view.scope,
+      release: view.release,
       status: view.status,
       startedAt: view.startedAt,
       finishedAt: view.finishedAt,

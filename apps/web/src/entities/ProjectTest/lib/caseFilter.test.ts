@@ -33,6 +33,16 @@ describe('matchesFilter', () => {
     expect(matchesFilter(archived, { includeArchived: true })).toBe(true);
   });
 
+  it('карантин отбирается трёхзначно: только он, всё кроме него, вперемешку', () => {
+    const quiet = make({ id: 'a', muted: true });
+    const loud = make({ id: 'b' });
+    expect(matchesFilter(quiet, {})).toBe(true);
+    expect(matchesFilter(quiet, { muted: true })).toBe(true);
+    expect(matchesFilter(quiet, { muted: false })).toBe(false);
+    expect(matchesFilter(loud, { muted: true })).toBe(false);
+    expect(matchesFilter(loud, { muted: false })).toBe(true);
+  });
+
   it('секция включает свои подсекции, но не соседей с общим началом', () => {
     const nested = make({ id: 'a', section: 'Чат/Вложения' });
     const sibling = make({ id: 'b', section: 'Чаты' });

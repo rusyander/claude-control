@@ -6,6 +6,7 @@ export {
   useCheckIntegration,
   useForgetIntegration,
   useTestTelegram,
+  useTestWebhook,
   useConnectAtlassianMcp,
 } from './api/IntegrationApi';
 export type { SaveIntegrationPayload } from './api/IntegrationApi';

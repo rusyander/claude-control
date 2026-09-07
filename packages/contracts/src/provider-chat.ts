@@ -51,6 +51,15 @@ export const providerChatSummarySchema = object({
   messageCount: number(),
   /** Рабочий каталог, в котором запускается CLI. Пусто — каталог сервера. */
   workdir: string().optional(),
+  /**
+   * Модель, подобранная панелью под класс работы при разделении задач (Т12).
+   * Помнится РАЗГОВОРОМ, а не прогоном: второе сообщение в тот же чат приходит
+   * уже без назначения (телефон и API его не шлют вовсе), и без этой записи оно
+   * уехало бы на настройке CLI. Пусто — панель ничего не подбирала.
+   */
+  model: string().optional(),
+  /** Аналог глубины к той же модели; понимает его только Codex. */
+  effort: string().optional(),
 });
 export type ProviderChatSummary = Infer<typeof providerChatSummarySchema>;
 

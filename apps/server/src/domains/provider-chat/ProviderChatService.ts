@@ -44,10 +44,14 @@ interface LiveRun {
   cleanupTimer?: ReturnType<typeof setTimeout>;
 }
 
-/** Что нужно прогону сверх самого разговора (подменяется в тестах). */
+/**
+ * Что нужно прогону сверх самого разговора (подменяется в тестах). Модель и
+ * глубина сюда не входят: они принадлежат РАЗГОВОРУ и читаются из его шапки —
+ * иначе второе сообщение в тот же чат уехало бы без назначения (см. Т12).
+ */
 export type ProviderChatRunDeps = Omit<
   ProviderChatRunOptions,
-  'history' | 'chatId' | 'appDataDir' | 'workdir'
+  'history' | 'chatId' | 'appDataDir' | 'workdir' | 'model' | 'effort'
 >;
 
 export interface SendOutcome {
@@ -109,6 +113,10 @@ export class ProviderChatService {
           chatId,
           appDataDir,
           ...(chat.workdir ? { workdir: chat.workdir } : {}),
+          // Подобранная модель живёт в шапке разговора и действует на КАЖДОЕ
+          // сообщение в нём, а не только на первое.
+          ...(chat.model ? { model: chat.model } : {}),
+          ...(chat.effort ? { effort: chat.effort } : {}),
         },
         (event) => {
           if (event.type === 'delta') {

@@ -442,6 +442,36 @@ describe('реестр провайдеров', () => {
     // задокументированы. Промпт всегда ОТДЕЛЬНЫМ элементом argv.
     expect(getProvider('codex').assistant?.oneShotArgs?.('P')).toEqual(['exec', 'P']);
     expect(getProvider('gemini').assistant?.oneShotArgs?.('P')).toEqual(['-p', 'P']);
+    // Т12: подобранная модель уходит задокументированными ключами, каждый на
+    // своём месте командной строки. Кавычек из примеров документации в argv
+    // быть не должно — их снимает оболочка, а здесь оболочки нет.
+    expect(
+      getProvider('codex').assistant?.oneShotArgs?.('P', {
+        model: 'gpt-5.3-codex',
+        effort: 'high',
+      }),
+    ).toEqual(['exec', '-m', 'gpt-5.3-codex', '-c', 'model_reasoning_effort=high', 'P']);
+    // Незадокументированный уровень глубины не передаётся вовсе: выдуманное
+    // значение уронило бы прогон, а молчание значит «как настроено у человека».
+    expect(
+      getProvider('codex').assistant?.oneShotArgs?.('P', {
+        model: 'gpt-5.3-codex',
+        effort: 'xhigh',
+      }),
+    ).toEqual(['exec', '-m', 'gpt-5.3-codex', 'P']);
+    // У Gemini аналога глубины нет — флага для неё не выдумываем.
+    expect(
+      getProvider('gemini').assistant?.oneShotArgs?.('P', {
+        model: 'gemini-3.8-flash',
+        effort: 'high',
+      }),
+    ).toEqual(['-m', 'gemini-3.8-flash', '-p', 'P']);
+    // CLI без задокументированного способа передать модель второй аргумент
+    // игнорирует: argv остаётся тем же самым.
+    expect(getProvider('qwen').assistant?.oneShotArgs?.('P', { model: 'qwen3.8-flash' })).toEqual([
+      '-p',
+      'P',
+    ]);
     // Qwen Code: OpenAI-совместимое API (OPENAI_API_KEY / DASHSCOPE_API_KEY),
     // one-shot `qwen -p <промпт>` — задокументированный headless-режим.
     expect(getProvider('qwen').assistant).toMatchObject({

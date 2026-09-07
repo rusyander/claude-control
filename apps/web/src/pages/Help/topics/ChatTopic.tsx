@@ -177,22 +177,12 @@ export function ChatTopic() {
         </Callout>
       </HelpSection>
 
+      {/* Тесты выросли из кнопки на вкладке проекта в собственный раздел, и
+          документ у них теперь свой. Здесь остаётся указатель: искать их будут
+          там, где раньше нашли, — в справке по чату. */}
       <HelpSection title={tr('testsTitle')} caption={tr('testsCaption')}>
-        <OptionCards
-          minWidth={320}
-          items={[
-            { title: tr('testsWhere'), text: tr('testsWhereText') },
-            { title: tr('testsGenerate'), text: tr('testsGenerateText') },
-            { title: tr('testsRun'), text: tr('testsRunText') },
-            { title: tr('testsEdit'), text: tr('testsEditText') },
-            { title: tr('testsConvention'), text: tr('testsConventionText') },
-          ]}
-        />
-        <Callout tone="warning" title={tr('testsAccessTitle')}>
-          {tr('testsAccessText')}
-        </Callout>
-        <Callout tone="info" title={tr('testsBrokenTitle')}>
-          {tr('testsBrokenText')}
+        <Callout tone="info" title={tr('testsMovedTitle')}>
+          {tr('testsMovedText')}
         </Callout>
       </HelpSection>
 

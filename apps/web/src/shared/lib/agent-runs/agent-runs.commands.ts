@@ -122,6 +122,8 @@ export async function resumeActive(): Promise<void> {
     startedAt?: number;
     /** `done` — прогон закончился и лежит в grace-буфере ради догона хвоста. */
     status?: 'running' | 'done';
+    /** Чем прогон запущен: у подхваченного своей записи об этом нет. */
+    model?: string;
   }[];
   try {
     const response = await apiClient.get('/chat/active');
@@ -173,6 +175,9 @@ export async function resumeActive(): Promise<void> {
       sessionId: info.sessionId,
       projectPath: info.projectPath,
       startedAt: info.startedAt,
+      // Чем ведётся: событие сессии назовёт то же имя, но оно придёт с потоком,
+      // а поток припаркованному прогону достаётся не сразу.
+      model: info.model,
       // Законченный заводим сразу законченным: «работает» у него не будет ни
       // секунды, а поток ниже дотянет только хвост — цену, расход, вопрос.
       status: finished ? 'idle' : 'running',

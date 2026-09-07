@@ -335,6 +335,9 @@ export function ChatPage() {
             queued={run.queued}
             onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
             child={child}
+            // Звено открывается ЗДЕСЬ же, как и переход к ребёнку из тоста:
+            // каталог у разговора свой, вкладка копии для него не нужна.
+            onOpenChild={session.openChatById}
             chats={chats.data ?? []}
             activeRuns={activeRuns}
             childAnswerOptions={{ allowEdits, autoApprove, ...models.effective }}

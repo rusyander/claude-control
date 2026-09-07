@@ -38,6 +38,20 @@ describe('selectActiveRuns', () => {
     );
     expect(active[0]?.status).toBe('quiet');
   });
+
+  // С подбором модели под задачу пять детей одного разделения идут разными
+  // моделями — без имени пульт показывает пять неотличимых строк.
+  it('несёт модель прогона, а незнающие её строки не засоряет пустым полем', () => {
+    const active = selectActiveRuns(
+      [
+        run({ id: 'named', status: 'running', model: 'claude-sonnet-5' }),
+        run({ id: 'unnamed', status: 'running' }),
+      ],
+      NOW,
+    );
+    expect(active.find((view) => view.id === 'named')?.model).toBe('claude-sonnet-5');
+    expect(active.find((view) => view.id === 'unnamed')).not.toHaveProperty('model');
+  });
 });
 
 describe('countRunning', () => {

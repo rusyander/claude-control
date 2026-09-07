@@ -463,6 +463,16 @@ export const helpEn: HelpSchema = {
         'parallel agents appear: the links run one after another, and the split card ' +
         'states before the button how many runs that is at worst. Work that ran at ' +
         'the ceiling itself gets no review — there is nothing to strengthen it with.',
+      cascadeHub: 'Where to see which stage a group is on',
+      cascadeHubText:
+        'In the conversation you split the tasks from. Under the agent’s answer sits ' +
+        'a summary of the groups: one row per group with its branch, the path it has ' +
+        'walked (“work › review › fixes”) and the model of the current stage; a ' +
+        'running stage carries a pulsing dot, a click opens its chat. The chat list ' +
+        'shows CONVERSATIONS, and the pipeline adds up to three per group — nine rows ' +
+        'do not tell you the state of three groups. The agents panel (the “Agents” ' +
+        'button in the header) now also says what each running run is being driven ' +
+        'by.',
       cascadeManual: 'Changing a group’s model',
       cascadeManualText:
         'Each group on the split card carries two dropdowns — model and depth. Your ' +
@@ -475,10 +485,30 @@ export const helpEn: HelpSchema = {
       cascadeLimitsText:
         'Depth max — to nobody, under any ceiling: that level is for your own ' +
         'decision, not for a fan of automatically created chats. And no outdated ' +
-        'model: only CLI aliases can be assigned (haiku, sonnet, opus, fable), and an ' +
-        'alias expands to the current model of its family by itself. A concrete name ' +
-        'from the agent’s answer is not accepted at all — otherwise the first model ' +
-        'to “remember” last year’s version would take a whole group there.',
+        'model: only levels can be assigned (haiku, sonnet, opus, fable), and the ' +
+        'panel itself expands a level into a concrete name — the newest of that ' +
+        'family in the model catalog. This used to be left to the CLI, but there ' +
+        '“sonnet”, for one, means not “the current Sonnet” but “the recommended one”, ' +
+        'so lowering the rank quietly took a group to the previous generation. A ' +
+        'concrete name from the agent’s answer is not accepted at all — otherwise the ' +
+        'first model to “remember” last year’s version would take a whole group there.',
+      cascadeForeign: 'Other CLIs: codex and gemini only, and downward only',
+      cascadeForeignText:
+        'When the active provider is not Claude, the conversation has no ceiling at ' +
+        'all: the panel knows neither the model configured in that CLI nor what your ' +
+        'plan allows. So it only LOWERS, and only where passing a model is ' +
+        'documented: Codex gets `-m` plus a reasoning level, Gemini gets `-m` (it has ' +
+        'no depth analogue). Mechanical work runs on the lower model of the line, ' +
+        'plain implementation and tests on the higher one; for architecture, ' +
+        'investigation and review the panel passes nothing, so they run on whatever ' +
+        'you configured. The other CLIs have no model routing on purpose: for Qwen ' +
+        '“newest in the family” may mean a different tier, for OpenCode choosing a ' +
+        'tier would choose a vendor for you, Kimi’s `-m` takes a name from your own ' +
+        'model table, and Aider, Goose and Continue are shells over any model at all. ' +
+        'The chosen model is shown in the conversation header and applies to every ' +
+        'message in it, not just the first. There is no work → review → fixes ' +
+        'pipeline for other CLIs — no review will be started, and the lowered task ' +
+        'says so outright.',
       cascadeOff: 'How to turn it off',
       cascadeOffText:
         'Chat menu (the “···” button in the header) → “Match the model to the task”. ' +
@@ -643,52 +673,16 @@ export const helpEn: HelpSchema = {
         'checks the write time on disk and will not let you silently overwrite someone ' +
         'else’s work. Reload the file (reopen it in the tree) and reapply your edit.',
 
-      testsTitle: 'Tests: the “Tests” button on a project tab',
+      testsTitle: 'Project tests',
       testsCaption:
-        'The list of checks over the project’s interface: what to click, what should ' +
-        'happen and how the last run ended. The agent writes the cases, you edit them, ' +
-        'and the agent walks through them live.',
-      testsWhere: 'Where they live',
-      testsWhereText:
-        'Not in the panel but in the project itself — .agent/tests/, one file per group ' +
-        '(gui.tests.json, e2e.tests.json). The file IS the tab: create a file and a tab ' +
-        'appears. Tests travel with the code and are visible to anyone who opens the ' +
-        'repository without the panel.',
-      testsGenerate: 'Generate',
-      testsGenerateText:
-        'The agent looks around the app and writes cases: it extends similar ones and ' +
-        'drops stale ones. The “What to focus on” field narrows the work down — for ' +
-        'example, “chat and analytics only”.',
-      testsRun: 'Run',
-      testsRunText:
-        'The agent walks each case live and writes the result to the file after EVERY ' +
-        'one. That is why checkmarks appear as it goes and an interrupted run keeps what ' +
-        'it already verified. “Full retest” clears the checkmarks first, so an old “passed” ' +
-        'cannot pass for a new one. Tick some cases and only those are run.',
-      testsEdit: 'Your own cases',
-      testsEditText:
-        'A case you wrote is marked as yours, and the agent may not delete or rewrite ' +
-        'it — only extend it. Its own cases it creates, updates and removes itself when ' +
-        'a feature is gone from the app.',
-      testsConvention: 'Asking from the chat',
-      testsConventionText:
-        'The buttons in this window explain the format to the agent themselves. An ' +
-        'ordinary conversation knows nothing about it: say “run the tests” in the chat ' +
-        'and it will check and write nothing down. The “Write it into the project’s ' +
-        'CLAUDE.md” button appends a block with the format and the rules to the end of ' +
-        'the file; it is read in EVERY conversation, so from then on the cases are kept ' +
-        'no matter where the request came from. Your own text is left alone and pressing ' +
-        'it twice adds nothing.',
-      testsBrokenTitle: 'A broken group file',
-      testsBrokenText:
-        'If the JSON does not parse, the panel disables ONLY that tab and leaves the file ' +
-        'alone: someone’s work stands behind it. The other groups keep working. Fix the ' +
-        'file by hand and the list comes back on its own.',
-      testsAccessTitle: 'Full access during a run',
-      testsAccessText:
-        'A run happens in the background with nobody to ask, so the agent works without ' +
-        '“Allow” cards. The task holds the boundaries: it may change only files under ' +
-        '.agent/tests, and a bug it finds is a test result, not a reason to fix code.',
+        'The project test cases do not live in the chat: they have their own section, with a ' +
+        'library, plans, a manual runner and a report.',
+      testsMovedTitle: 'Everything about tests is in the Tests section',
+      testsMovedText:
+        'Only one thing about tests is visible from the chat: an agent run is an ordinary ' +
+        'conversation with it, and it can be opened as one to see what it did step by step. ' +
+        'Everything else — where the cases live, how to keep them, what to run them with and ' +
+        'where to look afterwards — is in the help for the Tests section.',
 
       askTitle: 'Agent question: the “Your choice is needed” card',
       askCaption:
@@ -3908,6 +3902,325 @@ export const helpEn: HelpSchema = {
       noteBigText:
         'A file that is too large or binary does not go into a diff — the feed stays ' +
         'cheap and does not drag junk into the UI.',
+    },
+
+    tests: {
+      title: 'Tests',
+      summary: 'A tester workspace: the case library, plans, runs and the project report',
+      lead:
+        'The section keeps the test cases of the selected project: what they check, how they ' +
+        'check it and how the last run ended. The cases live not in the panel but in the ' +
+        'project itself — in its .agent/tests directory, as plain files — so they travel with ' +
+        'the code and are visible to anyone who opens the repository without the panel. Here ' +
+        'the panel is an editor, a remote and a report; the storage is the repository.',
+
+      whyFiles: 'Cases live in the project',
+      whyFilesText:
+        'The .agent/tests files sit next to the code they check. A branch with a new feature ' +
+        'carries the cases for it, reverting the code reverts the cases, and the edit history ' +
+        'of a case is plain git history.',
+      whyBoth: 'Both sides write',
+      whyBothText:
+        'The same file is edited by a human through the panel forms and by the agent by hand ' +
+        'during a run. Hence every rule of the format: someone else’s write must lose nothing, ' +
+        'and broken JSON must not black out the whole list.',
+      whyOne: 'One place instead of three',
+      whyOneText:
+        'Library, run, history and report are all here. A separate TMS next to the repository ' +
+        'would be a third system to synchronise by hand, and the first diverged version of a ' +
+        'case devalues both.',
+
+      storageCaption:
+        'Everything inside the project under test. The panel keeps no database of its own: ' +
+        'these files are the single source of truth.',
+      storageGroup: 'Case group',
+      storageShared: 'Shared steps',
+      storageEnvironments: 'Environments',
+      storageSchema: 'Custom fields and statuses',
+      storageViews: 'Saved filters',
+      storagePlans: 'Test plans',
+      storageRuns: 'Run history',
+      storageAttachments: 'Evidence attachments',
+      storageVersions: 'Versions and review',
+      storageVersionsValue:
+        'come from the project git — there is deliberately no versioning mechanism of its own',
+
+      libraryTitle: 'The library',
+      libraryCaption:
+        'What the set of checks is built from. The words are the familiar ones: groups, ' +
+        'sections, cases, checklists, shared steps, parameters, attributes, tags.',
+      libraryGroups: 'Groups = files = tabs',
+      libraryGroupsText:
+        'The file gui.tests.json is the "GUI" tab. Add a file — a tab appears. Groups split ' +
+        'the set coarsely: interface, end-to-end scenarios, smoke.',
+      librarySections: 'Sections — a tree inside a group',
+      librarySectionsText:
+        'The section field holds a path like "Chat/Attachments", and the panel draws a tree ' +
+        'from it. Sections are not files: a case moves between them with a bulk action, ' +
+        'touching nothing on disk.',
+      libraryCase: 'A case — a detailed scenario',
+      libraryCaseText:
+        'A precondition, steps where each one has its own expectation and its own data, an ' +
+        'overall expected result, a postcondition and an oracle — what exactly proves that it ' +
+        'passed.',
+      libraryChecklist: 'A checklist — a short check',
+      libraryChecklistText:
+        'The same item with type checklist: a list of points without expectations or ' +
+        'preconditions. For smoke sets where writing the steps down costs more than walking ' +
+        'them.',
+      librarySharedSteps: 'Shared steps',
+      librarySharedStepsText:
+        'A fragment repeated in a dozen cases ("log in as the test user") is written once in ' +
+        '_shared.steps.json. A case references it and the reference expands during a run — ' +
+        'editing the shared step changes every case at once.',
+      libraryParameters: 'Parameters',
+      libraryParametersText:
+        'A case with parameters (%login, %browser) is not one pass but as many as there are ' +
+        'value combinations. The panel expands them into test points: full combinatorics, or ' +
+        'pairwise when the full one grows indecent.',
+      libraryAttributes: 'The project’s own fields',
+      libraryAttributesText:
+        'schema.json describes fields the common format has no room for: "module", "release", ' +
+        '"requirement number". They become a column in the list and a field in the case form. ' +
+        'Custom statuses on top of the canonical five live there too.',
+      libraryTags: 'Tags and saved filters',
+      libraryTagsText:
+        'A tag is the cheapest way to assemble a set ("regression", "smoke", "payments"). A ' +
+        'tuned filter is saved as a view (views.json) and then works as a dynamic set: its ' +
+        'cases are recomputed at the moment of the run.',
+
+      fieldsTitle: 'Case fields',
+      fieldsCaption:
+        'The names are the real ones — exactly as they sit in the file, so the case can be ' +
+        'found by eye in the repository.',
+      fieldTitle: 'What is being checked — the only required field',
+      fieldType: 'case or checklist: a detailed scenario or a short check',
+      fieldPurpose: 'Why the case exists — what the steps cannot tell you',
+      fieldArea: 'The area of the app and the section path inside the group',
+      fieldPrecondition: 'The state the check starts from',
+      fieldSteps: 'A step: what to do, what should happen on it and what data to put in',
+      fieldExpected: 'What should come out overall',
+      fieldPostcondition: 'What to restore afterwards so the next case starts clean',
+      fieldOracle: 'What proves the result: text on screen, a database row, a network answer',
+      fieldPriority: 'blocker, high, medium, low — what you sort by when there is no time for all',
+      fieldReadiness: 'Readiness of the description itself: draft, ready, obsolete',
+      fieldDuration: 'Expected time to walk it through, in minutes',
+      fieldTags: 'Tags: sets are assembled and the list is filtered by them',
+      fieldLinks: 'Links to a requirement, an issue, an MR or a document',
+      fieldParameters: 'Parameter names and values the passes are expanded from',
+      fieldAutomation: 'manual, toAutomate, automated plus the file and the test name',
+      fieldCodePaths: 'Code files the case touches: the diff-based selection is computed from them',
+      fieldStatus: 'The last result, what was actually seen and when that was',
+      fieldSource: 'agent or human: the agent is forbidden to delete what a human wrote',
+
+      plansTitle: 'Plans and environments',
+      plansCaption:
+        'A plan answers "what do we check this time", an environment answers "on what". ' +
+        'Together they give a list of passes, not a list of cases.',
+      plansStatic: 'A static plan',
+      plansStaticText:
+        'Cases listed by name. Right for release acceptance: the set must not change under ' +
+        'your hands while the run is going.',
+      plansDynamic: 'A dynamic plan',
+      plansDynamicText:
+        'A filter instead of a list: "everything tagged regression with priority at least ' +
+        'high". Cases are picked at the moment of the start, so a new case joins the plan by ' +
+        'itself.',
+      plansEnvironments: 'Environments',
+      plansEnvironmentsText:
+        'A stand, a browser, an OS, the app address and the command that brings it up. A plan ' +
+        'can be run on several — the results do not mix: every pass carries its environment.',
+      plansPoints: 'Test points',
+      plansPointsText:
+        'Case × environment × parameter combination = one pass. It is the points that are ' +
+        'walked by hand and counted in the summary: five cases on two browsers are ten ' +
+        'results, not five.',
+      plansLockedTitle: 'A locked plan',
+      plansLockedText:
+        'A plan can be locked against edits. This is not about access rights but about an ' +
+        'honest report: a set that changed mid-acceptance makes its result unverifiable.',
+
+      manualTitle: 'The manual runner',
+      manualCaption:
+        'A human does the checking, the panel records it. The result lands in the same file ' +
+        'and the same history as an agent run — the report does not split them into "real" ' +
+        'and "the rest".',
+      manualStep1: 'Pick what to walk',
+      manualStep1Text:
+        'Tick the cases, choose a plan or just a group. If the plan has environments, choose ' +
+        'one — it goes into the run record.',
+      manualStep2: 'Start the run',
+      manualStep2Text:
+        'The panel expands the selection into test points and opens the first one. The session ' +
+        'lives on the server: it can be continued in another tab or from the phone.',
+      manualStep3: 'Walk the steps',
+      manualStep3Text:
+        'Every step has its own mark, the pass as a whole has a status: passed, failed, ' +
+        'skipped, blocked. Blocked means "someone else’s breakage is in the way, the step ' +
+        'cannot be reached", and that is not the same as a failure.',
+      manualStep4: 'Write down what you saw',
+      manualStep4Text:
+        'A note and an evidence attachment (a screenshot, a piece of a log) are stored next to ' +
+        'the result. A failure with no description of what was seen is half the work: there is ' +
+        'nothing to fix from it.',
+      manualStep5: 'Finish or drop',
+      manualStep5Text:
+        '"Finish" writes the run into the history, "drop" throws it away. The buttons differ ' +
+        'on purpose: "I am done" and "I changed my mind" leave a different trace, and mixing ' +
+        'them means lying to the report.',
+      manualPhoneTitle: 'The same thing from the phone',
+      manualPhoneText:
+        'The phone app opens the very same session: the result can be marked where the app is ' +
+        'being looked at, not later from memory at the computer. What was started in the panel ' +
+        'continues in the hand and back — the session is one.',
+
+      agentTitle: 'Agent runs',
+      agentCaption:
+        'Four different assignments, not one "start" button. The agent works on this computer: ' +
+        'it brings the app up where the code lives.',
+      agentGenerate: 'Generate',
+      agentGenerateText:
+        'The agent looks around the app and writes cases: it extends the similar ones and ' +
+        'marks the stale ones. The "scope" field narrows the work to the part you need — ' +
+        '"chat and analytics only".',
+      agentRun: 'Run',
+      agentRunText:
+        'The agent walks the cases live and writes the result into the file after EVERY one. ' +
+        'That is why the ticks trickle in as it goes and an interrupted run does not lose what ' +
+        'was already checked. "Full retest" first resets the statuses: an old "passed" will not ' +
+        'pass for a new one.',
+      agentExplore: 'Explore',
+      agentExploreText:
+        'A free search by charter: the agent looks for what no case covers yet and writes ' +
+        'cases for what it finds. This is exploratory testing, not a check of the known.',
+      agentAutomate: 'Automate',
+      agentAutomateText:
+        'The agent turns stable cases into automated test code and fills in automation: the ' +
+        'file and the test name. Results from CI later match on those names.',
+      agentAccessTitle: 'Full access for the duration of a run',
+      agentAccessText:
+        'A run happens in the background with nobody to ask, so the agent works without ' +
+        '"Allow" cards. The assignment holds the boundary: it may change only the files in ' +
+        '.agent/tests, and a bug it finds is a test result, not a reason to fix code.',
+      agentChangedTitle: 'Selection by the diff',
+      agentChangedText:
+        'A run can be narrowed to the cases touched by the uncommitted changes of the working ' +
+        'tree: the panel matches changed files against the codePaths field and the case area. ' +
+        'It is a cheap way to check only what was touched.',
+      agentConventionTitle: 'Asking from the chat',
+      agentConventionText:
+        'The buttons of this section explain the format to the agent themselves. An ordinary ' +
+        'conversation knows nothing about it: say "run the tests" in the chat and it will ' +
+        'check and write nothing down. The "Write into the project CLAUDE.md" button appends a ' +
+        'block with the format and the rules to the end of the file; it is read in EVERY ' +
+        'conversation. Your text is left alone, and pressing again adds nothing.',
+
+      runsTitle: 'History and report',
+      runsCaption:
+        'The status of a case is the LAST result, not a history. The history lives separately, ' +
+        'in runs/, and everything else is computed from it.',
+      runsColumn: 'What it shows',
+      runsSummary: 'Run summary',
+      runsSummaryText:
+        'How much passed, failed, was skipped and blocked, who ran it (agent, human, CI), on ' +
+        'which branch and commit. A green run from a week ago on someone else’s branch is not ' +
+        '"we are fine".',
+      runsCoverage: 'Coverage by area',
+      runsCoverageText:
+        'How many cases each area has and how many of them are green, plus the automation ' +
+        'slice: by hand, queued for automation, automated.',
+      runsFlaky: 'Flaky cases',
+      runsFlakyText:
+        'A case whose result jumps from run to run is computed from the history: the share of ' +
+        'runs without a change of result. A flaky case is worse than a red one — people stop ' +
+        'believing it.',
+      runsSpend: 'Time and spend',
+      runsSpendText:
+        'The duration of the runs and the tokens spent. Money here is an estimate at API ' +
+        'prices, not a bill: a subscription does not charge them.',
+      runsSession: 'Open a run as a conversation',
+      runsSessionText:
+        'An agent run has a CLI session, and it opens in the chat as an ordinary conversation: ' +
+        'you can see what the agent did step by step and why it decided the case had failed.',
+
+      importTitle: 'CI results and exchanging cases',
+      importCaption:
+        'Automated tests are run by CI, not by the panel. So that there is one report, their ' +
+        'results are pulled in here as a file — with the “Exchange” button above the library ' +
+        'or with `pnpm tests` in a terminal.',
+      importResults: 'Importing results',
+      importResultsText:
+        'JUnit XML, the Playwright report and Allure. The panel writes a run record marked ' +
+        '"from CI" and sets the case statuses — nothing is launched in the process.',
+      importCases: 'Importing cases',
+      importCasesText:
+        'CSV, XLSX and a TestRail export. That is how a set from an old TMS moves into the ' +
+        'project at once instead of being retyped by hand.',
+      importExport: 'Export',
+      importExportText:
+        'A group is exported to CSV, XLSX or Markdown — to attach to a report, to review, or ' +
+        'to agree with people who have no panel. A RUN REPORT is exported separately (.md or ' +
+        '.csv), straight from the run history: the circumstances, the totals and what was seen ' +
+        'at every failure.',
+      importMatchTitle: 'Matched by the test name',
+      importMatchText:
+        'A CI result lands on a case through the automation.testName field. No match — and the ' +
+        'panel lists the unmatched ones outright instead of staying silent: a quietly lost ' +
+        'result is worse than a missing one.',
+
+      defectsTitle: 'Defects',
+      defectsCaption:
+        'A failure should turn into an issue while it is still fresh in your head what exactly ' +
+        'broke.',
+      defectStep1: 'Assemble the draft',
+      defectStep1Text:
+        'The panel builds the title and the body from the case: the steps, the expectation, ' +
+        'what was actually seen, the tail of the run log and the attached evidence.',
+      defectStep2: 'Read it and fix it',
+      defectStep2Text:
+        'The draft opens for editing. Nothing goes out until you have read it — the title of ' +
+        'an issue is read more often than its body.',
+      defectStep3: 'File it in the tracker',
+      defectStep3Text:
+        'The issue is created in GitHub or GitLab by whichever CLI is installed (gh or glab), ' +
+        'under your name. The link to it is stored in the case. Neither installed — the panel ' +
+        'says plainly what is missing.',
+
+      canLibrary: 'Keep the library: groups, sections, cases, checklists, shared steps, parameters',
+      canPlans: 'Assemble test plans and environments and expand them into test points',
+      canManual: 'Walk cases by hand with per-step marks, notes and attachments',
+      canAgent: 'Start the agent: generate, run, explore, automate',
+      canImport: 'Pull automated results from CI and exchange cases as files',
+      canDefect: 'File a defect for a failure in GitHub or GitLab',
+      canPhone: 'Do all of it from the phone: the same project, the same manual session',
+
+      cantDatabase: 'A case database of its own — the source of truth is the project files',
+      cantSchedule: 'Scheduled runs — CI runs on a schedule, the panel pulls the result',
+      cantMerge:
+        'Merging branches with cases — conflicts are settled by git, like the rest of the code',
+      cantUsers: 'Accounts and roles — the panel is local and works under your name',
+
+      notesTitle: 'Things people trip over',
+      noteBrokenTitle: 'A broken group file',
+      noteBrokenText:
+        'If the JSON did not parse, the panel blacks out ONLY that tab and leaves the file ' +
+        'alone: somebody’s work stands behind it, and fixing it by a silent rewrite means ' +
+        'losing that work. The other groups work as usual.',
+      noteStatusTitle: 'The status is the last result, not a history',
+      noteStatusText:
+        'A case holds how the last run ended: the question people ask is "what is red right ' +
+        'now". Everything else — trends, flakiness, coverage — is computed from the records in ' +
+        'runs/, and those live separately.',
+      noteHumanTitle: 'The agent does not delete your cases',
+      noteHumanText:
+        'A case you wrote is marked source: human, and the agent is forbidden to delete or ' +
+        'rewrite it — only to extend it. Its own cases it creates, updates and removes itself ' +
+        'when a feature is gone from the app.',
+      noteGitTitle: 'Versions, review and conflicts — through git',
+      noteGitText:
+        'There is deliberately no versioning mechanism of its own. An edit to a case shows in ' +
+        'the diff, is discussed in an MR and is reverted like ordinary code. Old files keep ' +
+        'parsing meanwhile: steps as strings, a case without a type, a status spelled ok.',
     },
 
     projects: {

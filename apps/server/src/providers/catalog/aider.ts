@@ -67,6 +67,9 @@ export const aiderProvider: ConfigProvider = {
     apiKind: 'openai-compat',
     apiKeyEnvVars: ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY'],
     cliRunnable: true,
+    // Подбора модели (Т12) у Aider НЕТ, хотя `--model` задокументирован: своего
+    // вендора у него нет вовсе (`modelVendors` не задан — оболочка поверх любой
+    // модели), значит нет и каталога, из которого брать ступени лестницы.
     oneShotArgs: (prompt) => ['--message', prompt],
   },
   // Свой эндпоинт: у Aider свои имена под собственным префиксом —

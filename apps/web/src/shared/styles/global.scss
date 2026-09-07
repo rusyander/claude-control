@@ -79,9 +79,13 @@
   --color-accent-subtle: #eef2ff;
   --color-accent-fg: #ffffff;
 
-  --color-success: #15803d;
+  // Затемнены с #15803d и #b45309: на белом те держали AA, а на утопленной
+  // поверхности (наведённая строка, вставка кода, шапка записи в ленте
+  // изменений) давали 4.47 и 4.48 — мимо 4.5 для мелкого текста. Нынешние
+  // держат ≥5.8 на обеих. Проверено axe на /history и живым замером.
+  --color-success: #166534;
   --color-success-subtle: #dcfce7;
-  --color-warning: #b45309;
+  --color-warning: #92400e;
   --color-warning-subtle: #fef3c7;
   --color-danger: #b91c1c;
   --color-danger-subtle: #fee2e2;

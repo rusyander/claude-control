@@ -4,6 +4,7 @@ import type { CascadeAssignment, CascadeCeiling } from '@agentdeck/contracts/mod
 import type { HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 import type { StreamState } from '@entities/Chat';
 import type { PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
+import type { ChildStageGroup } from './ChildStages.types';
 
 /**
  * Всё, что карточке продолжения нужно от страницы, одним объектом. Плоскими
@@ -108,6 +109,14 @@ export interface ChatMessagesProps {
   childPermissions?: ChildPermission[];
   /** Решение по правам ребёнка — уходит в ЕГО прогон, не в этот. */
   onChildPermissionDecide?: (chatId: string, toolUseId: string, behavior: 'allow' | 'deny') => void;
+  /**
+   * Сводка групп разделения: на каком звене конвейера каждая стоит и чем
+   * ведётся. Без неё состояние группы приходится собирать из списка чатов, где
+   * работа, её ревью и правки по нему лежат тремя отдельными строками.
+   */
+  childStages?: ChildStageGroup[];
+  /** Открыть звено группы — в этом же окне, как и переход к ребёнку из тоста. */
+  onOpenChild?: (chatId: string) => void;
   /** Повторить упавший запрос — кнопка прямо в карточке ошибки. */
   onRetry?: () => void;
   /**

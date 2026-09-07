@@ -116,6 +116,16 @@ export const KIND_PLAN: Readonly<Record<TaskKind, KindPlan | undefined>> = {
 const BIG_GROUP_TASKS = 5;
 const BIG_GROUP_CHARS = 4_000;
 
+/**
+ * Группа, которую панель считает большой по одним только фактам — числу задач и
+ * длине задания. Экспортируется, потому что тот же вопрос решает подбор у ЧУЖИХ
+ * провайдеров (`domains/provider-cascade.ts`): у них другая лестница моделей, но
+ * ровно та же поправка на размер, и второй её копии быть не должно.
+ */
+export function isBigGroup(group: Pick<CascadeGroup, 'tasks' | 'length'>): boolean {
+  return (group.tasks ?? 0) >= BIG_GROUP_TASKS || (group.length ?? 0) > BIG_GROUP_CHARS;
+}
+
 /** Потолок прогона: то, что выбрал человек в настройках или в шапке чата. */
 export interface CascadeCeiling {
   /** Алиас (`opus`) либо конкретное имя модели (`claude-opus-5`), либо пусто. */
@@ -300,8 +310,20 @@ export function cascadeSystemPrompt(ceiling: CascadeCeiling): string {
  * правдоподобного «готово». Скрывать проверку ради «чистоты эксперимента» здесь
  * нечего — проверка не ловушка, а следующее звено той же работы.
  */
-export function loweredWorkPrompt(kind: TaskKind | undefined): string {
+export function loweredWorkPrompt(
+  kind: TaskKind | undefined,
+  options: {
+    /**
+     * Заведёт ли панель ревью этой работы. У Claude — да, и об этом говорится
+     * прямо. У ЧУЖОГО провайдера конвейер не работает вовсе (он живёт на реестре
+     * прогонов Claude), и обещание «панель сама заведёт ревью» было бы враньём в
+     * задании: агент рассчитывал бы на вторую пару глаз, которой не будет.
+     */
+    review?: boolean;
+  } = {},
+): string {
   const named = kind ? `«${kind}»` : 'простую работу';
+  const review = options.review ?? true;
   return (
     'Эту работу ведёт модель НИЖЕ потолка разговора: панель подобрала её по роду задачи. ' +
     'Прежде чем сказать «готово», прогони проверки проекта (типы, линт, тесты — что в нём есть) ' +
@@ -310,9 +332,13 @@ export function loweredWorkPrompt(kind: TaskKind | undefined): string {
     'контрактах, миграциях или причина сбоя неизвестна, — не выкручивайся: опиши, во что упёрся, ' +
     'и заверши ход, работу продолжат на более сильной модели. ' +
     'Незаконченное называй незаконченным: остановка с честным списком того, что осталось, стоит ' +
-    'дешевле правдоподобного «готово», за которым правок больше, чем было работы. ' +
-    'Когда ты закончишь, панель сама заведёт ревью твоего диффа на модели-потолке; ' +
-    'его замечания вернутся сюда же отдельным заданием.'
+    'дешевле правдоподобного «готово», за которым правок больше, чем было работы.' +
+    (review
+      ? ' Когда ты закончишь, панель сама заведёт ревью твоего диффа на модели-потолке; ' +
+        'его замечания вернутся сюда же отдельным заданием.'
+      : // Проверки не будет — значит проверять себя некому, кроме самого агента,
+        // и сказать это надо прямо, а не умолчать про отсутствующее звено.
+        ' Ревью этой работы панель не заведёт: проверить сделанное некому, кроме тебя.')
   );
 }
 
@@ -594,8 +620,7 @@ export function planAssignment(group: CascadeGroup, ceiling: CascadeCeiling): Ca
   const plan = KIND_PLAN[kind];
   if (!plan) return atCeiling(kind);
 
-  const big = (group.tasks ?? 0) >= BIG_GROUP_TASKS || (group.length ?? 0) > BIG_GROUP_CHARS;
-  const planned: KindPlan = big
+  const planned: KindPlan = isBigGroup(group)
     ? {
         // Ранг с единицы, индекс с нуля — поэтому [ранг] и есть «ступенью выше».
         model: ASSIGNABLE_MODELS[MODEL_RANK[plan.model]] ?? plan.model,

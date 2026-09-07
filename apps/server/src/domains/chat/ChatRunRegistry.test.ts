@@ -116,6 +116,18 @@ describe('ChatRunRegistry', () => {
     expect(active[0]?.finishedAt).toBeUndefined();
   });
 
+  // Вкладка, не заводившая прогон (F5, телефон, дети разделения), своей записи
+  // о модели не имеет: с подбором модели под задачу пульт агентов без этого
+  // поля показывает несколько неотличимых строк.
+  it('active() называет модель прогона, а «как решит CLI» полем не засоряет', () => {
+    registry.start('c1', { ...OPTIONS, model: 'claude-sonnet-5' }, {});
+    registry.start('c2', OPTIONS, {});
+
+    const active = registry.active();
+    expect(active.find((info) => info.chatId === 'c1')?.model).toBe('claude-sonnet-5');
+    expect(active.find((info) => info.chatId === 'c2')).not.toHaveProperty('model');
+  });
+
   it('завершение закрывает живых слушателей, но буфер живёт для догона', async () => {
     registry.start('c1', OPTIONS, {});
     const live = collector();

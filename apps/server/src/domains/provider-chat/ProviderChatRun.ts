@@ -57,6 +57,17 @@ export interface ProviderChatRunOptions {
   systemPrefix?: string;
   timeoutMs?: number;
   models?: ModelInfo[];
+  /**
+   * Подбор модели под задачу (Т12): чем вести ЭТОТ прогон. Уходит в argv только
+   * тем CLI, у которых способ передать модель задокументирован (`oneShotArgs`
+   * второго аргумента). Пусто — CLI работает своей настроенной моделью.
+   *
+   * Путь `api` его НЕ использует намеренно: там модель выбирает панель по
+   * собственному скромному умолчанию и по ключу пользователя, за который платит
+   * он сам, — подставлять туда ступень лестницы значит менять его расходы.
+   */
+  model?: string;
+  effort?: string;
   /** Подменяемые зависимости: в тестах ничего настоящего не запускается. */
   spawnImpl?: typeof nodeSpawn;
   fetchImpl?: typeof fetch;
@@ -121,7 +132,10 @@ export class ProviderChatRun implements ProviderChatRunLike {
         return;
       }
 
-      const args = provider.assistant?.oneShotArgs?.(buildPrompt(options.history).text);
+      const args = provider.assistant?.oneShotArgs?.(buildPrompt(options.history).text, {
+        ...(options.model ? { model: options.model } : {}),
+        ...(options.effort ? { effort: options.effort } : {}),
+      });
       if (args) {
         await this.runStreaming(options, args, resolution.cliCommandFound, onEvent);
         return;

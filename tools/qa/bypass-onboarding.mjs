@@ -18,14 +18,23 @@
  */
 export async function bypassOnboarding(page, patch = {}) {
   await page.route('**/api/settings', async (route) => {
-    if (route.request().method() !== 'GET') return route.continue();
-    const response = await route.fetch();
-    let body;
+    // Запрос может быть ещё в полёте, когда проверка уже закрыла браузер: тогда
+    // любое действие с ним бросает TargetClosedError, и это НЕ отказ проверки —
+    // но без перехвата он всплывает необработанным отказом и роняет процесс
+    // ненулевым кодом уже после всех «чисто». Прогон a11y так и падал: 62
+    // страницы пройдены, а выход 1.
     try {
-      body = await response.json();
+      if (route.request().method() !== 'GET') return await route.continue();
+      const response = await route.fetch();
+      let body;
+      try {
+        body = await response.json();
+      } catch {
+        return await route.fulfill({ response });
+      }
+      return await route.fulfill({ response, json: { ...body, ...patch, onboardingDone: true } });
     } catch {
-      return route.fulfill({ response });
+      /* контекст закрыт — отвечать уже некому */
     }
-    return route.fulfill({ response, json: { ...body, ...patch, onboardingDone: true } });
   });
 }

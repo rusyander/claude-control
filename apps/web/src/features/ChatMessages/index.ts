@@ -11,3 +11,5 @@ export type { TaskSplitCardProps } from './ui/TaskSplitCard.types';
 export { HandoffCard } from './ui/HandoffCard';
 export type { HandoffCardProps } from './ui/HandoffCard.types';
 export type { ChildPermission, ChildQuestion, HandoffControls } from './ui/ChatMessages.types';
+/** Сводка звеньев у родителя: страница собирает её из списка чатов и прогонов. */
+export type { ChildStageGroup } from './ui/ChildStages.types';

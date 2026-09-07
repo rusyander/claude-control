@@ -57,8 +57,10 @@ export function ChatParallelSections() {
             { title: tr('cascadeCeiling'), text: tr('cascadeCeilingText') },
             { title: tr('cascadeKinds'), text: tr('cascadeKindsText') },
             { title: tr('cascadeReview'), text: tr('cascadeReviewText') },
+            { title: tr('cascadeHub'), text: tr('cascadeHubText') },
             { title: tr('cascadeManual'), text: tr('cascadeManualText') },
             { title: tr('cascadeLimits'), text: tr('cascadeLimitsText') },
+            { title: tr('cascadeForeign'), text: tr('cascadeForeignText') },
             { title: tr('cascadeOff'), text: tr('cascadeOffText') },
           ]}
         />

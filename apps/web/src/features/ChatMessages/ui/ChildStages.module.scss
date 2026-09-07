@@ -1,0 +1,47 @@
+// Сводка групп разделения. Форма — та же карточка, что у вердикта ревью и
+// разделения задач: они появляются в одном месте ленты. Отличие в том, что эта
+// карточка ничего не спрашивает, поэтому и акцентной полосы у неё нет — она
+// сообщает состояние, а не зовёт решать.
+.card {
+  margin-bottom: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.head {
+  margin-bottom: var(--spacing-3xs);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  padding: var(--spacing-3xs) var(--spacing-3xs);
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  // Строка кликабельна, поэтому наведение обязано быть видно в ОБЕИХ темах:
+  // «утопленная» поверхность темнее карточки на свету и на тёмном.
+  &:hover {
+    background: var(--color-surface-sunken);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+}
+
+// Длинное имя ветки не должно распирать карточку: строка ужимается, а не
+// растягивает ленту вбок.
+.text {
+  min-width: 0;
+  flex: 1;
+}

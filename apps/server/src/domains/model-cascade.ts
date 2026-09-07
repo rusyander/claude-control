@@ -1,6 +1,11 @@
 import { dirname, basename } from 'node:path';
-import type { AppSettings } from '@agentdeck/contracts';
-import type { CascadeCeiling } from '@agentdeck/contracts/model-cascade';
+import type { AppSettings, ModelInfo } from '@agentdeck/contracts';
+import {
+  ASSIGNABLE_MODELS,
+  type CascadeCeiling,
+  type AssignableModel,
+} from '@agentdeck/contracts/model-cascade';
+import { newestInFamily } from './models/model-defaults.ts';
 import { normalizeProjectPath } from '../lib/app-store/projects.ts';
 import { WORKTREES_DIR_SUFFIX } from './project-git/worktrees.ts';
 import { matchesProject } from './group-activation.ts';
@@ -82,4 +87,32 @@ export function cascadeCeilingFor(
     model: override.model || deps.settings.chatModel,
     effort: override.effort || deps.settings.chatEffort,
   };
+}
+
+/**
+ * Алиас CLI → самая свежая модель этого семейства из каталога.
+ *
+ * Зачем вообще: партия подбора держит инвариант «устаревшее поколение
+ * недостижимо» — назначать разрешено только алиасы, а алиас, как считалось,
+ * всегда ведёт на свежую модель семейства. Живые прогоны 07.09.2026 показали
+ * обратное: `--model sonnet` пошёл на `claude-sonnet-4-6`, `--model opus` — на
+ * `claude-opus-4-8`, при том что в каталоге есть и Sonnet 5, и Opus 5, и
+ * человек в шапке выбрал именно Opus 5. То есть алиас у CLI значит не «свежая
+ * модель семейства», а «рекомендованная для этого уровня», и понижение ранга
+ * молча превращалось ещё и в понижение ПОКОЛЕНИЯ — ровно то, чего партия
+ * обещала не делать.
+ *
+ * Поэтому разворачивает алиас панель, а не CLI, и делает это в последний момент
+ * — уже после клэмпа: сравнение силы живёт на алиасах (`MODEL_RANK`), и
+ * конкретные имена ему только мешали бы.
+ *
+ * Не алиас (человек выбрал конкретное имя) — возвращается как есть: это его
+ * выбор, а не наш подбор. Каталога нет или семейство в нём пустое — тоже как
+ * есть: гадать не о чем, а прогон с алиасом заведомо запустится.
+ */
+export function expandAssignedModel(models: ModelInfo[], model: string): string {
+  const alias = ASSIGNABLE_MODELS.find((known): known is AssignableModel => known === model);
+  if (!alias) return model;
+
+  return newestInFamily(models, `claude-${alias}`)?.id ?? model;
 }

@@ -27,6 +27,7 @@ export function ChatThread({
   queued,
   onCancelQueued,
   child,
+  onOpenChild,
   chats,
   activeRuns,
   childAnswerOptions,
@@ -80,6 +81,8 @@ export function ChatThread({
       onPermissionDecide={(toolUseId, behavior, message) =>
         chatId && agentRuns.decidePermission(chatId, toolUseId, behavior, message)
       }
+      childStages={child.stages}
+      onOpenChild={onOpenChild}
       childPermissions={child.permissions}
       // Решение по правам ребёнка уходит в ЕГО прогон — тем же путём, что и
       // своё: брокер ждёт ответа по ключу прогона, и родительский разговор об

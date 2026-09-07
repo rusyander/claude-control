@@ -23,6 +23,10 @@ const CHAT = {
   createdAt: '2026-08-02T10:00:00.000Z',
   updatedAt: '2026-08-02T10:00:00.000Z',
   messageCount: 0,
+  // Разговор, заведённый разделением задач: панель подобрала модель под класс
+  // работы (Т12) и обязана назвать её в шапке — подбор только ПОНИЖАЕТ, и
+  // человек должен видеть, что чат идёт не тем, что настроено у CLI.
+  model: 'gpt-5.3-codex-spark',
 };
 
 /** Переписка растёт по ходу прогона — как на настоящем сервере. */
@@ -124,6 +128,7 @@ const check = (ok, text) => {
 const body = await page.textContent('body');
 check(body.includes('Разговоры'), 'открылся чат чужого провайдера, а не чат Claude');
 check(body.includes('Проверка'), 'разговор виден в списке');
+check(body.includes('gpt-5.3-codex-spark'), 'подобранная панелью модель названа в шапке');
 
 const composer = page.getByRole('textbox', { name: /Сообщение провайдеру/ });
 check((await composer.count()) === 1, 'поле ввода на месте');

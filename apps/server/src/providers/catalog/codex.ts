@@ -8,6 +8,13 @@ import { codexHome, unimplementedPaths } from './config-dirs.ts';
  */
 const codexConfigToml = (): string => join(codexHome(), 'config.toml');
 
+/**
+ * Значения глубины, задокументированные для `model_reasoning_effort`. Незнакомое
+ * не передаётся вовсе: выдуманный уровень уронил бы прогон целиком, а «панель
+ * ничего не сказала» значит «как настроено у пользователя» — рабочее состояние.
+ */
+const CODEX_EFFORTS = ['low', 'medium', 'high'];
+
 /** Codex (OpenAI): AGENTS.md + ~/.codex/config.toml (MCP в [mcp_servers]). */
 export const codexProvider: ConfigProvider = {
   id: 'codex',
@@ -44,7 +51,22 @@ export const codexProvider: ConfigProvider = {
     apiKind: 'openai',
     apiKeyEnvVars: ['OPENAI_API_KEY'],
     cliRunnable: true,
-    oneShotArgs: (prompt) => ['exec', prompt],
+    // Подбор модели (Т12): `-m/--model` задокументирован у самой `codex exec`, а
+    // глубина — единственная среди всех чужих CLI — задаётся ключом конфига
+    // `-c model_reasoning_effort=<low|medium|high>`. Кавычек из примеров
+    // документации здесь нет намеренно: их снимает оболочка, а argv уходит без
+    // неё, и `"high"` приехало бы в значение вместе с кавычками.
+    //
+    // Опции идут ДО позиционного промпта — так описан сам вызов
+    // (`codex exec [OPTIONS] [PROMPT]`), и промпт остаётся отдельным элементом.
+    oneShotArgs: (prompt, run) => [
+      'exec',
+      ...(run?.model ? ['-m', run.model] : []),
+      ...(CODEX_EFFORTS.includes(run?.effort ?? '')
+        ? ['-c', `model_reasoning_effort=${run?.effort}`]
+        : []),
+      prompt,
+    ],
   },
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
@@ -69,4 +91,11 @@ export const codexProvider: ConfigProvider = {
   }),
   // Модели: каталог OpenAI (models.dev). Codex CLI работает с моделями OpenAI.
   modelVendors: ['openai'],
+  // Лестница подбора (Т12): обе ступени — модели самого Codex, поэтому выбор
+  // между ними не меняет ни вендора, ни доступа. `gpt-codex-spark` — младшая
+  // (быстрая) кодовая модель, `gpt-codex` — старшая; семейства однородны, и
+  // «свежайшая в семействе» означает ту же ступень следующего поколения.
+  // Флагман общего назначения (`gpt`, `gpt-pro`) сюда не берём: подбор
+  // существует, чтобы понижать, а не чтобы менять линейку.
+  modelLadder: ['gpt-codex-spark', 'gpt-codex'],
 };

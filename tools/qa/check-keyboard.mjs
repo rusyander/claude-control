@@ -129,8 +129,15 @@ async function checkDialog(page) {
     () => true,
     () => false,
   );
-  await page.waitForTimeout(400); // анимация закрытия — фокус возвращается после неё
-  const returned = closed && (await create.evaluate((el) => el === document.activeElement));
+  // Фокус возвращается ПОСЛЕ анимации закрытия, а её длительность живая: под
+  // нагрузкой один замер через фиксированную паузу давал ложную красноту (раздел
+  // с тяжёлой формой — «фокус НЕ вернулся», при повторе всё чисто). Ждём
+  // возврата опросом, а не одним взглядом.
+  let returned = false;
+  for (let waited = 0; closed && !returned && waited < 2500; waited += 100) {
+    await page.waitForTimeout(100);
+    returned = await create.evaluate((el) => el === document.activeElement);
+  }
   const note = `модалка: фокус внутри ${focusInside ? 'да' : 'НЕТ'}, Escape ${closed ? 'закрывает' : 'НЕ закрывает'}, фокус ${returned ? 'вернулся' : 'НЕ вернулся'}`;
   return { note, problem: focusInside && closed && returned ? null : note };
 }

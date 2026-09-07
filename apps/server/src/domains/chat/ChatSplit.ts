@@ -64,6 +64,12 @@ export const splitGit: SplitGit = {
 /** Запуск прогона группы; `false` — под этим ключом прогон уже идёт. */
 export type SplitStart = (input: {
   chatId: string;
+  /**
+   * Название группы. Нужно чужому провайдеру: разговор заводит его собственное
+   * хранилище, и без названия он лёг бы в список под служебным ключом (`new-…`)
+   * — до правки от 07.09.2026 так и было.
+   */
+  title: string;
   prompt: string;
   cwd: string;
   /** Чем эту группу решено делать; нет — подбор в проекте выключен. */
@@ -195,7 +201,7 @@ export async function splitTasks({
       ...(assignment ? { assignment } : {}),
     });
     const started = startRuns
-      ? start({ chatId, prompt, cwd, ...(assignment ? { assignment } : {}) })
+      ? start({ chatId, title: group.title, prompt, cwd, ...(assignment ? { assignment } : {}) })
       : false;
 
     chats.push({

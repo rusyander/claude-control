@@ -11,7 +11,12 @@ import type { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
 import { activateGroupsQuietly } from '../../domains/group-activation.ts';
-import { cascadeCeilingFor } from '../../domains/model-cascade.ts';
+import {
+  cascadeCeilingFor,
+  expandAssignedModel,
+  isCascadeEnabled,
+} from '../../domains/model-cascade.ts';
+import { planForeignAssignment } from '../../domains/provider-cascade.ts';
 import {
   cascadeSystemPrompt,
   clampAssignment,
@@ -96,22 +101,47 @@ export function registerChatSplitRoutes(
     }
 
     const provider = getActiveProvider(ctx.store);
+    // Чужой CLI ведёт разговор своим хранилищем, и подбор модели у него устроен
+    // иначе — от лестницы провайдера, а не от потолка разговора (см.
+    // `domains/provider-cascade.ts`). Развилка одна на весь маршрут.
+    const isForeign = provider.id !== 'claude';
     const wantRuns = startRuns !== false;
     // Замены человека: чем бы ни оказалось поле, отсюда выходит карта понятных
     // значений — незнакомое отброшено, потолок всё равно держится ниже.
     const manual = parseAssignments(request.body?.assignments);
 
+    // Правило проекта одно на обе ветки: выключив подбор в репозитории, человек
+    // выключил его и чужому CLI — тумблер стоит на проекте, а не на провайдере.
+    const cascadeEntries = ctx.store.getProjectCascadeEntries();
     // Потолок разговора и правило проекта: `undefined` — подбор здесь выключен,
     // и дальше всё идёт ровно как до партии подбора (дети = выбранная модель).
-    const ceiling = cascadeCeilingFor(
-      { entries: ctx.store.getProjectCascadeEntries(), settings: ctx.store.getSettings() },
-      dir,
-      { model, effort },
-    );
+    //
+    // У чужого провайдера потолка НЕТ вовсе, и подставлять сюда настройку панели
+    // нельзя: в ней имя модели Claude, а прогон пойдёт кодексом. До правки от
+    // 07.09.2026 так и было — карточка и связь показывали `claude-sonnet-5` там,
+    // где CLI работал своей настройкой.
+    const ceiling = isForeign
+      ? undefined
+      : cascadeCeilingFor({ entries: cascadeEntries, settings: ctx.store.getSettings() }, dir, {
+          model,
+          effort,
+        });
+    // Каталог моделей: им алиас разворачивается в свежую модель семейства.
+    // Читается один раз на запрос — он один и тот же для всех групп.
+    const catalog = ctx.models.current(provider.modelVendors ?? []).models;
     // Потолок в том виде, в каком с ним можно ЗАПУСТИТЬ прогон: `max` срезан до
     // `xhigh`, незнакомая глубина — до пустой строки. Клэмп пустого пожелания
     // делает ровно это, и второй его копии здесь заводить незачем.
-    const runnableCeiling = ceiling ? clampAssignment({}, ceiling) : undefined;
+    //
+    // Алиас разворачивается и здесь: этот потолок уезжает в связь и по нему
+    // пойдёт РЕВЬЮ работы — проверка обязана идти на том же поколении, что
+    // выбрал человек, а не на прошлом (см. `expandAssignedModel`).
+    const runnableCeiling = ceiling
+      ? (() => {
+          const clamped = clampAssignment({}, ceiling);
+          return { ...clamped, model: expandAssignedModel(catalog, clamped.model) };
+        })()
+      : undefined;
 
     const result: TaskSplitResult = await splitTasks({
       projectPath: dir,
@@ -132,56 +162,82 @@ export function registerChatSplitRoutes(
        * половины потолка — оверрайд шапки этого разговора и настройка панели, —
        * а также правило проекта. Разделение только разносит ответ.
        */
-      assign: ceiling
-        ? (group, prompt, index) => {
-            const auto = planAssignment(
-              {
-                ...(group.kind ? { kind: group.kind } : {}),
-                ...(group.model ? { model: group.model } : {}),
-                ...(group.effort ? { effort: group.effort } : {}),
-                tasks: group.tasks.length,
-                length: prompt.length,
-              },
-              ceiling,
-            );
-            // Замена человека сильнее подбора и действует ВНИЗ тоже: он видел
-            // задачи группы. Класс при этом остаётся распознанным — по нему
-            // группа подписана на карточке и по нему же пишется связь.
-            const wish = manual.get(index);
-            return wish ? manualAssignment(wish, ceiling, auto.kind) : auto;
-          }
-        : undefined,
-      link: parentChatId
-        ? ({ chatId, title, branch, assignment }) =>
-            ctx.store.setChatLink(chatId, {
-              parentChatId,
-              title,
-              branch,
-              createdAt: new Date().toISOString(),
-              // Назначение живёт в связи, а не только в прогоне: второе
-              // сообщение ребёнку приходит уже без него (телефон и API модель
-              // не шлют вовсе), и без этой записи оно уехало бы на дефолте.
-              ...(assignment
-                ? {
-                    model: assignment.model,
-                    effort: assignment.effort,
-                    lowered: assignment.lowered,
-                    stage: 'work',
-                    ...(assignment.kind ? { kind: assignment.kind } : {}),
-                    // Потолок ЭТОГО разговора — на нём пойдёт ревью работы.
-                    // Пересчитать его потом нечем: половина потолка жила в шапке
-                    // родительского чата, которого к тому времени уже нет.
-                    ...(runnableCeiling
-                      ? {
-                          ceilingModel: runnableCeiling.model,
-                          ceilingEffort: runnableCeiling.effort,
-                        }
-                      : {}),
-                  }
-                : {}),
-            })
-        : undefined,
-      start: ({ chatId, prompt, cwd, assignment }) => {
+      assign: isForeign
+        ? // Чужой CLI: ступень лестницы провайдера по классу работы, и только
+          // вниз. Классу-потолку (`design`, `investigation`, `review`) и любому
+          // CLI без лестницы отвечается `undefined` — прогон идёт настройкой
+          // пользователя, а карточка ничего про модель не обещает. Ручные замены
+          // с карточки здесь не участвуют: её список — алиасы Claude, у чужого
+          // вендора не значащие ничего.
+          (group, prompt) =>
+            isCascadeEnabled(cascadeEntries, dir)
+              ? planForeignAssignment(provider, catalog, {
+                  ...(group.kind ? { kind: group.kind } : {}),
+                  tasks: group.tasks.length,
+                  length: prompt.length,
+                })
+              : undefined
+        : ceiling
+          ? (group, prompt, index) => {
+              const auto = planAssignment(
+                {
+                  ...(group.kind ? { kind: group.kind } : {}),
+                  ...(group.model ? { model: group.model } : {}),
+                  ...(group.effort ? { effort: group.effort } : {}),
+                  tasks: group.tasks.length,
+                  length: prompt.length,
+                },
+                ceiling,
+              );
+              // Замена человека сильнее подбора и действует ВНИЗ тоже: он видел
+              // задачи группы. Класс при этом остаётся распознанным — по нему
+              // группа подписана на карточке и по нему же пишется связь.
+              const wish = manual.get(index);
+              const plan = wish ? manualAssignment(wish, ceiling, auto.kind) : auto;
+              // Алиас — в свежую модель семейства, последним шагом: сравнение силы
+              // идёт по алиасам, а прогону нужно имя, за которым не прячется
+              // прошлое поколение.
+              return { ...plan, model: expandAssignedModel(catalog, plan.model) };
+            }
+          : undefined,
+      // Связь пишется только у Claude, и это не пробел. Ключ здесь временный
+      // (`new-…`) и переезжает на настоящий `sessionId` прогона; у чужого CLI
+      // разговор заводит его собственное хранилище со своим идентификатором, и
+      // связь под временным ключом осталась бы записью о чате, которого нет.
+      // Дерево, сводка звеньев и конвейер ревью у чужих провайдеров поэтому не
+      // работают — см. `domains/provider-cascade.ts`.
+      link:
+        parentChatId && !isForeign
+          ? ({ chatId, title, branch, assignment }) =>
+              ctx.store.setChatLink(chatId, {
+                parentChatId,
+                title,
+                branch,
+                createdAt: new Date().toISOString(),
+                // Назначение живёт в связи, а не только в прогоне: второе
+                // сообщение ребёнку приходит уже без него (телефон и API модель
+                // не шлют вовсе), и без этой записи оно уехало бы на дефолте.
+                ...(assignment
+                  ? {
+                      model: assignment.model,
+                      effort: assignment.effort,
+                      lowered: assignment.lowered,
+                      stage: 'work',
+                      ...(assignment.kind ? { kind: assignment.kind } : {}),
+                      // Потолок ЭТОГО разговора — на нём пойдёт ревью работы.
+                      // Пересчитать его потом нечем: половина потолка жила в шапке
+                      // родительского чата, которого к тому времени уже нет.
+                      ...(runnableCeiling
+                        ? {
+                            ceilingModel: runnableCeiling.model,
+                            ceilingEffort: runnableCeiling.effort,
+                          }
+                        : {}),
+                    }
+                  : {}),
+              })
+          : undefined,
+      start: ({ chatId, title, prompt, cwd, assignment }) => {
         // Набор, привязанный к проекту, включается и здесь: агент, которого
         // завело разделение, работает в том же проекте и должен получить те же
         // правила и скиллы. Копия репозитория считается тем же проектом —
@@ -192,9 +248,9 @@ export function registerChatSplitRoutes(
           (error) => app.log.warn({ err: error }, 'group activation failed'),
         );
 
-        return provider.id === 'claude'
-          ? startClaude(chatId, prompt, cwd, assignment)
-          : startForeign(chatId, prompt, cwd);
+        return isForeign
+          ? startForeign(title, prompt, cwd, assignment)
+          : startClaude(chatId, prompt, cwd, assignment);
       },
     });
 
@@ -256,21 +312,41 @@ export function registerChatSplitRoutes(
 
     /**
      * Разговор чужого CLI. Идентификатор здесь СВОЙ (его выдаёт хранилище
-     * провайдера), поэтому ключ из домена не используется — клиент открывает
-     * такой чат по пути и по id из ответа.
+     * провайдера), поэтому ключ из домена не используется — человек находит
+     * такой чат в списке разговоров провайдера по НАЗВАНИЮ группы.
+     *
+     * Назначение модели (Т12) уезжает в шапку разговора, а не только в первый
+     * прогон: следующее сообщение в тот же чат приходит без него, и без записи
+     * оно ушло бы на настройке CLI — то есть работа продолжилась бы не тем, чем
+     * началась.
      */
-    function startForeign(chatId: string, prompt: string, cwd: string): boolean {
+    function startForeign(
+      title: string,
+      prompt: string,
+      cwd: string,
+      assignment?: CascadePlan,
+    ): boolean {
       const appData = ctx.location.paths.appData;
-      const created = createChat(appData, provider.id, { title: chatId, workdir: cwd });
+      const created = createChat(appData, provider.id, {
+        title,
+        workdir: cwd,
+        ...(assignment ? { model: assignment.model, effort: assignment.effort } : {}),
+      });
       if (!created) return false;
       // У чужого CLI инициатива — первая реплика переписки, а не флаг запуска.
       // Без неё порождённый чат вёл бы себя иначе, чем тот же чат после первого
       // же вопроса из панели, — а тумблер в настройках один. Разделение из неё
       // выключено по той же причине, что и у Claude: этот чат уже выделен.
-      const initiative = initiativePrompt(ctx.store.getSettings(), {
-        splitMuted: true,
-        foreign: true,
-      });
+      const initiative = [
+        initiativePrompt(ctx.store.getSettings(), { splitMuted: true, foreign: true }),
+        // Планка сдачи — единственная плата за понижение, которая у чужого
+        // провайдера вообще есть: конвейер ревью работает на реестре прогонов
+        // Claude, и завести проверку на потолке здесь нечем (см.
+        // `domains/provider-cascade.ts`). Обещать больше было бы враньём.
+        assignment?.lowered ? loweredWorkPrompt(assignment.kind, { review: false }) : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
       const outcome = deps.providerChats.send(
         appData,
         provider.id,
@@ -278,7 +354,7 @@ export function registerChatSplitRoutes(
         { text: prompt },
         {
           provider,
-          models: ctx.models.current(provider.modelVendors ?? []).models,
+          models: catalog,
           ...(initiative ? { systemPrefix: initiative } : {}),
         },
       );

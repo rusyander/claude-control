@@ -21,6 +21,7 @@ import { QuestionCard } from './QuestionCard';
 import { TaskSplitCard } from './TaskSplitCard';
 import { HandoffCard } from './HandoffCard';
 import { PermissionCard } from './PermissionCard';
+import { ChildBlocks } from './ChildBlocks';
 import { QueuedBubbles } from './QueuedBubbles';
 import type { ChatMessagesProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
@@ -47,6 +48,8 @@ export function ChatMessages({
   onChildAnswer,
   childPermissions,
   onChildPermissionDecide,
+  childStages,
+  onOpenChild,
   onRetry,
   onContinue,
   onRefresh,
@@ -422,57 +425,18 @@ export function ChatMessages({
       )}
 
       {/*
-        Запросы прав дочерних разговоров. Показываются рядом со своими и по
-        более веской причине: на запросе прав агент СТОИТ. Подпись обязательна —
-        разрешать «удалить каталог» вслепую, не зная, кто из шести просит,
-        человек не должен.
+        Всё о детях этого разговора — сводка звеньев, их права, их вопросы —
+        одним блоком: порядок внутри него важен (сперва «где все», потом «кого
+        ждут»), и держать его целиком проще в одном месте.
       */}
-      {onChildPermissionDecide &&
-        (childPermissions ?? []).map((child) => (
-          <div key={child.chatId} className={styles.childAsk}>
-            <Typography variant="caption" color="subtle" className={styles.childAskFrom}>
-              {t('chat.permissionFromChild', { title: child.title })}
-            </Typography>
-            <PermissionCard
-              permissions={child.permissions}
-              onDecide={(toolUseId, behavior) =>
-                onChildPermissionDecide(child.chatId, toolUseId, behavior)
-              }
-            />
-          </div>
-        ))}
-
-      {/*
-        Вопросы дочерних разговоров. Ответ уходит в ИХ чат — этот разговор о нём
-        не узнает и хода себе не добавит. Подпись обязательна: одинаковых
-        вопросов от шести агентов бывает шесть, и без имени чата человек отвечает
-        вслепую.
-      */}
-      {onChildAnswer &&
-        (childQuestions ?? []).map((child) => {
-          const questions = parseQuestions(child.input);
-          if (!questions) return null;
-          const key = liveQuestionKey(child.chatId, child.toolUseId, child.input);
-          return (
-            <div key={`${child.chatId}-${child.toolUseId ?? 'ask'}`} className={styles.childAsk}>
-              <Typography variant="caption" color="subtle" className={styles.childAskFrom}>
-                {t('chat.questionFromChild', { title: child.title })}
-              </Typography>
-              <QuestionCard
-                questions={questions}
-                onPick={(answer) => {
-                  markQuestionAnswered(key);
-                  onChildAnswer(child.chatId, answer);
-                }}
-                busy={child.isRunning}
-                isAnswered={answered.has(key)}
-                // Подпись сохраняется и ПОСЛЕ ответа: «отправлено» без имени
-                // разговора не говорит, кому именно из шестерых человек ответил.
-                target={child.title}
-              />
-            </div>
-          );
-        })}
+      <ChildBlocks
+        stages={childStages}
+        onOpenChild={onOpenChild}
+        permissions={childPermissions}
+        onPermissionDecide={onChildPermissionDecide}
+        questions={childQuestions}
+        onAnswer={onChildAnswer}
+      />
 
       {/*
         Ошибка — такое же событие разговора, как ответ, и место ей в ленте.

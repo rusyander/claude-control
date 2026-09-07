@@ -186,4 +186,8 @@ export const opencodeProvider: ConfigProvider = {
   }),
   // Модели: собственный шлюз OpenCode Zen (models.dev, вендор `opencode`).
   modelVendors: ['opencode'],
+  // Подбора модели (Т12) у OpenCode НЕТ: флаг `--model provider/model`
+  // задокументирован, но шлюз ведёт модели ВСЕХ вендоров сразу (claude, gpt,
+  // gemini, glm, kimi…), и выбор ступени здесь означает выбор вендора за
+  // пользователя. Это его решение, а не панели.
 };

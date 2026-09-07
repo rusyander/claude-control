@@ -15,6 +15,8 @@ export interface RunLike {
   lastEventAt: number;
   costUsd?: number;
   tokens?: number;
+  /** Чем ведётся прогон: имя называет сам CLI первым событием сессии. */
+  model?: string;
   /** Запросы прав, ждущие ответа — влияют на статус (жёлтая точка). */
   permissions?: PendingPermission[];
   /** Вызовы этого хода: среди них и вопрос человеку. */
@@ -29,6 +31,12 @@ export interface ActiveRunView {
   status: Exclude<RunStatus, 'idle'>;
   costUsd?: number;
   tokens?: number;
+  /**
+   * Чем ведётся прогон. Нужно с тех пор, как панель подбирает модель под задачу:
+   * дети одного разделения идут РАЗНЫМИ моделями, звено проверки — сильнее
+   * работы, и в пульте агентов «кто на чём» иначе не прочесть.
+   */
+  model?: string;
   /**
    * Вызовы прогона. Нужны не только его собственной ленте: вопрос дочернего
    * чата (`AskUserQuestion`) показывается и в РОДИТЕЛЬСКОМ разговоре, чтобы
@@ -65,6 +73,7 @@ export function selectActiveRuns(runs: RunLike[], now: number): ActiveRunView[] 
       status,
       costUsd: run.costUsd,
       tokens: run.tokens,
+      ...(run.model ? { model: run.model } : {}),
       // Вопросы носим только у тех, кто спрашивал: у остальных это лишний
       // массив на каждый пересчёт пульта агентов.
       ...(run.tools?.some((tool) => tool.name === 'AskUserQuestion') ? { tools: run.tools } : {}),

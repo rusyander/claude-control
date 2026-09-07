@@ -55,6 +55,9 @@ export const gooseProvider: ConfigProvider = {
     apiKind: 'none',
     apiKeyEnvVars: [],
     cliRunnable: true,
+    // Подбора модели (Т12) у Goose НЕТ: `--model` задокументирован только В ПАРЕ
+    // с `--provider`, а какой провайдер настроен у пользователя, панель не знает
+    // — как и вендора его моделей (`modelVendors` не задан).
     oneShotArgs: (prompt) => ['run', '--no-session', '-t', prompt],
   },
   capabilities: buildCapabilities({

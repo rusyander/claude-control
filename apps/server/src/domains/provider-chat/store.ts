@@ -39,6 +39,9 @@ interface MetaRecord {
   title: string;
   createdAt: string;
   workdir?: string;
+  /** Подбор модели под задачу (Т12): чем ведётся ЭТОТ разговор. */
+  model?: string;
+  effort?: string;
 }
 
 interface MessageRecord extends ProviderChatMessage {
@@ -104,6 +107,8 @@ function toSummary(meta: MetaRecord, messages: ProviderChatMessage[]): ProviderC
     updatedAt: messages.at(-1)?.at ?? meta.createdAt,
     messageCount: messages.length,
     ...(meta.workdir ? { workdir: meta.workdir } : {}),
+    ...(meta.model ? { model: meta.model } : {}),
+    ...(meta.effort ? { effort: meta.effort } : {}),
   };
 }
 
@@ -111,7 +116,15 @@ function toSummary(meta: MetaRecord, messages: ProviderChatMessage[]): ProviderC
 export function createChat(
   appDataDir: string,
   providerId: string,
-  options: { title?: string; workdir?: string; now?: Date; id?: string } = {},
+  options: {
+    title?: string;
+    workdir?: string;
+    now?: Date;
+    id?: string;
+    /** Подбор модели под задачу (Т12): назначение живёт в шапке разговора. */
+    model?: string;
+    effort?: string;
+  } = {},
 ): ProviderChatSummary | undefined {
   const dir = providerDir(appDataDir, providerId);
   if (!dir) return undefined;
@@ -126,6 +139,8 @@ export function createChat(
     title: options.title?.trim() || 'Новый разговор',
     createdAt: (options.now ?? new Date()).toISOString(),
     ...(options.workdir ? { workdir: options.workdir } : {}),
+    ...(options.model ? { model: options.model } : {}),
+    ...(options.effort ? { effort: options.effort } : {}),
   };
 
   mkdirSync(dir, { recursive: true });

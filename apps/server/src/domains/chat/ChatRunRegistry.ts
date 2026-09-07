@@ -66,6 +66,13 @@ export interface ActiveRunInfo {
   status: 'running' | 'done';
   /** Момент завершения (мс) — только у `done`. */
   finishedAt?: number;
+  /**
+   * Чем прогон запущен. Нужно вкладке, которая его не заводила: свою модель она
+   * помнит с отправки, а подхваченный после F5 (или заведённый разделением,
+   * телефоном, другой вкладкой) прогон иначе стоит в пульте агентов безымянным —
+   * ровно там, где подбор модели под задачу и разводит детей по разным моделям.
+   */
+  model?: string;
 }
 
 export interface BufferedEvent {
@@ -567,6 +574,8 @@ export class ChatRunRegistry {
         startedAt: run.startedAt,
         status: recentlyDone ? 'done' : 'running',
         finishedAt: run.finishedAt,
+        // Пусто значит «как решит CLI» — тогда имя приедет событием сессии.
+        ...(run.options.model ? { model: run.options.model } : {}),
       });
     }
     return list;

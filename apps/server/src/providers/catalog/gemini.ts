@@ -59,7 +59,10 @@ export const geminiProvider: ConfigProvider = {
     apiKind: 'google',
     apiKeyEnvVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
     cliRunnable: true,
-    oneShotArgs: (prompt) => ['-p', prompt],
+    // Подбор модели (Т12): `-m/--model` задокументирован («Specify the model»)
+    // и работает вместе с `-p`. Аналога глубины у Gemini CLI нет — `run.effort`
+    // здесь не участвует вовсе, и придумывать ему флаг нельзя.
+    oneShotArgs: (prompt, run) => [...(run?.model ? ['-m', run.model] : []), '-p', prompt],
   },
   // Свой эндпоинт: задокументированная переменная `GOOGLE_GEMINI_BASE_URL`
   // («Overrides the default base URL for Gemini API requests») — она же
@@ -97,4 +100,10 @@ export const geminiProvider: ConfigProvider = {
   }),
   // Модели: каталог Google (models.dev).
   modelVendors: ['google'],
+  // Лестница подбора (Т12): `flash-lite` и `flash` — младшие линейки Gemini, обе
+  // ниже линейки `pro`, которой CLI работает по умолчанию. Семейства однородны:
+  // в каждом только своя ступень, поэтому «свежайшая в семействе» не меняет
+  // класс модели. `gemini-pro` в лестницу не берём — верх у чужого CLI это его
+  // собственная настройка, и панель её не подменяет.
+  modelLadder: ['gemini-flash-lite', 'gemini-flash'],
 };

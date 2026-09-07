@@ -82,6 +82,26 @@ describe('provider-chat store', () => {
     expect(readChat(dir, 'codex', 'meta')?.messages).toHaveLength(1);
   });
 
+  it('помнит подобранную модель и переживает переписывание шапки', () => {
+    // Т12: назначение живёт в шапке разговора, поэтому его надо не потерять там,
+    // где шапка переписывается целиком, — при названии по первому вопросу и при
+    // переименовании. Потеря значила бы, что вторая реплика уехала на настройке
+    // CLI, а не на подобранной модели.
+    createChat(dir, 'codex', { id: 'plan', model: 'gpt-5.3-codex-spark', effort: 'medium' });
+    appendMessage(dir, 'codex', 'plan', { role: 'user', content: 'Переименования' });
+
+    expect(readChat(dir, 'codex', 'plan')).toMatchObject({
+      title: 'Переименования',
+      model: 'gpt-5.3-codex-spark',
+      effort: 'medium',
+    });
+    expect(patchChat(dir, 'codex', 'plan', { title: 'Другое' })?.model).toBe('gpt-5.3-codex-spark');
+
+    // Обычный разговор ничего не назначает: подбор — только у разделения.
+    createChat(dir, 'codex', { id: 'plain' });
+    expect(readChat(dir, 'codex', 'plain')?.model).toBeUndefined();
+  });
+
   it('удаляет разговор и сообщает о повторной попытке честно', () => {
     createChat(dir, 'codex', { id: 'gone' });
 

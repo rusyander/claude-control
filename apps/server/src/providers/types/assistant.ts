@@ -79,11 +79,32 @@ export type ProviderEndpointConfig = Partial<Record<ProviderEndpointApiKind, Pro
  *   остальных не задан → программный запуск через CLI невозможен (падаем в
  *   api/none). Claude сюда НЕ входит — он делегирует своему существующему пути.
  */
+/**
+ * Чем вести ЭТОТ прогон, если панель подобрала модель под класс работы
+ * (`domains/provider-cascade.ts`). Пусто — панель ничего не подбирала, и CLI
+ * работает своей настроенной моделью: подставлять её вместо человека нельзя,
+ * панель не знает ни его подписки, ни доступных ему моделей.
+ */
+export interface OneShotRun {
+  /** Конкретное имя модели из каталога models.dev — в том виде, что ждёт CLI. */
+  model?: string;
+  /** Аналог глубины (`low`/`medium`/`high`). Есть только у Codex. */
+  effort?: string;
+}
+
 export interface ProviderAssistant {
   apiKind: AssistantApiKind;
   apiKeyEnvVars: string[];
   cliRunnable: boolean;
-  oneShotArgs?: (prompt: string) => string[];
+  /**
+   * Второй аргумент — подбор модели под задачу (Т12). Каждый CLI собирает argv
+   * САМ: место флага в командной строке у них разное (`codex exec -m … <промпт>`
+   * против `gemini -m … -p <промпт>`), и общей склейки, которая была бы верна
+   * для всех, не существует. CLI, у которого способ передать модель не
+   * задокументирован, второй аргумент просто игнорирует — и тогда у него не
+   * должно быть `modelLadder` (см. `ConfigProvider`).
+   */
+  oneShotArgs?: (prompt: string, run?: OneShotRun) => string[];
   /**
    * ПРОТОКОЛ локального сервера CLI, дающего СЕССИОННЫЙ (богатый) режим ассистента
    * вместо one-shot: диалог держит сам CLI, панель шлёт только новое сообщение.

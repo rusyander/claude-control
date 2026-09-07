@@ -95,6 +95,59 @@ describe('ProviderChatRun', () => {
     expect(events.at(-1)).toEqual({ type: 'done', reply: 'Первый ответ', transport: 'stream' });
   });
 
+  it('подобранная модель уезжает в командную строку CLI', async () => {
+    // Т12: главное здесь — что назначение доходит до argv ровно один раз и
+    // задокументированным ключом. Промпт при этом остаётся ОТДЕЛЬНЫМ элементом,
+    // как и был: подстановки в строку оболочки на этом пути нет вовсе.
+    const seen: { command: string; args: string[] }[] = [];
+    const spawn = fakeSpawn({ chunks: ['ок'] });
+    const spawnImpl = ((command: string, args: string[], options: unknown) => {
+      seen.push({ command, args });
+      return (spawn.fn as unknown as (c: string, a: string[], o: unknown) => unknown)(
+        command,
+        args,
+        options,
+      );
+    }) as unknown as Parameters<ProviderChatRun['start']>[0]['spawnImpl'];
+
+    await collect('codex', {
+      detect: yesCli,
+      spawnImpl,
+      model: 'gpt-5.3-codex-spark',
+      effort: 'medium',
+    });
+
+    // Командная строка целиком: на Windows cross-spawn собирает её в ОДНУ строку
+    // для `cmd.exe /c`, и сравнивать поэлементно там нечего. Ключи подбора
+    // пробелов и кавычек не содержат — им эта склейка ничем не грозит.
+    const line = [seen[0]?.command, ...(seen[0]?.args ?? [])].join(' ');
+    expect(line).toContain('exec');
+    expect(line).toContain('-m gpt-5.3-codex-spark');
+    expect(line).toContain('model_reasoning_effort=medium');
+    expect(line).toContain('Вопрос');
+  });
+
+  it('без подбора командная строка остаётся прежней', async () => {
+    const seen: string[] = [];
+    const spawn = fakeSpawn({ chunks: ['ок'] });
+    const spawnImpl = ((command: string, args: string[], options: unknown) => {
+      seen.push([command, ...args].join(' '));
+      return (spawn.fn as unknown as (c: string, a: string[], o: unknown) => unknown)(
+        command,
+        args,
+        options,
+      );
+    }) as unknown as Parameters<ProviderChatRun['start']>[0]['spawnImpl'];
+
+    await collect('codex', { detect: yesCli, spawnImpl });
+
+    // Ни `-m`, ни `-c`: CLI работает своей настроенной моделью — она и есть
+    // потолок, которого панель не знает.
+    expect(seen[0]).not.toContain('-m ');
+    expect(seen[0]).not.toContain('model_reasoning_effort');
+    expect(seen[0]).toContain('exec');
+  });
+
   it('не рвёт кириллицу на границе кусков', async () => {
     const run = new ProviderChatRun();
     const events: ProviderChatRunEvent[] = [];

@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from 'react';
 import type { ChatSummary } from '@agentdeck/contracts';
 import { agentRuns, type ActiveRunView } from '@shared/lib/agent-runs';
-import type { ChildPermission, ChildQuestion } from '@features/ChatMessages';
+import type { ChildPermission, ChildQuestion, ChildStageGroup } from '@features/ChatMessages';
 import { collectChildQuestions } from '../lib/childQuestions';
 import { collectChildPermissions } from '../lib/childPermissions';
+import { collectChildStages } from '../lib/childStages';
 
 /** Всё, что родительский разговор знает о своих детях, одним объектом. */
 export interface ChildHub {
@@ -24,6 +25,11 @@ export interface ChildHub {
    * следующей реплики агента, и второе нажатие заводит те же копии ещё раз.
    */
   branches: string[];
+  /**
+   * Группы разделения с их звеньями: на чём каждая стоит сейчас и чем ведётся.
+   * Считается по веткам, а не по чатам — у одной группы разговоров до трёх.
+   */
+  stages: ChildStageGroup[];
 }
 
 /**
@@ -48,6 +54,7 @@ export function useChildHub(
       permissions: collectChildPermissions(all, parentChatId, runs),
       list: children.map((chat) => ({ id: chat.id, title: chat.title || chat.id })),
       branches: children.map((chat) => chat.branch ?? '').filter(Boolean),
+      stages: collectChildStages(all, parentChatId, runs),
     };
   }, [chats, parentChatId, runs]);
 

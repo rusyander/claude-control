@@ -35,6 +35,28 @@ describe('вложения чата: один источник списка ра
 
   it('в разметке нет второго списка расширений, написанного строкой', () => {
     const offenders: string[] = [];
+    // Свой перечень форматов у чужой задачи — законен: импорт результатов
+    // прогонов берёт `.xml,.json,.txt`, обмен случаями — `.csv,.xlsx,.txt`, и к
+    // вложениям чата это отношения не имеет. Копией списка вложений считаем
+    // совпадение в половину: настоящая копия несёт все восемнадцать расширений,
+    // случайное пересечение доменного списка — два-три.
+    const COPY_THRESHOLD = Math.ceil(SUPPORTED_UPLOAD_EXTENSIONS.length / 2);
+    // Внутри самого чата литерал запрещён при любом составе: поле выбора файла
+    // обязано подставлять `UPLOAD_ACCEPT_ATTRIBUTE`, иначе копия и появится.
+    const isChatCode = (path: string): boolean => /[\\/]Chat[A-Za-z]*[\\/]/.test(path);
+    const looksLikeCopy = (value: string): boolean =>
+      value
+        .split(',')
+        .map((part) => part.trim().toLowerCase())
+        .filter((part) => SUPPORTED_UPLOAD_EXTENSIONS.includes(part)).length >= COPY_THRESHOLD;
+
+    // Порог проверяем тут же, иначе сторож молча ослепнет: настоящая копия
+    // ловится, чужой доменный список — нет.
+    expect(looksLikeCopy(UPLOAD_ACCEPT_ATTRIBUTE)).toBe(true);
+    expect(looksLikeCopy('.xml,.json,.txt')).toBe(false);
+
+    // Один тип (`application/json,.json` в импорте настроек) списком не является.
+    const literal = /accept="([^"]*\.[a-z]{2,4},[^"]*)"/gi;
 
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir)) {
@@ -44,11 +66,9 @@ describe('вложения чата: один источник списка ра
           continue;
         }
         if (!path.endsWith('.tsx') && !path.endsWith('.ts')) continue;
-        // Атрибут `accept` со списком расширений файлов — ровно та копия,
-        // которая расходилась. Один тип (`application/json,.json` в импорте
-        // настроек) списком не является и тестом не ловится.
-        const literal = /accept="[^"]*\.[a-z]{2,4},[^"]*"/i;
-        if (literal.test(readFileSync(path, 'utf8'))) offenders.push(path);
+        for (const match of readFileSync(path, 'utf8').matchAll(literal)) {
+          if (isChatCode(path) || looksLikeCopy(match[1] ?? '')) offenders.push(path);
+        }
       }
     };
 

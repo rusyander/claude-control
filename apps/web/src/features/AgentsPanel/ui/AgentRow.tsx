@@ -32,9 +32,13 @@ export function AgentRow({ run, costUnit, statusLabel, chatLabel, onOpen, onStop
           <Typography variant="body-sm" as="span" truncate>
             {projectName(run.projectPath, chatLabel)}
           </Typography>
-          <Typography variant="caption" color="subtle" as="span">
+          <Typography variant="caption" color="subtle" as="span" truncate>
             {statusLabel}
             {spent ? ` · ${spent}` : ''}
+            {/* Чем ведётся прогон. С подбором модели под задачу дети одного
+                разделения идут разными моделями, а звено проверки — сильнее
+                работы: без имени пульт показывает пять одинаковых строк. */}
+            {run.model ? ` · ${run.model}` : ''}
           </Typography>
         </Stack>
       </button>

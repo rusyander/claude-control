@@ -39,8 +39,10 @@ export interface ChatThreadProps {
   queued: QueuedMessage[];
   /** Убрать сообщение из очереди, пока оно не ушло. */
   onCancelQueued: (queuedId: string) => void;
-  /** Пульт детей разделения: их вопросы, права и заведённые ветки. */
+  /** Пульт детей разделения: их вопросы, права, ветки и звенья конвейера. */
   child: ChildHub;
+  /** Открыть звено группы из сводки — в этом же окне, без вкладки копии. */
+  onOpenChild: (chatId: string) => void;
   /** Разговоры и активные прогоны — по ним ответ ребёнку находит его чат. */
   chats: ChatSummary[];
   activeRuns: ActiveRunView[];

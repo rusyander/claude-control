@@ -51,6 +51,12 @@ export function ProviderChatHeader({
           <Badge tone="neutral">{t(`providerChat.mode.${runner.mode}`)}</Badge>
         )}
         {transport && <Badge tone="neutral">{t(`providerChat.transport.${transport}`)}</Badge>}
+        {/* Чем ведётся разговор, когда модель подобрала панель (разделение задач,
+            Т12). Без метки человек не знает, что этот чат идёт не тем, что
+            настроено у CLI, — а знать он это обязан: подбор только ПОНИЖАЕТ. */}
+        {chat?.model && (
+          <Badge tone="neutral">{t('providerChat.modelBadge', { model: chat.model })}</Badge>
+        )}
         {chat?.workdir && (
           <Badge tone="neutral">{t('providerChat.workdirBadge', { path: chat.workdir })}</Badge>
         )}

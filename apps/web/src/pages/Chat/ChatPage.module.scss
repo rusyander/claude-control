@@ -153,15 +153,6 @@
   border-radius: var(--radius-sm);
 }
 
-// Тумблер прав рядом с путём проекта: видно и где идёт разговор, и что там
-// Claude позволено.
-.editsToggle {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
 .empty {
   text-align: center;
   overflow-y: auto;
@@ -211,32 +202,6 @@
   }
 }
 
-// Ссылка на справку рядом с пультом агентов: своей шапки PageHeader у чата нет,
-// а вопрос «как это работает» возникает именно здесь.
-.help {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-3xs);
-  border-radius: var(--radius-full);
-  color: var(--color-fg-subtle);
-  transition:
-    color var(--duration-fast) ease,
-    background-color var(--duration-fast) ease;
-
-  &:hover {
-    background-color: var(--color-info-subtle);
-    color: var(--color-info);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .help {
-    transition: none;
-  }
-}
+// Ссылка на справку переехала в меню «Настройки чата» (ChatHeaderMenu):
+// своей шапки PageHeader у чата нет, а в ряду она занимала место наравне с
+// работой. Стили пункта живут там же, рядом с остальными пунктами меню.

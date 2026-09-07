@@ -78,7 +78,9 @@ export default function ChatScreen() {
   const [value, setValue] = useState<ComposerValue>({
     text: '',
     allowEdits: true,
-    autoApprove: false,
+    // Как в панели: автоподтверждение включено по умолчанию — с телефона
+    // отвечать на карточку «Разрешить» на каждый шаг тем более некому.
+    autoApprove: true,
     model: '',
     effort: '',
     files: [],

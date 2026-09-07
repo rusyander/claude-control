@@ -4,7 +4,7 @@ import { initiativePrompt, QUESTION_DENIED } from '../../domains/chat/initiative
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
 import { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
-import { shouldAutoApprove } from '../../domains/chat/auto-approve.ts';
+import { shouldAutoApprove, isReadOnlyTool } from '../../domains/chat/auto-approve.ts';
 import { createGuardedPatternsReader } from '../../domains/permissions.ts';
 import { chatDirectory } from '../../domains/chat/ChatArtifacts.ts';
 import { resolveWorkspace, permissionModeFor } from '../../domains/chat/ChatWorkspace.ts';
@@ -349,14 +349,18 @@ export function registerChatRunRoutes(
     // снос данных и инфраструктуры, публикация в чужой реестр) и всё, что
     // попадает под правила `ask`/`deny` пользователя, — граница целиком в
     // `domains/chat/auto-approve.ts`, там же и причина её выбора.
+    //
+    // Чтение проходит и при выключенном тумблере: посмотреть файл нечего
+    // отменять, а карточка на каждый открытый файл останавливала прогон чаще
+    // всего остального вместе взятого.
     const auto = session.autoApproveFor(runId);
     if (
-      auto?.enabled &&
+      (auto?.enabled || isReadOnlyTool(toolName)) &&
       shouldAutoApprove({
         toolName,
         input,
         guardedPatterns: guardedPatterns(),
-        allowEdits: auto.allowEdits,
+        allowEdits: auto?.allowEdits ?? false,
       })
     ) {
       return reply.send({ behavior: 'allow', updatedInput: input });

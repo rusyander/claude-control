@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -11,6 +11,12 @@ interface ButtonBase extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'clas
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
   className?: string;
+  /**
+   * Ссылка на сам `<button>`. В React 19 это обычный проп, forwardRef не нужен:
+   * кнопке, открывающей меню, ссылка на себя нужна, чтобы вернуть на неё фокус
+   * после Escape.
+   */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 /**

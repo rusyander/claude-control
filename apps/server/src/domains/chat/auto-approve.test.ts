@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldAutoApprove } from './auto-approve.ts';
+import { shouldAutoApprove, isReadOnlyTool } from './auto-approve.ts';
 
 const base = { guardedPatterns: [] as string[], allowEdits: true };
 
@@ -74,11 +74,38 @@ describe('shouldAutoApprove', () => {
     expect(
       shouldAutoApprove({
         ...base,
-        toolName: 'Read',
-        input: { file_path: '/x/.env' },
-        guardedPatterns: ['Read(//**/.env)'],
+        toolName: 'mcp__jira__get_issue',
+        input: {},
+        guardedPatterns: ['mcp__jira__get_issue'],
       }),
     ).toBe(false);
+  });
+
+  /**
+   * Чтение подтверждается само — всегда и раньше остальных проверок. Оно ничего
+   * не меняет, а карточка на каждый открытый файл стоила прогону остановки чаще
+   * всего прочего: агент читает куда чаще, чем пишет. Правило `ask` на чтение
+   * тоже больше не спрашивает (решение владельца, 07.09.2026), `deny` до панели
+   * не доходит — его режет сам Claude Code.
+   */
+  it('чтение разрешается всегда: тумблеры и правила ask его не касаются', () => {
+    const read = { toolName: 'Read', input: { file_path: '/x/notes.md' } };
+    expect(shouldAutoApprove({ ...base, ...read })).toBe(true);
+    expect(shouldAutoApprove({ ...base, allowEdits: false, ...read })).toBe(true);
+    expect(shouldAutoApprove({ ...base, ...read, guardedPatterns: ['Read(//**/.env)'] })).toBe(
+      true,
+    );
+    expect(
+      shouldAutoApprove({ ...base, toolName: 'Grep', input: { pattern: 'x' }, allowEdits: false }),
+    ).toBe(true);
+    expect(shouldAutoApprove({ ...base, toolName: 'Glob', input: { pattern: '**/*.ts' } })).toBe(
+      true,
+    );
+
+    // Сетевое чтение остаётся под правилами: там читается чужая сторона.
+    expect(isReadOnlyTool('Read')).toBe(true);
+    expect(isReadOnlyTool('WebFetch')).toBe(false);
+    expect(isReadOnlyTool('Write')).toBe(false);
   });
 
   it('правило на MCP-сервер закрывает все его инструменты', () => {

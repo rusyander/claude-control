@@ -560,7 +560,11 @@ export const en: TranslationSchema = {
     autoApproveOn: 'Permissions auto',
     autoApproveOff: 'Permissions manual',
     autoApproveHint:
-      'The panel itself approves anything that can be undone — commit, push, branch, moving a file, an API call. What still asks is the irreversible: deleting, wiping history, tearing down data and infrastructure, publishing — plus anything covered by ask/deny rules from settings.json.',
+      'The panel itself approves anything that can be undone — commit, push, branch, moving a file, an API call. What still asks is the irreversible: deleting, wiping history, tearing down data and infrastructure, publishing — plus anything covered by ask/deny rules from settings.json. Reading files is always allowed, whatever this toggle says.',
+    menu: 'Chat settings',
+    menuHint: 'Permission toggles, export, refresh and help',
+    menuPermissions: 'Permissions',
+    menuActions: 'Conversation',
     retry: 'Retry',
     continueAfterDrop:
       'Continue from where you stopped: the connection dropped and the last answer may be unfinished. Do not redo what is already done.',
@@ -2466,7 +2470,7 @@ export const en: TranslationSchema = {
     starterPrompt:
       'You are working in the project "{{name}}". Read-only for now. Look around and briefly say what this project is and what you suggest starting with.',
     introHint:
-      'A new conversation in the project directory. File edits are allowed — turn them off with the toggle in the header if you only want a look around.',
+      'A new conversation in the project directory. File edits are allowed — turn them off in the “Chat settings” menu if you only want a look around.',
     actions: {
       review: 'Do a code review: find problems and suggest fixes.',
       bugs: 'Find potential bugs and explain the cause of each.',

@@ -762,9 +762,14 @@ export const helpEn: HelpSchema = {
 
       autoApproveTitle: 'Auto-approving permissions',
       autoApproveText:
-        'The second toggle in the chat header — «Permissions auto» — takes the routine ' +
+        'The «Permissions auto» toggle lives in the «Chat settings» menu on the right ' +
+        'of the header, and it is ON by default. It takes the routine ' +
         'away: a reversible request is approved by the panel itself, and no ' +
-        '«Allow/Deny» card appears. The border is irreversibility, not «writing»: a ' +
+        '«Allow/Deny» card appears. Reading files is always allowed, whatever this ' +
+        'toggle says: opening a file, searching the code and listing a directory ' +
+        'leave nothing to undo, while a card on every file the agent opened stalled ' +
+        'runs more often than everything else combined. For the rest of the tools ' +
+        'the border is irreversibility, not «writing»: a ' +
         'commit, a push, a branch, moving a file, restarting a process and an API ' +
         'call go to the agent, because there is something to undo them with. What ' +
         'still asks is what leaves nothing to roll back to: deleting files (rm, ' +
@@ -851,7 +856,8 @@ export const helpEn: HelpSchema = {
         'list? Use “Add a folder” and pick the directory on disk.',
       recipe2: 'Check the edit toggle',
       recipe2Text:
-        'It is in the header and switched on by default. To look around first, move it ' +
+        'It is in the “Chat settings” menu on the right of the header and switched on ' +
+        'by default. To look around first, move it ' +
         'to read-only: the field already holds a question about the project, so send ' +
         'it as is.',
       recipe3: 'Give the task',

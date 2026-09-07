@@ -1,0 +1,75 @@
+// Выпадающее меню шапки чата. Раскладка повторяет пульт агентов намеренно:
+// в одном ряду стоят две кнопки, открывающие панель, и вести они себя должны
+// одинаково.
+.wrap {
+  position: relative;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + var(--spacing-2xs));
+  right: 0;
+  z-index: 61;
+  width: min(320px, calc(100vw - var(--spacing-xl)));
+  padding: var(--spacing-xs);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+// Заголовок группы: «Права», «Разговор».
+.groupTitle {
+  display: block;
+  padding: var(--spacing-2xs) var(--spacing-2xs) var(--spacing-3xs);
+}
+
+// Строка с тумблером кликабельна целиком — попадать в сам тумблер не нужно.
+.row {
+  padding: var(--spacing-2xs);
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+  }
+}
+
+.divider {
+  height: 1px;
+  margin: var(--spacing-2xs) 0;
+  background: var(--color-border);
+}
+
+// Пункт-действие: кнопка во всю ширину, слева иконка, текст прижат к ней.
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  padding: var(--spacing-2xs);
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+}

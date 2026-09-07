@@ -68,12 +68,26 @@ for (const path of PAGES) {
   // У части разделов заголовок с «?» сидит за загрузкой данных (настройки,
   // CLAUDE.md, сравнение) и появляется через 0,4–5 с: фиксированная пауза
   // в 400 мс давала ложные «нет кнопки». Ждём саму ссылку, с потолком.
-  const found = await page
-    .locator('a[href*="/help?topic="]')
-    .first()
+  const link = page.locator('a[href*="/help?topic="]').first();
+  let found = await link
     .waitFor({ timeout: 10_000 })
     .then(() => 1)
     .catch(() => 0);
+
+  // Ссылка может жить в собственном меню раздела (чат: «Настройки чата»):
+  // ряд шапки не резиновый, и редко используемое ушло за одну кнопку. Открываем
+  // такие меню и смотрим внутри — проверяем доступность справки, а не её место.
+  if (found === 0) {
+    const menus = page.locator('button[aria-haspopup="dialog"]');
+    for (let i = 0; i < (await menus.count()) && found === 0; i++) {
+      await menus.nth(i).click();
+      found = await link
+        .waitFor({ timeout: 2000 })
+        .then(() => 1)
+        .catch(() => 0);
+    }
+  }
+
   if (found === 0) {
     noButton++;
     console.log(`${path}: нет кнопки «?», хотя документ справки для раздела есть`);

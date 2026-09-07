@@ -1,17 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { Link } from '@tanstack/react-router';
-import { HELP_ROUTE } from '@shared/config/routes';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
-import { Toggle } from '@shared/ui/toggle';
 import { formatSpend } from '@shared/lib/format';
 import { AgentsPanel } from '@features/AgentsPanel';
 import { ChatModelPicker } from '@features/ChatModelPicker';
 import { ProjectRunnerControls } from '@features/ProjectRunner';
 import { ProjectGitControls } from '@features/ProjectGit';
+import { ChatHeaderMenu } from './ChatHeaderMenu';
 import { formatTime } from './lib/formatTime';
 import type { ChatHeaderProps } from './ChatHeader.types';
 import styles from './ChatPage.module.scss';
@@ -82,17 +80,6 @@ export function ChatHeader({
       </Stack>
 
       <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap justify="end">
-        {/* Шапки PageHeader здесь нет — ссылку на справку ставим рядом с пультом. */}
-        <Link
-          to={HELP_ROUTE}
-          search={{ topic: 'chat' }}
-          className={styles.help}
-          title={t('common.openHelp')}
-          aria-label={t('common.openHelp')}
-        >
-          <Icon name="help" size={24} />
-        </Link>
-
         <AgentsPanel
           activeRuns={activeRuns}
           totalCost={totalCost}
@@ -160,50 +147,6 @@ export function ChatHeader({
             сам компонент вернёт null, когда репозитория нет. */}
         {isProjectContext && projectPath && <ProjectGitControls path={projectPath} />}
 
-        {isProjectContext && (
-          <Stack
-            as="label"
-            direction="row"
-            align="center"
-            gap="var(--spacing-2xs)"
-            padding="var(--spacing-3xs) var(--spacing-xs)"
-            className={styles.editsToggle}
-          >
-            <Toggle
-              size="sm"
-              checked={allowEdits}
-              onCheckedChange={onAllowEditsChange}
-              aria-label={t('chat.allowEdits')}
-            />
-            <Typography variant="caption" color={allowEdits ? 'default' : 'subtle'} as="span">
-              {allowEdits ? t('chat.editsAllowed') : t('chat.readOnly')}
-            </Typography>
-          </Stack>
-        )}
-
-        {/* Автоподтверждение: панель сама разрешает безопасные запросы, а
-            опасные (записи в git, удаление, миграции) и всё под правилами
-            ask/deny из settings.json по-прежнему спрашивает. */}
-        <Stack
-          as="label"
-          direction="row"
-          align="center"
-          gap="var(--spacing-2xs)"
-          padding="var(--spacing-3xs) var(--spacing-xs)"
-          className={styles.editsToggle}
-          title={t('chat.autoApproveHint')}
-        >
-          <Toggle
-            size="sm"
-            checked={autoApprove}
-            onCheckedChange={onAutoApproveChange}
-            aria-label={t('chat.autoApprove')}
-          />
-          <Typography variant="caption" color={autoApprove ? 'default' : 'subtle'} as="span">
-            {autoApprove ? t('chat.autoApproveOn') : t('chat.autoApproveOff')}
-          </Typography>
-        </Stack>
-
         {runStatus === 'error' && chatId && (
           <>
             <Button
@@ -239,23 +182,16 @@ export function ChatHeader({
         {limitResetsAt !== undefined && (
           <Badge tone="info">{t('chat.limitResets', { time: formatTime(limitResetsAt) })}</Badge>
         )}
-        {canExport && (
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Icon name="file" size={20} />}
-            onClick={onExport}
-            title={t('chat.exportHint')}
-          >
-            {t('chat.export')}
-          </Button>
-        )}
-        <Button
-          variant="ghost"
-          iconOnly
-          icon={<Icon name="refresh" size={24} />}
-          aria-label={t('common.refresh')}
-          onClick={onRefresh}
+
+        {/* Тумблеры прав, выгрузка, обновление и справка — за одной кнопкой у
+            самого края: трогают их редко, а ряд шапки они забивали целиком. */}
+        <ChatHeaderMenu
+          {...(isProjectContext ? { allowEdits, onAllowEditsChange } : {})}
+          autoApprove={autoApprove}
+          onAutoApproveChange={onAutoApproveChange}
+          canExport={canExport}
+          onExport={onExport}
+          onRefresh={onRefresh}
         />
       </Stack>
     </Stack>

@@ -1,11 +1,14 @@
-import type { ProjectFileChange } from '@agentdeck/contracts';
+import type { ChangedRow } from '../lib/changedRows';
 
 export interface ProjectCodeTreeProps {
   projectPath: string;
   /** Открытый файл — путь от корня проекта. */
   selected?: string;
-  /** Правки агента по путям: по ним у файла появляются счётчики строк. */
-  changes: Map<string, ProjectFileChange>;
+  /**
+   * Изменённые файлы по путям — и правки агента, и рабочее дерево git. У правок
+   * агента в дереве видны счётчики строк, у остальных — буква состояния git.
+   */
+  changes: Map<string, ChangedRow>;
   /** Каталоги, внутри которых что-то изменилось, — на любой глубине. */
   changedDirs: Set<string>;
   /** Раскрытые каталоги: состояние дерева живёт снаружи и переживает окно. */

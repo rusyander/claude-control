@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { GIT_MAX_BUFFER, GIT_TIMEOUT_MS } from './constants.ts';
@@ -80,5 +80,36 @@ export async function git(
     }
     const text = stripGitProgress(shell.stderr || shell.stdout || shell.message || '');
     throw new GitError(text || 'Команда git завершилась с ошибкой');
+  }
+}
+
+/**
+ * Тот же запуск, но СИНХРОННЫЙ, и ровно для одного случая — вопроса «работа
+ * что-нибудь изменила?» в планировщике завершения прогона.
+ *
+ * Планировщик синхронный намеренно: его событие обязано попасть в поток до того,
+ * как прогон закроет слушателей (см. `ChatRunRegistry.planHandoff`). Ждать
+ * промис там негде, а ответ нужен до решения, заводить ли ревью, — поэтому здесь
+ * блокирующий вызов с коротким потолком ожидания.
+ *
+ * Пользоваться им где-то ещё не надо: любое чтение состояния репозитория, у
+ * которого есть право быть асинхронным, идёт через `git`.
+ */
+export function gitSync(projectDir: string, args: string[], timeout = 5_000): string | undefined {
+  try {
+    return execFileSync('git', [...LONG_PATHS_ARGS, ...args], {
+      cwd: resolve(projectDir),
+      timeout,
+      maxBuffer: GIT_MAX_BUFFER,
+      windowsHide: true,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    });
+  } catch {
+    // Не репозиторий, git не найден, таймаут — всё это значит «ответа нет», а не
+    // «изменений нет». Отличать причины здесь незачем: решение по `undefined`
+    // одно и то же, и принимает его вызывающий.
+    return undefined;
   }
 }

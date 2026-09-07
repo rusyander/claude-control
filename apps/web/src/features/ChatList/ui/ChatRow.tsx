@@ -24,9 +24,17 @@ export function ChatRow({
   const { t } = useTranslation();
 
   // У чата из разделения имя проекта бесполезно — это копия того же
-  // репозитория. Полезна ветка: по ней человек и узнаёт свою группу.
+  // репозитория. Полезна ветка: по ней человек и узнаёт свою группу. Ветка
+  // берётся из транскрипта, поэтому в списке она та, где агент СЕЙЧАС, — с
+  // иконкой, иначе имя ветки читается как ещё одно название проекта.
   const subtitle = () => {
-    if (chat.branch) return chat.branch;
+    if (chat.branch) {
+      return (
+        <>
+          <Icon name="branch" size={12} /> {chat.branch}
+        </>
+      );
+    }
     if (chat.isSandbox) return t('chat.sandboxLabel');
     return projectName(chat.projectPath, chat.project);
   };
@@ -54,6 +62,14 @@ export function ChatRow({
           <Typography variant="body-sm" weight="medium" className={styles.title}>
             {chat.title}
           </Typography>
+          {/* Звено конвейера. У работы метки нет: она и так подразумевается, а
+              подписать каждый второй чат «работа» значит спрятать те два, ради
+              которых метка и заведена. */}
+          {(chat.stage === 'review' || chat.stage === 'fix') && (
+            <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
+              {t(`chat.cascade.stage.${chat.stage}`)}
+            </Typography>
+          )}
         </Stack>
 
         {snippet ? (

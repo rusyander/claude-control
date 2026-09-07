@@ -15,11 +15,13 @@ import {
   SUPPORTED_UPLOAD_EXTENSIONS,
 } from '../../domains/chat/ChatUploads.ts';
 import { activateGroupsForCwd } from '../../domains/group-activation.ts';
+import { cascadeCeilingFor } from '../../domains/model-cascade.ts';
 import { activeCliCommand } from '../../providers/cli.ts';
 import { estimateCost } from '../../domains/analytics/pricing.ts';
 import { projectsDir, validTargetCwd } from './paths.ts';
 import { streamRun, streamGone } from '../../domains/chat/ChatStream.ts';
 import { parseBody } from '../../lib/request-body.ts';
+import { allowedPermissionRules } from '@agentdeck/contracts/permission-rules';
 import {
   autoApproveBodySchema,
   chatSendBodySchema,
@@ -206,8 +208,23 @@ export function registerChatRunRoutes(
         allowEdits: workspace.isSandbox || allowEdits === true || fullAccess === true,
       });
 
+      // Что назначено ЭТОМУ чату при разделении. Ключей у разговора два —
+      // временный и настоящий `sessionId`, — поэтому смотрим оба: связь
+      // переезжает на второй, но вкладка ещё помнит первый.
+      const assigned =
+        ctx.store.getChatLink(chatId) ?? (sessionId ? ctx.store.getChatLink(sessionId) : undefined);
+
+      // Потолок для подбора — модель этого разговора: оверрайд шапки, иначе
+      // настройка. Правило выключено в проекте → `undefined`, и про классы
+      // работы агенту не говорится ни слова.
+      const ceiling = cascadeCeilingFor(
+        { entries: ctx.store.getProjectCascadeEntries(), settings: ctx.store.getSettings() },
+        cwd,
+        { model, effort },
+      );
       const initiative = initiativePrompt(ctx.store.getSettings(), {
         splitMuted: registry.isSplitMuted(chatId),
+        ...(ceiling ? { cascade: ceiling } : {}),
       });
 
       // Связь с родителем — СТРОГО до запуска. Прогон называет свой настоящий
@@ -240,8 +257,13 @@ export function registerChatRunRoutes(
           // Команда запуска — из активного провайдера (Ф1: всегда Claude).
           command: activeCliCommand(ctx.store),
           // Модель и глубина продумывания — выбор пользователя в шапке чата.
-          model,
-          effort,
+          // Пусто — берём назначение этого чата, если оно у него есть: чат,
+          // заведённый разделением, работает моделью, подобранной под род его
+          // задачи, и второе сообщение обязано уехать на ней же. Панель модель
+          // шлёт всегда, а телефон и API-клиенты — нет, и без этого их сообщения
+          // молча возвращали бы разговор на дефолт из настроек.
+          model: model || assigned?.model,
+          effort: effort || assigned?.effort,
           // Инициативы панели (разделить задачи, закрыть этап чистой сессией) —
           // одной строкой к системному промпту. Тумблеры в настройках, потому что
           // уместны они не всякому: кто ведёт один короткий разговор, увидит в них
@@ -361,6 +383,10 @@ export function registerChatRunRoutes(
         input,
         guardedPatterns: guardedPatterns(),
         allowEdits: auto?.allowEdits ?? false,
+        // Правила читаются на КАЖДЫЙ запрос: тумблер щёлкают ровно тогда, когда
+        // надоела карточка, и действовать он обязан со следующего же вызова, а
+        // не со следующего прогона.
+        allowedRules: allowedPermissionRules(ctx.store.getSettings().autoApproveRules),
       })
     ) {
       return reply.send({ behavior: 'allow', updatedInput: input });

@@ -10,6 +10,8 @@
     ".": "./src/index.ts",
     "./chat-handoff": "./src/chat-handoff.ts",
     "./env-secret": "./src/env-secret.ts",
+    "./model-cascade": "./src/model-cascade.ts",
+    "./permission-rules": "./src/permission-rules.ts",
     "./project-code": "./src/project-code.ts",
     "./request-bodies": "./src/request-bodies.ts",
     "./rule-format": "./src/rule-format.ts",

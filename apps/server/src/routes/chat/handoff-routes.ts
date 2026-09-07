@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import type { AppSettings } from '@agentdeck/contracts';
 import {
   HANDOFF_MAX_CHAIN,
   HANDOFF_SYSTEM_PROMPT,
@@ -19,6 +20,8 @@ import {
   type HandoffChains,
   type StatFile,
 } from '../../domains/chat/ChatHandoff.ts';
+import { planCascadeStage, stageAppendPrompt } from '../../domains/chat/ChatCascadeStages.ts';
+import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { createChat, type ProviderChatService } from '../../domains/provider-chat.ts';
 import { checkProjectDir } from '../../domains/projects.ts';
 import { getActiveProvider } from '../../providers/registry.ts';
@@ -63,8 +66,34 @@ export interface HandoffPlannerDeps {
    * Ноль — за размером окна не следим.
    */
   contextLimit?: () => number;
+  /**
+   * Перенести связь закрываемого разговора на продолжение. Прогон продолжения
+   * идёт теми же параметрами и без этого (они копируются целиком), но СЛЕДУЮЩЕЕ
+   * сообщение человека приходит уже без модели — и без записи уехало бы на
+   * дефолте, посреди работы, которую вели подобранной моделью.
+   */
+  carryLink?: (from: string[], to: string) => void;
+  /**
+   * Конвейер подбора модели: чем платится понижение. Нет поля — звеньев ревью и
+   * правок не бывает вовсе, и всё ведёт себя как до этапа 2.
+   */
+  cascade?: CascadeStageDeps;
   /** Время правки файла; подменяется в тестах. */
   stat?: StatFile;
+}
+
+/** Что планировщику нужно снаружи, чтобы завести звено конвейера. */
+export interface CascadeStageDeps {
+  /** Связь закончившегося чата — по любому из его ключей. */
+  linkOf: (aliases: string[]) => ChatLink | undefined;
+  /** Записать связь нового звена. Строго ДО запуска (см. `SplitLink`). */
+  saveLink: (chatId: string, link: ChatLink) => void;
+  /** Отметить работу проверенной — по всем ключам чата, чтобы не завести второе ревью. */
+  markReviewed: (aliases: string[], at: string) => void;
+  /** Изменила ли работа что-нибудь в копии: пустой дифф проверять незачем. */
+  hasWork: (cwd: string, since?: string) => boolean;
+  /** Настройки — из них собирается системная дописка звена. */
+  settings: () => Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>;
 }
 
 /**
@@ -81,8 +110,72 @@ export function createHandoffPlanner({
   session,
   selfBaseUrl,
   contextLimit,
+  carryLink,
+  cascade,
   stat,
 }: HandoffPlannerDeps): (finished: RunFinished) => ChatEvent | undefined {
+  /**
+   * Звено конвейера подбора модели: проверка работы на потолке и правки по её
+   * замечаниям. Считается ПОСЛЕ продолжения в чистой сессии и только когда то не
+   * состоялось — предложение агента сильнее: оно означает, что работа ещё идёт,
+   * а проверять надо законченное.
+   */
+  function planStage(finished: RunFinished, aliases: string[]): ChatEvent | undefined {
+    if (!cascade || !finished.projectPath) return undefined;
+    // Потолок цепочки общий с продолжением: звенья — такие же прогоны, заведённые
+    // панелью, и предохранитель от бесконечности у них обязан быть один.
+    if (chains.depth(aliases) >= HANDOFF_MAX_CHAIN) return undefined;
+
+    const link = cascade.linkOf(aliases);
+    const cwd = finished.projectPath;
+    const plan = planCascadeStage({
+      ...(link ? { link } : {}),
+      ok: finished.ok,
+      text: finished.text,
+      task: finished.options.prompt ?? '',
+      hasWork: () => cascade.hasWork(cwd, link?.createdAt),
+    });
+    if (!plan) return undefined;
+
+    const chatId = `new-${Date.now()}`;
+    // Связь и отметка «проверено» пишутся ДО запуска. Связь — потому что перенос
+    // на настоящий `sessionId` ищет запись по временному ключу и, не найдя, молча
+    // ничего не делает; отметка — потому что упавший запуск не повод завести
+    // вторую проверку той же работы на следующем же сообщении человека.
+    cascade.saveLink(chatId, plan.link);
+    if (plan.stage === 'review') cascade.markReviewed(aliases, new Date().toISOString());
+
+    const options = { ...finished.options, prompt: plan.prompt };
+    delete options.sessionId;
+    delete options.fork;
+    delete options.name;
+    options.model = plan.model;
+    options.effort = plan.effort;
+    options.permissionPrompt = { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() };
+    // Дописка собирается заново по стадии: у работы в ней лежит планка сдачи
+    // «тебя ведёт модель ниже потолка», и в ревью она сказала бы проверяющему
+    // ровно обратное тому, зачем его завели.
+    const append = stageAppendPrompt(plan, cascade.settings());
+    if (append) options.appendSystemPrompt = append;
+    else delete options.appendSystemPrompt;
+
+    // Права наследуются от работы: звено заводится, когда человека у панели по
+    // построению нет, и запрос прав остановил бы конвейер на первом же чтении.
+    runs.muteSplit(chatId);
+    session.inherit(aliases, chatId);
+    const chainDepth = chains.link(aliases, chatId);
+    if (!runs.start(chatId, options, { projectPath: cwd })) return undefined;
+
+    return {
+      kind: 'handoff',
+      chatId,
+      path: cwd,
+      chainDepth,
+      stage: plan.stage,
+      ...(plan.findings ? { findings: plan.findings } : {}),
+    };
+  }
+
   return (finished) => {
     const own = scanHandoffBlocks(finished.text).proposals.at(-1);
     const aliases = aliasesOf(finished.chatId, finished.sessionId);
@@ -109,6 +202,12 @@ export function createHandoffPlanner({
     });
 
     if (!verdict.ok) {
+      // Продолжения не будет — значит работа закончена, и настал черёд конвейера.
+      // Порядок именно такой: предложение агента означает, что он ещё в работе,
+      // и проверять на этом месте было бы нечего.
+      const staged = planStage(finished, aliases);
+      if (staged) return staged;
+
       if (verdict.reason === 'no_block') return undefined;
       // Повод по порогу молчать не должен, даже когда автомат выключен: человек
       // не видит размера окна и узнать о нём может только отсюда. Но и повторять
@@ -152,6 +251,10 @@ export function createHandoffPlanner({
         // нет у панели, — ради чего цепочка и заводилась.
         if (runs.isSplitMuted(finished.chatId)) runs.muteSplit(chatId);
         session.inherit(aliases, chatId);
+        // Связь — тоже от закрытого разговора, и строго ДО запуска: перенос на
+        // настоящий `sessionId` ищет запись по временному ключу и, не найдя,
+        // молча ничего не делает (см. `SplitLink`).
+        carryLink?.(aliases, chatId);
         return runs.start(chatId, options, { projectPath: cwd });
       },
     });
@@ -214,6 +317,15 @@ export function registerChatHandoffRoutes(
     const provider = getActiveProvider(ctx.store);
     const wantRun = startRun !== false;
 
+    // Чем ведётся ЗАКРЫВАЕМЫЙ разговор. Продолжение — тот же разговор по смыслу,
+    // и модель у него обязана быть та же: чат, заведённый разделением, работает
+    // подобранной под его задачу, и «чистая сессия» не повод вернуть его на
+    // дефолт из настроек. Ключей у разговора два (временный и `sessionId`) —
+    // смотрим оба, связь переезжает на второй.
+    const assigned =
+      ctx.store.getChatLink(String(chatId ?? '')) ??
+      (sessionId ? ctx.store.getChatLink(sessionId) : undefined);
+
     return startHandoff({
       proposal,
       cwd: dir,
@@ -246,14 +358,25 @@ export function registerChatHandoffRoutes(
       const initiative = initiativePrompt(settings);
       // Тумблеры закрытого разговора — новому (см. планировщик выше).
       deps.session.inherit(aliasesOf(chatId, sessionId), nextId);
+      // Назначение переезжает на продолжение — ДО запуска, как и при разделении:
+      // без записи цепочка глубже одного звена съехала бы на дефолт (второе
+      // продолжение уже не знало бы, чем ведётся работа). Заводим только там,
+      // где связь была: у обычного разговора наследовать нечего.
+      if (assigned) {
+        ctx.store.setChatLink(nextId, { ...assigned, createdAt: new Date().toISOString() });
+      }
       return deps.runs.start(
         nextId,
         {
           prompt,
           cwd,
           command: activeCliCommand(ctx.store),
-          model: model || settings.chatModel,
-          effort: effort || settings.chatEffort,
+          // Пусто в запросе — берём назначение закрываемого разговора, и только
+          // потом настройку. Панель модель шлёт всегда, телефон и API-клиенты —
+          // нет, и без этой ступени их продолжение уезжало бы на другой модели,
+          // чем шла работа.
+          model: model || assigned?.model || settings.chatModel,
+          effort: effort || assigned?.effort || settings.chatEffort,
           permissionMode: allowEdits ? 'acceptEdits' : 'default',
           permissionPrompt: { runId: nextId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
           ...(initiative ? { appendSystemPrompt: initiative } : {}),

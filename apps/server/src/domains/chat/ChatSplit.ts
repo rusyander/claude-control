@@ -4,10 +4,12 @@ import {
   // предложение уже разделено, и второй реализации быть не должно.
   safeBranchName,
   type TaskSplitFailure,
+  type TaskSplitGroup,
   type TaskSplitProposal,
   type TaskSplitResult,
   type TaskSplitStarted,
 } from '@agentdeck/contracts/task-split';
+import type { CascadePlan } from '@agentdeck/contracts/model-cascade';
 import { addWorktree, isGitRepo, listWorktrees, readProjectGit } from '../project-git.ts';
 
 /**
@@ -60,7 +62,26 @@ export const splitGit: SplitGit = {
 };
 
 /** Запуск прогона группы; `false` — под этим ключом прогон уже идёт. */
-export type SplitStart = (input: { chatId: string; prompt: string; cwd: string }) => boolean;
+export type SplitStart = (input: {
+  chatId: string;
+  prompt: string;
+  cwd: string;
+  /** Чем эту группу решено делать; нет — подбор в проекте выключен. */
+  assignment?: CascadePlan;
+}) => boolean;
+
+/**
+ * Чем делать группу. Считает МАРШРУТ, а не разделение: там известен потолок
+ * разговора (оверрайд шапки поверх настроек) и правило проекта, а здесь — только
+ * ветки и копии. Разделение переносит ответ в три места сразу, чтобы связь,
+ * прогон и карточка не разошлись в том, что кому назначено.
+ */
+export type SplitAssign = (
+  group: TaskSplitGroup,
+  prompt: string,
+  /** Номер группы в предложении — под ним приезжают ручные замены с карточки. */
+  index: number,
+) => CascadePlan | undefined;
 
 /**
  * Чат группы заведён, прогон ещё НЕ запущен — место для связи с родителем.
@@ -78,6 +99,8 @@ export type SplitLink = (chat: {
   title: string;
   branch: string;
   path: string;
+  /** Назначение группы: по нему второе сообщение ребёнку не теряет модель. */
+  assignment?: CascadePlan;
 }) => void;
 
 export interface SplitTasksInput {
@@ -89,6 +112,8 @@ export interface SplitTasksInput {
   start: SplitStart;
   /** Связь с родителем — пишется на каждой удавшейся группе, до её запуска. */
   link?: SplitLink;
+  /** Подбор модели под группу; нет — правило проекта выключено. */
+  assign?: SplitAssign;
   git?: SplitGit;
   /** Часы — в тесте фиксируются, чтобы ключи чатов были предсказуемы. */
   now?: () => number;
@@ -115,6 +140,7 @@ export async function splitTasks({
   startRuns,
   start,
   link,
+  assign,
   git = splitGit,
   now = Date.now,
 }: SplitTasksInput): Promise<TaskSplitResult> {
@@ -155,12 +181,39 @@ export async function splitTasks({
     // настоящим id разговор станет, когда CLI выдаст сессию. Иначе вкладка
     // помнила бы ключ, которого в истории никогда не появится.
     const chatId = `new-${stamp}-${index}`;
+    // Чем делать эту группу — решается ОДИН раз и уходит сразу в связь, в
+    // прогон и в ответ: три расчёта одного и того же разошлись бы, и человек
+    // видел бы в карточке не то, что запустилось.
+    const assignment = assign?.(group, prompt, index);
     // Родство — ПЕРЕД запуском: прогон назовёт настоящий ключ сессии сам, и к
     // этому моменту переносить должно быть что (см. `SplitLink`).
-    link?.({ chatId, title: group.title, branch, path: cwd });
-    const started = startRuns ? start({ chatId, prompt, cwd }) : false;
+    link?.({
+      chatId,
+      title: group.title,
+      branch,
+      path: cwd,
+      ...(assignment ? { assignment } : {}),
+    });
+    const started = startRuns
+      ? start({ chatId, prompt, cwd, ...(assignment ? { assignment } : {}) })
+      : false;
 
-    chats.push({ title: group.title, branch, chatId, path: cwd, isWorktree, started, prompt });
+    chats.push({
+      title: group.title,
+      branch,
+      chatId,
+      path: cwd,
+      isWorktree,
+      started,
+      prompt,
+      ...(assignment
+        ? {
+            model: assignment.model,
+            effort: assignment.effort,
+            ...(assignment.kind ? { kind: assignment.kind } : {}),
+          }
+        : {}),
+    });
   }
 
   return { chats, failures };

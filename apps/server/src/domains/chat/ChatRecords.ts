@@ -23,6 +23,8 @@ export interface Record {
   parentUuid?: string | null;
   timestamp?: string;
   cwd?: string;
+  /** Ветка git на момент записи — Claude Code кладёт её в каждую строку. */
+  gitBranch?: string;
   aiTitle?: string;
   isMeta?: boolean;
   isCompactSummary?: boolean;

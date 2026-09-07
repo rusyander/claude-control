@@ -8,6 +8,8 @@ export interface UseWorkspace {
   activeProject: ProjectTab | undefined;
   isHome: boolean;
   openProject: (path: string, name: string) => string;
+  /** Показать каталог во вкладке, где он уже открыт (или завести новую). */
+  reveal: (path: string, name: string) => string;
   closeProject: (id: string) => void;
   activate: (id: string) => void;
   /** Новый порядок табов проектов после перетаскивания. */
@@ -28,6 +30,7 @@ export function useWorkspace(): UseWorkspace {
     activeProject,
     isHome: state.activeTabId === HOME_TAB_ID,
     openProject: workspace.openProject,
+    reveal: workspace.reveal,
     closeProject: workspace.closeProject,
     activate: workspace.activate,
     reorderProjects: workspace.reorderProjects,

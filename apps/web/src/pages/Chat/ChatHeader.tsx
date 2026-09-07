@@ -8,7 +8,6 @@ import { formatSpend } from '@shared/lib/format';
 import { AgentsPanel } from '@features/AgentsPanel';
 import { ChatModelPicker } from '@features/ChatModelPicker';
 import { ProjectRunnerControls } from '@features/ProjectRunner';
-import { ProjectGitControls } from '@features/ProjectGit';
 import { ChatHeaderMenu } from './ChatHeaderMenu';
 import { formatTime } from './lib/formatTime';
 import type { ChatHeaderProps } from './ChatHeader.types';
@@ -143,10 +142,6 @@ export function ChatHeader({
             что и «Открыть в редакторе». */}
         {isProjectContext && projectPath && <ProjectRunnerControls path={projectPath} />}
 
-        {/* Git проекта — тут же, но только если в каталоге есть .git:
-            сам компонент вернёт null, когда репозитория нет. */}
-        {isProjectContext && projectPath && <ProjectGitControls path={projectPath} />}
-
         {runStatus === 'error' && chatId && (
           <>
             <Button
@@ -186,7 +181,7 @@ export function ChatHeader({
         {/* Тумблеры прав, выгрузка, обновление и справка — за одной кнопкой у
             самого края: трогают их редко, а ряд шапки они забивали целиком. */}
         <ChatHeaderMenu
-          {...(isProjectContext ? { allowEdits, onAllowEditsChange } : {})}
+          {...(isProjectContext ? { allowEdits, onAllowEditsChange, projectPath } : {})}
           autoApprove={autoApprove}
           onAutoApproveChange={onAutoApproveChange}
           canExport={canExport}

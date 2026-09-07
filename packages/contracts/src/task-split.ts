@@ -32,6 +32,8 @@ const MAX_BRANCH = 120;
 const MAX_TASK = 2_000;
 const MAX_BRIEF = 4_000;
 const MAX_SHARED = 4_000;
+/** Имя модели и уровень глубины — короткие слова; всё длиннее просто мусор. */
+const MAX_ASSIGNMENT = 40;
 
 /** Одна группа задач: свой чат, своя ветка, своя рабочая копия. */
 export interface TaskSplitGroup {
@@ -43,6 +45,22 @@ export interface TaskSplitGroup {
   tasks: string[];
   /** Что важно знать этому чату сверх списка задач. */
   brief?: string;
+  /**
+   * Род работы в группе (`mechanical`, `implementation`, `tests`,
+   * `investigation`, `design`, `review`) — единственное, что панель спрашивает у
+   * агента про модель: модель под класс подставляет таблица в коде
+   * (`model-cascade.ts`). Здесь строка переносится как есть, потому что сабпаты
+   * контрактов друг друга не импортируют, а два понимания «что можно назначить»
+   * разошлись бы на первой правке лестницы.
+   */
+  kind?: string;
+  /**
+   * Просьба агента о модели и глубине — ТОЛЬКО ВВЕРХ: группа сложнее своего
+   * класса поднимается, понизить ниже класса нельзя. Проверяет и решает
+   * `planAssignment` на сервере.
+   */
+  model?: string;
+  effort?: string;
 }
 
 /** Предложение агента: общий контекст плюс группы. */
@@ -67,6 +85,15 @@ export interface TaskSplitStarted {
   started: boolean;
   /** Задание группы целиком — им засевается поле ввода, когда прогон не пускали. */
   prompt: string;
+  /**
+   * Модель, с которой чат РЕАЛЬНО стартовал (после подбора и клэмпа), её глубина
+   * и распознанный класс работы. Отдаётся клиенту, чтобы шапка ребёнка сразу
+   * показывала назначенное, а не дефолт из настроек: пер-чат оверрайд модели
+   * живёт на клиенте, и без этого второе сообщение ушло бы на другой модели.
+   */
+  model?: string;
+  effort?: string;
+  kind?: string;
 }
 
 /** Группа, которую завести не удалось: остальные при этом не откатываются. */
@@ -297,7 +324,21 @@ export function parseSplitProposal(raw: unknown): TaskSplitProposal | undefined 
 
     const branch = text(group.branch, MAX_BRANCH) ?? branchFromTitle(title, index);
     const brief = briefOf(group);
-    groups.push({ title, branch, tasks, ...(brief ? { brief } : {}) });
+    // Назначение — необязательное поле, и мусор в нём группу не отменяет:
+    // непонятое значение просто уедет на потолок при клэмпе. Синонимы те же,
+    // что и везде здесь: модель называет поля своими словами.
+    const kind = text(group.kind ?? group.type ?? group.class, MAX_ASSIGNMENT);
+    const model = text(group.model, MAX_ASSIGNMENT);
+    const effort = text(group.effort ?? group.thinking ?? group.reasoning, MAX_ASSIGNMENT);
+    groups.push({
+      title,
+      branch,
+      tasks,
+      ...(brief ? { brief } : {}),
+      ...(kind ? { kind } : {}),
+      ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
+    });
   }
 
   // Одна группа — это не разделение, а обычный разговор: карточка с единственной

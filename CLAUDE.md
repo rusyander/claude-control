@@ -64,9 +64,9 @@ Fix without asking: project code, deps, build config, launch env. Ask first: fil
 the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
 QA runs live in `tools/qa/` and need `pnpm dev` up + `pnpm qa:setup`; each drives the real UI of one
-area. Nine behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
+area. Ten behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
 `check-project-code.mjs`, `check-task-split.mjs`, `check-handoff.mjs`, `check-parent-hub.mjs`,
-`check-new-chat.mjs`, `check-stream-cap.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
+`check-new-chat.mjs`, `check-stream-cap.mjs`, `check-cascade-stages.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
 so they depend on no particular history, on no installed CLI, and leave neither branches nor copies
 behind. `panel-pages.mjs` is the ONE route list the a11y (axe, both themes, create modals) and
 keyboard (Tab order, focus ring, Escape + focus return) sweeps share — a new section goes there or

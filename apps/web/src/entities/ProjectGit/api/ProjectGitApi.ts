@@ -26,8 +26,23 @@ function keyFor(path: string | undefined): readonly unknown[] {
   return [...projectGitKey, path ? normalizeProjectPath(path) : ''];
 }
 
-/** Состояние репозитория проекта; `isRepo:false` — пульт не показывается. */
-export function useProjectGit(path: string | undefined) {
+/**
+ * Как часто перечитывается состояние репозитория, пока агент работает и пока
+ * нет.
+ *
+ * Пятнадцати секунд достаточно, когда репозиторий меняет человек в терминале, и
+ * слишком много, когда его меняет агент в этом же окне: он заводит ветку и
+ * коммитит за секунды, а панель до следующего такта показывала бы прежнюю
+ * ветку — то есть врала бы ровно в момент, ради которого на неё и смотрят.
+ */
+const IDLE_INTERVAL_MS = 15_000;
+const RUNNING_INTERVAL_MS = 4_000;
+
+/**
+ * Состояние репозитория проекта; `isRepo:false` — пульт не показывается.
+ * `isRunning` — идёт ли прогон в этом каталоге: от него зависит частота опроса.
+ */
+export function useProjectGit(path: string | undefined, isRunning = false) {
   return useQuery({
     queryKey: keyFor(path),
     queryFn: async () => {
@@ -36,7 +51,7 @@ export function useProjectGit(path: string | undefined) {
     },
     enabled: Boolean(path),
     refetchOnWindowFocus: true,
-    refetchInterval: 15_000,
+    refetchInterval: isRunning ? RUNNING_INTERVAL_MS : IDLE_INTERVAL_MS,
   });
 }
 

@@ -19,6 +19,13 @@ const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 const CHAT_ID = 'qa-handoff-chat';
 /** Каталога на диске нет: прогон ничего в файловой системе не трогает. */
 const PROJECT = { name: 'QA продолжение', path: 'C:/qa-handoff-project' };
+/**
+ * Разговор идёт во ВЛОЖЕННОМ каталоге проекта — так и живёт монорепозиторий: у
+ * Claude Code проект равен рабочему каталогу запуска, и чат из `…/widget` знает
+ * себя подпапкой, а человек смотрит на него во вкладке проекта. Именно на этой
+ * форме продолжение заводило «новый проект» вместо нового чата.
+ */
+const CHAT_PATH = `${PROJECT.path}/widget`;
 
 const PROPOSAL = {
   done: 'Закрыт экспорт отчётов: маршрут, тесты и справка.',
@@ -33,7 +40,7 @@ const CHAT = {
   id: CHAT_ID,
   title: 'Продолжение этапа',
   project: PROJECT.name,
-  projectPath: PROJECT.path,
+  projectPath: CHAT_PATH,
   isSandbox: false,
   messageCount: 2,
   createdAt: '2026-09-01T10:00:00.000Z',
@@ -134,7 +141,7 @@ await page.route('**/api/chat/handoff', (route) => {
   return route.fulfill({
     json: {
       chatId: 'new-1',
-      path: PROJECT.path,
+      path: CHAT_PATH,
       started: handoffBody.startRun === true,
       prompt: `Это новая сессия.\n${handoffBody.proposal.next}`,
       chainDepth: 2,
@@ -240,12 +247,27 @@ await waitEnabled(createOnly);
 await createOnly.click();
 await page.waitForTimeout(200);
 await waitEnabled(apply);
+
+// Лента вкладок ДО согласия: продолжение заводит новый ЧАТ того же проекта, и
+// расти ей не с чего. Разговор идёт во вложенном каталоге — раньше именно на нём
+// панель открывала вторую вкладку, и один проект оказывался двумя.
+const workspaceTabs = page.getByRole('tablist', { name: 'Рабочие пространства' });
+const tabsBefore = await workspaceTabs.getByRole('tab').count();
+
 await apply.click();
 await page.waitForTimeout(1500);
 
+check((await workspaceTabs.getByRole('tab').count()) === tabsBefore, 'новой вкладки не завелось');
+check(
+  ((await workspaceTabs.getByRole('tab', { selected: true }).textContent()) ?? '').includes(
+    PROJECT.name,
+  ),
+  'человек остался во вкладке проекта',
+);
+
 check(Boolean(handoffBody), 'согласие ушло на сервер');
 check(handoffBody?.startRun === false, '«только завести чат» доехало до сервера');
-check(handoffBody?.projectPath === PROJECT.path, 'каталог разговора передан');
+check(handoffBody?.projectPath === CHAT_PATH, 'каталог разговора передан');
 check(handoffBody?.chatId === CHAT_ID, 'ключ закрываемого разговора передан — цепочка не рвётся');
 check(handoffBody?.proposal?.next?.includes('импорт'), 'предложение ушло целиком');
 check(

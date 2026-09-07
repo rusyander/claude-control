@@ -1,6 +1,8 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TaskSplitProposal, TaskSplitResult } from '@agentdeck/contracts/task-split';
+import type { CascadeAssignment } from '@agentdeck/contracts/model-cascade';
 import { apiClient } from '@shared/api/client';
+import { normalizeProjectPath } from '@shared/lib/workspace';
 
 /**
  * Разделение списка задач по нескольким чатам.
@@ -22,6 +24,13 @@ export interface SplitTasksBody {
   effort?: string;
   /** Разговор, из которого выделяют, — корень дерева в списке чатов. */
   parentChatId?: string;
+  /**
+   * Ручные замены с карточки: номер группы → что человек выбрал ей сам. Едут
+   * рядом с предложением, а не внутри него: просьба агента о модели действует
+   * только вверх, выбор человека — в обе стороны, и подмешанные друг в друга на
+   * сервере они бы не различались.
+   */
+  assignments?: Record<number, CascadeAssignment>;
 }
 
 export function useSplitTasks() {
@@ -37,9 +46,20 @@ export function useSplitTasks() {
  * Текст просьбы «раздели задачи», который уходит агенту по кнопке. Живёт на
  * сервере вместе с описанием формата: вторая копия инструкции в клиенте
  * разошлась бы с первой на ближайшей же правке блока.
+ *
+ * Проект, модель и глубину сервер спрашивает не из любопытства: по ним он решает,
+ * действует ли здесь подбор модели, и называет агенту НАСТОЯЩИЙ потолок этого
+ * разговора. Без них к просьбе не приложится строка о классах работы — кнопка
+ * молча работала бы иначе, чем инициатива.
  */
-export async function fetchSplitRequestPrompt(): Promise<string> {
-  const { data } = await apiClient.get<{ prompt: string }>('/chat/split/request');
+export async function fetchSplitRequestPrompt(context: {
+  path?: string;
+  model?: string;
+  effort?: string;
+}): Promise<string> {
+  const { data } = await apiClient.get<{ prompt: string }>('/chat/split/request', {
+    params: context,
+  });
   return data.prompt;
 }
 
@@ -50,4 +70,50 @@ export async function fetchSplitRequestPrompt(): Promise<string> {
  */
 export async function declineSplit(chatId: string): Promise<void> {
   await apiClient.post('/chat/split/decline', { chatId }).catch(() => undefined);
+}
+
+/**
+ * Правило «подбирать модель под задачу»: панель сама ставит группе модель по
+ * роду её работы, а работе ниже потолка поднимает планку сдачи.
+ *
+ * Положение помнится на ПРОЕКТ, а не на разговор: решение относится к
+ * репозиторию и цене ошибки в нём. Умолчание — включено, поэтому пока ответ не
+ * пришёл, интерфейс показывает включённый тумблер, а не «выключено».
+ */
+const cascadeKey = (path: string | undefined): readonly unknown[] => [
+  'chat-cascade',
+  path ? normalizeProjectPath(path) : '',
+];
+
+export function useCascadeRule(path: string | undefined) {
+  return useQuery({
+    queryKey: cascadeKey(path),
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ enabled: boolean; project: string }>('/chat/cascade', {
+        params: { path },
+      });
+      return data;
+    },
+    enabled: Boolean(path),
+  });
+}
+
+export function useSetCascadeRule(path: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { data } = await apiClient.put<{ enabled: boolean; project: string }>('/chat/cascade', {
+        path,
+        enabled,
+      });
+      return data;
+    },
+    // Ответ и есть новое состояние: лишний запрос следом здесь не нужен, а вот
+    // соседние вкладки того же проекта должны увидеть смену — их ключ другой,
+    // поэтому гасим всё семейство.
+    onSuccess: (data) => {
+      queryClient.setQueryData(cascadeKey(path), data);
+      void queryClient.invalidateQueries({ queryKey: ['chat-cascade'] });
+    },
+  });
 }

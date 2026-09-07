@@ -103,7 +103,7 @@ export function ProjectCodeModal({
         <aside className={styles.sidebar}>
           <Stack direction="row" gap="var(--spacing-3xs)" className={styles.sidebarTabs}>
             <TabButton isActive={code.onlyChanged} onClick={() => code.setOnlyChanged(true)}>
-              {t('projectCode.tabChanged', { count: code.changed.size })}
+              {t('projectCode.tabChanged', { count: code.rows.length })}
             </TabButton>
             <TabButton isActive={!code.onlyChanged} onClick={() => code.setOnlyChanged(false)}>
               {t('projectCode.tabAll')}
@@ -112,8 +112,10 @@ export function ProjectCodeModal({
 
           {code.onlyChanged ? (
             <ProjectCodeChanged
-              changes={code.changes.data}
+              rows={code.rows}
+              git={code.git}
               isLoading={code.changes.isLoading}
+              skipped={code.changes.data?.skipped}
               selected={code.selected}
               onSelect={code.select}
             />

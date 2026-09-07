@@ -11,6 +11,7 @@ import {
   createBranch,
   isGitRepo,
   parseBranches,
+  parseNumstat,
   parseRemoteBranches,
   parseStatus,
   pickRemote,
@@ -186,6 +187,27 @@ describe('parseBranches: список локальных веток', () => {
       'feature/b',
       'main',
     ]);
+  });
+});
+
+describe('parseNumstat: сколько строк изменено', () => {
+  it('складывает по файлам', () => {
+    const out = '3\t1\tsrc/a.ts\n10\t0\tsrc/b.ts\n';
+    expect(parseNumstat(out)).toEqual({ insertions: 13, deletions: 1 });
+  });
+
+  it('двоичный файл пропускается: в строках он не измеряется', () => {
+    const out = '-\t-\tlogo.png\n2\t2\tsrc/a.ts\n';
+    expect(parseNumstat(out)).toEqual({ insertions: 2, deletions: 2 });
+  });
+
+  it('считать нечего — undefined, а не ноль: ноль читался бы как «правок нет»', () => {
+    expect(parseNumstat('')).toBeUndefined();
+    expect(parseNumstat('-\t-\tlogo.png\n')).toBeUndefined();
+  });
+
+  it('чистое дерево при существующем HEAD даёт пустой вывод, а не нули', () => {
+    expect(parseNumstat('\n')).toBeUndefined();
   });
 });
 

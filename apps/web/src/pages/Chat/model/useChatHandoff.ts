@@ -7,7 +7,7 @@ import {
   workspace,
   getWorkspaceState,
   projectShortName,
-  normalizeProjectPath,
+  tabContaining,
 } from '@shared/lib/workspace';
 import { agentRuns } from '@shared/lib/agent-runs';
 import { saveDraft } from '@shared/lib/draft';
@@ -115,12 +115,19 @@ export function useChatHandoff({
   /** Переезд на заведённый разговор: вкладка, память вкладки и живой поток. */
   const adopt = useCallback(
     (started: { chatId: string; path: string; started: boolean; prompt: string }): void => {
-      const tabId = workspace.openProject(started.path, projectShortName(started.path));
+      // ВКЛАДКУ НЕ ЗАВОДИМ, если каталог уже открыт: продолжение — это новый ЧАТ
+      // того же проекта, и второй вкладки под него не существует. Разговор,
+      // идущий во вложенном каталоге (`widget-app/widget`), человек смотрит во
+      // вкладке проекта — `reveal` вернёт её, а не заведёт «новый проект».
+      const tabId = workspace.reveal(started.path, projectShortName(started.path));
       workspace.rememberView(tabId, started.chatId);
       // Прогон не запускали — кладём задание в поле ввода. Ключ черновика у
-      // разговора, которого ещё нет, строится по ПУТИ проекта (`draftKeyFor`).
+      // разговора, которого ещё нет, строится по ПУТИ (`draftKeyFor`), и путь
+      // этот — каталог ВКЛАДКИ, на которой человек окажется: у продолжения во
+      // вложенном каталоге вкладкой остаётся проект, и задание, положенное под
+      // ключ подпапки, никто бы не прочитал.
       if (!started.started) {
-        saveDraft(`project:${normalizeProjectPath(started.path)}`, started.prompt);
+        saveDraft(`project:${tabId}`, started.prompt);
       }
       showRef.current({ id: started.chatId, projectPath: started.path });
       // Прогон завёл сервер, своего события у него нет: подхватываем поток сразу,
@@ -174,15 +181,25 @@ export function useChatHandoff({
         adopt({ chatId: nextId, path, started: true, prompt: '' });
         setChainDepth(event.chainDepth ?? 0);
       } else {
-        const tabId = normalizeProjectPath(path);
-        if (getWorkspaceState().projectTabs.some((tab) => tab.id === tabId)) {
-          workspace.rememberView(tabId, nextId);
-        }
+        // Вкладку не переключаем, но ту, что уже показывает этот каталог, учим
+        // помнить продолжение: человек вернётся на неё и увидит новый разговор.
+        const tab = tabContaining(getWorkspaceState(), path);
+        if (tab) workspace.rememberView(tab.id, nextId);
         void agentRuns.resumeActive();
         void queryClient.invalidateQueries({ queryKey: chatKeys.list });
       }
 
-      toast.success(t('chat.handoff.autoDone', { name: projectShortName(path) }), {
+      // Звено конвейера — не «продолжение в чистой сессии», и называть его так
+      // значит соврать в единственной строке, которую человек об этом прочтёт:
+      // работу проверяет другая модель, а не продолжает та же.
+      const done =
+        event.stage === 'review' || event.stage === 'fix'
+          ? t(`chat.cascade.started.${event.stage}`, {
+              name: projectShortName(path),
+              count: event.findings?.length ?? 0,
+            })
+          : t('chat.handoff.autoDone', { name: projectShortName(path) });
+      toast.success(done, {
         onClick: () => showRef.current({ id: nextId, projectPath: path }),
       });
     });

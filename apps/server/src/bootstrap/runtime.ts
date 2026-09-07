@@ -8,6 +8,7 @@ import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import { ProjectTestRunRegistry } from '../domains/project-tests.ts';
 import { DlpProxy } from '../domains/dlp.ts';
 import { createRunNotifier } from '../domains/remote-notify.ts';
+import { hasWorkSince } from '../domains/project-git.ts';
 import { createHandoffPlanner } from '../routes/chat/handoff-routes.ts';
 import { createEventHub, type EventHub } from '../lib/event-hub.ts';
 
@@ -98,6 +99,34 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       session: chatSession,
       selfBaseUrl,
       contextLimit: () => ctx.store.getSettings().handoffContextLimit,
+      // Продолжение наследует связь закрытого разговора: и родителя в дереве, и
+      // подобранную под задачу модель. Иначе следующее сообщение человека —
+      // первое, что придёт в новый чат без модели, — уехало бы на дефолте.
+      carryLink: (from, to) => {
+        const link = from.map((key) => ctx.store.getChatLink(key)).find(Boolean);
+        if (link) ctx.store.setChatLink(to, { ...link, createdAt: new Date().toISOString() });
+      },
+      /**
+       * Конвейер «работа → ревью → фикс»: чем оплачивается понижение модели.
+       * Всё, что ему нужно снаружи, — связи чатов, настройки и один вопрос к
+       * git. Решение о звене принимает домен (`ChatCascadeStages`), запускает
+       * планировщик, а собирается это здесь, как и остальные долгоживущие связки.
+       */
+      cascade: {
+        linkOf: (aliases) => aliases.map((key) => ctx.store.getChatLink(key)).find(Boolean),
+        saveLink: (chatId, link) => ctx.store.setChatLink(chatId, link),
+        // Отметка ставится по ОБОИМ ключам чата: под временным он живёт в памяти
+        // вкладок, под настоящим — в списке, и проверить работу дважды нельзя ни
+        // из того, ни из другого.
+        markReviewed: (aliases, at) => {
+          for (const key of aliases) {
+            const link = ctx.store.getChatLink(key);
+            if (link) ctx.store.setChatLink(key, { ...link, reviewedAt: at });
+          }
+        },
+        hasWork: (cwd, since) => hasWorkSince(cwd, since),
+        settings: () => ctx.store.getSettings(),
+      },
     }),
   );
   const providerChats = new ProviderChatService();

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readChatMessages } from './ChatHistory.ts';
+import { readChatMessages, readChats } from './ChatHistory.ts';
 
 /**
  * Тесты пагинации ленты переписки. Ключевое: по умолчанию отдаётся хвост
@@ -124,5 +124,73 @@ describe('readChatMessages — пагинация', () => {
     const page = await readChatMessages(projectsDir, 's', { limit: 400 });
     expect(page.total).toBe(2);
     expect(page.messages.map(textOf)).toEqual(['вопрос', 'ответ']);
+  });
+});
+
+/**
+ * Ветка в ленте и в списке. Claude Code пишет `gitBranch` в каждую строку
+ * транскрипта, и именно этим панель отвечает на вопрос «когда он ушёл в другую
+ * ветку»: живое состояние git знает только «сейчас».
+ */
+describe('ветка из транскрипта', () => {
+  let projectsDir: string;
+
+  beforeEach(() => {
+    projectsDir = mkdtempSync(join(tmpdir(), 'cc-chat-branch-'));
+  });
+
+  afterEach(() => {
+    rmSync(projectsDir, { recursive: true, force: true });
+  });
+
+  /** Транскрипт, где ветка меняется посреди разговора. */
+  function writeSwitching(session: string): void {
+    const dir = join(projectsDir, 'proj');
+    mkdirSync(dir, { recursive: true });
+    const lines = [
+      { type: 'user', uuid: 'u0', gitBranch: 'main', message: { role: 'user', content: 'начали' } },
+      {
+        type: 'assistant',
+        uuid: 'a0',
+        gitBranch: 'main',
+        message: { role: 'assistant', content: 'смотрю' },
+      },
+      {
+        type: 'assistant',
+        uuid: 'a1',
+        gitBranch: 'feat/x',
+        message: { role: 'assistant', content: 'ушёл в ветку' },
+      },
+    ].map((record) => JSON.stringify({ cwd: 'C:/work/app', ...record }));
+    writeFileSync(join(dir, `${session}.jsonl`), `${lines.join('\n')}\n`);
+  }
+
+  it('каждая реплика несёт свою ветку — по ним лента и ставит отметку смены', async () => {
+    writeSwitching('s');
+    const page = await readChatMessages(projectsDir, 's', { limit: 400 });
+    expect(page.messages.map((message) => message.gitBranch)).toEqual(['main', 'main', 'feat/x']);
+  });
+
+  it('транскрипт без веток оставляет поле пустым, а не пустой строкой', async () => {
+    const dir = join(projectsDir, 'proj');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'old.jsonl'),
+      `${JSON.stringify({
+        type: 'user',
+        uuid: 'u0',
+        cwd: 'C:/work/app',
+        message: { role: 'user', content: 'привет' },
+      })}\n`,
+    );
+
+    const page = await readChatMessages(projectsDir, 'old', { limit: 400 });
+    expect(page.messages[0]?.gitBranch).toBeUndefined();
+  });
+
+  it('в списке чатов стоит ПОСЛЕДНЯЯ ветка разговора, а не первая', () => {
+    writeSwitching('s');
+    const chats = readChats(projectsDir);
+    expect(chats.find((chat) => chat.id === 's')?.branch).toBe('feat/x');
   });
 });

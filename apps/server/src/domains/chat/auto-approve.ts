@@ -1,3 +1,11 @@
+// Подмодулем, а не индексом контрактов: сервер исполняет TypeScript как есть
+// (`--experimental-strip-types`), а в индексе реэкспорты без расширений — их
+// Node не разрешает, и первый же ЗНАЧЕНИЕВОЙ импорт оттуда роняет процесс.
+import {
+  allowedPermissionRules,
+  type PermissionRuleId,
+} from '@agentdeck/contracts/permission-rules';
+
 /**
  * Автоподтверждение прав в чате.
  *
@@ -14,6 +22,14 @@
  * ровно там, где отменить сделанное нечем: удаление, затирание истории, снос
  * данных и инфраструктуры, публикация в чужой реестр. Коммит, ветка, пуш,
  * перенос, перезапуск процесса, запрос к API — уходят агенту.
+ *
+ * САМА ЭТА ГРАНИЦА ТЕПЕРЬ НАСТРАИВАЕТСЯ (решение владельца, 07.09.2026).
+ * Запрос, попавший в охраняемую область, сперва называется ПРАВИЛОМ
+ * (`PermissionRuleId`), и спрашиваем мы только тогда, когда это правило
+ * выключено. Правила глобальные и живут в настройках панели — их состав,
+ * значения по умолчанию и причина такого деления лежат в
+ * `contracts/permission-rules.ts`. Здесь — разбор: какая команда и какой
+ * инструмент к какому правилу относятся.
  *
  * Два предохранителя сверх этого не тронуты: правила `ask`/`deny` из
  * settings.json (человек сам сказал «спрашивай» — здесь это перевешивает всё) и
@@ -45,7 +61,18 @@ export interface AutoApproveInput {
    * значит «только чтение», и автоподтверждение не вправе его отменять.
    */
   allowEdits: boolean;
+  /**
+   * Правила, которые человек разрешил подтверждать без него. Не задано —
+   * значения по умолчанию из контрактов (см. `allowedPermissionRules`).
+   */
+  allowedRules?: ReadonlySet<string>;
 }
+
+/**
+ * Правила по умолчанию — на случай вызова без настроек (тесты, прогон мимо
+ * маршрута). Считается один раз: набор не меняется в течение жизни процесса.
+ */
+const DEFAULT_ALLOWED: ReadonlySet<string> = allowedPermissionRules(undefined);
 
 /** Инструменты, меняющие файлы: под «только чтение» их подтверждает человек. */
 const EDIT_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
@@ -74,63 +101,123 @@ export function isReadOnlyTool(toolName: string): boolean {
 
 /**
  * Инструмент MCP, который на той стороне что-то СНОСИТ. Имена у серверов разные,
- * поэтому смотрим на глагол в названии. Создать задачу, написать комментарий,
- * повесить метку — обычная работа: это правится там же, где сделано. Удаление
- * страницы и слияние запроса правится уже не отсюда.
+ * поэтому смотрим на ГЛАГОЛ — и именно на глагол в начале имени, а не на любое
+ * вхождение слова: `create_merge_request_thread` — это комментарий в запросе на
+ * слияние, а не слияние, и пока проверка искала «merge» где угодно, КАЖДЫЙ
+ * инструмент вокруг merge request'ов останавливал прогон карточкой. Ровно на
+ * этом человек и уставал жать «Разрешить».
  */
-const MCP_DESTRUCTIVE = /(delete|remove|destroy|purge|drop|merge|unpublish|revoke)/i;
+const MCP_DESTRUCTIVE = /^(delete|remove|destroy|purge|drop|merge|unpublish|revoke)(_|$)/i;
 
 /**
- * Безвозвратные команды оболочки. Проверяются по каждому звену конвейера,
- * поэтому `ls && rm -rf dist` не проскочит из-за безобидного начала.
+ * Инструмент MCP, который только СМОТРИТ. Чтение на той стороне отменять нечего
+ * — так же, как и чтение файла, — поэтому под правило записи оно не идёт вовсе:
+ * иначе выключенное «записи во внешние сервисы» останавливало бы прогон на
+ * каждом `get_merge_request`, то есть на самой частой операции.
  */
-const IRREVERSIBLE_SEGMENT: RegExp[] = [
-  // Удаление и затирание на диске. Слева требуем начало звена или пробел, а не
-  // просто границу слова: иначе `docker run --rm` — стандартный одноразовый
-  // запуск — читается как `rm` и останавливает прогон на ровном месте.
-  /(^|[\s(])(rm|rmdir|unlink|shred|truncate|dd|mkfs|diskpart)\b/i,
-  /(^|[\s(])(del|rd|erase|Remove-Item|Clear-Content)\b/i,
-  /\breg\s+delete\b/i,
-  // Git — только то, что стирает работу или историю. Коммит, ветка, пуш, перенос
-  // и перебазирование здесь не значатся: они восстанавливаются из reflog и с
-  // удалённого, а стоят агенту остановки на каждом шаге.
-  /\bgit\s+(clean|filter-branch)\b/i,
-  /\bgit\s+reset\b[^\n]*--hard\b/i,
-  /\bgit\s+restore\b/i,
-  /\bgit\s+checkout\s+--\s/i,
-  /\bgit\s+(branch|tag)\b[^\n]*\s(-D|-d|--delete)\b/i,
-  /\bgit\s+stash\s+(drop|clear)\b/i,
-  /\bgit\s+worktree\s+(remove|prune)\b/i,
-  /\bgit\s+reflog\s+(expire|delete)\b/i,
-  // База данных: схема и данные.
-  /\b(drop|truncate)\b/i,
-  /\bdelete\s+from\b/i,
-  /\b(migrate|migration)\b.*\b(down|reset|fresh)\b/i,
-  /\bprisma\s+migrate\s+reset\b/i,
-  // Контейнеры, кластер, инфраструктура — снос, а не запуск. Подкоманда идёт
-  // сразу за именем: `docker run --rm` тем же `rm` не является.
-  /\b(docker|podman)\s+(rm|rmi|prune)\b/i,
-  /\b(docker|podman)\s+(system|image|volume|container|network)\s+(prune|rm)\b/i,
-  /\bdocker-compose\s+down\b[^\n]*\s-v\b/i,
-  /\bkubectl\s+delete\b/i,
-  /\bhelm\s+(delete|uninstall)\b/i,
-  /\b(terraform|tofu|pulumi)\s+destroy\b/i,
-  // Публикация в чужой реестр: снять её уже не отсюда.
-  /\b(npm|pnpm|yarn|bun)\s+(publish|unpublish|deprecate)\b/i,
-  // Хостинги репозиториев: удаление и слияние. Остальное — обычная работа.
-  /\b(gh|glab)\s+[a-z-]+\s+(delete|merge)\b/i,
-  // Удаление по сети и остановка машины.
-  /\bcurl\b[^\n]*\s-X\s*['"]?DELETE/i,
-  /\b(shutdown|reboot|halt)\b/i,
-];
+const MCP_READ =
+  /^(get|list|search|read|fetch|find|show|view|describe|query|count|check|validate|verify|discover|download|health|whoami|my)(_|$)/i;
 
-/** Проверяется по команде целиком: конвейер сам по себе и есть признак. */
-const IRREVERSIBLE_WHOLE: RegExp[] = [
-  // Скачал и сразу исполнил. Не удаление, но и не то, что подтверждают молча:
-  // что именно исполнится, до запуска не знает никто.
-  /\b(curl|wget|iwr|Invoke-WebRequest)\b[^\n]*\|\s*(sudo\s+)?(ba|z|fi)?sh\b/i,
-  // Принудительный пуш: чужая работа исчезает из ветки.
-  /\bgit\s+push\b[^\n]*(--force|--force-with-lease|-f)\b/i,
+/** Имя инструмента без префикса `mcp__<сервер>__` — глагол ищется в нём. */
+function mcpVerbPart(toolName: string): string {
+  return toolName.split('__').at(-1) ?? '';
+}
+
+/**
+ * Что именно охраняется в этой команде или инструменте. `undefined` — обычная
+ * обратимая работа, о ней человека не спрашивают вовсе.
+ *
+ * Правила проверяются по порядку, и порядок значим: `git push --force` — это
+ * затирание истории, а не обычный пуш, поэтому `gitHistory` идёт раньше
+ * `gitWrite`.
+ */
+interface RuleMatcher {
+  id: PermissionRuleId;
+  /** Проверяется по каждому звену конвейера: `ls && rm -rf dist` не проскочит. */
+  segment?: RegExp[];
+  /** Проверяется по команде целиком: конвейер сам по себе и есть признак. */
+  whole?: RegExp[];
+}
+
+const COMMAND_RULES: RuleMatcher[] = [
+  {
+    // Удаление и затирание на диске. Слева требуем начало звена или пробел, а не
+    // просто границу слова: иначе `docker run --rm` — стандартный одноразовый
+    // запуск — читается как `rm` и останавливает прогон на ровном месте.
+    id: 'filesDelete',
+    segment: [
+      /(^|[\s(])(rm|rmdir|unlink|shred|truncate|dd|mkfs|diskpart)\b/i,
+      /(^|[\s(])(del|rd|erase|Remove-Item|Clear-Content)\b/i,
+      /\breg\s+delete\b/i,
+    ],
+  },
+  {
+    // Git — только то, что стирает работу или историю. Коммит, ветка, пуш,
+    // перенос и перебазирование сюда не входят: они восстанавливаются из reflog
+    // и с удалённого (см. `gitWrite` ниже).
+    id: 'gitHistory',
+    segment: [
+      /\bgit\s+(clean|filter-branch)\b/i,
+      /\bgit\s+reset\b[^\n]*--hard\b/i,
+      /\bgit\s+restore\b/i,
+      /\bgit\s+checkout\s+--\s/i,
+      /\bgit\s+(branch|tag)\b[^\n]*\s(-D|-d|--delete)\b/i,
+      /\bgit\s+stash\s+(drop|clear)\b/i,
+      /\bgit\s+worktree\s+(remove|prune)\b/i,
+      /\bgit\s+reflog\s+(expire|delete)\b/i,
+    ],
+    // Принудительный пуш: чужая работа исчезает из ветки.
+    whole: [/\bgit\s+push\b[^\n]*(--force|--force-with-lease|-f)\b/i],
+  },
+  {
+    // База данных: схема и данные.
+    id: 'database',
+    segment: [
+      /\b(drop|truncate)\b/i,
+      /\bdelete\s+from\b/i,
+      /\b(migrate|migration)\b.*\b(down|reset|fresh)\b/i,
+      /\bprisma\s+migrate\s+reset\b/i,
+    ],
+  },
+  {
+    // Контейнеры, кластер, инфраструктура, питание машины — снос, а не запуск.
+    // Подкоманда идёт сразу за именем: `docker run --rm` тем же `rm` не является.
+    id: 'infrastructure',
+    segment: [
+      /\b(docker|podman)\s+(rm|rmi|prune)\b/i,
+      /\b(docker|podman)\s+(system|image|volume|container|network)\s+(prune|rm)\b/i,
+      /\bdocker-compose\s+down\b[^\n]*\s-v\b/i,
+      /\bkubectl\s+delete\b/i,
+      /\bhelm\s+(delete|uninstall)\b/i,
+      /\b(terraform|tofu|pulumi)\s+destroy\b/i,
+      /\b(shutdown|reboot|halt)\b/i,
+    ],
+  },
+  {
+    // Публикация в чужой реестр: снять её уже не отсюда.
+    id: 'packagePublish',
+    segment: [/\b(npm|pnpm|yarn|bun)\s+(publish|unpublish|deprecate)\b/i],
+  },
+  {
+    // Хостинги репозиториев и трекеры через их CLI: удаление и слияние.
+    // Остальное (комментарий, MR, тикет) — обычная работа, см. `externalWrite`.
+    id: 'externalDestroy',
+    segment: [/\b(gh|glab)\s+[a-z-]+\s+(delete|merge)\b/i],
+  },
+  {
+    // Скачал и сразу исполнил, удалил по сети. Не файлы на диске, но и не то,
+    // что подтверждают молча: что именно исполнится, до запуска не знает никто.
+    id: 'networkExec',
+    segment: [/\bcurl\b[^\n]*\s-X\s*['"]?DELETE/i],
+    whole: [/\b(curl|wget|iwr|Invoke-WebRequest)\b[^\n]*\|\s*(sudo\s+)?(ba|z|fi)?sh\b/i],
+  },
+  {
+    // Обычная работа с репозиторием. Правило существует не ради запрета, а ради
+    // ВЫБОРА: кому нужен просмотр каждого коммита и пуша — выключает тумблер, и
+    // они снова спрашивают.
+    id: 'gitWrite',
+    segment: [/\bgit\s+(commit|push|merge|rebase|cherry-pick|revert|tag|branch|switch)\b/i],
+  },
 ];
 
 /** Команда оболочки из ввода инструмента Bash; undefined — форма незнакомая. */
@@ -148,11 +235,29 @@ function segments(command: string): string[] {
     .filter(Boolean);
 }
 
-function isIrreversibleCommand(command: string): boolean {
-  if (IRREVERSIBLE_WHOLE.some((rule) => rule.test(command))) return true;
-  return segments(command).some((segment) =>
-    IRREVERSIBLE_SEGMENT.some((rule) => rule.test(segment)),
-  );
+/**
+ * Правило, под которое подпадает запрос; `undefined` — обычная обратимая
+ * работа. Экспортируется ради тестов и справки: по нему видно, ЧТО именно
+ * снимет тумблер.
+ */
+export function ruleFor(toolName: string, input: unknown): PermissionRuleId | undefined {
+  if (toolName.startsWith('mcp__')) {
+    const verb = mcpVerbPart(toolName);
+    if (MCP_DESTRUCTIVE.test(verb)) return 'externalDestroy';
+    return MCP_READ.test(verb) ? undefined : 'externalWrite';
+  }
+
+  if (toolName !== 'Bash') return undefined;
+  const command = bashCommand(input);
+  if (command === undefined) return undefined;
+
+  const parts = segments(command);
+  for (const rule of COMMAND_RULES) {
+    if (rule.whole?.some((pattern) => pattern.test(command))) return rule.id;
+    if (rule.segment?.some((pattern) => parts.some((part) => pattern.test(part)))) return rule.id;
+  }
+
+  return undefined;
 }
 
 /** Паттерн `Tool(spec)` → части; без скобок spec отсутствует. */
@@ -212,7 +317,7 @@ function matchesRule(pattern: string, toolName: string, input: unknown): boolean
  * раньше.
  */
 export function shouldAutoApprove(request: AutoApproveInput): boolean {
-  const { toolName, input, guardedPatterns, allowEdits } = request;
+  const { toolName, input, guardedPatterns, allowEdits, allowedRules } = request;
 
   // Вопрос человеку не подтверждается автоматически НИКОГДА. «Разрешить» здесь
   // значит «пусть CLI спросит сам», а в режиме `-p` спрашивать ему не у кого:
@@ -229,14 +334,11 @@ export function shouldAutoApprove(request: AutoApproveInput): boolean {
   // Правки файлов при выключенном тумблере правок — только руками.
   if (!allowEdits && EDIT_TOOLS.has(toolName)) return false;
 
-  // Сносящее через MCP (удалить страницу, слить запрос) — через человека.
-  if (toolName.startsWith('mcp__') && MCP_DESTRUCTIVE.test(toolName)) return false;
+  // Незнакомая форма Bash-вызова: что исполнится — неизвестно, спрашиваем.
+  if (toolName === 'Bash' && bashCommand(input) === undefined) return false;
 
-  if (toolName === 'Bash') {
-    const command = bashCommand(input);
-    if (command === undefined) return false;
-    if (isIrreversibleCommand(command)) return false;
-  }
+  const rule = ruleFor(toolName, input);
+  if (rule && !(allowedRules ?? DEFAULT_ALLOWED).has(rule)) return false;
 
   return !guardedPatterns.some((pattern) => matchesRule(pattern, toolName, input));
 }

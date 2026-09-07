@@ -38,6 +38,33 @@ export function openProjectTab(
 }
 
 /**
+ * Вкладка, в которой этот каталог УЖЕ открыт: сам каталог или любой его предок.
+ *
+ * У Claude Code проект равен рабочему каталогу запуска, поэтому разговор, начатый
+ * в `widget-app/widget`, знает себя каталогом подпапки, а человек смотрит на него
+ * во вкладке `widget-app` (`visibleChats` показывает вложенные разговоры её
+ * собственными). Открывать под такой разговор ВТОРУЮ вкладку — значит на ровном
+ * месте расщепить один проект надвое: именно так продолжение в чистой сессии
+ * заводило «новый проект» вместо нового чата.
+ *
+ * Активная вкладка выигрывает: если каталог виден и в ней, человек остаётся там,
+ * где стоял. Иначе берётся самая глубокая из подходящих — она ближе к каталогу
+ * разговора, чем общий корень.
+ */
+export function tabContaining(state: WorkspaceState, path: string): ProjectTab | undefined {
+  const target = normalizeProjectPath(path);
+  const fits = (tab: ProjectTab): boolean => tab.id === target || target.startsWith(`${tab.id}/`);
+
+  const active = state.projectTabs.find((tab) => tab.id === state.activeTabId);
+  if (active && fits(active)) return active;
+
+  return state.projectTabs
+    .filter(fits)
+    .sort((a, b) => b.id.length - a.id.length)
+    .at(0);
+}
+
+/**
  * Закрыть таб проекта. Если закрывали активный — фокус уходит на левого соседа
  * (как во вкладках браузера); у первого проекта левый сосед — домашний таб.
  */
@@ -212,6 +239,18 @@ export const workspace = {
   openProject(path: string, name: string): string {
     commit(openProjectTab(state, { path, name }));
     return normalizeProjectPath(path);
+  },
+  /**
+   * Показать каталог там, где он уже открыт: подходящую вкладку активируем, и
+   * только при отсутствии таковой заводим новую. Этим переезжают на разговор,
+   * заведённый не человеком (продолжение в чистой сессии, прогон из уведомления),
+   * — им нужна вкладка ПРОЕКТА, а не вкладка на каждый вложенный каталог.
+   */
+  reveal(path: string, name: string): string {
+    const existing = tabContaining(state, path);
+    if (!existing) return workspace.openProject(path, name);
+    commit(activateTab(state, existing.id));
+    return existing.id;
   },
   closeProject(id: string): void {
     commit(closeProjectTab(state, id));

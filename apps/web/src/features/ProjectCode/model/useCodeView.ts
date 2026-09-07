@@ -20,7 +20,13 @@ export function useCodeView(
   const [selected, setSelected] = useState<string | undefined>(undefined);
   const [openDirs, setOpenDirs] = useState<string[]>([]);
   const [showDiff, setShowDiff] = useState(true);
-  const [onlyChanged, setOnlyChanged] = useState(false);
+  /**
+   * Окно открывается на списке изменённых, а не на дереве всего проекта: в него
+   * приходят с вопросом «что тут натворили», и полный список файлов на этот
+   * вопрос не отвечает. Тем более что открытый файл всё равно подставлялся
+   * первый изменённый — дерево рядом с ним показывало другое.
+   */
+  const [onlyChanged, setOnlyChanged] = useState(true);
   const [isHydrated, setHydrated] = useState(false);
   const didExpand = useRef(false);
 

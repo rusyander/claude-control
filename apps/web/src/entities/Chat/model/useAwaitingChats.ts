@@ -51,7 +51,7 @@ export function useAwaitingAlarm(): ChatSummary[] {
       const path = chat.isSandbox ? undefined : chat.projectPath;
       const name = path ? projectShortName(path) : t('workspace.homeTab');
       toast.warning(t('projects.notifyWaiting', { name }), {
-        onClick: path ? () => ws.openProject(path, name) : undefined,
+        onClick: path ? () => ws.reveal(path, name) : undefined,
       });
     }
 

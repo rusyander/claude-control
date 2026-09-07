@@ -221,6 +221,42 @@ describe('терпимость разбора к именам полей', () =>
   it('разобранный блок в счётчик отказов не попадает', () => {
     expect(scanSplitBlocks(block(PROPOSAL)).rejected).toBe(0);
   });
+
+  it('класс и назначение доезжают до группы, синонимы type и thinking — тоже', () => {
+    const parsed = parseSplitProposal({
+      groups: [
+        { title: 'Раз', tasks: ['x'], kind: 'mechanical', model: 'sonnet', effort: 'medium' },
+        { title: 'Два', tasks: ['y'], type: 'design', model: 'opus', thinking: 'high' },
+        { title: 'Три', tasks: ['z'], class: 'tests' },
+      ],
+    });
+
+    expect(parsed?.groups[0]).toMatchObject({
+      kind: 'mechanical',
+      model: 'sonnet',
+      effort: 'medium',
+    });
+    expect(parsed?.groups[1]).toMatchObject({ kind: 'design', model: 'opus', effort: 'high' });
+    expect(parsed?.groups[2]?.kind).toBe('tests');
+  });
+
+  /**
+   * Проверять значения разбор не обязан: набор допустимых и потолок знает
+   * клэмп (`contracts/model-cascade`), и он же уводит непонятое на потолок.
+   * Обязан он другое — не терять группу из-за поля, которого мог и не быть.
+   */
+  it('мусор в назначении группу не отменяет', () => {
+    const parsed = parseSplitProposal({
+      groups: [
+        { title: 'Раз', tasks: ['x'], model: 'gpt-5', effort: 'max' },
+        { title: 'Два', tasks: ['y'], model: { name: 'sonnet' } },
+      ],
+    });
+
+    expect(parsed?.groups).toHaveLength(2);
+    expect(parsed?.groups[0]?.model).toBe('gpt-5');
+    expect(parsed?.groups[1]?.model).toBeUndefined();
+  });
 });
 
 describe('имя ветки из заголовка модели', () => {

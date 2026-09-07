@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { STATUS_LETTER, pullBody, splitPath } from './projectGitView';
+import { STATUS_LETTER } from '@shared/config/git-status-letter';
+import { splitPath } from '@shared/lib/file-path';
+import { pullBody } from './projectGitView';
 
 describe('splitPath: имя файла не должно обрезаться', () => {
   it('делит по последнему слэшу, каталог остаётся со слэшем', () => {

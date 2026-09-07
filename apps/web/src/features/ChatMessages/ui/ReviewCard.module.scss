@@ -1,0 +1,36 @@
+// Вердикт ревью. Форма та же, что у карточек разделения и продолжения, — все
+// три появляются в одном месте ленты, и разъезжаться им незачем. Отличие одно:
+// кнопок нет вовсе. Решать здесь нечего — следующее звено панель уже завела, а
+// карточка отвечает на вопрос «что именно нашли».
+.card {
+  margin-bottom: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.head {
+  margin-bottom: var(--spacing-2xs);
+  color: var(--color-accent);
+}
+
+.count {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--color-surface-muted, var(--color-surface));
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.list {
+  margin: 0;
+  padding-left: var(--spacing-md);
+}
+
+.item {
+  margin-bottom: var(--spacing-3xs);
+  white-space: pre-wrap;
+}

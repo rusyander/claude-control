@@ -27,6 +27,7 @@ export * from './assistant-run';
 export * from './provider-chat';
 export * from './permissions';
 export * from './permission-presets';
+export * from './permission-rules';
 export * from './env';
 export * from './endpoints';
 export * from './dlp';

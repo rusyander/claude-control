@@ -1,5 +1,6 @@
 import type { ChatMessage } from '@agentdeck/contracts';
 import type { TaskSplitProposal } from '@agentdeck/contracts/task-split';
+import type { CascadeAssignment, CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 import type { HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 import type { StreamState } from '@entities/Chat';
 import type { PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
@@ -23,6 +24,16 @@ export interface HandoffControls {
   maxChain: number;
   /** Новый разговор заводится прямо сейчас. */
   isPending: boolean;
+}
+
+/**
+ * Согласие на разделение: запускать ли прогоны и что человек поменял руками в
+ * карточке. Замены едут отдельно от предложения агента намеренно — его просьба
+ * о модели действует только вверх, а выбор человека в обе стороны.
+ */
+export interface SplitDecision {
+  startRuns: boolean;
+  assignments?: Record<number, CascadeAssignment>;
 }
 
 /** Вопрос, заданный агентом дочернего разговора, и подпись, чей он. */
@@ -112,11 +123,18 @@ export interface ChatMessagesProps {
   /** Глубина продумывания текущего прогона — идёт в разбивку расхода. */
   effort?: string;
   /** Согласиться на разделение задач по чатам (карточка в ответе агента). */
-  onSplit?: (proposal: TaskSplitProposal, options: { startRuns: boolean }) => void;
+  onSplit?: (proposal: TaskSplitProposal, options: SplitDecision) => void;
   /** Отказаться от разделения — продолжаем в этом же разговоре. */
   onKeepHere?: () => void;
   /** Копии заводятся прямо сейчас: кнопка карточки показывает ожидание. */
   isSplitPending?: boolean;
+  /**
+   * Потолок разговора, когда подбор модели в проекте включён: карточка
+   * предложения показывает по нему класс, модель и глубину каждой группы и даёт
+   * поменять их до запуска. Пусто — правило выключено, все дети поедут на
+   * выбранной человеком модели.
+   */
+  splitCeiling?: CascadeCeiling;
   /**
    * Ветки чатов, уже выделенных из этого разговора. По ним карточка предложения
    * понимает, что разделение состоялось: без этого кнопка живёт до следующей
@@ -158,11 +176,13 @@ export interface MessageBubbleProps {
   /** Единицы расхода из настроек: объём в токенах или деньги. */
   costUnit?: 'tokens' | 'money';
   /** Согласиться на разделение задач по чатам (карточка вместо блока в тексте). */
-  onSplit?: (proposal: TaskSplitProposal, options: { startRuns: boolean }) => void;
+  onSplit?: (proposal: TaskSplitProposal, options: SplitDecision) => void;
   /** Отказаться от разделения — продолжаем в этом же разговоре. */
   onKeepHere?: () => void;
   /** Копии заводятся прямо сейчас. */
   isSplitPending?: boolean;
+  /** Потолок разговора: по нему карточка показывает и даёт менять модель группы. */
+  splitCeiling?: CascadeCeiling;
   /** Ветки уже выделенных чатов — признак, что предложение отработано. */
   childBranches?: readonly string[];
   /** Продолжение в чистой сессии (карточка вместо блока в тексте). */

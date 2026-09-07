@@ -109,6 +109,9 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
     preview: cleanText(textOf(lastMessage)).slice(0, 160) || undefined,
     model: lastValue(records, (record) => record.message?.model),
     awaitingReply: isAwaitingReply(records) || undefined,
+    // Ветка последней записи, а не первой: разговор мог начаться в main и
+    // уехать в свою ветку, и в списке нужна та, где агент СЕЙЧАС.
+    branch: lastValue(records, (record) => record.gitBranch),
   };
 
   cache.set(path, { mtimeMs: stats.mtimeMs, size: stats.size, summary });
@@ -192,6 +195,7 @@ export async function readChatMessages(
       timestamp: record.timestamp ?? '',
       parentId: record.parentUuid ?? undefined,
       usage: toUsage(record),
+      gitBranch: record.gitBranch || undefined,
     });
 
     // Лишнее с начала выбрасываем сразу, не дожидаясь конца файла.

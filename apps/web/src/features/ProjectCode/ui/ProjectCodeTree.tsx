@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
+import { STATUS_LETTER } from '@shared/config/git-status-letter';
 import { useProjectTree } from '@entities/ProjectFile';
 import type { ProjectCodeTreeProps, ProjectCodeBranchProps } from './ProjectCodeTree.types';
 import styles from './ProjectCode.module.scss';
@@ -98,8 +99,15 @@ function ProjectCodeBranch({
               <span className={styles.nodeName}>{entry.name}</span>
               {change && (
                 <span className={styles.nodeCounts}>
-                  <span className={styles.added}>+{change.added}</span>
-                  <span className={styles.removed}>−{change.removed}</span>
+                  {change.added !== undefined && change.removed !== undefined && (
+                    <>
+                      <span className={styles.added}>+{change.added}</span>
+                      <span className={styles.removed}>−{change.removed}</span>
+                    </>
+                  )}
+                  {change.status && (
+                    <span className={styles.gitStatus}>{STATUS_LETTER[change.status]}</span>
+                  )}
                 </span>
               )}
             </button>

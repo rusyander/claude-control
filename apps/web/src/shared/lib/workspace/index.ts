@@ -7,6 +7,7 @@ export {
   normalizeProjectPath,
   projectShortName,
   openProjectTab,
+  tabContaining,
   closeProjectTab,
   activateTab,
   rememberTabView,

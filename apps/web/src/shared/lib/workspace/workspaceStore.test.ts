@@ -3,6 +3,7 @@ import { HOME_TAB_ID, type WorkspaceState } from './workspace.types';
 import {
   normalizeProjectPath,
   openProjectTab,
+  tabContaining,
   closeProjectTab,
   activateTab,
   rememberTabView,
@@ -44,6 +45,33 @@ describe('openProjectTab', () => {
     const two = openProjectTab(activateTab(one, HOME_TAB_ID), { path: 'C:\\work\\a', name: 'a' });
     expect(two.projectTabs).toHaveLength(1);
     expect(two.activeTabId).toBe('c:/work/a');
+  });
+});
+
+describe('tabContaining', () => {
+  it('разговор во вложенном каталоге принадлежит вкладке проекта', () => {
+    const state = withTabs('D:/work/widget-app');
+    expect(tabContaining(state, 'D:/work/widget-app/widget')?.id).toBe('d:/work/widget-app');
+  });
+
+  it('сосед по префиксу — не тот проект', () => {
+    const state = withTabs('D:/work/widget-app');
+    expect(tabContaining(state, 'D:/work/widget-app-admin')).toBeUndefined();
+  });
+
+  it('копия репозитория лежит РЯДОМ и своей вкладке не принадлежит', () => {
+    const state = withTabs('C:/work/repo');
+    expect(tabContaining(state, 'C:/work/repo-worktrees/feature')).toBeUndefined();
+  });
+
+  it('активная вкладка выигрывает у более глубокой', () => {
+    const state = activateTab(withTabs('C:/a', 'C:/a/pkg'), 'c:/a');
+    expect(tabContaining(state, 'C:/a/pkg/deep')?.id).toBe('c:/a');
+  });
+
+  it('без активной подходящей берётся самая глубокая', () => {
+    const state = activateTab(withTabs('C:/a', 'C:/a/pkg', 'C:/other'), 'c:/other');
+    expect(tabContaining(state, 'C:/a/pkg/deep')?.id).toBe('c:/a/pkg');
   });
 });
 

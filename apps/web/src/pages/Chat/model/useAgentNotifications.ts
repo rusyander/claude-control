@@ -75,7 +75,7 @@ export function useAgentNotifications({
       );
       const options = child
         ? onOpenChild && { onClick: () => onOpenChild(child.id) }
-        : path && { onClick: () => ws.openProject(path, name) };
+        : path && { onClick: () => ws.reveal(path, name) };
 
       if (child) {
         if (backgroundRun.status === 'error')
@@ -110,7 +110,7 @@ export function useAgentNotifications({
       if (!isHere) {
         const path = permissionRun.projectPath;
         const name = path ? projectShortName(path) : t('workspace.homeTab');
-        const options = path ? { onClick: () => ws.openProject(path, name) } : undefined;
+        const options = path ? { onClick: () => ws.reveal(path, name) } : undefined;
         toast.warning(t('projects.notifyPermission', { name }), options);
       }
       notifyAgent('waiting');

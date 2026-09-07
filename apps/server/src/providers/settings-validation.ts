@@ -101,6 +101,10 @@ export const settingsPatchSchema = object({
   handoffInitiative: boolean(),
   handoffContextLimit: number().int().nonnegative(),
   handoffAutoDefault: boolean(),
+  // Правила прав: id правила → разрешено без вопроса. Схема нарочно широкая —
+  // состав правил меняется с кодом, а сервер, зная только старый набор, вырезал
+  // бы из патча новое правило и молча возвращал бы тумблер назад.
+  autoApproveRules: record(string(), boolean()),
   modelPricing: record(string(), modelPricingSchema),
   encryptSecretBackups: boolean(),
   autoUpdateModels: boolean(),

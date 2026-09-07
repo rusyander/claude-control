@@ -11,6 +11,16 @@ import type { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
 import { activateGroupsQuietly } from '../../domains/group-activation.ts';
+import { cascadeCeilingFor } from '../../domains/model-cascade.ts';
+import {
+  cascadeSystemPrompt,
+  clampAssignment,
+  loweredWorkPrompt,
+  manualAssignment,
+  parseAssignments,
+  planAssignment,
+  type CascadePlan,
+} from '@agentdeck/contracts/model-cascade';
 import { splitTasks } from '../../domains/chat/ChatSplit.ts';
 import { createChat, type ProviderChatService } from '../../domains/provider-chat.ts';
 import { checkProjectDir } from '../../domains/projects.ts';
@@ -55,6 +65,13 @@ export function registerChatSplitRoutes(
        * ветвями под ней, а не лежать в списке вперемешку с остальными.
        */
       parentChatId?: string;
+      /**
+       * Ручные замены с карточки: номер группы → выбранные человеком модель и
+       * глубина. Отдельным полем от предложения намеренно — см.
+       * `parseAssignments`: просьба агента действует только вверх, выбор
+       * человека в обе стороны, и внутри одного объекта их не различить.
+       */
+      assignments?: unknown;
     };
   }>('/api/chat/split', async (request, reply) => {
     // Тумблера автоподтверждения в теле запроса нет намеренно: он живёт на
@@ -80,6 +97,21 @@ export function registerChatSplitRoutes(
 
     const provider = getActiveProvider(ctx.store);
     const wantRuns = startRuns !== false;
+    // Замены человека: чем бы ни оказалось поле, отсюда выходит карта понятных
+    // значений — незнакомое отброшено, потолок всё равно держится ниже.
+    const manual = parseAssignments(request.body?.assignments);
+
+    // Потолок разговора и правило проекта: `undefined` — подбор здесь выключен,
+    // и дальше всё идёт ровно как до партии подбора (дети = выбранная модель).
+    const ceiling = cascadeCeilingFor(
+      { entries: ctx.store.getProjectCascadeEntries(), settings: ctx.store.getSettings() },
+      dir,
+      { model, effort },
+    );
+    // Потолок в том виде, в каком с ним можно ЗАПУСТИТЬ прогон: `max` срезан до
+    // `xhigh`, незнакомая глубина — до пустой строки. Клэмп пустого пожелания
+    // делает ровно это, и второй его копии здесь заводить незачем.
+    const runnableCeiling = ceiling ? clampAssignment({}, ceiling) : undefined;
 
     const result: TaskSplitResult = await splitTasks({
       projectPath: dir,
@@ -95,16 +127,61 @@ export function registerChatSplitRoutes(
        * открывается, а на настоящий `sessionId` связь переедет сама, как только
        * прогон его назовёт (слушатель в `bootstrap/runtime.ts`).
        */
+      /**
+       * Чем делать группу. Считается здесь, потому что здесь известны обе
+       * половины потолка — оверрайд шапки этого разговора и настройка панели, —
+       * а также правило проекта. Разделение только разносит ответ.
+       */
+      assign: ceiling
+        ? (group, prompt, index) => {
+            const auto = planAssignment(
+              {
+                ...(group.kind ? { kind: group.kind } : {}),
+                ...(group.model ? { model: group.model } : {}),
+                ...(group.effort ? { effort: group.effort } : {}),
+                tasks: group.tasks.length,
+                length: prompt.length,
+              },
+              ceiling,
+            );
+            // Замена человека сильнее подбора и действует ВНИЗ тоже: он видел
+            // задачи группы. Класс при этом остаётся распознанным — по нему
+            // группа подписана на карточке и по нему же пишется связь.
+            const wish = manual.get(index);
+            return wish ? manualAssignment(wish, ceiling, auto.kind) : auto;
+          }
+        : undefined,
       link: parentChatId
-        ? ({ chatId, title, branch }) =>
+        ? ({ chatId, title, branch, assignment }) =>
             ctx.store.setChatLink(chatId, {
               parentChatId,
               title,
               branch,
               createdAt: new Date().toISOString(),
+              // Назначение живёт в связи, а не только в прогоне: второе
+              // сообщение ребёнку приходит уже без него (телефон и API модель
+              // не шлют вовсе), и без этой записи оно уехало бы на дефолте.
+              ...(assignment
+                ? {
+                    model: assignment.model,
+                    effort: assignment.effort,
+                    lowered: assignment.lowered,
+                    stage: 'work',
+                    ...(assignment.kind ? { kind: assignment.kind } : {}),
+                    // Потолок ЭТОГО разговора — на нём пойдёт ревью работы.
+                    // Пересчитать его потом нечем: половина потолка жила в шапке
+                    // родительского чата, которого к тому времени уже нет.
+                    ...(runnableCeiling
+                      ? {
+                          ceilingModel: runnableCeiling.model,
+                          ceilingEffort: runnableCeiling.effort,
+                        }
+                      : {}),
+                  }
+                : {}),
             })
         : undefined,
-      start: ({ chatId, prompt, cwd }) => {
+      start: ({ chatId, prompt, cwd, assignment }) => {
         // Набор, привязанный к проекту, включается и здесь: агент, которого
         // завело разделение, работает в том же проекте и должен получить те же
         // правила и скиллы. Копия репозитория считается тем же проектом —
@@ -116,7 +193,7 @@ export function registerChatSplitRoutes(
         );
 
         return provider.id === 'claude'
-          ? startClaude(chatId, prompt, cwd)
+          ? startClaude(chatId, prompt, cwd, assignment)
           : startForeign(chatId, prompt, cwd);
       },
     });
@@ -128,7 +205,12 @@ export function registerChatSplitRoutes(
     return result;
 
     /** Прогон Claude — тот же путь, что и у обычной отправки в чат проекта. */
-    function startClaude(chatId: string, prompt: string, cwd: string): boolean {
+    function startClaude(
+      chatId: string,
+      prompt: string,
+      cwd: string,
+      assignment?: CascadePlan,
+    ): boolean {
       const settings = ctx.store.getSettings();
       // Продолжение в чистой сессии порождённому чату уезжает, а РАЗДЕЛЕНИЕ —
       // нет, и это разные вещи по существу. Чат, только что выделенный под одну
@@ -145,15 +227,25 @@ export function registerChatSplitRoutes(
       // каждым. Тумблер родителя известен по любому его ключу — временному или
       // настоящему.
       if (parentChatId) deps.session.inherit([parentChatId], chatId);
-      const initiative = initiativePrompt(settings, { splitMuted: true });
+      // Ребёнку, отправленному на модель ниже потолка, дописывается планка
+      // сдачи и право остановиться: понижение оплачивается проверкой, а не
+      // надеждой. Ребёнок на потолке получает обычную склейку.
+      const initiative = [
+        initiativePrompt(settings, { splitMuted: true }),
+        assignment?.lowered ? loweredWorkPrompt(assignment.kind) : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
       return deps.runs.start(
         chatId,
         {
           prompt,
           cwd,
           command: activeCliCommand(ctx.store),
-          model: model || settings.chatModel,
-          effort: effort || settings.chatEffort,
+          // Назначение сильнее выбора шапки: оно ИЗ него и выведено (потолок),
+          // а пустая строка в нём значит «как решит CLI», а не «возьми настройку».
+          model: assignment?.model ?? (model || settings.chatModel),
+          effort: assignment?.effort ?? (effort || settings.chatEffort),
           permissionMode: allowEdits ? 'acceptEdits' : 'default',
           permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
           ...(initiative ? { appendSystemPrompt: initiative } : {}),
@@ -201,11 +293,31 @@ export function registerChatSplitRoutes(
    * прикладываем целиком — кнопкой пользуются и при выключенной инициативе,
    * когда системной строки в прогоне нет вовсе.
    */
-  app.get('/api/chat/split/request', () => ({
-    prompt:
-      'Раздели задачи из этого разговора на независимые группы и предложи разделение. ' +
-      SPLIT_SYSTEM_PROMPT,
-  }));
+  app.get<{ Querystring: { path?: string; model?: string; effort?: string } }>(
+    '/api/chat/split/request',
+    (request) => {
+      // Про классы работы говорим ровно тогда, когда панель их и применит: путь
+      // нужен, чтобы прочесть правило проекта, модель и глубина — чтобы назвать
+      // агенту настоящий потолок этого разговора, а не значение из настроек.
+      const { path, model: chatModel, effort: chatEffort } = request.query ?? {};
+      const ceiling = cascadeCeilingFor(
+        { entries: ctx.store.getProjectCascadeEntries(), settings: ctx.store.getSettings() },
+        String(path ?? ''),
+        { model: chatModel, effort: chatEffort },
+      );
+      const cascade = ceiling ? cascadeSystemPrompt(ceiling) : '';
+
+      return {
+        prompt: [
+          'Раздели задачи из этого разговора на независимые группы и предложи разделение.',
+          SPLIT_SYSTEM_PROMPT,
+          cascade,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      };
+    },
+  );
 
   /**
    * «Работаем здесь» — отказ от разделения. Отказ уходит агенту и репликой, но

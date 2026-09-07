@@ -328,3 +328,59 @@
   --code-property: #79c0ff;
   --code-punctuation: #9aa2b1;
 }
+
+/*
+  Итог над списком изменённых: ветка и числа. Липнет к верху при прокрутке —
+  список бывает длинным, а вопрос «сколько всего» задают, уже уехав по нему
+  вниз.
+*/
+.changedSummary {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: block;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  background: var(--color-surface-sunken);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Заголовок источника: чьи это правки — разговора или рабочего дерева. */
+.changedGroup {
+  display: block;
+  padding: var(--spacing-2xs) var(--spacing-xs) var(--spacing-3xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Буква состояния git там, где строк не посчитать: у нового файла нет прежней
+   версии, и «+0 −0» читалось бы как «ничего не изменилось». */
+.gitStatus {
+  color: var(--color-fg-subtle);
+  font-weight: var(--font-weight-semibold);
+}
+
+/*
+  Путь в списке изменённых: каталог сжимается, имя файла остаётся целым. То же
+  правило, что в пульте git, и по той же причине — обрезка с конца прячет ровно
+  то, что ищут глазами.
+*/
+.nodePath {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: baseline;
+}
+
+.nodeDir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-fg-subtle);
+}
+
+.nodeFile {
+  flex: none;
+  white-space: nowrap;
+}

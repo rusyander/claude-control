@@ -415,6 +415,28 @@ export const en: TranslationSchema = {
       notParsed:
         'The panel could not read this split proposal — the block is left above as it came, ' +
         'so there are no buttons. Ask the agent to propose the split again.',
+      cascade: {
+        kind: {
+          mechanical: 'mechanical',
+          implementation: 'implementation',
+          tests: 'tests',
+          investigation: 'investigation',
+          design: 'design',
+          review: 'review',
+        },
+        kindUnknown: 'kind not stated',
+        model: 'Model for the “{{title}}” group',
+        effort: 'Thinking depth for the “{{title}}” group',
+        lowered: 'below the ceiling',
+        loweredHint:
+          'A model weaker than this conversation’s ceiling: the group is told where the bar is — ' +
+          'run the project checks and match the result against the task point by point. ' +
+          'When it is done, the panel opens a review at the ceiling over the same diff, ' +
+          'and turns any findings into a fix run back on this model.',
+        cost: 'Chats: {{chats}} · runs right now: {{runs}}',
+        loweredCount: 'below the ceiling: {{count}}',
+        pipeline: 'up to {{total}} runs with reviews',
+      },
     },
     /** Продолжение в чистой сессии: карточка, кнопка и отказы автопродолжения. */
     handoff: {
@@ -452,6 +474,28 @@ export const en: TranslationSchema = {
         'Context at {{tokens}}k, but .agent/PROGRESS.md was not updated in this run — ' +
         'there would be nothing to continue from',
     },
+    /** Конвейер подбора модели: «работа → ревью → фикс». */
+    cascade: {
+      stage: {
+        review: 'review',
+        fix: 'fixes',
+      },
+      started: {
+        review: 'Work finished — reviewing it on the ceiling model: {{name}}',
+        fix: 'The review found {{count}} findings — fixing: {{name}}',
+      },
+      review: {
+        title: 'Work review',
+        count_one: '{{count}} finding',
+        count_few: '{{count}} findings',
+        count_many: '{{count}} findings',
+        count_other: '{{count}} findings',
+        clean: 'Checked against the task and the diff — nothing to fix, the chain is closed.',
+        notParsed:
+          'The panel could not read the review verdict — the block is left above as it came. ' +
+          'No fix run was started: ask the agent to repeat the block.',
+      },
+    },
     attach: 'Attach a file',
     thinking: 'Thinking',
     /** Пока ответа ещё нет: без этого пустая лента выглядит зависшей. */
@@ -463,6 +507,7 @@ export const en: TranslationSchema = {
     connectionLost:
       'Lost the connection to the run. The agent may have finished — look in the history.',
     messageCrash: 'This message could not be rendered. The rest of the conversation is intact.',
+    branchSwitched: 'Switched to branch {{branch}}',
     showFromHistory: 'Show from the history',
     progress: {
       title: "The agent's plan",
@@ -562,9 +607,35 @@ export const en: TranslationSchema = {
     autoApproveHint:
       'The panel itself approves anything that can be undone — commit, push, branch, moving a file, an API call. What still asks is the irreversible: deleting, wiping history, tearing down data and infrastructure, publishing — plus anything covered by ask/deny rules from settings.json. Reading files is always allowed, whatever this toggle says.',
     menu: 'Chat settings',
-    menuHint: 'Permission toggles, export, refresh and help',
+    menuHint: 'Permission toggles, rules, export, refresh and help',
     menuPermissions: 'Permissions',
     menuActions: 'Conversation',
+    rules: {
+      title: 'Approve without asking — in every project',
+      modelCascade: 'Match the model to the task (this project)',
+      modelCascadeHint:
+        'The panel gives each split group a model that fits its kind of work — never above the ' +
+        'one you picked; work on a weaker model gets a higher bar: project checks run, result ' +
+        'matched against the task. Off — every child runs on the model you picked',
+      externalWrite: 'Writes to external services',
+      externalWriteHint: 'MR comments and threads, Jira tickets, wiki pages — over MCP',
+      gitWrite: 'Commits, branches, plain push',
+      gitWriteHint: 'commit, push, branch, rebase, cherry-pick, revert',
+      filesDelete: 'Deleting files',
+      filesDeleteHint: 'rm, del, shred, dd, Remove-Item, reg delete',
+      gitHistory: 'Wiping git history',
+      gitHistoryHint: 'reset --hard, clean, restore, branch -D, stash drop, push --force',
+      database: 'Tearing down database data',
+      databaseHint: 'DROP, TRUNCATE, DELETE FROM, migration rollback',
+      infrastructure: 'Containers and infrastructure',
+      infrastructureHint: 'docker prune, kubectl delete, helm uninstall, terraform destroy, reboot',
+      packagePublish: 'Publishing packages',
+      packagePublishHint: 'npm/pnpm/yarn publish, unpublish, deprecate',
+      externalDestroy: 'Deleting and merging in external services',
+      externalDestroyHint: 'Merging an MR, deleting a ticket or a wiki page — not undoable here',
+      networkExec: 'Dangerous network commands',
+      networkExecHint: 'curl | sh — running what was downloaded, curl -X DELETE',
+    },
     retry: 'Retry',
     continueAfterDrop:
       'Continue from where you stopped: the connection dropped and the last answer may be unfinished. Do not redo what is already done.',
@@ -2483,9 +2554,14 @@ export const en: TranslationSchema = {
     title: 'Project code',
     tabChanged: 'Changed ({{count}})',
     tabAll: 'All files',
-    noChanges: 'The agent changed no files in this conversation.',
+    noChanges: 'Neither the agent nor the working tree shows any change.',
     missing: 'gone from disk',
     skipped: 'Edits outside the project: {{count}}',
+    fromAgent: 'In this conversation',
+    fromGit: 'In the working tree',
+    summary: 'Changed files: {{count}}',
+    summaryLines: '+{{added}} −{{removed}} lines',
+    summaryBranch: 'branch {{branch}}',
     emptyFolder: 'Folder is empty',
     truncated: 'Not all files in this folder are shown',
     nothingOpen: 'No file selected',

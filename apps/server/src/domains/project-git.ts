@@ -43,11 +43,12 @@ export { CHANGED_FILES_MAX, COMMIT_MESSAGE_MAX } from './project-git/constants.t
 export { GitError, stripGitProgress } from './project-git/exec.ts';
 export {
   parseBranches,
+  parseNumstat,
   parseRemoteBranches,
   parseStatus,
   pickRemote,
 } from './project-git/parse.ts';
-export { isGitRepo, readProjectGit, requireRepo } from './project-git/read.ts';
+export { hasWorkSince, isGitRepo, readProjectGit, requireRepo } from './project-git/read.ts';
 export {
   addWorktree,
   listWorktrees,

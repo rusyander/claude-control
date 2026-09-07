@@ -54,6 +54,63 @@
   }
 }
 
+// Чем пойдёт группа: класс работы и два компактных списка замены. Строка
+// отделена сверху, потому что это не часть задания, а решение о том, кем его
+// делать, — и читается она отдельно от списка задач.
+.assign {
+  margin-top: var(--spacing-2xs);
+  padding-top: var(--spacing-3xs);
+  border-top: 1px dashed var(--color-border);
+}
+
+.kind {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+// Тот же компактный список, что и в шапке чата: нативный, с видимым фокусом.
+.select {
+  max-width: 110px;
+  padding: 2px var(--spacing-3xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+.select:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.select:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+// Работа пойдёт слабее потолка. Не предупреждение, а факт: такой группе
+// дописывается планка сдачи, и человек вправе видеть это до кнопки.
+.lowered {
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.cost {
+  margin-bottom: var(--spacing-xs);
+}
+
 .option {
   margin-bottom: var(--spacing-xs);
 }

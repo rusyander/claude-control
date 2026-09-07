@@ -149,6 +149,61 @@ describe('shouldAutoApprove', () => {
     expect(shouldAutoApprove({ ...base, guardedPatterns: [], ...ask })).toBe(false);
   });
 
+  /**
+   * Из-за чего человек и устал жать «Разрешить»: глагол искался где угодно в
+   * имени инструмента, и слово `merge` внутри `merge_request` записывало в
+   * сносящее ВСЮ работу с запросами на слияние — комментарии, треды, правки.
+   */
+  it('в имени MCP-инструмента смотрит на глагол, а не на любое вхождение слова', () => {
+    const mcp = (toolName: string): boolean => shouldAutoApprove({ ...base, toolName, input: {} });
+
+    expect(mcp('mcp__gitlab__create_merge_request_thread')).toBe(true);
+    expect(mcp('mcp__gitlab__create_merge_request_note')).toBe(true);
+    expect(mcp('mcp__gitlab__update_merge_request')).toBe(true);
+    expect(mcp('mcp__gitlab__list_merge_requests')).toBe(true);
+    expect(mcp('mcp__gitlab__merge_merge_request')).toBe(false);
+    expect(mcp('mcp__confluence__delete_page')).toBe(false);
+  });
+
+  /**
+   * Правила прав: та же граница, но её кладёт человек. Выключенное правило
+   * возвращает карточку, включённое — убирает её.
+   */
+  it('правила прав двигают границу в обе стороны', () => {
+    const rules = (allowed: string[]): { allowedRules: Set<string> } => ({
+      allowedRules: new Set(allowed),
+    });
+
+    // Разрешённое удаление файлов больше не спрашивает.
+    expect(bash('rm -rf dist', rules(['filesDelete']))).toBe(true);
+    expect(bash('rm -rf dist', rules([]))).toBe(false);
+
+    // Выключенная запись во внешние сервисы — спрашивает, хотя ничего не сносит.
+    expect(
+      shouldAutoApprove({
+        ...base,
+        toolName: 'mcp__jira__create_issue',
+        input: {},
+        ...rules([]),
+      }),
+    ).toBe(false);
+    // Чтение через MCP под правило записи не подпадает: отменять там нечего.
+    expect(
+      shouldAutoApprove({ ...base, toolName: 'mcp__jira__get_issue', input: {}, ...rules([]) }),
+    ).toBe(true);
+
+    // Обычная работа с git — тоже правило: кому надо, тот вернёт себе карточку.
+    expect(bash('git push origin main', rules([]))).toBe(false);
+    expect(bash('git commit -m "x"', rules(['gitWrite']))).toBe(true);
+    // Принудительный пуш — это затирание истории, а не обычный пуш.
+    expect(bash('git push --force origin main', rules(['gitWrite']))).toBe(false);
+
+    // Правила `ask` пользователя сильнее любого включённого тумблера.
+    expect(
+      bash('rm -rf dist', { ...rules(['filesDelete']), guardedPatterns: ['Bash(rm:*)'] }),
+    ).toBe(false);
+  });
+
   it('при выключенных правках правка файла остаётся за человеком', () => {
     expect(
       shouldAutoApprove({

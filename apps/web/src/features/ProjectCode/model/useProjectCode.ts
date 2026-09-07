@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ProjectFileChange, ProjectFileContent } from '@agentdeck/contracts';
+import type { ProjectFileContent } from '@agentdeck/contracts';
 import { useProjectChanges, useProjectFile, useSaveProjectFile } from '@entities/ProjectFile';
+import { useProjectGit } from '@entities/ProjectGit';
+import { changedRows, firstOpenable, type ChangedRow } from '../lib/changedRows';
 import { useCodeView } from './useCodeView';
 
 /**
@@ -39,13 +41,27 @@ export function useProjectCode(
   const changes = useProjectChanges(isOpen ? projectPath : undefined, chatId);
   const save = useSaveProjectFile(projectPath, chatId);
 
+  /**
+   * Состояние репозитория — второй источник списка изменённых. Спрашивается
+   * только при открытом окне: закрытому оно ни к чему, а пульт в шапке чата
+   * держит свой запрос под тем же ключом, поэтому лишнего похода на сервер тут
+   * нет — react-query отдаст уже прочитанное.
+   */
+  const git = useProjectGit(isOpen ? projectPath : undefined);
+
+  /** Правки агента и изменения рабочего дерева одним списком. */
+  const rows = useMemo(
+    () => changedRows(changes.data?.files, git.data?.changedFiles),
+    [changes.data, git.data],
+  );
+
   const changed = useMemo(() => {
-    const map = new Map<string, ProjectFileChange>();
-    for (const entry of changes.data?.files ?? []) {
-      if (!entry.missing) map.set(entry.path, entry);
+    const map = new Map<string, ChangedRow>();
+    for (const row of rows) {
+      if (!row.missing) map.set(row.path, row);
     }
     return map;
-  }, [changes.data]);
+  }, [rows]);
 
   // Все каталоги на пути к изменённым файлам. Считается здесь, а не в дереве:
   // ветка знает только своих детей, а пометить надо и деда, и прадеда — иначе
@@ -88,11 +104,11 @@ export function useProjectCode(
   // снимка, иначе подстановка перебила бы запомненный выбор.
   useEffect(() => {
     if (!isOpen || !view.isHydrated || selected) return;
-    const first = changes.data?.files.find((entry) => !entry.missing);
-    if (first) view.select(first.path);
+    const first = firstOpenable(rows);
+    if (first) view.select(first);
     // `view.select` — сеттер состояния, он стабилен.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, view.isHydrated, selected, changes.data]);
+  }, [isOpen, view.isHydrated, selected, rows]);
 
   // Закрыли окно — забываем черновики: следующий раз открывается от того, что
   // лежит на диске, а не с чужой недописанной правкой. Спросить успели раньше,
@@ -166,6 +182,10 @@ export function useProjectCode(
     /** Ждём другой файл: показанный уже не тот, что выбран. */
     isSwitching: Boolean(selected) && shown?.path !== selected,
     changes,
+    /** Состояние репозитория: ветка и числа над списком изменённых. */
+    git: git.data,
+    /** Изменённые файлы из обоих источников — то, что рисует список. */
+    rows,
     changed,
     changedDirs,
     showDiff: view.showDiff,

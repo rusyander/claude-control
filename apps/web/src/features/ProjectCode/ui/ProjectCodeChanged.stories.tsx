@@ -3,8 +3,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ProjectCodeChanged } from './ProjectCodeChanged';
 
 /**
- * Список файлов, которых касался агент в одном разговоре. Он открывается
- * первым: за ним в это окно и приходят.
+ * Что в проекте изменено: правки агента за разговор и рабочее дерево git. Этот
+ * список открывается первым: за ним в окно кода и приходят.
  */
 const meta = {
   title: 'Организмы/ProjectCodeChanged',
@@ -17,26 +17,47 @@ const meta = {
           'Плоский список, а не дерево: правки одного разговора обычно разбросаны по ' +
           'разным веткам проекта, и раскрывать до каждой по три уровня — работа ради ' +
           'работы.\n\n' +
-          'Файл, которого уже нет на диске, показан отдельной пометкой и не ' +
-          'открывается: агент его правил, а потом он был удалён или переименован.',
+          'Два источника разделены заголовками: сверху — что тронул агент в этом ' +
+          'разговоре (со счётчиками строк), ниже — остальное, что git видит в рабочем ' +
+          'дереве (буквой состояния). Файл, которого уже нет на диске, показан ' +
+          'пометкой и не открывается.',
       },
     },
   },
   args: {
     isLoading: false,
     onSelect: () => undefined,
-    changes: {
-      files: [
-        { path: 'apps/server/src/lib/config.ts', added: 9, removed: 2, missing: false },
-        { path: 'apps/web/src/pages/Chat/ChatHeader.tsx', added: 14, removed: 0, missing: false },
-        { path: 'packages/contracts/src/project-files.ts', added: 96, removed: 0, missing: false },
-        { path: 'apps/web/src/features/Legacy/Old.tsx', added: 0, removed: 0, missing: true },
-      ],
-      skipped: 2,
+    skipped: 2,
+    git: {
+      isRepo: true,
+      branch: 'feat/cascade',
+      detached: false,
+      unborn: false,
+      branches: ['main', 'feat/cascade'],
+      dirtyCount: 6,
+      changedFiles: [],
+      remoteBranches: [],
+      insertions: 119,
+      deletions: 2,
     },
+    rows: [
+      { path: 'apps/server/src/lib/config.ts', source: 'agent', added: 9, removed: 2 },
+      {
+        path: 'apps/web/src/pages/Chat/ChatHeader.tsx',
+        source: 'agent',
+        added: 14,
+        removed: 0,
+        status: 'modified',
+        staged: false,
+      },
+      { path: 'packages/contracts/src/project-files.ts', source: 'agent', added: 96, removed: 0 },
+      { path: 'apps/web/src/features/Legacy/Old.tsx', source: 'agent', missing: true },
+      { path: 'TASKS.md', source: 'git', status: 'modified', staged: false },
+      { path: 'docs/NEW.md', source: 'git', status: 'untracked', staged: false },
+    ],
   },
   render: function Render(args) {
-    const [selected, setSelected] = useState<string | undefined>(args.changes?.files[0]?.path);
+    const [selected, setSelected] = useState<string | undefined>(args.rows[0]?.path);
 
     return (
       <div style={{ width: 320, border: '1px solid var(--color-border)' }}>
@@ -52,11 +73,28 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** Разговор ещё ничего не менял — обычное состояние нового чата. */
+/** Разговор ещё ничего не менял, но рабочее дерево уже не как в HEAD. */
+export const GitOnly: Story = {
+  args: {
+    skipped: 0,
+    rows: [
+      { path: 'TASKS.md', source: 'git', status: 'modified', staged: false },
+      {
+        path: 'apps/web/src/shared/ui/badge/Badge.tsx',
+        source: 'git',
+        status: 'added',
+        staged: true,
+      },
+      { path: 'docs/NEW.md', source: 'git', status: 'untracked', staged: false },
+    ],
+  },
+};
+
+/** Ни агент, ни git изменений не видят — чистое дерево на свежем чате. */
 export const Empty: Story = {
-  args: { changes: { files: [], skipped: 0 } },
+  args: { rows: [], skipped: 0 },
 };
 
 export const Loading: Story = {
-  args: { isLoading: true, changes: undefined },
+  args: { isLoading: true, rows: [] },
 };

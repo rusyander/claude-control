@@ -25,6 +25,10 @@ import {
   setCodeView as writeCodeView,
 } from './code-view.ts';
 import {
+  projectCascadeEntries as readCascadeEntries,
+  setProjectCascade as writeProjectCascade,
+} from './cascade.ts';
+import {
   getChatLink as readChatLink,
   getChatLinks as readChatLinks,
   linkChatSession as moveChatLink,
@@ -393,6 +397,20 @@ export class AppStore {
 
   forgetCodeView(path: string): void {
     if (dropCodeView(this.state, path)) this.persist();
+  }
+
+  /**
+   * Где выключен подбор модели под задачу. Отдаём весь список, а не ответ по
+   * одному пути: рабочая папка прогона бывает подпапкой проекта и копией ветки,
+   * и сопоставление живёт в домене (`domains/model-cascade.ts`).
+   */
+  getProjectCascadeEntries(): Array<[string, boolean]> {
+    return readCascadeEntries(this.state);
+  }
+
+  setProjectCascade(path: string, enabled: boolean): void {
+    writeProjectCascade(this.state, path, enabled);
+    this.persist();
   }
 
   /** Все связи «родитель → потомок»: списку чатов нужны разом, а не по одной. */

@@ -247,12 +247,24 @@ export const helpEn: HelpSchema = {
         'toggle clears on all of its targets.',
       toolsGit: 'Branch, files, commit, pull and push',
       toolsGitText:
-        'The button with the current branch name shows up only when the project has a ' +
-        '.git. It carries two numbers: how many files changed and by how many commits you ' +
-        'are behind the remote. Everything else opens under it — the list of changed files ' +
+        'A strip above the message feed carries the current branch — it is there only when ' +
+        'the project has a .git. Next to the branch are the numbers: how many files ' +
+        'changed, how many lines were added and removed (over tracked files — a brand new ' +
+        'file has no previous version), and how far ahead of and behind the remote you ' +
+        'are. While the agent works the strip is re-read every few seconds, and the moment ' +
+        'a run ends — at once. Clicking it opens everything else — the list of changed files ' +
         '(the letter on the left: A added, M modified, D deleted, R renamed, ? outside git, ' +
         'U conflict), the list of local branches, the pull row, a “new branch” field and a ' +
         'commit message field.',
+      toolsBranchMark: 'A branch switch inside the conversation',
+      toolsBranchMarkText:
+        'When the agent creates a branch or switches to one, a divider appears at that ' +
+        'point of the feed: “Switched to branch …”. Everything after it was edited in the ' +
+        'other branch. This is not a guess by the panel — Claude Code writes the branch ' +
+        'into every transcript line, so the mark survives a page reload and shows up in ' +
+        'old conversations too. In the chat list every conversation is labelled with the ' +
+        'branch it is on right now: split children carry their own, and you no longer have ' +
+        'to open them one by one to find out.',
       toolsPull: 'The Pull button',
       toolsPullText:
         'By default it pulls into the current branch through its upstream — a plain git ' +
@@ -407,6 +419,79 @@ export const helpEn: HelpSchema = {
         'bring the branches back together — that is your step, as with copies made ' +
         'by hand.',
 
+      cascadeTitle: 'Model routing: what each chat of a split runs on',
+      cascadeCaption:
+        'The split decides how many chats there will be. Routing decides what each ' +
+        'of them works with: a rename across ten files and an architecture change do ' +
+        'not cost the same, yet one rate window pays for both.',
+      cascadeWhat: 'Who picks what',
+      cascadeWhatText:
+        'The agent names the KIND of work in a group — and nothing else. The model ' +
+        'for that kind comes from a table in the panel’s code: one table for every ' +
+        'run, visible and editable in a single line. Asking the model which model ' +
+        'should run it was dropped on purpose — “something weaker will do” is a ' +
+        'judgement about itself, not about the task.',
+      cascadeCeiling: 'The ceiling is your own choice in the chat header',
+      cascadeCeilingText:
+        'Nothing new to configure: the ceiling is the model and depth already set in ' +
+        'the conversation header (or, if that says “from settings”, the settings ' +
+        'value). Nothing rises above it, and the agent knows that: it may ask for a ' +
+        'stronger model for a group, but only within the ceiling, and it can never ' +
+        'ask for a weaker one for itself.',
+      cascadeKinds: 'Kinds of work and what each one gets',
+      cascadeKindsText:
+        'Mechanical work (the same edit across many files, formatting, moves), ' +
+        'implementation (a clear change with ready acceptance criteria) and tests ' +
+        'against a written spec run below the ceiling. Investigation (cause unknown), ' +
+        'design (architecture, contracts, migrations, security) and review of ' +
+        'someone else’s work always stay at the ceiling: the price of a mistake there ' +
+        'is not visible right away. A large group does not count as mechanical — the ' +
+        'panel raises its rank itself, by task count and task length, without asking ' +
+        'the agent.',
+      cascadeReview: 'Going lower is paid for by a review: work → review → fixes',
+      cascadeReviewText:
+        'A group sent below the ceiling gets two obligations added to its task: ' +
+        'before saying “done”, run the project’s checks and match the result against ' +
+        'the task point by point — and stop if the task turns out to be harder than ' +
+        'its kind, instead of muddling through. Then the pipeline starts: as soon as ' +
+        'the work ends successfully, the panel opens a REVIEW at the ceiling — same ' +
+        'copy, same branch — told to read the diff against the task, list the ' +
+        'findings and change nothing. Findings exist → a third link, FIXES by that ' +
+        'list, back on the work model; no findings → the chain is closed. In the ' +
+        'chat list the links are labelled “review” and “fixes”, each with its own ' +
+        'model, and the review feed carries a card with what was found. No new ' +
+        'parallel agents appear: the links run one after another, and the split card ' +
+        'states before the button how many runs that is at worst. Work that ran at ' +
+        'the ceiling itself gets no review — there is nothing to strengthen it with.',
+      cascadeManual: 'Changing a group’s model',
+      cascadeManualText:
+        'Each group on the split card carries two dropdowns — model and depth. Your ' +
+        'choice beats the routing and works in both directions, haiku included, which ' +
+        'the panel never assigns on its own: you have seen that group’s tasks. The ' +
+        'ceiling still holds for you too. Next to them is the summary line: how many ' +
+        'chats will be created, how many runs start right now and how many there ' +
+        'will be in total with reviews and fixes — the price before the button.',
+      cascadeLimits: 'What the panel will never assign',
+      cascadeLimitsText:
+        'Depth max — to nobody, under any ceiling: that level is for your own ' +
+        'decision, not for a fan of automatically created chats. And no outdated ' +
+        'model: only CLI aliases can be assigned (haiku, sonnet, opus, fable), and an ' +
+        'alias expands to the current model of its family by itself. A concrete name ' +
+        'from the agent’s answer is not accepted at all — otherwise the first model ' +
+        'to “remember” last year’s version would take a whole group there.',
+      cascadeOff: 'How to turn it off',
+      cascadeOffText:
+        'Chat menu (the “···” button in the header) → “Match the model to the task”. ' +
+        'The setting is remembered per PROJECT, not per conversation, and it is on by ' +
+        'default. Turn it off and every child of a split runs on the model you chose, ' +
+        'with no kinds and no additions to the task: exactly how the panel worked ' +
+        'before routing existed.',
+      cascadeNote:
+        'The panel has to recognise the ceiling, or there is no routing at all: an ' +
+        'unfamiliar vendor or model name and everything runs at the ceiling, as ' +
+        'before. The same holds for a ceiling weaker than opus: there is nothing to ' +
+        'save there, and the risk remains.',
+
       handoffTitle: 'Continuing in a clean session: the stage closes, the context stays behind',
       handoffCaption:
         'A conversation gets more expensive with every turn: the whole context ' +
@@ -500,8 +585,13 @@ export const helpEn: HelpSchema = {
         'conversation’s edits.',
       codeTree: 'Two lists on the left',
       codeTreeText:
-        '“Changed” is a flat list of files the agent touched in THIS conversation, with ' +
-        'the count of added and removed lines; its first file is loaded right away. ' +
+        '“Changed” is a flat list of everything in the project that differs from the last ' +
+        'commit. On top — the summary: branch, how many files, how many lines. Below, in ' +
+        'two groups: “In this conversation” — files the agent touched, with the count of ' +
+        'added and removed lines — and “In the working tree” — the rest that git sees ' +
+        '(your own edits, earlier conversations, the terminal), with a status letter. That ' +
+        'is why the window makes sense in a fresh chat too, where the agent has changed ' +
+        'nothing yet; the first file of the list is loaded right away. ' +
         '“All files” is the whole project tree: a changed file is marked there with a ' +
         'green name and line counts, and every folder on the way to it carries a green ' +
         'dot, so the result of a run is visible without expanding everything. The tree ' +
@@ -784,7 +874,23 @@ export const helpEn: HelpSchema = {
         'case goes to a human too: a command the panel could not parse counts as ' +
         'irreversible. With edits switched off, file edits stay yours even when ' +
         'auto-approval is on. The toggle takes effect immediately, mid-run included, ' +
-        'its position is remembered, and split chats inherit it from the parent.',
+        'its position is remembered, and split chats inherit it from the parent. ' +
+        'The border itself is not carved in stone: permission rules place it, see below.',
+
+      rulesTitle: 'Permission rules: what the panel approves itself',
+      rulesText:
+        'In the same «Chat settings» menu, below the toggles, sits a list of rules — ' +
+        'one per kind of action. A rule that is on the panel approves itself; a rule ' +
+        'that is off brings back the «Allow/Deny» card. Out of the box WRITES are ' +
+        'allowed (merge request comments and threads, Jira tickets, wiki pages, ' +
+        'commits, branches and a plain push), while TEARDOWN asks: deleting files, ' +
+        'wiping git history and force-pushing, tearing down database data, ' +
+        'containers and infrastructure, publishing packages, deleting and merging in ' +
+        'external services, running what was downloaded from the network. The rules ' +
+        'are shared: switched on in one project, they hold in every project and on ' +
+        'the phone — they live in the panel settings, not in a conversation. What ' +
+        'they do not override: your own ask and deny rules from settings.json (they ' +
+        'beat any rule you switch on), read-only mode and a question to a human.',
 
       historyTitle: 'How a conversation continues',
       historyCaption:

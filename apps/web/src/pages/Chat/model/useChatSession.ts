@@ -8,6 +8,7 @@ import {
   getWorkspaceState,
   normalizeProjectPath,
   projectShortName,
+  tabContaining,
   HOME_TAB_ID,
 } from '@shared/lib/workspace';
 import { useAgentRun } from '@shared/lib/agent-runs';
@@ -296,12 +297,16 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     }
 
     if (activeRun.projectPath) {
-      const id = normalizeProjectPath(activeRun.projectPath);
-      if (ws.activeProject?.id === id) {
+      // Вкладка проекта показывает и разговоры ВЛОЖЕННЫХ каталогов (`visibleChats`),
+      // поэтому «своя ли это вкладка» — вопрос не о равенстве путей: у прогона в
+      // `widget-app/widget` открытая вкладка `widget-app` своя, и заводить рядом
+      // вторую значит расщепить проект надвое.
+      const tab = tabContaining(ws.state, activeRun.projectPath);
+      if (tab && tab.id === ws.state.activeTabId) {
         showRun(activeRun.id);
       } else {
         pendingViewRef.current = activeRun.id;
-        ws.openProject(activeRun.projectPath, projectShortName(activeRun.projectPath));
+        ws.reveal(activeRun.projectPath, projectShortName(activeRun.projectPath));
       }
     } else if (!ws.isHome) {
       // Домашний прогон — переходим на домашний таб, эффект смены таба покажет его.

@@ -116,6 +116,10 @@ export function ChatThread({
       onSplit={taskSplit.split}
       onKeepHere={taskSplit.keepHere}
       isSplitPending={taskSplit.isPending}
+      // Потолок разговора: карточка предложения показывает по нему класс,
+      // модель и глубину каждой группы — тем же расчётом, каким сервер их и
+      // назначит. Пусто — подбор в проекте выключен, и про модели она молчит.
+      splitCeiling={taskSplit.ceiling}
       // Ветки уже заведённых детей — по ним карточка предложения понимает, что
       // разделение состоялось, и убирает кнопку.
       childBranches={child.branches}

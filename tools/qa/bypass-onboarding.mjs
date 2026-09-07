@@ -10,8 +10,13 @@
  * Обход — чисто клиентский: перехватываем ответ GET /api/settings и подменяем в
  * нём `onboardingDone` на true. Настоящее состояние сервера НЕ меняется (никаких
  * записей), меняется только то, что видит эта вкладка. Вызывать ДО page.goto.
+ *
+ * `patch` — те же клиентские подмены для настроек, от которых зависит проверка
+ * (модель разговора, глубина). Через тот же перехват, а не вторым маршрутом:
+ * Playwright отдаёт запрос ПОСЛЕДНЕМУ подходящему обработчику, и вторая подмена
+ * настроек просто отменила бы обход мастера.
  */
-export async function bypassOnboarding(page) {
+export async function bypassOnboarding(page, patch = {}) {
   await page.route('**/api/settings', async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
     const response = await route.fetch();
@@ -21,7 +26,6 @@ export async function bypassOnboarding(page) {
     } catch {
       return route.fulfill({ response });
     }
-    body.onboardingDone = true;
-    return route.fulfill({ response, json: body });
+    return route.fulfill({ response, json: { ...body, ...patch, onboardingDone: true } });
   });
 }

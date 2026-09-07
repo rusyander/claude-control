@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
@@ -13,6 +13,7 @@ import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { toast } from '@shared/lib/toast';
 import { isStreamShown } from '@shared/lib/chat-stream';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
+import { branchMarks } from '../lib/branchMarks';
 import { parseQuestions } from '../lib/parseQuestions';
 import { liveQuestionKey } from '../lib/questionKey';
 import { MessageBubble } from './MessageBubble';
@@ -54,6 +55,7 @@ export function ChatMessages({
   onSplit,
   onKeepHere,
   isSplitPending,
+  splitCeiling,
   childBranches,
   handoff,
   queued,
@@ -109,6 +111,9 @@ export function ChatMessages({
   // каждый скан видит только свой.
   const streamed = useMemo(() => scanSplitBlocks(stream.text), [stream.text]);
   const streamedHandoff = useMemo(() => scanHandoffBlocks(streamed.text), [streamed.text]);
+
+  /** Где по ленте агент сменил ветку — по записям самого транскрипта. */
+  const branches = useMemo(() => branchMarks(messages), [messages]);
 
   /**
    * Сообщение с вопросом, который ещё ЖДЁТ ответа.
@@ -166,30 +171,42 @@ export function ChatMessages({
       {isLoading && <SkeletonList rows={3} withActions={false} />}
 
       {messages.map((message, index) => (
-        // Битое сообщение (неожиданный формат транскрипта) прячет только себя,
-        // а не всю переписку с полем ввода.
-        <ErrorBoundary
-          key={message.id}
-          scope={`сообщение ${message.id}`}
-          fallback={(error, reset) => (
-            <CrashCard compact error={error} text={t('chat.messageCrash')} onRetry={reset} />
+        <Fragment key={message.id}>
+          {/* Смена ветки — событие разговора, а не свойство шапки: показываем
+              её ровно там, где она случилась, чтобы дальнейшие правки читались
+              как сделанные уже в другой ветке. */}
+          {branches.has(message.id) && (
+            <div className={styles.branchMark} role="status">
+              <Icon name="branch" size={14} />
+              <span>{t('chat.branchSwitched', { branch: branches.get(message.id) })}</span>
+            </div>
           )}
-        >
-          <MessageBubble
-            message={message}
-            onEdit={onEdit}
-            onPickOption={onPickOption}
-            isLast={index === messages.length - 1}
-            isQuestionOpen={index === openQuestionIndex}
-            isRunning={isRunning}
-            costUnit={costUnit}
-            onSplit={onSplit}
-            onKeepHere={onKeepHere}
-            isSplitPending={isSplitPending}
-            childBranches={childBranches}
-            handoff={handoff}
-          />
-        </ErrorBoundary>
+
+          {/* Битое сообщение (неожиданный формат транскрипта) прячет только
+              себя, а не всю переписку с полем ввода. */}
+          <ErrorBoundary
+            scope={`сообщение ${message.id}`}
+            fallback={(error, reset) => (
+              <CrashCard compact error={error} text={t('chat.messageCrash')} onRetry={reset} />
+            )}
+          >
+            <MessageBubble
+              message={message}
+              onEdit={onEdit}
+              onPickOption={onPickOption}
+              isLast={index === messages.length - 1}
+              isQuestionOpen={index === openQuestionIndex}
+              isRunning={isRunning}
+              costUnit={costUnit}
+              onSplit={onSplit}
+              onKeepHere={onKeepHere}
+              isSplitPending={isSplitPending}
+              splitCeiling={splitCeiling}
+              childBranches={childBranches}
+              handoff={handoff}
+            />
+          </ErrorBoundary>
+        </Fragment>
       ))}
 
       {isStreamShown(stream) && (
@@ -280,7 +297,12 @@ export function ChatMessages({
                     />
                   )}
                   {streamed.proposals.map((proposal, index) => (
-                    <TaskSplitCard key={index} proposal={proposal} disabled />
+                    <TaskSplitCard
+                      key={index}
+                      proposal={proposal}
+                      ceiling={splitCeiling}
+                      disabled
+                    />
                   ))}
                   {streamed.rejected > 0 && (
                     <div className={styles.splitRejected} role="status">

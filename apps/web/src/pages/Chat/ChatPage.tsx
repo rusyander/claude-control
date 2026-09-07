@@ -13,6 +13,7 @@ import { useChatPrefs } from '@shared/lib/chat-prefs';
 import { useDraft } from '@shared/lib/draft';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
+import { ProjectGitControls } from '@features/ProjectGit';
 import {
   useChats,
   useChatMessages,
@@ -303,6 +304,14 @@ export function ChatPage() {
             onExport={() => activeChat && downloadChatExport(activeChat.id, 'md')}
             onRefresh={() => session.refresh()}
           />
+
+          {/* Ветка и числа правок — полосой над лентой, а не кнопкой в ряду
+              шапки: пока агент работает, это первое, на что смотрят, а в ряду
+              оно терялось между моделью и кнопками. Нет `.git` в каталоге —
+              сам компонент вернёт null, полосы не будет вовсе. */}
+          {isProjectContext && projectPath && (
+            <ProjectGitControls path={projectPath} variant="strip" isRunning={isRunning} />
+          )}
 
           <ChatArtifactsBar
             artifacts={artifacts}

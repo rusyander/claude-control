@@ -24,6 +24,7 @@ import { registerAssistantRoutes } from '../routes/assistant-routes.ts';
 import { registerScriptRoutes } from '../routes/script-routes.ts';
 import { registerChatRoutes } from '../routes/chat-routes.ts';
 import { registerChatSplitRoutes } from '../routes/chat/split-routes.ts';
+import { registerChatCascadeRoutes } from '../routes/chat/cascade-routes.ts';
 import { registerChatHandoffRoutes } from '../routes/chat/handoff-routes.ts';
 import { registerSandboxRoutes } from '../routes/sandbox-routes.ts';
 import { registerResourceRoutes } from '../routes/resource-routes.ts';
@@ -100,6 +101,9 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     (instance, context) => registerProjectGitRoutes(instance, context, chatRuns),
     registerProjectFilesRoutes,
     (instance, context) => registerChatRoutes(instance, context, chatRuns, chatSession),
+    // Правило «подбирать модель под задачу»: одно положение на проект, без
+    // зависимостей — ни реестр прогонов, ни сессия ему не нужны.
+    registerChatCascadeRoutes,
     // Разделение задач по чатам заводит копии репозитория и открывает разговоры —
     // у Claude через реестр прогонов, у чужого CLI через его собственный сервис.
     // Поэтому оба живут дольше запроса и приходят сюда параметром.

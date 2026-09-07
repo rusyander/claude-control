@@ -1,6 +1,17 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { branchTaken } from '@agentdeck/contracts/task-split';
+import { branchTaken, buildGroupPrompt } from '@agentdeck/contracts/task-split';
+import {
+  assignableEffortsUpTo,
+  assignableModelsUpTo,
+  clampAssignment,
+  manualAssignment,
+  modelAlias,
+  planAssignment,
+  plannedRunCount,
+  type CascadeAssignment,
+  type CascadePlan,
+} from '@agentdeck/contracts/model-cascade';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -21,9 +32,16 @@ import styles from './TaskSplitCard.module.scss';
  * такой же законный ответ, как и разделение, и уходит агенту обычной репликой.
  * Субагентов не появляется ни в одном из случаев: каждая группа — обычный чат,
  * в котором человек разговаривает сам.
+ *
+ * Когда в проекте действует подбор модели, у группы видно ещё три вещи: класс
+ * работы, модель и глубину. Считает их ТОТ ЖЕ `planAssignment`, что и сервер, по
+ * тому же заданию (`buildGroupPrompt`), — иначе карточка обещала бы одно, а
+ * стартовало другое. Поменять можно до запуска, и выбор человека действует в обе
+ * стороны, включая `haiku`, которого подбор не назначает никогда сам.
  */
 export function TaskSplitCard({
   proposal,
+  ceiling,
   onSplit,
   onKeepHere,
   isPending,
@@ -34,9 +52,65 @@ export function TaskSplitCard({
   // «Только завести чаты» — для случая, когда сначала хочется прочитать задания
   // и поправить их, а не получить четырёх агентов, стартовавших разом.
   const [createOnly, setCreateOnly] = useState(false);
+  // Замены человека по номеру группы. Живут в карточке до нажатия и уезжают
+  // отдельным полем запроса: подмешать их в предложение агента нельзя — его
+  // просьба действует только вверх, а выбор человека в обе стороны.
+  const [assignments, setAssignments] = useState<Record<number, CascadeAssignment>>({});
 
   const count = proposal.groups.length;
   const isLocked = Boolean(isPending || disabled);
+
+  // Что вообще можно назначить при этом потолке. Пусто — потолок не распознан
+  // (чужой вендор, незнакомое имя), и подбора нет ни здесь, ни на сервере.
+  const models = ceiling ? assignableModelsUpTo(ceiling.model) : [];
+  const efforts = ceiling ? assignableEffortsUpTo(ceiling.effort) : [];
+  // Потолок без глубины («как решит CLI») — законное значение, и в списке оно
+  // должно быть: иначе select показывал бы первый пункт вместо того, что уедет.
+  const effortOptions =
+    ceiling && clampAssignment({}, ceiling).effort === '' ? ['', ...efforts] : efforts;
+  const hasCascade = Boolean(ceiling) && models.length > 0;
+
+  // Чем пойдёт каждая группа. Класс распознаётся подбором один раз и переживает
+  // ручную замену: по нему группа подписана, и менять модель — не значит менять
+  // род работы.
+  const plans: CascadePlan[] =
+    hasCascade && ceiling
+      ? proposal.groups.map((group, index) => {
+          const auto = planAssignment(
+            {
+              ...(group.kind ? { kind: group.kind } : {}),
+              ...(group.model ? { model: group.model } : {}),
+              ...(group.effort ? { effort: group.effort } : {}),
+              tasks: group.tasks.length,
+              // Длина ЗАДАНИЯ, а не списка задач: по ней подбор поднимает ранг
+              // большой группы, и считать её надо ровно тем же сборщиком, каким
+              // сервер соберёт задание для чата.
+              length: buildGroupPrompt(group, proposal.shared).length,
+            },
+            ceiling,
+          );
+          const wish = assignments[index];
+          return wish ? manualAssignment(wish, ceiling, auto.kind) : auto;
+        })
+      : [];
+
+  // Замена всегда содержит ОБЕ оси: поменяв модель, человек не просил сбросить
+  // подобранную глубину, а неполное пожелание сервер добрал бы с потолка.
+  const replace = (index: number, patch: CascadeAssignment): void => {
+    const plan = plans[index];
+    setAssignments((prev) => ({
+      ...prev,
+      [index]: {
+        model: modelAlias(plan?.model ?? '') ?? '',
+        effort: plan?.effort ?? '',
+        ...patch,
+      },
+    }));
+  };
+
+  // Сколько групп поедет слабее потолка: им дописывается планка сдачи, и знать
+  // об этом человек должен ДО кнопки, а не по факту.
+  const lowered = plans.filter((plan) => plan.lowered).length;
 
   // Сколько групп уже стали чатами. Считаем по веткам, а не по названиям: имя
   // ветки — единственное, что переживает и заведение копии, и перезагрузку
@@ -68,26 +142,77 @@ export function TaskSplitCard({
         {/* Ключ по номеру, а не по ветке: разбор предложения имена веток не
             разуникаливает (это делает git, уже при заведении копии), и модель
             вполне может назвать две группы одинаково. */}
-        {proposal.groups.map((group, index) => (
-          <div key={index} className={styles.group}>
-            <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
-              <Typography variant="body-sm" weight="medium" as="span">
-                {group.title}
-              </Typography>
-              <span className={styles.branch}>{group.branch}</span>
-            </Stack>
-            {/* Единственный пункт, дословно повторяющий заголовок, — это разбор
-                подставил название вместо списка, которого модель не прислала.
-                Печатать его второй раз незачем: строка та же самая. */}
-            {(group.tasks.length > 1 || group.tasks[0] !== group.title) && (
-              <ul className={styles.tasks}>
-                {group.tasks.map((task, index) => (
-                  <li key={index}>{task}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
+        {proposal.groups.map((group, index) => {
+          const plan = plans[index];
+          return (
+            <div key={index} className={styles.group}>
+              <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
+                <Typography variant="body-sm" weight="medium" as="span">
+                  {group.title}
+                </Typography>
+                <span className={styles.branch}>{group.branch}</span>
+              </Stack>
+              {/* Единственный пункт, дословно повторяющий заголовок, — это разбор
+                  подставил название вместо списка, которого модель не прислала.
+                  Печатать его второй раз незачем: строка та же самая. */}
+              {(group.tasks.length > 1 || group.tasks[0] !== group.title) && (
+                <ul className={styles.tasks}>
+                  {group.tasks.map((task, position) => (
+                    <li key={position}>{task}</li>
+                  ))}
+                </ul>
+              )}
+              {plan && (
+                <Stack
+                  direction="row"
+                  align="center"
+                  gap="var(--spacing-3xs)"
+                  wrap
+                  className={styles.assign}
+                >
+                  <span className={styles.kind}>
+                    {plan.kind
+                      ? t(`chat.split.cascade.kind.${plan.kind}`)
+                      : t('chat.split.cascade.kindUnknown')}
+                  </span>
+                  {/* Нативные select — как в шапке чата: компактно, правильно
+                      работают с клавиатурой и дикторами, чинить их не надо. */}
+                  <select
+                    className={styles.select}
+                    value={modelAlias(plan.model) ?? ''}
+                    onChange={(event) => replace(index, { model: event.target.value })}
+                    disabled={isLocked || !onSplit || isDone}
+                    aria-label={t('chat.split.cascade.model', { title: group.title })}
+                  >
+                    {models.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className={styles.select}
+                    value={plan.effort}
+                    onChange={(event) => replace(index, { effort: event.target.value })}
+                    disabled={isLocked || !onSplit || isDone}
+                    aria-label={t('chat.split.cascade.effort', { title: group.title })}
+                  >
+                    {effortOptions.map((level) => (
+                      <option key={level || 'default'} value={level}>
+                        {level ? t(`chat.effort_${level}`) : t('chat.effortAuto')}
+                      </option>
+                    ))}
+                  </select>
+                  {plan.lowered && (
+                    <span className={styles.lowered} title={t('chat.split.cascade.loweredHint')}>
+                      {t('chat.split.cascade.lowered')}
+                    </span>
+                  )}
+                </Stack>
+              )}
+            </div>
+          );
+        })}
       </Stack>
 
       {/* Предложение уже отработано: вместо кнопок — итог. Карточка остаётся на
@@ -117,12 +242,32 @@ export function TaskSplitCard({
         </Stack>
       )}
 
+      {/* Цена решения ДО кнопки: сколько заведётся чатов и сколько прогонов
+          стартует прямо сейчас. Окно запросов тратят именно прогоны, и «только
+          завести чаты» честно показывает здесь ноль. */}
+      {hasCascade && onSplit && !isDone && (
+        <Typography variant="caption" color="subtle" className={styles.cost}>
+          {t('chat.split.cascade.cost', { chats: count, runs: createOnly ? 0 : count })}
+          {lowered > 0 && ` · ${t('chat.split.cascade.loweredCount', { count: lowered })}`}
+          {/* Конвейер добавляет прогоны, а не агентов: у понижённой группы за
+              работой идут ревью и правки по его замечаниям, последовательно в той
+              же копии. Называем это ДО кнопки — столько панель заведёт сама. */}
+          {lowered > 0 &&
+            ` · ${t('chat.split.cascade.pipeline', { total: plannedRunCount(plans) })}`}
+        </Typography>
+      )}
+
       {onSplit && !isDone && (
         <Stack direction="row" gap="var(--spacing-2xs)" wrap className={styles.actions}>
           <Button
             variant="primary"
             leftIcon={<Icon name="branch" size={18} />}
-            onClick={() => onSplit({ startRuns: !createOnly })}
+            onClick={() =>
+              onSplit({
+                startRuns: !createOnly,
+                ...(Object.keys(assignments).length > 0 ? { assignments } : {}),
+              })
+            }
             isLoading={isPending}
             disabled={isLocked}
           >

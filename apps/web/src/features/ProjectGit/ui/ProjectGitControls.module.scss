@@ -5,6 +5,38 @@
   position: relative;
 }
 
+// Полоса над лентой чата: та же кнопка, но во всю ширину и с числами. Своя
+// линия снизу отделяет её от переписки — иначе ветка читается как первое
+// сообщение разговора.
+.wrapStrip {
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+}
+
+.stripButton {
+  justify-content: flex-start;
+  border-radius: 0;
+  padding-left: var(--spacing-xl);
+  padding-right: var(--spacing-xl);
+}
+
+// Числа отодвинуты от ветки, но не прижаты к правому краю: взгляд идёт слева
+// направо и на широком экране терял бы их по дороге.
+.stripCounts {
+  margin-left: var(--spacing-2xs);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// В полосе кнопка стоит слева, поэтому и панель раскрывается от левого края:
+// прижатая вправо, она открывалась бы за метр от того, что нажали.
+.panelLeft {
+  right: auto;
+  left: var(--spacing-md);
+}
+
 .backdrop {
   position: fixed;
   inset: 0;

@@ -701,3 +701,26 @@
     opacity: 0.7;
   }
 }
+
+/*
+  Отметка смены ветки. Линия во всю ширину, а не пузырь: это не чья-то реплика,
+  а граница, после которой правки уходят в другую ветку, — ровно так её и надо
+  прочитать, скользя по ленте взглядом.
+*/
+.branchMark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2xs);
+  margin: var(--spacing-md) 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.branchMark::before,
+.branchMark::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}

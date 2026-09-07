@@ -28,6 +28,32 @@ function countOf(token: string | undefined): number | undefined {
   return Number.isFinite(value) ? Math.abs(value) : undefined;
 }
 
+/**
+ * Итог `git diff --numstat`: сколько строк добавлено и убрано всего.
+ *
+ * Каждая строка вывода — `<добавлено>\t<убрано>\t<путь>`, а у двоичного файла
+ * вместо чисел стоят дефисы: такие строки пропускаем, а не считаем нулями —
+ * «поменялась картинка» в строках не измеряется вовсе. Ни одной пригодной
+ * строки не нашлось → undefined: ноль читался бы как «правок нет».
+ */
+export function parseNumstat(out: string): { insertions: number; deletions: number } | undefined {
+  let insertions = 0;
+  let deletions = 0;
+  let counted = false;
+
+  for (const line of out.split('\n')) {
+    const [added, removed] = line.split('\t');
+    const plus = Number.parseInt(added ?? '', 10);
+    const minus = Number.parseInt(removed ?? '', 10);
+    if (!Number.isFinite(plus) || !Number.isFinite(minus)) continue;
+    insertions += plus;
+    deletions += minus;
+    counted = true;
+  }
+
+  return counted ? { insertions, deletions } : undefined;
+}
+
 /** Одна запись статуса → строка списка. Незнакомый тип записи → undefined. */
 function parseChange(entry: string): ProjectGitChange | undefined {
   if (entry.startsWith('? ')) {

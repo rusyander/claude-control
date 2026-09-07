@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -14,7 +14,9 @@ import {
   usePullChanges,
   usePushBranch,
 } from '@entities/ProjectGit';
-import { STATUS_LETTER, pullBody, splitPath } from '../model/projectGitView';
+import { STATUS_LETTER } from '@shared/config/git-status-letter';
+import { splitPath } from '@shared/lib/file-path';
+import { pullBody } from '../model/projectGitView';
 import { WorktreeSection } from './WorktreeSection';
 import type { ProjectGitControlsProps } from './ProjectGitControls.types';
 import styles from './ProjectGitControls.module.scss';
@@ -34,7 +36,11 @@ import styles from './ProjectGitControls.module.scss';
  * По первому включается коммит, по второму видно, что есть смысл нажать pull.
  */
 
-export function ProjectGitControls({ path }: ProjectGitControlsProps) {
+export function ProjectGitControls({
+  path,
+  variant = 'button',
+  isRunning = false,
+}: ProjectGitControlsProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
   const [newBranch, setNewBranch] = useState('');
@@ -42,7 +48,18 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
   // Пусто — «текущая ветка», то есть обычный git pull по её upstream.
   const [pullFrom, setPullFrom] = useState('');
 
-  const git = useProjectGit(path);
+  const git = useProjectGit(path, isRunning);
+
+  // Прогон закончился — перечитываем сразу, не дожидаясь такта опроса: ветка и
+  // число правок после работы агента другие, и именно на них смотрят первым
+  // делом, когда он отчитался.
+  const wasRunning = useRef(isRunning);
+  useEffect(() => {
+    if (wasRunning.current && !isRunning) void git.refetch();
+    wasRunning.current = isRunning;
+    // `git.refetch` стабилен между рендерами react-query.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning]);
   const checkout = useCheckoutBranch();
   const create = useCreateBranch();
   const commit = useCommitAll();
@@ -109,21 +126,41 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
     );
   };
 
+  const isStrip = variant === 'strip';
+
   return (
-    <div className={styles.wrap}>
+    <div className={isStrip ? `${styles.wrap} ${styles.wrapStrip}` : styles.wrap}>
       <Button
         variant="ghost"
         size="sm"
+        fullWidth={isStrip}
+        className={isStrip ? styles.stripButton : undefined}
         leftIcon={<Icon name="branch" size={18} />}
         onClick={() => setOpen((value) => !value)}
         aria-expanded={isOpen}
         title={t('git.hint', { branch: branchLabel })}
       >
         <span className={styles.branch}>{branchLabel}</span>
-        {info.dirtyCount > 0 && <Badge tone="warning">{info.dirtyCount}</Badge>}
+        {/* В полосе то же число стоит рядом словами — бейдж с ним был бы вторым
+            ответом на один вопрос. */}
+        {!isStrip && info.dirtyCount > 0 && <Badge tone="warning">{info.dirtyCount}</Badge>}
         {/* Отставание от удалённого — единственный повод открыть пульт, не
             имея своих правок, поэтому оно видно снаружи. */}
         {behind > 0 && <Badge tone="info">↓{behind}</Badge>}
+
+        {/* Полоса над лентой — единственное место, где до чисел не нужно
+            дотягиваться: их читают, пока агент работает, поэтому здесь они
+            словами и строками, а не одним бейджем с количеством файлов. */}
+        {isStrip && (
+          <Typography variant="caption" color="subtle" as="span" className={styles.stripCounts}>
+            {info.dirtyCount > 0 ? t('git.dirty', { count: info.dirtyCount }) : t('git.clean')}
+            {info.insertions === undefined || info.deletions === undefined
+              ? ''
+              : ` · +${info.insertions} −${info.deletions}`}
+            {info.ahead ? ` · ${t('git.ahead', { count: info.ahead })}` : ''}
+          </Typography>
+        )}
+
         {/* Шеврон: без него кнопка читается как надпись «текущая ветка», и то,
             что за ней спрятан весь git, не находят вовсе. */}
         <Icon name={isOpen ? 'chevronUp' : 'chevronDown'} size={14} className={styles.chevron} />
@@ -132,7 +169,11 @@ export function ProjectGitControls({ path }: ProjectGitControlsProps) {
       {isOpen && (
         <>
           <div className={styles.backdrop} onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className={styles.panel} role="dialog" aria-label={t('git.title')}>
+          <div
+            className={isStrip ? `${styles.panel} ${styles.panelLeft}` : styles.panel}
+            role="dialog"
+            aria-label={t('git.title')}
+          >
             <Stack gap="var(--spacing-sm)" padding="var(--spacing-sm)">
               {info.error ? (
                 <Typography variant="body-sm" color="danger">

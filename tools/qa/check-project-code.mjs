@@ -39,11 +39,29 @@ page.on('console', (message) => message.type() === 'error' && problems.push(mess
 /** Что ушло на запись — по нему проверяется, тем ли `mtimeMs` сохраняем. */
 let saved;
 
-// Каталога проекта на диске нет — настоящий git-пульт ответил бы отказом и
-// засорил консоль. Проверяем не его, поэтому отвечаем «не репозиторий».
+// Каталога проекта на диске нет — настоящий git ответил бы отказом и засорил
+// консоль. Отвечаем готовым состоянием: список изменённых собирается из ДВУХ
+// источников, и без второго проверялась бы половина окна. `src/config.ts` есть
+// в обоих — он не должен задвоиться; `src/index.ts` и `notes.txt` знает только
+// git — их видно, хотя агент их не трогал.
 await page.route('**/api/project-git*', async (route) =>
   route.fulfill({
-    json: { isRepo: false, detached: false, unborn: false, branches: [], changes: [] },
+    json: {
+      isRepo: true,
+      branch: 'qa/branch',
+      detached: false,
+      unborn: false,
+      branches: ['main', 'qa/branch'],
+      dirtyCount: 3,
+      changedFiles: [
+        { path: 'src/config.ts', status: 'modified', staged: false },
+        { path: 'src/index.ts', status: 'modified', staged: false },
+        { path: 'notes.txt', status: 'untracked', staged: false },
+      ],
+      remoteBranches: [],
+      insertions: 12,
+      deletions: 4,
+    },
   }),
 );
 
@@ -224,10 +242,24 @@ const editor = dialog.locator('[data-testid="project-code-editor"]');
 await editor.locator('.cm-content').waitFor({ timeout: 15_000 });
 check(true, 'редактор собрался');
 
+// Счётчик вкладки = длина списка: два файла от агента (один из них уже удалён с
+// диска) и два, которые знает только git. Файл из обоих источников — одна строка.
 check(
-  (await dialog.getByRole('button', { name: /Изменённые \(1\)/ }).count()) > 0,
-  'вкладка «Изменённые» считает только существующие файлы',
+  (await dialog.getByRole('button', { name: /Изменённые \(4\)/ }).count()) > 0,
+  'вкладка «Изменённые» считает оба источника и не двоит общий файл',
 );
+
+// Строка итога: за ветку и числа в это окно и приходят, а пересчитывать строки
+// списка глазами — не ответ.
+const changedText = await dialog.locator('[class*="_tree_"]').first().innerText();
+check(changedText.includes('ветка qa/branch'), 'над списком названа ветка');
+check(changedText.includes('Изменено файлов: 4'), 'над списком число файлов');
+check(changedText.includes('+12 −4 строк'), 'над списком строки, добавленные и убранные');
+// Заголовки источников набраны прописными — сравниваем без регистра.
+const upper = changedText.toUpperCase();
+check(upper.includes('В ЭТОМ РАЗГОВОРЕ'), 'правки агента названы своим источником');
+check(upper.includes('В РАБОЧЕМ ДЕРЕВЕ'), 'изменения git названы своим источником');
+check(changedText.includes('notes.txt'), 'файл, которого агент не трогал, в списке есть');
 
 const text = await editor.innerText();
 check(text.includes('127.0.0.1'), 'в редакторе текущий текст файла');

@@ -157,9 +157,22 @@ const GRACE_MS = 60_000;
  */
 const TEXT_TAIL = 32_768;
 
+/**
+ * Сколько выбывших прогонов помним по их второму написанию ключа. Строка на
+ * прогон, за сеанс сервера их сотни — предел нужен от бесконечного роста.
+ */
+const MAX_RETIRED = 200;
+
 export class ChatRunRegistry {
   private runs = new Map<string, RegisteredRun>();
   private readonly createRun: RunFactory;
+
+  /**
+   * `sessionId` → ключ, под которым прогон был заведён. Заполняется, когда
+   * прогон уходит из реестра: сам он больше не нужен, а связь двух его написаний
+   * спрашивают и после (см. `resolveKey`).
+   */
+  private readonly retired = new Map<string, string>();
 
   /** Накопленный за сеанс сервера расход — переживает перезагрузку вкладки. */
   private totalCostUsd = 0;
@@ -263,8 +276,14 @@ export class ChatRunRegistry {
    * «прогон уже идёт» промахивалась, и на один разговор поднималось ДВА
    * процесса CLI — оба писали в те же файлы и в тот же транскрипт. Поэтому
    * ищем: точное совпадение → прогон, чей sessionId равен пришедшему chatId →
-   * совпадение по самому sessionId (в обе стороны). Ничего не нашли — ключом
-   * остаётся chatId (новый разговор).
+   * совпадение по самому sessionId (в обе стороны) → память о выбывших
+   * прогонах. Ничего не нашли — ключом остаётся chatId (новый разговор).
+   *
+   * Последний шаг нужен потому, что завершённый прогон живёт в реестре ровно
+   * `GRACE_MS`, а вопросы о нём приходят и позже: разделение стартует тогда,
+   * когда человек прочитал карточку. Без памяти о синониме тумблеры родителя,
+   * взведённые под `new-…`, переставали находиться по sessionId — и дети веера
+   * заводились без автоподтверждения.
    */
   resolveKey(chatId: string, sessionId?: string): string {
     if (this.runs.has(chatId)) return chatId;
@@ -273,7 +292,9 @@ export class ChatRunRegistry {
       if (this.runs.has(sessionId)) return sessionId;
       for (const [key, run] of this.runs) if (run.sessionId === sessionId) return key;
     }
-    return chatId;
+    return (
+      this.retired.get(chatId) ?? (sessionId ? this.retired.get(sessionId) : undefined) ?? chatId
+    );
   }
 
   /** Идёт ли сейчас прогон этого разговора (в любом из написаний ключа). */
@@ -562,5 +583,16 @@ export class ChatRunRegistry {
     if (run.cleanupTimer) clearTimeout(run.cleanupTimer);
     run.subscribers.clear();
     this.runs.delete(chatId);
+    // Прогон ушёл, но его два написания спрашивать не перестанут: карточка
+    // разделения знает разговор по sessionId, а тумблеры и висящие состояния
+    // заведены под тем ключом, с которым прогон стартовал. Помним связь после
+    // выбывания — она весит одну строку и не воскрешает сам прогон.
+    if (run.sessionId && run.sessionId !== chatId) {
+      this.retired.set(run.sessionId, chatId);
+      for (const key of this.retired.keys()) {
+        if (this.retired.size <= MAX_RETIRED) break;
+        this.retired.delete(key);
+      }
+    }
   }
 }

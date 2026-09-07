@@ -13,6 +13,9 @@ export const DEFAULT_STATE: AppState = {
   providerChecks: {},
   mcpHealth: {},
   projectCodeViews: {},
+  // Пусто — подбор модели под задачу включён везде: сюда пишутся только проекты,
+  // где человек его ВЫКЛЮЧИЛ.
+  projectCascade: {},
   chatLinks: {},
   settings: {
     theme: 'system',
@@ -34,6 +37,9 @@ export const DEFAULT_STATE: AppState = {
     mcpAutoCheck: false,
     chatModel: '',
     chatEffort: 'xhigh',
+    // Пусто — правила прав как из коробки (contracts/permission-rules.ts):
+    // записи разрешены, снос спрашивает. Сюда пишутся только СВОИ положения.
+    autoApproveRules: {},
     modelPricing: {},
     encryptSecretBackups: false,
     taskSplitInitiative: true,

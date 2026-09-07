@@ -1,12 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TaskSplitProposal } from '@agentdeck/contracts/task-split';
+import type { CascadeAssignment, CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 import { agentRuns } from '@shared/lib/agent-runs';
 import { saveDraft } from '@shared/lib/draft';
 import { toast } from '@shared/lib/toast';
 import { chatKeys } from '@entities/Chat';
 import { projectGitKey } from '@entities/ProjectGit';
-import { useSplitTasks, fetchSplitRequestPrompt, declineSplit } from '@entities/ChatSplit';
+import {
+  useSplitTasks,
+  useCascadeRule,
+  fetchSplitRequestPrompt,
+  declineSplit,
+} from '@entities/ChatSplit';
 
 export interface TaskSplitInput {
   /** Каталог проекта: без него делить нечего — копию заводить не из чего. */
@@ -21,14 +27,31 @@ export interface TaskSplitInput {
   dispatch: (prompt: string, files: never[]) => Promise<boolean>;
 }
 
+/** Согласие на разделение: запускать ли прогоны и что человек поменял руками. */
+export interface SplitDecision {
+  startRuns: boolean;
+  /** Номер группы → выбранные человеком модель и глубина. */
+  assignments?: Record<number, CascadeAssignment>;
+}
+
 export interface TaskSplitApi {
   /** Кнопка «Разделить задачи»: просим агента предложить разделение. */
   askSplit?: () => void;
   /** Согласиться на предложение из карточки. */
-  split: (proposal: TaskSplitProposal, options: { startRuns: boolean }) => void;
+  split: (proposal: TaskSplitProposal, options: SplitDecision) => void;
   /** Отказаться: работаем в этом же разговоре по очереди. */
   keepHere: () => void;
   isPending: boolean;
+  /**
+   * Потолок этого разговора, когда подбор модели в проекте включён; пусто —
+   * правило выключено (или проекта нет), и карточка ничего про модели не
+   * показывает: все дети поедут на выбранной человеком модели.
+   *
+   * Считается здесь, а не в карточке: те же две половины потолка уже уходят в
+   * запрос разделения, и второй расчёт разошёлся бы с первым — карточка обещала
+   * бы одно, а стартовало другое.
+   */
+  ceiling?: CascadeCeiling;
 }
 
 /**
@@ -56,9 +79,16 @@ export function useTaskSplit({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const splitTasks = useSplitTasks();
+  // Правило проекта: включено по умолчанию, поэтому до ответа считаем его
+  // включённым — иначе карточка на долю секунды показывала бы прежний вид и
+  // мигала бы чипами при каждом открытии чата.
+  const cascade = useCascadeRule(projectPath);
 
   const askSplit = (): void => {
-    void fetchSplitRequestPrompt()
+    // Контекст просьбы = потолок этого разговора: по нему сервер решает, звать
+    // ли агента классифицировать группы. Без него кнопка вела бы себя не так,
+    // как та же инициатива, дописанная к прогону.
+    void fetchSplitRequestPrompt({ path: projectPath, model, effort })
       .then((prompt) => dispatch(prompt, []))
       .catch(() => toast.error(t('chat.split.askFailed')));
   };
@@ -72,7 +102,7 @@ export function useTaskSplit({
     void dispatch(t('chat.split.keepHerePrompt'), []);
   };
 
-  const split = (proposal: TaskSplitProposal, options: { startRuns: boolean }): void => {
+  const split = (proposal: TaskSplitProposal, options: SplitDecision): void => {
     if (!projectPath) return;
 
     splitTasks.mutate(
@@ -86,6 +116,9 @@ export function useTaskSplit({
         // Родитель уезжает на сервер, а не запоминается в браузере: дерево
         // должно быть видно и с телефона, и после чистки кэша.
         ...(parentChatId ? { parentChatId } : {}),
+        // Замены человека — отдельным полем от предложения агента: одно
+        // действует в обе стороны, другое только вверх.
+        ...(options.assignments ? { assignments: options.assignments } : {}),
       },
       {
         onSuccess: (result) => {
@@ -96,6 +129,14 @@ export function useTaskSplit({
             if (!chat.started) {
               saveDraft(`chat:${chat.chatId}`, chat.prompt);
             }
+
+            // Подобранная модель — в пер-чат оверрайд ребёнка. Без этого шапка
+            // его вкладки показывала бы общий дефолт и им же отправляла второе
+            // сообщение: модель, подобранная под задачу, жила бы ровно один
+            // прогон. Ключи те же, что у `useChatModelPrefs`.
+            if (chat.model !== undefined) saveDraft(`chat-model:chat:${chat.chatId}`, chat.model);
+            if (chat.effort !== undefined)
+              saveDraft(`chat-effort:chat:${chat.chatId}`, chat.effort);
           }
 
           // Прогоны завёл сервер, и своего события у них нет: подхватываем их
@@ -127,5 +168,8 @@ export function useTaskSplit({
     split,
     keepHere,
     isPending: splitTasks.isPending,
+    // Правило читается на проект, а потолок — из шапки этого разговора: ровно
+    // то, что уедет в запрос. Выключено — поля нет, и карточка про модели молчит.
+    ...(projectPath && cascade.data?.enabled !== false ? { ceiling: { model, effort } } : {}),
   };
 }

@@ -3,6 +3,12 @@ export interface ChatHeaderMenuProps {
   allowEdits?: boolean;
   onAllowEditsChange?: (value: boolean) => void;
 
+  /**
+   * Каталог проекта: правило подбора модели помнится на проект, и без пути
+   * тумблеру не к чему относиться — в разговоре вне проекта он не показывается.
+   */
+  projectPath?: string;
+
   autoApprove: boolean;
   onAutoApproveChange: (value: boolean) => void;
 

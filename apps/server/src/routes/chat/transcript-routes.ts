@@ -42,7 +42,15 @@ export function registerChatTranscriptRoutes(app: FastifyInstance, ctx: ServerCo
             return {
               ...chat,
               parentId: link.parentChatId,
-              ...(link.branch ? { branch: link.branch } : {}),
+              // Ветка связи — только подпорка: она запомнена при заведении
+              // копии, а транскрипт знает, где агент оказался после неё.
+              ...(chat.branch || !link.branch ? {} : { branch: link.branch }),
+              // Звено конвейера подбора модели. В транскрипте этого нет и быть
+              // не может: «проверка работы соседнего чата» — понятие панели, а
+              // без него три разговора одной группы выглядят в списке как три
+              // независимых, и понять, который из них правит по замечаниям,
+              // неоткуда.
+              ...(link.stage ? { stage: link.stage } : {}),
             };
           });
     return sendConditional(request, reply, withLinks);

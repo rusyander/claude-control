@@ -27,6 +27,9 @@ describe('POST /api/chat/split', () => {
     prompt: string;
     cwd: string;
     appendSystemPrompt?: string;
+    /** Чем прогон реально стартовал: подбор модели проверяется только здесь. */
+    model?: string;
+    effort?: string;
     /** Родитель, известный хранилищу В МОМЕНТ запуска, — см. тест про гонку. */
     parentAtStart?: string;
   }[];
@@ -47,6 +50,8 @@ describe('POST /api/chat/split', () => {
           prompt: options.prompt,
           cwd: options.cwd,
           ...(options.appendSystemPrompt ? { appendSystemPrompt: options.appendSystemPrompt } : {}),
+          ...(options.model ? { model: options.model } : {}),
+          ...(options.effort ? { effort: options.effort } : {}),
           ...(store.getChatLink(chatId)?.parentChatId
             ? { parentAtStart: store.getChatLink(chatId)?.parentChatId }
             : {}),
@@ -299,5 +304,133 @@ describe('POST /api/chat/split', () => {
 
     expect(response.statusCode).toBe(200);
     expect((response.json() as { prompt: string }).prompt).toContain('agentdeck:split');
+  });
+
+  /**
+   * Подбор модели под задачу. Проверяем не таблицу классов (у неё свои юниты), а
+   * склейку: доезжает ли назначение до аргументов прогона, до связи чата и до
+   * ответа — три места, которые обязаны говорить одно и то же.
+   */
+  describe('подбор модели под задачу', () => {
+    /** Потолок задаётся шапкой разговора — как это и делает панель. */
+    const ceiling = { model: 'claude-opus-5', effort: 'high' };
+    const kinds = {
+      shared: 'Общее',
+      groups: [
+        { title: 'Раз', branch: 'feature/one', tasks: ['переименовать поле'], kind: 'mechanical' },
+        { title: 'Два', branch: 'feature/two', tasks: ['почему падает'], kind: 'investigation' },
+      ],
+    };
+
+    it('механика едет ниже потолка, разбор — на потолке', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: { projectPath: project, proposal: kinds, startRuns: true, ...ceiling },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(started[0]?.model).toBe('sonnet');
+      expect(started[1]?.model).toBe('claude-opus-5');
+      // Понижение оплачивается проверкой: работе слабее потолка дописывается
+      // планка сдачи, работе на потолке — нет, усиливать нечем.
+      expect(started[0]?.appendSystemPrompt).toContain('НИЖЕ потолка');
+      expect(started[1]?.appendSystemPrompt).not.toContain('НИЖЕ потолка');
+
+      const body = response.json() as { chats: { model?: string; kind?: string }[] };
+      expect(body.chats[0]).toMatchObject({ model: 'sonnet', kind: 'mechanical' });
+    });
+
+    it('замена человека сильнее подбора и действует ВНИЗ', async () => {
+      // `haiku` подбор не назначает никогда сам — только человек, видевший
+      // задачи группы. Класс при этом остаётся распознанным.
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal: kinds,
+          startRuns: true,
+          ...ceiling,
+          assignments: { 0: { model: 'haiku', effort: 'low' } },
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(started[0]?.model).toBe('haiku');
+      expect(started[0]?.effort).toBe('low');
+      const body = response.json() as { chats: { model?: string; kind?: string }[] };
+      expect(body.chats[0]).toMatchObject({ model: 'haiku', kind: 'mechanical' });
+    });
+
+    it('замена выше потолка срезается до потолка', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal: kinds,
+          startRuns: true,
+          ...ceiling,
+          assignments: { 0: { model: 'fable', effort: 'xhigh' } },
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(started[0]?.model).toBe('claude-opus-5');
+      expect(started[0]?.effort).toBe('high');
+    });
+
+    it('связь чата помнит назначение — второе сообщение не теряет модель', async () => {
+      await app.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal: kinds,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+
+      const link = store.getChatLink(started[0]?.chatId ?? '');
+      expect(link).toMatchObject({ model: 'sonnet', kind: 'mechanical', lowered: true });
+    });
+
+    it('выключенное в проекте правило возвращает прежнее поведение', async () => {
+      store.setProjectCascade(project, false);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: { projectPath: project, proposal: kinds, startRuns: true, ...ceiling },
+      });
+
+      expect(response.statusCode).toBe(200);
+      // Оба ребёнка — на выбранной человеком модели, без пометок и без класса.
+      expect(started.map((run) => run.model)).toEqual(['claude-opus-5', 'claude-opus-5']);
+      expect(started[0]?.appendSystemPrompt).not.toContain('НИЖЕ потолка');
+      const body = response.json() as { chats: { model?: string; kind?: string }[] };
+      expect(body.chats[0]?.model).toBeUndefined();
+      expect(body.chats[0]?.kind).toBeUndefined();
+    });
+
+    it('просьба «раздели задачи» несёт классы только там, где правило действует', async () => {
+      const on = await app.inject({
+        method: 'GET',
+        url: `/api/chat/split/request?path=${encodeURIComponent(project)}&model=claude-opus-5`,
+      });
+      expect((on.json() as { prompt: string }).prompt).toContain('kind');
+
+      store.setProjectCascade(project, false);
+      const off = await app.inject({
+        method: 'GET',
+        url: `/api/chat/split/request?path=${encodeURIComponent(project)}&model=claude-opus-5`,
+      });
+      const prompt = (off.json() as { prompt: string }).prompt;
+      expect(prompt).toContain('agentdeck:split');
+      expect(prompt).not.toContain('mechanical');
+    });
   });
 });

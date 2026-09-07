@@ -1,6 +1,7 @@
 import type { AppSettings } from '@agentdeck/contracts';
 import { SPLIT_SYSTEM_PROMPT } from '@agentdeck/contracts/task-split';
 import { HANDOFF_SYSTEM_PROMPT } from '@agentdeck/contracts/chat-handoff';
+import { cascadeSystemPrompt, type CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 
 /**
  * Инициативы, которые панель дописывает прогону: разделить список задач по
@@ -83,6 +84,13 @@ export function initiativePrompt(
     /** В этом разговоре разделение уже предлагали и получили ответ — молчим. */
     splitMuted?: boolean;
     /**
+     * Потолок разговора, когда в этом проекте включён подбор модели под задачу.
+     * Нет поля — правило выключено или потолок не распознан: про классы работы
+     * агенту не рассказываем вовсе, иначе он расставит kind, а панель их
+     * проигнорирует — и в карточке будет обещано не то, что запустится.
+     */
+    cascade?: CascadeCeiling;
+    /**
      * Чужой CLI: правило про AskUserQuestion ему не адресовано — такого
      * инструмента у него нет вовсе, и рассказ про чужую ошибку только сбивал бы.
      */
@@ -90,7 +98,13 @@ export function initiativePrompt(
   } = {},
 ): string | undefined {
   const parts: string[] = options.foreign ? [] : [QUESTION_PROMPT];
-  if (settings.taskSplitInitiative && !options.splitMuted) parts.push(SPLIT_SYSTEM_PROMPT);
+  if (settings.taskSplitInitiative && !options.splitMuted) {
+    parts.push(SPLIT_SYSTEM_PROMPT);
+    // Про классы работы говорим только там, где речь о разделении: в разговоре,
+    // который делить уже не будут, это лишние полкилобайта в каждом прогоне.
+    const cascade = options.cascade ? cascadeSystemPrompt(options.cascade) : '';
+    if (cascade) parts.push(cascade);
+  }
   if (settings.handoffInitiative) parts.push(HANDOFF_SYSTEM_PROMPT);
   return parts.length > 0 ? [SOURCE, ...parts].join(' ') : undefined;
 }

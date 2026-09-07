@@ -1,13 +1,28 @@
 import type { TaskSplitProposal } from '@agentdeck/contracts/task-split';
+import type { CascadeAssignment, CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 
 export interface TaskSplitCardProps {
   proposal: TaskSplitProposal;
   /**
+   * Потолок разговора, когда подбор модели в этом проекте включён. Есть — у
+   * групп показываются чипы «класс · модель · глубина» и выбор замены; нет —
+   * карточка выглядит как раньше, все чаты пойдут на выбранной человеком модели.
+   */
+  ceiling?: CascadeCeiling;
+  /**
    * Разделить на отдельные чаты. Пусто — карточка только показывает предложение
    * без кнопок: предложение из середины истории давно закрыто, и заводить по
    * нему ветки спустя десять сообщений никто не просил.
+   *
+   * `assignments` — ручные замены по номеру группы: выбор человека сильнее
+   * подбора и действует в обе стороны, поэтому уезжает ОТДЕЛЬНО от предложения
+   * агента, а не подмешивается в него (иначе просьбу модели и решение человека
+   * на сервере было бы не различить).
    */
-  onSplit?: (options: { startRuns: boolean }) => void;
+  onSplit?: (options: {
+    startRuns: boolean;
+    assignments?: Record<number, CascadeAssignment>;
+  }) => void;
   /** Отказаться от разделения и продолжить в этом же разговоре. */
   onKeepHere?: () => void;
   /** Запрос уже пошёл: копии заводятся не мгновенно, кнопки обязаны это показать. */

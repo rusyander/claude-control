@@ -35,6 +35,7 @@ export function mergeState(loaded: Partial<AppState>): AppState {
     providerChecks: { ...base.providerChecks, ...loaded.providerChecks },
     mcpHealth: { ...base.mcpHealth, ...loaded.mcpHealth },
     projectCodeViews: { ...base.projectCodeViews, ...loaded.projectCodeViews },
+    projectCascade: { ...base.projectCascade, ...loaded.projectCascade },
     chatLinks: { ...base.chatLinks, ...loaded.chatLinks },
     settings: { ...base.settings, ...loaded.settings },
   };

@@ -7,12 +7,14 @@ import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { toast } from '@shared/lib/toast';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
+import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
 import { parseQuestions } from '../lib/parseQuestions';
 import { questionKey } from '../lib/questionKey';
 import { QuestionCard } from './QuestionCard';
 import { TaskSplitCard } from './TaskSplitCard';
 import { HandoffCard } from './HandoffCard';
+import { ReviewCard } from './ReviewCard';
 import type { MessageBubbleProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 
@@ -32,6 +34,7 @@ export function MessageBubble({
   onSplit,
   onKeepHere,
   isSplitPending,
+  splitCeiling,
   childBranches,
   handoff,
 }: MessageBubbleProps) {
@@ -114,18 +117,19 @@ export function MessageBubble({
             // видит только свой.
             const split = scanSplitBlocks(block.text);
             const handoffScan = scanHandoffBlocks(split.text);
+            const review = scanReviewBlocks(handoffScan.text);
 
             return (
               <div key={index} className={styles.block}>
                 {/* Текст и карточки — одной колонкой: соседом карточка попадала
                     в колонку расхода и сжималась в узкий столбик. */}
                 <div className={styles.blockBody}>
-                  {handoffScan.text && (
+                  {review.text && (
                     <div
                       className={styles.text}
                       // markdown-it с выключенным сырым html — теги из ответа
                       // модели в разметку не попадут.
-                      dangerouslySetInnerHTML={{ __html: renderMarkdown(handoffScan.text) }}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(review.text) }}
                     />
                   )}
                   {split.proposals.map((proposal, position) => (
@@ -138,6 +142,7 @@ export function MessageBubble({
                       onSplit={isLast ? (options) => onSplit?.(proposal, options) : undefined}
                       onKeepHere={isLast ? onKeepHere : undefined}
                       isPending={isSplitPending}
+                      ceiling={splitCeiling}
                       disabled={isRunning}
                       childBranches={childBranches}
                     />
@@ -179,6 +184,15 @@ export function MessageBubble({
                   {handoffScan.rejected > 0 && (
                     <div className={styles.splitRejected} role="status">
                       {t('chat.handoff.notParsed')}
+                    </div>
+                  )}
+                  {/* Вердикт ревью: решать по нему нечего — звено правок панель
+                      завела сама, — но прочитать состав человек вправе, и он же
+                      единственный, кто увидит «замечаний нет». */}
+                  {review.findings && <ReviewCard findings={review.findings} />}
+                  {review.rejected > 0 && (
+                    <div className={styles.splitRejected} role="status">
+                      {t('chat.cascade.review.notParsed')}
                     </div>
                   )}
                 </div>

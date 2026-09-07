@@ -2,11 +2,11 @@ import { useTranslation } from 'react-i18next';
 import { HelpSection, Callout, OptionCards } from '../ui';
 
 /**
- * Три соседних раздела документа «Чат» об одном и том же: как работа одного
- * проекта расходится по нескольким разговорам — копии репозитория руками,
- * разделение задач, которое предлагает сам агент, и продолжение закрытого этапа
- * в чистой сессии. Вынесены из `ChatTopic` целиком: вместе они переваливали
- * документ за предел длины файла.
+ * Соседние разделы документа «Чат» об одном и том же: как работа одного проекта
+ * расходится по нескольким разговорам — копии репозитория руками, разделение
+ * задач, которое предлагает сам агент, подбор модели под каждую группу и
+ * продолжение закрытого этапа в чистой сессии. Вынесены из `ChatTopic` целиком:
+ * вместе они переваливали документ за предел длины файла.
  */
 export function ChatParallelSections() {
   const { t } = useTranslation();
@@ -45,6 +45,24 @@ export function ChatParallelSections() {
           ]}
         />
         <Callout tone="warning" title={tr('splitNote')} />
+      </HelpSection>
+
+      {/* Подбор модели — прямое продолжение разделения: там решается, СКОЛЬКО
+          будет чатов, здесь — чем каждый из них будет вестись. */}
+      <HelpSection title={tr('cascadeTitle')} caption={tr('cascadeCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('cascadeWhat'), text: tr('cascadeWhatText') },
+            { title: tr('cascadeCeiling'), text: tr('cascadeCeilingText') },
+            { title: tr('cascadeKinds'), text: tr('cascadeKindsText') },
+            { title: tr('cascadeReview'), text: tr('cascadeReviewText') },
+            { title: tr('cascadeManual'), text: tr('cascadeManualText') },
+            { title: tr('cascadeLimits'), text: tr('cascadeLimitsText') },
+            { title: tr('cascadeOff'), text: tr('cascadeOffText') },
+          ]}
+        />
+        <Callout tone="warning" title={tr('cascadeNote')} />
       </HelpSection>
 
       {/* Продолжение в чистой сессии: там работа расходится вширь, здесь —

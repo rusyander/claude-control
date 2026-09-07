@@ -146,6 +146,7 @@ export function ChatTopic() {
             { title: tr('toolsPort'), text: tr('toolsPortText') },
             { title: tr('toolsAutostart'), text: tr('toolsAutostartText') },
             { title: tr('toolsGit'), text: tr('toolsGitText') },
+            { title: tr('toolsBranchMark'), text: tr('toolsBranchMarkText') },
             { title: tr('toolsPull'), text: tr('toolsPullText') },
             { title: tr('toolsPush'), text: tr('toolsPushText') },
           ]}
@@ -318,6 +319,10 @@ export function ChatTopic() {
 
         <Callout tone="info" title={tr('autoApproveTitle')}>
           {tr('autoApproveText')}
+        </Callout>
+
+        <Callout tone="info" title={tr('rulesTitle')}>
+          {tr('rulesText')}
         </Callout>
       </HelpSection>
 

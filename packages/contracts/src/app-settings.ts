@@ -9,6 +9,7 @@ import {
   type infer as Infer,
 } from 'zod';
 import { endpointProfileSchema } from './endpoints';
+import { permissionRulesSchema } from './permission-rules';
 import { dlpSettingsSchema } from './dlp';
 import { promptGateSettingsSchema } from './prompt-gate';
 import { remoteAccessSettingsSchema } from './remote';
@@ -197,6 +198,14 @@ export const appSettingsSchema = object({
    * отменяются ничем.
    */
   handoffAutoDefault: boolean().default(false),
+  /**
+   * Правила прав: id правила → разрешено без вопроса. Пусто — как из коробки
+   * (см. `permission-rules.ts`: записи разрешены, снос спрашивает). Живут здесь,
+   * а не в разговоре, намеренно: «пусть агент сам пишет комментарии в MR» — это
+   * решение про себя и свои сервисы, и повторять его в каждом проекте, на
+   * телефоне и в каждом новом чате человек не должен.
+   */
+  autoApproveRules: permissionRulesSchema.default({}),
   /**
    * Свои тарифы: фрагмент имени модели → цена за миллион токенов. Пустой
    * объект — считать по встроенным. Заведено потому, что тарифы меняются, а

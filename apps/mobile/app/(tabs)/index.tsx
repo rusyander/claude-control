@@ -26,7 +26,7 @@ import {
 } from '../../src/shared/lib/runs';
 import { chatMessagesQuery, useChatMessages, useChatProgress } from '../../src/entities/chat/api';
 import { useCostUnit } from '../../src/entities/settings/api';
-import { formatSpend } from '../../src/shared/lib/format';
+import { formatSpend, shortModel } from '../../src/shared/lib/format';
 import { Composer, type ComposerValue } from '../../src/features/chat/Composer';
 import { Markdown } from '../../src/features/chat/Markdown';
 import { PermissionCard } from '../../src/features/chat/PermissionCard';
@@ -205,6 +205,15 @@ export default function ChatScreen() {
           </Text>
         </Row>
         <Row gap={space.xs}>
+          {/* Чем ведут прогон. Имя приходит от самого CLI (событие `session`), а
+              не из того, что телефон отправил: по умолчанию он не шлёт ничего, а
+              чат, заведённый разделением, панель ведёт подобранной моделью — и
+              без этой подписи на телефоне не видно, слабее она потолка или нет. */}
+          {run.model ? (
+            <Text style={styles.model} numberOfLines={1}>
+              {shortModel(run.model)}
+            </Text>
+          ) : null}
           {/* Итог хода — рядом с названием проекта, как в шапке чата панели:
               сумма шагов сама по себе нигде больше не видна. */}
           {run.tokens > 0 ? (
@@ -338,6 +347,7 @@ const styles = StyleSheet.create({
   headerMain: { flex: 1 },
   project: { color: colors.text, fontSize: font.title, fontWeight: '600', flex: 1 },
   spend: { color: colors.textFaint, fontSize: font.small, fontFamily: font.mono },
+  model: { color: colors.textFaint, fontSize: font.small, fontFamily: font.mono, maxWidth: 120 },
   headerButton: { paddingHorizontal: space.sm, paddingVertical: space.xs },
   headerButtonText: { color: colors.accent, fontSize: font.small },
   feed: { padding: space.md, gap: space.sm },

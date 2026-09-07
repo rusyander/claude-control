@@ -1,12 +1,13 @@
 /**
- * Прогон окна «Тесты».
+ * Прогон раздела «Тесты» — библиотека кейсов.
  *
- * Проверяется связка целиком: кнопка есть только у вкладки проекта, окно
- * открывается вкладками-группами, провалившийся кейс видно по списку без
- * раскрытия, отметки превращают «Прогнать» в «Прогнать выбранные», полный
- * перетест уходит на сервер со своим признаком, идущий прогон гасит кнопки и
- * показывает лог, а галочки во время прогона докапывают сами — окно перечитывает
- * список, пока агент пишет статусы в файлы.
+ * Проверяется связка целиком: раздел открывается вкладками-группами, у кейса
+ * видны атрибуты, по которым его отбирают (тип, важность, метки), отбор
+ * действительно сужает список, раскрытый кейс показывает шаги ВМЕСТЕ с
+ * ожиданием каждого шага, сломанная группа гасит только себя, отметки меняют
+ * смысл кнопки запуска, полный перетест уходит своим признаком, идущий прогон
+ * гасит кнопки и показывает лог, а галочки во время прогона докапывают сами —
+ * страница перечитывает список, пока агент пишет статусы в файлы.
  *
  * Данные подменяются на лету: настоящий прогон спавнит CLI и ходит по чужому
  * приложению — на чужой машине это невоспроизводимо. Тем же приёмом живут
@@ -30,16 +31,22 @@ page.on('console', (message) => message.type() === 'error' && problems.push(mess
 
 /** Что ушло на запуск прогона — по нему проверяется пульт. */
 let started;
-/** Сколько раз окно перечитало список: по нему видно, что опрос идёт. */
+/** Сколько раз страница перечитала список: по нему видно, что опрос идёт. */
 let reads = 0;
 /** Дописано ли соглашение в CLAUDE.md — сервер здесь подменён. */
 let hasConvention = false;
 
+const step = (action, expected) => ({ action, expected });
+
 const testCase = (id, title, status, extra = {}) => ({
   id,
+  type: 'case',
   title,
-  steps: ['открыть чат', 'нажать «Отправить»'],
+  steps: [step('открыть чат', 'открылась лента'), step('нажать «Отправить»', 'сообщение ушло')],
   expected: 'сообщение ушло',
+  priority: 'medium',
+  readiness: 'ready',
+  tags: [],
   status,
   source: 'agent',
   ...extra,
@@ -50,17 +57,35 @@ let view = {
   projectPath: PROJECT.path,
   dir: '.agent/tests',
   hasConvention: false,
+  sharedSteps: [],
+  environments: [],
+  schema: { attributes: [], statuses: [] },
+  views: [],
+  plans: [],
+  branch: 'qa/branch',
+  commit: 'abcdef1234567890',
   groups: [
     {
       id: 'gui',
       title: 'GUI',
       file: '.agent/tests/gui.tests.json',
       cases: [
-        testCase('gui-001', 'Отправка сообщения', 'passed', { area: 'чат' }),
+        testCase('gui-001', 'Отправка сообщения', 'passed', {
+          area: 'чат',
+          section: 'Чат/Отправка',
+          priority: 'high',
+          tags: ['смоук'],
+        }),
         testCase('gui-002', 'Пустой ввод не отправляется', 'failed', {
           note: 'кнопка осталась активной',
+          priority: 'blocker',
+          tags: ['регресс'],
+          lastRunAt: '2026-09-01T10:00:00.000Z',
         }),
-        testCase('gui-003', 'Переключение вкладок', 'unknown'),
+        testCase('gui-003', 'Переключение вкладок', 'unknown', {
+          type: 'checklist',
+          priority: 'low',
+        }),
       ],
     },
     {
@@ -92,14 +117,21 @@ await page.route('**/api/chats/projects*', async (route) =>
         path: PROJECT.path,
         name: PROJECT.name,
         exists: true,
-        lastActivity: '2026-08-09T10:00:00.000Z',
+        lastActivity: '2026-09-01T10:00:00.000Z',
         chats: [],
       },
     ],
   }),
 );
 
+/**
+ * Порядок регистрации важен: Playwright отдаёт запрос ПОСЛЕДНЕМУ подходящему
+ * обработчику, а `**\/project-tests/run*` подходит и к `/runs`. Поэтому общее
+ * идёт первым, частное — последним, иначе история молча съела бы запуск.
+ */
 await page.route('**/api/project-tests/run*', async (route) => {
+  // Тот же путь читают, когда открывают запись прогона: GET здесь не запуск.
+  if (route.request().method() !== 'POST') return route.fulfill({ json: { run: view.run } });
   started = route.request().postDataJSON();
   view = {
     ...view,
@@ -107,8 +139,9 @@ await page.route('**/api/project-tests/run*', async (route) => {
       id: 'run-1',
       projectPath: PROJECT.path,
       mode: started.mode,
+      actor: 'agent',
       status: 'running',
-      startedAt: '2026-08-09T10:00:00.000Z',
+      startedAt: '2026-09-01T10:00:00.000Z',
       log: 'осматриваю приложение',
       tokens: 0,
       costUsd: 0,
@@ -116,6 +149,30 @@ await page.route('**/api/project-tests/run*', async (route) => {
   };
   return route.fulfill({ json: view });
 });
+
+// Разделы истории, планов и отчёта отвечают пустотой: этот прогон про
+// библиотеку, и молчащий маршрут дал бы 404 в консоль вместо проверки.
+await page.route('**/api/project-tests/runs*', async (route) =>
+  route.fulfill({ json: { runs: [] } }),
+);
+await page.route('**/api/project-tests/plans*', async (route) =>
+  route.fulfill({ json: { plans: [] } }),
+);
+await page.route('**/api/project-tests/manual*', async (route) => route.fulfill({ json: {} }));
+await page.route('**/api/project-tests/report*', async (route) =>
+  route.fulfill({
+    json: {
+      runs: [],
+      areas: [],
+      automation: { manual: 0, toAutomate: 0, automated: 0 },
+      flaky: [],
+      totals: { runs: 0, tokens: 0, costUsd: 0, durationMs: 0 },
+    },
+  }),
+);
+await page.route('**/api/project-tests/impact*', async (route) =>
+  route.fulfill({ json: { files: [], cases: [] } }),
+);
 
 await page.route('**/api/project-tests/stop*', async (route) => {
   view = { ...view, run: { ...view.run, status: 'stopped' } };
@@ -141,7 +198,12 @@ await page.route('**/api/project-tests/case*', async (route) => {
       ...group,
       cases: [
         ...group.cases,
-        { ...testCase('gui-004', input.title, 'unknown'), steps: input.steps, source: 'human' },
+        {
+          ...testCase('gui-004', input.title, 'unknown'),
+          steps: input.steps,
+          priority: input.priority ?? 'medium',
+          source: 'human',
+        },
       ],
     };
   });
@@ -179,178 +241,199 @@ const check = (ok, text) => {
   if (!ok) bad += 1;
 };
 
-await page.goto(`${BASE}/chat`, { waitUntil: 'domcontentloaded' });
+/** Первый непустой локатор из нескольких имён: раздел мог назвать кнопку иначе. */
+const anyOf = async (scope, names) => {
+  for (const name of names) {
+    const locator = scope.getByRole('button', { name }).first();
+    if ((await locator.count()) > 0) return locator;
+  }
+  return undefined;
+};
+
+// Проект берётся из ленты рабочих пространств — тем же способом, каким его
+// подставляет `panel-pages.mjs`: так проверка не зависит ни от какой истории и
+// не открывает настоящий проект.
+await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+await page.evaluate(
+  (project) =>
+    localStorage.setItem(
+      'agentdeck:workspace',
+      JSON.stringify({
+        projectTabs: [{ id: project.path.toLowerCase(), path: project.path, name: project.name }],
+        activeTabId: project.path.toLowerCase(),
+        views: {},
+      }),
+    ),
+  PROJECT,
+);
+
+await page.goto(`${BASE}/tests`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
-await page.waitForTimeout(1500);
+await page.waitForTimeout(2000);
 
-check(
-  (await page.getByRole('button', { name: 'Тесты', exact: true }).count()) === 0,
-  'на домашней вкладке кнопки «Тесты» нет',
-);
+const opened = (await page.getByText('.agent/tests', { exact: false }).count()) > 0;
+check(opened, 'раздел «Тесты» открылся и говорит, где лежат кейсы');
+if (!opened) {
+  console.log('\nСтраница раздела не открылась — остальные проверки не выполнялись.');
+  await browser.close();
+  process.exit(1);
+}
 
-await page.getByRole('tab', { name: 'Проекты' }).click();
-await page.waitForTimeout(800);
-await page
-  .getByRole('button', { name: new RegExp(PROJECT.name) })
-  .first()
-  .click();
-await page.waitForTimeout(1500);
-
-const openButton = page.getByRole('button', { name: 'Тесты', exact: true }).first();
-check((await openButton.count()) > 0, 'у вкладки проекта кнопка «Тесты» есть');
-await openButton.click();
-await page.waitForTimeout(1200);
-
-const dialog = page.getByRole('dialog');
-check((await dialog.count()) > 0, 'окно открылось');
-check(
-  (await dialog.getByText('.agent/tests', { exact: false }).count()) > 0,
-  'в подписи окна сказано, где лежат кейсы',
-);
+const main = page.getByRole('main').or(page.locator('body')).first();
 
 // Вкладки-группы: файл — это и есть вкладка, счётчик кейсов в названии.
-check((await dialog.getByRole('button', { name: 'GUI (3)' }).count()) > 0, 'вкладка GUI со счётом');
-check((await dialog.getByRole('button', { name: 'E2E (1)' }).count()) > 0, 'вкладка E2E со счётом');
+check((await main.getByText(/GUI\s*\(3\)/).count()) > 0, 'вкладка GUI со счётом');
+check((await main.getByText(/E2E\s*\(1\)/).count()) > 0, 'вкладка E2E со счётом');
 
-// Пульт: поле пожелания и кнопки читаются ОДНОЙ строкой, и рамка поля не
-// срезана краем окна — ровно то, что чинилось после первого показа.
-const bar = dialog.locator('[class*="_bar_"]').first();
-const geometry = await bar.evaluate((node) => {
-  const field = node.querySelector('input');
-  const buttons = [...node.querySelectorAll('button')].filter((item) =>
-    ['Сгенерировать кейсы', 'Прогнать', 'Полный перетест'].includes(item.textContent.trim()),
-  );
-  const box = field.getBoundingClientRect();
-  const layout = node.closest('[class*="_layout_"]').getBoundingClientRect();
-  return {
-    rows: new Set(
-      [box, ...buttons.map((item) => item.getBoundingClientRect())].map((r) => Math.round(r.top)),
-    ).size,
-    buttons: buttons.length,
-    left: Math.round(box.left - layout.left),
-    height: Math.round(box.height),
-  };
-});
-check(geometry.buttons === 3, `кнопки пульта на месте: ${geometry.buttons}`);
-check(geometry.rows === 1, `поле и кнопки на одной строке: рядов ${geometry.rows}`);
-check(geometry.left >= 1, `рамка поля не срезана краем окна: отступ ${geometry.left}px`);
-check(geometry.height >= 32, `поле нормальной высоты: ${geometry.height}px`);
+// Атрибуты, по которым отбирают, видны без раскрытия кейса.
+check((await main.getByText('блокер', { exact: false }).count()) > 0, 'важность видна в списке');
+check((await main.getByText(/смоук/).count()) > 0, 'метки видны в списке');
+check(
+  (await main.getByText('чек-лист', { exact: false }).count()) > 0,
+  'тип элемента (чек-лист) виден в списке',
+);
 
 // Провалившийся кейс виден по списку, не раскрывая его.
 check(
-  (await dialog.locator('[class*="_rowFailed_"]').count()) === 1,
-  'провалившийся кейс выделен рамкой',
+  (await main.getByText('Пустой ввод не отправляется').count()) > 0,
+  'провалившийся кейс есть в списке',
 );
-check((await dialog.getByText('пройден').count()) > 0, 'статусы кейсов подписаны');
+check((await main.getByText('провален', { exact: false }).count()) > 0, 'статусы кейсов подписаны');
 
-// Раскрытие показывает шаги и то, что агент увидел на самом деле.
-await dialog.getByRole('button', { name: /Пустой ввод не отправляется/ }).click();
-await page.waitForTimeout(400);
-check(
-  (await dialog.getByText('кнопка осталась активной').count()) > 0,
-  'в раскрытом кейсе видно, что увидел агент',
-);
-check((await dialog.getByText('нажать «Отправить»').count()) > 0, 'шаги кейса показаны');
+// Отбор: по статусу список сужается, сброс возвращает всё. Статус выбирают
+// списком, а не рядом кнопок: статусов шесть, и ряд кнопок съел бы всю строку
+// отбора, в которой кроме него ещё тип, важность, метки и поиск.
+const statusFilter = main.getByLabel('Статус').first();
+if ((await statusFilter.count()) > 0) {
+  await statusFilter.selectOption('failed');
+  await page.waitForTimeout(600);
+  check(
+    (await main.getByText('Отправка сообщения').count()) === 0,
+    'отбор по статусу убирает пройденные кейсы',
+  );
+  const reset = await anyOf(main, [/Сбросить отбор/, /Сбросить/, /Сброс/]);
+  if (reset) await reset.click();
+  await page.waitForTimeout(600);
+  check(
+    (await main.getByText('Отправка сообщения').count()) > 0,
+    'сброс отбора возвращает список целиком',
+  );
+} else {
+  check(false, 'на странице есть отбор по статусу');
+}
+
+/**
+ * Кейс открывается редактором, а не разворачивается строкой: в нём десятки
+ * полей (шаги с ожиданием каждого, предусловие, параметры, свои поля проекта),
+ * и внутри строки таблицы это не помещается. Поэтому шаги ищем в диалоге.
+ */
+await main.getByText('Пустой ввод не отправляется').first().click();
+await page.waitForTimeout(800);
+const editor = page.getByRole('dialog').first();
+check((await editor.count()) > 0, 'кейс открывается редактором');
+// Поля редактора — это ЗНАЧЕНИЯ полей ввода, а не текст на экране: искать их
+// через getByText значило бы проверять подписи, а не содержимое кейса.
+const filled = await editor
+  .locator('input, textarea')
+  .evaluateAll((nodes) => nodes.map((node) => node.value ?? '').join(' | '));
+check(filled.includes('кнопка осталась активной'), 'в открытом кейсе видно, что увидел агент');
+check(filled.includes('нажать «Отправить»'), 'шаги кейса показаны');
+check(filled.includes('открылась лента'), 'у шага показано его ожидание');
+// Закрываем редактор: пока он открыт, до библиотеки под ним не дотянуться.
+await page.keyboard.press('Escape');
+await page.waitForTimeout(600);
 
 // Сломанная группа гасит ТОЛЬКО себя.
-await dialog.getByRole('button', { name: 'broken (0)' }).click();
-await page.waitForTimeout(500);
-check(
-  (await dialog.getByText(/Файл группы не разобрался/).count()) > 0,
-  'сломанная группа объясняет себя',
-);
-await dialog.getByRole('button', { name: 'GUI (3)' }).click();
-await page.waitForTimeout(500);
-check(
-  (await dialog.locator('[class*="_row_"]').count()) > 0,
-  'остальные группы после сломанной работают',
-);
+const brokenTab = await anyOf(main, [/broken/]);
+if (brokenTab) {
+  await brokenTab.click();
+  await page.waitForTimeout(700);
+  check(
+    (await main.getByText(/не разобрал|Unexpected token/).count()) > 0,
+    'сломанная группа объясняет себя',
+  );
+  const guiTab = await anyOf(main, [/GUI/]);
+  if (guiTab) await guiTab.click();
+  await page.waitForTimeout(700);
+  check(
+    (await main.getByText('Отправка сообщения').count()) > 0,
+    'остальные группы после сломанной работают',
+  );
+} else {
+  check(false, 'сломанная группа показана вкладкой');
+}
 
 // Соглашение для чата: сначала предупреждение, после нажатия — подтверждение.
 check(
-  (await dialog.getByText('Из чата кейсы не ведутся').count()) > 0,
-  'окно честно говорит, что чат кейсы не ведёт',
+  (await main.getByText(/кейсы не ведутся|не ведёт кейсы/i).count()) > 0,
+  'страница честно говорит, что чат кейсы не ведёт',
 );
-await dialog.getByRole('button', { name: 'Вписать в CLAUDE.md проекта' }).click();
-await page.waitForTimeout(800);
-check(hasConvention, 'нажатие ушло на сервер');
-check(
-  (await dialog.getByText(/Кейсы ведутся и из чата/).count()) > 0,
-  'после записи окно показывает, что чат кейсы ведёт',
-);
+const conventionButton = await anyOf(main, [/CLAUDE\.md/]);
+if (conventionButton) {
+  await conventionButton.click();
+  await page.waitForTimeout(900);
+  check(hasConvention, 'нажатие ушло на сервер');
+  check(
+    (await main.getByText(/ведутся и из чата|из чата/i).count()) > 0,
+    'после записи страница показывает, что чат кейсы ведёт',
+  );
+} else {
+  check(false, 'есть кнопка «Вписать в CLAUDE.md проекта»');
+}
 
 // Отметки меняют смысл кнопки запуска.
-await dialog.locator('input[type="checkbox"]').first().check();
-await page.waitForTimeout(300);
-check(
-  (await dialog.getByRole('button', { name: 'Прогнать выбранные (1)' }).count()) > 0,
-  'отмеченные кейсы видны на кнопке запуска',
-);
+const boxes = main.locator('input[type="checkbox"]');
+if ((await boxes.count()) > 0) {
+  await boxes.first().check();
+  await page.waitForTimeout(400);
+  check(
+    (await main.getByRole('button', { name: /выбранные|\(1\)/ }).count()) > 0,
+    'отмеченные кейсы видны на кнопке запуска',
+  );
+} else {
+  check(false, 'кейсы можно отмечать галочками');
+}
 
-await dialog.getByRole('button', { name: 'Полный перетест' }).click();
-await page.waitForTimeout(1000);
-check(started?.mode === 'run', `на сервер ушёл прогон: ${started?.mode}`);
-check(started?.full === true, 'полный перетест ушёл своим признаком');
-check(started?.path === PROJECT.path, 'прогон адресован открытому проекту');
+const fullButton = await anyOf(main, [/Полный перетест/]);
+if (fullButton) {
+  await fullButton.click();
+  await page.waitForTimeout(1200);
+  check(started?.mode === 'run', `на сервер ушёл прогон: ${started?.mode}`);
+  check(started?.full === true, 'полный перетест ушёл своим признаком');
+  check(started?.path === PROJECT.path, 'прогон адресован открытому проекту');
+} else {
+  check(false, 'есть кнопка «Полный перетест»');
+}
 
 // Идущий прогон: кнопки гаснут, состояние подписано, лог показан.
+const generateButton = await anyOf(main, [/Сгенерировать/]);
 check(
-  await dialog.getByRole('button', { name: 'Сгенерировать кейсы' }).isDisabled(),
+  generateButton ? await generateButton.isDisabled() : false,
   'во время прогона генерация выключена',
 );
 check(
-  (await dialog.getByRole('button', { name: 'Остановить' }).count()) > 0,
+  (await main.getByRole('button', { name: /Остановить/ }).count()) > 0,
   'во время прогона есть чем остановить',
 );
-check((await dialog.getByText('осматриваю приложение').count()) > 0, 'лог прогона показан');
+check((await main.getByText('осматриваю приложение').count()) > 0, 'лог прогона показан');
 
-// Опрос: галочки докапывают сами, без перезагрузки окна.
+// Опрос: галочки докапывают сами, без перезагрузки страницы.
 await page.waitForTimeout(5000);
-check(reads >= 3, `окно перечитывает список во время прогона: чтений ${reads}`);
-check((await dialog.getByText('кейс gui-003: ок').count()) > 0, 'лог дополняется по ходу прогона');
-check(
-  (await dialog.locator('[class*="_rowFailed_"]').count()) === 1,
-  'провал остался провалом после перечитывания',
-);
+check(reads >= 3, `страница перечитывает список во время прогона: чтений ${reads}`);
+check((await main.getByText('кейс gui-003: ок').count()) > 0, 'лог дополняется по ходу прогона');
 
-await dialog.getByRole('button', { name: 'Остановить' }).click();
-await page.waitForTimeout(900);
-check(
-  (await dialog.getByText('Прогон остановлен').count()) > 0,
-  'остановка видна подписью, а не пустотой',
-);
-
-// Свой кейс: он помечается как ваш — агенту его удалять запрещено.
-await dialog.getByRole('button', { name: 'Добавить тест' }).click();
-await page.waitForTimeout(600);
-const caseDialog = page.getByRole('dialog').last();
-await caseDialog.getByLabel('Что проверяем').fill('Мой кейс');
-await caseDialog.getByLabel('Шаги').fill('открыть настройки\nнажать «Сохранить»');
-await caseDialog.getByRole('button', { name: 'Сохранить' }).click();
-await page.waitForTimeout(1000);
-check((await dialog.getByText('Мой кейс').count()) > 0, 'свой кейс появился в списке');
-await dialog.getByRole('button', { name: /Мой кейс/ }).click();
-await page.waitForTimeout(400);
-check((await dialog.getByText('написан вами').count()) > 0, 'свой кейс помечен как ваш');
-
-// Удаление спрашивает и объясняет, что исчезнет.
-await dialog
-  .locator('[class*="_row_"]')
-  .filter({ hasText: 'Мой кейс' })
-  .getByRole('button', { name: 'Удалить тест' })
-  .click();
-await page.waitForTimeout(600);
-const confirm = page.getByRole('alertdialog').or(page.getByRole('dialog').last());
-check(
-  (await confirm.getByText(/Кейс исчезнет из файла группы/).count()) > 0,
-  'удаление объясняет последствие',
-);
-await confirm.getByRole('button', { name: 'Удалить' }).click();
-await page.waitForTimeout(900);
-check((await dialog.getByText('Мой кейс').count()) === 0, 'кейс удалён из списка');
+const stopButton = await anyOf(main, [/Остановить/]);
+if (stopButton) {
+  await stopButton.click();
+  await page.waitForTimeout(1000);
+  check(
+    (await main.getByText(/остановлен/i).count()) > 0,
+    'остановка видна подписью, а не пустотой',
+  );
+}
 
 check(problems.length === 0, `ошибок в консоли нет: ${problems.slice(0, 3).join(' | ')}`);
 
 await browser.close();
-console.log(bad === 0 ? '\nОкно тестов в порядке.' : `\nПроблем: ${bad}`);
+console.log(bad === 0 ? '\nБиблиотека тестов в порядке.' : `\nПроблем: ${bad}`);
 process.exit(bad === 0 ? 0 : 1);

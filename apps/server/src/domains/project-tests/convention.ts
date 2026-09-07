@@ -38,13 +38,23 @@ const BLOCK = `${MARKER}
   "cases": [
     {
       "id": "gui-001",
+      "type": "case | checklist",
       "title": "коротко, что проверяем",
       "purpose": "зачем этот тест нужен",
       "area": "зона приложения",
-      "steps": ["что нажать", "что ввести"],
+      "section": "путь в дереве: Чат/Вложения",
+      "precondition": "с какого состояния начинать",
+      "steps": [{ "action": "что нажать", "data": "что ввести", "expected": "что видно" }],
       "expected": "что должно получиться",
-      "status": "unknown | passed | failed | skipped",
+      "oracle": "чем доказывается результат",
+      "priority": "blocker | high | medium | low",
+      "tags": ["smoke"],
+      "parameters": [{ "name": "role", "values": ["админ", "гость"] }],
+      "codePaths": ["src/pages/Chat"],
+      "automation": { "status": "manual | toAutomate | automated", "file": "…", "testName": "…" },
+      "status": "unknown | passed | failed | skipped | blocked",
       "note": "что увидел на самом деле",
+      "attachments": ["${TESTS_DIR}/attachments/gui-001/скриншот.png"],
       "lastRunAt": "ISO-время прогона",
       "source": "agent | human"
     }
@@ -52,13 +62,20 @@ const BLOCK = `${MARKER}
 }
 \`\`\`
 
+Рядом лежат \`_shared.steps.json\` (общие шаги, ссылка из кейса — \`{"ref": "login"}\`),
+\`environments.json\`, \`schema.json\`, \`views.json\`, \`plans/\` и \`runs/\` — их ведёт панель.
+
 Правила:
 
 - проверил что-то в интерфейсе — заведи или обнови кейс; результат пиши сразу
   после КАЖДОГО кейса (\`status\`, \`note\`, \`lastRunAt\`), а не пачкой в конце;
 - \`id\` не меняй: по нему панель сводит правки;
 - кейсы с \`"source": "human"\` дополняй, но не удаляй и не переписывай;
-- функции в приложении не стало — убери её кейсы;
+- пиши границы и негативные проверки, а не только счастливый путь; повторяющиеся
+  шаги выноси в общий шаг, почти одинаковые кейсы — в \`parameters\` (в тексте шага
+  параметр пишется как \`%role\`);
+- \`blocked\` — до проверки не дойти из-за чужой поломки, \`skipped\` — проверять нечем;
+- функции в приложении не стало — пометь её кейсы \`"readiness": "obsolete"\` или убери;
 - найденный баг — это \`status: "failed"\` и причина в \`note\`, а не повод чинить код
   без отдельной просьбы.
 `;

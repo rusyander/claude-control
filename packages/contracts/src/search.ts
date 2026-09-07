@@ -35,6 +35,12 @@ export const searchResultKindSchema = zodEnum([
   'instructions',
   /** Группа панели — надстройка, файлов Claude Code у неё нет, но раздел на странице есть. */
   'group',
+  /**
+   * Тест-кейс открытого проекта. Единственный вид, который живёт не в
+   * конфигурации Claude Code, а в самом проекте, — поэтому и появляется в
+   * выдаче, только когда запрос назвал проект (`?path=`).
+   */
+  'test',
 ]);
 
 export type SearchResultKind = Infer<typeof searchResultKindSchema>;

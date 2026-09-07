@@ -20,6 +20,12 @@ export type {
 // Реестр проектов уровня конфигурации.
 export { useProjectRegistry, useAddProject, useRemoveProject } from './api/ProjectRegistryApi';
 
+// Проект, над которым работают в разделе тестирования: реестр плюс открытые
+// вкладки, выбор запоминается браузером. Живёт здесь, а не на странице тестов,
+// потому что тот же выбор нужен общему поиску — он ищет и по кейсам проекта.
+export { useTestsProject, mergeProjects, resolveSelected } from './model/useTestedProject';
+export type { TestsProject } from './model/useTestedProject';
+
 // Конфиги конкретного проекта: CLAUDE.md, MCP-серверы, права.
 export {
   useProjectRules,

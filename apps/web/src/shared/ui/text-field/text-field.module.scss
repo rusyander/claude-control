@@ -17,6 +17,13 @@
   &:hover {
     border-color: var(--color-border-strong);
   }
+
+  /* Только для чтения: фон утоплен, курсор обычный — видно, что править нечего,
+     но текст остаётся выделяемым и поле не выпадает из обхода с клавиатуры. */
+  &:read-only {
+    background-color: var(--color-surface-sunken);
+    cursor: default;
+  }
 }
 
 .mono {

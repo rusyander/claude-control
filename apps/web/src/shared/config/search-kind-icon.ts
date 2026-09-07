@@ -19,4 +19,6 @@ export const KIND_ICON: Record<SearchResultKind, IconName> = {
   // что и у раздела инструкций в навигации.
   instructions: 'file',
   group: 'groups',
+  // Тест-кейс проекта — та же иконка, что у раздела тестирования в навигации.
+  test: 'check',
 };

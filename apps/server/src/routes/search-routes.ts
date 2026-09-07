@@ -8,7 +8,16 @@ import { searchConfig } from '../domains/search.ts';
  * пустой результат, секреты переменных окружения наружу не уходят.
  */
 export function registerSearchRoutes(app: FastifyInstance, ctx: ServerContext): void {
-  app.get<{ Querystring: { q?: string } }>('/api/search', (request) =>
-    searchConfig({ paths: ctx.location.paths, store: ctx.store }, request.query.q ?? ''),
+  app.get<{ Querystring: { q?: string; path?: string } }>('/api/search', (request) =>
+    searchConfig(
+      {
+        paths: ctx.location.paths,
+        store: ctx.store,
+        // Проект называет клиент: кейсы лежат в самом проекте, и без открытой
+        // вкладки проекта искать по ним нечего.
+        projectPath: request.query.path?.trim() || undefined,
+      },
+      request.query.q ?? '',
+    ),
   );
 }

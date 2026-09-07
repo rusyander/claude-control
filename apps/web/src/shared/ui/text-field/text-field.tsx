@@ -17,6 +17,7 @@ export function TextField({
   error,
   autoFocus,
   disabled,
+  readOnly,
   type = 'text',
 }: TextFieldProps) {
   const id = useId();
@@ -44,6 +45,7 @@ export function TextField({
           aria-invalid={Boolean(error)}
           autoFocus={autoFocus}
           disabled={disabled}
+          readOnly={readOnly}
           spellCheck={false}
         />
       ) : (
@@ -58,6 +60,7 @@ export function TextField({
           aria-invalid={Boolean(error)}
           autoFocus={autoFocus}
           disabled={disabled}
+          readOnly={readOnly}
           spellCheck={false}
         />
       )}

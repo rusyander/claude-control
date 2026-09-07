@@ -1,0 +1,102 @@
+// Раздел тестирования. Страница тянется на всю высоту, а прокручивается только
+// таблица кейсов внутри библиотеки: заголовок, выбор проекта и вкладки должны
+// оставаться на месте — с них начинается любое действие.
+.page {
+  height: 100%;
+  min-height: 0;
+}
+
+.libraryTab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  flex: 1;
+  min-height: 0;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+// Составная полоса: доли статусов подряд, без подписей внутри — подписи рядом
+// значками. Полоса без текста читается с двух метров, полоса с текстом внутри
+// не читается вовсе.
+.stack {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--color-surface-sunken);
+}
+
+.stackPart {
+  display: block;
+  height: 100%;
+}
+
+.stackPassed {
+  background: var(--color-success);
+}
+
+.stackFailed {
+  background: var(--color-danger);
+}
+
+.stackUnknown {
+  background: var(--color-border);
+}
+
+.stackToAutomate {
+  background: var(--color-accent);
+}
+
+.trend {
+  width: 100%;
+  height: 120px;
+}
+
+.trendPassed {
+  fill: var(--color-success);
+}
+
+.trendFailed {
+  fill: var(--color-danger);
+}
+
+// Заголовок записи прогона — кнопка раскрытия. Кнопка по умолчанию центрирует
+// содержимое и обрезает его, поэтому её оформление снимается целиком.
+.runHead {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.runLink {
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+}
+
+.runBody {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-2xs);
+}
+
+.result {
+  padding: var(--spacing-2xs);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
+// Сведённый провал: причина сверху, задетые кейсы — под ней.
+.failureRow {
+  padding: var(--spacing-2xs) 0;
+  border-top: 1px solid var(--color-border-subtle);
+}

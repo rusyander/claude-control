@@ -12,6 +12,7 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { useSearch, MIN_SEARCH_LENGTH } from '@entities/Search';
+import { useTestsProject } from '@entities/Project';
 import { useProviders, activeCapabilities, visibleNavItems } from '@entities/Provider';
 import { rankByFuzzy } from '../model/fuzzy';
 import type { CommandPaletteProps, PaletteOption } from './CommandPalette.types';
@@ -40,7 +41,10 @@ export function CommandPalette({ isOpen, onOpenChange }: CommandPaletteProps) {
   const debounced = useDebouncedValue(query, 200);
   const trimmed = debounced.trim();
   const isSearchReady = trimmed.length >= MIN_SEARCH_LENGTH;
-  const { data: searchData } = useSearch(isSearchReady ? debounced : '');
+  // Проект — ради тест-кейсов: они лежат в проекте, а не в конфигурации панели,
+  // и без его пути поиск их не видит (см. `useSearch`).
+  const { selected } = useTestsProject();
+  const { data: searchData } = useSearch(isSearchReady ? debounced : '', selected?.path);
   const { data: providers } = useProviders();
 
   // Разделы, скрытые у активного провайдера (`unsupported`), не предлагаем к

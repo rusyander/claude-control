@@ -6,10 +6,12 @@ import type {
   McpServer,
   PermissionRule,
   Plugin,
+  ProjectTestCase,
   Rule,
   Skill,
 } from '@agentdeck/contracts';
 import type { ScriptFile } from './scripts.ts';
+import type { SearchTestCase } from './search/types.ts';
 import { searchEntities, type ProviderSearchInputs, type SearchInputs } from './search.ts';
 
 /**
@@ -150,6 +152,46 @@ describe('searchEntities — группы панели', () => {
     const results = searchEntities(inputs({ groups: [group({})] }), 'скиллы под');
 
     expect(results.map((item) => item.kind)).toEqual(['group']);
+  });
+});
+
+/**
+ * Кейсы проекта в общем поиске. Ищут по тому, что нажимали, — поэтому текст
+ * шагов индексируется наравне с заголовком, а идентификатор результата несёт и
+ * группу: без неё страница тестов не знает, какой файл открывать.
+ */
+describe('searchEntities — тест-кейсы проекта', () => {
+  const testCase = (over: Partial<ProjectTestCase>): SearchTestCase => ({
+    groupId: 'gui',
+    groupTitle: 'Интерфейс',
+    testCase: {
+      id: 'gui-001',
+      type: 'case',
+      title: 'Вход с верными данными',
+      steps: [{ action: 'Открыть /login', expected: 'Форма видна' }],
+      status: 'unknown',
+      source: 'human',
+      ...over,
+    },
+  });
+
+  it('кейс находится по заголовку и ведёт на раздел тестов', () => {
+    const results = searchEntities(inputs({ tests: [testCase({})] }), 'верными');
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ kind: 'test', id: 'gui:gui-001', pagePath: 'tests' });
+  });
+
+  it('кейс находится по тексту шага и по тегу', () => {
+    const one = searchEntities(inputs({ tests: [testCase({})] }), 'login');
+    const two = searchEntities(inputs({ tests: [testCase({ tags: ['smoke'] })] }), 'smoke');
+
+    expect(one.map((item) => item.kind)).toEqual(['test']);
+    expect(two.map((item) => item.kind)).toEqual(['test']);
+  });
+
+  it('без открытого проекта кейсов в выдаче нет', () => {
+    expect(searchEntities(inputs({}), 'верными')).toEqual([]);
   });
 });
 

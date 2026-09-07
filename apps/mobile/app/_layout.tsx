@@ -108,6 +108,8 @@ export default function RootLayout() {
             <Stack.Screen name="chats" options={{ title: t.chats.title }} />
             <Stack.Screen name="code" options={{ title: t.code.projectTitle }} />
             <Stack.Screen name="tests" options={{ title: t.tests.screenTitle }} />
+            <Stack.Screen name="test-run" options={{ title: t.tests.manual.title }} />
+            <Stack.Screen name="test-runs" options={{ title: t.tests.runs.title }} />
             <Stack.Screen name="pair" options={{ title: t.pair.screenTitle }} />
           </Stack>
           {greeted ? null : <AppSplash onDone={() => setGreeted(true)} />}

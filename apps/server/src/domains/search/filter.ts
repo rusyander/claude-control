@@ -128,6 +128,33 @@ export function searchEntities(inputs: SearchInputs, query: string): SearchResul
     }
   }
 
+  /**
+   * Тест-кейсы открытого проекта: название, цель, зона, секция, теги и текст
+   * шагов. Шаги здесь важнее описания — ищут обычно по тому, что нажимали
+   * («вложение», «SSE»), а не по формулировке заголовка.
+   */
+  for (const { groupId, groupTitle, testCase } of inputs.tests ?? []) {
+    const steps = testCase.steps.map((step) => `${step.action} ${step.expected ?? ''}`).join(' ');
+    const fields = [
+      testCase.id,
+      testCase.title,
+      testCase.purpose,
+      testCase.area,
+      testCase.section,
+      steps,
+      testCase.expected,
+      ...(testCase.tags ?? []),
+    ];
+    if (matchesAny(fields, needle)) {
+      push(
+        'test',
+        `${groupId}:${testCase.id}`,
+        testCase.title,
+        buildSnippet([testCase.purpose, steps, testCase.expected, groupTitle], needle),
+      );
+    }
+  }
+
   // Разделы активного провайдера (не Claude): те же виды результатов и те же
   // страницы — страницы сами роутятся по провайдеру, поэтому ссылки рабочие.
   const provider = inputs.provider;

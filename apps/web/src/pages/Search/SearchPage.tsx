@@ -13,6 +13,7 @@ import { EmptyState } from '@shared/ui/empty-state';
 import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
 import { KIND_ICON } from '@shared/config/search-kind-icon';
 import { useSearch, MIN_SEARCH_LENGTH } from '@entities/Search';
+import { useTestsProject } from '@entities/Project';
 import { groupResults } from './model/groupResults';
 import styles from './SearchPage.module.scss';
 
@@ -24,7 +25,14 @@ export function SearchPage() {
 
   const trimmed = debounced.trim();
   const isReady = trimmed.length >= MIN_SEARCH_LENGTH;
-  const { data, isLoading } = useSearch(debounced);
+  /**
+   * Проект нужен поиску потому, что кроме конфигурации он отвечает и по
+   * тест-кейсам, а те лежат в самом проекте. Берётся тот же выбор, что и в
+   * разделе тестирования: искать по кейсам проекта, который человек сейчас не
+   * проверяет, было бы страннее, чем не искать вовсе.
+   */
+  const { selected } = useTestsProject();
+  const { data, isLoading } = useSearch(debounced, selected?.path);
 
   const groups = useMemo(() => groupResults(data?.results ?? []), [data]);
   const total = data?.results.length ?? 0;

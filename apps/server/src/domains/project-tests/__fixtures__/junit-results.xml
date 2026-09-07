@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="vitest" tests="5" failures="1" errors="1" skipped="1" time="3.2">
+  <testsuite name="Чат" tests="4" failures="1" skipped="1" time="2.1">
+    <testcase classname="e2e/chat.spec.ts" name="открывает чат" time="0.512"/>
+    <testcase classname="e2e/chat.spec.ts" name="[gui-002] отправляет сообщение" time="1.004">
+      <failure message="expected &quot;ок&quot; to be visible">AssertionError: ожидали «ок»
+        at e2e/chat.spec.ts:42:11</failure>
+    </testcase>
+    <testcase classname="e2e/chat.spec.ts" name="Загрузка вложения" time="0.2">
+      <skipped message="нет тестовых данных"/>
+    </testcase>
+    <testcase classname="e2e/chat.spec.ts" name="никому не известный тест" time="0.1"/>
+  </testsuite>
+  <testsuite name="API" tests="1" errors="1" time="0.9">
+    <testcase classname="api.spec.ts" name="health" time="0.9">
+      <error message="ECONNREFUSED 127.0.0.1:5178">Error: connect ECONNREFUSED</error>
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,37 @@
+// Планы карточками: их единицы, а не сотни, и у каждого есть что показать —
+// сроки, состав, число проходов. Список строками прятал бы ровно это.
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.halfField {
+  flex: 1;
+  min-width: 220px;
+
+  > * {
+    width: 100%;
+  }
+}
+
+// Выбор кейсов в план: своя прокрутка, потому что кейсов бывают сотни, а форма
+// плана не должна из-за этого превращаться в бесконечную страницу.
+.picker {
+  max-height: 260px;
+  overflow: auto;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.pickerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  cursor: pointer;
+}

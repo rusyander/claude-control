@@ -5,11 +5,12 @@ import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { Typography } from '@shared/ui/typography';
 import { SearchField } from '@shared/ui/search-field';
-import type { TestsBoard } from '../model/useTestsBoard';
+import { SelectField } from '@shared/ui/select-field';
+import type { ProjectTestsRunBarProps } from './ProjectTestsRunBar.types';
 import styles from './ProjectTests.module.scss';
 
 /**
- * Пульт прогона: что запустить и как оно идёт.
+ * Пульт прогона: что запустить, на чём и как оно идёт.
  *
  * Пока прогон идёт, кнопки запуска не прячутся, а гаснут: исчезающая панель
  * меняет высоту содержимого, и список кейсов под ней прыгает ровно в тот
@@ -22,11 +23,9 @@ export function ProjectTestsRunBar({
   board,
   scope,
   onScopeChange,
-}: {
-  board: TestsBoard;
-  scope: string;
-  onScopeChange: (value: string) => void;
-}) {
+  environmentId,
+  onEnvironmentChange,
+}: ProjectTestsRunBarProps) {
   const { t } = useTranslation();
   const run = board.run;
   const isRunning = run?.status === 'running';
@@ -35,8 +34,14 @@ export function ProjectTestsRunBar({
   const counts = {
     passed: cases.filter((item) => item.status === 'passed').length,
     failed: cases.filter((item) => item.status === 'failed').length,
-    skipped: cases.filter((item) => item.status === 'skipped').length,
+    skipped: cases.filter((item) => item.status === 'skipped' || item.status === 'blocked').length,
     rest: cases.filter((item) => item.status === 'unknown' || item.status === 'running').length,
+  };
+
+  const base = {
+    groupId: board.activeId || undefined,
+    scope,
+    environmentId: environmentId || undefined,
   };
 
   return (
@@ -54,15 +59,27 @@ export function ProjectTestsRunBar({
           />
         </div>
 
+        {onEnvironmentChange && board.environments.length > 0 && (
+          <SelectField
+            label={t('tests.runs.environment')}
+            value={environmentId ?? ''}
+            onChange={onEnvironmentChange}
+            options={[
+              { value: '', label: t('tests.runs.environmentDefault') },
+              ...board.environments
+                .filter((item) => !item.archived)
+                .map((item) => ({ value: item.id, label: item.title })),
+            ]}
+          />
+        )}
+
         <Button
           variant="secondary"
           leftIcon={<Icon name="plus" size={18} />}
           disabled={isRunning}
           isLoading={board.isBusy && !isRunning}
           title={t('projectTests.generateHint')}
-          onClick={() =>
-            board.start({ mode: 'generate', groupId: board.activeId || undefined, scope })
-          }
+          onClick={() => board.start({ mode: 'generate', ...base })}
         >
           {t('projectTests.generate')}
         </Button>
@@ -74,9 +91,8 @@ export function ProjectTestsRunBar({
           onClick={() =>
             board.start({
               mode: 'run',
-              groupId: board.activeId || undefined,
+              ...base,
               caseIds: board.checked.length > 0 ? board.checked : undefined,
-              scope,
             })
           }
         >
@@ -90,11 +106,21 @@ export function ProjectTestsRunBar({
           leftIcon={<Icon name="refresh" size={18} />}
           disabled={isRunning || cases.length === 0}
           title={t('projectTests.runFullHint')}
-          onClick={() =>
-            board.start({ mode: 'run', groupId: board.activeId || undefined, scope, full: true })
-          }
+          onClick={() => board.start({ mode: 'run', ...base, full: true })}
         >
           {t('projectTests.runFull')}
+        </Button>
+
+        {/* Отбор по диффу: гнать только то, чего касаются несохранённые правки.
+            Считает его сервер по `codePaths` кейсов — панель лишь просит. */}
+        <Button
+          variant="ghost"
+          leftIcon={<Icon name="branch" size={18} />}
+          disabled={isRunning || cases.length === 0}
+          title={t('tests.runs.changedOnlyHint')}
+          onClick={() => board.start({ mode: 'run', ...base, changedOnly: true })}
+        >
+          {t('tests.runs.changedOnly')}
         </Button>
 
         {isRunning && (
@@ -108,6 +134,11 @@ export function ProjectTestsRunBar({
         {cases.length > 0 && (
           <Typography variant="caption" color="subtle" as="span">
             {t('projectTests.counts', counts)}
+          </Typography>
+        )}
+        {board.branch && (
+          <Typography variant="caption" color="subtle" as="span">
+            {t('tests.runs.branch', { branch: board.branch })}
           </Typography>
         )}
         {run && (

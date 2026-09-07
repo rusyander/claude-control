@@ -1,8 +1,8 @@
-// Окно тест-кейсов: пульт сверху, список кейсов под ним.
-//
-// Высоту задаёт окно (`bodyFill`): прокручивается ТОЛЬКО список. Пульт с
-// кнопками прогона и вкладки групп остаются на месте — иначе на трёхстах
-// кейсах «Остановить» уезжало бы за экран ровно тогда, когда оно нужнее всего.
+// Библиотека тестов: пульт сверху, отбор под ним, дерево секций слева, таблица
+// справа. Высоту задаёт владелец экрана (окно с `bodyFill` или страница), а
+// прокручивается только таблица: вкладки групп, фильтры и панель массовых
+// действий обязаны оставаться на месте — иначе на трёхстах кейсах «Остановить»
+// и «Применить» уезжают за экран ровно тогда, когда они нужнее всего.
 .layout {
   display: flex;
   flex-direction: column;
@@ -41,75 +41,292 @@
 .list {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+  min-height: 0;
+}
+
+// Дерево и таблица — две колонки одной высоты, каждая со своей прокруткой.
+// Общая прокрутка увела бы дерево вверх ровно тогда, когда по нему выбирают.
+.libraryBody {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--spacing-sm);
+  flex: 1;
+  min-height: 0;
+}
+
+.tree {
   overflow: auto;
   scrollbar-width: thin;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-2xs);
+  min-height: 0;
+  padding-right: var(--spacing-3xs);
 }
 
-// Строка кейса. Слева отметка выбора и статус, дальше текст, справа кнопки —
-// они появляются всегда, а не по наведению: на списке в сотни строк искать
-// исчезающую кнопку мышью невозможно.
-.row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+.tableArea {
+  overflow: auto;
+  scrollbar-width: thin;
+  min-height: 0;
 }
 
-.rowFailed {
-  border-color: var(--color-danger);
+@media (max-width: 900px) {
+  // На узком экране дерево уезжает наверх: две колонки по 220px не оставляют
+  // таблице ширины, а таблица здесь — главное.
+  .libraryBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tree {
+    max-height: 180px;
+  }
 }
 
-.rowRunning {
-  border-color: var(--color-accent);
+.filters {
+  flex: none;
 }
 
-.rowText {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3xs);
-  min-width: 0;
+.query {
+  min-width: 260px;
+  flex: 1;
+
+  > * {
+    width: 100%;
+    max-width: none;
+  }
 }
 
-// Заголовок кейса — кнопка раскрытия. Кнопка по умолчанию центрирует и
-// обрезает содержимое, поэтому её выравнивание снимается здесь целиком.
-.head {
-  display: block;
-  width: 100%;
+.archived {
+  padding-bottom: var(--spacing-3xs);
+}
+
+.viewChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.viewApply {
   padding: 0;
   border: 0;
   background: none;
-  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+// Панель массовых действий: видна только когда что-то отмечено, поэтому она
+// подсвечена — это не постоянная часть экрана, а режим.
+.bulk {
+  flex: none;
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
+.bulkCount {
+  white-space: nowrap;
+}
+
+// Строка дерева секций: подпись слева, счётчик справа, отступ задаёт глубину.
+.section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  padding: var(--spacing-3xs) var(--spacing-xs);
+  border: 0;
+  border-radius: 8px;
+  background: none;
   cursor: pointer;
   color: inherit;
   font: inherit;
+  text-align: left;
+
+  &:hover {
+    background: var(--color-surface-sunken);
+  }
 }
 
-.steps {
-  margin: 0;
-  padding-left: var(--spacing-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3xs);
+.sectionActive {
+  background: var(--color-surface-sunken);
+  font-weight: 600;
 }
 
-.actions {
-  display: flex;
-  gap: var(--spacing-3xs);
-  align-items: center;
+.sectionTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-body-sm);
 }
 
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--spacing-2xs);
+.sectionCount {
+  flex: none;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-subtle);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-body-sm);
+
+  th,
+  td {
+    padding: var(--spacing-3xs) var(--spacing-2xs);
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-surface);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+}
+
+.tableCaption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: var(--spacing-3xs);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-subtle);
+}
+
+.tableRow:hover {
+  background: var(--color-surface-sunken);
+}
+
+// Провал видно по списку, не раскрывая кейс: полоса слева читается быстрее
+// подписи и не занимает колонку.
+.tableRowFailed {
+  box-shadow: inset 3px 0 0 0 var(--color-danger);
+}
+
+.tableRowArchived {
+  opacity: 0.55;
+}
+
+.cellCheck {
+  width: 28px;
+}
+
+.caseLink {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+// Скрыто визуально, но читается диктором: заголовок колонки с кнопками.
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+// Шаг сценария: номер, поля, кнопки перестановки.
+.stepRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--spacing-xs);
+  align-items: start;
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.stepIndex {
+  min-width: 20px;
+  padding-top: 22px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-subtle);
+}
+
+.stepFields {
+  min-width: 0;
+}
+
+.stepHalf {
+  flex: 1;
+  min-width: 200px;
+
+  > * {
+    width: 100%;
+  }
+}
+
+.paramRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  gap: var(--spacing-xs);
+  align-items: end;
+}
+
+.paramName,
+.paramValues {
+  min-width: 0;
+
+  > * {
+    width: 100%;
+  }
+}
+
+.linkRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: var(--spacing-xs);
+  align-items: end;
+}
+
+.linkUrl,
+.linkTitle {
+  min-width: 0;
+
+  > * {
+    width: 100%;
+  }
+}
+
+.narrowField {
+  width: 120px;
+}
+
+.halfField {
+  flex: 1;
+  min-width: 220px;
+
+  > * {
+    width: 100%;
+  }
 }
 
 // Лог прогона: моноширинный хвост вывода агента, отдельной прокруткой.
@@ -124,10 +341,32 @@
   font-size: var(--font-size-caption);
   color: var(--color-text-subtle);
   background: var(--color-surface-sunken);
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   padding: var(--spacing-xs);
 }
 
-.checkbox {
-  margin-top: 2px;
+// Строка истории файла кейсов: тема коммита сверху, подпись и объём — под ней.
+.historyRow {
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+
+// Выбор файла: нативный input скрыт, нажимают по кнопке рядом.
+.file {
+  display: none;
+}
+
+// Ссылка выгрузки стоит в одном ряду с полями — поэтому выглядит кнопкой.
+.exportLink {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-fg);
+  font-size: var(--font-size-body-sm);
+  text-decoration: none;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
 }

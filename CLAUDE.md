@@ -38,7 +38,8 @@ default and the only verified one. No database — **source of truth = Claude Co
   intermediates in `node_modules/*/android/{build,.cxx}` — ~10 GB per release build, in neither APK
   nor repo; the build sweeps them itself, `--keep-build` opts out, `--dry` measures),
   `make-mobile-icons.mjs` (one SVG mark → every icon/splash size, so launcher, splash and favicon
-  cannot drift)
+  cannot drift), `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report` — the QA workspace
+  of a project without the panel, `report` exits 1 on a failure so CI can gate on it)
 
 Needs **Node 22.6+** (server runs with `--experimental-strip-types`), pnpm 10, `claude` in PATH.
 
@@ -64,9 +65,10 @@ Fix without asking: project code, deps, build config, launch env. Ask first: fil
 the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
 QA runs live in `tools/qa/` and need `pnpm dev` up + `pnpm qa:setup`; each drives the real UI of one
-area. Ten behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
+area. Thirteen behave unlike the rest — `check-attention.mjs`, `check-provider-chat.mjs`,
 `check-project-code.mjs`, `check-task-split.mjs`, `check-handoff.mjs`, `check-parent-hub.mjs`,
-`check-new-chat.mjs`, `check-stream-cap.mjs`, `check-cascade-stages.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
+`check-new-chat.mjs`, `check-stream-cap.mjs`, `check-cascade-stages.mjs`, `check-project-tests.mjs`,
+`check-tests-runner.mjs`, `check-tests-report.mjs` stub their API and `check-worktrees.mjs` builds its own git repository in temp,
 so they depend on no particular history, on no installed CLI, and leave neither branches nor copies
 behind. `panel-pages.mjs` is the ONE route list the a11y (axe, both themes, create modals) and
 keyboard (Tab order, focus ring, Escape + focus return) sweeps share — a new section goes there or
@@ -154,15 +156,21 @@ the phone too. Copies live NEXT to the repo (`<parent>/<repo>-worktrees/<branch>
 watchers and bundlers would recurse), and the panel never merges anything: merging stays with the
 user.
 
-**Panel "switched itself off" after a few idle hours; sometimes only one half** — nothing crashed.
-The machine's janitor (`~/.claude/tools/proc-reaper`, task `ProcReaper`, every 4 h) reaped the
-stand: `pnpm dev` grows from a shell that has exited, the tree reads as orphaned, and only the two
-PIDs holding a socket survived — hence one half serving, the other gone. Fixed 2026-09-01: janitor
-`ProtectPorts` (5178/8888 — listener, subtree AND ancestor chain, no age cap); repo `pnpm
-keepalive:install` — TCP-probes both ports every 20 s (never HTTP: with the token gate on a live
-panel answers 401), restarts the silent half, adopts a stand already up. Autostart is user-level
-(Startup folder + 5-minute pickup task). Log `%LOCALAPPDATA%\agentdeck\keepalive.log`, state
-`pnpm keepalive:status`.
+**A test run ends with an empty history record, or "прогнать задетое" finds nothing** — by design, no
+counter of its own. The record is assembled on finish from the case files (`lastRunAt >= startedAt`):
+an agent that forgot `lastRunAt` leaves checkmarks and an empty record. Impact = `git status
+--porcelain -uall` (without `-uall` a new folder collapses to `src/` and matches no `codePaths`) →
+`codePaths` → the `area` word; nothing attributed ⇒ empty list, never "run everything".
+Detail: `.agent/code-map-projects.agent.md` §QA workspace.
+
+**Panel "switched itself off" after a few idle hours; sometimes only one half** — nothing crashed:
+the machine's janitor (`~/.claude/tools/proc-reaper`, task `ProcReaper`, every 4 h) reaped the stand
+(`pnpm dev` grows from an exited shell → reads as orphaned; only the two PIDs holding a socket
+survived). Fixed 2026-09-01: janitor `ProtectPorts` (5178/8888 — listener, subtree AND ancestor
+chain, no age cap); repo `pnpm keepalive:install` — TCP-probes both ports every 20 s (never HTTP: a
+live panel with the token gate answers 401), restarts the silent half, adopts a stand already up.
+Autostart is user-level (Startup folder + 5-min pickup task). Log
+`%LOCALAPPDATA%\agentdeck\keepalive.log`, state `pnpm keepalive:status`.
 
 ## Working rules
 

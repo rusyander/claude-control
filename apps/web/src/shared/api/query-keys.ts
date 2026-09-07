@@ -124,8 +124,12 @@ export const queryKeys = {
   /** Содержимое одного скилла проекта — ключ по его относительному пути. */
   projectProviderSkill: (id: string, path: string) =>
     ['projects', id, 'provider', 'skills', 'skill', path] as const,
-  /** Глобальный поиск: ключ зависит от запроса, чтобы кешировать по строке. */
-  search: (query: string) => ['search', query] as const,
+  /**
+   * Глобальный поиск: ключ зависит от запроса и от проекта. Проект нужен в
+   * ключе потому, что поиск отвечает и по тест-кейсам, а они лежат в самом
+   * проекте — одна строка в разных проектах находит разное.
+   */
+  search: (query: string, projectPath = '') => ['search', query, projectPath] as const,
 };
 
 /**

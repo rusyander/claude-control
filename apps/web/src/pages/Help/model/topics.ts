@@ -4,6 +4,7 @@ import { OverviewTopic } from '../topics/OverviewTopic';
 import { SearchTopic } from '../topics/SearchTopic';
 import { AnalyticsTopic } from '../topics/AnalyticsTopic';
 import { ChatTopic } from '../topics/ChatTopic';
+import { TestsTopic } from '../topics/TestsTopic';
 import { RulesTopic } from '../topics/RulesTopic';
 import { ClaudeMdTopic } from '../topics/ClaudeMdTopic';
 import { SkillsTopic } from '../topics/SkillsTopic';
@@ -62,6 +63,10 @@ export const HELP_GROUPS: HelpGroup[] = [
       { id: 'search', icon: 'search', pagePath: '/search', Content: SearchTopic },
       { id: 'analytics', icon: 'analytics', pagePath: '/analytics', Content: AnalyticsTopic },
       { id: 'chat', icon: 'chat', pagePath: '/chat', Content: ChatTopic },
+      // Рабочее место тестировщика: своя страница, но объясняется рядом с чатом
+      // намеренно — прогон кейсов ведёт тот же агент, что и разговор, и читать
+      // эти два документа приходится подряд.
+      { id: 'tests', icon: 'check', pagePath: '/tests', Content: TestsTopic },
     ],
   },
   {

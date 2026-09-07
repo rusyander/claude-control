@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectTestsView } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
-import { ProjectTestRunRegistry } from '../domains/project-tests.ts';
+import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/project-tests.ts';
 import { registerProjectTestsRoutes } from './project-tests-routes.ts';
 
 /**
@@ -36,6 +36,7 @@ describe('project-tests-routes', () => {
       // Реестр проектов пуст: имя копии соглашения строится из пути каталога.
       { backupDir, store: { getProjectByPath: () => undefined } } as unknown as ServerContext,
       new ProjectTestRunRegistry(),
+      new ProjectTestManualRegistry(),
     );
     await app.ready();
   });

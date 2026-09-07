@@ -184,6 +184,38 @@ export function StatusDot({ status }: { status: string }) {
   return <View style={[styles.dot, { backgroundColor: color }]} />;
 }
 
+/**
+ * Ряд взаимоисключающих значений: тип кейса, важность, отбор по статусу.
+ *
+ * Не выпадающий список: значений три-пять, все короткие, и на телефоне ряд
+ * читается и нажимается за один взгляд, тогда как список стоит двух тапов и
+ * прячет варианты до первого из них.
+ */
+export function Chips<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <View style={styles.chips}>
+      {options.map((option) => (
+        <Pressable
+          key={option.value}
+          accessibilityRole="button"
+          onPress={() => onChange(option.value)}
+          style={[styles.chip, option.value === value && styles.chipOn]}
+        >
+          <Text style={styles.chipText}>{option.label}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 export function Empty({ text }: { text: string }) {
   return (
     <View style={styles.empty}>
@@ -258,6 +290,17 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm + 2,
   },
   fieldMultiline: { minHeight: 44, maxHeight: 140, textAlignVertical: 'top' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
+  chip: {
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
+  },
+  chipOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  chipText: { color: colors.text, fontSize: font.small },
   dot: { width: 8, height: 8, borderRadius: 4 },
   empty: { padding: space.xl, alignItems: 'center', justifyContent: 'center' },
   emptyText: { textAlign: 'center' },

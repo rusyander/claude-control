@@ -6,6 +6,7 @@ import type {
   McpServer,
   PermissionRule,
   Plugin,
+  ProjectTestCase,
   Rule,
   Skill,
   UniversalMcpServer,
@@ -33,6 +34,13 @@ export interface ProviderSearchInputs {
   permissions?: Array<{ key: string; value: string }>;
 }
 
+/** Кейс проекта в индексе поиска: сам кейс и группа, в которой он лежит. */
+export interface SearchTestCase {
+  groupId: string;
+  groupTitle: string;
+  testCase: ProjectTestCase;
+}
+
 /** Собранные разделы. Держим их отдельным типом, чтобы фильтр не зависел от источника данных. */
 export interface SearchInputs {
   rules: Rule[];
@@ -47,10 +55,17 @@ export interface SearchInputs {
   groups: Group[];
   /** Разделы активного провайдера — задано, только когда активен НЕ Claude. */
   provider?: ProviderSearchInputs;
+  /**
+   * Кейсы открытого проекта. Есть, только когда запрос назвал проект: кейсы
+   * лежат в самом проекте, и «глобального» набора у них нет.
+   */
+  tests?: SearchTestCase[];
 }
 
 /** Откуда читать разделы — пути конфигурации и хранилище состояния панели. */
 export interface SearchSources {
   paths: ClaudePaths;
   store: AppStore;
+  /** Открытый проект: только для него ищутся тест-кейсы. */
+  projectPath?: string;
 }

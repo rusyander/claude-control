@@ -44,6 +44,7 @@ export const PANEL_PAGES = [
   { path: '/env', name: 'Переменные' },
   { path: '/groups', name: 'Группы' },
   { path: '/projects', name: 'Проекты' },
+  { path: '/tests', name: 'Тестирование' },
   { path: '/compare', name: 'Сравнение' },
   { path: '/dlp', name: 'Защита данных' },
   { path: '/search', name: 'Поиск' },

@@ -13,12 +13,13 @@ import {
   resolveProviderPermissionsTarget,
   type ProviderPermissionsValues,
 } from '../provider-permissions.ts';
+import { readGroups } from '../project-tests.ts';
 import { readRules } from '../rules.ts';
 import { readScripts } from '../scripts.ts';
 import { readSkills } from '../skills.ts';
 import { MIN_QUERY_LENGTH } from './constants.ts';
 import { searchEntities } from './filter.ts';
-import type { ProviderSearchInputs, SearchInputs, SearchSources } from './types.ts';
+import type { ProviderSearchInputs, SearchInputs, SearchSources, SearchTestCase } from './types.ts';
 
 /**
  * Сбор разделов читалками самих разделов и точка входа поиска. Разбор запроса и
@@ -175,9 +176,11 @@ export async function collectSearchInputs(sources: SearchSources): Promise<Searc
 
   // Группы — данные панели, не провайдера: ищутся при любом активном CLI.
   const groups = store.getGroups();
+  // Кейсы — тоже не конфигурация провайдера, а файлы открытого проекта.
+  const tests = collectTestCases(sources.projectPath);
 
   if (getActiveProvider(store).id !== 'claude') {
-    return { ...emptyInputs(), groups, provider: collectProviderInputs(sources) };
+    return { ...emptyInputs(), groups, tests, provider: collectProviderInputs(sources) };
   }
 
   const hooks = readHooks(paths.settings, store, paths.settingsLocal);
@@ -201,7 +204,25 @@ export async function collectSearchInputs(sources: SearchSources): Promise<Searc
     mcpServers: readMcpServers(paths.mcpConfig, store),
     plugins: installed,
     groups,
+    tests,
   };
+}
+
+/**
+ * Кейсы проекта для поиска. Раздел живёт в самом проекте, поэтому без пути
+ * искать нечего; сломанная группа (её файл правит и агент) пропускается — поиск
+ * не место, где узнают о битом JSON.
+ */
+function collectTestCases(projectPath: string | undefined): SearchTestCase[] {
+  if (!projectPath) return [];
+  const groups = readOrSkip(() => readGroups(projectPath)) ?? [];
+  return groups
+    .filter((group) => !group.error)
+    .flatMap((group) =>
+      group.cases
+        .filter((testCase) => !testCase.archived)
+        .map((testCase) => ({ groupId: group.id, groupTitle: group.title, testCase })),
+    );
 }
 
 /**

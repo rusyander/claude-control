@@ -1,0 +1,31 @@
+{
+  "content": [
+    {
+      "id": 101,
+      "name": "Открытие чата",
+      "description": "Человек должен увидеть список разговоров",
+      "precondition": "Панель открыта",
+      "expectedResult": "Видна переписка",
+      "suite": { "name": "GUI" },
+      "epic": "Чат",
+      "feature": "Основное",
+      "automated": true,
+      "tags": ["smoke", { "name": "чат" }],
+      "links": ["https://tracker/REQ-1"],
+      "scenario": {
+        "steps": [
+          { "name": "Нажать «Чат»", "expectedResult": "Открылся список" },
+          { "name": "Выбрать разговор", "steps": [{ "name": "Проверить заголовок" }] }
+        ]
+      }
+    },
+    {
+      "id": 102,
+      "name": "Проверка здоровья API",
+      "suite": "API",
+      "path": "Служебное > Проверки",
+      "status": "passed",
+      "steps": [{ "name": "Запросить /api/system", "expected": "Ответ 200" }]
+    }
+  ]
+}

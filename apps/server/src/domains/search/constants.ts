@@ -17,4 +17,6 @@ export const PAGE_PATH: Record<SearchResultKind, string> = {
   // страница сама роутится по активному (CLAUDE.md / AGENTS.md / GEMINI.md).
   instructions: 'claude-md',
   group: 'groups',
+  // Раздел тестов открывается по проекту, а `id` результата — «группа:кейс».
+  test: 'tests',
 };

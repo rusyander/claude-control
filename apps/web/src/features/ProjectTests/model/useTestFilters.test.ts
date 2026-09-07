@@ -1,0 +1,91 @@
+import { describe, it, expect } from 'vitest';
+import type { ProjectTestCase, ProjectTestGroup } from '@agentdeck/contracts';
+import { dropEmpty, selectView } from './useTestFilters';
+
+/**
+ * Отбор библиотеки: то, что видно на экране, и есть то, что уйдёт в прогон и в
+ * сохранённый набор. Поэтому проверяется именно чистая выборка, а не разметка.
+ */
+const make = (part: Partial<ProjectTestCase> & { id: string }): ProjectTestCase => ({
+  type: 'case',
+  title: part.id,
+  steps: [],
+  status: 'unknown',
+  source: 'human',
+  ...part,
+});
+
+const groups: ProjectTestGroup[] = [
+  {
+    id: 'gui',
+    title: 'GUI',
+    file: 'gui.tests.json',
+    cases: [
+      make({ id: 'a', section: 'Чат/Отправка', area: 'чат', tags: ['smoke'] }),
+      make({ id: 'b', section: 'Чат/Вложения', area: 'чат', priority: 'blocker' }),
+      make({ id: 'old', section: 'Архив', archived: true }),
+    ],
+  },
+  {
+    id: 'api',
+    title: 'API',
+    file: 'api.tests.json',
+    cases: [make({ id: 'c', section: 'Аналитика', area: 'аналитика' })],
+  },
+];
+
+describe('selectView', () => {
+  it('без группы берёт все кейсы, с группой — только её', () => {
+    expect(selectView(groups, undefined, {}).total).toBe(4);
+    expect(selectView(groups, 'api', {}).total).toBe(1);
+  });
+
+  it('счётчик показывает исходный размер, список — отфильтрованный', () => {
+    const view = selectView(groups, 'gui', { priorities: ['blocker'] });
+    expect(view.total).toBe(3);
+    expect(view.filtered.map((item) => item.testCase.id)).toEqual(['b']);
+  });
+
+  it('архив не попадает ни в список, ни в дерево, ни в значения фильтров', () => {
+    const view = selectView(groups, 'gui', {});
+    expect(view.filtered.map((item) => item.testCase.id)).toEqual(['a', 'b']);
+    expect(view.flatSections.map((node) => node.path)).not.toContain('Архив');
+    expect(view.facets.sections).not.toContain('Архив');
+  });
+
+  it('с показом архива он появляется везде', () => {
+    const view = selectView(groups, 'gui', { includeArchived: true });
+    expect(view.filtered).toHaveLength(3);
+    expect(view.flatSections.map((node) => node.path)).toContain('Архив');
+  });
+
+  it('дерево секций считается по всей группе, а не по отобранному', () => {
+    // Иначе выбранная ветка исчезала бы ровно в тот момент, когда по ней
+    // отфильтровали, и выйти из неё было бы нечем.
+    const view = selectView(groups, 'gui', { sections: ['Чат/Отправка'] });
+    expect(view.filtered).toHaveLength(1);
+    expect(view.flatSections.map((node) => node.path)).toEqual([
+      'Чат',
+      'Чат/Вложения',
+      'Чат/Отправка',
+    ]);
+  });
+});
+
+describe('dropEmpty', () => {
+  it('выкидывает пустые значения, но оставляет содержательные', () => {
+    expect(
+      dropEmpty({
+        query: '',
+        areas: [],
+        includeArchived: false,
+        tags: ['smoke'],
+        sections: undefined,
+      }),
+    ).toEqual({ tags: ['smoke'] });
+  });
+
+  it('включённый показ архива — тоже фильтр', () => {
+    expect(dropEmpty({ includeArchived: true })).toEqual({ includeArchived: true });
+  });
+});

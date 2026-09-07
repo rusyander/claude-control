@@ -1,13 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  ProjectTestBulkInput,
   ProjectTestCaseInput,
+  ProjectTestEnvironment,
   ProjectTestRunMode,
+  ProjectTestSchema,
+  ProjectTestSharedStep,
+  ProjectTestView,
   ProjectTestsView,
 } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
+import { TESTS_POLL_MS, testKeys } from './keys';
 
 /**
- * Тест-кейсы проекта.
+ * Библиотека тестов проекта: группы, кейсы, общие шаги, окружения, схема,
+ * сохранённые фильтры.
  *
  * Все правки возвращают уже пересобранный список — сервер отдаёт его тем же
  * ответом. Поэтому мутации не инвалидируют кэш, а КЛАДУТ в него результат: иначе
@@ -19,16 +26,9 @@ import { apiClient } from '@shared/api/client';
  * того, что кейсы живут в проекте, а не в памяти панели.
  */
 
-const ROOT_KEY = 'project-tests';
-
-/** Как часто перечитывать список во время прогона. */
-const POLL_MS = 2000;
-
-const key = (path: string | undefined) => [ROOT_KEY, path ?? ''];
-
 export function useProjectTests(path: string | undefined, isOpen: boolean) {
   return useQuery({
-    queryKey: key(path),
+    queryKey: testKeys.view(path),
     queryFn: async () => {
       const { data } = await apiClient.get<ProjectTestsView>('/project-tests', {
         params: { path },
@@ -38,11 +38,17 @@ export function useProjectTests(path: string | undefined, isOpen: boolean) {
     enabled: Boolean(path) && isOpen,
     staleTime: 0,
     refetchInterval: (query) =>
-      query.state.data?.run?.status === 'running' && isOpen ? POLL_MS : false,
+      query.state.data?.run?.status === 'running' && isOpen ? TESTS_POLL_MS : false,
   });
 }
 
-/** Общая часть мутаций: ответ сервера — это и есть новый список. */
+/**
+ * Общая часть мутаций библиотеки: ответ сервера — это и есть новый список.
+ *
+ * Соседние ветки кэша (история, отчёт, тест-поинты) считаются по тем же файлам,
+ * поэтому после записи они помечаются устаревшими: иначе отчёт показывал бы
+ * покрытие до правки, а список поинтов — кейсы, которых уже нет.
+ */
 function useViewMutation<TVariables>(
   path: string | undefined,
   send: (variables: TVariables) => Promise<ProjectTestsView>,
@@ -50,7 +56,11 @@ function useViewMutation<TVariables>(
   const client = useQueryClient();
   return useMutation({
     mutationFn: send,
-    onSuccess: (data) => client.setQueryData(key(path), data),
+    onSuccess: (data) => {
+      client.setQueryData(testKeys.view(path), data);
+      void client.invalidateQueries({ queryKey: testKeys.plans(path) });
+      void client.invalidateQueries({ queryKey: testKeys.report(path) });
+    },
   });
 }
 
@@ -62,6 +72,19 @@ export function useCreateTestGroup(path: string | undefined) {
     });
     return data;
   });
+}
+
+export function useUpdateTestGroup(path: string | undefined) {
+  return useViewMutation(
+    path,
+    async (group: { id: string; title?: string; description?: string }) => {
+      const { data } = await apiClient.post<ProjectTestsView>('/project-tests/group/update', {
+        path,
+        ...group,
+      });
+      return data;
+    },
+  );
 }
 
 export function useRemoveTestGroup(path: string | undefined) {
@@ -95,12 +118,100 @@ export function useRemoveTestCase(path: string | undefined) {
   });
 }
 
+/**
+ * Массовое действие над отмеченными кейсами. Ответ шире обычного (`touched` —
+ * сколько кейсов задето), поэтому мутация своя, а не через `useViewMutation`.
+ */
+export function useBulkTestCases(path: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: ProjectTestBulkInput) => {
+      const { data } = await apiClient.post<{ touched: number; view: ProjectTestsView }>(
+        '/project-tests/bulk',
+        { path, ...payload },
+      );
+      return data;
+    },
+    onSuccess: (data) => {
+      client.setQueryData(testKeys.view(path), data.view);
+      void client.invalidateQueries({ queryKey: testKeys.report(path) });
+    },
+  });
+}
+
+export function useSaveSharedStep(path: string | undefined) {
+  return useViewMutation(path, async (step: ProjectTestSharedStep) => {
+    const { data } = await apiClient.post<ProjectTestsView>('/project-tests/shared-step', {
+      path,
+      step,
+    });
+    return data;
+  });
+}
+
+export function useRemoveSharedStep(path: string | undefined) {
+  return useViewMutation(path, async (id: string) => {
+    const { data } = await apiClient.delete<ProjectTestsView>('/project-tests/shared-step', {
+      params: { path, id },
+    });
+    return data;
+  });
+}
+
+export function useSaveTestEnvironment(path: string | undefined) {
+  return useViewMutation(path, async (environment: ProjectTestEnvironment) => {
+    const { data } = await apiClient.post<ProjectTestsView>('/project-tests/environment', {
+      path,
+      environment,
+    });
+    return data;
+  });
+}
+
+export function useRemoveTestEnvironment(path: string | undefined) {
+  return useViewMutation(path, async (id: string) => {
+    const { data } = await apiClient.delete<ProjectTestsView>('/project-tests/environment', {
+      params: { path, id },
+    });
+    return data;
+  });
+}
+
+export function useSaveTestSchema(path: string | undefined) {
+  return useViewMutation(path, async (schema: ProjectTestSchema) => {
+    const { data } = await apiClient.post<ProjectTestsView>('/project-tests/schema', {
+      path,
+      schema,
+    });
+    return data;
+  });
+}
+
+export function useSaveTestView(path: string | undefined) {
+  return useViewMutation(path, async (view: ProjectTestView) => {
+    const { data } = await apiClient.post<ProjectTestsView>('/project-tests/view', { path, view });
+    return data;
+  });
+}
+
+export function useRemoveTestView(path: string | undefined) {
+  return useViewMutation(path, async (id: string) => {
+    const { data } = await apiClient.delete<ProjectTestsView>('/project-tests/view', {
+      params: { path, id },
+    });
+    return data;
+  });
+}
+
 export interface StartTestRunPayload {
   mode: ProjectTestRunMode;
   groupId?: string;
   caseIds?: string[];
+  planId?: string;
+  environmentId?: string;
   scope?: string;
   full?: boolean;
+  changedOnly?: boolean;
 }
 
 export function useStartTestRun(path: string | undefined) {
@@ -113,6 +224,13 @@ export function useStartTestRun(path: string | undefined) {
   });
 }
 
+export function useStopTestRun(path: string | undefined) {
+  return useViewMutation(path, async () => {
+    const { data } = await apiClient.post<ProjectTestsView>('/project-tests/stop', { path });
+    return data;
+  });
+}
+
 /**
  * Вписать соглашение о кейсах в `CLAUDE.md` проекта: после этого их ведёт и
  * обычный разговор, а не только прогоны из окна тестов.
@@ -120,13 +238,6 @@ export function useStartTestRun(path: string | undefined) {
 export function useInstallTestConvention(path: string | undefined) {
   return useViewMutation(path, async () => {
     const { data } = await apiClient.post<ProjectTestsView>('/project-tests/convention', { path });
-    return data;
-  });
-}
-
-export function useStopTestRun(path: string | undefined) {
-  return useViewMutation(path, async () => {
-    const { data } = await apiClient.post<ProjectTestsView>('/project-tests/stop', { path });
     return data;
   });
 }

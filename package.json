@@ -22,6 +22,7 @@
     "qa:setup": "playwright install --with-deps chromium",
     "check": "pnpm format:check && pnpm type-check && pnpm lint && pnpm depcruise && pnpm build",
     "doctor": "node tools/doctor.mjs",
+    "tests": "node tools/tests-cli.mjs",
     "remote": "node tools/tailscale-serve.mjs",
     "remote:off": "node tools/tailscale-serve.mjs --off",
     "keepalive": "node tools/keepalive.mjs",

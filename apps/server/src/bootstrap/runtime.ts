@@ -5,7 +5,7 @@ import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { HandoffChains } from '../domains/chat/ChatHandoff.ts';
 import { ProviderChatService } from '../domains/provider-chat.ts';
 import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
-import { ProjectTestRunRegistry } from '../domains/project-tests.ts';
+import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/project-tests.ts';
 import { DlpProxy } from '../domains/dlp.ts';
 import { createRunNotifier } from '../domains/remote-notify.ts';
 import { hasWorkSince } from '../domains/project-git.ts';
@@ -28,6 +28,8 @@ export interface Runtime {
   chatSession: ChatSession;
   /** Прогоны GUI-тестов проектов. */
   projectTestRuns: ProjectTestRunRegistry;
+  /** Ручные прогоны: кейсы проходит человек, панель записывает. */
+  projectTestManual: ProjectTestManualRegistry;
   /** Уведомления на телефон о судьбе прогона. */
   notifyRun: ReturnType<typeof createRunNotifier>;
   /** Цепочки продолжений в чистой сессии. */
@@ -63,6 +65,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Прогоны тестов — третий такой объект: агент ходит по кейсам минутами, и
   // оборванный при выходе панели процесс остался бы висеть с полным доступом.
   const projectTestRuns = new ProjectTestRunRegistry();
+  // Ручной прогон живёт в памяти (его открывает один человек в одном окне), но
+  // каждый отмеченный результат уходит на диск сразу. При выходе панели
+  // незакрытая сессия помечается брошенной — иначе в истории остался бы прогон,
+  // который «идёт» уже после смерти процесса.
+  const projectTestManual = new ProjectTestManualRegistry();
   /**
    * Уведомления на телефон. Реестр прогонов знает, ЧТО случилось, но не знает ни
    * про устройства, ни про настройку — поэтому отправитель собирается здесь и
@@ -74,6 +81,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     forget: (token) => ctx.store.removePushDevice(token),
   });
   chatRuns.setNotifier(notifyRun);
+  // Прогон тестов уведомляет тем же отправителем: он идёт десятки минут, и
+  // сидеть перед панелью всё это время незачем.
+  projectTestRuns.setNotifier(notifyRun);
   /**
    * Дерево чатов переживает смену ключа. Разделение заводит чат под временным
    * `new-<ts>-<n>`, а настоящий `sessionId` Claude Code выдаёт уже в прогоне —
@@ -145,6 +155,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     projectRunner.stopAll();
     providerChats.stopAll();
     projectTestRuns.stopAll();
+    projectTestManual.stopAll(new Date().toISOString());
   };
 
   return {
@@ -152,6 +163,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     chatRuns,
     chatSession,
     projectTestRuns,
+    projectTestManual,
     notifyRun,
     handoffChains,
     providerChats,

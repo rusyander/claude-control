@@ -109,6 +109,15 @@ export const NAV_SECTIONS: NavSection[] = [
         key: 'projects',
         capability: 'projects',
       },
+      // Тестирование стоит рядом с проектами: раздел работает над проектом из
+      // того же реестра, и кейсы лежат в его файлах, а не в панели.
+      {
+        path: '/tests',
+        label: 'nav.tests',
+        icon: 'check',
+        key: 'tests',
+        capability: 'projects',
+      },
     ],
   },
   {

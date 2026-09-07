@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
-import type { ProjectTestCase, ProjectTestStatus } from '@agentdeck/contracts';
+import { Stack, router } from 'expo-router';
+import type { ProjectTestCase } from '@agentdeck/contracts';
 import {
   Button,
   Card,
@@ -22,17 +22,29 @@ import {
   useProjectTests,
   useRemoveTestCase,
   useSaveTestCase,
+  useStartManualRun,
   useStartTestRun,
   useStopTestRun,
 } from '../src/entities/tests/api';
+import { formatWhen } from '../src/entities/tests/status';
 import { TestCaseEditor } from '../src/features/tests/TestCaseEditor';
+import { TestCaseRow } from '../src/features/tests/TestCaseRow';
+import {
+  EMPTY_FILTER,
+  TestFilters,
+  filterCases,
+  isFilterEmpty,
+  type TestFilterState,
+} from '../src/features/tests/TestFilters';
 
 /**
  * Тест-кейсы проекта на телефоне: те же файлы `.agent/tests/`, что в панели.
  *
- * Запуск отсюда ничем не отличается от запуска из панели — работает всё равно
- * агент на компьютере. Это и есть смысл экрана: посмотреть, что красное, и
- * перезапустить прогон, не подходя к машине.
+ * Прогон АГЕНТА отсюда ничем не отличается от запуска из панели — работает всё
+ * равно агент на компьютере. Это и есть смысл экрана: посмотреть, что красное,
+ * и перезапустить прогон, не подходя к машине. Ручной прогон — наоборот, вещь
+ * именно телефонная: приложение проверяют глазами, часто на этом же устройстве,
+ * и отметить результат надо там же, где смотрят.
  *
  * Группы — вкладками строкой, а не выпадающим списком: их две-три, и лишний
  * тап ради переключения между GUI и E2E не окупается.
@@ -48,9 +60,12 @@ export default function TestsScreen() {
   const save = useSaveTestCase(projectPath);
   const remove = useRemoveTestCase(projectPath);
   const convention = useInstallTestConvention(projectPath);
+  const startManual = useStartManualRun(projectPath);
 
   const [groupId, setGroupId] = useState('');
   const [scope, setScope] = useState('');
+  const [filter, setFilter] = useState<TestFilterState>(EMPTY_FILTER);
+  const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<ProjectTestCase | undefined>();
   const [isEditorOpen, setEditorOpen] = useState(false);
 
@@ -59,14 +74,40 @@ export default function TestsScreen() {
   const run = tests.data?.run;
   const isRunning = run?.status === 'running';
 
-  const counts = useMemo(() => {
-    const cases = active?.cases ?? [];
-    return {
+  const cases = useMemo(() => active?.cases ?? [], [active]);
+  const shown = useMemo(() => filterCases(cases, filter), [cases, filter]);
+  const counts = useMemo(
+    () => ({
       passed: cases.filter((item) => item.status === 'passed').length,
       failed: cases.filter((item) => item.status === 'failed').length,
       rest: cases.filter((item) => item.status !== 'passed' && item.status !== 'failed').length,
-    };
-  }, [active]);
+    }),
+    [cases],
+  );
+  // Последний результат по всей группе: он отвечает на вопрос «эти галочки
+  // вообще свежие?» — без даты зелёный список полугодовой давности читается
+  // как сегодняшний.
+  const lastRunAt = useMemo(
+    () =>
+      cases
+        .map((item) => item.lastRunAt ?? '')
+        .sort()
+        .at(-1) ?? '',
+    [cases],
+  );
+
+  const toggleSelected = (caseId: string): void =>
+    setSelected((list) =>
+      list.includes(caseId) ? list.filter((item) => item !== caseId) : [...list, caseId],
+    );
+
+  const openManual = (): void => {
+    if (!active) return;
+    startManual.mutate(
+      { groupId: active.id, caseIds: selected.length > 0 ? selected : undefined },
+      { onSuccess: () => router.push('/test-run') },
+    );
+  };
 
   if (!projectPath) {
     return (
@@ -109,8 +150,15 @@ export default function TestsScreen() {
             <Button
               title={t.tests.run}
               tone="accent"
-              onPress={() => start.mutate({ mode: 'run', groupId: active?.id, scope })}
-              disabled={isRunning || (active?.cases.length ?? 0) === 0}
+              onPress={() =>
+                start.mutate({
+                  mode: 'run',
+                  groupId: active?.id,
+                  caseIds: selected.length > 0 ? selected : undefined,
+                  scope,
+                })
+              }
+              disabled={isRunning || cases.length === 0}
               style={styles.grow}
             />
           </Row>
@@ -118,7 +166,7 @@ export default function TestsScreen() {
             <Button
               title={t.tests.runFull}
               onPress={() => start.mutate({ mode: 'run', groupId: active?.id, scope, full: true })}
-              disabled={isRunning || (active?.cases.length ?? 0) === 0}
+              disabled={isRunning || cases.length === 0}
               style={styles.grow}
             />
             {isRunning ? (
@@ -129,6 +177,24 @@ export default function TestsScreen() {
                 style={styles.grow}
               />
             ) : null}
+          </Row>
+          <Row gap={space.xs}>
+            <Button
+              title={
+                selected.length > 0
+                  ? t.tests.manual.openSelected(selected.length)
+                  : t.tests.manual.open
+              }
+              onPress={openManual}
+              busy={startManual.isPending}
+              disabled={cases.length === 0}
+              style={styles.grow}
+            />
+            <Button
+              title={t.tests.runs.open}
+              onPress={() => router.push('/test-runs')}
+              style={styles.grow}
+            />
           </Row>
           <Muted>{t.tests.onComputer}</Muted>
           {/* Прогон отсюда отдаёт формат агенту сам, а просьба из чата — нет:
@@ -149,6 +215,9 @@ export default function TestsScreen() {
             <Text style={styles.runState}>{runLabel(run.status, run.mode, run.error, t)}</Text>
           ) : null}
           {start.error ? <Text style={styles.bad}>{(start.error as Error).message}</Text> : null}
+          {startManual.error ? (
+            <Text style={styles.bad}>{(startManual.error as Error).message}</Text>
+          ) : null}
         </Card>
 
         {groups.length > 1 ? (
@@ -193,18 +262,46 @@ export default function TestsScreen() {
                   setEditorOpen(true);
                 }}
               >
-                <Text style={styles.add}>{t.tests.addCase}</Text>
+                <Text style={styles.action}>{t.tests.addCase}</Text>
               </Pressable>
             </Row>
             <Muted>{t.tests.counts(counts.passed, counts.failed, counts.rest)}</Muted>
+            <Muted>
+              {lastRunAt ? t.tests.lastRun(formatWhen(lastRunAt)) : t.tests.lastRunNever}
+            </Muted>
 
-            {active.cases.length === 0 ? <Muted>{t.tests.emptyGroup}</Muted> : null}
+            <TestFilters cases={cases} filter={filter} onChange={setFilter} />
+            {!isFilterEmpty(filter) ? (
+              <Row gap={space.sm}>
+                <Muted style={styles.grow}>
+                  {t.tests.filter.shown(shown.length, cases.length)}
+                </Muted>
+                <Pressable onPress={() => setFilter(EMPTY_FILTER)}>
+                  <Text style={styles.action}>{t.tests.filter.reset}</Text>
+                </Pressable>
+              </Row>
+            ) : null}
+            {selected.length > 0 ? (
+              <Row gap={space.sm}>
+                <Muted style={styles.grow}>{t.tests.selected(selected.length)}</Muted>
+                <Pressable onPress={() => setSelected([])}>
+                  <Text style={styles.action}>{t.tests.clearSelection}</Text>
+                </Pressable>
+              </Row>
+            ) : null}
+
+            {cases.length === 0 ? <Muted>{t.tests.emptyGroup}</Muted> : null}
+            {cases.length > 0 && shown.length === 0 ? (
+              <Muted>{t.tests.filter.nothing}</Muted>
+            ) : null}
 
             <View style={styles.list}>
-              {active.cases.map((testCase) => (
-                <TestRow
+              {shown.map((testCase) => (
+                <TestCaseRow
                   key={testCase.id}
                   testCase={testCase}
+                  isSelected={selected.includes(testCase.id)}
+                  onToggleSelected={() => toggleSelected(testCase.id)}
                   onEdit={() => {
                     setEditing(testCase);
                     setEditorOpen(true);
@@ -239,78 +336,6 @@ export default function TestsScreen() {
   );
 }
 
-/** Одна строка списка: статус, название и что агент увидел. */
-function TestRow({
-  testCase,
-  onEdit,
-  onRemove,
-}: {
-  testCase: ProjectTestCase;
-  onEdit: () => void;
-  onRemove: () => void;
-}) {
-  const t = useT();
-  const [isOpen, setOpen] = useState(false);
-
-  return (
-    <View style={[styles.case, testCase.status === 'failed' && styles.caseFailed]}>
-      <Pressable onPress={() => setOpen((value) => !value)}>
-        <Row gap={space.xs}>
-          <Text style={[styles.mark, markStyle(testCase.status)]}>{MARK[testCase.status]}</Text>
-          <Text style={styles.caseTitle} numberOfLines={isOpen ? undefined : 2}>
-            {testCase.title}
-          </Text>
-        </Row>
-        {testCase.area ? <Muted>{testCase.area}</Muted> : null}
-      </Pressable>
-
-      {isOpen ? (
-        <View style={styles.details}>
-          {testCase.purpose ? <Muted>{testCase.purpose}</Muted> : null}
-          {testCase.steps.map((step, index) => (
-            <Text key={index} style={styles.step}>
-              {index + 1}. {step}
-            </Text>
-          ))}
-          {testCase.expected ? <Muted>→ {testCase.expected}</Muted> : null}
-          {testCase.note ? (
-            <Text style={testCase.status === 'failed' ? styles.bad : styles.note}>
-              {testCase.note}
-            </Text>
-          ) : null}
-          <Muted>
-            {testCase.id} · {t.tests.status[testCase.status]} · {t.tests.source[testCase.source]}
-          </Muted>
-          <Row gap={space.sm}>
-            <Pressable onPress={onEdit}>
-              <Text style={styles.add}>{t.tests.editCase}</Text>
-            </Pressable>
-            <Pressable onPress={onRemove}>
-              <Text style={styles.bad}>{t.tests.remove}</Text>
-            </Pressable>
-          </Row>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-/** Значок статуса. Символ, а не цвет: цвет один не читается при ярком солнце. */
-const MARK: Record<ProjectTestStatus, string> = {
-  passed: '✓',
-  failed: '✕',
-  skipped: '–',
-  running: '…',
-  unknown: '·',
-};
-
-function markStyle(status: ProjectTestStatus) {
-  if (status === 'passed') return styles.good;
-  if (status === 'failed') return styles.bad;
-  if (status === 'skipped') return styles.warn;
-  return styles.dim;
-}
-
 /** Подпись состояния прогона одной строкой. */
 function runLabel(
   status: string,
@@ -336,24 +361,10 @@ const styles = StyleSheet.create({
   },
   tabOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
   tabText: { color: colors.text, fontSize: font.small },
-  case: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    padding: space.sm,
-    gap: space.xs,
-  },
-  caseFailed: { borderColor: colors.danger },
-  caseTitle: { color: colors.text, fontSize: font.body, flex: 1 },
-  mark: { fontSize: font.body, width: 18, textAlign: 'center' },
-  details: { gap: space.xs },
-  step: { color: colors.textDim, fontSize: font.small },
-  note: { color: colors.textDim, fontSize: font.small },
-  add: { color: colors.accent, fontSize: font.small },
+  action: { color: colors.accent, fontSize: font.small },
   good: { color: colors.success },
   bad: { color: colors.danger, fontSize: font.small },
   warn: { color: colors.warning },
-  dim: { color: colors.textFaint },
   runState: { color: colors.textDim, fontSize: font.small },
   log: { color: colors.textDim, fontSize: font.small },
 });

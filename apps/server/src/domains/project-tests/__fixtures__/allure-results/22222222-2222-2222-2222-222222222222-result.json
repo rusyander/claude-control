@@ -1,0 +1,9 @@
+{
+  "uuid": "22222222-2222-2222-2222-222222222222",
+  "name": "Отправка сообщения",
+  "status": "broken",
+  "statusDetails": { "message": "TypeError: cannot read property of undefined" },
+  "start": 1756000001000,
+  "stop": 1756000002000,
+  "labels": [{ "name": "suite", "value": "Чат" }]
+}

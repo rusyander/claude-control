@@ -1,13 +1,35 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, rmSync } from 'node:fs';
 import type {
+  ProjectTestAutomation,
+  ProjectTestBulkInput,
   ProjectTestCase,
   ProjectTestCaseInput,
+  ProjectTestFilter,
   ProjectTestGroup,
+  ProjectTestKind,
+  ProjectTestLink,
+  ProjectTestParameter,
+  ProjectTestPriority,
+  ProjectTestReadiness,
   ProjectTestStatus,
+  ProjectTestStep,
 } from '@agentdeck/contracts';
-import { writeJsonFile } from '../../lib/safe-io.ts';
-import { ProjectFileError, resolveProjectPath } from '../project-files/paths.ts';
+import { toStatus, toSteps, stepText } from '@agentdeck/contracts/test-format';
+import {
+  ProjectTestsError,
+  ProjectTestsNotFoundError,
+  TESTS_DIR,
+  assertId,
+  listFiles,
+  optional,
+  readJson,
+  stringList,
+  testsFile,
+  testsPath,
+  text,
+  writeJson,
+} from './files.ts';
+import { readSchema } from './library.ts';
 
 /**
  * Файлы тест-кейсов в `.agent/tests/` проверяемого проекта.
@@ -20,18 +42,16 @@ import { ProjectFileError, resolveProjectPath } from '../project-files/paths.ts'
  * перезаписать сломанный JSON значит стереть работу, которую агент писал
  * полчаса, и человек об этом даже не узнает.
  *
- * Запись — только через `writeJsonFile` (атомарная замена): агент может читать
- * файл ровно в тот момент, когда панель его сохраняет.
+ * Модель кейса выросла до уровня TMS (предусловия, ожидание на шаг, приоритет,
+ * теги, параметры, вложения, привязка к автотесту), но СТАРЫЕ файлы читаются
+ * как были: шаг строкой становится шагом-объектом, отсутствующий тип — кейсом.
+ * Обратная совместимость здесь не любезность: файлы уже лежат в чужих проектах.
  */
 
-/** Папка с кейсами внутри проекта. Клиентская форма пути — всегда через `/`. */
-export const TESTS_DIR = '.agent/tests';
+export { TESTS_DIR, ProjectTestsError, ProjectTestsNotFoundError };
 
 /** Суффикс файла группы: по нему группа и опознаётся среди прочего в папке. */
 const SUFFIX = '.tests.json';
-
-/** Потолок на файл: кейсы — текст, мегабайты здесь означают порчу. */
-const MAX_FILE_BYTES = 2 * 1024 * 1024;
 
 /** Группы, которые панель заводит сама, если в проекте ещё ничего нет. */
 export const DEFAULT_GROUPS: { id: string; title: string; description: string }[] = [
@@ -55,53 +75,109 @@ interface GroupFile {
   cases?: unknown;
 }
 
-export class ProjectTestsError extends Error {
-  statusCode = 400;
-  constructor(message: string) {
-    super(message);
-    this.name = 'ProjectTestsError';
-  }
-}
-
-/** Группы с таким id нет — 404, а не молчаливое «ок» на удаление несуществующего. */
-export class ProjectTestsNotFoundError extends ProjectTestsError {
-  override statusCode = 404;
-  constructor(message: string) {
-    super(message);
-    this.name = 'ProjectTestsNotFoundError';
-  }
-}
-
-/** Идентификатор группы = имя файла: диапазон сужен намеренно. */
+/** Идентификатор группы = имя файла. */
 export function assertGroupId(id: string): string {
-  if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(id)) {
-    throw new ProjectTestsError(
-      'Идентификатор группы: латиница в нижнем регистре, цифры и дефис, до 40 символов.',
-    );
-  }
-  return id;
+  return assertId(id, 'Идентификатор группы');
 }
 
-/** Абсолютный путь файла группы — с той же защитой от обхода, что у файлов проекта. */
-function groupPath(root: string, id: string): string {
-  try {
-    return resolveProjectPath(root, `${TESTS_DIR}/${assertGroupId(id)}${SUFFIX}`);
-  } catch (error) {
-    if (error instanceof ProjectFileError) throw new ProjectTestsError(error.message);
-    throw error;
-  }
-}
-
-/** Путь файла группы от корня проекта — его же видит человек в модалке. */
+/** Путь файла группы от корня проекта — человеку видно, что где лежит. */
 export function groupFile(id: string): string {
-  return `${TESTS_DIR}/${id}${SUFFIX}`;
+  return testsFile(`${id}${SUFFIX}`);
 }
 
-const STATUSES: ProjectTestStatus[] = ['unknown', 'running', 'passed', 'failed', 'skipped'];
+function groupPath(root: string, id: string): string {
+  return testsPath(root, `${assertGroupId(id)}${SUFFIX}`);
+}
 
-/** Строка из чужого файла — или значение по умолчанию. */
-function text(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback;
+const KINDS: ProjectTestKind[] = ['case', 'checklist'];
+const PRIORITIES: ProjectTestPriority[] = ['blocker', 'high', 'medium', 'low'];
+const READINESS: ProjectTestReadiness[] = ['draft', 'ready', 'obsolete'];
+const AUTOMATION: ProjectTestAutomation['status'][] = ['manual', 'toAutomate', 'automated'];
+const LINK_TYPES: ProjectTestLink['type'][] = ['requirement', 'issue', 'mr', 'doc'];
+
+/** Значение из списка допустимых — или ничего. */
+function oneOf<T extends string>(value: unknown, allowed: T[]): T | undefined {
+  const word = text(value).trim() as T;
+  return allowed.includes(word) ? word : undefined;
+}
+
+/** Ссылки кейса: чужой мусор отбрасывается поштучно, а не целиком. */
+function parseLinks(raw: unknown): ProjectTestLink[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const links = raw
+    .map((item): ProjectTestLink | undefined => {
+      if (!item || typeof item !== 'object') return undefined;
+      const record = item as Record<string, unknown>;
+      const url = optional(record.url);
+      if (!url) return undefined;
+      return {
+        type: oneOf(record.type, LINK_TYPES) ?? 'doc',
+        url,
+        title: optional(record.title),
+      };
+    })
+    .filter((item): item is ProjectTestLink => item !== undefined);
+  return links.length > 0 ? links : undefined;
+}
+
+/** Параметры кейса: имя без `%` и список значений. */
+function parseParameters(raw: unknown): ProjectTestParameter[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const parameters = raw
+    .map((item): ProjectTestParameter | undefined => {
+      if (!item || typeof item !== 'object') return undefined;
+      const record = item as Record<string, unknown>;
+      const name = optional(record.name)?.replace(/^%/, '');
+      const values = stringList(record.values);
+      if (!name || values.length === 0) return undefined;
+      return { name, values };
+    })
+    .filter((item): item is ProjectTestParameter => item !== undefined);
+  return parameters.length > 0 ? parameters : undefined;
+}
+
+/** Свои поля проекта: только строковые значения, ключи как есть. */
+function parseAttributes(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const item = optional(value);
+    if (item) result[key] = item;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/** Привязка к коду автотеста. */
+function parseAutomation(raw: unknown): ProjectTestAutomation | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const record = raw as Record<string, unknown>;
+  const status = oneOf(record.status, AUTOMATION);
+  const file = optional(record.file);
+  const testName = optional(record.testName);
+  if (!status && !file && !testName) return undefined;
+  return { status: status ?? (file ? 'automated' : 'manual'), file, testName };
+}
+
+/** Дефекты, заведённые по провалам. */
+function parseDefects(raw: unknown): ProjectTestCase['defects'] {
+  if (!Array.isArray(raw)) return undefined;
+  const defects = raw
+    .map((item) => {
+      if (typeof item === 'string') {
+        const url = item.trim();
+        return url ? { url } : undefined;
+      }
+      if (!item || typeof item !== 'object') return undefined;
+      const record = item as Record<string, unknown>;
+      const url = optional(record.url);
+      return url
+        ? { url, title: optional(record.title), createdAt: optional(record.createdAt) }
+        : undefined;
+    })
+    .filter(
+      (item): item is { url: string; title?: string; createdAt?: string } => item !== undefined,
+    );
+  return defects.length > 0 ? defects : undefined;
 }
 
 /**
@@ -115,28 +191,40 @@ function parseCase(raw: unknown, index: number): ProjectTestCase | undefined {
   const title = text(item.title).trim();
   if (!title) return undefined;
 
-  const rawSteps = item.steps;
-  const steps = Array.isArray(rawSteps)
-    ? rawSteps.map((step) => text(step).trim()).filter(Boolean)
-    : text(rawSteps)
-        .split('\n')
-        .map((step) => step.trim())
-        .filter(Boolean);
-
-  const status = text(item.status) as ProjectTestStatus;
+  const steps = toSteps(item.steps) as ProjectTestStep[];
+  const duration = Number(item.duration);
 
   return {
     id: text(item.id).trim() || `case-${index + 1}`,
+    type: oneOf(item.type, KINDS) ?? 'case',
     title,
-    purpose: text(item.purpose).trim() || undefined,
-    area: text(item.area).trim() || undefined,
+    purpose: optional(item.purpose),
+    area: optional(item.area),
+    section: optional(item.section),
+    precondition: optional(item.precondition),
     steps,
-    expected: text(item.expected).trim() || undefined,
-    status: STATUSES.includes(status) ? status : 'unknown',
-    note: text(item.note).trim() || undefined,
-    lastRunAt: text(item.lastRunAt).trim() || undefined,
+    expected: optional(item.expected),
+    postcondition: optional(item.postcondition),
+    oracle: optional(item.oracle),
+    priority: oneOf(item.priority, PRIORITIES),
+    readiness: oneOf(item.readiness, READINESS),
+    duration: Number.isFinite(duration) && duration > 0 ? duration : undefined,
+    tags: stringList(item.tags).length > 0 ? stringList(item.tags) : undefined,
+    links: parseLinks(item.links),
+    attributes: parseAttributes(item.attributes),
+    parameters: parseParameters(item.parameters),
+    attachments: stringList(item.attachments).length > 0 ? stringList(item.attachments) : undefined,
+    automation: parseAutomation(item.automation),
+    codePaths: stringList(item.codePaths).length > 0 ? stringList(item.codePaths) : undefined,
+    defects: parseDefects(item.defects),
+    status: toStatus(item.status) as ProjectTestStatus,
+    statusId: optional(item.statusId),
+    note: optional(item.note),
+    lastRunAt: optional(item.lastRunAt),
+    lastRunId: optional(item.lastRunId),
     source: text(item.source) === 'human' ? 'human' : 'agent',
-    updatedAt: text(item.updatedAt).trim() || undefined,
+    updatedAt: optional(item.updatedAt),
+    archived: item.archived === true ? true : undefined,
   };
 }
 
@@ -153,33 +241,18 @@ function withUniqueIds(cases: ProjectTestCase[]): ProjectTestCase[] {
 }
 
 /** Одна группа с диска. Файл сломан → группа с `error` и пустым списком. */
-function readGroup(root: string, id: string): ProjectTestGroup {
+export function readGroup(root: string, id: string): ProjectTestGroup {
   const file = groupFile(id);
-  const path = groupPath(root, id);
   const base: ProjectTestGroup = { id, title: id.toUpperCase(), file, cases: [] };
 
-  let raw: string;
-  try {
-    const stats = readFileSync(path);
-    if (stats.byteLength > MAX_FILE_BYTES) {
-      return { ...base, error: 'Файл слишком велик для списка тестов.' };
-    }
-    raw = stats.toString('utf8');
-  } catch (error) {
-    return { ...base, error: `Файл не читается: ${(error as Error).message}` };
-  }
+  const { data, error } = readJson(root, `${id}${SUFFIX}`);
+  if (error) return { ...base, error };
+  if (data === undefined) return { ...base, error: 'Файл не читается: файла нет.' };
 
-  let data: GroupFile;
-  try {
-    data = JSON.parse(raw) as GroupFile;
-  } catch (error) {
-    // Файл НЕ чиним и не перезаписываем: за сломанным JSON стоит чья-то работа.
-    return { ...base, error: `Файл не разобрался: ${(error as Error).message}` };
-  }
-
-  const cases = Array.isArray(data?.cases)
+  const group = data as GroupFile;
+  const cases = Array.isArray(group?.cases)
     ? withUniqueIds(
-        data.cases
+        group.cases
           .map((item, index) => parseCase(item, index))
           .filter((item): item is ProjectTestCase => item !== undefined),
       )
@@ -187,8 +260,8 @@ function readGroup(root: string, id: string): ProjectTestGroup {
 
   return {
     id,
-    title: text(data?.title).trim() || base.title,
-    description: text(data?.description).trim() || undefined,
+    title: text(group?.title).trim() || base.title,
+    description: optional(group?.description),
     file,
     cases,
   };
@@ -196,17 +269,7 @@ function readGroup(root: string, id: string): ProjectTestGroup {
 
 /** Идентификаторы групп, найденные в папке, в алфавитном порядке. */
 function groupIds(root: string): string[] {
-  const dir = join(root, ...TESTS_DIR.split('/'));
-  if (!existsSync(dir)) return [];
-  try {
-    return readdirSync(dir, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.endsWith(SUFFIX))
-      .map((entry) => entry.name.slice(0, -SUFFIX.length))
-      .filter((id) => /^[a-z0-9][a-z0-9-]{0,39}$/.test(id))
-      .sort();
-  } catch {
-    return [];
-  }
+  return listFiles(root, '', SUFFIX);
 }
 
 /** Все группы проекта. Пустой список — тестов в проекте ещё нет. */
@@ -215,10 +278,9 @@ export function readGroups(root: string): ProjectTestGroup[] {
 }
 
 /** Запись группы целиком. Сломанную группу писать нельзя — иначе затрём файл. */
-function writeGroup(root: string, group: ProjectTestGroup): void {
+export function writeGroup(root: string, group: ProjectTestGroup): void {
   if (group.error) throw new ProjectTestsError(group.error);
-  mkdirSync(join(root, ...TESTS_DIR.split('/')), { recursive: true });
-  writeJsonFile(groupPath(root, group.id), {
+  writeJson(root, `${assertGroupId(group.id)}${SUFFIX}`, {
     version: 1,
     title: group.title,
     description: group.description,
@@ -227,7 +289,7 @@ function writeGroup(root: string, group: ProjectTestGroup): void {
 }
 
 /** Группа, готовая к правке: сломанную возвращаем ошибкой, а не пустышкой. */
-function loadForWrite(root: string, id: string): ProjectTestGroup {
+export function loadForWrite(root: string, id: string): ProjectTestGroup {
   const group = readGroup(root, assertGroupId(id));
   if (group.error && existsSync(groupPath(root, id))) throw new ProjectTestsError(group.error);
   return { ...group, error: undefined };
@@ -254,6 +316,30 @@ export function createGroup(
   return group;
 }
 
+/**
+ * Переименовать группу или сменить её описание. Идентификатор не трогаем: он
+ * же имя файла, и его смена оторвала бы группу от истории прогонов и от
+ * ссылок в планах.
+ */
+export function updateGroup(
+  root: string,
+  id: string,
+  title?: string,
+  description?: string,
+): ProjectTestGroup {
+  const group = loadForWrite(root, assertGroupId(id));
+  if (!existsSync(groupPath(root, group.id))) {
+    throw new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`);
+  }
+  const next: ProjectTestGroup = {
+    ...group,
+    title: title?.trim() || group.title,
+    description: description?.trim() || group.description,
+  };
+  writeGroup(root, next);
+  return next;
+}
+
 /** Удалить группу вместе с файлом — это осознанное действие человека. */
 export function removeGroup(root: string, id: string): void {
   const path = groupPath(root, assertGroupId(id));
@@ -273,6 +359,47 @@ function nextCaseId(group: ProjectTestGroup): string {
   return id;
 }
 
+/** Шаги из формы: строки и объекты приходят вперемешку. */
+function inputSteps(steps: ProjectTestCaseInput['steps']): ProjectTestStep[] {
+  return toSteps(steps ?? []) as ProjectTestStep[];
+}
+
+/**
+ * Проверка своих полей проекта при правке ИЗ ПАНЕЛИ.
+ *
+ * Ровно то, ради чего свои поля заводят: поле, объявленное обязательным,
+ * должно быть заполнено, а список — содержать одно из своих значений. Иначе
+ * «обязательное поле» остаётся подписью в форме, и в наборе снова заводятся
+ * кейсы без компонента и без версии.
+ *
+ * Файлы, написанные агентом руками, сюда не попадают: их читают щадяще, и
+ * ронять из-за незаполненного поля весь раздел было бы хуже, чем пустое поле.
+ */
+function assertAttributes(root: string, attributes?: Record<string, string>): void {
+  const schema = readSchema(root);
+  if (schema.attributes.length === 0) return;
+  const values = attributes ?? {};
+  for (const field of schema.attributes) {
+    const value = values[field.key]?.trim();
+    if (field.required && !value) {
+      throw new ProjectTestsError(`Поле «${field.title}» обязательно.`);
+    }
+    if (
+      value &&
+      field.type === 'select' &&
+      field.options?.length &&
+      !field.options.includes(value)
+    ) {
+      throw new ProjectTestsError(
+        `Поле «${field.title}»: допустимые значения — ${field.options.join(', ')}.`,
+      );
+    }
+    if (value && field.type === 'number' && !Number.isFinite(Number(value))) {
+      throw new ProjectTestsError(`Поле «${field.title}» — это число.`);
+    }
+  }
+}
+
 /**
  * Создать или обновить кейс. Правка из панели помечает кейс человеческим:
  * агенту велено такие не удалять, иначе он снесёт то, что человек только что
@@ -288,22 +415,42 @@ export function upsertCase(
   if (!title) throw new ProjectTestsError('У теста должно быть название.');
 
   const group = loadForWrite(root, groupId);
-  const steps = (input.steps ?? []).map((step) => step.trim()).filter(Boolean);
   const existing = input.id ? group.cases.find((item) => item.id === input.id) : undefined;
   if (input.id && !existing) throw new ProjectTestsError('Тест не найден.');
+  assertAttributes(root, input.attributes);
 
   const next: ProjectTestCase = {
     id: existing?.id ?? nextCaseId(group),
+    type: input.type ?? existing?.type ?? 'case',
     title,
-    purpose: input.purpose?.trim() || undefined,
-    area: input.area?.trim() || undefined,
-    steps,
-    expected: input.expected?.trim() || undefined,
+    purpose: optional(input.purpose),
+    area: optional(input.area),
+    section: optional(input.section),
+    precondition: optional(input.precondition),
+    steps: inputSteps(input.steps),
+    expected: optional(input.expected),
+    postcondition: optional(input.postcondition),
+    oracle: optional(input.oracle),
+    priority: input.priority ?? existing?.priority,
+    readiness: input.readiness ?? existing?.readiness,
+    duration: input.duration ?? existing?.duration,
+    tags: input.tags?.length ? input.tags : undefined,
+    links: input.links?.length ? input.links : undefined,
+    attributes:
+      input.attributes && Object.keys(input.attributes).length ? input.attributes : undefined,
+    parameters: input.parameters?.length ? input.parameters : undefined,
+    attachments: input.attachments?.length ? input.attachments : existing?.attachments,
+    automation: input.automation ?? existing?.automation,
+    codePaths: input.codePaths?.length ? input.codePaths : existing?.codePaths,
+    defects: existing?.defects,
     status: input.status ?? existing?.status ?? 'unknown',
-    note: input.note?.trim() ?? existing?.note,
+    statusId: input.statusId ?? existing?.statusId,
+    note: optional(input.note) ?? existing?.note,
     lastRunAt: existing?.lastRunAt,
+    lastRunId: existing?.lastRunId,
     source: 'human',
     updatedAt: now,
+    archived: input.archived ?? existing?.archived,
   };
 
   const cases = existing
@@ -328,6 +475,205 @@ export function resetStatuses(root: string, groupId: string, caseIds?: string[])
   const touch = (item: ProjectTestCase): ProjectTestCase =>
     caseIds && !caseIds.includes(item.id)
       ? item
-      : { ...item, status: 'unknown', note: undefined, lastRunAt: undefined };
+      : { ...item, status: 'unknown', note: undefined, lastRunAt: undefined, lastRunId: undefined };
   writeGroup(root, { ...group, cases: group.cases.map(touch) });
+}
+
+/** Результат прохода, который нужно записать в кейс. */
+export interface CaseResultPatch {
+  groupId: string;
+  caseId: string;
+  status: ProjectTestStatus;
+  statusId?: string;
+  note?: string;
+  runId?: string;
+  at?: string;
+  defect?: { url: string; title?: string; createdAt?: string };
+}
+
+/**
+ * Проставить результаты в файлы кейсов пачкой.
+ *
+ * Пачкой — потому что импорт из CI приносит сотню результатов сразу, и сто
+ * отдельных перезаписей одного файла означали бы сто шансов встретиться с
+ * агентом на той же секунде.
+ */
+export function applyResults(root: string, patches: CaseResultPatch[], now: string): number {
+  const byGroup = new Map<string, CaseResultPatch[]>();
+  for (const patch of patches) {
+    const list = byGroup.get(patch.groupId) ?? [];
+    list.push(patch);
+    byGroup.set(patch.groupId, list);
+  }
+
+  let applied = 0;
+  for (const [groupId, list] of byGroup) {
+    const group = loadForWrite(root, groupId);
+    const map = new Map(list.map((patch) => [patch.caseId, patch]));
+    const cases = group.cases.map((item) => {
+      const patch = map.get(item.id);
+      if (!patch) return item;
+      applied += 1;
+      const defects = patch.defect
+        ? [...(item.defects ?? []), patch.defect].filter(
+            (defect, index, all) => all.findIndex((other) => other.url === defect.url) === index,
+          )
+        : item.defects;
+      return {
+        ...item,
+        status: patch.status,
+        statusId: patch.statusId ?? item.statusId,
+        note: patch.note ?? item.note,
+        lastRunAt: patch.at ?? now,
+        lastRunId: patch.runId ?? item.lastRunId,
+        defects,
+      };
+    });
+    writeGroup(root, { ...group, cases });
+  }
+  return applied;
+}
+
+/** Совпал ли кейс с фильтром. Пустой фильтр пропускает всё, кроме архива. */
+export function matchesFilter(
+  item: ProjectTestCase,
+  groupId: string,
+  filter: ProjectTestFilter,
+): boolean {
+  if (item.archived && !filter.includeArchived) return false;
+  if (filter.groupIds?.length && !filter.groupIds.includes(groupId)) return false;
+  if (filter.types?.length && !filter.types.includes(item.type)) return false;
+  if (filter.statuses?.length && !filter.statuses.includes(item.status)) return false;
+  if (filter.priorities?.length && !filter.priorities.includes(item.priority ?? 'medium')) {
+    return false;
+  }
+  if (filter.readiness?.length && !filter.readiness.includes(item.readiness ?? 'ready')) {
+    return false;
+  }
+  if (
+    filter.automation?.length &&
+    !filter.automation.includes(item.automation?.status ?? 'manual')
+  ) {
+    return false;
+  }
+  if (filter.areas?.length && !filter.areas.includes(item.area ?? '')) return false;
+  if (filter.sections?.length) {
+    const section = item.section ?? '';
+    if (!filter.sections.some((prefix) => section === prefix || section.startsWith(`${prefix}/`))) {
+      return false;
+    }
+  }
+  if (filter.tags?.length && !filter.tags.some((tag) => item.tags?.includes(tag))) return false;
+  if (filter.query) {
+    const haystack = [
+      item.title,
+      item.purpose ?? '',
+      item.area ?? '',
+      item.section ?? '',
+      ...item.steps.map((step) => stepText(step)),
+    ]
+      .join(' ')
+      .toLowerCase();
+    if (!haystack.includes(filter.query.toLowerCase())) return false;
+  }
+  return true;
+}
+
+/** Кейсы всех групп, прошедшие фильтр, вместе с их группой. */
+export function selectCases(
+  groups: ProjectTestGroup[],
+  filter: ProjectTestFilter = {},
+): { groupId: string; testCase: ProjectTestCase }[] {
+  const selected: { groupId: string; testCase: ProjectTestCase }[] = [];
+  for (const group of groups) {
+    if (group.error) continue;
+    for (const testCase of group.cases) {
+      if (matchesFilter(testCase, group.id, filter)) selected.push({ groupId: group.id, testCase });
+    }
+  }
+  return selected;
+}
+
+/** Массовое действие над отмеченными кейсами. Возвращает, скольких коснулось. */
+export function bulkCases(root: string, input: ProjectTestBulkInput, now: string): number {
+  const group = loadForWrite(root, input.groupId);
+  const ids = new Set(input.caseIds);
+  if (ids.size === 0) throw new ProjectTestsError('Не выбрано ни одного теста.');
+  const value = input.value?.trim();
+
+  if (input.action === 'delete') {
+    const cases = group.cases.filter((item) => !ids.has(item.id));
+    const removed = group.cases.length - cases.length;
+    writeGroup(root, { ...group, cases });
+    return removed;
+  }
+
+  if (input.action === 'move') {
+    if (!value) throw new ProjectTestsError('Не указана группа-приёмник.');
+    const target = loadForWrite(root, value);
+    const moving = group.cases.filter((item) => ids.has(item.id));
+    if (moving.length === 0) return 0;
+    const taken = new Set(target.cases.map((item) => item.id));
+    const moved = moving.map((item) => {
+      let id = item.id;
+      let attempt = 2;
+      while (taken.has(id)) id = `${item.id}-${attempt++}`;
+      taken.add(id);
+      return { ...item, id, updatedAt: now };
+    });
+    writeGroup(root, { ...target, cases: [...target.cases, ...moved] });
+    writeGroup(root, { ...group, cases: group.cases.filter((item) => !ids.has(item.id)) });
+    return moved.length;
+  }
+
+  if (input.action === 'duplicate') {
+    const copies: ProjectTestCase[] = [];
+    const taken = new Set(group.cases.map((item) => item.id));
+    for (const item of group.cases) {
+      if (!ids.has(item.id)) continue;
+      let id = `${item.id}-copy`;
+      let attempt = 2;
+      while (taken.has(id)) id = `${item.id}-copy-${attempt++}`;
+      taken.add(id);
+      copies.push({
+        ...item,
+        id,
+        title: `${item.title} (копия)`,
+        status: 'unknown',
+        note: undefined,
+        lastRunAt: undefined,
+        lastRunId: undefined,
+        source: 'human',
+        updatedAt: now,
+      });
+    }
+    writeGroup(root, { ...group, cases: [...group.cases, ...copies] });
+    return copies.length;
+  }
+
+  let touched = 0;
+  const cases = group.cases.map((item) => {
+    if (!ids.has(item.id)) return item;
+    touched += 1;
+    const next: ProjectTestCase = { ...item, updatedAt: now };
+    if (input.action === 'tag' && value) {
+      next.tags = [...new Set([...(item.tags ?? []), value])];
+    }
+    if (input.action === 'untag' && value) {
+      const rest = (item.tags ?? []).filter((tag) => tag !== value);
+      next.tags = rest.length > 0 ? rest : undefined;
+    }
+    if (input.action === 'priority') next.priority = oneOf(value, PRIORITIES);
+    if (input.action === 'readiness') next.readiness = oneOf(value, READINESS);
+    if (input.action === 'automation') {
+      const status = oneOf(value, AUTOMATION) ?? 'manual';
+      next.automation = { ...(item.automation ?? {}), status };
+    }
+    if (input.action === 'section') next.section = value || undefined;
+    if (input.action === 'archive') next.archived = true;
+    if (input.action === 'restore') next.archived = undefined;
+    return next;
+  });
+  writeGroup(root, { ...group, cases });
+  return touched;
 }

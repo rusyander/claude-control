@@ -86,16 +86,19 @@ describe('project-tests store', () => {
     );
   });
 
-  it('чинит небрежность агента: шаги строкой, чужой статус, пустой id', () => {
+  it('чинит небрежность агента: шаги строкой, статус словом, пустой id', () => {
     writeGroupFile(root, 'gui', {
       version: 1,
       cases: [{ title: 'Открыть чат', steps: 'зайти\nнажать', status: 'ok' }],
     });
 
+    // Шаги старой формы (строками) достраиваются до объектов: панель и агент
+    // пишут действие и ожидание раздельно, а старые файлы должны читаться.
     expect(only(root).cases[0]).toMatchObject({
       id: 'case-1',
-      steps: ['зайти', 'нажать'],
-      status: 'unknown',
+      steps: [{ action: 'зайти' }, { action: 'нажать' }],
+      // `ok` — то же «прошёл»: терять чужой результат из-за синонима нельзя.
+      status: 'passed',
       source: 'agent',
     });
   });
@@ -127,7 +130,7 @@ describe('project-tests store', () => {
 
     const cases = only(root).cases;
     expect(cases).toHaveLength(1);
-    expect(cases[0]).toMatchObject({ title: 'Стало', steps: ['шаг'] });
+    expect(cases[0]).toMatchObject({ title: 'Стало', steps: [{ action: 'шаг' }] });
   });
 
   it('правка несуществующего кейса — ошибка, а не тихое создание', () => {

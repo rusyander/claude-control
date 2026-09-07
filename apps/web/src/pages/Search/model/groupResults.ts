@@ -26,6 +26,9 @@ export const SEARCH_KIND_ORDER: readonly SearchResultKind[] = [
   'env',
   // Группы — раздел приложения, в навигации он идёт после разделов конфигурации.
   'group',
+  // Кейсы проекта — последними: они появляются, только когда открыт проект, и
+  // конфигурацию панели человек ищет чаще, чем конкретную проверку.
+  'test',
 ];
 
 export function groupResults(results: readonly SearchResult[]): SearchGroup[] {

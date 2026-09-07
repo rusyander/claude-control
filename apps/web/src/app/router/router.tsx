@@ -66,6 +66,7 @@ const ProjectsPage = lazyRouteComponent(
   () => import('@pages/Projects/ProjectsPage'),
   'ProjectsPage',
 );
+const TestsPage = lazyRouteComponent(() => import('@pages/Tests/TestsPage'), 'TestsPage');
 
 /** Чанк раздела едет дольше секунды — скелет вместо застывшей предыдущей страницы. */
 function RoutePending() {
@@ -107,6 +108,9 @@ const routes = [
   { path: '/permissions', component: gated('permissions', PermissionsSection) },
   { path: '/env', component: gated('env', EnvSection) },
   { path: '/projects', component: gated('projects', ProjectsPage) },
+  // Тестирование живёт над реестром проектов и запускает прогоны через CLI,
+  // поэтому гейтится той же возможностью, что и сам реестр.
+  { path: '/tests', component: gated('projects', TestsPage) },
 ].map((route) => createRoute({ getParentRoute: () => rootRoute, validateSearch, ...route }));
 
 export const router = createRouter({

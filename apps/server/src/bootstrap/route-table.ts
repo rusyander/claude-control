@@ -59,6 +59,7 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     handoffChains,
     projectRunner,
     projectTestRuns,
+    projectTestManual,
     dlpProxy,
     notifyRun,
     events,
@@ -124,7 +125,10 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
       }),
     (instance, context) => registerProviderChatRoutes(instance, context, providerChats),
     (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
-    (instance, context) => registerProjectTestsRoutes(instance, context, projectTestRuns),
+    // Тестам нужны оба реестра: прогоны агента и ручная сессия человека. Оба
+    // переживают запрос — вкладку закрывают, а прогон идёт дальше.
+    (instance, context) =>
+      registerProjectTestsRoutes(instance, context, projectTestRuns, projectTestManual),
     (instance, context) => registerDlpRoutes(instance, context, dlpProxy),
     (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
     registerPromptGateRoutes,

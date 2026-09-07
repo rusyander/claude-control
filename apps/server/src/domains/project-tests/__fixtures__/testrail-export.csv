@@ -1,0 +1,5 @@
+"ID","Title","Suite","Section","Priority","Type","Preconditions","Steps Separated (Step 1)","Steps Separated (Expected Result 1)","Steps Separated (Step 2)","Steps Separated (Expected Result 2)","References"
+"C1","Открытие чата","GUI","Чат > Основное","High","Functional","Панель открыта","Нажать «Чат»","Открылся список разговоров","Выбрать разговор","Показана переписка","REQ-1"
+"C2","Отправка сообщения","GUI","Чат > Основное","Critical","Functional","Разговор открыт","Ввести текст","Кнопка «Отправить» активна","Нажать «Отправить»","Сообщение в ленте","REQ-2"
+"C3","Экспорт разговора","GUI","Чат > Выгрузка","Medium","Functional","","Открыть меню","Виден пункт «Выгрузить»","","",""
+"C4","Проверка здоровья API","API","Служебное","Low","Functional","","Запросить /api/system","Ответ 200","","","REQ-9"

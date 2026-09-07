@@ -18,6 +18,7 @@ import { useSettings } from '@entities/AppConfig';
 import { PeriodFilter } from './PeriodFilter';
 import { StatCard } from './StatCard';
 import { LiveAgentsCard } from './LiveAgentsCard';
+import { LoweredRunsCard } from './LoweredRunsCard';
 import { DetailModal } from './DetailModal';
 import type { DetailKind } from './DetailModal.types';
 import { buildReportCsv, buildJson } from './model/report';
@@ -97,6 +98,9 @@ export function AnalyticsPage() {
       />
 
       <LiveAgentsCard />
+      {/* Пустой журнал карточка не рисует вовсе — блока не будет, пока веер не
+          уедет ступенью ниже. */}
+      <LoweredRunsCard />
 
       {isLoading && (
         <>

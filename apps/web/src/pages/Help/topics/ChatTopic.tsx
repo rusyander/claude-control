@@ -228,6 +228,8 @@ export function ChatTopic() {
             { title: tr('panelAgents'), text: tr('panelAgentsText') },
             { title: tr('panelParallel'), text: tr('panelParallelText') },
             { title: tr('panelParallelModel'), text: tr('panelParallelModelText') },
+            { title: tr('panelParallelCost'), text: tr('panelParallelCostText') },
+            { title: tr('panelParallelJournal'), text: tr('panelParallelJournalText') },
             { title: tr('panelParallelTree'), text: tr('panelParallelTreeText') },
           ]}
         />

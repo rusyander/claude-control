@@ -101,6 +101,23 @@ export function AnalyticsTopic() {
 
       <HelpSection title={tr('liveTitle')} caption={tr('liveCaption')} />
 
+      {/* Единственный блок страницы, который считает не расход, а честность
+          сдачи, — поэтому объясняется отдельно, с границами того, что панель
+          вообще способна увидеть. */}
+      <HelpSection title={tr('loweredTitle')} caption={tr('loweredCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('loweredWhen'), text: tr('loweredWhenText') },
+            { title: tr('loweredRow'), text: tr('loweredRowText') },
+            { title: tr('loweredSeen'), text: tr('loweredSeenText') },
+            { title: tr('loweredCrash'), text: tr('loweredCrashText') },
+            { title: tr('loweredWhere'), text: tr('loweredWhereText') },
+          ]}
+        />
+        <Callout tone="warning" title={tr('loweredNote')} />
+      </HelpSection>
+
       <HelpSection title={tr('notesTitle')}>
         <Stack gap="var(--spacing-xs)">
           <Callout tone="warning" title={tr('noteLimitsTitle')}>

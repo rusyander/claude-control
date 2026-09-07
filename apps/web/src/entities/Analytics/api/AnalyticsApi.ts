@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type { Analytics, RunningAgent } from '@agentdeck/contracts';
+import type { LoweredRunRecord } from '@agentdeck/contracts/model-cascade';
 import { apiClient } from '@shared/api/client';
 import type { AnalyticsPeriod } from '../model/period';
 import { periodKey, periodParams } from '../model/period';
@@ -34,6 +35,25 @@ export function useAnalytics(period: AnalyticsPeriod) {
      */
     placeholderData: keepPreviousData,
   });
+}
+
+/**
+ * Журнал понижённых прогонов веера: чем их вели и видела ли панель, что прогон
+ * выполнил планку сдачи. Сводка приходит с сервера — правило «что считать
+ * проверкой» одно и живёт рядом со списком образцов команд.
+ */
+export interface LoweredRunsView {
+  runs: LoweredRunRecord[];
+  summary: { total: number; withChecks: number; withoutChecks: number; failed: number };
+}
+
+async function getLoweredRuns(): Promise<LoweredRunsView> {
+  const { data } = await apiClient.get<LoweredRunsView>('/chat/lowered-runs');
+  return data;
+}
+
+export function useLoweredRuns() {
+  return useQuery({ queryKey: ['chat', 'lowered-runs'], queryFn: getLoweredRuns });
 }
 
 /** Живой срез: запущенные процессы. Обновляется часто — он дешёвый. */

@@ -43,7 +43,7 @@ export default tseslint.config(
   },
   // Код внутри page.evaluate() выполняется браузером, а не Node.
   {
-    files: ['tools/qa/**/*.mjs'],
+    files: ['tools/qa/**/*.mjs', 'tools/docs/**/*.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   /**

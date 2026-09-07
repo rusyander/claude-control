@@ -39,7 +39,10 @@ default and the only verified one. No database — **source of truth = Claude Co
   nor repo; the build sweeps them itself, `--keep-build` opts out, `--dry` measures),
   `make-mobile-icons.mjs` (one SVG mark → every icon/splash size, so launcher, splash and favicon
   cannot drift), `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report` — the QA workspace
-  of a project without the panel, `report` exits 1 on a failure so CI can gate on it)
+  of a project without the panel, `report` exits 1 on a failure so CI can gate on it),
+  `docs/{shots,build}-chat-guide.mjs` (the human's chat guide: shots off a fully stubbed panel, then
+  Chromium prints `docs/CHAT-GUIDE.ru.pdf`. Source and 14 frames live in `.agent/chat-guide/`, OUT
+  of git — git carries the finished PDF only; a fresh clone re-shoots them against a running stand)
 
 Needs **Node 22.6+** (server runs with `--experimental-strip-types`), pnpm 10, `claude` in PATH.
 

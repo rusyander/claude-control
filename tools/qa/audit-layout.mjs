@@ -67,10 +67,16 @@ for (const [name, path] of ROUTES) {
     }
 
     // Слишком длинная строка текста читается плохо: ориентир — около 90 символов.
+    // Меру применяем только к тексту, который переносится: у однострочного
+    // элемента с многоточием (nowrap + ellipsis) видно ровно то, что влезло по
+    // ширине, а не всю длину — считать её значит ругаться на чужие описания
+    // плагинов и скиллов, которые панель и так обрезает.
     for (const element of main.querySelectorAll('p, span')) {
       const rect = element.getBoundingClientRect();
       const text = element.textContent ?? '';
-      if (text.length > 120 && rect.width > 900) {
+      const style = getComputedStyle(element);
+      const wraps = style.whiteSpace !== 'nowrap' && style.whiteSpace !== 'pre';
+      if (wraps && text.length > 120 && rect.width > 900) {
         issues.push(`слишком широкий текст (${Math.round(rect.width)}px): «${text.slice(0, 45)}…»`);
       }
     }

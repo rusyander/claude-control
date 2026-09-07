@@ -9,7 +9,8 @@
  *
  * Модули: `store.ts` — переписка на диске, `prompt.ts` — сборка промпта из неё,
  * `ProviderChatRun.ts` — один ответ (поток CLI, сессия, API),
- * `ProviderChatService.ts` — живые прогоны, подписка и запись результата.
+ * `ProviderChatService.ts` — живые прогоны, подписка и запись результата,
+ * `cascade.ts` — конвейер «работа → ревью → правки» над понижёнными прогонами.
  */
 
 export {
@@ -19,8 +20,18 @@ export {
   listChats,
   patchChat,
   readChat,
+  readChatCascade,
+  setChatCascade,
   titleFromText,
+  type ProviderChatCascade,
 } from './provider-chat/store.ts';
+export {
+  createForeignStagePlanner,
+  foreignStagePrefix,
+  planForeignStage,
+  type ForeignRunFinished,
+  type ForeignStagePlan,
+} from './provider-chat/cascade.ts';
 export { MAX_PROMPT_CHARS, buildPrompt, composeUserMessage } from './provider-chat/prompt.ts';
 export {
   ProviderChatRun,
@@ -30,6 +41,7 @@ export {
 } from './provider-chat/ProviderChatRun.ts';
 export {
   ProviderChatService,
+  type ProviderChatFinished,
   type ProviderChatSubscriber,
   type SendOutcome,
 } from './provider-chat/ProviderChatService.ts';

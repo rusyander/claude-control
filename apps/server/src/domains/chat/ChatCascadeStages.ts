@@ -92,7 +92,13 @@ export function stageAppendPrompt(
 ): string {
   return [
     initiativePrompt(settings, { splitMuted: true }) ?? '',
-    plan.stage === 'fix' ? loweredWorkPrompt(plan.link.kind as TaskKind | undefined) : '',
+    // Планка сдачи — да, обещание ревью — нет: после правок цепочка кончается
+    // (`planCascadeStage` возвращает `undefined` на стадии `fix`), и склейка по
+    // умолчанию говорила исполнителю правок, что панель заведёт проверку его
+    // диффа. Не заведёт ни разу.
+    plan.stage === 'fix'
+      ? loweredWorkPrompt(plan.link.kind as TaskKind | undefined, { review: false })
+      : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -178,7 +184,7 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
     stage: 'fix',
     model,
     effort: effort ?? '',
-    prompt: fixStagePrompt(findings, link.branch),
+    prompt: fixStagePrompt(findings, link.branch ? { branch: link.branch } : {}),
     findings,
     link: {
       ...base,

@@ -201,6 +201,63 @@ describe('ProviderChatService', () => {
     expect((run.options as { history: unknown[] }).history).toHaveLength(1);
   });
 
+  /**
+   * Точка, на которой висит конвейер звеньев (`cascade.ts`). Важно не «зовётся
+   * ли», а ЧТО в ней написано: снятый человеком ответ не законченная работа, и
+   * заводить по нему ревью нельзя.
+   */
+  describe('слушатель завершения', () => {
+    it('сообщает об удачном ответе вместе с его текстом', () => {
+      const seen = vi.fn();
+      service.setFinishedListener(seen);
+      send();
+      run.emit?.({ type: 'delta', text: 'Гото' });
+      run.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
+
+      expect(seen).toHaveBeenCalledWith({
+        providerId: 'codex',
+        appDataDir: dir,
+        chatId: 'chat',
+        ok: true,
+        text: 'Готово',
+      });
+    });
+
+    it('снятый кнопкой ответ законченным не считает', () => {
+      const seen = vi.fn();
+      service.setFinishedListener(seen);
+      send();
+      run.emit?.({ type: 'delta', text: 'начал' });
+      service.stop('chat');
+      // Остановленный прогон закрывается тем, что успел сказать, — событие то же
+      // самое, `done`, и отличить его можно только по отметке остановки.
+      run.emit?.({ type: 'done', reply: 'начал', transport: 'stream' });
+
+      expect(seen).toHaveBeenCalledWith(expect.objectContaining({ ok: false }));
+    });
+
+    it('ошибка прогона тоже завершение, но не удачное', () => {
+      const seen = vi.fn();
+      service.setFinishedListener(seen);
+      send();
+      run.emit?.({ type: 'error', error: 'CLI умер', reason: 'cli_error' });
+
+      expect(seen).toHaveBeenCalledWith(expect.objectContaining({ ok: false, text: '' }));
+    });
+
+    it('упавший слушатель не портит уже записанный ответ', () => {
+      service.setFinishedListener(() => {
+        throw new Error('звено не завелось');
+      });
+      send();
+
+      expect(() =>
+        run.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' }),
+      ).not.toThrow();
+      expect(readChat(dir, 'codex', 'chat')?.messages.at(-1)?.content).toBe('Готово');
+    });
+  });
+
   it('упавший прогон превращается в ошибку разговора, а не в тишину', async () => {
     const broken: ProviderChatRunLike = {
       start: () => Promise.reject(new Error('всё сломалось')),

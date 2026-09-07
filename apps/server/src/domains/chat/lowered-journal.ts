@@ -82,12 +82,12 @@ export function appendLoweredRun(appDataDir: string, record: LoweredRunRecord): 
  * дошёл, и записывать его в «сдал без проверок» значило бы обвинять агента в том,
  * чего он не мог сделать. Три числа не пересекаются и в сумме дают `total`.
  */
-export function summarizeLoweredRuns(records: LoweredRunRecord[]): {
-  total: number;
-  withChecks: number;
-  withoutChecks: number;
-  failed: number;
-} {
+export function summarizeLoweredRuns(records: LoweredRunRecord[]): LoweredRunsSummary {
+  return { ...countBucket(records), byKind: summarizeByKind(records) };
+}
+
+/** Три корзины проверок плюс расход окна — считаются одинаково для всех разрезов. */
+function countBucket(records: LoweredRunRecord[]): LoweredRunsCount {
   const finished = records.filter((record) => record.ok);
   const withChecks = finished.filter((record) => record.checks.length > 0).length;
   return {
@@ -95,7 +95,60 @@ export function summarizeLoweredRuns(records: LoweredRunRecord[]): {
     withChecks,
     withoutChecks: finished.length - withChecks,
     failed: records.length - finished.length,
+    tokens: records.reduce((sum, record) => sum + (record.tokens ?? 0), 0),
   };
+}
+
+/**
+ * Разрез по КЛАССУ работы: во что обошёлся каждый класс и как часто по нему
+ * доходило до проверок.
+ *
+ * Зачем это человеку, а не панели. Таблица «класс → модель» живёт в коде
+ * (`contracts/model-cascade.ts`), и правит её человек — но до сих пор правил
+ * вслепую: сколько окна съедает `implementation` против `mechanical`, не знал
+ * никто. Здесь он это видит.
+ *
+ * Почему те же числа НЕ уезжают агенту-классификатору: узнав, что `mechanical`
+ * дешевле всех, модель начнёт метить механикой всё подряд. Весь смысл подбора в
+ * том, что агент называет РОД работы, а модель под него подставляет панель;
+ * подсказка про цену классов превратила бы классификацию в выбор себе модели —
+ * ровно то, от чего уходили.
+ *
+ * Классы упорядочены по расходу окна: сверху то, что съело больше всего.
+ * Прогоны без класса (ручной веер) собираются в строку с пустым `kind` —
+ * прятать их нельзя, они тоже расход.
+ */
+function summarizeByKind(records: LoweredRunRecord[]): LoweredRunsKind[] {
+  const groups = new Map<string, LoweredRunRecord[]>();
+  for (const record of records) {
+    const key = record.kind ?? '';
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(record);
+    else groups.set(key, [record]);
+  }
+
+  return [...groups.entries()]
+    .map(([kind, group]) => ({ kind, ...countBucket(group) }))
+    .sort((a, b) => b.tokens - a.tokens || b.total - a.total);
+}
+
+/** Сколько прогонов и во что они обошлись. */
+export interface LoweredRunsCount {
+  total: number;
+  withChecks: number;
+  withoutChecks: number;
+  failed: number;
+  /** Сумма окна по прогонам разреза; записи старше 08.09.2026 добавляют ноль. */
+  tokens: number;
+}
+
+/** Строка разреза по классам; пустой `kind` — прогоны, которым класса не называли. */
+export interface LoweredRunsKind extends LoweredRunsCount {
+  kind: string;
+}
+
+export interface LoweredRunsSummary extends LoweredRunsCount {
+  byKind: LoweredRunsKind[];
 }
 
 function isRecord(value: unknown): value is LoweredRunRecord {

@@ -151,6 +151,34 @@ const afterSecond = await page.textContent('body');
 check(afterSecond.includes('Привет'), 'первый вопрос остался в переписке');
 check(afterSecond.includes('Второй вопрос'), 'второй вопрос виден');
 
+// Ответ ревьюера из конвейера звеньев: блок вердикта служебный — по нему панель
+// заводит правки, а человеку в ленте нужен разбор словами. У Claude блок убирает
+// `MessageBubble`, у чужого чата своя лента, и до 08.09.2026 она показывала
+// сырой JSON.
+messages.push({
+  id: 'a-review',
+  role: 'assistant',
+  content: [
+    'Прочитал дифф и задание. Два пункта требуют правки.',
+    '',
+    '```agentdeck:review',
+    JSON.stringify({ findings: ['src/read.ts: пустой ввод не обработан'] }),
+    '```',
+  ].join('\n'),
+  at: new Date().toISOString(),
+  transport: 'stream',
+});
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('nav');
+await page.waitForTimeout(1500);
+
+const afterReview = await page.textContent('body');
+check(afterReview.includes('Два пункта требуют правки'), 'слова ревьюера остались человеку');
+check(
+  !afterReview.includes('agentdeck:review') && !afterReview.includes('"findings"'),
+  'служебный блок вердикта в ленте не показывается',
+);
+
 // Удаление разговора спрашивает подтверждение: переписка исчезает с диска.
 await page.getByRole('button', { name: 'Удалить' }).first().click();
 await page.waitForTimeout(600);

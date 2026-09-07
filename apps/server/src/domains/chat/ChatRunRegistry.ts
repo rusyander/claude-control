@@ -103,7 +103,16 @@ export interface RunMeta {
    * `lowered` умирал в маршруте, и спросить «окупается ли понижение» было не у
    * кого.
    */
-  lowered?: { model: string; effort: string };
+  lowered?: {
+    model: string;
+    effort: string;
+    /**
+     * Класс работы, из-за которого ступень и понизили. Есть у детей разделения
+     * и у звена правок; у ручного веера его нет вовсе — там ступень выбрал
+     * человек, и рода работы никто не называл.
+     */
+    kind?: string;
+  };
 }
 
 /**
@@ -555,10 +564,15 @@ export class ChatRunRegistry {
           ...(run.meta.projectPath ? { projectPath: run.meta.projectPath } : {}),
           model: run.meta.lowered.model,
           effort: run.meta.lowered.effort,
+          ...(run.meta.lowered.kind ? { kind: run.meta.lowered.kind } : {}),
           startedAt: run.startedAt,
           finishedAt: run.finishedAt,
           ok: !run.errored,
           checks: run.checks,
+          // Сколько окна съел прогон. Ради этого числа журнал и заводился:
+          // «окупается ли понижение» — вопрос про расход окна, а не про то,
+          // сколько раз панель понизила.
+          tokens: run.spentTokens,
         });
       } catch {
         // Молча: журнал — наблюдение, а не часть работы прогона.

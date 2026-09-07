@@ -1315,6 +1315,15 @@ export const helpEn: HelpSchema = {
         '“no checks seen”. It started no checks not because it ignored the bar but ' +
         'because it never got that far, and folding the two cases into one number would ' +
         'blame the agent for someone else’s fault.',
+      loweredKinds: 'The breakdown by work class',
+      loweredKindsText:
+        'Below the summary the lowerings are split by the classes the panel picked ' +
+        'itself: how many runs, what the class cost in tokens, and how often no checks ' +
+        'were seen. A manual fan-out has no class — you chose the rung there — so those ' +
+        'runs get a “no class” row instead of being hidden. These numbers are for you: ' +
+        'they show which class has its rung set too low. The agent that sorts tasks into ' +
+        'classes is never told what a class costs — otherwise it would label everything ' +
+        'mechanical to “save”, where there is nothing to save.',
       loweredWhere: 'What to do about it',
       loweredWhereText:
         'A row with no checks seen is a reason to open that conversation and look, not a ' +

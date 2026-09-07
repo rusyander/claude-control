@@ -42,9 +42,28 @@ export function useAnalytics(period: AnalyticsPeriod) {
  * выполнил планку сдачи. Сводка приходит с сервера — правило «что считать
  * проверкой» одно и живёт рядом со списком образцов команд.
  */
+export interface LoweredRunsCount {
+  total: number;
+  withChecks: number;
+  withoutChecks: number;
+  failed: number;
+  /** Расход окна: сумма токенов прогонов разреза. */
+  tokens: number;
+}
+
+/**
+ * Разрез по классу работы — во что обошёлся каждый класс. Числа показываются
+ * ЧЕЛОВЕКУ и только ему: таблицу «класс → модель» правит он, а агенту-
+ * классификатору цена классов не сообщается никогда (см. `lowered-journal.ts`).
+ */
+export interface LoweredRunsKind extends LoweredRunsCount {
+  /** Пусто — прогоны, которым класса не называли: ручной веер. */
+  kind: string;
+}
+
 export interface LoweredRunsView {
   runs: LoweredRunRecord[];
-  summary: { total: number; withChecks: number; withoutChecks: number; failed: number };
+  summary: LoweredRunsCount & { byKind: LoweredRunsKind[] };
 }
 
 async function getLoweredRuns(): Promise<LoweredRunsView> {

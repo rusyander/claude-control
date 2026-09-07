@@ -31,6 +31,34 @@ import type {
  * строку, а не весь разговор, и чтение её просто пропустит.
  */
 
+/**
+ * Стадия конвейера «работа → ревью → правки» у чужого CLI.
+ *
+ * Живёт в шапке разговора, а не в `ChatLink` состояния панели, и это главное
+ * решение здесь. Связи панели ключуются идентификаторами чатов Claude и держат
+ * дерево, хаб и сводку звеньев; разговор чужого провайдера в них не значится
+ * вовсе (см. `routes/chat/split-routes.ts`). Класть стадию туда значило бы
+ * заводить записи о чатах, которых для той половины панели не существует, —
+ * а здесь она лежит ровно там же, где `model`/`effort`, и переживает
+ * перезапуск сервера тем же способом.
+ */
+export interface ProviderChatCascade {
+  stage: 'work' | 'review' | 'fix';
+  /** Название группы разделения: по нему называются все звенья цепочки. */
+  group?: string;
+  /** Класс работы, если подбор его распознал. */
+  kind?: string;
+  /** Работа поехала НИЖЕ настройки CLI — это и оплачивается ревью. */
+  lowered?: boolean;
+  /** Чем шла работа: на неё возвращаются правки. */
+  workModel?: string;
+  workEffort?: string;
+  /** Ветка копии: её читает ревьюер и по ней же называются звенья. */
+  branch?: string;
+  /** Работу уже проверяли — второго ревью на неё не бывает. */
+  reviewedAt?: string;
+}
+
 /** Запись файла: шапка разговора либо одна реплика. */
 interface MetaRecord {
   kind: 'meta';
@@ -42,6 +70,8 @@ interface MetaRecord {
   /** Подбор модели под задачу (Т12): чем ведётся ЭТОТ разговор. */
   model?: string;
   effort?: string;
+  /** Конвейер подбора модели (07.09.2026): какое это звено и чем его платить. */
+  cascade?: ProviderChatCascade;
 }
 
 interface MessageRecord extends ProviderChatMessage {
@@ -124,6 +154,8 @@ export function createChat(
     /** Подбор модели под задачу (Т12): назначение живёт в шапке разговора. */
     model?: string;
     effort?: string;
+    /** Звено конвейера, если разговор заведён им, а не человеком. */
+    cascade?: ProviderChatCascade;
   } = {},
 ): ProviderChatSummary | undefined {
   const dir = providerDir(appDataDir, providerId);
@@ -141,6 +173,7 @@ export function createChat(
     ...(options.workdir ? { workdir: options.workdir } : {}),
     ...(options.model ? { model: options.model } : {}),
     ...(options.effort ? { effort: options.effort } : {}),
+    ...(options.cascade ? { cascade: options.cascade } : {}),
   };
 
   mkdirSync(dir, { recursive: true });
@@ -255,6 +288,48 @@ export function patchChat(
   writeMeta(file, next, messages);
 
   return toSummary(next, messages);
+}
+
+/**
+ * Стадия конвейера у этого разговора. Отдельным чтением, а не полем в
+ * `ProviderChatDetail`: стадия — служебная запись панели, человеку и вкладке она
+ * не показывается, а в контракте разговора значилась бы полем, которое некому
+ * читать.
+ */
+export function readChatCascade(
+  appDataDir: string,
+  providerId: string,
+  chatId: string,
+): ProviderChatCascade | undefined {
+  const file = chatFile(appDataDir, providerId, chatId);
+  if (!file || !existsSync(file)) return undefined;
+
+  try {
+    return readRecords(file).meta?.cascade;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Дописать стадию — ею работа помечается проверенной. Файл переписывается
+ * целиком (шапка — первая строка), поэтому вызывать это на каждую реплику
+ * нельзя: отметка ставится один раз за звено.
+ */
+export function setChatCascade(
+  appDataDir: string,
+  providerId: string,
+  chatId: string,
+  patch: Partial<ProviderChatCascade>,
+): boolean {
+  const file = chatFile(appDataDir, providerId, chatId);
+  if (!file || !existsSync(file)) return false;
+
+  const { meta, messages } = readRecords(file);
+  if (!meta?.cascade) return false;
+
+  writeMeta(file, { ...meta, cascade: { ...meta.cascade, ...patch } }, messages);
+  return true;
 }
 
 /** Удалить разговор вместе с файлом. */

@@ -5,7 +5,8 @@ import { ChatRunRegistry, type RunNotice } from '../domains/chat/ChatRunRegistry
 import { appendLoweredRun } from '../domains/chat/lowered-journal.ts';
 import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { HandoffChains } from '../domains/chat/ChatHandoff.ts';
-import { ProviderChatService } from '../domains/provider-chat.ts';
+import { createForeignStagePlanner, ProviderChatService } from '../domains/provider-chat.ts';
+import { DEFAULT_PROVIDER_ID, getProvider, isKnownProviderId } from '../providers/registry.ts';
 import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/project-tests.ts';
 import { DlpProxy } from '../domains/dlp.ts';
@@ -207,6 +208,25 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     }),
   );
   const providerChats = new ProviderChatService();
+  /**
+   * Тот же конвейер «работа → ревью → правки», но у чужих CLI. Живёт не на
+   * реестре прогонов (их разговоры идут мимо него вовсе), а на завершении ответа
+   * и стадии в шапке разговора; решение принимает домен, снаружи ему нужны
+   * провайдер, каталог моделей, настройки и один вопрос к git.
+   */
+  providerChats.setFinishedListener(
+    createForeignStagePlanner({
+      chats: providerChats,
+      // Claude сюда не попадает никогда: у него свой чат и свой конвейер.
+      // Незнакомый id — не звено: `getProvider` откатился бы на Claude, а тот
+      // отказался бы запускаться, оставив в переписке ошибку на пустом месте.
+      provider: (id) =>
+        id !== DEFAULT_PROVIDER_ID && isKnownProviderId(id) ? getProvider(id) : undefined,
+      models: (provider) => ctx.models.current(provider.modelVendors ?? []).models,
+      settings: () => ctx.store.getSettings(),
+      hasWork: (cwd, since) => hasWorkSince(cwd, since),
+    }),
+  );
   // Прокси защиты данных: тоже слушатель, тоже переживает запрос. Создаётся
   // всегда, поднимается — только если человек включил его в настройках.
   const dlpProxy = new DlpProxy();

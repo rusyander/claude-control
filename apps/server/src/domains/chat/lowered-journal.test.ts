@@ -124,7 +124,7 @@ describe('summarizeLoweredRuns', () => {
       record({ checks: [], ok: false }),
     ]);
 
-    expect(summary).toEqual({ total: 3, withChecks: 1, withoutChecks: 1, failed: 1 });
+    expect(summary).toMatchObject({ total: 3, withChecks: 1, withoutChecks: 1, failed: 1 });
   });
 
   it('упавший прогон не записывается в «сдал без проверок»', () => {
@@ -135,7 +135,7 @@ describe('summarizeLoweredRuns', () => {
       record({ checks: ['pnpm lint'], ok: false }),
     ]);
 
-    expect(summary).toEqual({ total: 2, withChecks: 0, withoutChecks: 0, failed: 2 });
+    expect(summary).toMatchObject({ total: 2, withChecks: 0, withoutChecks: 0, failed: 2 });
   });
 
   it('три корзины не пересекаются и в сумме дают общее число', () => {
@@ -155,6 +155,53 @@ describe('summarizeLoweredRuns', () => {
       withChecks: 0,
       withoutChecks: 0,
       failed: 0,
+      tokens: 0,
+      byKind: [],
+    });
+  });
+
+  /**
+   * Разрез по классам — то, ради чего в записи появились `kind` и `tokens`.
+   * Числа показываются ЧЕЛОВЕКУ: таблицу «класс → модель» правит он, а
+   * классификатору цена классов не сообщается никогда.
+   */
+  describe('разрез по классам работы', () => {
+    it('складывает окно и корзины проверок внутри класса', () => {
+      const summary = summarizeLoweredRuns([
+        record({ kind: 'mechanical', tokens: 1_000, checks: ['pnpm test'] }),
+        record({ kind: 'mechanical', tokens: 500, checks: [] }),
+        record({ kind: 'tests', tokens: 300, checks: [], ok: false }),
+      ]);
+
+      expect(summary.tokens).toBe(1_800);
+      expect(summary.byKind).toEqual([
+        {
+          kind: 'mechanical',
+          total: 2,
+          withChecks: 1,
+          withoutChecks: 1,
+          failed: 0,
+          tokens: 1_500,
+        },
+        { kind: 'tests', total: 1, withChecks: 0, withoutChecks: 0, failed: 1, tokens: 300 },
+      ]);
+    });
+
+    it('прогоны без класса собираются в свою строку, а не прячутся', () => {
+      // Ручной веер класса не называет: ступень там выбрал человек. Расход у
+      // таких прогонов настоящий, и молчать о нём нельзя.
+      const summary = summarizeLoweredRuns([
+        record({ tokens: 900 }),
+        record({ kind: 'design', tokens: 100 }),
+      ]);
+
+      expect(summary.byKind.map((row) => row.kind)).toEqual(['', 'design']);
+    });
+
+    it('записи старого журнала без окна читаются и считаются нулём', () => {
+      const summary = summarizeLoweredRuns([record({ kind: 'mechanical' })]);
+
+      expect(summary.byKind[0]).toMatchObject({ kind: 'mechanical', total: 1, tokens: 0 });
     });
   });
 });

@@ -571,6 +571,51 @@ describe('ChatRunRegistry — журнал понижённых прогонов
     expect(written[0]?.checks).toEqual(['pnpm test', 'npx tsc --noEmit']);
   });
 
+  /**
+   * Класс работы и расход окна — то, из чего аналитика строит разрез «во что
+   * обошёлся каждый класс». Без них журнал отвечает только «сколько раз
+   * понизили», а спрашивают у него другое.
+   */
+  it('пишет класс работы и съеденное окно', async () => {
+    const fake = new FakeRun();
+    const registry = new ChatRunRegistry(() => fake);
+    const written: LoweredRunRecord[] = [];
+    registry.setLoweredJournal((entry) => written.push(entry));
+
+    registry.start('c1', OPTIONS, {
+      projectPath: '/tmp/proj',
+      lowered: { model: 'claude-sonnet-5', effort: 'medium', kind: 'mechanical' },
+    });
+    fake.emit({
+      kind: 'usage',
+      input: 100,
+      output: 20,
+      cacheRead: 300,
+      cacheCreation: 80,
+      model: 'claude-sonnet-5',
+      costUsd: 0,
+    });
+    fake.finish();
+    await flush();
+
+    expect(written[0]?.kind).toBe('mechanical');
+    expect(written[0]?.tokens).toBe(500);
+  });
+
+  /** У ручного веера класса нет: ступень выбрал человек, рода работы никто не называл. */
+  it('без класса поле в записи не появляется', async () => {
+    const fake = new FakeRun();
+    const registry = new ChatRunRegistry(() => fake);
+    const written: LoweredRunRecord[] = [];
+    registry.setLoweredJournal((entry) => written.push(entry));
+
+    registry.start('c1', OPTIONS, { lowered: { model: 'claude-haiku-4-5', effort: '' } });
+    fake.finish();
+    await flush();
+
+    expect(written[0]).not.toHaveProperty('kind');
+  });
+
   it('прогон без проверок пишется с пустым списком, а не пропускается', async () => {
     const fake = new FakeRun();
     const registry = new ChatRunRegistry(() => fake);

@@ -17,32 +17,57 @@ import { bypassOnboarding } from './bypass-onboarding.mjs';
 
 const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 
-const run = (chatId, model, checks, ok = true) => ({
+const run = (chatId, model, checks, ok = true, kind, tokens = 12_000) => ({
   chatId,
   projectPath: `C:/qa-lowered/${chatId}`,
   model,
   effort: 'high',
+  ...(kind ? { kind } : {}),
   // Время — миллисекунды, как в `LoweredRunRecord`: подмена обязана повторять
   // форму сервера, иначе зонд проверяет не то, что приходит на самом деле.
   startedAt: 1_757_236_800_000,
   finishedAt: 1_757_237_040_000,
   ok,
   checks,
+  tokens,
 });
 
 // Три записи закрывают все три состояния строки: проверки видели, не видели,
 // и прогон упал — у последнего свой значок, потому что до проверок он не дошёл.
 const RUNS = [
-  run('qa-seen', 'claude-sonnet-5', ['pnpm type-check', 'pnpm lint']),
-  run('qa-unseen', 'claude-haiku-4-5', []),
-  run('qa-failed', 'claude-haiku-4-5', [], false),
+  run('qa-seen', 'claude-sonnet-5', ['pnpm type-check', 'pnpm lint'], true, 'mechanical', 400_000),
+  run('qa-unseen', 'claude-haiku-4-5', [], true, 'tests', 30_000),
+  run('qa-failed', 'claude-haiku-4-5', [], false, undefined, 5_000),
 ];
 
 const JOURNAL = {
   runs: RUNS,
-  summary: { total: 3, withChecks: 1, withoutChecks: 1, failed: 1 },
+  summary: {
+    total: 3,
+    withChecks: 1,
+    withoutChecks: 1,
+    failed: 1,
+    tokens: 435_000,
+    // Разрез по классам: сверху съевший больше окна, прогон без класса —
+    // отдельной строкой (ручной веер рода работы не называет).
+    byKind: [
+      {
+        kind: 'mechanical',
+        total: 1,
+        withChecks: 1,
+        withoutChecks: 0,
+        failed: 0,
+        tokens: 400_000,
+      },
+      { kind: 'tests', total: 1, withChecks: 0, withoutChecks: 1, failed: 0, tokens: 30_000 },
+      { kind: '', total: 1, withChecks: 0, withoutChecks: 0, failed: 1, tokens: 5_000 },
+    ],
+  },
 };
-const EMPTY = { runs: [], summary: { total: 0, withChecks: 0, withoutChecks: 0, failed: 0 } };
+const EMPTY = {
+  runs: [],
+  summary: { total: 0, withChecks: 0, withoutChecks: 0, failed: 0, tokens: 0, byKind: [] },
+};
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
@@ -83,8 +108,10 @@ check((await title.count()) === 1, 'с записями карточка поя�
 // Строки карточки различимы сами по себе — сужать до контейнера незачем, а
 // попытка сузиться по `div` попадает во внутренний Stack и теряет их.
 const card = page;
-check((await card.getByText('без видимых проверок: 1').count()) === 1, 'сводка без проверок');
-check((await card.getByText('упало: 1').count()) === 1, 'сводка упавших');
+// По два: значок стоит и в общей сводке, и в строке класса, которому это число
+// принадлежит. Разрез по классам появился 08.09.2026 вместе с журналом окна.
+check((await card.getByText('без видимых проверок: 1').count()) === 2, 'сводка без проверок');
+check((await card.getByText('упало: 1').count()) === 2, 'сводка упавших');
 check(
   (await card.getByText('«проверок не видно» значит именно это', { exact: false }).count()) === 1,
   'оговорка про Bash на месте',
@@ -92,6 +119,28 @@ check(
 check(
   (await card.getByText('агент их не делал', { exact: false }).count()) === 1,
   'подпись прямо отделяет «не видно» от «не проверял»',
+);
+
+// --- Разрез по классам работы -------------------------------------------
+// Числа здесь для человека: он правит таблицу «класс → модель». Классификатору
+// цена классов не сообщается никогда, иначе он пометит механикой всё подряд.
+
+check(
+  (await card.getByText('По классам работы', { exact: false }).count()) === 1,
+  'разрез по классам показан',
+);
+check(
+  (await card.getByText('прогонов: 1 · 400.0k tok', { exact: true }).count()) === 1,
+  'у класса своё окно рядом с числом прогонов',
+);
+check(
+  (await card.getByText('без класса', { exact: true }).count()) === 1,
+  'ручной веер класса не называет — ему отдельная строка, а не молчание',
+);
+const kinds = await card.getByText(/^(mechanical|tests|без класса)$/).allInnerTexts();
+check(
+  kinds.join(',') === 'mechanical,tests,без класса',
+  `порядок классов как у сервера: ${kinds.join(',')}`,
 );
 
 // Значки строк ищем точным совпадением: «проверок: 2» иначе находится и внутри

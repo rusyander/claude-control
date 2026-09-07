@@ -72,6 +72,12 @@ export type SplitStart = (input: {
   title: string;
   prompt: string;
   cwd: string;
+  /**
+   * Ветка копии. Нужна конвейеру у чужого провайдера: связей панели у его
+   * разговоров нет, и ветку, в которой работал ребёнок, кроме как отсюда взять
+   * негде — а ревью читает дифф именно её.
+   */
+  branch: string;
   /** Чем эту группу решено делать; нет — подбор в проекте выключен. */
   assignment?: CascadePlan;
 }) => boolean;
@@ -201,7 +207,14 @@ export async function splitTasks({
       ...(assignment ? { assignment } : {}),
     });
     const started = startRuns
-      ? start({ chatId, title: group.title, prompt, cwd, ...(assignment ? { assignment } : {}) })
+      ? start({
+          chatId,
+          title: group.title,
+          prompt,
+          cwd,
+          branch,
+          ...(assignment ? { assignment } : {}),
+        })
       : false;
 
     chats.push({

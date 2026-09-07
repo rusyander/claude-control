@@ -112,6 +112,7 @@ export function AnalyticsTopic() {
             { title: tr('loweredRow'), text: tr('loweredRowText') },
             { title: tr('loweredSeen'), text: tr('loweredSeenText') },
             { title: tr('loweredCrash'), text: tr('loweredCrashText') },
+            { title: tr('loweredKinds'), text: tr('loweredKindsText') },
             { title: tr('loweredWhere'), text: tr('loweredWhereText') },
           ]}
         />

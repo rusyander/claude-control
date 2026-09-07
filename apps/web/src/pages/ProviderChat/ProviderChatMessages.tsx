@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ProviderChatMessage } from '@agentdeck/contracts';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
+import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
 import { TaskSplitCard, HandoffCard } from '@features/ChatMessages';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -42,13 +43,18 @@ export function ProviderChatMessages({
   const renderTurn = (message: ProviderChatMessage): ReactNode => {
     const split = scanSplitBlocks(message.content);
     const handoff = scanHandoffBlocks(split.text);
+    // Блок вердикта ревью — служебный: по нему панель заводит звено правок, а
+    // человеку нужен разбор словами. У Claude его убирает `MessageBubble`; здесь
+    // своя лента, и без этой строки звенья конвейера у чужого CLI показывали бы
+    // сырой JSON (проверено на живом прогоне 08.09.2026).
+    const review = scanReviewBlocks(handoff.text);
     if (split.proposals.length === 0 && handoff.proposals.length === 0) {
-      return <Typography className={styles.turnText}>{message.content}</Typography>;
+      return <Typography className={styles.turnText}>{review.text}</Typography>;
     }
     const isLast = message.id === lastId;
     return (
       <>
-        {handoff.text && <Typography className={styles.turnText}>{handoff.text}</Typography>}
+        {review.text && <Typography className={styles.turnText}>{review.text}</Typography>}
         {split.proposals.map((proposal, index) => (
           <TaskSplitCard
             key={index}
@@ -140,8 +146,11 @@ export function ProviderChatMessages({
               <Typography variant="caption" color="subtle" as="span">
                 {providerName}
               </Typography>
+              {/* Тот же разбор, что и у записанной реплики: недописанный блок
+                  вердикта прячется с открывающей кавычки и до конца, иначе
+                  человек несколько секунд смотрит, как растёт служебный JSON. */}
               <Typography className={styles.turnText}>
-                {partial || t('providerChat.thinking')}
+                {(partial ? scanReviewBlocks(partial).text : '') || t('providerChat.thinking')}
                 <span className={styles.caret}>▍</span>
               </Typography>
             </Stack>

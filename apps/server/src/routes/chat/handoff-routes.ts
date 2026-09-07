@@ -164,7 +164,22 @@ export function createHandoffPlanner({
     runs.muteSplit(chatId);
     session.inherit(aliases, chatId);
     const chainDepth = chains.link(aliases, chatId);
-    if (!runs.start(chatId, options, { projectPath: cwd })) return undefined;
+    // Правки идут ниже потолка так же, как работа, — значит и в журнал сдачи
+    // попадают так же. Ревью в него не попадает: оно идёт НА потолке, понижать
+    // там нечего и оплачивать нечем.
+    const meta = {
+      projectPath: cwd,
+      ...(plan.stage === 'fix'
+        ? {
+            lowered: {
+              model: plan.model,
+              effort: plan.effort,
+              ...(link?.kind ? { kind: link.kind } : {}),
+            },
+          }
+        : {}),
+    };
+    if (!runs.start(chatId, options, meta)) return undefined;
 
     return {
       kind: 'handoff',

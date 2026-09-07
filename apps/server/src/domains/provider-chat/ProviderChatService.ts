@@ -41,7 +41,24 @@ interface LiveRun {
   transport?: ProviderChatTransport;
   subscribers: Set<ProviderChatSubscriber>;
   isRunning: boolean;
+  /**
+   * Ответ сняли кнопкой. Записанным он остаётся (сказанное — сказано), но
+   * ЗАКОНЧЕННЫМ не считается: снятая на полуслове работа не повод заводить по
+   * ней следующее звено конвейера.
+   */
+  stopped?: boolean;
   cleanupTimer?: ReturnType<typeof setTimeout>;
+}
+
+/** Разговор, у которого закончился ответ, — то, что видит слушатель. */
+export interface ProviderChatFinished {
+  providerId: string;
+  appDataDir: string;
+  chatId: string;
+  /** Ответ дошёл до конца сам: не ошибка и не остановка человеком. */
+  ok: boolean;
+  /** Текст ответа целиком. */
+  text: string;
 }
 
 /**
@@ -65,6 +82,7 @@ export interface SendOutcome {
 export class ProviderChatService {
   private runs = new Map<string, LiveRun>();
   private readonly createRun: () => ProviderChatRunLike;
+  private onFinished?: (finished: ProviderChatFinished) => void;
 
   /**
    * Фабрика прогона присваивается вручную: сервер исполняет TypeScript без
@@ -72,6 +90,16 @@ export class ProviderChatService {
    */
   constructor(createRun: () => ProviderChatRunLike = () => new ProviderChatRun()) {
     this.createRun = createRun;
+  }
+
+  /**
+   * Кому сообщать, что ответ закончился. Тем же приёмом, что у реестра прогонов
+   * Claude: сервис знает только «ответ дописан», а решение о следующем звене
+   * конвейера принимает домен и собирает bootstrap (`domains/provider-chat/cascade.ts`).
+   * Слушателя нет — всё ведёт себя как до конвейера.
+   */
+  setFinishedListener(listener: (finished: ProviderChatFinished) => void): void {
+    this.onFinished = listener;
   }
 
   /** Задать вопрос: реплика пользователя пишется сразу, ответ идёт потоком. */
@@ -200,6 +228,7 @@ export class ProviderChatService {
     const live = this.runs.get(chatId);
     if (!live?.isRunning) return false;
 
+    live.stopped = true;
     live.run.stop();
     this.broadcast(live, { type: 'stopped' });
     return true;
@@ -225,5 +254,21 @@ export class ProviderChatService {
       if (this.runs.get(chatId) === live) this.runs.delete(chatId);
     }, GRACE_MS);
     live.cleanupTimer.unref?.();
+
+    if (!this.onFinished) return;
+    try {
+      this.onFinished({
+        providerId: live.providerId,
+        appDataDir: live.appDataDir,
+        chatId,
+        ok: event.type === 'done' && !live.stopped,
+        text: event.type === 'done' ? (event.message?.content ?? live.partial) : '',
+      });
+    } catch {
+      // Слушатель зовётся ИЗ колбэка прогона: брошенное отсюда исключение
+      // вернулось бы в него, а оттуда — в `.catch` запуска, который дописал бы в
+      // переписку вторую реплику об ошибке. Ответ уже записан и разослан; о
+      // своих бедах слушатель сообщает сам (`onError` планировщика).
+    }
   }
 }

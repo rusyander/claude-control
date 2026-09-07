@@ -3,6 +3,7 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
+import { formatTokens } from '@shared/lib/format';
 import { useLoweredRuns } from '@entities/Analytics';
 
 /** Сколько последних прогонов показываем: карточка — сводка, а не журнал целиком. */
@@ -52,6 +53,48 @@ export function LoweredRunsCard() {
         <Typography variant="caption" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
           {t('analytics.lowered.hint')}
         </Typography>
+
+        {/* Разрез по классам работы: во что обошёлся каждый класс и как часто по
+            нему доходило до проверок. Числа здесь для ЧЕЛОВЕКА — таблицу «класс →
+            модель» правит он; агенту-классификатору цена классов не сообщается
+            никогда, иначе он начнёт метить механикой всё подряд. */}
+        {summary.byKind.length > 1 && (
+          <Stack gap="var(--spacing-3xs)">
+            <Typography variant="caption" color="subtle" as="span">
+              {t('analytics.lowered.byKind')}
+            </Typography>
+            {summary.byKind.map((row) => (
+              <Stack
+                key={row.kind || 'none'}
+                direction="row"
+                align="center"
+                justify="between"
+                gap="var(--spacing-xs)"
+                wrap
+              >
+                <Typography variant="caption" as="span">
+                  {row.kind || t('analytics.lowered.noKind')}
+                </Typography>
+                <Stack direction="row" align="center" gap="var(--spacing-2xs)">
+                  <Typography variant="caption" color="subtle" as="span">
+                    {t('analytics.lowered.kindRuns', { count: row.total })}
+                    {row.tokens > 0 ? ` · ${formatTokens(row.tokens)} tok` : ''}
+                  </Typography>
+                  {row.withoutChecks > 0 && (
+                    <Badge tone="warning">
+                      {t('analytics.lowered.withoutChecks', { count: row.withoutChecks })}
+                    </Badge>
+                  )}
+                  {row.failed > 0 && (
+                    <Badge tone="danger">
+                      {t('analytics.lowered.failed', { count: row.failed })}
+                    </Badge>
+                  )}
+                </Stack>
+              </Stack>
+            ))}
+          </Stack>
+        )}
 
         <Stack gap="var(--spacing-2xs)">
           {(data?.runs ?? []).slice(0, ROWS).map((run) => (

@@ -435,11 +435,24 @@ describe('тексты звеньев', () => {
   });
 
   it('правки перечисляют замечания по номерам и не зовут на второй заход', () => {
-    const prompt = fixStagePrompt(['первое', 'второе'], 'split/rename');
+    const prompt = fixStagePrompt(['первое', 'второе'], { branch: 'split/rename' });
 
     expect(prompt).toContain('1. первое');
     expect(prompt).toContain('2. второе');
     expect(prompt).toContain('split/rename');
+    expect(prompt).toContain('модель сильнее');
+  });
+
+  /**
+   * У чужого CLI потолка нет: ревьюером работает его собственная настройка, и
+   * чем она сильнее подобранной ступени — панель не знает. Обещать «сильнее»
+   * значит подписаться за то, чего не проверяли.
+   */
+  it('правки у чужого CLI не называют ревьюера сильнейшим', () => {
+    const prompt = fixStagePrompt(['первое'], { reviewer: 'cli' });
+
+    expect(prompt).toContain('другая модель');
+    expect(prompt).not.toContain('модель сильнее');
   });
 
   /**
@@ -448,5 +461,21 @@ describe('тексты звеньев', () => {
    */
   it('планка сдачи обещает ревью, а не только проверки проекта', () => {
     expect(loweredWorkPrompt('mechanical')).toContain('ревью');
+    expect(loweredWorkPrompt('mechanical')).toContain('модели-потолке');
+  });
+
+  /** Тот же текст чужому CLI: ступень отсчитывается от настройки CLI, не от потолка. */
+  it('планка сдачи у чужого CLI обещает ревью настроенной моделью CLI', () => {
+    const prompt = loweredWorkPrompt('mechanical', { reviewer: 'cli' });
+
+    expect(prompt).toContain('настроенной моделью самого CLI');
+    expect(prompt).not.toContain('потолка разговора');
+  });
+
+  /** Правки — конец цепочки: обещать по ним ещё одно ревью нечем. */
+  it('планка сдачи без ревью говорит об этом прямо', () => {
+    const prompt = loweredWorkPrompt('mechanical', { review: false });
+
+    expect(prompt).toContain('Ревью этой работы панель не заведёт');
   });
 });

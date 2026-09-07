@@ -13,6 +13,7 @@ import {
   ProviderChatService,
   listChats,
   readChat,
+  readChatCascade,
   type ProviderChatRunOptions,
 } from '../domains/provider-chat.ts';
 
@@ -131,11 +132,36 @@ describe('POST /api/chat/split — чужой провайдер', () => {
   it('понижённой группе дописывается планка сдачи, группе на потолке — нет', async () => {
     await split();
 
-    expect(runs[0]?.systemPrefix).toContain('НИЖЕ потолка');
-    // Обещания ревью в задании быть не должно: у чужого провайдера конвейер не
-    // работает, и агент, рассчитывающий на вторую пару глаз, проверит себя хуже.
-    expect(runs[0]?.systemPrefix).toContain('Ревью этой работы панель не заведёт');
-    expect(runs[1]?.systemPrefix ?? '').not.toContain('НИЖЕ потолка');
+    expect(runs[0]?.systemPrefix).toContain('НИЖЕ той, которой CLI работает');
+    // Ревью здесь обещается, но не «моделью-потолком»: потолка у чужого CLI нет,
+    // и проверку панель заводит прогоном без подобранной ступени.
+    expect(runs[0]?.systemPrefix).toContain('настроенной моделью самого CLI');
+    expect(runs[0]?.systemPrefix ?? '').not.toContain('потолка разговора');
+    expect(runs[1]?.systemPrefix ?? '').not.toContain('НИЖЕ');
+  });
+
+  /**
+   * Стадия — единственное, чем конвейер у чужого CLI вообще держится: связей
+   * панели у этих разговоров нет, и, не запиши её разделение, ревью не завелось
+   * бы никогда.
+   */
+  it('понижённой группе пишется стадия работы в шапке, группе на потолке — нет', async () => {
+    await split();
+
+    const lowered = listChats(appData, 'codex').find((item) => item.title === 'Переименования');
+    expect(readChatCascade(appData, 'codex', lowered?.id ?? '')).toMatchObject({
+      stage: 'work',
+      lowered: true,
+      kind: 'mechanical',
+      group: 'Переименования',
+      workModel: 'gpt-5.3-codex-spark',
+      workEffort: 'medium',
+    });
+    // Ветка копии нужна ревьюеру: дифф он читает именно в ней.
+    expect(readChatCascade(appData, 'codex', lowered?.id ?? '')?.branch).toBeTruthy();
+
+    const ceiling = listChats(appData, 'codex').find((item) => item.title === 'Архитектура');
+    expect(readChatCascade(appData, 'codex', ceiling?.id ?? '')).toBe(undefined);
   });
 
   it('разговор называется группой, а не служебным ключом', async () => {

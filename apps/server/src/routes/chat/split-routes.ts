@@ -204,8 +204,9 @@ export function registerChatSplitRoutes(
       // (`new-…`) и переезжает на настоящий `sessionId` прогона; у чужого CLI
       // разговор заводит его собственное хранилище со своим идентификатором, и
       // связь под временным ключом осталась бы записью о чате, которого нет.
-      // Дерево, сводка звеньев и конвейер ревью у чужих провайдеров поэтому не
-      // работают — см. `domains/provider-cascade.ts`.
+      // Дерево чатов и сводка звеньев у чужих провайдеров поэтому не работают.
+      // Конвейер ревью работает — он живёт не на связях, а на стадии в шапке
+      // самого разговора (`domains/provider-chat/cascade.ts`).
       link:
         parentChatId && !isForeign
           ? ({ chatId, title, branch, assignment }) =>
@@ -237,7 +238,7 @@ export function registerChatSplitRoutes(
                   : {}),
               })
           : undefined,
-      start: ({ chatId, title, prompt, cwd, assignment }) => {
+      start: ({ chatId, title, prompt, cwd, branch, assignment }) => {
         // Набор, привязанный к проекту, включается и здесь: агент, которого
         // завело разделение, работает в том же проекте и должен получить те же
         // правила и скиллы. Копия репозитория считается тем же проектом —
@@ -249,7 +250,7 @@ export function registerChatSplitRoutes(
         );
 
         return isForeign
-          ? startForeign(title, prompt, cwd, assignment)
+          ? startForeign(title, prompt, cwd, branch, assignment)
           : startClaude(chatId, prompt, cwd, assignment);
       },
     });
@@ -306,7 +307,22 @@ export function registerChatSplitRoutes(
           permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
           ...(initiative ? { appendSystemPrompt: initiative } : {}),
         },
-        { projectPath: cwd },
+        {
+          projectPath: cwd,
+          // Понижённый ребёнок попадает в журнал сдачи вместе с КЛАССОМ, из-за
+          // которого его понизили. Без класса журнал отвечает только «сколько
+          // раз понизили»; с ним — «что именно и во что обошлось», а это тот
+          // самый вопрос, ради которого подбор и затевался.
+          ...(assignment?.lowered
+            ? {
+                lowered: {
+                  model: assignment.model,
+                  effort: assignment.effort,
+                  ...(assignment.kind ? { kind: assignment.kind } : {}),
+                },
+              }
+            : {}),
+        },
       );
     }
 
@@ -318,12 +334,15 @@ export function registerChatSplitRoutes(
      * Назначение модели (Т12) уезжает в шапку разговора, а не только в первый
      * прогон: следующее сообщение в тот же чат приходит без него, и без записи
      * оно ушло бы на настройке CLI — то есть работа продолжилась бы не тем, чем
-     * началась.
+     * началась. Туда же уезжает и стадия конвейера: связей панели у этих
+     * разговоров нет, и другого места, переживающего перезапуск сервера, у них
+     * тоже нет (`domains/provider-chat/cascade.ts`).
      */
     function startForeign(
       title: string,
       prompt: string,
       cwd: string,
+      branch: string,
       assignment?: CascadePlan,
     ): boolean {
       const appData = ctx.location.paths.appData;
@@ -331,6 +350,22 @@ export function registerChatSplitRoutes(
         title,
         workdir: cwd,
         ...(assignment ? { model: assignment.model, effort: assignment.effort } : {}),
+        // Стадия пишется ТОЛЬКО понижённой группе: работа, идущая настройкой
+        // самого CLI, ревью не получает — усиливать её нечем, прогон проверки
+        // пошёл бы ровно той же моделью.
+        ...(assignment?.lowered
+          ? {
+              cascade: {
+                stage: 'work' as const,
+                group: title,
+                branch,
+                lowered: true,
+                workModel: assignment.model,
+                workEffort: assignment.effort,
+                ...(assignment.kind ? { kind: assignment.kind } : {}),
+              },
+            }
+          : {}),
       });
       if (!created) return false;
       // У чужого CLI инициатива — первая реплика переписки, а не флаг запуска.
@@ -339,11 +374,11 @@ export function registerChatSplitRoutes(
       // выключено по той же причине, что и у Claude: этот чат уже выделен.
       const initiative = [
         initiativePrompt(ctx.store.getSettings(), { splitMuted: true, foreign: true }),
-        // Планка сдачи — единственная плата за понижение, которая у чужого
-        // провайдера вообще есть: конвейер ревью работает на реестре прогонов
-        // Claude, и завести проверку на потолке здесь нечем (см.
-        // `domains/provider-cascade.ts`). Обещать больше было бы враньём.
-        assignment?.lowered ? loweredWorkPrompt(assignment.kind, { review: false }) : '',
+        // Планка сдачи и обещание ревью. Ревьюером здесь работает настроенная
+        // модель самого CLI — прогон без подобранной ступени: потолка у чужого
+        // провайдера нет вовсе, панель умеет только понижать (см.
+        // `domains/provider-cascade.ts`), и «модель сильнее» ему не обещается.
+        assignment?.lowered ? loweredWorkPrompt(assignment.kind, { reviewer: 'cli' }) : '',
       ]
         .filter(Boolean)
         .join(' ');

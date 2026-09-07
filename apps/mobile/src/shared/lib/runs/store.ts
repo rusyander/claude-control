@@ -119,6 +119,12 @@ export function applyEvent(id: string, event: ChatEvent): void {
     case 'session':
       next.sessionId = event.sessionId;
       next.startedAt = event.startedAt ?? run.startedAt;
+      // Модель — от самого CLI, а не из того, что телефон отправил. Отправляет
+      // он её далеко не всегда (по умолчанию в поле ввода стоит «как в
+      // настройках»), а чат, заведённый разделением, панель вообще ведёт
+      // подобранной моделью, которой телефон не называл. Без этой строки экран
+      // молчал бы ровно там, где ответ на «чем это сейчас работает» и нужен.
+      next.model = event.model || run.model;
       break;
     case 'text':
       if (!tailOnly) next.text = run.text + event.text;

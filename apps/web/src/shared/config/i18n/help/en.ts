@@ -779,8 +779,21 @@ export const helpEn: HelpSchema = {
       panelParallelText:
         'The button lives in the project list on the home tab, not in the header. One ' +
         'request goes to several projects at once: tick the projects, write the task, ' +
-        'and an agent starts in each. The window has its own edit toggle, switched off ' +
-        'every time it opens. Handy for sweeps like “check every repository for X”.',
+        'and an agent starts in each. The window has its own edit toggle and its own ' +
+        'model choice. Handy for sweeps like “check every repository for X”.',
+      panelParallelModel: 'The fan-out model is chosen in the window itself',
+      panelParallelModelText:
+        'Next to the task sits the same model + effort pair as on the split card, with ' +
+        'no rung above the model of the conversation itself. It defaults to that pair, ' +
+        'and lowering it is a deliberate act: five agents starting at once at the ' +
+        'ceiling eat the rate window faster than anything else the panel does, while ' +
+        'fan-out work is usually the same and well understood. One rung covers the ' +
+        'whole launch — different models per project would give different results for ' +
+        'one and the same task. Lowering is paid for with a delivery bar: the task ' +
+        'gains the duty to run the project checks, verify the result point by point ' +
+        'and stop when the work turns out to be of another class. No review at the ' +
+        'ceiling is started here — the stage pipeline only runs for split children, in ' +
+        'their own copy of the branch, and promising it to the fan-out would be a lie.',
       panelParallelTree: 'What you launch becomes a tree, not tabs',
       panelParallelTreeText:
         'The launched agents’ conversations hang as branches under the chat they were ' +
@@ -842,7 +855,7 @@ export const helpEn: HelpSchema = {
         'reset on every refresh, and the agent stalled over nothing. The flip side is ' +
         'that switching it off is a deliberate act — it never returns to read-only on ' +
         'its own. The exception is the parallel launch window: it has its own toggle, ' +
-        'switched off every time it opens.',
+        'and it opens on “edits allowed”, the same as a normal chat.',
 
       autoApproveTitle: 'Auto-approving permissions',
       autoApproveText:

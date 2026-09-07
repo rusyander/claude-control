@@ -326,3 +326,21 @@ describe('очередь дописанного', () => {
     expect(storage.size).toBe(0);
   });
 });
+
+describe('чем ведут прогон', () => {
+  it('модель берётся из события сессии, а не из того, что телефон отправил', async () => {
+    const stream = sseStream();
+    fetchMock.mockResolvedValueOnce(stream.response);
+
+    // Телефон модель не назвал — так уходит и обычное сообщение (в поле ввода
+    // стоит «как в настройках»), и любое сообщение в чат, заведённый
+    // разделением: там модель подобрала панель.
+    void send({ chatId: 'new-1', prompt: 'привет' });
+    await flush();
+
+    stream.push({ kind: 'session', sessionId: 's9', model: 'claude-sonnet-5', tools: 0, seq: 1 });
+    await flush();
+
+    expect(getRun('new-1').model).toBe('claude-sonnet-5');
+  });
+});

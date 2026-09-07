@@ -39,8 +39,9 @@ describe('список выбора модели', () => {
   it('алиасы идут первыми, конкретные модели — следом и подписаны id', () => {
     const result = options([model('claude-opus-5', 'Claude Opus 5')]);
 
-    expect(result.slice(0, 2)).toEqual([
+    expect(result.slice(0, 3)).toEqual([
       { value: '', label: 'как выберет CLI' },
+      { value: 'fable', label: 'fable' },
       { value: 'opus', label: 'opus' },
     ]);
     expect(result.at(-1)).toEqual({
@@ -69,6 +70,9 @@ describe('константы выбора', () => {
   it('первый вариант модели — пустой (как выберет Claude)', () => {
     expect(MODEL_OPTIONS[0]).toBe('');
     expect(MODEL_OPTIONS).toContain('opus');
+    // Верхняя ступень лестницы: без неё потолок на неё не поставить иначе как
+    // конкретным id из каталога.
+    expect(MODEL_OPTIONS).toContain('fable');
   });
 
   it('первый уровень effort — пустой (по умолчанию)', () => {

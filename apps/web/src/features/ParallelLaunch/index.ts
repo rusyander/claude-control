@@ -1,2 +1,2 @@
 export { ParallelLaunch } from './ui/ParallelLaunch';
-export type { ParallelLaunchProps } from './ui/ParallelLaunch.types';
+export type { ParallelLaunchProps, ParallelChoice } from './ui/ParallelLaunch.types';

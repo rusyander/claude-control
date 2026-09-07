@@ -36,6 +36,7 @@ export function ChatOverlays({
   onTestsOpenChange,
   isParallelOpen,
   onParallelOpenChange,
+  parallelCeiling,
   projects,
   onLaunch,
 }: ChatOverlaysProps) {
@@ -90,6 +91,7 @@ export function ChatOverlays({
         isOpen={isParallelOpen}
         onOpenChange={onParallelOpenChange}
         projects={projects}
+        {...(parallelCeiling ? { ceiling: parallelCeiling } : {})}
         onLaunch={onLaunch}
       />
     </>

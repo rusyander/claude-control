@@ -2,6 +2,37 @@
   cursor: pointer;
 }
 
+// Тот же компактный список, что в шапке чата и на карточке разделения:
+// нативный, с видимым фокусом.
+.select {
+  max-width: 110px;
+  padding: 2px var(--spacing-3xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+// Веер пойдёт слабее потолка. Не предупреждение, а факт: такому прогону
+// дописывается планка сдачи, и человек вправе видеть это до кнопки.
+.lowered {
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
 .list {
   max-height: 40vh;
   overflow-y: auto;

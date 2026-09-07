@@ -4,6 +4,7 @@ import { useWorkspace } from '@shared/lib/workspace';
 import { agentRuns } from '@shared/lib/agent-runs';
 import { chatKeys } from '@entities/Chat';
 import type { ProjectInfo } from '@entities/Project';
+import type { ParallelChoice } from '@features/ParallelLaunch';
 
 export interface ParallelLaunchInput {
   /** Модель и глубина продумывания, с которыми уйдут все прогоны разом. */
@@ -19,7 +20,12 @@ export interface ParallelLaunchInput {
 export interface ParallelLaunchApi {
   isParallelOpen: boolean;
   setParallelOpen: (open: boolean) => void;
-  launchParallel: (selected: ProjectInfo[], prompt: string, editsAllowed: boolean) => void;
+  launchParallel: (
+    selected: ProjectInfo[],
+    prompt: string,
+    editsAllowed: boolean,
+    choice?: ParallelChoice,
+  ) => void;
 }
 
 /**
@@ -50,7 +56,12 @@ export function useParallelLaunch({
   const ws = useWorkspace();
   const [isParallelOpen, setParallelOpen] = useState(false);
 
-  const launchParallel = (selected: ProjectInfo[], prompt: string, editsAllowed: boolean): void => {
+  const launchParallel = (
+    selected: ProjectInfo[],
+    prompt: string,
+    editsAllowed: boolean,
+    choice?: ParallelChoice,
+  ): void => {
     const stamp = Date.now();
     selected.forEach((project, index) => {
       if (!parentChatId) ws.openProject(project.path, project.name);
@@ -59,8 +70,14 @@ export function useParallelLaunch({
         prompt,
         projectPath: project.path,
         allowEdits: editsAllowed,
-        model,
-        effort,
+        // Выбор в окне веера сильнее шапки чата: человек решает про этот запуск,
+        // глядя на то, сколько агентов стартует. Нет выбора (подбор недоступен —
+        // потолок не распознан) — уходит пара разговора, как и раньше.
+        model: choice?.model ?? model,
+        effort: choice?.effort ?? effort,
+        // Понижение отмечаем явно: по этой отметке сервер разворачивает алиас
+        // ступени в свежую модель семейства и дописывает заданию планку сдачи.
+        ...(choice?.lowered ? { lowered: true } : {}),
         // Имя проекта — подпись ветви: у прогона, начатого не с реплики
         // человека, заголовка ещё нет, и в дереве он был бы безымянным ключом.
         ...(parentChatId ? { parentChatId, parentTitle: project.name } : {}),

@@ -427,3 +427,111 @@ describe('POST /api/chat/send: связь с родителем', () => {
     expect(store.getChatLink('solo')).toBeUndefined();
   });
 });
+
+/**
+ * Веер ручного параллельного запуска, отправленный ступенью НИЖЕ потолка
+ * разговора. Проверяем ровно две вещи, которые панель обязана сделать за
+ * человека и которых нет ни у одного другого запуска: развернуть алиас ступени в
+ * свежую модель семейства (алиас CLI — «рекомендованная модель уровня», не
+ * последняя) и дописать заданию планку сдачи БЕЗ обещания ревью — конвейер
+ * звеньев живёт на связи разделения, а веер идёт в настоящих проектах.
+ */
+describe('POST /api/chat/send: понижённый веер', () => {
+  let root: string;
+  let project: string;
+  let app: FastifyInstance;
+  /** С чем реально стартовал прогон: модель и системная дописка. */
+  let started: Array<{ model?: string; append?: string }>;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), 'cc-fan-'));
+    project = mkdtempSync(join(tmpdir(), 'cc-fan-proj-'));
+    mkdirSync(join(root, 'agentdeck'), { recursive: true });
+
+    started = [];
+    const registry = new ChatRunRegistry((): RunLike => ({
+      start: async (options) => {
+        started.push({ model: options.model, append: options.appendSystemPrompt });
+      },
+      stop: () => undefined,
+    }));
+
+    const ctx = {
+      location: { paths: { root } },
+      store: new AppStore(join(root, 'agentdeck')),
+      // Каталог: в семействе две модели, и свежая — не та, на которую CLI
+      // разворачивает алиас сам. Ради этого различия шаг и существует.
+      models: {
+        current: () => ({
+          models: [
+            {
+              id: 'claude-sonnet-4-6',
+              name: 'Claude Sonnet 4.6',
+              family: 'claude-sonnet',
+              vendor: 'anthropic',
+              releaseDate: '2026-02-01',
+            },
+            {
+              id: 'claude-sonnet-5',
+              name: 'Claude Sonnet 5',
+              family: 'claude-sonnet',
+              vendor: 'anthropic',
+              releaseDate: '2026-06-29',
+            },
+          ],
+        }),
+      },
+    } as unknown as ServerContext;
+
+    app = Fastify();
+    registerChatRoutes(app, ctx, registry, new ChatSession(registry));
+    await app.ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    rmSync(root, { recursive: true, force: true });
+    rmSync(project, { recursive: true, force: true });
+  });
+
+  const send = (payload: Record<string, unknown>) =>
+    app.inject({ method: 'POST', url: '/api/chat/send', payload });
+
+  it('алиас ступени разворачивается в свежую модель семейства', async () => {
+    await send({
+      chatId: 'fan-1',
+      prompt: 'прогони линт',
+      projectPath: project,
+      model: 'sonnet',
+      effort: 'high',
+      lowered: true,
+    });
+
+    expect(started[0]?.model).toBe('claude-sonnet-5');
+  });
+
+  it('заданию дописывается планка сдачи, и ревью в ней не обещается', async () => {
+    await send({
+      chatId: 'fan-2',
+      prompt: 'прогони линт',
+      projectPath: project,
+      model: 'sonnet',
+      lowered: true,
+    });
+
+    expect(started[0]?.append).toContain('прогони проверки проекта');
+    expect(started[0]?.append).toContain('Ревью этой работы панель не заведёт');
+  });
+
+  it('без отметки о понижении не трогается ничего: ни модель, ни задание', async () => {
+    await send({
+      chatId: 'fan-3',
+      prompt: 'прогони линт',
+      projectPath: project,
+      model: 'sonnet',
+    });
+
+    expect(started[0]?.model).toBe('sonnet');
+    expect(started[0]?.append ?? '').not.toContain('Ревью этой работы');
+  });
+});

@@ -7,8 +7,17 @@ import type { ModelInfo } from '@agentdeck/contracts';
  * чата (там доступны и настройки-entity, и per-chat черновик).
  */
 
-/** Алиасы моделей CLI для выбора. '' = как выберет Claude (по умолчанию). */
-export const MODEL_OPTIONS = ['', 'opus', 'sonnet', 'haiku'] as const;
+/**
+ * Алиасы моделей CLI для выбора. '' = как выберет Claude (по умолчанию).
+ *
+ * `fable` здесь потому, что он — верхняя ступень лестницы подбора
+ * (`MODEL_RANK` в `contracts/model-cascade`), и без него потолок разговора нельзя
+ * было поставить на неё иначе как конкретным именем из каталога: подбор считает
+ * ранг по семейству, а список выбора о самом сильном семействе молчал. Доступ к
+ * нему зависит от аккаунта — как и к любому имени из каталога, который панель
+ * показывает целиком.
+ */
+export const MODEL_OPTIONS = ['', 'fable', 'opus', 'sonnet', 'haiku'] as const;
 
 /** Уровни глубины продумывания (--effort). '' = по умолчанию. */
 export const EFFORT_LEVELS = ['', 'low', 'medium', 'high', 'xhigh', 'max'] as const;

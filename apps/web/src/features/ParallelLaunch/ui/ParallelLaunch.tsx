@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  assignableEffortsUpTo,
+  assignableModelsUpTo,
+  clampAssignment,
+  manualAssignment,
+  modelAlias,
+  type CascadeAssignment,
+} from '@agentdeck/contracts/model-cascade';
 import { Modal } from '@shared/ui/modal';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -17,19 +25,42 @@ import styles from './ParallelLaunch.module.scss';
  * цветным точкам на табах. Правки по умолчанию разрешены — как и в обычном чате
  * (`chatPrefsStore`): агент, которому нельзя писать, в проекте бесполезен, а
  * выключить тумблер перед запуском можно тут же.
+ *
+ * Модель выбирается ЗДЕСЬ, а не только в шапке чата, и это главное отличие веера
+ * от обычной отправки. Пять агентов, стартующих разом на потолке, съедают окно
+ * лимитов быстрее всего, что вообще делает панель, — а работа у веера чаще всего
+ * одинаковая и понятная («прогони линт», «обнови зависимость»). Ступень ниже
+ * потолка выбирается одна на весь запуск: разные модели по проектам значили бы
+ * разный результат на одинаковой задаче.
+ *
+ * Понижение здесь оплачивается ПЛАНКОЙ СДАЧИ и только ей: конвейер «работа →
+ * ревью → правки» живёт на связи разделения и на копии ветки, а веер идёт в
+ * настоящих проектах. Об этом сказано и человеку в подсказке, и агенту в задании
+ * (`loweredWorkPrompt(…, { review: false })` на сервере).
  */
-export function ParallelLaunch({ isOpen, onOpenChange, projects, onLaunch }: ParallelLaunchProps) {
+export function ParallelLaunch({
+  isOpen,
+  onOpenChange,
+  projects,
+  ceiling,
+  onLaunch,
+}: ParallelLaunchProps) {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [prompt, setPrompt] = useState('');
   const [allowEdits, setAllowEdits] = useState(true);
+  // Чего человек хочет от веера по моделям. Пусто — потолок: подбирать род
+  // работы здесь не по чему, задание одно на все проекты и класс ему никто не
+  // называл, поэтому по умолчанию всё идёт ровно как раньше.
+  const [wish, setWish] = useState<CascadeAssignment | undefined>(undefined);
 
   // При каждом открытии — с чистого листа.
   useEffect(() => {
     if (isOpen) {
       setSelected(new Set());
       setPrompt('');
-      setAllowEdits(false);
+      setAllowEdits(true);
+      setWish(undefined);
     }
   }, [isOpen]);
 
@@ -47,6 +78,25 @@ export function ParallelLaunch({ isOpen, onOpenChange, projects, onLaunch }: Par
 
   const chosen = available.filter((project) => selected.has(normalizeProjectPath(project.path)));
   const canLaunch = chosen.length > 0 && prompt.trim().length > 0;
+
+  // Что вообще можно назначить при этом потолке — тот же список, что и на
+  // карточке разделения. Пусто = потолок не распознан, и выбора не показываем
+  // вовсе: обещать ступени, которых панель не умеет сравнивать, нельзя.
+  const models = ceiling ? assignableModelsUpTo(ceiling.model) : [];
+  const efforts = ceiling ? assignableEffortsUpTo(ceiling.effort) : [];
+  // Потолок без глубины («как решит CLI») — законное значение, и в списке оно
+  // должно быть: иначе select показывал бы первый пункт вместо того, что уедет.
+  const effortOptions =
+    ceiling && clampAssignment({}, ceiling).effort === '' ? ['', ...efforts] : efforts;
+  const hasCascade = Boolean(ceiling) && models.length > 0;
+  // Выбор человека действует в обе стороны и держится потолком — тот же
+  // `manualAssignment`, что и на карточке; он же считает `lowered`.
+  const plan = hasCascade && ceiling ? manualAssignment(wish ?? {}, ceiling) : undefined;
+
+  // Замена всегда содержит ОБЕ оси: поменяв модель, человек не просил сбросить
+  // глубину, а неполное пожелание сервер добрал бы с потолка.
+  const replace = (patch: CascadeAssignment): void =>
+    setWish({ model: modelAlias(plan?.model ?? '') ?? '', effort: plan?.effort ?? '', ...patch });
 
   return (
     <Modal
@@ -88,7 +138,16 @@ export function ParallelLaunch({ isOpen, onOpenChange, projects, onLaunch }: Par
               variant="primary"
               disabled={!canLaunch}
               leftIcon={<Icon name="send" size={20} />}
-              onClick={() => onLaunch(chosen, prompt.trim(), allowEdits)}
+              onClick={() =>
+                onLaunch(
+                  chosen,
+                  prompt.trim(),
+                  allowEdits,
+                  plan
+                    ? { model: plan.model, effort: plan.effort, lowered: plan.lowered }
+                    : undefined,
+                )
+              }
             >
               {t('parallel.launch', { count: chosen.length })}
             </Button>
@@ -105,6 +164,47 @@ export function ParallelLaunch({ isOpen, onOpenChange, projects, onLaunch }: Par
           multiline
           rows={3}
         />
+
+        {/* Модель веера — рядом с заданием, а не в шапке чата: решение про неё
+            принимают, глядя на то, СКОЛЬКО агентов сейчас стартует. */}
+        {hasCascade && plan && (
+          <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
+            <Typography variant="caption" color="subtle" as="span">
+              {t('parallel.cascade.label')}
+            </Typography>
+            {/* Нативные select — как в шапке чата и на карточке разделения:
+                компактно и правильно работают с клавиатурой и дикторами. */}
+            <select
+              className={styles.select}
+              value={modelAlias(plan.model) ?? ''}
+              onChange={(event) => replace({ model: event.target.value })}
+              aria-label={t('parallel.cascade.model')}
+            >
+              {models.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
+            </select>
+            <select
+              className={styles.select}
+              value={plan.effort}
+              onChange={(event) => replace({ effort: event.target.value })}
+              aria-label={t('parallel.cascade.effort')}
+            >
+              {effortOptions.map((level) => (
+                <option key={level || 'default'} value={level}>
+                  {level ? t(`chat.effort_${level}`) : t('chat.effortAuto')}
+                </option>
+              ))}
+            </select>
+            {plan.lowered && (
+              <span className={styles.lowered} title={t('parallel.cascade.loweredHint')}>
+                {t('chat.split.cascade.lowered')}
+              </span>
+            )}
+          </Stack>
+        )}
 
         <Typography variant="caption" color="subtle">
           {t('parallel.pickProjects', { count: chosen.length })}

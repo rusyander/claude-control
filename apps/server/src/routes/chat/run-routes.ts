@@ -15,8 +15,10 @@ import {
   SUPPORTED_UPLOAD_EXTENSIONS,
 } from '../../domains/chat/ChatUploads.ts';
 import { activateGroupsForCwd } from '../../domains/group-activation.ts';
-import { cascadeCeilingFor } from '../../domains/model-cascade.ts';
+import { cascadeCeilingFor, expandAssignedModel } from '../../domains/model-cascade.ts';
+import { loweredWorkPrompt } from '@agentdeck/contracts/model-cascade';
 import { activeCliCommand } from '../../providers/cli.ts';
+import { getActiveProvider } from '../../providers/registry.ts';
 import { estimateCost } from '../../domains/analytics/pricing.ts';
 import { projectsDir, validTargetCwd } from './paths.ts';
 import { streamRun, streamGone } from '../../domains/chat/ChatStream.ts';
@@ -115,6 +117,7 @@ export function registerChatRunRoutes(
         parentTitle,
         model,
         effort,
+        lowered,
       } = body;
 
       // Прошлый ответ ещё генерируется — второй промпт принять некуда. Раньше
@@ -227,6 +230,29 @@ export function registerChatRunRoutes(
         ...(ceiling ? { cascade: ceiling } : {}),
       });
 
+      // Веер ручного параллельного запуска, отправленный ступенью НИЖЕ потолка
+      // разговора. Плата за понижение тут одна — планка сдачи, и про это в
+      // задании сказано прямо: конвейер «работа → ревью → фикс» живёт на связи
+      // разделения и на копии ветки, а прогоны веера идут в настоящих проектах,
+      // где ни того, ни другого нет. Обещать ревью значило бы соврать агенту.
+      const appendSystemPrompt =
+        [initiative ?? '', lowered ? loweredWorkPrompt(undefined, { review: false }) : '']
+          .filter(Boolean)
+          .join(' ') || undefined;
+
+      // Ступень лестницы приходит алиасом, а алиас CLI — это «рекомендованная
+      // модель уровня», не последняя в семействе: `--model sonnet` уводил прогон
+      // на прошлое поколение при свежем в каталоге. Разворачиваем сами, ровно как
+      // разделение (`expandAssignedModel` в `split-routes.ts`). Только у
+      // понижённого: модель, выбранная человеком в шапке, — его выбор, и
+      // подменять её нечем и незачем.
+      const runModel = lowered
+        ? expandAssignedModel(
+            ctx.models.current(getActiveProvider(ctx.store).modelVendors ?? []).models,
+            model ?? '',
+          )
+        : model;
+
       // Связь с родителем — СТРОГО до запуска. Прогон называет свой настоящий
       // `sessionId` через пару секунд, и перенос связи ищет запись по временному
       // ключу: не найдя, он молча ничего не делает, и чат уезжает в список
@@ -262,13 +288,13 @@ export function registerChatRunRoutes(
           // задачи, и второе сообщение обязано уехать на ней же. Панель модель
           // шлёт всегда, а телефон и API-клиенты — нет, и без этого их сообщения
           // молча возвращали бы разговор на дефолт из настроек.
-          model: model || assigned?.model,
+          model: runModel || assigned?.model,
           effort: effort || assigned?.effort,
           // Инициативы панели (разделить задачи, закрыть этап чистой сессией) —
           // одной строкой к системному промпту. Тумблеры в настройках, потому что
           // уместны они не всякому: кто ведёт один короткий разговор, увидит в них
-          // лишний шаг.
-          ...(initiative ? { appendSystemPrompt: initiative } : {}),
+          // лишний шаг. Тут же планка сдачи понижённого прогона.
+          ...(appendSystemPrompt ? { appendSystemPrompt } : {}),
           // Полный доступ снимает все проверки прав — по кнопке «Разрешить и
           // продолжить» у агента, вставшего из-за отсутствия разрешения.
           permissionMode: fullAccess

@@ -1,5 +1,7 @@
 import type { Artifact } from '@agentdeck/contracts';
+import type { CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 import type { ProjectInfo } from '@entities/Project';
+import type { ParallelChoice } from '@features/ParallelLaunch';
 
 /** Окна поверх чата: выбор папки, подтверждение удаления, код, тесты, запуск. */
 export interface ChatOverlaysProps {
@@ -31,5 +33,19 @@ export interface ChatOverlaysProps {
   isParallelOpen: boolean;
   onParallelOpenChange: (open: boolean) => void;
   projects: ProjectInfo[];
-  onLaunch: (selected: ProjectInfo[], prompt: string, allowEdits: boolean) => void;
+  /**
+   * Потолок разговора: от него окно веера отсчитывает ступени вниз.
+   *
+   * Пара самого разговора, независимо от правила подбора в проекте: здесь модель
+   * выбирает ЧЕЛОВЕК, как в шапке чата, а правило выключает автоматический
+   * подбор. Иначе запуск с домашней вкладки, где проекта нет вовсе, остался бы
+   * без выбора — а веер по нескольким проектам чаще всего уходит именно оттуда.
+   */
+  parallelCeiling?: CascadeCeiling;
+  onLaunch: (
+    selected: ProjectInfo[],
+    prompt: string,
+    allowEdits: boolean,
+    choice?: ParallelChoice,
+  ) => void;
 }

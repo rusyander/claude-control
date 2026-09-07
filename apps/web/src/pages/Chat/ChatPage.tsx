@@ -403,6 +403,7 @@ export function ChatPage() {
         isParallelOpen={isParallelOpen}
         onParallelOpenChange={setParallelOpen}
         projects={projects.data ?? []}
+        parallelCeiling={models.effective}
         onLaunch={launchParallel}
       />
     </div>

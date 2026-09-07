@@ -227,6 +227,7 @@ export function ChatTopic() {
           items={[
             { title: tr('panelAgents'), text: tr('panelAgentsText') },
             { title: tr('panelParallel'), text: tr('panelParallelText') },
+            { title: tr('panelParallelModel'), text: tr('panelParallelModelText') },
             { title: tr('panelParallelTree'), text: tr('panelParallelTreeText') },
           ]}
         />

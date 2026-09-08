@@ -18,6 +18,7 @@ import { buildRisk, byRisk, budgetOf, riskOfCase } from './risk.ts';
  */
 
 const NOW = '2026-09-08T12:00:00.000Z';
+const MONTH_AGO = '2026-08-08T12:00:00.000Z';
 
 const testCase = (id: string, over: Partial<ProjectTestCase> = {}): ProjectTestCase => ({
   id,
@@ -91,6 +92,21 @@ describe('риск кейса', () => {
     const red = testCase('a', { priority: 'high', status: 'failed', lastRunAt: NOW });
     const green = testCase('b', { priority: 'high', status: 'passed', lastRunAt: NOW });
     expect(scoreOf(red)).toBeGreaterThan(scoreOf(green));
+  });
+
+  it('свежий провал рискованнее кейса без истории: давность красное не скидывает', () => {
+    const red = testCase('a', { priority: 'medium', status: 'failed', lastRunAt: NOW });
+    const never = testCase('b', { priority: 'medium', status: 'unknown' });
+    expect(scoreOf(red)).toBeGreaterThan(scoreOf(never));
+
+    const age = riskOfCase('gui', red, { now: Date.parse(NOW) }).factors.find(
+      (item) => item.key === 'age',
+    );
+    expect(age?.value).toBe(1);
+    // Зелёное стареет по-прежнему: проверенное сегодня дешевле проверенного месяц назад.
+    const stale = testCase('c', { priority: 'medium', status: 'passed', lastRunAt: MONTH_AGO });
+    const today = testCase('d', { priority: 'medium', status: 'passed', lastRunAt: NOW });
+    expect(scoreOf(stale)).toBeGreaterThan(scoreOf(today));
   });
 
   it('блокер рискованнее мелочи при одинаковой истории', () => {

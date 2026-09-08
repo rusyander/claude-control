@@ -172,6 +172,10 @@ describe('project-tests drafts', () => {
     expect(auto.applied).toBe(0);
     expect(auto.skipped[0]?.reason).toContain('человеком');
     expect(caseIn(root, 'gui', 'gui-001')?.title).toBe('Мой кейс');
+    // Причина остаётся в черновике: за галочкой никто не смотрел, и без неё
+    // висящая правка выглядит как галочка, которая не сработала.
+    expect(readDraft(root, RUN)?.items[0]?.hold).toContain('человеком');
+    expect(readDraft(root, RUN)?.items[0]?.state).toBe('pending');
 
     // Руками — можно: человек читает предложение и решает сам. Автор кейса при
     // этом не меняется, иначе кейс потерял бы защиту от удаления прогоном.
@@ -179,6 +183,7 @@ describe('project-tests drafts', () => {
     expect(byHand.applied).toBe(1);
     expect(caseIn(root, 'gui', 'gui-001')?.title).toBe('Переписанный агентом');
     expect(caseIn(root, 'gui', 'gui-001')?.source).toBe('human');
+    expect(readDraft(root, RUN)?.items[0]?.hold).toBeUndefined();
   });
 
   it('дополнение не стирает результат прогона: статус и заметка остаются', () => {
@@ -519,6 +524,8 @@ describe('project-tests drafts: отклонение остатка не отн�
     const result = rollbackDraft(root, RUN);
     expect(result.removed).toBe(1);
     expect(caseIn(root, 'gui', 'gui-001')).toBeUndefined();
+    // Откат — последнее решение человека: черновик откачен, а не «отклонён».
+    expect(result.draft.status).toBe('rolledBack');
     // Откатили всё принятое — теперь черновику в живом списке делать нечего.
     expect(readDraft(root, RUN)).toBeUndefined();
   });

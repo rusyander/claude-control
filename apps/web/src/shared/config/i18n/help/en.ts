@@ -4320,10 +4320,12 @@ export const helpEn: HelpSchema = {
         "A run's draft is the file .agent/tests/drafts/<run>.draft.json. New cases land in the " +
         'group chosen at launch even when the agent named another one — the panel moves them and ' +
         'assigns the ids itself; an edit of an existing case stays in its group. Until it is accepted ' +
-        'the group files are untouched, and there is nothing to undo: the library is as it was.',
+        'the group files are untouched, and there is nothing to undo: the library is as it was. ' +
+        'A run can propose missing cases too — they travel as the same draft, the agent never ' +
+        'writes them into the group files.',
       draftPick: 'One by one, not all at once',
       draftPickText:
-        'The "Generation proposed edits" banner opens the list: the title, why the case is ' +
+        'The "The agent proposed changes" banner opens the list: the title, why the case is ' +
         'needed and its steps. Tick the ones you want and accept those — the rest keep ' +
         'waiting, or go to the archive with "Reject".',
       draftSimilar: 'Look-alikes are named up front',
@@ -4586,8 +4588,8 @@ export const helpEn: HelpSchema = {
       riskUnknownTitle: 'Not knowing is a risk too',
       riskUnknownText:
         'A case without a single run does not get zero risk but an elevated one: you cannot ' +
-        'even say it worked once. A library sorted by risk starts with the unchecked, it does ' +
-        'not end with it.',
+        'even say it worked once. A library sorted by risk starts with failures and the ' +
+        'unchecked, it does not end with them: a fresh failure is never discounted for age.',
 
       releaseTitle: 'Milestones and releases',
       releaseCaption:

@@ -228,8 +228,10 @@ export class ProjectTestRunRegistry {
       environment,
       impact: request.changedOnly ? impactOf(root, groups).cases : undefined,
       // Имя файла черновика содержит id прогона: сам его агент не выдумает, а
-      // две генерации подряд не должны писать в один файл.
-      draftFile: request.mode === 'generate' ? draftFile(view.id) : undefined,
+      // две генерации подряд не должны писать в один файл. Прогон получает его
+      // ради шага 8: недостающая проверка идёт предложением, а не записью в группу.
+      draftFile:
+        request.mode === 'generate' || request.mode === 'run' ? draftFile(view.id) : undefined,
       // Материал источника собирает маршрут: он умеет ходить в трекер, а
       // реестр — нет, и тянуть сюда сеть значило бы сделать старт прогона
       // зависящим от чужой системы.
@@ -442,7 +444,7 @@ export class ProjectTestRunRegistry {
     }
     entry.view.results = collectResults(projectPath, entry.view, entry.redact);
     entry.view.summary = summarizeResults(entry.view.results);
-    if (entry.view.mode === 'generate') {
+    if (entry.view.mode === 'generate' || entry.view.mode === 'run') {
       this.settleDraft(projectPath, entry.view, entry.autoAccept === true);
     }
     this.persist(projectPath, entry.view);
@@ -460,7 +462,8 @@ export class ProjectTestRunRegistry {
   }
 
   /**
-   * Что делать с черновиком, который оставила генерация.
+   * Что делать с черновиком, который оставила генерация — или прогон, заметивший
+   * недостающую проверку (шаг 8 задания).
    *
    * Прогон писать в библиотеку не может — прав нет, — поэтому здесь либо
    * применение по галочке, либо ничего: черновик остаётся ждать человека. И то

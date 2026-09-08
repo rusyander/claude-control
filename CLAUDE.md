@@ -178,8 +178,10 @@ user.
 counter of its own. The record is assembled on finish from the case files: the panel fingerprints the
 selected cases at start and stamps every case that changed with `lastRunId` (`runs.ts
 stampRunResults`), clamping the agent's `lastRunAt` into the run window — the agent writes local time
-with a `Z` and a "future" result used to leak into the next run's record. A case the agent never touched
-leaves the record empty; `generate`/`explore` never produce results. Impact = `git status
+with a `Z` and a "future" result used to leak into the next run's record; stamps that older behaviour left
+in the future are repaired once per process on the first read (`repair.ts`, skipped while a run or manual
+session holds the project). A case the agent never touched leaves the record empty; `generate`/`explore`
+never produce results, and a run's own proposals land in its draft, never in a group file. Impact = `git status
 --porcelain -uall` (without `-uall` a new folder collapses to `src/` and matches no `codePaths`) →
 `codePaths` → the `area` word; nothing attributed ⇒ empty list, never "run everything".
 Detail: `.agent/code-map-tests.agent.md`.

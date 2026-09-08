@@ -27,7 +27,12 @@ await bypassOnboarding(page);
 
 const problems = [];
 page.on('pageerror', (error) => problems.push(error.message));
-page.on('console', (message) => message.type() === 'error' && problems.push(message.text()));
+page.on('console', (message) => {
+  if (message.type() !== 'error') return;
+  // Адрес рядом с текстом: «resource failed» без него не говорит, что именно упало.
+  const url = message.location()?.url ?? '';
+  problems.push(url ? `${message.text()} ← ${url}` : message.text());
+});
 
 /** Что ушло на запуск прогона — по нему проверяется пульт. */
 let started;
@@ -498,6 +503,66 @@ if ((await automate.count()) === 0) {
   await automate.click();
   await page.waitForTimeout(1200);
   check(started?.mode === 'automate', `на сервер ушла автоматизация: ${started?.mode}`);
+}
+
+// Ноутбучный экран: пульт, фильтры и панель выделения съедают высоту, а таблица
+// не имеет права схлопнуться — первая строка остаётся досягаемой прокруткой.
+await page.setViewportSize({ width: 1366, height: 768 });
+await page.waitForTimeout(400);
+const laptopBox = main.locator('tbody input[type="checkbox"]').first();
+if ((await laptopBox.count()) === 0) {
+  check(false, 'на ноутбучном экране таблица кейсов на месте');
+} else {
+  await laptopBox.check();
+  await page.waitForTimeout(400);
+  await laptopBox.scrollIntoViewIfNeeded();
+  const rect = await laptopBox.boundingBox();
+  const reachable = Boolean(rect) && rect.y >= 0 && rect.y + rect.height <= 768;
+  check(
+    reachable,
+    `после выбора кейса первая строка досягаема на 1366×768 (y=${rect ? Math.round(rect.y) : '—'})`,
+  );
+  const areaHeight = await laptopBox.evaluate((el) => {
+    let node = el.parentElement;
+    while (node && !/tableArea/.test(String(node.className))) node = node.parentElement;
+    return node ? node.clientHeight : 0;
+  });
+  check(areaHeight >= 300, `область таблицы не схлопнулась (высота ${areaHeight}px)`);
+  await laptopBox.uncheck();
+  check(!(await laptopBox.isChecked()), 'снять галочку на ноутбучном экране тоже можно');
+}
+
+// Та же библиотека в окне чата на ноутбучном экране: пульт и фильтры съедают
+// высоту, таблица держит свои 320px и уходит под низ окна — докрутиться до
+// строк обязано получаться колесом, а не только программной прокруткой.
+await page.setViewportSize({ width: 1366, height: 700 });
+await page.goto(`${BASE}/chat`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(1500);
+const testsButton = page.getByRole('button', { name: 'Тесты', exact: true }).first();
+if ((await testsButton.count()) === 0) {
+  check(false, 'в шапке чата есть кнопка «Тесты» для вкладки проекта');
+} else {
+  await testsButton.click();
+  const modal = page.getByRole('dialog').last();
+  await modal.waitFor({ timeout: 8000 });
+  await page.waitForTimeout(800);
+  const modalRow = modal.locator('tbody input[type="checkbox"]').first();
+  check((await modalRow.count()) > 0, 'окно чата показывает строки библиотеки');
+  // Колесо крутит то, над чем стоит мышь: ставим её в нижнюю часть окна, где
+  // лежит список, — строка «Показано» на этом экране сама может быть под сгибом.
+  const modalBox = await modal.boundingBox();
+  if (modalBox) {
+    await page.mouse.move(modalBox.x + modalBox.width / 2, modalBox.y + modalBox.height - 40);
+  }
+  await page.mouse.wheel(0, 800);
+  await page.waitForTimeout(400);
+  const rowBox = await modalRow.boundingBox();
+  const rowVisible = Boolean(rowBox) && rowBox.y >= 0 && rowBox.y + rowBox.height <= 700;
+  check(
+    rowVisible,
+    `в окне чата на 1366×700 колесо докручивает до первой строки (y=${rowBox ? Math.round(rowBox.y) : '—'})`,
+  );
+  await page.keyboard.press('Escape');
 }
 
 check(problems.length === 0, `ошибок в консоли нет: ${problems.slice(0, 3).join(' | ')}`);

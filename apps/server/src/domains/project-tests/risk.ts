@@ -32,7 +32,9 @@ import { caseStatusHistory } from './runs-store.ts';
  *
  * Ни один множитель не обнуляется. Кейс без истории — не безопасный кейс, а
  * непроверенный: незнание здесь стоит дороже зелёной истории, и множители
- * `instability` и `age` для него берутся выше средних, а не нулевыми.
+ * `instability` и `age` для него берутся выше средних, а не нулевыми. Давность
+ * скидывает только зелёное и пропущенное: у свежего провала `age` = 1, иначе
+ * непроверенный кейс обгонял бы заведомо сломанный.
  *
  * Модуль чистый: ни git, ни диск, ни сеть. Дифф рабочей копии приходит
  * параметром (`impactOf` его и считает), поэтому весь счёт закрывается юнитом
@@ -127,6 +129,11 @@ function instabilityFactor(statuses: string[]): ProjectTestRiskFactor {
  * работал.
  */
 function ageFactor(testCase: ProjectTestCase, now: number): ProjectTestRiskFactor {
+  // Провал не стареет: красный результат — знание, а не догадка, и скидка «гоняли
+  // сегодня» опускала свежий провал ниже кейса, который не гоняли ни разу.
+  if (testCase.status === 'failed' || testCase.status === 'blocked') {
+    return factor('age', 1, 'провал не стареет');
+  }
   const at = testCase.lastRunAt ? Date.parse(testCase.lastRunAt) : Number.NaN;
   if (Number.isNaN(at)) return factor('age', 1, 'ни разу не гоняли');
   const days = Math.max(Math.floor((now - at) / DAY), 0);

@@ -230,6 +230,14 @@ function DraftRow({
         </Typography>
       )}
 
+      {/* Автоприёмка оставила правку человеку: без причины на экране галочка
+          выглядит неработающей. */}
+      {item.hold && (
+        <Typography variant="caption" color="warning">
+          {t('tests.drafts.hold', { reason: item.hold })}
+        </Typography>
+      )}
+
       {steps && (
         <Typography variant="caption" color="muted">
           {steps}

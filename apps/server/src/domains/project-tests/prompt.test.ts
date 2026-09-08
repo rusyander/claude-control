@@ -62,6 +62,24 @@ describe('project-tests/prompt', () => {
     expect(prompt).toContain('оракул');
   });
 
+  it('недостающую проверку прогон кладёт в черновик, а не в файл группы', () => {
+    const prompt = buildPrompt(
+      [group],
+      { projectPath: '/p', mode: 'run' },
+      { shared: [], draftFile: '.agent/tests/drafts/run-7.draft.json' },
+    );
+
+    // Библиотеку меняет человек через приёмку: прогон предлагает, не записывает.
+    expect(prompt).toContain('в файл группы её НЕ пиши');
+    expect(prompt).toContain('.agent/tests/drafts/run-7.draft.json');
+    expect(prompt).toContain('"source":"run"');
+    expect(prompt).not.toContain('добавь новый кейс со `status: "unknown"`');
+
+    // Без имени файла (старый вызов) подсказка всё равно ведёт в папку черновиков.
+    const bare = buildPrompt([group], { projectPath: '/p', mode: 'run' });
+    expect(bare).toContain('.agent/tests/drafts/<runId>.draft.json');
+  });
+
   it('прогон по отобранным кейсам не тащит в задание остальные', () => {
     const two: ProjectTestGroup = {
       ...group,

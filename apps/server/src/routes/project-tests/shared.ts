@@ -17,9 +17,11 @@ import {
   readGroups,
   readLibraryIssues,
   readPlans,
+  readRuns,
   readSchema,
   readSharedSteps,
   readViews,
+  repairFutureStamps,
 } from '../../domains/project-tests.ts';
 
 /**
@@ -103,8 +105,29 @@ export function assertUnlocked(deps: TestsDeps, root: string, groupId?: string):
   );
 }
 
+/** Проекты, где будущие отметки прогона уже чинили: раз на процесс — чтение не пишет. */
+const stampsRepaired = new Set<string>();
+
+/**
+ * Одноразовая починка отметок «из будущего» (агент писал местное время с буквой Z
+ * до того, как панель стала штамповать результаты сама). Пока в проекте пишет
+ * прогон или идёт ручная сессия, файлы групп не наши — попытка переносится на
+ * следующее чтение.
+ */
+function repairStampsOnce(root: string, deps: TestsDeps): void {
+  if (stampsRepaired.has(root)) return;
+  if (deps.runs.get(root) || deps.manual.get(root)) return;
+  stampsRepaired.add(root);
+  try {
+    repairFutureStamps(root, readRuns(root));
+  } catch {
+    // Чтение раздела не ломается из-за починки: битую группу покажет libraryIssues.
+  }
+}
+
 /** Полное состояние раздела по одному проекту. */
 export function buildView(root: string, deps: TestsDeps): ProjectTestsView {
+  repairStampsOnce(root, deps);
   const { branch, commit } = gitContext(root);
   return {
     projectPath: root,

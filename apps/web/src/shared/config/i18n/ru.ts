@@ -3165,7 +3165,7 @@ export const ru = {
     },
     drafts: {
       title: 'Приёмка предложений генерации',
-      waiting: 'Генерация предложила правок: {{count}}',
+      waiting: 'Агент предложил правок: {{count}}',
       open: 'Посмотреть',
       openApplied: 'Что приняли',
       doneBanner: 'Из последней генерации принято кейсов: {{count}}',
@@ -3189,6 +3189,7 @@ export const ru = {
       skipped: '{{caseId}} не принят: {{reason}}',
       rolledBack: 'Убрано кейсов: {{removed}}, возвращено: {{restored}}',
       kept: '{{caseId}} оставлен как есть: {{reason}}',
+      hold: 'Автоприёмка оставила человеку: {{reason}}',
       allAccepted: 'Все предложения этого черновика уже приняты ({{count}}).',
       auto: 'Принимать сразу',
       autoHint:

@@ -107,3 +107,4 @@ export { buildPlanPreview, toPlan } from './project-tests/plan-recipes.ts';
 export { suggestTaxonomy } from './project-tests/taxonomy.ts';
 export { hasConvention, installConvention } from './project-tests/convention.ts';
 export { ProjectTestRunRegistry } from './project-tests/runs.ts';
+export { repairFutureStamps, type RepairedStamp } from './project-tests/repair.ts';

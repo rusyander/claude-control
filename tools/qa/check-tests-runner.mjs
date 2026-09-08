@@ -295,6 +295,14 @@ const boxCount = await boxes.count();
 for (let index = 0; index < Math.min(boxCount, 2); index += 1) await boxes.nth(index).check();
 await page.waitForTimeout(400);
 
+// Кнопка шапки следует за сессией: без неё — «Ручной проход», с живой —
+// «Вернуться к проходу»; обещать возврат туда, где ничего не идёт, нельзя.
+check(
+  (await main.getByRole('button', { name: 'Ручной проход' }).count()) > 0 &&
+    (await main.getByRole('button', { name: 'Вернуться к проходу' }).count()) === 0,
+  'без сессии шапка предлагает «Ручной проход», а не возврат',
+);
+
 const startButton = await anyOf(main, [/Пройти руками/, /Ручной прогон/, /Пройти вручную/]);
 if (!startButton) {
   check(false, 'на странице есть запуск ручного прогона');
@@ -308,6 +316,13 @@ await page.waitForTimeout(1500);
 check(Boolean(startBody), 'старт ручного прогона ушёл на сервер');
 check(startBody?.path === PROJECT.path, 'прогон адресован открытому проекту');
 check(startBody?.caseIds?.length === 2, `на старт ушли отмеченные кейсы: ${startBody?.caseIds}`);
+// Окно прохода открыто, и шапка под ним скрыта от дерева доступности — ищем её
+// с `includeHidden`, иначе кнопка есть, а роль её не видит.
+check(
+  (await main.getByRole('button', { name: 'Вернуться к проходу', includeHidden: true }).count()) >
+    0,
+  'с живой сессией шапка зовёт вернуться к проходу',
+);
 
 const runner = page.getByRole('dialog').last().or(main).first();
 

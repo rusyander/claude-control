@@ -3101,7 +3101,7 @@ export const en: TranslationSchema = {
     },
     drafts: {
       title: 'Review generated proposals',
-      waiting: 'Generation proposed {{count}} changes',
+      waiting: 'The agent proposed {{count}} changes',
       open: 'Review',
       openApplied: 'What was accepted',
       doneBanner: 'Accepted from the last generation: {{count}}',
@@ -3125,6 +3125,7 @@ export const en: TranslationSchema = {
       skipped: '{{caseId}} not accepted: {{reason}}',
       rolledBack: 'Removed: {{removed}}, restored: {{restored}}',
       kept: '{{caseId}} left as is: {{reason}}',
+      hold: 'Auto-accept left it to you: {{reason}}',
       allAccepted: 'Every proposal in this draft is already accepted ({{count}}).',
       auto: 'Accept immediately',
       autoHint:

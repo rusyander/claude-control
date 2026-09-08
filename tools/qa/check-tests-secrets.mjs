@@ -114,7 +114,12 @@ await page.route('**/api/chats/projects*', async (route) =>
 await page.route('**/api/project-tests/env-secret*', async (route) => {
   const request = route.request();
   const method = request.method();
-  if (method === 'GET') return route.fulfill({ json: secretsBody() });
+  // Список приходит с задержкой нарочно: окно обязано молчать, пока ответа нет,
+  // а не уверять человека с заданными доступами, что доступов нет.
+  if (method === 'GET') {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    return route.fulfill({ json: secretsBody() });
+  }
 
   if (method === 'POST') {
     const body = request.postDataJSON() ?? {};
@@ -242,7 +247,12 @@ if (!opened) {
 const openButton = main.getByRole('button', { name: /^Доступы$/ }).first();
 check((await openButton.count()) > 0, 'кнопка доступов стоит у выбора окружения');
 await openButton.click();
-await page.waitForTimeout(1200);
+await page.waitForTimeout(300);
+check(
+  (await page.getByRole('dialog').first().getByText('Доступов пока нет').count()) === 0,
+  'пока список грузится, окно не говорит «доступов нет»',
+);
+await page.waitForTimeout(1500);
 
 const dialog = page.getByRole('dialog').first();
 check(

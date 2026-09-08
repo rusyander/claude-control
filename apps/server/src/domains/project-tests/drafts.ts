@@ -161,14 +161,17 @@ function parseItem(
     state:
       state === 'accepted' || state === 'rejected' || state === 'rolledBack' ? state : 'pending',
     appliedAt: optional(record.appliedAt),
+    hold: optional(record.hold),
   };
 }
 
 /** Состояние черновика по его правкам: пока хоть одна ждёт — он ждёт. */
 function statusOf(items: ProjectTestDraftItem[], stored: unknown): ProjectTestDraft['status'] {
   if (items.some((item) => (item.state ?? 'pending') === 'pending')) return 'pending';
-  if (items.length > 0 && items.every((item) => item.state === 'rolledBack')) return 'rolledBack';
   if (items.some((item) => item.state === 'accepted')) return 'applied';
+  // Откат — последнее решение человека: «взял один, остальные отклонил, потом
+  // отменил» — это откаченный черновик, а не отклонённый.
+  if (items.some((item) => item.state === 'rolledBack')) return 'rolledBack';
   if (items.length > 0) return 'rejected';
   const value = optional(stored);
   return value === 'applied' || value === 'rejected' || value === 'rolledBack' ? value : 'pending';
@@ -422,10 +425,12 @@ export function applyDraft(
       // Кейс человека галочка переписывать не имеет права: за галочкой никто не
       // смотрит, а «дополнить» и «переписать» отличает только тот, кто читает.
       if (existing?.source === 'human' && options.auto) {
-        skipped.push({
-          caseId: item.caseId,
-          reason: 'Кейс написан человеком — правку к нему принимают руками.',
-        });
+        const reason = 'Кейс написан человеком — правку к нему принимают руками.';
+        skipped.push({ caseId: item.caseId, reason });
+        // Причина остаётся в черновике: автоприёмку никто не смотрел, и без неё
+        // висящая правка выглядит как галочка, которая не сработала.
+        item.hold = reason;
+        touched = true;
         continue;
       }
 
@@ -461,6 +466,7 @@ export function applyDraft(
       item.op = existing ? 'update' : 'add';
       item.state = 'accepted';
       item.appliedAt = options.now;
+      item.hold = undefined;
       applied += 1;
       touched = true;
     }

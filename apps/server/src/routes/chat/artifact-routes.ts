@@ -48,6 +48,9 @@ export function registerChatArtifactRoutes(app: FastifyInstance, ctx: ServerCont
 
       // Предпросмотр страницы: содержимое должно прийти разметкой, иначе
       // во врезке покажется JSON вместо самой страницы.
+      const text = readArtifactText(dir, name);
+      if (text === undefined) return reply.code(404).send(NOT_FOUND);
+
       if (as === 'html') {
         return (
           reply
@@ -58,11 +61,11 @@ export function registerChatArtifactRoutes(app: FastifyInstance, ctx: ServerCont
               'Content-Security-Policy',
               "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:",
             )
-            .send(readArtifactText(dir, name))
+            .send(text)
         );
       }
 
-      return { name, content: readArtifactText(dir, name) };
+      return { name, content: text };
     },
   );
 

@@ -8,6 +8,7 @@ import { toast } from '@shared/lib/toast';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
+import { attachmentBasename, splitAttachments } from '@agentdeck/contracts/uploads';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
 import { parseQuestions } from '../lib/parseQuestions';
 import { questionKey } from '../lib/questionKey';
@@ -118,19 +119,35 @@ export function MessageBubble({
             const split = scanSplitBlocks(block.text);
             const handoffScan = scanHandoffBlocks(split.text);
             const review = scanReviewBlocks(handoffScan.text);
+            // Список путей вложений дописывает сервер, а не человек: в пузыре он
+            // читался как сырой перечень абсолютных путей. Показываем чипами с
+            // именем файла; сам текст для копирования и правки (`plainText`)
+            // остаётся полным — агент получал именно его.
+            const attachments = isUser ? splitAttachments(review.text) : undefined;
+            const bodyText = attachments ? attachments.text : review.text;
 
             return (
               <div key={index} className={styles.block}>
                 {/* Текст и карточки — одной колонкой: соседом карточка попадала
                     в колонку расхода и сжималась в узкий столбик. */}
                 <div className={styles.blockBody}>
-                  {review.text && (
+                  {bodyText && (
                     <div
                       className={styles.text}
                       // markdown-it с выключенным сырым html — теги из ответа
                       // модели в разметку не попадут.
-                      dangerouslySetInnerHTML={{ __html: renderMarkdown(review.text) }}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(bodyText) }}
                     />
+                  )}
+                  {attachments && attachments.files.length > 0 && (
+                    <ul className={styles.attachments} aria-label={t('chat.attachments')}>
+                      {attachments.files.map((path) => (
+                        <li key={path} className={styles.attachment} title={path}>
+                          <Icon name="paperclip" size={14} />
+                          {attachmentBasename(path)}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                   {split.proposals.map((proposal, position) => (
                     <TaskSplitCard

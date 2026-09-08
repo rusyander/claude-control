@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { ATTACHMENTS_MARKER } from '@agentdeck/contracts/uploads';
 import { readChatMessages, readChats } from './ChatHistory.ts';
 
 /**
@@ -192,5 +193,106 @@ describe('ветка из транскрипта', () => {
     writeSwitching('s');
     const chats = readChats(projectsDir);
     expect(chats.find((chat) => chat.id === 's')?.branch).toBe('feat/x');
+  });
+
+  // Регрессия: вне репозитория CLI пишет `HEAD`, и список показывал «⎇ HEAD»
+  // у каждого чата панели и у папок без git.
+  it('HEAD — не ветка: пусто и в ленте, и в списке', async () => {
+    const dir = join(projectsDir, 'proj');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'nogit.jsonl'),
+      `${JSON.stringify({
+        type: 'user',
+        uuid: 'u0',
+        cwd: 'C:/work/app',
+        gitBranch: 'HEAD',
+        message: { role: 'user', content: 'привет' },
+      })}
+`,
+    );
+
+    const page = await readChatMessages(projectsDir, 'nogit', { limit: 400 });
+    expect(page.messages[0]?.gitBranch).toBeUndefined();
+    expect(readChats(projectsDir).find((chat) => chat.id === 'nogit')?.branch).toBeUndefined();
+  });
+});
+
+/**
+ * Блок вложений дописывает к промпту сервер, и в транскрипте он лежит как
+ * реплика человека. Название и превью — из текста ДО маркера: иначе заголовок
+ * обрывался на «…Приложен», а превью показывало абсолютный путь.
+ */
+describe('название и превью без блока вложений', () => {
+  let projectsDir: string;
+
+  beforeEach(() => {
+    projectsDir = mkdtempSync(join(tmpdir(), 'cc-chat-attach-'));
+  });
+
+  afterEach(() => {
+    rmSync(projectsDir, { recursive: true, force: true });
+  });
+
+  it('заголовок и превью берутся из слов человека, пути вложений отброшены', () => {
+    const dir = join(projectsDir, 'proj');
+    mkdirSync(dir, { recursive: true });
+    const content = `опиши схему
+
+${ATTACHMENTS_MARKER}
+- C:\\chat\\схема.png`;
+    writeFileSync(
+      join(dir, 'att.jsonl'),
+      `${JSON.stringify({
+        type: 'user',
+        uuid: 'u0',
+        cwd: 'C:/work/app',
+        message: { role: 'user', content },
+      })}
+`,
+    );
+
+    const chat = readChats(projectsDir).find((item) => item.id === 'att');
+    expect(chat?.title).toBe('опиши схему');
+    expect(chat?.preview).toBe('опиши схему');
+  });
+
+  // Регрессия: реплика из одного знака названия не давала, и в списке стояло
+  // кодированное имя папки проекта.
+  it('реплика из одного символа даёт название, а не имя папки', () => {
+    const dir = join(projectsDir, 'proj');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'one.jsonl'),
+      `${JSON.stringify({
+        type: 'user',
+        uuid: 'u0',
+        cwd: 'C:/work/app',
+        message: { role: 'user', content: '?' },
+      })}
+`,
+    );
+
+    expect(readChats(projectsDir).find((item) => item.id === 'one')?.title).toBe('?');
+  });
+
+  it('одиночный знак уступает первому настоящему тексту', () => {
+    const dir = join(projectsDir, 'proj');
+    mkdirSync(dir, { recursive: true });
+    const turn = (uuid: string, content: string): string =>
+      JSON.stringify({
+        type: 'user',
+        uuid,
+        cwd: 'C:/work/app',
+        message: { role: 'user', content },
+      });
+    writeFileSync(
+      join(dir, 'two.jsonl'),
+      `${turn('u0', '.')}
+${turn('u1', 'а теперь вопрос')}
+`,
+    );
+
+    expect(readChats(projectsDir).find((item) => item.id === 'two')?.title).toBe('а теперь вопрос');
   });
 });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Artifact, ChatMessage, ChatSummary } from '@agentdeck/contracts';
+import { useSearch } from '@tanstack/react-router';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import {
   useWorkspace,
@@ -79,6 +80,7 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
 
   const ws = useWorkspace();
   const writeUrl = useEntityUrlWriter();
+  const { id: urlId } = useSearch({ strict: false }) as { id?: string };
   const clearRunnerAutostart = useClearRunnerAutostart();
   const forgetCodeView = useForgetProjectCodeView();
 
@@ -180,6 +182,24 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     writeUrl(found.id);
   }, [chats, writeUrl]);
 
+  // Первый рендер: адрес без id, а вкладка помнит свой разговор — возвращаем
+  // его, как при переключении вкладок. Особенно важен черновик, в котором уже
+  // пошёл прогон: адрес получает id только по КОНЦУ первого хода, поэтому F5
+  // посреди него открывал пустой «Новый чат», хотя агент шёл дальше (точка в
+  // списке зелёная), а память вкладки держала именно этот ключ. Подхваченный
+  // прогон живёт в сторе под тем же временным ключом — черновик под ним сразу
+  // показывает живой ход, а эффект «взросления» доведёт до настоящего разговора.
+  // Адрес с id главнее памяти: его открывает `useEntityUrl`.
+  const restoredOnMountRef = useRef(false);
+  useEffect(() => {
+    if (restoredOnMountRef.current) return;
+    restoredOnMountRef.current = true;
+    if (urlId) return;
+    const remembered = getWorkspaceState().views[ws.state.activeTabId];
+    if (remembered) restoreView(remembered, chats);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Смена активного таба: вид сбрасываем, для проекта готовим новый разговор с
   // подсказкой. Фоновый прогон прежнего таба при этом НЕ трогаем — он идёт
   // дальше, а его точка остаётся на табе.
@@ -246,6 +266,10 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
   }, [run.sessionId, isRunning, chats, activeChat]);
 
   const startNewChat = (): void => {
+    // Разговор, которого вкладка ждала из списка, больше не нужен: человек
+    // только что сказал, что хочет чистый лист, и доехавший список не должен
+    // подменять его прежним разговором.
+    restoreRef.current = undefined;
     setActiveChat(undefined);
     const draft = `new-${Date.now()}`;
     setDraftId(draft);

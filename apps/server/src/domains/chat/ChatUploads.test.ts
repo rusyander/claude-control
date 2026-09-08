@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { ATTACHMENTS_MARKER, splitAttachments } from '@agentdeck/contracts/uploads';
 import { isSupportedUpload, saveUpload, buildPromptWithFiles } from './ChatUploads.ts';
 import type { UploadedFile } from './ChatUploads.ts';
 
@@ -88,6 +89,31 @@ describe('ChatUploads', () => {
       expect(saved.name).not.toContain(';');
       expect(saved.name).not.toContain('$');
     });
+
+    // Регрессия: буквы были только латинские, и два кириллических имени
+    // схлопывались в один `_____.txt` — второй файл молча затирал первый.
+    it('кириллическое имя сохраняется как есть', () => {
+      const saved = saveUpload(chatDir, 'отчёт за квартал.txt', b64('x'));
+      expect(saved.name).toBe('отчёт за квартал.txt');
+      expect(existsSync(join(chatDir, 'отчёт за квартал.txt'))).toBe(true);
+    });
+
+    it('два разных кириллических имени — два файла, ни один не затёрт', () => {
+      const first = saveUpload(chatDir, 'отчёт.txt', b64('первый'));
+      const second = saveUpload(chatDir, 'схема.txt', b64('второй'));
+      expect(first.name).not.toBe(second.name);
+      expect(readFileSync(first.path, 'utf8')).toBe('первый');
+      expect(readFileSync(second.path, 'utf8')).toBe('второй');
+    });
+
+    it('одно имя дважды → суффикс -2/-3, прежний файл цел', () => {
+      const a = saveUpload(chatDir, 'note.txt', b64('a'));
+      const b = saveUpload(chatDir, 'note.txt', b64('b'));
+      const c = saveUpload(chatDir, 'note.txt', b64('c'));
+      expect([a.name, b.name, c.name]).toEqual(['note.txt', 'note-2.txt', 'note-3.txt']);
+      expect(readFileSync(a.path, 'utf8')).toBe('a');
+      expect(readFileSync(c.path, 'utf8')).toBe('c');
+    });
   });
 
   // ── Безопасность имени файла (path traversal) ──
@@ -145,6 +171,25 @@ describe('ChatUploads', () => {
       expect(prompt).toContain('опиши');
       expect(prompt).toContain(join(chatDir, 'a.pdf'));
       expect(prompt).toContain(join(chatDir, 'b.png'));
+    });
+
+    // Маркер общий с фронтом: по нему лента режет реплику на текст и чипы, а
+    // заголовок разговора берётся из текста ДО него.
+    it('блок вложений отделён общим маркером и режется обратно без потерь', () => {
+      const files: UploadedFile[] = [
+        { name: 'отчёт.pdf', path: join(chatDir, 'отчёт.pdf'), sizeBytes: 1 },
+        { name: 'b.png', path: join(chatDir, 'b.png'), sizeBytes: 2 },
+      ];
+      const prompt = buildPromptWithFiles('опиши', files);
+      expect(prompt).toContain(ATTACHMENTS_MARKER);
+
+      const split = splitAttachments(prompt);
+      expect(split.text).toBe('опиши');
+      expect(split.files).toEqual([join(chatDir, 'отчёт.pdf'), join(chatDir, 'b.png')]);
+    });
+
+    it('реплика без маркера остаётся целой и без вложений', () => {
+      expect(splitAttachments('просто текст')).toEqual({ text: 'просто текст', files: [] });
     });
   });
 });

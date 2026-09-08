@@ -47,6 +47,35 @@
 }
 
 /*
+  Чипы вложений у реплики человека. Сервер дописывает к промпту список
+  абсолютных путей; в пузыре они читались как мусор — здесь только имя файла,
+  полный путь во всплывающей подсказке.
+*/
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+  margin: var(--spacing-2xs) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  overflow-wrap: anywhere;
+}
+
+/*
   Пузырь дописанного, которое ещё не ушло. Место и выравнивание — как у реплики
   человека (там она и встанет), а вид нарочно другой: пунктир и приглушённый
   текст говорят «принято, но агент этого пока не видел». Сплошной фон здесь

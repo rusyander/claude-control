@@ -57,3 +57,38 @@ export function unsupportedUploadNames(files: { name: string }[]): string[] {
 
 /** Значение атрибута `accept` для поля выбора файла — из того же списка. */
 export const UPLOAD_ACCEPT_ATTRIBUTE: string = SUPPORTED_UPLOAD_EXTENSIONS.join(',');
+
+/**
+ * Строка, которой сервер отделяет вложения от текста человека в промпте.
+ * Claude Code читает файлы с диска сам, поэтому агенту уходят пути; но та же
+ * строка оседает в транскрипте как реплика ЧЕЛОВЕКА — и без общего маркера
+ * заголовок разговора обрывался на «…Приложен», а в пузыре торчал сырой список
+ * абсолютных путей. Маркер один на сервер и фронт: сервер им пишет, фронт и
+ * заголовок по нему режут.
+ */
+export const ATTACHMENTS_MARKER = 'Приложенные файлы (прочитай их):';
+
+export interface AttachmentsSplit {
+  /** Текст человека без блока вложений. */
+  text: string;
+  /** Пути вложений из блока — в порядке перечисления. */
+  files: string[];
+}
+
+/** Разрезать реплику на собственный текст и список приложенных путей. */
+export function splitAttachments(text: string): AttachmentsSplit {
+  const at = text.indexOf(ATTACHMENTS_MARKER);
+  if (at < 0) return { text, files: [] };
+  const files = text
+    .slice(at + ATTACHMENTS_MARKER.length)
+    .split('\n')
+    .map((line) => line.replace(/^\s*-\s*/, '').trim())
+    .filter(Boolean);
+  return { text: text.slice(0, at).trimEnd(), files };
+}
+
+/** Имя файла из пути вложения — для подписи чипа; путь бывает и Windows, и POSIX. */
+export function attachmentBasename(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] ?? path;
+}

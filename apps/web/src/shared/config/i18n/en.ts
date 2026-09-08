@@ -512,6 +512,7 @@ export const en: TranslationSchema = {
       },
     },
     attach: 'Attach a file',
+    attachments: 'Attached files',
     thinking: 'Thinking',
     /** Пока ответа ещё нет: без этого пустая лента выглядит зависшей. */
     pending: 'Claude is thinking',

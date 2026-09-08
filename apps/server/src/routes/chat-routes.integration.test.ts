@@ -263,6 +263,21 @@ describe('маршруты чата: отказы отправки и смена
   // И вторая, из-за которой отказ переехал на HTTP-статус: имя файла попадало в
   // текст ошибки, а клиент по тексту решал, «временный» ли это сбой — файл
   // `network.zip` устраивал две молчаливые переотправки.
+  // Регрессия: пустое сообщение из API запускало CLI, тот отвечал ошибкой уже
+  // после старта — прогон, пустая реплика в транскрипте и красная точка ради ничего.
+  it('пустой промпт без вложений → 400, агент не запускается', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/chat/send',
+      payload: { chatId: 'c-empty', prompt: '   ' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(refusal(res.body).code).toBe('empty_prompt');
+    expect(created.length).toBe(0);
+    expect(registry.has('c-empty')).toBe(false);
+  });
+
   it('вложение неподдерживаемого типа → 415 с кодом и списком имён, агент не запускается', async () => {
     const res = await app.inject({
       method: 'POST',

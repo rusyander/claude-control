@@ -1,4 +1,5 @@
 import type { ChatSummary, ChatBlock, MessageUsage } from '@agentdeck/contracts';
+import { splitAttachments } from '@agentdeck/contracts/uploads';
 
 /**
  * Разбор одной записи транскрипта: что это за строка и что из неё показывать.
@@ -172,17 +173,44 @@ export function isDialogMessage(record: Record): boolean {
  * Первые осмысленные слова человека — из них делается название чата, когда
  * Claude Code не успел придумать своё. Реплика нередко начинается со служебной
  * вставки среды (открытый файл, напоминание), после очистки от неё остаётся
- * пусто — поэтому идём по репликам, пока не найдётся непустой текст.
+ * пусто или одиночный знак — поэтому идём по репликам, пока не найдётся текст
+ * длиннее символа. Не нашёлся — годится и одиночный: «?» или «а» в названии
+ * лучше, чем кодированное имя папки, которое ставится вместо пустого.
  */
 export function firstMeaningfulText(records: Record[]): string {
+  let single = '';
+
   for (const record of records) {
     if (!isDialogMessage(record) || record.type !== 'user') continue;
 
-    const text = cleanText(textOf(record));
+    const text = humanText(record);
     if (text.length > 1) return text;
+    if (text && !single) single = text;
   }
 
-  return '';
+  return single;
+}
+
+/**
+ * Текст реплики человека без служебного хвоста панели. Блок вложений
+ * («Приложенные файлы: - C:\…») пишет сервер, а не человек, и в заголовке или
+ * превью разговора ему не место: название обрывалось на «…Приложен», а превью
+ * показывало абсолютный путь вместо вопроса.
+ */
+export function humanText(record: Record): string {
+  return cleanText(splitAttachments(textOf(record)).text);
+}
+
+/**
+ * Ветка из записи транскрипта. Claude Code пишет `gitBranch` в каждую строку
+ * и вне репозитория ставит туда `HEAD` — у чатов панели и у папок без git. Это
+ * не ветка (так git не назовёт ни одну), и в списке она читалась как «⎇ HEAD»
+ * вместо «Чат в панели» или имени проекта. Отсечённая HEAD в настоящем
+ * репозитории тоже не ветка — показывать нечего.
+ */
+export function branchOf(record: Record): string | undefined {
+  const branch = record.gitBranch;
+  return branch && branch !== 'HEAD' ? branch : undefined;
 }
 
 export function toBlocks(record: Record): ChatBlock[] {

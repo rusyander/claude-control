@@ -74,6 +74,13 @@ await page.route('**/api/chat/send', async (route) => {
   }
 });
 
+// Список живых прогонов — тоже заглушка: без неё пульт считает и НАСТОЯЩИЕ
+// прогоны стенда, и «активных агентов: 1» падает, стоит кому-то вести чат
+// рядом. Свои прогоны страница держит потоком, а не опросом, — им это не мешает.
+await page.route('**/api/chat/active', (route) =>
+  route.fulfill({ status: 200, headers: { 'content-type': 'application/json' }, body: '[]' }),
+);
+
 await page.emulateMedia({ colorScheme: 'dark' });
 
 /** Перейти на вкладку «Проекты» в сайдбаре, вернувшись сперва на домашний таб. */
@@ -155,7 +162,7 @@ try {
   let waitToast = false;
   for (let i = 0; i < 20; i += 1) {
     const txt = await page
-      .locator('[aria-label="Уведомления"]')
+      .locator('ol[aria-label="Уведомления"]')
       .innerText()
       .catch(() => '');
     if (/ждёт ответа/.test(txt)) {
@@ -169,7 +176,7 @@ try {
 
   // Клик по тосту → переходим в тот проект (лента табов, активный — проект).
   await page
-    .locator('[aria-label="Уведомления"] li button')
+    .locator('ol[aria-label="Уведомления"] li button')
     .first()
     .click()
     .catch(() => {});
@@ -199,7 +206,7 @@ try {
   let errToast = false;
   for (let i = 0; i < 20; i += 1) {
     const txt = await page
-      .locator('[aria-label="Уведомления"]')
+      .locator('ol[aria-label="Уведомления"]')
       .innerText()
       .catch(() => '');
     if (/ошибка или лимит/.test(txt)) {

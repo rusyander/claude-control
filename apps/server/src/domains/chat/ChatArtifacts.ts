@@ -81,10 +81,17 @@ function detectKind(name: string): ArtifactKind {
   return CODE_EXTENSIONS.has(extension) ? 'code' : 'other';
 }
 
-/** Текст артефакта — для вкладки с исходником и разметки. */
-export function readArtifactText(chatDir: string, name: string): string {
+/**
+ * Текст артефакта — для вкладки с исходником и разметки. Файла нет —
+ * `undefined`, чтобы маршрут ответил 404, а не 200 с пустым телом: пустой ответ
+ * читался как «файл пустой», и удалённый или переименованный артефакт открывался
+ * пустой врезкой без единого слова о том, что его больше нет. Слишком большой
+ * файл по-прежнему отдаётся пустым: он есть, просто во врезку не помещается.
+ */
+export function readArtifactText(chatDir: string, name: string): string | undefined {
   const path = safePath(chatDir, name);
-  if (!existsSync(path) || statSync(path).size > MAX_INLINE_BYTES) return '';
+  if (!existsSync(path)) return undefined;
+  if (statSync(path).size > MAX_INLINE_BYTES) return '';
   return readFileSync(path, 'utf8');
 }
 

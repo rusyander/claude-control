@@ -136,7 +136,7 @@ describe('ChatArtifacts', () => {
     });
 
     it('для несуществующего файла возвращает пустую строку', () => {
-      expect(readArtifactText(chatDir, 'ghost.md')).toBe('');
+      expect(readArtifactText(chatDir, 'ghost.md')).toBeUndefined();
     });
 
     it('слишком большой файл (> 2 МБ) не отдаётся', () => {
@@ -170,9 +170,8 @@ describe('ChatArtifacts', () => {
       writeFileSync(join(root, 'secret.txt'), 'СЕКРЕТ');
       const leaked = readArtifactText(chatDir, '../secret.txt');
       // Имя схлопывается до basename → ищется secret.txt внутри chatDir, где его
-      // нет: содержимое родителя не утекает.
-      expect(leaked).toBe('');
-      expect(leaked).not.toContain('СЕКРЕТ');
+      // нет: содержимое родителя не утекает, а «нет файла» отдаётся как undefined.
+      expect(leaked).toBeUndefined();
     });
 
     it('бинарный обход ../ не даёт прочитать файл за пределами папки чата', () => {
@@ -182,7 +181,7 @@ describe('ChatArtifacts', () => {
 
     it('вложенный обход ../../ тоже усекается до имени', () => {
       writeFileSync(join(root, 'deep.txt'), 'НАРУЖУ');
-      expect(readArtifactText(chatDir, '../../deep.txt')).toBe('');
+      expect(readArtifactText(chatDir, '../../deep.txt')).toBeUndefined();
     });
   });
 

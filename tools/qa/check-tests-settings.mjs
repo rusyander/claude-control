@@ -72,7 +72,12 @@ await bypassOnboarding(page);
 
 const problems = [];
 page.on('pageerror', (error) => problems.push(error.message));
-page.on('console', (message) => message.type() === 'error' && problems.push(message.text()));
+page.on('console', (message) => {
+  if (message.type() !== 'error') return;
+  // Адрес рядом с текстом: «resource failed» без него не говорит, что именно упало.
+  const url = message.location()?.url ?? '';
+  problems.push(url ? `${message.text()} ← ${url}` : message.text());
+});
 
 await page.route('**/api/project-git*', async (route) =>
   route.fulfill({

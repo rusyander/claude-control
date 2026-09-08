@@ -12,8 +12,10 @@ import {
   TESTS_DIR,
   gitContext,
   hasConvention,
+  readDraftSummaries,
   readEnvironments,
   readGroups,
+  readLibraryIssues,
   readPlans,
   readSchema,
   readSharedSteps,
@@ -115,9 +117,20 @@ export function buildView(root: string, deps: TestsDeps): ProjectTestsView {
     schema: readSchema(root),
     views: readViews(root),
     plans: readPlans(root),
+    // Пусто в обычном случае: список не пустой означает, что часть обвязки
+    // прочитать не удалось, и окно настроек обязано сказать об этом вслух —
+    // молчащий пустой список зовёт переписать чужой файл поверх.
+    libraryIssues: emptyToUndefined(readLibraryIssues(root)),
+    drafts: readDraftSummaries(root),
+    autoAcceptDrafts: deps.ctx.store.isTestsAutoAccept(root),
     branch,
     commit,
   };
+}
+
+/** Пустой список — это `undefined`: поле необязательное, и пустого в ответе не будет. */
+function emptyToUndefined<T>(items: T[]): T[] | undefined {
+  return items.length > 0 ? items : undefined;
 }
 
 /** Список строк из тела запроса — пустой превращается в `undefined`. */

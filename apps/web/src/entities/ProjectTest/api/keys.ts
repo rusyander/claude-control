@@ -26,6 +26,14 @@ export const testKeys = {
   runs: (path: string | undefined) => [ROOT, 'runs', path ?? ''],
   run: (path: string | undefined, id: string | undefined) => [ROOT, 'run', path ?? '', id ?? ''],
   report: (path: string | undefined) => [ROOT, 'report', path ?? ''],
+  /** Сравнение прогонов: обе стороны в ключе — это разный вопрос к истории. */
+  diff: (path: string | undefined, id: string | undefined, baseId?: string) => [
+    ROOT,
+    'run-diff',
+    path ?? '',
+    id ?? '',
+    baseId ?? '',
+  ],
   /** Все матрицы покрытия проекта — для сброса разом, каким бы ни был запрос. */
   coverageAll: (path: string | undefined) => [ROOT, 'coverage', path ?? ''],
   /** Матрица покрытия: запрос JQL входит в ключ — это разный вопрос к Jira. */
@@ -39,4 +47,38 @@ export const testKeys = {
     groupId ?? '',
   ],
   manual: (path: string | undefined) => [ROOT, 'manual', path ?? ''],
+  /** Замечания линтера и дубликаты — считаются по всей библиотеке разом. */
+  lint: (path: string | undefined) => [ROOT, 'lint', path ?? ''],
+  /** Карантин и устаревание — считаются по библиотеке и истории прогонов. */
+  quarantine: (path: string | undefined) => [ROOT, 'quarantine', path ?? ''],
+  /** Риск кейсов: считается по всей библиотеке разом, бюджет применяется на экране. */
+  risk: (path: string | undefined) => [ROOT, 'risk', path ?? ''],
+  /** Готовность вехи: веха входит в ключ — это разные документы. */
+  release: (path: string | undefined, release: string | undefined) => [
+    ROOT,
+    'release',
+    path ?? '',
+    release ?? '',
+  ],
+  /** Предложение таксономии: порог входит в ключ — это разный вопрос. */
+  taxonomy: (path: string | undefined, minCases: number) => [
+    ROOT,
+    'taxonomy',
+    path ?? '',
+    String(minCases),
+  ],
+  /** Доступы окружения: ключ по окружению — у каждого свои переменные. */
+  secrets: (path: string | undefined, environmentId: string | undefined) => [
+    ROOT,
+    'env-secrets',
+    path ?? '',
+    environmentId ?? '',
+  ],
+  /** Черновик генерации целиком — ключ по прогону: у каждого свой файл. */
+  draft: (path: string | undefined, runId: string | undefined) => [
+    ROOT,
+    'draft',
+    path ?? '',
+    runId ?? '',
+  ],
 };

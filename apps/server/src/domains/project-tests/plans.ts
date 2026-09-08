@@ -9,6 +9,7 @@ import type {
   ProjectTestView,
 } from '@agentdeck/contracts';
 import { combineParams, pointId } from '@agentdeck/contracts/test-format';
+import { slugify } from '../../lib/slug.ts';
 import {
   ProjectTestsError,
   ProjectTestsNotFoundError,
@@ -74,14 +75,15 @@ export function readPlan(root: string, id: string): ProjectTestPlan | undefined 
   };
 }
 
-/** Свободный идентификатор плана из названия. */
+/**
+ * Свободный идентификатор плана из названия.
+ *
+ * Кириллица транслитерируется общим `slugify`, а не отбрасывается: у русского
+ * названия от отбрасывания оставались одни цифры, и «Дым за 10 мин» уезжал в
+ * файл `10.plan.json` — имя, по которому план уже не узнать.
+ */
 function nextPlanId(existing: ProjectTestPlan[], title: string): string {
-  const base =
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 30) || 'plan';
+  const base = slugify(title, 30) || 'plan';
   const used = new Set(existing.map((item) => item.id));
   if (!used.has(base)) return base;
   let attempt = 2;

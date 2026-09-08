@@ -5,6 +5,7 @@ import type { ProjectTestPointResult, ProjectTestRunRecord } from '@agentdeck/co
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildReport,
+  evidenceOf,
   failureGroups,
   flakyCases,
   readRun,
@@ -148,6 +149,87 @@ describe('project-tests/runs-store', () => {
     expect(report.totals.durationMs).toBe(60_000);
     expect(report.areas.map((row) => row.area).sort()).toEqual(['auth', 'chat']);
     expect(report.automation).toEqual({ manual: 1, toAutomate: 0, automated: 1 });
+  });
+
+  /**
+   * Доказательность провала. Ради этого счёта поле `attachments` в результате и
+   * существует: провал без снимка нельзя ни воспроизвести, ни завести дефектом,
+   * а молча выбросить его нельзя — это полчаса работы прогона.
+   */
+  it('провал без вложения назван недоказанным, с вложением — доказанным', () => {
+    const summary = evidenceOf(
+      [
+        record('r1', '2026-09-05T10:00:00.000Z', [
+          { status: 'failed', attachments: ['.agent/tests/attachments/gui-001/1.png'] },
+          { status: 'failed' },
+          { status: 'passed' },
+        ]),
+      ],
+      [],
+    );
+
+    expect(summary.failed).toBe(2);
+    expect(summary.proven).toBe(1);
+    expect(summary.missing.map((item) => item.caseId)).toEqual(['gui-002']);
+  });
+
+  it('считается последний провал кейса, а не все подряд', () => {
+    const summary = evidenceOf(
+      [
+        record('r2', '2026-09-06T10:00:00.000Z', [{ status: 'failed' }]),
+        record('r1', '2026-09-05T10:00:00.000Z', [
+          { status: 'failed', attachments: ['старый-снимок.png'] },
+        ]),
+      ],
+      [],
+    );
+
+    // Провал, доказанный месяц назад и голословный сегодня, — голословный.
+    expect(summary.failed).toBe(1);
+    expect(summary.proven).toBe(0);
+    expect(summary.missing).toHaveLength(1);
+  });
+
+  it('разбор провала и разошедшиеся попытки считаются отдельно', () => {
+    const summary = evidenceOf(
+      [
+        record('r1', '2026-09-05T10:00:00.000Z', [
+          { status: 'failed', failure: { step: 3, actual: 'кнопка не нажимается' } },
+          { status: 'blocked', failure: { retry: 'flaky', retryNote: 'со второго раза прошло' } },
+        ]),
+      ],
+      [],
+    );
+
+    expect(summary.detailed).toBe(1);
+    expect(summary.flaky.map((item) => item.caseId)).toEqual(['gui-002']);
+    // Блокировка — тоже красное: результата у кейса нет и доказывать нечем.
+    expect(summary.failed).toBe(2);
+  });
+
+  it('название кейса подтягивается из библиотеки: в записи прогона его нет', () => {
+    const summary = evidenceOf(
+      [record('r1', '2026-09-05T10:00:00.000Z', [{ status: 'failed' }])],
+      [
+        {
+          id: 'gui',
+          title: 'GUI',
+          file: 'f',
+          cases: [
+            {
+              id: 'gui-001',
+              type: 'case',
+              title: 'Вход',
+              steps: [],
+              status: 'failed',
+              source: 'agent',
+            },
+          ],
+        },
+      ],
+    );
+
+    expect(summary.missing[0]?.title).toBe('Вход');
   });
 
   it('чужой неполный файл пропускается, а не роняет историю', () => {

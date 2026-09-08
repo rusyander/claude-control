@@ -1,4 +1,8 @@
-import type { ProjectTestAttributeDef, ProjectTestCase } from '@agentdeck/contracts';
+import type {
+  ProjectTestAttributeDef,
+  ProjectTestCase,
+  ProjectTestRiskItem,
+} from '@agentdeck/contracts';
 import type { CaseWithGroup } from '@entities/ProjectTest';
 
 export interface TestCaseTableProps {
@@ -15,4 +19,9 @@ export interface TestCaseTableProps {
   onRemove: (testCase: ProjectTestCase, groupId: string) => void;
   /** Показывать колонку группы — когда список собран из нескольких файлов. */
   withGroup?: boolean;
+  /**
+   * Риск кейсов, «группа:кейс» → счёт и причина. Пусто — счёт не показывается:
+   * число без вопроса, ради которого его считали, только шумит в строке.
+   */
+  risk?: Map<string, ProjectTestRiskItem>;
 }

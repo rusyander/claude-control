@@ -39,6 +39,7 @@ export function mergeState(loaded: Partial<AppState>): AppState {
     chatLinks: { ...base.chatLinks, ...loaded.chatLinks },
     integrationHealth: { ...base.integrationHealth, ...loaded.integrationHealth },
     integrationLinks: { ...base.integrationLinks, ...loaded.integrationLinks },
+    testsAutoAccept: { ...base.testsAutoAccept, ...loaded.testsAutoAccept },
     settings: {
       ...base.settings,
       ...loaded.settings,

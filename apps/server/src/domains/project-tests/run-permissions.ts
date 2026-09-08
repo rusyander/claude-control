@@ -21,7 +21,11 @@ import { TESTS_DIR } from './files.ts';
  * агент.
  *
  * Правила по режимам:
- * - `generate`, `run`, `explore` — запись только внутрь `.agent/tests/`;
+ * - `generate` — запись только внутрь `.agent/tests/drafts/`: генерация пишет
+ *   ЧЕРНОВИК, а файлы групп меняет панель, применяя его. Так галочка «принимать
+ *   сразу» решает лишь, кто нажимает «применить», и никогда — кто пишет в
+ *   библиотеку;
+ * - `run`, `explore` — запись внутрь `.agent/tests/`;
  * - `automate` — плюс файлы автотестов, НАЗВАННЫЕ кейсами (`automation.file`),
  *   потому что именно их этот режим и пишет;
  * - чтение, поиск и запуск команд разрешены: без них тест не пройти. У команд
@@ -37,6 +41,13 @@ import { TESTS_DIR } from './files.ts';
 export interface RunScope {
   root: string;
   mode: ProjectTestRunMode;
+  /**
+   * Каталог от корня проекта, внутрь которого разрешена запись.
+   *
+   * У генерации он сужен до папки черновиков: библиотеку меняет панель, а не
+   * прогон, и это должно держаться правом, а не обещанием в задании.
+   */
+  writeDir: string;
   /** Пути от корня проекта, которые режим `automate` дописывает к тестовым. */
   testFiles: string[];
 }
@@ -82,13 +93,21 @@ export function automationFiles(cases: ProjectTestCase[]): string[] {
   return [...new Set(files)];
 }
 
+/** Папка черновиков — единственное, куда пишет генерация. */
+export const DRAFTS_WRITE_DIR = `${TESTS_DIR}/drafts`;
+
 /** Границы прогона по режиму. */
 export function runScope(
   root: string,
   mode: ProjectTestRunMode,
   cases: ProjectTestCase[] = [],
 ): RunScope {
-  return { root, mode, testFiles: mode === 'automate' ? automationFiles(cases) : [] };
+  return {
+    root,
+    mode,
+    writeDir: mode === 'generate' ? DRAFTS_WRITE_DIR : TESTS_DIR,
+    testFiles: mode === 'automate' ? automationFiles(cases) : [],
+  };
 }
 
 /** Лежит ли путь внутри каталога (сам каталог считается своим). */
@@ -121,7 +140,7 @@ function commandOf(input: unknown): string {
  */
 export function isWritable(scope: RunScope, target: string): boolean {
   const path = isAbsolute(target) ? resolve(target) : resolve(scope.root, target);
-  if (inside(scope.root, path, TESTS_DIR)) return true;
+  if (inside(scope.root, path, scope.writeDir || TESTS_DIR)) return true;
   if (scope.mode !== 'automate') return false;
   return scope.testFiles.some((file) => {
     const named = resolve(scope.root, file);
@@ -134,7 +153,10 @@ export function isWritable(scope: RunScope, target: string): boolean {
 
 /** Границы словами — тот же текст уходит и в задание, и в отказ. */
 export function describeScope(scope: RunScope): string {
-  const base = `писать разрешено только внутрь ${TESTS_DIR}/`;
+  const base = `писать разрешено только внутрь ${scope.writeDir || TESTS_DIR}/`;
+  if (scope.mode === 'generate') {
+    return `${base} — библиотеку меняет панель, применяя черновик`;
+  }
   if (scope.mode !== 'automate') return base;
   const named = scope.testFiles.length
     ? `, а также в файлы автотестов, названные кейсами (${scope.testFiles.slice(0, 5).join(', ')}${

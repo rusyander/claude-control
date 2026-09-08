@@ -9,7 +9,12 @@ import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { EmptyState } from '@shared/ui/empty-state';
 import { SkeletonList } from '@shared/ui/skeleton';
-import { STATUS_TONE, useRefreshDefects, useTestCoverage } from '@entities/ProjectTest';
+import {
+  STATUS_TONE,
+  useRefreshDefects,
+  useStartTestRun,
+  useTestCoverage,
+} from '@entities/ProjectTest';
 import type { ProjectTestCoverageItem } from '@agentdeck/contracts';
 import styles from './TestsPage.module.scss';
 
@@ -33,6 +38,9 @@ export function TestsCoverageTab({ projectPath }: { projectPath: string | undefi
   const [jql, setJql] = useState('');
   const coverage = useTestCoverage(projectPath, jql);
   const defects = useRefreshDefects(projectPath);
+  // «Покрыть кейсами» стоит на строке требования, а не в пульте прогона: это
+  // единственное место, где видно, какое требование не покрыто ничем.
+  const start = useStartTestRun(projectPath);
 
   const data = coverage.data;
   const items = data?.items ?? [];
@@ -95,6 +103,27 @@ export function TestsCoverageTab({ projectPath }: { projectPath: string | undefi
                 <Typography variant="caption" color="subtle">
                   {t('tests.coverage.recheckHint')}
                 </Typography>
+                {/* Список без кнопки заканчивался тем, что человек шёл в пульт и
+                    отмечал те же кейсы руками. Прогон стартует ровно по ним. */}
+                <Stack direction="row">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leftIcon={<Icon name="refresh" size={16} />}
+                    disabled={start.isPending}
+                    title={t('tests.coverage.recheckRunHint')}
+                    onClick={() =>
+                      start.mutate({
+                        mode: 'run',
+                        caseIds: [...new Set(defects.data.recheck.map((item) => item.caseId))],
+                      })
+                    }
+                  >
+                    {t('tests.coverage.recheckRun', {
+                      count: new Set(defects.data.recheck.map((item) => item.caseId)).size,
+                    })}
+                  </Button>
+                </Stack>
                 {defects.data.recheck.map((item) => (
                   <Stack
                     key={`${item.groupId}:${item.caseId}:${item.url}`}
@@ -152,7 +181,18 @@ export function TestsCoverageTab({ projectPath }: { projectPath: string | undefi
       )}
 
       {items.map((item) => (
-        <CoverageRow key={item.key} item={item} />
+        <CoverageRow
+          key={item.key}
+          item={item}
+          onCover={() =>
+            start.mutate({
+              mode: 'generate',
+              source: 'requirement',
+              sourceRef: item.url || item.key,
+            })
+          }
+          isStarting={start.isPending}
+        />
       ))}
 
       {/* Кейсы без единой ссылки на требование: не дыра в покрытии, а дыра в
@@ -188,7 +228,15 @@ function toneOf(item: ProjectTestCoverageItem): 'danger' | 'warning' | 'success'
 }
 
 /** Строка матрицы: требование, его кейсы и чем закончился последний прогон. */
-function CoverageRow({ item }: { item: ProjectTestCoverageItem }) {
+function CoverageRow({
+  item,
+  onCover,
+  isStarting,
+}: {
+  item: ProjectTestCoverageItem;
+  onCover: () => void;
+  isStarting: boolean;
+}) {
   const { t } = useTranslation();
   const isUncovered = item.cases.length === 0;
 
@@ -220,6 +268,19 @@ function CoverageRow({ item }: { item: ProjectTestCoverageItem }) {
               {item.status}
             </Typography>
           )}
+          {/* Кнопка стоит на строке требования, а не в пульте: запуск отсюда
+              несёт агенту ключ задачи, поэтому кейсы приходят уже привязанными
+              к ней — ради этого столбца матрица и существует. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="plus" size={16} />}
+            onClick={onCover}
+            disabled={isStarting}
+            title={t('projectTests.generateRequirementHint')}
+          >
+            {t('projectTests.generateRequirement')}
+          </Button>
         </Stack>
 
         {isUncovered ? (

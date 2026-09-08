@@ -1,11 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import type {
+  ProjectTestCase,
+  ProjectTestEnvironment,
+  ProjectTestGenerateMaterial,
   ProjectTestGroup,
   ProjectTestPointResult,
   ProjectTestRun,
   ProjectTestRunRecord,
   ProjectTestRunRequest,
+  ProjectTestStepResult,
 } from '@agentdeck/contracts';
 import { pointId, summarize as summarizeResults } from '@agentdeck/contracts/test-format';
 import { ChatRun, type ChatEvent } from '../chat/ChatRunner.ts';
@@ -17,7 +21,10 @@ import {
   resetStatuses,
 } from './store.ts';
 import { buildPrompt, runName, type PromptContext } from './prompt.ts';
-import { readEnvironments, readSharedSteps } from './library.ts';
+import { applyDraft, draftFile, readDraft } from './drafts.ts';
+import { stampOf } from './generate-sources.ts';
+import { redactor } from './env-secrets.ts';
+import { defaultEnvironment, readEnvironments, readSharedSteps } from './library.ts';
 import { planCases, readPlan } from './plans.ts';
 import { gitContext, impactOf, releaseTag } from './impact.ts';
 import { writeRun } from './runs-store.ts';
@@ -49,11 +56,29 @@ import {
 /** Хвост лога: полный вывод агента за сотню кейсов — это мегабайты. */
 const MAX_LOG = 200_000;
 
+/**
+ * Откуда прогон берёт доступы стенда. Считает их МАРШРУТ: домен не знает ни про
+ * appData панели, ни про шифрование, и обязан запускаться на голом каталоге —
+ * ровно так же, как отчёт считается без сети.
+ */
+export type RunSecretsResolver = (environment?: ProjectTestEnvironment) => {
+  values: Record<string, string>;
+  missing: { name: string; title?: string }[];
+};
+
 /** Одновременно идущий прогон на проект — один. */
 export class ProjectTestRunRegistry {
   private readonly runs = new Map<
     string,
-    { view: ProjectTestRun; run: ChatRun; gate?: RunPermissionGate }
+    {
+      view: ProjectTestRun;
+      run: ChatRun;
+      gate?: RunPermissionGate;
+      /** Принимать черновик генерации без просмотра — решение человека на старте. */
+      autoAccept?: boolean;
+      /** Затирание доступов стенда во всём, что выходит наружу. */
+      redact?: (text: string) => string;
+    }
   >();
 
   /**
@@ -99,7 +124,12 @@ export class ProjectTestRunRegistry {
    * Запустить прогон. Возвращает управление сразу: агент работает в фоне, а
    * клиент видит его по `GET /api/project-tests`.
    */
-  start(request: ProjectTestRunRequest, now: string): ProjectTestRun {
+  start(
+    request: ProjectTestRunRequest,
+    now: string,
+    material?: ProjectTestGenerateMaterial,
+    resolveSecrets?: RunSecretsResolver,
+  ): ProjectTestRun {
     const root = request.projectPath;
     if (!existsSync(root)) throw new ProjectTestsError('Каталог проекта не найден.');
 
@@ -111,6 +141,16 @@ export class ProjectTestRunRegistry {
     const all = readGroups(root);
     const scoped = request.groupId ? all.filter((group) => group.id === request.groupId) : all;
     const caseIds = this.pickCases(root, all, request);
+
+    // Исследование без хартии — это блуждание: агент час ходит по приложению и
+    // приносит десяток кейсов ни о чём. Хартию задаёт то же поле пожелания, и
+    // отказ здесь дешевле такого прогона.
+    if (request.mode === 'explore' && !request.scope?.trim()) {
+      throw new ProjectTestsError(
+        'Исследование идёт по хартии: напишите в поле пожелания, что именно смотреть ' +
+          '(«вложения в чате», «права на страницах проекта»).',
+      );
+    }
 
     if (request.mode === 'run' || request.mode === 'automate') {
       if (scoped.length === 0) throw new ProjectTestsError('Прогонять нечего: кейсов нет.');
@@ -125,14 +165,23 @@ export class ProjectTestRunRegistry {
       }
     }
 
+    // Автоматизировать уже автоматизированное значит переписать работающие
+    // тесты заново. Кейс с `automated` задание и так велит пропускать — но
+    // прогон, у которого таких кейсов ВСЕ, запускать незачем.
+    if (request.mode === 'automate' && !hasWorkToAutomate(scoped, caseIds)) {
+      throw new ProjectTestsError('Автоматизировать нечего: кейсы отбора уже помечены automated.');
+    }
+
     if (request.mode === 'run' && request.full) {
       for (const group of scoped) resetStatuses(root, group.id, caseIds);
     }
 
     const environments = readEnvironments(root);
-    const environmentId =
-      request.environmentId ??
-      (request.planId ? readPlan(root, request.planId)?.environmentIds?.[0] : undefined);
+    const environmentId = pickEnvironmentId(
+      environments,
+      request.environmentId,
+      request.planId ? readPlan(root, request.planId)?.environmentIds?.[0] : undefined,
+    );
     const { branch, commit } = gitContext(root);
     // Веху называет человек, а если не назвал — берём метку git: релиз,
     // помеченный тегом, отчёт узнаёт сам, и просить об этом ещё раз незачем.
@@ -156,15 +205,29 @@ export class ProjectTestRunRegistry {
       log: '',
       tokens: 0,
       costUsd: 0,
+      // След источника едет в запись прогона: черновик применяют позже, иногда
+      // через день, и к тому времени материал взять уже неоткуда.
+      generate: stampOf(material),
     };
 
     // Кейсы читаем ПОСЛЕ возможного сброса статусов: иначе в задание уехали бы
     // галочки прошлого прогона, которые человек только что попросил забыть.
     const groups = request.full ? readGroups(root) : all;
+    const environment = environments.find((item) => item.id === environmentId);
+    // Доступы стенда: значения уедут переменными окружения процесса CLI, а в
+    // задании агент увидит только их ИМЕНА — прочитать их он может сам.
+    const secrets = resolveSecrets?.(environment) ?? { values: {}, missing: [] };
     const context: PromptContext = {
       shared: readSharedSteps(root),
-      environment: environments.find((item) => item.id === environmentId),
+      environment,
       impact: request.changedOnly ? impactOf(root, groups).cases : undefined,
+      // Имя файла черновика содержит id прогона: сам его агент не выдумает, а
+      // две генерации подряд не должны писать в один файл.
+      draftFile: request.mode === 'generate' ? draftFile(view.id) : undefined,
+      // Материал источника собирает маршрут: он умеет ходить в трекер, а
+      // реестр — нет, и тянуть сюда сеть значило бы сделать старт прогона
+      // зависящим от чужой системы.
+      material,
     };
     const prompt = buildPrompt(
       request.groupId ? groups.filter((group) => group.id === request.groupId) : groups,
@@ -173,7 +236,22 @@ export class ProjectTestRunRegistry {
     );
 
     const run = new ChatRun();
-    this.runs.set(root, { view, run });
+    this.runs.set(root, {
+      view,
+      run,
+      autoAccept: request.autoAccept === true,
+      redact: redactor(secrets.values),
+    });
+    // Нехватка доступа прогон не отменяет, но молчать о ней нельзя: провал
+    // входа иначе выглядит как поломка приложения.
+    for (const ref of secrets.missing) {
+      this.note(
+        root,
+        'окружение',
+        `значения переменной ${ref.name} на этой машине нет${ref.title ? ` (${ref.title})` : ''} — ` +
+          'заполните её в доступах окружения, иначе вход в стенд не выполнится',
+      );
+    }
     this.persist(root, view);
 
     const scope = runScope(
@@ -181,7 +259,7 @@ export class ProjectTestRunRegistry {
       request.mode,
       scoped.flatMap((group) => group.cases),
     );
-    void this.launch(root, run, prompt, runName(request, scoped), scope);
+    void this.launch(root, run, prompt, runName(request, scoped), scope, secrets.values);
 
     return view;
   }
@@ -202,6 +280,7 @@ export class ProjectTestRunRegistry {
     prompt: string,
     name: string,
     scope: RunScope,
+    env: Record<string, string>,
   ): Promise<void> {
     let gate: RunPermissionGate | undefined;
     try {
@@ -218,6 +297,9 @@ export class ProjectTestRunRegistry {
           prompt,
           cwd: root,
           name,
+          // Доступы стенда идут ТОЛЬКО так: переменные процесса CLI не видны ни
+          // в задании, ни в записи прогона, ни в чужом ответе API.
+          ...(Object.keys(env).length > 0 ? { env } : {}),
           // С приёмником — обычный режим: каждый вызов инструмента проходит через
           // границы прогона. Без него — прежний полный доступ, но об этом сказано
           // в логе прогона, а не молчком.
@@ -235,7 +317,8 @@ export class ProjectTestRunRegistry {
   private note(projectPath: string, tool: string, message: string): void {
     const entry = this.runs.get(projectPath);
     if (!entry) return;
-    entry.view.log = tail(`${entry.view.log}\n· панель: ${tool} — ${message}\n`);
+    const clean = entry.redact ? entry.redact(message) : message;
+    entry.view.log = tail(`${entry.view.log}\n· панель: ${tool} — ${clean}\n`);
   }
 
   /** Остановить прогон человеком. Уже записанные статусы остаются. */
@@ -292,10 +375,15 @@ export class ProjectTestRunRegistry {
     if (!entry) return;
     const view = entry.view;
 
+    // Агент читает пароль из своего окружения и может повторить его в выводе —
+    // например, показав команду входа целиком. В лог он попадать не должен: лог
+    // видит человек, он же уезжает на телефон уведомлением.
+    const hide = entry.redact ?? ((value: string) => value);
+
     if (event.kind === 'session') view.sessionId = event.sessionId;
-    if (event.kind === 'text') view.log = tail(view.log + event.text);
+    if (event.kind === 'text') view.log = tail(view.log + hide(event.text));
     if (event.kind === 'tool') {
-      view.log = tail(`${view.log}\n· ${event.name} ${firstArg(event.input)}\n`);
+      view.log = tail(`${view.log}\n· ${event.name} ${hide(firstArg(event.input))}\n`);
     }
     if (event.kind === 'usage') {
       view.tokens += event.input + event.output + event.cacheRead + event.cacheCreation;
@@ -317,9 +405,15 @@ export class ProjectTestRunRegistry {
     entry.gate = undefined;
     entry.view.status = status;
     entry.view.finishedAt = new Date().toISOString();
-    if (error) entry.view.error = error;
-    entry.view.results = collectResults(projectPath, entry.view);
+    if (error) entry.view.error = entry.redact ? entry.redact(error) : error;
+    // Заметки к кейсам пишет агент, а они уезжают в историю прогонов — файл в
+    // git проверяемого проекта. Секрет, попавший в «не пустил с паролем …»,
+    // остался бы там навсегда.
+    entry.view.results = collectResults(projectPath, entry.view, entry.redact);
     entry.view.summary = summarizeResults(entry.view.results);
+    if (entry.view.mode === 'generate') {
+      this.settleDraft(projectPath, entry.view, entry.autoAccept === true);
+    }
     this.persist(projectPath, entry.view);
     // Об остановке рукой сообщать незачем: её сделал тот же человек, который
     // сейчас смотрит на панель.
@@ -332,6 +426,46 @@ export class ProjectTestRunRegistry {
         projectPath,
       });
     }
+  }
+
+  /**
+   * Что делать с черновиком, который оставила генерация.
+   *
+   * Прогон писать в библиотеку не может — прав нет, — поэтому здесь либо
+   * применение по галочке, либо ничего: черновик остаётся ждать человека. И то
+   * и другое видно строкой в логе прогона, а счёт — записью в истории: вопрос
+   * «откуда в наборе взялись эти кейсы» задают через месяц, когда черновик уже
+   * в архиве.
+   */
+  private settleDraft(root: string, view: ProjectTestRun, auto: boolean): void {
+    const draft = readDraft(root, view.id);
+    if (!draft) return;
+    if (draft.error) {
+      this.note(root, 'черновик', draft.error);
+      return;
+    }
+
+    let accepted = 0;
+    if (auto) {
+      try {
+        const result = applyDraft(root, view.id, {
+          auto: true,
+          now: new Date().toISOString(),
+          stamp: view.generate,
+        });
+        accepted = result.applied;
+        this.note(root, 'черновик', `принято автоматически, ${accepted} кейсов`);
+        for (const item of result.skipped) {
+          this.note(root, 'черновик', `${item.caseId} не принят: ${item.reason}`);
+        }
+      } catch (failure) {
+        this.note(root, 'черновик', `не применился: ${(failure as Error).message}`);
+      }
+    } else if (draft.items.length > 0) {
+      this.note(root, 'черновик', `${draft.items.length} правок ждут приёмки`);
+    }
+
+    view.draft = { runId: view.id, proposed: draft.items.length, accepted, auto };
   }
 
   /** Прогон в историю — той же формой, что и ручной. */
@@ -356,6 +490,8 @@ export class ProjectTestRunRegistry {
       sessionId: view.sessionId,
       results: view.results ?? [],
       summary: view.summary ?? summarizeResults(view.results ?? []),
+      draft: view.draft,
+      generate: view.generate,
     };
     try {
       writeRun(projectPath, record);
@@ -367,13 +503,53 @@ export class ProjectTestRunRegistry {
 }
 
 /**
+ * Окружение прогона: названное человеком, иначе первое из плана, иначе то, что
+ * помечено по умолчанию.
+ *
+ * Последнее звено раньше отсутствовало, и это молча ломало ровно тот случай,
+ * ради которого окружение и заводят: пульт с выбором «по умолчанию» не слал
+ * ничего, и прогон шёл без адреса стенда — а с Т12 не получил бы и доступов к
+ * нему. Ручной прогон и планы подставляли умолчание всегда; агентский прогон
+ * оставался единственным местом, где оно не работало.
+ */
+export function pickEnvironmentId(
+  environments: ProjectTestEnvironment[],
+  explicit?: string,
+  fromPlan?: string,
+): string | undefined {
+  return explicit ?? fromPlan ?? defaultEnvironment(environments)?.id;
+}
+
+/**
+ * Есть ли в отборе хоть один кейс, который ещё не в коде.
+ *
+ * Считается по тем же кейсам, что уедут в задание: панель показывает это число
+ * на кнопке, и отказ обязан совпадать с тем, что человек видел до нажатия.
+ */
+function hasWorkToAutomate(groups: ProjectTestGroup[], caseIds?: string[]): boolean {
+  return groups.some((group) =>
+    group.cases.some(
+      (item) =>
+        (!caseIds?.length || caseIds.includes(item.id)) &&
+        !item.archived &&
+        item.automation?.status !== 'automated',
+    ),
+  );
+}
+
+/**
  * Что агент успел записать за этот прогон.
  *
  * Считаем по файлам кейсов: результат — тот, у которого `lastRunAt` не раньше
  * старта. Своего учёта у прогона нет и быть не должно — статусы пишет агент, и
  * второй счётчик в памяти неизбежно разошёлся бы с файлами.
  */
-function collectResults(root: string, view: ProjectTestRun): ProjectTestPointResult[] {
+function collectResults(
+  root: string,
+  view: ProjectTestRun,
+  redact?: (text: string) => string,
+): ProjectTestPointResult[] {
+  const hide = (value?: string): string | undefined => (value && redact ? redact(value) : value);
   const results: ProjectTestPointResult[] = [];
   for (const group of readGroups(root)) {
     if (group.error) continue;
@@ -389,14 +565,45 @@ function collectResults(root: string, view: ProjectTestRun): ProjectTestPointRes
         environmentId: view.environmentId,
         status: testCase.status,
         statusId: testCase.statusId,
-        note: testCase.note,
+        note: hide(testCase.note),
         startedAt: view.startedAt,
         finishedAt: at,
         attachments: testCase.attachments,
+        failure: testCase.failure
+          ? {
+              ...testCase.failure,
+              expected: hide(testCase.failure.expected),
+              actual: hide(testCase.failure.actual),
+            }
+          : undefined,
+        steps: failedStep(testCase, hide),
       });
     }
   }
   return results;
+}
+
+/**
+ * Провалившийся шаг как результат шага.
+ *
+ * Поле `steps` в контракте было всегда, но агентские прогоны его не заполняли:
+ * «провалился» без указания шага нельзя ни воспроизвести, ни завести дефектом.
+ * Номер приходит от прогона в `failure.step` (с единицы), здесь он становится
+ * индексом — тем самым, по которому разметка находит текст шага.
+ */
+function failedStep(
+  testCase: ProjectTestCase,
+  hide: (value?: string) => string | undefined,
+): ProjectTestStepResult[] | undefined {
+  const step = testCase.failure?.step;
+  if (!step || step > testCase.steps.length) return undefined;
+  return [
+    {
+      index: step - 1,
+      status: testCase.status === 'blocked' ? 'blocked' : 'failed',
+      note: hide(testCase.failure?.actual ?? testCase.note),
+    },
+  ];
 }
 
 /** Первая строка входа инструмента — по ней в логе видно, что происходит. */

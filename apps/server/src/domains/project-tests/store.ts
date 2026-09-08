@@ -5,6 +5,7 @@ import type {
   ProjectTestCaseInput,
   ProjectTestDefect,
   ProjectTestDefectState,
+  ProjectTestFailure,
   ProjectTestFilter,
   ProjectTestGroup,
   ProjectTestKind,
@@ -86,6 +87,7 @@ const READINESS: ProjectTestReadiness[] = ['draft', 'ready', 'obsolete'];
 const AUTOMATION: ProjectTestAutomation['status'][] = ['manual', 'toAutomate', 'automated'];
 const LINK_TYPES: ProjectTestLink['type'][] = ['requirement', 'issue', 'mr', 'doc'];
 const DEFECT_STATES: ProjectTestDefectState[] = ['open', 'closed', 'unknown'];
+const RETRIES: NonNullable<ProjectTestFailure['retry']>[] = ['confirmed', 'flaky'];
 
 /** Значение из списка допустимых — или ничего. */
 function oneOf<T extends string>(value: unknown, allowed: T[]): T | undefined {
@@ -151,6 +153,27 @@ function parseAutomation(raw: unknown): ProjectTestAutomation | undefined {
   return { status: status ?? (file ? 'automated' : 'manual'), file, testName, externalId };
 }
 
+/**
+ * Разбор провала, оставленный прогоном.
+ *
+ * Разбирается снисходительно: агент пишет это поле руками, и «шаг 3» строкой
+ * вместо числа встречается чаще, чем хотелось бы. Половина разбора лучше, чем
+ * выброшенный целиком провал.
+ */
+function parseFailure(raw: unknown): ProjectTestFailure | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const record = raw as Record<string, unknown>;
+  const step = Number(String(record.step ?? '').replace(/\D+/g, ''));
+  const failure: ProjectTestFailure = {
+    step: Number.isFinite(step) && step > 0 ? step : undefined,
+    expected: optional(record.expected),
+    actual: optional(record.actual),
+    retry: oneOf(record.retry, RETRIES),
+    retryNote: optional(record.retryNote),
+  };
+  return Object.values(failure).some((value) => value !== undefined) ? failure : undefined;
+}
+
 /** Дефекты, заведённые по провалам. */
 function parseDefects(raw: unknown): ProjectTestCase['defects'] {
   if (!Array.isArray(raw)) return undefined;
@@ -184,7 +207,7 @@ function parseDefects(raw: unknown): ProjectTestCase['defects'] {
  * одной строкой вместо списка, статус словом «ok», отсутствующий id. Всё это
  * чинится здесь, потому что альтернатива — красная вкладка вместо списка.
  */
-function parseCase(raw: unknown, index: number): ProjectTestCase | undefined {
+export function parseCase(raw: unknown, index: number): ProjectTestCase | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const item = raw as Record<string, unknown>;
   const title = text(item.title).trim();
@@ -228,6 +251,7 @@ function parseCase(raw: unknown, index: number): ProjectTestCase | undefined {
     muted: item.muted === true ? true : undefined,
     muteReason: optional(item.muteReason),
     note: optional(item.note),
+    failure: parseFailure(item.failure),
     lastRunAt: optional(item.lastRunAt),
     lastRunId: optional(item.lastRunId),
     source: text(item.source) === 'human' ? 'human' : 'agent',
@@ -491,6 +515,9 @@ export function upsertCase(
     muted: input.muted ?? existing?.muted,
     muteReason: patchText(input.muteReason, existing?.muteReason),
     note: patchText(input.note, existing?.note),
+    // Разбор провала принадлежит прогону, как и `note`: правка описания кейса
+    // из панели не должна стирать номер шага, на котором он лёг.
+    failure: existing?.failure,
     lastRunAt: existing?.lastRunAt,
     lastRunId: existing?.lastRunId,
     source: 'human',
@@ -520,7 +547,14 @@ export function resetStatuses(root: string, groupId: string, caseIds?: string[])
   const touch = (item: ProjectTestCase): ProjectTestCase =>
     caseIds && !caseIds.includes(item.id)
       ? item
-      : { ...item, status: 'unknown', note: undefined, lastRunAt: undefined, lastRunId: undefined };
+      : {
+          ...item,
+          status: 'unknown',
+          note: undefined,
+          failure: undefined,
+          lastRunAt: undefined,
+          lastRunId: undefined,
+        };
   writeGroup(root, { ...group, cases: group.cases.map(touch) });
 }
 
@@ -531,6 +565,8 @@ export interface CaseResultPatch {
   status: ProjectTestStatus;
   statusId?: string;
   note?: string;
+  /** Разбор провала: номер шага, ожидание, что вышло. */
+  failure?: ProjectTestFailure;
   runId?: string;
   at?: string;
   defect?: { url: string; title?: string; createdAt?: string };
@@ -569,6 +605,11 @@ export function applyResults(root: string, patches: CaseResultPatch[], now: stri
         status: patch.status,
         statusId: patch.statusId ?? item.statusId,
         note: patch.note ?? item.note,
+        // Разбор описывает ПОСЛЕДНИЙ провал. Кейс, ставший зелёным, с прошлым
+        // разбором на борту выглядел бы доказанным провалом, которого больше нет.
+        failure:
+          patch.failure ??
+          (patch.status === 'failed' || patch.status === 'blocked' ? item.failure : undefined),
         lastRunAt: patch.at ?? now,
         lastRunId: patch.runId ?? item.lastRunId,
         defects,
@@ -698,6 +739,18 @@ export function bulkCases(root: string, input: ProjectTestBulkInput, now: string
   if (ids.size === 0) throw new ProjectTestsError('Не выбрано ни одного теста.');
   const value = input.value?.trim();
 
+  // Карантин без причины — тихое удаление кейса: он перестаёт красить прогон и
+  // никто уже не вспомнит, чего он ждал. Единственное исключение — кейс, у
+  // которого причина уже записана: повторный карантин её не стирает.
+  if (input.action === 'mute' && !value) {
+    const blank = group.cases.filter((item) => ids.has(item.id) && !item.muteReason?.trim());
+    if (blank.length > 0) {
+      throw new ProjectTestsError(
+        'Карантин без причины не ставится: напишите, чего он ждёт и до каких пор.',
+      );
+    }
+  }
+
   if (input.action === 'delete') {
     const cases = group.cases.filter((item) => !ids.has(item.id));
     const removed = group.cases.length - cases.length;
@@ -771,8 +824,8 @@ export function bulkCases(root: string, input: ProjectTestBulkInput, now: string
     if (input.action === 'restore') next.archived = undefined;
     if (input.action === 'mute') {
       next.muted = true;
-      // Причина — значение действия: карантин без объяснения через месяц никто
-      // не решится снять, потому что неизвестно, чего он ждал.
+      // Причина обязательна и проверена выше: карантин без объяснения через
+      // месяц никто не решится снять — неизвестно, чего он ждал.
       next.muteReason = value || item.muteReason;
     }
     if (input.action === 'unmute') {

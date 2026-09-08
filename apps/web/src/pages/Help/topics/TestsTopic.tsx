@@ -9,6 +9,9 @@ import {
   StepList,
   StorageCard,
 } from '../ui';
+import { TestsManualSections } from './TestsManualSections';
+import { TestsSetupSection } from './TestsSetupSection';
+import { TestsNotesSection } from './TestsNotesSection';
 
 /**
  * Документ раздела «Тесты» — рабочее место тестировщика целиком.
@@ -79,6 +82,8 @@ export function TestsTopic() {
         />
       </HelpSection>
 
+      <TestsSetupSection />
+
       <HelpSection title={tr('fieldsTitle')}>
         <FieldTable
           nameHeader={t('help.common.fieldName')}
@@ -130,20 +135,7 @@ export function TestsTopic() {
         </Callout>
       </HelpSection>
 
-      <HelpSection title={tr('manualTitle')} caption={tr('manualCaption')}>
-        <StepList
-          steps={[
-            { title: tr('manualStep1'), text: tr('manualStep1Text') },
-            { title: tr('manualStep2'), text: tr('manualStep2Text') },
-            { title: tr('manualStep3'), text: tr('manualStep3Text') },
-            { title: tr('manualStep4'), text: tr('manualStep4Text') },
-            { title: tr('manualStep5'), text: tr('manualStep5Text') },
-          ]}
-        />
-        <Callout tone="info" title={tr('manualPhoneTitle')}>
-          {tr('manualPhoneText')}
-        </Callout>
-      </HelpSection>
+      <TestsManualSections />
 
       <HelpSection title={tr('agentTitle')} caption={tr('agentCaption')}>
         <OptionCards
@@ -168,6 +160,43 @@ export function TestsTopic() {
         </Stack>
       </HelpSection>
 
+      {/* Источник — это не пятый режим прогона, а другое чтение той же
+          генерации, и путают их постоянно: кнопок четыре, а в истории все
+          четыре записи называются «генерация». */}
+      <HelpSection title={tr('sourceTitle')} caption={tr('sourceCaption')}>
+        <OptionCards
+          minWidth={280}
+          items={[
+            { title: tr('sourceCode'), text: tr('sourceCodeText') },
+            { title: tr('sourceRequirement'), text: tr('sourceRequirementText') },
+            { title: tr('sourceDiff'), text: tr('sourceDiffText') },
+            { title: tr('sourceDefect'), text: tr('sourceDefectText') },
+          ]}
+        />
+        <Callout tone="warning" title={tr('sourceRefusedTitle')}>
+          {tr('sourceRefusedText')}
+        </Callout>
+      </HelpSection>
+
+      {/* Отдельной секцией, а не карточкой у генерации: человек приходит сюда с
+          вопросом «куда делись кейсы, которые агент придумал», и ответ на него —
+          весь путь от черновика до отката, а не одна строка про кнопку. */}
+      <HelpSection title={tr('draftTitle')} caption={tr('draftCaption')}>
+        <OptionCards
+          minWidth={280}
+          items={[
+            { title: tr('draftFile'), text: tr('draftFileText') },
+            { title: tr('draftPick'), text: tr('draftPickText') },
+            { title: tr('draftSimilar'), text: tr('draftSimilarText') },
+            { title: tr('draftUndo'), text: tr('draftUndoText') },
+            { title: tr('draftAuto'), text: tr('draftAutoText') },
+          ]}
+        />
+        <Callout tone="warning" title={tr('draftRightsTitle')}>
+          {tr('draftRightsText')}
+        </Callout>
+      </HelpSection>
+
       <HelpSection title={tr('runsTitle')} caption={tr('runsCaption')}>
         <FieldTable
           nameHeader={tr('runsColumn')}
@@ -180,6 +209,38 @@ export function TestsTopic() {
             { name: tr('runsSession'), description: tr('runsSessionText'), isMono: false },
           ]}
         />
+      </HelpSection>
+
+      {/* Провал без доказательства чинить нечем: это единственное место, где
+          сказано, что панель требует и чего НЕ отменяет. */}
+      <HelpSection title={tr('evidenceTitle')} caption={tr('evidenceCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('evidenceWhat'), text: tr('evidenceWhatText') },
+            { title: tr('evidenceRetry'), text: tr('evidenceRetryText') },
+            { title: tr('evidenceReport'), text: tr('evidenceReportText') },
+            { title: tr('evidenceDefect'), text: tr('evidenceDefectText') },
+          ]}
+        />
+        <Callout tone="info" title={tr('evidenceKeepTitle')}>
+          {tr('evidenceKeepText')}
+        </Callout>
+      </HelpSection>
+
+      {/* Сравнение — единственное место, отвечающее на «что сломалось с прошлого
+          раза»: сводка прогона отвечает на «сколько красного сейчас». */}
+      <HelpSection title={tr('diffTitle')} caption={tr('diffCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('diffLists'), text: tr('diffListsText') },
+            { title: tr('diffPrevious'), text: tr('diffPreviousText') },
+            { title: tr('diffRerun'), text: tr('diffRerunText') },
+            { title: tr('diffRecheck'), text: tr('diffRecheckText') },
+          ]}
+        />
+        <Callout tone="warning" title={tr('diffComparableTitle')}>
+          {tr('diffComparableText')}
+        </Callout>
       </HelpSection>
 
       {/* Единственный вид, отвечающий на «что мы вообще не проверяем»: список
@@ -212,14 +273,79 @@ export function TestsTopic() {
         </Callout>
       </HelpSection>
 
+      {/* Карантин и устаревание — единственное место, где сказано, по каким
+          числам панель предлагает выключить кейс и вернуть его в строй. */}
+      <HelpSection title={tr('ageingTitle')} caption={tr('ageingCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('ageingLift'), text: tr('ageingLiftText') },
+            { title: tr('ageingMute'), text: tr('ageingMuteText') },
+            { title: tr('ageingStale'), text: tr('ageingStaleText') },
+            { title: tr('ageingNotRun'), text: tr('ageingNotRunText') },
+          ]}
+        />
+        <Callout tone="warning" title={tr('ageingManualTitle')}>
+          {tr('ageingManualText')}
+        </Callout>
+      </HelpSection>
+
+      {/* Риск — единственное место, где написана формула: пять множителей и
+          почему ни один из них не обнуляется. Без неё порядок «по риску»
+          читается как мнение панели, а он счётный. */}
+      <HelpSection title={tr('riskTitle')} caption={tr('riskCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('riskPriority'), text: tr('riskPriorityText') },
+            { title: tr('riskOutcome'), text: tr('riskOutcomeText') },
+            { title: tr('riskInstability'), text: tr('riskInstabilityText') },
+            { title: tr('riskAge'), text: tr('riskAgeText') },
+            { title: tr('riskImpact'), text: tr('riskImpactText') },
+          ]}
+        />
+        <Callout tone="info" title={tr('riskBudgetTitle')}>
+          {tr('riskBudgetText')}
+        </Callout>
+        <Callout tone="warning" title={tr('riskUnknownTitle')}>
+          {tr('riskUnknownText')}
+        </Callout>
+      </HelpSection>
+
+      {/* Готовность релиза — единственное место, где сказано, что вердикт
+          означает и чего он НЕ означает: панель ничего не подписывает. */}
       <HelpSection title={tr('releaseTitle')} caption={tr('releaseCaption')}>
         <OptionCards
           items={[
             { title: tr('releaseSet'), text: tr('releaseSetText') },
             { title: tr('releaseTag'), text: tr('releaseTagText') },
             { title: tr('releaseUntested'), text: tr('releaseUntestedText') },
+            { title: tr('releaseDoc'), text: tr('releaseDocText') },
           ]}
         />
+        <Callout tone="warning" title={tr('releaseVerdictTitle')}>
+          {tr('releaseVerdictText')}
+        </Callout>
+        <Callout tone="info" title={tr('releasePrintTitle')}>
+          {tr('releasePrintText')}
+        </Callout>
+      </HelpSection>
+
+      {/* Доступы стенда — единственное место, где сказано, ГДЕ лежит пароль и
+          почему его не видно обратно: без этого его ищут в файле проекта. */}
+      <HelpSection title={tr('secretsTitle')} caption={tr('secretsCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('secretsWhere'), text: tr('secretsWhereText') },
+            { title: tr('secretsSplit'), text: tr('secretsSplitText') },
+            { title: tr('secretsRun'), text: tr('secretsRunText') },
+            { title: tr('secretsMissing'), text: tr('secretsMissingText') },
+          ]}
+        />
+        <Callout tone="info" title={tr('secretsShowTitle')}>
+          {tr('secretsShowText')}
+        </Callout>
+        <Callout tone="warning" title={tr('secretsReservedTitle')}>
+          {tr('secretsReservedText')}
+        </Callout>
       </HelpSection>
 
       <HelpSection title={tr('importTitle')} caption={tr('importCaption')}>
@@ -241,6 +367,19 @@ export function TestsTopic() {
             { title: tr('defectStep1'), text: tr('defectStep1Text') },
             { title: tr('defectStep2'), text: tr('defectStep2Text') },
             { title: tr('defectStep3'), text: tr('defectStep3Text') },
+          ]}
+        />
+      </HelpSection>
+
+      {/* Терминальный вход стоит СРАЗУ после импорта из CI: человек, который
+          дочитал до «результаты приходят из CI», следующим вопросом спрашивает,
+          как в том же CI позвать линтер, сравнение и сборку плана. */}
+      <HelpSection title={tr('cliTitle')} caption={tr('cliCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('cliLint'), text: tr('cliLintText') },
+            { title: tr('cliDiff'), text: tr('cliDiffText') },
+            { title: tr('cliPlan'), text: tr('cliPlanText') },
           ]}
         />
       </HelpSection>
@@ -269,6 +408,7 @@ export function TestsTopic() {
             tr('canPlans'),
             tr('canManual'),
             tr('canAgent'),
+            tr('canDraft'),
             tr('canImport'),
             tr('canDefect'),
             tr('canCoverage'),
@@ -280,22 +420,7 @@ export function TestsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('notesTitle')}>
-        <Stack gap="var(--spacing-xs)">
-          <Callout tone="warning" title={tr('noteBrokenTitle')}>
-            {tr('noteBrokenText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteStatusTitle')}>
-            {tr('noteStatusText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteHumanTitle')}>
-            {tr('noteHumanText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteGitTitle')}>
-            {tr('noteGitText')}
-          </Callout>
-        </Stack>
-      </HelpSection>
+      <TestsNotesSection />
     </>
   );
 }

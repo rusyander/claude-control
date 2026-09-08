@@ -11,7 +11,7 @@ import { SelectField } from '@shared/ui/select-field';
 import { EmptyState } from '@shared/ui/empty-state';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useStartManualRun } from '@entities/ProjectTest';
-import { useTestsBoard } from '@features/ProjectTests';
+import { TestSettingsModal, useTestsBoard } from '@features/ProjectTests';
 import { TestRunnerModal } from '@features/TestRunner';
 import { TestPlansPanel } from '@features/TestPlans';
 import { IntegrationLinksBar } from '@features/IntegrationLinks';
@@ -56,6 +56,7 @@ export function TestsPage() {
   const [scope, setScope] = useState('');
   const [environmentId, setEnvironmentId] = useState('');
   const [isRunnerOpen, setRunnerOpen] = useState(false);
+  const [isSettingsOpen, setSettingsOpen] = useState(false);
 
   const setTab = (next: TestsTab): void => {
     void navigate({ to: '.', search: { tab: next }, replace: true });
@@ -128,6 +129,18 @@ export function TestsPage() {
                 {t('tests.dir', { dir: board.dir })}
               </Typography>
             )}
+            {/* Настройки набора стоят рядом с выбором проекта, а не во вкладках:
+                окружения, общие шаги и свои поля — свойства ВСЕГО набора, и
+                заводят их до того, как появляется первая вкладка. */}
+            {project.selected && (
+              <Button
+                variant="ghost"
+                leftIcon={<Icon name="settings" size={20} />}
+                onClick={() => setSettingsOpen(true)}
+              >
+                {t('tests.settings.open')}
+              </Button>
+            )}
           </Stack>
 
           {/* Чем этот проект связан с внешним миром: куда заводить дефекты и
@@ -187,6 +200,8 @@ export function TestsPage() {
           {active === 'coverage' && <TestsCoverageTab projectPath={projectPath} />}
         </>
       )}
+
+      <TestSettingsModal isOpen={isSettingsOpen} onOpenChange={setSettingsOpen} board={board} />
 
       <TestRunnerModal
         isOpen={isRunnerOpen}

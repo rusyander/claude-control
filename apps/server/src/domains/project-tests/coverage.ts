@@ -217,6 +217,63 @@ async function requirementsFromJira(
   }
 }
 
+/** Ключи требований, на которые ссылаются живые кейсы. */
+export function linkedRequirements(groups: ProjectTestGroup[]): string[] {
+  const keys = new Set<string>();
+  for (const group of groups) {
+    if (group.error) continue;
+    for (const item of group.cases) {
+      if (item.archived) continue;
+      for (const link of item.links ?? []) {
+        if (REQUIREMENT_LINKS.has(link.type)) keys.add(requirementKey(link.url));
+      }
+    }
+  }
+  return [...keys];
+}
+
+/** Только то, что Jira примет за ключ задачи: `QA-42`, а не адрес целиком. */
+const ISSUE_KEY = /^[A-Z][A-Z0-9_]*-\d+$/;
+
+/**
+ * Когда требования правили в трекере.
+ *
+ * Спрашиваем ровно по тем ключам, на которые сослались кейсы, а не по запросу
+ * проекта: расхождение ищется у кейса, и задача, на которую никто не сослался,
+ * к нему отношения не имеет. Ответа нет — возвращаем оговорку: раздел тестов
+ * обязан работать и без единой интеграции.
+ */
+export async function requirementUpdates(
+  deps: CoverageDeps,
+  keys: string[],
+): Promise<{ updates: Record<string, { updatedAt: string; url?: string }>; warning?: string }> {
+  const known = keys.filter((key) => ISSUE_KEY.test(key));
+  if (known.length === 0) return { updates: {} };
+
+  const settings = readIntegrations(deps.store).atlassian;
+  const token = readToken(deps.appDataDir, 'atlassian');
+  if (!settings.enabled || !token) {
+    return { updates: {}, warning: 'Atlassian не подключён: даты требований не сверялись.' };
+  }
+
+  try {
+    const issues = await searchIssues(toAccess(settings, token), {
+      jql: `key in (${known.slice(0, 100).join(', ')})`,
+      limit: 100,
+    });
+    const updates: Record<string, { updatedAt: string; url?: string }> = {};
+    for (const issue of issues) {
+      if (issue.updatedAt) updates[issue.key] = { updatedAt: issue.updatedAt, url: issue.url };
+    }
+    return { updates };
+  } catch (error) {
+    return {
+      updates: {},
+      warning: `Jira не ответила, даты требований не сверялись: ${error instanceof Error ? error.message : error}`,
+    };
+  }
+}
+
 /**
  * Запрос по умолчанию: дети привязанного эпика, иначе открытые задачи проекта.
  * `ORDER BY` намеренно по ключу — человек ищет строку глазами, а не по дате.

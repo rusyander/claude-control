@@ -42,9 +42,19 @@ import { ProjectTestsError } from './files.ts';
 const GH = process.platform === 'win32' ? ['gh.cmd', 'gh'] : ['gh'];
 const GLAB = process.platform === 'win32' ? ['glab.cmd', 'glab'] : ['glab'];
 
-/** Шаги в нумерованный список — так их читают в задаче. */
-function stepsBlock(steps: ProjectTestStep[]): string {
-  return steps.map((step, index) => `${index + 1}. ${stepText(step)}`).join('\n');
+/**
+ * Шаги в нумерованный список — так их читают в задаче.
+ *
+ * Провалившийся помечается прямо в списке: тот, кто чинит, ищет глазами место,
+ * а не сверяет номер из соседнего абзаца со списком из десяти пунктов.
+ */
+function stepsBlock(steps: ProjectTestStep[], failed?: number): string {
+  return steps
+    .map((step, index) => {
+      const line = `${index + 1}. ${stepText(step)}`;
+      return index + 1 === failed ? `${line} ← провал` : line;
+    })
+    .join('\n');
 }
 
 /**
@@ -74,7 +84,11 @@ export function buildDraft(
     deps?: DefectDeps;
   },
 ): DefectDraft {
-  const actual = context.result?.note ?? testCase.note ?? 'не описано';
+  // Разбор провала — от того прохода, по которому дефект и заводят; у кейса он
+  // лежит от последнего прогона и годится, когда дефект заводят из библиотеки.
+  const failure = context.result?.failure ?? testCase.failure;
+  const actual = failure?.actual ?? context.result?.note ?? testCase.note ?? 'не описано';
+  const step = failure?.step;
   const lines = [
     `**Кейс:** ${context.groupId}/${testCase.id} — ${testCase.title}`,
     testCase.area ? `**Зона:** ${testCase.area}` : '',
@@ -85,11 +99,20 @@ export function buildDraft(
     '',
     testCase.precondition ? `**Предусловие**\n${testCase.precondition}\n` : '',
     '**Шаги**',
-    stepsBlock(testCase.steps) || '— не описаны',
+    stepsBlock(testCase.steps, step) || '— не описаны',
     '',
-    `**Ожидалось**\n${testCase.expected ?? 'не описано'}`,
+    // Ожидание берётся с провалившегося шага, если оно там названо: общий итог
+    // сценария в дефекте отвечает на «что хотели», а чинят по конкретному шагу.
+    `**Ожидалось**\n${failure?.expected ?? testCase.expected ?? 'не описано'}`,
     '',
     `**Получилось**\n${actual}`,
+    step ? `\n**Провалился шаг ${step}**` : '',
+    // Разошедшиеся попытки — это отдельный факт: чинить в таком случае нужно
+    // сначала сам тест, и дефект обязан сказать об этом сразу.
+    failure?.retry === 'flaky'
+      ? `\n**Вторая попытка разошлась**\n${failure.retryNote ?? 'во второй раз вышло иначе'}`
+      : '',
+    failure?.retry === 'confirmed' ? '\n**Вторая попытка:** то же самое, провал подтверждён.' : '',
     context.result?.attachments?.length
       ? `\n**Доказательства**\n${context.result.attachments.map((file) => `- ${file}`).join('\n')}`
       : '',

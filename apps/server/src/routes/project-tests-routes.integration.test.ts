@@ -36,7 +36,19 @@ describe('project-tests-routes', () => {
     registerProjectTestsRoutes(
       app,
       // Реестр проектов пуст: имя копии соглашения строится из пути каталога.
-      { backupDir, store: { getProjectByPath: () => undefined } } as unknown as ServerContext,
+      {
+        backupDir,
+        store: {
+          getProjectByPath: () => undefined,
+          isTestsAutoAccept: () => false,
+          // Настройки спрашивают источники генерации: без них не ответить, что
+          // Jira не подключена, — а это отказ прогона, а не поломка панели.
+          getSettings: () => ({ integrations: { atlassian: { enabled: false } } }),
+        },
+        // Каталог данных панели нужен источникам генерации: в нём лежит токен
+        // трекера, и без него «покрыть требование» не собралось бы.
+        location: { paths: { appData: backupDir } },
+      } as unknown as ServerContext,
       runs,
       new ProjectTestManualRegistry(),
     );
@@ -126,6 +138,82 @@ describe('project-tests-routes', () => {
     });
 
     expect(response.statusCode).toBe(400);
+  });
+
+  /**
+   * Два режима, до которых у человека не было кнопки. Проверяются их отказы:
+   * запуск с настоящим агентом здесь не делается — он спавнит CLI.
+   */
+  it('исследование без хартии не запускается: сессия без неё — блуждание', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/run',
+      payload: { path: project, mode: 'explore' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().message).toContain('хартии');
+    expect((await view()).run).toBeUndefined();
+  });
+
+  it('автоматизация набора, который весь в коде, отказывается с причиной', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/group',
+      payload: { path: project, id: 'gui', title: 'GUI' },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/case',
+      payload: {
+        path: project,
+        groupId: 'gui',
+        testCase: {
+          title: 'Отправить сообщение',
+          steps: ['нажать «Отправить»'],
+          automation: { status: 'automated', file: 'e2e/send.spec.ts', testName: '[gui-001] send' },
+        },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/run',
+      payload: { path: project, mode: 'automate' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().message).toContain('automated');
+  });
+
+  /**
+   * Источник генерации собирается ДО старта, и отказ обязан быть внятным: не
+   * собрался — агент не запускается вовсе, а человек читает причину. Здесь это
+   * проверяется на маршруте, потому что 500 вместо строки означал бы «панель
+   * сломалась», хотя сломано ровно ничего.
+   */
+  it('«покрыть требование» без подключённой Jira отвечает причиной, а не 500', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/run',
+      payload: { path: project, mode: 'generate', source: 'requirement', sourceRef: 'QA-42' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().message).toContain('Jira');
+    // Прогон не начался: источник не собрался — начинать нечего.
+    expect((await view()).run).toBeUndefined();
+  });
+
+  it('генерация по диффу вне репозитория называет диапазон, который не сравнился', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/run',
+      payload: { path: project, mode: 'generate', source: 'diff' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().message).toContain('origin/main..HEAD');
   });
 
   it('соглашение вписывается в CLAUDE.md один раз и видно в ответе', async () => {

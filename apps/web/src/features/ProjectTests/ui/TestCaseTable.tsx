@@ -33,6 +33,7 @@ export function TestCaseTable({
   onEdit,
   onRemove,
   withGroup,
+  risk,
 }: TestCaseTableProps) {
   const { t } = useTranslation();
 
@@ -85,6 +86,7 @@ export function TestCaseTable({
         <tbody>
           {rows.map((row) => {
             const item = row.testCase;
+            const rowRisk = risk?.get(`${row.groupId}:${item.id}`);
             return (
               <tr
                 key={`${row.groupId}:${item.id}`}
@@ -115,6 +117,16 @@ export function TestCaseTable({
                     </Typography>
                   </button>
                   <Stack direction="row" gap="var(--spacing-3xs)" align="center" wrap>
+                    {/* Риск — с причиной в подсказке: число без объяснения
+                        человек либо игнорирует, либо принимает на веру, и оба
+                        исхода хуже, чем строка «последний прогон красный». */}
+                    {rowRisk && (
+                      <Badge tone="info">
+                        <span title={rowRisk.reason}>
+                          {t('tests.risk.score', { score: rowRisk.score })}
+                        </span>
+                      </Badge>
+                    )}
                     {item.section && (
                       <Typography variant="caption" color="subtle" as="span">
                         {item.section}

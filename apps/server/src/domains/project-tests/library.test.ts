@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   defaultEnvironment,
   readEnvironments,
+  readLibraryIssues,
   readSchema,
   readSharedSteps,
   readViews,
@@ -113,5 +114,54 @@ describe('project-tests/library', () => {
     expect(readFileSync(join(project, '.agent', 'tests', 'environments.json'), 'utf8')).toBe(
       '{ сломано',
     );
+  });
+
+  it('в сломанный файл окружений не пишут: правка отказывается, файл цел', () => {
+    const file = join(project, '.agent', 'tests', 'environments.json');
+    mkdirSync(join(project, '.agent', 'tests'), { recursive: true });
+    writeFileSync(file, '{ сломано');
+
+    // Без этого окно настроек показывало бы «окружений нет» и первое же
+    // сохранение стирало бы всё, что в файле написано руками.
+    expect(() => saveEnvironment(project, { title: 'Прод' })).toThrow(/не разобрался/);
+    expect(readFileSync(file, 'utf8')).toBe('{ сломано');
+  });
+
+  it('сломанные файлы обвязки называются по одному, с причиной', () => {
+    mkdirSync(join(project, '.agent', 'tests'), { recursive: true });
+    writeFileSync(join(project, '.agent', 'tests', 'schema.json'), '{ сломано');
+    saveEnvironment(project, { title: 'Стенд' });
+
+    const issues = readLibraryIssues(project);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.file).toBe('.agent/tests/schema.json');
+    expect(issues[0]?.error).toMatch(/не разобрался/);
+  });
+
+  it('своё поле проверяется при записи: ключ, повтор и выбор без вариантов', () => {
+    expect(() =>
+      saveSchema(project, {
+        attributes: [{ key: 'Своё поле', title: 'Стенд', type: 'text' }],
+        statuses: [],
+      }),
+    ).toThrow(/Ключ своего поля/);
+
+    expect(() =>
+      saveSchema(project, {
+        attributes: [
+          { key: 'stand', title: 'Стенд', type: 'text' },
+          { key: 'stand', title: 'Другой стенд', type: 'text' },
+        ],
+        statuses: [],
+      }),
+    ).toThrow(/уже есть/);
+
+    // Выбор без вариантов — поле, которое нечем заполнить.
+    expect(() =>
+      saveSchema(project, {
+        attributes: [{ key: 'stand', title: 'Стенд', type: 'select', options: [] }],
+        statuses: [],
+      }),
+    ).toThrow(/ни одного варианта/);
   });
 });

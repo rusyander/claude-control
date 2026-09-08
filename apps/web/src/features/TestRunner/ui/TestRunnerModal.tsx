@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProjectTestStatus } from '@agentdeck/contracts';
 import { Modal } from '@shared/ui/modal';
@@ -9,15 +9,19 @@ import { Badge } from '@shared/ui/badge';
 import { Typography } from '@shared/ui/typography';
 import { TextField } from '@shared/ui/text-field';
 import { EmptyState } from '@shared/ui/empty-state';
+import { useHotkeys } from '@shared/hooks/use-hotkeys';
 import { percentOf } from '@entities/ProjectTest';
 import { formatElapsed, useManualRunner } from '../model/useManualRunner';
+import {
+  RUNNER_ATTACH_KEY,
+  RUNNER_NOTE_KEY,
+  RUNNER_VERDICTS as VERDICTS,
+  runnerBindings,
+} from '../model/runnerHotkeys';
 import { TestRunnerPoints } from './TestRunnerPoints';
 import { TestRunnerDefect } from './TestRunnerDefect';
 import type { TestRunnerModalProps } from './TestRunnerModal.types';
 import styles from './TestRunner.module.scss';
-
-/** Вердикты прохода в том порядке, в каком их жмут чаще всего. */
-const VERDICTS: readonly ProjectTestStatus[] = ['passed', 'failed', 'skipped', 'blocked'];
 
 /**
  * Что кладут в доказательство: снимок экрана и текстовый вывод.
@@ -48,9 +52,33 @@ export function TestRunnerModal({
   const runner = useManualRunner(projectPath, groups, sharedSteps, isOpen);
   const [isDefectOpen, setDefectOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Заметка ищется в своей обёртке: общее поле владеет собственным id и ссылки
+  // наружу не отдаёт, а курсор по клавише должен попадать именно в неё.
+  const noteBox = useRef<HTMLDivElement>(null);
 
   const statusOf = (index: number): ProjectTestStatus =>
     runner.stepResults.find((item) => item.index === index)?.status ?? 'unknown';
+
+  // Клавиши живут, только пока открыт сам проход: окно дефекта поверх него
+  // забирает ввод себе, и цифра в нём означала бы совсем другое.
+  const isKeyboardOn = isOpen && runner.isActive && !isDefectOpen;
+  useHotkeys(
+    useMemo(
+      () =>
+        runnerBindings(
+          {
+            submit: (status) => void runner.submit(status),
+            prev: () => runner.goto(runner.index - 1),
+            next: () => runner.goto(runner.index + 1),
+            focusNote: () => noteBox.current?.querySelector('textarea')?.focus(),
+            attach: () => fileInput.current?.click(),
+          },
+          isKeyboardOn,
+        ),
+      // Обработчики читают свежий `runner` при каждом пересборе привязок.
+      [runner, isKeyboardOn],
+    ),
+  );
 
   const finish = (): void => {
     runner.finish();
@@ -182,14 +210,16 @@ export function TestRunnerModal({
                 </Typography>
               )}
 
-              <TextField
-                label={t('tests.runner.note')}
-                hint={t('tests.runner.noteHint')}
-                value={runner.note}
-                onChange={runner.setNote}
-                multiline
-                rows={3}
-              />
+              <div ref={noteBox}>
+                <TextField
+                  label={t('tests.runner.note', { key: RUNNER_NOTE_KEY })}
+                  hint={t('tests.runner.noteHint')}
+                  value={runner.note}
+                  onChange={runner.setNote}
+                  multiline
+                  rows={3}
+                />
+              </div>
 
               <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
                 {/* Нативный input скрыт, а нажимают по кнопке: системный
@@ -210,6 +240,7 @@ export function TestRunnerModal({
                   size="sm"
                   leftIcon={<Icon name="paperclip" size={16} />}
                   isLoading={runner.isAttaching}
+                  title={t('tests.runner.keyHint', { key: RUNNER_ATTACH_KEY })}
                   onClick={() => fileInput.current?.click()}
                 >
                   {t('tests.runner.attach')}
@@ -235,17 +266,25 @@ export function TestRunnerModal({
                   variant="ghost"
                   leftIcon={<Icon name="chevronLeft" size={18} />}
                   disabled={runner.index === 0}
+                  title={t('tests.runner.keyHint', { key: '←' })}
                   onClick={() => runner.goto(runner.index - 1)}
                 >
                   {t('tests.runner.prev')}
                 </Button>
-                {VERDICTS.map((verdict) => (
+                {/* Цифра стоит НА кнопке, а не только в подсказке снизу: по
+                    сотне проходов подряд человек смотрит на кнопку, а не на
+                    строку под ней. */}
+                {VERDICTS.map((verdict, index) => (
                   <Button
                     key={verdict}
                     variant={verdict === 'passed' ? 'primary' : 'secondary'}
                     isLoading={runner.isBusy}
+                    title={t('tests.runner.keyHint', { key: index + 1 })}
                     onClick={() => void runner.submit(verdict)}
                   >
+                    <span className={styles.key} aria-hidden="true">
+                      {index + 1}
+                    </span>
                     {t(`tests.runner.verdict.${verdict}`)}
                   </Button>
                 ))}
@@ -253,11 +292,21 @@ export function TestRunnerModal({
                   variant="ghost"
                   rightIcon={<Icon name="chevronRight" size={18} />}
                   disabled={runner.index >= runner.total - 1}
+                  title={t('tests.runner.keyHint', { key: '→' })}
                   onClick={() => runner.goto(runner.index + 1)}
                 >
                   {t('tests.runner.next')}
                 </Button>
               </div>
+
+              {/* Подсказка одной строкой: набор клавиш маленький и постоянный,
+                  отдельное окно «горячие клавиши» пришлось бы ещё найти. */}
+              <Typography variant="caption" color="subtle">
+                {t('tests.runner.keysHint', {
+                  note: RUNNER_NOTE_KEY,
+                  attach: RUNNER_ATTACH_KEY,
+                })}
+              </Typography>
             </div>
           </div>
         )}

@@ -44,7 +44,7 @@ describe('project-tests run-permissions', () => {
   });
 
   describe('генерация и прогон пишут только в свой каталог', () => {
-    for (const mode of ['generate', 'run', 'explore'] as const) {
+    for (const mode of ['run', 'explore'] as const) {
       it(`${mode}: кейсы записать можно, чужой код — нет`, () => {
         const scope = scopeOf(mode);
 
@@ -70,6 +70,31 @@ describe('project-tests run-permissions', () => {
         expect(denied.message).toContain('failed');
       });
     }
+
+    /**
+     * Главное право этой партии: генерация НЕ пишет в библиотеку. Не «не должна»
+     * по заданию, а не может — иначе галочка «принимать сразу» превращалась бы в
+     * разрешение прогону править файлы групп, а откатывать было бы нечем.
+     */
+    it('генерация пишет только черновик — файлы групп ей запрещены', () => {
+      const scope = scopeOf('generate');
+
+      expect(
+        decidePermission(scope, 'Write', {
+          file_path: join(root, '.agent', 'tests', 'drafts', 'run-1.draft.json'),
+        }).behavior,
+      ).toBe('allow');
+
+      const denied = decidePermission(scope, 'Write', {
+        file_path: join(root, '.agent', 'tests', 'gui.tests.json'),
+      });
+      expect(denied.behavior).toBe('deny');
+      expect(denied.message).toContain('drafts');
+      // Соседние файлы хозяйства — тоже не её дело: черновик и есть весь результат.
+      expect(isWritable(scope, '.agent/tests/_shared.steps.json')).toBe(false);
+      expect(isWritable(scope, '.agent/tests/environments.json')).toBe(false);
+      expect(describeScope(scope)).toContain('черновик');
+    });
 
     it('за корень проекта не выпускает даже абсолютным путём', () => {
       const scope = scopeOf('run');
@@ -169,7 +194,7 @@ describe('project-tests run-permissions', () => {
       const allowed = await ask(gate, {
         runId: gate.runId,
         toolName: 'Write',
-        input: { file_path: '.agent/tests/gui.tests.json' },
+        input: { file_path: '.agent/tests/drafts/run-1.draft.json' },
       });
       const denied = await ask(gate, {
         runId: gate.runId,

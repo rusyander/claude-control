@@ -119,6 +119,16 @@
   padding-bottom: var(--spacing-3xs);
 }
 
+/* Поле минут: узкое намеренно — в него пишут «30», а не текст. */
+.budget {
+  width: 96px;
+
+  > * {
+    width: 100%;
+    max-width: none;
+  }
+}
+
 .viewChip {
   display: inline-flex;
   align-items: center;
@@ -369,6 +379,14 @@
   display: none;
 }
 
+// Доступ стенда: имя переменной, состояние и кнопки — одной строкой в рамке,
+// чтобы поле замены раскрывалось внутри неё, а не рядом с чужим доступом.
+.secretRow {
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+
 // Ссылка выгрузки стоит в одном ряду с полями — поэтому выглядит кнопкой.
 .exportLink {
   padding: var(--spacing-xs) var(--spacing-sm);
@@ -381,4 +399,52 @@
   &:hover {
     border-color: var(--color-border-strong);
   }
+}
+
+// Первые шаги в пустом наборе: карточка вместо пустого списка. Ширина
+// ограничена, иначе строка объяснения растягивается на весь экран и читается
+// хуже, чем список кейсов, ради которого сюда и пришли.
+.onboarding {
+  max-width: 720px;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+
+.onboardingSteps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onboardingStep {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--spacing-xs);
+  align-items: start;
+}
+
+// Номер шага, а после выполнения — галочка на его месте: строка не прыгает.
+.onboardingNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--color-fg-subtle);
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+// Сломанный файл обвязки в окне настроек: причина стоит НАД списками, поэтому
+// нужна рамка — иначе она читается как подпись к первому окружению.
+.issueBox {
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border-warning, var(--color-border));
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
 }

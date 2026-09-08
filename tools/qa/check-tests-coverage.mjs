@@ -191,6 +191,31 @@ await page.route('**/api/project-tests/run*', async (route) =>
 await page.route('**/api/project-tests/runs*', async (route) =>
   route.fulfill({ json: { runs: [] } }),
 );
+// Здоровье набора живёт на той же вкладке отчёта: без заглушки линтер отвечает
+// 400 на несуществующий проект, и проверка «ошибок в консоли нет» краснеет не
+// о том.
+await page.route('**/api/project-tests/lint*', async (route) =>
+  route.fulfill({ json: { checked: 2, findings: [], byRule: [], duplicates: [] } }),
+);
+// Документ готовности вехи: карточка отчёта спрашивает его, как только у вехи
+// есть имя. Без подмены это 400 в консоли, а не пропавшая карточка.
+await page.route('**/api/project-tests/release*', async (route) =>
+  route.fulfill({ json: { releases: [] } }),
+);
+await page.route('**/api/project-tests/quarantine*', async (route) =>
+  route.fulfill({
+    json: {
+      lift: [],
+      quarantine: [],
+      stale: [],
+      thresholds: { greenStreak: 5, stability: 70, minRuns: 4 },
+      checkedAt: '2026-09-08T10:00:00.000Z',
+    },
+  }),
+);
+await page.route('**/api/project-tests/risk*', async (route) =>
+  route.fulfill({ json: { items: [], checkedAt: '2026-09-08T10:00:00.000Z' } }),
+);
 await page.route('**/api/project-tests/plans*', async (route) =>
   route.fulfill({ json: { plans: [] } }),
 );

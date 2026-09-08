@@ -31,10 +31,18 @@ import styles from './ProjectTests.module.scss';
  * при каждом обновлении браузера. Один тег, один статус, одна зона закрывают
  * работу тестировщика, а всё остальное набирается сохранённым набором.
  */
-export function TestFilterBar({ filters, views, onSaveView, onRemoveView }: TestFilterBarProps) {
+export function TestFilterBar({
+  filters,
+  views,
+  onSaveView,
+  onRemoveView,
+  onPickBudget,
+  budget,
+}: TestFilterBarProps) {
   const { t } = useTranslation();
   const [isSaveOpen, setSaveOpen] = useState(false);
   const [viewTitle, setViewTitle] = useState('');
+  const [minutes, setMinutes] = useState('30');
 
   const { filter, patch, facets } = filters;
 
@@ -130,6 +138,33 @@ export function TestFilterBar({ filters, views, onSaveView, onRemoveView }: Test
           ]}
         />
 
+        {/* «С замечаниями» — не поле фильтра, а взгляд на тот же список: линтер
+            считает их по библиотеке сейчас, и в сохранённом наборе они значили
+            бы кейсы, которых на чужой машине нет. */}
+        {filters.hasFindings && (
+          <Stack
+            direction="row"
+            gap="var(--spacing-2xs)"
+            align="center"
+            className={styles.archived}
+          >
+            <Toggle
+              checked={filters.withFindings}
+              onCheckedChange={filters.setWithFindings}
+              aria-label={t('tests.health.filter')}
+              size="sm"
+            />
+            <Typography
+              variant="caption"
+              color="subtle"
+              as="span"
+              title={t('tests.health.filterHint')}
+            >
+              {t('tests.health.filter')}
+            </Typography>
+          </Stack>
+        )}
+
         <Stack direction="row" gap="var(--spacing-2xs)" align="center" className={styles.archived}>
           <Toggle
             checked={Boolean(filter.includeArchived)}
@@ -142,10 +177,65 @@ export function TestFilterBar({ filters, views, onSaveView, onRemoveView }: Test
           </Typography>
         </Stack>
 
+        {/* Порядок — не фильтр: он ничего не убирает с экрана, а отвечает на
+            другой вопрос — с чего начинать, когда времени на всё нет. */}
+        <SelectField
+          label={t('tests.risk.sort')}
+          value={filters.sort}
+          onChange={(value) => filters.setSort(value === 'risk' ? 'risk' : 'file')}
+          options={[
+            { value: 'file', label: t('tests.risk.sortFile') },
+            { value: 'risk', label: t('tests.risk.sortRisk') },
+          ]}
+        />
+
         {filters.isActive && (
           <Button variant="ghost" size="sm" onClick={filters.reset}>
             {t('tests.library.reset')}
           </Button>
+        )}
+      </Stack>
+
+      {/* «У меня N минут» отмечает кейсы, а не запускает прогон: запуск остаётся
+          той же кнопкой пульта, и человек успевает посмотреть, что ему набрали. */}
+      <Stack direction="row" gap="var(--spacing-xs)" align="end" wrap>
+        <div className={styles.budget}>
+          <TextField
+            label={t('tests.risk.budget')}
+            hint={t('tests.risk.budgetHint')}
+            value={minutes}
+            onChange={setMinutes}
+          />
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          leftIcon={<Icon name="calendar" size={16} />}
+          disabled={budgetMinutes(minutes) === undefined}
+          onClick={() => {
+            const value = budgetMinutes(minutes);
+            if (value !== undefined) onPickBudget(value);
+          }}
+        >
+          {t('tests.risk.budgetApply')}
+        </Button>
+
+        {budget && (
+          <Typography
+            variant="caption"
+            color={budget.left.length > 0 ? 'warning' : 'subtle'}
+            as="span"
+            // Полный список невлезшего — в подсказке: строка отбора не должна
+            // расти на сто названий, но и молчать о них нельзя.
+            title={budget.left.map((item) => `${item.title} — ${item.duration} мин`).join('\n')}
+          >
+            {t('tests.risk.budgetResult', {
+              count: budget.picked,
+              minutes: budget.minutes,
+              budget: budget.budget,
+              left: budget.left.length,
+            })}
+          </Typography>
         )}
       </Stack>
 
@@ -233,6 +323,12 @@ function mutedFilter(value: string): boolean | undefined {
   if (value === 'only') return true;
   if (value === 'without') return false;
   return undefined;
+}
+
+/** Минуты бюджета из поля; мусор и ноль значат «набирать нечего». */
+function budgetMinutes(value: string): number | undefined {
+  const minutes = Number(value.replace(',', '.').trim());
+  return Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : undefined;
 }
 
 /** Первое значение списка фильтра — `select` показывает одно. */

@@ -29,8 +29,10 @@ export {
   writeGroup,
 } from './project-tests/store.ts';
 export {
+  declareSecret,
   defaultEnvironment,
   readEnvironments,
+  readLibraryIssues,
   readSchema,
   readSharedSteps,
   readViews,
@@ -41,7 +43,14 @@ export {
   saveSchema,
   saveSharedStep,
   saveView,
+  undeclareSecret,
 } from './project-tests/library.ts';
+export {
+  describeSecrets,
+  forgetEnvironmentSecrets,
+  runSecrets,
+  writeSecretValue,
+} from './project-tests/env-secrets.ts';
 export {
   buildPoints,
   filterOfView,
@@ -53,11 +62,13 @@ export {
 } from './project-tests/plans.ts';
 export {
   buildReport,
+  evidenceOf,
   flakyCases,
   readRun,
   readRuns,
   writeRun,
 } from './project-tests/runs-store.ts';
+export { diffRuns, diffWithPrevious, failedCases } from './project-tests/compare.ts';
 export { changedFiles, gitContext, impactOf } from './project-tests/impact.ts';
 export { historyOf } from './project-tests/history.ts';
 export { ProjectTestManualRegistry, remainingPoints } from './project-tests/manual.ts';
@@ -70,5 +81,29 @@ export {
   readBaselines,
 } from './project-tests/baselines.ts';
 export { buildPrompt } from './project-tests/prompt.ts';
+export {
+  applyDraft,
+  archiveDraft,
+  draftFile,
+  readDraft,
+  readDraftSummaries,
+  readDrafts,
+  rejectDraft,
+  rollbackDraft,
+  summarizeDraft,
+} from './project-tests/drafts.ts';
+export {
+  SIMILAR_LIMIT,
+  SIMILAR_THRESHOLD,
+  similarCases,
+  similarTo,
+} from './project-tests/similar.ts';
+export { lintLibrary } from './project-tests/lint.ts';
+export { buildQuarantine } from './project-tests/quarantine.ts';
+export { buildRelease, releaseNames } from './project-tests/release.ts';
+export { buildRisk, budgetOf, byRisk, riskOfCase } from './project-tests/risk.ts';
+export { DEFAULT_DIFF_RANGE, collectSource, stampOf } from './project-tests/generate-sources.ts';
+export { buildPlanPreview, toPlan } from './project-tests/plan-recipes.ts';
+export { suggestTaxonomy } from './project-tests/taxonomy.ts';
 export { hasConvention, installConvention } from './project-tests/convention.ts';
 export { ProjectTestRunRegistry } from './project-tests/runs.ts';

@@ -1,13 +1,16 @@
-import type { ProjectTestRunMode } from '@agentdeck/contracts';
+import type { ProjectTestGenerateSource, ProjectTestRunMode } from '@agentdeck/contracts';
 import type { FastifyInstance } from 'fastify';
 import {
   ProjectTestsNotFoundError,
   buildReport,
+  collectSource,
+  diffWithPrevious,
   historyOf,
   impactOf,
   readGroups,
   readRun,
   readRuns,
+  runSecrets,
 } from '../../domains/project-tests.ts';
 import { exportRunPdf } from '../../domains/project-tests/export-run.ts';
 import { buildView, guard, guardAsync, idList, requireRoot, type TestsDeps } from './shared.ts';
@@ -43,28 +46,63 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       full?: boolean;
       changedOnly?: boolean;
       release?: string;
+      autoAccept?: boolean;
+      source?: ProjectTestGenerateSource;
+      sourceRef?: string;
+      diffRange?: string;
+      sourceCase?: { groupId: string; caseId: string; runId?: string };
     };
-  }>('/api/project-tests/run', (request, reply) => {
+  }>('/api/project-tests/run', async (request, reply) => {
     const root = requireRoot(request.body?.path, reply);
     if (!root) return reply;
     const asked = request.body?.mode;
     const mode = asked && MODES.includes(asked) ? asked : 'run';
+    const source = request.body?.source;
 
-    return guard(reply, () => {
-      deps.runs.start(
-        {
-          projectPath: root,
-          mode,
-          groupId: request.body?.groupId || undefined,
-          caseIds: idList(request.body?.caseIds),
-          planId: request.body?.planId || undefined,
-          environmentId: request.body?.environmentId || undefined,
-          scope: request.body?.scope?.trim() || undefined,
-          full: request.body?.full === true,
-          changedOnly: request.body?.changedOnly === true,
-          release: request.body?.release?.trim() || undefined,
-        },
-        new Date().toISOString(),
+    // Галочка помнится на проект: не сказали — берём запомненное, сказали —
+    // запоминаем. Иначе положение из формы запуска и положение из окна приёмки
+    // жили бы отдельно и расходились после первого же прогона.
+    const asking = request.body?.autoAccept;
+    if (mode === 'generate' && typeof asking === 'boolean') {
+      deps.ctx.store.setTestsAutoAccept(root, asking);
+    }
+    const autoAccept = mode === 'generate' && deps.ctx.store.isTestsAutoAccept(root);
+
+    const run = {
+      projectPath: root,
+      mode,
+      groupId: request.body?.groupId || undefined,
+      caseIds: idList(request.body?.caseIds),
+      planId: request.body?.planId || undefined,
+      environmentId: request.body?.environmentId || undefined,
+      scope: request.body?.scope?.trim() || undefined,
+      full: request.body?.full === true,
+      changedOnly: request.body?.changedOnly === true,
+      release: request.body?.release?.trim() || undefined,
+      autoAccept,
+      // Источник имеет смысл только у генерации: «прогнать по требованию»
+      // означало бы прогнать кейсы, которых ещё нет.
+      source: mode === 'generate' ? source : undefined,
+      sourceRef: request.body?.sourceRef?.trim() || undefined,
+      diffRange: request.body?.diffRange?.trim() || undefined,
+      sourceCase: request.body?.sourceCase,
+    };
+
+    return guardAsync(reply, async () => {
+      // Материал собирается ДО старта: не собрался — прогон не начинается, и
+      // человек читает причину. Генерация «по требованию» без требования
+      // написала бы правдоподобные кейсы ни о чём.
+      const material = await collectSource(
+        { store: deps.ctx.store, appDataDir: deps.ctx.location.paths.appData, root },
+        run,
+        readGroups(root),
+      );
+      // Доступы стенда собирает МАРШРУТ по той же причине, что и материал: ключи
+      // лежат в каталоге панели и зашифрованы, а домен обязан считаться на голом
+      // каталоге проекта. Значения уходят в переменные процесса CLI и больше
+      // никуда — ни в задание, ни в лог, ни в историю прогонов.
+      deps.runs.start(run, new Date().toISOString(), material, (environment) =>
+        runSecrets(deps.ctx.location.paths.appData, root, environment),
       );
       return buildView(root, deps);
     });
@@ -103,6 +141,26 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
         if (!run) throw new ProjectTestsNotFoundError(`Прогона «${id}» в истории нет.`);
         return { run };
       });
+    },
+  );
+
+  /**
+   * Что изменилось с прошлого прогона.
+   *
+   * `baseId` пуст — сравниваем с ближайшим прогоном СТАРШЕ этого, у которого
+   * есть результаты: генерация и импорт лежат в той же истории, а сравнивать с
+   * генерацией нечего.
+   */
+  app.get<{ Querystring: { path?: string; id?: string; baseId?: string } }>(
+    '/api/project-tests/run/diff',
+    (request, reply) => {
+      const root = requireRoot(request.query.path, reply);
+      if (!root) return reply;
+      const id = request.query.id?.trim();
+      if (!id) return reply.code(400).send({ message: 'Не указан прогон.' });
+      return guard(reply, () =>
+        diffWithPrevious(root, id, request.query.baseId?.trim() || undefined, readGroups(root)),
+      );
     },
   );
 

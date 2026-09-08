@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { ProjectTestCase, ProjectTestGroup } from '@agentdeck/contracts';
+import type {
+  ProjectTestCase,
+  ProjectTestGroup,
+  ProjectTestRiskItem,
+} from '@agentdeck/contracts';
 import { dropEmpty, selectView } from './useTestFilters';
 
 /**
@@ -69,6 +73,46 @@ describe('selectView', () => {
       'Чат/Вложения',
       'Чат/Отправка',
     ]);
+  });
+});
+
+describe('порядок по риску', () => {
+  const risk = new Map<string, ProjectTestRiskItem>(
+    [
+      { key: 'gui:a', score: 12 },
+      { key: 'gui:b', score: 71 },
+    ].map((item) => [
+      item.key,
+      {
+        ...item,
+        groupId: 'gui',
+        caseId: item.key.split(':')[1] ?? '',
+        title: item.key,
+        factors: [],
+        reason: 'причина',
+        duration: 5,
+        hasDuration: false,
+        status: 'unknown',
+      } as ProjectTestRiskItem,
+    ]),
+  );
+
+  it('поднимает наверх самое рискованное', () => {
+    const view = selectView(groups, 'gui', {}, undefined, { sort: 'risk', risk });
+    expect(view.filtered.map((item) => item.testCase.id)).toEqual(['b', 'a']);
+  });
+
+  it('кейс без счёта уходит вниз, но остаётся в списке', () => {
+    const view = selectView(groups, 'gui', { includeArchived: true }, undefined, {
+      sort: 'risk',
+      risk,
+    });
+    expect(view.filtered.map((item) => item.testCase.id)).toEqual(['b', 'a', 'old']);
+  });
+
+  it('порядок файла остаётся порядком файла', () => {
+    const view = selectView(groups, 'gui', {}, undefined, { sort: 'file', risk });
+    expect(view.filtered.map((item) => item.testCase.id)).toEqual(['a', 'b']);
   });
 });
 

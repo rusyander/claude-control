@@ -2,11 +2,17 @@ import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
+import { Button } from '@shared/ui/button';
+import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { EmptyState } from '@shared/ui/empty-state';
 import { SkeletonList } from '@shared/ui/skeleton';
-import { percentOf, useTestReport } from '@entities/ProjectTest';
-import { automationTotal, statusTotals } from './model/reportMetrics';
+import { percentOf, useStartTestRun, useTestReport } from '@entities/ProjectTest';
+import { automationTotal, redCases, statusTotals } from './model/reportMetrics';
+import { TestsHealthCard } from './TestsHealthCard';
+import { TestsQuarantineCard } from './TestsQuarantineCard';
+import { TestsReleaseCard } from './TestsReleaseCard';
+import { TestsRunDiff } from './TestsRunDiff';
 import { TestsTrend } from './TestsTrend';
 import styles from './TestsPage.module.scss';
 
@@ -22,20 +28,31 @@ import styles from './TestsPage.module.scss';
 export function TestsReportTab({ projectPath }: { projectPath: string | undefined }) {
   const { t } = useTranslation();
   const report = useTestReport(projectPath);
+  const start = useStartTestRun(projectPath);
 
   if (report.isLoading) return <SkeletonList rows={4} />;
+  // Здоровье набора считается по САМОЙ библиотеке, а не по истории: набор без
+  // единого прогона уже бывает с дублями и без оракулов, и прятать это за «нет
+  // прогонов» значило бы молчать ровно там, где чинить дешевле всего.
   if (!report.data) {
     return (
-      <EmptyState
-        icon="analytics"
-        title={t('tests.report.empty')}
-        text={t('tests.report.emptyHint')}
-      />
+      <Stack gap="var(--spacing-sm)">
+        <EmptyState
+          icon="analytics"
+          title={t('tests.report.empty')}
+          text={t('tests.report.emptyHint')}
+        />
+        <TestsHealthCard projectPath={projectPath} />
+        <TestsQuarantineCard projectPath={projectPath} />
+      </Stack>
     );
   }
 
   const data = report.data;
   const totals = statusTotals(data);
+  // «С прошлого прогона» считается от последнего прогона С РЕЗУЛЬТАТАМИ:
+  // генерация и импорт тоже лежат в истории, а сравнивать с ними нечего.
+  const lastRun = data.runs.find((item) => item.results.length > 0);
 
   return (
     <Stack gap="var(--spacing-sm)">
@@ -136,6 +153,33 @@ export function TestsReportTab({ projectPath }: { projectPath: string | undefine
         </Card>
       </div>
 
+      {/* Первое, что спрашивают у отчёта после регресса: что сломалось с
+          прошлого раза. Тренд отвечает «стало хуже», а не «чем именно». */}
+      {lastRun && (
+        <Card padding="md">
+          <Stack gap="var(--spacing-2xs)">
+            <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
+              <Typography variant="body-sm" weight="medium" as="span">
+                {t('tests.diff.title')}
+              </Typography>
+              {redCases(lastRun).length > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<Icon name="refresh" size={16} />}
+                  disabled={start.isPending}
+                  title={t('tests.diff.rerunHint')}
+                  onClick={() => start.mutate({ mode: 'run', caseIds: redCases(lastRun) })}
+                >
+                  {t('tests.diff.rerun', { count: redCases(lastRun).length })}
+                </Button>
+              )}
+            </Stack>
+            <TestsRunDiff projectPath={projectPath} runId={lastRun.id} isOpenByDefault />
+          </Stack>
+        </Card>
+      )}
+
       <Card padding="md">
         <Stack gap="var(--spacing-2xs)">
           <Typography variant="body-sm" weight="medium">
@@ -219,6 +263,14 @@ export function TestsReportTab({ projectPath }: { projectPath: string | undefine
         </Stack>
       </Card>
 
+      {/* Готовность релиза одним документом: вердикт, что мешает и чем это
+          доказано. Стоит выше сводки по вехам — сводка отвечает «сколько
+          прогонов», а вопрос задают другой. */}
+      <TestsReleaseCard
+        projectPath={projectPath}
+        releases={(data.releases ?? []).map((item) => item.release)}
+      />
+
       {/* Вехи: что проверено к релизу. Главное число здесь — непроверенное:
           именно оно отвечает на «можно ли отдавать», а «прогонов 12» не
           отвечает ни на что. Прогоны без вехи сюда не попадают. */}
@@ -262,6 +314,74 @@ export function TestsReportTab({ projectPath }: { projectPath: string | undefine
         </Card>
       )}
 
+      {/* Чем доказаны провалы. Голословный провал нельзя ни воспроизвести, ни
+          завести дефектом — но и выбрасывать его нельзя: это полчаса работы
+          прогона. Поэтому здесь счёт и список того, что надо перепройти. */}
+      {(data.evidence?.failed ?? 0) > 0 && (
+        <Card padding="md">
+          <Stack gap="var(--spacing-2xs)">
+            <Typography variant="body-sm" weight="medium">
+              {t('tests.evidence.title')}
+            </Typography>
+            <Typography variant="caption" color="subtle">
+              {t('tests.evidence.hint')}
+            </Typography>
+            <Stack direction="row" gap="var(--spacing-2xs)" wrap>
+              <Badge tone="danger">
+                {t('tests.evidence.failed', { count: data.evidence?.failed ?? 0 })}
+              </Badge>
+              <Badge tone="success">
+                {t('tests.evidence.proven', { count: data.evidence?.proven ?? 0 })}
+              </Badge>
+              <Badge tone="info">
+                {t('tests.evidence.detailed', { count: data.evidence?.detailed ?? 0 })}
+              </Badge>
+            </Stack>
+            {(data.evidence?.missing.length ?? 0) > 0 && (
+              <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
+                <Typography variant="caption" color="warning" as="span">
+                  {t('tests.evidence.missingList')}
+                </Typography>
+                {(data.evidence?.missing ?? []).slice(0, 20).map((item) => (
+                  <Badge key={`${item.groupId}:${item.caseId}`} tone="warning">
+                    {item.title}
+                  </Badge>
+                ))}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Icon name="refresh" size={16} />}
+                  disabled={start.isPending}
+                  title={t('tests.evidence.recheckHint')}
+                  onClick={() =>
+                    start.mutate({
+                      mode: 'run',
+                      caseIds: [
+                        ...new Set((data.evidence?.missing ?? []).map((item) => item.caseId)),
+                      ],
+                    })
+                  }
+                >
+                  {t('tests.evidence.recheck')}
+                </Button>
+              </Stack>
+            )}
+            {(data.evidence?.flaky.length ?? 0) > 0 && (
+              <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
+                <Typography variant="caption" color="warning" as="span">
+                  {t('tests.evidence.flakyList')}
+                </Typography>
+                {(data.evidence?.flaky ?? []).slice(0, 20).map((item) => (
+                  <Badge key={`${item.groupId}:${item.caseId}`} tone="warning">
+                    {item.title}
+                  </Badge>
+                ))}
+              </Stack>
+            )}
+          </Stack>
+        </Card>
+      )}
+
       {/* Провалы, сведённые по причине: одна упавшая авторизация красит
           половину набора, и без этой сводки она читается как полсотни разных
           бед. Пусто — либо всё зелено, либо исполнитель не написал, что видел. */}
@@ -299,6 +419,9 @@ export function TestsReportTab({ projectPath }: { projectPath: string | undefine
           ))}
         </Stack>
       </Card>
+
+      <TestsHealthCard projectPath={projectPath} />
+      <TestsQuarantineCard projectPath={projectPath} />
     </Stack>
   );
 }

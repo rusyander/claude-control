@@ -1,5 +1,6 @@
 import { existsSync, rmSync } from 'node:fs';
 import type {
+  ProjectTestEvidenceSummary,
   ProjectTestFailureGroup,
   ProjectTestFlaky,
   ProjectTestGroup,
@@ -113,6 +114,44 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     sessionId: optional(record.sessionId),
     results,
     summary,
+    draft: parseDraftOutcome(record.draft),
+    generate: parseStamp(record.generate),
+  };
+}
+
+/**
+ * След источника генерации. Читается с диска, потому что черновик применяют
+ * позже самого прогона — панель узнаёт по нему, что проставить кейсам.
+ */
+function parseStamp(raw: unknown): ProjectTestRunRecord['generate'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = raw as Record<string, unknown>;
+  const source = optional(value.source);
+  if (source !== 'requirement' && source !== 'diff' && source !== 'defect') return undefined;
+  const paths = Array.isArray(value.codePaths)
+    ? value.codePaths.filter((item): item is string => typeof item === 'string')
+    : [];
+  return {
+    source,
+    requirementUrl: optional(value.requirementUrl),
+    requirementKey: optional(value.requirementKey),
+    codePaths: paths.length > 0 ? paths : undefined,
+    defectUrl: optional(value.defectUrl),
+  };
+}
+
+/** Итог генерации в записи прогона: сколько предложено, сколько принято и кем. */
+function parseDraftOutcome(raw: unknown): ProjectTestRunRecord['draft'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = raw as Record<string, unknown>;
+  const runId = optional(value.runId);
+  if (!runId) return undefined;
+  const count = (input: unknown): number => (typeof input === 'number' && input >= 0 ? input : 0);
+  return {
+    runId,
+    proposed: count(value.proposed),
+    accepted: count(value.accepted),
+    auto: value.auto === true,
   };
 }
 
@@ -122,6 +161,27 @@ function durationOf(run: ProjectTestRunRecord): number {
   const from = Date.parse(run.startedAt);
   const to = Date.parse(run.finishedAt);
   return Number.isFinite(from) && Number.isFinite(to) && to > from ? to - from : 0;
+}
+
+/**
+ * История результатов каждого кейса, от старых к новым.
+ *
+ * Прогоны хранилище отдаёт от новых к старым — разворачиваем, потому что по
+ * времени читаются все три вопроса к истории: стабильность, зелёная серия и
+ * давность. Одна раскладка на всех: три копии этого цикла разошлись бы молча, и
+ * карантин судил бы кейс по одной истории, а риск — по другой.
+ */
+export function caseStatusHistory(runs: ProjectTestRunRecord[]): Map<string, string[]> {
+  const byCase = new Map<string, string[]>();
+  for (const run of [...runs].reverse()) {
+    for (const result of run.results) {
+      const key = `${result.groupId}:${result.caseId}`;
+      const list = byCase.get(key) ?? [];
+      if (list.length < STABILITY_WINDOW) list.push(result.status);
+      byCase.set(key, list);
+    }
+  }
+  return byCase;
 }
 
 /**
@@ -136,16 +196,7 @@ export function flakyCases(
   runs: ProjectTestRunRecord[],
   groups: ProjectTestGroup[],
 ): ProjectTestFlaky[] {
-  const byCase = new Map<string, string[]>();
-  // Прогоны приходят от новых к старым — разворачиваем, чтобы смотреть по времени.
-  for (const run of [...runs].reverse()) {
-    for (const result of run.results) {
-      const key = `${result.groupId}:${result.caseId}`;
-      const list = byCase.get(key) ?? [];
-      if (list.length < STABILITY_WINDOW) list.push(result.status);
-      byCase.set(key, list);
-    }
-  }
+  const byCase = caseStatusHistory(runs);
 
   const titles = new Map<string, string>();
   for (const group of groups) {
@@ -251,6 +302,59 @@ export function failureGroups(
     .sort((left, right) => right.count - left.count || right.cases.length - left.cases.length);
 }
 
+/**
+ * Чем доказаны провалы.
+ *
+ * Считается по САМОМУ СВЕЖЕМУ провалу каждого кейса, а не по всем подряд:
+ * провал, доказанный снимком месяц назад и голословный сегодня, — это
+ * голословный провал, и перепройти надо именно его.
+ *
+ * Результат при этом не выбрасывается: панель не отменяет полчаса работы агента
+ * из-за формальности, она называет её неполной и показывает, что перепройти.
+ */
+export function evidenceOf(
+  runs: ProjectTestRunRecord[],
+  groups: ProjectTestGroup[],
+): ProjectTestEvidenceSummary {
+  const titles = new Map<string, string>();
+  for (const group of groups) {
+    for (const testCase of group.cases) titles.set(`${group.id}:${testCase.id}`, testCase.title);
+  }
+
+  const seen = new Set<string>();
+  const summary: ProjectTestEvidenceSummary = {
+    failed: 0,
+    proven: 0,
+    detailed: 0,
+    missing: [],
+    flaky: [],
+  };
+
+  // Прогоны идут от новых к старым — первый встреченный результат кейса и есть
+  // его последнее слово.
+  for (const run of runs) {
+    for (const result of run.results) {
+      if (result.status !== 'failed' && result.status !== 'blocked') continue;
+      const key = `${result.groupId}:${result.caseId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const row = {
+        groupId: result.groupId,
+        caseId: result.caseId,
+        title: titles.get(key) ?? result.caseId,
+      };
+      summary.failed += 1;
+      if ((result.attachments ?? []).length > 0) summary.proven += 1;
+      else summary.missing.push(row);
+      if (result.failure?.step !== undefined || result.failure?.actual) summary.detailed += 1;
+      if (result.failure?.retry === 'flaky') summary.flaky.push(row);
+    }
+  }
+
+  return summary;
+}
+
 /** Отчёт по проекту: тренды, покрытие, нестабильные, деньги и время. */
 export function buildReport(
   root: string,
@@ -303,6 +407,7 @@ export function buildReport(
     automation,
     flaky: flakyCases(runs, groups),
     failures: failureGroups(runs, groups),
+    evidence: evidenceOf(runs, groups),
     releases: releaseSummaries(runs, liveCases),
     totals: { ...totals, muted },
   };

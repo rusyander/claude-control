@@ -58,6 +58,51 @@ describe('project-tests/defects', () => {
     expect(draft.body).toContain('Chrome');
   });
 
+  /**
+   * Разбор провала — то, ради чего дефект вообще заводят из панели: номер шага,
+   * ожидание именно на нём и то, что вышло. Пересказывать это руками означало бы
+   * делать работу, которую прогон уже сделал.
+   */
+  it('черновик берёт номер шага, ожидание шага и факт из разбора провала', () => {
+    const draft = buildDraft(testCase, {
+      groupId: 'gui',
+      result: {
+        pointId: 'gui:gui-001',
+        groupId: 'gui',
+        caseId: 'gui-001',
+        status: 'failed',
+        note: 'кнопка неактивна',
+        failure: {
+          step: 2,
+          expected: 'сообщение в ленте',
+          actual: 'лента пустая, в консоли 500',
+          retry: 'confirmed',
+        },
+      },
+    });
+
+    expect(draft.body).toContain('Провалился шаг 2');
+    // Провалившийся шаг помечен в самом списке: тот, кто чинит, ищет глазами
+    // место, а не сверяет номер из соседнего абзаца.
+    expect(draft.body).toMatch(/2\. нажать «Отправить».* ← провал/);
+    expect(draft.body).not.toMatch(/1\. ввести текст.* ← провал/);
+    expect(draft.body).toContain('лента пустая, в консоли 500');
+    expect(draft.body).toContain('провал подтверждён');
+  });
+
+  it('разошедшаяся вторая попытка названа отдельно: чинить надо сначала тест', () => {
+    const draft = buildDraft(
+      {
+        ...testCase,
+        failure: { step: 1, retry: 'flaky', retryNote: 'со второго раза отправилось' },
+      },
+      { groupId: 'gui' },
+    );
+
+    expect(draft.body).toContain('Вторая попытка разошлась');
+    expect(draft.body).toContain('со второго раза отправилось');
+  });
+
   it('кейс без описанных шагов не даёт пустого раздела', () => {
     const draft = buildDraft(
       { ...testCase, steps: [], expected: undefined, note: undefined },

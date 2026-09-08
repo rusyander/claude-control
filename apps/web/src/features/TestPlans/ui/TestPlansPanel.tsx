@@ -18,6 +18,7 @@ import {
   useTestPlans,
 } from '@entities/ProjectTest';
 import { TestPlanEditor } from './TestPlanEditor';
+import { TestPlanRecipeModal } from './TestPlanRecipeModal';
 import type { TestPlansPanelProps } from './TestPlansPanel.types';
 import styles from './TestPlans.module.scss';
 
@@ -48,6 +49,7 @@ export function TestPlansPanel({
   const [editing, setEditing] = useState<ProjectTestPlan | undefined>();
   const [isEditorOpen, setEditorOpen] = useState(false);
   const [removing, setRemoving] = useState<ProjectTestPlan | undefined>();
+  const [isRecipeOpen, setRecipeOpen] = useState(false);
 
   const list = plans.data ?? [];
   const selected = list.find((item) => item.id === selectedId) ?? list[0];
@@ -69,6 +71,16 @@ export function TestPlansPanel({
           onClick={() => open(undefined)}
         >
           {t('tests.plans.create')}
+        </Button>
+        {/* Правилом — рядом с «создать»: это тот же план, только отобранный
+            счётом, а не руками. Токенов не стоит и работает офлайн. */}
+        <Button
+          variant="secondary"
+          leftIcon={<Icon name="sandbox" size={18} />}
+          title={t('tests.plans.recipeHint')}
+          onClick={() => setRecipeOpen(true)}
+        >
+          {t('tests.plans.recipeOpen')}
         </Button>
         {environments.length > 0 && (
           <SelectField
@@ -186,6 +198,13 @@ export function TestPlansPanel({
         views={views}
         environments={environments}
         onSave={(plan) => save.mutate(plan)}
+      />
+
+      <TestPlanRecipeModal
+        isOpen={isRecipeOpen}
+        onOpenChange={setRecipeOpen}
+        projectPath={projectPath}
+        environments={environments}
       />
 
       <ConfirmDialog

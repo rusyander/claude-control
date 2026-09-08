@@ -173,6 +173,38 @@ await page.route('**/api/project-tests/report*', async (route) =>
 await page.route('**/api/project-tests/impact*', async (route) =>
   route.fulfill({ json: { files: [], cases: [] } }),
 );
+// Здоровье набора считает сервер по файлам проекта — здесь их нет, а молчащий
+// маршрут дал бы 400 в консоль вместо проверки.
+await page.route('**/api/project-tests/lint*', async (route) =>
+  route.fulfill({
+    json: {
+      findings: [],
+      byRule: [],
+      duplicates: [],
+      checked: 0,
+      checkedAt: '2026-09-08T10:00:00.000Z',
+    },
+  }),
+);
+// Документ готовности вехи: карточка отчёта спрашивает его, как только у вехи
+// есть имя. Без подмены это 400 в консоли, а не пропавшая карточка.
+await page.route('**/api/project-tests/release*', async (route) =>
+  route.fulfill({ json: { releases: [] } }),
+);
+await page.route('**/api/project-tests/quarantine*', async (route) =>
+  route.fulfill({
+    json: {
+      lift: [],
+      quarantine: [],
+      stale: [],
+      thresholds: { greenStreak: 5, stability: 70, minRuns: 4 },
+      checkedAt: '2026-09-08T10:00:00.000Z',
+    },
+  }),
+);
+await page.route('**/api/project-tests/risk*', async (route) =>
+  route.fulfill({ json: { items: [], checkedAt: '2026-09-08T10:00:00.000Z' } }),
+);
 
 await page.route('**/api/project-tests/stop*', async (route) => {
   view = { ...view, run: { ...view.run, status: 'stopped' } };
@@ -430,6 +462,42 @@ if (stopButton) {
     (await main.getByText(/остановлен/i).count()) > 0,
     'остановка видна подписью, а не пустотой',
   );
+}
+
+// Два режима, которые давно есть на сервере: исследование и автоматизация.
+// Проверяются они после остановки — во время прогона весь пульт погашен.
+const explore = main.getByRole('button', { name: /^Исследовать$/ }).first();
+if ((await explore.count()) === 0) {
+  check(false, 'в пульте есть «Исследовать»');
+} else {
+  // Хартия — не украшение задания: сессия без неё превращается в блуждание,
+  // поэтому кнопка молчит, пока поле пожелания пусто.
+  check(await explore.isDisabled(), 'без хартии «Исследовать» выключено');
+  await main.getByLabel('Пожелание агенту').fill('вложения в чате');
+  await page.waitForTimeout(500);
+  check(!(await explore.isDisabled()), 'с хартией кнопка включается');
+  await explore.click();
+  await page.waitForTimeout(1200);
+  check(started?.mode === 'explore', `на сервер ушло исследование: ${started?.mode}`);
+  check(started?.scope === 'вложения в чате', 'хартия уехала вместе с запуском');
+}
+
+// Прогон исследования снова погасил пульт — останавливаем и смотрим вторую кнопку.
+const stopExplore = await anyOf(main, [/Остановить/]);
+if (stopExplore) {
+  await stopExplore.click();
+  await page.waitForTimeout(900);
+}
+
+const automate = main.getByRole('button', { name: /^Автоматизировать \(\d+\)$/ }).first();
+if ((await automate.count()) === 0) {
+  check(false, 'в пульте есть «Автоматизировать» с числом кейсов');
+} else {
+  // Число на кнопке — это работа режима: кейсы, которых ещё нет в коде.
+  check(true, 'кнопка автоматизации называет, сколько кейсов ещё не в коде');
+  await automate.click();
+  await page.waitForTimeout(1200);
+  check(started?.mode === 'automate', `на сервер ушла автоматизация: ${started?.mode}`);
 }
 
 check(problems.length === 0, `ошибок в консоли нет: ${problems.slice(0, 3).join(' | ')}`);

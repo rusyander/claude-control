@@ -33,7 +33,7 @@ import styles from './ProjectTests.module.scss';
  * панели: завёл файл — появилась вкладка, и завести его может как человек
  * кнопкой, так и агент во время генерации.
  */
-export function TestLibrary({ board, actions }: TestLibraryProps) {
+export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
   const { t } = useTranslation();
   const [isGroupOpen, setGroupOpen] = useState(false);
   const [groupId, setGroupId] = useState('');
@@ -162,13 +162,15 @@ export function TestLibrary({ board, actions }: TestLibraryProps) {
         </Stack>
       )}
 
-      {board.groups.length === 0 && !board.isLoading && (
-        <EmptyState
-          icon="check"
-          title={t('projectTests.empty')}
-          text={t('projectTests.emptyHint')}
-        />
-      )}
+      {board.groups.length === 0 &&
+        !board.isLoading &&
+        (empty ?? (
+          <EmptyState
+            icon="check"
+            title={t('projectTests.empty')}
+            text={t('projectTests.emptyHint')}
+          />
+        ))}
 
       {board.active && !board.active.error && (
         <>
@@ -177,6 +179,8 @@ export function TestLibrary({ board, actions }: TestLibraryProps) {
             views={board.views}
             onSaveView={board.saveView}
             onRemoveView={board.removeView}
+            onPickBudget={board.pickBudget}
+            budget={board.budget}
           />
 
           <TestBulkToolbar
@@ -207,6 +211,9 @@ export function TestLibrary({ board, actions }: TestLibraryProps) {
                 onCheckAll={board.checkAll}
                 onClearChecked={board.clearChecked}
                 attributes={board.schema.attributes}
+                // Счёт риска показывается только там, где его спросили
+                // порядком: в обычном списке это лишняя колонка цифр.
+                risk={board.filters.sort === 'risk' ? board.filters.risk : undefined}
                 onEdit={(testCase) => openCase(testCase)}
                 onRemove={(testCase) => setRemoving(testCase)}
               />

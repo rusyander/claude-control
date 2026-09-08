@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   ProjectTestsError,
+  applyResults,
   createGroup,
   readGroups,
   removeCase,
@@ -179,6 +180,93 @@ describe('project-tests store', () => {
     resetStatuses(root, 'gui', ['gui-002']);
 
     expect(only(root).cases.map((item) => item.status)).toEqual(['passed', 'unknown']);
+  });
+
+  /**
+   * Разбор провала. Пишет его агент руками, поэтому «шаг 3» строкой встречается
+   * не реже числа, а половина разбора полезнее выброшенного целиком провала.
+   */
+  it('разбор провала читается даже написанный небрежно', () => {
+    writeGroupFile(root, 'gui', {
+      version: 1,
+      cases: [
+        {
+          id: 'gui-001',
+          title: 'A',
+          status: 'failed',
+          failure: {
+            step: 'шаг 3',
+            expected: 'кнопка выключена',
+            actual: 'кнопка активна',
+            retry: 'confirmed',
+          },
+        },
+        { id: 'gui-002', title: 'B', status: 'failed', failure: { retry: 'чепуха' } },
+      ],
+    });
+
+    const cases = only(root).cases;
+    expect(cases[0]?.failure).toEqual({
+      step: 3,
+      expected: 'кнопка выключена',
+      actual: 'кнопка активна',
+      retry: 'confirmed',
+      retryNote: undefined,
+    });
+    // Разбор, в котором не осталось ни одного понятного поля, — это не разбор.
+    expect(cases[1]?.failure).toBeUndefined();
+  });
+
+  it('разбор провала принадлежит прогону: правка описания его не стирает', () => {
+    writeGroupFile(root, 'gui', {
+      version: 1,
+      cases: [
+        {
+          id: 'gui-001',
+          title: 'A',
+          status: 'failed',
+          failure: { step: 2, actual: 'пусто' },
+        },
+      ],
+    });
+
+    upsertCase(root, 'gui', { id: 'gui-001', title: 'A с уточнением' }, NOW);
+
+    expect(only(root).cases[0]?.failure).toMatchObject({ step: 2, actual: 'пусто' });
+  });
+
+  it('позеленевший кейс теряет разбор провала: доказывать больше нечего', () => {
+    writeGroupFile(root, 'gui', {
+      version: 1,
+      cases: [
+        { id: 'gui-001', title: 'A', status: 'failed', failure: { step: 2 } },
+        { id: 'gui-002', title: 'B', status: 'failed', failure: { step: 5 } },
+      ],
+    });
+
+    applyResults(
+      root,
+      [
+        { groupId: 'gui', caseId: 'gui-001', status: 'passed' },
+        { groupId: 'gui', caseId: 'gui-002', status: 'failed' },
+      ],
+      NOW,
+    );
+
+    const cases = only(root).cases;
+    expect(cases[0]?.failure).toBeUndefined();
+    expect(cases[1]?.failure).toMatchObject({ step: 5 });
+  });
+
+  it('перетест снимает и разбор провала вместе с галочкой', () => {
+    writeGroupFile(root, 'gui', {
+      version: 1,
+      cases: [{ id: 'gui-001', title: 'A', status: 'failed', failure: { step: 1 } }],
+    });
+
+    resetStatuses(root, 'gui');
+
+    expect(only(root).cases[0]?.failure).toBeUndefined();
   });
 
   it('имя группы за пределами разрешённого отклоняется — это имя файла', () => {

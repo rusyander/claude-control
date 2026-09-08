@@ -28,8 +28,9 @@ const VALUE_FROM: Record<
   duplicate: 'none',
   archive: 'none',
   restore: 'none',
-  // Причина карантина не обязательна технически, но без неё через месяц никто
-  // не решится снять карантин — поэтому поле есть, а кнопку оно не блокирует.
+  // Причина карантина обязательна — её требует и сервер: карантин без
+  // объяснения через месяц никто не решится снять, потому что неизвестно, чего
+  // он ждал.
   mute: 'reason',
   unmute: 'none',
   delete: 'none',
@@ -59,7 +60,7 @@ export function TestBulkToolbar({
   if (checked.length === 0) return null;
 
   const kind = VALUE_FROM[action];
-  const needsValue = kind !== 'none' && kind !== 'reason';
+  const needsValue = kind !== 'none';
 
   const run = async (next: BulkAction, nextValue?: string): Promise<void> => {
     setBusy(true);
@@ -157,11 +158,7 @@ export function TestBulkToolbar({
             setRemoving(true);
             return;
           }
-          const text = value.trim();
-          void run(
-            action,
-            needsValue || (kind === 'reason' && text) ? normalized(kind, value) : undefined,
-          );
+          void run(action, needsValue ? normalized(kind, value) : undefined);
         }}
       >
         {t('tests.bulk.apply')}

@@ -31,6 +31,7 @@ export {
 export {
   useTestRuns,
   useTestRun,
+  useTestRunDiff,
   useTestReport,
   useTestImpact,
   useTestHistory,
@@ -62,6 +63,29 @@ export type {
   RunExportFormat,
   PublishTarget,
 } from './api/ProjectTestExchangeApi';
+
+export {
+  useTestDraft,
+  useApplyTestDraft,
+  useRejectTestDraft,
+  useRollbackTestDraft,
+  useSetTestDraftAuto,
+} from './api/ProjectTestDraftApi';
+
+export {
+  useTestLint,
+  useTestQuarantine,
+  useTestRisk,
+  useTestTaxonomy,
+} from './api/ProjectTestHealthApi';
+
+export { useTestRelease, releaseExportUrl } from './api/ProjectTestReleaseApi';
+export type { ReleaseExportFormat } from './api/ProjectTestReleaseApi';
+
+export { useEnvSecrets, useSaveEnvSecret, useRemoveEnvSecret } from './api/ProjectTestSecretApi';
+export type { SaveEnvSecretPayload } from './api/ProjectTestSecretApi';
+
+export { useBuildTestPlan } from './api/ProjectTestPlanApi';
 
 export { useTestBaselines, useAcceptBaseline } from './api/ProjectTestBaselineApi';
 

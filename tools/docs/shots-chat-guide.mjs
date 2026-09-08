@@ -152,7 +152,7 @@ const MESSAGES = {
 
 const EMPTY_MESSAGES = { messages: [], total: 0, hasMore: false };
 
-const loweredRun = (chatId, model, checks, ok = true) => ({
+const loweredRun = (chatId, model, checks, ok = true, kind, tokens = 12_000) => ({
   chatId,
   projectPath: `C:/demo/${chatId}`,
   model,
@@ -161,15 +161,37 @@ const loweredRun = (chatId, model, checks, ok = true) => ({
   finishedAt: 1_757_237_040_000,
   ok,
   checks,
+  ...(kind ? { kind } : {}),
+  tokens,
 });
 
+// Класс есть у групп разделения (его подобрала панель) и нет у ручного веера —
+// в кадре должны быть оба случая, иначе строка «без класса» на снимке не видна.
 const JOURNAL = {
   runs: [
-    loweredRun('panel', 'claude-sonnet-5', ['pnpm type-check', 'pnpm lint']),
-    loweredRun('widget', 'claude-haiku-4-5', []),
-    loweredRun('server', 'claude-haiku-4-5', [], false),
+    loweredRun(
+      'panel',
+      'claude-sonnet-5',
+      ['pnpm type-check', 'pnpm lint'],
+      true,
+      'mechanical',
+      410_000,
+    ),
+    loweredRun('widget', 'claude-haiku-4-5', [], true, 'tests', 46_000),
+    loweredRun('server', 'claude-haiku-4-5', [], false, undefined, 7_000),
   ],
-  summary: { total: 3, withChecks: 1, withoutChecks: 1, failed: 1 },
+  summary: {
+    total: 3,
+    withChecks: 1,
+    withoutChecks: 1,
+    failed: 1,
+    tokens: 463_000,
+    byKind: [
+      { kind: 'mechanical', total: 1, withChecks: 1, withoutChecks: 0, failed: 0, tokens: 410_000 },
+      { kind: 'tests', total: 1, withChecks: 0, withoutChecks: 1, failed: 0, tokens: 46_000 },
+      { kind: '', total: 1, withChecks: 0, withoutChecks: 0, failed: 1, tokens: 7_000 },
+    ],
+  },
 };
 
 mkdirSync(OUT, { recursive: true });
@@ -289,7 +311,11 @@ await page
   .first()
   .click();
 await page.waitForTimeout(1500);
-await shot('11-review-card');
+// Снимается сама карточка, а не окно целиком: разговор ревью человеку интересен
+// одним — составом замечаний, а во всю полосу этот текст нечитаем. Заодно кадр
+// перестаёт быть высотой в треть листа и не гонит перед собой пустой хвост.
+const reviewCard = page.locator('[class*="card" i]').filter({ hasText: 'Ревью работы' }).first();
+await shot('11-review-card', (await reviewCard.count()) ? reviewCard : undefined);
 
 // --- 12. Понижённые прогоны на аналитике ---------------------------------
 await page.goto(`${BASE}/analytics`, { waitUntil: 'domcontentloaded' });
@@ -303,12 +329,20 @@ await page.waitForTimeout(1800);
 const loweredHeading = page.getByText('Понижённые прогоны веера').first();
 await loweredHeading.scrollIntoViewIfNeeded();
 await page.waitForTimeout(600);
-const box = await loweredHeading.boundingBox();
+// Границы берутся у самой карточки, а не числом: с разрезом по классам блок
+// вырос, и постоянная высота обрезала бы нижние строки посередине. Классы здесь
+// хешированные (CSS-модули), поэтому карточка узнаётся по своему `padding-*` —
+// единственному имени, которое переживает пересборку стилей.
+const box = await loweredHeading.evaluate((node) => {
+  const card = node.closest('[class*="padding-"]') ?? node.parentElement;
+  const rect = card.getBoundingClientRect();
+  return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+});
 await shot('12-lowered-runs', undefined, {
-  x: box.x - 24,
-  y: box.y - 28,
-  width: 1400 - (box.x - 24) - 40,
-  height: 232,
+  x: box.x,
+  y: box.y,
+  width: box.width,
+  height: box.height,
 });
 
 // --- 13. Группы -----------------------------------------------------------

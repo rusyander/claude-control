@@ -22,7 +22,9 @@
  *   node tools/tests-cli.mjs report --reporter junit --out report.xml
  *
  * Коды возврата рассчитаны на CI: `report` отвечает 1, если есть провалённые
- * или заблокированные кейсы ВНЕ карантина, `run` — кодом самой команды прогона.
+ * или заблокированные кейсы ВНЕ карантина, `run` — кодом самой команды прогона,
+ * `diff` — 1 при НОВЫХ провалах (давно известная поломка не красит каждую
+ * следующую сборку), `lint` — только если спросили `--fail-on <серьёзность>`.
  * Кейс в карантине печатается отдельным списком и сборку не роняет: команда уже
  * решила, что он сейчас не сторожевой.
  */
@@ -55,17 +57,25 @@ const HELP = `Тест-кейсы проекта без панели.
   import    забрать результаты прогона или кейсы из файла
   export    выгрузить группу в csv | md | xlsx
   report    сводка по статусам; --reporter junit — XML для CI
+  lint      замечания набора: дубликаты, черновики, кейсы без ожидания
+  diff      что изменилось между прогонами: diff <база> <новый>
+  plan      собрать план правилом: plan smoke | diff | release | flaky
 
 Опции:
   --project <dir>   каталог проекта (по умолчанию текущий)
   --group <id>      только эта группа
   --format <f>      junit | playwright | allure | csv | xlsx | testrail-csv | testrail | allure-testops | md
   --file <f>        файл или каталог с отчётом (путь от корня проекта)
-  --reporter <r>    text | junit — вид отчёта команды report
+  --reporter <r>    text | junit — вид отчёта команд report и diff
   --out <f>         писать результат в файл вместо экрана
   --cmd "<...>"     команда прогона (по умолчанию npm test из package.json)
   --results <f>     где прогон оставит отчёт (по умолчанию ищется сам)
   --dry             для run: показать, что было бы запущено, и выйти
+  --fail-on <s>     для lint: ронять сборку с этой серьёзности (error | warning | info)
+  --budget <мин>    для plan: сколько минут отведено (у «дыма» по умолчанию 30)
+  --release <веха>  для plan release: чью веху собирать
+  --threshold <ч>   для plan flaky: порог стабильности, доля 0–1 или проценты
+  --save            для plan: записать план в проект, а не только показать
 `;
 
 main().catch((error) => {
@@ -91,6 +101,9 @@ async function main() {
   if (command === 'import') return await importFile(project, options);
   if (command === 'export') return await exportGroupFile(project, options);
   if (command === 'report') return await report(project, options);
+  if (command === 'lint') return await lint(project, options);
+  if (command === 'diff') return await diff(project, options, positional);
+  if (command === 'plan') return await plan(project, options, positional);
   throw new Error(`Неизвестная команда «${command}». Список — node tools/tests-cli.mjs help`);
 }
 
@@ -443,6 +456,215 @@ async function report(project, options) {
     }
   }
   process.exit(failing.length > 0 ? 1 : 0);
+}
+
+/** Серьёзности от строгой к мягкой — по ним и решают, ронять ли сборку. */
+const SEVERITY_ORDER = ['error', 'warning', 'info'];
+
+const SEVERITY_MARK = { error: 'X', warning: '!', info: '·' };
+
+/**
+ * Замечания набора.
+ *
+ * Линтер ничего не правит: он называет кейс, правило и то, чем это чинится в
+ * панели. Сборку роняет только `--fail-on <серьёзность>`; без него команда
+ * отвечает нулём, потому что «в наборе есть о чём подумать» и «это нельзя
+ * выкладывать» — разные утверждения, и решает второе человек, а не линтер.
+ */
+async function lint(project, options) {
+  const groups = await groupsOf(project, options);
+  const { lintLibrary } = await domain('lint');
+  const report = lintLibrary(groups);
+
+  console.log(`Проверено кейсов: ${report.checked}`);
+  if (report.byRule.length > 0) {
+    console.log('');
+    for (const row of report.byRule) {
+      console.log(`  ${mark(row.severity)} ${row.rule} — ${row.title}: ${row.count}`);
+    }
+  }
+
+  if (report.findings.length > 0) {
+    console.log('\nЗамечания:');
+    for (const item of report.findings) {
+      const fix = item.fix ? ` [${item.fix.label}]` : '';
+      console.log(
+        `  ${mark(item.severity)} ${item.groupId}/${item.caseId} ${item.title} — ${item.message}${fix}`,
+      );
+    }
+  }
+
+  if (report.duplicates.length > 0) {
+    console.log('\nПохожие кейсы:');
+    for (const item of report.duplicates) {
+      const near = item.similar
+        .map((other) => `${other.groupId}/${other.caseId} (${Math.round(other.score * 100)}%)`)
+        .join(', ');
+      console.log(`  ~ ${item.groupId}/${item.caseId} ${item.title} ≈ ${near}`);
+    }
+  }
+
+  if (report.findings.length === 0 && report.duplicates.length === 0) {
+    console.log('\nЗамечаний нет.');
+  }
+
+  const failOn = options['fail-on'];
+  if (!failOn || failOn === true) return;
+  const limit = SEVERITY_ORDER.indexOf(String(failOn));
+  if (limit < 0) throw new Error(`Серьёзности «${failOn}» не бывает: error | warning | info`);
+  const counted = report.findings.filter(
+    (item) => SEVERITY_ORDER.indexOf(item.severity) <= limit,
+  ).length;
+  if (counted > 0) {
+    console.log(`\nЗамечаний уровня «${failOn}» и строже: ${counted} — сборка красная.`);
+    process.exit(1);
+  }
+}
+
+function mark(severity) {
+  return SEVERITY_MARK[severity] ?? '·';
+}
+
+/**
+ * Сравнение двух прогонов: diff <база> <новый>.
+ *
+ * Порядок аргументов важен, и если даты говорят обратное, прогоны меняются
+ * местами ВСЛУХ: при перепутанном порядке новые провалы читались бы как
+ * «починилось», а молчаливая перестановка скрыла бы и саму ошибку человека.
+ */
+async function diff(project, options, positional) {
+  const [first, second] = positional;
+  if (!first || !second) throw new Error('Нужны два прогона: diff <база> <новый>');
+
+  const { readRun } = await domain('runs-store');
+  const runA = readRun(project, first);
+  const runB = readRun(project, second);
+  if (!runA) throw new Error(`Прогона «${first}» в проекте нет.`);
+  if (!runB) throw new Error(`Прогона «${second}» в проекте нет.`);
+
+  const swapped = Date.parse(runB.startedAt) < Date.parse(runA.startedAt);
+  const [from, to] = swapped ? [runB, runA] : [runA, runB];
+  if (swapped) console.error(`Порядок поменян: «${from.id}» старше «${to.id}».`);
+
+  const groups = await groupsOf(project, options);
+  const { diffRuns } = await domain('compare');
+  const result = diffRuns(from, to, groups);
+  const reporter = options.reporter && options.reporter !== true ? options.reporter : 'text';
+
+  if (reporter === 'junit') {
+    const { buildRunDiffJUnit } = await domain('export-cases');
+    const xml = buildRunDiffJUnit(result);
+    if (options.out && options.out !== true) {
+      writeFileSync(resolve(options.out), xml, 'utf8');
+      console.log(`Сравнение записано: ${resolve(options.out)}`);
+    } else process.stdout.write(xml);
+    process.exit(result.newFailures.length > 0 ? 1 : 0);
+  }
+
+  console.log(`база:  ${runSide(result.from)}`);
+  console.log(`новый: ${runSide(result.to)}`);
+  if (result.warning) console.log(`\nОсторожно: ${result.warning}`);
+
+  printDiffList('Новые провалы', result.newFailures, 'X');
+  printDiffList('Починилось', result.fixed, '+');
+  printDiffList('Красное и там и там', result.stillFailing, '!');
+  printDiffList('Появилось', result.added, '>');
+  printDiffList('Пропало', result.removed, '<');
+  console.log(
+    `\nБез изменений: ${result.untouched.length} · новых провалов: ${result.newFailures.length}`,
+  );
+  process.exit(result.newFailures.length > 0 ? 1 : 0);
+}
+
+/** Одна сторона сравнения строкой: по ней и видно, что с чем сравнили. */
+function runSide(item) {
+  const parts = [`${item.id} от ${item.startedAt.slice(0, 16).replace('T', ' ')}`];
+  parts.push(`режим ${item.mode}`);
+  if (item.planId) parts.push(`план ${item.planId}`);
+  if (item.environmentId) parts.push(`окружение ${item.environmentId}`);
+  if (item.release) parts.push(`веха ${item.release}`);
+  return parts.join(' · ');
+}
+
+function printDiffList(title, items, sign) {
+  if (items.length === 0) return;
+  console.log(`\n${title}: ${items.length}`);
+  for (const item of items) {
+    const note = item.note ? ` — ${item.note}` : '';
+    console.log(`  ${sign} ${item.groupId}/${item.caseId} ${item.title ?? ''}${note}`);
+  }
+}
+
+/**
+ * План по правилу — без панели и без агента.
+ *
+ * `diff` ходит в git тем же `impactOf`, что и панель; `release` и `flaky`
+ * читают историю прогонов из файлов проекта. Требования Jira отсюда не
+ * спрашиваются вовсе — токен живёт в панели, — поэтому `release` собирается по
+ * красному с прошлой вехи и ГОВОРИТ об этом: план, молча потерявший требования,
+ * выглядел бы полным.
+ */
+async function plan(project, options, positional) {
+  const recipe = positional[0];
+  const known = ['smoke', 'diff', 'release', 'flaky'];
+  if (!recipe || !known.includes(recipe)) {
+    throw new Error(`Нужно правило: plan ${known.join(' | ')}`);
+  }
+
+  const groups = await groupsOf(project, options);
+  const { readRuns } = await domain('runs-store');
+  const input = { recipe, groups, runs: readRuns(project, 50) };
+
+  const budget = numberOption(options.budget);
+  if (budget !== undefined) input.budget = budget;
+  const threshold = numberOption(options.threshold);
+  // Порог принимаем и долей, и процентами: «--threshold 80» человек напишет
+  // раньше, чем «0.8», а правило считает в долях.
+  if (threshold !== undefined) input.threshold = threshold > 1 ? threshold / 100 : threshold;
+  if (options.release && options.release !== true) input.release = String(options.release);
+
+  if (recipe === 'diff') {
+    const { impactOf } = await domain('impact');
+    input.impact = impactOf(project, groups);
+    console.log(`Задето правками файлов: ${input.impact.files.length}`);
+  }
+  if (recipe === 'release') {
+    console.log('Требования Jira без панели не спрашиваются: в план вошло красное с прошлой вехи.');
+  }
+
+  const { buildPlanPreview, toPlan } = await domain('plan-recipes');
+  const preview = buildPlanPreview(input);
+
+  const budgetLine = preview.budget ? ` из ${preview.budget}` : '';
+  console.log(
+    `\n${preview.title} · кейсов ${preview.picked.length} · минут ${preview.minutes}${budgetLine}`,
+  );
+  for (const pick of preview.picked) {
+    console.log(`  + ${pick.groupId}/${pick.caseId} ${pick.title} — ${pick.reason}`);
+  }
+  if (preview.left.length > 0) {
+    console.log(`\nНе вошло: ${preview.left.length}`);
+    for (const pick of preview.left) {
+      console.log(`  - ${pick.groupId}/${pick.caseId} ${pick.title} — ${pick.reason}`);
+    }
+  }
+
+  if (!options.save) {
+    console.log('\nПлан не записан — добавьте --save, чтобы сохранить его в проект.');
+    return;
+  }
+  if (preview.picked.length === 0)
+    throw new Error('Записывать нечего: правило не выбрало ни кейса.');
+  const { savePlan } = await domain('plans');
+  const saved = savePlan(project, toPlan(preview), new Date().toISOString());
+  console.log(`\nПлан записан: ${saved.id} — ${saved.title}`);
+}
+
+/** Число из опции; всё, что не число, отбрасывается — подставлять своё нельзя. */
+function numberOption(value) {
+  if (value === undefined || value === true) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function isRed(item) {

@@ -10,10 +10,17 @@ import { SkeletonList } from '@shared/ui/skeleton';
 import { CHAT_ROUTE } from '@shared/config/routes';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import { STATUS_TONE, runExportUrl, useTestRun, useTestRuns } from '@entities/ProjectTest';
+import {
+  STATUS_TONE,
+  runExportUrl,
+  useStartTestRun,
+  useTestRun,
+  useTestRuns,
+} from '@entities/ProjectTest';
 import { BaselineViewer } from '@features/TestBaselines';
 import { TestsRunPublish } from './TestsRunPublish';
-import { formatRunDuration } from './model/reportMetrics';
+import { TestsRunDiff } from './TestsRunDiff';
+import { formatRunDuration, isRed, redCases } from './model/reportMetrics';
 import type { TestsRunsTabProps } from './TestsRunsTab.types';
 import styles from './TestsPage.module.scss';
 
@@ -36,6 +43,9 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
   // Сверка эталонов открывается по КЕЙСУ: у одного кейса несколько точек, и
   // разбирают их подряд, а не по одной из разных мест.
   const [baselineCase, setBaselineCase] = useState('');
+  // Регрессионный кейс заводят прямо у провала: там лежит и заметка, и снимки —
+  // всё, из чего агенту собирать шаги воспроизведения.
+  const start = useStartTestRun(projectPath);
 
   const titleOf = (groupId: string, caseId: string): string =>
     groups.find((group) => group.id === groupId)?.cases.find((item) => item.id === caseId)?.title ??
@@ -100,6 +110,19 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
                     text: formatRunDuration(record.startedAt, record.finishedAt),
                   })}
                 </Typography>
+                {/* Итог генерации: сводка по кейсам у неё пустая — она их не
+                    проходит, — и без этой строки запись выглядела бы прогоном,
+                    который ничего не сделал. */}
+                {record.draft && (
+                  <Typography variant="caption" color="subtle" as="span">
+                    {t('tests.runs.draftProposed', { count: record.draft.proposed })}
+                  </Typography>
+                )}
+                {record.draft?.auto && (
+                  <Typography variant="caption" color="warning" as="span">
+                    {t('tests.runs.draftAccepted', { count: record.draft.accepted })}
+                  </Typography>
+                )}
                 {Boolean(record.tokens) && (
                   <Typography variant="caption" color="subtle" as="span">
                     {t('tests.runs.tokens', { count: record.tokens ?? 0 })}
@@ -151,6 +174,25 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
                       на результат, а не пробегая список глазами. */}
                   <TestsRunPublish projectPath={projectPath} runId={record.id} />
 
+                  <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
+                    {/* Красное этого прогона уже названо — выбирать кейсы руками
+                        в пульте не нужно. Работает и на первом прогоне, которому
+                        сравнивать себя не с чем. */}
+                    {redCases(run.data).length > 0 && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        leftIcon={<Icon name="refresh" size={16} />}
+                        disabled={isRunning || start.isPending}
+                        title={t('tests.diff.rerunHint')}
+                        onClick={() => start.mutate({ mode: 'run', caseIds: redCases(run.data) })}
+                      >
+                        {t('tests.diff.rerun', { count: redCases(run.data).length })}
+                      </Button>
+                    )}
+                  </Stack>
+                  <TestsRunDiff projectPath={projectPath} runId={record.id} />
+
                   {run.data.results.length === 0 && (
                     <Typography variant="caption" color="subtle">
                       {t('tests.runs.noResults')}
@@ -176,11 +218,72 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
                             })}
                           </Typography>
                         )}
+                        {/* Провал без доказательства — не результат, а
+                            впечатление. Результат при этом остаётся: терять
+                            полчаса работы агента из-за формальности дороже. */}
+                        {isRed(result.status) && (result.attachments ?? []).length === 0 && (
+                          <Badge tone="warning">{t('tests.evidence.missing')}</Badge>
+                        )}
+                        {result.failure?.step !== undefined && (
+                          <Badge tone="neutral">
+                            {t('tests.evidence.step', { count: result.failure.step })}
+                          </Badge>
+                        )}
+                        {result.failure?.retry === 'flaky' && (
+                          <Badge tone="warning">{t('tests.evidence.flaky')}</Badge>
+                        )}
+                        {result.failure?.retry === 'confirmed' && (
+                          <Badge tone="neutral">{t('tests.evidence.confirmed')}</Badge>
+                        )}
                       </Stack>
                       {result.note && (
                         <Typography variant="caption" color="subtle">
                           {result.note}
                         </Typography>
+                      )}
+                      {/* Разбор провала: ожидание именно на том шаге, где
+                          разошлось, и что вышло. Без него «провалился» нельзя
+                          ни воспроизвести, ни завести дефектом. */}
+                      {(result.failure?.expected || result.failure?.actual) && (
+                        <Typography variant="caption" color="subtle">
+                          {t('tests.evidence.detail', {
+                            expected: result.failure.expected ?? '—',
+                            actual: result.failure.actual ?? '—',
+                          })}
+                        </Typography>
+                      )}
+                      {result.failure?.retryNote && (
+                        <Typography variant="caption" color="warning">
+                          {t('tests.evidence.retryNote', { text: result.failure.retryNote })}
+                        </Typography>
+                      )}
+                      {/* Провал без кейса, который его ловит, повторится. Кнопка
+                          отдаёт агенту сам провал — кейс, прогон и заметку, — а
+                          не просит человека пересказать его в пожелании. */}
+                      {result.status === 'failed' && (
+                        <Stack direction="row" gap="var(--spacing-3xs)" align="center" wrap>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            leftIcon={<Icon name="plus" size={16} />}
+                            disabled={isRunning || start.isPending}
+                            title={t('projectTests.generateRegressionHint')}
+                            onClick={() =>
+                              start.mutate({
+                                mode: 'generate',
+                                source: 'defect',
+                                groupId: result.groupId,
+                                sourceCase: {
+                                  groupId: result.groupId,
+                                  caseId: result.caseId,
+                                  runId: record.id,
+                                },
+                              })
+                            }
+                          >
+                            {t('projectTests.generateRegression')}
+                          </Button>
+                        </Stack>
                       )}
                       {(result.attachments ?? []).length > 0 && (
                         <Stack direction="row" gap="var(--spacing-3xs)" align="center" wrap>

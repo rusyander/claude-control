@@ -1,12 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import type { ProjectTestReport, ProjectTestRunRecord } from '@agentdeck/contracts';
-import { automationTotal, formatRunDuration, statusTotals, trendBars } from './reportMetrics';
+import {
+  automationTotal,
+  formatRunDuration,
+  redCases,
+  statusTotals,
+  trendBars,
+} from './reportMetrics';
 
 const report = (part: Partial<ProjectTestReport>): ProjectTestReport => ({
   areas: [],
   automation: { manual: 0, toAutomate: 0, automated: 0 },
   flaky: [],
   failures: [],
+  evidence: { failed: 0, proven: 0, detailed: 0, missing: [], flaky: [] },
   releases: [],
   runs: [],
   totals: { runs: 0, tokens: 0, costUsd: 0, durationMs: 0, muted: 0 },
@@ -111,6 +118,37 @@ describe('trendBars', () => {
     const runs = [run({ id: 'a' }), run({ id: 'b' })];
     trendBars(runs);
     expect(runs.map((item) => item.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('redCases', () => {
+  const point = (caseId: string, status: ProjectTestRunRecord['results'][number]['status']) => ({
+    pointId: `gui:${caseId}:${status}`,
+    groupId: 'gui',
+    caseId,
+    status,
+  });
+
+  it('перепрогонять надо провалы и блокировки, каждый кейс по разу', () => {
+    expect(
+      redCases(
+        run({
+          id: 'r1',
+          results: [
+            point('gui-001', 'failed'),
+            point('gui-001', 'failed'),
+            point('gui-002', 'blocked'),
+            point('gui-003', 'passed'),
+            point('gui-004', 'skipped'),
+          ],
+        }),
+      ),
+    ).toEqual(['gui-001', 'gui-002']);
+  });
+
+  it('нераскрытая запись прогона кнопку не рисует, а не падает', () => {
+    expect(redCases(undefined)).toEqual([]);
+    expect(redCases(run({ id: 'r1' }))).toEqual([]);
   });
 });
 

@@ -20,6 +20,9 @@ export const DEFAULT_STATE: AppState = {
   // Пусто — ни одна внешняя система ещё не проверялась и ничего не привязано.
   integrationHealth: {},
   integrationLinks: {},
+  // Пусто — черновики генерации принимает человек: сюда пишутся только проекты,
+  // где он РАЗРЕШИЛ принимать их без просмотра.
+  testsAutoAccept: {},
   settings: {
     theme: 'system',
     language: 'ru',

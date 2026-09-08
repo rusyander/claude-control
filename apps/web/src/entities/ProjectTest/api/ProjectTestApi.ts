@@ -3,6 +3,7 @@ import type {
   ProjectTestBulkInput,
   ProjectTestCaseInput,
   ProjectTestEnvironment,
+  ProjectTestGenerateSource,
   ProjectTestRunMode,
   ProjectTestSchema,
   ProjectTestSharedStep,
@@ -168,10 +169,15 @@ export function useSaveTestEnvironment(path: string | undefined) {
   });
 }
 
+/**
+ * Убрать окружение. `force` — ответ на отказ сервера «на него ссылается план»:
+ * решение «пусть план останется без окружения» принимает человек, и до его
+ * нажатия удаления не происходит.
+ */
 export function useRemoveTestEnvironment(path: string | undefined) {
-  return useViewMutation(path, async (id: string) => {
+  return useViewMutation(path, async ({ id, force }: { id: string; force?: boolean }) => {
     const { data } = await apiClient.delete<ProjectTestsView>('/project-tests/environment', {
-      params: { path, id },
+      params: { path, id, ...(force ? { force: '1' } : {}) },
     });
     return data;
   });
@@ -214,6 +220,16 @@ export interface StartTestRunPayload {
   release?: string;
   full?: boolean;
   changedOnly?: boolean;
+  /** Принимать черновик генерации без просмотра. Сервер помнит это на проект. */
+  autoAccept?: boolean;
+  /** Откуда генерация берёт материал; пусто — по коду проекта. */
+  source?: ProjectTestGenerateSource;
+  /** Требование или дефект: ключ задачи либо ссылка. */
+  sourceRef?: string;
+  /** Диапазон сравнения для источника «дифф»; пусто — `origin/main..HEAD`. */
+  diffRange?: string;
+  /** Провал, из которого заводится регрессионный кейс. */
+  sourceCase?: { groupId: string; caseId: string; runId?: string };
 }
 
 export function useStartTestRun(path: string | undefined) {

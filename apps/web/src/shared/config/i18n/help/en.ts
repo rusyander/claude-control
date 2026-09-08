@@ -4075,6 +4075,41 @@ export const helpEn: HelpSchema = {
         'tuned filter is saved as a view (views.json) and then works as a dynamic set: its ' +
         'cases are recomputed at the moment of the run.',
 
+      setupTitle: 'Suite settings',
+      setupCaption:
+        'Environments, shared steps and custom fields are created from the screen — the "Suite ' +
+        'settings" button next to the project picker. It writes the same three files the whole ' +
+        'section reads.',
+      setupEnv: 'Environments',
+      setupEnvText:
+        'Address, browser, OS and the command that brings the stand up. The one marked default ' +
+        'is preselected in the run bar and in plans; an archived one disappears from the picker ' +
+        'but stays in run history — a past report must not lose where it was run.',
+      setupSteps: 'Shared steps',
+      setupStepsText:
+        'Steps are typed line by line, the way they are written. Next to each one is how many ' +
+        'cases use it: that is the only thing worth knowing before editing or deleting it, and ' +
+        'it is counted by references in cases, not by matching titles.',
+      setupFields: 'Custom fields',
+      setupFieldsText:
+        'A field key travels into every case, so it is checked before sending: latin letters, ' +
+        'digits and a hyphen. A saved field becomes a column in the list and a field in the case ' +
+        'form at once. Project statuses in schema.json are left alone — those are edited in the file.',
+      setupSecrets: 'Stand credentials',
+      setupSecretsText:
+        'The "Credentials" button on an environment opens the same window as before a run: there ' +
+        'is no second place to type them, or the password lives in two forms and drifts apart.',
+      setupRemoveTitle: 'Deleting an environment names the plans',
+      setupRemoveText:
+        'If a plan references the environment, the panel stops the deletion and lists those plans ' +
+        'by name: an environment removed silently turns a plan into "run it who knows where", and ' +
+        'that surfaces only during the run itself. Its credentials are erased along with it.',
+      setupBrokenTitle: 'A broken file only breaks itself',
+      setupBrokenText:
+        'If environments.json, _shared.steps.json or schema.json fails to parse, the window shows ' +
+        'the file name and the reason at the top, and the panel does NOT write to it: saving over ' +
+        'it would rewrite the whole file and erase what was written by hand. Fix it — the edit waits.',
+
       fieldsTitle: 'Case fields',
       fieldsCaption:
         'The names are the real ones — exactly as they sit in the file, so the case can be ' +
@@ -4163,6 +4198,32 @@ export const helpEn: HelpSchema = {
         '"Finish" writes the run into the history, "drop" throws it away. The buttons differ ' +
         'on purpose: "I am done" and "I changed my mind" leave a different trace, and mixing ' +
         'them means lying to the report.',
+      manualKeysTitle: 'Keys of a manual point',
+      manualKeysText:
+        'The digit on a button closes the point with that verdict: 1 passed, 2 failed, ' +
+        '3 skipped, 4 blocked. 5 puts the cursor in the note, 6 opens the file picker, ' +
+        'arrows move between points. Digits, not letters, because a letter depends on the ' +
+        'keyboard layout. While the cursor is in a field the keys stay silent — a typed ' +
+        '«1» stays a character in the text.',
+
+      firstStepsTitle: 'First steps in an empty project',
+      firstStepsCaption:
+        'While the suite has no cases at all, the Library tab shows three steps instead ' +
+        'of an empty list — in the order they are actually done.',
+      firstStepsEnv: 'Environment',
+      firstStepsEnvText:
+        'Where to run. The button creates the first default environment; its passwords go ' +
+        'separately — the credentials button on the run bar puts them into the panel’s ' +
+        'encrypted store, never into a project file.',
+      firstStepsGenerate: 'Generation',
+      firstStepsGenerateText:
+        'The agent reads the app and proposes cases as a draft. Nothing reaches the ' +
+        'library until the draft is accepted — the acceptance banner appears above.',
+      firstStepsRun: 'First run',
+      firstStepsRunText:
+        'Once cases exist the steps disappear: the run bar hands them to the agent, and ' +
+        'the manual run opens the point walker with keys and a stopwatch.',
+
       manualPhoneTitle: 'The same thing from the phone',
       manualPhoneText:
         'The phone app opens the very same session: the result can be marked where the app is ' +
@@ -4175,9 +4236,9 @@ export const helpEn: HelpSchema = {
         'it brings the app up where the code lives.',
       agentGenerate: 'Generate',
       agentGenerateText:
-        'The agent looks around the app and writes cases: it extends the similar ones and ' +
+        'The agent looks around the app and proposes cases: it extends the similar ones and ' +
         'marks the stale ones. The "scope" field narrows the work to the part you need — ' +
-        '"chat and analytics only".',
+        '"chat and analytics only". Nothing reaches the library on its own — you accept it.',
       agentRun: 'Run',
       agentRunText:
         'The agent walks the cases live and writes the result into the file after EVERY one. ' +
@@ -4187,11 +4248,15 @@ export const helpEn: HelpSchema = {
       agentExplore: 'Explore',
       agentExploreText:
         'A free search by charter: the agent looks for what no case covers yet and writes ' +
-        'cases for what it finds. This is exploratory testing, not a check of the known.',
+        'cases for what it finds — failures with the "failed" status and reproduction steps. ' +
+        'The button stays inactive while the wish field is empty: that field IS the charter, ' +
+        'and a session without one turns into an hour of wandering around the application.',
       agentAutomate: 'Automate',
       agentAutomateText:
         'The agent turns stable cases into automated test code and fills in automation: the ' +
-        'file and the test name. Results from CI later match on those names.',
+        'file, the test name and the key. The number on the button is how many cases of the ' +
+        'selection are not in code yet; the ones marked automated are skipped. The test name ' +
+        'starts with the case id — the panel matches CI results by it and by the key.',
       agentAccessTitle: 'Full access for the duration of a run',
       agentAccessText:
         'A run happens in the background with nobody to ask, so the agent works without ' +
@@ -4209,6 +4274,73 @@ export const helpEn: HelpSchema = {
         'check and write nothing down. The "Write into the project CLAUDE.md" button appends a ' +
         'block with the format and the rules to the end of the file; it is read in EVERY ' +
         'conversation. Your text is left alone, and pressing again adds nothing.',
+
+      sourceTitle: 'Where generation takes its material from',
+      sourceCaption:
+        '"Generate cases" answers the question "what is here at all". At work people ask ' +
+        'something else, and that is not another run mode but another reading: the panel ' +
+        'collects the material itself and puts it into the task.',
+      sourceCode: 'From the project code',
+      sourceCodeText:
+        'The "Generate cases" button: the agent looks over the whole application — screens, ' +
+        'routes, label dictionaries — and proposes cases for what is used every day.',
+      sourceRequirement: 'From a requirement',
+      sourceRequirementText:
+        'The "Cover with cases" button on a coverage-matrix row. The panel reads the Jira ' +
+        'issue in full, description included, and hands its text to the agent. The link to ' +
+        'the requirement is stamped into the accepted cases by the panel itself — the row ' +
+        'stops being uncovered right after acceptance, not when the model remembers about links.',
+      sourceDiff: 'From the branch diff',
+      sourceDiffText:
+        'The "By diff" button in the run bar: the origin/main..HEAD comparison. The task gets ' +
+        'the PATHS and the summary, not the changes themselves — the whole patch would push ' +
+        'the library out of the window the run exists for. A case with no codePaths of its own ' +
+        'gets them from the diff.',
+      sourceDefect: 'From a failure',
+      sourceDefectText:
+        'The "Regression case" button at a red result in the run history. The steps of the ' +
+        "case, the runner's note and the attachments go into the task, and the new case links " +
+        'to the defect. The original case is left alone: it describes the normal scenario.',
+      sourceRefusedTitle: 'A source that did not come together does not start a run',
+      sourceRefusedText:
+        'Jira is not connected, the branch has no changes, the case behind the failure is ' +
+        'gone — the panel answers with the reason and starts no agent. Generation "for ' +
+        'requirement QA-42" that never saw QA-42 would write plausible cases about nothing, ' +
+        'and there would be no way to tell them apart.',
+
+      draftTitle: 'Accepting what generation proposes',
+      draftCaption:
+        'Generation does not edit the library itself: it brings a draft, and what to take out ' +
+        'of it is your call. In a project without git this is the only way to see the ' +
+        'proposals as a list.',
+      draftFile: 'Where the proposals live',
+      draftFileText:
+        "A run's draft is the file .agent/tests/drafts/<run>.draft.json. Until it is accepted " +
+        'the group files are untouched, and there is nothing to undo: the library is as it was.',
+      draftPick: 'One by one, not all at once',
+      draftPickText:
+        'The "Generation proposed edits" banner opens the list: the title, why the case is ' +
+        'needed and its steps. Tick the ones you want and accept those — the rest keep ' +
+        'waiting, or go to the archive with "Reject".',
+      draftSimilar: 'Look-alikes are named up front',
+      draftSimilarText:
+        'Every proposal carries a "looks like …" line with a match percentage. Without it the ' +
+        'third generation in a row drops a third "Login with an empty password" into the set, ' +
+        'and you only notice a month later.',
+      draftUndo: 'Acceptance can be undone',
+      draftUndoText:
+        'Added cases are removed, edited ones are restored from the snapshot. A case you had ' +
+        'time to edit by hand or to run stays as it is — such a case is named on its own line.',
+      draftAuto: 'Accept straight away',
+      draftAutoText:
+        'The switch next to the generate button: proposals land in the library unreviewed, ' +
+        'marked as a draft. The position is remembered per project, and it can be turned on ' +
+        'from the acceptance window itself — after the first proposals have been eyeballed.',
+      draftRightsTitle: 'The run never writes to the library',
+      draftRightsText:
+        'Generation is allowed into the drafts folder only: even if the agent decides to edit a ' +
+        'group itself, the write is refused. The one way into the library is acceptance in the ' +
+        'panel, so "accept straight away" widens no rights and the undo always works.',
 
       runsTitle: 'History and report',
       runsCaption:
@@ -4237,6 +4369,63 @@ export const helpEn: HelpSchema = {
       runsSessionText:
         'An agent run has a CLI session, and it opens in the chat as an ordinary conversation: ' +
         'you can see what the agent did step by step and why it decided the case had failed.',
+
+      evidenceTitle: 'A failure with no proof',
+      evidenceCaption:
+        '“Does not work” is an impression, not a result: there is nothing to fix by it, and a week ' +
+        'later nobody remembers what was actually seen. A run must analyse a failure, not state it.',
+      evidenceWhat: 'What a failure must carry',
+      evidenceWhatText:
+        'The number of the step where it diverged, what should have happened on THAT step, what ' +
+        'actually happened, and an attachment as proof: a screenshot or a slice of the log in ' +
+        '`.agent/tests/attachments/<case>/`.',
+      evidenceRetry: 'A second attempt inside the same run',
+      evidenceRetryText:
+        'A failed case is walked a second time right away. Same outcome — the failure is confirmed. ' +
+        'A different one — the case is marked unstable and both attempts are written down: a test ' +
+        'that answers differently on the same code is fixed before the application is.',
+      evidenceReport: 'The count in the report',
+      evidenceReportText:
+        'The “How the failures are proven” card counts the NEWEST failure of each case: proven by a ' +
+        'screenshot a month ago and unproven today means unproven. The button next to it re-runs ' +
+        'exactly the unproven ones.',
+      evidenceDefect: 'The defect draft',
+      evidenceDefectText:
+        'The failed step number, the expectation of that very step, the fact and the attachments go ' +
+        'into the draft on their own — nothing the run already wrote has to be retold by hand.',
+      evidenceKeepTitle: 'An incomplete result is never thrown away',
+      evidenceKeepText:
+        'A failure with no proof is flagged but accepted: losing half an hour of a run over a ' +
+        'formality costs more than showing an incomplete result and calling it incomplete.',
+
+      diffTitle: 'What changed since the previous run',
+      diffCaption:
+        'The summary answers “how much is red now”. Only a comparison of two runs answers ' +
+        '“what broke since yesterday” — and the rerun starts from that same list.',
+      diffLists: 'Five lists, every case in exactly one',
+      diffListsText:
+        'Broke · fixed · red again · appeared in the set · gone from the set. The lists never ' +
+        'overlap: a case landing in two at once would also be launched twice.',
+      diffPrevious: 'Which run it is compared with',
+      diffPreviousText:
+        'With the closest run older than this one that has results: generation and imports live ' +
+        'in the same history and there is nothing to compare with them. For the very first run ' +
+        'the panel says so in words.',
+      diffRerun: 'Rerun the failures',
+      diffRerunText:
+        'Starts a run over exactly the red cases of the record — failures and blocks, each one ' +
+        'once. The button sits on the record itself and works even for the first run, which has ' +
+        'nothing to compare itself with.',
+      diffRecheck: 'Recheck closed defects',
+      diffRecheckText:
+        'On the coverage tab “Refresh defect states” brings the list of “the case is red while ' +
+        'the defect is already closed”. The button next to it runs exactly that list: a case ' +
+        'status is still changed only by a run, never by the tracker.',
+      diffComparableTitle: 'Different plans and environments mean different sets',
+      diffComparableText:
+        'If the runs went by different plans, in different environments or in different modes, ' +
+        'the panel still compares them but says so plainly: “fixed” in such a comparison often ' +
+        'means “not run this time”.',
 
       importTitle: 'CI results and exchanging cases',
       importCaption:
@@ -4320,6 +4509,82 @@ export const helpEn: HelpSchema = {
         'keeps both: the case is checked, the result is visible, and a known breakage does ' +
         'not block the release. One click clears the flag and a failure counts again.',
 
+      ageingTitle: 'Self-cleaning quarantine and ageing',
+      ageingCaption:
+        'Quarantine with no expiry is a silent deletion of the case, and a set nobody revisits ' +
+        'drifts away from the app in half a year and starts lying in green. The «Quarantine and ' +
+        'ageing» card in the report counts both.',
+      ageingLift: 'Ready to come back',
+      ageingLiftText:
+        'A muted case with five greens in a row: the breakage it was muted for no longer ' +
+        'reproduces. A failure breaks the streak; a skip neither extends nor breaks it — «was ' +
+        'not run» is not the same as «failed».',
+      ageingMute: 'Worth muting',
+      ageingMuteText:
+        'Stability below 70% over four or more results: the case flips green and red on the same ' +
+        'code, and nobody believes its failures any more. The reason comes prefilled with the ' +
+        'numbers and is edited by hand — without it the button stays disabled.',
+      ageingStale: 'Drifted from the requirement',
+      ageingStaleText:
+        'The tracker issue was edited after the case, so the case checks yesterday’s ' +
+        'requirement. Dates come from Jira by the links of the cases; without Atlassian the ' +
+        'panel says plainly that it did not check, and still counts the quarantine suggestions.',
+      ageingNotRun: 'Not run for a long time',
+      ageingNotRunText:
+        'A separate line in set health: the case has not been run for over 90 days, and the ' +
+        'status shown proves nothing any more. The case itself opens from that line.',
+      ageingManualTitle: 'No suggestion applies itself',
+      ageingManualText:
+        'The panel names the case, the threshold and the button — the human presses it, and ' +
+        'presses an ordinary bulk action. Automation that lifts quarantine by a count of greens ' +
+        'will one day return a case that was muted deliberately, and you learn of it from a red ' +
+        'release.',
+
+      riskTitle: 'Risk and time: what to run if you have half an hour',
+      riskCaption:
+        'Running everything fits into no working day, and picking by priority alone ignores ' +
+        'history: a case that failed yesterday matters more than the same case green for a ' +
+        'year. The «by risk» order in the library is computed from five multipliers, each of ' +
+        'them named in the tooltip on the score: risk = priority × last outcome × instability × ' +
+        'age × diff hit.',
+      riskPriority: 'Priority',
+      riskPriorityText:
+        'A blocker costs more than a detail on any day. Priority is one of the five ' +
+        'multipliers here, not the first sort key: a green blocker ranks below a red «high», ' +
+        'and that is not a bug — priority says how important a case is in general, history says ' +
+        'how important it is today.',
+      riskOutcome: 'Last outcome',
+      riskOutcomeText:
+        'Failed and blocked go up, unchecked follows, green sits below. Quarantine pushes a ' +
+        'case down the hardest — its failure is known in advance and does not colour the run — ' +
+        'but never to zero, because quarantine gets lifted.',
+      riskInstability: 'Instability',
+      riskInstabilityText:
+        'The share of runs without a change of outcome, from the `runs/` history. A case that ' +
+        'is green then red on the very same code proves nothing either way. A steady case is ' +
+        'not free either: «always green» is a statement about yesterday’s code.',
+      riskAge: 'Age',
+      riskAgeText:
+        'Days since the last run, up to a month; beyond that the multiplier stops growing. A ' +
+        'case that was never run gets the maximum.',
+      riskImpact: 'Diff hit',
+      riskImpactText:
+        'The same diff selection as «run what is affected»: the case `codePaths` against `git ' +
+        'status` of the working copy. Not a repository — the multiplier simply stays silent and ' +
+        'the other four are computed as usual.',
+      riskBudgetTitle: '«I have N minutes»',
+      riskBudgetText:
+        'The «Fill» button checks what fits: cases are taken by descending risk while the sum ' +
+        'of `duration` fits the budget. A case without its own estimate counts as five minutes ' +
+        '— the assumption is stated out loud. The sum never exceeds the budget, and what was ' +
+        'left out is written in a line: hover it to see the list. No run is started — the ' +
+        'checkmarks are on screen and the usual run button launches them.',
+      riskUnknownTitle: 'Not knowing is a risk too',
+      riskUnknownText:
+        'A case without a single run does not get zero risk but an elevated one: you cannot ' +
+        'even say it worked once. A library sorted by risk starts with the unchecked, it does ' +
+        'not end with it.',
+
       releaseTitle: 'Milestones and releases',
       releaseCaption:
         'Without a milestone the report only answers “how are things now”. The question ' +
@@ -4337,6 +4602,57 @@ export const helpEn: HelpSchema = {
         'The report tab shows per milestone: how many runs, how many passed, how many ' +
         'failed, and how many cases no run of that milestone touched. The last one answers ' +
         '“can we ship”.',
+      releaseDoc: 'Readiness as one document',
+      releaseDocText:
+        'The “Release readiness” card on the report tab: the verdict on one line, then what ' +
+        'blocks it (untested cases and open defects), then requirements, failures and the ' +
+        'runs of the milestone. Computed from the runs of THIS milestone: a case that turned ' +
+        'green in another branch does not improve readiness.',
+      releaseVerdictTitle: 'The verdict signs nothing off',
+      releaseVerdictText:
+        '“Ready to ship” means exactly one thing: nothing listed blocks it — no failures, no ' +
+        'untested cases, no open defects, and at least one run of the milestone happened. The ' +
+        'decision stays with a human, so every reason is spelled out on its own line. A ' +
+        'failure of a quarantined case does not colour the verdict but is stated out loud: ' +
+        'its right to colour a run was removed deliberately.',
+      releasePrintTitle: 'Printed by the browser on this machine',
+      releasePrintText:
+        'MD goes into the MR, HTML is read as is, PDF goes to acceptance and the customer. ' +
+        'The PDF is drawn by Chrome, Edge or Chromium found on this machine — the same path ' +
+        'as the run report. No browser — the panel says what to install, and MD and HTML work ' +
+        'without it.',
+
+      secretsTitle: 'Stand credentials',
+      secretsCaption:
+        'A run against a real environment stops at the login form. Putting the password into ' +
+        'the project file is not an option — it would travel to everyone through git.',
+      secretsWhere: 'The «Credentials» button by the environment picker',
+      secretsWhereText:
+        'They belong to the environment currently selected in the run bar — the one the run ' +
+        'will use. Nothing selected means the default environment.',
+      secretsSplit: 'Name to the project, value to the panel',
+      secretsSplitText:
+        '`environments.json` carries only the variable name and a note saying what it is for. ' +
+        'The value is stored encrypted inside the panel on this machine, next to provider keys.',
+      secretsRun: 'How the agent gets them',
+      secretsRunText:
+        'Values go into the run process environment. The prompt lists only the names — enough ' +
+        'for the agent to read them itself.',
+      secretsMissing: 'A missing value does not cancel the run',
+      secretsMissingText:
+        'A colleague who cloned the repository sees the declared name and «not set». The run ' +
+        'starts anyway but writes into the log which variable was missing, so a failed login ' +
+        'does not look like a broken application.',
+      secretsShowTitle: 'The value is never shown back',
+      secretsShowText:
+        'Only a mask and a «set» flag leave the server: a password can be replaced or ' +
+        'forgotten, never read. Should it appear in the agent output, the panel blanks it out ' +
+        'in the log, in the case note and in the run history.',
+      secretsReservedTitle: 'The panel’s own variables are taken',
+      secretsReservedText:
+        'ANTHROPIC_API_KEY, CLAUDE_*, PATH and the like are refused as stand credentials: the ' +
+        'first would change the account the panel pays with, the second would break launching ' +
+        'the CLI. Name the credential your own way, e.g. STAND_PASSWORD.',
 
       defectsTitle: 'Defects',
       defectsCaption:
@@ -4385,10 +4701,34 @@ export const helpEn: HelpSchema = {
         'baseline” button. Accepting is manual only: otherwise every difference silently ' +
         'becomes the new normal.',
 
+      cliTitle: 'The same things from a terminal',
+      cliCaption:
+        'Cases are files inside the project, so everything the panel does with a mouse can be ' +
+        'called without it — «pnpm tests» in the checked project. In CI, where there is no ' +
+        'panel at all, that is the only way to reach them.',
+      cliLint: 'pnpm tests lint',
+      cliLintText:
+        'The same findings as the library health card: cases with nothing to prove them, stale ' +
+        'drafts, repeats. It fixes nothing — it names the case and the button. The build turns ' +
+        'red only with «--fail-on error | warning | info»: «worth a look» and «must not ship» ' +
+        'are different claims, and the second one is yours to make.',
+      cliDiff: 'pnpm tests diff <base> <new>',
+      cliDiffText:
+        'The run comparison of the history tab, as text or junit («--reporter junit»). It ' +
+        'returns 1 for NEW failures only: a long-known breakage would otherwise paint every ' +
+        'later build red. Arguments in the wrong order are swapped out loud, not silently.',
+      cliPlan: 'pnpm tests plan smoke | diff | release | flaky',
+      cliPlanText:
+        'A plan built by rule, with no panel and no agent: «--budget» for smoke, «--release» ' +
+        'for a milestone, «--threshold» for flaky ones. It also lists what did NOT fit and ' +
+        'why; «--save» writes the plan into the project. Jira requirements are not consulted ' +
+        'from a terminal — the token lives in the panel — and the command says so.',
+
       canLibrary: 'Keep the library: groups, sections, cases, checklists, shared steps, parameters',
       canPlans: 'Assemble test plans and environments and expand them into test points',
       canManual: 'Walk cases by hand with per-step marks, notes and attachments',
       canAgent: 'Start the agent: generate, run, explore, automate',
+      canDraft: 'Accept generated proposals one by one and undo the acceptance wholesale',
       canImport: 'Pull automated results from CI and exchange cases as files',
       canDefect: 'File a defect for a failure in GitHub or GitLab',
       canCoverage: 'Read the coverage matrix: requirement → cases → result, holes on top',

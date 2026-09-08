@@ -11,6 +11,10 @@ import { registerTestManualRoutes } from './project-tests/manual-routes.ts';
 import { registerTestDefectRoutes } from './project-tests/defect-routes.ts';
 import { registerTestCoverageRoutes } from './project-tests/coverage-routes.ts';
 import { registerProjectTestsImportRoutes } from './project-tests/import-routes.ts';
+import { registerTestDraftRoutes } from './project-tests/draft-routes.ts';
+import { registerTestHealthRoutes } from './project-tests/health-routes.ts';
+import { registerTestReleaseRoutes } from './project-tests/release-routes.ts';
+import { registerTestSecretRoutes } from './project-tests/secret-routes.ts';
 import type { TestsDeps } from './project-tests/shared.ts';
 
 /**
@@ -35,8 +39,15 @@ export function registerProjectTestsRoutes(
 ): void {
   const deps: TestsDeps = { ctx, runs, manual };
   registerTestLibraryRoutes(app, deps);
-  registerTestPlanRoutes(app);
+  // Доступы стенда: имя в файле проекта, значение — в шифрованном хранилище.
+  registerTestSecretRoutes(app, deps);
+  registerTestPlanRoutes(app, deps);
   registerTestRunRoutes(app, deps);
+  registerTestDraftRoutes(app, deps);
+  // Линтер и таксономия только читают: ни реестры, ни каталог панели им не нужны.
+  registerTestHealthRoutes(app, deps);
+  // Готовность вехи ходит в Jira за требованиями — как и матрица покрытия.
+  registerTestReleaseRoutes(app, deps);
   registerTestManualRoutes(app, deps);
   registerTestDefectRoutes(app, deps);
   registerTestCoverageRoutes(app, deps);

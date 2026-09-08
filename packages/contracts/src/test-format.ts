@@ -117,12 +117,24 @@ export function expandSteps(
   return result;
 }
 
+/**
+ * Грамматика имени параметра в тексте шага: `%login`, `%браузер`.
+ *
+ * Буквы любого алфавита, а не только латиница. Кейсы здесь пишут по-русски, и
+ * собственная справка панели приводит в пример `%браузер`; латинская грамматика
+ * молча превращала такой параметр в обычный текст — проходы размножались с
+ * одинаковыми шагами, подстановка не срабатывала, а линтер винил человека
+ * («параметр объявлен впустую»). Обе стороны, поиск и подстановка, обязаны
+ * читать имя ОДИНАКОВО, поэтому выражение одно на двоих.
+ */
+const PARAM_NAME = /%([\p{L}_][\p{L}\p{N}_]*)/gu;
+
 /** Имена параметров, использованных в шагах (`%login`). */
 export function parametersInSteps(steps: StepShape[]): string[] {
   const found = new Set<string>();
   for (const step of steps) {
     const text = `${step.action} ${step.expected ?? ''} ${step.data ?? ''}`;
-    for (const match of text.matchAll(/%([A-Za-z_][A-Za-z0-9_]*)/g)) {
+    for (const match of text.matchAll(PARAM_NAME)) {
       if (match[1]) found.add(match[1]);
     }
   }
@@ -131,10 +143,7 @@ export function parametersInSteps(steps: StepShape[]): string[] {
 
 /** Подстановка значений параметров в текст шага. */
 export function applyParams(text: string, params: Record<string, string>): string {
-  return text.replace(
-    /%([A-Za-z_][A-Za-z0-9_]*)/g,
-    (whole: string, name: string) => params[name] ?? whole,
-  );
+  return text.replace(PARAM_NAME, (whole: string, name: string) => params[name] ?? whole);
 }
 
 /**
@@ -264,4 +273,70 @@ export function stabilityOf(statuses: string[]): { stability: number; flips: num
   }
   const stability = Math.round((1 - flips / (final.length - 1)) * 100);
   return { stability, flips };
+}
+
+/**
+ * Во сколько минут обходится кейс без своей оценки.
+ *
+ * Считать его бесплатным нельзя: библиотека, где `duration` не проставили,
+ * влезла бы в любой бюджет целиком, и «полчаса» превратились бы в час. Пять
+ * минут — обычная длина ручного GUI-кейса, и допущение называется вслух в
+ * причине отбора, а не прячется в счёте.
+ */
+export const DEFAULT_CASE_DURATION = 5;
+
+/** Оценка кейса в минутах; ноль и мусор считаются отсутствием оценки. */
+export function caseDuration(duration: unknown): number {
+  return typeof duration === 'number' && Number.isFinite(duration) && duration > 0
+    ? duration
+    : DEFAULT_CASE_DURATION;
+}
+
+/** Кандидат на попадание в бюджет: минуты и то, чем его назовут человеку. */
+export interface BudgetItem {
+  key: string;
+  title: string;
+  duration: number;
+}
+
+/** Что влезло в бюджет, что нет и сколько минут набрано. */
+export interface BudgetPick<T extends BudgetItem> {
+  picked: T[];
+  /** Невлезшие с пометкой `taken` — сколько было набрано, когда кейс отложили. */
+  left: (T & { taken: number })[];
+  minutes: number;
+}
+
+/**
+ * Набить бюджет по порядку кандидатов: «у меня N минут».
+ *
+ * Кандидаты приходят уже отсортированными (по риску, по важности — как решил
+ * вызывающий), и порядок здесь не трогается: бюджет отвечает на вопрос «что
+ * успею», а не «что важнее».
+ *
+ * Кейс, который не влез, откладывается, а перебор ПРОДОЛЖАЕТСЯ: после
+ * получасового сценария в остаток ещё помещаются короткие. Сумма отобранного
+ * при этом никогда не превышает бюджет — иначе «полчаса» перестали бы отвечать
+ * на вопрос, ради которого их называют.
+ *
+ * Живёт здесь, а не на сервере, потому что считают это трое: маршрут панели,
+ * CLI и сам экран библиотеки, где бюджет применяют к ВИДИМОМУ отбору. Три копии
+ * такого правила разошлись бы молча — и «не влезло 3» на экране означало бы
+ * другую тройку, чем в собранном плане.
+ */
+export function pickWithinBudget<T extends BudgetItem>(items: T[], budget: number): BudgetPick<T> {
+  const picked: T[] = [];
+  const left: (T & { taken: number })[] = [];
+  let minutes = 0;
+
+  for (const item of items) {
+    const cost = caseDuration(item.duration);
+    if (minutes + cost > budget) {
+      left.push({ ...item, taken: minutes });
+      continue;
+    }
+    minutes += cost;
+    picked.push(item);
+  }
+  return { picked, left, minutes };
 }

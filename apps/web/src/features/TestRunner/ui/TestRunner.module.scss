@@ -139,6 +139,17 @@
   border-top: 1px solid var(--color-border);
 }
 
+// Номер клавиши на кнопке вердикта: приглушён и не мешает читать подпись, но
+// стоит там же, куда смотрит рука.
+.key {
+  margin-right: var(--spacing-3xs);
+  padding: 0 var(--spacing-3xs);
+  font-variant-numeric: tabular-nums;
+  border: 1px solid currentcolor;
+  border-radius: 4px;
+  opacity: 0.6;
+}
+
 .file {
   display: none;
 }

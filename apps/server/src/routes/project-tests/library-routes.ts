@@ -15,7 +15,9 @@ import {
   DEFAULT_GROUPS,
   bulkCases,
   createGroup,
+  forgetEnvironmentSecrets,
   installConvention,
+  readPlans,
   removeCase,
   removeEnvironment,
   removeGroup,
@@ -219,14 +221,33 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
     },
   );
 
-  /** Удалить окружение. */
-  app.delete<{ Querystring: { path?: string; id?: string } }>(
+  /**
+   * Удалить окружение. Вместе с ним уходят и его доступы: оставленный в панели
+   * пароль от стенда, которого больше нет в проекте, — это секрет, о котором
+   * никто не помнит и никто не сотрёт.
+   *
+   * План, ссылающийся на это окружение, останавливает удаление (409) и НАЗЫВАЕТ
+   * себя: молча убранное окружение превращает план в «прогнать неизвестно где»,
+   * и заметить это можно только на самом прогоне. Настоял — `force=1`.
+   */
+  app.delete<{ Querystring: { path?: string; id?: string; force?: string } }>(
     '/api/project-tests/environment',
     (request, reply) => {
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
+      const id = String(request.query.id ?? '');
+      const used = readPlans(root).filter((plan) => plan.environmentIds?.includes(id));
+      if (used.length > 0 && request.query.force !== '1') {
+        return reply.code(409).send({
+          message:
+            `На это окружение ссылаются планы: ${used.map((plan) => plan.title).join(', ')}. ` +
+            'Удалить всё равно — план останется без окружения.',
+          plans: used.map((plan) => ({ id: plan.id, title: plan.title })),
+        });
+      }
       return guard(reply, () => {
-        removeEnvironment(root, String(request.query.id ?? ''));
+        removeEnvironment(root, id);
+        forgetEnvironmentSecrets(deps.ctx.location.paths.appData, root, id);
         return buildView(root, deps);
       });
     },

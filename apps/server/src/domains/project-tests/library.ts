@@ -3,12 +3,15 @@ import type {
   ProjectTestEnvironment,
   ProjectTestFilter,
   ProjectTestSchema,
+  ProjectTestSecretRef,
   ProjectTestSharedStep,
   ProjectTestStatusDef,
   ProjectTestStep,
   ProjectTestView,
 } from '@agentdeck/contracts';
 import { toSteps } from '@agentdeck/contracts/test-format';
+import { slugify } from '../../lib/slug.ts';
+import { assertSecretName } from './env-secrets.ts';
 import {
   ProjectTestsError,
   ProjectTestsNotFoundError,
@@ -16,6 +19,7 @@ import {
   optional,
   readJson,
   stringList,
+  testsFile,
   text,
   writeJson,
 } from './files.ts';
@@ -42,6 +46,42 @@ const VIEWS_FILE = 'views.json';
 function pick<T extends string>(value: unknown, allowed: T[], fallback: T): T {
   const word = text(value).trim() as T;
   return allowed.includes(word) ? word : fallback;
+}
+
+/** Человеческое имя файла — им же названа причина на экране. */
+const FILE_TITLES: Record<string, string> = {
+  [SHARED_FILE]: 'общих шагов',
+  [ENVIRONMENTS_FILE]: 'окружений',
+  [SCHEMA_FILE]: 'своих полей',
+  [VIEWS_FILE]: 'сохранённых видов',
+};
+
+/**
+ * Что из обвязки не прочиталось. Чтение остаётся щадящим — этот список нужен
+ * тем, кто показывает файлы человеку, а не тем, кто просто берёт из них данные.
+ */
+export function readLibraryIssues(root: string): { file: string; error: string }[] {
+  const issues: { file: string; error: string }[] = [];
+  for (const file of [SHARED_FILE, ENVIRONMENTS_FILE, SCHEMA_FILE, VIEWS_FILE]) {
+    const { error } = readJson(root, file);
+    if (error) issues.push({ file: testsFile(file), error });
+  }
+  return issues;
+}
+
+/**
+ * Запись целиком в файл, который не прочитался, — это стирание чужой работы:
+ * список вышел пустым не потому, что в нём ничего нет, а потому что его не
+ * разобрали. Поэтому перед КАЖДОЙ записью файл проверяется, и сломанный
+ * останавливает правку с названной причиной.
+ */
+function assertWritable(root: string, file: string): void {
+  const { error } = readJson(root, file);
+  if (!error) return;
+  throw new ProjectTestsError(
+    `Файл ${FILE_TITLES[file] ?? file} не разобрался, и переписывать его целиком нельзя: ` +
+      `${error} Почините ${testsFile(file)} — правка ждёт.`,
+  );
 }
 
 // ─── Общие шаги ────────────────────────────────────────────────────────────
@@ -85,6 +125,7 @@ export function saveSharedStep(
   const steps = toSteps(input.steps ?? []) as ProjectTestStep[];
   if (steps.length === 0) throw new ProjectTestsError('В общем шаге нет ни одного шага.');
 
+  assertWritable(root, SHARED_FILE);
   const all = readSharedSteps(root);
   const id = input.id
     ? assertId(input.id, 'Идентификатор общего шага')
@@ -103,17 +144,13 @@ export function saveSharedStep(
 }
 
 /**
- * Свободный идентификатор из названия. Латиницы в названии может не быть
- * вовсе («Прод-стенд»), поэтому пустая основа заменяется словом, а не пустой
- * строкой: пустой id не пройдёт `assertId` и файл окажется безымянным.
+ * Свободный идентификатор из названия. Кириллица транслитерируется общим
+ * `slugify` («Прод-стенд» → `prod-stend`): отбрасывание оставляло от русского
+ * названия пустую строку или одни цифры, а id тут становится именем файла.
+ * Пустая основа всё равно заменяется словом — пустой id не пройдёт `assertId`.
  */
 function nextId(all: { id: string }[], title: string, fallback = 'item'): string {
-  const base =
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 30) || fallback;
+  const base = slugify(title, 30) || fallback;
   const used = new Set(all.map((item) => item.id));
   if (!used.has(base)) return base;
   let attempt = 2;
@@ -123,6 +160,7 @@ function nextId(all: { id: string }[], title: string, fallback = 'item'): string
 
 /** Удалить общий шаг. Ссылки на него в кейсах остаются подписями. */
 export function removeSharedStep(root: string, id: string): void {
+  assertWritable(root, SHARED_FILE);
   const all = readSharedSteps(root);
   if (!all.some((item) => item.id === id)) {
     throw new ProjectTestsNotFoundError(`Общего шага «${id}» в проекте нет.`);
@@ -154,9 +192,44 @@ export function readEnvironments(root: string): ProjectTestEnvironment[] {
         notes: optional(record.notes),
         isDefault: record.isDefault === true ? true : undefined,
         archived: record.archived === true ? true : undefined,
+        secrets: readSecretRefs(record.secrets),
       };
     })
     .filter((item): item is ProjectTestEnvironment => item !== undefined);
+}
+
+/**
+ * Объявления доступов из файла проекта: ТОЛЬКО имена переменных.
+ *
+ * Чтение щадящее, как у всей библиотеки: негодное имя пропускается молча, и
+ * одна опечатка в правленом руками файле не гасит всё окружение. Значение,
+ * дописанное в файл руками (`"value": "..."`), сюда не попадает вовсе — у
+ * секрета в проекте нет места, куда его положить.
+ */
+function readSecretRefs(raw: unknown): ProjectTestSecretRef[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const refs = raw
+    .map((item): ProjectTestSecretRef | undefined => {
+      const name = optional(typeof item === 'string' ? item : (item as { name?: unknown })?.name);
+      if (!name || !isSecretName(name)) return undefined;
+      const title =
+        typeof item === 'object' && item
+          ? optional((item as { title?: unknown }).title)
+          : undefined;
+      return { name, title };
+    })
+    .filter((item): item is ProjectTestSecretRef => item !== undefined);
+  return refs.length > 0 ? refs : undefined;
+}
+
+/** Имя годится — без падения: чтение файла ошибок не поднимает. */
+function isSecretName(name: string): boolean {
+  try {
+    assertSecretName(name);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Создать или обновить окружение; `isDefault` всегда ровно одно. */
@@ -166,6 +239,7 @@ export function saveEnvironment(
 ): ProjectTestEnvironment {
   const title = input.title?.trim();
   if (!title) throw new ProjectTestsError('У окружения должно быть название.');
+  assertWritable(root, ENVIRONMENTS_FILE);
   const all = readEnvironments(root);
   const id = input.id ? assertId(input.id, 'Идентификатор окружения') : nextId(all, title, 'env');
 
@@ -179,6 +253,14 @@ export function saveEnvironment(
     notes: optional(input.notes),
     isDefault: input.isDefault === true ? true : undefined,
     archived: input.archived === true ? true : undefined,
+    // Имена доступов проверяются с отказом, а не молча: их прислала форма, и
+    // человек должен узнать про негодное имя сразу, а не по пустому окружению.
+    secrets: input.secrets?.length
+      ? input.secrets.map((ref) => ({
+          name: assertSecretName(ref.name),
+          title: optional(ref.title),
+        }))
+      : undefined,
   };
 
   const exists = all.some((item) => item.id === id);
@@ -194,6 +276,7 @@ export function saveEnvironment(
 
 /** Удалить окружение. Прогоны, сделанные на нём, остаются в истории. */
 export function removeEnvironment(root: string, id: string): void {
+  assertWritable(root, ENVIRONMENTS_FILE);
   const all = readEnvironments(root);
   if (!all.some((item) => item.id === id)) {
     throw new ProjectTestsNotFoundError(`Окружения «${id}» в проекте нет.`);
@@ -201,6 +284,44 @@ export function removeEnvironment(root: string, id: string): void {
   writeJson(root, ENVIRONMENTS_FILE, {
     version: 1,
     environments: all.filter((item) => item.id !== id),
+  });
+}
+
+/** Окружение по имени — или отказ: оно называет то, чего в проекте нет. */
+function requireEnvironment(root: string, id: string): ProjectTestEnvironment {
+  const found = readEnvironments(root).find((item) => item.id === id);
+  if (!found) throw new ProjectTestsNotFoundError(`Окружения «${id}» в проекте нет.`);
+  return found;
+}
+
+/**
+ * Объявить доступ окружения: в файл проекта уезжает ИМЯ переменной и подпись.
+ * Значение здесь не участвует вовсе — его хранит панель (`env-secrets.ts`).
+ */
+export function declareSecret(
+  root: string,
+  environmentId: string,
+  ref: ProjectTestSecretRef,
+): ProjectTestEnvironment {
+  const environment = requireEnvironment(root, environmentId);
+  const name = assertSecretName(ref.name);
+  const rest = (environment.secrets ?? []).filter((item) => item.name !== name);
+  return saveEnvironment(root, {
+    ...environment,
+    secrets: [...rest, { name, title: optional(ref.title) }],
+  });
+}
+
+/** Убрать объявление доступа. Значение стирает маршрут — оно лежит не здесь. */
+export function undeclareSecret(
+  root: string,
+  environmentId: string,
+  name: string,
+): ProjectTestEnvironment {
+  const environment = requireEnvironment(root, environmentId);
+  return saveEnvironment(root, {
+    ...environment,
+    secrets: (environment.secrets ?? []).filter((item) => item.name !== name),
   });
 }
 
@@ -266,12 +387,38 @@ export function readSchema(root: string): ProjectTestSchema {
   return { attributes, statuses };
 }
 
-/** Записать схему целиком — форма её и правит целиком. */
+/**
+ * Записать схему целиком — форма её и правит целиком.
+ *
+ * Проверки строгие, в отличие от чтения: ключ поля уезжает в КАЖДЫЙ кейс
+ * (`attributes[key]`), и поле, заведённое с ключом «Своё поле», осталось бы в
+ * файлах навсегда. Повтор ключа так же запрещён: две колонки с одним ключом —
+ * это одна колонка, второе описание которой никто больше не увидит.
+ */
 export function saveSchema(root: string, schema: ProjectTestSchema): ProjectTestSchema {
+  const attributes = (schema.attributes ?? []).filter((item) => item.key?.trim());
+  const seen = new Set<string>();
   const cleaned: ProjectTestSchema = {
-    attributes: (schema.attributes ?? []).filter((item) => item.key?.trim()),
+    attributes: attributes.map((item) => {
+      const key = assertId(item.key.trim(), 'Ключ своего поля');
+      if (seen.has(key)) throw new ProjectTestsError(`Поле с ключом «${key}» уже есть.`);
+      seen.add(key);
+      const type = pick(item.type, ATTRIBUTE_TYPES, 'text');
+      const options = stringList(item.options);
+      if (type === 'select' && options.length === 0) {
+        throw new ProjectTestsError(`У поля «${item.title || key}» не задано ни одного варианта.`);
+      }
+      return {
+        key,
+        title: item.title?.trim() || key,
+        type,
+        options: type === 'select' ? options : undefined,
+        required: item.required === true ? true : undefined,
+      };
+    }),
     statuses: (schema.statuses ?? []).filter((item) => item.id?.trim()),
   };
+  assertWritable(root, SCHEMA_FILE);
   writeJson(root, SCHEMA_FILE, { version: 1, ...cleaned });
   return cleaned;
 }
@@ -319,6 +466,7 @@ export function saveView(
   const views = all.some((item) => item.id === id)
     ? all.map((item) => (item.id === id ? next : item))
     : [...all, next];
+  assertWritable(root, VIEWS_FILE);
   writeJson(root, VIEWS_FILE, { version: 1, views });
   return next;
 }
@@ -329,5 +477,6 @@ export function removeView(root: string, id: string): void {
   if (!all.some((item) => item.id === id)) {
     throw new ProjectTestsNotFoundError(`Фильтра «${id}» в проекте нет.`);
   }
+  assertWritable(root, VIEWS_FILE);
   writeJson(root, VIEWS_FILE, { version: 1, views: all.filter((item) => item.id !== id) });
 }

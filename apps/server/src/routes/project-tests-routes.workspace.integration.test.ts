@@ -1,10 +1,11 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
   ProjectTestManualSession,
   ProjectTestPlan,
   ProjectTestPoint,
+  ProjectTestSecretsView,
   ProjectTestsView,
 } from '@agentdeck/contracts';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -52,7 +53,10 @@ describe('project-tests-routes: рабочее место', () => {
         // подключены ли Jira и фордж по токену. Здесь их нет — и черновик
         // обязан собраться всё равно, только с пустым списком назначений.
         location: { paths: { appData: backupDir } },
-        store: { getProjectByPath: () => undefined },
+        // Галочку «принимать сразу» вид спрашивает у панели, а не у проекта:
+        // здесь её нет, и это ровно то состояние, в котором приходит человек,
+        // ни разу её не трогавший.
+        store: { getProjectByPath: () => undefined, isTestsAutoAccept: () => false },
       } as unknown as ServerContext,
       new ProjectTestRunRegistry(),
       new ProjectTestManualRegistry(),
@@ -139,6 +143,37 @@ describe('project-tests-routes: рабочее место', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('карантин без причины не ставится: иначе через месяц никто не решится его снять', async () => {
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/bulk',
+      payload: { path: project, groupId: 'gui', caseIds: ['gui-001'], action: 'mute' },
+    });
+    expect(refused.statusCode).toBe(400);
+    expect(String(refused.json().message)).toContain('причины');
+
+    const body = await post('/api/project-tests/bulk', {
+      path: project,
+      groupId: 'gui',
+      caseIds: ['gui-001'],
+      action: 'mute',
+      value: 'ждём починки логина',
+    });
+    const view = body.view as ProjectTestsView;
+    const muted = view.groups[0]?.cases.find((item) => item.id === 'gui-001');
+    expect(muted?.muted).toBe(true);
+    expect(muted?.muteReason).toBe('ждём починки логина');
+
+    // Повторный карантин уже объяснённого кейса причину не стирает и не требует
+    // ввести её заново.
+    const again = await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/bulk',
+      payload: { path: project, groupId: 'gui', caseIds: ['gui-001'], action: 'mute' },
+    });
+    expect(again.statusCode).toBe(200);
+  });
+
   it('общий шаг и окружение появляются в том же виде', async () => {
     await post('/api/project-tests/shared-step', {
       path: project,
@@ -151,6 +186,95 @@ describe('project-tests-routes: рабочее место', () => {
 
     expect(view.sharedSteps).toHaveLength(1);
     expect(view.environments[0]?.baseUrl).toBe('http://127.0.0.1:8888');
+  });
+
+  it('доступ окружения: наружу маска, в файле проекта — только имя переменной', async () => {
+    const environment = (
+      (await post('/api/project-tests/environment', {
+        path: project,
+        environment: { title: 'Стенд' },
+      })) as unknown as ProjectTestsView
+    ).environments[0]!;
+
+    const saved = (await post('/api/project-tests/env-secret', {
+      path: project,
+      environmentId: environment.id,
+      name: 'STAND_PASSWORD',
+      title: 'Пароль входа',
+      value: 'очень-секретно-42',
+    })) as unknown as ProjectTestSecretsView & { view: ProjectTestsView };
+
+    expect(saved.secrets[0]).toMatchObject({ name: 'STAND_PASSWORD', hasValue: true });
+    expect(JSON.stringify(saved)).not.toContain('очень-секретно-42');
+    // Файл проекта уезжает в git: там имя переменной и подпись, не значение.
+    expect(saved.view.environments[0]?.secrets).toEqual([
+      { name: 'STAND_PASSWORD', title: 'Пароль входа' },
+    ]);
+    expect(
+      readFileSync(join(project, '.agent', 'tests', 'environments.json'), 'utf8'),
+    ).not.toContain('очень-секретно-42');
+
+    const shown = (await get(
+      `/api/project-tests/env-secrets?path=${path()}&environmentId=${environment.id}`,
+    )) as unknown as ProjectTestSecretsView;
+    expect(shown.secrets[0]?.masked).not.toContain('секретно');
+    expect(JSON.stringify(shown)).not.toContain('очень-секретно-42');
+  });
+
+  it('удаление доступа уносит и объявление, и значение', async () => {
+    const environment = (
+      (await post('/api/project-tests/environment', {
+        path: project,
+        environment: { title: 'Стенд' },
+      })) as unknown as ProjectTestsView
+    ).environments[0]!;
+    await post('/api/project-tests/env-secret', {
+      path: project,
+      environmentId: environment.id,
+      name: 'STAND_TOKEN',
+      value: 'токен-стенда-1',
+    });
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/project-tests/env-secret?path=${path()}&environmentId=${environment.id}&name=STAND_TOKEN`,
+    });
+    const after = response.json() as ProjectTestSecretsView & { view: ProjectTestsView };
+
+    expect(after.secrets).toEqual([]);
+    expect(after.view.environments[0]?.secrets).toBeUndefined();
+  });
+
+  it('переменная самой панели под доступ стенда не отдаётся', async () => {
+    const environment = (
+      (await post('/api/project-tests/environment', {
+        path: project,
+        environment: { title: 'Стенд' },
+      })) as unknown as ProjectTestsView
+    ).environments[0]!;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/env-secret',
+      payload: {
+        path: project,
+        environmentId: environment.id,
+        name: 'ANTHROPIC_API_KEY',
+        value: 'sk-подмена',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().message).toContain('занята самой панелью');
+  });
+
+  it('доступ у окружения, которого нет, — 404, а не молчаливый успех', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/project-tests/env-secrets?path=${path()}&environmentId=нет-такого`,
+    });
+
+    expect(response.statusCode).toBe(404);
   });
 
   it('план разворачивается в тест-поинты по числу окружений', async () => {

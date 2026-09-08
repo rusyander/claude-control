@@ -31,6 +31,10 @@ import {
   setProjectCascade as writeProjectCascade,
 } from './cascade.ts';
 import {
+  isTestsAutoAccept as readTestsAutoAccept,
+  setTestsAutoAccept as writeTestsAutoAccept,
+} from './tests-drafts.ts';
+import {
   getChatLink as readChatLink,
   getChatLinks as readChatLinks,
   linkChatSession as moveChatLink,
@@ -424,6 +428,16 @@ export class AppStore {
 
   setProjectCascade(path: string, enabled: boolean): void {
     writeProjectCascade(this.state, path, enabled);
+    this.persist();
+  }
+
+  /** Принимать ли черновики генерации тестов этого проекта без просмотра. */
+  isTestsAutoAccept(path: string): boolean {
+    return readTestsAutoAccept(this.state, path);
+  }
+
+  setTestsAutoAccept(path: string, enabled: boolean): void {
+    writeTestsAutoAccept(this.state, path, enabled);
     this.persist();
   }
 

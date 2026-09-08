@@ -15,6 +15,8 @@
  *
  * Запуск: `node tools/qa/check-tests-runner.mjs` при поднятом `pnpm dev`.
  */
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { bypassOnboarding } from './bypass-onboarding.mjs';
 
@@ -194,6 +196,30 @@ await page.route('**/api/project-tests/run*', async (route) =>
 await page.route('**/api/project-tests/runs*', async (route) =>
   route.fulfill({ json: { runs: [] } }),
 );
+// Здоровье набора живёт на вкладке отчёта: без заглушки линтер отвечает 400 на
+// несуществующий проект, и проверка «ошибок в консоли нет» краснеет не о том.
+await page.route('**/api/project-tests/lint*', async (route) =>
+  route.fulfill({ json: { checked: 1, findings: [], byRule: [], duplicates: [] } }),
+);
+// Документ готовности вехи: карточка отчёта спрашивает его, как только у вехи
+// есть имя. Без подмены это 400 в консоли, а не пропавшая карточка.
+await page.route('**/api/project-tests/release*', async (route) =>
+  route.fulfill({ json: { releases: [] } }),
+);
+await page.route('**/api/project-tests/quarantine*', async (route) =>
+  route.fulfill({
+    json: {
+      lift: [],
+      quarantine: [],
+      stale: [],
+      thresholds: { greenStreak: 5, stability: 70, minRuns: 4 },
+      checkedAt: '2026-09-08T10:00:00.000Z',
+    },
+  }),
+);
+await page.route('**/api/project-tests/risk*', async (route) =>
+  route.fulfill({ json: { items: [], checkedAt: '2026-09-08T10:00:00.000Z' } }),
+);
 await page.route('**/api/project-tests/plans*', async (route) =>
   route.fulfill({ json: { plans: [] } }),
 );
@@ -217,6 +243,14 @@ let bad = 0;
 const check = (ok, text) => {
   console.log(`${ok ? 'ок  ' : 'ПЛОХО'} ${text}`);
   if (!ok) bad += 1;
+};
+
+/** Снимки: `SHOTS=<каталог> node tools/qa/check-tests-runner.mjs`. */
+const shotsDir = process.env.SHOTS;
+const shot = async (name) => {
+  if (!shotsDir) return;
+  await mkdir(shotsDir, { recursive: true });
+  await page.screenshot({ path: join(shotsDir, `${name}.png`), fullPage: true });
 };
 
 const anyOf = async (scope, names) => {
@@ -290,6 +324,7 @@ check(
   (await runner.getByText(/открыт проект с историей/).count()) > 0,
   'предусловие кейса показано до шагов',
 );
+await shot('runner-point');
 
 // Отметка по шагам: у каждого шага своя, иначе провал не объяснить.
 const stepMarks = runner.getByRole('button', { name: /^(Прошёл|Провален|Пройден|Провалён)$/ });
@@ -325,12 +360,36 @@ check(
   '«заблокирован» отделён от провала',
 );
 
-const passButton = await anyOf(runner, [/^Прошёл$/, /^Пройден$/, /^Прошел$/]);
-if (passButton) {
-  await passButton.click();
-  await page.waitForTimeout(1200);
-  check(posted.at(-1)?.status === 'passed', 'второй проход ушёл пройденным');
-}
+// Клавиатура: сто кейсов — это триста попаданий мышью, поэтому проход
+// закрывается цифрой. Проверяется и обратное: в поле ввода цифра остаётся
+// цифрой, иначе набранная заметка закрывала бы проход.
+check((await runner.getByText(/Клавиши:/).count()) > 0, 'подсказка по клавишам видна на экране');
+
+const sentBeforeTyping = posted.length;
+const noteField = runner.getByRole('textbox').last();
+await noteField.fill('нажатие 1 внутри заметки');
+await page.keyboard.press('1');
+await page.waitForTimeout(600);
+check(posted.length === sentBeforeTyping, 'в поле ввода цифра ничего не отправляет');
+check((await noteField.inputValue()).includes('1'), 'набранная в заметке цифра осталась в тексте');
+
+// Клавиша заметки возвращает курсор в неё — по ней и пишут увиденное.
+// Курсор снимается вслепую, а не нажатием по заголовку: окно во весь экран,
+// и клик мимо поля попадает по его же подложке.
+await page.evaluate(() => document.activeElement?.blur());
+await page.keyboard.press('5');
+await page.waitForTimeout(400);
+check(
+  (await page.evaluate(() => document.activeElement?.tagName)) === 'TEXTAREA',
+  'клавиша заметки ставит курсор в поле',
+);
+
+await noteField.fill('');
+await page.evaluate(() => document.activeElement?.blur());
+await page.keyboard.press('1');
+await page.waitForTimeout(1200);
+check(posted.at(-1)?.status === 'passed', 'второй проход закрыт клавишей «пройден»');
+await shot('runner-keys');
 
 const finishButton = await anyOf(runner, [/Закончить/, /Завершить/]);
 if (!finishButton) {

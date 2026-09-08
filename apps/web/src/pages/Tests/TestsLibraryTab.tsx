@@ -1,7 +1,15 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import { ProjectTestsRunBar, TestLibrary } from '@features/ProjectTests';
+import { Stack } from '@shared/ui/stack';
+import { Typography } from '@shared/ui/typography';
+import {
+  ProjectTestsRunBar,
+  TestDraftModal,
+  TestLibrary,
+  TestsOnboarding,
+} from '@features/ProjectTests';
 import type { TestsLibraryTabProps } from './TestsLibraryTab.types';
 import styles from './TestsPage.module.scss';
 
@@ -23,9 +31,48 @@ export function TestsLibraryTab({
   isStartingManual,
 }: TestsLibraryTabProps) {
   const { t } = useTranslation();
+  // Какой черновик открыт в приёмке. Пусто — окно закрыто; открывается только
+  // по нажатию: непринятое предложение не должно перекрывать библиотеку само.
+  const [draftRunId, setDraftRunId] = useState('');
+  const pending = board.pendingDraft;
+  const lastApplied = board.drafts.find((item) => item.status === 'applied');
 
   return (
     <div className={styles.libraryTab}>
+      {/* Плашка вместо модалки: генерация идёт минутами, и человек возвращается
+          во вкладку, чтобы увидеть предложенное, — но выбор момента остаётся
+          за ним. Откат тоже отсюда: он нужен ровно тем, кто уже принял. */}
+      {(pending ?? lastApplied) && (
+        <Stack
+          direction="row"
+          gap="var(--spacing-xs)"
+          align="center"
+          wrap
+          className={styles.draftBanner}
+        >
+          <Icon name="plus" size={18} />
+          <Typography variant="body" as="span">
+            {pending
+              ? t('tests.drafts.waiting', { count: pending.pending })
+              : t('tests.drafts.doneBanner', { count: lastApplied?.accepted ?? 0 })}
+          </Typography>
+          <Button
+            variant={pending ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => setDraftRunId((pending ?? lastApplied)?.runId ?? '')}
+          >
+            {pending ? t('tests.drafts.open') : t('tests.drafts.openApplied')}
+          </Button>
+        </Stack>
+      )}
+
+      <TestDraftModal
+        isOpen={Boolean(draftRunId)}
+        onOpenChange={(open) => setDraftRunId(open ? draftRunId : '')}
+        projectPath={board.path}
+        runId={draftRunId || undefined}
+      />
+
       <ProjectTestsRunBar
         board={board}
         scope={scope}
@@ -36,6 +83,9 @@ export function TestsLibraryTab({
 
       <TestLibrary
         board={board}
+        // Пустой проект встречают три шага, а не общая заглушка: с ними
+        // человек уходит отсюда с кейсами, а не с вопросом «и что теперь».
+        empty={<TestsOnboarding board={board} scope={scope} environmentId={environmentId} />}
         actions={
           <Button
             variant="primary"

@@ -166,7 +166,7 @@ export function runToMarkdown(run: ProjectTestRunRecord, groups: ProjectTestGrou
 }
 
 /** Экранирование для HTML: в заметках прогона бывает и `<`, и `&`. */
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -175,14 +175,39 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * Тот же отчёт, свёрстанный под печать.
+ * Вёрстка печатной страницы — одна на все документы раздела.
  *
  * Стили внутри страницы и без единого внешнего файла: печатать её будет
  * браузер во временной папке, где ни шрифтов, ни картинок рядом нет, а
  * страница, ждущая сеть, печатается пустой. `@page` задаёт A4 и поля,
  * `break-inside: avoid` не даёт разорвать строку таблицы между листами —
  * без этого половина провала уезжает на следующую страницу.
+ *
+ * Принудительных разрывов (`break-before: page`) здесь нет намеренно: пустая
+ * страница в PDF берётся именно из них — раздел кончился у края листа, а разрыв
+ * добавил следующий. Заголовкам вместо этого запрещено оставаться последней
+ * строкой листа (`break-after: avoid`).
  */
+export const PRINT_CSS = `
+  @page { size: A4; margin: 16mm 14mm; }
+  body { font: 11pt/1.45 "Segoe UI", Arial, sans-serif; color: #111; margin: 0; }
+  h1 { font-size: 18pt; margin: 0 0 4mm; }
+  h2 { font-size: 13pt; margin: 6mm 0 2mm; break-after: avoid; }
+  h1 + *, h2 + * { break-before: avoid; }
+  dl { display: grid; grid-template-columns: 34mm 1fr; gap: 1mm 4mm; margin: 0 0 4mm; }
+  dt { color: #555; }
+  dd { margin: 0; }
+  .summary { border: 1px solid #ccc; padding: 3mm; margin: 0 0 4mm; }
+  ul { margin: 0; padding-left: 6mm; }
+  li { break-inside: avoid; margin-bottom: 1.5mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  th, td { border: 1px solid #ccc; padding: 1.5mm 2mm; text-align: left; vertical-align: top; }
+  th { background: #f3f3f3; }
+  tr { break-inside: avoid; }
+  .error { color: #a00; }
+`;
+
+/** Тот же отчёт, свёрстанный под печать (`PRINT_CSS`). */
 export function runToHtml(run: ProjectTestRunRecord, groups: ProjectTestGroup[]): string {
   const titles = titlesOf(groups);
   const broken = run.results.filter(
@@ -217,23 +242,7 @@ export function runToHtml(run: ProjectTestRunRecord, groups: ProjectTestGroup[])
 <head>
 <meta charset="utf-8">
 <title>Прогон ${escapeHtml(run.startedAt)}</title>
-<style>
-  @page { size: A4; margin: 16mm 14mm; }
-  body { font: 11pt/1.45 "Segoe UI", Arial, sans-serif; color: #111; margin: 0; }
-  h1 { font-size: 18pt; margin: 0 0 4mm; }
-  h2 { font-size: 13pt; margin: 6mm 0 2mm; }
-  dl { display: grid; grid-template-columns: 34mm 1fr; gap: 1mm 4mm; margin: 0 0 4mm; }
-  dt { color: #555; }
-  dd { margin: 0; }
-  .summary { border: 1px solid #ccc; padding: 3mm; margin: 0 0 4mm; }
-  ul { margin: 0; padding-left: 6mm; }
-  li { break-inside: avoid; margin-bottom: 1.5mm; }
-  table { width: 100%; border-collapse: collapse; font-size: 9pt; }
-  th, td { border: 1px solid #ccc; padding: 1.5mm 2mm; text-align: left; vertical-align: top; }
-  th { background: #f3f3f3; }
-  tr { break-inside: avoid; }
-  .error { color: #a00; }
-</style>
+<style>${PRINT_CSS}</style>
 </head>
 <body>
 <h1>Прогон: ${escapeHtml(MODE_TEXT[run.mode] ?? run.mode)}</h1>

@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   ProjectTestsError,
+  ProjectTestsNotFoundError,
   applyResults,
+  bulkCases,
   createGroup,
   readGroups,
   removeCase,
@@ -12,6 +14,7 @@ import {
   resetStatuses,
   upsertCase,
 } from './store.ts';
+import { saveSharedStep } from './library.ts';
 
 /**
  * Хранилище кейсов. Проверяется ровно то, ради чего оно написано отдельно от
@@ -385,5 +388,109 @@ describe('project-tests store', () => {
       // 30 — это не доля: лучше общий порог, чем «сойдётся что угодно».
       expect(cases[1]?.maxDiffRatio).toBeUndefined();
     });
+  });
+});
+
+/**
+ * Строгость на входе. Каждая из этих проверок — бывший тихий провал, найденный
+ * живым прогоном API 08.09: запрос с опечаткой отвечал 200 и либо ничего не
+ * делал, либо делал не то, что просили.
+ */
+describe('project-tests store: строгость на входе', () => {
+  let root = '';
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-tests-strict-'));
+    createGroup(root, 'gui');
+    upsertCase(root, 'gui', { title: 'Вход', steps: ['открыть'], priority: 'high' }, NOW);
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  it('кейс в несуществующую группу — 404, а не новый файл группы', () => {
+    expect(() => upsertCase(root, 'nope', { title: 'X', steps: [] }, NOW)).toThrow(
+      ProjectTestsNotFoundError,
+    );
+    expect(readGroups(root).map((group) => group.id)).toEqual(['gui']);
+  });
+
+  it('удаление несуществующего кейса — 404 с именем, а не молчаливый успех', () => {
+    expect(() => removeCase(root, 'gui', 'gui-999')).toThrow(/gui-999/);
+    expect(() => removeCase(root, 'nope', 'gui-001')).toThrow(ProjectTestsNotFoundError);
+  });
+
+  it('ссылка на неизвестный общий шаг отклоняется — при прогоне он раскрылся бы в пустоту', () => {
+    saveSharedStep(root, { id: 'login', title: 'Войти', steps: ['ввести пароль'] }, NOW);
+
+    expect(() =>
+      upsertCase(root, 'gui', { title: 'Y', steps: [{ action: 'выйти', ref: 'logout' }] }, NOW),
+    ).toThrow(/logout/);
+    expect(() =>
+      upsertCase(root, 'gui', { title: 'Y', steps: [{ action: 'войти', ref: 'login' }] }, NOW),
+    ).not.toThrow();
+  });
+
+  it('неизвестное массовое действие — ошибка, а не «тронуто N» вхолостую', () => {
+    const before = only(root).cases[0]?.updatedAt;
+
+    expect(() =>
+      bulkCases(root, { groupId: 'gui', caseIds: ['gui-001'], action: 'explode' as 'tag' }, NOW),
+    ).toThrow(/explode/);
+    expect(only(root).cases[0]?.updatedAt).toBe(before);
+  });
+
+  it('приоритет, готовность и автоматизация вне словаря не стирают поле', () => {
+    expect(() =>
+      bulkCases(
+        root,
+        { groupId: 'gui', caseIds: ['gui-001'], action: 'priority', value: 'urgent' },
+        NOW,
+      ),
+    ).toThrow(/urgent/);
+    expect(() =>
+      bulkCases(
+        root,
+        { groupId: 'gui', caseIds: ['gui-001'], action: 'readiness', value: 'meh' },
+        NOW,
+      ),
+    ).toThrow(/meh/);
+    expect(() =>
+      bulkCases(
+        root,
+        { groupId: 'gui', caseIds: ['gui-001'], action: 'automation', value: 'robot' },
+        NOW,
+      ),
+    ).toThrow(/robot/);
+    expect(only(root).cases[0]?.priority).toBe('high');
+
+    bulkCases(
+      root,
+      { groupId: 'gui', caseIds: ['gui-001'], action: 'priority', value: 'low' },
+      NOW,
+    );
+    expect(only(root).cases[0]?.priority).toBe('low');
+  });
+
+  it('массовое действие по несуществующей группе — 404', () => {
+    expect(() =>
+      bulkCases(root, { groupId: 'nope', caseIds: ['gui-001'], action: 'tag', value: 'x' }, NOW),
+    ).toThrow(ProjectTestsNotFoundError);
+  });
+
+  it('вложения результата копятся в кейсе, а не заменяют прошлые', () => {
+    applyResults(
+      root,
+      [{ groupId: 'gui', caseId: 'gui-001', status: 'failed', attachments: ['a.png'] }],
+      NOW,
+    );
+    applyResults(
+      root,
+      [{ groupId: 'gui', caseId: 'gui-001', status: 'failed', attachments: ['b.png', 'a.png'] }],
+      NOW,
+    );
+
+    expect(only(root).cases[0]?.attachments).toEqual(['a.png', 'b.png']);
   });
 });

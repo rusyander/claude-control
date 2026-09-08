@@ -175,8 +175,11 @@ watchers and bundlers would recurse), and the panel never merges anything: mergi
 user.
 
 **A test run ends with an empty history record, or "прогнать задетое" finds nothing** — by design, no
-counter of its own. The record is assembled on finish from the case files (`lastRunAt >= startedAt`):
-an agent that forgot `lastRunAt` leaves checkmarks and an empty record. Impact = `git status
+counter of its own. The record is assembled on finish from the case files: the panel fingerprints the
+selected cases at start and stamps every case that changed with `lastRunId` (`runs.ts
+stampRunResults`), clamping the agent's `lastRunAt` into the run window — the agent writes local time
+with a `Z` and a "future" result used to leak into the next run's record. A case the agent never touched
+leaves the record empty; `generate`/`explore` never produce results. Impact = `git status
 --porcelain -uall` (without `-uall` a new folder collapses to `src/` and matches no `codePaths`) →
 `codePaths` → the `area` word; nothing attributed ⇒ empty list, never "run everything".
 Detail: `.agent/code-map-tests.agent.md`.

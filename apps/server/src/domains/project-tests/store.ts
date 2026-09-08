@@ -36,7 +36,7 @@ import {
   removeGroupFiles,
   writeGroupSource,
 } from './group-files.ts';
-import { readSchema } from './library.ts';
+import { readSchema, readSharedSteps } from './library.ts';
 
 /**
  * Файлы тест-кейсов в `.agent/tests/` проверяемого проекта.
@@ -93,6 +93,17 @@ const RETRIES: NonNullable<ProjectTestFailure['retry']>[] = ['confirmed', 'flaky
 function oneOf<T extends string>(value: unknown, allowed: T[]): T | undefined {
   const word = text(value).trim() as T;
   return allowed.includes(word) ? word : undefined;
+}
+
+/** То же, но слово вне словаря — отказ с перечнем допустимых, не undefined. */
+function strictValue<T extends string>(value: unknown, allowed: T[], what: string): T {
+  const word = oneOf(value, allowed);
+  if (!word) {
+    throw new ProjectTestsError(
+      `${what}: допустимо ${allowed.join(', ')}, а не «${text(value).trim()}».`,
+    );
+  }
+  return word;
 }
 
 /** Ссылки кейса: чужой мусор отбрасывается поштучно, а не целиком. */
@@ -329,6 +340,22 @@ export function loadForWrite(root: string, id: string): ProjectTestGroup {
   return { ...group, error: undefined };
 }
 
+/**
+ * Группа для правки ЧЕЛОВЕКОМ: файла нет — 404, а не тихая новая вкладка.
+ *
+ * `loadForWrite` мягкий нарочно — черновик генерации вправе предложить кейсы
+ * в группу, которой ещё нет, и применение её создаёт. Но кейс, импорт или
+ * массовая правка с опечаткой в имени группы заводили вкладку «nope» с тремя
+ * кейсами, и никто не понимал, откуда она.
+ */
+export function requireGroup(root: string, id: string): ProjectTestGroup {
+  const group = loadForWrite(root, id);
+  if (!groupFileExists(root, group.id)) {
+    throw new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`);
+  }
+  return group;
+}
+
 /** Создать группу (вкладку). Существующую не трогаем — вернём как есть. */
 export function createGroup(
   root: string,
@@ -398,6 +425,19 @@ function nextCaseId(group: ProjectTestGroup): string {
 /** Шаги из формы: строки и объекты приходят вперемешку. */
 function inputSteps(steps: ProjectTestCaseInput['steps']): ProjectTestStep[] {
   return toSteps(steps ?? []) as ProjectTestStep[];
+}
+
+/**
+ * Ссылка на общий шаг, которого нет, — опечатка в запросе. Форма выбирает `ref`
+ * из списка, а с телефона или из скрипта можно прислать что угодно; при прогоне
+ * такой шаг раскрылся бы в пустоту, и агент шёл бы дальше, будто его не было.
+ */
+function assertRefs(root: string, steps: ProjectTestStep[]): void {
+  const refs = steps.map((step) => step.ref?.trim()).filter((ref): ref is string => !!ref);
+  if (refs.length === 0) return;
+  const known = new Set(readSharedSteps(root).map((step) => step.id));
+  const missing = refs.find((ref) => !known.has(ref));
+  if (missing) throw new ProjectTestsError(`Общего шага «${missing}» в проекте нет.`);
 }
 
 /**
@@ -471,10 +511,19 @@ export function upsertCase(
   const title = input.title?.trim();
   if (!title) throw new ProjectTestsError('У теста должно быть название.');
 
-  const group = loadForWrite(root, groupId);
+  const group = requireGroup(root, groupId);
   const existing = input.id ? group.cases.find((item) => item.id === input.id) : undefined;
-  if (input.id && !existing) throw new ProjectTestsError('Тест не найден.');
+  // `id` в запросе значит «правлю этот кейс»: нет такого — значит, его удалили,
+  // пока форма была открыта, и молча завести его заново было бы ошибкой. Новый
+  // кейс сохраняют без id, идентификатор выдаёт панель.
+  if (input.id && !existing) {
+    throw new ProjectTestsNotFoundError(
+      `Кейса «${input.id}» в группе «${groupId}» нет: новый кейс сохраняют без id.`,
+    );
+  }
   assertAttributes(root, input.attributes ?? existing?.attributes);
+  const steps = input.steps === undefined ? (existing?.steps ?? []) : inputSteps(input.steps);
+  if (input.steps !== undefined) assertRefs(root, steps);
 
   const next: ProjectTestCase = {
     id: existing?.id ?? nextCaseId(group),
@@ -484,7 +533,7 @@ export function upsertCase(
     area: patchText(input.area, existing?.area),
     section: patchText(input.section, existing?.section),
     precondition: patchText(input.precondition, existing?.precondition),
-    steps: input.steps === undefined ? (existing?.steps ?? []) : inputSteps(input.steps),
+    steps,
     expected: patchText(input.expected, existing?.expected),
     postcondition: patchText(input.postcondition, existing?.postcondition),
     oracle: patchText(input.oracle, existing?.oracle),
@@ -534,7 +583,10 @@ export function upsertCase(
 
 /** Удалить кейс. */
 export function removeCase(root: string, groupId: string, caseId: string): void {
-  const group = loadForWrite(root, groupId);
+  const group = requireGroup(root, groupId);
+  if (!group.cases.some((item) => item.id === caseId)) {
+    throw new ProjectTestsNotFoundError(`Кейса «${caseId}» в группе «${groupId}» нет.`);
+  }
   writeGroup(root, { ...group, cases: group.cases.filter((item) => item.id !== caseId) });
 }
 
@@ -570,6 +622,8 @@ export interface CaseResultPatch {
   runId?: string;
   at?: string;
   defect?: { url: string; title?: string; createdAt?: string };
+  /** Доказательства прохода — пути от корня проекта; в кейсе копятся, не заменяются. */
+  attachments?: string[];
 }
 
 /**
@@ -610,6 +664,9 @@ export function applyResults(root: string, patches: CaseResultPatch[], now: stri
         failure:
           patch.failure ??
           (patch.status === 'failed' || patch.status === 'blocked' ? item.failure : undefined),
+        attachments: patch.attachments?.length
+          ? [...new Set([...(item.attachments ?? []), ...patch.attachments])]
+          : item.attachments,
         lastRunAt: patch.at ?? now,
         lastRunId: patch.runId ?? item.lastRunId,
         defects,
@@ -733,8 +790,29 @@ export function selectCases(
 }
 
 /** Массовое действие над отмеченными кейсами. Возвращает, скольких коснулось. */
+const BULK_ACTIONS: ProjectTestBulkInput['action'][] = [
+  'tag',
+  'untag',
+  'priority',
+  'readiness',
+  'automation',
+  'section',
+  'move',
+  'duplicate',
+  'archive',
+  'restore',
+  'mute',
+  'unmute',
+  'delete',
+];
+
 export function bulkCases(root: string, input: ProjectTestBulkInput, now: string): number {
-  const group = loadForWrite(root, input.groupId);
+  // Неизвестное действие раньше «трогало» кейсы вхолостую: штамп updatedAt
+  // сдвигался у всех отмеченных, а ответ был 200 с честным touched.
+  if (!BULK_ACTIONS.includes(input.action)) {
+    throw new ProjectTestsError(`Неизвестное действие «${String(input.action)}».`);
+  }
+  const group = requireGroup(root, input.groupId);
   const ids = new Set(input.caseIds);
   if (ids.size === 0) throw new ProjectTestsError('Не выбрано ни одного теста.');
   const value = input.value?.trim();
@@ -760,7 +838,7 @@ export function bulkCases(root: string, input: ProjectTestBulkInput, now: string
 
   if (input.action === 'move') {
     if (!value) throw new ProjectTestsError('Не указана группа-приёмник.');
-    const target = loadForWrite(root, value);
+    const target = requireGroup(root, value);
     const moving = group.cases.filter((item) => ids.has(item.id));
     if (moving.length === 0) return 0;
     const taken = new Set(target.cases.map((item) => item.id));
@@ -801,6 +879,19 @@ export function bulkCases(root: string, input: ProjectTestBulkInput, now: string
     return copies.length;
   }
 
+  // Слово вне словаря раньше проходило молча: `oneOf` отдавал undefined, и
+  // «readiness: meh» СТИРАЛ готовность у всех отмеченных, а «automation: robot»
+  // делал их manual. Массовая правка с опечаткой должна остановиться, а не
+  // переписать сотню кейсов не тем, что просили.
+  const chosen =
+    input.action === 'priority'
+      ? strictValue(value, PRIORITIES, 'Приоритет')
+      : input.action === 'readiness'
+        ? strictValue(value, READINESS, 'Готовность')
+        : input.action === 'automation'
+          ? strictValue(value, AUTOMATION, 'Статус автоматизации')
+          : undefined;
+
   let touched = 0;
   const cases = group.cases.map((item) => {
     if (!ids.has(item.id)) return item;
@@ -813,10 +904,10 @@ export function bulkCases(root: string, input: ProjectTestBulkInput, now: string
       const rest = (item.tags ?? []).filter((tag) => tag !== value);
       next.tags = rest.length > 0 ? rest : undefined;
     }
-    if (input.action === 'priority') next.priority = oneOf(value, PRIORITIES);
-    if (input.action === 'readiness') next.readiness = oneOf(value, READINESS);
+    if (input.action === 'priority') next.priority = chosen as ProjectTestPriority;
+    if (input.action === 'readiness') next.readiness = chosen as ProjectTestReadiness;
     if (input.action === 'automation') {
-      const status = oneOf(value, AUTOMATION) ?? 'manual';
+      const status = chosen as ProjectTestAutomation['status'];
       next.automation = { ...(item.automation ?? {}), status };
     }
     if (input.action === 'section') next.section = value || undefined;

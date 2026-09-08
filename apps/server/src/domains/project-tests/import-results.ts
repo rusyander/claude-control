@@ -162,7 +162,16 @@ function junitCase(
  * потому что единого стандарта нет: pytest пишет `test_id`, JUnit 5 — `testId`,
  * адаптеры Zephyr и Xray — `tms` и `externalId`.
  */
-const ID_PROPERTIES = new Set(['externalid', 'testid', 'test_id', 'tms', 'tms_id', 'case_id']);
+const ID_PROPERTIES = new Set([
+  'externalid',
+  'testid',
+  'test_id',
+  'tms',
+  'tms_id',
+  'case_id',
+  'id',
+  'allure_id',
+]);
 
 /** Ключ теста из `<properties>` случая junit. */
 function junitProperty(body: string): string | undefined {

@@ -6,7 +6,7 @@ import { ProjectTestManualRegistry, remainingPoints } from './manual.ts';
 import { createGroup, readGroups, upsertCase } from './store.ts';
 import { readRuns } from './runs-store.ts';
 import { savePlan } from './plans.ts';
-import { ProjectTestsError, ProjectTestsNotFoundError } from './files.ts';
+import { ProjectTestsError, ProjectTestsLockedError, ProjectTestsNotFoundError } from './files.ts';
 
 /**
  * Ручной прогон: кейсы проходит человек, панель записывает.
@@ -150,5 +150,87 @@ describe('project-tests/manual', () => {
     expect(() =>
       manual.record(project, { runId: session.runId, pointId: 'чужой', status: 'passed' }, now),
     ).toThrow(ProjectTestsNotFoundError);
+  });
+});
+
+/** Группы читаются по алфавиту — gui после api, поэтому не [0]. */
+const gui = (root: string) => readGroups(root).find((group) => group.id === 'gui')?.cases ?? [];
+
+describe('project-tests/manual: замок группы и доказательства', () => {
+  let project = '';
+  let manual: ProjectTestManualRegistry;
+  const now = '2026-09-08T10:00:00.000Z';
+
+  beforeEach(() => {
+    project = mkdtempSync(join(tmpdir(), 'cc-tests-manual-lock-'));
+    manual = new ProjectTestManualRegistry();
+    createGroup(project, 'gui', 'GUI');
+    createGroup(project, 'api', 'API');
+    upsertCase(project, 'gui', { title: 'Вход', steps: ['открыть', 'нажать'] }, now);
+    upsertCase(project, 'api', { title: 'Пинг', steps: ['curl'] }, now);
+  });
+
+  afterEach(() => {
+    rmSync(project, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  it('группу, которую переписывает агент, человек не начинает — сессии нет', () => {
+    const locked = (groupId: string) => {
+      if (groupId === 'gui') throw new ProjectTestsLockedError('идёт прогон', 'run-1');
+    };
+
+    expect(() => manual.start(project, { groupId: 'gui' }, now, locked)).toThrow(
+      ProjectTestsLockedError,
+    );
+    expect(manual.get(project)).toBeUndefined();
+    expect(manual.start(project, { groupId: 'api' }, now, locked).points).toHaveLength(1);
+  });
+
+  it('отбор принимает форму «группа:кейс» и несуществующую группу отвергает', () => {
+    expect(manual.start(project, { caseIds: ['gui:gui-001'] }, now).points).toHaveLength(1);
+    manual.cancel(project, manual.get(project)!.runId, now);
+    expect(() => manual.start(project, { groupId: 'nope' }, now)).toThrow(
+      ProjectTestsNotFoundError,
+    );
+  });
+
+  it('красный шаг человека становится разбором провала, вложения ложатся в кейс', () => {
+    const session = manual.start(project, { groupId: 'gui' }, now);
+    const point = session.points[0]!;
+
+    manual.record(
+      project,
+      {
+        runId: session.runId,
+        pointId: point.id,
+        status: 'failed',
+        note: 'общая заметка',
+        steps: [
+          { index: 0, status: 'passed' },
+          { index: 1, status: 'failed', note: 'кнопка серая' },
+        ],
+        attachments: ['.agent/tests/attachments/gui-001/shot.png'],
+      },
+      now,
+    );
+
+    const testCase = gui(project).find((item) => item.id === point.caseId);
+    expect(testCase?.failure).toEqual({ step: 2, actual: 'кнопка серая' });
+    expect(testCase?.attachments).toEqual(['.agent/tests/attachments/gui-001/shot.png']);
+  });
+
+  it('провал без отмеченных шагов берёт причину из заметки; зелёный разбора не получает', () => {
+    const session = manual.start(project, { groupId: 'gui' }, now);
+    const point = session.points[0]!;
+
+    manual.record(
+      project,
+      { runId: session.runId, pointId: point.id, status: 'failed', note: 'упало' },
+      now,
+    );
+    expect(gui(project)[0]?.failure).toEqual({ step: undefined, actual: 'упало' });
+
+    manual.record(project, { runId: session.runId, pointId: point.id, status: 'passed' }, now);
+    expect(gui(project)[0]?.failure).toBeUndefined();
   });
 });

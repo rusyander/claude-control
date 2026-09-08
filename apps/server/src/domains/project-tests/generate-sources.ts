@@ -117,6 +117,32 @@ async function requirement(
 }
 
 /**
+ * Кандидаты диапазона, когда явного не задали. Панель локальная: у половины
+ * проектов нет `origin`, а ветка одна — и `origin/main..HEAD` отвечал «не
+ * репозиторий или нет ветки» про каталог, в котором git есть. Первый диапазон
+ * с изменениями и берётся; чистые все — остаётся рабочая копия.
+ */
+const RANGE_CANDIDATES = [DEFAULT_DIFF_RANGE, 'origin/master..HEAD', 'main..HEAD', 'master..HEAD'];
+/** Подпись источника, когда сравнивали не ветки, а незакоммиченные правки. */
+export const WORKING_TREE_RANGE = 'рабочая копия';
+
+function changedFiles(root: string, range: string): string[] | undefined {
+  const names = gitSync(root, ['diff', '--name-only', range]);
+  return names === undefined ? undefined : cleanPaths(names);
+}
+
+function cleanPaths(raw: string): string[] {
+  return raw
+    .split('\n')
+    .map((line) => line.trim().replace(/\\/g, '/'))
+    .filter((line) => line.length > 0 && !line.startsWith('.agent/tests/'));
+}
+
+function statOf(root: string, range: string): string | undefined {
+  return gitSync(root, ['diff', '--stat', range])?.trim().split('\n').slice(-1)[0];
+}
+
+/**
  * Дифф ветки: ПУТИ и сводка, а не сами хунки.
  *
  * Патч целиком раздул бы задание до размеров изменения и вытеснил из окна
@@ -125,27 +151,44 @@ async function requirement(
  * вообще трогали.
  */
 function diff(root: string, range?: string): ProjectTestGenerateMaterial['diff'] {
-  const wanted = range?.trim() || DEFAULT_DIFF_RANGE;
-  const names = gitSync(root, ['diff', '--name-only', wanted]);
-  if (names === undefined) {
+  const explicit = range?.trim();
+  if (explicit) {
+    const files = changedFiles(root, explicit);
+    if (files === undefined) {
+      throw new ProjectTestsError(
+        `Сравнение «${explicit}» не сделалось: каталог не репозиторий или такой ветки нет.`,
+      );
+    }
+    if (files.length === 0) {
+      throw new ProjectTestsError(`Между «${explicit}» нет изменений — генерировать нечего.`);
+    }
+    return { range: explicit, files, summary: statOf(root, explicit) };
+  }
+
+  if (gitSync(root, ['rev-parse', '--verify', 'HEAD']) === undefined) {
     throw new ProjectTestsError(
-      `Сравнение «${wanted}» не сделалось: каталог не репозиторий или такой ветки нет.`,
+      `Сравнение «${DEFAULT_DIFF_RANGE}» не сделалось: каталог не git-репозиторий ` +
+        'или в нём нет ни одного коммита.',
     );
   }
-  const files = names
-    .split('\n')
-    .map((line) => line.trim().replace(/\\/g, '/'))
-    .filter((line) => line.length > 0 && !line.startsWith('.agent/tests/'));
-
-  if (files.length === 0) {
-    throw new ProjectTestsError(`Между «${wanted}» нет изменений — генерировать нечего.`);
+  for (const candidate of RANGE_CANDIDATES) {
+    const files = changedFiles(root, candidate);
+    if (files && files.length > 0) {
+      return { range: candidate, files, summary: statOf(root, candidate) };
+    }
   }
-
-  return {
-    range: wanted,
-    files,
-    summary: gitSync(root, ['diff', '--stat', wanted])?.trim().split('\n').slice(-1)[0],
-  };
+  // Ветки чистые или их нет: незакоммиченные правки плюс новые файлы — то, над
+  // чем человек работает прямо сейчас.
+  const tracked = changedFiles(root, 'HEAD') ?? [];
+  const untracked = cleanPaths(gitSync(root, ['ls-files', '--others', '--exclude-standard']) ?? '');
+  const files = [...new Set([...tracked, ...untracked])];
+  if (files.length === 0) {
+    throw new ProjectTestsError(
+      `Ни «${RANGE_CANDIDATES.join('», «')}», ни рабочая копия изменений не дали — ` +
+        'генерировать нечего. Укажите диапазон явно, например «v1.0.0..HEAD».',
+    );
+  }
+  return { range: WORKING_TREE_RANGE, files, summary: statOf(root, 'HEAD') };
 }
 
 /**

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppStore } from '../../lib/app-store.ts';
 import { writeSettings, writeToken } from '../integrations/store.ts';
 import {
+  WORKING_TREE_RANGE,
   collectSource,
   DEFAULT_DIFF_RANGE,
   stampOf,
@@ -221,6 +222,42 @@ describe('project-tests/generate-sources: дифф', () => {
     await expect(
       collectSource(deps(), { ...request, projectPath: root, diffRange: 'HEAD' }, []),
     ).rejects.toThrow(/нет изменений/);
+  });
+
+  it('без названного диапазона в репозитории с одной веткой берётся рабочая копия', async () => {
+    repo();
+
+    const material = await collectSource(deps(), { ...request, projectPath: root }, []);
+
+    expect(material?.diff?.range).toBe(WORKING_TREE_RANGE);
+    expect(material?.diff?.files).toEqual(['send.ts']);
+  });
+
+  it('ветка от main сравнивается с main, а не с рабочей копией', async () => {
+    repo();
+    const run = (...args: string[]) =>
+      execFileSync('git', args, { cwd: root, stdio: 'ignore', windowsHide: true });
+    run('checkout', '-q', '-B', 'main');
+    run('add', '-A');
+    run('commit', '-qm', 'base');
+    run('checkout', '-q', '-b', 'feature');
+    writeFileSync(join(root, 'login.ts'), 'export const login = () => 1;\n');
+    run('add', '-A');
+    run('commit', '-qm', 'feature');
+
+    const material = await collectSource(deps(), { ...request, projectPath: root }, []);
+
+    expect(material?.diff?.range).toBe('main..HEAD');
+    expect(material?.diff?.files).toEqual(['login.ts']);
+  });
+
+  it('ни ветки, ни правок — отказ «нечего», а не генерация по пустому диффу', async () => {
+    repo();
+    execFileSync('git', ['stash', '-u'], { cwd: root, stdio: 'ignore', windowsHide: true });
+
+    await expect(collectSource(deps(), { ...request, projectPath: root }, [])).rejects.toThrow(
+      /рабочая копия/,
+    );
   });
 
   it('не репозиторий — отказ с названным диапазоном по умолчанию', async () => {

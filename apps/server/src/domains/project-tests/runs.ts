@@ -19,9 +19,10 @@ import {
   ProjectTestsNotFoundError,
   readGroups,
   resetStatuses,
+  writeGroup,
 } from './store.ts';
 import { buildPrompt, runName, type PromptContext } from './prompt.ts';
-import { applyDraft, draftFile, readDraft } from './drafts.ts';
+import { applyDraft, confineDraft, draftFile, readDraft } from './drafts.ts';
 import { stampOf } from './generate-sources.ts';
 import { redactor } from './env-secrets.ts';
 import { defaultEnvironment, readEnvironments, readSharedSteps } from './library.ts';
@@ -78,6 +79,8 @@ export class ProjectTestRunRegistry {
       autoAccept?: boolean;
       /** Затирание доступов стенда во всём, что выходит наружу. */
       redact?: (text: string) => string;
+      /** Отпечатки кейсов отбора на старте — по ним видно, что агент тронул. */
+      snapshot?: Map<string, string>;
     }
   >();
 
@@ -140,6 +143,9 @@ export class ProjectTestRunRegistry {
 
     const all = readGroups(root);
     const scoped = request.groupId ? all.filter((group) => group.id === request.groupId) : all;
+    if (request.groupId && scoped.length === 0) {
+      throw new ProjectTestsNotFoundError(`Группы «${request.groupId}» в проекте нет.`);
+    }
     const caseIds = this.pickCases(root, all, request);
 
     // Исследование без хартии — это блуждание: агент час ходит по приложению и
@@ -241,6 +247,7 @@ export class ProjectTestRunRegistry {
       run,
       autoAccept: request.autoAccept === true,
       redact: redactor(secrets.values),
+      snapshot: fingerprintCases(groups, view),
     });
     // Нехватка доступа прогон не отменяет, но молчать о ней нельзя: провал
     // входа иначе выглядит как поломка приложения.
@@ -354,6 +361,27 @@ export class ProjectTestRunRegistry {
   ): string[] | undefined {
     let ids = request.caseIds?.length ? [...request.caseIds] : undefined;
 
+    // Отбор по id проверяется ДО старта: раньше прогон с опечаткой в id
+    // стартовал, час работал по пустому отбору и заканчивался «нечего». Здесь же
+    // принимается и форма «группа:кейс» — та, что у планов и ручного прохода.
+    if (ids) {
+      const scoped = request.groupId ? groups.filter((g) => g.id === request.groupId) : groups;
+      const known = new Map<string, string>();
+      for (const group of scoped) {
+        for (const item of group.cases) {
+          known.set(item.id, item.id);
+          known.set(`${group.id}:${item.id}`, item.id);
+        }
+      }
+      const missing = ids.filter((id) => !known.has(id));
+      if (missing.length > 0) {
+        throw new ProjectTestsError(
+          `Кейсов «${missing.slice(0, 5).join('», «')}» в отборе нет — проверьте id.`,
+        );
+      }
+      ids = [...new Set(ids.map((id) => known.get(id) as string))];
+    }
+
     if (request.planId) {
       const plan = readPlan(root, request.planId);
       if (!plan) throw new ProjectTestsNotFoundError(`Плана «${request.planId}» в проекте нет.`);
@@ -409,6 +437,9 @@ export class ProjectTestRunRegistry {
     // Заметки к кейсам пишет агент, а они уезжают в историю прогонов — файл в
     // git проверяемого проекта. Секрет, попавший в «не пустил с паролем …»,
     // остался бы там навсегда.
+    if (entry.view.mode === 'run' || entry.view.mode === 'automate') {
+      stampRunResults(projectPath, entry.view, entry.snapshot ?? new Map(), entry.view.finishedAt);
+    }
     entry.view.results = collectResults(projectPath, entry.view, entry.redact);
     entry.view.summary = summarizeResults(entry.view.results);
     if (entry.view.mode === 'generate') {
@@ -438,8 +469,10 @@ export class ProjectTestRunRegistry {
    * в архиве.
    */
   private settleDraft(root: string, view: ProjectTestRun, auto: boolean): void {
-    const draft = readDraft(root, view.id);
-    if (!draft) return;
+    const written = readDraft(root, view.id);
+    if (!written) return;
+    // Группу выбрал человек; агент её советом считает, панель — правилом.
+    const draft = confineDraft(root, written, view.groupId);
     if (draft.error) {
       this.note(root, 'черновик', draft.error);
       return;
@@ -537,18 +570,102 @@ function hasWorkToAutomate(groups: ProjectTestGroup[], caseIds?: string[]): bool
   );
 }
 
+/** Кейсы отбора прогона — по ним снимается отпечаток и ставится штамп. */
+function scopedCases(
+  groups: ProjectTestGroup[],
+  view: Pick<ProjectTestRun, 'groupId' | 'caseIds'>,
+): { group: ProjectTestGroup; testCase: ProjectTestCase }[] {
+  const picked: { group: ProjectTestGroup; testCase: ProjectTestCase }[] = [];
+  for (const group of groups) {
+    if (group.error) continue;
+    if (view.groupId && group.id !== view.groupId) continue;
+    for (const testCase of group.cases) {
+      if (view.caseIds?.length && !view.caseIds.includes(testCase.id)) continue;
+      picked.push({ group, testCase });
+    }
+  }
+  return picked;
+}
+
+/** То в кейсе, что пишет прогон, одной строкой: изменилось — значит, агент тронул. */
+function fingerprint(testCase: ProjectTestCase): string {
+  return JSON.stringify([
+    testCase.status,
+    testCase.statusId,
+    testCase.note,
+    testCase.lastRunAt,
+    testCase.failure,
+    testCase.attachments,
+  ]);
+}
+
+export function fingerprintCases(
+  groups: ProjectTestGroup[],
+  view: Pick<ProjectTestRun, 'groupId' | 'caseIds'>,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const { group, testCase } of scopedCases(groups, view)) {
+    map.set(`${group.id}:${testCase.id}`, fingerprint(testCase));
+  }
+  return map;
+}
+
+/** Секунда запаса на часы: штамп агента чуть позже `finishedAt` — ещё не будущее. */
+const CLOCK_SLACK_MS = 60_000;
+
 /**
- * Что агент успел записать за этот прогон.
+ * Штамп прогона на том, что агент тронул.
  *
- * Считаем по файлам кейсов: результат — тот, у которого `lastRunAt` не раньше
- * старта. Своего учёта у прогона нет и быть не должно — статусы пишет агент, и
- * второй счётчик в памяти неизбежно разошёлся бы с файлами.
+ * Кейс, который прогон изменил (статус, заметка, разбор, время), получает
+ * `lastRunId` этого прогона, а его `lastRunAt` втискивается в границы прогона.
+ * Без этого история верила времени, которое написал агент, — а он пишет
+ * местное время с буквой Z, и «19:24Z» при реальных 14:24Z делает результат
+ * будущим: следующая генерация через час собирала его в СВОЮ запись, а отчёт
+ * читал «гоняли сегодня» у кейса, который трогали вчера.
  */
-function collectResults(
+export function stampRunResults(
+  root: string,
+  view: Pick<ProjectTestRun, 'id' | 'groupId' | 'caseIds' | 'startedAt'>,
+  snapshot: Map<string, string>,
+  finishedAt: string = new Date().toISOString(),
+): number {
+  const ceiling = new Date(Date.parse(finishedAt) + CLOCK_SLACK_MS).toISOString();
+  let stamped = 0;
+  for (const group of readGroups(root)) {
+    if (group.error) continue;
+    if (view.groupId && group.id !== view.groupId) continue;
+    let touched = false;
+    const cases = group.cases.map((testCase) => {
+      if (view.caseIds?.length && !view.caseIds.includes(testCase.id)) return testCase;
+      const before = snapshot.get(`${group.id}:${testCase.id}`);
+      if (before === fingerprint(testCase) || testCase.lastRunId === view.id) return testCase;
+      // Новый кейс в отборе (агент завёл его сам) без единого результата — не итог.
+      if (before === undefined && testCase.status === 'unknown') return testCase;
+      const at = testCase.lastRunAt;
+      const inWindow = !!at && at >= view.startedAt && at <= ceiling;
+      touched = true;
+      stamped += 1;
+      return { ...testCase, lastRunId: view.id, lastRunAt: inWindow ? at : finishedAt };
+    });
+    if (touched) writeGroup(root, { ...group, cases });
+  }
+  return stamped;
+}
+
+/**
+ * Что агент записал за этот прогон.
+ *
+ * Считаем по файлам кейсов, по штампу `lastRunId`: своего учёта у прогона нет и
+ * быть не должно — статусы пишет агент, и второй счётчик в памяти неизбежно
+ * разошёлся бы с файлами. Генерация и исследование результатов не дают: они
+ * описывают проверки, а не проходят их.
+ */
+export function collectResults(
   root: string,
   view: ProjectTestRun,
   redact?: (text: string) => string,
 ): ProjectTestPointResult[] {
+  if (view.mode === 'generate' || view.mode === 'explore') return [];
   const hide = (value?: string): string | undefined => (value && redact ? redact(value) : value);
   const results: ProjectTestPointResult[] = [];
   for (const group of readGroups(root)) {
@@ -556,8 +673,8 @@ function collectResults(
     if (view.groupId && group.id !== view.groupId) continue;
     for (const testCase of group.cases) {
       if (view.caseIds?.length && !view.caseIds.includes(testCase.id)) continue;
-      const at = testCase.lastRunAt;
-      if (!at || at < view.startedAt) continue;
+      if (testCase.lastRunId !== view.id) continue;
+      const at = testCase.lastRunAt ?? view.finishedAt ?? view.startedAt;
       results.push({
         pointId: pointId(group.id, testCase.id, view.environmentId),
         groupId: group.id,

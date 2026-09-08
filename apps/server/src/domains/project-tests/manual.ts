@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type {
+  ProjectTestFailure,
   ProjectTestManualResultInput,
   ProjectTestManualSession,
   ProjectTestPoint,
@@ -39,6 +40,7 @@ export class ProjectTestManualRegistry {
     root: string,
     request: { planId?: string; groupId?: string; caseIds?: string[]; environmentId?: string },
     now: string,
+    assertUnlocked?: (groupId: string) => void,
   ): ProjectTestManualSession {
     const active = this.sessions.get(root);
     if (active && !active.finishedAt) {
@@ -46,6 +48,9 @@ export class ProjectTestManualRegistry {
     }
 
     const groups = readGroups(root);
+    if (request.groupId && !groups.some((group) => group.id === request.groupId)) {
+      throw new ProjectTestsNotFoundError(`Группы «${request.groupId}» в проекте нет.`);
+    }
     const environments = readEnvironments(root);
     const plan = request.planId ? readPlan(root, request.planId) : undefined;
     if (request.planId && !plan) {
@@ -56,9 +61,19 @@ export class ProjectTestManualRegistry {
       ? planCases(groups, plan)
       : selectCases(groups, {
           groupIds: request.groupId ? [request.groupId] : undefined,
-        }).filter((item) => !request.caseIds?.length || request.caseIds.includes(item.testCase.id));
+        }).filter(
+          (item) =>
+            !request.caseIds?.length ||
+            request.caseIds.includes(item.testCase.id) ||
+            request.caseIds.includes(`${item.groupId}:${item.testCase.id}`),
+        );
 
     if (chosen.length === 0) throw new ProjectTestsError('Прогонять нечего: кейсов нет.');
+
+    // Агент переписывает файл группы после каждого кейса; отметки человека в тот
+    // же файл либо потерялись бы, либо стёрли его результаты. Замок тот же, что у
+    // правок из панели, — маршрут передаёт его сюда, домен реестра прогонов не знает.
+    for (const groupId of new Set(chosen.map((item) => item.groupId))) assertUnlocked?.(groupId);
 
     const points = buildPoints(chosen, environments, {
       plan,
@@ -119,6 +134,8 @@ export class ProjectTestManualRegistry {
           status: result.status,
           statusId: result.statusId,
           note: result.note,
+          failure: failureOf(input),
+          attachments: result.attachments,
           runId: session.runId,
           at: now,
         },
@@ -207,4 +224,18 @@ export class ProjectTestManualRegistry {
 export function remainingPoints(session: ProjectTestManualSession): ProjectTestPoint[] {
   const done = new Set(session.results.map((item) => item.pointId));
   return session.points.filter((item) => !done.has(item.id));
+}
+
+/**
+ * Разбор провала из отметок человека: первый красный шаг и его заметка.
+ *
+ * Агент пишет `failure` сам, тестировщик ставит галочки — и без этого ручной
+ * провал в отчёте числился «недоказанным», хотя шаг и причина были отмечены.
+ */
+function failureOf(input: ProjectTestManualResultInput): ProjectTestFailure | undefined {
+  if (input.status !== 'failed' && input.status !== 'blocked') return undefined;
+  const red = input.steps?.find((step) => step.status === 'failed' || step.status === 'blocked');
+  const actual = red?.note?.trim() || input.note?.trim() || undefined;
+  if (!red && !actual) return undefined;
+  return { step: red ? red.index + 1 : undefined, actual };
 }

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { toXlsx } from './export-cases.ts';
 import { importCases, parseCsv, parseRows, readXlsx } from './import-cases.ts';
 import { createGroup, readGroups } from './store.ts';
+import { ProjectTestsNotFoundError } from './files.ts';
 
 /**
  * Импорт кейсов из таблиц. Главное здесь — что колонки опознаются ПО
@@ -105,6 +106,18 @@ describe('импорт кейсов', () => {
     ]);
     // Пустая вторая пара колонок не даёт пустого шага.
     expect(rows[2]?.steps).toHaveLength(1);
+  });
+
+  it('импорт в несуществующую группу — 404, а не новый файл группы', () => {
+    expect(() =>
+      importCases(root, {
+        format: 'csv',
+        groupId: 'nope',
+        content: fixture('cases.csv'),
+        now: NOW,
+      }),
+    ).toThrow(ProjectTestsNotFoundError);
+    expect(readGroups(root).map((group) => group.id)).toEqual(['gui']);
   });
 
   it('кладёт кейсы в группу и помечает их человеческими', () => {

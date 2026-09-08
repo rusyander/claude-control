@@ -3,9 +3,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectTestCase } from '@agentdeck/contracts';
-import { readGroups, upsertCase } from './store.ts';
+import { createGroup, readGroups, upsertCase } from './store.ts';
 import {
   applyDraft,
+  confineDraft,
   draftFile,
   readDraft,
   readDraftSummaries,
@@ -152,6 +153,7 @@ describe('project-tests drafts', () => {
   });
 
   it('галочка не переписывает кейс человека — такую правку принимают руками', () => {
+    createGroup(root, 'gui');
     upsertCase(root, 'gui', { title: 'Мой кейс', oracle: 'Так и должно быть' }, NOW);
     const mine = caseIn(root, 'gui', 'gui-001');
     expect(mine?.source).toBe('human');
@@ -412,5 +414,121 @@ describe('project-tests drafts', () => {
       expect(caseIn(root, 'gui', 'gui-001')?.links).toBeUndefined();
       expect(caseIn(root, 'gui', 'gui-001')?.codePaths).toBeUndefined();
     });
+  });
+});
+
+describe('project-tests drafts: группа — выбор человека', () => {
+  let root = '';
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-draft-home-'));
+    writeGroupFile(root, 'gui', [
+      { ...proposedCase('gui-001', 'Вход'), source: 'agent' } as unknown as ProjectTestCase,
+    ]);
+    writeGroupFile(root, 'api', [
+      { ...proposedCase('api-001', 'Пинг'), source: 'agent' } as unknown as ProjectTestCase,
+    ]);
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  it('новый кейс, положенный агентом в чужую группу, переезжает в выбранную с новым id', () => {
+    writeDraftFile(root, RUN, [
+      {
+        op: 'add',
+        groupId: 'gui',
+        caseId: 'gui-007',
+        case: proposedCase('gui-007', 'Email без @'),
+      },
+      {
+        op: 'update',
+        groupId: 'gui',
+        caseId: 'gui-001',
+        case: proposedCase('gui-001', 'Вход, дополнено'),
+      },
+      {
+        op: 'update',
+        groupId: 'gui',
+        caseId: 'gui-099',
+        case: proposedCase('gui-099', 'Правка несуществующего'),
+      },
+      { op: 'add', groupId: 'api', caseId: 'api-002', case: proposedCase('api-002', 'Свой') },
+    ]);
+
+    const draft = confineDraft(root, readDraft(root, RUN)!, 'api');
+
+    expect(draft.items.map((item) => [item.op, item.groupId, item.caseId])).toEqual([
+      ['add', 'api', 'api-003'],
+      ['update', 'gui', 'gui-001'],
+      ['add', 'api', 'api-004'],
+      ['add', 'api', 'api-002'],
+    ]);
+    expect(draft.items[0]?.testCase.id).toBe('api-003');
+    expect(draft.warnings?.join(' ')).toMatch(/перенесено в группу «api»: 2/);
+    // Переложенный черновик лежит на диске — окно приёмки читает файл.
+    expect(readDraft(root, RUN)?.items[0]?.groupId).toBe('api');
+
+    applyDraft(root, RUN, { now: LATER });
+    expect(caseIn(root, 'api', 'api-003')?.title).toBe('Email без @');
+    expect(caseIn(root, 'gui', 'gui-007')).toBeUndefined();
+    expect(caseIn(root, 'gui', 'gui-001')?.title).toBe('Вход, дополнено');
+  });
+
+  it('без выбранной группы и без чужих кейсов черновик не трогается', () => {
+    writeDraftFile(root, RUN, [
+      { op: 'add', groupId: 'gui', caseId: 'gui-007', case: proposedCase('gui-007', 'X') },
+    ]);
+    const file = join(root, draftFile(RUN));
+    const before = readFileSync(file, 'utf8');
+
+    const same = confineDraft(root, readDraft(root, RUN)!, undefined);
+    const home = confineDraft(root, readDraft(root, RUN)!, 'gui');
+
+    expect(same.items[0]?.groupId).toBe('gui');
+    expect(home.warnings).toBeUndefined();
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+});
+
+describe('project-tests drafts: отклонение остатка не отнимает откат', () => {
+  let root = '';
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-draft-reject-'));
+    writeGroupFile(root, 'gui', []);
+    writeDraftFile(root, RUN, [
+      { op: 'add', groupId: 'gui', caseId: 'gui-001', case: proposedCase('gui-001', 'Взятый') },
+      { op: 'add', groupId: 'gui', caseId: 'gui-002', case: proposedCase('gui-002', 'Лишний') },
+    ]);
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  it('взять один и отклонить остальные — черновик остаётся на месте и откатывается', () => {
+    applyDraft(root, RUN, { caseIds: ['gui-001'], now: LATER });
+    const rejected = rejectDraft(root, RUN);
+
+    expect(rejected.items.map((item) => item.state)).toEqual(['accepted', 'rejected']);
+    expect(readDraft(root, RUN)?.status).toBe('applied');
+    expect(readDraftSummaries(root).map((item) => item.runId)).toEqual([RUN]);
+
+    const result = rollbackDraft(root, RUN);
+    expect(result.removed).toBe(1);
+    expect(caseIn(root, 'gui', 'gui-001')).toBeUndefined();
+    // Откатили всё принятое — теперь черновику в живом списке делать нечего.
+    expect(readDraft(root, RUN)).toBeUndefined();
+  });
+
+  it('отклонённый целиком уезжает в архив, как и раньше', () => {
+    rejectDraft(root, RUN);
+
+    expect(readDraft(root, RUN)).toBeUndefined();
+    expect(
+      existsSync(join(root, '.agent', 'tests', 'drafts', 'archive', `${RUN}.draft.json`)),
+    ).toBe(true);
   });
 });

@@ -10,7 +10,7 @@ import { TabButton } from '@shared/ui/tab-button';
 import { SelectField } from '@shared/ui/select-field';
 import { EmptyState } from '@shared/ui/empty-state';
 import { SkeletonList } from '@shared/ui/skeleton';
-import { useStartManualRun } from '@entities/ProjectTest';
+import { useManualSession, useStartManualRun } from '@entities/ProjectTest';
 import { TestSettingsModal, useTestsBoard } from '@features/ProjectTests';
 import { TestRunnerModal } from '@features/TestRunner';
 import { TestPlansPanel } from '@features/TestPlans';
@@ -52,6 +52,10 @@ export function TestsPage() {
   const projectPath = project.selected?.path;
   const board = useTestsBoard(projectPath, true);
   const startManual = useStartManualRun(projectPath);
+  // «Вернуться к проходу» обещает проход, к которому есть куда вернуться; без
+  // сессии та же кнопка открывает пустой пульт — и называется по нему.
+  const manual = useManualSession(projectPath);
+  const hasManualSession = Boolean(manual.data && !manual.data.finishedAt);
 
   const [scope, setScope] = useState('');
   const [environmentId, setEnvironmentId] = useState('');
@@ -96,7 +100,7 @@ export function TestsPage() {
               leftIcon={<Icon name="refresh" size={20} />}
               onClick={() => setRunnerOpen(true)}
             >
-              {t('tests.runner.resume')}
+              {t(hasManualSession ? 'tests.runner.resume' : 'tests.runner.title')}
             </Button>
           )
         }

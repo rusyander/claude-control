@@ -133,6 +133,9 @@ await page.route('**/api/project-tests/env-secrets*', async (route) =>
 await page.route('**/api/project-tests/runs*', async (route) =>
   route.fulfill({ json: { runs: [] } }),
 );
+// Шапка страницы спрашивает ручную сессию, чтобы назвать кнопку «Ручной проход»
+// или «Вернуться к проходу»; без заглушки настоящий сервер отвечает 400.
+await page.route('**/api/project-tests/manual*', async (route) => route.fulfill({ json: {} }));
 await page.route('**/api/project-tests/lint*', async (route) =>
   route.fulfill({
     json: {

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { buildJUnitReport, exportGroup, toCsv, toMarkdown, toXlsx } from './export-cases.ts';
 import { importCases, readXlsx } from './import-cases.ts';
 import { createGroup, readGroups } from './store.ts';
+import { ProjectTestsNotFoundError } from './files.ts';
 
 /**
  * Выгрузка кейсов. Проверяется одно свойство, ради которого она такая, какая
@@ -168,6 +169,8 @@ describe('выгрузка кейсов', () => {
     writeFileSync(join(root, '.agent', 'tests', 'broken.tests.json'), '{ сломано');
 
     expect(() => exportGroup(root, 'broken', 'csv')).toThrow(/broken/);
+    // Несуществующая группа — 404 с именем, а не пустая таблица с заголовками.
+    expect(() => exportGroup(root, 'nope', 'csv')).toThrow(ProjectTestsNotFoundError);
     expect(() => exportGroup(root, 'gui', 'pdf' as 'csv')).toThrow(/Неизвестный формат/);
   });
 

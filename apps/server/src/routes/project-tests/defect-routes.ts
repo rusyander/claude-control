@@ -74,8 +74,11 @@ export function registerTestDefectRoutes(app: FastifyInstance, deps: TestsDeps):
   }>('/api/project-tests/defect', (request, reply) => {
     const root = requireRoot(request.body?.path, reply);
     if (!root) return reply;
-    const groupId = String(request.body?.groupId ?? '');
-    const caseId = String(request.body?.caseId ?? '');
+    const groupId = String(request.body?.groupId ?? '').trim();
+    const caseId = String(request.body?.caseId ?? '').trim();
+    if (!groupId || !caseId) {
+      return reply.code(400).send({ message: 'Не указан кейс, по которому заводится дефект.' });
+    }
 
     return guard(reply, () => {
       const group = readGroup(root, groupId);

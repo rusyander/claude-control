@@ -2651,7 +2651,7 @@ export const en: TranslationSchema = {
       'The agent looks around the app and proposes cases; it extends existing ones and marks dead ones. They reach the library once you accept them.',
     generateDiff: 'From the diff',
     generateDiffHint:
-      'Cases for what changed in the branch (origin/main..HEAD): the agent reads the list of touched files instead of the whole app, and fills codePaths from it.',
+      'Cases for what changed in the branch against main (or in the working tree when there is only one branch): the agent reads the list of touched files instead of the whole app, and fills codePaths from it.',
     generateRequirement: 'Cover with cases',
     generateRequirementHint:
       'The agent reads the tracker issue and proposes cases for it; the requirement link is filled in, and the row stops being uncovered.',

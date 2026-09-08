@@ -237,3 +237,51 @@ describe('импорт результатов', () => {
     expect(many.map((item) => item.status)).toEqual(['passed', 'skipped']);
   });
 });
+
+describe('импорт результатов: ключи id и allure_id', () => {
+  let root = '';
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-import-ids-'));
+    writeCases(root, [
+      {
+        id: 'gui-001',
+        title: 'Открытие чата',
+        steps: [],
+        automation: { status: 'automated', file: 'e2e/chat.spec.ts', externalId: 'TC-77' },
+        status: 'unknown',
+      },
+    ]);
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  it('свойство junit «id» ложится на externalId — так помечают тесты pytest и Allure', () => {
+    const xml =
+      '<testsuites><testsuite name="s"><testcase classname="c" name="что угодно">' +
+      '<properties><property name="id" value="TC-77"/></properties>' +
+      '<failure message="упало"/></testcase></testsuite></testsuites>';
+
+    const result = importResults(root, { format: 'junit', content: xml, now: NOW });
+
+    expect(result.matched).toBe(1);
+    expect(statuses(root)['gui-001']).toBe('failed');
+  });
+
+  it('метка allure_id тоже ключ', () => {
+    const result = importResults(root, {
+      format: 'allure',
+      content: JSON.stringify({
+        name: 'иначе названный',
+        status: 'passed',
+        labels: [{ name: 'allure_id', value: 'TC-77' }],
+      }),
+      now: NOW,
+    });
+
+    expect(result.matched).toBe(1);
+    expect(statuses(root)['gui-001']).toBe('passed');
+  });
+});

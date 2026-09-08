@@ -21,7 +21,8 @@ import {
   testsPath,
   writeJson,
 } from './files.ts';
-import { loadForWrite, parseCase, writeGroup } from './store.ts';
+import { freeCaseId } from './import-cases.ts';
+import { loadForWrite, parseCase, readGroups, writeGroup } from './store.ts';
 
 /**
  * Черновик генерации: что прогон ПРЕДЛОЖИЛ добавить в библиотеку.
@@ -333,6 +334,52 @@ function stamped(testCase: ProjectTestCase, stamp?: ProjectTestGenerateStamp): P
  * а не берёт из файла агента: откат обязан возвращать то, что было на самом
  * деле, иначе он вернёт выдумку.
  */
+/**
+ * Новые кейсы ложатся в группу, которую выбрал человек.
+ *
+ * Агент читает всю библиотеку и кладёт «кейс про вход» туда, где уже лежат
+ * кейсы про вход, — а генерацию запускали в другую группу, и именно её человек
+ * увидит пустой. Правка существующего кейса остаётся при кейсе: он лежит в
+ * одной группе. Ненайденный «update» — тот же новый кейс. Id выдаёт панель:
+ * агентский `gui-007` в группе `api` читался бы как чужой.
+ */
+export function confineDraft(
+  root: string,
+  draft: ProjectTestDraft,
+  groupId: string | undefined,
+): ProjectTestDraft {
+  if (!groupId || draft.error) return draft;
+  const groups = readGroups(root);
+  const home = groups.find((group) => group.id === groupId);
+  const taken = new Set([
+    ...(home?.cases.map((item) => item.id) ?? []),
+    ...draft.items.filter((item) => item.groupId === groupId).map((item) => item.caseId),
+  ]);
+
+  let moved = 0;
+  const items = draft.items.map((item): ProjectTestDraftItem => {
+    if (item.groupId === groupId) return item;
+    const own = groups.find((group) => group.id === item.groupId);
+    if (own?.cases.some((entry) => entry.id === item.caseId)) return item;
+    const caseId = freeCaseId(groupId, taken, taken.size + 1);
+    taken.add(caseId);
+    moved += 1;
+    return { ...item, op: 'add', groupId, caseId, testCase: { ...item.testCase, id: caseId } };
+  });
+  if (moved === 0) return draft;
+
+  const next: ProjectTestDraft = {
+    ...draft,
+    items,
+    warnings: [
+      ...(draft.warnings ?? []),
+      `Новых кейсов перенесено в группу «${groupId}»: ${moved} — её выбрал человек при запуске.`,
+    ],
+  };
+  writeDraft(root, next);
+  return next;
+}
+
 export function applyDraft(
   root: string,
   runId: string,
@@ -442,7 +489,10 @@ export function rejectDraft(root: string, runId: string): ProjectTestDraft {
   );
   const next: ProjectTestDraft = { ...draft, items, status: statusOf(items, 'rejected') };
   if (!draft.error) writeDraft(root, next);
-  archiveDraft(root, runId);
+  // Принятое остаётся откатываемым: «взять один, остальные отклонить» — обычный
+  // ход приёмки, и в архиве такой черновик терял бы обещанную отмену (404 на
+  // откат). В архив уезжает только то, из чего в библиотеку ничего не попало.
+  if (!items.some((item) => item.state === 'accepted')) archiveDraft(root, runId);
   return next;
 }
 

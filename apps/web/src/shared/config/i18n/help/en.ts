@@ -4292,10 +4292,12 @@ export const helpEn: HelpSchema = {
         'stops being uncovered right after acceptance, not when the model remembers about links.',
       sourceDiff: 'From the branch diff',
       sourceDiffText:
-        'The "By diff" button in the run bar: the origin/main..HEAD comparison. The task gets ' +
-        'the PATHS and the summary, not the changes themselves — the whole patch would push ' +
-        'the library out of the window the run exists for. A case with no codePaths of its own ' +
-        'gets them from the diff.',
+        'The "By diff" button in the run bar: the branch compared with main — the panel tries ' +
+        'origin/main, origin/master, main and master in turn, and in a single-branch repository ' +
+        'takes the working tree; an empty diff stops the run instead of sending the agent to ' +
+        'guess. The task gets the PATHS and the summary, not the changes themselves — the whole ' +
+        'patch would push the library out of the window the run exists for. A case with no ' +
+        'codePaths of its own gets them from the diff.',
       sourceDefect: 'From a failure',
       sourceDefectText:
         'The "Regression case" button at a red result in the run history. The steps of the ' +
@@ -4315,7 +4317,9 @@ export const helpEn: HelpSchema = {
         'proposals as a list.',
       draftFile: 'Where the proposals live',
       draftFileText:
-        "A run's draft is the file .agent/tests/drafts/<run>.draft.json. Until it is accepted " +
+        "A run's draft is the file .agent/tests/drafts/<run>.draft.json. New cases land in the " +
+        'group chosen at launch even when the agent named another one — the panel moves them and ' +
+        'assigns the ids itself; an edit of an existing case stays in its group. Until it is accepted ' +
         'the group files are untouched, and there is nothing to undo: the library is as it was.',
       draftPick: 'One by one, not all at once',
       draftPickText:

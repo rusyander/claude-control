@@ -88,6 +88,20 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       sourceCase: request.body?.sourceCase,
     };
 
+    // Зеркало замка группы: пока человек отмечает кейсы, агент в тот же файл не
+    // пишет. Без этого ручной прогон, начатый первым, ронял результаты агента —
+    // и наоборот. Прогон без группы (план, вся библиотека) задевает любую.
+    const manual = deps.manual.get(root);
+    if (manual && !manual.finishedAt) {
+      const held = new Set(manual.points.map((point) => point.groupId));
+      if (!run.groupId || held.has(run.groupId)) {
+        return reply.code(409).send({
+          message: `Идёт ручной прогон (${manual.runId}) — он пишет в тот же файл. Закончи или отмени его.`,
+          runId: manual.runId,
+        });
+      }
+    }
+
     return guardAsync(reply, async () => {
       // Материал собирается ДО старта: не собрался — прогон не начинается, и
       // человек читает причину. Генерация «по требованию» без требования

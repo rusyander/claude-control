@@ -6,7 +6,7 @@ import {
   readBaselines,
   saveAttachment,
 } from '../../domains/project-tests.ts';
-import { guard, idList, requireRoot, type TestsDeps } from './shared.ts';
+import { assertUnlocked, guard, idList, requireRoot, type TestsDeps } from './shared.ts';
 
 /** Статусы прохода. Список повторён здесь нарочно: приводить чужой ввод к
  * «unknown» молча нельзя — человек должен увидеть отказ, а не потерянный
@@ -46,6 +46,7 @@ export function registerTestManualRoutes(app: FastifyInstance, deps: TestsDeps):
           environmentId: request.body?.environmentId || undefined,
         },
         now(),
+        (groupId) => assertUnlocked(deps, root, groupId),
       ),
     }));
   });

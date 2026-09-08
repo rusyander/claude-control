@@ -89,7 +89,9 @@ export function TestSecretsModal({
     >
       <Stack gap="var(--spacing-md)">
         <Stack gap="var(--spacing-2xs)">
-          {items.length === 0 && (
+          {/* «Доступов нет» — только когда ответ пришёл: пока список грузится,
+              та же подпись врёт человеку, у которого доступы давно заданы. */}
+          {secrets.data && items.length === 0 && (
             <Typography variant="caption" color="subtle">
               {t('tests.secrets.empty')}
             </Typography>

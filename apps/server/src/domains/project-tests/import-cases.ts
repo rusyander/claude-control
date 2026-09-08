@@ -15,7 +15,7 @@ import { readZip } from '../../lib/zip.ts';
 import { ProjectFileError, resolveProjectPath } from '../project-files/paths.ts';
 import { ProjectTestsError } from './files.ts';
 import { findElements, textContent } from './import-xml.ts';
-import { loadForWrite, writeGroup } from './store.ts';
+import { requireGroup, writeGroup } from './store.ts';
 
 /**
  * Кейсы ИЗВНЕ: таблица, книга Excel, выгрузка TestRail.
@@ -609,7 +609,7 @@ export function applyRows(
   rows: ParsedCaseRow[],
   now: string,
 ): { matched: number; created: number } {
-  const group = loadForWrite(root, groupId);
+  const group = requireGroup(root, groupId);
   const taken = new Set(group.cases.map((item) => item.id));
   const byId = new Map(group.cases.map((item) => [item.id.toLowerCase(), item.id]));
   const byTitle = new Map(group.cases.map((item) => [item.title.trim().toLowerCase(), item.id]));

@@ -162,9 +162,13 @@ The full section-by-section breakdown is in [LIMITATIONS.md](docs/LIMITATIONS.md
 
 ## License
 
-[PolyForm Perimeter 1.0.1](LICENSE) — use, modify and redistribute it freely, at home and at work,
-inside a company and in commercial projects; keep the required notice. The one thing the license
-withholds is building a product that competes with this one. The software comes with no warranty.
+[GNU AGPL-3.0-or-later](LICENSE). Copyright (C) 2026 Rustam Urmanov.
 
-This is a source-available licence, not an OSI-approved open-source one. Earlier commits carried an
-MIT `LICENSE`; that grant stays with the snapshots that shipped it.
+Use, modify and redistribute it freely, at home and at work, inside a company and in commercial
+projects. The one condition that matters here: if you change it and let others use your version
+over a network, you must offer them the source of that version under the same license
+(section 13). The software comes with no warranty.
+
+Earlier snapshots shipped under MIT and, from 2026-08-05, under PolyForm Perimeter 1.0.1; those
+grants stay with the commits that carried them. Use under other terms is negotiated with the
+author separately.

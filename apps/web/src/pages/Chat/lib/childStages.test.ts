@@ -23,6 +23,63 @@ function run(over: Partial<ActiveRunView> & { id: string }): ActiveRunView {
 }
 
 describe('collectChildStages', () => {
+  it('время до первой правки — по звену работы, без момента поля нет', () => {
+    const chats = [
+      chat({
+        id: 'work',
+        parentId: 'parent',
+        branch: 'probe/a',
+        stage: 'work',
+        createdAt: '2026-09-09T10:00:00.000Z',
+        firstEditAt: '2026-09-09T10:01:12.000Z',
+      }),
+      chat({
+        id: 'review',
+        parentId: 'parent',
+        branch: 'probe/a',
+        stage: 'review',
+        createdAt: '2026-09-09T10:30:00.000Z',
+        firstEditAt: '2026-09-09T10:30:05.000Z',
+      }),
+      chat({ id: 'other', parentId: 'parent', branch: 'probe/b', stage: 'work' }),
+    ];
+    const [a, b] = collectChildStages(chats, 'parent', []);
+    expect(a?.firstEditAfterMs).toBe(72_000);
+    expect(b?.firstEditAfterMs).toBeUndefined();
+  });
+
+  it('время в работе — сумма звеньев от заведения до последней записи, паузы между ними не в счёт', () => {
+    const chats = [
+      chat({
+        id: 'work',
+        parentId: 'parent',
+        branch: 'probe/a',
+        stage: 'work',
+        createdAt: '2026-09-09T10:00:00.000Z',
+        updatedAt: '2026-09-09T10:05:00.000Z',
+      }),
+      chat({
+        id: 'review',
+        parentId: 'parent',
+        branch: 'probe/a',
+        stage: 'review',
+        createdAt: '2026-09-09T10:30:00.000Z',
+        updatedAt: '2026-09-09T10:31:20.000Z',
+      }),
+      chat({
+        id: 'broken',
+        parentId: 'parent',
+        branch: 'probe/b',
+        stage: 'work',
+        createdAt: '',
+        updatedAt: '',
+      }),
+    ];
+    const [a, b] = collectChildStages(chats, 'parent', []);
+    expect(a?.workMs).toBe(380_000);
+    expect(b?.workMs).toBeUndefined();
+  });
+
   it('без родителя и без детей молчит', () => {
     expect(collectChildStages([chat({ id: 'a' })], undefined, [])).toEqual([]);
     expect(collectChildStages([chat({ id: 'a' })], 'parent', [])).toEqual([]);
@@ -124,5 +181,96 @@ describe('collectChildStages', () => {
       collectChildStages(chats, 'parent', [run({ id: 'session-1', status: 'waiting' })])[0]
         ?.isRunning,
     ).toBe(false);
+  });
+
+  it('уровни (Т1): разбор первой строкой, группы без чата — по порядку разбора, с тем, чего ждут', () => {
+    const chats = [
+      chat({ id: 'triage', parentId: 'parent', stage: 'triage', groupTitle: 'Разбор разделения' }),
+      chat({
+        id: 'plan-a',
+        parentId: 'parent',
+        branch: 'feature/login',
+        stage: 'plan',
+        groupTitle: 'Форма входа',
+        createdAt: '2026-09-09T10:03:00.000Z',
+      }),
+    ];
+    const rows = collectChildStages(chats, 'parent', [], {
+      parentChatId: 'parent',
+      triageChatId: 'triage',
+      order: [1, 0, 2],
+      groups: [
+        {
+          index: 0,
+          title: 'Форма входа',
+          branch: 'feature/login',
+          after: [],
+          status: 'started',
+          chatId: 'plan-a',
+        },
+        {
+          index: 1,
+          title: 'Шапка',
+          branch: 'feature/header',
+          after: [],
+          status: 'held',
+          hold: 'Цвет?',
+        },
+        {
+          index: 2,
+          title: 'Тесты',
+          branch: 'feature/tests',
+          after: [1, 0],
+          status: 'waiting',
+          holdAnswer: 'Chrome',
+          base: 'feature/login',
+        },
+      ],
+    });
+
+    expect(rows.map((row) => row.title)).toEqual([
+      'Разбор разделения',
+      'Шапка',
+      'Форма входа',
+      'Тесты',
+    ]);
+    expect(rows[0]).toMatchObject({ chatId: 'triage', stages: ['triage'] });
+    expect(rows[1]).toMatchObject({
+      chatId: '',
+      pending: 'held',
+      hold: { index: 1, question: 'Цвет?' },
+    });
+    expect(rows[2]).toMatchObject({ chatId: 'plan-a', stages: ['plan'], branch: 'feature/login' });
+    expect(rows[3]).toMatchObject({
+      chatId: '',
+      pending: 'waiting',
+      waitsFor: ['Шапка', 'Форма входа'],
+      holdAnswered: true,
+      base: 'feature/login',
+    });
+  });
+
+  it('незнакомая стадия читается как работа, а первая правка считается по звену работы, не плана', () => {
+    const chats = [
+      chat({
+        id: 'plan',
+        parentId: 'parent',
+        branch: 'feature/a',
+        stage: 'plan',
+        createdAt: '2026-09-09T10:00:00.000Z',
+        firstEditAt: '2026-09-09T10:00:30.000Z',
+      }),
+      chat({
+        id: 'work',
+        parentId: 'parent',
+        branch: 'feature/a',
+        stage: 'something',
+        createdAt: '2026-09-09T10:10:00.000Z',
+        firstEditAt: '2026-09-09T10:10:20.000Z',
+      }),
+    ];
+    const [row] = collectChildStages(chats, 'parent', []);
+    expect(row?.stages).toEqual(['plan', 'work']);
+    expect(row?.firstEditAfterMs).toBe(20_000);
   });
 });

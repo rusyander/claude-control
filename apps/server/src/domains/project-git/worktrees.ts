@@ -1,9 +1,15 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import type { ProjectWorktree, ProjectWorktreesInfo } from '@agentdeck/contracts';
+import type {
+  ProjectWorktree,
+  ProjectWorktreesInfo,
+  WorktreeMirrorReport,
+  WorktreeMirrorSettings,
+} from '@agentdeck/contracts';
 import { GIT_NETWORK_TIMEOUT_MS } from './constants.ts';
 import { git, GitError } from './exec.ts';
+import { describeMirror, mirrorLocalLayer } from './mirror-local.ts';
 import { isGitRepo, requireRepo } from './read.ts';
 import { assertBranchName } from './write.ts';
 
@@ -179,7 +185,14 @@ export async function listWorktrees(projectDir: string): Promise<ProjectWorktree
 export async function addWorktree(
   projectDir: string,
   name: string,
-): Promise<{ path: string; output: string }> {
+  mirror?: WorktreeMirrorSettings,
+  /**
+   * От какой ветки отвести НОВУЮ ветку копии. Нужно группе разделения, которая
+   * ждала предшественников (Т1): её копия начинается с их правок. Пусто — от
+   * HEAD основной копии, как и раньше; у уже существующей ветки база не в счёт.
+   */
+  base?: string,
+): Promise<{ path: string; output: string; mirror?: WorktreeMirrorReport }> {
   const info = await requireRepo(projectDir);
   if (info.unborn) {
     throw new GitError('В репозитории ещё нет коммитов — сначала сделайте первый коммит');
@@ -213,7 +226,9 @@ export async function addWorktree(
     ? ['worktree', 'add', target, value]
     : info.remote && info.remoteBranches.includes(value)
       ? ['worktree', 'add', '--track', '-b', value, target, `${info.remote}/${value}`]
-      : ['worktree', 'add', '-b', value, target];
+      : base?.trim()
+        ? ['worktree', 'add', '-b', value, target, base.trim()]
+        : ['worktree', 'add', '-b', value, target];
 
   let out: string;
   try {
@@ -223,10 +238,47 @@ export async function addWorktree(
     throw explainAddFailure(error, target);
   }
   await ensureLongPaths(projectDir);
+
+  // Локальный слой — сразу, не спрашивая: без него первый ход агента в копии
+  // уходит на «настройку worktree». Отказ зеркала копию не отменяет: она уже
+  // есть и рабочая, а что не перенеслось — сказано в выводе.
+  let report: WorktreeMirrorReport | undefined;
+  let mirrorLine: string;
+  try {
+    report = await mirrorLocalLayer(main.path, target, mirror);
+    mirrorLine = describeMirror(report);
+  } catch (error) {
+    mirrorLine = `Локальный слой не перенесён: ${error instanceof Error ? error.message : String(error)}`;
+  }
+
+  const created = out.trim() || `Копия ${target} готова на ветке ${value}`;
   return {
     path: resolve(target),
-    output: out.trim() || `Копия ${target} готова на ветке ${value}`,
+    output: `${created}\n${mirrorLine}`,
+    ...(report ? { mirror: report } : {}),
   };
+}
+
+/**
+ * Повторное зеркало в существующую копию — кнопкой на карточке или разделением
+ * в уже заведённую копию. Перезаписывается только то, что в основной копии
+ * свежее; основная копия зеркалом не бывает.
+ */
+export async function mirrorWorktree(
+  projectDir: string,
+  worktreePath: string,
+  mirror?: WorktreeMirrorSettings,
+): Promise<{ output: string; mirror: WorktreeMirrorReport }> {
+  const list = await readWorktrees(projectDir);
+  const main = list[0];
+  if (!main) throw new GitError('git не назвал ни одной рабочей копии');
+  const target = list.find((item) => samePath(item.path, worktreePath));
+  if (!target) throw new GitError(`Копии ${worktreePath} нет в списке git`);
+  if (target.isMain) throw new GitError('Основная копия — источник локального слоя, не приёмник');
+  if (!existsSync(target.path)) throw new GitError(`Каталога ${target.path} больше нет`);
+
+  const report = await mirrorLocalLayer(main.path, target.path, mirror, { newerOnly: true });
+  return { output: describeMirror(report), mirror: report };
 }
 
 /**

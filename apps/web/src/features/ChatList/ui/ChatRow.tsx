@@ -63,11 +63,21 @@ export function ChatRow({
             {chat.title}
           </Typography>
           {/* Звено конвейера. У работы метки нет: она и так подразумевается, а
-              подписать каждый второй чат «работа» значит спрятать те два, ради
+              подписать каждый второй чат «работа» значит спрятать те, ради
               которых метка и заведена. */}
-          {(chat.stage === 'review' || chat.stage === 'fix') && (
+          {(chat.stage === 'triage' ||
+            chat.stage === 'plan' ||
+            chat.stage === 'review' ||
+            chat.stage === 'fix') && (
             <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
               {t(`chat.cascade.stage.${chat.stage}`)}
+            </Typography>
+          )}
+          {/* Дерево разговора стоит на паузе: в списке иначе остановленный
+              ребёнок неотличим от просто молчащего. */}
+          {chat.paused && (
+            <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
+              {t('chat.cascade.tree.paused')}
             </Typography>
           )}
         </Stack>

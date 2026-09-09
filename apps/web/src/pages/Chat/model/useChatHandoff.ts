@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import type { HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 import { HANDOFF_MAX_CHAIN, contextHandoffProposal } from '@agentdeck/contracts/chat-handoff';
@@ -9,7 +10,7 @@ import {
   projectShortName,
   tabContaining,
 } from '@shared/lib/workspace';
-import { agentRuns } from '@shared/lib/agent-runs';
+import { agentRuns, type HandoffEvent } from '@shared/lib/agent-runs';
 import { saveDraft } from '@shared/lib/draft';
 import { toast } from '@shared/lib/toast';
 import { chatKeys } from '@entities/Chat';
@@ -18,6 +19,7 @@ import {
   fetchHandoffState,
   setHandoffAuto,
   fetchHandoffRequestPrompt,
+  restartSession,
 } from '@entities/ChatHandoff';
 import type { HandoffControls } from '@features/ChatMessages';
 import type { ViewTarget } from './useChatSession';
@@ -41,6 +43,12 @@ export interface ChatHandoffInput {
 export interface ChatHandoffApi {
   /** Кнопка «Закрыть этап»: просим агента подготовить продолжение. */
   askHandoff?: () => void;
+  /**
+   * «Перезапустить сессию» из меню шапки: свежий файл-опора — продолжение
+   * заводится сразу; устаревший — агенту уходит просьба обновить его, а автомат
+   * разговора включается. Пусто — разговора или проекта ещё нет.
+   */
+  restartSession?: () => void;
   /** Всё, что нужно карточке в ленте; пусто — продолжать некуда (нет проекта). */
   controls?: HandoffControls;
 }
@@ -58,6 +66,35 @@ export interface ChatHandoffApi {
  * включают его в тот момент, когда впервые видят, что именно панель собирается
  * сделать, — и ровно для этой работы, а не для всех сразу.
  */
+/** Текст ошибки для тоста: фраза сервера, если она есть, иначе — сетевая. */
+function apiMessage(error: unknown): string {
+  const response = (error as { response?: { data?: { message?: unknown } } }).response;
+  const message = response?.data?.message;
+  return typeof message === 'string' && message ? message : (error as Error).message;
+}
+
+/**
+ * Единственная строка, которую человек прочтёт о заведённом панелью разговоре.
+ *
+ * Звено конвейера — не «продолжение в чистой сессии», и называть его так значит
+ * соврать: работу проверяет другая модель, а не продолжает та же. Работа после
+ * плана (Т1) — тоже звено, и сказать о ней надо ровно тогда, когда плана НЕТ:
+ * работа пошла без опоры, и это единственное место, где об этом скажут.
+ */
+function stageToast(event: HandoffEvent, name: string, t: TFunction): string {
+  if (event.stage === 'review' || event.stage === 'fix') {
+    return t(`chat.cascade.started.${event.stage}`, {
+      name,
+      count: event.findings?.length ?? 0,
+    });
+  }
+  if (event.stage === 'work') {
+    const key = event.planMissing ? 'workNoPlan' : 'work';
+    return t(`chat.cascade.started.${key}`, { name });
+  }
+  return t('chat.handoff.autoDone', { name });
+}
+
 export function useChatHandoff({
   projectPath,
   chatId,
@@ -192,13 +229,17 @@ export function useChatHandoff({
       // Звено конвейера — не «продолжение в чистой сессии», и называть его так
       // значит соврать в единственной строке, которую человек об этом прочтёт:
       // работу проверяет другая модель, а не продолжает та же.
-      const done =
-        event.stage === 'review' || event.stage === 'fix'
-          ? t(`chat.cascade.started.${event.stage}`, {
-              name: projectShortName(path),
-              count: event.findings?.length ?? 0,
-            })
-          : t('chat.handoff.autoDone', { name: projectShortName(path) });
+      // Работа после плана (Т1) — тоже звено: план дописан в задание, и сказать
+      // об этом надо ровно тогда, когда плана НЕТ — работа пошла без опоры.
+      const done = stageToast(event, projectShortName(path), t);
+      // Дерево на паузе — разговор заведён, но никто не работает: сказать
+      // «продолжено» значило бы соврать в единственной строке об этом.
+      if (event.deferred) {
+        toast.info(t('chat.cascade.tree.deferred', { name: projectShortName(path) }), {
+          onClick: () => showRef.current({ id: nextId, projectPath: path }),
+        });
+        return;
+      }
       toast.success(done, {
         onClick: () => showRef.current({ id: nextId, projectPath: path }),
       });
@@ -211,6 +252,38 @@ export function useChatHandoff({
     void fetchHandoffRequestPrompt()
       .then((prompt) => dispatch(prompt, []))
       .catch(() => toast.error(t('chat.handoff.askFailed')));
+  };
+
+  const [restarting, setRestarting] = useState(false);
+  const restart = (): void => {
+    if (!projectPath || !chatId || restarting) return;
+    setRestarting(true);
+    void restartSession(chatId, {
+      projectPath,
+      ...(sessionId ? { sessionId } : {}),
+      allowEdits,
+      model,
+      effort,
+    })
+      .then(async (outcome) => {
+        if (outcome.mode === 'started') {
+          adopt(outcome);
+          setChainDepth(outcome.chainDepth);
+          toast.success(t('chat.handoff.done'));
+          return;
+        }
+        // Файл-опора старее последней реплики: сервер уже включил автомат этого
+        // разговора, а просьбу обновить файл отправляем отсюда — обычным
+        // сообщением, чтобы она шла теми же моделью и правами, что и всё
+        // остальное. Конец этого хода панель доведёт до чистой сессии сама.
+        setAuto(true);
+        toast.info(t('chat.handoff.restartRequested'), { duration: 8_000 });
+        await dispatch(outcome.prompt, []);
+      })
+      .catch((error: unknown) => {
+        toast.error(t('chat.handoff.restartFailed', { message: apiMessage(error) }));
+      })
+      .finally(() => setRestarting(false));
   };
 
   const keepHere = (): void => {
@@ -260,6 +333,7 @@ export function useChatHandoff({
 
   return {
     ...(projectPath ? { askHandoff } : {}),
+    ...(projectPath && chatId ? { restartSession: restart } : {}),
     ...(projectPath
       ? {
           controls: {

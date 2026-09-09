@@ -1,0 +1,93 @@
+// Карточка решения по ревью чужого MR (Т7). Форма — как у продолжения и
+// разделения: они появляются в одном месте ленты, и разъезжаться им незачем.
+// Отличие в полосе: здесь решение о ЧУЖОМ репозитории, и карточка не должна
+// теряться среди отчётов.
+.card {
+  margin-bottom: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  border: 1px solid var(--color-accent);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+// Решённая карточка остаётся на месте, но перестаёт спорить за внимание:
+// убирать её нельзя — по ней человек вспоминает, что он выбрал.
+.decided {
+  border-color: var(--color-border);
+  border-left-color: var(--color-border);
+  box-shadow: none;
+}
+
+.head {
+  margin-bottom: var(--spacing-2xs);
+  color: var(--color-accent);
+}
+
+.count {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--color-surface-muted, var(--color-surface));
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.link {
+  display: block;
+  margin-bottom: var(--spacing-3xs);
+  overflow-wrap: anywhere;
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+}
+
+.branch {
+  display: block;
+  margin-bottom: var(--spacing-2xs);
+  color: var(--color-fg-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-caption);
+}
+
+// Копия отведена НЕ от ветки MR: ревью читало не тот дифф, и молчать об этом
+// нельзя — замечания могут быть уверенными и не про тот код.
+.warning {
+  margin-bottom: var(--spacing-2xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+  background: var(--color-warning-bg, var(--color-surface));
+  color: var(--color-warning-fg, var(--color-fg));
+}
+
+.list {
+  margin: 0 0 var(--spacing-sm);
+  padding-left: var(--spacing-md);
+}
+
+.item {
+  margin-bottom: var(--spacing-3xs);
+  white-space: pre-wrap;
+}
+
+.clean {
+  margin-bottom: var(--spacing-2xs);
+}
+
+.applyAll {
+  margin-bottom: var(--spacing-xs);
+}
+
+.actions {
+  margin-top: var(--spacing-2xs);
+}
+
+// Итог: что человек выбрал и чем это кончилось. Отказ форджа стоит здесь же —
+// решение сработало наполовину, и это надо читать одной строкой, а не искать.
+.outcome {
+  margin-top: var(--spacing-2xs);
+}
+
+.error {
+  color: var(--color-danger-fg, var(--color-fg));
+}

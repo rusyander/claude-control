@@ -41,6 +41,14 @@
 
 export { CHANGED_FILES_MAX, COMMIT_MESSAGE_MAX } from './project-git/constants.ts';
 export { GitError, stripGitProgress } from './project-git/exec.ts';
+export { describeMirror } from './project-git/mirror-local.ts';
+export { LOCKFILES, parseChurn, revertLockfileChurn } from './project-git/lockfiles.ts';
+export {
+  BOOTSTRAP_TIMEOUT_MS,
+  WorktreeBootstraps,
+  bootstrapCommandFor,
+  detectBootstrapCommand,
+} from './project-git/bootstrap.ts';
 export {
   parseBranches,
   parseNumstat,
@@ -48,10 +56,19 @@ export {
   parseStatus,
   pickRemote,
 } from './project-git/parse.ts';
-export { hasWorkSince, isGitRepo, readProjectGit, requireRepo } from './project-git/read.ts';
+export {
+  hasWorkSince,
+  isGitRepo,
+  parseDirtyPaths,
+  readBranchFiles,
+  readCurrentBranch,
+  readProjectGit,
+  requireRepo,
+} from './project-git/read.ts';
 export {
   addWorktree,
   listWorktrees,
+  mirrorWorktree,
   parseWorktrees,
   removeWorktree,
   worktreeDirFor,

@@ -124,7 +124,7 @@ export function TaskSplitCard({
   const isDone = done > 0;
 
   return (
-    <div className={styles.card}>
+    <div className={styles.card} data-split-card>
       <Stack direction="row" align="center" gap="var(--spacing-2xs)" className={styles.head}>
         <Icon name="branch" size={18} />
         <Typography variant="body-sm" weight="medium" as="span">
@@ -152,6 +152,19 @@ export function TaskSplitCard({
                 </Typography>
                 <span className={styles.branch}>{group.branch}</span>
               </Stack>
+              {/* Ревью-группа названа заголовком MR, а заголовки повторяются:
+                  решают тут по самому запросу на слияние, поэтому ссылка видна
+                  целиком и до кнопки, а не после заведения чата. */}
+              {group.review && (
+                <a
+                  className={styles.reviewLink}
+                  href={group.review.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  {group.review.url}
+                </a>
+              )}
               {/* Единственный пункт, дословно повторяющий заголовок, — это разбор
                   подставил название вместо списка, которого модель не прислала.
                   Печатать его второй раз незачем: строка та же самая. */}
@@ -249,11 +262,18 @@ export function TaskSplitCard({
         <Typography variant="caption" color="subtle" className={styles.cost}>
           {t('chat.split.cascade.cost', { chats: count, runs: createOnly ? 0 : count })}
           {lowered > 0 && ` · ${t('chat.split.cascade.loweredCount', { count: lowered })}`}
-          {/* Конвейер добавляет прогоны, а не агентов: у понижённой группы за
-              работой идут ревью и правки по его замечаниям, последовательно в той
-              же копии. Называем это ДО кнопки — столько панель заведёт сама. */}
-          {lowered > 0 &&
-            ` · ${t('chat.split.cascade.pipeline', { total: plannedRunCount(plans) })}`}
+          {/* Конвейер добавляет прогоны, а не агентов: разбор на всё разделение,
+              план у каждой группы, а у понижённой за работой ещё ревью и правки по
+              его замечаниям — последовательно в той же копии. Называем это ДО
+              кнопки: столько панель заведёт сама. «Только завести чаты» уровней
+              не получает, там счёт прежний. */}
+          {(lowered > 0 || !createOnly) &&
+            ` · ${t(
+              createOnly ? 'chat.split.cascade.pipeline' : 'chat.split.cascade.pipelinePlanned',
+              {
+                total: plannedRunCount(plans, { planned: !createOnly }),
+              },
+            )}`}
         </Typography>
       )}
 

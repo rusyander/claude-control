@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { HANDOFF_BLOCK_LANG } from '@agentdeck/contracts/chat-handoff';
+import { HANDOFF_BLOCK_LANG, HANDOFF_MAX_CHAIN } from '@agentdeck/contracts/chat-handoff';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { createHandoffPlanner, registerChatHandoffRoutes } from './chat/handoff-routes.ts';
@@ -29,6 +29,27 @@ const PROPOSAL = {
 
 function block(json: unknown): string {
   return ['```' + HANDOFF_BLOCK_LANG, JSON.stringify(json), '```'].join('\n');
+}
+
+/** Контекст сервера на временном каталоге — тот же, что собирает beforeEach. */
+function ctxOf(root: string, store: AppStore): ServerContext {
+  return {
+    location: {
+      paths: {
+        root,
+        appData: join(root, 'agentdeck'),
+        settings: join(root, 'settings.json'),
+        settingsLocal: join(root, 'settings.local.json'),
+        claudeMd: join(root, 'CLAUDE.md'),
+        skills: join(root, 'skills'),
+        hooks: join(root, 'hooks'),
+        mcpConfig: join(root, '.claude.json'),
+      },
+    },
+    store,
+    backupDir: join(root, 'agentdeck', 'backups'),
+    models: { current: () => ({ models: [] }) },
+  } as unknown as ServerContext;
 }
 
 describe('маршруты продолжения в чистой сессии', () => {
@@ -165,6 +186,107 @@ describe('маршруты продолжения в чистой сессии',
     });
 
     expect(response.statusCode).toBe(400);
+  });
+
+  describe('перезапуск сессии по кнопке', () => {
+    it('во время прогона — 409, ничего не заведено', async () => {
+      // Прогон, который не завершается сам: реестр считает его идущим.
+      const registry = new ChatRunRegistry((): RunLike => ({
+        start: () => new Promise(() => undefined),
+        stop: () => undefined,
+      }));
+      const busy = Fastify();
+      registerChatHandoffRoutes(busy, ctxOf(root, store), {
+        runs: registry,
+        chains: new HandoffChains(),
+        providerChats: new ProviderChatService(),
+        session: new ChatSession(registry),
+      });
+      await busy.ready();
+      registry.start('sess-busy', { prompt: 'работай', cwd: project }, { projectPath: project });
+
+      const response = await busy.inject({
+        method: 'POST',
+        url: '/api/chat/sess-busy/restart',
+        payload: { projectPath: project },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain('идёт');
+      await busy.close();
+    });
+
+    it('без транскрипта файл-опора считается несвежей: просьба обновить + автомат включён', async () => {
+      const chains = new HandoffChains();
+      const quiet = Fastify();
+      const registry = new ChatRunRegistry((): RunLike => ({
+        start: async () => undefined,
+        stop: () => undefined,
+      }));
+      registerChatHandoffRoutes(quiet, ctxOf(root, store), {
+        runs: registry,
+        chains,
+        providerChats: new ProviderChatService(),
+        session: new ChatSession(registry),
+      });
+      await quiet.ready();
+
+      const response = await quiet.inject({
+        method: 'POST',
+        url: '/api/chat/new-7/restart',
+        payload: { projectPath: project },
+      });
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.mode).toBe('requested');
+      expect(body.prompt).toContain('Обнови .agent/PROGRESS.md');
+      expect(body.prompt).toContain(HANDOFF_BLOCK_LANG);
+      expect(chains.isAuto(['new-7'])).toBe(true);
+      expect(registry.active()).toHaveLength(0);
+      await quiet.close();
+    });
+
+    it('свежий файл-опора: продолжение заводится сразу с последней репликой человека как заданием', async () => {
+      // Транскрипт разговора — под каталогом проектов панели, как его пишет CLI.
+      const projectsRoot = join(root, 'projects', 'proj');
+      mkdirSync(projectsRoot, { recursive: true });
+      const turnAt = new Date(Date.now() - 60_000).toISOString();
+      writeFileSync(
+        join(projectsRoot, 'sess-fresh.jsonl'),
+        [
+          JSON.stringify({
+            type: 'user',
+            uuid: 'u1',
+            sessionId: 'sess-fresh',
+            timestamp: turnAt,
+            cwd: project,
+            message: { role: 'user', content: 'Сделай экспорт отчётов' },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'a1',
+            sessionId: 'sess-fresh',
+            timestamp: new Date().toISOString(),
+            cwd: project,
+            message: { role: 'assistant', content: [{ type: 'text', text: 'Готово.' }] },
+          }),
+        ].join('\n') + '\n',
+      );
+      mkdirSync(join(project, '.agent'), { recursive: true });
+      writeFileSync(join(project, '.agent', 'PROGRESS.md'), 'next: документация\n');
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/chat/sess-fresh/restart',
+        payload: { projectPath: project, sessionId: 'sess-fresh', allowEdits: true },
+      });
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body).toMatchObject({ mode: 'started', started: true, path: project, chainDepth: 1 });
+      expect(started).toHaveLength(1);
+      expect(started[0]?.prompt).toContain('.agent/PROGRESS.md');
+      expect(started[0]?.prompt).toContain('Исходное задание');
+      expect(started[0]?.prompt).toContain('Сделай экспорт отчётов');
+    });
   });
 
   it('тумблер автомата ставится по одному написанию ключа, читается по другому', async () => {
@@ -356,6 +478,76 @@ describe('планировщик продолжения', () => {
     // Новый разговор виден реестру: это и есть продолжение цепочки.
     const active = registry.active().map((run) => run.chatId);
     expect(active.some((id) => id.startsWith('new-'))).toBe(true);
+  });
+
+  it('просьба словами («перезапустите сессию») продолжает так же, как блок', async () => {
+    const { chains, registry } = build(
+      'Этап закрыт. Перезапустите сессию. Новый прогон читает .agent/PROGRESS.md.',
+      Date.now() + 10_000,
+    );
+    chains.setAuto(['чат-проза'], true);
+
+    registry.start(
+      'чат-проза',
+      { prompt: 'Сделай экспорт отчётов', cwd: 'C:/work/проект' },
+      { projectPath: 'C:/work/проект' },
+    );
+    await new Promise((done) => setTimeout(done, 20));
+
+    const next = registry.active().find((run) => run.chatId.startsWith('new-'));
+    expect(next).toBeDefined();
+    // Исходное задание цепочки — реплика человека, с которой всё началось.
+    // Заглушка прогона отвечает той же фразой и продолжению, поэтому цепочка
+    // честно идёт дальше — но не за потолок и не теряя задания.
+    expect(chains.rootTaskOf([next?.chatId ?? ''])).toBe('Сделай экспорт отчётов');
+    expect(chains.depth([next?.chatId ?? ''])).toBeGreaterThanOrEqual(1);
+    expect(chains.depth([next?.chatId ?? ''])).toBeLessThanOrEqual(HANDOFF_MAX_CHAIN);
+  });
+
+  it('«не перезапускай» продолжения не заводит', async () => {
+    const { chains, registry } = build(
+      'Не перезапускай сессию — я продолжаю здесь.',
+      Date.now() + 10_000,
+    );
+    chains.setAuto(['чат-нет'], true);
+    registry.start(
+      'чат-нет',
+      { prompt: 'работай', cwd: 'C:/work/проект' },
+      { projectPath: 'C:/work/проект' },
+    );
+    await new Promise((done) => setTimeout(done, 20));
+    expect(registry.active().some((run) => run.chatId.startsWith('new-'))).toBe(false);
+  });
+
+  it('файл-опора тот же, что при прошлом продолжении, — отказ «ходит по кругу»', async () => {
+    const chains = new HandoffChains();
+    const registry = new ChatRunRegistry(() => fakeRun(`Готово.\n\n${block(PROPOSAL)}`));
+    registry.setHandoffPlanner(
+      createHandoffPlanner({
+        runs: registry,
+        chains,
+        session: new ChatSession(registry),
+        selfBaseUrl: 'http://127.0.0.1:5178',
+        stat: () => Date.now() + 10_000,
+        hash: () => 'same',
+      }),
+    );
+    // Прошлое продолжение оставило тот же отпечаток; тумблер — после связи, как
+    // и в жизни: связь пишется при заведении, тумблер человек трогает потом.
+    chains.link(['исходный'], 'чат-круг', { checkpointHash: 'same' });
+    chains.setAuto(['чат-круг'], true);
+
+    registry.start(
+      'чат-круг',
+      { prompt: 'работай', cwd: 'C:/work/проект' },
+      { projectPath: 'C:/work/проект' },
+    );
+    // Подписка — после старта: до него прогона нет и подписываться не на что.
+    const seen = watch(registry, 'чат-круг');
+    await new Promise((done) => setTimeout(done, 20));
+
+    expect(seen.map((event) => event.reason)).toContain('checkpoint_unchanged');
+    expect(registry.active().some((run) => run.chatId.startsWith('new-'))).toBe(false);
   });
 
   it('автопродолжение уносит с собой назначение — второе звено не съезжает', async () => {
@@ -655,5 +847,122 @@ describe('планировщик конвейера подбора модели'
     await run(registry, 'чат-работа');
 
     expect(runs.filter((item) => item.chatId.startsWith('new-'))).toHaveLength(1);
+  });
+
+  /**
+   * Уровни (Т1) через тот же планировщик: план кончился — стартует работа
+   * ровно один раз; разбор уходит конвейеру, а не в звенья; конец цепочки
+   * группы доходит до конвейера с её связью.
+   */
+  describe('уровни разделения', () => {
+    function buildLevels(text: string, options: { hasWork?: boolean } = {}) {
+      const built = build(text);
+      const planned: string[] = [];
+      const ended: { branch?: string; ok: boolean }[] = [];
+      const triaged: string[] = [];
+      built.registry.setHandoffPlanner(
+        createHandoffPlanner({
+          runs: built.registry,
+          chains: built.chains,
+          session: new ChatSession(built.registry),
+          selfBaseUrl: 'http://127.0.0.1:5178',
+          cascade: {
+            linkOf: (aliases) => aliases.map((key) => built.links.get(key)).find(Boolean),
+            saveLink: (chatId, link) => void built.links.set(chatId, link),
+            markReviewed: () => undefined,
+            markPlanned: (aliases) => void planned.push(...aliases),
+            hasWork: () => options.hasWork ?? true,
+            settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
+          },
+          split: {
+            onTriageFinished: (finished) => {
+              triaged.push(finished.chatId);
+              return { kind: 'notice', code: 'triageApplied', text: 'применён' };
+            },
+            onChainEnded: (link, ok) =>
+              void ended.push({ ...(link.branch ? { branch: link.branch } : {}), ok }),
+          },
+        }),
+      );
+      return { ...built, planned, ended, triaged };
+    }
+
+    const PLAN_LINK: ChatLink = {
+      ...WORK_LINK,
+      stage: 'plan',
+      model: 'claude-opus-5',
+      effort: 'high',
+      workModel: 'sonnet',
+      workEffort: 'medium',
+      task: 'переименуй foo в bar',
+      owns: ['src/rename'],
+    };
+
+    it('после плана заводит работу на подобранной модели и помечает план отработанным', async () => {
+      // Прогон-заглушка отвечает одним текстом всем: работе после плана тоже, и
+      // без диффа её цепочка кончается сразу — так виден и конец цепочки.
+      const { registry, links, runs, planned, ended } = buildLevels(
+        'Готово.\n```agentdeck:plan\n## Шаги\n1. Найти foo\n```',
+        { hasWork: false },
+      );
+      links.set('чат-план', PLAN_LINK);
+
+      await run(registry, 'чат-план');
+
+      const work = runs.find((item) => item.chatId.startsWith('new-'));
+      expect(work?.model).toBe('sonnet');
+      expect(work?.effort).toBe('medium');
+      expect(work?.append).toContain('НИЖЕ потолка');
+      expect(links.get(work?.chatId ?? '')).toMatchObject({ stage: 'work', lowered: true });
+      expect(planned).toContain('чат-план');
+      // План — не цепочка: конвейер узнаёт о конце РАБОТЫ, а не плана.
+      expect(ended).toEqual([{ branch: 'split/rename', ok: true }]);
+    });
+
+    it('план без блока: работа стартует с пометкой, что плана нет', async () => {
+      const { registry, links, runs } = buildLevels('Не разобрался.');
+      links.set('чат-план', PLAN_LINK);
+      const seen: { stage?: string; planMissing?: boolean }[] = [];
+      registry.start('чат-план', { prompt: 'план', cwd: CWD }, { projectPath: CWD });
+      registry.attach('чат-план', 0, {
+        send: ({ event }) => {
+          if (event.kind === 'handoff') {
+            seen.push({
+              ...(event.stage ? { stage: event.stage } : {}),
+              ...(event.planMissing ? { planMissing: true } : {}),
+            });
+          }
+        },
+        close: () => undefined,
+      });
+      await new Promise((done) => setTimeout(done, 20));
+
+      expect(runs.some((item) => item.chatId.startsWith('new-'))).toBe(true);
+      expect(seen).toEqual([{ stage: 'work', planMissing: true }]);
+    });
+
+    it('разбор идёт конвейеру, а не в звенья', async () => {
+      const { registry, links, runs, triaged } = buildLevels('Развёл.');
+      links.set('чат-разбор', { ...WORK_LINK, stage: 'triage', branch: undefined as never });
+
+      await run(registry, 'чат-разбор');
+
+      expect(triaged).toEqual(['чат-разбор']);
+      expect(runs.filter((item) => item.chatId.startsWith('new-'))).toEqual([]);
+    });
+
+    it('конец цепочки группы доходит до конвейера: работа на потолке — сразу, правки — тоже', async () => {
+      const { registry, links, ended } = buildLevels('Сделал.');
+      links.set('чат-работа', { ...WORK_LINK, lowered: false });
+      links.set('чат-правки', { ...WORK_LINK, stage: 'fix', branch: 'split/fix' });
+
+      await run(registry, 'чат-работа');
+      await run(registry, 'чат-правки');
+
+      expect(ended).toEqual([
+        { branch: 'split/rename', ok: true },
+        { branch: 'split/fix', ok: true },
+      ]);
+    });
   });
 });

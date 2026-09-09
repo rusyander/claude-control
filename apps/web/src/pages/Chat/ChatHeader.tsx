@@ -56,6 +56,7 @@ export function ChatHeader({
   canExport,
   onExport,
   onRefresh,
+  onRestartSession,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
 
@@ -187,6 +188,8 @@ export function ChatHeader({
           canExport={canExport}
           onExport={onExport}
           onRefresh={onRefresh}
+          {...(onRestartSession ? { onRestartSession } : {})}
+          {...(runStatus === 'running' ? { restartBlocked: t('chat.handoff.restartRunning') } : {})}
         />
       </Stack>
     </Stack>

@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { ChatBlock, ChatMessage } from '@agentdeck/contracts';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
+import { collectMessageTimings } from '@agentdeck/contracts/chat-timing';
 import { colors, font, radius, space } from '../../shared/config/theme';
 import { useT } from '../../shared/config/i18n';
 import type { CostUnit } from '../../shared/lib/format';
@@ -24,14 +25,23 @@ import { summarizeToolInput } from './toolSummary';
 export function Transcript({
   messages,
   costUnit,
+  isRunning = false,
 }: {
   messages: ChatMessage[];
   costUnit: CostUnit;
+  /** Идёт прогон — у его хвоста суммы нет: следующая запись ещё пишется. */
+  isRunning?: boolean;
 }) {
   const t = useT();
+  // Время шагов — по соседним записям, тем же расчётом, что и в панели.
+  const timings = useMemo(
+    () => collectMessageTimings(messages, { openRun: isRunning }),
+    [messages, isRunning],
+  );
   return (
     <View style={styles.root}>
       {messages.map((message) => {
+        const timing = timings.get(message.id);
         const toolsOnly = message.blocks.length > 0 && message.blocks.every(isTool);
         // Расход считается моделью на всё сообщение целиком, поэтому и стоит
         // один раз под ним, а не у каждого блока: размазать одно число по
@@ -107,6 +117,10 @@ export function Transcript({
                 unit={costUnit}
                 sharedWith={tools.length}
                 label={last?.type === 'tool' ? last.name : t.chat.usage.answer}
+                durationMs={timing?.stepMs}
+                from={timing?.from}
+                to={timing?.to}
+                runTotalMs={timing?.runTotalMs}
               />
             ) : null}
           </View>

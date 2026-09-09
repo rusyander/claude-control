@@ -124,6 +124,8 @@ export async function resumeActive(): Promise<void> {
     status?: 'running' | 'done';
     /** Чем прогон запущен: у подхваченного своей записи об этом нет. */
     model?: string;
+    /** Усыновлён сервером после его перезапуска: процесс жив, потока вывода нет. */
+    detached?: true;
   }[];
   try {
     const response = await apiClient.get('/chat/active');
@@ -196,6 +198,9 @@ export async function resumeActive(): Promise<void> {
       // его — уйдёт по концу хода, как ушла бы без перезагрузки.
       queued: loadQueue(info.sessionId, info.chatId),
       parked: true,
+      // Подхваченный сервером без потока: пузыря не будет и после того, как
+      // поток достанется, — ставим метку здесь, до первого события.
+      ...(info.detached ? { detached: true } : {}),
     });
     rebuildStatuses();
     emit();

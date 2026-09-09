@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MessageUsage } from '@agentdeck/contracts';
+import { formatDurationWith } from '@agentdeck/contracts/chat-timing';
 import { colors, font, radius, space } from '../../shared/config/theme';
 import { useT } from '../../shared/config/i18n';
 import { compact, type CostUnit } from '../../shared/lib/format';
@@ -15,21 +16,38 @@ import { compact, type CostUnit } from '../../shared/lib/format';
  *
  * Разбивка раскрывается нажатием, а не наведением: наведения на телефоне нет, и
  * подсказка «по hover» здесь была бы просто недоступной.
+ *
+ * Третий столбик — время шага, как в панели: от предыдущей записи прогона до
+ * этой; у последней записи прогона рядом его сумма (Σ). Нет времени — столбика
+ * нет, не «0с».
  */
 export function TokenBadge({
   usage,
   unit = 'tokens',
   sharedWith,
   label,
+  durationMs,
+  from,
+  to,
+  runTotalMs,
 }: {
   usage: MessageUsage;
   unit?: CostUnit;
   /** Сколько вызовов разделили этот расход — говорим об этом в разбивке. */
   sharedWith?: number;
   label?: string;
+  /** Время шага (мс) и его границы (ISO); сумма прогона — у последней записи. */
+  durationMs?: number;
+  from?: string;
+  to?: string;
+  runTotalMs?: number;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const time =
+    durationMs === undefined ? undefined : formatDurationWith(durationMs, t.common.duration);
+  const runTotal =
+    runTotalMs === undefined ? undefined : formatDurationWith(runTotalMs, t.common.duration);
 
   const total = usage.input + usage.output + usage.cacheRead + usage.cacheCreation;
   // Новое — всё, кроме чтения кэша: только оно и есть работа этого шага.
@@ -68,6 +86,8 @@ export function TokenBadge({
             <Text style={styles.fresh}>+{compact(fresh)}</Text>
           </>
         )}
+        {time !== undefined ? <Text style={styles.time}>{time}</Text> : null}
+        {runTotal !== undefined ? <Text style={styles.runTotal}>Σ {runTotal}</Text> : null}
       </Pressable>
 
       {open ? (
@@ -117,6 +137,25 @@ export function TokenBadge({
             ) : null}
           </View>
 
+          {/* Время отдельным подвалом: это другая величина, не вид токенов. */}
+          {time !== undefined ? (
+            <View style={styles.foot}>
+              <View style={styles.row}>
+                <Text style={styles.rowName}>{t.chat.usage.step}</Text>
+                <Text style={styles.rowValue}>{time}</Text>
+              </View>
+              {from && to ? (
+                <Text style={styles.note}>{t.chat.usage.span(clock(from), clock(to))}</Text>
+              ) : null}
+              {runTotal !== undefined ? (
+                <View style={styles.row}>
+                  <Text style={styles.rowName}>{t.chat.usage.runTime}</Text>
+                  <Text style={styles.rowValue}>{runTotal}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
           {sharedWith !== undefined && sharedWith > 1 ? (
             <Text style={styles.note}>{t.chat.usage.shared(sharedWith)}</Text>
           ) : null}
@@ -124,6 +163,17 @@ export function TokenBadge({
       ) : null}
     </View>
   );
+}
+
+/** Время суток из ISO: границы шага; дата не нужна, шаг длиннее суток не бывает. */
+function clock(iso: string): string {
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return '';
+  return new Date(at).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 const styles = StyleSheet.create({
@@ -142,6 +192,8 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
   total: { color: colors.textFaint, fontSize: font.small, fontFamily: font.mono },
   fresh: { color: colors.accent, fontSize: font.small, fontFamily: font.mono, fontWeight: '700' },
+  time: { color: colors.textDim, fontSize: font.small, fontFamily: font.mono },
+  runTotal: { color: colors.textFaint, fontSize: font.small, fontFamily: font.mono },
   panel: {
     minWidth: 240,
     gap: space.xs,

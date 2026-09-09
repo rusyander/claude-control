@@ -107,6 +107,18 @@ export class ChatRun {
    */
   private tempDir: string | undefined;
 
+  /**
+   * PID запущенного процесса — известен сразу после `start()`: `spawn` идёт до
+   * первого `await`. Реестр пишет его в журнал на диске, чтобы после перезапуска
+   * панели усыновить живой процесс. На Windows это pid оболочки `cmd.exe`,
+   * которая ждёт CLI, — по нему валится дерево при остановке; в журнал же
+   * реестр пишет найденный под ней pid самого CLI (`resolveCliPid`): оболочку
+   * перезапуск сервера убивает, а CLI живёт дальше.
+   */
+  get pid(): number | undefined {
+    return this.child?.pid;
+  }
+
   /** Запускает CLI и вызывает onEvent по мере поступления событий. */
   async start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
     try {

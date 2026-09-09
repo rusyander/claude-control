@@ -21,6 +21,8 @@
  * пониманиям формата негде.
  */
 
+import type { WorktreeBootstrapState } from './project-git';
+
 /** Язык блока: он же признак, по которому панель узнаёт предложение. */
 export const SPLIT_BLOCK_LANG = 'agentdeck:split';
 
@@ -34,6 +36,8 @@ const MAX_BRIEF = 4_000;
 const MAX_SHARED = 4_000;
 /** Имя модели и уровень глубины — короткие слова; всё длиннее просто мусор. */
 const MAX_ASSIGNMENT = 40;
+/** Ссылка на запрос на слияние: длиннее бывает только мусор с якорями. */
+const MAX_URL = 500;
 
 /** Одна группа задач: свой чат, своя ветка, своя рабочая копия. */
 export interface TaskSplitGroup {
@@ -61,7 +65,39 @@ export interface TaskSplitGroup {
    */
   model?: string;
   effort?: string;
+  /**
+   * Границы группы из разбора разделения (Т1): чем владеет только она и что
+   * знать про соседей. Агент в блоке их не пишет — их дописывает панель после
+   * уровня 1, поэтому разбор предложения этих полей не читает.
+   */
+  owns?: string[];
+  notes?: string;
+  /**
+   * Группа ревьюит запрос на слияние по ссылке (Т7), а не делает задачу.
+   *
+   * Меняет три вещи разом, и все три — намеренно: копия ветвится ОТ ветки MR
+   * (иначе ревьюить нечего), группа идёт на потолке без плана (проверка — не
+   * работа, планировать в ней нечего), а после ответа панель не заводит правки
+   * сама, а показывает человеку карточку решения: писать в чужой MR — его
+   * право, не автоматика.
+   */
+  review?: TaskSplitReview;
 }
+
+/** Что именно ревьюит группа: ссылка и, если агент её знал, ветка MR. */
+export interface TaskSplitReview {
+  /** Адрес MR/PR как его дал человек — по нему же панель находит номер. */
+  url: string;
+  /**
+   * Ветка MR, если она была названа в блоке. Панель предпочитает спросить её у
+   * форджа: агент называет ветку по памяти и ошибается, а ошибка здесь тихая —
+   * копия заведётся от не той ветки, и ревью прочитает чужой дифф.
+   */
+  branch?: string;
+}
+
+/** Что человек решил делать с замечаниями ревью (Т7). */
+export type TaskSplitReviewDecision = 'fix' | 'post' | 'both' | 'none';
 
 /** Предложение агента: общий контекст плюс группы. */
 export interface TaskSplitProposal {
@@ -75,6 +111,8 @@ export interface TaskSplitStarted {
   title: string;
   /** Ветка, под которой в итоге завели копию: занятое имя получает суффикс. */
   branch: string;
+  /** Позиция группы в предложении — по ней конвейер уровней находит свою запись. */
+  index?: number;
   /** Ключ прогона и разговора — под ним чат живёт в реестре и в памяти вкладки. */
   chatId: string;
   /** Рабочий каталог чата: копия репозитория либо сам проект. */
@@ -94,10 +132,16 @@ export interface TaskSplitStarted {
   model?: string;
   effort?: string;
   kind?: string;
+  /**
+   * С какого звена чат начал: `plan` — сперва план на потолке (подбор включён,
+   * Т1), `work` — сразу работа. Нет — как `work`: ответы до партии Т1.
+   */
+  stage?: 'plan' | 'work';
 }
 
 /** Группа, которую завести не удалось: остальные при этом не откатываются. */
 export interface TaskSplitFailure {
+  index?: number;
   title: string;
   branch: string;
   message: string;
@@ -107,6 +151,12 @@ export interface TaskSplitFailure {
 export interface TaskSplitResult {
   chats: TaskSplitStarted[];
   failures: TaskSplitFailure[];
+  /**
+   * Подбор включён — копий ещё нет: сперва идёт разбор разделения на потолке в
+   * корне репозитория (Т1), а группы заводит сервер по его итогу. Здесь — чат
+   * разбора; `chats` при этом пуст.
+   */
+  triage?: { chatId: string; path: string; started: boolean };
 }
 
 /**
@@ -150,6 +200,13 @@ export const SPLIT_SYSTEM_PROMPT =
   'Заводить ветки, копии репозитория и чаты самому НЕ нужно и нечем: всё это делает панель, ' +
   'когда человек нажмёт кнопку в карточке. ' +
   'После блока остановись и жди решения. ' +
+  // Ревью по ссылке (Т7) — единственный случай, когда одна группа законна:
+  // MR и есть отдельная работа в своей копии на его ветке. Без этой оговорки
+  // модель послушно требовала трёх задач и ревьюила один MR прямо в разговоре.
+  'Отдельный случай — ссылки на запросы на слияние (MR/PR) с просьбой их отревьюить: тогда сделай ' +
+  'по группе на КАЖДУЮ ссылку, и одна ссылка тоже даёт разделение — правило про три задачи здесь не ' +
+  'действует. У такой группы kind: "review", review: {"url":"ссылка целиком"}, title — заголовок MR ' +
+  'или его номер, tasks — что именно проверить. Ветку MR и копию на ней заведёт панель по ссылке. ' +
   'Если задачи связаны между собой или их меньше трёх — блока не выводи и работай как обычно.';
 
 /** Строка нужной длины или undefined: пустое поле лучше пустой строки. */
@@ -276,6 +333,25 @@ function briefOf(group: Record<string, unknown>): string | undefined {
 }
 
 /**
+ * Ссылка на MR/PR группы ревью (Т7). Как и везде здесь, разбор терпимый: модель
+ * кладёт ссылку то строкой (`"review": "https://…"`), то объектом, то под
+ * именем `mr`/`pr`. Не ссылка — не ревью: строка «посмотри MR Пети» завела бы
+ * копию неизвестно от какой ветки, и лучше обычная группа.
+ */
+function reviewOf(group: Record<string, unknown>): TaskSplitReview | undefined {
+  const raw = group.review ?? group.mr ?? group.pr ?? group.mergeRequest ?? group.pullRequest;
+  if (!raw) return undefined;
+
+  const source =
+    typeof raw === 'object' ? (raw as Record<string, unknown>) : { url: raw as unknown };
+  const url = text(source.url ?? source.link ?? source.href, MAX_URL);
+  if (!url || !(url.startsWith('http://') || url.startsWith('https://'))) return undefined;
+
+  const branch = text(source.branch ?? source.sourceBranch ?? source.source_branch, MAX_BRANCH);
+  return { url, ...(branch ? { branch } : {}) };
+}
+
+/**
  * Разбор предложения из уже разобранного JSON или из строки.
  *
  * Разбор НАМЕРЕННО терпимый к именам полей: обязательным остаётся только
@@ -330,20 +406,28 @@ export function parseSplitProposal(raw: unknown): TaskSplitProposal | undefined 
     const kind = text(group.kind ?? group.type ?? group.class, MAX_ASSIGNMENT);
     const model = text(group.model, MAX_ASSIGNMENT);
     const effort = text(group.effort ?? group.thinking ?? group.reasoning, MAX_ASSIGNMENT);
+    const review = reviewOf(group);
     groups.push({
       title,
       branch,
       tasks,
       ...(brief ? { brief } : {}),
-      ...(kind ? { kind } : {}),
+      // Ревью по ссылке — само по себе класс работы: без него группа уехала бы
+      // на подобранную ступень, то есть проверяла бы чужой код моделью слабее
+      // той, что его писала. Названный агентом класс при этом не трогаем.
+      ...(kind ? { kind } : review ? { kind: 'review' } : {}),
+      ...(review ? { review } : {}),
       ...(model ? { model } : {}),
       ...(effort ? { effort } : {}),
     });
   }
 
   // Одна группа — это не разделение, а обычный разговор: карточка с единственной
-  // кнопкой «разделить на 1 чат» только сбивала бы с толку.
-  if (groups.length < 2) return undefined;
+  // кнопкой «разделить на 1 чат» только сбивала бы с толку. Ревью по ссылке —
+  // исключение, и единственное (Т7): один MR — это уже отдельная работа в своей
+  // копии на его ветке, ради которой разговор человека прерывать не надо.
+  if (groups.length < 2 && !groups.some((group) => group.review)) return undefined;
+  if (groups.length === 0) return undefined;
 
   const shared = textOrList(source.shared ?? source.context, MAX_SHARED);
   return { groups, ...(shared ? { shared } : {}) };
@@ -478,6 +562,58 @@ export function branchTaken(wanted: string, taken: readonly string[]): boolean {
  * в ОДНОМ месте — иначе текст, ушедший в чат сразу, и текст, положенный в поле
  * ввода при «только создать чаты», разошлись бы уже на второй правке.
  */
+/** Что панель приготовила в копии — для преамбулы задания. */
+export interface EnvironmentPreambleInput {
+  /** Строка отчёта зеркала («Локальный слой: перенесено N…»); нет — зеркала не было. */
+  mirror?: string;
+  /** Итог подготовки копии; нет — команды не было. */
+  bootstrap?: WorktreeBootstrapState;
+}
+
+/**
+ * Преамбула задания для агента в копии: что панель уже сделала, чтобы первый
+ * ход был по задаче, а не по «обживанию» копии.
+ *
+ * До неё агент в свежей копии сам поднимал MCP, зеркалил `.claude/`, ставил
+ * зависимости в фоне и откатывал переписанные lock-файлы — минуты и контекст
+ * на каждом ребёнке разделения, часть шагов упиралась в человека. Теперь всё
+ * это сделано ДО старта, и преамбула говорит прямо: окружение готово, начинай
+ * с задачи. Провал подготовки не скрывается — хвост лога здесь же, и агент
+ * решает сам, повторять установку или обойтись.
+ */
+export function environmentPreamble(input: EnvironmentPreambleInput): string {
+  const lines: string[] = [];
+  const done: string[] = [];
+  if (input.mirror) done.push(input.mirror);
+  const boot = input.bootstrap;
+  if (boot?.status === 'ok') {
+    done.push(`зависимости установлены командой «${boot.command}»`);
+  }
+  if (boot?.reverted && boot.reverted.length > 0) {
+    done.push(`переписанные установкой lock-файлы откачены: ${boot.reverted.join(', ')}`);
+  }
+  lines.push(
+    done.length > 0
+      ? `Панель подготовила эту копию: ${done.join('; ')}.`
+      : 'Панель завела эту копию репозитория.',
+  );
+  if (boot && boot.status !== 'ok') {
+    const why = boot.timedOut
+      ? 'остановлена по потолку в 10 минут'
+      : `завершилась с кодом ${boot.exitCode ?? '?'}`;
+    const tail = boot.logTail.trim();
+    lines.push(
+      `⚠ Подготовка копии: команда «${boot.command}» ${why}. Зависимости могут быть не установлены — реши сам: повтори установку или обойдись без неё.${
+        tail ? `\nХвост лога:\n${tail}` : ''
+      }`,
+    );
+  }
+  lines.push(
+    'Окружение готово — не проверяй и не настраивай его (MCP, локальный слой, зависимости), начинай сразу с задачи.',
+  );
+  return lines.join('\n');
+}
+
 export function buildGroupPrompt(group: TaskSplitGroup, shared?: string): string {
   const parts: string[] = [];
   if (shared) parts.push(shared);

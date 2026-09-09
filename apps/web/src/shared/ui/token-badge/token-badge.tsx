@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatTokens } from '@shared/lib/format';
+import { formatDuration } from '@shared/lib/format-duration';
+import { formatClock } from '@shared/lib/format-clock';
 import type { TokenBadgeProps } from './token-badge.types';
 import styles from './token-badge.module.scss';
 
@@ -17,6 +19,10 @@ import styles from './token-badge.module.scss';
  * неё щелчка значило бы делать беглый взгляд платным. Уведённая в само
  * раскрытие мышь его не закрывает (числа можно выделить и скопировать), клик
  * закрепляет до следующего клика или Escape, а с клавиатуры работает фокус.
+ *
+ * Третий столбик — время: сколько агент шёл к этому действию от предыдущей
+ * записи прогона. Токены говорят, что шаг стоил, время — что он длился; без
+ * него минутный поиск по репозиторию и мгновенный `Read` выглядели одинаково.
  */
 export function TokenBadge({
   usage,
@@ -24,6 +30,10 @@ export function TokenBadge({
   sharedWith,
   effort,
   label,
+  durationMs,
+  from,
+  to,
+  runTotalMs,
   className,
 }: TokenBadgeProps) {
   const { t } = useTranslation();
@@ -36,6 +46,8 @@ export function TokenBadge({
   // Новое — всё, кроме чтения кэша: только оно и есть работа этого шага.
   const fresh = usage.input + usage.output + usage.cacheCreation;
   const isOpen = hovered || pinned;
+  const time = durationMs === undefined ? undefined : formatDuration(durationMs, t);
+  const runTotal = runTotalMs === undefined ? undefined : formatDuration(runTotalMs, t);
 
   // Закрепление снимается кликом мимо и Escape — иначе раскрытие,
   // оставленное открытым, перекрывало бы соседние строки ленты.
@@ -76,7 +88,11 @@ export function TokenBadge({
         className={styles.badge}
         aria-expanded={isOpen}
         aria-controls={panelId}
-        aria-label={t('chat.usage.badgeLabel', { total: formatTokens(total) })}
+        aria-label={
+          time === undefined
+            ? t('chat.usage.badgeLabel', { total: formatTokens(total) })
+            : t('chat.usage.badgeLabelTimed', { total: formatTokens(total), time })
+        }
         onClick={() => setPinned((value) => !value)}
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
@@ -88,6 +104,13 @@ export function TokenBadge({
             <span className={styles.total}>{formatTokens(total)}</span>
             <span className={styles.fresh}>+{formatTokens(fresh)}</span>
           </>
+        )}
+        {/* Время одной группой: переносится под токены целиком, а не по слову. */}
+        {time !== undefined && (
+          <span className={styles.timing}>
+            <span className={styles.time}>{time}</span>
+            {runTotal !== undefined && <span className={styles.runTotal}>Σ {runTotal}</span>}
+          </span>
         )}
       </button>
 
@@ -146,6 +169,27 @@ export function TokenBadge({
               </span>
             )}
           </span>
+
+          {/* Время отдельным подвалом: это другая величина, не вид токенов. */}
+          {time !== undefined && (
+            <span className={styles.foot}>
+              <span className={styles.row}>
+                <span className={styles.rowName}>{t('chat.usage.step')}</span>
+                <span className={styles.rowValue}>{time}</span>
+              </span>
+              {from && to && (
+                <span className={styles.note}>
+                  {t('chat.usage.span', { from: formatClock(from), to: formatClock(to) })}
+                </span>
+              )}
+              {runTotal !== undefined && (
+                <span className={styles.row}>
+                  <span className={styles.rowName}>{t('chat.usage.run')}</span>
+                  <span className={styles.rowValue}>{runTotal}</span>
+                </span>
+              )}
+            </span>
+          )}
 
           {sharedWith !== undefined && sharedWith > 1 && (
             <span className={styles.note}>{t('chat.usage.shared', { count: sharedWith })}</span>

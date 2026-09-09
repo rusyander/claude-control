@@ -7,6 +7,7 @@ import {
   type CascadeStage,
   type TaskKind,
 } from '@agentdeck/contracts/model-cascade';
+import { scanPlanBlocks, workAfterPlanPrompt } from '@agentdeck/contracts/split-plan';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { initiativePrompt } from './initiative.ts';
 
@@ -53,6 +54,11 @@ export interface CascadeStagePlan {
   link: ChatLink;
   /** Замечания, по которым заведены правки, — их показывает лента. */
   findings?: string[];
+  /**
+   * Работа стартует БЕЗ плана: прогон плана не дал блока, упал или был
+   * остановлен (Т1). Уровень не блокирует, но лента обязана это назвать.
+   */
+  planMissing?: boolean;
 }
 
 export interface CascadeStageInput {
@@ -98,7 +104,11 @@ export function stageAppendPrompt(
     // диффа. Не заведёт ни разу.
     plan.stage === 'fix'
       ? loweredWorkPrompt(plan.link.kind as TaskKind | undefined, { review: false })
-      : '',
+      : // Работа после плана (Т1) — та же планка сдачи, что у работы, заведённой
+        // разделением напрямую: понижение оплачивается ревью, и обещать его надо.
+        plan.stage === 'work' && plan.link.lowered
+        ? loweredWorkPrompt(plan.link.kind as TaskKind | undefined)
+        : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -106,7 +116,64 @@ export function stageAppendPrompt(
 
 /** Стадия связи; пусто читается как «работа»: так выглядят связи до конвейера. */
 function stageOf(link: ChatLink): CascadeStage {
-  return link.stage === 'review' || link.stage === 'fix' ? link.stage : 'work';
+  switch (link.stage) {
+    case 'triage':
+    case 'plan':
+    case 'review':
+    case 'fix':
+      return link.stage;
+    default:
+      return 'work';
+  }
+}
+
+/** Знаков задания в связи: столько же, сколько хранит контракт плана. */
+const TASK_MAX = 16_000;
+
+/**
+ * План группы кончился — заводится РАБОТА (Т1). Единственное звено, которое
+ * стартует и после неудачного прогона: план не блокирует, а лента скажет, что
+ * его не получили. Одноразово по `plannedAt`: второе сообщение человека в чат
+ * плана без отметки заводило бы вторую работу.
+ */
+function afterPlan(
+  link: ChatLink,
+  ok: boolean,
+  text: string,
+  base: ChatLink,
+): CascadeStagePlan | undefined {
+  if (link.plannedAt) return undefined;
+  const model = link.workModel ?? link.ceilingModel ?? link.model;
+  if (!model) return undefined;
+  const effort =
+    link.workEffort ?? (link.workModel ? '' : (link.ceilingEffort ?? link.effort ?? ''));
+  const plan = ok ? scanPlanBlocks(text).plan : undefined;
+  const task = (link.task ?? '').slice(0, TASK_MAX);
+
+  return {
+    stage: 'work',
+    model,
+    effort,
+    prompt: workAfterPlanPrompt({
+      task,
+      ...(link.owns ? { owns: link.owns } : {}),
+      ...(link.notes ? { notes: link.notes } : {}),
+      ...(plan ? { plan } : {}),
+    }),
+    ...(plan ? {} : { planMissing: true }),
+    link: {
+      ...base,
+      stage: 'work',
+      model,
+      ...(effort ? { effort } : {}),
+      // «Ниже потолка» на связи плана значило «работа пойдёт ниже»; здесь оно
+      // становится тем, что читает ревью.
+      ...(link.lowered ? { lowered: true } : {}),
+      ...(task ? { task } : {}),
+      ...(link.owns ? { owns: link.owns } : {}),
+      ...(link.notes ? { notes: link.notes } : {}),
+    },
+  };
 }
 
 /** Класс работы, если он был распознан при подборе. */
@@ -121,11 +188,17 @@ function kindOf(link: ChatLink): TaskKind | undefined {
  */
 export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | undefined {
   const { link, ok, text, task, hasWork, now = () => new Date() } = input;
-  if (!link || !ok) return undefined;
+  if (!link) return undefined;
 
   const stage = stageOf(link);
-  // Правки — конец цепочки: ревью второго круга панель не заводит.
-  if (stage === 'fix') return undefined;
+  // Правки — конец цепочки: ревью второго круга панель не заводит. Разбор
+  // (уровень 1) звеньев не заводит вовсе: его итог применяет конвейер
+  // разделения, а не планировщик стадий.
+  if (stage === 'fix' || stage === 'triage') return undefined;
+  // Ревью чужого MR по ссылке (Т7) конвейеру не принадлежит: после него панель
+  // не заводит ни правок, ни чего-либо ещё, пока человек не нажмёт кнопку.
+  // Правки в чужой ветке и запись в чужой MR — не то, что делают автоматом.
+  if (link.review) return undefined;
 
   const kind = kindOf(link);
   const base: ChatLink = {
@@ -137,6 +210,10 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
     ...(link.ceilingModel ? { ceilingModel: link.ceilingModel } : {}),
     ...(link.ceilingEffort ? { ceilingEffort: link.ceilingEffort } : {}),
   };
+
+  // План — единственное звено, после которого следующее стартует и при неудаче.
+  if (stage === 'plan') return afterPlan(link, ok, text, base);
+  if (!ok) return undefined;
 
   if (stage === 'work') {
     // Работа на потолке проверкой не усиливается: усиливать нечем.

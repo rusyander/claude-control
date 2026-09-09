@@ -60,3 +60,19 @@ function prune(state: AppState): void {
   );
   for (const key of ordered.slice(0, keys.length - MAX_LINKS)) delete links[key];
 }
+
+/**
+ * Агент впервые правил код: момент — в связь, один раз. Связь может лежать под
+ * временным ключом, под настоящим или под обоими — пишем во все, что есть, и
+ * только если момента ещё нет. Без связи молчим: это каждый прогон панели.
+ */
+export function markChatFirstEdit(state: AppState, keys: readonly string[], at: string): boolean {
+  let changed = false;
+  for (const key of keys) {
+    const link = state.chatLinks?.[key];
+    if (!link || link.firstEditAt) continue;
+    link.firstEditAt = at;
+    changed = true;
+  }
+  return changed;
+}

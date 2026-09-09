@@ -110,6 +110,29 @@ export interface ProjectWorktree {
   locked: boolean;
   /** Каталога больше нет: копию удалили мимо панели, строка ждёт уборки. */
   prunable: boolean;
+  /** Бутстрап копии (установка зависимостей): последний запуск, если был. Основной копии нет. */
+  bootstrap?: WorktreeBootstrapState;
+}
+
+export type WorktreeBootstrapStatus = 'running' | 'ok' | 'failed';
+
+/**
+ * Команда после создания копии — обычно установка зависимостей. Идёт до старта
+ * агента; провал не отменяет ни копию, ни группу разделения: агент получает
+ * хвост лога в задании и решает сам.
+ */
+export interface WorktreeBootstrapState {
+  command: string;
+  status: WorktreeBootstrapStatus;
+  startedAt: string;
+  finishedAt?: string;
+  exitCode?: number;
+  /** Остановлена по потолку (10 минут). */
+  timedOut?: boolean;
+  /** Последние строки лога; полный лог — отдельным запросом. */
+  logTail: string;
+  /** Lock-файлы, которые установка переписала и панель откатила к версии из индекса. */
+  reverted?: string[];
 }
 
 /** Список копий репозитория. Не репозиторий — `isRepo:false`, раздела нет. */
@@ -121,10 +144,49 @@ export interface ProjectWorktreesInfo {
   error?: string;
 }
 
-/** Ответ на создание или удаление копии: новый список + вывод git. */
+/** Ответ на создание, удаление или зеркало копии: новый список + вывод git. */
 export interface ProjectWorktreesResult {
   info: ProjectWorktreesInfo;
   output: string;
   /** Путь созданной копии — по нему панель сразу открывает вкладку. */
   createdPath?: string;
+  /** Что из локального слоя перенесено в копию (создание и повторное зеркало). */
+  mirror?: WorktreeMirrorReport;
+}
+
+/**
+ * Локальный слой репозитория, который панель переносит в каждую копию сверх
+ * чекаута: файлы `skip-worktree`/`assume-unchanged` и игнорируемое git по
+ * списку шаблонов. Здесь — то, что человек дописал к встроенному списку на
+ * проекте; пусто = только встроенное. Шаблоны как в `.gitignore`: без «/» —
+ * по имени на любой глубине, с «/» — от корня; `*`, `**`, `?`.
+ */
+export interface WorktreeMirrorSettings {
+  /** Зеркалить ещё. */
+  include: string[];
+  /** Не зеркалить (вычитается после списка). */
+  exclude: string[];
+  /**
+   * Команда после создания копии (оболочка системы, `CI=1`). Пусто — панель
+   * определяет по lock-файлу в корне копии: pnpm / npm / yarn; без него ничего.
+   */
+  bootstrap?: string;
+}
+
+export interface WorktreeMirrorSkipped {
+  path: string;
+  /** Почему не перенесено: размер, ссылка, ошибка записи, флаг git. */
+  reason: string;
+}
+
+/** Отчёт одного зеркала — карточка копии показывает его целиком. */
+export interface WorktreeMirrorReport {
+  /** Перенесено в этот раз, относительные пути. */
+  mirrored: string[];
+  /** Подходило по списку, но не перенесено — с причиной. */
+  skipped: WorktreeMirrorSkipped[];
+  /** Игнорируемое git на верхнем уровне, чего в списке нет — чтобы дополнить его. */
+  unlisted: string[];
+  /** Уже было не старее в копии и осталось как есть (повторное зеркало). */
+  kept: number;
 }

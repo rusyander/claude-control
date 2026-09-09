@@ -4,9 +4,14 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { ProjectGitInfo, ProjectGitResult } from '@agentdeck/contracts';
+import type {
+  ProjectGitInfo,
+  ProjectGitResult,
+  WorktreeMirrorSettings,
+} from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import { registerProjectGitRoutes } from './project-git-routes.ts';
+import { WorktreeBootstraps } from '../domains/project-git.ts';
 
 /**
  * Маршруты git проекта. Главное, что проверяем на уровне HTTP: чтение всегда
@@ -37,6 +42,24 @@ function hasGit(): boolean {
 
 const GIT_AVAILABLE = hasGit();
 
+/**
+ * Из контекста маршрутам нужно одно — шаблоны зеркала копий по проекту; они
+ * держатся в памяти двойника, чтобы тест не трогал настоящий `state.json`.
+ */
+function storeContext(): ServerContext {
+  const mirrors = new Map<string, WorktreeMirrorSettings>();
+  return {
+    worktreeBootstraps: new WorktreeBootstraps(mkdtempSync(join(tmpdir(), 'cc-wt-boot-'))),
+    store: {
+      getWorktreeMirror: (path: string) => mirrors.get(path) ?? { include: [], exclude: [] },
+      setWorktreeMirror: (path: string, settings: WorktreeMirrorSettings) => {
+        mirrors.set(path, settings);
+        return settings;
+      },
+    },
+  } as unknown as ServerContext;
+}
+
 describe('project-git-routes', () => {
   let app: FastifyInstance;
   let dir: string;
@@ -44,8 +67,7 @@ describe('project-git-routes', () => {
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'cc-git-routes-'));
     app = Fastify();
-    // Контекст этим маршрутам не нужен: путь приходит запросом.
-    registerProjectGitRoutes(app, {} as ServerContext);
+    registerProjectGitRoutes(app, storeContext());
     await app.ready();
   });
 
@@ -237,7 +259,7 @@ describe('project-git-routes: рабочие копии', () => {
     // Двойник реестра повторяет его существенное свойство: `active()` держит
     // прогон ещё минуту ПОСЛЕ завершения (буфер догона), и «занято» решает не
     // он, а `isRunning`.
-    registerProjectGitRoutes(app, {} as ServerContext, {
+    registerProjectGitRoutes(app, storeContext(), {
       active: () => (busyPath ? [{ chatId: 'run-1', projectPath: busyPath }] : []),
       isRunning: () => busyRunning,
     });

@@ -3,6 +3,7 @@ import type { TranslationSchema } from './ru';
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
   common: {
+    duration: { h: 'h', m: 'm', s: 's' },
     appName: 'AgentDeck',
     loadError: 'Could not load this section',
     loadErrorText: 'The server did not answer. Check that it is running and retry.',
@@ -438,7 +439,10 @@ export const en: TranslationSchema = {
         cost: 'Chats: {{chats}} · runs right now: {{runs}}',
         loweredCount: 'below the ceiling: {{count}}',
         pipeline: 'up to {{total}} runs with reviews',
+        pipelinePlanned: 'up to {{total}} runs: triage, plans, work and reviews',
       },
+      triageStarted: 'Split triage started — the groups start on its verdict',
+      triageDeferred: 'Tree paused — the triage is created, it starts on “Resume all”',
     },
     /** Продолжение в чистой сессии: карточка, кнопка и отказы автопродолжения. */
     handoff: {
@@ -458,6 +462,15 @@ export const en: TranslationSchema = {
       failed: 'Could not continue: {{message}}',
       autoDone: 'Work continued in a clean session — {{name}}',
       autoFailed: 'Could not switch auto-continue',
+      /** Кнопка в меню шапки и её исходы. */
+      restart: 'Restart the session',
+      restartHint:
+        'A new conversation of the same project from the checkpoint file — the expensive context stays behind',
+      restartRunning: 'A run is still going — wait for the turn to end or stop it',
+      restartRequested:
+        'The checkpoint is older than your last message — the agent will update it and the panel ' +
+        'will restart the session by itself',
+      restartFailed: 'Could not restart: {{message}}',
       notParsed:
         'The panel could not read this hand-off proposal — the block is left above as it came, ' +
         'so there are no buttons. Ask the agent to propose it again.',
@@ -467,6 +480,9 @@ export const en: TranslationSchema = {
         chain_cap: 'No continuation: the chain reached its cap',
         checkpoint_missing: 'No continuation: the checkpoint file is missing',
         checkpoint_stale: 'No continuation: the checkpoint file was not updated in this run',
+        checkpoint_unchanged:
+          'No continuation: the checkpoint file has not changed since the last restart — the agent ' +
+          'is going in circles',
         no_project: 'No continuation: the conversation runs outside a project',
         context_high: 'The conversation window has grown — a clean session is cheaper from here',
       },
@@ -479,10 +495,14 @@ export const en: TranslationSchema = {
     /** Конвейер подбора модели: «работа → ревью → фикс». */
     cascade: {
       stage: {
+        triage: 'triage',
+        plan: 'plan',
         review: 'review',
         fix: 'fixes',
       },
       stageFull: {
+        triage: 'triage',
+        plan: 'plan',
         work: 'work',
         review: 'review',
         fix: 'fixes',
@@ -494,10 +514,82 @@ export const en: TranslationSchema = {
         title_other: 'Split groups: {{count}}',
         running: 'run in progress',
         idle: 'no run in progress',
+        firstEdit: 'first edit after {{time}}',
+        work: 'worked {{time}}',
+        triageRunning: 'triage in progress',
+        triageApplied: 'triage applied',
+        triageMissing: 'no triage received — the groups went as proposed',
+        repairs: 'repaired by the panel: {{count}}',
+        pending: 'waiting for the triage',
+        waiting: 'waiting for: {{names}}',
+        held: 'waiting for your answer',
+        holdAnswered: 'answered',
+        failed: 'did not start: {{message}}',
+        base: 'from branch {{branch}}',
+        holdPlaceholder: 'The answer goes into the group’s plan and task',
+        holdSend: 'Answer',
+        holdStarted: 'Answer accepted — “{{title}}” is starting',
+        holdQueued: 'Answer accepted — the group starts once its predecessors finish',
+        holdFailed: 'Answer not accepted: {{message}}',
+      },
+      overlap: {
+        idle: 'Branch overlap not checked',
+        none: 'No overlap between branches',
+        title_one: 'Branch overlap: {{count}} file',
+        title_few: 'Branch overlap: {{count}} files',
+        title_many: 'Branch overlap: {{count}} files',
+        title_other: 'Branch overlap: {{count}} files',
+        check: 'Check branches',
+        hint: 'Count the files several groups touched at once. The panel never touches branches — merging stays with you',
+        outside: 'outside ownership: {{names}}',
+        mergeOrder: 'Merge order: {{names}}',
+        unread: 'Unread: {{names}}',
+        clean: 'Branches checked — no shared files',
+        failed: 'Check failed: {{message}}',
+      },
+      tree: {
+        pauseAll: 'Stop all ({{count}})',
+        resumeAll: 'Resume all ({{count}})',
+        pauseHint:
+          'Stop every running run of the tree; continuations, stages and new children queue up',
+        resumeHint: 'Restart the stopped runs in their own sessions and release the queue',
+        paused: 'paused',
+        pausedToast_one: 'Tree stopped: {{count}} run. Auto-starts are queued.',
+        pausedToast_few: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
+        pausedToast_many: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
+        pausedToast_other: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
+        resumedToast: 'Tree resumed: {{resumed}} in their sessions, {{flushed}} from the queue',
+        deferred: 'Tree paused — {{name}}: the chat is created, it starts on “Resume all”',
+        failed: 'Failed: {{message}}',
       },
       started: {
+        work: 'Plan ready — working: {{name}}',
+        workNoPlan: 'No plan received — working without one: {{name}}',
         review: 'Work finished — reviewing it on the ceiling model: {{name}}',
         fix: 'The review found {{count}} findings — fixing: {{name}}',
+      },
+      triage: {
+        title: 'Split triage',
+        count_one: '{{count}} group',
+        count_few: '{{count}} groups',
+        count_many: '{{count}} groups',
+        count_other: '{{count}} groups',
+        group: 'group {{number}}',
+        owns: 'owns',
+        after: 'after',
+        tasks_one: '{{count}} task',
+        tasks_few: '{{count}} tasks',
+        tasks_many: '{{count}} tasks',
+        tasks_other: '{{count}} tasks',
+        hold: 'Question for you',
+        conflicts: 'Overlaps',
+        order: 'Order: {{list}}',
+        notParsed:
+          'The panel could not read the triage block — it is left above as it came. ' +
+          'The groups start as proposed, without boundaries or waits.',
+      },
+      plan: {
+        title: 'Work plan — goes into the group’s task',
       },
       review: {
         title: 'Work review',
@@ -510,6 +602,43 @@ export const en: TranslationSchema = {
           'The panel could not read the review verdict — the block is left above as it came. ' +
           'No fix run was started: ask the agent to repeat the block.',
       },
+    },
+    review: {
+      title: 'Merge request review',
+      titleNamed: 'Review: {{title}}',
+      branch: 'copy on branch {{branch}}',
+      offBranch:
+        'The copy could not be put on this MR branch — it was cut from the base branch. ' +
+        'The findings may have been read from the wrong diff.',
+      clean: 'No findings — the group is closed.',
+      applyAll_one: 'same decision for {{count}} more group',
+      applyAll_few: 'same decision for {{count}} more groups',
+      applyAll_many: 'same decision for {{count}} more groups',
+      applyAll_other: 'same decision for {{count}} more groups',
+      fix: 'Fix in the copy',
+      post: 'Post to the MR',
+      both: 'Both',
+      none: 'Do nothing',
+      decided: {
+        fix: 'Decided: fixing in the copy',
+        post: 'Decided: posted to the MR',
+        both: 'Decided: fixing and posting',
+        none: 'Decided: do nothing',
+      },
+      posted: 'The summary comment is written to the MR',
+      postFailed: 'The comment was not written: {{message}}',
+      push: 'Commit and push to the MR',
+      pushed: 'Consent given — the agent commits and pushes the fixes',
+      donePlain_one: 'Decision applied: {{count}} group',
+      donePlain_few: 'Decision applied: {{count}} groups',
+      donePlain_many: 'Decision applied: {{count}} groups',
+      donePlain_other: 'Decision applied: {{count}} groups',
+      doneToast_one: 'Decision applied: {{count}} group, comments posted: {{posted}}',
+      doneToast_few: 'Decision applied: {{count}} groups, comments posted: {{posted}}',
+      doneToast_many: 'Decision applied: {{count}} groups, comments posted: {{posted}}',
+      doneToast_other: 'Decision applied: {{count}} groups, comments posted: {{posted}}',
+      pushToast: 'Consent to commit and push sent to the agent',
+      failed: 'Failed: {{message}}',
     },
     attach: 'Attach a file',
     attachments: 'Attached files',
@@ -525,6 +654,8 @@ export const en: TranslationSchema = {
     messageCrash: 'This message could not be rendered. The rest of the conversation is intact.',
     branchSwitched: 'Switched to branch {{branch}}',
     showFromHistory: 'Show from the history',
+    detachedNotice:
+      'The panel restarted: this run was picked up without its output stream. The answer is read from the conversation, permission requests still work; no continuation or pipeline follows this run.',
     progress: {
       title: "The agent's plan",
       count: '{{done}} of {{total}} done',
@@ -598,6 +729,11 @@ export const en: TranslationSchema = {
       effort: 'Effort',
       shared: 'Shared across {{count}} calls of this step',
       answer: 'Answer',
+      badgeLabelTimed: 'Step spend: {{total}} tokens, took {{time}}, details on hover',
+      step: 'Step time',
+      span: 'from {{from}} to {{to}}',
+      run: 'Whole run',
+      live: 'running {{time}}',
     },
     copyArtifact: 'Copy contents',
     tabPreview: 'Preview',
@@ -2199,11 +2335,12 @@ export const en: TranslationSchema = {
     handoffContextLimitDefault: '{{tokens}} thousand tokens (recommended)',
     handoffAutoDefault: 'Continue on its own in every conversation',
     handoffAutoDefaultHint:
-      'Auto-continue is normally armed per conversation — by the card toggle, once you have seen ' +
-      'what the panel is about to do. Turn this on to get that behaviour everywhere at once: in ' +
-      'conversations where the toggle was never touched, the panel continues by itself. A toggle ' +
-      'switched off by hand beats the setting and stays off, and nothing waives the safeguards — a ' +
-      'fresh mark in the checkpoint file, a successfully finished turn, no more than five ' +
+      'On out of the box: in conversations where the card toggle was never touched, the panel ' +
+      'continues by itself — the agent closes a stage with the block or in words (“restart the ' +
+      'session”, “/clear”), and the work goes on in a clean session with the original task. Turn ' +
+      'this off to decide every move by button. A conversation’s own toggle beats the setting ' +
+      'either way, and nothing waives the safeguards — a fresh mark in the checkpoint file, a ' +
+      'successfully finished turn, a checkpoint that changed since last time, no more than eight ' +
       'continuations in a row.',
     chatEffortAuto: 'CLI default',
     pricingTitle: 'Rates used to estimate cost',
@@ -3674,6 +3811,57 @@ export const en: TranslationSchema = {
       namePlaceholder: 'feature/branch-name',
       add: 'Create a copy',
       note: 'A copy is a separate directory next to the project with its own branch and shared history: its own agent works there without disturbing the others. The branch shown is the one the copy is on right now — inside it the agent is free to switch. The panel never merges branches',
+      mirror: 'Refresh local layer',
+      mirrorHint:
+        'Carry over what is newer in the main copy: .mcp.json under skip-worktree, .claude/, .env, .agent/ and the project patterns. The copy’s own edits are kept',
+      mirrorTitle: 'Local layer',
+      mirrorHide: 'Hide',
+      mirrorNothing: 'Nothing to carry over: the main copy has no local layer',
+      mirrorMirrored_one: 'Carried over: {{count}} file',
+      mirrorMirrored_few: 'Carried over: {{count}} files',
+      mirrorMirrored_many: 'Carried over: {{count}} files',
+      mirrorMirrored_other: 'Carried over: {{count}} files',
+      mirrorKept_one: 'Unchanged: {{count}} file is already as new in the copy',
+      mirrorKept_few: 'Unchanged: {{count}} files are already as new in the copy',
+      mirrorKept_many: 'Unchanged: {{count}} files are already as new in the copy',
+      mirrorKept_other: 'Unchanged: {{count}} files are already as new in the copy',
+      mirrorSkipped_one: 'Skipped: {{count}} file',
+      mirrorSkipped_few: 'Skipped: {{count}} files',
+      mirrorSkipped_many: 'Skipped: {{count}} files',
+      mirrorSkipped_other: 'Skipped: {{count}} files',
+      mirrorUnlisted: 'Left behind — git-ignored and not on the list:',
+      mirrorUnlistedHint:
+        'Needed in the copy — add it under “Copy settings”. node_modules, dist, build, coverage and *.log are never carried over',
+      mirrorSettings: 'Copy settings',
+      mirrorBuiltin:
+        'Built-in, always carried: .mcp.json, .claude/, CLAUDE.local.md, .agent/ (without tmp, screenshots, archive and PROGRESS), .env, .env.*, *.local, *.local.*, .dev/. Files flagged skip-worktree / assume-unchanged — with the flag',
+      mirrorInclude: 'Also carry',
+      mirrorIncludePlaceholder: '.venv/**\nconfig/local.yaml',
+      mirrorExclude: 'Do not carry',
+      mirrorExcludePlaceholder: '.env',
+      mirrorPatternsHint:
+        'One pattern per line, as in .gitignore: without “/” — by name at any depth, with “/” — from the root; * within a segment, ** — any depth. Never: node_modules, dist, build, coverage, *.log, files over 8 MB and links',
+      mirrorSave: 'Save',
+      mirrorSaved:
+        'Copy settings saved — they apply to the next copy, to “Refresh local layer” and to “Retry install”',
+      bootstrapCommand: 'Command after creating a copy',
+      bootstrapCommandPlaceholder: 'pnpm install --frozen-lockfile --prefer-offline',
+      bootstrapCommandHint:
+        'Runs in the copy before the agent starts, 10-minute ceiling, through the system shell with CI=1. Empty — by the root lockfile: pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci, yarn.lock → yarn install --immutable; no lockfile — nothing',
+      bootstrapTitle: 'Copy preparation',
+      bootstrap: {
+        running: 'installing',
+        ok: 'dependencies ready',
+        failed: 'install failed',
+      },
+      bootstrapExit: 'exit code {{code}}',
+      bootstrapTimedOut: 'stopped at the 10-minute ceiling',
+      bootstrapLog: 'Log',
+      bootstrapHideLog: 'Hide log',
+      bootstrapFullLog: 'Full log',
+      bootstrapEmptyLog: 'Nothing yet',
+      bootstrapRerun: 'Retry install',
+      bootstrapReverted: 'Lockfiles rewritten by the install were reverted: {{files}}',
     },
   },
   remote: {

@@ -24,6 +24,14 @@ import styles from './ChatMessages.module.scss';
 export function ChildBlocks({
   stages,
   onOpenChild,
+  tree,
+  onPauseTree,
+  onResumeTree,
+  treeBusy,
+  onAnswerHold,
+  holdBusy,
+  onCheckOverlap,
+  overlapBusy,
   permissions,
   onPermissionDecide,
   questions,
@@ -38,7 +46,20 @@ export function ChildBlocks({
         Сводка групп разделения — перед вопросами и правами детей: сперва «где
         все», потом «кого ждут». Ничего не спрашивает и потому стоит первой.
       */}
-      {onOpenChild && <ChildStages groups={stages ?? []} onOpen={onOpenChild} />}
+      {onOpenChild && (
+        <ChildStages
+          groups={stages ?? []}
+          onOpen={onOpenChild}
+          tree={tree}
+          onPauseAll={onPauseTree}
+          onResumeAll={onResumeTree}
+          treeBusy={treeBusy}
+          onAnswerHold={onAnswerHold}
+          holdBusy={holdBusy}
+          onCheckOverlap={onCheckOverlap}
+          overlapBusy={overlapBusy}
+        />
+      )}
 
       {/*
         Запросы прав дочерних разговоров. Показываются рядом со своими и по

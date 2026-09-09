@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
@@ -16,13 +16,19 @@ import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-ru
 import { branchMarks } from '../lib/branchMarks';
 import { parseQuestions } from '../lib/parseQuestions';
 import { liveQuestionKey } from '../lib/questionKey';
+import { useMessageTimings } from '../lib/useMessageTimings';
+import { useFeedScroll } from '../lib/useFeedScroll';
 import { MessageBubble } from './MessageBubble';
 import { QuestionCard } from './QuestionCard';
 import { TaskSplitCard } from './TaskSplitCard';
 import { HandoffCard } from './HandoffCard';
 import { PermissionCard } from './PermissionCard';
 import { ChildBlocks } from './ChildBlocks';
+import { ReviewDecisionCard } from './ReviewDecisionCard';
+import { waitsDecision } from '../lib/reviewWaiting';
+import { FeedNotices } from './FeedNotices';
 import { QueuedBubbles } from './QueuedBubbles';
+import { RunTimer } from './RunTimer';
 import type { ChatMessagesProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 
@@ -50,6 +56,18 @@ export function ChatMessages({
   onChildPermissionDecide,
   childStages,
   onOpenChild,
+  childTree,
+  onPauseTree,
+  onResumeTree,
+  treeBusy,
+  onAnswerHold,
+  holdBusy,
+  onCheckOverlap,
+  overlapBusy,
+  reviews,
+  onReviewDecide,
+  onReviewPush,
+  reviewBusy,
   onRetry,
   onContinue,
   onRefresh,
@@ -63,50 +81,22 @@ export function ChatMessages({
   handoff,
   queued,
   onCancelQueued,
+  runStartedAt,
 }: ChatMessagesProps) {
   const { t } = useTranslation();
+  const timings = useMessageTimings(messages, isRunning);
   // Отвеченные вопросы детей: пока прогон ребёнка жив, источник отдаёт тот же
   // последний `AskUserQuestion`, и без общей памяти он воскресал на каждый
   // возврат на вкладку — а второй ответ стоит ещё одного хода агента.
   const answered = useAnsweredQuestions();
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-
-  // Держаться ли низа. Пока пользователь внизу — лента едет за ответом; стоит
-  // ему отлистать вверх, чтобы перечитать, — отпускаем. Раньше лента тянула
-  // вниз на каждом слове, и читать прошлые сообщения во время ответа было
-  // нельзя.
-  const isPinned = useRef(true);
-
-  // Высота ленты в момент клика «Загрузить ещё»: подгруженные сверху сообщения
-  // сдвигают содержимое вниз, и без поправки прокрутки лента прыгала бы. После
-  // прибавки восстанавливаем позицию по приросту высоты.
-  const restoreScroll = useRef<number | undefined>(undefined);
-
-  // Смена разговора — снова к последнему сообщению. Ключ — id разговора, а не
-  // первого сообщения: при подгрузке более ранних первое сообщение меняется, но
-  // прокрутку к низу это запускать не должно.
-  useEffect(() => {
-    isPinned.current = true;
-    restoreScroll.current = undefined;
-    bottomRef.current?.scrollIntoView({ block: 'end' });
-  }, [conversationId]);
-
-  useEffect(() => {
-    // Подгрузка более ранних не должна утягивать ленту вниз — её обрабатывает
-    // отдельный layout-эффект восстановления позиции.
-    if (restoreScroll.current !== undefined) return;
-    if (isPinned.current) bottomRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length, stream.text, stream.tools.length, stream.stalled, permissions?.length]);
-
-  // Восстановление позиции после подгрузки более ранних: держим на экране то же
-  // сообщение, что и было, компенсируя прокрутку приростом высоты сверху.
-  useLayoutEffect(() => {
-    const list = listRef.current;
-    if (!list || restoreScroll.current === undefined) return;
-    list.scrollTop += list.scrollHeight - restoreScroll.current;
-    restoreScroll.current = undefined;
-  }, [messages.length]);
+  const feed = useFeedScroll({
+    conversationId,
+    messageCount: messages.length,
+    streamText: stream.text,
+    streamToolCount: stream.tools.length,
+    stalled: stream.stalled,
+    permissionCount: permissions?.length,
+  });
 
   // Разбор идущего ответа: каждый кусок текста заново, поэтому по памяти — это
   // единственное место ленты, которое пересчитывается на каждое слово. Оба
@@ -144,18 +134,15 @@ export function ChatMessages({
   }, [messages]);
 
   const loadMore = (): void => {
-    if (listRef.current) restoreScroll.current = listRef.current.scrollHeight;
+    feed.rememberHeight();
     onLoadMore?.();
   };
 
   return (
     <div
       className={styles.list}
-      ref={listRef}
-      onScroll={(event) => {
-        const list = event.currentTarget;
-        isPinned.current = list.scrollHeight - list.scrollTop - list.clientHeight < 160;
-      }}
+      ref={feed.listRef}
+      onScroll={(event) => feed.onScroll(event.currentTarget)}
     >
       {hasMore && onLoadMore && (
         <Stack align="center" padding="var(--spacing-2xs) 0">
@@ -201,6 +188,7 @@ export function ChatMessages({
               isQuestionOpen={index === openQuestionIndex}
               isRunning={isRunning}
               costUnit={costUnit}
+              timing={timings.get(message.id)}
               onSplit={onSplit}
               onKeepHere={onKeepHere}
               isSplitPending={isSplitPending}
@@ -372,46 +360,17 @@ export function ChatMessages({
             )}
 
             {stream.isRunning && stream.text && <span className={styles.caret} />}
+
+            {/* Живой таймер под ответом; шагам стрима время не ставится — при
+                восстановлении события приходят пачкой и дали бы нули. */}
+            {stream.isRunning && runStartedAt !== undefined && (
+              <RunTimer since={runStartedAt} className={styles.liveTimer} />
+            )}
           </div>
         </div>
       )}
 
-      {/*
-        Связь с потоком потеряна. Пузырь при этом погашен нарочно — он оборван
-        на полуслове, а полный ответ агент дописывает в транскрипт, откуда лента
-        его и показывает. Без этой строки происходящее выглядело бы как ход,
-        исчезнувший без следа; с ней видно и что связь чинится, и что работа
-        идёт: прогон живёт на сервере, а не во вкладке.
-      */}
-      {stream.stalled && !stream.dropped && (
-        <div className={styles.reconnecting} role="status">
-          <span className={styles.dots} aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-          {t('chat.reconnecting')}
-        </div>
-      )}
-
-      {/*
-        Переподключаться больше нечем — попытки исчерпаны. Молчать здесь нельзя:
-        от «агент думает» это неотличимо, и человек ждёт ответа, которого никто
-        не пришлёт. Прогон при этом мог спокойно доработать на сервере, поэтому
-        и предлагаем не «повторить», а перечитать переписку: ответ, если он
-        дописался, лежит в транскрипте.
-      */}
-      {stream.dropped && (
-        <div className={styles.reconnecting} role="status">
-          <Icon name="warning" size={18} />
-          {t('chat.connectionLost')}
-          {onRefresh && (
-            <Button size="sm" variant="secondary" onClick={onRefresh}>
-              {t('chat.showFromHistory')}
-            </Button>
-          )}
-        </div>
-      )}
+      <FeedNotices stream={stream} onRefresh={onRefresh} />
 
       {/*
         Дописанное, ждущее конца хода, — в ленте, а не только полоской над
@@ -432,11 +391,41 @@ export function ChatMessages({
       <ChildBlocks
         stages={childStages}
         onOpenChild={onOpenChild}
+        tree={childTree}
+        onPauseTree={onPauseTree}
+        onResumeTree={onResumeTree}
+        treeBusy={treeBusy}
+        onAnswerHold={onAnswerHold}
+        holdBusy={holdBusy}
+        onCheckOverlap={onCheckOverlap}
+        overlapBusy={overlapBusy}
         permissions={childPermissions}
         onPermissionDecide={onChildPermissionDecide}
         questions={childQuestions}
         onAnswer={onChildAnswer}
       />
+
+      {/*
+        Ревью чужих MR (Т7) — после сводки детей и перед ошибкой: это решение
+        человека, а не отчёт, и стоять ему там же, где стоят вопросы и права,
+        — внизу ленты, куда человек и смотрит, вернувшись к разговору.
+      */}
+      {onReviewDecide &&
+        (reviews ?? []).map((item) => (
+          <ReviewDecisionCard
+            key={item.chatId}
+            item={item}
+            // «Ко всем» считается по СОСЕДЯМ: сколько ещё карточек этого дерева
+            // ждут решения. Своя в счёт не идёт — иначе тумблер обещал бы
+            // применить решение к самой себе.
+            others={
+              (reviews ?? []).filter((other) => waitsDecision(other) && other !== item).length
+            }
+            onDecide={onReviewDecide}
+            {...(onReviewPush ? { onPush: onReviewPush } : {})}
+            {...(reviewBusy !== undefined ? { busy: reviewBusy } : {})}
+          />
+        ))}
 
       {/*
         Ошибка — такое же событие разговора, как ответ, и место ей в ленте.
@@ -496,7 +485,7 @@ export function ChatMessages({
         </div>
       )}
 
-      <div ref={bottomRef} />
+      <div ref={feed.bottomRef} />
     </div>
   );
 }

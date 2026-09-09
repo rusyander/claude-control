@@ -135,6 +135,16 @@ polling `/chat/active` (`pages/Chat/model/useRunLifecycle.ts`), not by one shot 
 `node tools/qa/check-live-sync.mjs`: it fires a run straight into the API, like the phone does, and
 never reloads the page.
 
+**Every permission request is refused with «Панель перезапускалась…», or an agent keeps running after
+the panel restarted** — the second is by design, the first is its edge. `node --watch` on Windows kills
+the server without handlers, the CLI processes survive; the registry persists every run to
+`<appData>/runs.json` and adopts the live ones at boot as `detached` (place in `/chat/active`, permission
+card, Stop; no stdout — the answer is read from the transcript, no handoff/stage). Refused = the run is not
+in the ledger (started before 09.09.2026, ledger unwritable, or pid dead): resend the message. The ledger
+keeps the pid of `claude.exe` UNDER the `cmd.exe` wrapper — the wrapper dies with the server (`run-ledger.ts
+resolveCliPid`). Proof `.agent/tmp/live-registry-restart.mjs` + `t4-tab-open.mjs`; detail
+`.claude/gotchas.md` §Sessions.
+
 **"New chat" seems not to fire — the previous conversation stays on screen** — the click DID work:
 title, list selection and the URL all change. What does not change is the only thing the human looks
 at, the thread. `useChatMessages` (`entities/Chat/api/ChatApi.ts`) keeps the previous window through
@@ -167,6 +177,63 @@ that key AND `LongPathsEnabled` in the registry. Reproduce end-to-end with
 on a machine where either switch is already on the failure cannot be shown at all. **Capture stderr
 when probing this**: git emits the warning and still exits 0, so a stdout-only check reads as "no
 problem".
+
+**A fresh copy has no `.mcp.json` / `.claude/` / `.env`, or has a stray `.venv`-less run** — the local
+layer is mirrored on `worktree add` by `domains/project-git/mirror-local.ts`: skip-worktree/assume-unchanged
+files (flag re-set in the copy) plus git-ignored paths on the built-in list + the project's own patterns
+(git popover → «Настройка копий»). What stayed behind is NAMED under the copy's card («за бортом»:
+ignored top-level entries not on the list) — extend the list there, then «Обновить локальный слой»
+(newer-only, the copy's edits survive). Never mirrored: `node_modules dist build coverage *.log`, > 8 MB,
+links. Guard: `node tools/qa/check-worktrees.mjs`.
+
+**A copy says «установка не удалась» right after the panel started, or a split agent's task opens with
+«⚠ Подготовка копии»** — the bootstrap of the copy (`domains/project-git/bootstrap.ts`): after the mirror
+the panel runs the project's command («Настройка копий» → «Команда после создания копии», empty = by the
+root lockfile: pnpm/npm/yarn, none ⇒ nothing) in the copy, 10-minute ceiling, log under
+`<appData>/worktree-logs/`. A record left `running` by a previous process reads as failed by design —
+«Повторить установку» on the card. A failure never blocks: the copy stays, the split group still starts
+and its prompt carries the log tail so the agent decides. Guard: the same `check-worktrees.mjs`.
+
+**A child's first message starts with «Панель подготовила эту копию…», or the hub says «первая правка
+через 5с»** — the clean start (T9): the split prepends a panel preamble (mirror line, install command,
+reverted lockfiles, failure tail, «начинай сразу с задачи») to every group that runs in a copy, and the run
+registry stamps the first `Edit|Write` into the child's link — the hub shows the delay from the work
+link's creation. Lockfiles an install rewrote are reverted right after the bootstrap command
+(`domains/project-git/lockfiles.ts`). Detail: `.agent/code-map-projects.agent.md` §Clean start.
+
+**A split with runs opens with ONE chat and no copies, or a group stands with a question and no chat**
+— the two-level conveyor (T1). A split at a ceiling starts a `triage` run in the repo ROOT, read-only
+whatever the edits toggle says, and copies appear only after its `agentdeck:split-plan` block is
+applied: a group with no `after` starts, one with `after` waits for the predecessor's whole chain and is
+branched FROM its branch, one with `hold` gets no chat at all until the human answers in the parent hub
+(`POST /api/chat/split/:parent/hold`, repeat ⇒ 409). Each started group then gets a `plan` run at the
+ceiling in its own copy, and the work prompt carries that plan verbatim (`workAfterPlanPrompt`). No block
+or a failed level never blocks: a feed notice says so and the groups run as before. Conveyor links do not
+count toward the handoff cap. Guard `tools/qa/check-split-levels.mjs` (stubs only); live
+`.agent/tmp/t1-live.mjs`; detail `.agent/code-map-chat.agent.md` (server, «Two levels before the work»).
+
+**The agent wrote «Перезапустите сессию» / «/clear» in words and the panel started a new chat by itself; or
+it did NOT and the toast says «файл-опора не изменился»** — both by design (T3). Prose in the tail of the
+answer is a handoff proposal like the block (`scanHandoffProse`), the continuation's first message carries
+the checkpoint AND the original task, auto-continue is on by default (an explicit `false` stored in
+`state.json` still wins — the owner's stand has one), the chain cap is 8 handoffs (cascade stages excluded),
+and a checkpoint whose sha1 equals the one at the previous handoff stops the chain: the agent is looping.
+«Перезапустить сессию» in the chat header menu = `POST /api/chat/:id/restart` (409 while running; stale
+checkpoint ⇒ the agent is asked to update it, auto forced on). Guard `tools/qa/check-handoff.mjs`; detail
+`.agent/code-map-chat.agent.md` §Handoff.
+
+**The hub says «Пересечения веток: N», or it says «не сверялись» and never counts on its own** — both
+by design (T6). The panel compares the split branches ONLY on the end of a group's chain and on the
+«Сверить ветки» button; before that it claims nothing. The count is `git diff --name-only
+<base>...<branch>` (three dots — a two-dot diff would blame the group for everything that landed in
+base since) plus uncommitted in the copy, intersected across groups
+(`domains/chat/split-overlap.ts`). RED is only a file outside that group's `owns` from the triage —
+two rightful owners of one file are work for the merge, not a violation. A new fact is announced in
+the parent's feed once (`path@groups`); the parent is usually idle, and then the notice is skipped
+and the fact stays in the hub instead of being lost. Nothing is merged, rebased or checked out here
+and never will be — merging stays with the user; the `after` order is a hint beside the list. A
+branch git could not read is NAMED with its reason, never folded into «no overlap». Guard: the
+overlap block of `node tools/qa/check-parent-hub.mjs`.
 
 **A parallel working copy refuses to be removed (409)** — an agent is running inside it. That is why
 `routes/project-git-routes.ts` takes the run registry as its third argument, and the check holds for

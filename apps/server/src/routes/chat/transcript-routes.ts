@@ -7,6 +7,7 @@ import { searchChats } from '../../domains/chat/ChatSearch.ts';
 import { listProjects } from '../../domains/chat/ChatProjects.ts';
 import { buildChatExport, type ExportFormat } from '../../domains/chat/ChatExport.ts';
 import { createStepCost } from '../../domains/chat/ChatCost.ts';
+import { pausedChatIds } from '../../domains/chat/tree-pause.ts';
 import { clampInt, DEFAULT_MESSAGE_PAGE, MAX_MESSAGE_PAGE } from '../../domains/chat/constants.ts';
 import { sendConditional } from '../../lib/conditional-get.ts';
 import { projectsDir } from './paths.ts';
@@ -33,14 +34,20 @@ export function registerChatTranscriptRoutes(app: FastifyInstance, ctx: ServerCo
   app.get('/api/chats', (request, reply) => {
     const chats = readChats(projectsDir(ctx));
     const links = ctx.store.getChatLinks();
+    // Разговоры деревьев на паузе — фишка в списке. Считается по записям паузы
+    // и связям, а не по реестру: остановленный прогон из реестра УШЁЛ, и ничем
+    // иным «стоит» от «молчит» в списке не отличить.
+    const paused = pausedChatIds(ctx.store.getTreePauses(), links);
     const withLinks =
-      Object.keys(links).length === 0
+      Object.keys(links).length === 0 && paused.size === 0
         ? chats
         : chats.map((chat) => {
             const link = links[chat.id];
-            if (!link) return chat;
+            const flag = paused.has(chat.id) ? { paused: true } : {};
+            if (!link) return paused.has(chat.id) ? { ...chat, ...flag } : chat;
             return {
               ...chat,
+              ...flag,
               parentId: link.parentChatId,
               // Ветка связи — только подпорка: она запомнена при заведении
               // копии, а транскрипт знает, где агент оказался после неё.
@@ -61,6 +68,10 @@ export function registerChatTranscriptRoutes(app: FastifyInstance, ctx: ServerCo
               // есть: без него сводка звеньев у родителя молчит про модель
               // ровно в те минуты, когда на неё и смотрят.
               ...(chat.model || !link.model ? {} : { model: link.model }),
+              // Первая правка кода — только из связи: транскрипт этого не
+              // считает, а по разнице с заведением ребёнка сводка у родителя
+              // показывает, сколько ушло на обживание копии.
+              ...(link.firstEditAt ? { firstEditAt: link.firstEditAt } : {}),
             };
           });
     return sendConditional(request, reply, withLinks);

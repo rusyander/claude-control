@@ -3,8 +3,10 @@ import {
   buildHandoffPrompt,
   HANDOFF_DEFAULT_CHECKPOINT,
   HANDOFF_MAX_CHAIN,
+  HANDOFF_ROOT_TASK_MAX,
   parseHandoffProposal,
   scanHandoffBlocks,
+  scanHandoffProse,
   type HandoffProposal,
 } from '@agentdeck/contracts/chat-handoff';
 import { evaluateHandoff, HandoffChains, startHandoff } from './ChatHandoff.ts';
@@ -109,7 +111,70 @@ describe('вырезание блока из ответа', () => {
   });
 });
 
+/**
+ * Проза вместо блока: скилл учит агента «назови /clear вслух», и он так и
+ * пишет — раньше это был конец работы до утра. Проверяем, что фразы читаются,
+ * что файл-опора берётся из текста, и что отрицание гасит всё.
+ */
+describe('просьба перезапуститься словами', () => {
+  it.each([
+    ['перезапустите сессию', 'Этап закрыт. Перезапустите сессию.'],
+    ['перезапусти эту сессию', 'Готово, перезапусти эту сессию и продолжай.'],
+    ['/clear', 'Задача закрыта — /clear, затем продолжай по PROGRESS.'],
+    ['продолжай по', 'Дальше: продолжай по .agent/PROGRESS.md.'],
+    ['новый прогон читает', 'Новый прогон читает .agent/PROGRESS.md и делает следующий шаг.'],
+  ])('читается как предложение (%s)', (_name, text) => {
+    const proposal = scanHandoffProse(text);
+    expect(proposal).toBeDefined();
+    expect(proposal?.checkpoint).toBe(HANDOFF_DEFAULT_CHECKPOINT);
+    expect(proposal?.next).toContain(HANDOFF_DEFAULT_CHECKPOINT);
+  });
+
+  it('файл-опора берётся из текста, хвостовая пунктуация и кавычки срезаются', () => {
+    expect(
+      scanHandoffProse('Перезапустите сессию, новый прогон читает `.agent/STATE.md`.')?.checkpoint,
+    ).toBe('.agent/STATE.md');
+    expect(scanHandoffProse('продолжай по «.agent/notes/PROGRESS.md».')?.checkpoint).toBe(
+      '.agent/notes/PROGRESS.md',
+    );
+  });
+
+  it('файл-опора наружу проекта не принимается — берётся по умолчанию', () => {
+    expect(scanHandoffProse('новый прогон читает ../../secrets.md')?.checkpoint).toBe(
+      HANDOFF_DEFAULT_CHECKPOINT,
+    );
+  });
+
+  it('отрицание гасит просьбу: «не перезапускай» — продолжаем здесь', () => {
+    expect(scanHandoffProse('Не перезапускай сессию, я ещё не закончил.')).toBeUndefined();
+    expect(
+      scanHandoffProse('Сессию не нужно перезапускать — продолжай по .agent/PROGRESS.md'),
+    ).toBeUndefined();
+  });
+
+  it('обычный ответ без этих фраз — не предложение', () => {
+    expect(scanHandoffProse('Сделал. Тесты зелёные, продолжай по плану.')).toBeUndefined();
+    expect(scanHandoffProse('Команда clear в терминале чистит экран.')).toBeUndefined();
+  });
+
+  it('смотрится только хвост ответа: «/clear» в начале длинного разбора — разговор о команде', () => {
+    const long = '/clear недоступен хукам.\n' + 'x'.repeat(2000) + '\nГотово.';
+    expect(scanHandoffProse(long)).toBeUndefined();
+  });
+});
+
 describe('первое сообщение новой сессии', () => {
+  it('исходное задание едет последним и обрезается по потолку', () => {
+    const prompt = buildHandoffPrompt(PROPOSAL, 'Сделай экспорт отчётов. '.repeat(1000));
+    expect(prompt).toContain('Исходное задание');
+    expect(prompt.indexOf('Исходное задание')).toBeGreaterThan(prompt.indexOf(PROPOSAL.next));
+    expect(prompt.length).toBeLessThan(HANDOFF_ROOT_TASK_MAX + 600);
+  });
+
+  it('без исходного задания строки о нём нет', () => {
+    expect(buildHandoffPrompt(PROPOSAL)).not.toContain('Исходное задание');
+  });
+
   it('предупреждает о потере контекста и называет файл-опору', () => {
     const prompt = buildHandoffPrompt(PROPOSAL);
     expect(prompt).toContain('новая сессия');
@@ -139,6 +204,27 @@ describe('цепочки', () => {
     const chains = new HandoffChains();
     expect(chains.link(['sess-1'], 'new-2')).toBe(1);
     expect(chains.isAuto(['new-2'])).toBe(false);
+  });
+
+  it('звено конвейера наследует всё, но шаг не двигает', () => {
+    const chains = new HandoffChains();
+    chains.setAuto(['sess-1'], true);
+    expect(chains.link(['sess-1'], 'new-2', { rootTask: 'задание', checkpointHash: 'h1' })).toBe(1);
+    expect(chains.link(['new-2'], 'review-3', { stage: true })).toBe(1);
+    expect(chains.isAuto(['review-3'])).toBe(true);
+    expect(chains.rootTaskOf(['review-3'])).toBe('задание');
+    expect(chains.lastCheckpointHash(['review-3'])).toBe('h1');
+    // Следующее продолжение после звена — шаг 2, а не 3.
+    expect(chains.link(['review-3'], 'new-4', { checkpointHash: 'h2' })).toBe(2);
+    expect(chains.lastCheckpointHash(['new-4'])).toBe('h2');
+  });
+
+  it('исходное задание ставится первым продолжением и дальше не перебивается', () => {
+    const chains = new HandoffChains();
+    chains.link(['sess-1'], 'new-2', { rootTask: 'первое' });
+    chains.link(['new-2'], 'new-3', { rootTask: 'второе' });
+    expect(chains.rootTaskOf(['new-3'])).toBe('первое');
+    expect(chains.rootTaskOf(['sess-1'])).toBeUndefined();
   });
 
   it('забытый разговор теряет и тумблер, и номер шага', () => {
@@ -277,7 +363,71 @@ describe('предохранители автопродолжения', () => {
   });
 });
 
+describe('предохранитель «чекпойнт не изменился»', () => {
+  const base = {
+    proposal: PROPOSAL,
+    cwd: 'C:/work/проект',
+    ok: true,
+    startedAt: 1_000,
+    auto: true,
+    depth: 1,
+    stat: () => 2_000,
+  };
+
+  it('тот же отпечаток, что при прошлом продолжении, — отказ', () => {
+    const verdict = evaluateHandoff({ ...base, previousHash: 'abc', hash: () => 'abc' });
+    expect(verdict).toEqual({ ok: false, reason: 'checkpoint_unchanged', proposal: PROPOSAL });
+  });
+
+  it('файл изменился — продолжаем', () => {
+    expect(evaluateHandoff({ ...base, previousHash: 'abc', hash: () => 'def' }).ok).toBe(true);
+  });
+
+  it('у первого продолжения сравнивать не с чем — продолжаем', () => {
+    expect(evaluateHandoff({ ...base, hash: () => 'abc' }).ok).toBe(true);
+  });
+
+  it('потолок считается продолжениями: восьмое — последнее', () => {
+    expect(evaluateHandoff({ ...base, depth: HANDOFF_MAX_CHAIN - 1 }).ok).toBe(true);
+    expect(evaluateHandoff({ ...base, depth: HANDOFF_MAX_CHAIN })).toMatchObject({
+      ok: false,
+      reason: 'chain_cap',
+    });
+  });
+});
+
 describe('заведение продолжения', () => {
+  it('исходное задание уезжает в промпт и запоминается цепочкой', () => {
+    const chains = new HandoffChains();
+    const started = startHandoff({
+      proposal: PROPOSAL,
+      cwd: 'C:/work/проект',
+      fromAliases: ['sess-1'],
+      chains,
+      startRun: false,
+      start: () => true,
+      rootTask: 'Сделай экспорт отчётов',
+      checkpointHash: 'h1',
+    });
+    expect(started.prompt).toContain('Сделай экспорт отчётов');
+    expect(chains.rootTaskOf([started.chatId])).toBe('Сделай экспорт отчётов');
+    expect(chains.lastCheckpointHash([started.chatId])).toBe('h1');
+
+    // Второе продолжение: своё задание у цепочки уже есть, новое не перебивает.
+    const second = startHandoff({
+      proposal: PROPOSAL,
+      cwd: 'C:/work/проект',
+      fromAliases: [started.chatId],
+      chains,
+      startRun: false,
+      start: () => true,
+      rootTask: 'другое',
+    });
+    expect(second.prompt).toContain('Сделай экспорт отчётов');
+    expect(second.prompt).not.toContain('другое');
+    expect(second.chainDepth).toBe(2);
+  });
+
   it('запускает прогон в том же каталоге и наращивает цепочку', () => {
     const chains = new HandoffChains();
     chains.setAuto(['sess-1'], true);

@@ -1,0 +1,13 @@
+// Шаблоны зеркала: раскрывашка под списком копий. Кнопка выровнена по левому
+// краю раздела, форма — чуть утоплена, чтобы читалась как его продолжение.
+.settings {
+  align-items: flex-start;
+}
+
+.form {
+  width: 100%;
+  padding: var(--spacing-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+}

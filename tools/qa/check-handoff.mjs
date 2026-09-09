@@ -80,6 +80,7 @@ page.on('console', (message) => {
 let sent;
 let handoffBody;
 let autoBody;
+let restartBody;
 
 // Каталога проекта на диске нет — настоящий git-пульт ответил бы отказом и
 // засорил консоль. Проверяем не его, поэтому отвечаем «не репозиторий».
@@ -123,8 +124,17 @@ await page.route('**/api/chat/send', (route) => {
 // Состояние цепочки живёт на сервере: тумблер переживает перезагрузку вкладки,
 // а номер шага показывает, что автомат не бесконечен.
 await page.route('**/api/chat/handoff/state*', (route) =>
-  route.fulfill({ json: { auto: false, depth: 1, maxChain: 5 } }),
+  route.fulfill({ json: { auto: false, depth: 1, maxChain: 8 } }),
 );
+
+// Перезапуск по кнопке: файл-опора «устарел» — сервер отвечает просьбой, которую
+// вкладка отправляет в разговор сама.
+await page.route(`**/api/chat/${CHAT_ID}/restart`, (route) => {
+  restartBody = route.request().postDataJSON();
+  return route.fulfill({
+    json: { mode: 'requested', prompt: 'Обнови .agent/PROGRESS.md и выведи блок handoff.' },
+  });
+});
 
 await page.route('**/api/chat/handoff/auto', (route) => {
   autoBody = route.request().postDataJSON();
@@ -189,7 +199,7 @@ check(body.includes('Закрыт экспорт отчётов'), 'что за�
 check(body.includes('Взяться за импорт'), 'задание новой сессии показано целиком');
 check(body.includes('.agent/PROGRESS.md'), 'файл-опора назван');
 check(body.includes('.agent/ARCHIVE.md'), 'вычищенное показано человеку');
-check(body.includes('шаг 1 из 5'), 'номер шага цепочки и её потолок видны');
+check(body.includes('шаг 1 из 8'), 'номер шага цепочки и её потолок видны');
 
 // Решение принимают только по последнему предложению: карточка из середины
 // истории отработана, стирать по ней контекст десять ходов спустя незачем.
@@ -223,6 +233,32 @@ check(
   'просьба ушла текстом сервера',
 );
 check(handoffBody === undefined, 'просьба ничего не заводит сама по себе');
+
+// Перезапуск сессии из меню шапки: прогон не идёт — кнопка доступна; файл-опора
+// «устарел» — агенту уходит просьба обновить его (текст с сервера), а не новый чат.
+sent = undefined;
+await page.getByRole('button', { name: 'Настройки чата' }).click();
+const restart = page.getByRole('button', { name: 'Перезапустить сессию' });
+check(
+  await waitEnabled(restart),
+  'в меню шапки есть «Перезапустить сессию», прогон не идёт — доступна',
+);
+await restart.click();
+await page.waitForTimeout(1500);
+check(restartBody?.projectPath === CHAT_PATH, 'перезапуск назвал каталог разговора');
+check(
+  restartBody?.sessionId === CHAT_ID || restartBody?.sessionId === undefined,
+  'ключ разговора в адресе, не в теле',
+);
+check(
+  sent?.prompt === 'Обнови .agent/PROGRESS.md и выведи блок handoff.',
+  'просьба обновить файл-опору ушла в разговор текстом сервера',
+);
+check(handoffBody === undefined, 'устаревший файл-опора не заводит новый чат сам по себе');
+check(
+  (await page.getByText(/Файл-опора старее последней реплики/).count()) > 0,
+  'человеку сказано, почему сессия не перезапущена сразу',
+);
 
 // Согласие проверяем на свежей ленте: после наших реплик предложение перестало
 // быть последним, а решают только по последнему.

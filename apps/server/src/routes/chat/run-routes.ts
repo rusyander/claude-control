@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../../context.ts';
 import { initiativePrompt, QUESTION_DENIED } from '../../domains/chat/initiative.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
+import { RUN_UNKNOWN_DENIED } from '../../domains/chat/run-ledger.ts';
 import { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
 import { shouldAutoApprove, isReadOnlyTool } from '../../domains/chat/auto-approve.ts';
@@ -440,8 +441,12 @@ export function registerChatRunRoutes(
       return reply.send({ behavior: 'allow', updatedInput: input });
     }
 
+    // Прогона нет в реестре — ни живого, ни усыновлённого из журнала после
+    // перезапуска (`bootstrap/runtime.ts`). Текст честный и с действием: он
+    // уезжает агенту результатом вызова и в транскрипт, откуда его видит лента.
+    // «Разговор не найден» здесь стояло 09.09.2026 на 24 отказах за секунду.
     const shown = registry.emitExternal(runId, { kind: 'permission', toolName, input, toolUseId });
-    if (!shown) return reply.send({ behavior: 'deny', message: 'Разговор не найден.' });
+    if (!shown) return reply.send({ behavior: 'deny', message: RUN_UNKNOWN_DENIED });
 
     const decision = await session.requestPermission({ runId, toolName, input, toolUseId });
     // Помечаем в потоке, что решение принято — карточка в чате обновится.

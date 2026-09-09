@@ -7,7 +7,7 @@ import {
   scanSplitBlocks,
   type TaskSplitProposal,
 } from '@agentdeck/contracts/task-split';
-import { splitTasks, type SplitGit } from './ChatSplit.ts';
+import { splitTasks, type SplitGit, type SplitTasksInput } from './ChatSplit.ts';
 
 /**
  * Разделение задач по чатам. Проверяем ровно то, из-за чего эта штука может
@@ -41,7 +41,7 @@ function fakeGit(overrides: Partial<SplitGit> = {}): SplitGit & { added: string[
     takenBranches: async () => [],
     addWorktree: async (_dir, branch) => {
       added.push(branch);
-      return `/copies/${branch.replace(/\//g, '-')}`;
+      return { path: `/copies/${branch.replace(/\//g, '-')}` };
     },
     ...overrides,
   };
@@ -333,7 +333,7 @@ describe('разделение задач по чатам', () => {
     const git = fakeGit({
       addWorktree: async (_dir, branch) => {
         if (branch === 'feature/login') throw new Error('каталог уже существует');
-        return `/copies/${branch}`;
+        return { path: `/copies/${branch}` };
       },
     });
 
@@ -387,6 +387,141 @@ describe('разделение задач по чатам', () => {
     expect(result.chats[0]?.prompt).toContain('починить валидацию');
   });
 
+  it('провал подготовки копии не останавливает группу: хвост лога — в задании', async () => {
+    const git = fakeGit({
+      bootstrap: async (_dir, copy) =>
+        copy.includes('login')
+          ? {
+              command: 'pnpm install',
+              status: 'failed',
+              startedAt: '2026-09-09T10:00:00.000Z',
+              finishedAt: '2026-09-09T10:01:00.000Z',
+              exitCode: 1,
+              logTail: 'ERR_PNPM_OUTDATED_LOCKFILE',
+            }
+          : {
+              command: 'pnpm install',
+              status: 'ok',
+              startedAt: '2026-09-09T10:00:00.000Z',
+              finishedAt: '2026-09-09T10:01:00.000Z',
+              exitCode: 0,
+              logTail: 'Done',
+            },
+    });
+    const prompts: string[] = [];
+
+    const result = await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git,
+      start: ({ prompt }) => {
+        prompts.push(prompt);
+        return true;
+      },
+    });
+
+    expect(result.chats.every((chat) => chat.started)).toBe(true);
+    expect(prompts[0]).toContain('⚠ Подготовка копии');
+    expect(prompts[0]).toContain('кодом 1');
+    expect(prompts[0]).toContain('ERR_PNPM_OUTDATED_LOCKFILE');
+    expect(prompts[0]).toContain('починить валидацию');
+    // Удачная подготовка — в преамбуле как сделанное, без предупреждения.
+    expect(prompts[1]).not.toContain('Подготовка копии');
+    expect(prompts[1]).toContain('зависимости установлены');
+    expect(prompts[1]).toContain('начинай сразу с задачи');
+    expect(result.chats[0]?.prompt).toBe(prompts[0]);
+  });
+
+  it('задание копии открывает преамбула панели: зеркало, зависимости, откат lock-файлов', async () => {
+    const git = fakeGit({
+      addWorktree: async (_dir, branch) => ({
+        path: `/copies/${branch}`,
+        mirror: 'Локальный слой: перенесено 3',
+      }),
+      bootstrap: async () => ({
+        command: 'pnpm install --frozen-lockfile',
+        status: 'ok',
+        startedAt: '2026-09-09T10:00:00.000Z',
+        finishedAt: '2026-09-09T10:01:00.000Z',
+        exitCode: 0,
+        logTail: 'Done',
+        reverted: ['pnpm-lock.yaml'],
+      }),
+    });
+    const prompts: string[] = [];
+
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git,
+      start: ({ prompt }) => {
+        prompts.push(prompt);
+        return true;
+      },
+    });
+
+    const [first] = prompts;
+    expect(first?.startsWith('Панель подготовила эту копию: Локальный слой: перенесено 3;')).toBe(
+      true,
+    );
+    expect(first).toContain('зависимости установлены командой «pnpm install --frozen-lockfile»');
+    expect(first).toContain('lock-файлы откачены: pnpm-lock.yaml');
+    expect(first).toContain('Окружение готово — не проверяй и не настраивай');
+    // Само задание — после преамбулы, целиком.
+    const task = PROPOSAL.groups[0]?.tasks[0] ?? '';
+    expect(task).not.toBe('');
+    expect(first).toContain(task);
+    expect(first?.indexOf('начинай сразу с задачи')).toBeLessThan(first?.indexOf(task) ?? -1);
+  });
+
+  it('группа в общем каталоге преамбулы не получает', async () => {
+    const prompts: string[] = [];
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git: fakeGit({ isRepo: () => false }),
+      start: ({ prompt }) => {
+        prompts.push(prompt);
+        return true;
+      },
+    });
+    expect(prompts.every((prompt) => !prompt.includes('Панель'))).toBe(true);
+  });
+
+  it('подготовка копий идёт параллельно и ждётся до запуска', async () => {
+    const order: string[] = [];
+    let inFlight = 0;
+    let peak = 0;
+    const git = fakeGit({
+      bootstrap: async (_dir, copy) => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        inFlight -= 1;
+        order.push(`boot:${copy}`);
+        return undefined;
+      },
+    });
+
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git,
+      start: ({ cwd }) => {
+        order.push(`start:${cwd}`);
+        return true;
+      },
+    });
+
+    expect(peak).toBe(2);
+    expect(order.slice(0, 2).every((item) => item.startsWith('boot:'))).toBe(true);
+    expect(order.slice(2).every((item) => item.startsWith('start:'))).toBe(true);
+  });
+
   it('отказ реестра (в этом чате уже идёт прогон) виден в ответе', async () => {
     const result = await splitTasks({
       projectPath: '/repo',
@@ -397,5 +532,230 @@ describe('разделение задач по чатам', () => {
     });
 
     expect(result.chats.every((chat) => !chat.started)).toBe(true);
+  });
+});
+
+/**
+ * Порции конвейера уровней (Т1): заводится подмножество групп, чат стартует со
+ * звена плана, копия отводится от ветки предшественника, и позиция группы едет
+ * в ответ — по ней конвейер узнаёт свою запись.
+ */
+describe('порция групп для конвейера уровней', () => {
+  it('заводит только выбранные группы, со стадией плана и контекстом, индекс — в ответе', async () => {
+    const bases: (string | undefined)[] = [];
+    const git = fakeGit({
+      addWorktree: async (_dir, branch, base) => {
+        bases.push(base);
+        return { path: `/copies/${branch.replace(/\//g, '-')}` };
+      },
+    });
+    const linked: { stage: string; index: number; base?: string }[] = [];
+    const started: { stage: string; index: number; predecessors?: number }[] = [];
+    const context = {
+      base: 'feature/login',
+      predecessors: [{ title: 'Форма входа', branch: 'feature/login' }],
+    };
+
+    const result = await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git,
+      now: () => 1000,
+      groups: [1, 7],
+      stage: 'plan',
+      context,
+      link: (chat) =>
+        void linked.push({
+          stage: chat.stage,
+          index: chat.index,
+          ...(chat.context?.base ? { base: chat.context.base } : {}),
+        }),
+      start: (input) => {
+        started.push({
+          stage: input.stage,
+          index: input.index,
+          ...(input.context?.predecessors
+            ? { predecessors: input.context.predecessors.length }
+            : {}),
+        });
+        return true;
+      },
+    });
+
+    // Копия одна — у выбранной группы, от ветки предшественника; чужой индекс отброшен.
+    expect(bases).toEqual(['feature/login']);
+    expect(result.chats.map((chat) => chat.branch)).toEqual(['feature/header']);
+    expect(result.chats.map((chat) => [chat.index, chat.chatId])).toEqual([[1, 'new-1000-1']]);
+    expect(linked).toEqual([{ stage: 'plan', index: 1, base: 'feature/login' }]);
+    expect(started).toEqual([{ stage: 'plan', index: 1, predecessors: 1 }]);
+  });
+
+  it('сбой копии в порции называет позицию группы', async () => {
+    const git = fakeGit({
+      addWorktree: async () => {
+        throw new Error('ветка занята');
+      },
+    });
+
+    const result = await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git,
+      groups: [1],
+      start: () => true,
+    });
+
+    expect(result.failures).toEqual([
+      { index: 1, title: 'Шапка', branch: 'feature/header', message: 'ветка занята' },
+    ]);
+  });
+});
+
+describe('ссылка на MR в блоке предложения', () => {
+  const MR = 'https://gitlab.com/team/app/-/merge_requests/42';
+
+  /** Разбор одной группы: всё остальное здесь неважно. */
+  const groupOf = (extra: Record<string, unknown>) =>
+    parseSplitProposal({
+      groups: [{ title: 'Ревью MR', tasks: ['посмотри'], ...extra }],
+    })?.groups[0];
+
+  it('одна ревью-группа — законное предложение: обычная одиночка им не считается', () => {
+    expect(groupOf({ review: MR })).toBeTruthy();
+    expect(parseSplitProposal({ groups: [{ title: 'Одна', tasks: ['что-то'] }] })).toBeUndefined();
+  });
+
+  it('ссылка принимается и строкой, и объектом, и под именами mr/pr', () => {
+    expect(groupOf({ review: MR })?.review).toEqual({ url: MR });
+    expect(groupOf({ mr: { url: MR, source_branch: 'feature/login' } })?.review).toEqual({
+      url: MR,
+      branch: 'feature/login',
+    });
+    expect(groupOf({ pullRequest: { link: MR } })?.review).toEqual({ url: MR });
+  });
+
+  it('класс становится ревью сам: иначе проверка чужого кода уехала бы на модель слабее', () => {
+    expect(groupOf({ review: MR })?.kind).toBe('review');
+    // Названный агентом класс не трогаем: он мог знать про эту работу больше.
+    expect(groupOf({ review: MR, kind: 'design' })?.kind).toBe('design');
+  });
+
+  it('не ссылка — не ревью: копию отводить не от чего', () => {
+    for (const raw of ['посмотри MR Пети', 'file:///etc/passwd', '', { branch: 'main' }]) {
+      expect(groupOf({ review: raw })?.review).toBeUndefined();
+    }
+  });
+});
+
+describe('группа ревью по ссылке', () => {
+  const MR = 'https://gitlab.com/team/app/-/merge_requests/42';
+
+  /** Предложение из одной ревью-группы: столько разделение и разрешает. */
+  const REVIEW_PROPOSAL: TaskSplitProposal = {
+    groups: [
+      {
+        title: 'Ревью MR 42',
+        branch: 'review/mr-42',
+        tasks: ['посмотри на обработку ошибок'],
+        review: { url: MR },
+      },
+    ],
+  };
+
+  /** Один вызов со стендом по умолчанию: чем разделение отвечает и что запустило. */
+  async function split(
+    overrides: Partial<SplitTasksInput> & { git?: SplitGit & { added: string[] } },
+    proposal: TaskSplitProposal = REVIEW_PROPOSAL,
+  ) {
+    const git = overrides.git ?? fakeGit();
+    const started: { stage: string; prompt: string; cwd: string; review?: unknown }[] = [];
+    const linked: { stage: string; review?: unknown }[] = [];
+
+    const result = await splitTasks({
+      projectPath: '/repo',
+      proposal,
+      startRuns: true,
+      git,
+      now: () => 1000,
+      link: (chat) => void linked.push({ stage: chat.stage, review: chat.review }),
+      start: (input) => {
+        started.push({
+          stage: input.stage,
+          prompt: input.prompt,
+          cwd: input.cwd,
+          review: input.review,
+        });
+        return true;
+      },
+      ...overrides,
+    });
+
+    return { git, started, linked, result };
+  }
+
+  it('ветку MR берёт у форджа как есть — суффикса занятости она не получает', async () => {
+    const asked: string[] = [];
+    const { git, result, started } = await split({
+      // Ветка уже заведена в репозитории: обычной группе досталось бы
+      // `-2`, а ревью-группе такой суффикс дал бы ДРУГОЙ дифф.
+      git: fakeGit({ takenBranches: async () => ['feature/very/long-branch-name'] }),
+      resolveReview: async (review) => {
+        asked.push(review.url);
+        return { branch: 'feature/very/long-branch-name' };
+      },
+    });
+
+    expect(asked).toEqual([MR]);
+    expect(git.added).toEqual(['feature/very/long-branch-name']);
+    expect(result.chats[0]?.branch).toBe('feature/very/long-branch-name');
+    expect(started[0]?.review).toEqual({
+      url: MR,
+      branch: 'feature/very/long-branch-name',
+      onMrBranch: true,
+    });
+  });
+
+  it('без интеграции идёт ветка из блока агента, приведённая к имени git', async () => {
+    const { git, started } = await split({}, {
+      groups: [
+        { ...REVIEW_PROPOSAL.groups[0], review: { url: MR, branch: 'feature/Вход в систему' } },
+      ],
+    } as TaskSplitProposal);
+
+    expect(git.added).toEqual(['feature/Вход-в-систему']);
+    expect(started[0]?.review).toMatchObject({ onMrBranch: true });
+  });
+
+  it('отказ форджа разделение не роняет, а задание честно говорит про базовую ветку', async () => {
+    const { git, started, result } = await split({
+      resolveReview: async () => {
+        throw new Error('403');
+      },
+    });
+
+    expect(result.failures).toHaveLength(0);
+    // Ветки MR не знает никто — копия от базы под именем из блока.
+    expect(git.added).toEqual(['review/mr-42']);
+    expect(started[0]?.review).toEqual({ url: MR, onMrBranch: false });
+    expect(started[0]?.prompt).toContain('отведена от базовой ветки');
+  });
+
+  it('задание — ревью MR, а не задание группы: править и писать в MR запрещено прямо', async () => {
+    const { started } = await split({ resolveReview: async () => ({ branch: 'feature/login' }) });
+
+    expect(started[0]?.prompt).toContain(MR);
+    expect(started[0]?.prompt).toContain('deep-review');
+    expect(started[0]?.prompt).toContain('НИЧЕГО НЕ ПРАВЬ');
+    expect(started[0]?.prompt).toContain('посмотри на обработку ошибок');
+    expect(started[0]?.prompt).toContain('agentdeck:review');
+  });
+
+  it('план ревью-группе не заводится: планировать нечего, она ничего не делает', async () => {
+    const { started, linked } = await split({ stage: 'plan' });
+
+    expect(started.map((run) => run.stage)).toEqual(['work']);
+    expect(linked.map((chat) => chat.stage)).toEqual(['work']);
   });
 });

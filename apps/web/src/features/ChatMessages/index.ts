@@ -13,3 +13,9 @@ export type { HandoffCardProps } from './ui/HandoffCard.types';
 export type { ChildPermission, ChildQuestion, HandoffControls } from './ui/ChatMessages.types';
 /** Сводка звеньев у родителя: страница собирает её из списка чатов и прогонов. */
 export type { ChildStageGroup } from './ui/ChildStages.types';
+/**
+ * Карточка решения по ревью чужого MR (Т7). Наружу выставлен только её предмет:
+ * саму карточку лента ставит сама, а собирает список страница — по дереву,
+ * которое она и так опрашивает.
+ */
+export type { ReviewDecisionItem } from './ui/ReviewDecisionCard.types';

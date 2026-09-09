@@ -80,6 +80,9 @@ export class ChatSession {
     const key = this.registry.resolveKey(chatId);
     const current = this.autoApprove.get(key);
     this.autoApprove.set(key, { enabled, allowEdits: current?.allowEdits ?? false });
+    // Новое положение — и в журнал на диске: усыновлённый после перезапуска
+    // прогон должен молчать ровно там, где молчал до него.
+    this.registry.persist(key);
   }
 
   /** Положение тумблеров идущего прогона; нет записи — прогон не наш. */

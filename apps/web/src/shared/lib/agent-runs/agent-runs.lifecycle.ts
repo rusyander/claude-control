@@ -44,6 +44,17 @@ function finalStatus(run: AgentRun): RunStatus {
   return 'idle';
 }
 
+/**
+ * Что из заметки сервера переживает конец хода. Строка про подхват без потока
+ * («adopted», «detachedDone») — про прогон, и с ним уходит. Заметка конвейера
+ * уровней (разбор применён или не получен, работа без плана) — про ИТОГ хода:
+ * лента показывает её до следующего прогона, иначе человек узнал бы об исходе
+ * разбора только из тоста на пять секунд.
+ */
+function outcomeNotice(run: AgentRun): string | undefined {
+  return run.detached ? undefined : run.notice;
+}
+
 export function finalize(id: string): void {
   const run = runs.get(id);
   if (!run) return;
@@ -75,6 +86,9 @@ export function finalize(id: string): void {
           sentFromQueue: undefined,
           // Законченному поток не нужен — из очереди за ним выходит.
           parked: undefined,
+          // Подхваченный без потока закончился — строка про подхват больше не нужна.
+          detached: undefined,
+          notice: outcomeNotice(run),
         }
       : {
           ...run,
@@ -86,6 +100,8 @@ export function finalize(id: string): void {
           stalled: undefined,
           sentFromQueue: undefined,
           parked: undefined,
+          detached: undefined,
+          notice: outcomeNotice(run),
         };
   runs.set(id, finalized);
   // Сервер ещё минуту будет называть этот прогон в `/chat/active` — помечаем,
@@ -386,6 +402,9 @@ export function startRun(input: StartInput): Promise<SendOutcome> {
     sentFromQueue: prev?.sentFromQueue,
     // Своя отправка — всегда с потоком: парковка снимается.
     parked: undefined,
+    // Усыновлённым был прошлый прогон — этот запущен нами, с трубой.
+    detached: undefined,
+    notice: undefined,
     // Запоминаем запрос, права, модель и глубину — для кнопки «Повторить».
     lastPrompt: input.prompt,
     // Старт по часам сервера придёт с событием session.

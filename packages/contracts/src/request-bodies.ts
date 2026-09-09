@@ -99,6 +99,24 @@ export const gitWorktreeRemoveBodySchema = object({
   worktreePath: string().trim().min(1),
   force: boolean().optional(),
 });
+/** Повторное зеркало локального слоя в уже существующую копию. */
+export const gitWorktreeMirrorBodySchema = object({
+  path: gitPathSchema,
+  worktreePath: string().trim().min(1),
+});
+/** Шаблоны зеркала на проекте: по строке на шаблон, пустые строки отбрасываются. */
+export const gitMirrorSettingsBodySchema = object({
+  path: gitPathSchema,
+  include: array(string().max(400)).max(200),
+  exclude: array(string().max(400)).max(200),
+  /** Команда после создания копии; пусто — по lock-файлу. */
+  bootstrap: string().max(2000).optional(),
+});
+/** Повторный бутстрап уже существующей копии — кнопкой на карточке. */
+export const gitWorktreeBootstrapBodySchema = object({
+  path: gitPathSchema,
+  worktreePath: string().trim().min(1),
+});
 export type GitPathBody = Infer<typeof gitPathBodySchema>;
 export type GitCheckoutBody = Infer<typeof gitCheckoutBodySchema>;
 export type GitBranchBody = Infer<typeof gitBranchBodySchema>;
@@ -106,3 +124,6 @@ export type GitCommitBody = Infer<typeof gitCommitBodySchema>;
 export type GitPullBody = Infer<typeof gitPullBodySchema>;
 export type GitWorktreeAddBody = Infer<typeof gitWorktreeAddBodySchema>;
 export type GitWorktreeRemoveBody = Infer<typeof gitWorktreeRemoveBodySchema>;
+export type GitWorktreeMirrorBody = Infer<typeof gitWorktreeMirrorBodySchema>;
+export type GitMirrorSettingsBody = Infer<typeof gitMirrorSettingsBodySchema>;
+export type GitWorktreeBootstrapBody = Infer<typeof gitWorktreeBootstrapBodySchema>;

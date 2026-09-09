@@ -43,6 +43,14 @@
   white-space: nowrap;
 }
 
+.reviewLink {
+  display: block;
+  margin-top: var(--spacing-3xs);
+  overflow-wrap: anywhere;
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+}
+
 .tasks {
   margin: var(--spacing-3xs) 0 0;
   padding-left: var(--spacing-md);

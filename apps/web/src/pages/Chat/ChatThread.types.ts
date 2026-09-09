@@ -32,6 +32,8 @@ export interface ChatThreadProps {
   onEdit: (text: string) => void;
   onPickOption: (answer: string) => Promise<boolean> | void;
   isRunning: boolean;
+  /** Старт живого прогона (мс эпохи) — таймер под ответом, пока тот пишется. */
+  runStartedAt?: number;
   /** Ключ прогона этого разговора: по нему уходят права и повтор. */
   chatId?: string;
   permissions: PendingPermission[];

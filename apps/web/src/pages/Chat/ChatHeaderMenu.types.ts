@@ -16,4 +16,12 @@ export interface ChatHeaderMenuProps {
   canExport: boolean;
   onExport: () => void;
   onRefresh: () => void;
+
+  /**
+   * Перезапуск сессии: новый разговор того же проекта по файлу-опоре, дорогой
+   * контекст остаётся позади. Пусто — разговора или проекта ещё нет.
+   */
+  onRestartSession?: () => void;
+  /** Почему перезапуск сейчас недоступен (идёт прогон) — кнопка погашена с подсказкой. */
+  restartBlocked?: string;
 }

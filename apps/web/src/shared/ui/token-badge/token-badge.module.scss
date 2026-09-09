@@ -6,8 +6,11 @@
 
 .badge {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: baseline;
-  gap: var(--spacing-2xs);
+  gap: 0 var(--spacing-2xs);
+  max-width: 100%;
   padding: 2px var(--spacing-xs);
   border: none;
   border-radius: var(--radius-full);
@@ -35,6 +38,26 @@
 .fresh {
   color: var(--color-accent);
   opacity: 0.85;
+}
+
+/* Время шага и сумма прогона — одна группа: в узкой колонке она уходит на
+   вторую строку целиком, под токены. */
+.timing {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-2xs);
+}
+
+/* Время шага — третий столбик. Тоном между общим объёмом и новой работой:
+   читается с первого взгляда, но токены с него не сбивает. */
+.time {
+  color: var(--color-fg-muted);
+}
+
+/* Сумма прогона стоит у его последней записи — это итог, не ещё один шаг,
+   поэтому со знаком суммы и приглушённо. */
+.runTotal {
+  color: var(--color-fg-subtle);
 }
 
 .panel {

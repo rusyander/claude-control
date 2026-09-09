@@ -9,6 +9,9 @@ import { registerChatSplitRoutes } from './chat/split-routes.ts';
 import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry.ts';
 import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { ProviderChatService } from '../domains/provider-chat.ts';
+import { SplitConveyor } from '../domains/chat/split-conveyor.ts';
+import { createSplitLauncher, launchFromRecord } from './chat/split-launch.ts';
+import type { ChatLink } from '../lib/app-store/app-store.types.ts';
 
 /**
  * Маршрут разделения задач по чатам. Каталог берём обычный (не репозиторий) —
@@ -22,6 +25,7 @@ describe('POST /api/chat/split', () => {
   let store: AppStore;
   let registry: ChatRunRegistry;
   let session: ChatSession;
+  let ctx: ServerContext;
   let started: {
     chatId: string;
     prompt: string;
@@ -61,7 +65,7 @@ describe('POST /api/chat/split', () => {
     }));
 
     store = new AppStore(join(root, 'agentdeck'));
-    const ctx = {
+    ctx = {
       location: {
         paths: {
           root,
@@ -431,6 +435,278 @@ describe('POST /api/chat/split', () => {
       const prompt = (off.json() as { prompt: string }).prompt;
       expect(prompt).toContain('agentdeck:split');
       expect(prompt).not.toContain('mechanical');
+    });
+  });
+
+  /**
+   * Уровни (Т1): подбор включён, родитель известен, прогоны нужны — маршрут не
+   * заводит ни одной копии, а запускает разбор в корне и отдаёт его чат. Группы
+   * заводит конвейер по итогу разбора; здесь проверяется только склейка
+   * «маршрут → конвейер → лаунчер»: что стартовало и что записано.
+   */
+  describe('уровни разделения при включённом подборе', () => {
+    const ceiling = { model: 'claude-opus-5', effort: 'high' };
+    const kinds = {
+      shared: 'Общее',
+      groups: [
+        { title: 'Раз', branch: 'feature/one', tasks: ['переименовать поле'], kind: 'mechanical' },
+        { title: 'Два', branch: 'feature/two', tasks: ['почему падает'], kind: 'investigation' },
+      ],
+    };
+
+    function withConveyor(): SplitConveyor {
+      const conveyor = new SplitConveyor({
+        store: {
+          get: (parent) => store.getSplitPlan(parent),
+          set: (record) => store.setSplitPlan(record),
+          findByTriage: (ids) => store.findSplitPlanByTriage(ids),
+          all: () => store.getSplitPlans(),
+        },
+        launch: (record, groups, context) =>
+          launchFromRecord(ctx, launchDeps(), record, groups, context),
+        startTriage: (record, prompt) =>
+          createSplitLauncher(ctx, launchDeps(), {
+            projectPath: record.projectPath,
+            parentChatId: record.parentChatId,
+            ...(record.request.model ? { model: record.request.model } : {}),
+            ...(record.request.effort ? { effort: record.request.effort } : {}),
+          }).startTriage(prompt),
+        log: () => undefined,
+      });
+      return conveyor;
+    }
+
+    function launchDeps() {
+      return {
+        runs: registry,
+        providerChats: new ProviderChatService(),
+        session,
+        log: { warn: () => undefined },
+      };
+    }
+
+    async function withRoutes(conveyor: SplitConveyor): Promise<FastifyInstance> {
+      const instance = Fastify();
+      registerChatSplitRoutes(instance, ctx, { ...launchDeps(), conveyor });
+      await instance.ready();
+      return instance;
+    }
+
+    it('сначала разбор в корне на потолке; копий и групп ещё нет', async () => {
+      const conveyor = withConveyor();
+      const instance = await withRoutes(conveyor);
+
+      const response = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+      await instance.close();
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json() as {
+        chats: unknown[];
+        triage?: { chatId: string; started: boolean };
+      };
+      expect(body.chats).toEqual([]);
+      expect(body.triage?.started).toBe(true);
+      expect(started).toHaveLength(1);
+      expect(started[0]).toMatchObject({
+        chatId: body.triage?.chatId,
+        cwd: project,
+        model: 'claude-opus-5',
+        effort: 'high',
+      });
+      expect(started[0]?.prompt).toContain('разбор разделения');
+      expect(started[0]?.prompt).toContain('agentdeck:split-plan');
+      // Связь разбора — под родителем, со стадией; запись конвейера — под родителем.
+      expect(store.getChatLink(body.triage?.chatId ?? '')).toMatchObject({
+        parentChatId: 'parent-1',
+        stage: 'triage',
+        title: 'Разбор разделения',
+      });
+      expect(store.getSplitPlan('parent-1')?.groups.map((group) => group.status)).toEqual([
+        'pending',
+        'pending',
+      ]);
+    });
+
+    it('по итогу разбора группы стартуют со звена плана на потолке, границы — в связи', async () => {
+      const conveyor = withConveyor();
+      const instance = await withRoutes(conveyor);
+      const first = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal: kinds,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+      await instance.close();
+      const triageId = (first.json() as { triage: { chatId: string } }).triage.chatId;
+      started.length = 0;
+
+      const block = [
+        '```agentdeck:split-plan',
+        JSON.stringify({
+          groups: [
+            { index: 1, owns: ['src/rename.ts'], notes: 'api.ts не трогать' },
+            { index: 2, after: [1] },
+          ],
+          order: [1, 2],
+        }),
+        '```',
+      ].join('\n');
+      const event = conveyor.onTriageFinished(
+        {
+          chatId: triageId,
+          projectPath: project,
+          text: `Развёл.\n${block}`,
+          ok: true,
+          startedAt: 1,
+          options: { prompt: '', cwd: project },
+          contextTokens: 0,
+        },
+        [triageId],
+      );
+      await new Promise((done) => setTimeout(done, 30));
+
+      expect(event).toMatchObject({ kind: 'notice', code: 'triageApplied' });
+      // Стартовала только первая группа; вторая ждёт её цепочки.
+      expect(started).toHaveLength(1);
+      expect(started[0]?.prompt).toContain('План работы для группы «Раз»');
+      expect(started[0]?.prompt).toContain('src/rename.ts');
+      // План — на потолке, хотя работа механики пойдёт ниже.
+      expect(started[0]?.model).toBe('claude-opus-5');
+      expect(store.getChatLink(started[0]?.chatId ?? '')).toMatchObject({
+        stage: 'plan',
+        model: 'claude-opus-5',
+        workModel: 'sonnet',
+        lowered: true,
+        owns: ['src/rename.ts'],
+        notes: 'api.ts не трогать',
+      });
+      const record = store.getSplitPlan('parent-1');
+      expect(record?.groups.map((group) => group.status)).toEqual(['started', 'waiting']);
+
+      // Цепочка первой кончилась — вторая стартует с заметкой о предшественнике.
+      conveyor.onChainEnded(store.getChatLink(started[0]?.chatId ?? '') as ChatLink, true);
+      await new Promise((done) => setTimeout(done, 30));
+      expect(started).toHaveLength(2);
+      expect(store.getChatLink(started[1]?.chatId ?? '')?.notes).toContain(
+        'Раньше этой группы работали: «Раз»',
+      );
+    });
+
+    it('ответ на вопрос разбора — маршрутом родителя; без вопроса — 409', async () => {
+      const conveyor = withConveyor();
+      const instance = await withRoutes(conveyor);
+      const first = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+      const triageId = (first.json() as { triage: { chatId: string } }).triage.chatId;
+      const block = [
+        '```agentdeck:split-plan',
+        JSON.stringify({ groups: [{ index: 2, hold: 'какой стиль?' }] }),
+        '```',
+      ].join('\n');
+      conveyor.onTriageFinished(
+        {
+          chatId: triageId,
+          projectPath: project,
+          text: block,
+          ok: true,
+          startedAt: 1,
+          options: { prompt: '', cwd: project },
+          contextTokens: 0,
+        },
+        [triageId],
+      );
+      await new Promise((done) => setTimeout(done, 30));
+      started.length = 0;
+
+      const refused = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split/parent-1/hold',
+        payload: { index: 0, answer: 'x' },
+      });
+      expect(refused.statusCode).toBe(409);
+      const empty = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split/parent-1/hold',
+        payload: { index: 1, answer: '  ' },
+      });
+      expect(empty.statusCode).toBe(400);
+
+      const answered = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split/parent-1/hold',
+        payload: { index: 1, answer: 'как в шапке' },
+      });
+      await instance.close();
+      expect(answered.statusCode).toBe(200);
+      expect(
+        (answered.json() as { chats: { index: number }[] }).chats.map((chat) => chat.index),
+      ).toEqual([1]);
+      expect(started).toHaveLength(1);
+      expect(started[0]?.prompt).toContain('Ответ человека: как в шапке');
+      expect(store.getSplitPlan('parent-1')?.groups[1]).toMatchObject({
+        status: 'started',
+        holdAnswer: 'как в шапке',
+      });
+    });
+
+    it('«только завести чаты» и выключенное правило идут старым путём — без разбора', async () => {
+      const instance = await withRoutes(withConveyor());
+
+      const drafts = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal,
+          startRuns: false,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+      expect((drafts.json() as { chats: unknown[]; triage?: unknown }).chats).toHaveLength(2);
+      expect((drafts.json() as { triage?: unknown }).triage).toBeUndefined();
+
+      store.setProjectCascade(project, false);
+      const off = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal,
+          startRuns: true,
+          parentChatId: 'parent-2',
+          ...ceiling,
+        },
+      });
+      await instance.close();
+      expect(
+        (off.json() as { chats: { started: boolean }[] }).chats.map((chat) => chat.started),
+      ).toEqual([true, true]);
+      expect(store.getSplitPlan('parent-2')).toBeUndefined();
     });
   });
 });

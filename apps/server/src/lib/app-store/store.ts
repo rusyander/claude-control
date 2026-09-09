@@ -7,6 +7,7 @@ import type {
   Hook,
   IntegrationLink,
   IntegrationLinks,
+  WorktreeMirrorSettings,
   Project,
   ProjectCodeLayout,
   ProjectCodeView,
@@ -38,11 +39,26 @@ import {
   getChatLink as readChatLink,
   getChatLinks as readChatLinks,
   linkChatSession as moveChatLink,
+  markChatFirstEdit as stampFirstEdit,
   setChatLink as writeChatLink,
 } from './chat-links.ts';
+import {
+  clearTreePause as dropTreePause,
+  getTreePause as readTreePause,
+  getTreePauses as readTreePauses,
+  setTreePause as writeTreePause,
+} from './tree-pause.ts';
+import {
+  findSplitPlanByTriage as readSplitPlanByTriage,
+  getSplitPlan as readSplitPlan,
+  getSplitPlans as readSplitPlans,
+  setSplitPlan as writeSplitPlan,
+} from './split-plans.ts';
 import type {
   AppState,
   ChatLink,
+  TreePauseRecord,
+  SplitPlanRecord,
   IntegrationHealthRecord,
   McpHealthRecord,
   RunnerPrefs,
@@ -60,6 +76,10 @@ import {
   setIntegrationLink as writeIntegrationLink,
 } from './integration-links.ts';
 import { mergeState, readStateFile, stateFilePath } from './state-file.ts';
+import {
+  getWorktreeMirror as readWorktreeMirror,
+  setWorktreeMirror as writeWorktreeMirror,
+} from './worktree-mirror.ts';
 import {
   forgetMcpHealth as dropMcpHealth,
   getMcpHealth as readMcpHealth,
@@ -464,6 +484,49 @@ export class AppStore {
     if (moveChatLink(this.state, chatId, sessionId)) this.persist();
   }
 
+  /** Первая правка кода в разговоре ребёнка — момент в связь; чужие прогоны молча мимо. */
+  markChatFirstEdit(keys: readonly string[], at: string): void {
+    if (stampFirstEdit(this.state, keys, at)) this.persist();
+  }
+
+  // --- Пауза дерева разговоров: корень → остановленные прогоны и отложенные автостарты ---
+
+  getTreePauses(): Record<string, TreePauseRecord> {
+    return readTreePauses(this.state);
+  }
+
+  getTreePause(root: string): TreePauseRecord | undefined {
+    return readTreePause(this.state, root);
+  }
+
+  setTreePause(record: TreePauseRecord): void {
+    writeTreePause(this.state, record);
+    this.persist();
+  }
+
+  clearTreePause(root: string): void {
+    if (dropTreePause(this.state, root)) this.persist();
+  }
+
+  // --- Конвейер уровней разделения (Т1): родитель → разбор, ожидания, группы.
+
+  getSplitPlans(): Record<string, SplitPlanRecord> {
+    return readSplitPlans(this.state);
+  }
+
+  getSplitPlan(parentChatId: string): SplitPlanRecord | undefined {
+    return readSplitPlan(this.state, parentChatId);
+  }
+
+  findSplitPlanByTriage(chatIds: readonly string[]): SplitPlanRecord | undefined {
+    return readSplitPlanByTriage(this.state, chatIds);
+  }
+
+  setSplitPlan(record: SplitPlanRecord): void {
+    writeSplitPlan(this.state, record);
+    this.persist();
+  }
+
   // --- Внешние интеграции: итог проверки связи и привязки проектов ---
 
   /** Итоги последних проверок связи: id интеграции → запись (копия, не внутренний объект). */
@@ -483,6 +546,17 @@ export class AppStore {
 
   getIntegrationLinks(path: string): IntegrationLinks {
     return readIntegrationLinks(this.state, path);
+  }
+
+  /** Что человек дописал к зеркалу копий этого репозитория; пусто — встроенное. */
+  getWorktreeMirror(path: string): WorktreeMirrorSettings {
+    return readWorktreeMirror(this.state, path);
+  }
+
+  setWorktreeMirror(path: string, settings: WorktreeMirrorSettings): WorktreeMirrorSettings {
+    const next = writeWorktreeMirror(this.state, path, settings);
+    this.persist();
+    return next;
   }
 
   /** Все привязки разом: активация MCP по началу прогона спрашивает именно так. */

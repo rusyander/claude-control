@@ -17,9 +17,16 @@ export const DEFAULT_STATE: AppState = {
   // где человек его ВЫКЛЮЧИЛ.
   projectCascade: {},
   chatLinks: {},
+  // Пусто — ни одно дерево разговоров не стоит на паузе.
+  treePause: {},
+  // Пусто — ни одно разделение не ждёт разбора, ответа человека или предшественников.
+  splitPlans: {},
   // Пусто — ни одна внешняя система ещё не проверялась и ничего не привязано.
   integrationHealth: {},
   integrationLinks: {},
+  // Пусто — копии получают встроенный список зеркала; сюда пишутся только проекты,
+  // где человек его дополнил.
+  worktreeMirror: {},
   // Пусто — черновики генерации принимает человек: сюда пишутся только проекты,
   // где он РАЗРЕШИЛ принимать их без просмотра.
   testsAutoAccept: {},
@@ -51,7 +58,7 @@ export const DEFAULT_STATE: AppState = {
     taskSplitInitiative: true,
     handoffInitiative: true,
     handoffContextLimit: 0,
-    handoffAutoDefault: false,
+    handoffAutoDefault: true,
     autoUpdateModels: true,
     previewProviderWrites: true,
     endpointProfiles: [],

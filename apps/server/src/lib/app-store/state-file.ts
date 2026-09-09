@@ -37,8 +37,11 @@ export function mergeState(loaded: Partial<AppState>): AppState {
     projectCodeViews: { ...base.projectCodeViews, ...loaded.projectCodeViews },
     projectCascade: { ...base.projectCascade, ...loaded.projectCascade },
     chatLinks: { ...base.chatLinks, ...loaded.chatLinks },
+    treePause: { ...base.treePause, ...loaded.treePause },
+    splitPlans: { ...base.splitPlans, ...loaded.splitPlans },
     integrationHealth: { ...base.integrationHealth, ...loaded.integrationHealth },
     integrationLinks: { ...base.integrationLinks, ...loaded.integrationLinks },
+    worktreeMirror: { ...base.worktreeMirror, ...loaded.worktreeMirror },
     testsAutoAccept: { ...base.testsAutoAccept, ...loaded.testsAutoAccept },
     settings: {
       ...base.settings,

@@ -1,5 +1,7 @@
+import { reviewLinkPrompt } from '@agentdeck/contracts/model-cascade';
 import {
   buildGroupPrompt,
+  environmentPreamble,
   // Приведение имени ветки живёт в контрактах: по нему же панель узнаёт, что
   // предложение уже разделено, и второй реализации быть не должно.
   safeBranchName,
@@ -7,10 +9,18 @@ import {
   type TaskSplitGroup,
   type TaskSplitProposal,
   type TaskSplitResult,
+  type TaskSplitReview,
   type TaskSplitStarted,
 } from '@agentdeck/contracts/task-split';
 import type { CascadePlan } from '@agentdeck/contracts/model-cascade';
-import { addWorktree, isGitRepo, listWorktrees, readProjectGit } from '../project-git.ts';
+import type { WorktreeBootstrapState, WorktreeMirrorSettings } from '@agentdeck/contracts';
+import {
+  addWorktree,
+  describeMirror,
+  isGitRepo,
+  listWorktrees,
+  readProjectGit,
+} from '../project-git.ts';
 
 /**
  * Разделение списка задач по нескольким чатам: под каждую группу — своя ветка,
@@ -36,30 +46,59 @@ import { addWorktree, isGitRepo, listWorktrees, readProjectGit } from '../projec
  * Слияния здесь нет и не будет: свести ветки обратно — шаг владельца.
  */
 
+/** Заведённая копия: каталог и что в него перенёс локальный слой (для преамбулы задания). */
+export interface SplitCopy {
+  path: string;
+  mirror?: string;
+}
+
 /** Ровно то, что разделению нужно от git. Отдельным типом — ради теста без репозитория. */
 export interface SplitGit {
   isRepo(dir: string): boolean;
   /** Занятые имена веток: локальные плюс те, что держат копии. */
   takenBranches(dir: string): Promise<string[]>;
-  /** Завести копию под ветку; возвращает её каталог. */
-  addWorktree(dir: string, branch: string): Promise<string>;
+  /**
+   * Завести копию под ветку; возвращает её каталог и строку отчёта зеркала.
+   * `base` — от какой ветки отвести новую (группа, ждавшая предшественников).
+   */
+  addWorktree(dir: string, branch: string, base?: string): Promise<SplitCopy>;
+  /**
+   * Подготовить копию до старта агента (установка зависимостей). Ждётся;
+   * `undefined` — команды нет. Провал — состояние, не исключение.
+   */
+  bootstrap?(dir: string, copy: string): Promise<WorktreeBootstrapState | undefined>;
 }
 
-/** Настоящий git — тот же, которым работает пульт репозитория. */
-export const splitGit: SplitGit = {
-  isRepo: isGitRepo,
-  async takenBranches(dir) {
-    const [info, worktrees] = await Promise.all([readProjectGit(dir), listWorktrees(dir)]);
-    return [
-      ...info.branches,
-      ...worktrees.worktrees.map((item) => item.branch ?? '').filter(Boolean),
-    ];
-  },
-  async addWorktree(dir, branch) {
-    const created = await addWorktree(dir, branch);
-    return created.path;
-  },
-};
+/**
+ * Настоящий git — тот же, которым работает пульт репозитория. `mirrorFor` — что
+ * человек дописал к зеркалу копий этого проекта (хранилище панели); копия из
+ * разделения получает тот же локальный слой, что и заведённая руками.
+ */
+export function makeSplitGit(
+  mirrorFor: (dir: string) => WorktreeMirrorSettings | undefined = () => undefined,
+  bootstrapFor?: (dir: string, copy: string) => Promise<WorktreeBootstrapState | undefined>,
+): SplitGit {
+  return {
+    ...(bootstrapFor ? { bootstrap: bootstrapFor } : {}),
+    isRepo: isGitRepo,
+    async takenBranches(dir) {
+      const [info, worktrees] = await Promise.all([readProjectGit(dir), listWorktrees(dir)]);
+      return [
+        ...info.branches,
+        ...worktrees.worktrees.map((item) => item.branch ?? '').filter(Boolean),
+      ];
+    },
+    async addWorktree(dir, branch, base) {
+      const created = await addWorktree(dir, branch, mirrorFor(dir), base);
+      return {
+        path: created.path,
+        ...(created.mirror ? { mirror: describeMirror(created.mirror) } : {}),
+      };
+    },
+  };
+}
+
+export const splitGit: SplitGit = makeSplitGit();
 
 /** Запуск прогона группы; `false` — под этим ключом прогон уже идёт. */
 export type SplitStart = (input: {
@@ -80,7 +119,39 @@ export type SplitStart = (input: {
   branch: string;
   /** Чем эту группу решено делать; нет — подбор в проекте выключен. */
   assignment?: CascadePlan;
+  /** С какого звена стартует чат: `plan` — сперва план на потолке (Т1). */
+  stage: 'plan' | 'work';
+  /** Сама группа — границы (`owns`, `notes`) и класс уезжают в связь и в план. */
+  group: TaskSplitGroup;
+  /** Позиция группы в предложении. */
+  index: number;
+  /** Что группа знает о предшественниках и от какой ветки отведена копия. */
+  context?: SplitGroupContext;
+  /** Группа ревьюит MR по ссылке (Т7) — стадия и карточка решения у неё свои. */
+  review?: SplitReviewTarget;
 }) => boolean;
+
+/**
+ * Ревью-группа глазами разделения (Т7): что ревьюим и на чьей ветке стоит копия.
+ *
+ * `onMrBranch: false` значит «ветку MR получить не удалось» — копия отведена от
+ * базы. Это не отказ: ревью пойдёт, но по ссылке, а не по диффу копии, и знать
+ * об этом должны и агент (в задании), и человек (на карточке).
+ */
+export interface SplitReviewTarget {
+  url: string;
+  branch?: string;
+  onMrBranch: boolean;
+}
+
+/** Что группа, ждавшая своей очереди, знает о тех, кто работал раньше (Т1). */
+export interface SplitGroupContext {
+  /** От какой ветки отведена копия. */
+  base?: string;
+  predecessors?: { title: string; branch: string; failed?: boolean }[];
+  /** Вопрос разбора и ответ человека, если группу держали. */
+  holdAnswer?: { question: string; answer: string };
+}
 
 /**
  * Чем делать группу. Считает МАРШРУТ, а не разделение: там известен потолок
@@ -113,6 +184,14 @@ export type SplitLink = (chat: {
   path: string;
   /** Назначение группы: по нему второе сообщение ребёнку не теряет модель. */
   assignment?: CascadePlan;
+  stage: 'plan' | 'work';
+  group: TaskSplitGroup;
+  index: number;
+  /** Задание группы целиком — в связь: из него после плана собирается работа. */
+  prompt: string;
+  context?: SplitGroupContext;
+  /** Ревью по ссылке (Т7): уезжает в связь — по ней рисуется карточка решения. */
+  review?: SplitReviewTarget;
 }) => void;
 
 export interface SplitTasksInput {
@@ -129,6 +208,51 @@ export interface SplitTasksInput {
   git?: SplitGit;
   /** Часы — в тесте фиксируются, чтобы ключи чатов были предсказуемы. */
   now?: () => number;
+  /**
+   * Какие группы предложения заводить — индексы. Нет — все. Конвейер уровней
+   * (Т1) заводит группы порциями: сразу те, что без ожиданий, потом по одной,
+   * когда кончилась цепочка предшественников или ответил человек.
+   */
+  groups?: number[];
+  /** С какого звена стартуют чаты; нет — с работы. */
+  stage?: 'plan' | 'work';
+  /** От какой ветки отвести копии этой порции и что группы знают о предшественниках. */
+  context?: SplitGroupContext;
+  /**
+   * Спросить у форджа ветку MR ревью-группы (Т7). Нет — спрашивать некому
+   * (интеграция не настроена), и в дело идёт ветка из блока агента, а без неё
+   * копия отводится от базы с пометкой. Отказ форджа не роняет разделение:
+   * колбэк обязан вернуть `undefined`, а не бросить.
+   */
+  resolveReview?: (review: TaskSplitReview) => Promise<{ branch?: string } | undefined>;
+}
+
+/**
+ * На какой ветке заводить копию ревью-группы (Т7).
+ *
+ * Порядок источников — по надёжности, и он же порядок падения: фордж (ветку
+ * знает он один) → ветка из блока агента (он называет её по памяти и ошибается)
+ * → ничего, копия от базы с пометкой. Отказ форджа разделение не роняет: ревью
+ * по ссылке всё равно возможно, а вот молча отвести копию не от той ветки —
+ * это уверенные замечания не про тот код.
+ */
+async function reviewTargetOf(
+  review: TaskSplitReview,
+  resolve?: SplitTasksInput['resolveReview'],
+): Promise<SplitReviewTarget> {
+  let fromForge: string | undefined;
+  try {
+    fromForge = (await resolve?.(review))?.branch;
+  } catch {
+    fromForge = undefined;
+  }
+  // Ветку форджа берём КАК ЕСТЬ: она уже настоящее имя ветки, а приведение
+  // срезало бы длинную и увело копию на ветку, которой в MR нет.
+  if (fromForge) return { url: review.url, branch: fromForge, onMrBranch: true };
+  if (review.branch) {
+    return { url: review.url, branch: safeBranchName(review.branch), onMrBranch: true };
+  }
+  return { url: review.url, onMrBranch: false };
 }
 
 /** Свободное имя: занятое получает суффикс `-2`, `-3`, … — как вкладки проводника. */
@@ -155,6 +279,10 @@ export async function splitTasks({
   assign,
   git = splitGit,
   now = Date.now,
+  groups: selected,
+  stage = 'work',
+  context,
+  resolveReview,
 }: SplitTasksInput): Promise<TaskSplitResult> {
   const chats: TaskSplitStarted[] = [];
   const failures: TaskSplitFailure[] = [];
@@ -166,21 +294,49 @@ export async function splitTasks({
 
   const stamp = now();
 
-  for (const [index, group] of proposal.groups.entries()) {
-    const wanted = safeBranchName(group.branch);
-    const branch = isRepo ? freeBranchName(wanted, taken) : wanted;
-    const prompt = buildGroupPrompt(group, proposal.shared);
+  // Три фазы, а не одна петля: копии заводятся по очереди (занятые имена
+  // пополняются по ходу), подготовка идёт ПАРАЛЛЕЛЬНО (установка зависимостей
+  // в четырёх копиях подряд — это четыре раза по минуте), запуск — снова по
+  // порядку групп, чтобы ключи чатов и связи шли предсказуемо.
+  const prepared: {
+    index: number;
+    group: TaskSplitGroup;
+    branch: string;
+    cwd: string;
+    isWorktree: boolean;
+    /** Строка отчёта зеркала — в преамбулу задания. */
+    mirror?: string;
+    /** Ревью по ссылке (Т7): предмет и на чьей ветке в итоге стоит копия. */
+    review?: SplitReviewTarget;
+  }[] = [];
+
+  const chosen = (selected ?? proposal.groups.map((_, index) => index)).filter(
+    (index) => index >= 0 && index < proposal.groups.length,
+  );
+  for (const index of chosen) {
+    const group = proposal.groups[index] as TaskSplitGroup;
+    // Ревью-группа (Т7) ветку не выдумывает: её копия обязана стоять на ветке
+    // MR, иначе читать нечего. Имя такой ветки суффиксом НЕ разводится — с
+    // суффиксом это была бы другая ветка, то есть другой дифф.
+    const review = group.review ? await reviewTargetOf(group.review, resolveReview) : undefined;
+    const wanted = review?.branch ?? safeBranchName(group.branch);
+    const exact = Boolean(review?.onMrBranch);
+    const branch = isRepo && !exact ? freeBranchName(wanted, taken) : wanted;
 
     let cwd = projectPath;
     let isWorktree = false;
+    let mirror: string | undefined;
 
     if (isRepo) {
       try {
-        cwd = await git.addWorktree(projectPath, branch);
+        const copy = await git.addWorktree(projectPath, branch, context?.base);
+        cwd = copy.path;
+        mirror = copy.mirror;
         isWorktree = true;
         taken.add(branch);
       } catch (error) {
         failures.push({
+          index,
           title: group.title,
           branch,
           message: error instanceof Error ? error.message : String(error),
@@ -188,6 +344,43 @@ export async function splitTasks({
         continue;
       }
     }
+    prepared.push({ index, group, branch, cwd, isWorktree, mirror, ...(review ? { review } : {}) });
+  }
+
+  const bootstraps = await Promise.all(
+    prepared.map(async (item) => {
+      if (!item.isWorktree || !git.bootstrap) return undefined;
+      try {
+        return await git.bootstrap(projectPath, item.cwd);
+      } catch {
+        // Подготовка не отклоняется по договору; на всякий случай — как «нет команды».
+        return undefined;
+      }
+    }),
+  );
+
+  for (const [position, item] of prepared.entries()) {
+    const { index, group, branch, cwd, isWorktree, mirror, review } = item;
+    const bootstrap = bootstraps[position];
+    // Ревью по ссылке (Т7) — другое задание и другая стадия: план группе,
+    // которая ничего не делает, не нужен, а понижать её нечем (класс `review`
+    // держится на потолке).
+    const base = review
+      ? reviewLinkPrompt({
+          url: review.url,
+          ...(review.branch ? { branch: review.branch } : {}),
+          onMrBranch: review.onMrBranch,
+          tasks: group.tasks,
+          ...(proposal.shared ? { shared: proposal.shared } : {}),
+        })
+      : buildGroupPrompt(group, proposal.shared);
+    const groupStage = review ? 'work' : stage;
+    // Копии — преамбула панели первым абзацем: что зазеркалено и установлено,
+    // провал подготовки (с хвостом лога) и прямое «начинай с задачи». Группа в
+    // общем каталоге работает в окружении человека — ей преамбула не нужна.
+    const prompt = isWorktree
+      ? `${environmentPreamble({ ...(mirror ? { mirror } : {}), ...(bootstrap ? { bootstrap } : {}) })}\n\n${base}`
+      : base;
 
     // Ключ чата — тот же временный вид, что и у разговора, начатого из панели:
     // настоящим id разговор станет, когда CLI выдаст сессию. Иначе вкладка
@@ -205,6 +398,12 @@ export async function splitTasks({
       branch,
       path: cwd,
       ...(assignment ? { assignment } : {}),
+      stage: groupStage,
+      group,
+      index,
+      prompt,
+      ...(context ? { context } : {}),
+      ...(review ? { review } : {}),
     });
     const started = startRuns
       ? start({
@@ -214,10 +413,16 @@ export async function splitTasks({
           cwd,
           branch,
           ...(assignment ? { assignment } : {}),
+          stage: groupStage,
+          group,
+          index,
+          ...(context ? { context } : {}),
+          ...(review ? { review } : {}),
         })
       : false;
 
     chats.push({
+      index,
       title: group.title,
       branch,
       chatId,
@@ -225,6 +430,7 @@ export async function splitTasks({
       isWorktree,
       started,
       prompt,
+      stage: groupStage,
       ...(assignment
         ? {
             model: assignment.model,

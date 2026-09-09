@@ -4,6 +4,8 @@ import type {
   ProjectGitResult,
   ProjectWorktreesInfo,
   ProjectWorktreesResult,
+  WorktreeBootstrapState,
+  WorktreeMirrorSettings,
 } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { normalizeProjectPath } from '@shared/lib/workspace';
@@ -123,7 +125,12 @@ export function useProjectWorktrees(path: string | undefined) {
     },
     enabled: Boolean(path),
     refetchOnWindowFocus: true,
-    refetchInterval: 15_000,
+    // Пока в какой-то копии идёт установка, список опрашивается часто: значок
+    // «ставится» обязан смениться сам, а не по F5.
+    refetchInterval: (query) =>
+      query.state.data?.worktrees.some((item) => item.bootstrap?.status === 'running')
+        ? 3_000
+        : 15_000,
   });
 }
 
@@ -160,4 +167,71 @@ export function useRemoveWorktree() {
   return useWorktreeAction<{ path: string; worktreePath: string; force?: boolean }>(
     '/project-git/worktrees/remove',
   );
+}
+
+/**
+ * Повторно перенести локальный слой в копию — после правки шаблонов или
+ * `.mcp.json` в основной копии. Ответ несёт отчёт: карточка копии его показывает.
+ */
+export function useMirrorWorktree() {
+  return useWorktreeAction<{ path: string; worktreePath: string }>('/project-git/worktrees/mirror');
+}
+
+/** Ключ шаблонов зеркала — по основной копии, как и сама запись в хранилище. */
+function mirrorSettingsKeyFor(path: string | undefined): readonly unknown[] {
+  return [...projectGitKey, 'mirror-settings', path ? normalizeProjectPath(path) : ''];
+}
+
+/** Что человек дописал к встроенному списку зеркала на этом проекте. */
+export function useMirrorSettings(path: string | undefined) {
+  return useQuery({
+    queryKey: mirrorSettingsKeyFor(path),
+    queryFn: async () => {
+      const { data } = await apiClient.get<WorktreeMirrorSettings>('/project-git/mirror-settings', {
+        params: { path },
+      });
+      return data;
+    },
+    enabled: Boolean(path),
+  });
+}
+
+export function useSaveMirrorSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { path: string } & WorktreeMirrorSettings) => {
+      const { data } = await apiClient.put<WorktreeMirrorSettings>(
+        '/project-git/mirror-settings',
+        body,
+      );
+      return data;
+    },
+    onSuccess: (result, body) => {
+      queryClient.setQueryData(mirrorSettingsKeyFor(body.path), result);
+    },
+  });
+}
+
+/** Повторить бутстрап копии (установку зависимостей) — после провала или смены команды. */
+export function useBootstrapWorktree() {
+  return useWorktreeAction<{ path: string; worktreePath: string }>(
+    '/project-git/worktrees/bootstrap',
+  );
+}
+
+/** Полный лог последнего бутстрапа копии — по запросу, когда его раскрыли. */
+export function useWorktreeBootstrapLog(path: string, worktreePath: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...projectGitKey, 'bootstrap-log', normalizeProjectPath(path), worktreePath],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ log: string; state: WorktreeBootstrapState | null }>(
+        '/project-git/worktrees/bootstrap-log',
+        { params: { path, worktreePath } },
+      );
+      return data;
+    },
+    enabled,
+    // Пока установка идёт, лог растёт — дочитываем.
+    refetchInterval: (query) => (query.state.data?.state?.status === 'running' ? 2_000 : false),
+  });
 }

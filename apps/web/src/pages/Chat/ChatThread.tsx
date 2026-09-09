@@ -22,6 +22,7 @@ export function ChatThread({
   onEdit,
   onPickOption,
   isRunning,
+  runStartedAt,
   chatId,
   permissions,
   queued,
@@ -75,6 +76,7 @@ export function ChatThread({
       onEdit={onEdit}
       onPickOption={onPickOption}
       isRunning={isRunning}
+      runStartedAt={runStartedAt}
       permissions={permissions}
       queued={queued}
       onCancelQueued={onCancelQueued}
@@ -83,6 +85,21 @@ export function ChatThread({
       }
       childStages={child.stages}
       onOpenChild={onOpenChild}
+      childTree={child.tree}
+      onPauseTree={child.pauseAll}
+      onResumeTree={child.resumeAll}
+      treeBusy={child.treeBusy}
+      onAnswerHold={child.answerHold}
+      holdBusy={child.holdBusy}
+      onCheckOverlap={child.checkOverlap}
+      overlapBusy={child.overlapBusy}
+      // Ревью чужих MR (Т7): в родителе — карточки всех групп, в самой группе —
+      // её собственная. Решение оттуда и отсюда одно и то же: состояние живёт в
+      // связи чата, а не во вкладке.
+      reviews={child.reviews}
+      onReviewDecide={child.reviewDecide}
+      onReviewPush={child.reviewPush}
+      reviewBusy={child.reviewBusy}
       childPermissions={child.permissions}
       // Решение по правам ребёнка уходит в ЕГО прогон — тем же путём, что и
       // своё: брокер ждёт ответа по ключу прогона, и родительский разговор об

@@ -311,8 +311,8 @@ export const helpEn: HelpSchema = {
         'The copy’s tab is an ordinary project tab: its own chat list, its own agent, ' +
         'its own status dot, its own git controls. The branch shown in the list is the ' +
         'one the copy is on RIGHT NOW: inside it the agent is free to switch and create ' +
-        'branches, and the panel does not police that. Dependencies are not installed in ' +
-        'a fresh copy — the agent installs them itself, as in a fresh clone.',
+        'branches, and the panel does not police that. The local layer and the ' +
+        'dependencies are already in the copy — see the two cards below.',
       parallelRemove: 'Removing one',
       parallelRemoveText:
         'The “Remove” button deletes the copy through git. While an agent works there ' +
@@ -330,6 +330,49 @@ export const helpEn: HelpSchema = {
         'blank sheet. This is what makes working with several agents possible: leave for ' +
         'another tab, come back, and the same conversation is there; and if an agent ' +
         'asked something meanwhile, you hear a sound and get a toast that jumps to it.',
+      parallelMirror: 'The local layer moves by itself',
+      parallelMirrorText:
+        'A checkout gives the copy only what is in git. Everything the project lives on ' +
+        'locally the panel carries over next, no questions asked: files under ' +
+        'skip-worktree or assume-unchanged (with the same flag set in the copy), ' +
+        '.mcp.json, .claude/, CLAUDE.local.md, .agent/ (without tmp, screenshots, archive ' +
+        'and PROGRESS), .env and .env.*, *.local, .dev/. Never — node_modules, dist, ' +
+        'build, coverage, *.log, files over 8 MB and links. What else to carry and what ' +
+        'to subtract — “Copy settings” under the list, one pattern per line ' +
+        'as in .gitignore; stored per project, and a copy made by task splitting gets the ' +
+        'same. “Refresh local layer” on a copy’s card repeats the transfer into a live ' +
+        'copy — only what is newer in the main copy moves, the copy’s edits stay. The ' +
+        'report under the card names what was carried, what was skipped and why, and ' +
+        'what was “left behind” — top-level git-ignored entries not on the list: that ' +
+        'is what the patterns are written from.',
+      parallelBootstrap: 'Dependencies are installed before the agent starts',
+      parallelBootstrapText:
+        'Right after the mirror a preparation command runs in the copy — in the ' +
+        'background, before any agent starts there. Which one: the “Command after ' +
+        'creating a copy” field in “Copy settings”; empty — the panel looks at the root ' +
+        'lockfile (pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, ' +
+        'package-lock.json → npm ci, yarn.lock → yarn install --immutable) and does ' +
+        'nothing without one. The command runs through the system shell with CI=1, ' +
+        '10-minute ceiling. The copy’s card shows “installing” / “dependencies ready” / ' +
+        '“install failed”, the log and a “Retry install” button. A failure stops ' +
+        'nothing: the copy stays, and on task splitting the agent gets the log tail as ' +
+        'the first paragraph of its task and decides itself whether to retry or go ' +
+        'without. Copies from a split are prepared in parallel, and the start waits for ' +
+        'all of them. After the command the panel checks the lockfiles (package-lock.json, ' +
+        'pnpm-lock.yaml, yarn.lock, bun.lock): ones rewritten by the install are reverted to ' +
+        'the index version, newly created ones are removed, and the list shows on the card ' +
+        'and in the log.',
+      parallelPreamble: 'The agent’s first move in a copy is the task',
+      parallelPreambleText:
+        'The task of every split group running in a copy opens with a panel preamble: what ' +
+        'was mirrored, which command installed the dependencies, which lockfiles were ' +
+        'reverted, and — if the preparation failed — the tail of its log. It ends with a ' +
+        'direct “the environment is ready — do not check or set it up, start with the task”. ' +
+        'Before it, an agent in a fresh copy brought up MCP itself, mirrored .claude/, ' +
+        'installed dependencies and reverted lockfiles — minutes and context on every child. ' +
+        'How much that helped shows in the parent’s group summary: “first edit after 1m 12s” ' +
+        '— from the work link’s creation to the agent’s first Edit/Write call. A group working ' +
+        'in the shared directory gets no preamble: that environment is yours.',
 
       splitTitle: 'Splitting tasks across chats: the agent proposes, you decide',
       splitCaption:
@@ -367,6 +410,26 @@ export const helpEn: HelpSchema = {
         'suffix rather than a refusal. If the project is not a repository, the chats ' +
         'are created in the same directory, with no copies. One group failing does ' +
         'not cancel the rest: a separate toast says so, and the other chats stay.',
+      splitReview: 'Reviewing someone else’s merge requests',
+      splitReviewText:
+        'Drop MR (or PR) links into the chat and ask for a review — the split creates ' +
+        'one group per link, even for a single link. The copy of such a group is put on ' +
+        'the MR branch itself: the panel asks GitLab or GitHub for it over the enabled ' +
+        'integration instead of trusting the agent’s word. If that fails, the copy is ' +
+        'cut from the base branch and the card says so outright: the findings may have ' +
+        'been read from the wrong diff. The review runs on the ceiling model, with no ' +
+        'plan and no fixes: the agent is told to change nothing and to write nothing ' +
+        'into the MR. It returns a list of findings, and the decision is yours — the ' +
+        'card shows up both in the parent summary and in the group chat, sharing one ' +
+        'state. Four answers: “Fix in the copy” (a separate run works through the ' +
+        'list), “Post to the MR” (the panel writes ONE summary comment; without the ' +
+        'integration the button is disabled and says why), “Both” and “Do nothing”. A ' +
+        'refusal from the forge does not cancel the fixes — the reason stays on the ' +
+        'card. No findings at all closes the group by itself, with no card. With ' +
+        'several groups, the “same decision for the rest” toggle clears them at once. ' +
+        'After the fixes a separate “Commit and push to the MR” button appears — the ' +
+        'only write into someone else’s branch, and only on your click. The panel never ' +
+        'merges or closes an MR: merging stays with you.',
       splitTree: 'Where the new chats are',
       splitTreeText:
         'In the list on the left, in the same tab: the chat the proposal came from, ' +
@@ -463,6 +526,24 @@ export const helpEn: HelpSchema = {
         'parallel agents appear: the links run one after another, and the split card ' +
         'states before the button how many runs that is at worst. Work that ran at ' +
         'the ceiling itself gets no review — there is nothing to strengthen it with.',
+      cascadeLevels: 'Levels: one triage for the whole split and a plan per group',
+      cascadeLevelsText:
+        'With model selection on, the groups do not start at once. First a TRIAGE ' +
+        'runs at the ceiling in the project root — one for the whole split, read-only: ' +
+        'who owns which files, where the groups overlap and who gets the contested ' +
+        'ones, who must wait for whom, and what to ask you before a group starts. ' +
+        'On its verdict the panel creates the copies: groups with no waits right ' +
+        'away, waiting ones once their predecessor’s chain ends (the copy then ' +
+        'branches from ITS branch, not the main one), held ones after your answer ' +
+        'right in the summary under the parent. Every group opens with a PLAN at ' +
+        'the ceiling: a short look at its own task in its own copy, no edits; the ' +
+        'plan goes into the work task and the work follows it step by step. No ' +
+        'triage or a broken one — the groups start as proposed; no plan — the work ' +
+        'goes without it, and that chat’s feed says so in one line: a level never ' +
+        'blocks the work. A task lost in the triage is returned home, a circular ' +
+        'wait is cut, and the summary labels that “repaired by the panel”. In the ' +
+        'chat list the links are labelled “triage” and “plan”; “Only create the ' +
+        'chats” gets no levels.',
       cascadeHub: 'Where to see which stage a group is on',
       cascadeHubText:
         'In the conversation you split the tasks from. Under the agent’s answer sits ' +
@@ -473,6 +554,34 @@ export const helpEn: HelpSchema = {
         'do not tell you the state of three groups. The agents panel (the “Agents” ' +
         'button in the header) now also says what each running run is being driven ' +
         'by.',
+      cascadeOverlap: 'Branch overlap after the work',
+      cascadeOverlapText:
+        'Triage splits the groups by ownership IN ADVANCE — and gets it wrong in ' +
+        'advance too: an agent edits a neighbouring file because otherwise nothing ' +
+        'builds. Finding that out at merge time is expensive, so the panel compares ' +
+        'the branches itself as soon as any group chain ends, and on the “Check ' +
+        'branches” button in the summary. One row is one file touched by more than ' +
+        'one group: the path on the left, the groups on the right. Red means the file ' +
+        'is OUTSIDE the group declared ownership — a boundary triage had agreed ' +
+        'otherwise. Two rightful owners of one file are not painted red: you will ' +
+        'still have to merge them, but nothing was violated. The merge order from the ' +
+        'triage waits is shown next to it. A new overlap is announced once: a ' +
+        'recount after every chain does not repeat what was already said. A branch ' +
+        'that could not be read is named separately — “no overlap” in place of ' +
+        'something unread would be a lie. Before the first check the section says so.',
+      cascadePause: 'Stop the whole tree at once',
+      cascadePauseText:
+        'The same summary carries a “Stop all (N)” button. It stops every running run of ' +
+        'the tree — the children, their review and fix stages, clean-session continuations ' +
+        '— and remembers how to restart each one. While the tree is paused the panel starts ' +
+        'nothing in it on its own: continuations, stages and new children are queued. ' +
+        '“Resume all (N)” restarts the stopped runs in their own sessions (the agent keeps ' +
+        'its context and is only told it was interrupted and the last tool may not have run) ' +
+        'and releases the queue in order. Pressed on a child it stops the same whole tree: ' +
+        'stages are started from the top, so everything has to stand still. Paused chats ' +
+        'carry a “paused” chip in the summary and in the list. Anything you type into a ' +
+        'paused chat yourself is sent as usual — the pause mutes only the panel’s auto-starts. ' +
+        'The pause survives a panel restart.',
       cascadeManual: 'Changing a group’s model',
       cascadeManualText:
         'Each group on the split card carries two dropdowns — model and depth. Your ' +
@@ -537,12 +646,18 @@ export const helpEn: HelpSchema = {
         'checkpoint file says.',
       handoffWhen: 'When the offer appears',
       handoffWhenText:
-        'The agent offers the move on its own once the task the conversation was ' +
-        'about is closed and verified — and only after it has tidied its working ' +
-        'files. The offer comes instead of new work: until you press the button, ' +
-        'nothing is created and nothing is started. You can ask for it yourself ' +
-        'too — the “Close the stage and continue in a clean session” button in ' +
-        'the composer, at any point in the conversation.',
+        'The agent offers the move on its own once a stage is closed: the task is ' +
+        'done and verified, a sizeable part of a big job is done, or the context ' +
+        'window got heavy — and only after it has tidied its working files. The ' +
+        'offer may come in words too: “restart the session”, “/clear”, “continue ' +
+        'from .agent/PROGRESS.md” at the end of an answer is read like the block — ' +
+        'such a phrase used to be the end of the work until morning. You can ask ' +
+        'yourself: the “Close the stage and continue in a clean session” button in ' +
+        'the composer asks the agent to prepare the move, and “Restart the session” ' +
+        'in the header menu does it at once — a fresh checkpoint: a new conversation ' +
+        'is started right there; a stale one: the agent is asked to update it, and ' +
+        'the panel takes the end of that turn to a clean session itself. While a ' +
+        'run is going the button is dimmed: wiping context mid-turn loses the turn.',
       handoffSize: 'The second reason: the conversation got expensive',
       handoffSizeText:
         'Besides a closed task there is a reason the agent will not see: the size ' +
@@ -574,19 +689,20 @@ export const helpEn: HelpSchema = {
         'so you can read it through and edit it.',
       handoffAuto: '“Keep going on your own” and the chain cap',
       handoffAutoText:
-        'The toggle on the card enables auto-continue FOR THIS conversation: from ' +
-        'then on the panel moves to a clean session by itself as soon as the ' +
-        'agent closes the next stage. Out of the box it is off, deliberately: ' +
-        'wiping context silently on the model’s say-so is lost work, not saved ' +
-        'money. The decision is made by the server, not by the tab: the chain ' +
-        'survives a closed browser — the agent works at night, you look in the ' +
-        'morning. A conversation continues at most five times in a row, after ' +
-        'which the panel stops and says so. A move that did not happen is ' +
-        'explained by a toast too: the run failed, the checkpoint was not ' +
-        'updated, the chain ran out. If you want that everywhere rather than per ' +
-        'conversation, Settings → “Continue by itself in every conversation” sets ' +
-        'the toggle’s default value, and one switched off by hand stays off. ' +
-        'Neither of them waives the safeguards.',
+        'The toggle on the card is auto-continue FOR THIS conversation, and it is ' +
+        'on out of the box: a chain with nobody at the panel is the normal night ' +
+        'mode, not an exception. The decision is made by the server, not by the ' +
+        'tab: the chain survives a closed browser — the agent works at night, you ' +
+        'look in the morning. Every continuation gets the original task of the whole ' +
+        'job along with the checkpoint, so the third session in a row still knows ' +
+        'the bounds of its group. A conversation continues at most eight times in a ' +
+        'row (review and fix stages do not count), and if the checkpoint is word for ' +
+        'word the same as at the previous move the panel stops earlier: the agent is ' +
+        'going in circles. A move that did not happen is explained by a toast: the ' +
+        'run failed, the checkpoint was not updated or did not change, the chain ran ' +
+        'out. Turn it off per conversation with the toggle, or everywhere in Settings ' +
+        '→ “Continue on its own in every conversation”; one switched off by hand ' +
+        'stays off. Neither of them waives the safeguards.',
       handoffTidy: 'Tidying the working files — half the point',
       handoffTidyText:
         'A clean session reads exactly the checkpoint file (.agent/PROGRESS.md by ' +
@@ -608,9 +724,8 @@ export const helpEn: HelpSchema = {
       handoffNote:
         'The panel never wipes context silently, whatever the toggles say: a move ' +
         'is always a NEW conversation, and the old one stays in the list in full. ' +
-        'Auto-continue is enabled per conversation and lives until the server ' +
-        'restarts — there is deliberately no way to turn it on for every chat at ' +
-        'once.',
+        'A conversation’s toggle lives until the server restarts; the “every ' +
+        'conversation” setting is the toggle’s default value, not an order.',
 
       codeTitle: 'Project code: what the agent changed, and editing on the spot',
       codeCaption:
@@ -979,7 +1094,11 @@ export const helpEn: HelpSchema = {
         'it. Hover the numbers for the breakdown by token kind with shares, the model ' +
         'of that step and the cost at its rate; a click pins the panel. The model ' +
         'counts spend per STEP, so several calls made at once share one number — the ' +
-        'panel says so outright instead of splitting it evenly.',
+        'panel says so outright instead of splitting it evenly. The third column is ' +
+        'the step time: how long the agent took to reach this action since the previous ' +
+        'record of the run; the last block of an answer also carries the whole run (Σ), ' +
+        'and while an answer is being written a live counter runs under it. Old records ' +
+        'without a timestamp get no column.',
 
       recipesTitle: 'How to start working with a project',
       recipe1: 'Open the project',
@@ -1049,6 +1168,19 @@ export const helpEn: HelpSchema = {
       noteHistoryText:
         'Very long conversations are trimmed from the top: transcripts run to hundreds ' +
         'of megabytes, and there is nothing to read them whole with in a browser.',
+      noteRestartTitle: 'A panel server restart does not kill the agent — the run is picked up',
+      noteRestartText:
+        'Agent processes outlive a restart of the panel server, while the run registry ' +
+        'used to live only in memory: after a restart every permission request was ' +
+        'refused with "Conversation not found" and no card appeared in the chat. Running ' +
+        'runs are now recorded in a ledger on disk (runs.json in the panel data folder), ' +
+        'and on start the server picks up the ones whose process is alive: permission ' +
+        'cards are drawn in their chats, Stop works, the end is detected by the process ' +
+        'dying. What a picked-up run lacks is its output stream: the answer is read from ' +
+        'the conversation, the feed says so in a line, and no continuation or ' +
+        'work → review → fix pipeline follows it. A run missing from the ledger too gets ' +
+        'an honest refusal — "the panel restarted, send the message again" — and the ' +
+        'same text shows in the conversation as the call result.',
       noteLiveTitle: 'A conversation running outside the panel is picked up on its own',
       noteLiveText:
         'The same chat can be driven from a terminal or an editor extension — such a ' +

@@ -116,6 +116,13 @@ export function applyEvent(id: string, event: ChatEvent): void {
       // переключает вкладку и читает прогон, который должен быть уже актуален.
       fireHandoff = event;
       break;
+    case 'notice':
+      // Подхвачен без потока: пузырь гасим (текста не будет, правда в
+      // транскрипте), лента скажет об этом строкой. Заметка о конце придёт
+      // вместе с `done` — прогон закроется как обычный.
+      if (event.code === 'adopted') next.detached = true;
+      next.notice = event.text;
+      break;
   }
   runs.set(id, next);
   // Разговор обзавёлся настоящим id — переписываем под него сохранённую

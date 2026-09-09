@@ -48,6 +48,13 @@ export interface StreamState {
    * досталось более важным. Прогон жив на сервере, правда — в транскрипте.
    */
   parked?: boolean;
+  /**
+   * Прогон усыновлён сервером после его перезапуска: процесс жив, трубы нет.
+   * Текста в потоке не будет — правда в транскрипте, как у припаркованного.
+   */
+  detached?: boolean;
+  /** Заметка панели про подхват — запасной текст, если код незнаком словарю. */
+  notice?: string;
   error?: string;
   sessionId?: string;
   costUsd?: number;
@@ -67,10 +74,12 @@ export interface StreamState {
  * Уступая место истории, пузырь тем же движением её и раскрывает — ход, который
  * он прятал, снова виден, и вместо замершего текста человек получает настоящий.
  * Припаркованный прогон — тот же случай: потока нет, историю ведёт транскрипт.
+ * Усыновлённый после перезапуска сервера — тоже: труба умерла с прежним
+ * сервером, и пузырь прятал бы из истории ответ, который есть только там.
  */
 export function isStreamShown(
-  stream: Pick<StreamState, 'isRunning' | 'text' | 'stalled' | 'parked'>,
+  stream: Pick<StreamState, 'isRunning' | 'text' | 'stalled' | 'parked' | 'detached'>,
 ): boolean {
-  if (stream.stalled || stream.parked) return false;
+  if (stream.stalled || stream.parked || stream.detached) return false;
   return stream.isRunning || Boolean(stream.text);
 }

@@ -1,8 +1,10 @@
-import { statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import {
   buildHandoffPrompt,
   HANDOFF_MAX_CHAIN,
+  HANDOFF_ROOT_TASK_MAX,
   type HandoffProposal,
   type HandoffStarted,
   type HandoffVerdict,
@@ -25,7 +27,10 @@ import {
  *    чему, и автопродолжение отказывает.
  * 2. ПРОГОН ЗАВЕРШИЛСЯ УСПЕШНО. После ошибки, лимита или остановки человеком
  *    очищать разговор нельзя: там осталась работа, а не результат.
- * 3. ПОТОЛОК ЦЕПОЧКИ. Иначе «закончил → продолжил» крутится всю ночь.
+ * 3. ПОТОЛОК ЦЕПОЧКИ. Иначе «закончил → продолжил» крутится всю ночь. Считаются
+ *    только продолжения в чистой сессии; звенья конвейера идут отдельно.
+ * 4. ЧЕКПОЙНТ ИЗМЕНИЛСЯ. Файл-опора слово в слово тот же, что при прошлом
+ *    продолжении, — агент ходит по кругу, и следующий круг ничего не добавит.
  *
  * Ручное продолжение (кнопка на карточке) проверяет только каталог: решение
  * человека предохранителями не отменяют — ему их показывают.
@@ -39,16 +44,41 @@ interface ChainState {
    * цепочки по любому другому поводу молча заморозило бы её на «выключено».
    */
   auto?: boolean;
-  /** Какой это шаг: исходный разговор — 0, первое продолжение — 1. */
+  /**
+   * Какой это шаг: исходный разговор — 0, первое продолжение — 1. Звено
+   * конвейера (ревью, правки) номер не двигает: оно продолжает ту же работу
+   * другой моделью, а не стирает контекст.
+   */
   depth: number;
   /** Последнее касание — по нему выбрасываются самые старые записи. */
   touchedAt: number;
+  /**
+   * Исходное задание цепочки — уезжает в каждое продолжение, чтобы третья
+   * сессия подряд всё ещё знала границы своей работы. Ставится первым
+   * продолжением (задание прогона, который его предложил), дальше наследуется.
+   */
+  rootTask?: string;
+  /**
+   * Отпечаток файла-опоры в момент последнего продолжения. Совпал с нынешним —
+   * круг: агент перечитал то же самое и снова просит перезапуск.
+   */
+  checkpointHash?: string;
   /**
    * Окно, при котором о его размере уже говорили. Без этого предложение по
    * порогу повторялось бы после КАЖДОГО хода: окно за порогом само по себе не
    * уменьшается, и человек получал бы то же самое уведомление каждые полминуты.
    */
   noticedContext?: number;
+}
+
+/** Чем связь отличается от простого «следующий шаг». */
+export interface ChainLinkOptions {
+  /** Звено конвейера подбора модели, не продолжение: шаг не растёт. */
+  stage?: boolean;
+  /** Исходное задание — берётся, только если у цепочки его ещё нет. */
+  rootTask?: string;
+  /** Отпечаток файла-опоры в момент этого продолжения. */
+  checkpointHash?: string;
 }
 
 /**
@@ -105,19 +135,38 @@ export class HandoffChains {
     return this.stateOf(aliases)?.depth ?? 0;
   }
 
+  /** Исходное задание цепочки, если разговор — уже продолжение. */
+  rootTaskOf(aliases: string[]): string | undefined {
+    return this.stateOf(aliases)?.rootTask;
+  }
+
+  /** Отпечаток файла-опоры при прошлом продолжении; у исходного разговора его нет. */
+  lastCheckpointHash(aliases: string[]): string | undefined {
+    return this.stateOf(aliases)?.checkpointHash;
+  }
+
   /**
-   * Связать продолжение с исходным разговором: новый чат наследует тумблер и
-   * получает следующий номер шага. Без наследования цепочка обрывалась бы после
-   * первого же продолжения — человек включил автомат один раз, а работает он
-   * ровно один переход.
+   * Связать продолжение с исходным разговором: новый чат наследует тумблер,
+   * исходное задание и получает следующий номер шага. Без наследования цепочка
+   * обрывалась бы после первого же продолжения — человек включил автомат один
+   * раз, а работает он ровно один переход.
+   *
+   * `stage` — звено конвейера: наследует всё, но шаг не двигает и отпечаток
+   * чекпойнта не трогает — своего продолжения оно не делало.
    */
-  link(fromAliases: string[], toChatId: string): number {
+  link(fromAliases: string[], toChatId: string, options: ChainLinkOptions = {}): number {
     const parent = this.stateOf(fromAliases);
-    const depth = (parent?.depth ?? 0) + 1;
+    const depth = (parent?.depth ?? 0) + (options.stage ? 0 : 1);
+    const rootTask = parent?.rootTask ?? options.rootTask?.trim().slice(0, HANDOFF_ROOT_TASK_MAX);
+    const checkpointHash = options.stage
+      ? parent?.checkpointHash
+      : (options.checkpointHash ?? parent?.checkpointHash);
     this.write([toChatId], {
       ...(parent?.auto === undefined ? {} : { auto: parent.auto }),
       depth,
       touchedAt: Date.now(),
+      ...(rootTask ? { rootTask } : {}),
+      ...(checkpointHash ? { checkpointHash } : {}),
     });
     return depth;
   }
@@ -177,6 +226,18 @@ export const statMtime: StatFile = (path) => {
   }
 };
 
+/** Отпечаток содержимого файла или undefined, если его нет. Подменяется в тестах. */
+export type HashFile = (path: string) => string | undefined;
+
+/** sha1 содержимого: сравниваем «тот же ли файл», а не защищаемся от подделки. */
+export const hashFile: HashFile = (path) => {
+  try {
+    return createHash('sha1').update(readFileSync(path)).digest('hex');
+  } catch {
+    return undefined;
+  }
+};
+
 export interface HandoffCheckInput {
   /** Предложение из блока ответа; его отсутствие — обычный конец хода. */
   proposal?: HandoffProposal;
@@ -190,7 +251,13 @@ export interface HandoffCheckInput {
   auto: boolean;
   /** Длина цепочки на текущий момент. */
   depth: number;
+  /**
+   * Отпечаток файла-опоры при ПРОШЛОМ продолжении. Совпадение с нынешним —
+   * отказ: новая сессия прочитала бы ровно то же, что и предыдущая.
+   */
+  previousHash?: string;
   stat?: StatFile;
+  hash?: HashFile;
 }
 
 /**
@@ -205,7 +272,9 @@ export function evaluateHandoff({
   startedAt,
   auto,
   depth,
+  previousHash,
   stat = statMtime,
+  hash = hashFile,
 }: HandoffCheckInput): HandoffVerdict {
   if (!proposal) return { ok: false, reason: 'no_block' };
   if (!auto) return { ok: false, reason: 'auto_off', proposal };
@@ -222,6 +291,12 @@ export function evaluateHandoff({
   // миллисекунду, что и старт, записан этим прогоном.
   if (mtime < startedAt) return { ok: false, reason: 'checkpoint_stale', proposal };
 
+  // Свежая запись, но слово в слово прошлая: агент переписал файл тем же текстом
+  // и снова просит перезапуск. Это круг, и третий заход его не разомкнёт.
+  if (previousHash !== undefined && hash(target) === previousHash) {
+    return { ok: false, reason: 'checkpoint_unchanged', proposal };
+  }
+
   return { ok: true, proposal };
 }
 
@@ -232,7 +307,7 @@ export function evaluateHandoff({
  * повторяется здесь намеренно: разбор описывает ФОРМАТ, а этот модуль трогает
  * настоящую файловую систему, и полагаться в таком на чужую валидацию нельзя.
  */
-function checkpointInside(cwd: string, checkpoint: string): string | undefined {
+export function checkpointInside(cwd: string, checkpoint: string): string | undefined {
   const root = resolve(cwd);
   const target = resolve(root, checkpoint);
   if (target !== root && !target.startsWith(root.endsWith(sep) ? root : root + sep)) {
@@ -256,6 +331,13 @@ export interface StartHandoffInput {
   start: HandoffStart;
   /** Часы — в тесте фиксируются, чтобы ключ чата был предсказуем. */
   now?: () => number;
+  /**
+   * Задание, с которого началась вся работа, — на случай, если цепочка только
+   * начинается и своего у неё ещё нет. У продолжения наследство сильнее.
+   */
+  rootTask?: string;
+  /** Отпечаток файла-опоры сейчас — для предохранителя «чекпойнт не изменился». */
+  checkpointHash?: string;
 }
 
 /**
@@ -271,12 +353,20 @@ export function startHandoff({
   startRun,
   start,
   now = Date.now,
+  rootTask,
+  checkpointHash,
 }: StartHandoffInput): HandoffStarted {
   // Ключ чата — тот же временный вид, что и у разговора, начатого из панели:
   // настоящим id он станет, когда CLI выдаст сессию.
   const chatId = `new-${now()}`;
-  const prompt = buildHandoffPrompt(proposal);
-  const chainDepth = chains.link(fromAliases, chatId);
+  // Задание в промпте и задание в памяти цепочки — одно и то же: иначе второе
+  // продолжение получило бы не тот текст, что первое.
+  const task = chains.rootTaskOf(fromAliases) ?? rootTask?.trim().slice(0, HANDOFF_ROOT_TASK_MAX);
+  const prompt = buildHandoffPrompt(proposal, task);
+  const chainDepth = chains.link(fromAliases, chatId, {
+    ...(task ? { rootTask: task } : {}),
+    ...(checkpointHash ? { checkpointHash } : {}),
+  });
   const started = startRun ? start({ chatId, prompt, cwd }) : false;
   return { chatId, path: cwd, started, prompt, chainDepth };
 }

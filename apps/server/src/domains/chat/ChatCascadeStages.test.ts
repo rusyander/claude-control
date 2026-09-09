@@ -139,6 +139,20 @@ describe('planCascadeStage: после ревью', () => {
 
     expect(staged).toBeUndefined();
   });
+
+  /**
+   * Ревью чужого MR по ссылке (Т7) — не звено этого конвейера. Заведи он правки
+   * сам, панель молча начала бы править чужую ветку по замечаниям, которых
+   * человек ещё не видел. Решение там принимается кнопкой (`split-review.ts`).
+   */
+  it('ревью чужого MR по ссылке правок не заводит: там решает человек', () => {
+    const staged = plan({
+      link: reviewLink({ review: { url: 'https://gitlab.com/team/app/-/merge_requests/42' } }),
+      text: REVIEW_BLOCK('{"findings":["src/a.ts:10 — забыт await"]}'),
+    });
+
+    expect(staged).toBeUndefined();
+  });
 });
 
 describe('stageAppendPrompt', () => {
@@ -164,5 +178,91 @@ describe('stageAppendPrompt', () => {
     const review = plan();
 
     expect(review && stageAppendPrompt(review, settings)).not.toContain('agentdeck:split');
+  });
+});
+
+/**
+ * Уровни разделения (Т1): после плана заводится работа — единственное звено,
+ * которое стартует и после неудачи; разбор звеньев не заводит вовсе.
+ */
+describe('planCascadeStage: после плана и разбора', () => {
+  const PLAN_BLOCK = (body: string): string =>
+    ['Изучил.', '```agentdeck:plan', body, '```'].join('\n');
+
+  const planLink = (patch: Partial<ChatLink> = {}): ChatLink =>
+    workLink({
+      stage: 'plan',
+      model: 'claude-opus-5',
+      effort: 'high',
+      workModel: 'sonnet',
+      workEffort: 'medium',
+      lowered: true,
+      task: 'Переименуй foo в bar',
+      owns: ['src/rename'],
+      notes: 'api.ts — у соседей',
+      ...patch,
+    });
+
+  it('план кончился — работа на подобранной модели с планом, границами и заметками', () => {
+    const staged = plan({ link: planLink(), text: PLAN_BLOCK('## Шаги\n1. Найти foo') });
+
+    expect(staged?.stage).toBe('work');
+    expect(staged?.model).toBe('sonnet');
+    expect(staged?.effort).toBe('medium');
+    expect(staged?.planMissing).toBeUndefined();
+    expect(staged?.prompt).toContain('Переименуй foo в bar');
+    expect(staged?.prompt).toContain('1. Найти foo');
+    expect(staged?.prompt).toContain('src/rename');
+    expect(staged?.prompt).toContain('api.ts — у соседей');
+    // Связь работы: понижена, с потолком и задачей — ревью после неё идёт как обычно.
+    expect(staged?.link).toMatchObject({
+      stage: 'work',
+      model: 'sonnet',
+      effort: 'medium',
+      lowered: true,
+      ceilingModel: 'claude-opus-5',
+      owns: ['src/rename'],
+    });
+  });
+
+  it('план без блока или упавший — работа всё равно стартует, с пометкой planMissing', () => {
+    const noBlock = plan({ link: planLink(), text: 'Ничего не понял.' });
+    const failed = plan({ link: planLink(), ok: false, text: '' });
+
+    expect(noBlock?.stage).toBe('work');
+    expect(noBlock?.planMissing).toBe(true);
+    expect(noBlock?.prompt).toContain('панель не получила');
+    expect(failed?.stage).toBe('work');
+    expect(failed?.planMissing).toBe(true);
+  });
+
+  it('план на потолке — работа не понижена и планки сдачи не получает', () => {
+    const staged = plan({
+      link: planLink({ workModel: 'claude-opus-5', workEffort: 'high', lowered: false }),
+      text: PLAN_BLOCK('план'),
+    });
+
+    expect(staged?.link.lowered).toBeUndefined();
+    expect(
+      staged && stageAppendPrompt(staged, { taskSplitInitiative: true, handoffInitiative: true }),
+    ).not.toContain('НИЖЕ потолка');
+  });
+
+  it('понижённая работа после плана получает планку сдачи', () => {
+    const staged = plan({ link: planLink(), text: PLAN_BLOCK('план') });
+
+    expect(
+      staged && stageAppendPrompt(staged, { taskSplitInitiative: true, handoffInitiative: true }),
+    ).toContain('НИЖЕ потолка');
+  });
+
+  it('план отработан один раз: с отметкой plannedAt вторая работа не заводится', () => {
+    expect(
+      plan({ link: planLink({ plannedAt: '2026-09-09T10:00:00.000Z' }), text: PLAN_BLOCK('п') }),
+    ).toBeUndefined();
+  });
+
+  it('разбор (уровень 1) звеньев не заводит: его итог применяет конвейер', () => {
+    expect(plan({ link: workLink({ stage: 'triage' }), text: 'что угодно' })).toBeUndefined();
   });
 });

@@ -31,6 +31,8 @@ export function ChatHeaderMenu({
   canExport,
   onExport,
   onRefresh,
+  onRestartSession,
+  restartBlocked,
 }: ChatHeaderMenuProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
@@ -209,6 +211,25 @@ export function ChatHeaderMenu({
             <Typography variant="caption" color="subtle" as="span" className={styles.groupTitle}>
               {t('chat.menuActions')}
             </Typography>
+
+            {/* Перезапуск сессии стоит первым среди действий: это единственное
+                из них, что меняет ход работы, а не показ. Пока идёт прогон —
+                погашен с причиной: стереть контекст посреди хода — потерять ход. */}
+            {onRestartSession && (
+              <button
+                type="button"
+                className={styles.item}
+                disabled={Boolean(restartBlocked)}
+                onClick={() => {
+                  onRestartSession();
+                  close();
+                }}
+                title={restartBlocked ?? t('chat.handoff.restartHint')}
+              >
+                <Icon name="swap" size={20} />
+                {t('chat.handoff.restart')}
+              </button>
+            )}
 
             {canExport && (
               <button

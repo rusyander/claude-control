@@ -53,4 +53,6 @@ export interface ChatHeaderProps {
   canExport: boolean;
   onExport: () => void;
   onRefresh: () => void;
+  /** «Перезапустить сессию» в меню шапки; пусто — разговора ещё нет. */
+  onRestartSession?: () => void;
 }

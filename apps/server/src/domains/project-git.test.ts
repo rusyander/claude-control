@@ -17,6 +17,7 @@ import {
   pickRemote,
   pullChanges,
   pushBranch,
+  parseDirtyPaths,
   readProjectGit,
 } from './project-git.ts';
 
@@ -464,5 +465,27 @@ describe.skipIf(!GIT_AVAILABLE)('pull на настоящих репозитор
   it('отправлять нечего — это не ошибка: git отвечает «всё уже там»', async () => {
     const output = await pushBranch(dir);
     expect(output.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Незакоммиченное в копии (Т6): по нему сверяются ветки разделения, и путь
+ * оттуда обязан быть в тех же координатах, что путь из `diff --name-only`.
+ */
+describe('parseDirtyPaths', () => {
+  it('обычные записи отдают путь без буквы состояния', () => {
+    expect(parseDirtyPaths(' M  src/a.ts ?? src/new.ts ')).toEqual(['src/a.ts', 'src/new.ts']);
+  });
+
+  it('переименование считается обоими путями — сосед конфликтует и со старым', () => {
+    expect(parseDirtyPaths('R  src/new.ts src/old.ts A  src/x.ts ')).toEqual([
+      'src/new.ts',
+      'src/old.ts',
+      'src/x.ts',
+    ]);
+  });
+
+  it('пустой вывод — пустой список, а не строка из ничего', () => {
+    expect(parseDirtyPaths('')).toEqual([]);
   });
 });

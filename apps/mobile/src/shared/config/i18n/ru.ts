@@ -19,6 +19,7 @@ export const ru = {
     open: 'открыть',
     close: 'закрыть',
     kb: 'КБ',
+    duration: { h: 'ч', m: 'м', s: 'с' },
   },
 
   chat: {
@@ -52,6 +53,10 @@ export const ru = {
       answer: 'Ответ',
       run: 'Расход хода',
       shared: (count: number) => `Общий расход на ${count} вызова этого шага`,
+      step: 'Время шага',
+      span: (from: string, to: string) => `с ${from} до ${to}`,
+      runTime: 'Весь прогон',
+      live: (time: string) => `идёт ${time}`,
     },
   },
 

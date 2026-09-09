@@ -10,7 +10,11 @@ import { fetchCiReport } from './ci.ts';
 import {
   commentForgeIssue,
   commentMergeRequest,
+  commentMergeRequestByUrl,
   createForgeIssue,
+  forgeAccessForUrl,
+  parseMergeRequestUrl,
+  readMergeRequestByUrl,
   toForgeAccess,
   toForgeIdentity,
   whoAmI,
@@ -161,6 +165,162 @@ describe('domains/integrations/forge: дефекты по токену', () => {
       statusCode: 502,
       message: expect.stringContaining('токен отклонён'),
     });
+  });
+});
+
+/**
+ * Ревью чужого MR по ссылке (Т7). Ссылку даёт человек словами, а по разобранному
+ * адресу панель заводит копию на чужой ветке и пишет в чужое обсуждение —
+ * поэтому «не разобрал» здесь обязано быть отказом, а не догадкой.
+ */
+describe('domains/integrations/forge: запрос на слияние по ссылке', () => {
+  it('GitLab: подгруппы, разделитель `-`, хвост адреса — всё это одна и та же ссылка', () => {
+    const expected = {
+      kind: 'gitlab',
+      site: 'https://git.acme.local',
+      repo: 'team/sub/app',
+      number: 42,
+    };
+
+    expect(parseMergeRequestUrl('https://git.acme.local/team/sub/app/-/merge_requests/42')).toEqual(
+      expected,
+    );
+    expect(
+      parseMergeRequestUrl(
+        '  https://git.acme.local/team/sub/app/-/merge_requests/42/diffs#note_7 ',
+      ),
+    ).toEqual(expected);
+    // Старая форма без разделителя — такие ссылки живут в задачах годами.
+    expect(parseMergeRequestUrl('https://git.acme.local/team/sub/app/merge_requests/42')).toEqual(
+      expected,
+    );
+  });
+
+  it('GitHub: и адрес браузера, и вид из API', () => {
+    expect(parseMergeRequestUrl('https://github.com/acme/panel/pull/7')).toEqual({
+      kind: 'github',
+      site: 'https://github.com',
+      repo: 'acme/panel',
+      number: 7,
+    });
+    expect(parseMergeRequestUrl('https://github.com/acme/panel/pulls/7')).toMatchObject({
+      number: 7,
+    });
+  });
+
+  it('не ссылка на MR — отказ, а не догадка', () => {
+    for (const url of [
+      'https://git.acme.local/team/app/-/issues/42',
+      'https://git.acme.local/team/app/-/merge_requests/абв',
+      'https://git.acme.local/team/app/-/merge_requests/0',
+      'https://github.com/acme/panel',
+      'file:///etc/passwd',
+      'не ссылка вовсе',
+      '',
+    ]) {
+      expect(parseMergeRequestUrl(url)).toBeUndefined();
+    }
+  });
+
+  it('доступ берётся из САМОЙ ссылки: репозиторий настройки увёл бы запрос не туда', () => {
+    expect(forgeAccessForUrl('https://git.acme.local/team/app/-/merge_requests/42', 'T')).toEqual({
+      kind: 'gitlab',
+      api: 'https://git.acme.local/api/v4',
+      site: 'https://git.acme.local',
+      repo: 'team/app',
+      token: 'T',
+    });
+    expect(forgeAccessForUrl('https://github.com/acme/panel/pull/7', 'T')).toMatchObject({
+      api: 'https://api.github.com',
+      repo: 'acme/panel',
+    });
+    expect(forgeAccessForUrl('https://github.com/acme/panel', 'T')).toBeUndefined();
+  });
+
+  it('ветка копии — та, что назвал фордж; закрытый MR виден по состоянию', async () => {
+    const { calls } = stubApi([
+      [
+        /merge_requests\/42/,
+        {
+          body: {
+            title: 'Вход',
+            state: 'opened',
+            source_branch: 'feature/login',
+            target_branch: 'main',
+            web_url: 'https://git.acme.local/mr/42',
+          },
+        },
+      ],
+    ]);
+
+    await expect(
+      readMergeRequestByUrl('https://git.acme.local/team/app/-/merge_requests/42', 'T'),
+    ).resolves.toEqual({
+      branch: 'feature/login',
+      targetBranch: 'main',
+      title: 'Вход',
+      url: 'https://git.acme.local/mr/42',
+      state: 'open',
+    });
+    expect(calls[0]!.url).toBe(
+      'https://git.acme.local/api/v4/projects/team%2Fapp/merge_requests/42',
+    );
+  });
+
+  it('GitHub называет ветку своими полями, а `open` у него без хвоста', async () => {
+    stubApi([
+      [
+        /pulls\/7/,
+        {
+          body: {
+            title: 'Шапка',
+            state: 'open',
+            head: { ref: 'feature/header' },
+            base: { ref: 'main' },
+            html_url: 'https://gh/7',
+          },
+        },
+      ],
+    ]);
+
+    await expect(
+      readMergeRequestByUrl('https://github.com/acme/panel/pull/7', 'T'),
+    ).resolves.toMatchObject({ branch: 'feature/header', state: 'open' });
+  });
+
+  it('MR без ветки — отказ: копию отводить не от чего', async () => {
+    stubApi([[/merge_requests\/42/, { body: { title: 'Вход', state: 'opened' } }]]);
+
+    await expect(
+      readMergeRequestByUrl('https://git.acme.local/team/app/-/merge_requests/42', 'T'),
+    ).rejects.toMatchObject({ message: expect.stringContaining('не назвал ветку') });
+  });
+
+  it('чужая ссылка не читается и в неё не пишут', async () => {
+    const { calls } = stubApi([]);
+
+    await expect(
+      readMergeRequestByUrl('https://github.com/acme/panel', 'T'),
+    ).resolves.toBeUndefined();
+    await expect(
+      commentMergeRequestByUrl('https://github.com/acme/panel', 'T', 'текст'),
+    ).rejects.toMatchObject({ detail: 'url' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('комментарий уходит в обсуждение того MR, что в ссылке', async () => {
+    const { calls } = stubApi([[/./, { body: {} }]]);
+
+    await commentMergeRequestByUrl(
+      'https://git.acme.local/team/app/-/merge_requests/42',
+      'T',
+      '**Замечания ревью (1)**',
+    );
+
+    expect(calls[0]!.url).toBe(
+      'https://git.acme.local/api/v4/projects/team%2Fapp/merge_requests/42/notes',
+    );
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ body: '**Замечания ревью (1)**' });
   });
 });
 

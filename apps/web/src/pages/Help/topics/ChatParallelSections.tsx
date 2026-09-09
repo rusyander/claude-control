@@ -22,6 +22,9 @@ export function ChatParallelSections() {
             { title: tr('parallelCreate'), text: tr('parallelCreateText') },
             { title: tr('parallelWork'), text: tr('parallelWorkText') },
             { title: tr('parallelRemove'), text: tr('parallelRemoveText') },
+            { title: tr('parallelMirror'), text: tr('parallelMirrorText') },
+            { title: tr('parallelBootstrap'), text: tr('parallelBootstrapText') },
+            { title: tr('parallelPreamble'), text: tr('parallelPreambleText') },
             { title: tr('parallelMemory'), text: tr('parallelMemoryText') },
           ]}
         />
@@ -37,6 +40,7 @@ export function ChatParallelSections() {
             { title: tr('splitWhen'), text: tr('splitWhenText') },
             { title: tr('splitCard'), text: tr('splitCardText') },
             { title: tr('splitWhat'), text: tr('splitWhatText') },
+            { title: tr('splitReview'), text: tr('splitReviewText') },
             { title: tr('splitTree'), text: tr('splitTreeText') },
             { title: tr('splitParent'), text: tr('splitParentText') },
             { title: tr('splitDone'), text: tr('splitDoneText') },
@@ -57,7 +61,10 @@ export function ChatParallelSections() {
             { title: tr('cascadeCeiling'), text: tr('cascadeCeilingText') },
             { title: tr('cascadeKinds'), text: tr('cascadeKindsText') },
             { title: tr('cascadeReview'), text: tr('cascadeReviewText') },
+            { title: tr('cascadeLevels'), text: tr('cascadeLevelsText') },
             { title: tr('cascadeHub'), text: tr('cascadeHubText') },
+            { title: tr('cascadeOverlap'), text: tr('cascadeOverlapText') },
+            { title: tr('cascadePause'), text: tr('cascadePauseText') },
             { title: tr('cascadeManual'), text: tr('cascadeManualText') },
             { title: tr('cascadeLimits'), text: tr('cascadeLimitsText') },
             { title: tr('cascadeForeign'), text: tr('cascadeForeignText') },

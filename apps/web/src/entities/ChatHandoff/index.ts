@@ -3,5 +3,11 @@ export {
   fetchHandoffState,
   setHandoffAuto,
   fetchHandoffRequestPrompt,
+  restartSession,
 } from './api/ChatHandoffApi';
-export type { StartHandoffBody, HandoffState } from './api/ChatHandoffApi';
+export type {
+  StartHandoffBody,
+  HandoffState,
+  RestartOutcome,
+  RestartSessionBody,
+} from './api/ChatHandoffApi';

@@ -33,6 +33,7 @@ import { PermissionCard } from '../../src/features/chat/PermissionCard';
 import { Progress } from '../../src/features/chat/Progress';
 import { TokenBadge } from '../../src/features/chat/TokenBadge';
 import { ToolCall } from '../../src/features/chat/ToolCall';
+import { RunTimer } from '../../src/features/chat/RunTimer';
 import { Transcript, UserBubble } from '../../src/features/chat/Transcript';
 
 /**
@@ -249,7 +250,7 @@ export default function ChatScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {messages.isLoading ? <Loading /> : null}
-          <Transcript messages={history} costUnit={costUnit} />
+          <Transcript messages={history} costUnit={costUnit} isRunning={isRunning} />
 
           {sent ? (
             <UserBubble>
@@ -273,6 +274,8 @@ export default function ChatScreen() {
           {run.text && run.textUsage ? (
             <TokenBadge usage={run.textUsage} unit={costUnit} label={t.chat.usage.answer} />
           ) : null}
+          {/* Живой таймер прогона: сколько агент уже работает над этим ходом. */}
+          {isRunning && run.startedAt !== undefined ? <RunTimer since={run.startedAt} /> : null}
 
           {run.permissions.map((permission) => (
             <PermissionCard key={permission.toolUseId} chatId={chatId} permission={permission} />

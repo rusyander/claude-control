@@ -10,8 +10,36 @@
   background: var(--color-surface);
 }
 
+// Шапка: подпись слева, фишка паузы и ОДНА кнопка справа. Кнопка одна на
+// состояние — идёт что-то или стоит, — чтобы не спрашивать человека, какое из
+// двух действий сейчас имеет смысл.
 .head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
   margin-bottom: var(--spacing-3xs);
+}
+
+.headText {
+  flex: 1;
+  min-width: 0;
+}
+
+// Фишка «на паузе» — та же форма, что у звена конвейера в списке чатов: одно
+// слово в капсуле на утопленной поверхности, читается в обеих темах.
+.chip {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  white-space: nowrap;
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  min-width: 0;
 }
 
 .row {
@@ -44,4 +72,77 @@
 .text {
   min-width: 0;
   flex: 1;
+}
+
+// Строка группы, у которой чата ещё нет (конвейер уровней, Т1): та же сетка,
+// что у кликабельной строки, но без наведения и без курсора — открывать нечего,
+// и обещать клик было бы враньём.
+.rowStatic {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  padding: var(--spacing-3xs) var(--spacing-3xs);
+  border-radius: 8px;
+}
+
+// Форма ответа на вопрос разбора — под строкой группы, в её же отступе: вопрос
+// про эту группу, и ответ уедет в её план.
+.hold {
+  margin-top: var(--spacing-3xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+}
+
+.holdActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--spacing-2xs);
+}
+
+// Пересечения веток (Т6). Раздел карточки, а не отдельная карточка: вопрос
+// «кто ещё трогал этот файл» — про те же группы, что строками выше, и разрывать
+// их пустым полем значило бы заставить человека сводить два списка глазами.
+.overlap {
+  margin-top: var(--spacing-2xs);
+  padding-top: var(--spacing-2xs);
+  border-top: 1px solid var(--color-border);
+}
+
+.overlapHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  margin-bottom: var(--spacing-3xs);
+}
+
+// Строка файла: путь слева, группы справа. Путь бывает длиннее строки —
+// обрезается многоточием, а целиком читается по наведению (`title`).
+.overlapRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2xs);
+  padding: 2px var(--spacing-3xs);
+  border-radius: 8px;
+}
+
+.overlapPath {
+  flex: 1;
+  min-width: 0;
+}
+
+.overlapGroups {
+  flex: none;
+  max-width: 55%;
+}
+
+// Файл вне объявленного владения — единственное красное в карточке: это не
+// «надо будет свести», а «границы разбора нарушены».
+.overlapBad {
+  background: var(--color-danger-subtle);
+
+  .overlapGroups {
+    color: var(--color-danger);
+  }
 }

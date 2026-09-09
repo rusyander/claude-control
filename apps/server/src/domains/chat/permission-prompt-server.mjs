@@ -22,9 +22,10 @@
 // выключен) заголовка просто нет.
 //
 // Самодостаточный .mjs: его спавнит claude, импортов из пакета сервера тут быть
-// не может. Ошибку связи трактуем как «запретить» — это безопасный дефолт.
+// не может. Ошибку связи повторяем (панель перезапускается секунды), и лишь
+// исчерпав повторы, трактуем как «запретить» — это безопасный дефолт.
 
-/* global process, Buffer, URL */
+/* global process, Buffer, URL, setTimeout */
 import readline from 'node:readline';
 import { readFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
@@ -91,7 +92,25 @@ function postJson(url, body) {
   });
 }
 
-/** Спросить у приложения решение пользователя (длинный запрос — держит ответ). */
+/**
+ * Пауза между повторами: панель после перезапуска поднимается секунды, а не
+ * миллисекунды, и первые попытки упираются в закрытый порт.
+ */
+const RETRY_DELAYS_MS = [1000, 2000, 3000, 5000, 8000, 8000, 8000, 10000];
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Спросить у приложения решение пользователя (длинный запрос — держит ответ).
+ *
+ * Сетевая ошибка — не решение. Панель перезапускается (`node --watch`, правка
+ * сервера, обновление), и в это окно попадают два случая: запрос ушёл в закрытый
+ * порт, или соединение с карточкой, ждавшей человека, оборвалось вместе со
+ * старым процессом. Прежде оба означали «запретить», и агент терял ход, хотя
+ * человек ничего не нажимал. Теперь запрос повторяется: новый сервер
+ * усыновляет прогон из журнала и рисует карточку заново. Ответ приложения —
+ * любой статус, любое решение — не повторяется никогда: отказ человека и
+ * «прогон не в реестре» окончательны.
+ */
 async function askUser(args) {
   if (!BASE_URL || !RUN_ID) {
     return {
@@ -99,13 +118,28 @@ async function askUser(args) {
       message: 'Некому подтвердить разрешение (нет связи с приложением).',
     };
   }
-  try {
-    const { status, json: decision } = await postJson(`${BASE_URL}/api/chat/permission-request`, {
-      runId: RUN_ID,
-      toolName: args.tool_name,
-      input: args.input ?? {},
-      toolUseId: args.tool_use_id ?? '',
-    });
+  const body = {
+    runId: RUN_ID,
+    toolName: args.tool_name,
+    input: args.input ?? {},
+    toolUseId: args.tool_use_id ?? '',
+  };
+  for (let attempt = 0; ; attempt += 1) {
+    let outcome;
+    try {
+      outcome = await postJson(`${BASE_URL}/api/chat/permission-request`, body);
+    } catch {
+      const delay = RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) {
+        return {
+          behavior: 'deny',
+          message: 'Не удалось связаться с приложением для подтверждения.',
+        };
+      }
+      await sleep(delay);
+      continue;
+    }
+    const { status, json: decision } = outcome;
     if (status < 200 || status >= 300) {
       return { behavior: 'deny', message: `Не удалось запросить разрешение (${status}).` };
     }
@@ -113,8 +147,6 @@ async function askUser(args) {
       return { behavior: 'allow', updatedInput: decision.updatedInput ?? args.input ?? {} };
     }
     return { behavior: 'deny', message: decision?.message ?? 'Пользователь отклонил действие.' };
-  } catch {
-    return { behavior: 'deny', message: 'Не удалось связаться с приложением для подтверждения.' };
   }
 }
 

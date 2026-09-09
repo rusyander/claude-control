@@ -150,6 +150,15 @@ export function useTaskSplit({
           if (result.chats.length > 0) {
             toast.success(t('chat.split.done', { count: result.chats.length }));
           }
+          // Уровни (Т1): чатов ещё нет — первым пошёл разбор, группы заведёт
+          // конвейер по его итогу. Молчать нельзя: кнопка нажата, а копий не
+          // прибавилось, и без этой строки это читается как отказ.
+          if (result.triage) {
+            toast.info(
+              t(result.triage.started ? 'chat.split.triageStarted' : 'chat.split.triageDeferred'),
+              { duration: 8_000 },
+            );
+          }
           // Сбой одной группы не откатывает остальные, поэтому о нём говорим
           // отдельной строкой: три чата из четырёх — это результат, а не отказ.
           for (const failure of result.failures) {

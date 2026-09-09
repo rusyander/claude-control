@@ -8,6 +8,7 @@ import { toast } from '@shared/lib/toast';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
+import { scanPlanBlocks, scanSplitPlanBlocks } from '@agentdeck/contracts/split-plan';
 import { attachmentBasename, splitAttachments } from '@agentdeck/contracts/uploads';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
 import { parseQuestions } from '../lib/parseQuestions';
@@ -16,6 +17,8 @@ import { QuestionCard } from './QuestionCard';
 import { TaskSplitCard } from './TaskSplitCard';
 import { HandoffCard } from './HandoffCard';
 import { ReviewCard } from './ReviewCard';
+import { TriageCard } from './TriageCard';
+import { PlanCard } from './PlanCard';
 import type { MessageBubbleProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 
@@ -32,6 +35,7 @@ export function MessageBubble({
   isQuestionOpen,
   isRunning,
   costUnit,
+  timing,
   onSplit,
   onKeepHere,
   isSplitPending,
@@ -106,6 +110,10 @@ export function MessageBubble({
                 unit={costUnit}
                 sharedWith={toolCount}
                 label={block.type === 'tool' ? block.name : t('chat.usage.answer')}
+                durationMs={timing?.stepMs}
+                from={timing?.from}
+                to={timing?.to}
+                runTotalMs={timing?.runTotalMs}
                 className={styles.spend}
               />
             ) : null;
@@ -119,12 +127,15 @@ export function MessageBubble({
             const split = scanSplitBlocks(block.text);
             const handoffScan = scanHandoffBlocks(split.text);
             const review = scanReviewBlocks(handoffScan.text);
+            // Уровни разделения (Т1): блок разбора и блок плана группы.
+            const triage = scanSplitPlanBlocks(review.text);
+            const plan = scanPlanBlocks(triage.text);
             // Список путей вложений дописывает сервер, а не человек: в пузыре он
             // читался как сырой перечень абсолютных путей. Показываем чипами с
             // именем файла; сам текст для копирования и правки (`plainText`)
             // остаётся полным — агент получал именно его.
-            const attachments = isUser ? splitAttachments(review.text) : undefined;
-            const bodyText = attachments ? attachments.text : review.text;
+            const attachments = isUser ? splitAttachments(plan.text) : undefined;
+            const bodyText = attachments ? attachments.text : plan.text;
 
             return (
               <div key={index} className={styles.block}>
@@ -212,6 +223,16 @@ export function MessageBubble({
                       {t('chat.cascade.review.notParsed')}
                     </div>
                   )}
+                  {/* Разбор и план (Т1): решать по ним нечего — конвейер уже
+                      применил разбор и заведёт работу по плану, — но прочитать,
+                      что именно панель приняла, человек вправе. */}
+                  {triage.plan && <TriageCard plan={triage.plan} />}
+                  {triage.rejected > 0 && (
+                    <div className={styles.splitRejected} role="status">
+                      {t('chat.cascade.triage.notParsed')}
+                    </div>
+                  )}
+                  {plan.plan && <PlanCard plan={plan.plan} />}
                 </div>
                 {spend}
               </div>

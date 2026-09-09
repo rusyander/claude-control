@@ -51,6 +51,9 @@ const PARENT_ID = 'demo-parent';
 const REVIEW_ID = 'demo-review';
 /** Разговор без детей: только в нём у карточки разделения живые кнопки. */
 const SOLO_ID = 'demo-solo';
+/** Уровень 1 — общий разбор; уровень 2 — план одной из групп. */
+const TRIAGE_ID = 'demo-triage';
+const PLAN_ID = 'demo-plan';
 
 /** Родитель и три звена одной группы: работа, ревью, правки. */
 const CHATS = [
@@ -60,19 +63,38 @@ const CHATS = [
     parentId: PARENT_ID,
     stage: 'work',
     branch: 'split/rename',
+    createdAt: '2026-09-07T10:10:00.000Z',
     updatedAt: '2026-09-07T10:10:00.000Z',
   }),
   chat(REVIEW_ID, 'Ревью работы «Переименования»', {
     parentId: PARENT_ID,
     stage: 'review',
     branch: 'split/rename',
+    createdAt: '2026-09-07T10:20:00.000Z',
     updatedAt: '2026-09-07T10:20:00.000Z',
   }),
   chat('demo-fix', 'Правки по замечаниям', {
     parentId: PARENT_ID,
     stage: 'fix',
     branch: 'split/rename',
+    createdAt: '2026-09-07T10:30:00.000Z',
     updatedAt: '2026-09-07T10:30:00.000Z',
+  }),
+  // Уровни разделения: один разбор на всё, план у каждой группы.
+  chat(TRIAGE_ID, 'Разбор разделения', {
+    parentId: PARENT_ID,
+    stage: 'triage',
+    groupTitle: 'Разбор разделения',
+    createdAt: '2026-09-07T10:06:00.000Z',
+    updatedAt: '2026-09-07T10:07:00.000Z',
+  }),
+  chat(PLAN_ID, 'План работы для группы «Переименования» в ветке split/rename.', {
+    parentId: PARENT_ID,
+    stage: 'plan',
+    groupTitle: 'Переименования',
+    branch: 'split/rename',
+    createdAt: '2026-09-07T10:08:00.000Z',
+    updatedAt: '2026-09-07T10:09:00.000Z',
   }),
 ];
 
@@ -152,6 +174,131 @@ const MESSAGES = {
 
 const EMPTY_MESSAGES = { messages: [], total: 0, hasMore: false };
 
+/** Блок разбора: номера групп с единицы, как отвечает модель. */
+const TRIAGE_PLAN = {
+  groups: [
+    { index: 1, owns: ['apps/web/src/features/Login/**'], tasks: ['починить валидацию'] },
+    {
+      index: 2,
+      owns: ['apps/web/src/widgets/Header/**', 'apps/web/src/shared/api/client.ts'],
+      after: [1],
+      notes: 'client.ts твой — Форма входа его не трогает',
+    },
+    { index: 3, hold: 'Переименовывать ли поля в тестах-снимках?' },
+  ],
+  conflicts: [
+    {
+      paths: ['apps/web/src/shared/api/client.ts'],
+      resolvedBy: 2,
+      why: 'шапка зовёт клиент первой',
+    },
+  ],
+  order: [1, 2, 3],
+};
+
+/** План группы: с вложенным блоком команд — план им не обрывается. */
+const PLAN_BODY = [
+  '## Шаги',
+  '1. Прогнать проверки до правок:',
+  '```',
+  'pnpm type-check && pnpm lint',
+  '```',
+  '2. Переименовать поля по списку из задания, файл за файлом.',
+  '3. Прогнать те же проверки и сверить дифф с заданием по пунктам.',
+  '',
+  '## Не трогать',
+  'apps/web/src/shared/api/client.ts — он у группы «Шапка».',
+].join('\n');
+
+MESSAGES[TRIAGE_ID] = {
+  messages: [
+    message(
+      'm-triage',
+      `Прочитал код всех трёх групп. Пересекались в client.ts.
+
+${fence('split-plan', TRIAGE_PLAN)}`,
+      '2026-09-07T10:07:00.000Z',
+    ),
+  ],
+  total: 1,
+  hasMore: false,
+};
+
+MESSAGES[PLAN_ID] = {
+  messages: [
+    message(
+      'm-plan',
+      [
+        'Посмотрел, где лежат переименовываемые поля.',
+        '',
+        '```agentdeck:plan',
+        PLAN_BODY,
+        '```',
+      ].join('\n'),
+      '2026-09-07T10:09:00.000Z',
+    ),
+  ],
+  total: 1,
+  hasMore: false,
+};
+
+/** Конвейер уровней глазами сводки: одна группа идёт, одна ждёт, одна стоит. */
+const TREE = {
+  root: PARENT_ID,
+  running: 1,
+  split: {
+    parentChatId: PARENT_ID,
+    triageChatId: TRIAGE_ID,
+    triage: {
+      at: '2026-09-07T10:07:00.000Z',
+      received: true,
+      repairs: [
+        'задача «вернуть фокус после закрытия меню» пропала из разбора — возвращена в «Шапку»',
+      ],
+      conflicts: [
+        {
+          paths: ['apps/web/src/shared/api/client.ts'],
+          resolvedBy: 1,
+          why: 'шапка зовёт клиент первой',
+        },
+      ],
+    },
+    order: [2, 0, 1],
+    groups: [
+      {
+        index: 0,
+        title: 'Форма входа',
+        branch: 'feature/login',
+        after: [],
+        status: 'held',
+        hold: 'Переименовывать ли поля в тестах-снимках?',
+      },
+      {
+        index: 1,
+        title: 'Шапка',
+        branch: 'feature/header',
+        after: [2],
+        status: 'waiting',
+      },
+      {
+        index: 2,
+        title: 'Переименования',
+        branch: 'split/rename',
+        after: [],
+        status: 'started',
+        chatId: 'demo-work',
+      },
+    ],
+  },
+  nodes: CHATS.filter((item) => item.parentId).map((item) => ({
+    chatId: item.id,
+    aliases: [],
+    parentChatId: PARENT_ID,
+    title: item.title,
+    running: item.id === 'demo-work',
+  })),
+};
+
 const loweredRun = (chatId, model, checks, ok = true, kind, tokens = 12_000) => ({
   chatId,
   projectPath: `C:/demo/${chatId}`,
@@ -219,6 +366,13 @@ await page.route('**/api/chats/*/messages*', (route) => {
   return route.fulfill({ json: MESSAGES[id] ?? EMPTY_MESSAGES });
 });
 await page.route('**/api/chat/active', (route) => route.fulfill({ json: [] }));
+/**
+ * Дерево меняется по ходу съёмки: пересечения считаются ПОСЛЕ работы, а ревью
+ * чужих MR — вообще другое разделение. Кадры 17, 18 и 19 — три состояния одного
+ * пульта, поэтому маршрут отдаёт текущее значение, а не константу.
+ */
+let tree = TREE;
+await page.route('**/api/chat/*/tree', (route) => route.fulfill({ json: tree }));
 await page.route('**/api/chat/*/progress*', (route) =>
   route.fulfill({ json: { steps: [], isComplete: false } }),
 );
@@ -316,6 +470,141 @@ await page.waitForTimeout(1500);
 // перестаёт быть высотой в треть листа и не гонит перед собой пустой хвост.
 const reviewCard = page.locator('[class*="card" i]').filter({ hasText: 'Ревью работы' }).first();
 await shot('11-review-card', (await reviewCard.count()) ? reviewCard : undefined);
+
+// --- 15. Карточка разбора: уровень 1 --------------------------------------
+await page
+  .getByRole('button', { name: /Разбор разделения/ })
+  .first()
+  .click();
+await page.waitForTimeout(1500);
+// Как и у ревью: снимается сама карточка. Разговор разбора интересен одним —
+// кто чем владеет, кто кого ждёт и что спросили у человека.
+const triageCard = page.locator('[data-triage-card]').first();
+await shot('15-triage-card', (await triageCard.count()) ? triageCard : undefined);
+
+// --- 16. Карточка плана: уровень 2 ----------------------------------------
+await page
+  .getByRole('button', { name: /План работы для группы/ })
+  .first()
+  .click();
+await page.waitForTimeout(1500);
+const planCard = page.locator('[data-plan-card]').first();
+await shot('16-plan-card', (await planCard.count()) ? planCard : undefined);
+
+// --- 17. Сводка групп с ожиданиями и вопросом разбора ----------------------
+await page
+  .getByRole('button', { name: /Разбор пула правок/ })
+  .first()
+  .click();
+await page.waitForTimeout(1800);
+const hubCard = page.locator('[data-child-hub]').first();
+await shot('17-split-hub-levels', (await hubCard.count()) ? hubCard : undefined);
+
+// --- 18. Пересечения веток после работы (Т6) ------------------------------
+tree = {
+  ...TREE,
+  split: {
+    ...TREE.split,
+    overlap: {
+      at: '2026-09-07T11:20:00.000Z',
+      files: [
+        {
+          path: 'apps/web/src/shared/api/client.ts',
+          groups: [1, 2],
+          outside: [2],
+        },
+        { path: 'apps/web/src/shared/config/i18n/ru.ts', groups: [0, 1, 2], outside: [] },
+      ],
+      mergeOrder: [2, 0, 1],
+      counted: [
+        { index: 0, files: 7 },
+        { index: 1, files: 12 },
+        { index: 2, files: 4 },
+      ],
+      unread: [],
+    },
+  },
+};
+await openChat();
+await page
+  .getByRole('button', { name: /Разбор пула правок/ })
+  .first()
+  .click();
+await page.waitForTimeout(1800);
+const overlapHub = page.locator('[data-child-hub]').first();
+await shot('18-overlap', (await overlapHub.count()) ? overlapHub : undefined);
+
+// --- 19. Решение по ревью чужих запросов на слияние (Т7) ------------------
+// Другое разделение: группы здесь не задачи, а сами запросы на слияние. Пульт
+// тот же, поэтому хватает подменить дерево — карточки решения читают его.
+const mrNode = (chatId, title, review) => ({
+  chatId,
+  aliases: [],
+  parentChatId: PARENT_ID,
+  title,
+  stage: 'review',
+  running: false,
+  review,
+});
+tree = {
+  root: PARENT_ID,
+  running: 0,
+  nodes: [
+    mrNode('demo-mr-42', 'MR 42 — вход', {
+      url: 'https://gitlab.com/team/app/-/merge_requests/42',
+      branch: 'feature/login',
+      findings: [
+        'src/auth/login.ts:88 — ошибка входа гасится пустым catch',
+        'нет теста на просроченный токен',
+      ],
+    }),
+    mrNode('demo-mr-43', 'MR 43 — шапка', {
+      url: 'https://gitlab.com/team/app/-/merge_requests/43',
+      branch: 'feature/header',
+      findings: ['шапка едет на 320px'],
+      postBlocked: 'интеграция с форджем не настроена',
+    }),
+    mrNode('demo-mr-44', 'MR 44 — сборка', {
+      url: 'https://gitlab.com/team/app/-/merge_requests/44',
+      findings: [],
+      decision: 'none',
+      decidedAt: '2026-09-07T11:30:00.000Z',
+    }),
+  ],
+};
+await openChat();
+await page
+  .getByRole('button', { name: /Разбор пула правок/ })
+  .first()
+  .click();
+await page.waitForTimeout(1800);
+// Три карточки выше окна не помещаются, а показать надо все три: ждущую,
+// упёршуюся в ненастроенную интеграцию и закрытую без замечаний. Кадр берётся
+// по их общим границам — первая карточка иначе обрезана сверху.
+// Окно на время кадра выше: три карточки в 900 px не помещаются, а снимок
+// «по границам» без этого упёрся бы в невидимую часть страницы и обрезал
+// последнюю. После кадра размер возвращается — остальные кадры сняты в 900.
+await page.setViewportSize({ width: 1400, height: 1400 });
+await page.waitForTimeout(600);
+const cards = page.locator('[data-review-card]');
+await cards.first().scrollIntoViewIfNeeded();
+await page.waitForTimeout(400);
+const first = await cards.first().boundingBox();
+const last = await cards.last().boundingBox();
+await shot(
+  '19-review-decision',
+  undefined,
+  first && last
+    ? {
+        x: first.x - 8,
+        y: first.y - 8,
+        width: first.width + 16,
+        height: last.y + last.height - first.y + 16,
+      }
+    : undefined,
+);
+await page.setViewportSize({ width: 1400, height: 900 });
+tree = TREE;
 
 // --- 12. Понижённые прогоны на аналитике ---------------------------------
 await page.goto(`${BASE}/analytics`, { waitUntil: 'domcontentloaded' });

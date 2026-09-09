@@ -1,0 +1,27 @@
+// Отчёт зеркала внутри карточки копии: отбит слева, как цитата, — это не
+// свойство копии, а разовое событие, и его можно закрыть.
+.report {
+  margin-top: var(--spacing-3xs);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-left: 2px solid var(--color-border-strong);
+  background: var(--color-surface);
+  border-radius: 4px;
+}
+
+// Пути моноширинные и с переносом: они длинные, а поповер узкий.
+.paths {
+  margin: 2px 0 0;
+  padding-left: var(--spacing-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-muted);
+  word-break: break-all;
+  // Отчёт может назвать сотни файлов `.agent/`: список сворачивается в скролл,
+  // а не растягивает поповер за экран.
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.reason {
+  color: var(--color-fg-subtle);
+}

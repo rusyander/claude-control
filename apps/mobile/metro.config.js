@@ -38,7 +38,7 @@ config.resolver.disableHierarchicalLookup = true;
  * `@agentdeck/contracts` так подключать нельзя: она импортирует zod,
  * которого в node_modules приложения нет.
  */
-const VALUE_MODULES = ['uploads', 'task-split', 'chat-handoff', 'test-format'];
+const VALUE_MODULES = ['uploads', 'task-split', 'chat-handoff', 'test-format', 'chat-timing'];
 const aliases = new Map(
   VALUE_MODULES.map((name) => [
     `@agentdeck/contracts/${name}`,

@@ -109,7 +109,9 @@ export function ChatPage() {
 
   // Родительский чат как пульт над детьми разделения: их вопросы, их запросы
   // прав и они сами — по именам (подробности и почему именно так — в хуке).
-  const child = useChildHub(chats.data, activeChat?.id, activeRuns);
+  // Четвёртым — чей ребёнок сам этот разговор: карточку решения по ревью (Т7)
+  // человек видит и в группе, а её состояние лежит в дереве родителя.
+  const child = useChildHub(chats.data, activeChat?.id, activeRuns, activeChat?.parentId);
 
   // Размер окна ленты. Растёт кнопкой «Загрузить ещё»: каждый шаг подтягивает
   // более ранние сообщения. При смене разговора возвращаемся к последнему окну.
@@ -303,6 +305,7 @@ export function ChatPage() {
             canExport={Boolean(activeChat)}
             onExport={() => activeChat && downloadChatExport(activeChat.id, 'md')}
             onRefresh={() => session.refresh()}
+            {...(handoff.restartSession ? { onRestartSession: handoff.restartSession } : {})}
           />
 
           {/* Ветка и числа правок — полосой над лентой, а не кнопкой в ряду
@@ -330,6 +333,7 @@ export function ChatPage() {
             onEdit={editMessage}
             onPickOption={answerQuestion}
             isRunning={isRunning}
+            runStartedAt={run.startedAt}
             chatId={chatId}
             permissions={run.permissions}
             queued={run.queued}

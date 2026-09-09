@@ -1,0 +1,38 @@
+// Бутстрап под карточкой копии: та же «цитата» слева, что и у отчёта зеркала, —
+// это событие в жизни копии, а не её свойство.
+.card {
+  margin-top: var(--spacing-3xs);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-left: 2px solid var(--color-border-strong);
+  background: var(--color-surface);
+  border-radius: 4px;
+}
+
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+}
+
+.command {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-muted);
+  word-break: break-all;
+}
+
+// Лог установки длинный и широкий: скролл внутри, а не поповер за экран.
+.pre {
+  margin: 0;
+  padding: var(--spacing-3xs);
+  max-height: 200px;
+  overflow: auto;
+  border-radius: 4px;
+  background: var(--color-surface-sunken);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg);
+  white-space: pre-wrap;
+  word-break: break-all;
+}

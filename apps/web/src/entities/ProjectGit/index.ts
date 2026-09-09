@@ -8,6 +8,11 @@ export {
   useProjectWorktrees,
   useAddWorktree,
   useRemoveWorktree,
+  useMirrorWorktree,
+  useMirrorSettings,
+  useSaveMirrorSettings,
+  useBootstrapWorktree,
+  useWorktreeBootstrapLog,
   projectGitKey,
 } from './api/ProjectGitApi';
 export type {
@@ -18,4 +23,9 @@ export type {
   ProjectWorktree,
   ProjectWorktreesInfo,
   ProjectWorktreesResult,
+  WorktreeMirrorReport,
+  WorktreeMirrorSettings,
+  WorktreeMirrorSkipped,
+  WorktreeBootstrapState,
+  WorktreeBootstrapStatus,
 } from '@agentdeck/contracts';

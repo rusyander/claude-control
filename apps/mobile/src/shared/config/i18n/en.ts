@@ -18,6 +18,7 @@ export const en: Dictionary = {
     open: 'open',
     close: 'close',
     kb: 'KB',
+    duration: { h: 'h', m: 'm', s: 's' },
   },
 
   chat: {
@@ -52,6 +53,10 @@ export const en: Dictionary = {
       answer: 'Answer',
       run: 'Turn spend',
       shared: (count: number) => `Shared spend across ${count} calls of this step`,
+      step: 'Step time',
+      span: (from: string, to: string) => `from ${from} to ${to}`,
+      runTime: 'Whole run',
+      live: (time: string) => `running ${time}`,
     },
   },
 

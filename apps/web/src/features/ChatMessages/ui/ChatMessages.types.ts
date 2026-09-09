@@ -1,10 +1,15 @@
 import type { ChatMessage } from '@agentdeck/contracts';
-import type { TaskSplitProposal } from '@agentdeck/contracts/task-split';
+import type { MessageTiming } from '@agentdeck/contracts/chat-timing';
+import type {
+  TaskSplitProposal,
+  TaskSplitReviewDecision,
+} from '@agentdeck/contracts/task-split';
 import type { CascadeAssignment, CascadeCeiling } from '@agentdeck/contracts/model-cascade';
-import type { HandoffProposal } from '@agentdeck/contracts/chat-handoff';
+import type { ChatTreeView, HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 import type { StreamState } from '@entities/Chat';
 import type { PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
 import type { ChildStageGroup } from './ChildStages.types';
+import type { ReviewDecisionItem } from './ReviewDecisionCard.types';
 
 /**
  * Всё, что карточке продолжения нужно от страницы, одним объектом. Плоскими
@@ -84,6 +89,11 @@ export interface ChatMessagesProps {
   onPickOption?: (answer: string) => void;
   /** Идёт прогон — варианты вопроса недоступны, пока агент занят. */
   isRunning?: boolean;
+  /**
+   * Старт живого прогона (мс эпохи) — от него идёт таймер под ответом, пока
+   * тот пишется. Нет — таймера нет: отсчитывать от открытия вкладки нечестно.
+   */
+  runStartedAt?: number;
   /** Запросы прав, ждущие решения человека (карточка «Разрешить/Запретить»). */
   permissions?: PendingPermission[];
   /**
@@ -117,6 +127,37 @@ export interface ChatMessagesProps {
   childStages?: ChildStageGroup[];
   /** Открыть звено группы — в этом же окне, как и переход к ребёнку из тоста. */
   onOpenChild?: (chatId: string) => void;
+  /**
+   * Дерево разговоров с сервера и кнопки его паузы. Пауза — состояние дерева,
+   * не прогонов: по одному дети не останавливаются, у первого успевает
+   * стартовать ревью, пока человек гасит третьего.
+   */
+  childTree?: ChatTreeView;
+  onPauseTree?: () => void;
+  onResumeTree?: () => void;
+  treeBusy?: boolean;
+  /**
+   * Ответ на вопрос разбора (Т1) группе, у которой чата ещё нет: уходит
+   * родителю с номером группы, а конвейер заводит копию по ответу.
+   */
+  onAnswerHold?: (index: number, answer: string) => void;
+  holdBusy?: boolean;
+  /** Пересчитать пересечения веток разделения (Т6) — кнопка в сводке групп. */
+  onCheckOverlap?: () => void;
+  overlapBusy?: boolean;
+  /**
+   * Ревью чужих MR по ссылке (Т7), ждущие решения человека.
+   *
+   * В родительском разговоре это все группы дерева, в чате самой группы — она
+   * одна. Список, а не флаг: разделение на пять ссылок даёт пять карточек, и
+   * каждая про свой MR.
+   */
+  reviews?: ReviewDecisionItem[];
+  /** Что человек выбрал; `all` — то же решение остальным ждущим группам дерева. */
+  onReviewDecide?: (chatId: string, decision: TaskSplitReviewDecision, all: boolean) => void;
+  /** «Закоммитить и отправить в MR» — отдельным кликом после правок. */
+  onReviewPush?: (chatId: string) => void;
+  reviewBusy?: boolean;
   /** Повторить упавший запрос — кнопка прямо в карточке ошибки. */
   onRetry?: () => void;
   /**
@@ -184,6 +225,8 @@ export interface MessageBubbleProps {
   isRunning?: boolean;
   /** Единицы расхода из настроек: объём в токенах или деньги. */
   costUnit?: 'tokens' | 'money';
+  /** Время этого шага и, у последней записи прогона, его сумма — для бейджа. */
+  timing?: MessageTiming;
   /** Согласиться на разделение задач по чатам (карточка вместо блока в тексте). */
   onSplit?: (proposal: TaskSplitProposal, options: SplitDecision) => void;
   /** Отказаться от разделения — продолжаем в этом же разговоре. */

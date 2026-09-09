@@ -1,14 +1,21 @@
 import { resolve } from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import type { ProjectGitResult, ProjectWorktreesResult } from '@agentdeck/contracts';
+import type {
+  ProjectGitResult,
+  ProjectWorktreesInfo,
+  ProjectWorktreesResult,
+  WorktreeMirrorReport,
+} from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import {
   GitError,
   addWorktree,
+  bootstrapCommandFor,
   checkoutBranch,
   commitAll,
   createBranch,
   listWorktrees,
+  mirrorWorktree,
   pullChanges,
   pushBranch,
   readProjectGit,
@@ -22,7 +29,10 @@ import {
   gitCommitBodySchema,
   gitPathBodySchema,
   gitPullBodySchema,
+  gitMirrorSettingsBodySchema,
   gitWorktreeAddBodySchema,
+  gitWorktreeBootstrapBodySchema,
+  gitWorktreeMirrorBodySchema,
   gitWorktreeRemoveBodySchema,
 } from '@agentdeck/contracts/request-bodies';
 
@@ -67,7 +77,7 @@ export interface ActiveRuns {
  */
 export function registerProjectGitRoutes(
   app: FastifyInstance,
-  _ctx: ServerContext,
+  ctx: ServerContext,
   runs?: ActiveRuns,
 ): void {
   /**
@@ -95,6 +105,14 @@ export function registerProjectGitRoutes(
    * закончил, отказывалась бы удаляться со словами «остановите его» — а
    * останавливать уже некого.
    */
+  const samePathAs = (a: string, b: string): boolean => {
+    const norm = (value: string): string => {
+      const text = resolve(value).replace(/\\/g, '/').replace(/\/+$/, '');
+      return process.platform === 'win32' ? text.toLowerCase() : text;
+    };
+    return norm(a) === norm(b);
+  };
+
   const isBusy = (target: string): boolean => {
     const registry = runs;
     if (!registry) return false;
@@ -186,18 +204,44 @@ export function registerProjectGitRoutes(
     return write(path, reply, () => pushBranch(path));
   });
 
+  /** Список копий с состоянием бутстрапа у каждой неосновной. */
+  const listWithBootstrap = async (path: string): Promise<ProjectWorktreesInfo> => {
+    const info = await listWorktrees(path);
+    return {
+      ...info,
+      worktrees: info.worktrees.map((item) => {
+        if (item.isMain) return item;
+        const bootstrap = ctx.worktreeBootstraps.status(item.path);
+        return bootstrap ? { ...item, bootstrap } : item;
+      }),
+    };
+  };
+
+  /**
+   * Запустить бутстрап копии в фоне. Ответ на запрос его не ждёт: установка
+   * идёт минуты, а карточка копии читает состояние из списка. Пустая команда
+   * (ни настроенной, ни lock-файла) — тишина, не ошибка.
+   */
+  const startBootstrap = (path: string, copy: string): string | undefined => {
+    const command = bootstrapCommandFor(copy, ctx.store.getWorktreeMirror(path).bootstrap);
+    if (!command) return undefined;
+    void ctx.worktreeBootstraps.run(copy, command);
+    return command;
+  };
+
   /** Обёртка операций над копиями: результат = новый список + вывод git. */
   const worktreeWrite = async (
     path: string,
     reply: FastifyReply,
-    action: () => Promise<{ output: string; createdPath?: string }>,
+    action: () => Promise<{ output: string; createdPath?: string; mirror?: WorktreeMirrorReport }>,
   ): Promise<ProjectWorktreesResult | FastifyReply> => {
     try {
-      const { output, createdPath } = await action();
+      const { output, createdPath, mirror } = await action();
       return {
-        info: await listWorktrees(path),
+        info: await listWithBootstrap(path),
         output,
         ...(createdPath ? { createdPath } : {}),
+        ...(mirror ? { mirror } : {}),
       };
     } catch (error) {
       if (error instanceof GitError) return reply.code(400).send({ message: error.message });
@@ -211,7 +255,7 @@ export function registerProjectGitRoutes(
     async (request, reply) => {
       const path = requirePath(request.query.path, reply);
       if (!path) return reply;
-      return listWorktrees(path);
+      return listWithBootstrap(path);
     },
   );
 
@@ -222,8 +266,92 @@ export function registerProjectGitRoutes(
     const path = requirePath(body.path, reply);
     if (!path) return reply;
     return worktreeWrite(path, reply, async () => {
-      const created = await addWorktree(path, body.name);
-      return { output: created.output, createdPath: created.path };
+      const created = await addWorktree(path, body.name, ctx.store.getWorktreeMirror(path));
+      const command = startBootstrap(path, created.path);
+      return {
+        output: command ? `${created.output}\nУстановка запущена: ${command}` : created.output,
+        createdPath: created.path,
+        ...(created.mirror ? { mirror: created.mirror } : {}),
+      };
+    });
+  });
+
+  /**
+   * Повторить бутстрап существующей копии — после провала или смены команды.
+   * Пока идёт прежний — 409: два установщика в одном каталоге ломают друг друга.
+   */
+  app.post<{ Body: unknown }>('/api/project-git/worktrees/bootstrap', async (request, reply) => {
+    const body = parseBody(gitWorktreeBootstrapBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    const list = await listWorktrees(path);
+    const target = list.worktrees.find(
+      (item) => !item.isMain && samePathAs(item.path, body.worktreePath),
+    );
+    if (!target) return reply.code(404).send({ message: 'Такой копии нет в списке git' });
+    if (ctx.worktreeBootstraps.isRunning(target.path)) {
+      return reply.code(409).send({ message: 'Установка в этой копии уже идёт' });
+    }
+    const command = startBootstrap(path, target.path);
+    if (!command) {
+      return reply
+        .code(400)
+        .send({ message: 'Команды нет: ни настроенной на проекте, ни lock-файла в корне копии' });
+    }
+    return worktreeWrite(path, reply, async () => ({ output: `Установка запущена: ${command}` }));
+  });
+
+  /** Полный лог последнего бутстрапа копии. */
+  app.get<{ Querystring: { path?: string; worktreePath?: string } }>(
+    '/api/project-git/worktrees/bootstrap-log',
+    async (request, reply) => {
+      const path = requirePath(request.query.path, reply);
+      if (!path) return reply;
+      const copy = String(request.query.worktreePath ?? '').trim();
+      if (!copy) return reply.code(400).send({ message: 'Нужен путь копии' });
+      return {
+        log: ctx.worktreeBootstraps.log(copy),
+        state: ctx.worktreeBootstraps.status(copy) ?? null,
+      };
+    },
+  );
+
+  /**
+   * Повторно перенести локальный слой в уже существующую копию — после того,
+   * как человек дописал шаблоны или поправил `.mcp.json` в основной копии.
+   * Переносится только то, что в копии старее; её собственные правки не
+   * затираются.
+   */
+  app.post<{ Body: unknown }>('/api/project-git/worktrees/mirror', async (request, reply) => {
+    const body = parseBody(gitWorktreeMirrorBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    return worktreeWrite(path, reply, () =>
+      mirrorWorktree(path, body.worktreePath, ctx.store.getWorktreeMirror(path)),
+    );
+  });
+
+  /** Шаблоны зеркала на проекте: что человек дописал к встроенному списку. */
+  app.get<{ Querystring: { path?: string } }>(
+    '/api/project-git/mirror-settings',
+    async (request, reply) => {
+      const path = requirePath(request.query.path, reply);
+      if (!path) return reply;
+      return ctx.store.getWorktreeMirror(path);
+    },
+  );
+
+  app.put<{ Body: unknown }>('/api/project-git/mirror-settings', async (request, reply) => {
+    const body = parseBody(gitMirrorSettingsBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    return ctx.store.setWorktreeMirror(path, {
+      include: body.include,
+      exclude: body.exclude,
+      ...(body.bootstrap !== undefined ? { bootstrap: body.bootstrap } : {}),
     });
   });
 

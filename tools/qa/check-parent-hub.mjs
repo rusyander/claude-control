@@ -166,7 +166,97 @@ await page.route('**/api/chats/projects*', (route) =>
   }),
 );
 
-await page.route('**/api/chats', (route) => route.fulfill({ json: CHATS }));
+// Пауза дерева: состояние заглушки меняется нажатиями, как на сервере.
+let treePaused = false;
+const treeCalls = [];
+await page.route('**/api/chats', (route) =>
+  route.fulfill({ json: treePaused ? CHATS.map((c) => ({ ...c, paused: true })) : CHATS }),
+);
+/**
+ * Пересечения веток (Т6). Заглушка ведёт себя как сервер: до первой сверки поля
+ * нет вовсе, кнопка его заводит. Один файл нарушает границы владения (красный),
+ * второй задет двумя законными владельцами — на глаз это разные вещи.
+ */
+let overlap;
+const overlapCalls = [];
+const OVERLAP = {
+  at: '2026-09-02T10:07:00.000Z',
+  files: [
+    { path: 'src/shared/api/client.ts', groups: [0, 1], outside: [1] },
+    { path: 'src/entities/User/model.ts', groups: [0, 1], outside: [] },
+  ],
+  mergeOrder: [0, 1],
+  counted: [
+    { index: 0, files: 12 },
+    { index: 1, files: 7 },
+  ],
+  unread: [],
+};
+
+await page.route('**/api/chat/*/tree', (route) =>
+  route.fulfill({
+    json: {
+      root: PARENT,
+      running: treePaused ? 0 : 3,
+      ...(treePaused ? { paused: { at: '2026-09-02T10:06:00.000Z', chats: 3, pending: 1 } } : {}),
+      split: {
+        parentChatId: PARENT,
+        order: [0, 1],
+        triage: { at: '2026-09-02T10:00:30.000Z', received: true, repairs: [], conflicts: [] },
+        ...(overlap ? { overlap } : {}),
+        groups: [
+          {
+            index: 0,
+            title: 'Форма входа',
+            branch: 'feature/login',
+            after: [],
+            status: 'started',
+            chatId: CHILD,
+          },
+          {
+            index: 1,
+            title: 'Сборка',
+            branch: 'feature/build',
+            after: [],
+            status: 'started',
+            chatId: KID2,
+          },
+        ],
+      },
+      nodes: [
+        {
+          chatId: CHILD,
+          aliases: [],
+          parentChatId: PARENT,
+          title: 'Форма входа',
+          running: !treePaused,
+        },
+        { chatId: KID2, aliases: [], parentChatId: PARENT, title: 'Сборка', running: !treePaused },
+      ],
+    },
+  }),
+);
+await page.route('**/api/chat/*/tree/pause', (route) => {
+  treeCalls.push({
+    op: 'pause',
+    chatId: new URL(route.request().url()).pathname.split('/').at(-3),
+  });
+  treePaused = true;
+  return route.fulfill({ json: { root: PARENT, stopped: 3, chats: 3, alreadyPaused: false } });
+});
+await page.route('**/api/chat/*/tree/resume', (route) => {
+  treeCalls.push({
+    op: 'resume',
+    chatId: new URL(route.request().url()).pathname.split('/').at(-3),
+  });
+  treePaused = false;
+  return route.fulfill({ json: { root: PARENT, wasPaused: true, resumed: 3, flushed: 1 } });
+});
+await page.route('**/api/chat/split/*/overlap', (route) => {
+  overlapCalls.push(new URL(route.request().url()).pathname.split('/').at(-2));
+  overlap = OVERLAP;
+  return route.fulfill({ json: OVERLAP });
+});
 await page.route(`**/api/chats/${PARENT}/messages*`, (route) => route.fulfill({ json: MESSAGES }));
 await page.route(`**/api/chats/${CHILD}/messages*`, (route) =>
   route.fulfill({ json: { messages: [], total: 0, hasMore: false } }),
@@ -313,6 +403,105 @@ const shot = async (name) => {
 };
 
 await shot('01_вопросы-родителя-и-ребёнка_AFTER');
+
+// Пауза всего дерева — из сводки групп у родителя. Кнопка одна на состояние:
+// идёт что-то — «Остановить всё», стоит — «Продолжить всё»; обе адресуют
+// РОДИТЕЛЯ, а корень дерева сервер найдёт сам.
+const pauseAll = page.getByRole('button', { name: /Остановить всё \(3\)/ });
+check((await pauseAll.count()) === 1, 'в сводке групп есть «Остановить всё (3)» — по числу идущих');
+await pauseAll.first().click();
+await page.getByRole('button', { name: /Продолжить всё \(4\)/ }).waitFor({ timeout: 8000 });
+check(
+  treeCalls.length === 1 && treeCalls[0].op === 'pause' && treeCalls[0].chatId === PARENT,
+  `пауза ушла одним запросом и адресована родителю: ${JSON.stringify(treeCalls)}`,
+);
+check(
+  (await page.getByText(/Дерево остановлено: 3 прогона/).count()) === 1,
+  'тост называет, сколько прогонов остановлено',
+);
+const chips = await page.locator('[class*="_chip_"]').filter({ hasText: 'на паузе' }).count();
+check(chips === 3, `фишка «на паузе» у шапки сводки и у каждой группы: ${chips}`);
+check(
+  (await page.locator('[class*="_stage_"]').filter({ hasText: 'на паузе' }).count()) >= 2,
+  'в списке чатов остановленные дети тоже помечены',
+);
+await shot('06_дерево-на-паузе_AFTER');
+
+await page.getByRole('button', { name: /Продолжить всё \(4\)/ }).click();
+await page.getByRole('button', { name: /Остановить всё \(3\)/ }).waitFor({ timeout: 8000 });
+check(
+  treeCalls.length === 2 && treeCalls[1].op === 'resume' && treeCalls[1].chatId === PARENT,
+  `продолжение ушло одним запросом родителю: ${JSON.stringify(treeCalls.at(-1))}`,
+);
+check(
+  (await page.getByText(/Дерево продолжено: в своих сессиях — 3, из очереди — 1/).count()) === 1,
+  'тост называет, сколько продолжено и сколько вышло из очереди',
+);
+check(
+  (await page.locator('[class*="_chip_"]').filter({ hasText: 'на паузе' }).count()) === 0,
+  'после продолжения фишек «на паузе» не осталось',
+);
+await shot('07_дерево-продолжено_AFTER');
+
+// Пересечения веток (Т6). До сверки панель ничего не утверждает: раздел говорит
+// «не сверялись» — «пересечений нет» на месте непроверенного было бы враньём.
+const overlapPanel = page.locator('[data-hub-overlap]');
+check(
+  (await overlapPanel.getAttribute('data-hub-overlap')) === 'idle',
+  'до сверки раздел пересечений честно говорит, что не считал',
+);
+check(
+  (await page.getByText('Пересечения веток не сверялись').count()) === 1,
+  'подпись раздела до сверки на месте',
+);
+await shot('08_пересечения-не-сверялись_BEFORE');
+
+await page.getByRole('button', { name: 'Сверить ветки' }).click();
+await page.getByText(/Пересечения веток: 2 файла/).waitFor({ timeout: 8000 });
+check(
+  overlapCalls.length === 1 && overlapCalls[0] === PARENT,
+  `сверка ушла одним запросом и адресована родителю: ${JSON.stringify(overlapCalls)}`,
+);
+
+// Файл — группы: строка отвечает на «кто ещё это трогал», не заставляя человека
+// открывать ветки.
+const shared = page.locator('[data-overlap-file]');
+check((await shared.count()) === 2, `в списке обе строки пересечения: ${await shared.count()}`);
+check(
+  (await page.locator('[data-overlap-file="outside"]').count()) === 1,
+  'файл вне владения помечен отдельно — он и красный',
+);
+const outsideRow = page.locator('[data-overlap-file="outside"]');
+check(
+  (await outsideRow.innerText()).includes('src/shared/api/client.ts'),
+  'у нарушения назван файл',
+);
+check(
+  /Форма входа.*Сборка/s.test(await outsideRow.innerText()),
+  'у файла названы ОБЕ группы, а не номера',
+);
+check(
+  (await outsideRow.innerText()).includes('вне владения: Сборка'),
+  'названа группа, вышедшая за свои границы',
+);
+// Красное — только у нарушения границ: два законных владельца одного файла это
+// работа для слияния, а не нарушение, и красить их одинаково значило бы врать.
+const badColor = await outsideRow.evaluate((node) => getComputedStyle(node).backgroundColor);
+const okColor = await page
+  .locator('[data-overlap-file="shared"]')
+  .evaluate((node) => getComputedStyle(node).backgroundColor);
+check(badColor !== okColor, `нарушение выделено фоном: ${badColor} против ${okColor}`);
+
+check(
+  (await page.getByText('Порядок слияния: Форма входа → Сборка').count()) === 1,
+  'порядок слияния подсказан рядом',
+);
+// Кнопки слияния тут нет и быть не должно: сводить ветки — шаг человека.
+check(
+  (await page.getByRole('button', { name: /Слить|Влить|Merge/ }).count()) === 0,
+  'кнопки слияния в хабе нет — панель ветки не трогает',
+);
+await shot('09_пересечения-посчитаны_AFTER');
 
 // Решение по правам ребёнка — из родителя, и уходит брокеру ЕГО прогона: ответ
 // сообщением здесь не годится вовсе, агент стоит на вызове и ждёт вердикта.

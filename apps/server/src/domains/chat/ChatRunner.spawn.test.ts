@@ -39,6 +39,7 @@ class FakeChild extends EventEmitter {
   readonly stdout = new PassThrough();
   readonly stderr = new PassThrough();
   readonly unhandled: string[] = [];
+  pid?: number;
 
   raise(code: string): void {
     if (this.listenerCount('error') === 0) {
@@ -116,5 +117,23 @@ describe('ChatRun.start: сбой запуска CLI', () => {
     expect(await finished).toBe(true);
     expect(child.stdin.unhandled).toEqual([]);
     expect(events.find((event) => event.kind === 'error')?.message).toContain('Invalid API key');
+  });
+
+  it('pid процесса известен сразу после start — реестр пишет его в журнал на диске', async () => {
+    child.pid = 4242;
+    const run = new ChatRun();
+    const finished = run.start(
+      { prompt: 'привет', cwd: process.cwd(), command: 'fake-cli' },
+      () => undefined,
+    );
+    // Синхронно, до первого await внутри start: spawn идёт раньше разбора потока.
+    expect(run.pid).toBe(4242);
+
+    process.nextTick(() => {
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', 0);
+    });
+    await finished;
   });
 });

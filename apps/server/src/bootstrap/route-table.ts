@@ -26,6 +26,7 @@ import { registerChatRoutes } from '../routes/chat-routes.ts';
 import { registerChatSplitRoutes } from '../routes/chat/split-routes.ts';
 import { registerChatCascadeRoutes } from '../routes/chat/cascade-routes.ts';
 import { registerChatHandoffRoutes } from '../routes/chat/handoff-routes.ts';
+import { registerChatTreeRoutes } from '../routes/chat/tree-routes.ts';
 import { registerSandboxRoutes } from '../routes/sandbox-routes.ts';
 import { registerResourceRoutes } from '../routes/resource-routes.ts';
 import { registerBackupRoutes } from '../routes/backup-routes.ts';
@@ -59,6 +60,10 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     chatSession,
     providerChats,
     handoffChains,
+    treePause,
+    splitConveyor,
+    splitOverlap,
+    splitReview,
     projectRunner,
     projectTestRuns,
     projectTestManual,
@@ -116,7 +121,15 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
         runs: chatRuns,
         providerChats,
         session: chatSession,
+        gate: treePause,
+        conveyor: splitConveyor,
+        overlap: splitOverlap,
+        review: splitReview,
       }),
+    // Пауза дерева: «Остановить всё» / «Продолжить всё» у родителя и само
+    // дерево для пульта. Объект переживает запрос — он же глушит автостарты.
+    (instance, context) =>
+      registerChatTreeRoutes(instance, context, treePause, (ids) => splitConveyor.view(ids)),
     // Продолжение в чистой сессии: маршруты заводят новый разговор по кнопке, а
     // цепочки (тумблер автомата и номер шага) переживают запрос — как и реестр.
     (instance, context) =>

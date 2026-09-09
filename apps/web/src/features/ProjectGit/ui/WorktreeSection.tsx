@@ -9,9 +9,18 @@ import { toast } from '@shared/lib/toast';
 import { toErrorMessage } from '@shared/api/client';
 import { workspace, normalizeProjectPath, projectShortName } from '@shared/lib/workspace';
 import { isLive, useProjectStatuses } from '@shared/lib/agent-runs';
-import { useProjectWorktrees, useAddWorktree, useRemoveWorktree } from '@entities/ProjectGit';
-import type { ProjectWorktree } from '@entities/ProjectGit';
+import {
+  useProjectWorktrees,
+  useAddWorktree,
+  useRemoveWorktree,
+  useMirrorWorktree,
+  useBootstrapWorktree,
+} from '@entities/ProjectGit';
+import type { ProjectWorktree, WorktreeMirrorReport as MirrorReport } from '@entities/ProjectGit';
 import type { WorktreeSectionProps } from './WorktreeSection.types';
+import { WorktreeMirrorReport } from './WorktreeMirrorReport';
+import { WorktreeMirrorSettings } from './WorktreeMirrorSettings';
+import { WorktreeBootstrapCard } from './WorktreeBootstrapCard';
 import styles from './WorktreeSection.module.scss';
 
 /**
@@ -30,6 +39,10 @@ import styles from './WorktreeSection.module.scss';
  * Кнопка «убрать» выключена, пока в копии работает агент: снести каталог из-под
  * живого процесса — потерять его работу молча. Сервер отвечает тем же отказом,
  * так что запрет держится и для телефона.
+ *
+ * Локальный слой (`.mcp.json` под skip-worktree, `.claude/`, `.env`, `.agent/`)
+ * сервер переносит в копию сам при создании; кнопка «Обновить локальный слой»
+ * повторяет перенос в уже живую копию, а отчёт о нём ложится под её карточку.
  */
 /** Тон значка по состоянию агента в копии — тот же язык цвета, что и в пульте. */
 const STATUS_TONE = {
@@ -47,15 +60,22 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
   // Копия, которую git отказался убрать из-за незакоммиченной работы: для неё
   // (и только для неё) показываем повторную кнопку, уже с force.
   const [forceFor, setForceFor] = useState<string | undefined>(undefined);
+  // Последний отчёт зеркала и копия, к которой он относится. Один на раздел:
+  // отчёт — событие, а не свойство копии, и к следующему зеркалу приходит новый.
+  const [mirrorReport, setMirrorReport] = useState<
+    { path: string; report: MirrorReport } | undefined
+  >(undefined);
 
   const worktrees = useProjectWorktrees(path);
   const add = useAddWorktree();
   const remove = useRemoveWorktree();
+  const mirror = useMirrorWorktree();
+  const bootstrap = useBootstrapWorktree();
 
   const info = worktrees.data;
   if (!info?.isRepo || info.error) return null;
 
-  const pending = add.isPending || remove.isPending;
+  const pending = add.isPending || remove.isPending || mirror.isPending || bootstrap.isPending;
   const list = info.worktrees;
 
   const openTab = (target: string): void => {
@@ -71,6 +91,9 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
         onSuccess: (result) => {
           setName('');
           toast.success(result.output);
+          if (result.mirror && result.createdPath) {
+            setMirrorReport({ path: result.createdPath, report: result.mirror });
+          }
           // Копия заведена — сразу открываем её вкладкой: ради этого всё и
           // затевалось, а искать её потом в списке — лишний шаг.
           if (result.createdPath) openTab(result.createdPath);
@@ -94,6 +117,29 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
           setForceFor(worktree.path);
           toast.error(toErrorMessage(error));
         },
+      },
+    );
+  };
+
+  const onMirror = (worktree: ProjectWorktree): void => {
+    mirror.mutate(
+      { path, worktreePath: worktree.path },
+      {
+        onSuccess: (result) => {
+          toast.success(result.output);
+          if (result.mirror) setMirrorReport({ path: worktree.path, report: result.mirror });
+        },
+        onError: (error) => toast.error(toErrorMessage(error)),
+      },
+    );
+  };
+
+  const onBootstrap = (worktree: ProjectWorktree): void => {
+    bootstrap.mutate(
+      { path, worktreePath: worktree.path },
+      {
+        onSuccess: (result) => toast.success(result.output),
+        onError: (error) => toast.error(toErrorMessage(error)),
       },
     );
   };
@@ -131,10 +177,22 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
                 {worktree.path}
               </span>
 
-              <Stack direction="row" gap="var(--spacing-3xs)">
+              <Stack direction="row" gap="var(--spacing-3xs)" wrap>
                 <Button variant="ghost" size="sm" onClick={() => openTab(worktree.path)}>
                   {t('git.worktrees.open')}
                 </Button>
+                {!worktree.isMain && !worktree.prunable && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy || pending}
+                    title={t('git.worktrees.mirrorHint')}
+                    leftIcon={<Icon name="refresh" size={16} />}
+                    onClick={() => onMirror(worktree)}
+                  >
+                    {t('git.worktrees.mirror')}
+                  </Button>
+                )}
                 {!worktree.isMain && (
                   <Button
                     variant="ghost"
@@ -158,6 +216,21 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
                   </Button>
                 )}
               </Stack>
+
+              {!worktree.isMain && (
+                <WorktreeBootstrapCard
+                  path={path}
+                  worktree={worktree}
+                  disabled={busy || pending}
+                  onRerun={() => onBootstrap(worktree)}
+                />
+              )}
+              {mirrorReport?.path === worktree.path && (
+                <WorktreeMirrorReport
+                  report={mirrorReport.report}
+                  onClose={() => setMirrorReport(undefined)}
+                />
+              )}
             </div>
           );
         })}
@@ -186,6 +259,8 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
       <Typography variant="caption" color="subtle">
         {t('git.worktrees.note')}
       </Typography>
+
+      <WorktreeMirrorSettings path={path} disabled={busy || pending} />
     </Stack>
   );
 }

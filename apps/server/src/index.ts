@@ -10,6 +10,7 @@ import { detectProviders } from './providers/detect.ts';
 import { autostartProjects } from './domains/project-runner.ts';
 import { buildDlpRuntime } from './domains/dlp.ts';
 import { gatewayPricing } from './domains/platform/spend.ts';
+import { reconcileActivePlatform } from './domains/platform/activation.ts';
 import { startSandboxHousekeeping } from './domains/sandbox/SandboxConfig.ts';
 import { createRuntime, installShutdownHandlers } from './bootstrap/runtime.ts';
 import { buildRouteTable } from './bootstrap/route-table.ts';
@@ -118,6 +119,13 @@ if (ctx.store.getSettings().dlp.enabled) {
     dlpNote = `Защита данных НЕ поднялась: ${error instanceof Error ? error.message : String(error)}`;
   }
 }
+
+// Инвариант 1 сводится ЗДЕСЬ, на каждом старте, а не только на первом после
+// Т2: настройки правит не одна панель — снимок с чужой машины и архив переноса
+// приносят свои тумблеры. Делается ДО шлюза: тот показывает адреса по тумблерам,
+// и погасить их после того, как человек прочитал баннер, было бы поздно. Сети
+// здесь нет: только состояние панели.
+reconcileActivePlatform(ctx.store);
 
 // Шлюз контуров — по тому же доводу, и по своему: адрес шлюза уже вписан в
 // конфигурацию CLI, а ключ контура есть только у панели. Не поднявшийся шлюз

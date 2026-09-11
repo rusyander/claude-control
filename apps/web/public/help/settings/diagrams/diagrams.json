@@ -1,0 +1,15 @@
+{
+  "topic": "settings",
+  "source": "docs/diagrams/settings-guide/settings-guide.drawio",
+  "pages": [
+    {
+      "name": "what-happens-before-a-write",
+      "file": "what-happens-before-a-write.png",
+      "page": 1,
+      "source": "19c98290b1415495",
+      "width": 1507,
+      "height": 918,
+      "exportedAt": "2026-09-11T15:24:06.129Z"
+    }
+  ]
+}

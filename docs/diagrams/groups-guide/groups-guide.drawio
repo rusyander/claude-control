@@ -1,0 +1,323 @@
+<mxfile host="app.diagrams.net" version="24.7.7">
+  <diagram id="p1" name="1. Две отметки выключения">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1520" pageHeight="1460" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p1:title" value="Почему включённая группа не всё оживляет" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="1340" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:sub" value="Тумблер на экране один, а отметок за ним две: ручная и групповая. Участник действует, только когда снята ручная И его не держит ни одна группа." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="1340" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:manual" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Тумблер участника&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;На его собственной странице: «Правила», «Скиллы», «Хуки», «MCP-серверы», «Права».&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Ставит ОДНУ отметку — ручную. Она не привязана ни к какой группе и снимается только тем же тумблером.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="150" width="420" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:manual:icon" value="вы" style="shape=card;fillColor=#FFFFFF;strokeColor=#43A047;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1B5E20;informational=1;" vertex="1" parent="p1:manual">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:group" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Тумблер группы&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Гасит весь набор разом — ради этого группы и заводят.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Ставит отметку «погашено этой группой» на каждый лист состава, разворачивая вложенные группы до самого низа.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="150" width="420" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:group:icon" value="вы" style="shape=card;fillColor=#FFFFFF;strokeColor=#43A047;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1B5E20;informational=1;" vertex="1" parent="p1:group">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:auto" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Включение по каталогу&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Прогон начался в привязанном проекте — сервер включает группу тем же кодом, что и рука.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Копия ветки «&amp;lt;репозиторий&amp;gt;-worktrees/&amp;lt;ветка&amp;gt;» считается тем же проектом.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Обратно не выключает НИКОГДА: файлы конфигурации общие, а прогонов идёт несколько сразу.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="150" width="400" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:auto:icon" value="API" style="shape=hexagon;fillColor=#FFFFFF;strokeColor=#7E57C2;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#4527A0;informational=1;" vertex="1" parent="p1:auto">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:state" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Состояние панели: две независимые отметки&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Ручная — отдельно, групповые — списком: на одном участнике их столько, в скольких группах он состоит.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Включён = ручной отметки нет И групповых не осталось ни одной.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Отсюда обе неожиданности: выключенное руками не оживает от включения группы, а участник двух групп ждёт, пока его отпустят обе.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="470" width="520" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:state:icon" value="state" style="shape=cylinder3;backgroundOutline=1;size=7;fillColor=#FFFFFF;strokeColor=#7E57C2;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#4527A0;informational=1;" vertex="1" parent="p1:state">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:disk" value="" style="rounded=1;arcSize=2;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="860" y="470" width="460" height="410" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:disk:tab" value="Что «выключено» значит на диске&lt;div style=&quot;font-size:9px&quot;&gt;запись в файлы, а не флаг в интерфейсе&lt;/div&gt;" style="rounded=0;fillColor=#FB8C00;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p1:disk">
+          <mxGeometry x="10" y="10" width="440" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:disk:rule" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Правило&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Текст переезжает в служебный раздел «Отключённые правила (AgentDeck)» в конце CLAUDE.md.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p1:disk">
+          <mxGeometry x="20" y="70" width="420" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:disk:skill" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Скилл&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Папка переезжает из skills/ в соседний skills-disabled/ — целиком, со всеми файлами.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p1:disk">
+          <mxGeometry x="20" y="160" width="420" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:disk:hook" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Хук и право&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Исчезают из settings.json: Claude Code читает только то, что в файле. Панель помнит их у себя и возвращает при включении.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p1:disk">
+          <mxGeometry x="20" y="240" width="420" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:disk:mcp" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;MCP-сервер&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Выключается в своём файле конфигурации, с резервной копией перед записью.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p1:disk">
+          <mxGeometry x="20" y="330" width="420" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:local" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Хук из settings.local.json группе не подчиняется&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;В этот файл панель не пишет, поэтому выключить такой хук ей нечем — и он честно остаётся включённым.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Панель считает их отдельно и говорит об этом при переключении группы: «N участников пропущено».&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="960" width="460" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:env" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Переменные набора — по тому же правилу&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Пока группа включена, её переменные лежат в env файла settings.json.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Ключ, который вы задали руками, группа не трогает вовсе; при выключении снимаются только её ключи, которых не держит другая группа.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="580" y="960" width="460" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:one" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Один набор на машину&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Группы правят общие файлы ~/.claude, а не копию для конкретного чата.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Включили набор — его видят все идущие прогоны, включая телефон и соседний терминал.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="960" width="360" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge:p1:manual:p1:state" value="ручная отметка" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:manual" target="p1:state">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="228" y="470"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:group:p1:state" value="отметка группы — на каждый лист" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.6;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:group" target="p1:state">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="770" y="470"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:auto:p1:group" value="тем же путём, что и рука" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:auto" target="p1:group">
+          <mxGeometry relative="1" x="0" y="-88" as="geometry">
+            <Array as="points">
+            <mxPoint x="980" y="210"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:state:p1:disk" value="посчитанный итог — одна запись на&lt;br&gt;файл" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:state" target="p1:disk">
+          <mxGeometry relative="1" x="-0.82" y="-88" as="geometry">
+            <Array as="points">
+            <mxPoint x="860" y="525"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1110" width="210" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1140" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap0" value="человек и его решение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1140" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1170" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap1" value="панель и её состояние" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1170" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1200" width="30" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw2b" value="" style="rounded=0;fillColor=#FB8C00;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="1200" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap2" value="файлы на диске" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1200" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1230" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap3" value="то, о что спотыкаются" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1230" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1260" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap4" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1260" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1290" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap5" value="значок — чья это коробка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1290" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1330" as="sourcePoint"/>
+            <mxPoint x="110" y="1330" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap6" value="действие человека" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1320" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1360" as="sourcePoint"/>
+            <mxPoint x="110" y="1360" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap7" value="путь внутри панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1350" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1390" as="sourcePoint"/>
+            <mxPoint x="110" y="1390" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap8" value="запись на диск" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1380" width="150" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p2" name="2. Во что превращается набор">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1520" pageHeight="1110" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p2:title" value="Про группы Claude Code не знает" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="1340" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:sub" value="Ни группы, ни порядка работы, ни сценария в Claude Code нет. Чтобы они работали, панель собирает из них обычный скилл и обычные хуки — с меткой в команде, по которой потом отличает своё от чужого." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="1340" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:group" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Группа — запись в состоянии панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Состав, порядок, привязка к проектам, переменные и шаги лежат в state.json панели.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Сохранение группы пересобирает то, что из неё компилируется, — и только это.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="150" width="440" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:group:icon" value="state" style="shape=cylinder3;backgroundOutline=1;size=7;fillColor=#FFFFFF;strokeColor=#7E57C2;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#4527A0;informational=1;" vertex="1" parent="p2:group">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:compiled" value="" style="rounded=1;arcSize=2;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="150" width="460" height="350" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:compiled:tab" value="Что панель пишет на диск&lt;div style=&quot;font-size:9px&quot;&gt;обычные файлы Claude Code, без единой новой сущности&lt;/div&gt;" style="rounded=0;fillColor=#FB8C00;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p2:compiled">
+          <mxGeometry x="10" y="10" width="440" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:compiled:env" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Переменные → env в settings.json&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Пока группа включена. Ключ, заданный руками, остаётся за человеком.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:compiled">
+          <mxGeometry x="20" y="70" width="420" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:compiled:skill" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Шаги → скилл skills/scenario-…&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Строка «Когда применять» становится описанием скилла — по ней Claude решает, браться ли за порядок работы.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Скилл добавляется в группу участником и гаснет вместе с ней.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:compiled">
+          <mxGeometry x="20" y="150" width="420" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:compiled:trigger" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Триггер → хук UserPromptSubmit&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Регулярное выражение по тексту запроса: рядом со скиллом кладётся trigger.mjs, а в settings.json — хук с меткой «agentdeck:scenario:&amp;lt;id&amp;gt;» в команде.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Описание скилла лишь предлагает себя модели; триггер напоминает о порядке работы сам.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:compiled">
+          <mxGeometry x="20" y="250" width="420" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:form" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Сценарий «когда — что»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Событие, фильтр и команда — отдельно от групп, своим списком внизу страницы.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Он не даёт ничего сверх хуков: избавляет от необходимости помнить, какое событие и какой фильтр писать.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="150" width="380" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:form:icon" value="вы" style="shape=card;fillColor=#FFFFFF;strokeColor=#43A047;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1B5E20;informational=1;" vertex="1" parent="p2:form">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:automation" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Хук в settings.json&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Та же запись, что у написанного руками, плюс метка «agentdeck:automation:&amp;lt;id&amp;gt;» в команде.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Поэтому сценарий работает ровно так же, как хук, и виден на странице «Хуки».&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="330" width="380" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:automation:icon" value="json" style="shape=note;size=14;fillColor=#FFFFFF;strokeColor=#FB8C00;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#EF6C00;informational=1;" vertex="1" parent="p2:automation">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:marker" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Метка в команде — не украшение&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;По ней пересборка находит СВОИ записи и не трогает чужие: хук, написанный руками, переживает любое сохранение группы.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Убрали шаги или удалили группу — уходит ровно помеченная запись, соседние остаются.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="580" width="460" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:rename" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Скилл сценария не переименовывается&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Имя скилла считается один раз, при первой компиляции, и дальше не пересчитывается.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Иначе переименование группы оставило бы на диске второй, осиротевший скилл — и он продолжал бы предлагать себя модели.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="580" y="580" width="460" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:cli" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Claude Code видит обычный набор&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Скиллы, хуки, права и переменные — и ничего о том, что их собрала панель.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Значит, разобраться в них можно и без неё: файлы остаются читаемыми руками.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="580" width="360" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:cli:icon" value="CLI" style="shape=process;fillColor=#FFFFFF;strokeColor=#EC407A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#AD1457;informational=1;" vertex="1" parent="p2:cli">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge:p2:group:p2:compiled" value="сохранение пересобирает" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=1;exitY=0.4;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:group" target="p2:compiled">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="500" y="255"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p2:form:p2:automation" value="сохранение" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:form" target="p2:automation">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p2:compiled:p2:cli" value="читается при старте сессии" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:compiled" target="p2:cli">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="1172" y="500"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p2:automation:p2:cli" value="срабатывает на событии" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:automation" target="p2:cli">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="1270" y="580"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="730" width="210" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="760" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap0" value="человек и его решение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="760" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="790" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap1" value="панель и её состояние" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="790" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="820" width="30" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw2b" value="" style="rounded=0;fillColor=#FB8C00;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="820" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap2" value="файлы на диске" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="820" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="850" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap3" value="агентный CLI" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="850" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="880" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap4" value="то, о что спотыкаются" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="880" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="910" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap5" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="910" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw6" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="940" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap6" value="значок — чья это коробка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="940" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="980" as="sourcePoint"/>
+            <mxPoint x="110" y="980" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2:legend:cap7" value="действие человека" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="970" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1010" as="sourcePoint"/>
+            <mxPoint x="110" y="1010" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2:legend:cap8" value="запись на диск" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1000" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1040" as="sourcePoint"/>
+            <mxPoint x="110" y="1040" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2:legend:cap9" value="дальше по пути" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1030" width="150" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

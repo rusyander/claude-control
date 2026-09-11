@@ -1,0 +1,78 @@
+{
+  "topic": "prompts",
+  "scenario": "library",
+  "frames": [
+    {
+      "id": "01-list",
+      "side": "panel",
+      "file": "01-list.png",
+      "masked": 0,
+      "width": 1116,
+      "height": 368,
+      "shotAt": "2026-09-11T18:30:10.614Z",
+      "text": "Промпты приложения Тексты, которыми панель разговаривает с моделью не от вашего имени. Встроенный текст приезжает вместе с панелью; ваша правка лежит отдельно и обновление панели её не трогает. Протокол инструментов Как модель без своих инструментов вызывает их текстом, а панель превращает вызов в настоящий. 2785 Б Открыть Агент через контур Короткий системный промпт прогона через контур: он заменяет собственный промпт CLI. 2087 Б Открыть Преамбула контура Чем контур отличается от прямого запроса к вендору — в начале разговора. 1500 Б Открыть Картинка Просьба человека превращается в задание генератору изображений. 1880 Б Открыть Презентация Тема превращается в слайды: заголовки, пункты, заметки докладчику. 2110 Б Открыть",
+      "en": {
+        "file": "01-list.en.png",
+        "masked": 0,
+        "width": 1116,
+        "height": 348,
+        "shotAt": "2026-09-11T18:30:29.164Z",
+        "text": "Application prompts The texts the panel speaks to the model with, not on your behalf. The built-in text ships with the panel; your edit lives separately and a panel update leaves it alone. Tool protocol How a model with no tools of its own calls them in text, and the panel turns that into a real call. 2785 B Open Agent behind a contour The short system prompt of a run through a contour: it replaces the CLI’s own prompt. 2087 B Open Contour preamble How a contour differs from a direct vendor request — said up front. 1500 B Open Image A person’s request becomes a task for an image generator. 1880 B Open Presentation A topic becomes slides: titles, bullets, speaker notes. 2110 B Open"
+      }
+    },
+    {
+      "id": "02-builtin",
+      "side": "panel",
+      "file": "02-builtin.png",
+      "masked": 0,
+      "width": 1116,
+      "height": 801,
+      "shotAt": "2026-09-11T18:30:13.058Z",
+      "text": "Промпты приложения Тексты, которыми панель разговаривает с моделью не от вашего имени. Встроенный текст приезжает вместе с панелью; ваша правка лежит отдельно и обновление панели её не трогает. Протокол инструментов Как модель без своих инструментов вызывает их текстом, а панель превращает вызов в настоящий. 2785 Б Открыть Агент через контур Короткий системный промпт прогона через контур: он заменяет собственный промпт CLI. 2087 Б Закрыть Преамбула контура Чем контур отличается от прямого запроса к вендору — в начале разговора. 1500 Б Открыть Картинка Просьба человека превращается в задание генератору изображений. 1880 Б Открыть Презентация Тема превращается в слайды: заголовки, пункты, заметки докладчику. 2110 Б Открыть Агент через контур Версия встроенного текста: 1. Сохранённая правка уезжает модели целиком, как написана. Сохранить Сбросить к встроенному Сейчас работает встроенный текст",
+      "en": {
+        "file": "02-builtin.en.png",
+        "masked": 0,
+        "width": 1116,
+        "height": 782,
+        "shotAt": "2026-09-11T18:30:31.622Z",
+        "text": "Application prompts The texts the panel speaks to the model with, not on your behalf. The built-in text ships with the panel; your edit lives separately and a panel update leaves it alone. Tool protocol How a model with no tools of its own calls them in text, and the panel turns that into a real call. 2785 B Open Agent behind a contour The short system prompt of a run through a contour: it replaces the CLI’s own prompt. 2087 B Close Contour preamble How a contour differs from a direct vendor request — said up front. 1500 B Open Image A person’s request becomes a task for an image generator. 1880 B Open Presentation A topic becomes slides: titles, bullets, speaker notes. 2110 B Open Agent behind a contour Built-in text version: 1. A saved edit goes to the model exactly as written. Save Reset to built-in The built-in text is in use"
+      }
+    },
+    {
+      "id": "03-edited",
+      "side": "panel",
+      "file": "03-edited.png",
+      "masked": 0,
+      "width": 1116,
+      "height": 801,
+      "shotAt": "2026-09-11T18:30:16.724Z",
+      "text": "Промпты приложения Тексты, которыми панель разговаривает с моделью не от вашего имени. Встроенный текст приезжает вместе с панелью; ваша правка лежит отдельно и обновление панели её не трогает. Протокол инструментов Как модель без своих инструментов вызывает их текстом, а панель превращает вызов в настоящий. 2785 Б Открыть Агент через контур Короткий системный промпт прогона через контур: он заменяет собственный промпт CLI. Изменён 2210 Б Закрыть Преамбула контура Чем контур отличается от прямого запроса к вендору — в начале разговора. 1500 Б Открыть Картинка Просьба человека превращается в задание генератору изображений. 1880 Б Открыть Презентация Тема превращается в слайды: заголовки, пункты, заметки докладчику. 2110 Б Открыть Агент через контур Версия встроенного текста: 1. Сохранённая правка уезжает модели целиком, как написана. Сохранить Сбросить к встроенному",
+      "en": {
+        "file": "03-edited.en.png",
+        "masked": 0,
+        "width": 1116,
+        "height": 782,
+        "shotAt": "2026-09-11T18:30:35.290Z",
+        "text": "Application prompts The texts the panel speaks to the model with, not on your behalf. The built-in text ships with the panel; your edit lives separately and a panel update leaves it alone. Tool protocol How a model with no tools of its own calls them in text, and the panel turns that into a real call. 2785 B Open Agent behind a contour The short system prompt of a run through a contour: it replaces the CLI’s own prompt. Edited 2159 B Close Contour preamble How a contour differs from a direct vendor request — said up front. 1500 B Open Image A person’s request becomes a task for an image generator. 1880 B Open Presentation A topic becomes slides: titles, bullets, speaker notes. 2110 B Open Agent behind a contour Built-in text version: 1. A saved edit goes to the model exactly as written. Save Reset to built-in"
+      }
+    },
+    {
+      "id": "04-reset",
+      "side": "panel",
+      "file": "04-reset.png",
+      "masked": 0,
+      "width": 1116,
+      "height": 801,
+      "shotAt": "2026-09-11T18:30:19.673Z",
+      "text": "Промпты приложения Тексты, которыми панель разговаривает с моделью не от вашего имени. Встроенный текст приезжает вместе с панелью; ваша правка лежит отдельно и обновление панели её не трогает. Протокол инструментов Как модель без своих инструментов вызывает их текстом, а панель превращает вызов в настоящий. 2785 Б Открыть Агент через контур Короткий системный промпт прогона через контур: он заменяет собственный промпт CLI. 2087 Б Закрыть Преамбула контура Чем контур отличается от прямого запроса к вендору — в начале разговора. 1500 Б Открыть Картинка Просьба человека превращается в задание генератору изображений. 1880 Б Открыть Презентация Тема превращается в слайды: заголовки, пункты, заметки докладчику. 2110 Б Открыть Агент через контур Версия встроенного текста: 1. Сохранённая правка уезжает модели целиком, как написана. Сохранить Сбросить к встроенному Сейчас работает встроенный текст",
+      "en": {
+        "file": "04-reset.en.png",
+        "masked": 0,
+        "width": 1116,
+        "height": 782,
+        "shotAt": "2026-09-11T18:30:38.222Z",
+        "text": "Application prompts The texts the panel speaks to the model with, not on your behalf. The built-in text ships with the panel; your edit lives separately and a panel update leaves it alone. Tool protocol How a model with no tools of its own calls them in text, and the panel turns that into a real call. 2785 B Open Agent behind a contour The short system prompt of a run through a contour: it replaces the CLI’s own prompt. 2087 B Close Contour preamble How a contour differs from a direct vendor request — said up front. 1500 B Open Image A person’s request becomes a task for an image generator. 1880 B Open Presentation A topic becomes slides: titles, bullets, speaker notes. 2110 B Open Agent behind a contour Built-in text version: 1. A saved edit goes to the model exactly as written. Save Reset to built-in The built-in text is in use"
+      }
+    }
+  ]
+}

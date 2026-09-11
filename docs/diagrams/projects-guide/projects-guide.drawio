@@ -1,0 +1,318 @@
+<mxfile host="app.diagrams.net" version="24.7.7">
+  <diagram id="p1" name="1. Реестр и файлы проекта">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1460" pageHeight="1440" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p1:title" value="Что «добавить проект» делает с диском" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="1340" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:sub" value="Запись о проекте уходит в состояние панели. В самом репозитории от добавления не появляется ничего — файлы правятся только тогда, когда вы что-то сохраняете на вкладке." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="1340" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:add" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;«Добавить проект» → «Открыть эту папку»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Обзор дисков панели: любая папка, даже та, где Claude Code ещё не работал.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Имя проекта — последний сегмент пути; его можно переименовать, путь останется прежним.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="150" width="380" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:add:icon" value="вы" style="shape=card;fillColor=#FFFFFF;strokeColor=#43A047;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1B5E20;informational=1;" vertex="1" parent="p1:add">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:registry" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Реестр панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Запись «id, имя, путь» в state.json каталога данных панели — рядом с группами, а не в проекте.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Удаление проекта из списка убирает только эту запись: файлы остаются на диске нетронутыми.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="150" width="400" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:registry:icon" value="state" style="shape=cylinder3;backgroundOutline=1;size=7;fillColor=#FFFFFF;strokeColor=#7E57C2;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#4527A0;informational=1;" vertex="1" parent="p1:registry">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:nothing" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;В репозитории — ничего нового&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Ни CLAUDE.md, ни .claude/ добавление не создаёт. Каталог .claude появляется при ПЕРВОЙ записи на вкладке «Права».&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Поэтому пустые вкладки у только что добавленного проекта — норма, а не потерянная конфигурация.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="150" width="400" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:edit" value="" style="rounded=1;arcSize=2;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="420" width="440" height="370" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:edit:tab" value="Панель правит&lt;div style=&quot;font-size:9px&quot;&gt;файлы в каталоге проекта, каждый со своей вкладки&lt;/div&gt;" style="rounded=0;fillColor=#FB8C00;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p1:edit">
+          <mxGeometry x="10" y="10" width="420" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:edit:md" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;CLAUDE.md в корне — вкладка «Правила»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Текст целиком, одним полем: отдельных правил, тумблеров и групп у проектного уровня нет.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Перед записью — резервная копия под именем project-&amp;lt;id&amp;gt;-CLAUDE.md, чтобы она не смешалась с копиями личного файла.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p1:edit">
+          <mxGeometry x="20" y="70" width="400" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:edit:mcp" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;.mcp.json в корне — вкладка «MCP-серверы»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Серверы проекта: тот же формат, что у личных, и тот же редактор.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Файл лежит в корне репозитория и обычно коммитится — правка видна всей команде.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p1:edit">
+          <mxGeometry x="20" y="180" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:edit:settings" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;.claude/settings.json — вкладка «Права»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Разрешено, спросить, запрещено — список шаблонов проекта.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Запись с пометкой «личное» уходит в .claude/settings.local.json: этот файл в гит обычно не попадает.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p1:edit">
+          <mxGeometry x="20" y="270" width="400" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:read" value="" style="rounded=1;arcSize=2;fillColor=#E0F2F1;strokeColor=#26A69A;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="420" width="440" height="360" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:read:tab" value="Панель только показывает&lt;div style=&quot;font-size:9px&quot;&gt;собственный .claude проекта — вкладка «Из проекта»&lt;/div&gt;" style="rounded=0;fillColor=#26A69A;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p1:read">
+          <mxGeometry x="10" y="10" width="420" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:read:skills" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;.claude/skills/ — скиллы репозитория&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Имя, описание, число файлов и пометка «выключен» — всё, что видно.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Тумблера нет: набор принадлежит гиту проекта и правится там, как остальной код.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#26A69A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p1:read">
+          <mxGeometry x="20" y="70" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:read:hooks" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;.claude/hooks/ и хуки из settings.json&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Событие, фильтр, команда и имя файла настроек, из которого хук пришёл.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Ссылка на скрипт, которого нет на диске, помечается «скрипт не найден» — молча такое не находят.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#26A69A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p1:read">
+          <mxGeometry x="20" y="160" width="400" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:read:rules" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;.claude/rules/ — файлы правил&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Заголовок, путь файла и маски путей, к которым правило привязано.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Текст раскрывается кнопкой рядом с заголовком; вложенные каталоги показываются путём, а не только именем.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#26A69A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p1:read">
+          <mxGeometry x="20" y="260" width="400" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:cli" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Claude Code в этом каталоге&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;При старте сессии читает личный уровень (~/.claude) И проектный — оба набора складываются в один.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Открытая сессия новую редакцию не увидит: файлы читаются один раз при запуске.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="880" width="440" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:cli:icon" value="CLI" style="shape=process;fillColor=#FFFFFF;strokeColor=#EC407A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#AD1457;informational=1;" vertex="1" parent="p1:cli">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:levels" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Выключить проектное нечем&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Тумблеры, группы и песочница есть у личного уровня. У проектного их нет ни на одной вкладке.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Единственный способ убрать проектное правило или хук — изменить файл репозитория: это решение команды, а не панели.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="880" width="440" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:git" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Это обычные файлы репозитория&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Правка из панели, правка руками и правка, сделанная самим агентом, видны здесь одинаково — своей базы у панели нет.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Сохранение — это коммитируемое изменение в чужом рабочем дереве: оно уедет в ветку вместе с кодом.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="880" width="400" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge:p1:add:p1:registry" value="открыть папку как проект" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:add" target="p1:registry">
+          <mxGeometry relative="1" x="0" y="-66" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:registry:p1:edit" value="сохранение на вкладке — с&lt;br&gt;резервной копией" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:registry" target="p1:edit">
+          <mxGeometry relative="1" x="0" y="66" as="geometry">
+            <Array as="points">
+            <mxPoint x="368" y="240"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:registry:p1:read" value="чтение, без единой записи" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.4;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:registry" target="p1:read">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="840" y="420"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:edit:p1:cli" value="читается при старте сессии" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:edit" target="p1:cli">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:read:p1:cli" value="подхватывается тем же стартом" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:read" target="p1:cli">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="648" y="840"/>
+            <mxPoint x="600" y="840"/>
+            <mxPoint x="412" y="840"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1030" width="240" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1060" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap0" value="человек и его решение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1060" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1090" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap1" value="панель и её состояние" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1090" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1120" width="30" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw2b" value="" style="rounded=0;fillColor=#FB8C00;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="1120" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap2" value="файлы, которые панель правит" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1120" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#E0F2F1;strokeColor=#26A69A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1150" width="30" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw3b" value="" style="rounded=0;fillColor=#26A69A;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="1150" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap3" value="то, что она только показывает" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1150" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1180" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap4" value="агентный CLI" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1180" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1210" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap5" value="то, о что спотыкаются" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1210" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw6" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1240" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap6" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1240" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw7" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1270" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap7" value="значок — чья это коробка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1270" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1310" as="sourcePoint"/>
+            <mxPoint x="110" y="1310" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap8" value="действие человека" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1300" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1340" as="sourcePoint"/>
+            <mxPoint x="110" y="1340" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap9" value="запись на диск" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1330" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1370" as="sourcePoint"/>
+            <mxPoint x="110" y="1370" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap10" value="чтение и путь дальше" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1360" width="180" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p2" name="2. Тот же проект у другого CLI">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1460" pageHeight="1340" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p2:title" value="Один реестр — разные файлы" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="1340" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:sub" value="Запись о проекте общая для всех CLI. Вкладки его карточки называются файлами активного: у каждого CLI свой файл инструкций и свой формат конфига." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="1340" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:registry" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Реестр панели: путь и имя&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Одна запись на проект. Смена активного CLI её не трогает — список проектов остаётся тем же.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Активный CLI выбирается в «Настройки → Провайдеры», и карточка проекта перерисовывается под него.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="130" width="440" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:registry:icon" value="state" style="shape=cylinder3;backgroundOutline=1;size=7;fillColor=#FFFFFF;strokeColor=#7E57C2;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#4527A0;informational=1;" vertex="1" parent="p2:registry">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:claude" value="" style="rounded=1;arcSize=2;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="420" width="440" height="400" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:claude:tab" value="Claude Code&lt;div style=&quot;font-size:9px&quot;&gt;вкладки: Правила · MCP-серверы · Права · Из проекта&lt;/div&gt;" style="rounded=0;fillColor=#EC407A;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p2:claude">
+          <mxGeometry x="10" y="10" width="420" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:claude:md" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;CLAUDE.md&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Инструкции проекта. Правятся текстом целиком, с резервной копией перед записью.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:claude">
+          <mxGeometry x="20" y="70" width="400" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:claude:mcp" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;.mcp.json — формат JSON&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Серверы проекта в корне репозитория.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:claude">
+          <mxGeometry x="20" y="150" width="400" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:claude:perm" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;.claude/settings.json&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Права проекта; записи с пометкой «личное» — в .claude/settings.local.json.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:claude">
+          <mxGeometry x="20" y="230" width="400" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:claude:local" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Вкладка «Из проекта» — только у Claude&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Собственный .claude репозитория: скиллы, хуки, файлы правил. У остальных CLI такой вкладки нет вовсе.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:claude">
+          <mxGeometry x="20" y="310" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:codex" value="" style="rounded=1;arcSize=2;fillColor=#E3F2FD;strokeColor=#42A5F5;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="420" width="440" height="340" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:codex:tab" value="Codex CLI (пример чужого)&lt;div style=&quot;font-size:9px&quot;&gt;вкладки: AGENTS.md · MCP-серверы&lt;/div&gt;" style="rounded=0;fillColor=#42A5F5;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p2:codex">
+          <mxGeometry x="10" y="10" width="420" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:codex:md" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1565C0;text-align:left&quot;&gt;AGENTS.md&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Тот же проект, другой файл инструкций. Панель прямо называет его в шапке вкладки и в подсказке о перезапуске.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#42A5F5;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:codex">
+          <mxGeometry x="20" y="70" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:codex:mcp" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1565C0;text-align:left&quot;&gt;.codex/config.toml — формат TOML&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Серверы того же проекта, но другой файл и другой синтаксис: панель пишет в его формате, а не в JSON.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#42A5F5;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:codex">
+          <mxGeometry x="20" y="160" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:codex:sections" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1565C0;text-align:left&quot;&gt;Список вкладок решает сервер&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Разделы приходят от панели по возможностям провайдера, а не подбираются в браузере: чего у CLI нет, того и не покажут.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#42A5F5;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:codex">
+          <mxGeometry x="20" y="250" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:apart" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Файлы не связаны между собой&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Правка CLAUDE.md не попадает в AGENTS.md и наоборот: это два разных файла одного репозитория.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Проект, с которым работают двумя CLI, инструкции держит в двух местах — и расходятся они молча.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="900" width="440" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:restart" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Перезапуск называется по имени CLI&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Строка под редактором говорит «изменения применятся после перезапуска Codex CLI» — именно того CLI, чей файл вы только что сохранили.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="900" width="440" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:experimental" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Полоса «экспериментально»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Проверен и поддержан полностью только Claude Code. У остальных CLI панель честно предупреждает об этом сверху страницы.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="130" width="340" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge:p2:registry:p2:claude" value="активный CLI — Claude Code" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:registry" target="p2:claude">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="368" y="220"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p2:registry:p2:codex" value="активный CLI — другой" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.4;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:registry" target="p2:codex">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="912" y="420"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1050" width="210" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1080" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap0" value="панель и её состояние" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1080" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1110" width="30" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw1b" value="" style="rounded=0;fillColor=#EC407A;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="1110" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap1" value="файлы Claude Code" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1110" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#E3F2FD;strokeColor=#42A5F5;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1140" width="30" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw2b" value="" style="rounded=0;fillColor=#42A5F5;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="1140" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap2" value="файлы чужого CLI" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1140" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1170" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap3" value="то, о что спотыкаются" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1170" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1200" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap4" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1200" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1230" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap5" value="значок — чья это коробка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1230" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1270" as="sourcePoint"/>
+            <mxPoint x="110" y="1270" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2:legend:cap6" value="что показывает карточка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1260" width="150" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

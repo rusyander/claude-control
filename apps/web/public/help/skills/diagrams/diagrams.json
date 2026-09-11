@@ -1,0 +1,24 @@
+{
+  "topic": "skills",
+  "source": "docs/diagrams/skills-guide/skills-guide.drawio",
+  "pages": [
+    {
+      "name": "skill-pickup",
+      "file": "skill-pickup.png",
+      "page": 1,
+      "source": "a82de0256a4834b4",
+      "width": 1497,
+      "height": 948,
+      "exportedAt": "2026-09-11T15:05:10.848Z"
+    },
+    {
+      "name": "skill-on-disk",
+      "file": "skill-on-disk.png",
+      "page": 2,
+      "source": "44640248323abe05",
+      "width": 1497,
+      "height": 898,
+      "exportedAt": "2026-09-11T15:05:13.905Z"
+    }
+  ]
+}

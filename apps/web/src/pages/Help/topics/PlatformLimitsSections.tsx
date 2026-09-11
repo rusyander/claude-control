@@ -24,7 +24,11 @@ export function PlatformLimitsSections({ tr }: SectionProps) {
     { label: tr('workAgent'), mark: 'yes' },
     { label: tr('workBridge'), mark: 'yes' },
     { label: tr('workCliChat'), mark: 'partial' },
-    { label: tr('workCliAgent'), mark: 'no' },
+    // «Частично», а не «да»: руки у агента через контур появились прослойкой
+    // (Т5), но послушается ли модель протокола — её дело, и ход без вызова
+    // выглядит удачным. Обещать здесь «работает» значило бы скрыть ровно ту
+    // разницу, ради которой человек сюда и пришёл.
+    { label: tr('workCliAgent'), mark: 'partial' },
   ];
 
   return (
@@ -111,13 +115,33 @@ export function PlatformLimitsSections({ tr }: SectionProps) {
               name: tr('workCliAgent'),
               description: tr('workCliAgentWhy'),
               isMono: false,
-              badge: tr('worksBadgeNo'),
-              badgeTone: 'danger',
+              badge: tr('worksBadgePartial'),
+              badgeTone: 'warning',
             },
           ]}
         />
         <Callout tone="warning" title={tr('worksHonestTitle')}>
           {tr('worksHonestText')}
+        </Callout>
+      </HelpSection>
+
+      {/* Отдельным разделом, а не строкой в таблице: прослойка — единственное
+          место, где панель делает за человека что-то, о чём он обязан знать
+          заранее, и цена хода тоже его. */}
+      <HelpSection title={tr('shimTitle')} caption={tr('shimCaption')}>
+        <FieldTable
+          nameHeader={tr('shimColumn')}
+          descriptionHeader={tr('shimMeaningColumn')}
+          rows={[
+            { name: tr('shimUp'), description: tr('shimUpText'), isMono: false },
+            { name: tr('shimDown'), description: tr('shimDownText'), isMono: false },
+            { name: tr('shimPrice'), description: tr('shimPriceText'), isMono: false },
+            { name: tr('shimPrompt'), description: tr('shimPromptText'), isMono: false },
+            { name: tr('shimOff'), description: tr('shimOffText'), isMono: false },
+          ]}
+        />
+        <Callout tone="warning" title={tr('shimWarnTitle')}>
+          {tr('shimWarnText')}
         </Callout>
       </HelpSection>
 
@@ -140,6 +164,10 @@ export function PlatformLimitsSections({ tr }: SectionProps) {
       <HelpSection title={tr('disableTitle')} caption={tr('disableCaption')}>
         <StepList
           steps={[
+            // Самое узкое действие стоит первым (Т3): снятая галочка потребителя
+            // не трогает ни файлы CLI, ни идущие прогоны, и человеку стоит
+            // узнать о ней раньше, чем об откате применения.
+            { title: tr('disableStep0'), text: tr('disableStep0Text') },
             { title: tr('disableStep1'), text: tr('disableStep1Text') },
             { title: tr('disableStep2'), text: tr('disableStep2Text') },
             { title: tr('disableStep3'), text: tr('disableStep3Text') },

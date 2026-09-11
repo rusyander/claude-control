@@ -1,0 +1,164 @@
+<mxfile host="app.diagrams.net" version="24.7.7">
+  <diagram id="p1" name="Где оказывается адрес">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1570" pageHeight="910" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p1:title" value="Профиль у панели, переменная у CLI" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="1240" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:sub" value="Профиль работает ровно до кнопки «Применить»: пока её не нажали, ни один CLI об этом адресе не знает." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="1240" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:profile" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Профиль в панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Название, вид API, адрес и модель. Лежат открыто в agentdeck/state.json → endpointProfiles: секрета в них нет.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Вид API решает и смысл адреса, и то, какие CLI профиль примут.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="150" width="400" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:profile:icon" value="профиль" style="shape=card;fillColor=#FFFFFF;strokeColor=#7E57C2;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#4527A0;informational=1;" vertex="1" parent="e:profile">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:token" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Токен — отдельно и зашифрованно&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;agentdeck/provider-keys.enc под ключом endpoint: плюс идентификатор профиля. Наружу отдаётся только маска; в чужой конфиг уходит исключительно по явной галочке, с предупреждением.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="290" width="400" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:token:icon" value="enc" style="shape=note;size=14;fillColor=#FFFFFF;strokeColor=#FB8C00;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#EF6C00;informational=1;" vertex="1" parent="e:token">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:probe" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;«Проверить связь»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Запрос за списком моделей — не за генерацией. Ничего не записывает ни в один CLI и ничего не стоит.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E0F2F1;strokeColor=#26A69A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="430" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:probe:icon" value="проба" style="shape=hexagon;fillColor=#FFFFFF;strokeColor=#26A69A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#00695C;informational=1;" vertex="1" parent="e:probe">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:apply" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Кнопка у принимающего CLI&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;До нажатия видно, какая переменная и в какой файл уйдёт. Перед записью снимается копия файла — как при любой другой правке конфигурации.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="150" width="460" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:apply:icon" value="применить" style="shape=process;fillColor=#FFFFFF;strokeColor=#7E57C2;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#4527A0;informational=1;" vertex="1" parent="e:apply">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:cli" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Файл окружения CLI&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;У Claude Code — ключ env в settings.json; у Qwen Code — ~/.qwen/.env; у Aider — set-env в ~/.aider.conf.yml.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Профиль ДОПОЛНЯЕТ окружение: существующие переменные переносятся целиком, одноимённые перекрываются.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="280" width="460" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:cli:icon" value="CLI" style="shape=process;fillColor=#FFFFFF;strokeColor=#EC407A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#AD1457;informational=1;" vertex="1" parent="e:cli">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:restart" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;CLI читает переменные при старте&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Запись мгновенна, но уже запущенная сессия о ней не узнает. Перезапуск CLI — единственный способ, и панель делает его не за вас.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="430" width="460" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:restart:icon" value="старт" style="shape=card;fillColor=#FFFFFF;strokeColor=#E53935;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#B71C1C;informational=1;" vertex="1" parent="e:restart">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:assistant" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Помощник панели — отдельно&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Свой переключатель в том же блоке. Выбран профиль — подсказки в формах идут по этому адресу, минуя и облако, и CLI провайдера. Ничего никуда не записывается.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="150" width="430" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:no" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Почему CLI «не принимает»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Вид API не тот, что понимает этот CLI.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Переменной адреса у него не задокументировано — адрес правится только руками в его конфиге.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Своего файла переменных окружения у него нет вовсе — писать некуда.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="280" width="430" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="e:not" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Чего профиль не делает&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Не поднимает модель по адресу, не смотрит, ЧТО уходит в запросе, и не встаёт на его пути: панель только пишет адрес, дальше CLI ходит сам.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="430" width="430" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge:e:profile:e:apply" value="адрес и модель" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" parent="1" source="e:profile" target="e:apply">
+          <mxGeometry relative="1" x="0" y="44" as="geometry">
+            <Array as="points">
+            <mxPoint x="540" y="174"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:e:token:e:probe" value="подставляется в пробу" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="e:token" target="e:probe">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:e:probe:e:profile" value="список моделей в поле" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=1;entryY=0.9;entryDx=0;entryDy=0;" edge="1" parent="1" source="e:probe" target="e:profile">
+          <mxGeometry relative="1" x="-0.48" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:e:apply:e:cli" value="запись + копия файла" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="e:apply" target="e:cli">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:e:cli:e:restart" value="увидит при старте" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="e:cli" target="e:restart">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:e:profile:e:assistant" value="тот же адрес, другой переключатель" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=1;exitY=0.1;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="e:profile" target="e:assistant">
+          <mxGeometry relative="1" x="0" y="22" as="geometry">
+            <Array as="points">
+            <mxPoint x="1080" y="158"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:e:apply:e:no" value="кому кнопка недоступна" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" parent="1" source="e:apply" target="e:no">
+          <mxGeometry relative="1" x="0.24" y="-66" as="geometry">
+            <Array as="points">
+            <mxPoint x="1000" y="316"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="560" width="210" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="590" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap0" value="что видно на экране" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="590" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="620" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap1" value="файл на диске" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="620" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#E0F2F1;strokeColor=#26A69A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="650" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap2" value="работа панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="650" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="680" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap3" value="чужой CLI" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="680" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="710" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap4" value="границы и отказы" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="710" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="740" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap5" value="значок — чья это коробка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="740" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="780" as="sourcePoint"/>
+            <mxPoint x="110" y="780" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap6" value="порядок" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="770" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="810" as="sourcePoint"/>
+            <mxPoint x="110" y="810" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap7" value="что возвращается" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="800" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="840" as="sourcePoint"/>
+            <mxPoint x="110" y="840" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap8" value="кто что читает" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="830" width="150" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

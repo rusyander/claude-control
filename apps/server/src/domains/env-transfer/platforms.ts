@@ -1,5 +1,6 @@
 import type { Platform, PlatformGatewaySettings } from '@agentdeck/contracts';
 import { platformGatewaySettingsSchema, platformsSchema } from '@agentdeck/contracts/platform';
+import { withLegacyConsumers } from '../platform/store.ts';
 import type { ChecklistItem } from './collect/types.ts';
 
 /**
@@ -244,9 +245,16 @@ function parsePanelPlatforms(
   return {
     version: PANEL_PLATFORMS_VERSION,
     gateway: gateway.data,
-    platforms: platforms.data,
+    platforms: withLegacyConsumers(record.platforms, platforms.data),
   };
 }
+
+/*
+ * Подстановка прежнего поведения для архива, собранного ДО Т3, живёт в
+ * `domains/platform/store.ts` рядом с самим правилом (`consumersOf`): дверей,
+ * через которые контур приезжает извне, три — архив, снимок настроек и PATCH, —
+ * и три копии одного правила разъехались бы на первой же правке.
+ */
 
 /** Совпадает ли настройка целиком: поля контура сравниваются как данные. */
 function sameSetting(a: Platform, b: Platform): boolean {

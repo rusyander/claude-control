@@ -1,0 +1,24 @@
+{
+  "topic": "projects",
+  "source": "docs/diagrams/projects-guide/projects-guide.drawio",
+  "pages": [
+    {
+      "name": "registry-and-files",
+      "file": "registry-and-files.png",
+      "page": 1,
+      "source": "e5781fea53f51d67",
+      "width": 1397,
+      "height": 1398,
+      "exportedAt": "2026-09-11T14:34:10.629Z"
+    },
+    {
+      "name": "other-cli",
+      "file": "other-cli.png",
+      "page": 2,
+      "source": "fa10a8422b5aa0c2",
+      "width": 1397,
+      "height": 1298,
+      "exportedAt": "2026-09-11T14:34:13.715Z"
+    }
+  ]
+}

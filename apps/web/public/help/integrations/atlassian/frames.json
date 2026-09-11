@@ -1,0 +1,114 @@
+{
+  "topic": "integrations",
+  "scenario": "atlassian",
+  "frames": [
+    {
+      "id": "01-cards",
+      "file": "01-cards.png",
+      "side": "panel",
+      "masked": 3,
+      "width": 1400,
+      "height": 1300,
+      "shotAt": "2026-09-11T17:37:19.106Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Настройки Приложение, доступность и путь к конфигурации Общие Доступ Провайдеры Модели Интеграции Расходы Безопасность Перенос Jira и Confluence, фордж по токену, Telegram, тест-менеджмент и отчёты CI: откуда панель берёт внешний контекст и куда отдаёт результат. Что панель делает с этими ключами Jira и Confluence не проверялось Включён Откуда берутся требования и куда уходят дефекты и отчёты. Один ключ на обе системы, если они на одном сайте. Адрес сайта Без этого поля коннектор не включить Почта Только для облака: там ключ работает в паре с почтой. Для Server/DC оставьте пустым. Установка Не выбрано Облако Server / Data Center Не выбрано — определится живой проверкой и запомнится. Адрес Confluence Заполните, если Confluence живёт не на хосте Jira. Подключить MCP Atlassian Тот же сайт и тот же ключ, но доступные агенту прямо в разговоре. Сервер добавится в раздел MCP — оттуда его можно и убрать. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Облако: API-токен из •••••••••••• вместе с почтой ниже. Server/DC: personal access token, почту оставьте пустой. Сохранить Проверить связь Не заполнено: Адрес сайта Фордж по токену не проверялось Включён GitHub или GitLab напрямую, без установленных gh и glab: нужен там, где CLI не поставить. Система Не выбрано GitHub GitLab Что на том конце: GitHub или GitLab. Адрес установки Свой GitLab — адрес инсталляции. Пусто = •••••••••••• или ••••••••••••. Репозиторий owner/repo или числовой id проекта. Пусто — выведется из origin проверяемого проекта. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. GitHub: personal access token с правом на issues. GitLab: токен проекта или личный, scope api. Сохранить Проверить связь Не заполнено: Система Telegram не проверялось Включён Куда панель пишет о завершённых прогонах, вопросах агента и запросах прав. Чат Без этого поля коннектор не включить О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Отправить пробное Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Токен бота от @BotFather. Бот должен быть добавлен в чат, иначе он туда не напишет. Сохранить Проверить связь Не заполнено: Чат Вебхук не проверялось Включён Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Без этого поля коннектор не включить О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь Не заполнено: Адрес приёмника Тест-менеджмент не проверялось Включён Zephyr, Xray или Test IT: забрать кейсы в группу панели и отправить туда результат прогона. Повторная отправка попадает в тот же ран. Система Не выбрано Zephyr Scale Xray Test IT Zephyr Scale, Xray или Test IT — от этого зависит формат кейсов. Адрес установки Только для Test IT: адрес своей установки. У Zephyr и Xray API общий на всех. Проект Без этого поля коннектор не включить Группа тестов С какой группой панели синхронизировать. Пусто — панель спросит при обмене. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Zephyr Scale: свой API-ключ. Xray: ключ и секрет одной строкой через двоеточие. Test IT: личный токен из профиля. Пусто — возьмётся ключ Atlassian. Сохранить Проверить связь Не заполнено: Система, Проект Отчёты CI не проверялось Включён Откуда подтянуть отчёт последнего прогона сборки, чтобы не выкладывать файл руками. Система Не выбрано GitHub Actions GitLab CI GitHub Actions или GitLab CI. Репозиторий owner/repo или id проекта. Пусто — выведется из origin. Сборка Имя workflow или job. Пусто — последний завершившийся прогон. Артефакт Имя артефакта или путь к отчёту внутри него. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Тот же токен форджа, но с правом читать артефакты сборок. Сохранить Проверить связь Не заполнено: Система",
+      "en": {
+        "file": "01-cards.en.png",
+        "masked": 3,
+        "width": 1400,
+        "height": 1300,
+        "shotAt": "2026-09-11T17:41:09.297Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Settings Application, accessibility and configuration path General Access Providers Models Integrations Spend Safety Transfer Jira and Confluence, a forge by token, Telegram, test management and CI reports: where the panel takes outside context from and where it hands results back. What the panel does with these keys Jira and Confluence not checked Enabled Where requirements come from and where defects and reports go. One key for both systems when they share a site. Site URL The connector cannot be enabled without this field Email Cloud only: the key works there in a pair with the email. Leave empty for Server/DC. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Confluence URL Fill in when Confluence does not live on the Jira host. Connect Atlassian MCP The same site and the same key, but available to the agent inside a conversation. The server is added to the MCP section — it can be removed from there too. Token No key yet. It goes into the encrypted store and never returns to this screen. Cloud: an API token from •••••••••••• together with the email below. Server/DC: a personal access token, leave the email empty. Save Check connection Not filled in: Site URL Forge by token not checked Enabled GitHub or GitLab directly, without gh and glab installed: needed where the CLI cannot be installed. System Not set GitHub GitLab What is on the other end: GitHub or GitLab. Installation URL Own GitLab — the installation URL. Empty = •••••••••••• or ••••••••••••. Repository owner/repo or a numeric project id. Empty — derived from the checked project origin. Token No key yet. It goes into the encrypted store and never returns to this screen. GitHub: a personal access token with issue rights. GitLab: a project or personal token with the api scope. Save Check connection Not filled in: System Telegram not checked Enabled Where the panel writes about finished runs, agent questions and permission requests. Chat The connector cannot be enabled without this field What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Send a test message Token No key yet. It goes into the encrypted store and never returns to this screen. A bot token from @BotFather. The bot must be added to the chat, otherwise it cannot post there. Save Check connection Not filled in: Chat Webhook not checked Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL The connector cannot be enabled without this field What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token No key yet. It goes into the encrypted store and never returns to this screen. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection Not filled in: Receiver URL Test management not checked Enabled Zephyr, Xray or Test IT: pull cases into a panel group and push run results back. A repeated push lands in the same run. System Not set Zephyr Scale Xray Test IT Zephyr Scale, Xray or Test IT — the case format follows from it. Installation URL Test IT only: the URL of your own installation. Zephyr and Xray share one API. Project The connector cannot be enabled without this field Test group Which panel group to sync with. Empty — the panel asks at exchange time. Token No key yet. It goes into the encrypted store and never returns to this screen. Zephyr Scale: its own API key. Xray: key and secret in one line separated by a colon. Test IT: the personal token from the profile. Empty — the Atlassian key is used. Save Check connection Not filled in: System, Project CI reports not checked Enabled Where to pull the latest build report from, so no file has to be uploaded by hand. System Not set GitHub Actions GitLab CI GitHub Actions or GitLab CI. Repository owner/repo or a project id. Empty — derived from origin. Workflow Workflow or job name. Empty — the last finished run. Artifact Artifact name or the path to the report inside it. Token No key yet. It goes into the encrypted store and never returns to this screen. The same forge token, but allowed to read build artifacts. Save Check connection Not filled in: System"
+      }
+    },
+    {
+      "id": "02-filled",
+      "file": "02-filled.png",
+      "side": "panel",
+      "masked": 2,
+      "width": 1116,
+      "height": 464,
+      "shotAt": "2026-09-11T17:37:20.842Z",
+      "text": "Jira и Confluence не проверялось Включён Откуда берутся требования и куда уходят дефекты и отчёты. Один ключ на обе системы, если они на одном сайте. Адрес сайта https://•••••••••••• для облака, свой адрес для Server/DC. Почта Только для облака: там ключ работает в паре с почтой. Для Server/DC оставьте пустым. Установка Не выбрано Облако Server / Data Center Не выбрано — определится живой проверкой и запомнится. Адрес Confluence Заполните, если Confluence живёт не на хосте Jira. Подключить MCP Atlassian Тот же сайт и тот же ключ, но доступные агенту прямо в разговоре. Сервер добавится в раздел MCP — оттуда его можно и убрать. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Облако: API-токен из •••••••••••• вместе с почтой ниже. Server/DC: personal access token, почту оставьте пустой. Сохранить Проверить связь",
+      "en": {
+        "file": "02-filled.en.png",
+        "masked": 2,
+        "width": 1116,
+        "height": 464,
+        "shotAt": "2026-09-11T17:41:11.054Z",
+        "text": "Jira and Confluence not checked Enabled Where requirements come from and where defects and reports go. One key for both systems when they share a site. Site URL •••••••••••• for cloud, your own URL for Server/DC. Email Cloud only: the key works there in a pair with the email. Leave empty for Server/DC. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Confluence URL Fill in when Confluence does not live on the Jira host. Connect Atlassian MCP The same site and the same key, but available to the agent inside a conversation. The server is added to the MCP section — it can be removed from there too. Token No key yet. It goes into the encrypted store and never returns to this screen. Cloud: an API token from •••••••••••• together with the email below. Server/DC: a personal access token, leave the email empty. Save Check connection"
+      }
+    },
+    {
+      "id": "03-checked",
+      "file": "03-checked.png",
+      "side": "panel",
+      "masked": 2,
+      "width": 1116,
+      "height": 554,
+      "shotAt": "2026-09-11T17:37:28.327Z",
+      "text": "Jira и Confluence связь есть облако Включён Откуда берутся требования и куда уходят дефекты и отчёты. Один ключ на обе системы, если они на одном сайте. Адрес сайта https://•••••••••••• для облака, свой адрес для Server/DC. Почта Только для облака: там ключ работает в паре с почтой. Для Server/DC оставьте пустым. Установка Не выбрано Облако Server / Data Center Не выбрано — определится живой проверкой и запомнится. Адрес Confluence Заполните, если Confluence живёт не на хосте Jira. Подключить MCP Atlassian Тот же сайт и тот же ключ, но доступные агенту прямо в разговоре. Сервер добавится в раздел MCP — оттуда его можно и убрать. Токен Ключ сохранён: atl…42a0. Новое значение заменит его, пустое поле — оставит как есть. Облако: API-токен из •••••••••••• вместе с почтой ниже. Server/DC: personal access token, почту оставьте пустой. Сохранить Проверить связь Забыть ключ Вошли как Отдел контроля качества (облако). вошли как Отдел контроля качества проверено 11.09.2026, 22:37:23",
+      "en": {
+        "file": "03-checked.en.png",
+        "masked": 2,
+        "width": 1116,
+        "height": 554,
+        "shotAt": "2026-09-11T17:41:18.553Z",
+        "text": "Jira and Confluence connected cloud Enabled Where requirements come from and where defects and reports go. One key for both systems when they share a site. Site URL •••••••••••• for cloud, your own URL for Server/DC. Email Cloud only: the key works there in a pair with the email. Leave empty for Server/DC. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Confluence URL Fill in when Confluence does not live on the Jira host. Connect Atlassian MCP The same site and the same key, but available to the agent inside a conversation. The server is added to the MCP section — it can be removed from there too. Token Key saved: atl…42a0. A new value replaces it, an empty field leaves it alone. Cloud: an API token from •••••••••••• together with the email below. Server/DC: a personal access token, leave the email empty. Save Check connection Forget key Вошли как Отдел контроля качества (облако). signed in as Отдел контроля качества checked 11.09.2026, 22:41:13"
+      }
+    },
+    {
+      "id": "04-mcp",
+      "file": "04-mcp.png",
+      "side": "panel",
+      "masked": 2,
+      "width": 1400,
+      "height": 1300,
+      "shotAt": "2026-09-11T17:37:34.979Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 1 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка MCP-серверы Внешние источники инструментов для Claude Добавить сервер Как это работает agentdeck-atlassian stdio •••••••••••• •••••••••••• Проверить Инструменты",
+      "en": {
+        "file": "04-mcp.en.png",
+        "masked": 2,
+        "width": 1400,
+        "height": 1300,
+        "shotAt": "2026-09-11T17:41:25.302Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 1 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help MCP servers External tool providers for Claude Add server How it works agentdeck-atlassian stdio •••••••••••• •••••••••••• Check Tools"
+      }
+    },
+    {
+      "id": "05-forge",
+      "file": "05-forge.png",
+      "side": "panel",
+      "masked": 5,
+      "width": 1116,
+      "height": 468,
+      "shotAt": "2026-09-11T17:37:46.674Z",
+      "text": "Фордж по токену связь есть Включён GitHub или GitLab напрямую, без установленных gh и glab: нужен там, где CLI не поставить. Система Не выбрано GitHub GitLab Что на том конце: GitHub или GitLab. Адрес установки Свой GitLab — адрес инсталляции. Пусто = •••••••••••• или ••••••••••••. Репозиторий owner/repo или числовой id проекта. Пусто — выведется из origin проверяемого проекта. Токен Ключ сохранён: glp…60f4. Новое значение заменит его, пустое поле — оставит как есть. GitHub: personal access token с правом на issues. GitLab: токен проекта или личный, scope api. Сохранить Проверить связь Забыть ключ Вошли как qa-release-bot. вошли как qa-release-bot проверено 11.09.2026, 22:37:41",
+      "en": {
+        "file": "05-forge.en.png",
+        "masked": 5,
+        "width": 1116,
+        "height": 468,
+        "shotAt": "2026-09-11T17:41:37.016Z",
+        "text": "Forge by token connected Enabled GitHub or GitLab directly, without gh and glab installed: needed where the CLI cannot be installed. System Not set GitHub GitLab What is on the other end: GitHub or GitLab. Installation URL Own GitLab — the installation URL. Empty = •••••••••••• or ••••••••••••. Repository owner/repo or a numeric project id. Empty — derived from the checked project origin. Token Key saved: glp…60f4. A new value replaces it, an empty field leaves it alone. GitHub: a personal access token with issue rights. GitLab: a project or personal token with the api scope. Save Check connection Forget key Вошли как qa-release-bot. signed in as qa-release-bot checked 11.09.2026, 22:41:32"
+      }
+    },
+    {
+      "id": "06-forgotten",
+      "file": "06-forgotten.png",
+      "side": "panel",
+      "masked": 1,
+      "width": 1116,
+      "height": 378,
+      "shotAt": "2026-09-11T17:37:50.123Z",
+      "text": "Фордж по токену не проверялось Включён GitHub или GitLab напрямую, без установленных gh и glab: нужен там, где CLI не поставить. Система Не выбрано GitHub GitLab Что на том конце: GitHub или GitLab. Адрес установки Свой GitLab — адрес инсталляции. Пусто = •••••••••••• или ••••••••••••. Репозиторий owner/repo или числовой id проекта. Пусто — выведется из origin проверяемого проекта. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. GitHub: personal access token с правом на issues. GitLab: токен проекта или личный, scope api. Сохранить Проверить связь",
+      "en": {
+        "file": "06-forgotten.en.png",
+        "masked": 1,
+        "width": 1116,
+        "height": 378,
+        "shotAt": "2026-09-11T17:41:40.468Z",
+        "text": "Forge by token not checked Enabled GitHub or GitLab directly, without gh and glab installed: needed where the CLI cannot be installed. System Not set GitHub GitLab What is on the other end: GitHub or GitLab. Installation URL Own GitLab — the installation URL. Empty = •••••••••••• or ••••••••••••. Repository owner/repo or a numeric project id. Empty — derived from the checked project origin. Token No key yet. It goes into the encrypted store and never returns to this screen. GitHub: a personal access token with issue rights. GitLab: a project or personal token with the api scope. Save Check connection"
+      }
+    }
+  ]
+}

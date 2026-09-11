@@ -1,0 +1,15 @@
+{
+  "topic": "compare",
+  "source": "docs/diagrams/compare-guide/compare-guide.drawio",
+  "pages": [
+    {
+      "name": "what-crosses-and-what-does-not",
+      "file": "what-crosses-and-what-does-not.png",
+      "page": 1,
+      "source": "c0ea65438f7c74fa",
+      "width": 1507,
+      "height": 998,
+      "exportedAt": "2026-09-11T14:34:50.738Z"
+    }
+  ]
+}

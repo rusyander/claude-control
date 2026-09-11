@@ -1,5 +1,9 @@
 export {
   usePlatforms,
+  usePlatformsInfo,
+  useActivatePlatform,
+  useDeactivatePlatform,
+  useDismissActivationNotice,
   usePlatformGateway,
   useRestartGateway,
   useSavePlatform,

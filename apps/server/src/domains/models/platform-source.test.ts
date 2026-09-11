@@ -22,6 +22,8 @@ const platform = (overrides: Partial<Platform> = {}): Platform =>
     capabilities: [],
     agents: [],
     budgetSince: '',
+    toolShim: true,
+    contourPrompt: true,
     caCertPath: '',
     ...overrides,
   }) as Platform;

@@ -1,15 +1,43 @@
 import { useTranslation } from 'react-i18next';
-import { Stack } from '@shared/ui/stack';
-import { FlowDiagram } from '@shared/ui/diagram';
-import { HelpSection, StorageCard, FieldTable, Callout, CapabilityGrid, OptionCards } from '../ui';
+import { HelpSection, StorageCard, FieldTable, Callout, OptionCards } from '../ui';
+import { CommandsGuideSections } from './CommandsGuideSections';
+import { CommandsLimitsSections } from './CommandsLimitsSections';
 
-/** Документ раздела «Команды». */
+/**
+ * Документ раздела «Команды».
+ *
+ * Порядок тот же, что у «Правил»: зачем это нужно → чем это НЕ является → как
+ * собирается список и оба пути в снимках → что уходит на диск → четыре
+ * источника и группы → границы, тонкости и разбор «команды не видно».
+ *
+ * Раньше документ был перечнем возможностей и одной нарисованной схемой:
+ * человек читал, ЧТО умеет раздел, и не видел ни одного экрана, пока не
+ * открывал панель. Теперь середина — настоящие кадры двух путей, снятые на
+ * отдельной панели с временным каталогом настроек, и каждое число в тексте
+ * списано со своего кадра.
+ *
+ * Блок «Чем это НЕ является» стоит вторым намеренно: раздел читающий, и его
+ * постоянно путают со «Скиллами», «Плагинами» и палитрой «/» в чате — человек,
+ * пришедший сюда править команду, не узнает об этом ни из одного снимка.
+ *
+ * Соседние файлы — не «вынесенные куски», а разделы со своей работой:
+ * `CommandsGuideSections` держит схему и оба пути в снимках,
+ * `CommandsLimitsSections` — границы, числа, отказы и разбор.
+ */
 export function CommandsTopic() {
   const { t } = useTranslation();
+  // Ключи этого документа лежат под своим префиксом — короткий хелпер
+  // избавляет от него в каждой строке.
   const tr = (key: string): string => t(`help.topics.commands.${key}`);
 
   return (
     <>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards
           items={[
@@ -20,6 +48,19 @@ export function CommandsTopic() {
         />
       </HelpSection>
 
+      <HelpSection title={tr('diffTitle')} caption={tr('diffCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('diffSkills'), text: tr('diffSkillsText') },
+            { title: tr('diffPlugins'), text: tr('diffPluginsText') },
+            { title: tr('diffChat'), text: tr('diffChatText') },
+          ]}
+        />
+      </HelpSection>
+
+      <CommandsGuideSections tr={tr} />
+
       <HelpSection title={t('help.common.storageTitle')}>
         <StorageCard
           title={tr('title')}
@@ -28,45 +69,13 @@ export function CommandsTopic() {
             { label: tr('storageFiles'), value: '~/.claude/commands/**/*.md', isMono: true },
             { label: tr('storagePlugins'), value: '~/.claude/plugins/', isMono: true },
             { label: tr('storageBuiltin'), value: tr('storageBuiltinValue') },
+            { label: tr('storageWrites'), value: tr('storageWritesValue') },
           ]}
         />
       </HelpSection>
 
-      <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('flowTitle')}
-          nodes={[
-            {
-              id: 'disk',
-              label: tr('flowDisk'),
-              caption: tr('flowDiskCaption'),
-              tone: 'accent',
-              icon: 'folder',
-            },
-            {
-              id: 'merge',
-              label: tr('flowMerge'),
-              caption: tr('flowMergeCaption'),
-              tone: 'info',
-              icon: 'commands',
-            },
-            {
-              id: 'search',
-              label: tr('flowSearch'),
-              caption: tr('flowSearchCaption'),
-              icon: 'search',
-            },
-            {
-              id: 'open',
-              label: tr('flowOpen'),
-              caption: tr('flowOpenCaption'),
-              tone: 'success',
-              icon: 'edit',
-            },
-          ]}
-        />
-      </HelpSection>
-
+      {/* Имя команды складывается из источника, и это единственное, что нужно
+          знать, чтобы прочитать любую строку списка. */}
       <HelpSection title={tr('sourcesTitle')}>
         <FieldTable
           caption={tr('sourcesCaption')}
@@ -85,23 +94,6 @@ export function CommandsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canList'),
-            tr('canSearch'),
-            tr('canFilter'),
-            tr('canFamily'),
-            tr('canOpen'),
-            tr('canDisabled'),
-            tr('canProvider'),
-          ]}
-          cant={[tr('cantEdit'), tr('cantRun'), tr('cantTranslate'), tr('cantFresh')]}
-        />
-      </HelpSection>
-
       <HelpSection title={tr('familyTitle')} caption={tr('familyCaption')}>
         <OptionCards
           minWidth={320}
@@ -112,25 +104,7 @@ export function CommandsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('notesTitle')}>
-        <Stack gap="var(--spacing-xs)">
-          <Callout tone="info" title={tr('noteReadOnlyTitle')}>
-            {tr('noteReadOnlyText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteAutoTitle')}>
-            {tr('noteAutoText')}
-          </Callout>
-          <Callout tone="warning" title={tr('noteBuiltinTitle')}>
-            {tr('noteBuiltinText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteDescTitle')}>
-            {tr('noteDescText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteProviderTitle')}>
-            {tr('noteProviderText')}
-          </Callout>
-        </Stack>
-      </HelpSection>
+      <CommandsLimitsSections />
     </>
   );
 }

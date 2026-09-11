@@ -1,16 +1,34 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { FlowDiagram } from '@shared/ui/diagram';
-import { HelpSection, StorageCard, FieldTable, Callout, CapabilityGrid, OptionCards } from '../ui';
+import { HelpSection, FieldTable, Callout, OptionCards } from '../ui';
+import { AnalyticsGuideSections } from './AnalyticsGuideSections';
+import { AnalyticsLimitsSections } from './AnalyticsLimitsSections';
 
-/** Документ раздела «Аналитика». */
+/**
+ * Документ раздела «Аналитика».
+ *
+ * Порядок тот же, что у соседей: зачем это вообще → схема происхождения чисел →
+ * два пути в снимках (отчёт и живой срез) → чем раздел НЕ является → что читает и
+ * пишет → что умеет и чего нет → пределы → что означают показатели → понижённые
+ * прогоны → тонкости.
+ *
+ * Блок понижений стоит отдельно и последним из крупных: он единственный на
+ * странице считает не расход, а выполнение планки сдачи, и мерить его теми же
+ * глазами, что и токены, — ошибка.
+ */
 export function AnalyticsTopic() {
   const { t } = useTranslation();
   const tr = (key: string): string => t(`help.topics.analytics.${key}`);
+  const common = (key: string): string => t(`help.common.${key}`);
 
   return (
     <>
-      <HelpSection title={t('help.common.whyTitle')}>
+      {/* Страница длинная: первое, что ей нужно сказать, — из чего она состоит. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
+      <HelpSection title={common('whyTitle')}>
         <OptionCards
           items={[
             { title: tr('whyLocal'), text: tr('whyLocalText') },
@@ -20,68 +38,14 @@ export function AnalyticsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')}>
-        <StorageCard
-          title={tr('title')}
-          rows={[
-            { label: tr('storageSource'), value: tr('storageSourceValue'), isMono: true },
-            { label: tr('storageWhat'), value: tr('storageWhatValue') },
-            { label: tr('storageSkills'), value: tr('storageSkillsValue') },
-            { label: tr('storageCache'), value: tr('storageCacheValue') },
-          ]}
-        />
-      </HelpSection>
+      <AnalyticsGuideSections tr={tr} />
 
-      <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('flowTitle')}
-          nodes={[
-            {
-              id: 'files',
-              label: tr('flowFiles'),
-              caption: tr('flowFilesCaption'),
-              tone: 'accent',
-              icon: 'file',
-            },
-            {
-              id: 'scan',
-              label: tr('flowScan'),
-              caption: tr('flowScanCaption'),
-              tone: 'info',
-              icon: 'search',
-            },
-            { id: 'sum', label: tr('flowSum'), caption: tr('flowSumCaption'), icon: 'analytics' },
-            {
-              id: 'view',
-              label: tr('flowView'),
-              caption: tr('flowViewCaption'),
-              tone: 'success',
-              icon: 'check',
-            },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canPeriod'),
-            tr('canDetail'),
-            tr('canLive'),
-            tr('canTools'),
-            tr('canSessions'),
-            tr('canExport'),
-          ]}
-          cant={[tr('cantLimits'), tr('cantBill'), tr('cantOther')]}
-        />
-      </HelpSection>
+      <AnalyticsLimitsSections tr={tr} common={common} />
 
       <HelpSection title={tr('metricsTitle')}>
         <FieldTable
-          nameHeader={t('help.common.fieldName')}
-          descriptionHeader={t('help.common.fieldPurpose')}
+          nameHeader={common('fieldName')}
+          descriptionHeader={common('fieldPurpose')}
           rows={[
             { name: tr('metricTotal'), description: tr('metricTotalText'), isMono: false },
             { name: tr('metricCache'), description: tr('metricCacheText'), isMono: false },
@@ -98,8 +62,6 @@ export function AnalyticsTopic() {
           ]}
         />
       </HelpSection>
-
-      <HelpSection title={tr('liveTitle')} caption={tr('liveCaption')} />
 
       {/* Единственный блок страницы, который считает не расход, а честность
           сдачи, — поэтому объясняется отдельно, с границами того, что панель
@@ -119,7 +81,7 @@ export function AnalyticsTopic() {
         <Callout tone="warning" title={tr('loweredNote')} />
       </HelpSection>
 
-      <HelpSection title={tr('notesTitle')}>
+      <HelpSection title={common('notesTitle')}>
         <Stack gap="var(--spacing-xs)">
           <Callout tone="warning" title={tr('noteLimitsTitle')}>
             {tr('noteLimitsText')}
@@ -130,8 +92,11 @@ export function AnalyticsTopic() {
           <Callout tone="success" title={tr('noteLiveTitle')}>
             {tr('noteLiveText')}
           </Callout>
-          <Callout tone="info" title={tr('noteBigTitle')}>
-            {tr('noteBigText')}
+          <Callout tone="info" title={tr('noteWholeTitle')}>
+            {tr('noteWholeText')}
+          </Callout>
+          <Callout tone="info" title={tr('noteProjectTitle')}>
+            {tr('noteProjectText')}
           </Callout>
           <Callout tone="info" title={tr('noteScopeTitle')}>
             {tr('noteScopeText')}

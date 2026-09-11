@@ -1,5 +1,9 @@
 import type { RemoteNotifyKind } from '@agentdeck/contracts';
 import type { LoweredRunRecord } from '@agentdeck/contracts/model-cascade';
+import type { PlatformRunConsumer } from '@agentdeck/contracts/platform-consumers';
+// Только тип маршрута: про контуры, шлюз и ключи реестр по-прежнему не знает
+// ничего — решение принимает домен платформы, реестр лишь передаёт его прогону.
+import type { PlatformRunRoute } from '../platform/routing.ts';
 import { ChatRun, type ChatEvent, type RunOptions } from './ChatRunner.ts';
 import { DetachedRun, type DetachedRunDeps } from './detached-run.ts';
 import { looksLikeCheck } from './lowered-journal.ts';
@@ -50,6 +54,12 @@ export interface RunFinished {
   options: RunOptions;
   /** Окно контекста на последнем шаге; 0 — расход не приходил (чужой CLI, ошибка). */
   contextTokens: number;
+  /**
+   * Чем прогон был для контура (Т3). Нужно продолжениям и звеньям конвейера:
+   * они заводятся ОТ этого прогона, и без переноса работа группы спрашивала бы
+   * маршрут как «чат» — то есть меняла бы провайдера посреди цепочки.
+   */
+  origin?: PlatformRunConsumer;
 }
 
 /** Событие с порядковым номером — по нему клиент догоняет пропущенное. */
@@ -99,6 +109,13 @@ export interface RunSubscriber {
 
 /** Сведения о прогоне для группировки и переподключения (в т.ч. после F5). */
 export interface RunMeta {
+  /**
+   * Откуда прогон: обычный чат (`chat`, умолчание) или группа разделения
+   * (`groups`). Это же — ПОТРЕБИТЕЛЬ маршрута контура (Т3): реестр знает
+   * происхождение каждого прогона, и список «Где работает контур» строится по
+   * нему, а не по списку пожеланий.
+   */
+  origin?: PlatformRunConsumer;
   /** Каталог проекта (для группировки статусов); undefined — песочница/дом. */
   projectPath?: string;
   /** Идентификатор сессии на старте (для продолжения разговора). */
@@ -357,6 +374,21 @@ export class ChatRunRegistry {
    */
   private onSession?: (chatId: string, sessionId: string) => void;
 
+  /**
+   * Маршрут контура: по происхождению прогона — переменные его окружения (Т3)
+   * и системный промпт контура, если тот включён (Т5.4а).
+   *
+   * Подаётся снаружи, как и оценка стоимости: реестр знает, ОТКУДА прогон, но
+   * про контуры, шлюз и ключи не знает ничего и знать не должен. Спрашивается
+   * на КАЖДОМ старте — снятая галочка обязана действовать со следующего
+   * запуска, а не с перезапуска панели.
+   */
+  setPlatformRouting(resolve: (origin: PlatformRunConsumer) => PlatformRunRoute): void {
+    this.platformRouting = resolve;
+  }
+
+  private platformRouting?: (origin: PlatformRunConsumer) => PlatformRunRoute;
+
   setSessionListener(listener: (chatId: string, sessionId: string) => void): void {
     this.onSession = listener;
   }
@@ -576,11 +608,24 @@ export class ChatRunRegistry {
     }
 
     const run = this.createRun();
+    // Маршрут решается ЗДЕСЬ, на каждом старте: продолжение остановленного
+    // прогона приходит со СТАРЫМИ параметрами (пауза дерева, продолжение в
+    // чистой сессии), и адрес контура, оставшийся в них с прошлой жизни,
+    // пережил бы снятую галочку. Пустой объект — законный ответ «не через
+    // контур», и он затирает прежний.
+    const route = this.platformRouting?.(meta.origin ?? 'chat') ?? { env: {} };
+    const routed: RunOptions = {
+      ...options,
+      platformEnv: route.env,
+      // Промпт контура ставится и СНИМАЕТСЯ здесь же: прогон, продолженный
+      // после выключенной галочки, обязан вернуться к промпту CLI.
+      platformSystemPrompt: route.systemPrompt ?? '',
+    };
     const registered: RegisteredRun = {
       chatId,
       run,
       meta,
-      options,
+      options: routed,
       startedAt: Date.now(),
       text: '',
       events: [],
@@ -597,7 +642,7 @@ export class ChatRunRegistry {
     this.runs.set(chatId, registered);
 
     void run
-      .start(options, (event) => this.emit(registered, event))
+      .start(routed, (event) => this.emit(registered, event))
       .then(() => this.finish(registered))
       .catch((error) => {
         this.emit(registered, {
@@ -764,6 +809,7 @@ export class ChatRunRegistry {
           startedAt: run.startedAt,
           options: run.options,
           contextTokens: run.contextTokens,
+          ...(run.meta.origin ? { origin: run.meta.origin } : {}),
         });
         if (event) this.emit(run, event);
       } catch {

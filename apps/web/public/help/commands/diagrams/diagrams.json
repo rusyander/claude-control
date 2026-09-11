@@ -1,0 +1,15 @@
+{
+  "topic": "commands",
+  "source": "docs/diagrams/commands-guide/commands-guide.drawio",
+  "pages": [
+    {
+      "name": "four-sources",
+      "file": "four-sources.png",
+      "page": 1,
+      "source": "effb1c8d86f67567",
+      "width": 1565,
+      "height": 958,
+      "exportedAt": "2026-09-11T15:05:16.996Z"
+    }
+  ]
+}

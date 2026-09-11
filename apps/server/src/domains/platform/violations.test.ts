@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { PlatformGatewayEvent } from '@agentdeck/contracts';
 import { violationReport } from './violations.ts';
+import { enterprise-platformDriver } from './drivers/enterprise-platform.ts';
 import { bridgeUpstreamStatus } from './gateway/status.ts';
 
 /**
@@ -26,6 +27,10 @@ const event = (patch: Partial<PlatformGatewayEvent>): PlatformGatewayEvent => ({
   interrupted: false,
   unknownFrames: [],
   lost: [],
+  shimmed: [],
+  toolCalls: 0,
+  toolFlaws: [],
+  claimedWithoutCall: false,
   totalTokens: 0,
   ...patch,
 });
@@ -203,17 +208,21 @@ describe('текст проверки в сводку не попадает', ()
     // фрагмент запроса, ключ, адрес внутреннего хоста. Просеивание живёт в
     // разборе ответа контура, сводка складывает уже просеянное; тест держит
     // обе половины разом, потому что порознь дыра между ними не видна.
-    const bridged = bridgeUpstreamStatus(451, {
-      error: {
-        message: 'Запрос остановлен проверками',
-        violations: [
-          { category: 'pii', matched_text: 'Иванов Иван Иванович, паспорт 4509 №123456' },
-          { name: 'secrets', evidence: 'AKIAIOSFODNN7EXAMPLE' },
-          'db.internal.corp.ru',
-          'токсичность в третьем абзаце',
-        ],
+    const bridged = bridgeUpstreamStatus(
+      451,
+      {
+        error: {
+          message: 'Запрос остановлен проверками',
+          violations: [
+            { category: 'pii', matched_text: 'Иванов Иван Иванович, паспорт 4509 №123456' },
+            { name: 'secrets', evidence: 'AKIAIOSFODNN7EXAMPLE' },
+            'db.internal.corp.ru',
+            'токсичность в третьем абзаце',
+          ],
+        },
       },
-    });
+      { driverRows: enterprise-platformDriver.statusRows },
+    );
 
     const report = violationReport([
       event({ status: 400, blocked: true, violations: bridged.violations }),

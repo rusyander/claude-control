@@ -174,7 +174,13 @@ export default function SettingsScreen() {
             const spent = item.budget.spentUsd.toFixed(2);
             return (
               <View key={item.platform.id} style={styles.platform}>
-                <Text style={styles.name}>{item.platform.title}</Text>
+                <Text style={styles.name}>
+                  {/* Активный контур помечен прямо в названии: через него идёт
+                      работа панели и всех CLI, и таких контуров ровно один.
+                      Без пометки список из трёх строк ничего не говорит о том,
+                      какая из них сейчас в деле. */}
+                  {item.active ? t.platform.active(item.platform.title) : item.platform.title}
+                </Text>
                 {/* «Ещё не проверялся» — не беда: тревожным цветом это читалось
                     бы как поломка, а панель просто ни разу туда не ходила. */}
                 <Text style={styles[STATE_STYLE[platformTone(problem)]]}>
@@ -189,6 +195,23 @@ export default function SettingsScreen() {
                       )
                     : t.platform.budgetOff(spent)}
                 </Muted>
+                {/* Пробный запрос — про путь CLI целиком, и он расходится с
+                    пробой чаще, чем кажется: живой контур при погашенном шлюзе
+                    даёт зелёную пробу и красный пробный запрос. Показывается
+                    он только у АКТИВНОГО контура, обеими половинами: у
+                    остальных это итог прошлой активации, а не сегодняшнее
+                    состояние — сегодня шлюз отвечает на их адрес отказом
+                    «контур выключен в панели». Красная строка врёт при этом
+                    ровно так же, как зелёная: она читается как сегодняшняя
+                    поломка. Так же поступает панель. */}
+                {item.active && item.smoke && !item.smoke.ok ? (
+                  <Mono style={styles.failed}>
+                    {t.platform.smokeFailed(item.smoke.detail ?? '')}
+                  </Mono>
+                ) : null}
+                {item.active && item.smoke?.ok ? (
+                  <Muted>{t.platform.smokeOk(item.smoke.answer, item.smoke.model)}</Muted>
+                ) : null}
                 {item.budget.exhaustedAt ? (
                   <Mono style={styles.failed}>
                     {t.platform.exhaustedAt(

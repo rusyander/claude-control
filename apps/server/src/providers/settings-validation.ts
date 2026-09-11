@@ -4,6 +4,7 @@ import { object, string, boolean, number, record, array, unknown, enum as zodEnu
 // Само правило формата берётся отсюда, а не переписывается: разъехавшись, две
 // копии дали бы «сохранилось в панели, не сохранилось в настройках».
 import { isPlatformDay, platformIdPattern } from '@agentdeck/contracts/platform';
+import { platformConsumerSchema } from '@agentdeck/contracts/platform-consumers';
 import { modelSources } from '@agentdeck/contracts/models';
 import { isKnownProviderId } from './registry.ts';
 
@@ -91,12 +92,31 @@ export const platformSchema = object({
     zodEnum(['models', 'chat', 'embeddings', 'agents', 'guardrails', 'knowledge', 'client-tools']),
   ),
   targets: array(string()),
+  // Потребители маршрута (Т3). Умолчание по той же причине, что у `agents`: у
+  // контура, настроенного до Т3, поля нет вовсе, и без умолчания отказ получал
+  // бы ВЕСЬ PATCH настроек. Но пустой список — это «никуда не подключён», а не
+  // «как раньше», поэтому обе двери в настройки (PATCH и разворот снимка)
+  // ПЕРЕД записью возвращают прежнее поведение по сырому телу
+  // (`withLegacyConsumers` в `domains/platform/store.ts`) — иначе снимок со
+  // старой панели молча отключал бы контур от ассистента.
+  //
+  // Правило формата берётся из контракта, а не переписывается строкой: иначе
+  // мусор в списке доехал бы сюда молча — схему контракта эти двери не видят.
+  consumers: array(platformConsumerSchema).default([]),
   projectPaths: array(string()),
   // Список агентов ведёт человек: маршрута «дай список агентов» на публичной
   // поверхности ключа нет, и пробе взять его неоткуда. Умолчание обязательно:
   // у контура, настроенного до Т7, поля нет вовсе, и без него ВЕСЬ PATCH
   // настроек получал бы отказ — раздел откатывался бы на первом же сохранении.
   agents: array(object({ id: string().min(1), title: string().min(1) })).default([]),
+  // Прослойка инструментов и свой короткий промпт (Т5). Умолчание `true` —
+  // парное контракту и по той же причине, что у `agents`: у контура,
+  // настроенного до Т5, полей нет вовсе, и без умолчания ВЕСЬ PATCH настроек
+  // получал бы отказ. Значение умолчания совпадает с контрактом намеренно:
+  // разойдись они, один и тот же контур вёл бы себя по-разному до первого
+  // сохранения и после него.
+  toolShim: boolean().default(true),
+  contourPrompt: boolean().default(true),
   caCertPath: string(),
 });
 
@@ -290,6 +310,14 @@ export const settingsPatchSchema = object({
  */
 const importSettingsSchema = settingsPatchSchema.extend({
   remoteAccess: remoteAccessSettingsSchema.optional(),
+  /**
+   * Активный контур. В PATCH его нет намеренно (он переключается транзакцией
+   * активации), а в снимке обязан быть: без ключа zod вырезал его, тумблеры
+   * контуров при этом приезжали как есть — и панель называла контур неактивным,
+   * пока шлюз продолжал его обслуживать. Пару сводит `reconcileActivePlatform`
+   * сразу после записи.
+   */
+  activePlatformId: string().optional(),
 });
 
 /**

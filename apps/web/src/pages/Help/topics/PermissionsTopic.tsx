@@ -1,30 +1,36 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { PriorityLadder } from '@shared/ui/diagram';
-import {
-  HelpSection,
-  StorageCard,
-  FieldTable,
-  StepList,
-  Callout,
-  CapabilityGrid,
-  OptionCards,
-} from '../ui';
+import { HelpSection, FieldTable, Callout, OptionCards } from '../ui';
+import { PermissionsGuideSections } from './PermissionsGuideSections';
+import { PermissionsLimitsSections } from './PermissionsLimitsSections';
 
 /**
- * Документ раздела «Права».
+ * Документ раздела «Права» — один на весь раздел и намеренно длинный.
  *
- * Главная мысль раздела — приоритет решений, поэтому вместо схемы потока
- * здесь лестница: порядок ступеней и есть ответ на вопрос «почему запрет
- * победил разрешение».
+ * Порядок задан вопросами, в которых человек приходит: зачем это вообще → чем
+ * раздел НЕ является (половина вопросов — «это здесь или там») → как устроено
+ * (две схемы) → весь путь в снимках, двумя сценариями по входу → что правит на
+ * диске → пределы и отказы → справочные таблицы → тонкости.
+ *
+ * Лестница приоритета осталась рядом со схемами, а не вместо них: схема
+ * отвечает «кто и в каком порядке решает», лестница — «что сильнее чего», и это
+ * то самое место, куда человек тычет пальцем, объясняя коллеге.
  */
 export function PermissionsTopic() {
   const { t } = useTranslation();
   const tr = (key: string): string => t(`help.topics.permissions.${key}`);
+  const common = (key: string): string => t(`help.common.${key}`);
 
   return (
     <>
-      <HelpSection title={t('help.common.whyTitle')}>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
+      <HelpSection title={common('whyTitle')}>
         <OptionCards
           items={[
             { title: tr('whyHard'), text: tr('whyHardText') },
@@ -34,18 +40,7 @@ export function PermissionsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')}>
-        <StorageCard
-          title="settings.json"
-          rows={[
-            { label: tr('storageFile'), value: tr('storageFileValue'), isMono: true },
-            { label: tr('storageLocal'), value: tr('storageLocalValue'), isMono: true },
-            { label: tr('storageId'), value: tr('storageIdValue') },
-            { label: tr('storageMove'), value: tr('storageMoveValue') },
-            { label: tr('storageOs'), value: tr('storageOsValue') },
-          ]}
-        />
-      </HelpSection>
+      <PermissionsGuideSections tr={tr} />
 
       <HelpSection title={tr('priorityTitle')} caption={tr('priorityCaption')}>
         <PriorityLadder
@@ -61,26 +56,7 @@ export function PermissionsTopic() {
         <Callout tone="info" title={tr('priorityNote')} />
       </HelpSection>
 
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canThree'),
-            tr('canPattern'),
-            tr('canPreset'),
-            tr('canBulk'),
-            tr('canMcp'),
-            tr('canMove'),
-            tr('canToggle'),
-            tr('canSee'),
-            tr('canShadow'),
-            tr('canValidate'),
-            tr('canAssistant'),
-          ]}
-          cant={[tr('cantWhy'), tr('cantProject'), tr('cantOrderCustom')]}
-        />
-      </HelpSection>
+      <PermissionsLimitsSections tr={tr} common={common} />
 
       <HelpSection title={tr('patternTitle')} caption={tr('patternCaption')}>
         <OptionCards
@@ -104,8 +80,8 @@ export function PermissionsTopic() {
 
       <HelpSection title={tr('risksTitle')}>
         <FieldTable
-          nameHeader={t('help.common.fieldName')}
-          descriptionHeader={t('help.common.fieldPurpose')}
+          nameHeader={common('fieldName')}
+          descriptionHeader={common('fieldPurpose')}
           rows={[
             {
               name: tr('riskLow'),
@@ -135,33 +111,22 @@ export function PermissionsTopic() {
       <HelpSection title={tr('fieldsTitle')}>
         <FieldTable
           caption={tr('fieldsCaption')}
-          nameHeader={t('help.common.fieldName')}
-          descriptionHeader={t('help.common.fieldPurpose')}
+          nameHeader={common('fieldName')}
+          descriptionHeader={common('fieldPurpose')}
           rows={[
             {
               name: 'pattern',
               description: tr('fieldPattern'),
-              badge: t('help.common.required'),
+              badge: common('required'),
               badgeTone: 'accent',
             },
             {
               name: 'decision',
               description: tr('fieldDecision'),
-              badge: t('help.common.required'),
+              badge: common('required'),
               badgeTone: 'accent',
             },
             { name: 'groupIds', description: tr('fieldGroups') },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('recipesTitle')}>
-        <StepList
-          steps={[
-            { title: tr('recipe1'), text: tr('recipe1Text') },
-            { title: tr('recipe2'), text: tr('recipe2Text') },
-            { title: tr('recipe3'), text: tr('recipe3Text') },
-            { title: tr('recipe4'), text: tr('recipe4Text') },
           ]}
         />
       </HelpSection>

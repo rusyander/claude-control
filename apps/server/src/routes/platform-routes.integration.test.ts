@@ -3,9 +3,10 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Platform } from '@agentdeck/contracts';
+import type { EndpointProfile, Platform } from '@agentdeck/contracts';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
+import { managedProfileId } from '../domains/platform/apply/profile.ts';
 import { writePlatform, writeToken } from '../domains/platform/store.ts';
 import { PlatformGateway } from '../domains/platform/gateway/listener.ts';
 import { registerPlatformRoutes } from './platform-routes.ts';
@@ -37,8 +38,11 @@ const PLATFORM: Platform = {
   capabilities: [],
   targets: ['assistant'],
   projectPaths: [],
+  consumers: [],
   agents: [],
   budgetSince: '',
+  toolShim: true,
+  contourPrompt: true,
   caCertPath: '',
 };
 
@@ -104,6 +108,38 @@ describe('platform routes: настройка контура', () => {
     expect(new AppStore(appData).getSettings().platforms).toHaveLength(1);
   });
 
+  it('сохранение не включает контур: тумблер — это активация, и она своя ручка', async () => {
+    // Тело просит `enabled: true`, как это делала бы форма до Т2.
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: { ...PLATFORM, enabled: true } },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().platform.enabled).toBe(false);
+    expect(res.json().active).toBe(false);
+    expect(store.getSettings().platforms[0]?.enabled).toBe(false);
+    expect(store.getSettings().activePlatformId).toBe('');
+  });
+
+  it('правка АКТИВНОГО контура его не гасит: тумблер идёт за активностью', async () => {
+    writePlatform(store, PLATFORM);
+    store.updateSettings({ activePlatformId: PLATFORM.id });
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      // Форма правки названия присылает то, что показывала: выключённый контур.
+      payload: { settings: { ...PLATFORM, title: 'EnterprisePlatform · прод', enabled: false } },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().platform.enabled).toBe(true);
+    expect(res.json().active).toBe(true);
+    expect(store.getSettings().platforms[0]?.enabled).toBe(true);
+  });
+
   it('идентификатор в адресе и в теле обязаны совпадать: ключ лежит под старым', async () => {
     const res = await app.inject({
       method: 'PUT',
@@ -119,7 +155,14 @@ describe('platform routes: настройка контура', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/api/platforms/enterprise-platform-dev',
-      payload: { settings: { ...PLATFORM, caCertPath: join(root, 'нет-такого.pem') } },
+      payload: {
+        settings: {
+          ...PLATFORM,
+          toolShim: true,
+          contourPrompt: true,
+          caCertPath: join(root, 'нет-такого.pem'),
+        },
+      },
     });
 
     expect(res.statusCode).toBe(400);
@@ -139,7 +182,7 @@ describe('platform routes: настройка контура', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/api/platforms/enterprise-platform-dev',
-      payload: { settings: { ...PLATFORM, caCertPath: pem } },
+      payload: { settings: { ...PLATFORM, toolShim: true, contourPrompt: true, caCertPath: pem } },
     });
 
     expect(res.statusCode).toBe(200);
@@ -152,7 +195,7 @@ describe('platform routes: настройка контура', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/api/platforms/enterprise-platform-dev',
-      payload: { settings: { ...PLATFORM, caCertPath: fake } },
+      payload: { settings: { ...PLATFORM, toolShim: true, contourPrompt: true, caCertPath: fake } },
     });
 
     expect(res.statusCode).toBe(400);
@@ -314,6 +357,122 @@ describe('platform routes: проверка связи', () => {
   });
 });
 
+/**
+ * Активность как её видит браузер. Проверяется здесь то, чего не доказывает ни
+ * один разбор домена: что маршруты вообще заведены, что отказ приезжает своим
+ * кодом, что сетевой итог лежит ВНУТРИ ответа — и что «погасить рассказ» не
+ * читается как «удалить контур с таким именем».
+ */
+describe('platform routes: активность контура (Т2)', () => {
+  const SECOND: Platform = { ...PLATFORM, id: 'enterprise-platform-prod', title: 'EnterprisePlatform · прод' };
+
+  /** Управляемый профиль прежнего контура: по нему видно, что откат случился. */
+  const managedProfile = (platformId: string): EndpointProfile => ({
+    id: managedProfileId(platformId),
+    name: `Контур ${platformId}`,
+    baseUrl: `http://127.0.0.1:5199/${platformId}`,
+    apiKind: 'anthropic',
+    model: '',
+    writeToken: false,
+    ownerPlatformId: platformId,
+  });
+
+  it('активация переносит активность: прежний гаснет вместе со своим профилем', async () => {
+    writePlatform(store, { ...PLATFORM, enabled: true });
+    writePlatform(store, { ...SECOND, enabled: false });
+    store.updateSettings({
+      activePlatformId: PLATFORM.id,
+      endpointProfiles: [managedProfile(PLATFORM.id)],
+    });
+
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-prod/activate' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().activePlatformId).toBe('enterprise-platform-prod');
+    expect(res.json().previousPlatformId).toBe('enterprise-platform-dev');
+    // Прежний контур не просто помечен неактивным: его применение снято, и
+    // профиль, смотревший в шлюз, ушёл вместе с ним.
+    expect(res.json().rollback.profileRemoved).toBe(true);
+    expect(store.getSettings().endpointProfiles).toEqual([]);
+    expect(store.getSettings().activePlatformId).toBe('enterprise-platform-prod');
+    expect(store.getSettings().platforms.map((item) => [item.id, item.enabled])).toEqual([
+      ['enterprise-platform-dev', false],
+      ['enterprise-platform-prod', true],
+    ]);
+  });
+
+  it('погашенный шлюз — это красный пробный запрос В ОТВЕТЕ, а не отказ маршрута', async () => {
+    // Шлюз этого теста не поднят, значит порт живого слушателя нулевой. Такая
+    // активация обязана состояться и назвать причину: «активировали, но
+    // спросить модель нечем» — состояние карточки, а не сбой панели.
+    writePlatform(store, PLATFORM);
+
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/activate' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().probe.outcome).toBe('ok');
+    expect(res.json().smoke.ok).toBe(false);
+    expect(res.json().smoke.detail).toContain('Шлюз не поднят');
+    expect(store.getSettings().activePlatformId).toBe('enterprise-platform-dev');
+    // Наружу ходила только проба: пробный запрос идёт в 127.0.0.1 и до него не дошло.
+    expect(calls).toEqual(['https://api.dev.example.ru/v1/models']);
+  });
+
+  it('возврат по кнопке чистит поле активного контура и не ходит в сеть', async () => {
+    writePlatform(store, { ...PLATFORM, enabled: true });
+    store.updateSettings({
+      activePlatformId: PLATFORM.id,
+      endpointProfiles: [managedProfile(PLATFORM.id)],
+    });
+
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/deactivate' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().profileRemoved).toBe(true);
+    expect(store.getSettings().activePlatformId).toBe('');
+    expect(store.getSettings().platforms[0]?.enabled).toBe(false);
+    expect(store.getSettings().endpointProfiles).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it('несуществующий контур на обеих ручках активности — 404, а не 500', async () => {
+    const answers = await Promise.all([
+      app.inject({ method: 'POST', url: '/api/platforms/нет-такого/activate' }),
+      app.inject({ method: 'POST', url: '/api/platforms/нет-такого/deactivate' }),
+    ]);
+
+    for (const res of answers) {
+      expect(res.statusCode).toBe(404);
+      expect(res.json().code).toBe('platform_not_found');
+    }
+    expect(store.getSettings().activePlatformId).toBe('');
+  });
+
+  it('рассказ о переносе гасится своим маршрутом, а не удалением контура', async () => {
+    writePlatform(store, PLATFORM);
+    store.setPlatformActivationNotice({
+      activatedId: PLATFORM.id,
+      activatedTitle: PLATFORM.title,
+      others: ['EnterprisePlatform · прод'],
+    });
+
+    const before = await app.inject({ method: 'GET', url: '/api/platforms' });
+    expect(before.json().activationNotice.others).toEqual(['EnterprisePlatform · прод']);
+
+    const res = await app.inject({ method: 'DELETE', url: '/api/platforms/activation-notice' });
+
+    expect(res.statusCode).toBe(200);
+    // Рядом с ним живёт «DELETE /api/platforms/:id», и совпасть они не вправе:
+    // удаление контура по имени «activation-notice» ответило бы 404, а рассказ
+    // остался бы висеть. (Порядок объявления на это не влияет — постоянный
+    // отрезок у маршрутизатора Fastify всегда старше параметра; проверено
+    // перестановкой: тест остаётся зелёным.)
+    expect(res.json().platforms).toHaveLength(1);
+    expect(res.json().activationNotice).toBeUndefined();
+    expect(store.getPlatformActivationNotice()).toBeUndefined();
+  });
+});
+
 describe('инвариант 1: ни один ответ раздела не содержит ключа', () => {
   it('перебор всех маршрутов — наружу уходит только маска', async () => {
     writePlatform(store, PLATFORM);
@@ -374,7 +533,14 @@ describe('инвариант 1: ни один ответ раздела не с�
     // ходит — это проверяет отдельный тест ниже. Список здесь короткий
     // намеренно: он и есть перечень мест, откуда панель вообще может позвонить
     // в контур, и вырасти он может только правкой этой строки.
+    //
+    // `activation.ts` добавлен Т2 ОСОЗНАННО: активация — единственное действие,
+    // после которого проба обязательна, потому что человек только что перевёл
+    // на этот контур и панель, и все CLI. Ходит она по нажатию кнопки, а не
+    // сама: при старте панели активация не зовётся (перенос старых настроек
+    // сети не касается вовсе).
     expect(callers.sort()).toEqual([
+      'activation.ts',
       'check.ts',
       'model-routes.ts',
       'platform-routes.ts',

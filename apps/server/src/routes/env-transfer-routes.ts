@@ -11,6 +11,7 @@ import {
   parseEnvironmentArchive,
 } from '../domains/env-transfer/archive.ts';
 import { applyEnvironmentImport, planEnvironmentImport } from '../domains/env-transfer/import.ts';
+import { reconcileActivePlatform } from '../domains/platform/activation.ts';
 import { providerLocations } from '../domains/env-transfer/locations.ts';
 import {
   buildPanelPlatforms,
@@ -29,6 +30,9 @@ import {
   readToken,
   writePlatforms,
 } from '../domains/platform/store.ts';
+import { buildPanelPrompts, takePanelPrompts } from '../domains/env-transfer/prompts.ts';
+import { PromptTooLongError } from '../domains/prompts/errors.ts';
+import { exportPromptOverrides, savePrompt } from '../domains/prompts.ts';
 
 /**
  * Перенос окружения: конфигурация ЛЮБОГО провайдера уезжает одним zip и
@@ -57,10 +61,18 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
   const panelSection = () =>
     buildPanelPlatforms(readPlatforms(ctx.store), activeGatewaySettings(ctx.store));
 
+  /**
+   * Правки промптов этой машины для архива. Встроенных текстов здесь нет: они
+   * приезжают вместе с панелью, и везти их копию значило бы перекрыть на новой
+   * машине её собственный встроенный текст (`env-transfer/prompts.ts`).
+   */
+  const promptSection = () => buildPanelPrompts(exportPromptOverrides(ctx.location.paths.appData));
+
   /** Контекст этой машины для плана: с чем сравнивать и что уже есть. */
   const panelContext = () => ({
     current: readPlatforms(ctx.store),
     hasToken: (id: string) => Boolean(readToken(ctx.location.paths.appData, id)),
+    prompts: exportPromptOverrides(ctx.location.paths.appData),
   });
 
   const requireProvider = (id: unknown, reply: FastifyReply): ConfigProvider | undefined => {
@@ -140,7 +152,13 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
 
       const exportedAt = body.exportedAt?.trim() || new Date().toISOString();
       try {
-        const built = buildEnvironmentArchive(provider, exportedAt, override(), panelSection());
+        const built = buildEnvironmentArchive(
+          provider,
+          exportedAt,
+          override(),
+          panelSection(),
+          promptSection(),
+        );
         const path = uniquePath(targetDir, archiveFileName(provider.id, exportedAt));
         writeFileSync(path, built.zip);
 
@@ -150,6 +168,7 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
           bytes: built.zip.length,
           files: built.manifest.entries.length,
           platforms: built.manifest.panel?.platforms.length ?? 0,
+          prompts: built.manifest.panelPrompts?.prompts.length ?? 0,
           skipped: built.manifest.skipped,
           checklist: built.manifest.checklist,
         };
@@ -188,6 +207,7 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
       archivePath?: string;
       selection?: unknown;
       platformSelection?: unknown;
+      promptSelection?: unknown;
       applyGateway?: unknown;
     };
   }>('/api/env-transfer/import/apply', (request, reply) => {
@@ -197,12 +217,18 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
 
     const selection = stringList(body.selection);
     const platformSelection = stringList(body.platformSelection);
+    const promptSelection = stringList(body.promptSelection);
     // Настройка шлюза — такая же отметка, как файл и контур: её одну человек
     // вправе принять, ничего больше не трогая. Без неё в этой проверке кнопка на
     // экране была бы включена, а маршрут отвечал бы «не отмечено ни одной
     // записи» на прямо отмеченную запись.
     const applyGateway = body.applyGateway === true;
-    if (selection.length === 0 && platformSelection.length === 0 && !applyGateway) {
+    if (
+      selection.length === 0 &&
+      platformSelection.length === 0 &&
+      promptSelection.length === 0 &&
+      !applyGateway
+    ) {
       return reply
         .code(400)
         .send({ error: 'empty_selection', message: 'Не отмечено ни одной записи.' });
@@ -225,7 +251,8 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
           : { written: [], merged: [], skipped: [], backupPaths: [] };
 
       const platforms = applyPanelSection(parsed, platformSelection, applyGateway);
-      return { ok: true, needsRestart: true, summary, platforms };
+      const prompts = applyPromptSection(parsed, promptSelection);
+      return { ok: true, needsRestart: true, summary, platforms, prompts };
     } catch (error) {
       return fail(reply, error);
     }
@@ -272,12 +299,62 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
     // выбирал (`store.writePlatforms`).
     writePlatforms(ctx.store, incoming);
     const written = incoming.map((platform) => platform.id);
+    // Архив принёс тумблеры ЧУЖОЙ машины, где активным был свой контур. Без
+    // сведения включённых оказалось бы двое — здешний активный и приехавший, —
+    // и шлюз обслуживал бы обоих, пока карточка приехавшего называет его
+    // неактивным (инвариант 1). Здешний активный остаётся активным: архив
+    // привозит настройки, а не решение о том, через что идёт работа.
+    if (written.length > 0) reconcileActivePlatform(ctx.store);
 
     const gateway = applyGateway ? takePanelGateway(data) : undefined;
     if (gateway) ctx.store.updateSettings({ platformGateway: gateway });
 
     if (written.length > 0 || gateway) reconcileManagedProfiles(ctx.store);
     return { written, gateway: Boolean(gateway), keysDropped };
+  }
+
+  /**
+   * Пишет отмеченные правки промптов. Встроенные тексты остаются нетронутыми —
+   * не по договорённости, а потому, что писать в них некуда: они лежат файлами
+   * репозитория, а сюда приезжает только слой правок.
+   *
+   * Неизвестный этой панели идентификатор отсеивается доменом (`takePanelPrompts`)
+   * и в ответ не попадает: молча созданный файл правки для несуществующего
+   * промпта никто бы не прочитал.
+   */
+  function applyPromptSection(
+    parsed: ReturnType<typeof parseEnvironmentArchive>,
+    selection: string[],
+  ): { written: string[]; skipped: { id: string; reason: string }[] } {
+    if (selection.length === 0) return { written: [], skipped: [] };
+
+    const data = parsed.manifest.panelPrompts
+      ? parsed.files.get(parsed.manifest.panelPrompts.archivePath)
+      : undefined;
+
+    const written: string[] = [];
+    const skipped: { id: string; reason: string }[] = [];
+    for (const override of takePanelPrompts(data, selection)) {
+      try {
+        // Через тот же путь, что и правка руками: совпавший со встроенным текст
+        // правкой не станет, а дата сохранения будет датой разворота, а не чужой
+        // машины — здесь это правка появилась сегодня. Потолок длины держит тот
+        // же путь, поэтому архив с гигантским промптом отказывается ОДНОЙ
+        // правкой, а не роняет весь разворот.
+        savePrompt(
+          ctx.location.paths.appData,
+          override.id,
+          override.text,
+          undefined,
+          ctx.backupDir,
+        );
+        written.push(override.id);
+      } catch (error) {
+        if (!(error instanceof PromptTooLongError)) throw error;
+        skipped.push({ id: override.id, reason: error.message });
+      }
+    }
+    return { written, skipped };
   }
 
   /** Читает архив с диска. Путь приходит из обзора файловой системы панели. */

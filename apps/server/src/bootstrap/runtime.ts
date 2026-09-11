@@ -26,6 +26,11 @@ import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/project-tests.ts';
 import { DlpProxy } from '../domains/dlp.ts';
 import { PlatformGateway } from '../domains/platform/gateway/listener.ts';
+import {
+  resolveRunRoute,
+  type PlatformRoutingDeps,
+  type PlatformRunRoute,
+} from '../domains/platform/routing.ts';
 import { createRunNotifier } from '../domains/remote-notify.ts';
 import { createTelegramNotifier, type TelegramNotice } from '../domains/notify/telegram.ts';
 import { createWebhookNotifier } from '../domains/notify/webhook.ts';
@@ -452,6 +457,34 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // читает сам, в момент запроса, — поэтому создаётся без настроек и знает
   // только состояние панели.
   const platformGateway = new PlatformGateway();
+  /**
+   * Маршрут контура для прогонов Claude (Т3): реестр спрашивает по
+   * происхождению прогона, домен отвечает окружением. Порт берётся у ЖИВОГО
+   * слушателя — записанный в состоянии остался бы от прошлого запуска, и
+   * прогон ушёл бы тому процессу, который занял порт после панели.
+   */
+  const platformRouting: PlatformRoutingDeps = {
+    store: ctx.store,
+    appDataDir: ctx.location.paths.appData,
+    gatewayPort: () => (platformGateway.status().running ? platformGateway.status().port : 0),
+  };
+  const runRoute = (origin: string): PlatformRunRoute => {
+    const decision = resolveRunRoute(platformRouting, origin);
+    // Пустой маршрут — законный ответ «не через контур», и он ОБЯЗАН затирать
+    // прежний: продолжение остановленного прогона приходит со старыми
+    // параметрами, и адрес контура пережил бы снятую галочку.
+    if (!decision.routed) return { env: {} };
+    return {
+      env: decision.env,
+      ...(decision.systemPrompt ? { systemPrompt: decision.systemPrompt } : {}),
+    };
+  };
+  chatRuns.setPlatformRouting(runRoute);
+  projectTestRuns.setPlatformRouting(() => runRoute('tests'));
+  // Чат чужого CLI спрашивает за себя: потребитель `foreign:<cli>` собирается по
+  // провайдеру разговора. Без этой строки галочка «Qwen Code» в мастере была бы
+  // нарисованной — контур сохранил бы её, а прогон ушёл бы в облако вендора.
+  providerChats.setPlatformRouting(runRoute);
   const events = createEventHub();
 
   /**

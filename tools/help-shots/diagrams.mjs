@@ -58,6 +58,116 @@ const SETS = [
     topic: 'chat',
     pages: ['message-path', 'split-conveyor'],
   },
+  {
+    source: 'docs/diagrams/rules-guide/rules-guide.drawio',
+    topic: 'rules',
+    pages: ['rule-round-trip', 'rule-states'],
+  },
+  {
+    source: 'docs/diagrams/claudeMd-guide/claudeMd-guide.drawio',
+    topic: 'claudeMd',
+    pages: ['instruction-layers', 'save-and-conflict'],
+  },
+  {
+    source: 'docs/diagrams/projects-guide/projects-guide.drawio',
+    topic: 'projects',
+    pages: ['registry-and-files', 'other-cli'],
+  },
+  {
+    source: 'docs/diagrams/groups-guide/groups-guide.drawio',
+    topic: 'groups',
+    pages: ['two-marks', 'compiled-set'],
+  },
+  {
+    source: 'docs/diagrams/permissions-guide/permissions-guide.drawio',
+    topic: 'permissions',
+    pages: ['decision-order', 'where-rules-live'],
+  },
+  {
+    source: 'docs/diagrams/mcp-guide/mcp-guide.drawio',
+    topic: 'mcp',
+    pages: ['probe-path', 'who-runs-what'],
+  },
+  {
+    source: 'docs/diagrams/env-guide/env-guide.drawio',
+    topic: 'env',
+    pages: ['where-a-value-goes'],
+  },
+  {
+    source: 'docs/diagrams/overview-guide/overview-guide.drawio',
+    topic: 'overview',
+    pages: ['where-numbers-come-from'],
+  },
+  {
+    source: 'docs/diagrams/search-guide/search-guide.drawio',
+    topic: 'search',
+    pages: ['what-search-covers'],
+  },
+  {
+    source: 'docs/diagrams/analytics-guide/analytics-guide.drawio',
+    topic: 'analytics',
+    pages: ['how-the-report-is-built'],
+  },
+  {
+    source: 'docs/diagrams/history-guide/history-guide.drawio',
+    topic: 'history',
+    pages: ['where-the-feed-comes-from'],
+  },
+  {
+    source: 'docs/diagrams/compare-guide/compare-guide.drawio',
+    topic: 'compare',
+    pages: ['what-crosses-and-what-does-not'],
+  },
+  {
+    source: 'docs/diagrams/skills-guide/skills-guide.drawio',
+    topic: 'skills',
+    pages: ['skill-pickup', 'skill-on-disk'],
+  },
+  {
+    source: 'docs/diagrams/commands-guide/commands-guide.drawio',
+    topic: 'commands',
+    pages: ['four-sources'],
+  },
+  {
+    source: 'docs/diagrams/hooks-guide/hooks-guide.drawio',
+    topic: 'hooks',
+    pages: ['hook-flow', 'hook-storage'],
+  },
+  {
+    source: 'docs/diagrams/scripts-guide/scripts-guide.drawio',
+    topic: 'scripts',
+    pages: ['script-usage'],
+  },
+  {
+    source: 'docs/diagrams/plugins-guide/plugins-guide.drawio',
+    topic: 'plugins',
+    pages: ['plugin-install'],
+  },
+  {
+    source: 'docs/diagrams/settings-guide/settings-guide.drawio',
+    topic: 'settings',
+    pages: ['what-happens-before-a-write'],
+  },
+  {
+    source: 'docs/diagrams/providers-guide/providers-guide.drawio',
+    topic: 'providers',
+    pages: ['what-switching-changes'],
+  },
+  {
+    source: 'docs/diagrams/endpoints-guide/endpoints-guide.drawio',
+    topic: 'endpoints',
+    pages: ['where-the-address-is-written'],
+  },
+  {
+    source: 'docs/diagrams/integrations-guide/integrations-guide.drawio',
+    topic: 'integrations',
+    pages: ['who-calls-whom'],
+  },
+  {
+    source: 'docs/diagrams/dlp-guide/dlp-guide.drawio',
+    topic: 'dlp',
+    pages: ['what-the-proxy-sees-and-what-the-gate-sees'],
+  },
 ];
 
 const browser = await chromium.launch();

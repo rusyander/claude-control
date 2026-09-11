@@ -374,7 +374,10 @@ export async function shootSplit(browser, web, scenario) {
     await page.waitForTimeout(800);
 
     // ── 05. Сверка веток после работы ────────────────────────────────────────
-    await page.getByRole('button', { name: 'Сверить ветки' }).first().click();
+    await page
+      .getByRole('button', { name: /^(Сверить ветки|Check branches)$/ })
+      .first()
+      .click();
     await page.waitForTimeout(2000);
     // Поля почти нет: над панелью идёт строка группы, и на обычном поле она
     // попадала в кадр обрезанной наполовину.
@@ -382,7 +385,7 @@ export async function shootSplit(browser, web, scenario) {
 
     // ── 06. Пауза всего дерева ───────────────────────────────────────────────
     await page
-      .getByRole('button', { name: /Остановить всё/ })
+      .getByRole('button', { name: /^(Остановить всё|Stop all)/ })
       .first()
       .click();
     await page.waitForTimeout(2500);

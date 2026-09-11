@@ -378,6 +378,9 @@ export function createSplitLauncher(
       .filter(Boolean)
       .join(' ');
     const meta = {
+      // Происхождение прогона (Т3): дети разделения — это потребитель «группы»,
+      // и галочка контура у них своя, отдельная от обычного чата.
+      origin: 'groups' as const,
       projectPath: cwd,
       // Понижённая работа попадает в журнал сдачи вместе с классом; план — нет,
       // он идёт на потолке.
@@ -651,7 +654,7 @@ export function createSplitLauncher(
         permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
         ...(initiative ? { appendSystemPrompt: initiative } : {}),
       };
-      const meta = { projectPath: dir };
+      const meta = { origin: 'groups' as const, projectPath: dir };
       claim?.(chatId);
       if (deps.gate?.defer('triage', chatId, options, meta)) {
         return { chatId, started: false, deferred: true };
@@ -712,7 +715,7 @@ export function createReviewStarter(
       permissionPrompt: { runId: input.chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
       ...(initiative ? { appendSystemPrompt: initiative } : {}),
     };
-    const meta = { projectPath: input.cwd };
+    const meta = { origin: 'groups' as const, projectPath: input.cwd };
     // Дерево на паузе — прогон заведён, но ждёт «Продолжить всё»: решение
     // человека при этом не теряется, оно уже записано в связь.
     if (deps.gate?.defer('stage', input.chatId, options, meta)) return { started: true };

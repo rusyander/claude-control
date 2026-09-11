@@ -171,7 +171,7 @@ export async function openProject(page, web) {
   await page.goto(`${web}/chat`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('nav');
   await page.waitForTimeout(1500);
-  await page.getByRole('tab', { name: 'Проекты' }).click();
+  await page.getByRole('tab', { name: /^(Проекты|Projects)$/ }).click();
   await page.waitForTimeout(800);
   await page
     .getByRole('button', { name: new RegExp(PROJECT.name) })

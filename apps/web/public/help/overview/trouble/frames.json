@@ -1,0 +1,60 @@
+{
+  "topic": "overview",
+  "scenario": "trouble",
+  "frames": [
+    {
+      "id": "01-wrong-dir",
+      "file": "01-wrong-dir.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-09-11T15:03:34.580Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации задан вручную D:/backup/claude-2026-08 Не найдены файлы: CLAUDE.md, settings.json Изменения за 7 дн. 0 Изменений нет Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 0 0 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 0 пока не созданы Резервные копии 0 копий пока нет Открыть историю",
+      "en": {
+        "file": "01-wrong-dir.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-11T17:23:28.284Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Configuration overview What is currently wired into your Claude Code Configuration directory set manually D:/backup/claude-2026-08 Missing files: CLAUDE.md, settings.json Changes in 7 days 0 No changes Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 0 0 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 0 none yet Backups 0 no backups yet Open history"
+      }
+    },
+    {
+      "id": "02-broken-hook",
+      "file": "02-broken-hook.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-09-11T15:03:36.624Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 4 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации определён автоматически C:/Users/user/.claude Изменения за 7 дн. 5 Открыть историю изменений Правила 4 4 включено Добавить CLAUDE.md Скиллы 3 2 включено Добавить Хуки 4 1 хуков со сломанным путём Добавить Скрипты 4 1 не привязано к событиям Добавить MCP-серверы 4 3 включено Добавить Права 7 4 разрешено · 1 с подтверждением · 2 запрещено Группы 0 пока не созданы Резервные копии 5 последняя: 10 сент. 2026 г. Открыть историю",
+      "en": {
+        "file": "02-broken-hook.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-11T17:23:30.385Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 4 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Configuration overview What is currently wired into your Claude Code Configuration directory detected automatically C:/Users/user/.claude Changes in 7 days 5 Open change history Rules 4 4 enabled Add CLAUDE.md Skills 3 2 enabled Add Hooks 4 1 hooks with a broken path Add Scripts 4 1 not bound to any event Add MCP servers 4 3 enabled Add Permissions 7 4 allowed · 1 ask first · 2 denied Groups 0 none yet Backups 5 latest: Sep 10, 2026 Open history"
+      }
+    },
+    {
+      "id": "03-hooks",
+      "file": "03-hooks.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-09-11T15:03:38.822Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 4 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Bash Страж разрушительных команд: не пускает rm -rf мимо прав. node \"C:/Users/user/.claude/hooks/guard-destructive.mjs\" PostToolUse Edit Прогоняет форматирование по изменённым файлам. node \"C:/Users/user/.claude/hooks/format-edited.mjs\" Stop Уведомление о завершении ответа. node \"C:/Users/user/.claude/hooks/notify-done.mjs\" SessionStart Файл скрипта не найден node \"C:/Users/user/.claude/hooks/warm-cache.mjs\"",
+      "en": {
+        "file": "03-hooks.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-11T17:23:32.689Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 4 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Bash Страж разрушительных команд: не пускает rm -rf мимо прав. node \"C:/Users/user/.claude/hooks/guard-destructive.mjs\" PostToolUse Edit Прогоняет форматирование по изменённым файлам. node \"C:/Users/user/.claude/hooks/format-edited.mjs\" Stop Уведомление о завершении ответа. node \"C:/Users/user/.claude/hooks/notify-done.mjs\" SessionStart Script file not found node \"C:/Users/user/.claude/hooks/warm-cache.mjs\""
+      }
+    }
+  ]
+}

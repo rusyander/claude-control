@@ -4,11 +4,13 @@ import type {
   ProviderChatStatus,
   ProviderChatTransport,
 } from '@agentdeck/contracts';
+import { foreignConsumerId } from '@agentdeck/contracts/platform-consumers';
 import {
   ProviderChatRun,
   type ProviderChatRunLike,
   type ProviderChatRunOptions,
 } from './ProviderChatRun.ts';
+import type { PlatformRunRoute } from '../platform/routing.ts';
 import { appendMessage, readChat } from './store.ts';
 import { composeUserMessage } from './prompt.ts';
 
@@ -78,7 +80,7 @@ export interface ProviderChatFinished {
  */
 export type ProviderChatRunDeps = Omit<
   ProviderChatRunOptions,
-  'history' | 'chatId' | 'appDataDir' | 'workdir' | 'model' | 'effort'
+  'history' | 'chatId' | 'appDataDir' | 'workdir' | 'model' | 'effort' | 'platformEnv'
 >;
 
 export interface SendOutcome {
@@ -112,6 +114,22 @@ export class ProviderChatService {
     this.onFinished = listener;
   }
 
+  /**
+   * Маршрут контура для чата чужого CLI (Т3): по потребителю `foreign:<cli>` —
+   * переменные окружения ОДНОГО запуска.
+   *
+   * Тем же приёмом, что у реестра Claude, и по той же причине: служба знает,
+   * КАКОЙ CLI она поднимает, но про контуры, шлюз и ключи не знает ничего.
+   * Спрашивается на КАЖДОМ сообщении — снятая галочка обязана действовать со
+   * следующего запуска, а не с перезапуска панели. Слушателя нет — чат ходит
+   * своим провайдером, как до контуров.
+   */
+  setPlatformRouting(resolve: (consumer: string) => PlatformRunRoute): void {
+    this.platformRouting = resolve;
+  }
+
+  private platformRouting?: (consumer: string) => PlatformRunRoute;
+
   /** Задать вопрос: реплика пользователя пишется сразу, ответ идёт потоком. */
   send(
     appDataDir: string,
@@ -143,6 +161,11 @@ export class ProviderChatService {
     this.runs.set(chatId, live);
 
     const history = [...chat.messages, message];
+    // Маршрут решается ЗДЕСЬ, на каждом сообщении, и в опции прогона приходит
+    // только отсюда: у `ProviderChatRunDeps` этого поля нет намеренно — иначе
+    // адрес контура протащил бы в новый запуск отложенный вызов конвейера,
+    // собранный при прежней галочке. Пустой объект — «не через контур».
+    const route = this.platformRouting?.(foreignConsumerId(providerId)) ?? { env: {} };
 
     void live.run
       .start(
@@ -151,6 +174,7 @@ export class ProviderChatService {
           history,
           chatId,
           appDataDir,
+          platformEnv: route.env,
           ...(chat.workdir ? { workdir: chat.workdir } : {}),
           // Подобранная модель живёт в шапке разговора и действует на КАЖДОЕ
           // сообщение в нём, а не только на первое.

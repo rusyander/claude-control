@@ -28,7 +28,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario } from './kit.mjs';
+import { openScenario, applyShotLanguage } from './kit.mjs';
 import { shootBasics } from './chat-basics.mjs';
 import { shootSplit } from './chat-split.mjs';
 
@@ -74,6 +74,11 @@ try {
   if (!(await waitFor(`${PANEL}/api/system`, 40)))
     throw new Error('одноразовая панель не поднялась');
   console.log(`панель на ${PANEL}`);
+
+  // Язык — до первого кадра и через настройки панели, а не через i18n в
+  // странице: кадр должен доказывать тот путь, по которому язык приходит
+  // человеку. `GUIDE_LANG=en` → английские кадры рядом с русскими.
+  await applyShotLanguage(PANEL);
 
   started.push(
     spawn(

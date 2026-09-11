@@ -5,6 +5,7 @@ import type { AppStore } from '../../../lib/app-store.ts';
 import type { PlatformFetch } from '../ca-fetch.ts';
 import { readPlatforms, readToken } from '../store.ts';
 import { reconcileManagedProfiles } from '../apply/profile.ts';
+import { toolShimReport } from '../tool-shim-report.ts';
 import { violationReport } from '../violations.ts';
 import type { PricingLookup } from '../../analytics/pricing.ts';
 import { GATEWAY_ROUTES, handleGatewayRequest } from './pipeline.ts';
@@ -52,6 +53,10 @@ const GATEWAY_COMPROMISES: CompromiseId[] = [
   'gateway-required',
   'nonstream-120s',
   'context-managed',
+  // Цена прослойки инструментов: правила и схемы едут в КАЖДОМ ходе, кэша
+  // промпта у платформы нет. Значка на экране у этой подписи нет и быть не
+  // может — платит за неё шлюз, а не элемент интерфейса.
+  'shim-no-cache',
 ];
 
 export interface GatewayRuntime {
@@ -110,6 +115,7 @@ export class PlatformGateway {
       // оставшийся на экране, читается как след того, на который человек
       // смотрит, а выключение обязано возвращать раздел к прежнему виду.
       violations: violationReport(this.#journal.events(), { platformIds: this.#enabledIds() }),
+      toolShim: toolShimReport(this.#journal.events(), { platformIds: this.#enabledIds() }),
       compromises: GATEWAY_COMPROMISES,
     };
   }

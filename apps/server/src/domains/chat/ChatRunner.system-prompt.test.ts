@@ -33,6 +33,17 @@ const APPENDED =
   'Панель показывает предложения карточками. Выведи блок с JSON вида ' +
   '{"done":"что закрыто","next":"чем продолжить","checkpoint":".agent/PROGRESS.md"} и остановись.';
 
+/**
+ * Промпт контура (Т5.4а): многострочный, с примерами JSON и угловыми скобками
+ * грамматики. В командной строке такому тексту делать нечего ни на одной
+ * системе — отсюда файл везде, а не только на Windows.
+ */
+const CONTOUR =
+  'Ты работаешь через контур.\n' +
+  'Инструмент вызывается блоком:\n' +
+  '<tool_call>{"name":"Read","arguments":{"file_path":"a.ts"}}</tool_call>\n' +
+  'Больше ничего в этом ходе не пиши.';
+
 interface SpawnCall {
   args: string[];
   /** Содержимое файла читаем в момент запуска: после прогона папки уже нет. */
@@ -43,7 +54,12 @@ interface SpawnCall {
  * Прогон с подменённой системой. `isWindows` в модуле вычисляется на импорте,
  * поэтому платформа подменяется ДО него, а модули сбрасываются.
  */
-async function runOn(platform: string): Promise<SpawnCall> {
+async function runOn(
+  platform: string,
+  extra: { appendSystemPrompt?: string; platformSystemPrompt?: string } = {
+    appendSystemPrompt: APPENDED,
+  },
+): Promise<SpawnCall> {
   const original = Object.getOwnPropertyDescriptor(process, 'platform');
   Object.defineProperty(process, 'platform', { value: platform, configurable: true });
 
@@ -55,8 +71,8 @@ async function runOn(platform: string): Promise<SpawnCall> {
     spawn: (_command: string, args: string[]) => {
       call.args = args;
       for (const arg of args) {
-        // Путь до файла дописки читаем сразу: `start` уберёт папку за собой.
-        if (arg.includes('append-system-prompt')) {
+        // Путь до файла промпта читаем сразу: `start` уберёт папку за собой.
+        if (arg.includes('system-prompt')) {
           try {
             call.fileContents[arg] = readFileSync(arg.replace(/^"|"$/g, ''), 'utf8');
           } catch {
@@ -76,7 +92,7 @@ async function runOn(platform: string): Promise<SpawnCall> {
 
   const { ChatRun } = await import('./ChatRunner.ts');
   await new ChatRun().start(
-    { prompt: 'настоящая задача', cwd: process.cwd(), appendSystemPrompt: APPENDED },
+    { prompt: 'настоящая задача', cwd: process.cwd(), ...extra },
     () => undefined,
   );
 
@@ -111,5 +127,43 @@ describe('ChatRun: дописка к системному промпту', () =>
     expect(flag).toBeGreaterThanOrEqual(0);
     expect(call.args[flag + 1]).toBe(APPENDED);
     expect(call.args.some((arg) => arg.includes('--append-system-prompt-file'))).toBe(false);
+  });
+});
+
+describe('ChatRun: свой системный промпт контура (Т5.4а)', () => {
+  for (const platform of ['win32', 'linux']) {
+    it(`на ${platform} уходит файлом, дословно, и заменяет промпт CLI`, async () => {
+      const call = await runOn(platform, { platformSystemPrompt: CONTOUR });
+
+      const flag = call.args.indexOf('--system-prompt-file');
+      expect(flag).toBeGreaterThanOrEqual(0);
+
+      const path = call.args[flag + 1] ?? '';
+      // Дословно: ни переводы строк, ни кавычки примера JSON не тронуты.
+      expect(call.fileContents[path]).toBe(CONTOUR);
+      expect(call.args.some((arg) => arg.includes('"'))).toBe(false);
+      // Текст промпта не имеет права оказаться в командной строке ни куском.
+      expect(call.args.some((arg) => arg.includes('<tool_call>'))).toBe(false);
+    });
+  }
+
+  it('пустое значение не добавляет флага вовсе', async () => {
+    const call = await runOn('win32', { platformSystemPrompt: '   ' });
+
+    expect(call.args).not.toContain('--system-prompt-file');
+    expect(call.args.some((arg) => arg.includes('--system-prompt'))).toBe(false);
+  });
+
+  it('живёт рядом с допиской: два разных файла, два разных флага', async () => {
+    const call = await runOn('win32', {
+      platformSystemPrompt: CONTOUR,
+      appendSystemPrompt: APPENDED,
+    });
+
+    const own = call.args[call.args.indexOf('--system-prompt-file') + 1] ?? '';
+    const appended = call.args[call.args.indexOf('--append-system-prompt-file') + 1] ?? '';
+    expect(own).not.toBe(appended);
+    expect(call.fileContents[own]).toBe(CONTOUR);
+    expect(call.fileContents[appended]).toBe(APPENDED);
   });
 });

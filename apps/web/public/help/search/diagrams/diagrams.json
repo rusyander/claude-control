@@ -1,0 +1,15 @@
+{
+  "topic": "search",
+  "source": "docs/diagrams/search-guide/search-guide.drawio",
+  "pages": [
+    {
+      "name": "what-search-covers",
+      "file": "what-search-covers.png",
+      "page": 1,
+      "source": "d7adbef0baa41e31",
+      "width": 1487,
+      "height": 1058,
+      "exportedAt": "2026-09-11T14:34:41.520Z"
+    }
+  ]
+}

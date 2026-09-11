@@ -1,0 +1,15 @@
+{
+  "topic": "history",
+  "source": "docs/diagrams/history-guide/history-guide.drawio",
+  "pages": [
+    {
+      "name": "where-the-feed-comes-from",
+      "file": "where-the-feed-comes-from.png",
+      "page": 1,
+      "source": "8c0e32dfbfbf542b",
+      "width": 1507,
+      "height": 958,
+      "exportedAt": "2026-09-11T14:34:47.673Z"
+    }
+  ]
+}

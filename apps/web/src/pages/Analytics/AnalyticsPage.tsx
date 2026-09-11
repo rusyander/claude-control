@@ -130,7 +130,7 @@ export function AnalyticsPage() {
             <StatCard
               label={t('analytics.requests')}
               value={formatNumber(data.overall.requests, locale)}
-              detail={`${data.activeSessions} ${t('analytics.activeSessions')}`}
+              detail={t('analytics.activeSessions', { count: data.activeSessions })}
             />
             <StatCard
               label={t('analytics.outputTokens')}

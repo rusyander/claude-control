@@ -1,0 +1,15 @@
+{
+  "topic": "plugins",
+  "source": "docs/diagrams/plugins-guide/plugins-guide.drawio",
+  "pages": [
+    {
+      "name": "plugin-install",
+      "file": "plugin-install.png",
+      "page": 1,
+      "source": "ffddab4254802cc6",
+      "width": 1565,
+      "height": 1048,
+      "exportedAt": "2026-09-11T15:05:29.318Z"
+    }
+  ]
+}

@@ -16,8 +16,19 @@
 
 export type DlpApiKind = 'anthropic' | 'openai-compat';
 
+/**
+ * Куда попадает текст: обычная строка JSON или JSON, УПАКОВАННЫЙ в строку
+ * (`tool_calls[].function.arguments`, `input_json_delta.partial_json`).
+ *
+ * Разница нужна обратной подстановке, и только ей. Метка экранирования не
+ * требует (буквы, цифры, скобки), а вот значение — сплошь и рядом: путь
+ * `C:\Users\…` или кавычка внутри аргумента, подставленные в упакованный JSON
+ * как есть, делают его неразбираемым, и клиент теряет весь вызов инструмента.
+ */
+export type TextSlot = 'text' | 'json';
+
 type Json = unknown;
-type TextFn = (text: string) => string;
+type TextFn = (text: string, slot?: TextSlot) => string;
 
 /**
  * Какому API принадлежит путь. База адреса у CLI может включать `/v1`, а может
@@ -113,10 +124,11 @@ function mapOpenAiMessage(message: Json, fn: TextFn): Json {
     out.tool_calls = out.tool_calls.map((call) => {
       if (!isRecord(call) || !isRecord(call.function)) return call;
       const fnBlock = call.function;
-      // `arguments` — JSON, УПАКОВАННЫЙ в строку: заменяем как текст. Метка
-      // состоит из букв, цифр и скобок, экранирования JSON не ломает.
+      // `arguments` — JSON, УПАКОВАННЫЙ в строку, и подстановка обязана знать
+      // это: метка экранирования не ломает, а вернувшееся на её место значение
+      // ломает (путь с обратными косыми, кавычка внутри).
       return typeof fnBlock.arguments === 'string'
-        ? { ...call, function: { ...fnBlock, arguments: fn(fnBlock.arguments) } }
+        ? { ...call, function: { ...fnBlock, arguments: fn(fnBlock.arguments, 'json') } }
         : call;
     });
   }
@@ -143,6 +155,19 @@ function mapOpenAiBody(body: Json, fn: TextFn): Json {
   return out;
 }
 
+/** Тот же кадр с подменёнными аргументами — парой к `argumentsDelta`. */
+function withArgumentsText(delta: Record<string, Json>, text: string): Record<string, Json> {
+  if (!Array.isArray(delta.tool_calls)) return delta;
+  let replaced = false;
+  const calls = delta.tool_calls.map((call) => {
+    if (replaced || !isRecord(call) || !isRecord(call.function)) return call;
+    if (typeof call.function.arguments !== 'string') return call;
+    replaced = true;
+    return { ...call, function: { ...call.function, arguments: text } };
+  });
+  return replaced ? { ...delta, tool_calls: calls } : delta;
+}
+
 /** Пройти по пользовательскому тексту тела — и запроса, и цельного ответа. */
 export function mapBodyTexts(body: Json, kind: DlpApiKind, fn: TextFn): Json {
   return kind === 'anthropic' ? mapAnthropicBody(body, fn) : mapOpenAiBody(body, fn);
@@ -157,6 +182,8 @@ export function mapBodyTexts(body: Json, kind: DlpApiKind, fn: TextFn): Json {
 export interface DeltaText {
   channel: string;
   text: string;
+  /** Куда подставлять: обычная строка или упакованный в строку JSON. */
+  slot: TextSlot;
 }
 
 export function deltaTextOf(event: Json, kind: DlpApiKind): DeltaText | undefined {
@@ -167,10 +194,10 @@ export function deltaTextOf(event: Json, kind: DlpApiKind): DeltaText | undefine
     const index = typeof event.index === 'number' ? event.index : 0;
     const delta = event.delta;
     if (delta.type === 'text_delta' && typeof delta.text === 'string') {
-      return { channel: `text:${index}`, text: delta.text };
+      return { channel: `text:${index}`, text: delta.text, slot: 'text' };
     }
     if (delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
-      return { channel: `json:${index}`, text: delta.partial_json };
+      return { channel: `json:${index}`, text: delta.partial_json, slot: 'json' };
     }
     // thinking_delta и signature_delta — мимо: подпись должна дойти как есть.
     return undefined;
@@ -181,7 +208,31 @@ export function deltaTextOf(event: Json, kind: DlpApiKind): DeltaText | undefine
   if (!isRecord(choice) || !isRecord(choice.delta)) return undefined;
   const index = typeof choice.index === 'number' ? choice.index : 0;
   if (typeof choice.delta.content === 'string') {
-    return { channel: `content:${index}`, text: choice.delta.content };
+    return { channel: `content:${index}`, text: choice.delta.content, slot: 'text' };
+  }
+  // Аргументы вызова в потоке. Без этой ветки метка доезжала бы до CLI как
+  // есть, и агент записывал бы `[ПОЧТА_1]` в файл вместо адреса — обратная
+  // подстановка молча не работала бы ровно там, где она нужнее всего.
+  const call = argumentsDelta(choice.delta);
+  if (call) return { channel: `args:${index}:${call.index}`, text: call.text, slot: 'json' };
+  return undefined;
+}
+
+/**
+ * Первая запись `tool_calls` с аргументами-строкой. Первая, а не все: у одного
+ * кадра подстановка одна, а параллельные вызовы контур и так шлёт по одному на
+ * кадр. Пришли двое сразу — второй останется с меткой, и это видно в ответе,
+ * тогда как «починенный» кусками поток разошёлся бы с эталоном замены молча.
+ */
+function argumentsDelta(delta: Record<string, Json>): { index: number; text: string } | undefined {
+  if (!Array.isArray(delta.tool_calls)) return undefined;
+  for (const call of delta.tool_calls) {
+    if (!isRecord(call) || !isRecord(call.function)) continue;
+    if (typeof call.function.arguments !== 'string') continue;
+    return {
+      index: typeof call.index === 'number' ? call.index : 0,
+      text: call.function.arguments,
+    };
   }
   return undefined;
 }
@@ -200,10 +251,12 @@ export function withDeltaText(event: Json, kind: DlpApiKind, text: string): Json
   }
 
   if (!Array.isArray(event.choices)) return event;
-  const choices = event.choices.map((choice, position) =>
-    position === 0 && isRecord(choice) && isRecord(choice.delta)
-      ? { ...choice, delta: { ...choice.delta, content: text } }
-      : choice,
-  );
+  const choices = event.choices.map((choice, position) => {
+    if (position !== 0 || !isRecord(choice) || !isRecord(choice.delta)) return choice;
+    if (typeof choice.delta.content === 'string') {
+      return { ...choice, delta: { ...choice.delta, content: text } };
+    }
+    return { ...choice, delta: withArgumentsText(choice.delta, text) };
+  });
   return { ...event, choices };
 }

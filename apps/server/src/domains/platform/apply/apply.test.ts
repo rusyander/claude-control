@@ -45,8 +45,14 @@ const PLATFORM: Platform = {
   capabilities: [],
   targets: [],
   projectPaths: [],
+  // Оба потребителя применения включены (Т3): без них `apply` законно
+  // отказывает каждой цели с причиной `consumer_off`, и здесь проверялся бы
+  // отказ, а не запись в файлы.
+  consumers: ['assistant', 'terminal'],
   agents: [],
   budgetSince: '',
+  toolShim: true,
+  contourPrompt: true,
   caCertPath: '',
 };
 
@@ -345,6 +351,25 @@ describe('занятое место и неподдержанные цели', (
     expect(() => applyContour(deps(), PLATFORM, { targets: ['нет-такого'] })).toThrow(
       PlatformError,
     );
+  });
+
+  it('снятый «Терминал» — файл CLI не тронут, отказ назван потребителем', () => {
+    // Правило Т3 со стороны сервера. Экран и без него не прислал бы цель, но
+    // дверь в применение одна на всех — телефон и API-клиент ходят в неё же.
+    const noTerminal = { ...PLATFORM, consumers: ['assistant'] };
+    const result = applyContour(deps(), noTerminal, { targets: ['claude', 'assistant'] });
+
+    expect(result.skipped).toEqual([{ targetId: 'claude', reason: 'consumer_off' }]);
+    expect(result.applied).toEqual([{ targetId: 'assistant', filePath: '', written: [] }]);
+    expect(statSync(settingsPath, { throwIfNoEntry: false })).toBeUndefined();
+  });
+
+  it('снятый «Ассистент панели» — настройка ассистента не переезжает на контур', () => {
+    const noAssistant = { ...PLATFORM, consumers: ['terminal'] };
+    const result = applyContour(deps(), noAssistant, { targets: ['assistant'] });
+
+    expect(result.skipped).toEqual([{ targetId: 'assistant', reason: 'consumer_off' }]);
+    expect(store.getSettings().assistantEndpointId).toBe('');
   });
 });
 

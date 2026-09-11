@@ -25,6 +25,7 @@ import { EndpointsTopic } from '../topics/EndpointsTopic';
 import { DlpTopic } from '../topics/DlpTopic';
 import { IntegrationsTopic } from '../topics/IntegrationsTopic';
 import { PlatformTopic } from '../topics/PlatformTopic';
+import { PromptsTopic } from '../topics/PromptsTopic';
 
 export { HELP_ROUTE } from '@shared/config/routes';
 
@@ -123,6 +124,11 @@ export const HELP_GROUPS: HelpGroup[] = [
       // Контур — третий документ того же вопроса: куда уходит запрос, если
       // моделью распоряжается не вендор, а компания.
       { id: 'platform', icon: 'flag', pagePath: '/platform', Content: PlatformTopic },
+      // После контура намеренно: три промпта из пяти существуют ради него, и
+      // читать про тексты, которыми панель разговаривает с моделью, осмысленно
+      // после того, как узнал, куда эти тексты уезжают. Вкладка настроек, а не
+      // свой раздел, — `pagePath` ведёт в «Настройки».
+      { id: 'prompts', icon: 'file', pagePath: '/settings', Content: PromptsTopic },
       // Единственный сквозной документ: он объясняет не свой раздел, а почему
       // набор разделов вообще меняется. Своей страницы у него нет, поэтому
       // `pagePath` ведёт в «Настройки» — там стоит переключатель провайдера.

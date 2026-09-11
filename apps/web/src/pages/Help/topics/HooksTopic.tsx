@@ -1,30 +1,42 @@
 import { useTranslation } from 'react-i18next';
-import { Stack } from '@shared/ui/stack';
-import { FlowDiagram } from '@shared/ui/diagram';
 import { HOOK_EVENT_INFO } from '@agentdeck/contracts';
-import {
-  HelpSection,
-  StorageCard,
-  FieldTable,
-  StepList,
-  Callout,
-  CapabilityGrid,
-  OptionCards,
-} from '../ui';
+import { HelpSection, StorageCard, FieldTable, StepList, Callout, OptionCards } from '../ui';
+import { HooksGuideSections } from './HooksGuideSections';
+import { HooksLimitsSections } from './HooksLimitsSections';
 
 /**
  * Документ раздела «Хуки».
  *
+ * Порядок тот же, что у «Правил»: зачем это нужно → чем это НЕ является → как
+ * устроено и весь путь в снимках → что уходит на диск → события, шаблоны,
+ * пресеты, поля → границы, тонкости и отмена.
+ *
  * Таблица событий строится из HOOK_EVENT_INFO: список событий, поддержку
  * фильтра и способность блокировать берём из контракта, чтобы справка не
  * разошлась с формой. Тексты при этом свои — в контракте они только на русском.
+ *
+ * Блок «Чем это НЕ является» стоит вторым намеренно: хук путают с правилом,
+ * скиллом и правом, а человек, которому на самом деле нужно правило, не узнает
+ * об этом ни из одного снимка.
+ *
+ * Соседние файлы — не «вынесенные куски», а разделы со своей работой:
+ * `HooksGuideSections` держит две схемы и оба пути в снимках,
+ * `HooksLimitsSections` — границы, числа, отказы и отмену.
  */
 export function HooksTopic() {
   const { t } = useTranslation();
+  // Ключи этого документа лежат под своим префиксом — короткий хелпер
+  // избавляет от него в каждой строке.
   const tr = (key: string): string => t(`help.topics.hooks.${key}`);
 
   return (
     <>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards
           items={[
@@ -34,6 +46,19 @@ export function HooksTopic() {
           ]}
         />
       </HelpSection>
+
+      <HelpSection title={tr('diffTitle')} caption={tr('diffCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('diffRule'), text: tr('diffRuleText') },
+            { title: tr('diffSkill'), text: tr('diffSkillText') },
+            { title: tr('diffPermission'), text: tr('diffPermissionText') },
+          ]}
+        />
+      </HelpSection>
+
+      <HooksGuideSections tr={tr} />
 
       <HelpSection title={t('help.common.storageTitle')}>
         <StorageCard
@@ -45,60 +70,6 @@ export function HooksTopic() {
             { label: tr('storageStructure'), value: tr('storageStructureValue') },
             { label: tr('storageOff'), value: tr('storageOffValue') },
           ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('flowTitle')}
-          nodes={[
-            {
-              id: 'event',
-              label: tr('flowEvent'),
-              caption: tr('flowEventCaption'),
-              tone: 'accent',
-              icon: 'hooks',
-            },
-            {
-              id: 'matcher',
-              label: tr('flowMatcher'),
-              caption: tr('flowMatcherCaption'),
-              icon: 'search',
-            },
-            {
-              id: 'script',
-              label: tr('flowScript'),
-              caption: tr('flowScriptCaption'),
-              tone: 'info',
-              icon: 'scripts',
-            },
-            {
-              id: 'decision',
-              label: tr('flowDecision'),
-              caption: tr('flowDecisionCaption'),
-              tone: 'warning',
-              icon: 'permissions',
-            },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canPreset'),
-            tr('canScript'),
-            tr('canMatcher'),
-            tr('canBulkPresets'),
-            tr('canAssistant'),
-            tr('canProbe'),
-            tr('canToggle'),
-            tr('canOrder'),
-            tr('canTimeout'),
-          ]}
-          cant={[tr('cantBlockAll'), tr('cantStable'), tr('cantLocal'), tr('cantDebug')]}
         />
       </HelpSection>
 
@@ -179,33 +150,7 @@ export function HooksTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('notesTitle')}>
-        <Stack gap="var(--spacing-xs)">
-          <Callout tone="danger" title={tr('noteBrokenTitle')}>
-            {tr('noteBrokenText')}
-          </Callout>
-          <Callout tone="warning" title={tr('noteExitTitle')}>
-            {tr('noteExitText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteIdTitle')}>
-            {tr('noteIdText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteDisabledTitle')}>
-            {tr('noteDisabledText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteLocalTitle')}>
-            {tr('noteLocalText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteScriptTitle')}>
-            {tr('noteScriptText')}
-          </Callout>
-          {/* Хуки OpenCode — принципиально другая модель; говорим об этом здесь,
-              чтобы страница не выглядела описанием «хуков вообще». */}
-          <Callout tone="info" title={tr('noteProviderTitle')}>
-            {tr('noteProviderText')}
-          </Callout>
-        </Stack>
-      </HelpSection>
+      <HooksLimitsSections />
     </>
   );
 }

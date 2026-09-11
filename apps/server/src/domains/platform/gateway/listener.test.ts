@@ -109,8 +109,11 @@ describe('порт', () => {
           budgetUsd: 0,
           targets: [],
           projectPaths: [],
+          consumers: [],
           agents: [],
           budgetSince: '',
+          toolShim: true,
+          contourPrompt: true,
           caCertPath: '',
         },
       ],
@@ -176,6 +179,9 @@ describe('состояние до первого запроса', () => {
       'gateway-required',
       'nonstream-120s',
       'context-managed',
+      // Прослойка инструментов (Т5): схемы едут текстом на КАЖДОМ ходе, кэша
+      // промпта у платформы нет.
+      'shim-no-cache',
     ]);
   });
 

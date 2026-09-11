@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, StepList } from '../ui';
+import { HelpSection, StorageCard, FieldTable, Callout, OptionCards } from '../ui';
+import { IntegrationsGuideSections } from './IntegrationsGuideSections';
+import { IntegrationsLimitsSections } from './IntegrationsLimitsSections';
 
 /**
  * Документ «Интеграции» — про вкладку настроек и про то, что она включает в
@@ -9,14 +11,23 @@ import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, StepList } 
  * Живёт в группе «Интеграции» рядом с MCP намеренно: вопрос у читателя один —
  * «как панель разговаривает с чужими системами», и MCP отвечает на его половину
  * со стороны агента, а этот документ — со стороны человека.
+ *
+ * Рукописных шагов подключения здесь больше нет: те же шаги показаны кадрами
+ * настоящих карточек в `IntegrationsGuideSections`.
  */
 export function IntegrationsTopic() {
   const { t } = useTranslation();
   const tr = (key: string): string => t(`help.topics.integrations.${key}`);
+  const common = (key: string): string => t(`help.common.${key}`);
 
   return (
     <>
-      <HelpSection title={t('help.common.whyTitle')}>
+      {/* Документ длинный: первым делом он говорит, из чего состоит. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
+      <HelpSection title={common('whyTitle')}>
         <OptionCards
           items={[
             { title: tr('whyOne'), text: tr('whyOneText') },
@@ -26,16 +37,9 @@ export function IntegrationsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('stepsTitle')} caption={tr('stepsCaption')}>
-        <StepList
-          steps={[
-            { title: tr('step1'), text: tr('step1Text') },
-            { title: tr('step2'), text: tr('step2Text') },
-            { title: tr('step3'), text: tr('step3Text') },
-            { title: tr('step4'), text: tr('step4Text') },
-          ]}
-        />
-      </HelpSection>
+      <IntegrationsGuideSections tr={tr} />
+
+      <IntegrationsLimitsSections tr={tr} common={common} />
 
       <HelpSection title={tr('cardsTitle')} caption={tr('cardsCaption')}>
         <FieldTable
@@ -79,7 +83,7 @@ export function IntegrationsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')} caption={tr('filesCaption')}>
+      <HelpSection title={tr('filesTitle')} caption={tr('filesCaption')}>
         <Stack gap="var(--spacing-xs)">
           <StorageCard
             title={tr('filePanelTitle')}

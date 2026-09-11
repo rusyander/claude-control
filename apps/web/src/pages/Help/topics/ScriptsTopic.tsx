@@ -1,23 +1,38 @@
 import { useTranslation } from 'react-i18next';
-import { Stack } from '@shared/ui/stack';
 import { FlowDiagram } from '@shared/ui/diagram';
-import {
-  HelpSection,
-  StorageCard,
-  FieldTable,
-  StepList,
-  Callout,
-  CapabilityGrid,
-  OptionCards,
-} from '../ui';
+import { HelpSection, StorageCard, FieldTable, StepList, Callout, OptionCards } from '../ui';
+import { ScriptsGuideSections } from './ScriptsGuideSections';
+import { ScriptsLimitsSections } from './ScriptsLimitsSections';
 
-/** Документ раздела «Скрипты». */
+/**
+ * Документ раздела «Скрипты».
+ *
+ * Порядок тот же, что у «Правил»: зачем это нужно → чем это НЕ является → как
+ * считается привязка и весь путь в снимках → что уходит на диск → контракт со
+ * stdin/stdout, каркасы, поля → границы, тонкости и отмена.
+ *
+ * Блок «Чем это НЕ является» стоит вторым намеренно: «Скрипты» и «Хуки» —
+ * две стороны одного действия, и человек, пришедший сюда настраивать событие,
+ * не узнает об этом ни из одного снимка.
+ *
+ * Соседние файлы — не «вынесенные куски», а разделы со своей работой:
+ * `ScriptsGuideSections` держит схему привязки и оба пути в снимках,
+ * `ScriptsLimitsSections` — границы, числа, отказы и отмену.
+ */
 export function ScriptsTopic() {
   const { t } = useTranslation();
+  // Ключи этого документа лежат под своим префиксом — короткий хелпер
+  // избавляет от него в каждой строке.
   const tr = (key: string): string => t(`help.topics.scripts.${key}`);
 
   return (
     <>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards
           items={[
@@ -27,6 +42,19 @@ export function ScriptsTopic() {
           ]}
         />
       </HelpSection>
+
+      <HelpSection title={tr('diffTitle')} caption={tr('diffCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('diffHook'), text: tr('diffHookText') },
+            { title: tr('diffScript'), text: tr('diffScriptText') },
+            { title: tr('diffBoth'), text: tr('diffBothText') },
+          ]}
+        />
+      </HelpSection>
+
+      <ScriptsGuideSections tr={tr} />
 
       <HelpSection title={t('help.common.storageTitle')}>
         <StorageCard
@@ -40,6 +68,8 @@ export function ScriptsTopic() {
         />
       </HelpSection>
 
+      {/* Контракт со средой: событие приходит потоком и ответ уходит потоком.
+          Без этой пары шагов код скрипта неоткуда начать писать. */}
       <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
         <FlowDiagram
           ariaLabel={tr('flowTitle')}
@@ -72,25 +102,6 @@ export function ScriptsTopic() {
               icon: 'permissions',
             },
           ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canWrite'),
-            tr('canTemplate'),
-            tr('canBulkTemplates'),
-            tr('canProbe'),
-            tr('canSee'),
-            tr('canExpand'),
-            tr('canRename'),
-            tr('canLang'),
-            tr('canAssistant'),
-          ]}
-          cant={[tr('cantAuto'), tr('cantSchedule'), tr('cantInstall'), tr('cantDebug')]}
         />
       </HelpSection>
 
@@ -136,21 +147,9 @@ export function ScriptsTopic() {
               badge: t('help.common.required'),
               badgeTone: 'accent',
             },
-            {
-              name: 'path',
-              description: tr('fieldPath'),
-              badge: t('help.common.readOnly'),
-            },
-            {
-              name: 'isUsed',
-              description: tr('fieldIsUsed'),
-              badge: t('help.common.readOnly'),
-            },
-            {
-              name: 'sizeBytes, modifiedAt',
-              description: tr('fieldSize'),
-              badge: t('help.common.readOnly'),
-            },
+            { name: 'path', description: tr('fieldPath') },
+            { name: 'isUsed', description: tr('fieldIsUsed') },
+            { name: 'size', description: tr('fieldSize') },
           ]}
         />
       </HelpSection>
@@ -166,25 +165,7 @@ export function ScriptsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('notesTitle')}>
-        <Stack gap="var(--spacing-xs)">
-          <Callout tone="danger" title={tr('noteDeleteTitle')}>
-            {tr('noteDeleteText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteUnusedTitle')}>
-            {tr('noteUnusedText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteInterpreterTitle')}>
-            {tr('noteInterpreterText')}
-          </Callout>
-          <Callout tone="success" title={tr('noteRestartTitle')}>
-            {tr('noteRestartText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteProviderTitle')}>
-            {tr('noteProviderText')}
-          </Callout>
-        </Stack>
-      </HelpSection>
+      <ScriptsLimitsSections />
     </>
   );
 }

@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, StepList } from '../ui';
+import { DlpGuideSections } from './DlpGuideSections';
+import { DlpLimitsSections } from './DlpLimitsSections';
 
 /**
  * Документ «Защита данных».
@@ -9,14 +11,24 @@ import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, StepList } 
  * средство защиты, о границах которого умолчали, опаснее его отсутствия, потому
  * что заменяет осторожность уверенностью. Поэтому и таблица встроенных образцов
  * называет, что каждый ловит и чего не ловит.
+ *
+ * Список шагов настройки здесь остаётся рядом с кадрами намеренно: он про
+ * ПОРЯДОК действий (правила → проверка → запуск → адрес в CLI), а кадры — про
+ * то, что при этом видно на экране.
  */
 export function DlpTopic() {
   const { t } = useTranslation();
   const tr = (key: string): string => t(`help.topics.dlp.${key}`);
+  const common = (key: string): string => t(`help.common.${key}`);
 
   return (
     <>
-      <HelpSection title={t('help.common.whyTitle')}>
+      {/* Документ длинный: первым делом он говорит, из чего состоит. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
+      <HelpSection title={common('whyTitle')}>
         <OptionCards
           items={[
             { title: tr('whyBody'), text: tr('whyBodyText') },
@@ -25,6 +37,10 @@ export function DlpTopic() {
           ]}
         />
       </HelpSection>
+
+      <DlpGuideSections tr={tr} />
+
+      <DlpLimitsSections tr={tr} common={common} />
 
       <HelpSection title={tr('threeTitle')} caption={tr('threeCaption')}>
         <FieldTable
@@ -118,9 +134,15 @@ export function DlpTopic() {
             },
           ]}
         />
+        {/* Обратная подстановка в аргументы — единственное место, где прокси
+            обязан думать об экранировании: метка его не требует, а значение
+            требует, и цена ошибки здесь — весь вызов целиком. */}
+        <Callout tone="info" title={tr('shapeArgsTitle')}>
+          {tr('shapeArgsText')}
+        </Callout>
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')} caption={tr('filesCaption')}>
+      <HelpSection title={tr('filesTitle')} caption={tr('filesCaption')}>
         <Stack gap="var(--spacing-xs)">
           <StorageCard
             title={tr('filesPanelTitle')}

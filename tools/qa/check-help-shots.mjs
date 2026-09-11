@@ -60,7 +60,7 @@ import {
 const ROOT = resolve(import.meta.dirname, '../..');
 const TOPICS_DIR = join(ROOT, 'apps/web/src/pages/Help/topics');
 const TOPICS_REGISTRY = join(ROOT, 'apps/web/src/pages/Help/model/topics.ts');
-const RU_DICT = join(ROOT, 'apps/web/src/shared/config/i18n/help/ru.ts');
+const RU_DICT_DIR = join(ROOT, 'apps/web/src/shared/config/i18n/help/ru/topics');
 const SECRETS_DIR = join(homedir(), '.agentdeck');
 
 /** Команда, которой человек гасит красноту раздела. Одна на весь файл. */
@@ -73,6 +73,18 @@ const confirmCommand = (topic) => `node tools/help-shots/sources.mjs ${topic}`;
  * переснятый не на локальном стенде, а на настоящем контуре заказчика.
  */
 const FOREIGN_HOST = /\b[a-z0-9-]+\.(ai|com|ru|io|net|org|dev|cloud|app)\b/gi;
+
+/**
+ * Хосты вендора. Они приходят не с машины съёмки, а из СОБСТВЕННЫХ текстов
+ * панели: каталог встроенных команд описывает `/design-login` словами «через
+ * аккаунт claude.ai», и этот текст виден на любом стенде. Правило выше их
+ * ловить не должно — иначе единственный способ снять список команд состоит в
+ * том, чтобы замазать в нём кусок настоящего описания.
+ *
+ * Список закрытый, и взгляд назад обязателен: `my-claude.ai` — уже чужой хост,
+ * и он по-прежнему краснеет.
+ */
+const VENDOR_HOST = /(?<![\w.-])(?:claude\.ai|anthropic\.com)\b/gi;
 
 /** Выражения, по которым ищутся утечки в тексте кадра. Имя → выражение. */
 const LEAK_PATTERNS = {
@@ -103,6 +115,19 @@ function readSecrets(dir = SECRETS_DIR) {
     }
   }
   return secrets;
+}
+
+/**
+ * Подписи кадров ищутся текстом по словарю справки, а он разрезан по разделам:
+ * `help/ru/topics/<раздел>.ts`. Склейка, а не один файл, — иначе кадр раздела,
+ * чей модуль просто не прочитали, краснел бы как «без подписи».
+ */
+function readDictionary(dir = RU_DICT_DIR) {
+  if (!existsSync(dir)) return '';
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.ts'))
+    .map((name) => readFileSync(join(dir, name), 'utf8'))
+    .join('\n');
 }
 
 /**
@@ -290,7 +315,7 @@ function auditText(text, secrets) {
     const hits = text.match(new RegExp(source, 'g'));
     if (hits) leaks.push(`${label} (${hits.length})`);
   }
-  const hosts = [...new Set(text.match(FOREIGN_HOST) ?? [])];
+  const hosts = [...new Set(text.replace(VENDOR_HOST, '').match(FOREIGN_HOST) ?? [])];
   if (hosts.length) leaks.push(`чужой домен: ${hosts.join(', ')}`);
   for (const secret of secrets) {
     // Значение не печатается никогда — только имя переменной, из которой оно.
@@ -303,6 +328,8 @@ function verify(catalog, usages, dictionary, secrets, diagrams = [], freshness =
   const problems = [];
   const ok = [];
   const known = new Map();
+  /** Раздел → сколько у него кадров и у скольких есть английский близнец. */
+  const coverage = new Map();
 
   for (const entry of catalog) {
     const where = `${entry.topic}/${entry.scenario}`;
@@ -311,10 +338,44 @@ function verify(catalog, usages, dictionary, secrets, diagrams = [], freshness =
       continue;
     }
 
+    const counted = coverage.get(entry.topic) ?? { frames: 0, english: 0 };
+    coverage.set(entry.topic, counted);
+
     const listed = new Set();
     for (const frame of entry.manifest.frames) {
       listed.add(frame.file);
       known.set(`${where}/${frame.id}`, { ...frame, topic: entry.topic, scenario: entry.scenario });
+      counted.frames += 1;
+
+      // Английский кадр — не отдельная запись, а вложенный `en` у русской:
+      // кадр остаётся одним кадром с одной подписью и одним номером шага.
+      // Поэтому запись БЕЗ русских полей — не «ещё не переснято», а поломка
+      // съёмки: английский прогон дописал отпечаток туда, где дописывать не к
+      // чему, и на странице такой кадр не покажется никому.
+      if (!frame.file) {
+        problems.push(
+          `${where}/${frame.id}: записан только по-английски — русского оригинала в описи нет`,
+        );
+        continue;
+      }
+
+      if (frame.en) {
+        counted.english += 1;
+        listed.add(frame.en.file);
+        if (!entry.files.includes(frame.en.file)) {
+          problems.push(`${where}/${frame.id}: английский кадр в описи есть, файла нет`);
+          continue;
+        }
+        // Секретный скан идёт по ОБОИМ текстам. Английский кадр снят вторым
+        // прогоном, с другой обстановкой и другими подменами: утечка в нём
+        // ничем не связана с русским и ловится только собственным осмотром.
+        const englishLeaks = auditText(frame.en.text ?? '', secrets);
+        if (englishLeaks.length) {
+          problems.push(`${where}/${frame.id} [en]: УТЕЧКА — ${englishLeaks.join('; ')}`);
+          continue;
+        }
+      }
+
       if (!entry.files.includes(frame.file)) {
         problems.push(`${where}/${frame.id}: в описи есть, файла нет`);
         continue;
@@ -414,7 +475,38 @@ function verify(catalog, usages, dictionary, secrets, diagrams = [], freshness =
     }
   }
 
-  return { problems, ok };
+  return { problems, ok, coverage };
+}
+
+/**
+ * Английские кадры: строка отчёта, а НЕ краснота.
+ *
+ * Разделов двадцать пять, переснимают их по одному, и правило, краснеющее на
+ * первом же непереснятом разделе, пришлось бы вводить выключенным — то есть
+ * никогда. Поэтому здесь считают: сколько разделов переснято целиком, сколько
+ * начато и скольких кадров каждому из начатых не хватает. Названный пробел
+ * заставляет двигаться не хуже красноты, а ход работы виден по одной строке.
+ *
+ * Молчания тоже быть не должно: раздел без единого английского кадра назван
+ * своим именем, иначе «25 из 25» и «0 из 25» читались бы одинаково пусто.
+ */
+function englishReport(coverage) {
+  const lines = [];
+  const topics = [...coverage].sort(([a], [b]) => a.localeCompare(b));
+  const full = topics.filter(([, c]) => c.english === c.frames && c.frames > 0);
+  const partial = topics.filter(([, c]) => c.english > 0 && c.english < c.frames);
+  const none = topics.filter(([, c]) => c.english === 0);
+
+  lines.push(`Разделов с английскими кадрами: ${full.length} из ${topics.length}`);
+  for (const [topic, c] of partial) {
+    lines.push(
+      `  ${topic}: английских кадров ${c.english} из ${c.frames} — раздел переснят не весь`,
+    );
+  }
+  if (none.length) {
+    lines.push(`  без английских кадров (${none.length}): ${none.map(([t]) => t).join(', ')}`);
+  }
+  return lines;
 }
 
 /** Сторож обязан уметь краснеть. Все образцы ниже вымышлены. */
@@ -426,6 +518,8 @@ function selftest() {
     ['почта', 'вошли как admin@instance.local', true],
     ['токен в заголовке', 'Authorization: Bearer example0000000000000', true],
     ['чужой домен', 'контур tenant.example.com отвечает', true],
+    ['похожий на вендора', 'контур my-claude.ai отвечает', true],
+    ['хост вендора в тексте панели', 'Выдать доступ через аккаунт claude.ai', false],
     ['значение из хранилища', 'пароль абсолютно-секретное-значение в поле', true],
     ['чистый кадр', 'Контур «Платформа компании · стенд» · шлюз 127.0.0.1:5179 · qwen2.5:0.5b', false],
   ];
@@ -449,6 +543,44 @@ function selftest() {
         frames: [{ id: '01-нет-файла', file: '01-нет-файла.png', side: 'panel', text: '' }],
       },
       files: ['99-сирота.png'],
+    },
+    // Английская половина: у кадра есть близнец, и он ломается СВОИМИ
+    // способами — файла нет, в тексте утечка, запись без русского оригинала.
+    {
+      topic: 'перевод',
+      scenario: 'проверка',
+      dir: '',
+      manifest: {
+        frames: [
+          {
+            id: '01-без-английского-файла',
+            file: '01-без-английского-файла.png',
+            side: 'panel',
+            text: '',
+            en: { file: '01-без-английского-файла.en.png', text: '' },
+          },
+          {
+            id: '02-утечка-по-английски',
+            file: '02-утечка-по-английски.png',
+            side: 'panel',
+            text: '',
+            en: {
+              file: '02-утечка-по-английски.en.png',
+              text: 'signed in as admin@instance.local',
+            },
+          },
+          {
+            id: '03-только-английский',
+            side: 'panel',
+            en: { file: '03-только-английский.en.png', text: '' },
+          },
+        ],
+      },
+      files: [
+        '01-без-английского-файла.png',
+        '02-утечка-по-английски.png',
+        '02-утечка-по-английски.en.png',
+      ],
     },
   ];
   const usages = {
@@ -476,6 +608,9 @@ function selftest() {
   );
   const expected = [
     'в описи есть, файла нет',
+    'английский кадр в описи есть, файла нет',
+    '[en]: УТЕЧКА',
+    'русского оригинала в описи нет',
     'файл есть, в описи нет',
     'такого кадра в каталоге нет',
     'файла схемы нет',
@@ -489,6 +624,7 @@ function selftest() {
     if (!found) failed += 1;
   }
 
+  failed += selftestEnglish();
   failed += selftestSources();
 
   console.log(
@@ -500,7 +636,39 @@ function selftest() {
 }
 
 /**
- * Третья часть самопроверки — сверка документа с кодом.
+ * Счёт английских кадров проверяется отдельно — и не на красноту, а на ТЕКСТ.
+ *
+ * Это единственная часть отчёта, которая обязана оставаться зелёной при пустом
+ * результате: раздел без английских кадров — пробел, а не поломка. Проверять
+ * тут нечего, кроме того, что пробел НАЗВАН: сторож, который молча печатает
+ * «0 из 25», ничем не отличается от сторожа, который не считает вовсе.
+ */
+function selftestEnglish() {
+  const report = englishReport(
+    new Map([
+      ['целиком', { frames: 3, english: 3 }],
+      ['наполовину', { frames: 4, english: 1 }],
+      ['нетронутый', { frames: 5, english: 0 }],
+    ]),
+  ).join('\n');
+
+  const cases = [
+    ['переснятые разделы сосчитаны', 'Разделов с английскими кадрами: 1 из 3'],
+    ['начатый раздел назван с остатком', 'наполовину: английских кадров 1 из 4'],
+    ['нетронутый раздел назван по имени', 'без английских кадров (1): нетронутый'],
+  ];
+
+  let failed = 0;
+  for (const [name, fragment] of cases) {
+    const found = report.includes(fragment);
+    console.log(`${found ? 'ок   ' : 'ПЛОХО'} называет: ${name}`);
+    if (!found) failed += 1;
+  }
+  return failed;
+}
+
+/**
+ * Четвёртая часть самопроверки — сверка документа с кодом.
  *
  * Здесь подкладывается не готовое состояние, а ВЫМЫШЛЕННОЕ дерево файлов:
  * отпечаток считается по-настоящему, поэтому проверяется не формулировка
@@ -589,8 +757,8 @@ function main() {
   }
 
   const secrets = readSecrets();
-  const dictionary = existsSync(RU_DICT) ? readFileSync(RU_DICT, 'utf8') : '';
-  const { problems, ok } = verify(
+  const dictionary = readDictionary();
+  const { problems, ok, coverage } = verify(
     catalog,
     readUsages(),
     dictionary,
@@ -617,6 +785,7 @@ function main() {
     `Разделов сверено с кодом: ${watched.length} из ${readHelpTopics().length}` +
       ` (исходников ${states.filter((state) => state.ok).length} сходится)`,
   );
+  for (const line of englishReport(coverage)) console.log(line);
   for (const problem of problems) console.log(`  ${problem}`);
 
   console.log(

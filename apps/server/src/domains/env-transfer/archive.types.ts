@@ -43,6 +43,18 @@ export interface ManifestPanel {
   platforms: { id: string; title: string; driver: string; baseUrl: string }[];
 }
 
+/**
+ * Опись секции промптов. Только идентификаторы и размеры: тексты лежат рядом
+ * файлом (`panel/prompts.json`), и держать их ещё и в описи значило бы завести
+ * второй источник истины — тот же довод, что и у секции контуров.
+ */
+export interface ManifestPanelPrompts {
+  archivePath: string;
+  bytes: number;
+  sha256: string;
+  prompts: { id: string; bytes: number }[];
+}
+
 export interface ArchiveManifest {
   kind: string;
   formatVersion: number;
@@ -60,6 +72,11 @@ export interface ArchiveManifest {
    * были, но не поехали».
    */
   panel?: ManifestPanel;
+  /**
+   * Правки промптов. Поля нет вовсе, если человек не правил ни одного: пустая
+   * секция читалась бы как «правки были, но не поехали».
+   */
+  panelPrompts?: ManifestPanelPrompts;
 }
 
 export interface BuiltArchive {

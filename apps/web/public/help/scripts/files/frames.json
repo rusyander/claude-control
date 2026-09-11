@@ -1,0 +1,78 @@
+{
+  "topic": "scripts",
+  "scenario": "files",
+  "frames": [
+    {
+      "id": "01-list",
+      "file": "01-list.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 950,
+      "shotAt": "2026-09-11T14:16:45.229Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скрипты Файлы, которые запускают хуки Добавить скрипт Что здесь лежит 7 файлов · 1 не привязано к событиям destructive-guard.mjs Используется Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. 632 B · 11 сент. 2026 г., 19:15 format-on-edit.mjs Используется Прогоняет форматтер по файлу, который только что правили. 385 B · 11 сент. 2026 г., 19:15 guards.test.mjs Тест Проверка стражей: подкладывает строку запуска и ждёт код возврата 2. 321 B · 11 сент. 2026 г., 19:15 notify.ps1 Не привязан Всплывающее уведомление на рабочем столе. Запускается руками, ни к какому событию не привязан. 269 B · 11 сент. 2026 г., 19:15 secret-guard.mjs Используется Проверяет запись файлов на строки, похожие на ключи и токены. 514 B · 11 сент. 2026 г., 19:15 session-brief.mjs Используется Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. 396 B · 11 сент. 2026 г., 19:15 shared/input.mjs Используется Разбор входных данных хука: Claude Code передаёт их одним JSON на stdin. Общий модуль — его импортируют все скрипты рядом. 450 B · 11 сент. 2026 г., 19:15",
+      "en": {
+        "file": "01-list.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 950,
+        "shotAt": "2026-09-11T17:29:32.602Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Scripts Files that hooks run Add script What lives here 7 files · 1 not bound to any event destructive-guard.mjs In use Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. 632 B · Sep 11, 2026, 10:28 PM format-on-edit.mjs In use Прогоняет форматтер по файлу, который только что правили. 385 B · Sep 11, 2026, 10:28 PM guards.test.mjs Test Проверка стражей: подкладывает строку запуска и ждёт код возврата 2. 321 B · Sep 11, 2026, 10:28 PM notify.ps1 Not bound Всплывающее уведомление на рабочем столе. Запускается руками, ни к какому событию не привязан. 269 B · Sep 11, 2026, 10:28 PM secret-guard.mjs In use Проверяет запись файлов на строки, похожие на ключи и токены. 514 B · Sep 11, 2026, 10:28 PM session-brief.mjs In use Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. 396 B · Sep 11, 2026, 10:28 PM shared/input.mjs In use Разбор входных данных хука: Claude Code передаёт их одним JSON на stdin. Общий модуль — его импортируют все скрипты рядом. 450 B · Sep 11, 2026, 10:28 PM"
+      }
+    },
+    {
+      "id": "02-content",
+      "file": "02-content.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 950,
+      "shotAt": "2026-09-11T14:16:47.343Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скрипты Файлы, которые запускают хуки Добавить скрипт Что здесь лежит 7 файлов · 1 не привязано к событиям destructive-guard.mjs Используется Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. 632 B · 11 сент. 2026 г., 19:15 format-on-edit.mjs Используется Прогоняет форматтер по файлу, который только что правили. 385 B · 11 сент. 2026 г., 19:15 guards.test.mjs Тест Проверка стражей: подкладывает строку запуска и ждёт код возврата 2. 321 B · 11 сент. 2026 г., 19:15 notify.ps1 Не привязан Всплывающее уведомление на рабочем столе. Запускается руками, ни к какому событию не привязан. 269 B · 11 сент. 2026 г., 19:15 secret-guard.mjs Используется Проверяет запись файлов на строки, похожие на ключи и токены. 514 B · 11 сент. 2026 г., 19:15 session-brief.mjs Используется Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. 396 B · 11 сент. 2026 г., 19:15 shared/input.mjs Используется Разбор входных данных хука: Claude Code передаёт их одним JSON на stdin. Общий модуль — его импортируют все скрипты рядом. 450 B · 11 сент. 2026 г., 19:15 Файлы — можно открыть, поправить, создать или удалить Новый файл shared 1 input.mjs Помощник структуры Опишите задачу — помощник создаст и дополнит файлы целиком. Существующее не удаляется. Собрать",
+      "en": {
+        "file": "02-content.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 950,
+        "shotAt": "2026-09-11T17:29:34.736Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Scripts Files that hooks run Add script What lives here 7 files · 1 not bound to any event destructive-guard.mjs In use Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. 632 B · Sep 11, 2026, 10:28 PM format-on-edit.mjs In use Прогоняет форматтер по файлу, который только что правили. 385 B · Sep 11, 2026, 10:28 PM guards.test.mjs Test Проверка стражей: подкладывает строку запуска и ждёт код возврата 2. 321 B · Sep 11, 2026, 10:28 PM notify.ps1 Not bound Всплывающее уведомление на рабочем столе. Запускается руками, ни к какому событию не привязан. 269 B · Sep 11, 2026, 10:28 PM secret-guard.mjs In use Проверяет запись файлов на строки, похожие на ключи и токены. 514 B · Sep 11, 2026, 10:28 PM session-brief.mjs In use Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. 396 B · Sep 11, 2026, 10:28 PM shared/input.mjs In use Разбор входных данных хука: Claude Code передаёт их одним JSON на stdin. Общий модуль — его импортируют все скрипты рядом. 450 B · Sep 11, 2026, 10:28 PM Files — open, edit, create or delete them here New file shared 1 input.mjs Structure assistant Describe the task — the assistant creates and fills files wholesale. Existing files are kept. Build"
+      }
+    },
+    {
+      "id": "03-search",
+      "file": "03-search.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 950,
+      "shotAt": "2026-09-11T14:16:49.472Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скрипты Файлы, которые запускают хуки Добавить скрипт Что здесь лежит 7 файлов · 1 не привязано к событиям Ничего не найдено по «миграции».",
+      "en": {
+        "file": "03-search.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 950,
+        "shotAt": "2026-09-11T17:29:36.855Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Scripts Files that hooks run Add script What lives here 7 files · 1 not bound to any event Nothing found for “миграции”."
+      }
+    },
+    {
+      "id": "04-delete",
+      "file": "04-delete.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 468,
+      "height": 339,
+      "shotAt": "2026-09-11T14:16:52.101Z",
+      "text": "Удалить безвозвратно? Этот скрипт вызывается хуком. После удаления хук перестанет работать — файл не найдётся. Введите «destructive-guard.mjs», чтобы подтвердить Отмена Удалить",
+      "en": {
+        "file": "04-delete.en.png",
+        "masked": 0,
+        "width": 468,
+        "height": 339,
+        "shotAt": "2026-09-11T17:29:39.504Z",
+        "text": "Delete permanently? This script is called by a hook. Once deleted the hook will stop working — the file will not be found. Type \"destructive-guard.mjs\" to confirm Cancel Delete"
+      }
+    }
+  ]
+}

@@ -11,3 +11,7 @@ apps/mobile/.expo/
 apps/mobile/expo-env.d.ts
 # Локальный рабочий слой агента — вне git (.git/info/exclude), prettier его не видит через .gitignore.
 .agent/
+# Встроенные промпты — это ДАННЫЕ, уезжающие модели байт в байт, а не документация.
+# Prettier переформатировал бы отступы примера JSON внутри текста, и модель получила бы
+# не тот пример, который человек видит в панели.
+apps/server/src/domains/prompts/catalog/

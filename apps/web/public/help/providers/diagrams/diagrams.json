@@ -1,0 +1,15 @@
+{
+  "topic": "providers",
+  "source": "docs/diagrams/providers-guide/providers-guide.drawio",
+  "pages": [
+    {
+      "name": "what-switching-changes",
+      "file": "what-switching-changes.png",
+      "page": 1,
+      "source": "86a9d094aa68daa5",
+      "width": 1507,
+      "height": 918,
+      "exportedAt": "2026-09-11T15:24:09.206Z"
+    }
+  ]
+}

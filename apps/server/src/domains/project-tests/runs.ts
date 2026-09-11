@@ -14,6 +14,7 @@ import type {
 import { pointId, summarize as summarizeResults } from '@agentdeck/contracts/test-format';
 import { ChatRun, type ChatEvent } from '../chat/ChatRunner.ts';
 import type { RunNotice } from '../chat/ChatRunRegistry.ts';
+import type { PlatformRunRoute } from '../platform/routing.ts';
 import {
   ProjectTestsError,
   ProjectTestsNotFoundError,
@@ -93,6 +94,17 @@ export class ProjectTestRunRegistry {
 
   setNotifier(notify: (notice: RunNotice) => void): void {
     this.notify = notify;
+  }
+
+  /**
+   * Маршрут контура для агента тестов (Т3) — тем же приёмом, что и у чатов:
+   * реестр знает, что прогон его, а про контуры не знает ничего. Потребитель
+   * здесь всегда один («тесты»), поэтому и спрашивается без аргументов.
+   */
+  private platformRouting?: () => PlatformRunRoute;
+
+  setPlatformRouting(resolve: () => PlatformRunRoute): void {
+    this.platformRouting = resolve;
   }
 
   /** Прогон проекта: идущий или последний завершившийся. */
@@ -300,6 +312,9 @@ export class ProjectTestRunRegistry {
       this.note(root, 'права', `приёмник прав не поднялся (${(error as Error).message})`);
     }
 
+    // Маршрут контура — на КАЖДОМ запуске: снятая галочка обязана действовать
+    // со следующего прогона.
+    const route = this.platformRouting?.() ?? { env: {} };
     try {
       await run.start(
         {
@@ -309,6 +324,13 @@ export class ProjectTestRunRegistry {
           // Доступы стенда идут ТОЛЬКО так: переменные процесса CLI не видны ни
           // в задании, ни в записи прогона, ни в чужом ответе API.
           ...(Object.keys(env).length > 0 ? { env } : {}),
+          // Маршрут контура — отдельным полем и на КАЖДОМ запуске: снятая
+          // галочка обязана действовать со следующего прогона.
+          platformEnv: route.env,
+          // Свой промпт контура — и агенту тестов тоже: через контур ходит
+          // модель среднего класса, и полный промпт CLI топит её одинаково,
+          // о чём бы её ни просили (Т5.4а).
+          platformSystemPrompt: route.systemPrompt ?? '',
           // С приёмником — обычный режим: каждый вызов инструмента проходит через
           // границы прогона. Без него — прежний полный доступ, но об этом сказано
           // в логе прогона, а не молчком.

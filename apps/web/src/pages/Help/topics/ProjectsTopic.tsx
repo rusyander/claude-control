@@ -1,14 +1,39 @@
 import { useTranslation } from 'react-i18next';
-import { Stack } from '@shared/ui/stack';
-import { HelpSection, StorageCard, FieldTable, Callout, CapabilityGrid, OptionCards } from '../ui';
+import { HelpSection, StorageCard, FieldTable, Callout, OptionCards } from '../ui';
+import { ProjectsGuideSections } from './ProjectsGuideSections';
+import { ProjectsLimitsSections } from './ProjectsLimitsSections';
 
-/** Документ раздела «Проекты» — проектный уровень конфигурации. */
+/**
+ * Документ раздела «Проекты».
+ *
+ * Порядок тот же, что у «Правил»: зачем это нужно → чем это НЕ является → как
+ * устроено и оба пути в снимках → что уходит на диск → поля → границы, тонкости
+ * и отмена.
+ *
+ * Блок «Чем это НЕ является» стоит вторым намеренно. Проектный уровень путают с
+ * пользовательским (те же формы, другой файл), вкладку «Из проекта» — с
+ * редактором, а сохранение — с безопасной панельной настройкой, хотя оно правит
+ * рабочее дерево чужого репозитория. Ни одну из этих ошибок снимок не
+ * опровергает: экран в них выглядит ровно так, как человек и ожидает.
+ *
+ * Соседние файлы — не «вынесенные куски», а разделы со своей работой:
+ * `ProjectsGuideSections` держит схемы и оба пути в снимках,
+ * `ProjectsLimitsSections` — границы, числа, тонкости и отмену.
+ */
 export function ProjectsTopic() {
   const { t } = useTranslation();
+  // Ключи этого документа лежат под своим префиксом — короткий хелпер
+  // избавляет от него в каждой строке.
   const tr = (key: string): string => t(`help.topics.projects.${key}`);
 
   return (
     <>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards
           items={[
@@ -19,46 +44,44 @@ export function ProjectsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')}>
-        <StorageCard
-          title={tr('title')}
-          rows={[
-            { label: tr('storageRules'), value: '<project>/CLAUDE.md', isMono: true },
-            { label: tr('storageMcp'), value: '<project>/.mcp.json', isMono: true },
-            { label: tr('storagePerms'), value: '<project>/.claude/settings.json', isMono: true },
-            {
-              label: tr('storageSkills'),
-              value: '<project>/.claude/skills/*/SKILL.md',
-              isMono: true,
-            },
-            {
-              label: tr('storageHooks'),
-              value: '<project>/.claude/settings.json → hooks',
-              isMono: true,
-            },
-            {
-              label: tr('storageRuleFiles'),
-              value: '<project>/.claude/rules/**/*.md',
-              isMono: true,
-            },
-            { label: tr('storageCreate'), value: tr('storageCreateValue') },
+      <HelpSection title={tr('diffTitle')} caption={tr('diffCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('diffUser'), text: tr('diffUserText') },
+            { title: tr('diffLocal'), text: tr('diffLocalText') },
+            { title: tr('diffGroups'), text: tr('diffGroupsText') },
+            { title: tr('diffGit'), text: tr('diffGitText') },
           ]}
         />
       </HelpSection>
 
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canRegister'),
-            tr('canRules'),
-            tr('canMcp'),
-            tr('canPerms'),
-            tr('canLocal'),
-            tr('canAdditive'),
+      <ProjectsGuideSections tr={tr} />
+
+      <HelpSection title={t('help.common.storageTitle')}>
+        <StorageCard
+          title="<проект>/"
+          rows={[
+            {
+              label: tr('storageRegistry'),
+              value: '~/.claude/agentdeck/state.json',
+              isMono: true,
+            },
+            { label: tr('storageRules'), value: '<проект>/CLAUDE.md', isMono: true },
+            { label: tr('storageMcp'), value: '<проект>/.mcp.json', isMono: true },
+            {
+              label: tr('storagePerms'),
+              value: '<проект>/.claude/settings.json · settings.local.json',
+              isMono: true,
+            },
+            { label: tr('storageLocal'), value: tr('storageLocalValue') },
+            {
+              label: tr('storageBackup'),
+              value: '~/.claude/agentdeck/backups/project-<id>-<файл>',
+              isMono: true,
+            },
+            { label: tr('storageCreate'), value: tr('storageCreateValue') },
           ]}
-          cant={[tr('cantGroups'), tr('cantHealth')]}
         />
       </HelpSection>
 
@@ -78,22 +101,7 @@ export function ProjectsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('notesTitle')}>
-        <Stack gap="var(--spacing-xs)">
-          <Callout tone="warning" title={tr('noteRawTitle')}>
-            {tr('noteRawText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteLocalTitle')}>
-            {tr('noteLocalText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteUserTitle')}>
-            {tr('noteUserText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteProviderTitle')}>
-            {tr('noteProviderText')}
-          </Callout>
-        </Stack>
-      </HelpSection>
+      <ProjectsLimitsSections />
     </>
   );
 }

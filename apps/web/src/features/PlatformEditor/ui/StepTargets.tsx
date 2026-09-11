@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PLATFORM_ASSISTANT_TARGET, type PlatformApplyTarget } from '@agentdeck/contracts';
+import {
+  PLATFORM_ASSISTANT_TARGET,
+  PLATFORM_TERMINAL_CONSUMER,
+  foreignProviderId,
+  type PlatformApplyTarget,
+  type PlatformConsumerOption,
+} from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Typography } from '@shared/ui/typography';
@@ -37,27 +43,91 @@ export function StepTargets({ model }: WizardStepProps) {
   );
   const budget = budgetFromText(budgetText);
 
+  const terminalOn = model.draft.consumers.includes(PLATFORM_TERMINAL_CONSUMER);
+
+  // Снятая галочка «Терминал» прячет список файловых целей — и этим создаёт
+  // впечатление, что файлов больше нет. Они остались: снятый потребитель не
+  // трогает уже записанное (это делает «Снять применение» на карточке). Пока
+  // хоть одна файловая цель применена, об этом сказано прямо здесь.
+  const appliedFiles = new Set(
+    (plan?.targets ?? [])
+      .filter((target) => target.targetId !== PLATFORM_ASSISTANT_TARGET && target.applied)
+      .map((target) => target.targetId),
+  );
+  const filesStayApplied = !terminalOn && appliedFiles.size > 0;
+
+  /**
+   * У этого потребителя файл CLI уже применён, а галочка снята — и файл
+   * сильнее. Панель обещает выбор «на один прогон», но переменные она кладёт в
+   * окружение процесса, а применённый файл CLI читает сам CLI на КАЖДОМ
+   * запуске: пустым окружением записанное в его настройках не отменить.
+   * Единственное, что возвращает такой прогон провайдеру по умолчанию, — «Снять
+   * применение» на карточке, и сказать это здесь честнее, чем обещать обратное.
+   */
+  const fileWins = (consumer: PlatformConsumerOption): boolean =>
+    consumer.scope === 'run' &&
+    !model.draft.consumers.includes(consumer.id) &&
+    appliedFiles.has(foreignProviderId(consumer.id) ?? 'claude');
+
   return (
     <Stack gap="var(--spacing-md)">
       <Stack gap="var(--spacing-2xs)">
         <Typography variant="body-sm" weight="medium" as="h3">
-          {t('platform.targetsTitle')}
+          {t('platform.consumersTitle')}
+        </Typography>
+        <Typography variant="caption" color="muted">
+          {t('platform.consumersHint')}
         </Typography>
 
         {model.plan.isLoading && <SkeletonList rows={3} withActions={false} />}
 
-        {plan &&
-          sortApplyTargets(plan.targets).map((target) => (
-            <TargetRow
-              key={target.targetId}
-              target={target}
-              checked={model.targets.includes(target.targetId)}
-              overwrite={model.overwrite.includes(target.targetId)}
-              onToggle={() => model.toggleTarget(target.targetId)}
-              onToggleOverwrite={() => model.toggleOverwrite(target.targetId)}
-            />
-          ))}
+        {plan?.consumers.map((consumer) => (
+          <ConsumerRow
+            key={consumer.id}
+            consumer={consumer}
+            // Отмечено берётся из ЧЕРНОВИКА, а не из плана: план построен по
+            // сохранённому контуру, и галочка, поставленная минуту назад,
+            // отскакивала бы обратно при каждом обновлении плана.
+            checked={model.draft.consumers.includes(consumer.id)}
+            fileWins={fileWins(consumer)}
+            onToggle={() => model.toggleConsumer(consumer.id)}
+          />
+        ))}
+
+        {filesStayApplied && (
+          <Typography variant="caption" color="warning">
+            {t('platform.consumersFilesStay')}
+          </Typography>
+        )}
       </Stack>
+
+      {/* Список файловых целей — только когда человек попросил терминал: до Т3
+          он был единственным смыслом этого шага, теперь это один потребитель из
+          списка, и показывать его записи, пока галочка снята, значило бы звать
+          нажать то, что всё равно не запишется. */}
+      {terminalOn && (
+        <Stack gap="var(--spacing-2xs)">
+          <Typography variant="body-sm" weight="medium" as="h3">
+            {t('platform.targetsTitle')}
+          </Typography>
+
+          {plan &&
+            sortApplyTargets(plan.targets)
+              // Ассистент панели — потребитель, а не файловая цель: его галочка
+              // стоит выше, в списке «Где работает контур».
+              .filter((target) => target.targetId !== PLATFORM_ASSISTANT_TARGET)
+              .map((target) => (
+                <TargetRow
+                  key={target.targetId}
+                  target={target}
+                  checked={model.targets.includes(target.targetId)}
+                  overwrite={model.overwrite.includes(target.targetId)}
+                  onToggle={() => model.toggleTarget(target.targetId)}
+                  onToggleOverwrite={() => model.toggleOverwrite(target.targetId)}
+                />
+              ))}
+        </Stack>
+      )}
 
       <Card padding="md">
         <Stack gap="var(--spacing-xs)">
@@ -163,6 +233,69 @@ export function StepTargets({ model }: WizardStepProps) {
             </Typography>
           ))}
         </Stack>
+      )}
+    </Stack>
+  );
+}
+
+interface ConsumerRowProps {
+  consumer: PlatformConsumerOption;
+  checked: boolean;
+  /** Галочка снята, но файл этого CLI применён — и он сильнее (см. `fileWins`). */
+  fileWins: boolean;
+  onToggle: () => void;
+}
+
+/**
+ * Строка потребителя. Недоступный — прочерк с ПРИЧИНОЙ, как и у целей: чужой
+ * CLI, который держит адрес в своём файле, нельзя включить «только для чата», и
+ * сказать это словом честнее, чем дать галочку, которая сделает больше
+ * обещанного.
+ */
+function ConsumerRow({ consumer, checked, fileWins, onToggle }: ConsumerRowProps) {
+  const { t } = useTranslation();
+  // Имя собственное чужого CLI приходит с сервера; встроенных потребителей
+  // называет клиент — сервер языка интерфейса не знает.
+  const title = consumer.title || t(`platform.consumer.${consumer.id}`);
+
+  if (consumer.reason) {
+    return (
+      <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap className={styles.row}>
+        <Typography variant="body-sm" color="subtle" as="span">
+          — {title}
+        </Typography>
+        <Typography variant="caption" color="muted" as="span">
+          {t(`platform.consumerReason.${consumer.reason}`)}
+        </Typography>
+      </Stack>
+    );
+  }
+
+  return (
+    <Stack gap="var(--spacing-3xs)" className={styles.row}>
+      <label className={styles.check}>
+        <input type="checkbox" checked={checked} onChange={onToggle} />
+        <Typography variant="body-sm" as="span">
+          {title}
+        </Typography>
+        <Typography variant="caption" color="muted" as="span">
+          {t(`platform.consumerScope.${consumer.scope}`)}
+        </Typography>
+        {/* Через шлюз у CLI нет своих инструментов — это относится к прогонам, а
+            не к ассистенту панели и не к записи в файлы. */}
+        {consumer.scope === 'run' && <CompromiseMark id="no-client-tools" />}
+      </label>
+
+      {consumer.id === PLATFORM_TERMINAL_CONSUMER && (
+        <Typography variant="caption" color="muted">
+          {t('platform.consumerTerminalHint')}
+        </Typography>
+      )}
+
+      {fileWins && (
+        <Typography variant="caption" color="warning">
+          {t('platform.consumerFileWins')}
+        </Typography>
       )}
     </Stack>
   );

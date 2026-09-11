@@ -1,0 +1,114 @@
+{
+  "topic": "skills",
+  "scenario": "first",
+  "frames": [
+    {
+      "id": "01-empty",
+      "file": "01-empty.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 950,
+      "shotAt": "2026-09-11T14:19:06.754Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает Скиллов пока нет В папке skills/ нет ни одной папки со SKILL.md. Создайте первый скилл кнопкой выше или положите папку руками — список обновится сам.",
+      "en": {
+        "file": "01-empty.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 950,
+        "shotAt": "2026-09-11T17:28:43.712Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works No skills yet The skills/ folder has no folder with a SKILL.md. Create the first skill with the button above or drop a folder in by hand — the list updates on its own."
+      }
+    },
+    {
+      "id": "02-form",
+      "file": "02-form.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1428,
+      "height": 856,
+      "shotAt": "2026-09-11T14:19:08.766Z",
+      "text": "Создать скилл Изменения применятся после перезапуска Claude Code Простой скилл Один файл SKILL.md Конструктор Папка с модулями по темам Имя скилла Латиницей через дефис — станет именем папки в skills/ Описание — когда применять Главное поле: по нему Claude решает, подключать ли скилл. Опишите ситуацию и слова, с которыми к вам придут («Use КОГДА пользователь просит…»). Шаблон SKILL.md Заполнит инструкции готовым каркасом — потом поправите под себя. Пустой каркас Скилл-инструмент с шагами Правило-инструкция Проверка / чеклист Уборка рабочих файлов агента Инструкции Тело SKILL.md: что именно делать, по шагам. Markdown. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "en": {
+        "file": "02-form.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 856,
+        "shotAt": "2026-09-11T17:28:45.735Z",
+        "text": "Create skill Changes apply after restarting Claude Code Simple skill A single SKILL.md Builder A folder of topic modules Skill name Latin letters with dashes — becomes the folder name in skills/ Description — when to apply The key field: Claude uses it to decide whether to pull the skill in. Describe the situation and the wording users will come with (\"Use WHEN the user asks…\"). SKILL.md template Fills the instructions with a ready skeleton — tweak it afterwards. Empty skeleton Tool skill with steps Rule instruction Check / checklist Tidying the agent working files Instructions The body of SKILL.md: what exactly to do, step by step. Markdown. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+      }
+    },
+    {
+      "id": "03-template",
+      "file": "03-template.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1428,
+      "height": 856,
+      "shotAt": "2026-09-11T14:19:09.699Z",
+      "text": "Создать скилл Изменения применятся после перезапуска Claude Code Простой скилл Один файл SKILL.md Конструктор Папка с модулями по темам Имя скилла Латиницей через дефис — станет именем папки в skills/ Описание — когда применять Главное поле: по нему Claude решает, подключать ли скилл. Опишите ситуацию и слова, с которыми к вам придут («Use КОГДА пользователь просит…»). Шаблон SKILL.md Заполнит инструкции готовым каркасом — потом поправите под себя. Пустой каркас Скилл-инструмент с шагами Правило-инструкция Проверка / чеклист Уборка рабочих файлов агента Инструкции Тело SKILL.md: что именно делать, по шагам. Markdown. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "en": {
+        "file": "03-template.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 856,
+        "shotAt": "2026-09-11T17:28:46.665Z",
+        "text": "Create skill Changes apply after restarting Claude Code Simple skill A single SKILL.md Builder A folder of topic modules Skill name Latin letters with dashes — becomes the folder name in skills/ Description — when to apply The key field: Claude uses it to decide whether to pull the skill in. Describe the situation and the wording users will come with (\"Use WHEN the user asks…\"). SKILL.md template Fills the instructions with a ready skeleton — tweak it afterwards. Empty skeleton Tool skill with steps Rule instruction Check / checklist Tidying the agent working files Instructions The body of SKILL.md: what exactly to do, step by step. Markdown. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+      }
+    },
+    {
+      "id": "04-structure",
+      "file": "04-structure.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1428,
+      "height": 856,
+      "shotAt": "2026-09-11T14:19:13.137Z",
+      "text": "Создать скилл Изменения применятся после перезапуска Claude Code Имя скилла Латиницей через дефис — станет именем папки в skills/ Описание — когда применять Главное поле: по нему Claude решает, подключать ли скилл. Опишите ситуацию и слова, с которыми к вам придут («Use КОГДА пользователь просит…»). Инструкции Тело SKILL.md: что именно делать, по шагам. Markdown. Структура файлов Скилл может быть папкой с модулями. Соберите структуру шаблоном, помощником или вручную — SKILL.md уже создан. Файлы — можно открыть, поправить, создать или удалить Новый файл SKILL.md Помощник структуры Опишите задачу — помощник создаст и дополнит файлы целиком. Существующее не удаляется. Собрать Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Закрыть Сохранить и продолжить",
+      "en": {
+        "file": "04-structure.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 856,
+        "shotAt": "2026-09-11T17:28:50.094Z",
+        "text": "Create skill Changes apply after restarting Claude Code Skill name Latin letters with dashes — becomes the folder name in skills/ Description — when to apply The key field: Claude uses it to decide whether to pull the skill in. Describe the situation and the wording users will come with (\"Use WHEN the user asks…\"). Instructions The body of SKILL.md: what exactly to do, step by step. Markdown. File structure A skill can be a folder of modules. Build the structure from a template, the assistant, or by hand — SKILL.md already exists. Files — open, edit, create or delete them here New file SKILL.md Structure assistant Describe the task — the assistant creates and fills files wholesale. Existing files are kept. Build Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Close Save and continue"
+      }
+    },
+    {
+      "id": "05-card",
+      "file": "05-card.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 950,
+      "shotAt": "2026-09-11T14:19:16.753Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 1 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает release-checklist 610 B Use КОГДА собираются выкатывать ветку и просят проверить, всё ли готово к отправке.",
+      "en": {
+        "file": "05-card.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 950,
+        "shotAt": "2026-09-11T17:28:53.714Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 1 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works release-checklist 442 B Use КОГДА собираются выкатывать ветку и просят проверить, всё ли готово к отправке."
+      }
+    },
+    {
+      "id": "06-builder",
+      "file": "06-builder.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1428,
+      "height": 856,
+      "shotAt": "2026-09-11T14:19:20.463Z",
+      "text": "Создать скилл Изменения применятся после перезапуска Claude Code Простой скилл Один файл SKILL.md Конструктор Папка с модулями по темам Имя скилла Латиницей через дефис — станет именем папки в skills/ Описание — когда применять Главное поле: по нему Claude решает, подключать ли скилл. Опишите ситуацию и слова, с которыми к вам придут («Use КОГДА пользователь просит…»). Инструкции Тело SKILL.md: что именно делать, по шагам. Markdown. Заготовка структуры Выберите форму — она развернётся сразу после создания. Можно пропустить и собрать вручную. Простой скилл SKILL.md Один файл SKILL.md. Подходит, когда правило умещается на страницу. Скилл с модулями SKILL.md, references/rules.md, references/examples.md Тонкий SKILL.md и папка references/ по темам. Форма, в которой сделаны крупные скиллы: сам вход короткий, подробности грузятся по надобности. Скилл с конфигами и шаблонами SKILL.md, references/rules.md, config/README.md, templates/README.md Модули по темам плюс config/ и templates/ — для скиллов, которые подставляют готовые файлы в проект. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Создать и собрать структуру",
+      "en": {
+        "file": "06-builder.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 856,
+        "shotAt": "2026-09-11T17:28:57.430Z",
+        "text": "Create skill Changes apply after restarting Claude Code Simple skill A single SKILL.md Builder A folder of topic modules Skill name Latin letters with dashes — becomes the folder name in skills/ Description — when to apply The key field: Claude uses it to decide whether to pull the skill in. Describe the situation and the wording users will come with (\"Use WHEN the user asks…\"). Instructions The body of SKILL.md: what exactly to do, step by step. Markdown. Structure template Pick a shape — it unfolds right after creation. You can skip and build by hand. Простой скилл SKILL.md Один файл SKILL.md. Подходит, когда правило умещается на страницу. Скилл с модулями SKILL.md, references/rules.md, references/examples.md Тонкий SKILL.md и папка references/ по темам. Форма, в которой сделаны крупные скиллы: сам вход короткий, подробности грузятся по надобности. Скилл с конфигами и шаблонами SKILL.md, references/rules.md, config/README.md, templates/README.md Модули по темам плюс config/ и templates/ — для скиллов, которые подставляют готовые файлы в проект. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Create and build structure"
+      }
+    }
+  ]
+}

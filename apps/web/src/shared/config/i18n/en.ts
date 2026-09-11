@@ -1695,6 +1695,15 @@ export const en: TranslationSchema = {
     empty: 'No profiles yet. Add the first one — the panel will show which CLIs accept it.',
     add: 'Add profile',
     remove: 'Delete profile',
+    ownerLine:
+      'This profile is owned by the contour “{{title}}”: the address points at the panel’s local gateway and the key is injected there. Editing the fields here sends the CLI past the contour.',
+    ownerActive: 'contour is active',
+    ownerIdle: 'contour is not active',
+    ownerGone: 'The contour that created this profile is gone — the profile can be deleted.',
+    ownerUnknown:
+      'This profile is owned by a contour: the address points at the panel’s local gateway and the key is injected there. Which contour exactly, the panel has not read yet.',
+    ownerReturned: 'Back on the default provider: CLI files are restored',
+    ownerReturnFailed: 'Could not return to the default provider',
     newName: 'Endpoint {{n}}',
     profile: 'Profile',
     name: 'Name',
@@ -1765,11 +1774,25 @@ export const en: TranslationSchema = {
     checkAgain: 'Check again',
     configure: 'Configure',
     disableAll: 'Undo the apply',
+    activate: 'Make it active',
+    activateNoToken: 'Save the contour key first: there is nothing to ask with',
+    activeBadge: 'active',
+    deactivate: 'Back to the default provider',
+    activatedOk: 'Contour “{{title}}” is active: the model answered',
+    activatedSmokeFailed: 'The contour is active, but the test request failed: {{detail}}',
+    activateFailed: 'Activation failed: the panel wrote no change at all',
+    smokeOk: 'Test request went through: “{{answer}}” in {{seconds}} s, model {{model}}',
+    smokeFailed: 'The test request through the gateway did not go through',
+    smokeAt: 'asked {{when}}',
+    migratedTitle: 'The contour “{{title}}” is now the active one',
+    migratedText:
+      'Several contours used to be on while the work went through one of them — and which one could only be told from the CLI files. Exactly one is active now. The rest stayed configured, with their keys and budgets; only their switches went off: {{others}}. Any of them can be made active from its own card.',
+    migratedDismiss: 'Got it',
     deleteTitle: 'Delete the contour?',
     deleteText:
       'The settings, the key and the probe record go together. The apply is undone first: CLI files return to their original state and the managed profile disappears. A file you edited after the apply is left as it is — the panel names it.',
     state: {
-      disabled: 'off',
+      disabled: 'not active',
       unchecked: 'never checked',
       ok: 'online',
       unauthorized: 'key rejected',
@@ -1868,13 +1891,40 @@ export const en: TranslationSchema = {
     justNow: 'just now',
     minutesAgo: '{{count}} min ago',
     hoursAgo: '{{count}} h ago',
+    consumersTitle: 'Where the contour works',
+    consumersHint:
+      'A run gets the gateway address in the environment of ITS OWN process, so “chat through the contour, tests on your own key” is a choice rather than a wish. Clearing a box takes effect from the next launch; running work is left alone.',
+    consumersFilesStay:
+      'CLI files stay applied: clearing the box does not touch them. To restore the files, press “Undo apply” on the contour card.',
+    consumer: {
+      chat: 'Chat',
+      groups: 'Split groups',
+      tests: 'Test agent',
+      assistant: 'Panel assistant',
+      terminal: 'Terminal (CLI files)',
+    },
+    consumerScope: {
+      run: 'for one run',
+      profile: 'through the panel profile',
+      files: 'written into the CLI configuration — a run started outside the panel gets it too',
+    },
+    consumerReason: {
+      no_env_section: 'this CLI has no environment file at all',
+      no_documented_base_url: 'no documented address variable',
+      gateway_dialect: 'speaks a dialect the gateway does not understand',
+      file_only: 'globally only: this CLI keeps the address in its file, one per machine',
+    },
+    consumerTerminalHint:
+      'This is the old applying to CLI files. Cleared by default: a write into the shared config also reaches a run the panel knows nothing about.',
+    consumerFileWins:
+      'This CLI has its files applied, and the file wins: it reads the contour address from its own configuration on every launch, so clearing this box will not bring its runs back. “Undo apply” on the contour card will.',
     targetsTitle: 'Where to apply',
     targetRecommended: 'recommended',
     targetReason: {
       no_env_section: 'this CLI has no environment file at all',
       no_documented_base_url: 'no documented address variable',
       gateway_dialect: 'speaks a dialect the gateway does not understand',
-      gateway_down: 'the gateway is down or the contour is off',
+      gateway_down: 'the gateway is down or the contour is not active',
     },
     targetApplied: 'applied',
     targetAppliedChat: 'applied, works as a chat without tools',
@@ -1888,10 +1938,11 @@ export const en: TranslationSchema = {
     skippedTitle: 'Not every target was written',
     skipReason: {
       conflict: 'the place is taken, overwriting was not confirmed',
+      consumer_off: 'the consumer is not ticked — you did not ask for a write into files',
       no_env_section: 'this CLI has no environment file at all',
       no_documented_base_url: 'no documented address variable',
       gateway_dialect: 'speaks a dialect the gateway does not understand',
-      gateway_down: 'the gateway is down or the contour is off',
+      gateway_down: 'the gateway is down or the contour is not active',
     },
     gatewayUp: 'gateway is up: {{address}}',
     gatewayPortTaken: 'port {{requested}} was busy — the one it got is what gets written',
@@ -1994,6 +2045,33 @@ export const en: TranslationSchema = {
     violationsSince:
       'Counted over the last requests the gateway still remembers, starting {{date}}: the trace is ' +
       'length-capped, and restarting the panel clears it entirely.',
+    toolShimTitle: 'Tools through the contour',
+    toolShimText:
+      'The contour does not accept a list of tools, so the panel declares them to the model as ' +
+      'protocol text and reassembles the call from its answer. The model is free to ignore it: ' +
+      'then it describes the action in words, the turn ends successfully, and no file appears.',
+    toolShimEmpty: {
+      idle: 'No request with tools has gone through the gateway yet — the panel knows nothing about the shim so far.',
+      quiet:
+        'Requests with tools did go through, but the model made no call and claimed no action in words.',
+    },
+    toolShimTurns: 'turns with tools: {{turns}}',
+    toolShimCalls: '{{calls}} calls across {{requests}} requests with tools',
+    toolShimClaimed_one:
+      'In {{count}} turn the model described an action and called nothing: the answer looks fine, the work is missing.',
+    toolShimClaimed_few:
+      'In {{count}} turns the model described an action and called nothing: the answers look fine, the work is missing.',
+    toolShimClaimed_many:
+      'In {{count}} turns the model described an action and called nothing: the answers look fine, the work is missing.',
+    toolShimClaimed_other:
+      'In {{count}} turns the model described an action and called nothing: the answers look fine, the work is missing.',
+    toolShimFlaw_one: '{{count}} time',
+    toolShimFlaw_few: '{{count}} times',
+    toolShimFlaw_many: '{{count}} times',
+    toolShimFlaw_other: '{{count}} times',
+    toolShimSince:
+      'Counted over the requests with tools the gateway still remembers, starting {{date}}: the ' +
+      'trace is length-capped, and restarting the panel clears it entirely.',
     agentsTitle: 'Contour agents',
     agentsOwner:
       'Agents are built by the company: each has its own knowledge and tools, and they run on ' +
@@ -2012,7 +2090,7 @@ export const en: TranslationSchema = {
     agentsAsk: 'Ask',
     agentsAsking: 'The agent is thinking…',
     agentsBlocked: {
-      disabled: 'The contour is off — switch it on in the card above.',
+      disabled: 'The contour is not active — make it active in the card above.',
       'no-token': 'No key saved: run the connection wizard.',
       'no-agent': 'Pick an agent.',
       'no-question': 'Type a question.',
@@ -2070,8 +2148,8 @@ export const en: TranslationSchema = {
     items: {
       'no-client-tools': {
         name: 'Client tools cannot be declared',
-        how: 'The contour’s public API does not accept tool descriptions: the platform picks the set itself, and a list sent by the client is dropped on the way in. The model knows nothing about reading or editing files, nor about your MCP servers.',
-        why: 'We do not change the platform. Through a contour a CLI works as a chat: it does not edit files — and claiming otherwise would be selling something that does not exist.',
+        how: 'The contour’s public API does not accept tool descriptions: the platform picks the set itself, and a list sent by the client is dropped on the way in. By the field the vendor API declares them with, tools never reach the model.',
+        why: 'We do not change the platform. Worked around by the shim: the panel declares the tools to the model as protocol text and reassembles the call from its answer (“Tools are declared to the model as text”), so an agent through a contour does edit files and does see your MCP servers. But it is a protocol on top of someone else’s, and it is weaker than the vendor one; with the shim off the old behaviour stands — a CLI through a contour works as a chat.',
         revisitWhen:
           'If the contour starts accepting the client’s own tool schemas — at least in the mode where the client executes the calls itself.',
       },
@@ -2166,6 +2244,18 @@ export const en: TranslationSchema = {
         revisitWhen:
           'If the contour starts signalling that history was modified in both modes — including the truncation it falls back to when summarizing fails.',
       },
+      'tool-shim': {
+        name: 'Tools are declared to the model as text',
+        how: 'The contour does not accept a tool list at all, so the panel declares the tools to the model as protocol text and assembles the call back out of its answer: the agent gets a real tool_use block and edits files. A block left unclosed or unreadable never becomes a call — it stays in the answer as text, and the request trace says why.',
+        why: 'Without the shim an agent behind a contour “works like a chat”: it says it will write the file and does not. Synthesis from text is the only way to give it hands without turning off the client CLI’s skills, hooks or MCP.',
+        revisitWhen: 'If the contour starts accepting client tools in its own schema.',
+      },
+      'shim-no-cache': {
+        name: 'The tool list is paid for on every turn',
+        how: 'Tool schemas travel in every request: the contour has no prompt cache. Measured on real runs: 24 tools — 58 thousand characters of system text and 86 KB per request on every turn (`claude -p` through the gateway), 108,546 characters and 154 KB on an interactive run with the full CLI prompt. Same order either way — tens of kilobytes for every step the agent takes; which is why a run through a contour uses the panel’s short prompt by default instead of the CLI’s.',
+        why: 'A prompt cache is a vendor API feature and the contour has none; the panel will not trim schemas on the client’s behalf — a trimmed schema breaks the call silently.',
+        revisitWhen: 'If the contour gains a prompt cache or accepts tools as a separate field.',
+      },
     },
   },
   dlp: {
@@ -2248,7 +2338,7 @@ export const en: TranslationSchema = {
     },
     terms: 'Dictionary',
     termsHint:
-      'One value per line: staff names, project names, addresses. Matched case-insensitively and on whole words; Russian inflections are covered ("Урманова" matches "Урманов").',
+      'One value per line: staff names, project names, addresses. Matched case-insensitively and on whole words; Russian inflections are covered ("Петрова" matches "Петров").',
     pattern: 'Regular expression',
     patternHint: 'Validated before saving. No flags needed — the search runs over the whole text.',
     actionLabel: 'Action',
@@ -2645,6 +2735,50 @@ export const en: TranslationSchema = {
     tab_models: 'Models',
     tabHint_models:
       'Default model and thinking effort, the model catalog, a custom endpoint and MCP server checks.',
+    prompts: {
+      title: 'Application prompts',
+      description:
+        'The texts the panel speaks to the model with, not on your behalf. The built-in text ships with the panel; your edit lives separately and a panel update leaves it alone.',
+      empty: 'The prompt catalog is empty',
+      open: 'Open',
+      reset: 'Reset to built-in',
+      edited: 'Edited',
+      builtinChanged: 'Built-in updated',
+      builtinChangedHint:
+        'The panel was updated and this prompt’s built-in text was rewritten — yours stayed as it was. Re-read the built-in one with “Show built-in”: no need to reset for that.',
+      builtinNow: 'The built-in text is in use',
+      showBuiltin: 'Show built-in',
+      hideBuiltin: 'Hide built-in',
+      builtinTitle: 'Built-in text',
+      builtinHint:
+        'The text shipped with the panel, read-only. “Reset to built-in” returns to it; your edit is in use instead of it right now.',
+      resetConfirmTitle: 'Reset the prompt edit?',
+      resetConfirmText:
+        'Your text will be deleted and the panel will speak the built-in one again. Prompts keep no edit history — the only way back is the copy in the backup folder.',
+      unsaved: 'Not saved',
+      size: '{{bytes}} B',
+      editorHint:
+        'Built-in text version: {{version}}. A saved edit goes to the model exactly as written.',
+      name: {
+        'tool-protocol': 'Tool protocol',
+        'contour-agent': 'Agent behind a contour',
+        'contour-preamble': 'Contour preamble',
+        image: 'Image',
+        presentation: 'Presentation',
+      },
+      hint: {
+        'tool-protocol':
+          'How a model with no tools of its own calls them in text, and the panel turns that into a real call.',
+        'contour-agent':
+          'The short system prompt of a run through a contour: it replaces the CLI’s own prompt.',
+        'contour-preamble': 'How a contour differs from a direct vendor request — said up front.',
+        image: 'A person’s request becomes a task for an image generator.',
+        presentation: 'A topic becomes slides: titles, bullets, speaker notes.',
+      },
+    },
+    tab_prompts: 'Prompts',
+    tabHint_prompts:
+      'The texts the panel speaks to the model with, not on your behalf: the tool protocol, the agent behind a contour, the image and presentation modes.',
     tab_integrations: 'Integrations',
     tabHint_integrations:
       'Jira and Confluence, a forge by token, Telegram, test management and CI reports: where the panel takes outside context from and where it hands results back.',
@@ -3134,7 +3268,10 @@ export const en: TranslationSchema = {
       kindRuns: 'runs: {{count}}',
     },
     agentsSummary: 'Show processes — {{count}}, {{memory}}',
-    activeSessions: 'active sessions',
+    activeSessions_one: '{{count}} active session',
+    activeSessions_few: '{{count}} active sessions',
+    activeSessions_many: '{{count}} active sessions',
+    activeSessions_other: '{{count}} active sessions',
     memory: 'memory',
     scanInfo: 'Scanned {{files}} files in {{ms}} ms',
     sessionActive: 'running now',
@@ -4568,6 +4705,11 @@ export const en: TranslationSchema = {
     platformsHint:
       'The contour setting travels, the key does not: it lives in the encrypted store of the panel and is entered again on the new machine.',
     platformsGateway: 'Also take the local gateway setting (port {{port}})',
+    promptsTitle: 'Prompt edits from the archive',
+    promptsHint:
+      'Only your edits travel: built-in texts ship with the panel, and restoring never touches them.',
+    promptBytes: '{{bytes}} B',
+    promptUnknown: 'no such prompt in this panel — nowhere to write it',
     planTitle: 'Unpack environment: {{provider}}',
     planDesc:
       'Built {{date}} on {{platform}}. Checked entries will be written, the rest stays as it is.',

@@ -1,23 +1,39 @@
 import { useTranslation } from 'react-i18next';
-import { Stack } from '@shared/ui/stack';
 import { FlowDiagram } from '@shared/ui/diagram';
-import {
-  HelpSection,
-  StorageCard,
-  FieldTable,
-  StepList,
-  Callout,
-  CapabilityGrid,
-  OptionCards,
-} from '../ui';
+import { HelpSection, StorageCard, FieldTable, StepList, Callout, OptionCards } from '../ui';
+import { PluginsGuideSections } from './PluginsGuideSections';
+import { PluginsLimitsSections } from './PluginsLimitsSections';
 
-/** Документ раздела «Плагины». */
+/**
+ * Документ раздела «Плагины».
+ *
+ * Порядок тот же, что у «Правил»: зачем это нужно → чем это НЕ является → как
+ * идёт установка и оба пути в снимках → что уходит на диск → поля и каркас →
+ * границы, тонкости и отмена.
+ *
+ * Блок «Чем это НЕ является» стоит вторым намеренно и говорит одно: это
+ * единственный раздел панели, который не пишет в файлы, а вызывает чужую
+ * команду. Почти все его странности — отсюда, и ни из одного снимка этого не
+ * видно.
+ *
+ * Соседние файлы — не «вынесенные куски», а разделы со своей работой:
+ * `PluginsGuideSections` держит схему и оба пути в снимках,
+ * `PluginsLimitsSections` — границы, числа, отказы и отмену.
+ */
 export function PluginsTopic() {
   const { t } = useTranslation();
+  // Ключи этого документа лежат под своим префиксом — короткий хелпер
+  // избавляет от него в каждой строке.
   const tr = (key: string): string => t(`help.topics.plugins.${key}`);
 
   return (
     <>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards
           items={[
@@ -27,6 +43,19 @@ export function PluginsTopic() {
           ]}
         />
       </HelpSection>
+
+      <HelpSection title={tr('diffTitle')} caption={tr('diffCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('diffCli'), text: tr('diffCliText') },
+            { title: tr('diffOutput'), text: tr('diffOutputText') },
+            { title: tr('diffOwn'), text: tr('diffOwnText') },
+          ]}
+        />
+      </HelpSection>
+
+      <PluginsGuideSections tr={tr} />
 
       <HelpSection title={t('help.common.storageTitle')}>
         <StorageCard
@@ -40,6 +69,8 @@ export function PluginsTopic() {
         />
       </HelpSection>
 
+      {/* Та же цепочка шагами: схема выше показывает её целиком, а эта полоса
+          нужна как быстрый ответ на «что вообще происходит по кнопке». */}
       <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
         <FlowDiagram
           ariaLabel={tr('flowTitle')}
@@ -76,37 +107,29 @@ export function PluginsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canCatalog'),
-            tr('canInstall'),
-            tr('canUpdate'),
-            tr('canToggle'),
-            tr('canUninstall'),
-            tr('canMarketplaces'),
-            tr('canSee'),
-            tr('canView'),
-            tr('canScaffold'),
-          ]}
-          cant={[tr('cantEdit'), tr('cantPick'), tr('cantOffline')]}
-        />
-      </HelpSection>
-
       <HelpSection title={tr('fieldsTitle')}>
         <FieldTable
           caption={tr('fieldsCaption')}
           nameHeader={t('help.common.fieldName')}
           descriptionHeader={t('help.common.fieldPurpose')}
           rows={[
-            { name: 'id', description: tr('fieldId') },
+            { name: 'id', description: tr('fieldId'), isMono: true },
             { name: 'marketplace', description: tr('fieldMarketplace') },
             { name: 'version', description: tr('fieldVersion') },
             { name: 'scope', description: tr('fieldScope') },
             { name: 'installedAt', description: tr('fieldInstalled') },
             { name: 'installCount', description: tr('fieldCount') },
+          ]}
+        />
+      </HelpSection>
+
+      <HelpSection title={tr('scaffoldTitle')} caption={tr('scaffoldCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('scaffoldManifest'), text: tr('scaffoldManifestText') },
+            { title: tr('scaffoldParts'), text: tr('scaffoldPartsText') },
+            { title: tr('scaffoldNext'), text: tr('scaffoldNextText') },
           ]}
         />
       </HelpSection>
@@ -122,29 +145,7 @@ export function PluginsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('notesTitle')}>
-        <Stack gap="var(--spacing-xs)">
-          <Callout tone="warning" title={tr('noteCliTitle')}>
-            {tr('noteCliText')}
-          </Callout>
-          <Callout tone="warning" title={tr('noteMarketplaceTitle')}>
-            {tr('noteMarketplaceText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteSlowTitle')}>
-            {tr('noteSlowText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteContentTitle')}>
-            {tr('noteContentText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteManualTitle')}>
-            {tr('noteManualText')}
-          </Callout>
-          {/* Плагины OpenCode — это плагины его CLI, а не расширения панели. */}
-          <Callout tone="info" title={tr('noteProviderTitle')}>
-            {tr('noteProviderText')}
-          </Callout>
-        </Stack>
-      </HelpSection>
+      <PluginsLimitsSections />
     </>
   );
 }

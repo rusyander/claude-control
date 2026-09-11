@@ -1,0 +1,60 @@
+{
+  "topic": "claudeMd",
+  "scenario": "file",
+  "frames": [
+    {
+      "id": "01-editor",
+      "file": "01-editor.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-09-11T13:07:50.589Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это Символов: 717 Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+      "en": {
+        "file": "01-editor.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-11T17:07:39.180Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is Characters: 717 Revert changes Save Changes apply after restarting Claude Code"
+      }
+    },
+    {
+      "id": "02-unsaved",
+      "file": "02-unsaved.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-09-11T13:07:51.938Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это Символов: 803 · есть несохранённые правки Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+      "en": {
+        "file": "02-unsaved.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-11T17:07:40.546Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is Characters: 803 · unsaved changes Revert changes Save Changes apply after restarting Claude Code"
+      }
+    },
+    {
+      "id": "03-conflict",
+      "file": "03-conflict.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-09-11T13:07:55.988Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 5 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это Файл изменился на диске, пока вы его правили. Ваши правки на месте; «Сохранить» перезапишет новую версию файла. Загрузить с диска Символов: 803 · есть несохранённые правки Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+      "en": {
+        "file": "03-conflict.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-11T17:07:44.598Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 5 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The file changed on disk while you were editing. Your edits are kept; “Save” will overwrite the newer file. Load from disk Characters: 803 · unsaved changes Revert changes Save Changes apply after restarting Claude Code"
+      }
+    }
+  ]
+}

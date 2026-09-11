@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { enterprise-platformDriver } from '../drivers/enterprise-platform.ts';
 import { StreamTranslator, classifyFrame, type FrameKind } from './frames.ts';
 
 /**
@@ -43,18 +44,19 @@ const USAGE =
 
 describe('распознавание кадров', () => {
   it.each(VENDOR)('$frame → $kind ($why)', ({ kind, frame }) => {
-    expect(classifyFrame(JSON.parse(frame))).toBe(kind);
+    expect(classifyFrame(JSON.parse(frame), enterprise-platformDriver)).toBe(kind);
   });
 
   it('обычный чанк и финальный расход различаются', () => {
-    expect(classifyFrame(JSON.parse(DELTA))).toBe('delta');
-    expect(classifyFrame(JSON.parse(USAGE))).toBe('usage');
+    expect(classifyFrame(JSON.parse(DELTA), enterprise-platformDriver)).toBe('delta');
+    expect(classifyFrame(JSON.parse(USAGE), enterprise-platformDriver)).toBe('usage');
   });
 });
 
 describe('ни один вендорный кадр не доезжает до клиента', () => {
   it.each(VENDOR)('$frame не появляется в потоке клиента (openai)', ({ frame }) => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'gpt-x',
       includeUsage: false,
@@ -66,6 +68,7 @@ describe('ни один вендорный кадр не доезжает до �
 
   it.each(VENDOR)('$frame не появляется в потоке клиента (anthropic)', ({ frame }) => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -79,6 +82,7 @@ describe('ни один вендорный кадр не доезжает до �
 describe('факты, которые кадры оставляют панели', () => {
   it('стадии копятся без повторов, а summarizing поднимает признак сжатия', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -98,6 +102,7 @@ describe('факты, которые кадры оставляют панели'
 
   it('расход снимается всегда, даже когда клиент его не просил', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -110,6 +115,7 @@ describe('факты, которые кадры оставляют панели'
 
   it('расход уходит клиенту, если он сам его просил', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: true,
@@ -120,6 +126,7 @@ describe('факты, которые кадры оставляют панели'
 
   it('незнакомый кадр попадает в след ИМЕНАМИ ПОЛЕЙ, а не содержимым', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -131,6 +138,7 @@ describe('факты, которые кадры оставляют панели'
 
   it('нечитаемый кадр наружу не идёт', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -147,6 +155,7 @@ describe('обрыв по проверкам содержимого', () => {
 
   it('openai получает терминальную ошибку и [DONE], а не тихий конец', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -163,6 +172,7 @@ describe('обрыв по проверкам содержимого', () => {
 
   it('anthropic получает событие error', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'anthropic',
       model: 'm',
       includeUsage: false,
@@ -177,6 +187,7 @@ describe('обрыв по проверкам содержимого', () => {
     // Строгое чтение одного уровня давало худший исход: флаг терялся, `[DONE]`
     // следом закрывал поток, и ОБОРВАННЫЙ ответ приезжал человеку законченным.
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -192,6 +203,7 @@ describe('обрыв по проверкам содержимого', () => {
 
   it('перечень, присланный массивом, тоже читается', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -203,6 +215,7 @@ describe('обрыв по проверкам содержимого', () => {
 
   it('кадр гардрейлов без имени и без вердикта становится незнакомым, а не тишиной', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -218,6 +231,7 @@ describe('обрыв по проверкам содержимого', () => {
     // вердиктом чанк уносил и текст, и `finish_reason`, после чего законченный
     // ответ приезжал человеку как оборванный.
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -234,6 +248,7 @@ describe('обрыв по проверкам содержимого', () => {
 
   it('после обрыва в поток клиента больше ничего не пишется', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: true,
@@ -249,6 +264,7 @@ describe('обрыв по проверкам содержимого', () => {
 describe('перевод потока в диалект Anthropic', () => {
   it('поток разворачивается в полный набор событий', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -274,6 +290,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('пустой поток закрывается ОШИБКОЙ, а не пустым удачным ответом', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -288,6 +305,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('поток без [DONE] и без причины остановки объявляется оборванным', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -301,6 +319,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('причина остановки без [DONE] считается законным концом', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -317,6 +336,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('итоговый расход входа доезжает до клиента', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -332,6 +352,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('кадр, разорванный между кусками TCP, не теряется', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -344,6 +365,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('кириллица в escape-последовательностях доезжает как есть', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'anthropic',
       model: 'm',
       includeUsage: false,
@@ -361,6 +383,7 @@ describe('перевод потока в диалект Anthropic', () => {
 describe('сборка ответа для клиента, просившего не поток', () => {
   it('текст, причина и расход собираются из потока', () => {
     const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
       dialect: 'openai-compat',
       model: 'gpt-x',
       includeUsage: false,
@@ -379,5 +402,108 @@ describe('сборка ответа для клиента, просившего 
     expect(answer.totalTokens).toBe(12);
     expect(answer.model).toBe('gpt-x');
     expect(answer.id).toBe('c1');
+  });
+});
+
+/**
+ * Придержанный хвост и конец потока.
+ *
+ * Прослойка держит ответ, который весь может оказаться вызовом, до последнего
+ * знака — и вопрос «когда его отдать» решается не в разборщике, а здесь: у
+ * каждого диалекта свой знак конца, и отдать хвост ПОСЛЕ него значит не отдать
+ * вовсе. Клиент, прочитавший `data: [DONE]`, закрывает чтение.
+ */
+describe('хвост прослойки на конце потока', () => {
+  const CALL = '{"name":"Write","arguments":{"file_path":"a.ts"}}';
+
+  function withShim(dialect: 'openai-compat' | 'anthropic'): StreamTranslator {
+    return new StreamTranslator({
+      driver: enterprise-platformDriver,
+      dialect,
+      model: 'gpt-x',
+      includeUsage: false,
+      shim: { allowed: new Set(['Write']) },
+    });
+  }
+
+  it('вызов уходит клиенту РАНЬШЕ [DONE], а не после него', () => {
+    const translator = withShim('openai-compat');
+    // Контур прислал `[DONE]` без причины остановки — так он и делает, когда
+    // ответ кончился сам. Весь ответ при этом один объект вызова: разборщик
+    // держал его до конца и отдать обязан ДО закрывающего кадра.
+    const out = translator.push(
+      sse(`{"choices":[{"index":0,"delta":{"content":${JSON.stringify(CALL)}}}]}`, '[DONE]'),
+    );
+
+    expect(out).toContain('tool_calls');
+    expect(out.indexOf('tool_calls')).toBeLessThan(out.indexOf('[DONE]'));
+    expect(translator.facts.toolCalls).toBe(1);
+  });
+
+  it('обрыв отдаёт прочитанное текстом, но вызова из него не собирает', () => {
+    const translator = withShim('openai-compat');
+    // Половина вызова и обрыв связи: выполнить её — записать половину файла,
+    // а потерять текст значило бы показать пустой ответ там, где модель успела
+    // написать половину.
+    translator.push(sse('{"choices":[{"index":0,"delta":{"content":"{\\"name\\":\\"Wr"}}]}'));
+    const out = translator.fail('связь с контуром оборвалась');
+
+    expect(out).toContain('{\\"name\\":\\"Wr');
+    expect(out.indexOf('{\\"name\\":\\"Wr')).toBeLessThan(out.indexOf('связь с контуром'));
+    expect(translator.facts.toolCalls).toBe(0);
+    expect(translator.facts.truncated).toBe(true);
+  });
+
+  it('поток, кончившийся без слова контура, тоже не съедает придержанное', () => {
+    const translator = withShim('openai-compat');
+    translator.push(sse('{"choices":[{"index":0,"delta":{"content":"{\\"name\\":\\"Wr"}}]}'));
+    const out = translator.end();
+
+    expect(out).toContain('{\\"name\\":\\"Wr');
+    expect(translator.facts.truncated).toBe(true);
+  });
+});
+
+/**
+ * Пометка «описала действие и не вызвала ничего» — эвристика, и цена у неё
+ * ровно одна: она обязана молчать на удачном ходе. Загораясь на каждом втором
+ * успешном прогоне, она обесценивается за день, и человек перестаёт её читать
+ * ровно к тому моменту, когда она права.
+ */
+describe('пометка заявки без вызова', () => {
+  function say(text: string, priorCalls: boolean): boolean {
+    const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
+      dialect: 'openai-compat',
+      model: 'gpt-x',
+      includeUsage: false,
+      shim: { allowed: new Set(['Write']), priorCalls },
+    });
+    // `[DONE]` здесь обязателен: без слова контура поток считается оборванным,
+    // и пометка не выставляется вовсе — проверять было бы нечего.
+    translator.push(
+      sse(`{"choices":[{"index":0,"delta":{"content":${JSON.stringify(text)}}}]}`, '[DONE]'),
+    );
+    translator.end();
+    return translator.facts.claimedWithoutCall;
+  }
+
+  it('горит там, где модель описала действие и не вызвала ничего', () => {
+    expect(say('Файл создан.', false)).toBe(true);
+  });
+
+  it('молчит в итоговой реплике удачного хода', () => {
+    // Последний запрос любого удачного хода — это «файл создан по протоколу», и
+    // вызовов в нём нет по устройству: они были в предыдущем.
+    expect(say('Файл создан.', true)).toBe(false);
+  });
+
+  it('молчит на честном признании неудачи', () => {
+    // Иначе «файл не создан — инструмент вернул ошибку» панель показывает теми
+    // же словами, что галлюцинацию «файл создан»: два противоположных исхода
+    // человек не различает никак.
+    expect(say('Файл не создан — инструмент вернул ошибку доступа.', false)).toBe(false);
+    expect(say('The file was not created because the tool call failed.', false)).toBe(false);
+    expect(say("I didn't create the file: the path is not writable.", false)).toBe(false);
   });
 });

@@ -1,0 +1,42 @@
+{
+  "topic": "analytics",
+  "scenario": "live",
+  "frames": [
+    {
+      "id": "01-idle",
+      "file": "01-idle.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 700,
+      "shotAt": "2026-09-11T15:03:59.565Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Аналитика Расход токенов, сессии и работающие агенты — по локальным транскриптам Сегодня 7 дней 30 дней 90 дней За всё время Свои даты Сбросить CSV JSON Работают прямо сейчас 0 Запущенные процессы Claude Code на этой машине. Реестра агентов не существует, поэтому считаем по процессам. Запущенных процессов Claude Code не найдено Всего токенов 1,1 млн 1 124 802 Запросов к модели 9 1 активных сессий Сгенерировано 14,3 тыс. 14 330 Прочитано из кэша 89 % 981,6 тыс. В эквиваленте API 0,96 $ если бы платили по тарифам API По моделям claude-haiku-4-5 661,2 тыс. claude-sonnet-5 287,3 тыс. claude-opus-4-8 176,3 тыс. По проектам work/shop-front 1,1 млн Из чего сложился расход Доли входа, вывода и работы с кэшем во всех токенах за период 89 % Прочитано из кэша Чтение кэша 981,6 тыс. 87% Входные токены 6,9 тыс. 1% Сгенерировано 14,3 тыс. 1% Запись кэша 121,9 тыс. 11% Активность по часам суток Когда идёт основная работа — по времени вашей машины 0:00 3:00 6:00 9:00 12:00 15:00 18:00 21:00 меньше больше Чаще всего вызываемые инструменты Glob 2 WebFetch 2 Bash 2 Task 2 Write 1 Edit 1 Read 1 Использование скиллов release-notes 34 price-import 21 legacy-import 4 Последние сессии work/shop-front идёт сейчас main 11.09.2026, 18:03:00 · claude-sonnet-5, claude-haiku-4-5, claude-opus-4-8 1,1 млн Про лимиты подписки Остаток лимитов Claude Code хранится на серверах Anthropic и в локальные файлы не попадает — показать его здесь нельзя. Точные цифры доступны по команде /usage в самом Claude Code. Настройки лимитов по моделям в Claude Code тоже нет: такой возможности не существует. Просканировано 1 файлов за 2 мс",
+      "en": {
+        "file": "01-idle.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 700,
+        "shotAt": "2026-09-11T17:23:53.648Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Analytics Token spend, sessions and running agents — from local transcripts Today 7 days 30 days 90 days All time Custom dates Reset CSV JSON Running right now 0 Claude Code processes running on this machine. There is no agent registry, so we count processes. No running Claude Code processes found Total tokens 1.1M 1,124,802 Model requests 9 1 active session Generated 14.3K 14,330 Read from cache 89% 981.6K API equivalent $0.96 if billed at API rates By model claude-haiku-4-5 661.2K claude-sonnet-5 287.3K claude-opus-4-8 176.3K By project work/shop-front 1.1M What the spend is made of Shares of input, output and cache traffic across all tokens in the period 89% Read from cache Cache reads 981.6K 87% Input tokens 6.9K 1% Generated 14.3K 1% Cache writes 121.9K 11% Activity by hour of day When the work actually happens — in your machine time 0:00 3:00 6:00 9:00 12:00 15:00 18:00 21:00 less more Most used tools Glob 2 WebFetch 2 Bash 2 Task 2 Write 1 Edit 1 Read 1 Skill usage release-notes 34 price-import 21 legacy-import 4 Recent sessions work/shop-front running now main 9/11/2026, 6:03:00 PM · claude-sonnet-5, claude-haiku-4-5, claude-opus-4-8 1.1M About subscription limits Claude Code limit balances live on Anthropic servers and never reach local files — they cannot be shown here. Exact figures are available via the /usage command inside Claude Code. There is also no per-model limit setting in Claude Code: the feature does not exist. Scanned 1 files in 7 ms"
+      }
+    },
+    {
+      "id": "02-running",
+      "file": "02-running.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 700,
+      "shotAt": "2026-09-11T15:04:06.224Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Аналитика Расход токенов, сессии и работающие агенты — по локальным транскриптам Сегодня 7 дней 30 дней 90 дней За всё время Свои даты Сбросить CSV JSON Работают прямо сейчас 2 Запущенные процессы Claude Code на этой машине. Реестра агентов не существует, поэтому считаем по процессам. Показать процессы — 2 шт., 1.1 ГБ PID 24180 612 МБ PID 31044 488 МБ Всего токенов 1,1 млн 1 124 802 Запросов к модели 9 1 активных сессий Сгенерировано 14,3 тыс. 14 330 Прочитано из кэша 89 % 981,6 тыс. В эквиваленте API 0,96 $ если бы платили по тарифам API По моделям claude-haiku-4-5 661,2 тыс. claude-sonnet-5 287,3 тыс. claude-opus-4-8 176,3 тыс. По проектам work/shop-front 1,1 млн Из чего сложился расход Доли входа, вывода и работы с кэшем во всех токенах за период 89 % Прочитано из кэша Чтение кэша 981,6 тыс. 87% Входные токены 6,9 тыс. 1% Сгенерировано 14,3 тыс. 1% Запись кэша 121,9 тыс. 11% Активность по часам суток Когда идёт основная работа — по времени вашей машины 0:00 3:00 6:00 9:00 12:00 15:00 18:00 21:00 меньше больше Чаще всего вызываемые инструменты Glob 2 WebFetch 2 Bash 2 Task 2 Write 1 Edit 1 Read 1 Использование скиллов release-notes 34 price-import 21 legacy-import 4 Последние сессии work/shop-front идёт сейчас main 11.09.2026, 18:03:00 · claude-sonnet-5, claude-haiku-4-5, claude-opus-4-8 1,1 млн Про лимиты подписки Остаток лимитов Claude Code хранится на серверах Anthropic и в локальные файлы не попадает — показать его здесь нельзя. Точные цифры доступны по команде /usage в самом Claude Code. Настройки лимитов по моделям в Claude Code тоже нет: такой возможности не существует. Просканировано 1 файлов за 2 мс",
+      "en": {
+        "file": "02-running.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 700,
+        "shotAt": "2026-09-11T17:24:00.327Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Analytics Token spend, sessions and running agents — from local transcripts Today 7 days 30 days 90 days All time Custom dates Reset CSV JSON Running right now 2 Claude Code processes running on this machine. There is no agent registry, so we count processes. Show processes — 2, 1.1 GB PID 24180 612 MB PID 31044 488 MB Total tokens 1.1M 1,124,802 Model requests 9 1 active session Generated 14.3K 14,330 Read from cache 89% 981.6K API equivalent $0.96 if billed at API rates By model claude-haiku-4-5 661.2K claude-sonnet-5 287.3K claude-opus-4-8 176.3K By project work/shop-front 1.1M What the spend is made of Shares of input, output and cache traffic across all tokens in the period 89% Read from cache Cache reads 981.6K 87% Input tokens 6.9K 1% Generated 14.3K 1% Cache writes 121.9K 11% Activity by hour of day When the work actually happens — in your machine time 0:00 3:00 6:00 9:00 12:00 15:00 18:00 21:00 less more Most used tools Glob 2 WebFetch 2 Bash 2 Task 2 Write 1 Edit 1 Read 1 Skill usage release-notes 34 price-import 21 legacy-import 4 Recent sessions work/shop-front running now main 9/11/2026, 6:03:00 PM · claude-sonnet-5, claude-haiku-4-5, claude-opus-4-8 1.1M About subscription limits Claude Code limit balances live on Anthropic servers and never reach local files — they cannot be shown here. Exact figures are available via the /usage command inside Claude Code. There is also no per-model limit setting in Claude Code: the feature does not exist. Scanned 1 files in 7 ms"
+      }
+    }
+  ]
+}

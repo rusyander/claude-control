@@ -35,8 +35,11 @@ const PLATFORM: Platform = {
   capabilities: [],
   targets: [],
   projectPaths: [],
+  consumers: [],
   agents: [],
   budgetSince: '',
+  toolShim: true,
+  contourPrompt: true,
   caCertPath: '',
 };
 
@@ -771,6 +774,37 @@ describe('контур ответил не потоком', () => {
     expect(JSON.parse(answer.text).choices[0].message.content).toBe('ответ');
   });
 
+  it('контур сказал «инструменты выброшены» — это потеря, а не незнакомый кадр', async () => {
+    // Кадр контура про инструменты панель выносила вперёд ответа (он в списке
+    // вендорных полей) и тут же не узнавала: в карточке он оказывался среди
+    // незнакомых, то есть «панель такого не знает». А знает: это подтверждение
+    // самой платформой того, что схемы инструментов до модели не дошли, —
+    // единственное объяснение агенту, ничего не сделавшему руками.
+    withoutForceStream();
+    await start(
+      wholeBody({
+        id: 'c1',
+        model: 'gpt-x',
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'ответ' }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 },
+        enterprise-platform_tools_unavailable: true,
+      }),
+    );
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      messages: [{ role: 'user', content: 'посчитай' }],
+    });
+
+    expect(answer.status).toBe(200);
+    const event = gateway.status().events[0];
+    expect(event?.lost).toContain('tools');
+    expect(event?.unknownFrames).toEqual([]);
+    // Служебный кадр наружу не ушёл: строгий клиент на нём ломается.
+    expect(answer.text).not.toContain('enterprise-platform_tools_unavailable');
+  });
+
   it('тело, которое и не поток, и не ответ модели, — честный отказ', async () => {
     withoutForceStream();
     await start(wholeBody('<html>вход в корпоративный портал</html>', 'text/html'));
@@ -839,6 +873,9 @@ describe('поток оборвался', () => {
 
 describe('след запроса для панели', () => {
   it('потери перевода названы, тел и текстов в следе нет', async () => {
+    // Прослойка выключена: инструменты некуда девать, и это ПОТЕРЯ — ровно то,
+    // что человек читает как «агент без рук».
+    writePlatform(store, { ...PLATFORM, toolShim: false });
     await start(upstream([DELTA, USAGE, '[DONE]']));
     await ask('/enterprise-platform/v1/messages', {
       model: 'gpt-x',
@@ -850,8 +887,25 @@ describe('след запроса для панели', () => {
 
     const event = gateway.status().events[0];
     expect(event?.lost).toContain('tools');
+    expect(event?.shimmed).toEqual([]);
     expect(JSON.stringify(event)).not.toContain('мой секретный промпт');
     expect(JSON.stringify(event)).not.toContain('да');
+  });
+
+  it('с прослойкой инструменты названы перенесёнными текстом, а не потерянными', async () => {
+    await start(upstream([DELTA, USAGE, '[DONE]']));
+    await ask('/enterprise-platform/v1/messages', {
+      model: 'gpt-x',
+      max_tokens: 10,
+      messages: [{ role: 'user', content: 'создай файл' }],
+      tools: [{ name: 'Read', input_schema: { type: 'object' } }],
+      stream: true,
+    });
+
+    const event = gateway.status().events[0];
+    // Т5.4: `tools: shimmed` — и ни одной строки о потере там, где потери нет.
+    expect(event?.shimmed).toEqual(['tools', 'tool_choice']);
+    expect(event?.lost).not.toContain('tools');
   });
 
   it('потери называются и клиенту в диалекте самого контура', async () => {
@@ -870,7 +924,10 @@ describe('след запроса для панели', () => {
     });
 
     const event = gateway.status().events[0];
-    expect(event?.lost).toEqual(expect.arrayContaining(['tools', 'response_format', 'n', 'user']));
+    // `tools` здесь не теряются — их забирает прослойка (Т5.3); остальное контур
+    // выбрасывает своей схемой, и об этом человек должен прочитать в следе.
+    expect(event?.shimmed).toContain('tools');
+    expect(event?.lost).toEqual(expect.arrayContaining(['response_format', 'n', 'user']));
     // Присланного клиентом там нет — только имена полей.
     expect(event?.lost).not.toContain('ivanov');
   });
@@ -988,3 +1045,355 @@ describe('постоянный учёт расхода (Т8)', () => {
     expect(store.getPlatformSpend()['enterprise-platform']!.days[0]!.totalTokens).toBe(12);
   });
 });
+
+/**
+ * Прослойка инструментов через ВЕСЬ конвейер (Т5.2–Т5.4).
+ *
+ * Здесь проверяется не грамматика (её держит таблица форм в `tool-shim/`), а
+ * то, ради чего прослойка написана: клиент, приславший инструменты, получает
+ * НАСТОЯЩИЙ вызов в своём диалекте — иначе агент через контур остаётся чатом.
+ */
+describe('прослойка инструментов', () => {
+  /** Ответ «модели»: текст, внутри которого лежит вызов по протоколу. */
+  const CALL_TEXT =
+    'Сейчас запишу файл. <tool_call>{"name": "Write", "arguments": {"file_path": "a.ts", "content": "x"}}</tool_call>';
+  const callFrame = (text: string): string =>
+    JSON.stringify({ id: 'c1', model: 'gpt-x', choices: [{ index: 0, delta: { content: text } }] });
+  const STOP = JSON.stringify({
+    id: 'c1',
+    model: 'gpt-x',
+    choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+  });
+
+  const ANTHROPIC_ASK = {
+    model: 'gpt-x',
+    max_tokens: 100,
+    messages: [{ role: 'user', content: 'создай файл' }],
+    tools: [
+      {
+        name: 'Write',
+        description: 'пишет файл',
+        input_schema: { type: 'object', properties: { file_path: { type: 'string' } } },
+      },
+    ],
+  };
+
+  it('наверх уходят правила протокола, схемы и `tool_choice: "none"` (Т5.4)', async () => {
+    await start(upstream([callFrame('готово'), USAGE, '[DONE]']));
+    await ask('/enterprise-platform/v1/messages', { ...ANTHROPIC_ASK, stream: true });
+
+    const sent = JSON.parse(calls[0]!.body) as {
+      tools?: unknown;
+      tool_choice?: string;
+      messages: { role: string; content: string }[];
+    };
+    // Поля `tools` наверху нет вовсе: контур его не принимает, а лишний ключ он
+    // выбросил бы молча — и разница между «не послали» и «пропало» исчезла бы.
+    expect(sent.tools).toBeUndefined();
+    expect(sent.tool_choice).toBe('none');
+    const system = sent.messages[0]!;
+    expect(system.role).toBe('system');
+    expect(system.content).toContain('<tool_call>');
+    expect(system.content).toContain('### Write');
+    expect(system.content).toContain('"file_path"');
+  });
+
+  it('диалект Anthropic, поток: клиент получает блок `tool_use` и `stop_reason: tool_use`', async () => {
+    await start(upstream([callFrame(CALL_TEXT), STOP, USAGE, '[DONE]']));
+    const answer = await ask('/enterprise-platform/v1/messages', { ...ANTHROPIC_ASK, stream: true });
+
+    expect(answer.text).toContain('"type":"tool_use"');
+    expect(answer.text).toContain('"name":"Write"');
+    expect(answer.text).toContain(
+      '"partial_json":"{\\"file_path\\":\\"a.ts\\",\\"content\\":\\"x\\"}"',
+    );
+    expect(answer.text).toContain('"stop_reason":"tool_use"');
+    // Служебный блок клиенту не уезжает: он выполняет вызов, а не показывает
+    // человеку его текст.
+    expect(answer.text).not.toContain('<tool_call>');
+    expect(answer.text).toContain('Сейчас запишу файл.');
+  });
+
+  it('диалект Anthropic, цельный ответ: вызов приходит блоком содержимого', async () => {
+    await start(upstream([callFrame(CALL_TEXT), STOP, USAGE, '[DONE]']));
+    const answer = await ask('/enterprise-platform/v1/messages', ANTHROPIC_ASK);
+
+    const body = JSON.parse(answer.text) as {
+      content: { type: string; name?: string; input?: unknown }[];
+      stop_reason: string;
+    };
+    expect(body.stop_reason).toBe('tool_use');
+    const call = body.content.find((block) => block.type === 'tool_use');
+    expect(call?.name).toBe('Write');
+    expect(call?.input).toEqual({ file_path: 'a.ts', content: 'x' });
+  });
+
+  it('диалект OpenAI, поток: `tool_calls` и `finish_reason: tool_calls` (Т5.3)', async () => {
+    await start(upstream([callFrame(CALL_TEXT), STOP, USAGE, '[DONE]']));
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      messages: [{ role: 'user', content: 'создай файл' }],
+      tools: [{ type: 'function', function: { name: 'Write', parameters: { type: 'object' } } }],
+      stream: true,
+    });
+
+    expect(answer.text).toContain('"tool_calls"');
+    expect(answer.text).toContain('"name":"Write"');
+    expect(answer.text).toContain('"finish_reason":"tool_calls"');
+    expect(answer.text).not.toContain('<tool_call>');
+  });
+
+  it('диалект OpenAI, цельный ответ: вызов приходит полем сообщения', async () => {
+    await start(upstream([callFrame(CALL_TEXT), STOP, USAGE, '[DONE]']));
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      messages: [{ role: 'user', content: 'создай файл' }],
+      tools: [{ type: 'function', function: { name: 'Write', parameters: { type: 'object' } } }],
+    });
+
+    const body = JSON.parse(answer.text) as {
+      choices: {
+        message: {
+          content: string;
+          tool_calls?: { function: { name: string; arguments: string } }[];
+        };
+        finish_reason: string;
+      }[];
+    };
+    expect(body.choices[0]?.finish_reason).toBe('tool_calls');
+    expect(body.choices[0]?.message.tool_calls?.[0]?.function.name).toBe('Write');
+    expect(body.choices[0]?.message.tool_calls?.[0]?.function.arguments).toBe(
+      '{"file_path":"a.ts","content":"x"}',
+    );
+  });
+
+  it('вызов, разрезанный контуром на два кадра, всё равно собирается', async () => {
+    const cut = CALL_TEXT.indexOf('"Write"');
+    await start(
+      upstream([
+        callFrame(CALL_TEXT.slice(0, cut)),
+        callFrame(CALL_TEXT.slice(cut)),
+        STOP,
+        USAGE,
+        '[DONE]',
+      ]),
+    );
+    const answer = await ask('/enterprise-platform/v1/messages', { ...ANTHROPIC_ASK, stream: true });
+    expect(answer.text).toContain('"type":"tool_use"');
+    expect(answer.text).not.toContain('<tool_call>');
+  });
+
+  it('ход без вызова, но с заявкой о действии, помечен в следе (Т5.5)', async () => {
+    await start(upstream([callFrame('Файл создан.'), STOP, USAGE, '[DONE]']));
+    await ask('/enterprise-platform/v1/messages', { ...ANTHROPIC_ASK, stream: true });
+
+    const event = gateway.status().events[0];
+    expect(event?.toolCalls).toBe(0);
+    expect(event?.claimedWithoutCall).toBe(true);
+  });
+
+  it('испорченный блок вызовом не становится и назван в следе', async () => {
+    await start(
+      upstream([
+        callFrame('<tool_call>{"name":"Bash","arguments":{}}</tool_call>'),
+        STOP,
+        USAGE,
+        '[DONE]',
+      ]),
+    );
+    const answer = await ask('/enterprise-platform/v1/messages', { ...ANTHROPIC_ASK, stream: true });
+
+    expect(answer.text).not.toContain('"type":"tool_use"');
+    // Человек видит и текст блока, и причину: инструмент не объявлялся клиентом.
+    expect(answer.text).toContain('Bash');
+    const event = gateway.status().events[0];
+    expect(event?.toolCalls).toBe(0);
+    expect(event?.toolFlaws.join(' ')).toContain('Bash');
+  });
+
+  it('прослойка выключена — конвейер работает ровно как до неё', async () => {
+    writePlatform(store, { ...PLATFORM, toolShim: false });
+    await start(upstream([callFrame(CALL_TEXT), STOP, USAGE, '[DONE]']));
+    const answer = await ask('/enterprise-platform/v1/messages', { ...ANTHROPIC_ASK, stream: true });
+
+    const sent = JSON.parse(calls[0]!.body) as { messages: { content: string }[] };
+    expect(sent.messages[0]?.content).not.toContain('<tool_call>');
+    // Текст вызова уезжает человеку как текст: прослойки нет, разбирать некому.
+    expect(answer.text).toContain('tool_call');
+    expect(answer.text).not.toContain('"type":"tool_use"');
+    expect(gateway.status().events[0]?.toolCalls).toBe(0);
+  });
+});
+
+/**
+ * Метки защиты данных внутри вызова инструмента (Р11, Т5.7).
+ *
+ * Через контур аргумент едет замаскированным, и вернуться к CLI он обязан
+ * значением: агент выполняет вызов сам, и метка вместо адреса или пути уедет не
+ * на экран, а в файл — где человек найдёт её не сегодня.
+ */
+describe('метки защиты данных в вызове инструмента', () => {
+  const ASK = {
+    model: 'gpt-x',
+    max_tokens: 100,
+    messages: [{ role: 'user', content: 'напиши письмо: Иванов' }],
+    tools: [{ name: 'Write', description: 'пишет файл', input_schema: { type: 'object' } }],
+    stream: true,
+  };
+  const STOP = JSON.stringify({
+    id: 'c1',
+    model: 'gpt-x',
+    choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+  });
+  const callFrame = (args: unknown): string =>
+    JSON.stringify({
+      id: 'c1',
+      model: 'gpt-x',
+      choices: [
+        {
+          index: 0,
+          delta: {
+            content: `<tool_call>${JSON.stringify({ name: 'Write', arguments: args })}</tool_call>`,
+          },
+        },
+      ],
+    });
+
+  /** Одно правило маскирования — ровно так его заводит человек. */
+  function withRule(): void {
+    store.updateSettings({ dlp: { ...store.getSettings().dlp, enabled: true } });
+    saveRules(appData, [
+      {
+        id: 'r1',
+        name: 'Фамилии сотрудников',
+        enabled: true,
+        kind: 'terms',
+        terms: ['Иванов'],
+        pattern: '',
+        action: 'mask',
+        label: 'ИМЯ',
+      },
+    ]);
+  }
+
+  it('значение возвращается в аргументы вызова, а метка до клиента не доезжает', async () => {
+    withRule();
+    await start(
+      upstream([
+        callFrame({ file_path: 'letter.md', content: 'здравствуйте, [ИМЯ_1]' }),
+        STOP,
+        USAGE,
+        '[DONE]',
+      ]),
+    );
+    const answer = await ask('/enterprise-platform/v1/messages', ASK);
+
+    // Наверх ушла метка.
+    expect(calls[0]?.body).not.toContain('Иванов');
+    expect(calls[0]?.body).toContain('[ИМЯ_1]');
+    // А в вызове у клиента — значение, и вызов разбирается как JSON.
+    expect(answer.text).toContain('"type":"tool_use"');
+    expect(answer.text).not.toContain('[ИМЯ_1]');
+    const json = partialJson(answer.text);
+    expect(JSON.parse(json)).toEqual({ file_path: 'letter.md', content: 'здравствуйте, Иванов' });
+  });
+
+  it('путь с обратными косыми не ломает упакованный JSON вызова', async () => {
+    store.updateSettings({ dlp: { ...store.getSettings().dlp, enabled: true } });
+    saveRules(appData, [
+      {
+        id: 'r2',
+        name: 'Путь в профиле',
+        enabled: true,
+        kind: 'regex',
+        terms: [],
+        pattern: 'C:\\\\Users\\\\[A-Za-z0-9_.-]+',
+        action: 'mask',
+        label: 'ПУТЬ',
+      },
+    ]);
+    await start(
+      upstream([
+        callFrame({ file_path: '[ПУТЬ_1]\\notes.md', content: 'готово' }),
+        STOP,
+        USAGE,
+        '[DONE]',
+      ]),
+    );
+    const answer = await ask('/enterprise-platform/v1/messages', {
+      ...ASK,
+      messages: [{ role: 'user', content: 'запиши в C:\\Users\\rusyander' }],
+    });
+
+    // Разбор — и есть проверка: неэкранированная косая делает вызов
+    // неразбираемым целиком, и агент молча не делает ничего.
+    expect(JSON.parse(partialJson(answer.text))).toEqual({
+      file_path: 'C:\\Users\\rusyander\\notes.md',
+      content: 'готово',
+    });
+  });
+
+  it('метка, которой панель не выдавала, останавливает ход и названа в следе', async () => {
+    withRule();
+    await start(
+      upstream([callFrame({ file_path: 'a.md', content: 'пишу [ИМЯ_9]' }), STOP, USAGE, '[DONE]']),
+    );
+    const answer = await ask('/enterprise-platform/v1/messages', ASK);
+
+    expect(answer.text).not.toContain('"type":"tool_use"');
+    expect(answer.text).toContain('метку защиты данных');
+    expect(answer.text).toContain('[ИМЯ_9]');
+    const event = gateway.status().events[0];
+    expect(event?.toolFlaws.join(' ')).toContain('mask-unrestorable');
+    expect(event?.toolCalls).toBe(0);
+  });
+
+  it('та же остановка приходит цельным телом, если клиент не просил поток', async () => {
+    withRule();
+    store.updateSettings({
+      platformGateway: { ...store.getSettings().platformGateway, forceStream: true },
+    });
+    await start(
+      upstream([callFrame({ file_path: 'a.md', content: 'пишу [ИМЯ_9]' }), STOP, USAGE, '[DONE]']),
+    );
+    const answer = await ask('/enterprise-platform/v1/messages', { ...ASK, stream: false });
+
+    expect(answer.status).toBe(400);
+    expect(answer.text).toContain('метку защиты данных');
+    // Причина названа своя, а не «проверки контура»: контур тут ни при чём.
+    expect(answer.text).not.toContain('Проверки контента контура');
+  });
+
+  it('карта подмены контура разворачивается ДО синтеза вызова', async () => {
+    await start(
+      upstream([
+        JSON.stringify({ enterprise-platform_deanonymized_entities: { ORG_7: 'Платформа компании' } }),
+        callFrame({ file_path: 'a.md', content: 'заказчик ORG_7' }),
+        STOP,
+        USAGE,
+        '[DONE]',
+      ]),
+    );
+    const answer = await ask('/enterprise-platform/v1/messages', ASK);
+
+    expect(JSON.parse(partialJson(answer.text))).toEqual({
+      file_path: 'a.md',
+      content: 'заказчик Платформа компании',
+    });
+    // Сам вендорный кадр клиенту по-прежнему не уезжает.
+    expect(answer.text).not.toContain('enterprise-platform_deanonymized_entities');
+    expect(gateway.status().events[0]?.masked).toBe(true);
+  });
+});
+
+/** Аргументы вызова из потока Anthropic: их везёт единственная `input_json_delta`. */
+function partialJson(stream: string): string {
+  for (const line of stream.split('\n')) {
+    if (!line.startsWith('data: ')) continue;
+    const event = JSON.parse(line.slice(6)) as {
+      delta?: { type?: string; partial_json?: string };
+    };
+    if (event.delta?.type === 'input_json_delta') return event.delta.partial_json ?? '';
+  }
+  return '';
+}

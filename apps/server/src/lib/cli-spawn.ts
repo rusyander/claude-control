@@ -46,6 +46,15 @@ export interface CliSpawnOptions {
   spawnImpl?: typeof nodeSpawn;
   /** Рабочий каталог процесса. Не задан — каталог сервера. */
   cwd?: string;
+  /**
+   * Добавка к окружению процесса — адрес шлюза контура (Т3) и больше ничего.
+   *
+   * ДОБАВКА, а не замена: `process.env` остаётся целиком. Собственное
+   * окружение CLI — это его PATH, домашний каталог и вход в аккаунт; отдать ему
+   * три переменные вместо них значило бы не «направить в контур», а сломать
+   * запуск.
+   */
+  env?: Record<string, string>;
 }
 
 /** Либо запущенный процесс, либо причина, по которой запускать не стали. */
@@ -59,7 +68,15 @@ export function spawnCliProcess(
   options: CliSpawnOptions = {},
 ): CliSpawnOutcome {
   const spawnImpl = options.spawnImpl ?? nodeSpawn;
-  const base = { windowsHide: true, ...(options.cwd ? { cwd: options.cwd } : {}) };
+  // `env` уходит в spawn ТОЛЬКО целиком: node не умеет «добавить переменную», он
+  // заменяет окружение целиком. Поэтому добавку кладём поверх копии process.env —
+  // иначе CLI лишился бы PATH и входа в аккаунт. Ключа нет — options.env не
+  // передаём вовсе, чтобы ребёнок унаследовал окружение сервера как раньше.
+  const base = {
+    windowsHide: true,
+    ...(options.cwd ? { cwd: options.cwd } : {}),
+    ...(options.env ? { env: { ...process.env, ...options.env } } : {}),
+  };
 
   try {
     if (!isWindows()) {

@@ -1,0 +1,24 @@
+{
+  "topic": "permissions",
+  "source": "docs/diagrams/permissions-guide/permissions-guide.drawio",
+  "pages": [
+    {
+      "name": "decision-order",
+      "file": "decision-order.png",
+      "page": 1,
+      "source": "a39004aee1fb17b7",
+      "width": 1398,
+      "height": 1028,
+      "exportedAt": "2026-09-11T14:34:23.036Z"
+    },
+    {
+      "name": "where-rules-live",
+      "file": "where-rules-live.png",
+      "page": 2,
+      "source": "536aa99dc4a875ac",
+      "width": 1418,
+      "height": 988,
+      "exportedAt": "2026-09-11T14:34:26.062Z"
+    }
+  ]
+}

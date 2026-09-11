@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { PriorityLadder } from '@shared/ui/diagram';
-import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, StepList } from '../ui';
+import { HelpSection, StorageCard, FieldTable, Callout, OptionCards } from '../ui';
+import { ProvidersGuideSections } from './ProvidersGuideSections';
+import { ProvidersLimitsSections } from './ProvidersLimitsSections';
 
 /**
  * Документ «Провайдеры» — единственный сквозной: он не про один раздел панели, а
@@ -12,14 +14,23 @@ import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, StepList } 
  * — честный статус у каждого CLI. Дублировать её из кода нельзя (карта в коде —
  * машинная, здесь нужен человеческий разбор с причинами), поэтому при изменении
  * `providers/catalog.ts` эту таблицу правят руками.
+ *
+ * Рукописных шагов выбора здесь больше нет: те же четыре шага показаны кадрами
+ * настоящего раздела в `ProvidersGuideSections`.
  */
 export function ProvidersTopic() {
   const { t } = useTranslation();
   const tr = (key: string): string => t(`help.topics.providers.${key}`);
+  const common = (key: string): string => t(`help.common.${key}`);
 
   return (
     <>
-      <HelpSection title={t('help.common.whyTitle')}>
+      {/* Документ длинный: первым делом он говорит, из чего состоит. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
+      <HelpSection title={common('whyTitle')}>
         <OptionCards
           items={[
             { title: tr('whyOne'), text: tr('whyOneText') },
@@ -29,16 +40,9 @@ export function ProvidersTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('chooseTitle')} caption={tr('chooseCaption')}>
-        <StepList
-          steps={[
-            { title: tr('chooseStep1'), text: tr('chooseStep1Text') },
-            { title: tr('chooseStep2'), text: tr('chooseStep2Text') },
-            { title: tr('chooseStep3'), text: tr('chooseStep3Text') },
-            { title: tr('chooseStep4'), text: tr('chooseStep4Text') },
-          ]}
-        />
-      </HelpSection>
+      <ProvidersGuideSections tr={tr} />
+
+      <ProvidersLimitsSections tr={tr} common={common} />
 
       <HelpSection title={tr('statusTitle')} caption={tr('statusCaption')}>
         <OptionCards
@@ -111,7 +115,7 @@ export function ProvidersTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')} caption={tr('filesCaption')}>
+      <HelpSection title={tr('filesTitle')} caption={tr('filesCaption')}>
         <Stack gap="var(--spacing-xs)">
           <StorageCard
             title="Claude Code"

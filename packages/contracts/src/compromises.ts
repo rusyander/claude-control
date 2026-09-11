@@ -56,6 +56,8 @@ export const COMPROMISE_IDS = [
   'probe-guess',
   'context-managed',
   'agents-manual-roster',
+  'tool-shim',
+  'shim-no-cache',
 ] as const;
 
 export type CompromiseId = (typeof COMPROMISE_IDS)[number];
@@ -170,6 +172,22 @@ const REGISTRY: Record<CompromiseId, Omit<CompromiseEntry, 'id'>> = {
       'packages/contracts/src/platform.ts',
       'apps/server/src/domains/platform/agents.ts',
     ],
+  },
+  // Подписано 12.09.2026, при Т5. Два обхода, а не один: первый — что вызов
+  // инструмента едет текстом (это можно выключить и остаться с чатом), второй —
+  // что этот текст платится в каждом ходе (это выключить нельзя вовсе).
+  'tool-shim': {
+    severity: 'workaround',
+    since: '2026-09-12',
+    codeAnchors: [
+      'apps/server/src/domains/platform/gateway/pipeline.ts',
+      'apps/server/src/domains/platform/gateway/frames.ts',
+    ],
+  },
+  'shim-no-cache': {
+    severity: 'limitation',
+    since: '2026-09-12',
+    codeAnchors: ['apps/server/src/domains/platform/gateway/tool-shim/protocol.ts'],
   },
 };
 

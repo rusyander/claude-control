@@ -1,0 +1,114 @@
+{
+  "topic": "permissions",
+  "scenario": "audit",
+  "frames": [
+    {
+      "id": "01-all-rules",
+      "file": "01-all-rules.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1400,
+      "height": 1100,
+      "shotAt": "2026-09-11T12:47:05.997Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 20 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Права доступа Что Claude делает сам, а что спрашивает Добавить правило Как это работает Системные MCP-серверы Все правила всего Разрешено Спрашивать Запрещено Read Разрешено Edit Разрешено Bash(npm run:*) Разрешено Bash(git status:*) Разрешено Bash(git diff:*) Разрешено WebSearch Разрешено Skill Разрешено mcp__orders__list_orders Разрешено mcp__orders__order_details Разрешено mcp__orders__export_orders Разрешено Write Спрашивать Bash(git commit:*) Спрашивать WebFetch Спрашивать Task Спрашивать mcp__orders__sync_stock Спрашивать Bash(rm:*) Запрещено Bash(git push:*) Запрещено mcp__orders__refund_order Запрещено Bash(docker:*) Спрашивать локальные Bash(curl:*) Запрещено локальные",
+      "en": {
+        "file": "01-all-rules.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1100,
+        "shotAt": "2026-09-11T17:43:28.031Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 20 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Permissions What Claude does on its own and what it asks about Add rule How it works System MCP servers All rules total Allowed Ask Denied Read Allowed Edit Allowed Bash(npm run:*) Allowed Bash(git status:*) Allowed Bash(git diff:*) Allowed WebSearch Allowed Skill Allowed mcp__orders__list_orders Allowed mcp__orders__order_details Allowed mcp__orders__export_orders Allowed Write Ask Bash(git commit:*) Ask WebFetch Ask Task Ask mcp__orders__sync_stock Ask Bash(rm:*) Denied Bash(git push:*) Denied mcp__orders__refund_order Denied Bash(docker:*) Ask local Bash(curl:*) Denied local"
+      }
+    },
+    {
+      "id": "02-search",
+      "file": "02-search.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1400,
+      "height": 1100,
+      "shotAt": "2026-09-11T12:47:06.969Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 20 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Права доступа Что Claude делает сам, а что спрашивает Добавить правило Как это работает Системные MCP-серверы Все правила всего Разрешено Спрашивать Запрещено Bash(git status:*) Разрешено Bash(git diff:*) Разрешено Bash(git commit:*) Спрашивать Bash(git push:*) Запрещено",
+      "en": {
+        "file": "02-search.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1100,
+        "shotAt": "2026-09-11T17:43:29.016Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 20 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Permissions What Claude does on its own and what it asks about Add rule How it works System MCP servers All rules total Allowed Ask Denied Bash(git status:*) Allowed Bash(git diff:*) Allowed Bash(git commit:*) Ask Bash(git push:*) Denied"
+      }
+    },
+    {
+      "id": "03-local",
+      "file": "03-local.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1400,
+      "height": 1100,
+      "shotAt": "2026-09-11T12:47:07.956Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 20 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Права доступа Что Claude делает сам, а что спрашивает Добавить правило Как это работает Системные MCP-серверы Все правила всего Разрешено Спрашивать Запрещено Bash(npm run:*) Разрешено Bash(git status:*) Разрешено Bash(git diff:*) Разрешено Bash(git commit:*) Спрашивать Bash(rm:*) Запрещено Bash(git push:*) Запрещено Bash(docker:*) Спрашивать локальные Bash(curl:*) Запрещено локальные",
+      "en": {
+        "file": "03-local.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1100,
+        "shotAt": "2026-09-11T17:43:30.011Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 20 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Permissions What Claude does on its own and what it asks about Add rule How it works System MCP servers All rules total Allowed Ask Denied Bash(npm run:*) Allowed Bash(git status:*) Allowed Bash(git diff:*) Allowed Bash(git commit:*) Ask Bash(rm:*) Denied Bash(git push:*) Denied Bash(docker:*) Ask local Bash(curl:*) Denied local"
+      }
+    },
+    {
+      "id": "04-disabled",
+      "file": "04-disabled.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1400,
+      "height": 1100,
+      "shotAt": "2026-09-11T12:47:10.852Z",
+      "text": "AgentDeck Свернуть панель 1 Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 20 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Права доступа Что Claude делает сам, а что спрашивает Добавить правило Как это работает Системные MCP-серверы Все правила всего Разрешено Спрашивать Запрещено Bash(git commit:*) Спрашивать Выключено Обновлено",
+      "en": {
+        "file": "04-disabled.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1100,
+        "shotAt": "2026-09-11T17:43:32.908Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 20 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Permissions What Claude does on its own and what it asks about Add rule How it works System MCP servers All rules total Allowed Ask Denied Bash(git commit:*) Ask Disabled Updated"
+      }
+    },
+    {
+      "id": "05-mcp-tab",
+      "file": "05-mcp-tab.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1400,
+      "height": 1100,
+      "shotAt": "2026-09-11T12:47:12.202Z",
+      "text": "AgentDeck Свернуть панель 1 Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 20 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Права доступа Что Claude делает сам, а что спрашивает Добавить правило Как это работает Системные MCP-серверы Все правила всего Разрешено Спрашивать Запрещено mcp__orders__list_orders Разрешено mcp__orders__order_details Разрешено mcp__orders__export_orders Разрешено mcp__orders__sync_stock Спрашивать mcp__orders__refund_order Запрещено",
+      "en": {
+        "file": "05-mcp-tab.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1100,
+        "shotAt": "2026-09-11T17:43:34.260Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 20 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Permissions What Claude does on its own and what it asks about Add rule How it works System MCP servers All rules total Allowed Ask Denied mcp__orders__list_orders Allowed mcp__orders__order_details Allowed mcp__orders__export_orders Allowed mcp__orders__sync_stock Ask mcp__orders__refund_order Denied"
+      }
+    },
+    {
+      "id": "06-delete",
+      "file": "06-delete.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 468,
+      "height": 358,
+      "shotAt": "2026-09-11T12:47:13.313Z",
+      "text": "Удалить безвозвратно? Правило будет удалено из settings.json. Инструмент вернётся к поведению по умолчанию — подтверждение при каждом вызове. Введите «mcp__orders__refund_order», чтобы подтвердить Отмена Удалить",
+      "en": {
+        "file": "06-delete.en.png",
+        "masked": 0,
+        "width": 468,
+        "height": 339,
+        "shotAt": "2026-09-11T17:43:35.368Z",
+        "text": "Delete permanently? The rule is removed from settings.json. The tool returns to the default behaviour — confirmation on every call. Type \"mcp__orders__refund_order\" to confirm Cancel Delete"
+      }
+    }
+  ]
+}

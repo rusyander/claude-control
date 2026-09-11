@@ -192,11 +192,64 @@ export const DEFAULT_MASKS = [
 ];
 
 /**
+ * ЯЗЫК СЪЁМКИ. Кадр — это снимок ИНТЕРФЕЙСА, а интерфейс переведён: английскому
+ * читателю справки русский снимок не объясняет ничего, и подпись под ним,
+ * переведённая одна, только подчёркивает разрыв.
+ *
+ * Английский кадр лежит РЯДОМ с русским и называется `<кадр>.en.png`, а не в
+ * папке `en/`. Причина в стороже: `check-help-shots.mjs` читает сценарий как
+ * «опись + плоский список PNG», и вложенная папка потребовала бы второго обхода
+ * каталога, второго множества файлов и второй ветки в каждом правиле. Суффикс
+ * же попадает в тот же список сам собой, и «файл есть, в описи нет» ловит
+ * забытый английский кадр тем же правилом, что и русский.
+ *
+ * Запись в описи остаётся ОДНА на кадр: русские поля на месте, английский
+ * отпечаток — во вложенном `en` (свой файл, свой видимый текст, своё время).
+ * Так секретный скан идёт по обоим текстам, а кадр остаётся одним кадром — с
+ * одной подписью, одной стороной и одним порядковым номером.
+ */
+export const SHOT_LANGS = ['ru', 'en'];
+
+/** Язык текущего прогона. Переменная одна на всю пачку: `GUIDE_LANG=en`. */
+export function shotLanguage(env = process.env) {
+  return env.GUIDE_LANG === 'en' ? 'en' : 'ru';
+}
+
+/**
+ * Переключить язык ПАНЕЛИ перед съёмкой.
+ *
+ * Делается на сервере, а не в браузере, и это не мелочь: язык живёт в настройках
+ * панели (`state.json → settings.language`), фронт берёт его из `/api/settings`
+ * и только потом зовёт `i18n.changeLanguage`. Каждая пачка кадров подменяет
+ * настройки своим `page.route`, но все подмены собраны одинаково — «взять
+ * НАСТОЯЩИЙ ответ панели и дописать своё». Значит достаточно поменять ответ у
+ * источника: подмены донесут язык сами, и ни одну из них править не нужно.
+ *
+ * Дёргать `i18n` из страницы было бы короче и неверно: это обход того самого
+ * пути, по которому язык приходит человеку, — кадр доказывал бы работу
+ * подкрутки, а не работу настройки.
+ */
+export async function applyShotLanguage(panel, lang = shotLanguage()) {
+  const response = await fetch(`${panel}/api/settings`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ language: lang }),
+  });
+  if (!response.ok) throw new Error(`PATCH /api/settings language: ${response.status}`);
+  console.log(`язык съёмки: ${lang}`);
+  return lang;
+}
+
+/**
  * Опись сценария. Открывается один раз на съёмку, дописывается кадр за кадром
  * и сохраняется в конце. Кадры ДРУГОЙ стороны (снятые прошлым прогоном с
  * `--side`) не теряются: запись заменяется по идентификатору, остальные живут.
+ *
+ * Язык прогона по умолчанию берётся из переменной: пачке достаточно позвать
+ * `applyShotLanguage` после подъёма панели, а `openScenario` подхватит сам —
+ * иначе про язык пришлось бы помнить в каждом из четырёх десятков сценариев.
  */
-export function openScenario(topic, scenario) {
+export function openScenario(topic, scenario, lang = shotLanguage()) {
   const dir = join(SHOTS_ROOT, topic, scenario);
   mkdirSync(dir, { recursive: true });
   const manifestPath = join(dir, 'frames.json');
@@ -208,6 +261,9 @@ export function openScenario(topic, scenario) {
 
   /** Что сняла ИМЕННО эта съёмка: по этому списку чистится своя сторона. */
   const thisRun = { side: '', ids: new Set() };
+
+  /** Имя файла кадра: русский — как раньше, английский — с суффиксом. */
+  const fileOf = (id) => (lang === 'en' ? `${id}.en.png` : `${id}.png`);
 
   return {
     dir,
@@ -277,7 +333,25 @@ export function openScenario(topic, scenario) {
         };
       }
 
-      const file = `${id}.png`;
+      // Язык проверяется у САМОЙ страницы, а не по переменной окружения:
+      // `GUIDE_LANG=en` в пачке, которая забыла позвать `applyShotLanguage`,
+      // положил бы русский интерфейс под английским именем файла — и заметить
+      // это было бы нечем, кроме как глазами по всем кадрам. `lang` на <html>
+      // ставит тот же `ThemeProvider`, который зовёт `i18n.changeLanguage`,
+      // поэтому совпадение здесь означает «интерфейс в кадре действительно
+      // английский». Сторону `enterprise-platform` не трогаем: чужое приложение своего
+      // языка нам не сообщает.
+      if (side === 'panel') {
+        const pageLang = await page.evaluate(() => document.documentElement.lang || '(пусто)');
+        if (!pageLang.startsWith(lang)) {
+          throw new Error(
+            `кадр ${id}: съёмка идёт как «${lang}», а интерфейс на странице «${pageLang}» — ` +
+              'позовите applyShotLanguage(PANEL) после подъёма панели',
+          );
+        }
+      }
+
+      const file = fileOf(id);
       await page.screenshot({ path: join(dir, file), clip: area });
 
       // Текст снимаемой области — из той же разметки и после замазывания.
@@ -285,19 +359,30 @@ export function openScenario(topic, scenario) {
         ? await page.locator(clip).first().innerText()
         : await page.locator('body').innerText();
 
-      thisRun.side = side;
-      thisRun.ids.add(id);
-      frames.set(id, {
-        id,
+      const taken = {
         file,
-        side,
         masked: maskedCount,
         width: Math.round(area?.width ?? page.viewportSize()?.width ?? 0),
         height: Math.round(area?.height ?? page.viewportSize()?.height ?? 0),
         shotAt: new Date().toISOString(),
         text: text.replace(/\s+/g, ' ').trim(),
-      });
-      console.log(`  кадр ${id}${maskedCount ? ` (замазано узлов: ${maskedCount})` : ''}`);
+      };
+
+      thisRun.side = side;
+      thisRun.ids.add(id);
+      const previousFrame = frames.get(id);
+      // Английский прогон дописывает СВОЙ отпечаток в существующую запись и не
+      // трогает русские поля: снимают их разные прогоны, и второй не обязан
+      // знать, чем закончился первый. Русский прогон так же бережёт `en`.
+      frames.set(
+        id,
+        lang === 'en'
+          ? { ...previousFrame, id, side, en: taken }
+          : { ...previousFrame, id, side, ...taken },
+      );
+      console.log(
+        `  кадр ${id} [${lang}]${maskedCount ? ` (замазано узлов: ${maskedCount})` : ''}`,
+      );
     },
 
     /**
@@ -312,13 +397,24 @@ export function openScenario(topic, scenario) {
     finish() {
       for (const [id, frame] of [...frames]) {
         if (frame.side !== thisRun.side || thisRun.ids.has(id)) continue;
+        // Английский прогон снимает с учёта только английский близнец: русский
+        // кадр снят не им, и удалять чужую работу он права не имеет.
+        if (lang === 'en') {
+          if (!frame.en) continue;
+          rmSync(join(dir, frame.en.file), { force: true });
+          frames.set(id, { ...frame, en: undefined });
+          console.log(`  снят с учёта устаревший английский кадр ${id}`);
+          continue;
+        }
         frames.delete(id);
         rmSync(join(dir, frame.file), { force: true });
+        // Шага больше нет — английского его снимка тоже быть не должно.
+        if (frame.en) rmSync(join(dir, frame.en.file), { force: true });
         console.log(`  снят с учёта устаревший кадр ${id}`);
       }
       const list = [...frames.values()].sort((a, b) => a.id.localeCompare(b.id));
       // Файл, которого нет НИ В ОДНОЙ записи, — сирота: опись здесь главная.
-      const known = new Set(list.map((frame) => frame.file));
+      const known = new Set(list.flatMap((frame) => [frame.file, frame.en?.file]).filter(Boolean));
       for (const name of readdirSync(dir)) {
         if (!name.endsWith('.png') || known.has(name)) continue;
         rmSync(join(dir, name), { force: true });
@@ -330,7 +426,10 @@ export function openScenario(topic, scenario) {
         'utf8',
       );
       const files = readdirSync(dir).filter((name) => name.endsWith('.png'));
-      console.log(`\nОпись: ${list.length} кадров, файлов на диске ${files.length}`);
+      const english = list.filter((frame) => frame.en).length;
+      console.log(
+        `\nОпись: ${list.length} кадров (английских ${english}), файлов на диске ${files.length}`,
+      );
       return list;
     },
   };

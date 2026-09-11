@@ -31,6 +31,22 @@ export function buildArchiveReadme(manifest: ArchiveManifest): string {
           })
           .join('\n');
 
+  // Секции панели называются, только когда они в архиве есть: строка про файл,
+  // которого в zip нет, отправила бы человека искать его глазами.
+  const panelFiles = [
+    manifest.panel
+      ? `- \`${manifest.panel.archivePath}\` — контуры панели (${manifest.panel.platforms.length}), ` +
+        'настройка без ключа: ключ вводится на новой машине.'
+      : '',
+    manifest.panelPrompts
+      ? `- \`${manifest.panelPrompts.archivePath}\` — ваши правки промптов панели ` +
+        `(${manifest.panelPrompts.prompts.length}). Встроенные тексты не переносятся: они ` +
+        'приезжают вместе с панелью.'
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
   return `# Окружение ${provider.name} — перенос на другую машину
 
 Собрано панелью agentdeck ${exportedAt} на платформе \`${source.platform}\`.
@@ -43,7 +59,7 @@ export function buildArchiveReadme(manifest: ArchiveManifest): string {
 - \`files/loc-<номер>/…\` — сама конфигурация. Номер соответствует месту:
 
 ${locations}
-
+${panelFiles ? `\n${panelFiles}\n` : ''}
 ## Как развернуть
 
 **Через панель (рекомендуется):** Настройки → «Перенос окружения» → «Импорт» у нужного

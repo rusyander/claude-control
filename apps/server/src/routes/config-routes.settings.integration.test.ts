@@ -178,6 +178,8 @@ describe('config-routes: валидация настроек и импорта',
       targets: [],
       projectPaths: [],
       budgetSince: '',
+      toolShim: true,
+      contourPrompt: true,
       caCertPath: '',
     };
 

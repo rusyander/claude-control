@@ -1,4 +1,8 @@
-import type { EnvTransferPlanEntry, EnvTransferPlatformEntry } from '../EnvTransfer.types';
+import type {
+  EnvTransferPlanEntry,
+  EnvTransferPlatformEntry,
+  EnvTransferPromptEntry,
+} from '../EnvTransfer.types';
 
 /**
  * Разбор плана разворота архива — отдельно от разметки, потому что это правила,
@@ -26,6 +30,17 @@ export function defaultSelection(entries: EnvTransferPlanEntry[]): string[] {
  */
 export function defaultPlatformSelection(entries: EnvTransferPlatformEntry[]): string[] {
   return entries.filter((entry) => entry.status === 'new').map((entry) => entry.id);
+}
+
+/**
+ * Что отмечено в секции промптов при открытии: только новое и только известное
+ * этой панели. Промпт, которого здесь нет, отметить нельзя вовсе — записать
+ * такую правку было бы некуда.
+ */
+export function defaultPromptSelection(entries: EnvTransferPromptEntry[]): string[] {
+  return entries
+    .filter((entry) => entry.status === 'new' && !entry.unknown)
+    .map((entry) => entry.id);
 }
 
 /** Отмечено ли всё, что можно отметить (для переключателя «отметить всё»). */

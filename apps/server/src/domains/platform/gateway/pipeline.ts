@@ -6,16 +6,19 @@ import { AliasVault } from '../../dlp/mask.ts';
 import { maskRequestBody } from '../../dlp/request-filter.ts';
 import { ResponseStreamFilter, restoreJsonResponse } from '../../dlp/response-filter.ts';
 import { readRules } from '../../dlp/rules-store.ts';
+import { promptText } from '../../prompts.ts';
+import { driverFor } from '../drivers/index.ts';
 import { findPlatform, readToken } from '../store.ts';
 import {
   anthropicRequestToOpenAi,
   errorBody,
   openAiModelsToAnthropic,
-  openAiRequestLoss,
+  openAiRequestWithShim,
   openAiResponseToAnthropic,
   type Dialect,
 } from './dialect.ts';
-import { StreamTranslator, TRUNCATED_MESSAGE } from './frames.ts';
+import { maskStopMessage, StreamTranslator, TRUNCATED_MESSAGE } from './frames.ts';
+import { historyHasToolUse } from './tool-shim/encode.ts';
 import { bridgeUpstreamStatus } from './status.ts';
 import { callUpstream, forceStreamBody, retryAfterSeconds, UpstreamError } from './upstream.ts';
 import type { SpendFlusher } from './spend-flush.ts';
@@ -220,7 +223,9 @@ async function models(
     if (upstream.status >= 400) {
       const body = safeJson(text);
       noteExhausted(deps, platform.id, upstream.status, body);
-      const bridged = bridgeUpstreamStatus(upstream.status, body);
+      const bridged = bridgeUpstreamStatus(upstream.status, body, {
+        driverRows: driverFor(platform.driver).statusRows,
+      });
       return refuse(response, deps, {
         platformId: platform.id,
         path,
@@ -292,16 +297,30 @@ async function chat(
     });
   }
 
+  // Манифест платформы: судьба полей запроса, вендорные кадры потока, отказы,
+  // которые умеет объяснить только она. Ниже конвейер спрашивает только его и
+  // ни разу — имя контура.
+  const driver = driverFor(platform.driver);
+
+  // Прослойка инструментов (Т5): текст протокола берётся из каталога промптов
+  // (Т4) — правку человека она обязана видеть так же, как встроенный текст.
+  // Выключена — конвейер идёт ровно так, как шёл до неё.
+  // compromise: tool-shim — платформа не принимает `tools`, поэтому схемы едут текстом, а вызов собирается из ответа
+  const shim = platform.toolShim
+    ? { protocolText: promptText(deps.appDataDir, 'tool-protocol') }
+    : undefined;
+
   // compromise: dialect-bridge — клиент говорит по-Anthropic, контур по-OpenAI; что не переносится, названо таблицей
   const translated =
     dialect === 'anthropic'
-      ? anthropicRequestToOpenAi(clientBody)
+      ? anthropicRequestToOpenAi(clientBody, driver.requestFields, shim)
       : // Перевода тут нет, а потери есть: контур принимает схемой половину
         // полей диалекта OpenAI и до модели их не доносит (справочник §5).
         // Без этой строки codex и cursor читали бы в следе «перенеслось всё»
         // ровно там, где молча пропали их инструменты.
-        { body: clientBody, lost: openAiRequestLoss(clientBody) };
+        openAiRequestWithShim(clientBody, driver.requestFields, shim);
   const lost = translated.lost.map((item) => item.field);
+  const allowed = new Set(translated.tools.map((tool) => tool.name));
 
   const settings = deps.store.getSettings();
   const wantsStream = clientBody.stream === true;
@@ -370,6 +389,7 @@ async function chat(
     const bridged = bridgeUpstreamStatus(upstream.status, body, {
       model,
       retryAfterSeconds: retryAfterSeconds(upstream),
+      driverRows: driver.statusRows,
     });
     return refuse(response, deps, {
       platformId: platform.id,
@@ -379,17 +399,41 @@ async function chat(
       code: bridged.code,
       message: bridged.message,
       violations: bridged.violations,
-      // Отказ проверок отличается от отказа ключа: 451 здесь ещё виден, а
-      // клиенту он уедет четырёхсотым и станет неотличим от прочих.
-      blocked: upstream.status === 451,
+      // Отказ проверок отличается от отказа ключа: код платформы здесь ещё
+      // виден, а клиенту он уедет четырёхсотым и станет неотличим от прочих.
+      // Какой это код, знает драйвер — общего «451 значит проверки» нет.
+      blocked: driver.statusRows.some(
+        (row) => row.upstream === upstream.status && row.violations === true,
+      ),
       lost,
     });
   }
 
-  const translator = new StreamTranslator({ dialect, model, includeUsage });
+  const translator = new StreamTranslator({
+    dialect,
+    model,
+    includeUsage,
+    driver,
+    // Прослойка разбирает ответ только там, где клиент объявил инструменты:
+    // без списка имён любой `<tool_call>` в тексте — это текст, и выполнять
+    // его от имени человека панель не станет.
+    // Словарь меток отдаётся живой картой хранилища: к ответу он уже полон, а
+    // снимок, сделанный здесь копией, отстал бы ровно на те метки, которые
+    // защита выдала последнему куску запроса.
+    shim:
+      allowed.size > 0
+        ? {
+            allowed,
+            aliases: vault.reverse(),
+            // Ход уже идёт с инструментами — итоговая реплика «файл создан»
+            // пометкой не красится: она правда.
+            priorCalls: historyHasToolUse(clientBody),
+          }
+        : undefined,
+  });
   const restore = new ResponseStreamFilter(dialect, vault.reverse());
 
-  const source = await readSource(upstream);
+  const source = await readSource(upstream, driver.vendorFields);
   if (!source) {
     return refuse(response, deps, {
       platformId: platform.id,
@@ -461,7 +505,25 @@ async function chat(
     interrupted: facts.interrupted,
     unknownFrames: facts.unknownFrames,
     totalTokens: facts.totalTokens,
-    lost,
+    // Потери запроса (их считает диалект) плюс потери ОТВЕТА, которые видны
+    // только по ходу потока: подтверждённый кадром выброс инструментов и части
+    // ответа, не перенесённые в чужой диалект. Клиент мог и не присылать
+    // `tools` (тогда в списке их нет), а контур всё равно вправе сказать, что до
+    // модели они не дойдут.
+    //
+    // Кадр «инструменты выброшены» при включённой прослойке ничего не значит:
+    // полем `tools` мы наверх не посылали ничего, а схемы уехали текстом.
+    // Записать их тогда в потери — прямо соврать человеку о работающем агенте.
+    lost: withLost(lost, [
+      ...(facts.toolsDropped && translated.shimmed.length === 0 ? ['tools'] : []),
+      ...facts.droppedParts,
+    ]),
+    // Что доехало НЕ полем, а текстом прослойки: `tools: shimmed` человек
+    // читает рядом с потерями и видит разницу между «нет рук» и «руки текстом».
+    shimmed: translated.shimmed,
+    toolCalls: facts.toolCalls,
+    toolFlaws: facts.toolFlaws,
+    claimedWithoutCall: facts.claimedWithoutCall,
     error:
       failure ??
       (facts.interrupted
@@ -481,16 +543,19 @@ async function chat(
  * кадры, и дальше конвейер остаётся ОДИН — а не два, из которых второй никто
  * никогда не проверял.
  */
-async function readSource(upstream: Response): Promise<UpstreamSource | undefined> {
+async function readSource(
+  upstream: Response,
+  vendorFields: readonly string[],
+): Promise<UpstreamSource | undefined> {
   if ((upstream.headers.get('content-type') ?? '').includes('event-stream')) {
     return { stream: upstream };
   }
-  const frames = framesFromCompletion(await upstream.text());
+  const frames = framesFromCompletion(await upstream.text(), vendorFields);
   return frames === undefined ? undefined : { frames };
 }
 
 /** Цельный ответ контура → кадры потока. `undefined` — это вообще не ответ модели. */
-function framesFromCompletion(text: string): string | undefined {
+function framesFromCompletion(text: string, vendorFields: readonly string[]): string | undefined {
   // Контур прислал поток, не назвав его потоком: это всё-таки кадры.
   const head = text.trimStart();
   if (head.startsWith('data:') || head.startsWith('event:')) return text;
@@ -511,7 +576,7 @@ function framesFromCompletion(text: string): string | undefined {
     choices: [
       {
         index: 0,
-        delta: { role: 'assistant', content: contentText(message.content) },
+        delta: { role: 'assistant', content: passthroughContent(message.content) },
         finish_reason: typeof choice.finish_reason === 'string' ? choice.finish_reason : 'stop',
       },
     ],
@@ -522,30 +587,34 @@ function framesFromCompletion(text: string): string | undefined {
   // теле живут как раз вердикты по выходу (справочник §7), и пересобрав из него
   // только `choices` и `usage`, конвейер терял их целиком: запрос, по которому
   // контур вынес решение, приезжал в панель как «проверки молчали».
-  const vendor = VENDOR_FIELDS.filter((field) => payload[field] !== undefined).map(
-    (field) => `data: ${JSON.stringify({ [field]: payload[field] })}\n\n`,
-  );
+  const vendor = vendorFields
+    .filter((field) => payload[field] !== undefined)
+    .map((field) => `data: ${JSON.stringify({ [field]: payload[field] })}\n\n`);
 
   // Порядок как в потоке: сначала текст, потом вердикт. Обратный порядок оборвал
   // бы ответ до того, как клиент увидел то, что контур всё-таки прислал.
   return `data: ${JSON.stringify(chunk)}\n\n${vendor.join('')}data: ${JSON.stringify(usage)}\n\ndata: [DONE]\n\n`;
 }
 
-/** Поля контура, которые цельное тело несёт рядом с ответом. */
-const VENDOR_FIELDS = [
-  'enterprise-platform_guardrails',
-  'enterprise-platform_sanitized',
-  'enterprise-platform_status',
-  'enterprise-platform_tools_unavailable',
-] as const;
+/** Потери запроса и потери ответа одним списком, без повторов и без перестановок. */
+function withLost(lost: readonly string[], extra: readonly string[]): string[] {
+  const all = [...lost];
+  for (const item of extra) if (!all.includes(item)) all.push(item);
+  return all;
+}
 
-/** Текст ответа: строкой либо частями — обе формы законны у совместимых шлюзов. */
-function contentText(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return '';
-  return content
-    .map((part) => (isRecord(part) && typeof part.text === 'string' ? part.text : ''))
-    .join('');
+/**
+ * Содержимое ответа: строкой либо частями — обе формы законны у совместимых
+ * шлюзов, и обе едут дальше КАК ЕСТЬ. Здесь стояла сборка частей в одну строку,
+ * и она молча выбрасывала всё, что не текст: картинка контура из цельного тела
+ * не доезжала ни до клиента, ни до списка потерь — человек видел ответ без неё и
+ * без единого слова об этом. Что делать с нетекстовой частью, решает один
+ * разборщик кадров: в своём диалекте она уходит клиенту целиком, в чужом
+ * попадает в потери перевода под своим именем.
+ */
+function passthroughContent(content: unknown): unknown {
+  if (typeof content === 'string' || Array.isArray(content)) return content;
+  return '';
 }
 
 /**
@@ -663,6 +732,21 @@ async function collectForClient(
   }
 
   const answer = translator.assembled();
+  // Остановка по неразворачиваемой метке — НАША, и названа она своими словами:
+  // «проверки контура» здесь были бы ложью, а человек пошёл бы читать журнал
+  // контура, в котором про это нет ни строки.
+  if (translator.facts.maskStop.length > 0) {
+    respond(
+      response,
+      400,
+      errorBody(
+        dialect,
+        maskStopMessage(translator.facts.maskStop.join(', ')),
+        'content_policy_violation',
+      ),
+    );
+    return;
+  }
   if (translator.facts.interrupted) {
     const names = translator.facts.violations.join(', ');
     const message = names
@@ -679,6 +763,15 @@ async function collectForClient(
     return;
   }
 
+  // Вызовы прослойки едут клиенту полем его диалекта и здесь: путь «не поток»
+  // отдаёт то же самое, что и поток, — иначе агент, выключивший поток, получал
+  // бы вместо вызова его текст и показывал человеку служебный блок как ответ.
+  const toolCalls = answer.calls.map((call) => ({
+    id: call.id,
+    type: 'function',
+    function: { name: call.name, arguments: JSON.stringify(call.arguments) },
+  }));
+
   const completion = {
     id: answer.id,
     object: 'chat.completion',
@@ -687,7 +780,11 @@ async function collectForClient(
     choices: [
       {
         index: 0,
-        message: { role: 'assistant', content: answer.text },
+        message: {
+          role: 'assistant',
+          content: answer.text,
+          ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+        },
         finish_reason: answer.finishReason,
       },
     ],
@@ -847,6 +944,10 @@ function record(deps: PipelineDeps, event: Partial<PlatformGatewayEvent>): void 
     interrupted: event.interrupted ?? false,
     unknownFrames: event.unknownFrames ?? [],
     lost: event.lost ?? [],
+    shimmed: event.shimmed ?? [],
+    toolCalls: event.toolCalls ?? 0,
+    toolFlaws: event.toolFlaws ?? [],
+    claimedWithoutCall: event.claimedWithoutCall ?? false,
     totalTokens: event.totalTokens ?? 0,
     error: event.error,
   });

@@ -7,6 +7,7 @@ import {
   PANEL_PLATFORMS_PATH,
   type PanelPlatformsDocument,
 } from './platforms.ts';
+import { panelPromptsFile, PANEL_PROMPTS_PATH, type PanelPromptsDocument } from './prompts.ts';
 import { buildArchiveReadme } from './readme.ts';
 import type {
   ArchiveManifest,
@@ -14,6 +15,7 @@ import type {
   ManifestEntry,
   ManifestLocation,
   ManifestPanel,
+  ManifestPanelPrompts,
   ManifestSkipped,
 } from './archive.types.ts';
 
@@ -39,6 +41,7 @@ export type {
   ManifestLocation,
   ManifestEntry,
   ManifestPanel,
+  ManifestPanelPrompts,
   ManifestSkipped,
   ArchiveManifest,
   BuiltArchive,
@@ -53,6 +56,7 @@ export function buildEnvironmentArchive(
   exportedAt: string,
   override?: string,
   panel?: PanelPlatformsDocument,
+  prompts?: PanelPromptsDocument,
 ): BuiltArchive {
   const collected = collectProviderFiles(provider, override);
 
@@ -70,6 +74,22 @@ export function buildEnvironmentArchive(
           title: platform.title,
           driver: platform.driver,
           baseUrl: platform.baseUrl,
+        })),
+      }
+    : undefined;
+
+  // Правки промптов — той же меркой: секции нет, пока человек не переписал ни
+  // одного текста. Встроенных текстов здесь нет вовсе (см. `prompts.ts`).
+  const promptOverrides = prompts?.overrides ?? [];
+  const promptData = promptOverrides.length > 0 && prompts ? panelPromptsFile(prompts) : undefined;
+  const promptEntry: ManifestPanelPrompts | undefined = promptData
+    ? {
+        archivePath: PANEL_PROMPTS_PATH,
+        bytes: promptData.length,
+        sha256: sha256(promptData),
+        prompts: promptOverrides.map((override) => ({
+          id: override.id,
+          bytes: Buffer.byteLength(override.text, 'utf8'),
         })),
       }
     : undefined;
@@ -103,6 +123,7 @@ export function buildEnvironmentArchive(
     })),
     checklist: [...collected.checklist, ...panelPlatformsChecklist(panelPlatforms)],
     ...(panelEntry ? { panel: panelEntry } : {}),
+    ...(promptEntry ? { panelPrompts: promptEntry } : {}),
   };
 
   const entries: ZipEntry[] = [
@@ -110,6 +131,7 @@ export function buildEnvironmentArchive(
     { path: README_PATH, data: Buffer.from(buildArchiveReadme(manifest), 'utf8') },
     ...collected.files.map((file) => ({ path: file.archivePath, data: file.data })),
     ...(panelData ? [{ path: PANEL_PLATFORMS_PATH, data: panelData }] : []),
+    ...(promptData ? [{ path: PANEL_PROMPTS_PATH, data: promptData }] : []),
   ];
 
   const stamp = new Date(exportedAt);
@@ -174,6 +196,7 @@ export function parseEnvironmentArchive(zip: Buffer): ParsedArchive {
   const locations = parsed.locations.map(parseLocation);
   const entries = parsed.entries.map((entry, index) => parseEntry(entry, index, files));
   const panel = parsePanelSection(parsed.panel, files);
+  const panelPrompts = parsePromptsSection(parsed.panelPrompts, files);
 
   return {
     manifest: {
@@ -196,9 +219,39 @@ export function parseEnvironmentArchive(zip: Buffer): ParsedArchive {
       skipped: Array.isArray(parsed.skipped) ? parsed.skipped.filter(isSkipped) : [],
       checklist: Array.isArray(parsed.checklist) ? parsed.checklist.filter(isChecklistItem) : [],
       ...(panel ? { panel } : {}),
+      ...(panelPrompts ? { panelPrompts } : {}),
     },
     files,
   };
+}
+
+/**
+ * Секция промптов из описи. Заявлена, но файла нет — говорим вслух той же
+ * причиной, что и у контуров: молча потерянный текст читался бы как «панель
+ * ничего не привезла», и человек искал бы правку глазами в чужом архиве.
+ */
+function parsePromptsSection(
+  value: unknown,
+  files: Map<string, Buffer>,
+): ManifestPanelPrompts | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const archivePath = typeof value.archivePath === 'string' ? value.archivePath : '';
+  if (!archivePath) throw archiveError('В описи есть секция промптов без пути к файлу.');
+  if (!files.has(archivePath)) {
+    throw archiveError(`Секция промптов «${archivePath}» есть в описи, но отсутствует в архиве.`);
+  }
+
+  return {
+    archivePath,
+    bytes: typeof value.bytes === 'number' ? value.bytes : 0,
+    sha256: typeof value.sha256 === 'string' ? value.sha256 : '',
+    prompts: Array.isArray(value.prompts) ? value.prompts.filter(isPanelPrompt) : [],
+  };
+}
+
+function isPanelPrompt(value: unknown): value is ManifestPanelPrompts['prompts'][number] {
+  return isRecord(value) && typeof value.id === 'string' && typeof value.bytes === 'number';
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   requireConnected,
   requirePlatform,
   tokenId,
+  withLegacyConsumers,
   writePlatform,
   writeToken,
 } from './store.ts';
@@ -47,8 +48,11 @@ const PLATFORM: Platform = {
   capabilities: [],
   targets: ['assistant'],
   projectPaths: [],
+  consumers: [],
   agents: [],
   budgetSince: '',
+  toolShim: true,
+  contourPrompt: true,
   caCertPath: '',
 };
 
@@ -197,6 +201,73 @@ describe('domains/platform/store: контуры и ключи', () => {
     expect(describePlatforms(store, dir)).toEqual([]);
     expect(readToken(dir, PLATFORM.id) ?? '').toBe('');
     expect(store.getPlatformHealth()[PLATFORM.id]).toBeUndefined();
+  });
+});
+
+describe('потребители: снятая галочка ассистента и контур со старой панели', () => {
+  it('снятый «Ассистент панели» возвращает ассистента на прежний профиль', () => {
+    // Применение уже увело ассистента на контур и запомнило, откуда взяло.
+    store.updateSettings({
+      endpointProfiles: [
+        { id: 'my-own', title: 'Свой', baseUrl: 'https://own.example', apiKind: 'anthropic' },
+      ] as never,
+      assistantEndpointId: 'contour-enterprise-platform-dev',
+    });
+    store.savePlatformApplied(PLATFORM.id, {
+      platformId: PLATFORM.id,
+      profileId: 'contour-enterprise-platform-dev',
+      targets: [],
+      previousAssistantProfileId: 'my-own',
+    });
+
+    writePlatform(store, { ...PLATFORM, consumers: ['terminal'] });
+
+    expect(store.getSettings().assistantEndpointId).toBe('my-own');
+  });
+
+  it('прежнего профиля больше нет — ассистент уходит в облако вендора, а не на шлюз', () => {
+    store.updateSettings({ assistantEndpointId: 'contour-enterprise-platform-dev' });
+    store.savePlatformApplied(PLATFORM.id, {
+      platformId: PLATFORM.id,
+      profileId: 'contour-enterprise-platform-dev',
+      targets: [],
+      previousAssistantProfileId: 'исчез',
+    });
+
+    writePlatform(store, { ...PLATFORM, consumers: [] });
+
+    expect(store.getSettings().assistantEndpointId).toBe('');
+  });
+
+  it('отмеченный ассистент на контуре и остаётся: сохранение его не сбрасывает', () => {
+    store.updateSettings({ assistantEndpointId: 'contour-enterprise-platform-dev' });
+    writePlatform(store, { ...PLATFORM, consumers: ['assistant', 'terminal'] });
+    expect(store.getSettings().assistantEndpointId).toBe('contour-enterprise-platform-dev');
+  });
+
+  it('чужой выбор ассистента снятие галочки не трогает', () => {
+    store.updateSettings({ assistantEndpointId: 'contour-другой' });
+    writePlatform(store, { ...PLATFORM, consumers: [] });
+    expect(store.getSettings().assistantEndpointId).toBe('contour-другой');
+  });
+
+  it('контур без поля потребителей получает прежнее поведение, а не «никуда»', () => {
+    // Ровно то, что приезжает в `PATCH /api/settings` и в снимке со старой
+    // панели: схема подставила пустой список, сырое тело поля не знает.
+    const older = { ...PLATFORM, targets: ['assistant', 'claude'] } as Partial<Platform>;
+    delete older.consumers;
+
+    const [fixed] = withLegacyConsumers([older], [{ ...(older as Platform), consumers: [] }]);
+
+    expect(fixed?.consumers).toEqual(['assistant', 'terminal']);
+  });
+
+  it('пустой список, присланный явно, остаётся пустым — это выбор человека', () => {
+    const [kept] = withLegacyConsumers(
+      [{ ...PLATFORM, consumers: [] }],
+      [{ ...PLATFORM, consumers: [] }],
+    );
+    expect(kept?.consumers).toEqual([]);
   });
 });
 

@@ -1,22 +1,34 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { PriorityLadder } from '@shared/ui/diagram';
-import { HelpSection, FieldTable, Callout, CapabilityGrid, OptionCards } from '../ui';
+import { HelpSection, FieldTable, Callout, OptionCards } from '../ui';
+import { OverviewGuideSections } from './OverviewGuideSections';
+import { OverviewLimitsSections } from './OverviewLimitsSections';
 
 /**
  * Документ раздела «Обзор».
  *
- * Схемы потока здесь нет намеренно: страница ничего не делает, а только
- * показывает. Зато есть лестница — порядок поиска каталога конфигурации,
- * из-за которого чаще всего и возникают вопросы к этой странице.
+ * Порядок тот же, что у соседей: зачем это вообще → как устроено (лестница
+ * выбора каталога и схема происхождения чисел) → два пути в снимках → чем раздел
+ * НЕ является → что он читает и пишет → пределы и отказы → что стоит за каждой
+ * плиткой → тонкости.
+ *
+ * Лестница выбора каталога осталась рукодельной: она показывает ПОРЯДОК из трёх
+ * правил, и ради этого её и рисовали. Схема рядом отвечает на другой вопрос —
+ * откуда взялось само число на плитке, — и одна другую не заменяет.
  */
 export function OverviewTopic() {
   const { t } = useTranslation();
   const tr = (key: string): string => t(`help.topics.overview.${key}`);
+  const common = (key: string): string => t(`help.common.${key}`);
 
   return (
     <>
-      <HelpSection title={t('help.common.whyTitle')}>
+      {/* Страница длинная: первое, что ей нужно сказать, — из чего она состоит. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
+      <HelpSection title={common('whyTitle')}>
         <OptionCards
           items={[
             { title: tr('whyWhere'), text: tr('whyWhereText') },
@@ -26,40 +38,14 @@ export function OverviewTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('sourceTitle')} caption={tr('sourceCaption')}>
-        <PriorityLadder
-          ariaLabel={tr('sourceTitle')}
-          topLabel={tr('sourceTop')}
-          steps={[
-            { id: 'manual', label: 'manual', caption: tr('sourceManual'), tone: 'accent' },
-            { id: 'env', label: 'env', caption: tr('sourceEnv'), tone: 'info' },
-            { id: 'home', label: 'home', caption: tr('sourceHome') },
-          ]}
-        />
-        <Callout tone="info" title={tr('sourceNote')} />
-      </HelpSection>
+      <OverviewGuideSections tr={tr} />
 
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canSee'),
-            tr('canPath'),
-            tr('canMissing'),
-            tr('canBroken'),
-            tr('canBackups'),
-            tr('canChanges'),
-            tr('canJump'),
-          ]}
-          cant={[tr('cantEdit'), tr('cantDeep')]}
-        />
-      </HelpSection>
+      <OverviewLimitsSections tr={tr} common={common} />
 
-      <HelpSection title={tr('tilesTitle')}>
+      <HelpSection title={tr('tilesTitle')} caption={tr('tilesCaption')}>
         <FieldTable
-          nameHeader={t('help.common.fieldName')}
-          descriptionHeader={t('help.common.fieldPurpose')}
+          nameHeader={common('fieldName')}
+          descriptionHeader={common('fieldPurpose')}
           rows={[
             { name: tr('tileRules'), description: tr('tileRulesText'), isMono: false },
             { name: tr('tileScripts'), description: tr('tileScriptsText'), isMono: false },
@@ -72,11 +58,13 @@ export function OverviewTopic() {
             },
             { name: tr('tileMcp'), description: tr('tileMcpText'), isMono: false },
             { name: tr('tileGroups'), description: tr('tileGroupsText'), isMono: false },
+            { name: tr('tileBackups'), description: tr('tileBackupsText'), isMono: false },
+            { name: tr('tileChanges'), description: tr('tileChangesText'), isMono: false },
           ]}
         />
       </HelpSection>
 
-      <HelpSection title={tr('notesTitle')}>
+      <HelpSection title={common('notesTitle')}>
         <Stack gap="var(--spacing-xs)">
           <Callout tone="warning" title={tr('noteZeroTitle')}>
             {tr('noteZeroText')}
@@ -86,6 +74,9 @@ export function OverviewTopic() {
           </Callout>
           <Callout tone="info" title={tr('noteMissingTitle')}>
             {tr('noteMissingText')}
+          </Callout>
+          <Callout tone="info" title={tr('noteHealthTitle')}>
+            {tr('noteHealthText')}
           </Callout>
           <Callout tone="info" title={tr('noteToastTitle')}>
             {tr('noteToastText')}

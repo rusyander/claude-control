@@ -1,95 +1,72 @@
 import { useTranslation } from 'react-i18next';
-import { Stack } from '@shared/ui/stack';
-import { FlowDiagram } from '@shared/ui/diagram';
-import {
-  HelpSection,
-  StorageCard,
-  FieldTable,
-  StepList,
-  Callout,
-  CapabilityGrid,
-  OptionCards,
-} from '../ui';
+import { HelpSection, StorageCard, FieldTable, Callout, OptionCards } from '../ui';
+import { GroupsGuideSections } from './GroupsGuideSections';
+import { GroupsLimitsSections } from './GroupsLimitsSections';
 
-/** Документ раздела «Группы» — вместе со сценариями, они живут на той же странице. */
+/**
+ * Документ раздела «Группы».
+ *
+ * Порядок тот же, что у «Правил»: зачем это нужно → чем это НЕ является → как
+ * устроено и оба пути в снимках → привязка и старшинство тумблеров → что уходит
+ * на диск → поля → границы, тонкости и отмена.
+ *
+ * Два блока стоят между снимками и хранением намеренно. «Привязка к проекту» —
+ * единственная автоматика раздела, и в момент срабатывания на экране не
+ * происходит ничего: группа просто оказывается включённой, снять это кадром
+ * нечем. «Кто кого перебивает» отвечает на самый частый вопрос раздела —
+ * «включаю, а оно не включается», — и ответ у него не в состоянии экрана, а в
+ * двух независимых отметках выключения.
+ *
+ * Соседние файлы — не «вынесенные куски», а разделы со своей работой:
+ * `GroupsGuideSections` держит схемы и оба пути в снимках,
+ * `GroupsLimitsSections` — границы, числа, тонкости и отмену.
+ */
 export function GroupsTopic() {
   const { t } = useTranslation();
+  // Ключи этого документа лежат под своим префиксом — короткий хелпер
+  // избавляет от него в каждой строке.
   const tr = (key: string): string => t(`help.topics.groups.${key}`);
 
   return (
     <>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards
           items={[
-            { title: tr('whyBundle'), text: tr('whyBundleText') },
             { title: tr('whyEnv'), text: tr('whyEnvText') },
+            { title: tr('whyBundle'), text: tr('whyBundleText') },
             { title: tr('whySimple'), text: tr('whySimpleText') },
           ]}
         />
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')}>
-        <StorageCard
-          title={tr('title')}
-          rows={[
-            { label: tr('storageWhere'), value: tr('storageWhereValue') },
-            { label: tr('storageWhy'), value: tr('storageWhyValue') },
-            { label: tr('storageAuto'), value: tr('storageAutoValue') },
-            { label: tr('storageMarker'), value: tr('storageMarkerValue') },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canCollect'),
-            tr('canBindProject'),
-            tr('canLocal'),
-            tr('canSteps'),
-            tr('canToggleGroup'),
-            tr('canGroupEnv'),
-            tr('canToggleAutomation'),
-            tr('canBadge'),
-            tr('canConflict'),
-            tr('canSandbox'),
-            tr('canNest'),
-            tr('canOrder'),
-            tr('canAutomation'),
-            tr('canAssistant'),
-          ]}
-          cant={[tr('cantOverride'), tr('cantRevive'), tr('cantKnow'), tr('cantMagic')]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('groupTitle')}>
+      <HelpSection title={tr('diffTitle')} caption={tr('diffCaption')}>
         <OptionCards
+          minWidth={320}
           items={[
-            { title: tr('groupMembers'), text: tr('groupMembersText') },
-            { title: tr('groupToggle'), text: tr('groupToggleText') },
-            { title: tr('groupEnv'), text: tr('groupEnvText') },
+            { title: tr('diffClaude'), text: tr('diffClaudeText') },
+            { title: tr('diffCopy'), text: tr('diffCopyText') },
+            { title: tr('diffMagic'), text: tr('diffMagicText') },
+            { title: tr('diffAuto'), text: tr('diffAutoText') },
           ]}
         />
       </HelpSection>
 
+      <GroupsGuideSections tr={tr} />
+
+      {/* Автоматического включения не видно ни на одном экране: в этот момент
+          человек смотрит в чат, а не в раздел. Поэтому — словами. */}
       <HelpSection title={tr('bindTitle')} caption={tr('bindCaption')}>
         <OptionCards
           items={[
             { title: tr('bindProject'), text: tr('bindProjectText') },
             { title: tr('bindWorktree'), text: tr('bindWorktreeText') },
             { title: tr('bindNoOff'), text: tr('bindNoOffText') },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('stepsTitle')} caption={tr('stepsCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('stepsSkill'), text: tr('stepsSkillText') },
-            { title: tr('stepsGate'), text: tr('stepsGateText') },
-            { title: tr('stepsTrigger'), text: tr('stepsTriggerText') },
           ]}
         />
       </HelpSection>
@@ -106,48 +83,28 @@ export function GroupsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('automationTitle')} caption={tr('automationCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('autoWhen'), text: tr('autoWhenText') },
-            { title: tr('autoFilter'), text: tr('autoFilterText') },
-            { title: tr('autoWhat'), text: tr('autoWhatText') },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('flowTitle')}
-          nodes={[
+      <HelpSection title={t('help.common.storageTitle')}>
+        <StorageCard
+          title={tr('storageTitle')}
+          rows={[
             {
-              id: 'scenario',
-              label: tr('flowScenario'),
-              caption: tr('flowScenarioCaption'),
-              tone: 'accent',
-              icon: 'groups',
+              label: tr('storageWhere'),
+              value: '~/.claude/agentdeck/state.json',
+              isMono: true,
             },
+            { label: tr('storageEnv'), value: '~/.claude/settings.json → env', isMono: true },
             {
-              id: 'compile',
-              label: tr('flowCompile'),
-              caption: tr('flowCompileCaption'),
-              tone: 'info',
-              icon: 'refresh',
-            },
-            {
-              id: 'hook',
-              label: tr('flowHook'),
-              caption: tr('flowHookCaption'),
-              icon: 'hooks',
+              label: tr('storageSkill'),
+              value: '~/.claude/skills/scenario-<название>/',
               isMono: true,
             },
             {
-              id: 'run',
-              label: tr('flowRun'),
-              caption: tr('flowRunCaption'),
-              tone: 'success',
-              icon: 'check',
+              label: tr('storageHooks'),
+              value: '~/.claude/settings.json → hooks',
+              isMono: true,
             },
+            { label: tr('storageMarker'), value: tr('storageMarkerValue') },
+            { label: tr('storageDisabled'), value: tr('storageDisabledValue') },
           ]}
         />
       </HelpSection>
@@ -181,39 +138,7 @@ export function GroupsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('recipesTitle')}>
-        <StepList
-          steps={[
-            { title: tr('recipe1'), text: tr('recipe1Text') },
-            { title: tr('recipe2'), text: tr('recipe2Text') },
-            { title: tr('recipe3'), text: tr('recipe3Text') },
-            { title: tr('recipe4'), text: tr('recipe4Text') },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('notesTitle')}>
-        <Stack gap="var(--spacing-xs)">
-          <Callout tone="danger" title={tr('noteDeleteTitle')}>
-            {tr('noteDeleteText')}
-          </Callout>
-          <Callout tone="warning" title={tr('noteAutoOnTitle')}>
-            {tr('noteAutoOnText')}
-          </Callout>
-          <Callout tone="warning" title={tr('noteRebuildTitle')}>
-            {tr('noteRebuildText')}
-          </Callout>
-          <Callout tone="info" title={tr('notePermTitle')}>
-            {tr('notePermText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteInvisibleTitle')}>
-            {tr('noteInvisibleText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteConflictTitle')}>
-            {tr('noteConflictText')}
-          </Callout>
-        </Stack>
-      </HelpSection>
+      <GroupsLimitsSections />
     </>
   );
 }

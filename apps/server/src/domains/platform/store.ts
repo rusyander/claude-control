@@ -1,4 +1,8 @@
 import type { Platform, PlatformStatus } from '@agentdeck/contracts';
+import {
+  PLATFORM_ASSISTANT_CONSUMER,
+  PLATFORM_TERMINAL_CONSUMER,
+} from '@agentdeck/contracts/platform-consumers';
 import type { AppStore } from '../../lib/app-store.ts';
 import {
   clearStoredKey,
@@ -8,6 +12,7 @@ import {
   setStoredKey,
   MAX_KEY_LENGTH,
 } from '../../lib/provider-keys.ts';
+import { managedProfileId } from './apply/profile.ts';
 import { HEADER_SAFE_KEY, invalidField, platformNotFound, notConnected } from './errors.ts';
 import { budgetVerdict, daysSince, emptySpend, sumDays } from './spend.ts';
 
@@ -59,7 +64,58 @@ export function readPlatforms(store: AppStore): Platform[] {
     // контракт обещает числом. `undefined` там означал бы полосу без предела и
     // сравнение, дающее `false` при любом расходе.
     budgetUsd: typeof platform.budgetUsd === 'number' ? platform.budgetUsd : 0,
+    // И потребители: они из Т3, а до неё контур работал файлами. Читатель
+    // подставляет то, что контур делал до сих пор, — см. `consumersOf`.
+    consumers: consumersOf(platform),
   }));
+}
+
+/**
+ * Потребители контура, с подстановкой для записей, заведённых ДО Т3 (поля нет
+ * вовсе).
+ *
+ * Такому контуру достаётся ровно то, что он делал до сих пор: ассистент, если
+ * он был целью применения, и терминал, если выбрана хоть одна файловая цель.
+ * Чата, групп и тестов среди них нет ни при каких целях: до Т3 ни один прогон
+ * через контур не шёл, и «обновили панель — рабочий диалог уехал в корпоративный
+ * контур» было бы худшим способом узнать о новой возможности.
+ *
+ * Пустой список — законное состояние (человек снял все галочки), поэтому
+ * подстановка смотрит на ОТСУТСТВИЕ поля, а не на его пустоту.
+ */
+export function consumersOf(platform: Platform): string[] {
+  if (Array.isArray(platform.consumers)) return platform.consumers;
+
+  const targets = Array.isArray(platform.targets) ? platform.targets : [];
+  const legacy: string[] = [];
+  if (targets.includes(PLATFORM_ASSISTANT_CONSUMER)) legacy.push(PLATFORM_ASSISTANT_CONSUMER);
+  if (targets.some((target) => target !== PLATFORM_ASSISTANT_CONSUMER)) {
+    legacy.push(PLATFORM_TERMINAL_CONSUMER);
+  }
+  return legacy;
+}
+
+/**
+ * Вернуть прежнее поведение тем контурам, у которых поля `consumers` в теле не
+ * было вовсе.
+ *
+ * Зачем отдельная функция: схема подставляет отсутствующему полю пустой список,
+ * а это НЕ то же самое — пустой список означает «никуда не подключён», и
+ * контур, приехавший со старой панели (снимок, архив, `PATCH /api/settings`),
+ * молча переставал бы работать у ассистента. Отличить одно от другого можно
+ * только по СЫРОМУ телу, пока ещё видно, было поле или его не было, — поэтому
+ * зовётся до записи и принимает обе половины.
+ *
+ * Само правило подстановки одно на всю панель (`consumersOf`): второй его копии
+ * здесь нет намеренно.
+ */
+export function withLegacyConsumers(raw: unknown, parsed: Platform[]): Platform[] {
+  const rawList = Array.isArray(raw) ? raw : [];
+  return parsed.map((platform, index) => {
+    const entry = rawList[index];
+    const had = typeof entry === 'object' && entry !== null && 'consumers' in entry;
+    return had ? platform : { ...platform, consumers: consumersOf(entry as Platform) };
+  });
 }
 
 export function findPlatform(store: AppStore, id: string): Platform | undefined {
@@ -163,7 +219,34 @@ export function writePlatforms(store: AppStore, platforms: Platform[]): Platform
       index >= 0 ? next.map((item, i) => (i === index ? platform : item)) : [...next, platform];
   }
   store.updateSettings({ platforms: next });
+  for (const platform of platforms) detachAssistantIfOff(store, platform);
   return next;
+}
+
+/**
+ * Снятая галочка «Ассистент панели» отвязывает ассистента ОТ КОНТУРА — здесь, в
+ * момент сохранения (Т3).
+ *
+ * Иначе снятие не делало бы ничего: применение уже записало
+ * `assistantEndpointId: contour-<id>`, применённое состояние живёт в настройке,
+ * и «применить заново» с пустым списком целей до записи не доходит вовсе. Для
+ * ассистента это ЕДИНСТВЕННЫЙ потребитель, включённый по умолчанию, — человек,
+ * снявший его, ждёт, что ассистент вернулся; молча оставленный на шлюзе он
+ * продолжал бы ходить в корпоративный контур.
+ *
+ * Возвращаем ровно туда, откуда взяли: запомненный профиль ассистента, а если
+ * его больше нет — в облако вендора пустым полем, тем же приёмом, что и уборка
+ * исчезнувших профилей (`forgetManagedProfiles`).
+ */
+function detachAssistantIfOff(store: AppStore, platform: Platform): void {
+  const settings = store.getSettings();
+  const current = settings.assistantEndpointId;
+  if (!current || current !== managedProfileId(platform.id)) return;
+  if (consumersOf(platform).includes(PLATFORM_ASSISTANT_CONSUMER)) return;
+
+  const previous = store.getPlatformApplied()[platform.id]?.previousAssistantProfileId ?? '';
+  const exists = Boolean(previous) && settings.endpointProfiles.some((it) => it.id === previous);
+  store.updateSettings({ assistantEndpointId: exists ? previous : '' });
 }
 
 /**
@@ -175,6 +258,12 @@ export function removePlatform(store: AppStore, appDataDir: string, id: string):
   requirePlatform(store, id);
   forgetToken(appDataDir, id);
   store.forgetPlatformHealth(id);
+  store.forgetPlatformSmoke(id);
+  // Удалённый контур не может оставаться активным: поле, указывающее в никуда,
+  // читалось бы всеми как «работа идёт через контур», которого больше нет.
+  if (store.getSettings().activePlatformId === id) {
+    store.updateSettings({ activePlatformId: '' });
+  }
   // Учёт расхода — тоже след контура: идентификатор человек вправе завести
   // заново (переименование выглядит именно так), и оставленная запись
   // приписала бы новому контуру чужой расход и чужой упёртый бюджет.
@@ -207,6 +296,19 @@ export function forgetOrphanPlatforms(store: AppStore, appDataDir: string): stri
   for (const id of Object.keys(store.getPlatformHealth())) {
     if (!alive.has(id) && store.forgetPlatformHealth(id)) gone.add(id);
   }
+  for (const id of Object.keys(store.getPlatformSmoke())) {
+    if (alive.has(id)) continue;
+    store.forgetPlatformSmoke(id);
+    gone.add(id);
+  }
+  // Активный контур — тоже ссылка, и общий PATCH настроек умеет удалить то, на
+  // что она указывает. Оставленная, она означала бы «работа идёт через контур»
+  // при пустом списке контуров.
+  const active = store.getSettings().activePlatformId;
+  if (active && !alive.has(active)) {
+    store.updateSettings({ activePlatformId: '' });
+    gone.add(active);
+  }
   for (const id of Object.keys(store.getPlatformSpend())) {
     if (alive.has(id)) continue;
     store.forgetPlatformSpend(id);
@@ -236,11 +338,14 @@ export function describePlatform(
   const token = readToken(appDataDir, platform.id) ?? '';
   const health = store.getPlatformHealth()[platform.id];
   const spend = store.getPlatformSpend()[platform.id] ?? emptySpend(platform.id);
+  const smoke = store.getPlatformSmoke()[platform.id];
   return {
     platform,
     hasToken: Boolean(token),
     maskedToken: token ? maskKey(token) : '',
     health,
+    active: store.getSettings().activePlatformId === platform.id,
+    ...(smoke ? { smoke } : {}),
     budget: budgetVerdict(platform, spend),
     periodSpend: sumDays(daysSince(spend.days, platform.budgetSince)),
   };

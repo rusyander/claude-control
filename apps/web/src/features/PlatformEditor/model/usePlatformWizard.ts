@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import type {
-  Platform,
-  PlatformApplyResult,
-  PlatformProbeResult,
-  PlatformStatus,
+import {
+  PLATFORM_ASSISTANT_TARGET,
+  PLATFORM_TERMINAL_CONSUMER,
+  type Platform,
+  type PlatformApplyResult,
+  type PlatformProbeResult,
+  type PlatformStatus,
 } from '@agentdeck/contracts';
 import {
   newPlatform,
   isPlatformValid,
+  useActivatePlatform,
   useApplyPlatform,
   useCheckPlatform,
   usePlatformApplyPlan,
@@ -66,6 +69,7 @@ export function usePlatformWizard({ existing, onDone }: PlatformWizardOptions) {
 
   const save = useSavePlatform();
   const check = useCheckPlatform();
+  const activate = useActivatePlatform();
   const apply = useApplyPlatform();
   const gateway = usePlatformGateway();
   const restartGateway = useRestartGateway();
@@ -107,19 +111,51 @@ export function usePlatformWizard({ existing, onDone }: PlatformWizardOptions) {
     setTargets((current) => toggled(current, targetId));
   };
 
+  /**
+   * Потребитель маршрута (Т3) живёт в самом черновике, а не отдельным списком:
+   * он сохраняется вместе с контуром, и «Готово» отправляет его тем же
+   * запросом. Порядок важен — сохранение идёт ДО применения, поэтому галочка
+   * «Терминал», поставленная здесь, уже действует к моменту записи в файлы.
+   */
+  const toggleConsumer = (consumerId: string): void => {
+    setDraft((current) => ({ ...current, consumers: toggled(current.consumers, consumerId) }));
+  };
+
   const toggleOverwrite = (targetId: string): void => {
     setOverwrite((current) => toggled(current, targetId));
   };
 
   /**
-   * Готово: включить контур, запомнить выбор целей и записать их. Порядок
-   * важен — применение спрашивает у сервера уже сохранённый контур, и
-   * включение обязано лечь раньше, иначе план вернул бы «шлюз не поднят».
+   * Готово: сохранить, при ПОДКЛЮЧЕНИИ сделать активным и записать в выбранные
+   * цели.
+   *
+   * Порядок важен и он же объясняет средний шаг. Включённый контур — это
+   * активный контур и никакой другой (инвариант 1), поэтому сохранение тумблер
+   * не трогает вовсе: «подключить» здесь значит «перевести работу на него», а
+   * это транзакция — применения прежнего контура снимаются, его тумблер гаснет.
+   * Активация же обязана лечь ДО применения: план спрашивает у сервера уже
+   * сохранённый и уже включённый контур, иначе цели вернулись бы негодными.
+   *
+   * ПРАВКА активность НЕ переносит. Та же форма открывается кнопкой «Настройка
+   * контура» на карточке любого контура, и «Готово» в ней означает «сохранить
+   * то, что я поправил», а не «перевести на него всю машину»: об этом не
+   * говорят ни подпись кнопки, ни заголовок, ни справка. Активным контур
+   * делают его собственной кнопкой, где рядом написано, что при этом
+   * случится.
    */
   const finish = async (): Promise<void> => {
-    await save.mutateAsync(savePayload({ ...draft, enabled: true, targets }, token));
+    // Цели применения СОБИРАЮТСЯ из потребителей (Т3), а не спрашиваются
+    // вторично: ассистент панели — это его потребитель, файлы CLI — «Терминал».
+    // Снятый терминал означает, что файловые цели не уезжают вовсе, даже если
+    // человек отметил их до того, как снял галочку.
+    const applyTargets = [
+      ...(draft.consumers.includes(PLATFORM_ASSISTANT_TARGET) ? [PLATFORM_ASSISTANT_TARGET] : []),
+      ...(draft.consumers.includes(PLATFORM_TERMINAL_CONSUMER) ? targets : []),
+    ];
+    await save.mutateAsync(savePayload({ ...draft, targets: applyTargets }, token));
     setStored(true);
-    const result = await apply.mutateAsync({ id: draft.id, targets, overwrite });
+    if (!existing) await activate.mutateAsync(draft.id);
+    const result = await apply.mutateAsync({ id: draft.id, targets: applyTargets, overwrite });
     setApplied(result);
     // Занятое место мастер не перебивает молча: пропущенные цели остаются на
     // экране с причиной, и человек решает — перезаписать или оставить как есть.
@@ -139,6 +175,7 @@ export function usePlatformWizard({ existing, onDone }: PlatformWizardOptions) {
     setToken,
     targets,
     toggleTarget,
+    toggleConsumer,
     overwrite,
     toggleOverwrite,
     probe,
@@ -148,6 +185,7 @@ export function usePlatformWizard({ existing, onDone }: PlatformWizardOptions) {
     isBusy:
       save.isPending ||
       check.isPending ||
+      activate.isPending ||
       apply.isPending ||
       restartGateway.isPending ||
       updateSettings.isPending,

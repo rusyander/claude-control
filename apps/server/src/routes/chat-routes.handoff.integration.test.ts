@@ -480,6 +480,33 @@ describe('планировщик продолжения', () => {
     expect(active.some((id) => id.startsWith('new-'))).toBe(true);
   });
 
+  it('продолжение остаётся тем же потребителем контура, что и работа до него', async () => {
+    // Т3: маршрут спрашивается происхождением прогона. Продолжение заводится от
+    // ЗАКРЫТОГО прогона, и без переноса работа группы после первого же
+    // продолжения спрашивала бы «чат» — то есть уезжала бы к другому провайдеру
+    // посреди цепочки, ничего об этом не сказав.
+    const { chains, registry } = build(`Готово.\n\n${block(PROPOSAL)}`, Date.now() + 10_000);
+    const asked: string[] = [];
+    registry.setPlatformRouting((origin) => {
+      asked.push(origin);
+      return { env: {} };
+    });
+    chains.setAuto(['чат-группы'], true);
+
+    registry.start(
+      'чат-группы',
+      { prompt: 'работай', cwd: 'C:/work/проект' },
+      { projectPath: 'C:/work/проект', origin: 'groups' },
+    );
+    await new Promise((done) => setTimeout(done, 20));
+
+    // Заглушка отвечает тем же предложением, поэтому цепочка идёт до упора —
+    // и КАЖДОЕ её звено обязано спросить маршрут тем же потребителем.
+    expect(registry.active().some((run) => run.chatId.startsWith('new-'))).toBe(true);
+    expect(asked.length).toBeGreaterThan(1);
+    expect(new Set(asked)).toEqual(new Set(['groups']));
+  });
+
   it('просьба словами («перезапустите сессию») продолжает так же, как блок', async () => {
     const { chains, registry } = build(
       'Этап закрыт. Перезапустите сессию. Новый прогон читает .agent/PROGRESS.md.',

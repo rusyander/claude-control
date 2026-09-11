@@ -1,5 +1,6 @@
 import {
   PLATFORM_ASSISTANT_TARGET,
+  PLATFORM_DEFAULT_CONSUMERS,
   isPlatformDay,
   platformIdPattern,
   type Platform,
@@ -46,11 +47,20 @@ export function newPlatform(id: string, title: string): Platform {
     budgetUsd: 0,
     capabilities: [],
     targets: [],
+    // Где работает контур (Т3): только ассистент панели. Прослойка Т5 вернула
+    // CLI руки, но выбор «куда пустить контур» остаётся за человеком: молча
+    // увести туда рабочий чат значило бы сменить ему модель, ничего не сказав.
+    consumers: [...PLATFORM_DEFAULT_CONSUMERS],
     projectPaths: [],
     // Агентов человек вносит сам и уже после подключения: их идентификаторы
     // лежат в админке компании, и спросить их у контура нечем.
     agents: [],
     budgetSince: '',
+    // Прослойка инструментов и короткий промпт — включёнными (решение В1): без
+    // них агент через контур «работает как чат», а это ровно та беда, ради
+    // которой партия и заводилась.
+    toolShim: true,
+    contourPrompt: true,
     caCertPath: '',
   };
 }
@@ -178,7 +188,13 @@ export function platformBudgetAlarming(budget: PlatformBudgetState): boolean {
 export type PlatformCardState = 'disabled' | 'unchecked' | 'ok' | 'unauthorized' | 'unreachable';
 
 export function platformCardState(status: PlatformStatus): PlatformCardState {
-  if (!status.platform.enabled) return 'disabled';
+  // Признак ровно один — `active`. Тумблер контура говорит о том же самом
+  // (инвариант 1), но это ВТОРОЙ источник одного факта, и разойтись они могут:
+  // настройки приезжают чужими писателями (снимок, архив переноса), и до
+  // сведения панель показывала бы «на связи» с кнопкой «сделать активным» тому
+  // контуру, который шлюз уже обслуживает. `disabled` здесь читается как
+  // «работа идёт не через него».
+  if (!status.active) return 'disabled';
   if (!status.health) return 'unchecked';
   if (status.health.outcome === 'ok') return 'ok';
   if (status.health.outcome === 'unauthorized') return 'unauthorized';

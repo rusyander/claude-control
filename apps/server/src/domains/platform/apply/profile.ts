@@ -149,3 +149,12 @@ export function reconcileManagedProfiles(store: AppStore): string[] {
   store.updateSettings(patch);
   return removed;
 }
+
+/**
+ * Модель управляемого профиля: выбор человека переживает пересборку плана.
+ * Пусто — CLI пойдёт с моделью по умолчанию, и это его собственное поведение.
+ */
+export function managedModel(store: AppStore, platformId: string): string {
+  const id = managedProfileId(platformId);
+  return store.getSettings().endpointProfiles.find((item) => item.id === id)?.model ?? '';
+}

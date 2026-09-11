@@ -1,0 +1,78 @@
+{
+  "topic": "search",
+  "scenario": "find",
+  "frames": [
+    {
+      "id": "01-prompt",
+      "file": "01-prompt.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-09-11T15:03:41.054Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Начните вводить запрос Ищет сразу по всем разделам конфигурации. Достаточно двух символов.",
+      "en": {
+        "file": "01-prompt.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-11T17:23:35.017Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Start typing a query Searches every configuration section at once. Two characters are enough."
+      }
+    },
+    {
+      "id": "02-two-sections",
+      "file": "02-two-sections.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-09-11T15:03:42.518Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Найдено: 2 Правила 1 Не трогать каталог migrations Не трогать каталог migrations Права доступа 1 Edit(migrations/**) deny: Edit(migrations/**)",
+      "en": {
+        "file": "02-two-sections.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-11T17:23:36.484Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Found: 2 Rules 1 Не трогать каталог migrations Не трогать каталог migrations Permissions 1 Edit(migrations/**) deny: Edit(migrations/**)"
+      }
+    },
+    {
+      "id": "03-variables",
+      "file": "03-variables.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-09-11T15:03:43.984Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Найдено: 2 Переменные окружения 2 MAX_THINKING_TOKENS MAX_THINKING_TOKENS SHOP_API_TOKEN SHOP_API_TOKEN",
+      "en": {
+        "file": "03-variables.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-11T17:23:37.952Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Found: 2 Environment variables 2 MAX_THINKING_TOKENS MAX_THINKING_TOKENS SHOP_API_TOKEN SHOP_API_TOKEN"
+      }
+    },
+    {
+      "id": "04-empty",
+      "file": "04-empty.png",
+      "side": "panel",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-09-11T15:03:45.438Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Ничего не найдено По запросу «выгрузка склада» совпадений нет. Попробуйте другое слово или часть имени.",
+      "en": {
+        "file": "04-empty.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-11T17:23:39.421Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Nothing found No matches for \"выгрузка склада\". Try another word or part of a name."
+      }
+    }
+  ]
+}

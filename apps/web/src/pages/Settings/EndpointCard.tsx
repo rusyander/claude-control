@@ -19,8 +19,10 @@ import {
   removeProfile,
   isProfileComplete,
 } from '@entities/Endpoint';
+import { usePlatforms } from '@entities/Platform';
 import { EndpointProfileForm } from './EndpointProfileForm';
 import { EndpointTargetRow } from './EndpointTargetRow';
+import { ManagedProfileRow } from './ManagedProfileRow';
 
 /**
  * Свой эндпоинт: адрес, по которому CLI ходит в модель вместо облака вендора —
@@ -47,6 +49,7 @@ export function EndpointCard() {
   const { data } = useEndpoints(selectedId);
   const probe = useProbeEndpoint();
   const apply = useApplyEndpoint();
+  const platforms = usePlatforms();
 
   if (!settings) return null;
 
@@ -95,6 +98,16 @@ export function EndpointCard() {
   const activeProbe = active ? probes[active.id] : undefined;
   const complete = active ? isProfileComplete(active) : false;
 
+  // Профиль контура ведёт панель: адрес в нём — локальный шлюз, ключ подставляет
+  // он же. Владельца ищем в списке контуров: название нужно человеку, а не
+  // идентификатор из адреса.
+  const ownerId = active?.ownerPlatformId ?? '';
+  const owner = platforms.data?.find((item) => item.platform.id === ownerId);
+  // «Владельца не нашли» и «список ещё не читали» — разные утверждения, и
+  // второе стоит дороже: пока запрос в пути (а при закрытом удалённом доступе —
+  // всегда) `owner` пуст ровно так же, как у профиля с удалённым контуром.
+  const ownerGone = Boolean(ownerId) && platforms.isSuccess && !owner;
+
   return (
     <Card padding="md">
       <Stack gap="var(--spacing-sm)">
@@ -131,6 +144,15 @@ export function EndpointCard() {
               />
             )}
 
+            {ownerId && (
+              <ManagedProfileRow
+                platformId={ownerId}
+                platformTitle={owner?.platform.title ?? ''}
+                isActive={owner?.active ?? false}
+                ownerKnown={platforms.isSuccess}
+              />
+            )}
+
             <EndpointProfileForm
               profile={active}
               tokenMask={data?.tokenMasks[active.id] ?? ''}
@@ -149,17 +171,24 @@ export function EndpointCard() {
               >
                 {t('endpoints.probe')}
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                leftIcon={<Icon name="trash" size={16} />}
-                onClick={() => {
-                  saveProfiles(removeProfile(profiles, active.id));
-                  setSelectedId('');
-                }}
-              >
-                {t('endpoints.remove')}
-              </Button>
+              {/* У профиля контура своей кнопки удаления нет: убрать его руками
+                  значит оставить контур применённым к файлам CLI и без того,
+                  чем этот след снимают. Возврат — строкой выше. Появляется она
+                  только у профиля БЕЗ владельца и у осиротевшего — то есть
+                  когда список контуров прочитан и контура в нём нет. */}
+              {(!ownerId || ownerGone) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Icon name="trash" size={16} />}
+                  onClick={() => {
+                    saveProfiles(removeProfile(profiles, active.id));
+                    setSelectedId('');
+                  }}
+                >
+                  {t('endpoints.remove')}
+                </Button>
+              )}
               {activeProbe && (
                 <Badge tone={activeProbe.ok ? 'success' : 'danger'} withDot>
                   {activeProbe.ok

@@ -1,0 +1,15 @@
+{
+  "topic": "analytics",
+  "source": "docs/diagrams/analytics-guide/analytics-guide.drawio",
+  "pages": [
+    {
+      "name": "how-the-report-is-built",
+      "file": "how-the-report-is-built.png",
+      "page": 1,
+      "source": "b259cdca5d51bc85",
+      "width": 1497,
+      "height": 988,
+      "exportedAt": "2026-09-11T14:34:44.590Z"
+    }
+  ]
+}

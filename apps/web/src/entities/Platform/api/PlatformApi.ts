@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type {
   Platform,
+  PlatformActivationResult,
   PlatformAgentAnswer,
   PlatformAgentSession,
   PlatformApplyPlan,
@@ -21,9 +22,15 @@ import { queryKeys } from '@shared/api/query-keys';
 
 const path = (id: string, suffix = ''): string => `/platforms/${encodeURIComponent(id)}${suffix}`;
 
-async function getPlatforms(): Promise<PlatformStatus[]> {
+/**
+ * Список приезжает ЦЕЛИКОМ — с активным контуром и разовым рассказом о переносе
+ * — и целиком же лежит в кеше. Отбросить лишнее здесь, как делалось раньше,
+ * значило бы завести второй запрос за активным контуром и получить два ответа
+ * на один вопрос: список, где контур уже активен, и поле, где ещё нет.
+ */
+async function getPlatformsInfo(): Promise<PlatformsInfo> {
   const { data } = await apiClient.get<PlatformsInfo>('/platforms');
-  return data.platforms;
+  return data;
 }
 
 async function getGateway(): Promise<PlatformGatewayInfo> {
@@ -85,6 +92,31 @@ async function disablePlatform(input: {
     input.targets ? { targets: input.targets } : undefined,
   );
   return data;
+}
+
+/**
+ * Сделать контур активным. Запрос ходит в сеть дважды (проба и пробный запрос
+ * через свой же шлюз), поэтому таймаут — свой: общих 60 с не хватает контуру,
+ * который думает над ответом, а оборванный браузером запрос выглядел бы как
+ * «активация не удалась» при удавшейся активации.
+ */
+async function activatePlatform(id: string): Promise<PlatformActivationResult> {
+  const { data } = await apiClient.post<PlatformActivationResult>(
+    path(id, '/activate'),
+    undefined,
+    { timeout: LONG_TIMEOUTS.platformActivate },
+  );
+  return data;
+}
+
+/** Вернуть провайдер по умолчанию: применения снимаются, тумблер гаснет. */
+async function deactivatePlatform(id: string): Promise<PlatformRollbackResult> {
+  const { data } = await apiClient.post<PlatformRollbackResult>(path(id, '/deactivate'));
+  return data;
+}
+
+async function dismissActivationNotice(): Promise<void> {
+  await apiClient.delete('/platforms/activation-notice');
 }
 
 async function deletePlatform(id: string): Promise<void> {
@@ -182,7 +214,20 @@ function invalidateApplied(queryClient: QueryClient, id: string): void {
  * открытии раздела, а живая проверка остаётся отдельной кнопкой.
  */
 export function usePlatforms() {
-  return useQuery({ queryKey: queryKeys.platforms, queryFn: getPlatforms });
+  return useQuery({
+    queryKey: queryKeys.platforms,
+    queryFn: getPlatformsInfo,
+    select: (info: PlatformsInfo) => info.platforms,
+  });
+}
+
+/**
+ * То же самое, но целиком: активный контур и рассказ о переносе. Запрос тот же
+ * — react-query держит один ответ под одним ключом, и раздел с карточками не
+ * ходит на сервер дважды.
+ */
+export function usePlatformsInfo() {
+  return useQuery({ queryKey: queryKeys.platforms, queryFn: getPlatformsInfo });
 }
 
 /**
@@ -250,18 +295,24 @@ export function useCheckPlatform() {
   return useMutation({
     mutationFn: checkPlatform,
     onSuccess: (health, id) => {
-      queryClient.setQueryData<PlatformStatus[]>(queryKeys.platforms, (list) =>
-        list?.map((item) =>
-          item.platform.id === id
-            ? {
-                ...item,
-                // Дата последнего успеха живёт по тому же правилу, что и на
-                // сервере: неудачная проба её не стирает. Иначе карточка
-                // теряла бы «а три часа назад отвечал» до перезагрузки списка.
-                health: { ...health, ...lastOkPatch(health, item.health) },
-              }
-            : item,
-        ),
+      queryClient.setQueryData<PlatformsInfo>(queryKeys.platforms, (info) =>
+        info
+          ? {
+              ...info,
+              platforms: info.platforms.map((item) =>
+                item.platform.id === id
+                  ? {
+                      ...item,
+                      // Дата последнего успеха живёт по тому же правилу, что и
+                      // на сервере: неудачная проба её не стирает. Иначе
+                      // карточка теряла бы «а три часа назад отвечал» до
+                      // перезагрузки списка.
+                      health: { ...health, ...lastOkPatch(health, item.health) },
+                    }
+                  : item,
+              ),
+            }
+          : info,
       );
       // Проба уточняет возможности контура — значит и то, что панель считает
       // применимым.
@@ -300,6 +351,59 @@ export function useDisablePlatform() {
   return useMutation({
     mutationFn: disablePlatform,
     onSuccess: (_result, variables) => invalidateApplied(queryClient, variables.id),
+  });
+}
+
+/**
+ * Сделать контур активным.
+ *
+ * Сбрасывается не только карточка: активация СНИМАЕТ применения прежнего
+ * контура — то есть меняет переменные окружения CLI, управляемый профиль в
+ * настройках и историю правок. Прежний контур назван в ответе, и его
+ * предпросмотр применения сбрасывается отдельно: иначе он продолжал бы
+ * показывать записанное, которого в файлах уже нет.
+ */
+export function useActivatePlatform() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: activatePlatform,
+    onSuccess: (result, id) => {
+      invalidateApplied(queryClient, id);
+      if (result.previousPlatformId) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.platformApply(result.previousPlatformId),
+        });
+      }
+    },
+    // Отказ перечитывается ТАК ЖЕ. Сервер возвращает состояние к прежнему сам,
+    // но «прежнее» — это его состояние, а не наш снимок: активацию мог увести
+    // другой вкладкой или телефоном, и тогда отказ означает, что экран устарел
+    // весь. Оставить его как есть — значит показывать вчерашнюю картину до F5.
+    onError: (_error, id) => invalidateApplied(queryClient, id),
+  });
+}
+
+/**
+ * Вернуть провайдер по умолчанию. Один маршрут на две кнопки — на карточке
+ * контура и в строке провайдера: «вернуть как было» это одно действие.
+ */
+export function useDeactivatePlatform() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deactivatePlatform,
+    onSuccess: (_result, id) => invalidateApplied(queryClient, id),
+  });
+}
+
+/**
+ * Закрыть рассказ о переносе. Разовый: сервер стирает его у себя, и второй раз
+ * он не приедет — иначе он висел бы на экране у человека, который его прочитал.
+ */
+export function useDismissActivationNotice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: dismissActivationNotice,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.platforms }),
   });
 }
 

@@ -18,9 +18,25 @@ import { deltaTextOf, mapBodyTexts, withDeltaText, type DlpApiKind } from './api
  * начаться в тексте ответа и закончиться в аргументах инструмента, а вот
  * подстановка «через границу» испортила бы оба.
  */
+/**
+ * Та же карта, но значения экранированы для JSON-СТРОКИ.
+ *
+ * Аргументы вызова инструмента едут упакованным JSON, и подстановка в них —
+ * подстановка в текст, а не в значение. Путь `C:\Users\rusyander`, вставленный
+ * туда как есть, даёт `\U` — недопустимое экранирование, после которого клиент
+ * не разбирает вызов ЦЕЛИКОМ и агент молча ничего не делает. Ключи не трогаем:
+ * в метке только буквы, цифры и подчёркивание.
+ */
+function jsonEscaped(reverse: ReadonlyMap<string, string>): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  for (const [alias, value] of reverse) out.set(alias, JSON.stringify(value).slice(1, -1));
+  return out;
+}
+
 export class ResponseStreamFilter {
   readonly #kind: DlpApiKind;
   readonly #reverse: ReadonlyMap<string, string>;
+  readonly #reverseJson: ReadonlyMap<string, string>;
 
   #buffer = '';
   #channel?: string;
@@ -31,6 +47,7 @@ export class ResponseStreamFilter {
   constructor(kind: DlpApiKind, reverse: ReadonlyMap<string, string>) {
     this.#kind = kind;
     this.#reverse = reverse;
+    this.#reverseJson = jsonEscaped(reverse);
   }
 
   /** Очередной кусок ответа; возвращает то, что можно отдать CLI. */
@@ -74,7 +91,9 @@ export class ResponseStreamFilter {
     if (delta.channel !== this.#channel) {
       prefix = this.#flushChannel();
       this.#channel = delta.channel;
-      this.#replacer = createStreamReplacer(this.#reverse);
+      this.#replacer = createStreamReplacer(
+        delta.slot === 'json' ? this.#reverseJson : this.#reverse,
+      );
     }
 
     this.#envelope = event;
@@ -109,7 +128,10 @@ export function restoreJsonResponse(
   reverse: ReadonlyMap<string, string>,
 ): unknown {
   if (reverse.size === 0) return body;
-  return mapBodyTexts(body, kind, (text) => replaceAll(text, reverse));
+  const escaped = jsonEscaped(reverse);
+  return mapBodyTexts(body, kind, (text, slot) =>
+    replaceAll(text, slot === 'json' ? escaped : reverse),
+  );
 }
 
 function parseJson(payload: string): unknown {

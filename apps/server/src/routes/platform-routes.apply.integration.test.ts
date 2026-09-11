@@ -34,8 +34,13 @@ const PLATFORM: Platform = {
   capabilities: [],
   targets: ['assistant'],
   projectPaths: [],
+  // Т3: применение отказывает цели, чей потребитель не отмечен. Здесь
+  // проверяются сами маршруты применения, поэтому оба включены.
+  consumers: ['assistant', 'terminal'],
   agents: [],
   budgetSince: '',
+  toolShim: true,
+  contourPrompt: true,
   caCertPath: '',
 };
 

@@ -1,0 +1,24 @@
+{
+  "topic": "claudeMd",
+  "source": "docs/diagrams/claudeMd-guide/claudeMd-guide.drawio",
+  "pages": [
+    {
+      "name": "instruction-layers",
+      "file": "instruction-layers.png",
+      "page": 1,
+      "source": "a5900aac9194278f",
+      "width": 1437,
+      "height": 958,
+      "exportedAt": "2026-09-11T14:34:04.381Z"
+    },
+    {
+      "name": "save-and-conflict",
+      "file": "save-and-conflict.png",
+      "page": 2,
+      "source": "53c13cb72135ef4a",
+      "width": 1437,
+      "height": 1078,
+      "exportedAt": "2026-09-11T14:34:07.524Z"
+    }
+  ]
+}

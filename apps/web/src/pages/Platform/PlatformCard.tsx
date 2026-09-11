@@ -10,19 +10,23 @@ import { StatusDot } from '@shared/ui/status-dot';
 import { TruncatedText } from '@shared/ui/truncated-text';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
+import { toast } from '@shared/lib/toast';
 import {
   CapabilityMatrix,
   platformBudgetOf,
   platformCardState,
   platformSpendOf,
+  useActivatePlatform,
   useCheckPlatform,
   useClearExhausted,
+  useDeactivatePlatform,
   useDeletePlatform,
   useDisablePlatform,
   usePlatformApplyPlan,
 } from '@entities/Platform';
 import { AppliedTargets } from './AppliedTargets';
 import { ApplyJournal } from './ApplyJournal';
+import { SmokeLine } from './SmokeLine';
 import { formatAgo } from './lib/formatAgo';
 import styles from './PlatformPage.module.scss';
 
@@ -45,12 +49,32 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const platform = status.platform;
+  // Активность приезжает в самой карточке, а не считается на странице: карточку
+  // читают по одной, и второй источник этого признака разошёлся бы с первым.
+  const isActive = status.active;
   const state = platformCardState(status);
   const check = useCheckPlatform();
   const disable = useDisablePlatform();
   const remove = useDeletePlatform();
   const clearExhausted = useClearExhausted();
+  const activate = useActivatePlatform();
+  const deactivate = useDeactivatePlatform();
   const plan = usePlatformApplyPlan(platform.id);
+
+  /**
+   * Активация удалась — а пробный запрос мог и не пройти: это одно состояние,
+   * а не два. Поэтому исход всегда называется словами, и «контур активен, но
+   * модель молчит» приезжает предупреждением, а не тихим зелёным.
+   */
+  const runActivate = (): void => {
+    activate.mutate(platform.id, {
+      onSuccess: (result) => {
+        if (result.smoke.ok) toast.success(t('platform.activatedOk', { title: platform.title }));
+        else toast.warning(t('platform.activatedSmokeFailed', { detail: result.smoke.detail }));
+      },
+      onError: () => toast.error(t('platform.activateFailed')),
+    });
+  };
 
   // Расход считает СЕРВЕР по постоянному учёту: счётчик живого шлюза обнуляется
   // вместе с процессом, и после перезапуска панели карточка сообщала бы
@@ -61,7 +85,10 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
   const applied = plan.data?.targets.filter((target) => target.applied) ?? [];
 
   return (
-    <Card padding="md">
+    // Идентификатор контура на самой карточке: контуров на экране бывает
+    // несколько, и живой прогон обязан отличать «этот погас» от «какой-то
+    // погас» — по тексту всей страницы это неотличимо.
+    <Card padding="md" data-platform-card={platform.id}>
       <Stack gap="var(--spacing-md)">
         <Stack direction="row" gap="var(--spacing-sm)" justify="between" align="start" wrap>
           <Stack gap="var(--spacing-3xs)" minWidth="14rem" flex={1}>
@@ -73,6 +100,9 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
               <Typography variant="body-sm" color="muted" as="span">
                 {t(`platform.state.${state}`)}
               </Typography>
+              {/* «Активен» — про панель целиком, а не про эту карточку: через
+                  этот контур идёт работа, и таких контуров не бывает двое. */}
+              {isActive && <Badge tone="success">{t('platform.activeBadge')}</Badge>}
               <Badge tone="neutral">{t(`platform.driver.${platform.driver}`)}</Badge>
             </Stack>
 
@@ -103,6 +133,30 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
           </Stack>
 
           <Stack direction="row" gap="var(--spacing-2xs)" wrap>
+            {/* Две кнопки на одно решение: сделать активным или вернуться к
+                провайдеру по умолчанию. Без ключа активировать нечего — проба и
+                пробный запрос упёрлись бы в него на первой же секунде, поэтому
+                кнопка гаснет и называет причину, а не отвечает отказом. */}
+            {isActive ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => deactivate.mutate(platform.id)}
+                isLoading={deactivate.isPending}
+              >
+                {t('platform.deactivate')}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={runActivate}
+                isLoading={activate.isPending}
+                disabled={!status.hasToken}
+                {...(status.hasToken ? {} : { title: t('platform.activateNoToken') })}
+              >
+                {t('platform.activate')}
+              </Button>
+            )}
             <Button
               variant="secondary"
               size="sm"
@@ -143,6 +197,14 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
             </Stack>
           </Stack>
         )}
+
+        {/* Итог пробного запроса живёт на сервере и переживает F5: «модель
+            ответила» — свойство связки, а не события нажатия. Но только пока
+            контур АКТИВЕН: у неактивного это итог прошлой активации, а сегодня
+            шлюз отвечает на его адрес отказом «контур выключен в панели» — и
+            зелёная строка под словом «не активен», и красная как будто про
+            сейчас одинаково врут. Так же поступает телефон. */}
+        {isActive && status.smoke && <SmokeLine smoke={status.smoke} />}
 
         <Stack gap="var(--spacing-3xs)">
           {/* Величина ОДНА и она оценка: деньги по нашему прайсу. «Внутренней

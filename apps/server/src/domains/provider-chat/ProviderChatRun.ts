@@ -68,6 +68,17 @@ export interface ProviderChatRunOptions {
    */
   model?: string;
   effort?: string;
+  /**
+   * Маршрут контура для ЭТОГО прогона (Т3): адрес локального шлюза в
+   * переменных одного процесса. Собирает служба чатов на каждом запуске —
+   * решение зависит от активного контура и отмеченного потребителя
+   * `foreign:<cli>`, а они меняются между прогонами.
+   *
+   * Достаётся только потоковому пути: он и есть запуск CLI. Путь `api` ходит
+   * ключом самого человека, и подменять ему адрес значило бы отправить его
+   * платный запрос в корпоративный шлюз.
+   */
+  platformEnv?: Record<string, string>;
   /** Подменяемые зависимости: в тестах ничего настоящего не запускается. */
   spawnImpl?: typeof nodeSpawn;
   fetchImpl?: typeof fetch;
@@ -265,6 +276,9 @@ export class ProviderChatRun implements ProviderChatRunLike {
     const spawned = spawnCliProcess(command, args, {
       spawnImpl: options.spawnImpl,
       ...(options.workdir ? { cwd: options.workdir } : {}),
+      ...(options.platformEnv && Object.keys(options.platformEnv).length > 0
+        ? { env: options.platformEnv }
+        : {}),
     });
 
     if (spawned.error) {

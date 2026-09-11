@@ -1,0 +1,24 @@
+{
+  "topic": "mcp",
+  "source": "docs/diagrams/mcp-guide/mcp-guide.drawio",
+  "pages": [
+    {
+      "name": "probe-path",
+      "file": "probe-path.png",
+      "page": 1,
+      "source": "6e300cd94284cf3f",
+      "width": 1457,
+      "height": 948,
+      "exportedAt": "2026-09-11T14:34:29.241Z"
+    },
+    {
+      "name": "who-runs-what",
+      "file": "who-runs-what.png",
+      "page": 2,
+      "source": "88c05ea47799807e",
+      "width": 1457,
+      "height": 978,
+      "exportedAt": "2026-09-11T14:34:32.289Z"
+    }
+  ]
+}

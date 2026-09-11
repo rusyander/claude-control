@@ -230,6 +230,11 @@ export function createHandoffPlanner({
     // там нечего и оплачивать нечем.
     const meta = {
       projectPath: cwd,
+      // Откуда прогон — от прогона, за которым звено заводится (Т3). Работа
+      // после плана, ревью и правки — это та же группа разделения, и маршрут
+      // контура они обязаны спрашивать её потребителем: без переноса работа
+      // ушла бы провайдером по умолчанию, пока план шёл через контур.
+      ...(finished.origin ? { origin: finished.origin } : {}),
       // Работа после плана (Т1) понижена так же, как работа из разделения, — и
       // в журнал сдачи попадает так же.
       ...(plan.stage === 'fix' || (plan.stage === 'work' && plan.link.lowered)
@@ -382,12 +387,18 @@ export function createHandoffPlanner({
         // настоящий `sessionId` ищет запись по временному ключу и, не найдя,
         // молча ничего не делает (см. `SplitLink`).
         carryLink?.(aliases, chatId);
+        // Происхождение — тоже от закрытого прогона: продолжение в чистой
+        // сессии остаётся тем же потребителем контура, что и работа до него.
+        const meta = {
+          projectPath: cwd,
+          ...(finished.origin ? { origin: finished.origin } : {}),
+        };
         // Дерево на паузе — продолжение заведено, но не запущено: в очередь.
-        if (gate?.defer('handoff', chatId, options, { projectPath: cwd })) {
+        if (gate?.defer('handoff', chatId, options, meta)) {
           deferred = true;
           return false;
         }
-        return runs.start(chatId, options, { projectPath: cwd });
+        return runs.start(chatId, options, meta);
       },
     });
 
@@ -628,6 +639,12 @@ function continuationStarter(
   const assigned =
     ctx.store.getChatLink(String(source.chatId ?? '')) ??
     (source.sessionId ? ctx.store.getChatLink(source.sessionId) : undefined);
+  // Откуда прогон для контура (Т3). Прогона, от которого заводится продолжение,
+  // в реестре может уже не быть (кнопку перезапуска жмут и через час), поэтому
+  // источник берём долговечный: связь заводится ТОЛЬКО разделением — значит
+  // разговор со связью принадлежит дереву групп, и его продолжение обязано
+  // спрашивать маршрут потребителем «Группы разделения», а не «Чат».
+  const origin = assigned ? ('groups' as const) : undefined;
 
   /** Прогон Claude — тот же путь, что и у обычной отправки в чат проекта. */
   function startClaude(nextId: string, prompt: string, cwd: string): boolean {
@@ -662,7 +679,7 @@ function continuationStarter(
         permissionPrompt: { runId: nextId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
         ...(initiative ? { appendSystemPrompt: initiative } : {}),
       },
-      { projectPath: cwd },
+      { projectPath: cwd, ...(origin ? { origin } : {}) },
     );
   }
 

@@ -20,8 +20,11 @@ const PLATFORM: Platform = {
   capabilities: [],
   targets: [],
   projectPaths: [],
+  consumers: [],
   agents: [{ id: 'a1', title: 'Аналитик' }],
   budgetSince: '',
+  toolShim: true,
+  contourPrompt: true,
   caCertPath: '',
 };
 

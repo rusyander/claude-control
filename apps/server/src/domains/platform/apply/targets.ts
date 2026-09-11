@@ -84,7 +84,7 @@ export function contourEntryName(platformId: string): string {
  * он родной для контура, и перевод в конвейере шлюза не понадобится вовсе.
  * Диалект, которого шлюз не знает, целью не становится.
  */
-function pickApiKind(provider: ConfigProvider): EndpointApiKind | undefined {
+export function pickApiKind(provider: ConfigProvider): EndpointApiKind | undefined {
   const config = provider.endpointConfig;
   if (config?.['openai-compat']) return 'openai-compat';
   if (config?.anthropic) return 'anthropic';

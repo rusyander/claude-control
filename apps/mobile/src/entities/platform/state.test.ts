@@ -20,11 +20,13 @@ const base: PlatformStatus = {
     capabilities: [],
     targets: [],
     projectPaths: [],
+    consumers: [],
     agents: [],
     caCertPath: '',
   },
   hasToken: true,
   maskedToken: 'sk-…4f21',
+  active: false,
   budget: {
     spentUsd: 5,
     budgetUsd: 20,

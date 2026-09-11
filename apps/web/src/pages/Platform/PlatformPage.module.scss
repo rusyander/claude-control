@@ -51,6 +51,12 @@
   background-color: var(--color-surface-sunken);
 }
 
+// Рассказ о переносе: та же полоса слева, что у беды, но цветом акцента —
+// случилось не плохое, а то, о чём человеку обязаны сказать.
+.notice {
+  border-left: 3px solid var(--color-accent);
+}
+
 .bar {
   width: 100%;
   height: 6px;

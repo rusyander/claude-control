@@ -1,0 +1,15 @@
+{
+  "topic": "scripts",
+  "source": "docs/diagrams/scripts-guide/scripts-guide.drawio",
+  "pages": [
+    {
+      "name": "script-usage",
+      "file": "script-usage.png",
+      "page": 1,
+      "source": "13aa0a96ba372d37",
+      "width": 1497,
+      "height": 918,
+      "exportedAt": "2026-09-11T15:05:26.206Z"
+    }
+  ]
+}

@@ -8,8 +8,10 @@ import type {
   IntegrationLink,
   IntegrationLinks,
   WorktreeMirrorSettings,
+  PlatformActivationNotice,
   PlatformAppliedRecord,
   PlatformHealthRecord,
+  PlatformSmokeResult,
   PlatformSpendRecord,
   Project,
   ProjectCodeLayout,
@@ -88,6 +90,14 @@ import {
   getPlatformSpend as readPlatformSpend,
   savePlatformSpend as writePlatformSpend,
 } from './platform-spend.ts';
+import {
+  clearPlatformActivationNotice as dropPlatformActivationNotice,
+  forgetPlatformSmoke as dropPlatformSmoke,
+  getPlatformActivationNotice as readPlatformActivationNotice,
+  getPlatformSmoke as readPlatformSmoke,
+  savePlatformSmoke as writePlatformSmoke,
+  setPlatformActivationNotice as writePlatformActivationNotice,
+} from './platform-activation.ts';
 import {
   getAllIntegrationLinks as readAllIntegrationLinks,
   getIntegrationLinks as readIntegrationLinks,
@@ -626,6 +636,38 @@ export class AppStore {
   /** Контур удалён — расход уходит вместе с ним. */
   forgetPlatformSpend(id: string): void {
     if (dropPlatformSpend(this.state, id)) this.persist();
+  }
+
+  // --- Контуры: активация (Т2) ---
+
+  /** Итоги последних пробных запросов: id контура → ответ (копия, не внутренний объект). */
+  getPlatformSmoke(): Record<string, PlatformSmokeResult> {
+    return readPlatformSmoke(this.state);
+  }
+
+  savePlatformSmoke(id: string, result: PlatformSmokeResult): void {
+    writePlatformSmoke(this.state, id, result);
+    this.persist();
+  }
+
+  /** Контур удалён — след пробного запроса уходит вместе с ним. */
+  forgetPlatformSmoke(id: string): void {
+    if (dropPlatformSmoke(this.state, id)) this.persist();
+  }
+
+  /** Разовый рассказ о переносе старых настроек; пусто — переносить было нечего. */
+  getPlatformActivationNotice(): PlatformActivationNotice | undefined {
+    return readPlatformActivationNotice(this.state);
+  }
+
+  setPlatformActivationNotice(notice: PlatformActivationNotice): void {
+    writePlatformActivationNotice(this.state, notice);
+    this.persist();
+  }
+
+  /** Человек прочитал — сообщение уходит навсегда. */
+  clearPlatformActivationNotice(): void {
+    if (dropPlatformActivationNotice(this.state)) this.persist();
   }
 
   /**

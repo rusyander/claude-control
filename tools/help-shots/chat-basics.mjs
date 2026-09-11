@@ -254,7 +254,7 @@ export async function shootBasics(browser, web, scenario, home) {
 
     // ── 01. Пустой чат проекта ───────────────────────────────────────────────
     await page
-      .getByRole('button', { name: /Новый чат/ })
+      .getByRole('button', { name: /^(Новый чат|New chat)/ })
       .first()
       .click();
     await page.waitForTimeout(1500);
@@ -317,7 +317,10 @@ export async function shootBasics(browser, web, scenario, home) {
     // ── 07. Меню чата: тумблеры прав и правила ───────────────────────────────
     await page.setViewportSize({ width: 1440, height: 1240 });
     const menu = page.locator('[role="dialog"]').first();
-    await page.getByRole('button', { name: 'Настройки чата' }).first().click();
+    await page
+      .getByRole('button', { name: /^(Настройки чата|Chat settings)$/ })
+      .first()
+      .click();
     await page.waitForTimeout(1200);
     await scenario.shot(page, '07-menu', { clip: '[role="dialog"]', padding: 220 });
 
@@ -331,7 +334,7 @@ export async function shootBasics(browser, web, scenario, home) {
 
     // ── 09. Пульт агентов ────────────────────────────────────────────────────
     await page
-      .getByRole('button', { name: /Агенты/ })
+      .getByRole('button', { name: /^(Агенты|Agents)/ })
       .first()
       .click();
     await page.waitForTimeout(1200);

@@ -8,18 +8,24 @@ import type {
   PlatformApplyTarget,
 } from '@agentdeck/contracts';
 import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
+import {
+  PLATFORM_ASSISTANT_CONSUMER,
+  PLATFORM_TERMINAL_CONSUMER,
+} from '@agentdeck/contracts/platform-consumers';
 import type { AppStore } from '../../../lib/app-store.ts';
 import { applyEndpointProfile } from '../../endpoints/endpoint-apply.ts';
 import { invalidField } from '../errors.ts';
+import { consumersOf } from '../store.ts';
 import { applyCodexEndpoint, applyContinueEndpoint, type FileWriteResult } from './config-files.ts';
 import { fingerprintOf, readCurrentEnv } from './current.ts';
 import {
   activeGatewaySettings,
   buildManagedProfile,
   gatewayUrlFor,
+  managedModel,
   PLACEHOLDER_KEY,
 } from './profile.ts';
-import { buildPlatformApplyPlan, managedModel, type ContourApplyDeps } from './plan.ts';
+import { buildPlatformApplyPlan, type ContourApplyDeps } from './plan.ts';
 import {
   contourEntryName,
   describeContourTargets,
@@ -201,8 +207,21 @@ export function applyContour(
 
   const result: PlatformApplyResult = { applied: [], skipped: [] };
   const write: string[] = [];
+  // Потребитель решает, кому вообще можно писать (Т3): файлы CLI — «терминалу»,
+  // настройку ассистента — «ассистенту». Снятая галочка не запрет, а ОТКАЗ с
+  // названной причиной: «применил, а ничего не записалось» без неё читается как
+  // поломка панели.
+  const consumers = new Set(consumersOf(platform));
   for (const targetId of wanted) {
     const planned = plan.targets.find((item) => item.targetId === targetId)!;
+    const consumer =
+      targetId === PLATFORM_ASSISTANT_TARGET
+        ? PLATFORM_ASSISTANT_CONSUMER
+        : PLATFORM_TERMINAL_CONSUMER;
+    if (!consumers.has(consumer)) {
+      result.skipped.push({ targetId, reason: 'consumer_off' });
+      continue;
+    }
     if (!planned.supported) {
       result.skipped.push({ targetId, reason: planned.reason ?? 'gateway_down' });
       continue;

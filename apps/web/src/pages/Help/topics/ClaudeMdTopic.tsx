@@ -1,14 +1,23 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { FlowDiagram } from '@shared/ui/diagram';
-import { HelpSection, StorageCard, StepList, Callout, CapabilityGrid, OptionCards } from '../ui';
+import { HelpSection, StorageCard, FieldTable, Callout, CapabilityGrid, OptionCards } from '../ui';
+import { ClaudeMdGuideSections } from './ClaudeMdGuideSections';
+import { ClaudeMdLayersSections } from './ClaudeMdLayersSections';
 
 /**
  * Документ раздела «CLAUDE.md».
  *
- * Соседний документ «Правила» описывает тот же файл, разобранный на карточки,
- * поэтому здесь отдельным блоком объяснено, чем два раздела отличаются: без
- * этого читатель видит два способа править одно и то же и не знает, какой брать.
+ * Порядок тот же, что у остальных путеводителей: зачем это нужно → чем это НЕ
+ * является → как устроено и путь в снимках → где ещё лежат инструкции и чьё
+ * правило главнее → что уходит на диск → границы, тонкости и отмена.
+ *
+ * Соседний документ «Правила» описывает ТОТ ЖЕ файл, разобранный на карточки,
+ * поэтому «чем это не является» здесь стоит вторым блоком: без него читатель
+ * видит два способа править одно и то же и не знает, какой брать.
+ *
+ * Уровни инструкций — половина документа не случайно. Самый частый вопрос про
+ * правила («написал, а агент не выполняет») почти никогда не про этот файл, и
+ * ответ на него — соседний уровень, а не отказ правила.
  */
 export function ClaudeMdTopic() {
   const { t } = useTranslation();
@@ -16,6 +25,12 @@ export function ClaudeMdTopic() {
 
   return (
     <>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards
           items={[
@@ -26,6 +41,22 @@ export function ClaudeMdTopic() {
         />
       </HelpSection>
 
+      <HelpSection title={tr('diffTitle')} caption={tr('diffCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('diffRules'), text: tr('diffRulesText') },
+            { title: tr('diffProject'), text: tr('diffProjectText') },
+            { title: tr('diffPreview'), text: tr('diffPreviewText') },
+            { title: tr('diffHistory'), text: tr('diffHistoryText') },
+          ]}
+        />
+      </HelpSection>
+
+      <ClaudeMdGuideSections tr={tr} />
+
+      <ClaudeMdLayersSections tr={tr} />
+
       <HelpSection title={t('help.common.storageTitle')}>
         <StorageCard
           title="CLAUDE.md"
@@ -33,47 +64,12 @@ export function ClaudeMdTopic() {
             { label: tr('storageFile'), value: '~/.claude/CLAUDE.md', isMono: true },
             { label: tr('storageFormat'), value: tr('storageFormatValue') },
             { label: tr('storageReader'), value: tr('storageReaderValue') },
+            { label: tr('storageWatch'), value: tr('storageWatchValue') },
+            { label: tr('storageWrite'), value: tr('storageWriteValue') },
             {
               label: tr('storageBackup'),
               value: '~/.claude/agentdeck/backups/',
               isMono: true,
-            },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('flowTitle')}
-          edgeLabels={[tr('flowEdgeSave'), tr('flowEdgeWrite'), tr('flowEdgeRestart')]}
-          nodes={[
-            {
-              id: 'editor',
-              label: tr('flowEditor'),
-              caption: tr('flowEditorCaption'),
-              tone: 'accent',
-              icon: 'edit',
-            },
-            {
-              id: 'backup',
-              label: tr('flowBackup'),
-              caption: tr('flowBackupCaption'),
-              tone: 'info',
-              icon: 'copy',
-            },
-            {
-              id: 'file',
-              label: tr('flowFile'),
-              caption: tr('flowFileCaption'),
-              icon: 'file',
-              isMono: true,
-            },
-            {
-              id: 'session',
-              label: tr('flowSession'),
-              caption: tr('flowSessionCaption'),
-              tone: 'success',
-              icon: 'refresh',
             },
           ]}
         />
@@ -91,30 +87,28 @@ export function ClaudeMdTopic() {
             tr('canFixParse'),
             tr('canFollow'),
           ]}
-          cant={[tr('cantProject'), tr('cantPreview'), tr('cantToggle'), tr('cantHistory')]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('pairTitle')} caption={tr('pairCaption')}>
-        <OptionCards
-          minWidth={320}
-          items={[
-            { title: tr('pairRules'), text: tr('pairRulesText') },
-            { title: tr('pairFile'), text: tr('pairFileText') },
+          cant={[
+            tr('cantProject'),
+            tr('cantPreview'),
+            tr('cantToggle'),
+            tr('cantHistory'),
+            tr('cantMerge'),
           ]}
         />
-        <Callout tone="warning" title={tr('pairNoteTitle')}>
-          {tr('pairNoteText')}
-        </Callout>
       </HelpSection>
 
-      <HelpSection title={tr('recipesTitle')}>
-        <StepList
-          steps={[
-            { title: tr('recipe1'), text: tr('recipe1Text') },
-            { title: tr('recipe2'), text: tr('recipe2Text') },
-            { title: tr('recipe3'), text: tr('recipe3Text') },
-            { title: tr('recipe4'), text: tr('recipe4Text') },
+      {/* Числа таблицей, а не россыпью по абзацам: за ними приходят повторно и
+          ищут глазами, а не чтением. */}
+      <HelpSection title={tr('limitsTitle')} caption={tr('limitsCaption')}>
+        <FieldTable
+          nameHeader={t('help.common.fieldName')}
+          descriptionHeader={t('help.common.fieldPurpose')}
+          rows={[
+            { name: tr('limitLevel'), description: tr('limitLevelValue'), isMono: false },
+            { name: tr('limitSave'), description: tr('limitSaveValue'), isMono: false },
+            { name: tr('limitConflict'), description: tr('limitConflictValue'), isMono: false },
+            { name: tr('limitBackups'), description: tr('limitBackupsValue'), isMono: false },
+            { name: tr('limitReach'), description: tr('limitReachValue'), isMono: false },
           ]}
         />
       </HelpSection>
@@ -127,8 +121,8 @@ export function ClaudeMdTopic() {
           <Callout tone="danger" title={tr('noteDisabledTitle')}>
             {tr('noteDisabledText')}
           </Callout>
-          <Callout tone="warning" title={tr('noteStaleTitle')}>
-            {tr('noteStaleText')}
+          <Callout tone="warning" title={tr('noteConflictTitle')}>
+            {tr('noteConflictText')}
           </Callout>
           <Callout tone="info" title={tr('noteBackupTitle')}>
             {tr('noteBackupText')}
@@ -140,6 +134,20 @@ export function ClaudeMdTopic() {
             {tr('noteProviderText')}
           </Callout>
         </Stack>
+      </HelpSection>
+
+      {/* Отмена — последним блоком и одним списком: человек ищет её после того,
+          как что-то уже сделал, и листать за ней весь путь заново не станет. */}
+      <HelpSection title={tr('undoTitle')} caption={tr('undoCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('undoRevert'), text: tr('undoRevertText') },
+            { title: tr('undoConflict'), text: tr('undoConflictText') },
+            { title: tr('undoBackup'), text: tr('undoBackupText') },
+            { title: tr('undoDisabled'), text: tr('undoDisabledText') },
+          ]}
+        />
       </HelpSection>
     </>
   );

@@ -50,7 +50,10 @@ const contour = {
   capabilities: ['chat' as const],
   targets: ['assistant'],
   projectPaths: ['C:\\work\\старая-машина'],
+  consumers: [],
   agents: [],
+  toolShim: true,
+  contourPrompt: true,
   caCertPath: '',
 };
 

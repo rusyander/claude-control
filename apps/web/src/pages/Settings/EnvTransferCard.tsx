@@ -108,12 +108,15 @@ export function EnvTransferCard() {
           archivePath,
           selection: choice.selection,
           platformSelection: choice.platforms,
+          promptSelection: choice.prompts,
           applyGateway: choice.gateway,
         },
       );
       await queryClient.invalidateQueries();
       toast.success(
-        t('envTransfer.importDone', { count: choice.selection.length + choice.platforms.length }),
+        t('envTransfer.importDone', {
+          count: choice.selection.length + choice.platforms.length + choice.prompts.length,
+        }),
       );
       // Снятый ключ — единственное, что разворот УБИРАЕТ, а не добавляет. План
       // предупреждал об этом до нажатия, но молча исчезнувший секрет человек

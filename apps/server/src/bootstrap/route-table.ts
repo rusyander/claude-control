@@ -46,6 +46,7 @@ import { registerDlpRoutes } from '../routes/dlp-routes.ts';
 import { registerCompromiseRoutes } from '../routes/compromise-routes.ts';
 import { registerPlatformRoutes } from '../routes/platform-routes.ts';
 import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
+import { registerPromptRoutes } from '../routes/prompt-routes.ts';
 import { registerRemoteRoutes } from '../routes/remote-routes.ts';
 import { registerEventsRoutes } from '../routes/events-routes.ts';
 import type { Runtime } from './runtime.ts';
@@ -167,6 +168,9 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     (instance, context) => registerPlatformRoutes(instance, context, platformGateway, selfBaseUrl),
     (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
     registerPromptGateRoutes,
+    // Каталог промптов приложения: тексты режимов лежат файлами, а не строками
+    // в коде, и правка человека живёт отдельно от встроенного текста.
+    registerPromptRoutes,
     // Поток событий об изменениях файлов: подписчиков держит хаб, рассылку по
     // нему ведёт наблюдатель за конфигами.
     (instance, context) => registerEventsRoutes(instance, context, events),

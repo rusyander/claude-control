@@ -333,7 +333,7 @@ export const en: Dictionary = {
     readOnly: 'Read-only: the key is entered in the panel, on its own machine.',
     empty: 'No contours.',
     state_ok: 'working',
-    state_off: 'switched off in the panel',
+    state_off: 'not active: the work does not go through it',
     state_noKey: 'no key saved',
     state_failed: 'the probe did not pass',
     state_unchecked: 'not checked yet',
@@ -341,6 +341,11 @@ export const en: Dictionary = {
     budget: (spent: string, budget: string, percent: number) =>
       `Spend estimate: $${spent} of $${budget} (${percent}%)`,
     budgetOff: (spent: string) => `Spend estimate: $${spent}, no budget set`,
+    active: (title: string) => `${title} — active`,
+    smokeOk: (answer: string, model: string) =>
+      `Test request went through: “${answer}”, model ${model}`,
+    smokeFailed: (detail: string) =>
+      detail ? `The test request failed: ${detail}` : 'The test request failed',
     estimate: "This is the panel's estimate by its own price table, not the contour's bill.",
     exhaustedAt: (at: string, level: string) =>
       level ? `Refused ${at}, limit: ${level}` : `Refused ${at}`,

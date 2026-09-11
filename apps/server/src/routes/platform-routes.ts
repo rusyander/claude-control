@@ -18,6 +18,11 @@ import { EnvKeyNotEncodableError, EnvKeyPreservedError } from '../domains/provid
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 import { readCaCert } from '../domains/platform/ca-fetch.ts';
 import { checkPlatform } from '../domains/platform/check.ts';
+import {
+  activatePlatform,
+  deactivatePlatform,
+  type ContourActivationDeps,
+} from '../domains/platform/activation.ts';
 import { PlatformError, invalidField } from '../domains/platform/errors.ts';
 import type { PlatformGateway } from '../domains/platform/gateway/listener.ts';
 import { applyContour } from '../domains/platform/apply/apply.ts';
@@ -119,12 +124,26 @@ export function registerPlatformRoutes(
     }
   });
 
+  /**
+   * Список контуров одним ответом: карточки, активный и разовый рассказ о
+   * переносе. Собирается в одном месте — второй сборки хватило бы, чтобы
+   * удаление контура отвечало без активного, а список с ним.
+   */
+  const platformsInfo = (): PlatformsInfo => {
+    const notice = ctx.store.getPlatformActivationNotice();
+    return {
+      platforms: describePlatforms(ctx.store, appData()),
+      activePlatformId: ctx.store.getSettings().activePlatformId,
+      ...(notice ? { activationNotice: notice } : {}),
+    };
+  };
+
   app.get('/api/platforms', () => {
     // Хвост учёта дописываем ПЕРЕД чтением: расход копится пачкой (см.
     // `gateway/spend-flush.ts`), и карточка, открытая сразу после ответа
     // модели, иначе показывала бы цифру пятисекундной давности.
     gateway.flushSpend();
-    return { platforms: describePlatforms(ctx.store, appData()) } satisfies PlatformsInfo;
+    return platformsInfo();
   });
 
   /**
@@ -161,9 +180,16 @@ export function registerPlatformRoutes(
       // непрочитанный файл, сохраняя форму, а не через отказ связи потом.
       if (platform.caCertPath.trim()) readCaCert(platform.caCertPath.trim());
 
-      writePlatform(ctx.store, platform);
+      // Тумблер контура сохранением НЕ меняется: включён — значит активен, а
+      // активность переключается своим маршрутом, транзакцией (инвариант 1).
+      // Иначе обычная правка названия заводила бы второй включённый контур, и
+      // «через какой из них идёт работа» снова становилось бы вопросом с двумя
+      // ответами. Пришедшее значение молча заменяется на сегодняшнее — форма
+      // его не показывает и не спрашивает.
+      const stored = { ...platform, enabled: ctx.store.getSettings().activePlatformId === id };
+      writePlatform(ctx.store, stored);
       if (typeof body?.token === 'string') writeToken(appData(), platform.id, body.token.trim());
-      return describePlatform(ctx.store, appData(), platform);
+      return describePlatform(ctx.store, appData(), stored);
     } catch (error) {
       return fail(reply, error);
     }
@@ -192,6 +218,26 @@ export function registerPlatformRoutes(
     // Именно ПОДНЯТ, а не «включён в настройках»: применить контур к CLI,
     // который упрётся в закрытый порт, значит соврать человеку.
     gatewayRunning: gateway.status().running,
+  });
+
+  /**
+   * Зависимости активации — те же пути и копии, что у отката, плюс каталог
+   * данных: проба читает ключ, а пробный запрос идёт в свой же шлюз.
+   * Живость шлюза сюда не входит намеренно: активировать контур при погашенном
+   * шлюзе можно, и об этом говорит сам пробный запрос, а не отказ маршрута.
+   */
+  const activationDeps = (): ContourActivationDeps => ({
+    store: ctx.store,
+    paths: {
+      claudeSettings: ctx.location.paths.settings,
+      override: ctx.store.getSettings().claudeDirOverride,
+    },
+    backupDir: ctx.backupDir,
+    appDataDir: appData(),
+    // Порт — у живого слушателя. Записанный в состоянии остаётся от прошлого
+    // запуска, и пробный запрос ушёл бы процессу, который занял порт после
+    // убитой панели.
+    gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
   });
 
   /**
@@ -262,6 +308,48 @@ export function registerPlatformRoutes(
   );
 
   /**
+   * Сделать контур активным (Т2). Одним нажатием: снять применения прежнего,
+   * погасить чужие тумблеры, зажечь свой, сходить пробой и задать модели один
+   * вопрос через собственный шлюз.
+   *
+   * Сеть здесь есть, но отказом связи маршрут не отвечает: красная проба и
+   * молчащая модель приезжают ВНУТРИ ответа, потому что активация к этому
+   * моменту уже случилась (Р3) и человеку нужно видеть, что именно не так.
+   */
+  app.post<{ Params: { id: string } }>('/api/platforms/:id/activate', async (request, reply) => {
+    try {
+      return await activatePlatform(activationDeps(), request.params.id);
+    } catch (error) {
+      return failWrite(reply, error);
+    }
+  });
+
+  /**
+   * Вернуть провайдер по умолчанию. Один маршрут на две кнопки — на карточке
+   * контура и в строке провайдера: это одно действие, и два его исполнения
+   * разошлись бы в первый же месяц.
+   */
+  app.post<{ Params: { id: string } }>('/api/platforms/:id/deactivate', (request, reply) => {
+    try {
+      return deactivatePlatform(
+        activationDeps(),
+        request.params.id,
+      ) satisfies PlatformRollbackResult;
+    } catch (error) {
+      return failWrite(reply, error);
+    }
+  });
+
+  /**
+   * Погасить рассказ о переносе старых настроек: человек прочитал. Навсегда —
+   * повторно показанный, он читается как новое событие.
+   */
+  app.delete('/api/platforms/activation-notice', () => {
+    ctx.store.clearPlatformActivationNotice();
+    return platformsInfo();
+  });
+
+  /**
    * Удалить: настройка, ключ и след пробы уходят вместе. Применение снимается
    * ПЕРЕД удалением — иначе конфиги CLI остались бы указывать на маршрут шлюза,
    * которого больше нет, и человеку некому было бы это откатить.
@@ -271,7 +359,7 @@ export function registerPlatformRoutes(
       requirePlatform(ctx.store, request.params.id);
       rollbackContour(applyDeps(), request.params.id);
       removePlatform(ctx.store, appData(), request.params.id);
-      return { platforms: describePlatforms(ctx.store, appData()) } satisfies PlatformsInfo;
+      return platformsInfo();
     } catch (error) {
       return fail(reply, error);
     }

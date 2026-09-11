@@ -52,6 +52,7 @@ export function PlatformTopic() {
           descriptionHeader={tr('screenPurposeColumn')}
           rows={[
             { name: tr('screenCard'), description: tr('screenCardText'), isMono: false },
+            { name: tr('screenSmoke'), description: tr('screenSmokeText'), isMono: false },
             { name: tr('screenMatrix'), description: tr('screenMatrixText'), isMono: false },
             { name: tr('screenApplied'), description: tr('screenAppliedText'), isMono: false },
             { name: tr('screenJournal'), description: tr('screenJournalText'), isMono: false },
@@ -62,6 +63,28 @@ export function PlatformTopic() {
         />
         <Callout tone="warning" title={tr('driftTitle')}>
           {tr('driftText')}
+        </Callout>
+      </HelpSection>
+
+      {/* Активный контур стоит ДО состояний связи: «не активен» — первое, что
+          человек читает на карточке соседа, и объяснять его после таблицы
+          состояний значило бы объяснять задним числом. */}
+      <HelpSection title={tr('activeTitle')} caption={tr('activeCaption')}>
+        <FieldTable
+          nameHeader={tr('activeColumn')}
+          descriptionHeader={tr('activeMeaningColumn')}
+          rows={[
+            { name: tr('activeMake'), description: tr('activeMakeText'), isMono: false },
+            { name: tr('activeBadgeRow'), description: tr('activeBadgeRowText'), isMono: false },
+            { name: tr('activeSmokeRow'), description: tr('activeSmokeRowText'), isMono: false },
+            { name: tr('activeReturnRow'), description: tr('activeReturnRowText'), isMono: false },
+          ]}
+        />
+        <Callout tone="info" title={tr('activeWhyTitle')}>
+          {tr('activeWhyText')}
+        </Callout>
+        <Callout tone="warning" title={tr('activeMigratedTitle')}>
+          {tr('activeMigratedText')}
         </Callout>
       </HelpSection>
 

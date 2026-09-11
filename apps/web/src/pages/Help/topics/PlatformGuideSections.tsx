@@ -130,6 +130,11 @@ export function PlatformGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('pTargets')} text={g('pTargetsText')}>
             <HelpShot topic="platform" scenario="connect" frame="14-wizard-targets" side="panel" />
           </GuideStep>
+          {/* Без своего кадра намеренно: список файлов CLI открывается под
+              галочкой «Терминал», а снимать ещё один кадр того же шага значило
+              бы показать одно и то же дважды. Текст стоит шагом, потому что это
+              ответ на вопрос «куда делось прежнее „Где применять“». */}
+          <GuideStep title={g('pTerminal')} text={g('pTerminalText')} />
           <GuideStep title={g('pGateway')} text={g('pGatewayText')}>
             <HelpShot topic="platform" scenario="connect" frame="15-wizard-gateway" side="panel" />
           </GuideStep>

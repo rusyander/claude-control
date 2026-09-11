@@ -1,24 +1,34 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { FlowDiagram } from '@shared/ui/diagram';
-import {
-  HelpSection,
-  StorageCard,
-  FieldTable,
-  StepList,
-  Callout,
-  CapabilityGrid,
-  OptionCards,
-} from '../ui';
+import { HelpSection, FieldTable, Callout, OptionCards } from '../ui';
+import { McpGuideSections } from './McpGuideSections';
+import { McpLimitsSections } from './McpLimitsSections';
 
-/** Документ раздела «MCP-серверы». */
+/**
+ * Документ раздела «MCP-серверы».
+ *
+ * Порядок задан вопросами, в которых человек приходит: зачем это вообще → как
+ * устроено (две схемы) → весь путь в снимках, двумя сценариями по входу → чем
+ * раздел НЕ является → что пишет на диске → пределы и отказы → справочные
+ * таблицы → тонкости.
+ *
+ * Рукодельной схемы здесь больше нет: её место заняли две сгенерированные,
+ * которые показывают то, чего абстрактная цепочка «конфиг → старт → список →
+ * работа» не показывала, — развилки отказа и границу ответственности панели.
+ */
 export function McpTopic() {
   const { t } = useTranslation();
   const tr = (key: string): string => t(`help.topics.mcp.${key}`);
+  const common = (key: string): string => t(`help.common.${key}`);
 
   return (
     <>
-      <HelpSection title={t('help.common.whyTitle')}>
+      {/* Страница длинная: первое, что ей нужно сказать, — из чего она состоит. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
+      <HelpSection title={common('whyTitle')}>
         <OptionCards
           items={[
             { title: tr('whyTools'), text: tr('whyToolsText') },
@@ -28,72 +38,9 @@ export function McpTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')}>
-        <StorageCard
-          title="~/.claude.json"
-          rows={[
-            { label: tr('storageFile'), value: tr('storageFileValue'), isMono: true },
-            { label: tr('storageWhy'), value: tr('storageWhyValue') },
-            { label: tr('storageOff'), value: tr('storageOffValue') },
-            { label: tr('storageRestart'), value: tr('storageRestartValue') },
-          ]}
-        />
-      </HelpSection>
+      <McpGuideSections tr={tr} />
 
-      <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('flowTitle')}
-          nodes={[
-            {
-              id: 'config',
-              label: tr('flowConfig'),
-              caption: tr('flowConfigCaption'),
-              tone: 'accent',
-              icon: 'mcp',
-            },
-            {
-              id: 'start',
-              label: tr('flowStart'),
-              caption: tr('flowStartCaption'),
-              tone: 'info',
-              icon: 'refresh',
-            },
-            {
-              id: 'list',
-              label: tr('flowList'),
-              caption: tr('flowListCaption'),
-              icon: 'file',
-            },
-            {
-              id: 'use',
-              label: tr('flowUse'),
-              caption: tr('flowUseCaption'),
-              tone: 'success',
-              icon: 'check',
-            },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canPreset'),
-            tr('canImport'),
-            tr('canTransport'),
-            tr('canHeaders'),
-            tr('canOAuth'),
-            tr('canAssistant'),
-            tr('canHealth'),
-            tr('canProbe'),
-            tr('canToggle'),
-            tr('canAutoCheck'),
-          ]}
-          cant={[tr('cantInstall'), tr('cantSecrets'), tr('cantPerTool'), tr('cantDuplicate')]}
-        />
-      </HelpSection>
+      <McpLimitsSections tr={tr} common={common} />
 
       <HelpSection title={tr('transportTitle')} caption={tr('transportCaption')}>
         <OptionCards
@@ -125,19 +72,19 @@ export function McpTopic() {
       <HelpSection title={tr('fieldsTitle')}>
         <FieldTable
           caption={tr('fieldsCaption')}
-          nameHeader={t('help.common.fieldName')}
-          descriptionHeader={t('help.common.fieldPurpose')}
+          nameHeader={common('fieldName')}
+          descriptionHeader={common('fieldPurpose')}
           rows={[
             {
               name: 'name',
               description: tr('fieldName'),
-              badge: t('help.common.required'),
+              badge: common('required'),
               badgeTone: 'accent',
             },
             {
               name: 'transport',
               description: tr('fieldTransport'),
-              badge: t('help.common.required'),
+              badge: common('required'),
               badgeTone: 'accent',
             },
             { name: 'command', description: tr('fieldCommand') },
@@ -145,27 +92,8 @@ export function McpTopic() {
             { name: 'url', description: tr('fieldUrl') },
             { name: 'env', description: tr('fieldEnv') },
             { name: 'headers', description: tr('fieldHeaders') },
-            {
-              name: 'health',
-              description: tr('fieldHealth'),
-              badge: t('help.common.readOnly'),
-            },
-            {
-              name: 'toolCount',
-              description: tr('fieldTools'),
-              badge: t('help.common.readOnly'),
-            },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('recipesTitle')}>
-        <StepList
-          steps={[
-            { title: tr('recipe1'), text: tr('recipe1Text') },
-            { title: tr('recipe2'), text: tr('recipe2Text') },
-            { title: tr('recipe3'), text: tr('recipe3Text') },
-            { title: tr('recipe4'), text: tr('recipe4Text') },
+            { name: 'health', description: tr('fieldHealth'), badge: common('readOnly') },
+            { name: 'toolCount', description: tr('fieldTools'), badge: common('readOnly') },
           ]}
         />
       </HelpSection>

@@ -13,9 +13,10 @@ import {
   activeGatewaySettings,
   buildManagedProfile,
   gatewayUrlFor,
-  managedProfileId,
+  managedModel,
 } from './profile.ts';
 import { describeContourTargets, type ContourTarget, type ContourTargetPaths } from './targets.ts';
+import { listConsumerOptions } from '../routing.ts';
 
 /**
  * Предпросмотр применения: что и куда ляжет, что уже занято, что панель уже
@@ -33,15 +34,6 @@ export interface ContourApplyDeps {
   backupDir?: string;
   /** Слушатель шлюза поднят НА САМОМ ДЕЛЕ, а не только включён в настройках. */
   gatewayRunning: boolean;
-}
-
-/**
- * Модель управляемого профиля: выбор человека переживает пересборку плана.
- * Пусто — CLI пойдёт с моделью по умолчанию, и это его собственное поведение.
- */
-export function managedModel(store: AppStore, platformId: string): string {
-  const id = managedProfileId(platformId);
-  return store.getSettings().endpointProfiles.find((item) => item.id === id)?.model ?? '';
 }
 
 /**
@@ -151,6 +143,10 @@ export function buildPlatformApplyPlan(
     rootUrl: gatewayUrlFor(gateway.port, platform.id, 'anthropic'),
     ready,
     targets,
+    // «Где работает контур» — вторая половина того же ответа: человек
+    // спрашивает «что будет, если я это включу», и файлы без прогонов ответом
+    // больше не являются (Т3).
+    consumers: listConsumerOptions(platform),
   };
 }
 

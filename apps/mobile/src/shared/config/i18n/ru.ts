@@ -339,7 +339,7 @@ export const ru = {
     readOnly: 'Только чтение: ключ вводят в панели, на своей машине.',
     empty: 'Контуров нет.',
     state_ok: 'работает',
-    state_off: 'выключен в панели',
+    state_off: 'не активен: работа идёт не через него',
     state_noKey: 'ключ не сохранён',
     state_failed: 'проба не прошла',
     state_unchecked: 'ещё не проверялся',
@@ -347,6 +347,11 @@ export const ru = {
     budget: (spent: string, budget: string, percent: number) =>
       `Оценка расхода: $${spent} из $${budget} (${percent}%)`,
     budgetOff: (spent: string) => `Оценка расхода: $${spent}, бюджет не задан`,
+    active: (title: string) => `${title} — активен`,
+    smokeOk: (answer: string, model: string) =>
+      `Пробный запрос прошёл: «${answer}», модель ${model}`,
+    smokeFailed: (detail: string) =>
+      detail ? `Пробный запрос не прошёл: ${detail}` : 'Пробный запрос не прошёл',
     estimate: 'Это оценка панели по её прайсу, а не счёт контура.',
     exhaustedAt: (at: string, level: string) =>
       level ? `Отказ ${at}, предел: ${level}` : `Отказ ${at}`,

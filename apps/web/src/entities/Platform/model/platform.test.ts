@@ -53,8 +53,16 @@ describe('новый контур', () => {
       capabilities: [],
       targets: [],
       projectPaths: [],
+      // Т3: новый контур подключён к ассистенту самой панели и больше ни к
+      // кому. Ни один прогон и ни один файл CLI на него не уходит, пока
+      // человек не отметит потребителя сам.
+      consumers: ['assistant'],
       agents: [],
       budgetSince: '',
+      // Т5, решение В1: прослойка инструментов и короткий промпт контура —
+      // включёнными, иначе агент через контур «работает как чат».
+      toolShim: true,
+      contourPrompt: true,
       caCertPath: '',
     });
   });
@@ -156,10 +164,13 @@ describe('тревога по бюджету', () => {
 });
 
 describe('состояние карточки', () => {
+  // Активный контур: сервер держит пару «активен ↔ тумблер» согласованной
+  // (инвариант 1), и карточка рисуется по ней же.
   const statusOf = (patch: Partial<PlatformStatus>): PlatformStatus => ({
     platform: platformOf({ enabled: true }),
     hasToken: true,
     maskedToken: 'sk-…4f21',
+    active: true,
     budget: {
       spentUsd: 0,
       budgetUsd: 0,
@@ -193,10 +204,21 @@ describe('состояние карточки', () => {
     checkedAt: '2026-09-10T10:00:00.000Z',
   });
 
-  it('выключенный контур не притворяется проверенным', () => {
-    expect(platformCardState(statusOf({ platform: platformOf({ enabled: false }) }))).toBe(
-      'disabled',
-    );
+  it('неактивный контур не притворяется проверенным', () => {
+    expect(
+      platformCardState(statusOf({ active: false, platform: platformOf({ enabled: false }) })),
+    ).toBe('disabled');
+  });
+
+  it('признак один — активность: разъехавшаяся пара читается по ней', () => {
+    // Такую пару приносят чужие писатели настроек — снимок и архив переноса, —
+    // и до сведения панель показывала бы «на связи» с кнопкой «сделать
+    // активным» тому контуру, который шлюз уже обслуживает.
+    expect(
+      platformCardState(
+        statusOf({ active: false, platform: platformOf({ enabled: true }), health: probe('ok') }),
+      ),
+    ).toBe('disabled');
   });
 
   it('«не проверяли» отделено от «не отвечает»', () => {

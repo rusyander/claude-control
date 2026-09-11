@@ -161,8 +161,11 @@ describe('маршрут каталога моделей: источник «к�
           capabilities: [],
           targets: [],
           projectPaths: [],
+          consumers: [],
           agents: [],
           budgetSince: '',
+          toolShim: true,
+          contourPrompt: true,
           caCertPath: '',
         },
       ],
@@ -319,6 +322,8 @@ describe('маршрут каталога моделей: источник «к�
       platforms: settings.platforms.map((platform) => ({
         ...platform,
         agents: [],
+        toolShim: true,
+        contourPrompt: true,
         caCertPath: join(root, 'нет-такого.pem'),
       })),
     });

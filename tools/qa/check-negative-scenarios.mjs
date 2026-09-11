@@ -111,7 +111,10 @@ const SCENARIOS = [
         `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
         '401 называет ВСЕ ПЯТЬ причин',
       ],
-      [`${SERVER}/domains/platform/gateway/status.ts`, 'истёк по сроку'],
+      // Текст отказа переехал в драйвер (Т1): пять причин — знание о ПЛАТФОРМА КОМПАНИИ, и
+      // у произвольного совместимого шлюза их нет. Якорь идёт за текстом, а не
+      // за файлом: он стережёт формулировку, а не её адрес.
+      [`${SERVER}/domains/platform/drivers/enterprise-platform.ts`, 'истёк по сроку'],
     ],
   },
   {
@@ -125,7 +128,7 @@ const SCENARIOS = [
       ],
       // Якорь в САМОМ ТЕКСТЕ отказа, а не в комментарии рядом с ним: комментарий
       // про причины переживёт замену сообщения на плоское «ключ не принят».
-      [`${SERVER}/domains/platform/gateway/status.ts`, 'исчерпал свой бюджет'],
+      [`${SERVER}/domains/platform/drivers/enterprise-platform.ts`, 'исчерпал свой бюджет'],
     ],
   },
   {

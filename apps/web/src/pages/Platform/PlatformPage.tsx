@@ -14,12 +14,15 @@ import { CompromiseMark } from '@shared/ui/compromise-mark';
 import { CompromiseList } from '@features/CompromiseList';
 import { PlatformWizard } from '@features/PlatformEditor';
 import { useCompromises } from '@entities/Compromise';
-import { usePlatformGateway, usePlatforms } from '@entities/Platform';
+import { usePlatformGateway, usePlatformsInfo } from '@entities/Platform';
 import { PlatformCard } from './PlatformCard';
+import { ActivationNotice } from './ActivationNotice';
 import { ViolationsCard } from './ViolationsCard';
+import { ToolShimCard } from './ToolShimCard';
 import { AgentsCard } from './AgentsCard';
 import { BridgeRow } from './BridgeRow';
 import { showsViolations } from './lib/violationsView';
+import { showsToolShim } from './lib/toolShimView';
 import { showsAgents } from './lib/agentsView';
 import styles from './PlatformPage.module.scss';
 
@@ -37,7 +40,8 @@ import styles from './PlatformPage.module.scss';
  */
 export function PlatformPage() {
   const { t } = useTranslation();
-  const { data, isLoading, isError, refetch } = usePlatforms();
+  const { data: info, isLoading, isError, refetch } = usePlatformsInfo();
+  const data = info?.platforms;
   const gateway = usePlatformGateway();
   const compromises = useCompromises();
   const [wizard, setWizard] = useState<{ open: boolean; existing?: PlatformStatus }>({
@@ -72,6 +76,11 @@ export function PlatformPage() {
           action={<Button onClick={openCreate}>{t('platform.connect')}</Button>}
         />
       )}
+
+      {/* Разовый рассказ о переносе: включённых контуров могло быть несколько,
+          активный теперь ровно один. Стоит ВЫШЕ карточек — он объясняет, почему
+          тумблеры соседей погасли сами. */}
+      {info?.activationNotice && <ActivationNotice notice={info.activationNotice} />}
 
       {data?.map((status) => (
         <PlatformCard key={status.platform.id} status={status} onEdit={() => openEdit(status)} />
@@ -109,6 +118,16 @@ export function PlatformPage() {
           )}
         />
       )}
+
+      {/* Прослойка инструментов — рядом с проверками и по тем же правилам:
+          выключенный контур или мёртвый шлюз возвращают раздел к прежнему виду.
+          Отдельная карточка, а не строка в «Проверках»: там чужая работа
+          (гардрейлы компании), здесь своя. */}
+      {showsToolShim(
+        (data ?? []).some((status) => status.platform.enabled),
+        gateway.data?.status.running ?? false,
+        gateway.data?.status.toolShim,
+      ) && <ToolShimCard report={gateway.data?.status.toolShim} />}
 
       {/* Два решения, которые уже приняты и уже стоят денег: ключ живёт в
           панели, и через контур CLI работает как чат. Оба подписаны прямо

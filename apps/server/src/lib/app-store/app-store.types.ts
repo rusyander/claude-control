@@ -12,6 +12,8 @@ import type {
   PlatformAppliedRecord,
   PlatformHealthRecord,
   PlatformSpendRecord,
+  PlatformSmokeResult,
+  PlatformActivationNotice,
   Project,
   ProjectCodeLayout,
   ProjectCodeView,
@@ -476,6 +478,18 @@ export interface AppState {
    * показывал бы человеку с почти исчерпанным ключом честный ноль.
    */
   platformSpend?: Record<string, PlatformSpendRecord>;
+  /**
+   * Итог последнего пробного запроса через шлюз (Т2): id контура → ответ, модель,
+   * задержка. Здесь, а не в настройках: задержка и ответ — свойство этого стенда,
+   * а не настройки, которую человек переносит на другую машину.
+   */
+  platformSmoke?: Record<string, PlatformSmokeResult>;
+  /**
+   * Разовый рассказ о переносе старых настроек: включённых контуров могло быть
+   * несколько, активным стал первый. Гасится маршрутом после прочтения —
+   * повторно показанный, он читается как новое событие.
+   */
+  platformActivationNotice?: PlatformActivationNotice;
   /**
    * Порт, который шлюз контуров занял НА САМОМ ДЕЛЕ. Ноль или отсутствие —
    * шлюз не поднят.

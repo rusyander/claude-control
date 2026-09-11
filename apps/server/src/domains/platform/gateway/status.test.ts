@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { enterprise-platformDriver } from '../drivers/enterprise-platform.ts';
 import { bridgeUpstreamStatus, readViolations } from './status.ts';
 
 /**
@@ -72,18 +73,22 @@ describe('коды контура → отказ клиенту', () => {
     [502, 502, 'api_error'],
     [503, 503, 'overloaded_error'],
   ])('%s → %s (%s)', (from, to, code) => {
-    const bridged = bridgeUpstreamStatus(from, {});
+    const bridged = bridgeUpstreamStatus(from, {}, { driverRows: enterprise-platformDriver.statusRows });
     expect(bridged.status).toBe(to);
     expect(bridged.code).toBe(code);
     expect(bridged.message).not.toBe('');
   });
 
   it('451 становится обычным отказом запроса с перечнем нарушенного', () => {
-    const bridged = bridgeUpstreamStatus(451, {
-      type: 'guardrail_violation',
-      code: 'content_policy_violation',
-      violations: [{ category: 'pii_phone', text: 'телефон 89001234567' }],
-    });
+    const bridged = bridgeUpstreamStatus(
+      451,
+      {
+        type: 'guardrail_violation',
+        code: 'content_policy_violation',
+        violations: [{ category: 'pii_phone', text: 'телефон 89001234567' }],
+      },
+      { driverRows: enterprise-platformDriver.statusRows },
+    );
     // Ни один CLI не ждёт 451: он покажет сырое тело или решит, что сервер лёг.
     expect(bridged.status).toBe(400);
     expect(bridged.code).toBe('content_policy_violation');
@@ -93,19 +98,21 @@ describe('коды контура → отказ клиенту', () => {
   });
 
   it('русский текст контура показывается как есть', () => {
-    const bridged = bridgeUpstreamStatus(402, {
-      error: { message: 'Квота API провайдера исчерпана' },
-    });
+    const bridged = bridgeUpstreamStatus(
+      402,
+      { error: { message: 'Квота API провайдера исчерпана' } },
+      { driverRows: enterprise-platformDriver.statusRows },
+    );
     expect(bridged.message).toContain('Квота API провайдера исчерпана');
   });
 
   it('незнакомый код не притворяется знакомым', () => {
-    const bridged = bridgeUpstreamStatus(418, {});
+    const bridged = bridgeUpstreamStatus(418, {}, { driverRows: [] });
     expect(bridged.status).toBe(418);
     expect(bridged.message).toContain('418');
   });
 
   it('чужой код вне диапазона ошибок отдаётся как отказ связи', () => {
-    expect(bridgeUpstreamStatus(0, {}).status).toBe(502);
+    expect(bridgeUpstreamStatus(0, {}, { driverRows: [] }).status).toBe(502);
   });
 });

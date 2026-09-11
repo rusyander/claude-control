@@ -1,0 +1,15 @@
+{
+  "topic": "env",
+  "source": "docs/diagrams/env-guide/env-guide.drawio",
+  "pages": [
+    {
+      "name": "where-a-value-goes",
+      "file": "where-a-value-goes.png",
+      "page": 1,
+      "source": "373ec0e668e5808b",
+      "width": 1457,
+      "height": 968,
+      "exportedAt": "2026-09-11T14:34:35.360Z"
+    }
+  ]
+}

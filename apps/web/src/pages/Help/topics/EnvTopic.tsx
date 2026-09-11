@@ -1,24 +1,34 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { FlowDiagram } from '@shared/ui/diagram';
-import {
-  HelpSection,
-  StorageCard,
-  FieldTable,
-  StepList,
-  Callout,
-  CapabilityGrid,
-  OptionCards,
-} from '../ui';
+import { HelpSection, FieldTable, Callout, OptionCards } from '../ui';
+import { EnvGuideSections } from './EnvGuideSections';
+import { EnvLimitsSections } from './EnvLimitsSections';
 
-/** Документ раздела «Переменные». */
+/**
+ * Документ раздела «Переменные».
+ *
+ * Порядок тот же, что у соседей по пачке «Доступы»: зачем это вообще → как
+ * устроено (схема трёх файлов) → два пути в снимках → чем раздел НЕ является →
+ * что пишет на диске → пределы и отказы → справочные таблицы → тонкости.
+ *
+ * Рукодельной цепочки «имя → похоже на секрет? → файл» здесь больше нет: она
+ * утверждала, что файл угадывается по имени, а в форме ОДНОЙ переменной его
+ * выбирает человек. Сгенерированная схема показывает три файла с их читателями
+ * — то, из-за чего значение «не доходит».
+ */
 export function EnvTopic() {
   const { t } = useTranslation();
   const tr = (key: string): string => t(`help.topics.env.${key}`);
+  const common = (key: string): string => t(`help.common.${key}`);
 
   return (
     <>
-      <HelpSection title={t('help.common.whyTitle')}>
+      {/* Страница длинная: первое, что ей нужно сказать, — из чего она состоит. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
+      <HelpSection title={common('whyTitle')}>
         <OptionCards
           items={[
             { title: tr('whySeparate'), text: tr('whySeparateText') },
@@ -28,79 +38,16 @@ export function EnvTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')}>
-        <StorageCard
-          title={tr('title')}
-          rows={[
-            { label: tr('storageSettings'), value: tr('storageSettingsValue'), isMono: true },
-            { label: tr('storageLocal'), value: tr('storageLocalValue'), isMono: true },
-            { label: tr('storageSecrets'), value: tr('storageSecretsValue'), isMono: true },
-            { label: tr('storageWhoReads'), value: tr('storageWhoReadsValue') },
-            { label: tr('storageDetect'), value: tr('storageDetectValue') },
-          ]}
-        />
-      </HelpSection>
+      <EnvGuideSections tr={tr} />
 
-      <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('flowTitle')}
-          nodes={[
-            {
-              id: 'name',
-              label: tr('flowName'),
-              caption: tr('flowNameCaption'),
-              tone: 'accent',
-              icon: 'env',
-            },
-            {
-              id: 'detect',
-              label: tr('flowDetect'),
-              caption: tr('flowDetectCaption'),
-              tone: 'warning',
-              icon: 'search',
-            },
-            {
-              id: 'secrets',
-              label: tr('flowSecrets'),
-              caption: tr('flowSecretsCaption'),
-              tone: 'danger',
-              isMono: true,
-              icon: 'eyeOff',
-            },
-            {
-              id: 'settings',
-              label: tr('flowSettings'),
-              caption: tr('flowSettingsCaption'),
-              tone: 'info',
-              isMono: true,
-              icon: 'file',
-            },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canTwo'),
-            tr('canAuto'),
-            tr('canReveal'),
-            tr('canBulkAdd'),
-            tr('canComment'),
-            tr('canAssistant'),
-            tr('canMove'),
-          ]}
-          cant={[tr('cantEdit'), tr('cantEncrypt'), tr('cantScope'), tr('cantSee')]}
-        />
-      </HelpSection>
+      <EnvLimitsSections tr={tr} common={common} />
 
       <HelpSection title={tr('placesTitle')}>
         <OptionCards
           minWidth={320}
           items={[
             { title: tr('placeSettings'), text: tr('placeSettingsText') },
+            { title: tr('placeLocal'), text: tr('placeLocalText') },
             { title: tr('placeSecrets'), text: tr('placeSecretsText') },
           ]}
         />
@@ -109,35 +56,24 @@ export function EnvTopic() {
       <HelpSection title={tr('fieldsTitle')}>
         <FieldTable
           caption={tr('fieldsCaption')}
-          nameHeader={t('help.common.fieldName')}
-          descriptionHeader={t('help.common.fieldPurpose')}
+          nameHeader={common('fieldName')}
+          descriptionHeader={common('fieldPurpose')}
           rows={[
             {
               name: 'key',
               description: tr('fieldKey'),
-              badge: t('help.common.required'),
+              badge: common('required'),
               badgeTone: 'accent',
             },
             {
               name: 'value',
               description: tr('fieldValue'),
-              badge: t('help.common.required'),
+              badge: common('required'),
               badgeTone: 'accent',
             },
             { name: 'source', description: tr('fieldSource') },
             { name: 'isSecret', description: tr('fieldIsSecret') },
             { name: 'comment', description: tr('fieldComment') },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('recipesTitle')}>
-        <StepList
-          steps={[
-            { title: tr('recipe1'), text: tr('recipe1Text') },
-            { title: tr('recipe2'), text: tr('recipe2Text') },
-            { title: tr('recipe3'), text: tr('recipe3Text') },
-            { title: tr('recipe4'), text: tr('recipe4Text') },
           ]}
         />
       </HelpSection>
@@ -149,6 +85,9 @@ export function EnvTopic() {
           </Callout>
           <Callout tone="warning" title={tr('noteDetectTitle')}>
             {tr('noteDetectText')}
+          </Callout>
+          <Callout tone="danger" title={tr('noteReaderTitle')}>
+            {tr('noteReaderText')}
           </Callout>
           <Callout tone="info" title={tr('noteLocalTitle')}>
             {tr('noteLocalText')}

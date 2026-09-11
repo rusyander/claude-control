@@ -1,24 +1,34 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { PriorityLadder } from '@shared/ui/diagram';
-import {
-  HelpSection,
-  StorageCard,
-  FieldTable,
-  Callout,
-  CapabilityGrid,
-  OptionCards,
-  StepList,
-} from '../ui';
+import { HelpSection, FieldTable, Callout, OptionCards } from '../ui';
+import { SettingsGuideSections } from './SettingsGuideSections';
+import { SettingsLimitsSections } from './SettingsLimitsSections';
 
-/** Документ раздела «Настройки». */
+/**
+ * Документ раздела «Настройки».
+ *
+ * Порядок общий для пачки «Доступы»: зачем это вообще → что происходит перед
+ * записью (схема) → два пути в снимках → чем раздел НЕ является → что пишет на
+ * диске → пределы и отказы → справочные таблицы → тонкости.
+ *
+ * Рукописного списка шагов мастера здесь больше нет: те же четыре шага теперь
+ * показаны кадрами настоящего мастера. Описание шага словами и снимок того же
+ * шага расходятся при первой же правке интерфейса, и расходятся молча.
+ */
 export function SettingsTopic() {
   const { t } = useTranslation();
   const tr = (key: string): string => t(`help.topics.settings.${key}`);
+  const common = (key: string): string => t(`help.common.${key}`);
 
   return (
     <>
-      <HelpSection title={t('help.common.whyTitle')}>
+      {/* Страница длинная: первое, что ей нужно сказать, — из чего она состоит. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
+      <HelpSection title={common('whyTitle')}>
         <OptionCards
           items={[
             { title: tr('whyPath'), text: tr('whyPathText') },
@@ -28,41 +38,16 @@ export function SettingsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')}>
-        <StorageCard
-          title={tr('title')}
-          rows={[
-            { label: tr('storageApp'), value: tr('storageAppValue') },
-            { label: tr('storageManual'), value: tr('storageManualValue'), isMono: true },
-            { label: tr('storageBackups'), value: tr('storageBackupsValue'), isMono: true },
-            { label: tr('storageApply'), value: tr('storageApplyValue') },
-          ]}
-        />
-      </HelpSection>
+      <SettingsGuideSections tr={tr} />
 
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canPath'),
-            tr('canCreds'),
-            tr('canEditor'),
-            tr('canTheme'),
-            tr('canSpendUnit'),
-            tr('canBackup'),
-            tr('canEncrypt'),
-            tr('canRevertHunk'),
-            tr('canTransfer'),
-            tr('canEnvTransfer'),
-            tr('canModels'),
-            tr('canCheck'),
-            tr('canPreview'),
-            tr('canWatch'),
-          ]}
-          cant={[tr('cantLogin'), tr('cantToken'), tr('cantChange'), tr('cantSync')]}
-        />
-      </HelpSection>
+      <SettingsLimitsSections
+        tr={tr}
+        common={common}
+        platform={{
+          title: t('help.topics.platform.title'),
+          summary: t('help.topics.platform.summary'),
+        }}
+      />
 
       <HelpSection title={tr('tabsTitle')} caption={tr('tabsCaption')}>
         <OptionCards
@@ -87,22 +72,6 @@ export function SettingsTopic() {
             { title: tr('cardEditor'), text: tr('cardEditorText') },
           ]}
         />
-      </HelpSection>
-
-      <HelpSection title={tr('firstRunTitle')} caption={tr('firstRunCaption')}>
-        <Stack gap="var(--spacing-xs)">
-          <StepList
-            steps={[
-              { title: tr('firstRunStep1'), text: tr('firstRunStep1Text') },
-              { title: tr('firstRunStep2'), text: tr('firstRunStep2Text') },
-              { title: tr('firstRunStep3'), text: tr('firstRunStep3Text') },
-              { title: tr('firstRunStep4'), text: tr('firstRunStep4Text') },
-            ]}
-          />
-          <Callout tone="info" title={tr('firstRunReturnTitle')}>
-            {tr('firstRunReturnText')}
-          </Callout>
-        </Stack>
       </HelpSection>
 
       <HelpSection title={tr('credsTitle')} caption={tr('credsCaption')}>
@@ -205,8 +174,8 @@ export function SettingsTopic() {
       <HelpSection title={tr('fieldsTitle')}>
         <FieldTable
           caption={tr('fieldsCaption')}
-          nameHeader={t('help.common.fieldName')}
-          descriptionHeader={t('help.common.fieldPurpose')}
+          nameHeader={common('fieldName')}
+          descriptionHeader={common('fieldPurpose')}
           rows={[
             { name: 'theme', description: tr('fieldTheme') },
             { name: 'language', description: tr('fieldLanguage') },

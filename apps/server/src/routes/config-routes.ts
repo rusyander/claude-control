@@ -15,7 +15,8 @@ import {
 } from '../lib/credentials.ts';
 import { buildOverview } from '../domains/overview.ts';
 import { readAccount } from '../domains/account.ts';
-import { forgetOrphanPlatforms } from '../domains/platform/store.ts';
+import { forgetOrphanPlatforms, withLegacyConsumers } from '../domains/platform/store.ts';
+import { reconcileActivePlatform } from '../domains/platform/activation.ts';
 import { reconcileManagedProfiles } from '../domains/platform/apply/profile.ts';
 import { rollbackContour, type ContourRollbackDeps } from '../domains/platform/apply/rollback.ts';
 import {
@@ -143,6 +144,15 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     }
 
     const { claudeDirOverride, ...patch }: Partial<AppSettings> = parsed.data;
+    // Контур, приехавший с панели ДО Т3, поля потребителей не знает, а схема
+    // подставила ему пустой список — то есть «никуда не подключён». Возвращаем
+    // прежнее поведение по сырому телу, пока ещё видно, было поле или нет.
+    if (patch.platforms) {
+      patch.platforms = withLegacyConsumers(
+        (pre as { platforms?: unknown } | null)?.platforms,
+        patch.platforms,
+      );
+    }
     // Смена каталога через настройки применяется сразу же, а не после перезапуска.
     // Сначала переезд, потом память: отказанный путь не должен осесть в
     // настройках (раньше PATCH с несуществующим каталогом отвечал 200, и
@@ -178,6 +188,12 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       for (const id of forgetOrphanPlatforms(ctx.store, ctx.location.paths.appData)) {
         rollbackContour(rollbackDeps(), id);
       }
+      // Тумблеры в пришедшем списке — не решение о том, через какой контур идёт
+      // работа: это решение принимает активация, и только она (инвариант 1).
+      // Общий патч настроек тумблер трогать вправе, но итог обязан сойтись к
+      // активному контуру — иначе шлюз обслуживал бы контур, который панель
+      // называет выключенным.
+      reconcileActivePlatform(ctx.store);
     }
     // Управляемые профили эндпоинтов — вторая такая же зависимость, и сверка
     // нужна ещё и при смене НАСТРОЕК ШЛЮЗА: сменившийся порт оставил бы в
@@ -206,7 +222,22 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       });
     }
 
-    ctx.store.importState(parsed.data);
+    // Тот же возврат прежнего поведения, что и в PATCH: снимок со старой панели
+    // поля потребителей не знает, и записанный пустым список отключил бы
+    // перенесённый контур от ассистента молча (см. `withLegacyConsumers`).
+    const raw = request.body as { settings?: { platforms?: unknown } } | null;
+    const incoming = parsed.data.settings?.platforms;
+    const state = incoming
+      ? {
+          ...parsed.data,
+          settings: {
+            ...parsed.data.settings,
+            platforms: withLegacyConsumers(raw?.settings?.platforms, incoming),
+          },
+        }
+      : parsed.data;
+
+    ctx.store.importState(state);
     // Снимок принёс СВОЙ список контуров, а ключи остались от прежнего: те, чьих
     // контуров в снимке нет, стали бы секретами без владельца — панель их больше
     // не показывает, значит и стереть их было бы уже нечем.
@@ -215,6 +246,10 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       // контур. Уходящий контур забирает своё применение с собой.
       rollbackContour(rollbackDeps(), id);
     }
+    // Снимок принёс тумблеры контуров чужой машины, где активным был другой.
+    // Без сведения здесь включённых оказалось бы двое: шлюз обслуживал бы обоих,
+    // а карточка одного из них называла бы его неактивным (инвариант 1).
+    reconcileActivePlatform(ctx.store);
     // Профили, порождённые контурами: снимок принёс свои и мог не принести
     // прежних. Управляемый профиль без контура указывает на маршрут шлюза,
     // которого нет, — сверка убирает его вместе с выбором ассистента.

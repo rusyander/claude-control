@@ -335,13 +335,22 @@ sent a corporate request to whatever process had occupied it. Configs applied BE
 old address: the plan shows it as a conflict, and a re-apply WITH the target's overwrite tick closes
 it — a conflict is never overwritten silently.
 
-**An agent through a contour does not edit files, and its MCP servers are invisible** — not a
-misconfiguration and not fixable here (`no-client-tools`): the platform assembles the tool set itself,
-by model, skill and key owner, runs it on its own side, and its public schema DROPS the client's
-tools field as an extra key. Faking tool calls through the prompt text is a homemade protocol over a
-foreign one and is refused deliberately. Agent work keeps going through the CLI's own key; a contour
-carries what needs no tools plus the platform's own agents. Detail: help «Контур»
-(`pages/Help/topics/Platform*`), [docs/PLATFORM.ru.md](docs/PLATFORM.ru.md),
+**An agent through a contour edits files, but a call the model wrote is ignored** — the shim, and its
+grammar is deliberately narrower than "looks like a call". The contour still DROPS the client's tools
+field as an extra key (`no-client-tools`), so the panel declares them as protocol TEXT and reassembles
+the call out of the answer (`gateway/tool-shim/`, on by default, switch on the contour). Executed:
+a block in the protocol tags, and an answer that is ENTIRELY one call — that second form is what a
+mid-size model actually returns. NEVER executed: a call inside a code fence, or an object with text
+around it. That is not strictness for its own sake — a fence is also how a quoted protocol and a
+documentation file the agent just READ arrive, and a live run on 12.09.2026 had the real `claude.exe`
+write a file out of a block the model had explicitly marked "do not run, this is an example". Every
+non-executed block is NAMED in the request trace (`toolFlaws`), so «вызовов не было» never reads as a
+broken panel. The model may also just describe the action instead of calling — flagged, never blocked,
+and the flag stays silent on a turn whose history already holds a call. Proof is
+`node tools/qa/check-tool-shim.mjs`: the REAL CLI through the real gateway, five runs (tags, whole-answer
+fence, fenced example, shim off), and the file on disk is the only evidence that cannot be faked by
+parsing. Detail: help «Контур» (`pages/Help/topics/Platform*`),
+[docs/PLATFORM.ru.md](docs/PLATFORM.ru.md),
 [.agent/code-map-platform.agent.md](.agent/code-map-platform.agent.md).
 
 ## Working rules
@@ -349,7 +358,9 @@ carries what needs no tools plus the platform's own agents. Detail: help «Ко�
 - Verify by running, not by reasoning — `tools/qa/` drives the real UI per area.
 - Never repeat failed logins (brute-force lockouts).
 - Help is part of the code: documents `pages/Help/topics/*.tsx`, texts
-  `shared/config/i18n/help/{ru,en}.ts`. Change a section's behaviour → change its help document —
+  `shared/config/i18n/help/{ru,en}/topics/<topic>.ts` (one module per topic, carrying that topic's
+  shot and diagram captions too; `{ru,en}.ts` are only the composers, and `en` stays typed against
+  `ru` per topic). Change a section's behaviour → change its help document —
   the user reads help inside the panel, drift here beats a stale README in damage. New document =
   entry in `HELP_GROUPS` + component beside it; index, `?topic=`, "?" button and next-section link
   follow automatically.
@@ -373,7 +384,11 @@ gate runs unattended: pre-commit (husky + lint-staged: eslint, prettier check, L
 `tools/check-lf.mjs`) and `.github/workflows/ci.yml` (format:check → type-check → lint → test →
 depcruise, plus mobile type-check + tests). Touched help → also `node tools/qa/check-help.mjs`: it looks for on-page
 `help.…` strings, i.e. a key called under a name that doesn't exist (`tsc` checks the dictionary, not
-call sites).
+call sites). Touched the contour (`domains/platform/**`) → also `node tools/qa/check-platform-wire.mjs`:
+it boots its own throwaway panel plus `tools/qa/stub-platform.mjs` as the upstream and drives the whole
+socket path client → gateway → contour, so it needs no stand and no installed CLI. Everything else
+about the contour is proved on frames built inside the test that reads them — green there is compatible
+with nothing passing over a real wire.
 
 ## Layer boundaries — checked, not just described
 

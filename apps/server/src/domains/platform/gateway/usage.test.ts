@@ -53,6 +53,10 @@ describe('журнал шлюза', () => {
         interrupted: false,
         unknownFrames: [],
         lost: [],
+        shimmed: [],
+        toolCalls: 0,
+        toolFlaws: [],
+        claimedWithoutCall: false,
         totalTokens: 0,
       });
     }
@@ -78,6 +82,10 @@ describe('журнал шлюза', () => {
       interrupted: false,
       unknownFrames: [],
       lost: [],
+      shimmed: [],
+      toolCalls: 0,
+      toolFlaws: [],
+      claimedWithoutCall: false,
       totalTokens: 0,
     };
     journal.addEvent({ ...base, status: 200 });

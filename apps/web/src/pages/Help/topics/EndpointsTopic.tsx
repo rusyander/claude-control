@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, StepList } from '../ui';
+import { HelpSection, StorageCard, FieldTable, Callout, OptionCards } from '../ui';
+import { EndpointsGuideSections } from './EndpointsGuideSections';
+import { EndpointsLimitsSections } from './EndpointsLimitsSections';
 
 /**
  * Документ «Свой эндпоинт» — второй сквозной после «Провайдеров»: блок стоит в
@@ -10,14 +12,23 @@ import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, StepList } 
  * `endpointConfig` каталога провайдеров. Дублирование намеренное: в коде лежат
  * имена переменных, здесь — причина, по которой у соседа их нет. Меняется
  * `endpointConfig` — правится эта таблица.
+ *
+ * Рукописных шагов заведения профиля здесь больше нет: те же шаги показаны
+ * кадрами настоящего блока в `EndpointsGuideSections`.
  */
 export function EndpointsTopic() {
   const { t } = useTranslation();
   const tr = (key: string): string => t(`help.topics.endpoints.${key}`);
+  const common = (key: string): string => t(`help.common.${key}`);
 
   return (
     <>
-      <HelpSection title={t('help.common.whyTitle')}>
+      {/* Документ длинный: первым делом он говорит, из чего состоит. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
+      <HelpSection title={common('whyTitle')}>
         <OptionCards
           items={[
             { title: tr('whyLocal'), text: tr('whyLocalText') },
@@ -27,17 +38,9 @@ export function EndpointsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('stepsTitle')} caption={tr('stepsCaption')}>
-        <StepList
-          steps={[
-            { title: tr('step1'), text: tr('step1Text') },
-            { title: tr('step2'), text: tr('step2Text') },
-            { title: tr('step3'), text: tr('step3Text') },
-            { title: tr('step4'), text: tr('step4Text') },
-            { title: tr('step5'), text: tr('step5Text') },
-          ]}
-        />
-      </HelpSection>
+      <EndpointsGuideSections tr={tr} />
+
+      <EndpointsLimitsSections tr={tr} common={common} />
 
       <HelpSection title={tr('kindTitle')} caption={tr('kindCaption')}>
         <FieldTable
@@ -111,7 +114,7 @@ export function EndpointsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={t('help.common.storageTitle')} caption={tr('filesCaption')}>
+      <HelpSection title={tr('filesTitle')} caption={tr('filesCaption')}>
         <Stack gap="var(--spacing-xs)">
           <StorageCard
             title={tr('filePanelTitle')}

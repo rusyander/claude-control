@@ -27,7 +27,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario } from './kit.mjs';
+import { openScenario, applyShotLanguage, shotLanguage } from './kit.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5194);
@@ -205,6 +205,11 @@ try {
     throw new Error('одноразовая панель не поднялась');
   console.log(`панель на ${PANEL}`);
 
+  // Язык — до первого кадра и через настройки панели, а не через i18n в
+  // странице: кадр должен доказывать тот путь, по которому язык приходит
+  // человеку. `GUIDE_LANG=en` → английские кадры рядом с русскими.
+  await applyShotLanguage(PANEL);
+
   started.push(
     spawn(
       process.execPath,
@@ -244,7 +249,7 @@ async function shoot() {
 
     // Свежая панель встречает мастером онбординга. Он закрывается по-настоящему:
     // подменять на съёмке нечего — кадры должны быть тем, что человек увидит сам.
-    const skip = page.getByRole('button', { name: 'Пропустить' });
+    const skip = page.getByRole('button', { name: /^(Пропустить|Skip)$/ });
     if (await skip.count()) {
       await skip.first().click();
       await page.waitForTimeout(1200);
@@ -288,53 +293,82 @@ async function workspace(page) {
 
   // Шаг 1 онбординга заводит окружение `local` «Локальное» — настоящей записью
   // в environments.json, а не отметкой на экране.
-  await main.getByRole('button', { name: 'Добавить окружение' }).first().click();
+  await main
+    .getByRole('button', { name: /^(Добавить окружение|Add an environment)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(1800);
   await scenario.shot(page, '02-environment');
 
   // ── Группа ────────────────────────────────────────────────────────────────
-  await main.getByRole('button', { name: 'Новая группа' }).first().click();
+  await main
+    .getByRole('button', { name: /^(Новая группа|New group)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(600);
-  await page.getByLabel('Идентификатор').fill(GROUP);
+  await page.getByLabel(/^(Идентификатор|Identifier)$/).fill(GROUP);
   await page.waitForTimeout(300);
   await scenario.shot(page, '03-group', { clip: '[role="dialog"]' });
-  await page.getByRole('button', { name: 'Сохранить' }).first().click();
+  await page
+    .getByRole('button', { name: /^(Сохранить|Save)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(1800);
 
   // ── Первый кейс руками ────────────────────────────────────────────────────
   // Окно кейса выше экрана: на 900px под срез уходят шаги, ради которых кейс и
   // заводят, и кадр обещал бы меньше, чем форма просит.
   await page.setViewportSize({ width: 1440, height: 1500 });
-  await main.getByRole('button', { name: 'Добавить тест' }).first().click();
+  await main
+    .getByRole('button', { name: /^(Добавить тест|Add a test)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(800);
 
   const editor = page.getByRole('dialog').first();
-  await editor.getByLabel('Что проверяем').fill('Товар добавляется в корзину');
+  await editor.getByLabel(/^(Что проверяем|What we check)$/).fill('Товар добавляется в корзину');
   await editor
-    .getByLabel('Зачем')
+    .getByLabel(/^(Зачем|Why)$/)
     .fill('Корзина — вход в оплату: без неё не проверить ничего дальше');
-  await editor.getByLabel('Зона', { exact: true }).fill('Корзина');
-  await editor.getByLabel('Секция').fill('Корзина/Добавление');
-  await editor.getByLabel('Минут').fill('4');
-  await editor.getByLabel('Важность').selectOption({ label: 'высокая' });
-  await editor.getByLabel('Предусловие').fill('Каталог открыт, пользователь не входил');
+  await editor.getByLabel(/^(Зона|Area)$/).fill('Корзина');
+  await editor.getByLabel(/^(Секция|Section)$/).fill('Корзина/Добавление');
+  await editor.getByLabel(/^(Минут|Minutes)$/).fill('4');
+  await editor
+    .getByLabel(/^(Важность|Priority)$/)
+    .selectOption({ label: shotLanguage() === 'en' ? 'high' : 'высокая' });
+  await editor
+    .getByLabel(/^(Предусловие|Precondition)$/)
+    .fill('Каталог открыт, пользователь не входил');
 
   // Поле шага ищется ролью: подпись «Шаг 1» носят ещё и кнопки «поднять»,
   // «опустить» и «удалить» этого же шага.
-  await editor.getByRole('textbox', { name: 'Шаг 1' }).fill('Открыть карточку товара');
-  await editor.getByLabel('Ожидание шага').nth(0).fill('Кнопка «В корзину» активна');
-  await editor.getByRole('button', { name: 'Добавить шаг' }).click();
+  await editor.getByRole('textbox', { name: /^(Шаг 1|Step 1)$/ }).fill('Открыть карточку товара');
+  await editor
+    .getByLabel(/^(Ожидание шага|Step expectation)$/)
+    .nth(0)
+    .fill('Кнопка «В корзину» активна');
+  await editor.getByRole('button', { name: /^(Добавить шаг|Add a step)$/ }).click();
   await page.waitForTimeout(400);
-  await editor.getByRole('textbox', { name: 'Шаг 2' }).fill('Нажать «В корзину»');
-  await editor.getByLabel('Ожидание шага').nth(1).fill('Счётчик корзины стал 1');
+  await editor.getByRole('textbox', { name: /^(Шаг 2|Step 2)$/ }).fill('Нажать «В корзину»');
+  await editor
+    .getByLabel(/^(Ожидание шага|Step expectation)$/)
+    .nth(1)
+    .fill('Счётчик корзины стал 1');
 
-  await editor.getByLabel('Ожидаемый результат').fill('В корзине один товар, сумма равна его цене');
-  await editor.getByLabel('Чем доказывается').fill('Счётчик в шапке и строка товара в корзине');
-  await editor.getByLabel('Теги').fill('корзина, дым');
+  await editor
+    .getByLabel(/^(Ожидаемый результат|Expected result)$/)
+    .fill('В корзине один товар, сумма равна его цене');
+  await editor
+    .getByLabel(/^(Чем доказывается|How it is proven)$/)
+    .fill('Счётчик в шапке и строка товара в корзине');
+  await editor.getByLabel(/^(Теги|Tags)$/).fill('корзина, дым');
   await page.waitForTimeout(500);
   await scenario.shot(page, '04-case', { clip: '[role="dialog"]' });
 
-  await editor.getByRole('button', { name: 'Сохранить' }).first().click();
+  await editor
+    .getByRole('button', { name: /^(Сохранить|Save)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(2000);
   await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -345,10 +379,13 @@ async function workspace(page) {
   await scenario.shot(page, '05-library');
 
   // ── Ручной проход ─────────────────────────────────────────────────────────
-  await main.getByLabel('Отметить все показанные').first().check();
+  await main
+    .getByLabel(/^(Отметить все показанные|Select everything shown)$/)
+    .first()
+    .check();
   await page.waitForTimeout(600);
   await main
-    .getByRole('button', { name: /Пройти руками/ })
+    .getByRole('button', { name: /^(Пройти руками|Run( it)? manually)/ })
     .first()
     .click();
   await page.waitForTimeout(3000);
@@ -373,13 +410,18 @@ async function workspace(page) {
   // кейсе, который на экране, иначе кадр учит выдуманному примеру.
   const step2 = runner
     .locator('li')
-    .filter({ has: page.getByLabel('Заметка к шагу 2') })
+    .filter({ has: page.getByLabel(/^(Заметка к шагу 2|Note on step 2)$/) })
     .first();
-  await step2.getByRole('button', { name: 'провален' }).first().click();
+  await step2
+    .getByRole('button', { name: /^(провален|failed)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(400);
-  await page.getByLabel('Заметка к шагу 2').fill('Количество осталось 1, сумма не пересчиталась');
   await page
-    .getByLabel(/Что получилось/)
+    .getByLabel(/^(Заметка к шагу 2|Note on step 2)$/)
+    .fill('Количество осталось 1, сумма не пересчиталась');
+  await page
+    .getByLabel(/^(Что получилось|What actually happened)/)
     .fill('Кнопка «плюс» не увеличивает количество: сумма заказа остаётся прежней');
   await page.waitForTimeout(600);
   await scenario.shot(page, '07-runner-failed', { clip: '[role="dialog"]' });
@@ -390,7 +432,10 @@ async function workspace(page) {
   await verdict('1');
   await verdict('1');
 
-  await runner.getByRole('button', { name: 'Завершить' }).first().click();
+  await runner
+    .getByRole('button', { name: /^(Завершить|Finish)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(2500);
 
   await openTests(page);
@@ -415,7 +460,10 @@ async function health(page) {
 
   // ── Отбор по правкам на чистом дереве ─────────────────────────────────────
   await openTests(page);
-  await main.getByRole('button', { name: 'Только изменённое' }).first().click();
+  await main
+    .getByRole('button', { name: /^(Только изменённое|Changed only)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(2500);
   await scenario.shot(page, '01-changed-only');
 
@@ -424,15 +472,21 @@ async function health(page) {
   // Галочка строки подписана названием кейса — по нему её и находят.
   await main.getByLabel('Количество товара в корзине меняется').first().check();
   await page.waitForTimeout(600);
-  await main.getByLabel('Действие').first().selectOption({ label: 'в карантин' });
+  await main
+    .getByLabel(/^(Действие|Action)$/)
+    .first()
+    .selectOption({ label: shotLanguage() === 'en' ? 'quarantine' : 'в карантин' });
   await page.waitForTimeout(400);
   await main
-    .getByLabel('Причина карантина')
+    .getByLabel(/^(Причина карантина|Quarantine reason)$/)
     .fill('Ждём починки пересчёта суммы, дефект SHOP-31 открыт');
   await page.waitForTimeout(400);
   await scenario.shot(page, '02-quarantine');
 
-  await main.getByRole('button', { name: 'Применить' }).first().click();
+  await main
+    .getByRole('button', { name: /^(Применить|Apply)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(2200);
   await scenario.shot(page, '03-muted');
 
@@ -440,11 +494,17 @@ async function health(page) {
   // Два кадра, а не один: «отдаём или нет» и «чем это доказано» — разные
   // вопросы, и карточки под них стоят на странице далеко друг от друга.
   await openTests(page, 'report');
-  await main.getByText('Готовность релиза').first().scrollIntoViewIfNeeded();
+  await main
+    .getByText(/^(Готовность релиза|Release readiness)$/)
+    .first()
+    .scrollIntoViewIfNeeded();
   await page.waitForTimeout(1200);
   await scenario.shot(page, '04-release');
 
-  await main.getByText('Карантин и устаревание').first().scrollIntoViewIfNeeded();
+  await main
+    .getByText(/^(Карантин и устаревание|Quarantine and ageing)$/)
+    .first()
+    .scrollIntoViewIfNeeded();
   await page.waitForTimeout(1200);
   await scenario.shot(page, '05-health');
 
@@ -471,11 +531,20 @@ async function health(page) {
   );
 
   await openTests(page);
-  await main.getByRole('button', { name: 'Обмен' }).first().click();
+  await main
+    .getByRole('button', { name: /^(Обмен|Exchange)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(900);
   const modal = page.getByRole('dialog').first();
-  await modal.getByLabel('Файл в проекте').first().fill('test-results/junit.xml');
-  await modal.getByRole('button', { name: 'Взять из проекта' }).first().click();
+  await modal
+    .getByLabel(/^(Файл в проекте|File in the project)$/)
+    .first()
+    .fill('test-results/junit.xml');
+  await modal
+    .getByRole('button', { name: /^(Взять из проекта|Take from the project)$/ })
+    .first()
+    .click();
   await page.waitForTimeout(3000);
   await scenario.shot(page, '07-exchange', { clip: '[role="dialog"]' });
 

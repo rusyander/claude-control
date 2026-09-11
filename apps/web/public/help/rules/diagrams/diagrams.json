@@ -1,0 +1,24 @@
+{
+  "topic": "rules",
+  "source": "docs/diagrams/rules-guide/rules-guide.drawio",
+  "pages": [
+    {
+      "name": "rule-round-trip",
+      "file": "rule-round-trip.png",
+      "page": 1,
+      "source": "bf9ae498a650ff49",
+      "width": 1377,
+      "height": 1338,
+      "exportedAt": "2026-09-11T14:33:58.210Z"
+    },
+    {
+      "name": "rule-states",
+      "file": "rule-states.png",
+      "page": 2,
+      "source": "39031d9256b62ff6",
+      "width": 1378,
+      "height": 908,
+      "exportedAt": "2026-09-11T14:34:01.324Z"
+    }
+  ]
+}

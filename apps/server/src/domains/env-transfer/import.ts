@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, resolve, sep } from 'node:path';
 import type { Platform } from '@agentdeck/contracts';
+import type { PromptOverride } from '@agentdeck/contracts/prompts';
 import type { ConfigProvider } from '../../providers/types.ts';
 import {
   readJsonFile,
@@ -13,6 +14,7 @@ import { archiveError, type ArchiveManifest, type ParsedArchive } from './archiv
 import { sha256 } from './collect.ts';
 import { providerLocations } from './locations.ts';
 import { planPanelPlatforms, type PanelPlatformsPlan } from './platforms.ts';
+import { planPanelPrompts, type PanelPromptsPlan } from './prompts.ts';
 
 /**
  * Разворот архива окружения на этой машине.
@@ -61,6 +63,12 @@ export interface ImportPlan {
    * Отсутствует — контуров в архиве нет.
    */
   platforms?: PanelPlatformsPlan;
+  /**
+   * Правки промптов из архива — по той же причине отдельной секцией: файла
+   * провайдера у них нет, они живут в каталоге данных панели. Отсутствует —
+   * человек на прежней машине не правил ни одного промпта.
+   */
+  prompts?: PanelPromptsPlan;
 }
 
 export interface ImportSummary {
@@ -86,6 +94,8 @@ export interface PanelContext {
   hasToken: (id: string) => boolean;
   /** Проверка пути сертификата; по умолчанию — обычное существование файла. */
   fileExists?: (path: string) => boolean;
+  /** Правки промптов, уже сделанные здесь. Нет поля — секция промптов не считается. */
+  prompts?: PromptOverride[];
 }
 
 export function planEnvironmentImport(
@@ -146,7 +156,27 @@ export function planEnvironmentImport(
     },
     checklist: parsed.manifest.checklist,
     ...planPlatformsSection(parsed, panel),
+    ...planPromptsSection(parsed, panel),
   };
+}
+
+/**
+ * Секция промптов плана. Молчит ровно в тех же двух случаях, что и секция
+ * контуров: архив её не несёт или вызывающая сторона не дала контекст этой
+ * машины — тогда «новая правка или другая» ответить нечем.
+ */
+function planPromptsSection(
+  parsed: ParsedArchive,
+  panel?: PanelContext,
+): { prompts?: PanelPromptsPlan } {
+  const archivePath = parsed.manifest.panelPrompts?.archivePath;
+  if (!archivePath || !panel?.prompts) return {};
+
+  const plan = planPanelPrompts({
+    data: parsed.files.get(archivePath),
+    current: panel.prompts,
+  });
+  return plan.entries.length > 0 || plan.problem ? { prompts: plan } : {};
 }
 
 /**

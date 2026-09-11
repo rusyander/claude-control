@@ -24,6 +24,23 @@ export interface EnvTransferPlatformsPlan {
   problem?: string;
 }
 
+/**
+ * Правка промпта в архиве. Встроенных текстов здесь нет вовсе: они приезжают
+ * вместе с панелью, и архив везёт только разницу.
+ */
+export interface EnvTransferPromptEntry {
+  id: string;
+  status: 'new' | 'same' | 'differs';
+  bytes: number;
+  /** Промпта с таким идентификатором в этой панели нет — записать его некуда. */
+  unknown: boolean;
+}
+
+export interface EnvTransferPromptsPlan {
+  entries: EnvTransferPromptEntry[];
+  problem?: string;
+}
+
 export interface EnvTransferSkipped {
   sourcePath: string;
   reason: string;
@@ -74,4 +91,6 @@ export interface EnvTransferPlan {
   checklist: EnvTransferChecklistItem[];
   /** Секции нет — контуров в архиве не было. */
   platforms?: EnvTransferPlatformsPlan;
+  /** Секции нет — на прежней машине не правили ни одного промпта. */
+  prompts?: EnvTransferPromptsPlan;
 }

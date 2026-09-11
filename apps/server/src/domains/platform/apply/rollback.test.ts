@@ -30,8 +30,13 @@ const PLATFORM: Platform = {
   capabilities: [],
   targets: [],
   projectPaths: [],
+  // Откат проверяется после применения, а применение (Т3) идёт только при
+  // включённых потребителях — иначе снимать было бы нечего.
+  consumers: ['assistant', 'terminal'],
   agents: [],
   budgetSince: '',
+  toolShim: true,
+  contourPrompt: true,
   caCertPath: '',
 };
 

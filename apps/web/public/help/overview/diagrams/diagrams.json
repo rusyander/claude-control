@@ -1,0 +1,15 @@
+{
+  "topic": "overview",
+  "source": "docs/diagrams/overview-guide/overview-guide.drawio",
+  "pages": [
+    {
+      "name": "where-numbers-come-from",
+      "file": "where-numbers-come-from.png",
+      "page": 1,
+      "source": "69db056bfde3638d",
+      "width": 1477,
+      "height": 918,
+      "exportedAt": "2026-09-11T15:02:31.569Z"
+    }
+  ]
+}

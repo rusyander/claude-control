@@ -211,6 +211,66 @@ describe('ChatRunRegistry', () => {
 });
 
 /**
+ * Маршрут контура (Т3) со стороны реестра: кого он спрашивает, что кладёт в
+ * параметры прогона и что рассказывает о завершившемся.
+ *
+ * Проверяется здесь потому, что происхождение прогона выбирается ИМЕННО тут:
+ * работа группы, у которой оно потерялось, спрашивала маршрут как «чат» — то
+ * есть меняла провайдера посреди цепочки, и ни один тест этого не видел.
+ */
+describe('ChatRunRegistry — происхождение прогона и маршрут контура', () => {
+  let fake: FakeRun;
+  let registry: ChatRunRegistry;
+  const asked: string[] = [];
+
+  beforeEach(() => {
+    asked.length = 0;
+    fake = new FakeRun();
+    registry = new ChatRunRegistry(() => fake);
+    registry.setPlatformRouting((origin) => {
+      asked.push(origin);
+      const env: Record<string, string> =
+        origin === 'groups' ? { ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/contour' } : {};
+      return { env };
+    });
+  });
+
+  it('маршрут спрашивается происхождением из меты, а не «чатом» по умолчанию', () => {
+    registry.start('c1', OPTIONS, { origin: 'groups' });
+    expect(asked).toEqual(['groups']);
+    expect(registry.describe('c1')?.options.platformEnv).toEqual({
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/contour',
+    });
+  });
+
+  it('происхождения нет — спрашивается «чат», и адрес прошлой жизни затирается', () => {
+    registry.start(
+      'c2',
+      { ...OPTIONS, platformEnv: { ANTHROPIC_BASE_URL: 'http://127.0.0.1:1/stale' } },
+      {},
+    );
+    expect(asked).toEqual(['chat']);
+    expect(registry.describe('c2')?.options.platformEnv).toEqual({});
+  });
+
+  it('завершившийся прогон рассказывает планировщику своё происхождение', async () => {
+    const seen: (string | undefined)[] = [];
+    registry.setHandoffPlanner((finished) => {
+      seen.push(finished.origin);
+      return undefined;
+    });
+
+    registry.start('c3', OPTIONS, { origin: 'groups' });
+    fake.finish();
+    await flush();
+
+    // Без этого звено конвейера и продолжение в чистой сессии заводились бы
+    // «чатом»: они собирают свою мету от ЭТОГО прогона.
+    expect(seen).toEqual(['groups']);
+  });
+});
+
+/**
  * Счётчик расхода за сеанс сервера. Ключевое (по ТЗ): накопление идёт на
  * сервере (переживает F5 вкладки), а переподключение с догоном буфера НЕ должно
  * считать токены/деньги повторно — накопление привязано к генерации события, а

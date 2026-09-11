@@ -1,15 +1,43 @@
 import { useTranslation } from 'react-i18next';
-import { Stack } from '@shared/ui/stack';
-import { FlowDiagram } from '@shared/ui/diagram';
-import { HelpSection, StorageCard, FieldTable, Callout, CapabilityGrid, OptionCards } from '../ui';
+import { HelpSection, StorageCard, FieldTable, Callout, OptionCards } from '../ui';
+import { SkillsGuideSections } from './SkillsGuideSections';
+import { SkillsLimitsSections } from './SkillsLimitsSections';
 
-/** Документ раздела «Скиллы». */
+/**
+ * Документ раздела «Скиллы».
+ *
+ * Порядок тот же, что у «Правил»: зачем это нужно → чем это НЕ является → как
+ * устроено и весь путь в снимках → что уходит на диск → описание и структура →
+ * поля → границы, тонкости и отмена.
+ *
+ * Раньше документ был перечнем возможностей и двумя нарисованными схемами:
+ * человек читал, ЧТО умеет раздел, и не видел ни одного экрана, пока не
+ * открывал панель. Теперь середина — настоящие кадры двух путей, снятые на
+ * отдельной панели с временным каталогом настроек, и каждый шаг назван
+ * значениями из своего кадра.
+ *
+ * Блок «Чем это НЕ является» стоит вторым намеренно: скиллы путают с правилами,
+ * разделом «Команды», скиллами плагина и проектными скиллами, и человек,
+ * попавший не в тот раздел, не узнает об этом ни из одного снимка.
+ *
+ * Соседние файлы — не «вынесенные куски», а разделы со своей работой:
+ * `SkillsGuideSections` держит схемы и оба пути в снимках,
+ * `SkillsLimitsSections` — границы, числа, отказы и отмену.
+ */
 export function SkillsTopic() {
   const { t } = useTranslation();
+  // Ключи этого документа лежат под своим префиксом — короткий хелпер
+  // избавляет от него в каждой строке.
   const tr = (key: string): string => t(`help.topics.skills.${key}`);
 
   return (
     <>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards
           items={[
@@ -20,6 +48,20 @@ export function SkillsTopic() {
         />
       </HelpSection>
 
+      <HelpSection title={tr('diffTitle')} caption={tr('diffCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('diffRules'), text: tr('diffRulesText') },
+            { title: tr('diffCommands'), text: tr('diffCommandsText') },
+            { title: tr('diffPlugins'), text: tr('diffPluginsText') },
+            { title: tr('diffProject'), text: tr('diffProjectText') },
+          ]}
+        />
+      </HelpSection>
+
+      <SkillsGuideSections tr={tr} />
+
       <HelpSection title={t('help.common.storageTitle')}>
         <StorageCard
           title={tr('title')}
@@ -28,65 +70,18 @@ export function SkillsTopic() {
             { label: tr('storageMain'), value: tr('storageMainValue') },
             { label: tr('storageDisabled'), value: '~/.claude/skills-disabled/', isMono: true },
             { label: tr('storageOff'), value: tr('storageOffValue') },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('flowTitle')}
-          nodes={[
+            { label: tr('storageMarks'), value: tr('storageMarksValue') },
             {
-              id: 'folder',
-              label: tr('flowFolder'),
-              caption: tr('flowFolderCaption'),
-              tone: 'accent',
-              icon: 'folder',
-            },
-            {
-              id: 'desc',
-              label: tr('flowDescriptions'),
-              caption: tr('flowDescriptionsCaption'),
-              tone: 'info',
-              icon: 'search',
-            },
-            {
-              id: 'match',
-              label: tr('flowMatch'),
-              caption: tr('flowMatchCaption'),
-              tone: 'warning',
-              icon: 'check',
-            },
-            {
-              id: 'body',
-              label: tr('flowBody'),
-              caption: tr('flowBodyCaption'),
-              tone: 'success',
-              icon: 'skills',
+              label: tr('storageBackup'),
+              value: '~/.claude/agentdeck/backups/',
+              isMono: true,
             },
           ]}
         />
       </HelpSection>
 
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canCreate'),
-            tr('canRename'),
-            tr('canTree'),
-            tr('canAssistant'),
-            tr('canSearch'),
-            tr('canToggle'),
-            tr('canRestore'),
-            tr('canSandbox'),
-            tr('canLink'),
-          ]}
-          cant={[tr('cantAutoRead'), tr('cantGuarantee'), tr('cantVersions')]}
-        />
-      </HelpSection>
-
+      {/* Описание — единственное поле, от которого зависит, подключится скилл
+          или нет. Оно стоит сразу после диска и перед всем остальным. */}
       <HelpSection title={tr('descriptionTitle')} caption={tr('descriptionCaption')}>
         <OptionCards
           items={[
@@ -133,29 +128,6 @@ export function SkillsTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('offTitle')} caption={tr('offCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('offTitle')}
-          nodes={[
-            { id: 'toggle', label: tr('offToggle'), tone: 'warning', icon: 'close' },
-            {
-              id: 'move',
-              label: tr('offMove'),
-              caption: tr('offMoveCaption'),
-              isMono: true,
-              icon: 'folder',
-            },
-            {
-              id: 'result',
-              label: tr('offResult'),
-              caption: tr('offResultCaption'),
-              tone: 'info',
-              icon: 'eyeOff',
-            },
-          ]}
-        />
-      </HelpSection>
-
       <HelpSection title={tr('assistantTitle')} caption={tr('assistantCaption')}>
         <OptionCards
           minWidth={320}
@@ -167,25 +139,7 @@ export function SkillsTopic() {
         <Callout tone="info" title={tr('assistantNote')} />
       </HelpSection>
 
-      <HelpSection title={tr('notesTitle')}>
-        <Stack gap="var(--spacing-xs)">
-          <Callout tone="warning" title={tr('noteNestedTitle')}>
-            {tr('noteNestedText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteNameTitle')}>
-            {tr('noteNameText')}
-          </Callout>
-          <Callout tone="danger" title={tr('noteDeleteTitle')}>
-            {tr('noteDeleteText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteDescTitle')}>
-            {tr('noteDescText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteProviderTitle')}>
-            {tr('noteProviderText')}
-          </Callout>
-        </Stack>
-      </HelpSection>
+      <SkillsLimitsSections />
     </>
   );
 }

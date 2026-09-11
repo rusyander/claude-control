@@ -4,8 +4,8 @@ import { createCaFetch, type PlatformFetch } from './ca-fetch.ts';
 import { headerUnsafeKeyReason } from './errors.ts';
 import { foreignTail as tail, redactSecrets } from './redact.ts';
 import { driverFor } from './drivers/index.ts';
-import { KEY_REJECTED_DETAIL } from './gateway/status.ts';
 import type { PlatformDriver } from './drivers/driver.ts';
+import { bridgeUpstreamStatus } from './gateway/status.ts';
 
 /**
  * Проба контура: панель спрашивает у него СПИСОК МОДЕЛЕЙ.
@@ -111,10 +111,16 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
       outcome: 'unauthorized',
       detail:
         status === 401
-          ? // Тот же текст, что говорит шлюз: причин у 401 пять, и «перевыпустите
-            // ключ» отправляло бы человека с кончившимся бюджетом или моргнувшей
-            // сверкой владельца чинить не то.
-            `${KEY_REJECTED_DETAIL} (401).`
+          ? // Ровно тот текст, что скажет шлюз на тот же код, — и берётся он
+            // ТЕМ ЖЕ переводом отказа, а не поиском строки по манифесту с
+            // запасным литералом рядом. Запасной литерал здесь и был расхождением:
+            // общую фразу про 401 он повторял копией, и правка общей таблицы
+            // молча разводила кнопку «Проверить связь» с отказом шлюза. У
+            // платформа компании причин пять сразу («перевыпустите ключ» отправило бы
+            // человека с кончившимся бюджетом чинить не то), у произвольного
+            // шлюза панель их не знает и не выдумывает — оба случая уже решены
+            // одним переводом.
+            `${bridgeUpstreamStatus(401, {}, { driverRows: driver.statusRows }).message} (401).`
           : 'Ключу не разрешено то, что запросила панель (403). Проверьте права ключа.',
     };
   }

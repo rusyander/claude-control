@@ -1,0 +1,15 @@
+{
+  "topic": "integrations",
+  "source": "docs/diagrams/integrations-guide/integrations-guide.drawio",
+  "pages": [
+    {
+      "name": "who-calls-whom",
+      "file": "who-calls-whom.png",
+      "page": 1,
+      "source": "fff6ff327df0c57b",
+      "width": 1507,
+      "height": 968,
+      "exportedAt": "2026-09-11T15:25:18.768Z"
+    }
+  ]
+}

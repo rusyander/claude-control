@@ -1,4 +1,12 @@
 import type { DlpApiKind } from '../../dlp/api-shapes.ts';
+import type { DriverRequestField } from '../drivers/driver.ts';
+import {
+  encodeToolResult,
+  encodeToolUse,
+  shimOpenAiRequest,
+  toolNamesById,
+} from './tool-shim/encode.ts';
+import { readTools, systemAddendum, type ShimTool } from './tool-shim/protocol.ts';
 
 /**
  * Перевод диалектов: клиент говорит по-Anthropic, контур — по-OpenAI.
@@ -31,7 +39,13 @@ export type DialectFate =
   /** Переносится частично: часть смысла теряется, и она названа. */
   | 'lossy'
   /** Не переносится вовсе. */
-  | 'dropped';
+  | 'dropped'
+  /**
+   * Переносится ПРОСЛОЙКОЙ, текстом протокола (Т5). Не `mapped`: поля своего
+   * у контура по-прежнему нет, и человек должен читать в следе именно это —
+   * «доехало не полем, а текстом», иначе он ищет причину не там.
+   */
+  | 'shimmed';
 
 export interface DialectRow {
   /** Поле в диалекте Anthropic — то, что присылает клиент. */
@@ -41,6 +55,12 @@ export interface DialectRow {
   fate: DialectFate;
   /** Почему так. Этот текст панель показывает человеку не переводя. */
   note: string;
+  /**
+   * Что с полем делает ВКЛЮЧЁННАЯ прослойка инструментов. Есть только у трёх
+   * строк, и только у них судьба зависит от настройки: таблица обязана
+   * говорить правду в обоих состояниях, а не в том, которое было первым.
+   */
+  withShim?: { fate: DialectFate; note: string };
 }
 
 /**
@@ -98,12 +118,20 @@ export const DIALECT_TABLE: DialectRow[] = [
     openai: '',
     fate: 'dropped',
     note: 'свои инструменты контуру объявить нельзя: он подбирает их сам (`no-client-tools`)',
+    withShim: {
+      fate: 'shimmed',
+      note: 'схемы уезжают текстом в системную строку, вызов собирается обратно из ответа модели',
+    },
   },
   {
     anthropic: 'tool_choice',
     openai: '',
     fate: 'dropped',
     note: 'выбирать не из чего: набор инструментов не наш',
+    withShim: {
+      fate: 'shimmed',
+      note: 'наверх уходит `none`: свои инструменты платформы остаются выключенными, работает протокол прослойки',
+    },
   },
   {
     anthropic: 'thinking',
@@ -134,6 +162,18 @@ export const DIALECT_TABLE: DialectRow[] = [
     openai: '',
     fate: 'dropped',
     note: 'следы вызова инструментов уходят вместе с инструментами; пустая реплика не отправляется',
+    withShim: {
+      fate: 'shimmed',
+      note: 'вызов и его результат сворачиваются в текст того же протокола — история хода остаётся целой',
+    },
+  },
+  {
+    // Строка живёт только при включённой прослойке: без неё результат вызова не
+    // переносится целиком строкой выше, и терять внутри него нечего.
+    anthropic: 'content[].tool_result (внутри картинка)',
+    openai: 'messages[].content (только текст)',
+    fate: 'lossy',
+    note: 'картинку внутри результата инструмента текстовый протокол не переносит',
   },
   {
     anthropic: 'content[].text ← choices[].message.content',
@@ -156,50 +196,34 @@ export const DIALECT_TABLE: DialectRow[] = [
 ];
 
 /**
- * Что контур выбрасывает из запроса, написанного НА ЕГО ЖЕ диалекте.
- *
- * Мост здесь ни при чём: клиент говорит по-OpenAI, контур принимает по-OpenAI,
- * и переводить нечего — а половина полей всё равно не доезжает до модели
- * (справочник §5, `build_completion_kwargs`). Без этой таблицы след запроса от
- * codex или cursor честно показывал бы «перенеслось всё» ровно там, где молча
- * пропали инструменты, — то есть в самом важном случае.
- *
- * Названия полей здесь — имена диалекта OpenAI, а не наши: человек ищет их в
- * своём конфиге и в документации CLI.
- */
-export const OPENAI_DROPPED: DialectLoss[] = [
-  {
-    field: 'tools',
-    note: 'контур игнорирует схемы инструментов молча: он подбирает инструменты сам (`no-client-tools`)',
-  },
-  {
-    field: 'n',
-    note: 'принято схемой и потеряно: контур отдаёт один вариант ответа (справочник §5)',
-  },
-  { field: 'presence_penalty', note: 'принято схемой контура и до модели не доносится' },
-  { field: 'frequency_penalty', note: 'принято схемой контура и до модели не доносится' },
-  { field: 'user', note: 'принято схемой контура и до модели не доносится' },
-  {
-    field: 'response_format',
-    note: 'схемой контура не объявлено — пройдёт лишним ключом и исчезнет',
-  },
-  { field: 'seed', note: 'схемой контура не объявлено — пройдёт лишним ключом и исчезнет' },
-  { field: 'logprobs', note: 'схемой контура не объявлено — пройдёт лишним ключом и исчезнет' },
-  { field: 'logit_bias', note: 'схемой контура не объявлено — пройдёт лишним ключом и исчезнет' },
-];
-
-/**
  * Потери запроса в диалекте OpenAI: называются только РЕАЛЬНО присланные поля.
+ *
+ * ЧТО теряется — свойство платформы, а не моста: у произвольного совместимого
+ * шлюза `seed` и `response_format` работают по-настоящему, и назвать их
+ * потерей значило бы соврать про чужой шлюз. Поэтому список приходит манифестом
+ * драйвера; пусто — потерь не объявлено.
+ *
  * `tool_choice: "none"` потерей не считается — это единственное его значение,
  * которое у контура работает (выключает инструменты платформы).
  */
-export function openAiRequestLoss(body: Record<string, unknown>): DialectLoss[] {
-  const lost = OPENAI_DROPPED.filter((row) => body[row.field] !== undefined);
-  if (body.tool_choice !== undefined && body.tool_choice !== 'none') {
-    lost.push({
-      field: 'tool_choice',
-      note: 'у контура имеет смысл только «none»: набор инструментов не наш',
-    });
+export function openAiRequestLoss(
+  body: Record<string, unknown>,
+  fields: readonly DriverRequestField[],
+): DialectLoss[] {
+  // `lossy` попадает в след наравне с `dropped`: «доехало наполовину» человек
+  // должен видеть там же, где «не доехало вовсе», — иначе объявленная частичная
+  // потеря не видна нигде и отличается от невыполненного обещания только словом
+  // в манифесте.
+  const dropped = fields.filter(
+    (row) => row.dialect === 'openai' && (row.fate === 'dropped' || row.fate === 'lossy'),
+  );
+  const lost = dropped
+    .filter((row) => row.field !== 'tool_choice' && body[row.field] !== undefined)
+    .map((row) => ({ field: row.field, note: row.note }));
+
+  const toolChoice = dropped.find((row) => row.field === 'tool_choice');
+  if (toolChoice && body.tool_choice !== undefined && body.tool_choice !== 'none') {
+    lost.push({ field: 'tool_choice', note: toolChoice.note });
   }
   return lost;
 }
@@ -223,20 +247,50 @@ export interface TranslatedRequest {
   body: Record<string, unknown>;
   /** Что не перенеслось — по одной записи на РЕАЛЬНО встреченное поле. */
   lost: DialectLoss[];
+  /**
+   * Что перенесла прослойка (Т5): те же имена полей, но с другой судьбой.
+   * Отдельный список, а не строка в `lost`: «доехало текстом» и «не доехало» —
+   * разные новости, и смешать их значит либо напугать человека там, где всё
+   * работает, либо успокоить там, где агент без рук.
+   */
+  shimmed: string[];
+  /** Инструменты, объявленные клиентом: их именами проверяется ответ модели. */
+  tools: ShimTool[];
+}
+
+/** Прослойка инструментов включена: чем её кормить. */
+export interface ShimContext {
+  /** Текст протокола из каталога промптов (Т4). Здесь его копии нет и не будет. */
+  protocolText: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** Строка таблицы по имени поля Anthropic — чтобы текст потери был один. */
-function rowNote(anthropic: string): string {
+/**
+ * Строка таблицы по имени поля Anthropic — чтобы текст потери был один.
+ * Драйвер уточняет её своей: одно и то же поле у разных платформ теряется по
+ * разным причинам, и общая формулировка тогда врёт про одну из них.
+ */
+function rowNote(anthropic: string, fields: readonly DriverRequestField[] = []): string {
+  const override = fields.find(
+    // Уточнять можно только ПОТЕРЮ. Строка манифеста, объявившая поле
+    // перенесённым там, где мост его не переносит, иначе подписывала бы потерю
+    // текстом «контур это принимает» — то есть объясняла бы пропажу её
+    // отсутствием.
+    (row) =>
+      row.dialect === 'anthropic' &&
+      row.field === anthropic &&
+      (row.fate === 'dropped' || row.fate === 'lossy'),
+  );
+  if (override) return override.note;
   return DIALECT_TABLE.find((row) => row.anthropic === anthropic)?.note ?? '';
 }
 
-function lose(lost: DialectLoss[], field: string): void {
+function lose(lost: DialectLoss[], field: string, fields?: readonly DriverRequestField[]): void {
   if (lost.some((item) => item.field === field)) return;
-  lost.push({ field, note: rowNote(field) });
+  lost.push({ field, note: rowNote(field, fields) });
 }
 
 /** Часть содержимого в форме OpenAI: текст либо картинка. */
@@ -248,7 +302,7 @@ type OpenAiPart =
  * реплика из одних следов инструментов не отправляется вовсе, потому что
  * контур требует непустое содержимое у всех ролей, кроме assistant.
  */
-function blocksToParts(content: unknown, lost: DialectLoss[]): OpenAiPart[] {
+function blocksToParts(content: unknown, lost: DialectLoss[], fold?: FoldTraces): OpenAiPart[] {
   if (typeof content === 'string') return content ? [{ type: 'text', text: content }] : [];
   if (!Array.isArray(content)) return [];
 
@@ -275,7 +329,20 @@ function blocksToParts(content: unknown, lost: DialectLoss[]): OpenAiPart[] {
       continue;
     }
     if (block.type === 'tool_use' || block.type === 'tool_result') {
-      lose(lost, 'content[].tool_use / tool_result');
+      // Прослойка выключена — след вызова уходит вместе с инструментами.
+      if (!fold) {
+        lose(lost, 'content[].tool_use / tool_result');
+        continue;
+      }
+      if (block.type === 'tool_use' && typeof block.name === 'string') {
+        parts.push({ type: 'text', text: encodeToolUse(block.name, block.input) });
+        fold.shimmed();
+        continue;
+      }
+      const result = encodeToolResult(block, fold.names);
+      if (result.dropped) lose(lost, 'content[].tool_result (внутри картинка)');
+      parts.push({ type: 'text', text: result.text });
+      fold.shimmed();
       continue;
     }
     if (block.type === 'thinking' || block.type === 'redacted_thinking') {
@@ -315,18 +382,40 @@ function partsToContent(parts: OpenAiPart[]): string | OpenAiPart[] | undefined 
  * контур молча выбросит своей схемой (`extra='ignore'`), и разница между
  * «мы не послали» и «оно исчезло по дороге» стала бы невидимой.
  */
-export function anthropicRequestToOpenAi(input: unknown): TranslatedRequest {
+export function anthropicRequestToOpenAi(
+  input: unknown,
+  fields: readonly DriverRequestField[],
+  shim?: ShimContext,
+): TranslatedRequest {
   const lost: DialectLoss[] = [];
-  if (!isRecord(input)) return { body: {}, lost };
+  const shimmed: string[] = [];
+  if (!isRecord(input)) return { body: {}, lost, shimmed, tools: [] };
+
+  const tools = shim ? readTools(input.tools) : [];
+  // Свернуть следы вызовов можно только вместе с самими инструментами: без
+  // списка модель прочтёт `<tool_call>` прошлого хода как форму, которой её
+  // никто не учил, и повторит её наугад.
+  const fold: FoldTraces | undefined =
+    shim && tools.length > 0
+      ? {
+          names: toolNamesById(input.messages),
+          shimmed: () => noteShimmed(shimmed, 'content[].tool_use / tool_result'),
+        }
+      : undefined;
 
   const body: Record<string, unknown> = {};
   if (typeof input.model === 'string') body.model = input.model;
 
   const messages: Record<string, unknown>[] = [];
+  const addendum = shim ? systemAddendum(shim.protocolText, tools) : '';
 
-  if (input.system !== undefined) {
+  if (input.system !== undefined || addendum) {
     if (Array.isArray(input.system)) lose(lost, 'system[] (массив блоков)');
     const parts = blocksToParts(input.system, lost);
+    // Правила протокола дописываются ПОСЛЕ системной строки клиента: последнее
+    // в системном сообщении модель держит ближе всего к делу, а спорить с
+    // промптом CLI прослойке нечем — он длиннее её в сотню раз.
+    if (addendum) parts.push({ type: 'text', text: addendum });
     const content = partsToContent(parts);
     if (content !== undefined) messages.push({ role: 'system', content });
   }
@@ -335,7 +424,7 @@ export function anthropicRequestToOpenAi(input: unknown): TranslatedRequest {
     for (const message of input.messages) {
       if (!isRecord(message)) continue;
       const role = message.role === 'assistant' ? 'assistant' : 'user';
-      const content = partsToContent(blocksToParts(message.content, lost));
+      const content = partsToContent(blocksToParts(message.content, lost, fold));
       // Реплика, от которой после перевода ничего не осталось, не отправляется:
       // контур отвергает пустое содержимое у всех ролей, кроме assistant.
       if (content === undefined) continue;
@@ -354,12 +443,76 @@ export function anthropicRequestToOpenAi(input: unknown): TranslatedRequest {
     lose(lost, 'metadata.user_id');
   }
 
-  if (input.top_k !== undefined) lose(lost, 'top_k');
-  if (input.tools !== undefined) lose(lost, 'tools');
-  if (input.tool_choice !== undefined) lose(lost, 'tool_choice');
-  if (input.thinking !== undefined) lose(lost, 'thinking');
+  // `top_k` и `thinking` — потери САМОГО перевода: первого в диалекте OpenAI
+  // нет вовсе, второе не воспроизводится без подписи. Это верно у любой
+  // платформы, поэтому решает таблица.
+  if (input.top_k !== undefined) lose(lost, 'top_k', fields);
+  if (input.thinking !== undefined) lose(lost, 'thinking', fields);
 
-  return { body, lost };
+  // Инструменты либо ТЕРЯЮТСЯ (поля для них у контура нет), либо уезжают
+  // текстом прослойки — третьего нет, и в след попадает ровно то, что случилось.
+  //
+  // Условной эта потеря была ровно один час: драйвер, честно объявивший
+  // `toolsPassthrough: true`, получал пустой след при выброшенных инструментах —
+  // то есть панель обещала агенту руки и молчала о том, что их нет. Это худшая
+  // из двух ошибок: лишняя строка в следе человека пугает, отсутствие строки
+  // отправляет его искать поломку в модели.
+  if (tools.length > 0) {
+    noteShimmed(shimmed, 'tools');
+    noteShimmed(shimmed, 'tool_choice');
+    // compromise: tool-shim — контур не принимает `tools`, поэтому схемы едут текстом, а вызов собирается обратно
+    body.tool_choice = 'none';
+  } else {
+    if (input.tools !== undefined) lose(lost, 'tools', fields);
+    if (input.tool_choice !== undefined) lose(lost, 'tool_choice', fields);
+  }
+
+  return { body, lost, shimmed, tools };
+}
+
+/** Что нужно свёртке следов: имена вызовов и куда записать, что она сработала. */
+interface FoldTraces {
+  names: ReadonlyMap<string, string>;
+  shimmed: () => void;
+}
+
+function noteShimmed(shimmed: string[], field: string): void {
+  if (!shimmed.includes(field)) shimmed.push(field);
+}
+
+/**
+ * Запрос в диалекте OpenAI. Переводить нечего — контур говорит на нём же, — но
+ * инструменты всё равно надо снять с поля, которого у контура нет, и положить
+ * текстом. Без прослойки остаётся только список потерь.
+ */
+export function openAiRequestWithShim(
+  body: Record<string, unknown>,
+  fields: readonly DriverRequestField[],
+  shim?: ShimContext,
+): TranslatedRequest {
+  if (!shim || readTools(body.tools).length === 0) {
+    return {
+      body,
+      lost: openAiRequestLoss(body, fields),
+      shimmed: [],
+      tools: [],
+    };
+  }
+
+  const shimmed = shimOpenAiRequest(body, shim.protocolText);
+  const lost = openAiRequestLoss(shimmed.body, fields);
+  if (shimmed.droppedResultParts) {
+    lost.push({
+      field: 'content[].tool_result (внутри картинка)',
+      note: rowNote('content[].tool_result (внутри картинка)'),
+    });
+  }
+  return {
+    body: shimmed.body,
+    lost,
+    shimmed: ['tools', 'tool_choice'],
+    tools: shimmed.tools,
+  };
 }
 
 /** Причина остановки в диалекте Anthropic. */
@@ -379,12 +532,27 @@ export function openAiResponseToAnthropic(payload: unknown, model: string): unkn
   const usage = isRecord(source.usage) ? source.usage : {};
   const text = typeof message.content === 'string' ? message.content : '';
 
+  // Вызовы прослойки — отдельными блоками ПОСЛЕ текста, ровно в том порядке, в
+  // каком их написала модель: клиент выполняет их сверху вниз.
+  const calls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
+  const content: Record<string, unknown>[] = [];
+  if (text || calls.length === 0) content.push({ type: 'text', text });
+  for (const call of calls) {
+    const fn = isRecord(call.function) ? call.function : {};
+    content.push({
+      type: 'tool_use',
+      id: typeof call.id === 'string' ? call.id : '',
+      name: typeof fn.name === 'string' ? fn.name : '',
+      input: parseArguments(fn.arguments),
+    });
+  }
+
   return {
     id: `msg_${typeof source.id === 'string' ? source.id : Date.now().toString(36)}`,
     type: 'message',
     role: 'assistant',
     model: typeof source.model === 'string' ? source.model : model,
-    content: [{ type: 'text', text }],
+    content,
     stop_reason: stopReasonOf(isRecord(choice) ? choice.finish_reason : undefined),
     stop_sequence: null,
     usage: {
@@ -424,6 +592,20 @@ export function openAiModelsToAnthropic(payload: unknown): unknown {
 
 function numberOf(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/** Аргументы вызова в диалекте OpenAI — строка JSON; у Anthropic — объект. */
+function parseArguments(value: unknown): unknown {
+  if (isRecord(value)) return value;
+  if (typeof value !== 'string' || !value.trim()) return {};
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    // Сюда попадает только то, что прослойка уже разобрала и сериализовала
+    // сама, — но чужой ответ ходит этим же путём, и пустой объект честнее
+    // выдуманных аргументов.
+    return {};
+  }
 }
 
 /**

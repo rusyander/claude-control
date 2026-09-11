@@ -5,8 +5,14 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
-import { defaultSelection, isAllSelected, selectableEntries } from './model/EnvTransferPlan';
+import {
+  defaultPlatformSelection,
+  defaultSelection,
+  isAllSelected,
+  selectableEntries,
+} from './model/EnvTransferPlan';
 import { EnvTransferChecklist } from './EnvTransferChecklist';
+import { EnvTransferPlatforms } from './EnvTransferPlatforms';
 import { STATUS_TONE } from './EnvTransferImportModal.constants';
 import type { EnvTransferImportModalProps } from './EnvTransferImportModal.types';
 import styles from './EnvTransferCard.module.scss';
@@ -27,9 +33,16 @@ export function EnvTransferImportModal({
 }: EnvTransferImportModalProps) {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [platforms, setPlatforms] = useState<Set<string>>(new Set());
+  // Настройка шлюза не отмечена никогда по умолчанию: это порт слушателя ЭТОЙ
+  // машины, и менять его архивом с чужой втихую панель не станет.
+  const [gateway, setGateway] = useState(false);
 
   useEffect(() => {
-    if (plan) setSelected(new Set(defaultSelection(plan.entries)));
+    if (!plan) return;
+    setSelected(new Set(defaultSelection(plan.entries)));
+    setPlatforms(new Set(defaultPlatformSelection(plan.platforms?.entries ?? [])));
+    setGateway(false);
   }, [plan]);
 
   if (!plan) return null;
@@ -39,6 +52,15 @@ export function EnvTransferImportModal({
       const next = new Set(current);
       if (next.has(archivePath)) next.delete(archivePath);
       else next.add(archivePath);
+      return next;
+    });
+  };
+
+  const togglePlatform = (id: string): void => {
+    setPlatforms((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -63,10 +85,12 @@ export function EnvTransferImportModal({
           </Button>
           <Button
             isLoading={isBusy}
-            disabled={selected.size === 0}
-            onClick={() => onApply([...selected])}
+            disabled={selected.size === 0 && platforms.size === 0 && !gateway}
+            onClick={() =>
+              onApply({ selection: [...selected], platforms: [...platforms], gateway })
+            }
           >
-            {t('envTransfer.applySelected', { count: selected.size })}
+            {t('envTransfer.applySelected', { count: selected.size + platforms.size })}
           </Button>
         </>
       }
@@ -120,6 +144,16 @@ export function EnvTransferImportModal({
             </label>
           ))}
         </div>
+
+        {plan.platforms && (
+          <EnvTransferPlatforms
+            plan={plan.platforms}
+            selected={platforms}
+            onToggle={togglePlatform}
+            gateway={gateway}
+            onGateway={setGateway}
+          />
+        )}
 
         <EnvTransferChecklist items={plan.checklist} />
       </Stack>

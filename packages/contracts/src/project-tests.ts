@@ -1,3 +1,5 @@
+import type { TmsKind } from './integrations';
+
 /**
  * Тест-кейсы проекта: что проверяют, чем это кончилось и как это шло.
  *
@@ -582,6 +584,26 @@ export interface ProjectTestRunRecord {
    * строка матрицы покрытия считаться непокрытой.
    */
   generate?: ProjectTestGenerateStamp;
+  /** След отправки в тест-менеджмент; по нему повторная отправка не плодит ран. */
+  tms?: ProjectTestRunTms;
+}
+
+/**
+ * Куда этот прогон уже уехал в тест-менеджмент.
+ *
+ * Лежит в записи прогона, а не в настройках: отправляют по кнопке и иногда
+ * дважды — второй раз должен попасть в ТОТ ЖЕ ран, иначе в чужой системе
+ * появляется двойник, и отчёт по релизу считает один прогон за два.
+ */
+export interface ProjectTestRunTms {
+  /** Какая система приняла: у другой свои идентификаторы, и они не совместимы. */
+  kind: TmsKind;
+  /** Ключ рана/цикла на той стороне. */
+  runId: string;
+  url?: string;
+  /** Сколько результатов ушло в последний раз. */
+  pushed: number;
+  pushedAt: string;
 }
 
 /** Кейс в сравнении двух прогонов: чем он был и чем стал. */
@@ -1528,7 +1550,14 @@ export interface ProjectTestDefectDraft {
 
 /** Форматы, из которых панель умеет забирать результаты и кейсы. */
 export type ProjectTestImportFormat =
-  'junit' | 'playwright' | 'allure' | 'testrail-csv' | 'csv' | 'xlsx';
+  | 'junit'
+  | 'playwright'
+  | 'allure'
+  | 'testrail-csv'
+  | 'csv'
+  | 'xlsx'
+  /** Ручные кейсы, написанные в репозитории markdown-файлами (`QA/…/ТК-*.md`). */
+  | 'markdown';
 
 /** Итог импорта: что нашли и что легло на кейсы. */
 export interface ProjectTestImportResult {

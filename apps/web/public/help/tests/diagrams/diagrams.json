@@ -1,0 +1,24 @@
+{
+  "topic": "tests",
+  "source": "docs/diagrams/tests-guide/tests-guide.drawio",
+  "pages": [
+    {
+      "name": "where-cases-live",
+      "file": "where-cases-live.png",
+      "page": 1,
+      "source": "fe0337ffef21c002",
+      "width": 1056,
+      "height": 1448,
+      "exportedAt": "2026-09-11T11:00:29.456Z"
+    },
+    {
+      "name": "what-turns-red",
+      "file": "what-turns-red.png",
+      "page": 2,
+      "source": "3adbb026d8125574",
+      "width": 1056,
+      "height": 1278,
+      "exportedAt": "2026-09-11T11:00:32.495Z"
+    }
+  ]
+}

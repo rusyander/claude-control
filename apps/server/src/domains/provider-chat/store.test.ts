@@ -64,6 +64,32 @@ describe('provider-chat store', () => {
     expect(chat?.messages[1]?.transport).toBe('stream');
   });
 
+  it('хранит время ответа и читает старую запись без него', () => {
+    createChat(dir, 'codex', { id: 'timed' });
+    appendMessage(dir, 'codex', 'timed', {
+      role: 'assistant',
+      content: 'Быстро',
+      durationMs: 4200,
+    });
+    // Разговор, записанный до появления поля: время не выдумывается, его нет.
+    appendFileSync(
+      join(dir, 'provider-chats', 'codex', 'timed.jsonl'),
+      `${JSON.stringify({
+        kind: 'message',
+        id: 'old',
+        at: '2026-09-01T10:00:00.000Z',
+        role: 'assistant',
+        content: 'Старый',
+      })}\n`,
+      'utf8',
+    );
+
+    const messages = readChat(dir, 'codex', 'timed')?.messages ?? [];
+    expect(messages[0]?.durationMs).toBe(4200);
+    expect(messages[1]?.content).toBe('Старый');
+    expect(messages[1]?.durationMs).toBeUndefined();
+  });
+
   it('пропускает оборванную последнюю строку, а не теряет разговор', () => {
     createChat(dir, 'codex', { id: 'torn' });
     appendMessage(dir, 'codex', 'torn', { role: 'user', content: 'Целая' });

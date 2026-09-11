@@ -9,4 +9,10 @@ export interface ProviderChatHeaderProps {
   onPickWorkdir: () => void;
   onDelete: () => void;
   onStop: () => void;
+  /**
+   * Перезапустить разговор в чистом виде (Т7). Сессии у чужого CLI нет, поэтому
+   * это новый разговор с контрольной точкой; пусто — перезапускать нечего.
+   */
+  onRestart?: () => void;
+  isRestarting?: boolean;
 }

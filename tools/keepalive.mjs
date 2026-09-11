@@ -15,6 +15,11 @@
  * (после стартовой паузы) — перезапуск ровно той половины, которая молчит,
  * с нарастающей паузой, чтобы не долбиться в цикле по мёртвому порту.
  *
+ * Третий порт — шлюз контуров (по умолчанию 5179), и только когда он включён в
+ * настройках панели: своего процесса у шлюза нет, он живёт внутри серверной
+ * половины, поэтому считается её вторым условием жизни. Молчащий шлюз при живом
+ * сервере — это CLI без модели, о котором человек узнаёт последним.
+ *
  * Живую панель НЕ трогает: если порт отвечает уже на старте, сторож просто
  * берёт её под наблюдение — иначе он подрался бы за порт с запущенным `pnpm dev`.
  *
@@ -237,9 +242,67 @@ function restart(unit) {
   unit.nextStartAt = Date.now() + wait;
 }
 
+/**
+ * Порт шлюза контуров, если человек его включил.
+ *
+ * Шлюз живёт ВНУТРИ серверной половины, отдельного процесса у него нет — своей
+ * единицы наблюдения ему поэтому не заводится: она подняла бы второй сервер.
+ * Но молчащий порт шлюза при живом сервере — это CLI без модели, о котором
+ * человек узнаёт последним: адрес шлюза давно вписан в конфигурацию CLI, а ключ
+ * контура есть только у панели. Поэтому порт добавляется к серверной половине
+ * как второе условие жизни, и лечится тем же перезапуском.
+ *
+ * Настройка читается из состояния панели на каждом опросе: её меняют с экрана,
+ * и сторож, запомнивший порт при старте, следил бы за прежним.
+ *
+ * Порт берётся ДОСТАВШИЙСЯ (`platformGatewayPort`), а не задуманный. Разница
+ * не теоретическая: задуманный по умолчанию совпадает с портом прокси защиты
+ * данных, и шлюз при включённом прокси сидит на соседнем. Сторож, следящий за
+ * задуманным, в этом случае слушал бы ЧУЖОЙ порт (и не заметил бы смерти
+ * шлюза), а после выключения прокси — перезапускал бы здоровый стенд из-за
+ * молчания порта, который шлюзу никогда не принадлежал.
+ */
+function gatewayPort() {
+  const roots = [];
+  const fromEnv = process.env.CLAUDE_CONFIG_DIR?.trim();
+  if (fromEnv) roots.push(resolve(fromEnv));
+  roots.push(join(homedir(), '.claude'));
+
+  for (const root of roots) {
+    const state = readState(join(root, 'agentdeck', 'state.json'));
+    if (!state) continue;
+    // Путь, заданный руками, лежит в состоянии по умолчанию и перекрывает всё
+    // остальное — как и в самой панели (`detectClaudeLocation`).
+    const override = state.settings?.claudeDirOverride?.trim?.();
+    const panel = override
+      ? readState(join(resolve(override), 'agentdeck', 'state.json'))
+      : state;
+    if (!panel?.settings?.platformGateway?.enabled) return 0;
+    const port = panel.platformGatewayPort;
+    // Шлюз включён, но порта в состоянии нет — он ещё не поднимался в этой
+    // версии панели: следить не за чем, и выдумывать порт нельзя.
+    return Number.isInteger(port) && port > 0 ? port : 0;
+  }
+  return 0;
+}
+
+function readState(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    // Нет файла, битый файл, нет прав — сторож молчит про шлюз. Выдуманный порт
+    // хуже отсутствия наблюдения: он перезапускал бы стенд из-за чужого порта.
+    return null;
+  }
+}
+
 async function tick() {
+  const gateway = gatewayPort();
+
   for (const unit of UNITS) {
-    const alive = await probe(unit.port);
+    // Шлюз поднимает серверная половина: его молчание лечится её перезапуском.
+    const extra = unit.id === 'server' && gateway ? gateway : 0;
+    const alive = (await probe(unit.port)) && (!extra || (await probe(extra)));
     if (alive) {
       unit.failures = 0;
       if (!unit.healthySince) unit.healthySince = Date.now();
@@ -354,6 +417,14 @@ async function status() {
       `  ${unit.id.padEnd(7)} 127.0.0.1:${unit.port}  ${alive ? '✓ отвечает' : '✕ молчит'}`,
     );
   }
+  // Шлюз показывается только включённым: строка «✕ молчит» о выключенном шлюзе
+  // читалась бы как поломка.
+  const gateway = gatewayPort();
+  if (gateway) {
+    const alive = await probe(gateway);
+    lines.push(`  шлюз    127.0.0.1:${gateway}  ${alive ? '✓ отвечает' : '✕ молчит'}`);
+  }
+
   let watchdog = '✕ не запущен';
   try {
     const pid = Number(readFileSync(PID_PATH, 'utf8').trim());

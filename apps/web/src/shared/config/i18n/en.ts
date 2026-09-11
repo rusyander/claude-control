@@ -86,6 +86,7 @@ export const en: TranslationSchema = {
     compare: 'Comparison',
     settings: 'Settings',
     dlp: 'Data protection',
+    platform: 'Contour',
     help: 'Help',
     sectionMain: 'Main',
     sectionBehavior: 'Agent behaviour',
@@ -553,12 +554,18 @@ export const en: TranslationSchema = {
         pauseHint:
           'Stop every running run of the tree; continuations, stages and new children queue up',
         resumeHint: 'Restart the stopped runs in their own sessions and release the queue',
+        resumeHintForeign:
+          'Start the stopped runs over and release the queue: this CLI has no session, ' +
+          'so continuing means asking the same thing again',
         paused: 'paused',
         pausedToast_one: 'Tree stopped: {{count}} run. Auto-starts are queued.',
         pausedToast_few: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
         pausedToast_many: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
         pausedToast_other: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
         resumedToast: 'Tree resumed: {{resumed}} in their sessions, {{flushed}} from the queue',
+        resumedToastForeign:
+          'Tree resumed: {{resumed}} started over, {{flushed}} from the queue. ' +
+          'This CLI has no session: continuing means asking the same thing again.',
         deferred: 'Tree paused — {{name}}: the chat is created, it starts on “Resume all”',
         failed: 'Failed: {{message}}',
       },
@@ -1743,13 +1750,431 @@ export const en: TranslationSchema = {
         'This CLI speaks a different API kind. Create a profile with a matching kind — or apply this one to the CLIs that accept it.',
     },
   },
+  platform: {
+    title: 'Contour',
+    subtitle:
+      'A corporate platform behind one key: its models, embeddings and agents, from the panel',
+    explainTitle: 'What this section does and what it does not',
+    explainText:
+      'A contour is somebody else’s platform the panel talks to with a corporate key. The key stays in the panel: CLIs are pointed at its local gateway, never at the contour itself. What the section does NOT do: it changes nothing on the contour side, it never redirects an address you did not tick, and it promises no capability it has not probed. Everything the platform does differently from what a client expects is signed here as a compromise, not hidden.',
+    emptyTitle: 'No contour connected',
+    emptyText:
+      'Connect your corporate platform and the panel will run on its models with a single key: the list arrives already narrowed to what the key may use, and the key itself stays here — it reaches no CLI config. The wizard asks for the address and the key, goes to the contour and shows what it actually offers.',
+    connect: 'Connect a contour',
+    check: 'Check',
+    checkAgain: 'Check again',
+    configure: 'Configure',
+    disableAll: 'Undo the apply',
+    deleteTitle: 'Delete the contour?',
+    deleteText:
+      'The settings, the key and the probe record go together. The apply is undone first: CLI files return to their original state and the managed profile disappears. A file you edited after the apply is left as it is — the panel names it.',
+    state: {
+      disabled: 'off',
+      unchecked: 'never checked',
+      ok: 'online',
+      unauthorized: 'key rejected',
+      unreachable: 'not responding',
+    },
+    driverLabel: 'Contour type',
+    driver: { enterprise-platform: 'EnterprisePlatform', 'openai-compat': 'OpenAI-compatible' },
+    driverHint: {
+      enterprise-platform:
+        'The panel knows this platform up front: content checks, knowledge through the key owner, history summarised on its side.',
+      'openai-compat':
+        'Any compatible gateway. The panel asks for the model list only — everything else honestly stays “not declared”.',
+    },
+    titleLabel: 'Name',
+    titlePlaceholder: 'EnterprisePlatform · dev',
+    idLabel: 'Identifier',
+    idHint:
+      'The local gateway address is built from it, so latin letters, digits, dash, dot and underscore only. Renaming = delete and create: the key is stored under the old identifier.',
+    baseUrlLabel: 'API address',
+    baseUrlHint:
+      'The root of the contour public API — the panel appends /v1 itself. An admin console address will not do: the check names that, but half an hour is already gone.',
+    error: {
+      title_required: 'Without a name one contour cannot be told from the next',
+      id_required: 'The identifier is required: the gateway address is built from it',
+      id_pattern: 'Latin letters, digits, dash, dot and underscore only',
+      baseUrl_required: 'Nothing to check without an address',
+      baseUrl_url: 'A full address with an http or https scheme is required',
+      budgetSince_pattern: 'A date as YYYY-MM-DD, for example 2026-09-01',
+      budgetUsd_number: 'The budget is a number, for example 100 or 10.5',
+    },
+    checkConnection: 'Check the connection',
+    checkSavesDraft:
+      'Checking saves the draft: the panel server goes to the contour, not the browser. The contour stays off until the last step.',
+    outcome: {
+      ok: 'responds',
+      unreachable: 'not responding',
+      'not-api': 'answers, but not a model API',
+      unauthorized: 'key rejected',
+      'not-ready': 'contour is still starting up',
+    },
+    fix: {
+      ok: 'The contour responds — nothing to fix.',
+      unreachable: 'Check the address, the network and access to the contour from here.',
+      'not-api':
+        'Looks like an admin console or a login page. The API root is needed — usually the same domain with an api. prefix.',
+      unauthorized:
+        'There are five causes and the contour tells none of them apart. Probe again — the last one is transient. If that does not help, check the key’s term, budget and owner in the admin console.',
+      'not-ready': 'The model registry is not ready yet. Retry in a minute.',
+    },
+    tokenLabel: 'Contour key',
+    tokenPlaceholder: 'sk-…',
+    tokenHint:
+      'A saved key is never shown — not here, not in any panel response. Leave the field empty to keep the saved one.',
+    tokenStays:
+      'The key stays in the panel: CLIs go to its local gateway, and the gateway substitutes the key.',
+    tokenSaved: 'key {{masked}}',
+    tokenMissing: 'no key saved',
+    tokenHowTitle: 'Where to get the key',
+    tokenHowAdmin:
+      'Everything happens in the contour admin console, usually https://inst.<your-domain>.',
+    tokenHowStep: {
+      1: 'The model provider is registered and active.',
+      2: 'The model is created and answers in the platform chat.',
+      3: 'The key has an owner — without one company knowledge is out of its reach.',
+      4: 'The key is created, budget and limits are set, the value is copied.',
+    },
+    tokenHowOwner:
+      'The owner is not a formality: knowledge tools act on their behalf, and a key without an owner finds nothing.',
+    capabilitiesTitle: 'What is available',
+    capabilityColumn: 'Capability',
+    stateColumn: 'State',
+    detailColumn: 'Details',
+    capability: {
+      models: 'Models',
+      chat: 'Chat models',
+      embeddings: 'Embeddings',
+      agents: 'Platform agents',
+      guardrails: 'Content checks',
+      knowledge: 'Company knowledge',
+      'client-tools': 'Client tools',
+    },
+    capabilityState: {
+      yes: 'yes',
+      no: 'no',
+      indirect: 'indirectly',
+      unknown: 'not declared',
+    },
+    capabilityCount: '{{count}}',
+    evidence: { answer: 'confirmed by the probe', platform: 'property of the platform' },
+    modelsTitle: 'Models for this key: {{count}}',
+    notCheckedTitle: 'The contour has not been checked yet',
+    notCheckedText:
+      'The panel claims nothing about a contour it has not visited. Press “Check the connection” — the matrix fills with your contour’s answer to your key.',
+    checkedAt: 'checked {{when}}',
+    lastOkAt: 'last successful check — {{when}}',
+    justNow: 'just now',
+    minutesAgo: '{{count}} min ago',
+    hoursAgo: '{{count}} h ago',
+    targetsTitle: 'Where to apply',
+    targetRecommended: 'recommended',
+    targetReason: {
+      no_env_section: 'this CLI has no environment file at all',
+      no_documented_base_url: 'no documented address variable',
+      gateway_dialect: 'speaks a dialect the gateway does not understand',
+      gateway_down: 'the gateway is down or the contour is off',
+    },
+    targetApplied: 'applied',
+    targetAppliedChat: 'applied, works as a chat without tools',
+    targetNotApplied: 'not applied',
+    appliedTitle: 'Applied to',
+    appliedLegend:
+      '✔ — works fully, ⚠ — works as a chat without tools, ○ — can be applied, — unavailable with a reason.',
+    planPlaceholder: 'placeholder, the gateway substitutes the key',
+    conflictLine: 'taken: {{key}} = {{current}}',
+    overwriteLabel: 'overwrite this value',
+    skippedTitle: 'Not every target was written',
+    skipReason: {
+      conflict: 'the place is taken, overwriting was not confirmed',
+      no_env_section: 'this CLI has no environment file at all',
+      no_documented_base_url: 'no documented address variable',
+      gateway_dialect: 'speaks a dialect the gateway does not understand',
+      gateway_down: 'the gateway is down or the contour is off',
+    },
+    gatewayUp: 'gateway is up: {{address}}',
+    gatewayPortTaken: 'port {{requested}} was busy — the one it got is what gets written',
+    gatewayDown: 'the gateway is down — there is nothing to apply to a CLI yet',
+    gatewayStart: 'Start the gateway',
+    modeLabel: 'If the contour does not respond',
+    mode: { required: 'required', 'best-effort': 'best effort' },
+    modeHint: {
+      required:
+        'Do not work: a contour failure is a failure, there is no silent fallback to the vendor cloud.',
+      'best-effort': 'Warn and leave the decision to you.',
+    },
+    modeRequiredWarning:
+      'With the panel off the gateway is closed, and a CLI pointed at it is left without a model: it gets a connection refusal instead of quietly going to the cloud.',
+    budgetLabel: 'Key budget, $',
+    budgetHint: 'Type the number from the admin console. Zero — do not track.',
+    budgetManual: 'The contour exposes no route for the remainder — the number is typed by hand.',
+    budgetSinceLabel: 'Budget period from',
+    budgetSinceHint:
+      'The day the contour starts counting the budget anew (YYYY-MM-DD). Empty — from the start of our records: when the contour resets its own counter is not visible from outside.',
+    budgetLine: 'spend ≈ {{spent}} of {{budget}} $',
+    spentLine: 'spend ≈ {{spent}} $ — no budget set',
+    spendSince: 'period from {{since}}, by our price book — an estimate',
+    spendSinceStart: 'from the start of our records, by our price book — an estimate',
+    moneyUnpriced: 'left out of the estimate, no price for: {{models}}',
+    budgetOverEstimate: 'our estimate has reached the budget',
+    budgetNearLimit: 'by our estimate {{percent}} % of the budget is spent',
+    budgetMeterLabel: 'Budget spent',
+    budgetMeterValue: '≈ {{spent}} of {{budget}} $ — {{percent}} %',
+    budgetExhausted: 'the contour refused on a spend limit {{when}} — not the key budget',
+    budgetExhaustedLevel:
+      'the contour refused on the «{{level}}» limit {{when}} — not the key budget',
+    budgetExhaustedRecently: 'just now',
+    budgetExhaustedClear: 'Clear the mark',
+    budgetExceeded: 'budget exhausted',
+    journalTitle: 'Apply journal ({{total}})',
+    journalEntry: '{{title}} written',
+    journalDrifted: 'the file changed after the apply — the rollback will not touch it',
+    journalHistoryHint:
+      'The file edits themselves live in the History section, together with the copies taken before the edit.',
+    rollbackOne: 'Undo',
+    wizardTitle: 'Connect a contour',
+    wizardEditTitle: 'Contour settings',
+    wizardHint: 'Address and key, a probe of capabilities, the choice of consumers — four steps.',
+    wizardStep: {
+      address: 'Address',
+      token: 'Key',
+      capabilities: 'What is available',
+      targets: 'Where to apply',
+    },
+    wizardFinish: 'Done',
+    next: 'Next',
+    back: 'Back',
+    factsTitle: 'What is already decided',
+    factKey:
+      'The contour key stays in the panel: CLIs go to its local gateway, never to the contour itself',
+    factTools:
+      'Through a contour a CLI works as a chat: client tools cannot be declared, and it edits no files',
+    factCli:
+      'Not every CLI takes a gateway address: four of the ten document no such setting, and the list shows them as a dash with its reason',
+    violationsTitle: 'Contour content checks',
+    violationsOwner:
+      'The checks belong to the company and run on the contour’s side, in the request path: ' +
+      'the panel neither calls them, nor configures them, nor can switch them off — what they ' +
+      'are and how strict they are is set in the platform’s admin console. All you see here is ' +
+      'what they did. Local data-protection rules are a separate thing: those run in the panel, ' +
+      'BEFORE anything is sent.',
+    violationsRow_one: '{{count}} time, last {{date}}',
+    violationsRow_few: '{{count}} times, last {{date}}',
+    violationsRow_many: '{{count}} times, last {{date}}',
+    violationsRow_other: '{{count}} times, last {{date}}',
+    violationsAction: {
+      blocked: 'request refused',
+      interrupted: 'answer cut short',
+      masked: 'data masked',
+      unknown: 'the contour did not say what happened',
+    },
+    violationsEmpty: {
+      idle: 'No request has gone through the gateway yet — the panel knows nothing about the checks so far.',
+      clean: 'No check has fired on any request the gateway still remembers.',
+    },
+    violationsUnnamed: {
+      blocked_one: 'The contour refused {{count}} request without naming a single check.',
+      blocked_few: 'The contour refused {{count}} requests without naming a single check.',
+      blocked_many: 'The contour refused {{count}} requests without naming a single check.',
+      blocked_other: 'The contour refused {{count}} requests without naming a single check.',
+      interrupted_one: '{{count}} answer was cut short by a check the contour did not name.',
+      interrupted_few: '{{count}} answers were cut short by checks the contour did not name.',
+      interrupted_many: '{{count}} answers were cut short by checks the contour did not name.',
+      interrupted_other: '{{count}} answers were cut short by checks the contour did not name.',
+      masked_one:
+        'In {{count}} answer the contour masked data without naming a check: the model saw something other than what you sent.',
+      masked_few:
+        'In {{count}} answers the contour masked data without naming a check: the model saw something other than what you sent.',
+      masked_many:
+        'In {{count}} answers the contour masked data without naming a check: the model saw something other than what you sent.',
+      masked_other:
+        'In {{count}} answers the contour masked data without naming a check: the model saw something other than what you sent.',
+    },
+    violationsSince:
+      'Counted over the last requests the gateway still remembers, starting {{date}}: the trace is ' +
+      'length-capped, and restarting the panel clears it entirely.',
+    agentsTitle: 'Contour agents',
+    agentsOwner:
+      'Agents are built by the company: each has its own knowledge and tools, and they run on ' +
+      'the contour’s side. The panel only calls them — an agent can be neither assembled nor ' +
+      'configured from here. The list is yours to keep: the key has no “list the agents” route.',
+    agentsEmpty:
+      'No agent added yet. Take the agent id from the platform’s admin console — it is the UUID ' +
+      'on the agent’s card.',
+    agentsRemove: 'Remove agent “{{title}}” from the list',
+    agentsNewTitle: 'Name',
+    agentsNewId: 'Agent id',
+    agentsNewIdHint: 'UUID from the platform’s admin console',
+    agentsAdd: 'Add',
+    agentsPick: 'Agent',
+    agentsQuestion: 'Question',
+    agentsAsk: 'Ask',
+    agentsAsking: 'The agent is thinking…',
+    agentsBlocked: {
+      disabled: 'The contour is off — switch it on in the card above.',
+      'no-token': 'No key saved: run the connection wizard.',
+      'no-agent': 'Pick an agent.',
+      'no-question': 'Type a question.',
+    },
+    agentsOutcome: {
+      ok: 'Answered',
+      unavailable: 'Agents are not in the licence',
+      unauthorized: 'Key rejected',
+      rejected: 'Request not accepted',
+      'agent-error': 'The agent ended with an error',
+      'not-ready': 'The contour did not answer',
+      failed: 'Never reached the contour',
+    },
+    agentsSessionGap:
+      'The answer is real, but this turn did not make it into the session: the agent will read the next question without it.',
+    agentsSession: 'Session {{id}}',
+    agentsSessionReset: 'Reset the session',
+    agentsSessionKept_one: 'The contour remembers {{count}} message of this conversation',
+    agentsSessionKept_few: 'The contour remembers {{count}} messages of this conversation',
+    agentsSessionKept_many: 'The contour remembers {{count}} messages of this conversation',
+    agentsSessionKept_other: 'The contour remembers {{count}} messages of this conversation',
+    agentsCut:
+      'The agent did not finish (the contour named the reason: {{reason}}) — this is a fragment, not the whole answer.',
+    agentsSessionUnread:
+      'The session could not be read — what the contour remembers is unknown right now.',
+    agentsBridgeBlocked: 'Nowhere to write the bridge: {{reason}}',
+    agentsSessionEmpty: 'The contour remembers no conversation for this session yet.',
+    agentsBridgeTitle: 'The MCP bridge',
+    agentsBridgeText:
+      'The same agents, knowledge and models of the contour — as tools for a local agent. Only the ' +
+      'panel’s address goes into the CLI config; the contour key stays here. One record covers ' +
+      'every contour: the call itself picks which one.',
+    agentsBridgeOn: 'Switch the bridge on',
+    agentsBridgeOff: 'Switch the bridge off',
+    compromisesTitle: 'Compromises ({{total}})',
+    compromisesText:
+      'Every workaround and every limitation of the other platform is signed up front, with a condition for revisiting it. A workaround without a signature fails the build — that is how the list stays in step with the code.',
+  },
+  compromise: {
+    markLabel: 'Compromise signature: {{name}} · {{severity}}',
+    headline: '{{severity}} · since {{date}}',
+    severity: {
+      limitation: 'Limitation',
+      workaround: 'Workaround',
+      risk: 'With risk',
+    },
+    how: 'How it works',
+    why: 'Why it is like this',
+    revisit: 'When to revisit',
+    more: 'More',
+    planned: 'not in the code yet',
+    hiddenGroup: 'Without a place of their own on screen',
+    hiddenGroupText:
+      'These workarounds live in the wiring — there is nothing next to them to mark. They are named in full here: not one of them may disappear quietly.',
+    items: {
+      'no-client-tools': {
+        name: 'Client tools cannot be declared',
+        how: 'The contour’s public API does not accept tool descriptions: the platform picks the set itself, and a list sent by the client is dropped on the way in. The model knows nothing about reading or editing files, nor about your MCP servers.',
+        why: 'We do not change the platform. Through a contour a CLI works as a chat: it does not edit files — and claiming otherwise would be selling something that does not exist.',
+        revisitWhen:
+          'If the contour starts accepting the client’s own tool schemas — at least in the mode where the client executes the calls itself.',
+      },
+      'dialect-bridge': {
+        name: 'Dialect translation lives on our side',
+        how: 'The contour speaks the OpenAI dialect, some CLIs speak the Anthropic one. The panel’s gateway rewrites request and response on the fly.',
+        why: 'Otherwise only CLIs that already speak OpenAI could use a contour. What the translation loses is listed next to the translation itself, not hidden.',
+        revisitWhen: 'If the contour starts accepting requests in the Anthropic dialect.',
+      },
+      'vendor-sse-frames': {
+        name: 'Vendor stream frames are parsed by us',
+        how: 'The contour’s stream carries frames with no choices field: status, reasoning, sanitizing, guardrail hits, the final usage chunk. A strict OpenAI client breaks on them, so the gateway parses them itself and emits a clean stream.',
+        why: 'The stream format is a property of somebody else’s platform: we cannot change it, and we will not break every CLI over it.',
+        revisitWhen: 'If the contour starts emitting a stream strictly per the OpenAI schema.',
+        hiddenReason:
+          'It lives in the gateway pipeline: there is nothing to mark beside it — the human already sees an ordinary answer stream.',
+      },
+      'status-451-bridge': {
+        name: 'A content-check refusal is translated for the client',
+        how: 'The contour’s checks run in-band, and a block arrives as HTTP 451 with the list of violations. Clients do not expect that status, so the gateway turns it into a refusal they understand and the panel shows the reason.',
+        why: 'The text the check fired on never leaves the contour — only what exactly was violated.',
+        revisitWhen: 'If the contour starts refusing checks with a code clients understand.',
+      },
+      'gateway-required': {
+        name: 'With the panel down, CLIs pointed at the gateway stop working',
+        how: 'The contour key never leaves the panel, so CLIs go to its local gateway rather than to the contour. Panel off — gateway silent, and such a CLI is left without a model.',
+        why: 'The alternative is spreading a corporate key across nine CLI configs, from where it can never be recalled. Depending on a running panel is the cheaper price.',
+        revisitWhen: 'If a way appears to issue CLIs a short-lived token instead of the key.',
+      },
+      'cli-no-endpoint': {
+        name: 'Four CLIs have no way to set the model address',
+        how: 'Some CLIs document no way to change the model address — neither an environment variable nor a config key. The panel cannot point them at a contour and does not pretend it can.',
+        why: 'An invented config key would break silently with their very next release.',
+        revisitWhen: 'If such a CLI documents a variable or a key for the model address.',
+      },
+      'nonstream-120s': {
+        name: 'A non-streaming request dies at two minutes',
+        how: 'An ordinary, non-streaming call is cut off by the contour after 120 seconds. So the panel talks to a contour only by streaming — including where a human needs no stream at all.',
+        why: 'The limit sits on the platform side: the only way around it is the shape of the request.',
+        revisitWhen: 'If the contour’s response ceiling grows or becomes a setting.',
+        hiddenReason:
+          'The gateway picks the shape of the request: there is nothing to mark beside it — the human only sees that the answer arrived.',
+      },
+      'budget-manual': {
+        name: 'The key budget is typed in by hand',
+        how: 'The contour exposes the remaining budget on no route at all, and rejects an exhausted key with a 401 indistinguishable from a revoked one. The panel counts the remainder itself: you enter the budget you were given, and spend is estimated by our own price book.',
+        why: 'Otherwise a human would learn about an exhausted budget from a refusal in the middle of the work — and mistake it for a broken key.',
+        revisitWhen:
+          'If the contour publishes a key’s remaining budget, or starts telling the causes of a 401 apart — an exhausted key from a revoked one.',
+      },
+      'pricing-local': {
+        name: 'Prices are counted from our own catalog',
+        how: 'The contour does not publish model prices — they live in an internal catalog of the platform. The panel counts money from its own price list.',
+        why: 'An empty space instead of a cost is worse than an honest estimate called an estimate.',
+        revisitWhen:
+          'If the contour starts returning model prices for a key — in the model list itself.',
+      },
+      'telemetry-local': {
+        name: 'The contour accepts no client telemetry',
+        how: 'There is no intake for client telemetry: spend, errors and response times are written by the panel to this machine.',
+        why: 'A picture across the whole team will not come out of the panel — it sees this machine only.',
+        revisitWhen: 'If the contour gains an intake for telemetry from an external client.',
+      },
+      'kb-via-owner': {
+        name: 'Company knowledge is reachable only through the key owner',
+        how: 'The knowledge base is governed by the key owner: the panel neither picks which knowledge joins a request nor sees the list. An answer may lean on it, while control stays in the contour’s admin console.',
+        why: 'Headers with which a client would ask for other knowledge are stripped on the way in.',
+        revisitWhen: 'If the contour opens knowledge-base search to an ordinary key.',
+      },
+      'key-cache-lag': {
+        name: 'A revoked key keeps working for a while',
+        how: 'The contour caches key validation, so a revoked key still answers for some time after the revocation.',
+        why: 'The cache lives in the platform: the panel can neither learn its lifetime nor drop it.',
+        revisitWhen: 'If the contour publishes the cache lifetime or a way to drop it.',
+      },
+      'probe-guess': {
+        name: 'A compatible gateway declares no capabilities',
+        how: 'An arbitrary OpenAI-compatible address can only return a list of models. Everything else the panel shows as “not declared” — not as “no”, and never as a tick.',
+        why: 'Guessing capabilities from a host name would mean promising the unverified.',
+        revisitWhen: 'If compatible gateways gain a common way to declare capabilities.',
+      },
+      'agents-manual-roster': {
+        name: 'The agent list is kept by hand',
+        how: 'The key’s public surface is seven routes, and “list the agents” is not one of them: you can ask an agent, you cannot enumerate them. The human takes the agent id from the platform’s admin console and types it into the panel; the panel remembers it and puts it into the call.',
+        why: 'An empty list with no explanation would read as “the panel lost the agents”. A hand-named agent works; an invented listing route would break silently.',
+        revisitWhen: 'If the contour publishes a route that enumerates agents for a key.',
+      },
+      'context-managed': {
+        name: 'The contour summarizes a long history itself',
+        how: 'History beyond its limit is summarized by the contour in a separate model call. The only outside sign is a frame in the stream; what exactly went into the summary cannot be seen.',
+        why: 'The platform owns the summarizing — the panel can only show that it happened.',
+        revisitWhen:
+          'If the contour starts signalling that history was modified in both modes — including the truncation it falls back to when summarizing fails.',
+      },
+    },
+  },
   dlp: {
     title: 'Data protection',
     subtitle:
       'A local proxy between the CLI and the model: it sees every request body and rewrites it by rules',
     explainTitle: 'What this section does — and what it does not',
     explainText:
-      'The proxy listens on 127.0.0.1. Point a CLI at this address instead of the model address and the panel sees the BODY of every request: the prompt, the contents of files the agent read, tool output. Whatever the rules match is replaced by a placeholder ([NAME_1]) and restored in the response — the model works with the placeholder, you read the real name. A "block" rule stops the request entirely. What it does not do: it does not guess anything the rules do not describe; it does not intercept TLS (the hop upstream is ordinary https, no substituted certificates); it cannot help if the model paraphrases a placeholder in its reply — then there is nothing left to substitute back. Three different things: your own endpoint decides WHERE a request goes; this proxy decides WHAT goes in it; the prompt gate sees only what a human typed by hand.',
+      'The proxy listens on 127.0.0.1. Point a CLI at this address instead of the model address and the panel sees the BODY of every request: the prompt, the contents of files the agent read, tool output. Whatever the rules match is replaced by a placeholder ([NAME_1]) and restored in the response — the model works with the placeholder, you read the real name. A "block" rule stops the request entirely. What it does not do: it does not guess anything the rules do not describe; it does not intercept TLS (the hop upstream is ordinary https, no substituted certificates); it cannot help if the model paraphrases a placeholder in its reply — then there is nothing left to substitute back. Three different things: your own endpoint decides WHERE a request goes; this proxy decides WHAT goes in it; the prompt gate sees only what a human typed by hand. A contour’s own checks are a fourth, and somebody else’s: they run on the company’s side, the panel does not govern them, and what they did is shown in the “Contour” section.',
     statusTitle: 'Proxy',
     running: 'running',
     stopped: 'stopped',
@@ -1952,6 +2377,13 @@ export const en: TranslationSchema = {
     stop: 'Stop',
     thinking: 'The provider is thinking…',
     failed: 'error',
+    restart: 'Restart',
+    restartTitle: 'Restart the conversation from a clean slate',
+    restartDone:
+      'Work continues in a new conversation — a foreign CLI has no session, so this is a new conversation with the checkpoint.',
+    restartRequested:
+      'The checkpoint file is not ready: the agent was asked to write the state down, then the panel continues on its own.',
+    restartFailed: 'Failed to restart the conversation: {{message}}',
     rename: 'Rename',
     renamePrompt: 'Conversation title',
     delete: 'Delete',
@@ -1972,6 +2404,10 @@ export const en: TranslationSchema = {
       stream: 'CLI stream',
       session: 'CLI session',
       api: 'via API',
+    },
+    timing: {
+      step: 'Answer took {{step}}',
+      full: 'Answer took {{step}}, {{total}} in this conversation',
     },
   },
   mcp: {
@@ -2346,6 +2782,8 @@ export const en: TranslationSchema = {
     pricingTitle: 'Rates used to estimate cost',
     pricingHint:
       'Prices per million tokens behind the cost figures in Analytics. The panel pulls them from the Anthropic site — at most once a day, when you open Settings. Rates are tied to a specific model version, so older runs are priced at the rates that applied back then. You can set your own price: it overrides the list.',
+    pricingPlatform:
+      'A contour publishes no prices of its own, so spend through a contour is computed from this same list — as an estimate of “the same work through the API would have cost this much”. The contour’s internal unit is shown as a separate figure under its own label; the panel will not mix the two.',
     pricingLive: 'Anthropic price list',
     pricingBuiltIn: 'Built-in table',
     pricingUpdated: 'updated {{date}}',
@@ -2495,15 +2933,62 @@ export const en: TranslationSchema = {
     autoUpdateHint:
       'Ask the catalog once a day and, when a concrete model is set as the default, ' +
       'move it to the newer generation of the same family.',
+    hintPlatform:
+      'The list comes from the contour, already narrowed by your key’s rights. The panel ' +
+      'never visits the contour on its own: what you see is the answer from the last ' +
+      'connection check, and “Refresh” asks again.',
     source: 'Source: models.dev ({{vendors}}), updated {{date}}',
+    sourcePlatform: 'Source: the “{{platform}}” contour — your key’s own list, checked {{date}}',
     noSource: 'The catalog has never been downloaded — press “Refresh”.',
+    sourceLabel: 'Where the model list comes from',
+    sourceHint:
+      'models.dev is an open catalog of every vendor: complete, but it knows nothing ' +
+      'about what your key is allowed. A contour hands back the list already narrowed ' +
+      'by the key’s rights — exactly what you can use.',
+    sourceHintNoPlatform:
+      'A contour shows up here once at least one is set up, switched on and holds a key.',
+    sourceDev: 'models.dev — the open catalog',
+    sourcePlatformOption: 'Contour — my key’s own list',
+    sourcePlatformLabel: 'Which contour',
+    sourcePlatformHint:
+      'The panel never visits a contour on its own: the list comes from the last ' +
+      'connection check. Press “Refresh” to ask the contour again.',
+    sourcePlatformNone: 'not chosen',
+    fallback: {
+      'no-platform':
+        'A contour is chosen as the source, but not which one — the list below is from ' +
+        'models.dev.',
+      'platform-gone':
+        'The “{{platform}}” contour is gone from the settings — the list below is from models.dev.',
+      'platform-off':
+        'The “{{platform}}” contour is off or has no key — the list below is from models.dev.',
+      'never-checked':
+        'The “{{platform}}” contour has never been checked — the list below is from ' +
+        'models.dev. Press “Refresh”.',
+      'never-answered':
+        'The “{{platform}}” contour has never answered — the list below is from models.dev.',
+      'check-failed':
+        'The “{{platform}}” contour could not even be reached: check its root certificate ' +
+        'file on its card. The list below is from models.dev.',
+    },
     stale: 'older than a day',
     new: 'new',
+    retired: 'gone from the contour',
+    retiredSince: 'gone from the contour, last seen {{date}}',
+    flag: {
+      vision: 'images',
+      functionCalling: 'functions',
+      jsonMode: 'strict JSON',
+    },
+    flagOff: ': no',
     context: 'context {{value}}',
     isDefault: 'default',
     makeDefault: 'Make default',
     showAll: 'Show all ({{count}})',
     empty: 'The catalog is empty: the source did not answer and there is no earlier data.',
+    emptyPlatform:
+      'The contour answered, but your key has been granted no models — that is its answer, ' +
+      'not a connection failure. Model grants come from the key’s owner.',
     promoted: 'Default model updated: {{from}} → {{to}}',
   },
   formatCheck: {
@@ -2620,6 +3105,17 @@ export const en: TranslationSchema = {
     liveAgentsHint:
       'Claude Code processes running on this machine. There is no agent registry, so we count processes.',
     noAgents: 'No running Claude Code processes found',
+    contourSpend: {
+      title: 'Spend through the contour',
+      hint:
+        'Counted by the panel itself, from the usage frames that went through its gateway — it ' +
+        'is not part of the figures above: those come from this machine’s transcripts, and work ' +
+        'done through the contour has both. Added up, they would count the same tokens twice.',
+      money: 'By our price book — an estimate',
+      tokens: 'Tokens',
+      unpriced: 'No price for: {{models}} — their {{tokens}} tokens are not converted into money.',
+      dayHint: 'requests: {{requests}}',
+    },
     lowered: {
       title: 'Lowered fan-out runs',
       hint:
@@ -3016,6 +3512,10 @@ export const en: TranslationSchema = {
         'A CI report lands as case statuses and as its own history record — labelled as somebody else’s run.',
       cases: 'Cases into the group “{{group}}”',
       casesHint: 'A table from another system: columns are read from the headers.',
+      casesHintMarkdown:
+        'Manual cases from the repository itself: ТК-*.md files, nested folders included. The number from the file name is kept, and a repeated import updates the case instead of adding a second one.',
+      folder: 'Folder in the project',
+      folderHint: 'Where the ТК-*.md files live. Empty — QA',
       export: 'Export of the group “{{group}}”',
       exportHint: 'The server builds the file — named after the group and today’s date.',
       format: 'Format',
@@ -3026,6 +3526,7 @@ export const en: TranslationSchema = {
         csv: 'CSV',
         xlsx: 'Excel (xlsx)',
         'testrail-csv': 'TestRail CSV',
+        markdown: 'Manual cases (ТК-*.md)',
         md: 'Markdown',
       },
       environment: 'Environment',
@@ -3608,9 +4109,9 @@ export const en: TranslationSchema = {
       },
       tms: {
         title: 'Test management',
-        hint: 'Zephyr or Xray in Jira: pull cases into a panel group and push run results back.',
+        hint: 'Zephyr, Xray or Test IT: pull cases into a panel group and push run results back. A repeated push lands in the same run.',
         tokenHint:
-          'Zephyr Scale: its own API key. Xray: key and secret in one line separated by a colon. Empty — the Atlassian key is used.',
+          'Zephyr Scale: its own API key. Xray: key and secret in one line separated by a colon. Test IT: the personal token from the profile. Empty — the Atlassian key is used.',
       },
       ci: {
         title: 'CI reports',
@@ -3628,7 +4129,12 @@ export const en: TranslationSchema = {
       forge: { kind: 'System', baseUrl: 'Installation URL', repo: 'Repository' },
       telegram: { chatId: 'Chat' },
       webhook: { url: 'Receiver URL' },
-      tms: { kind: 'System', projectKey: 'Jira project', groupId: 'Test group' },
+      tms: {
+        kind: 'System',
+        baseUrl: 'Installation URL',
+        projectKey: 'Project',
+        groupId: 'Test group',
+      },
       ci: { kind: 'System', repo: 'Repository', workflow: 'Workflow', artifact: 'Artifact' },
     },
     hint: {
@@ -3647,8 +4153,10 @@ export const en: TranslationSchema = {
       telegram: { chatId: 'A numeric chat id or a @channel name.' },
       webhook: { url: 'Where to POST the JSON. http(s) only.' },
       tms: {
-        kind: 'Zephyr Scale or Xray — the case format follows from it.',
-        projectKey: 'Key of the Jira project holding the cases and cycles.',
+        kind: 'Zephyr Scale, Xray or Test IT — the case format follows from it.',
+        baseUrl: 'Test IT only: the URL of your own installation. Zephyr and Xray share one API.',
+        projectKey:
+          'Key of the Jira project holding cases and cycles; for Test IT — the project id.',
         groupId: 'Which panel group to sync with. Empty — the panel asks at exchange time.',
       },
       ci: {
@@ -3662,7 +4170,7 @@ export const en: TranslationSchema = {
       unset: 'Not set',
       atlassian: { deployment: { cloud: 'Cloud', server: 'Server / Data Center' } },
       forge: { kind: { github: 'GitHub', gitlab: 'GitLab' } },
-      tms: { kind: { zephyr: 'Zephyr Scale', xray: 'Xray' } },
+      tms: { kind: { zephyr: 'Zephyr Scale', xray: 'Xray', testit: 'Test IT' } },
       ci: { kind: { github: 'GitHub Actions', gitlab: 'GitLab CI' } },
     },
     telegram: {
@@ -4054,6 +4562,12 @@ export const en: TranslationSchema = {
     checklistReason_redacted: 'values replaced with the __REDACTED__ marker',
     'checklistReason_env-file': 'environment variables',
     'checklistReason_secret-file': 'a secrets file was not transferred',
+    'checklistReason_panel-key': 'the contour key lives in the panel and never enters the archive',
+    previewPlatforms: 'Panel contours ({{count}}) — settings without the key:',
+    platformsTitle: 'Contours from the archive',
+    platformsHint:
+      'The contour setting travels, the key does not: it lives in the encrypted store of the panel and is entered again on the new machine.',
+    platformsGateway: 'Also take the local gateway setting (port {{port}})',
     planTitle: 'Unpack environment: {{provider}}',
     planDesc:
       'Built {{date}} on {{platform}}. Checked entries will be written, the rest stays as it is.',
@@ -4066,7 +4580,9 @@ export const en: TranslationSchema = {
     status_same: 'identical',
     status_differs: 'overwrites',
     status_unresolved: 'no target',
-    importDone: 'Files written: {{count}}. Everything overwritten went into backups.',
+    importDone: 'Entries written: {{count}}. Everything overwritten went into backups.',
+    importKeysDropped:
+      'Contours whose address changed had their key dropped: {{ids}}. Enter the key of the new address.',
   },
   folderPicker: {
     title: 'Choose a project folder',

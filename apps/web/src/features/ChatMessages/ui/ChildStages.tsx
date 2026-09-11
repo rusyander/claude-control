@@ -40,6 +40,7 @@ export function ChildStages({
   holdBusy,
   onCheckOverlap,
   overlapBusy,
+  foreign,
 }: ChildStagesProps) {
   const { t } = useTranslation();
   if (groups.length === 0) return null;
@@ -82,7 +83,9 @@ export function ChildStages({
             size="sm"
             variant="secondary"
             isLoading={treeBusy}
-            title={t('chat.cascade.tree.resumeHint')}
+            title={t(
+              foreign ? 'chat.cascade.tree.resumeHintForeign' : 'chat.cascade.tree.resumeHint',
+            )}
             onClick={onResumeAll}
           >
             {t('chat.cascade.tree.resumeAll', {

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, resolve, sep } from 'node:path';
+import type { Platform } from '@agentdeck/contracts';
 import type { ConfigProvider } from '../../providers/types.ts';
 import {
   readJsonFile,
@@ -11,6 +12,7 @@ import {
 import { archiveError, type ArchiveManifest, type ParsedArchive } from './archive.ts';
 import { sha256 } from './collect.ts';
 import { providerLocations } from './locations.ts';
+import { planPanelPlatforms, type PanelPlatformsPlan } from './platforms.ts';
 
 /**
  * Разворот архива окружения на этой машине.
@@ -53,6 +55,12 @@ export interface ImportPlan {
   entries: ImportPlanEntry[];
   counts: { new: number; same: number; differs: number; unresolved: number };
   checklist: ArchiveManifest['checklist'];
+  /**
+   * Контуры из архива. Отдельной секцией, а не среди записей: у контура нет
+   * места на диске, он не пишется файлом, и отмечается он сам по себе.
+   * Отсутствует — контуров в архиве нет.
+   */
+  platforms?: PanelPlatformsPlan;
 }
 
 export interface ImportSummary {
@@ -66,10 +74,25 @@ export interface ImportSummary {
  * Считает план разворота. Ничего не пишет — только сравнивает содержимое архива
  * с тем, что уже лежит на диске.
  */
+/**
+ * Что нужно знать про ЭТУ машину, чтобы посчитать план по контурам. Приходит
+ * снаружи: домену переноса нечего знать ни про хранилище настроек, ни про
+ * шифрохранилище ключей.
+ */
+export interface PanelContext {
+  /** Контуры, настроенные здесь. */
+  current: Platform[];
+  /** Сохранён ли здесь ключ такого контура. Значение ключа не спрашивается. */
+  hasToken: (id: string) => boolean;
+  /** Проверка пути сертификата; по умолчанию — обычное существование файла. */
+  fileExists?: (path: string) => boolean;
+}
+
 export function planEnvironmentImport(
   parsed: ParsedArchive,
   provider: ConfigProvider,
   override?: string,
+  panel?: PanelContext,
 ): ImportPlan {
   assertSameProvider(parsed.manifest, provider);
 
@@ -122,7 +145,30 @@ export function planEnvironmentImport(
       unresolved: entries.filter((entry) => entry.status === 'unresolved').length,
     },
     checklist: parsed.manifest.checklist,
+    ...planPlatformsSection(parsed, panel),
   };
+}
+
+/**
+ * Секция контуров плана. Пусто и когда архив её не несёт, и когда вызывающая
+ * сторона не дала контекст этой машины: сравнивать «новый или отличается» не с
+ * чем, а показать список без этого ответа значило бы предложить человеку
+ * отметить запись, последствий которой он не видит.
+ */
+function planPlatformsSection(
+  parsed: ParsedArchive,
+  panel?: PanelContext,
+): { platforms?: PanelPlatformsPlan } {
+  const archivePath = parsed.manifest.panel?.archivePath;
+  if (!archivePath || !panel) return {};
+
+  const plan = planPanelPlatforms({
+    data: parsed.files.get(archivePath),
+    current: panel.current,
+    hasToken: panel.hasToken,
+    fileExists: panel.fileExists ?? ((path: string) => existsSync(path)),
+  });
+  return plan.entries.length > 0 || plan.problem ? { platforms: plan } : {};
 }
 
 export interface ApplyOptions {

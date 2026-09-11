@@ -407,13 +407,16 @@ describe('domains/integrations/ci: отчёт последнего прогон�
 describe('domains/integrations/tms: Zephyr и Xray за одним интерфейсом', () => {
   it('не выбрана система или нет токена — честное «не подключено»', () => {
     expect(() =>
-      tmsClient({ enabled: false, kind: 'zephyr', projectKey: 'GOR', groupId: '' }, 'T'),
+      tmsClient(
+        { enabled: false, kind: 'zephyr', baseUrl: '', projectKey: 'GOR', groupId: '' },
+        'T',
+      ),
     ).toThrow(expect.objectContaining({ statusCode: 404 }));
     expect(() =>
-      tmsClient({ enabled: true, kind: '', projectKey: 'GOR', groupId: '' }, 'T'),
+      tmsClient({ enabled: true, kind: '', baseUrl: '', projectKey: 'GOR', groupId: '' }, 'T'),
     ).toThrow(/не выбрана система/);
     expect(() =>
-      tmsClient({ enabled: true, kind: 'zephyr', projectKey: '', groupId: '' }, 'T'),
+      tmsClient({ enabled: true, kind: 'zephyr', baseUrl: '', projectKey: '', groupId: '' }, 'T'),
     ).toThrow(expect.objectContaining({ detail: 'projectKey' }));
   });
 
@@ -436,13 +439,13 @@ describe('domains/integrations/tms: Zephyr и Xray за одним интерф�
       ],
     ]);
     const client = tmsClient(
-      { enabled: true, kind: 'zephyr', projectKey: 'GOR', groupId: '' },
+      { enabled: true, kind: 'zephyr', baseUrl: '', projectKey: 'GOR', groupId: '' },
       'ZEPHYR-SECRET',
     );
     await expect(client.ping()).resolves.toContain('GOR');
     expect(calls[0]!.url).toContain('maxResults=1');
 
-    const cases = await client.pullCases();
+    const { cases } = await client.pullCases();
     expect(cases[0]).toMatchObject({
       key: 'GOR-T1',
       title: 'Вход',
@@ -461,7 +464,7 @@ describe('domains/integrations/tms: Zephyr и Xray за одним интерф�
       [/testexecutions/, { body: {} }],
     ]);
     const client = tmsClient(
-      { enabled: true, kind: 'zephyr', projectKey: 'GOR', groupId: '' },
+      { enabled: true, kind: 'zephyr', baseUrl: '', projectKey: 'GOR', groupId: '' },
       'Z',
     );
     const result = await client.pushRun({
@@ -488,7 +491,7 @@ describe('domains/integrations/tms: Zephyr и Xray за одним интерф�
       [/import\/execution/, { body: { self: 'https://xray/exec/1' } }],
     ]);
     const client = tmsClient(
-      { enabled: true, kind: 'xray', projectKey: 'GOR', groupId: '' },
+      { enabled: true, kind: 'xray', baseUrl: '', projectKey: 'GOR', groupId: '' },
       'id:secret',
     );
     const result = await client.pushRun({
@@ -503,7 +506,7 @@ describe('domains/integrations/tms: Zephyr и Xray за одним интерф�
       },
       keyOf: () => 'PRJ-1',
     });
-    expect(result).toEqual({ pushed: 1, url: 'https://xray/exec/1' });
+    expect(result).toMatchObject({ pushed: 1, url: 'https://xray/exec/1', reused: false });
     expect(JSON.parse(String(calls[0]!.init.body))).toEqual({
       client_id: 'id',
       client_secret: 'secret',
@@ -513,7 +516,7 @@ describe('domains/integrations/tms: Zephyr и Xray за одним интерф�
   it('Xray: токен без двоеточия — 400 с объяснением формы, а не 401 из чужого API', async () => {
     stubApi([]);
     const client = tmsClient(
-      { enabled: true, kind: 'xray', projectKey: 'GOR', groupId: '' },
+      { enabled: true, kind: 'xray', baseUrl: '', projectKey: 'GOR', groupId: '' },
       'один-кусок',
     );
     await expect(client.ping()).rejects.toMatchObject({ detail: 'token' });

@@ -38,12 +38,14 @@ export default tseslint.config(
   },
   // Служебные скрипты исполняются Node напрямую: process и console там есть.
   {
-    files: ['tools/**/*.{mjs,js}', '*.cjs', '*.mjs'],
+    // Генераторы схем лежат рядом со своим `.drawio` в `docs/diagrams/`, а не
+    // в `tools/`: источник и его сборщик не разносятся по разным деревьям.
+    files: ['tools/**/*.{mjs,js}', 'docs/**/*.{mjs,js}', '*.cjs', '*.mjs'],
     languageOptions: { globals: { ...globals.node } },
   },
   // Код внутри page.evaluate() выполняется браузером, а не Node.
   {
-    files: ['tools/qa/**/*.mjs', 'tools/docs/**/*.mjs'],
+    files: ['tools/qa/**/*.mjs', 'tools/docs/**/*.mjs', 'tools/help-shots/**/*.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   /**

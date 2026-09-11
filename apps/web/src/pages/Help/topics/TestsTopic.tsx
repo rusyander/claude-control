@@ -1,16 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import {
-  Callout,
-  CapabilityGrid,
-  FieldTable,
-  HelpSection,
-  OptionCards,
-  StepList,
-  StorageCard,
-} from '../ui';
+import { Callout, FieldTable, HelpSection, OptionCards, StorageCard } from '../ui';
+import { TestsGuideSections } from './TestsGuideSections';
 import { TestsManualSections } from './TestsManualSections';
 import { TestsSetupSection } from './TestsSetupSection';
+import { TestsHealthSections } from './TestsHealthSections';
+import { TestsExchangeSections } from './TestsExchangeSections';
+import { TestsLimitsSections } from './TestsLimitsSections';
 import { TestsNotesSection } from './TestsNotesSection';
 
 /**
@@ -18,8 +14,17 @@ import { TestsNotesSection } from './TestsNotesSection';
  *
  * Пишется для человека, который пришёл из TMS и ищет привычные слова:
  * библиотека, чек-лист, общий шаг, тест-план, окружение, прогон, отчёт, дефект.
- * Поэтому порядок здесь не «как устроено», а «как этим работают»: сначала где
- * живут кейсы, потом как их вести, чем гонять и куда смотреть после.
+ *
+ * Порядок — общий для всей справки: зачем это нужно → чем отличается от
+ * соседнего → весь путь шагами со снимками → таблицы полей и состояний → что
+ * этим ведут (библиотека, планы, прогоны, отчёт) → ограничения и отказы → как
+ * отменить и убрать. Раньше он был «тема за темой», и человек, впервые
+ * открывший раздел, доходил до слова «прогон» на третьем экране, ни разу не
+ * увидев экрана.
+ *
+ * Снимки и схемы живут в `TestsGuideSections` — это не отдельный документ и
+ * больше им не будет: две страницы означают два оглавления и вопрос «это я уже
+ * читал?» на каждом переходе.
  */
 export function TestsTopic() {
   const { t } = useTranslation();
@@ -27,6 +32,12 @@ export function TestsTopic() {
 
   return (
     <>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards
           items={[
@@ -36,6 +47,23 @@ export function TestsTopic() {
           ]}
         />
       </HelpSection>
+
+      {/* Соседей у раздела четверо, и с каждым его путают по-своему. Пока не
+          сказано, чем он им не является, половина вопросов к нему — про то,
+          чего он никогда не делал. */}
+      <HelpSection title={tr('vsTitle')} caption={tr('vsCaption')}>
+        <OptionCards
+          minWidth={280}
+          items={[
+            { title: tr('vsTms'), text: tr('vsTmsText') },
+            { title: tr('vsChat'), text: tr('vsChatText') },
+            { title: tr('vsCi'), text: tr('vsCiText') },
+            { title: tr('vsProjects'), text: tr('vsProjectsText') },
+          ]}
+        />
+      </HelpSection>
+
+      <TestsGuideSections />
 
       <HelpSection title={t('help.common.storageTitle')} caption={tr('storageCaption')}>
         <StorageCard
@@ -65,24 +93,6 @@ export function TestsTopic() {
           ]}
         />
       </HelpSection>
-
-      <HelpSection title={tr('libraryTitle')} caption={tr('libraryCaption')}>
-        <OptionCards
-          minWidth={280}
-          items={[
-            { title: tr('libraryGroups'), text: tr('libraryGroupsText') },
-            { title: tr('librarySections'), text: tr('librarySectionsText') },
-            { title: tr('libraryCase'), text: tr('libraryCaseText') },
-            { title: tr('libraryChecklist'), text: tr('libraryChecklistText') },
-            { title: tr('librarySharedSteps'), text: tr('librarySharedStepsText') },
-            { title: tr('libraryParameters'), text: tr('libraryParametersText') },
-            { title: tr('libraryAttributes'), text: tr('libraryAttributesText') },
-            { title: tr('libraryTags'), text: tr('libraryTagsText') },
-          ]}
-        />
-      </HelpSection>
-
-      <TestsSetupSection />
 
       <HelpSection title={tr('fieldsTitle')}>
         <FieldTable
@@ -120,6 +130,50 @@ export function TestsTopic() {
           ]}
         />
       </HelpSection>
+
+      {/* Состояния — отдельная таблица, потому что их читают с экрана: в строке
+          кейса рядом стоят статус, готовность, автоматизация и карантин, и это
+          четыре независимых отметки, а не одна шкала. */}
+      <HelpSection title={tr('statesTitle')} caption={tr('statesCaption')}>
+        <FieldTable
+          nameHeader={tr('stateColumn')}
+          descriptionHeader={tr('stateMeaningColumn')}
+          rows={[
+            { name: tr('stateNotRun'), description: tr('stateNotRunText'), isMono: false },
+            { name: tr('stateRunning'), description: tr('stateRunningText'), isMono: false },
+            { name: tr('statePassed'), description: tr('statePassedText'), isMono: false },
+            { name: tr('stateFailed'), description: tr('stateFailedText'), isMono: false },
+            { name: tr('stateSkipped'), description: tr('stateSkippedText'), isMono: false },
+            { name: tr('stateBlocked'), description: tr('stateBlockedText'), isMono: false },
+            { name: tr('stateDraft'), description: tr('stateDraftText'), isMono: false },
+            { name: tr('stateReady'), description: tr('stateReadyText'), isMono: false },
+            { name: tr('stateStale'), description: tr('stateStaleText'), isMono: false },
+            { name: tr('stateManual'), description: tr('stateManualText'), isMono: false },
+            { name: tr('stateToAutomate'), description: tr('stateToAutomateText'), isMono: false },
+            { name: tr('stateAuto'), description: tr('stateAutoText'), isMono: false },
+            { name: tr('stateMuted'), description: tr('stateMutedText'), isMono: false },
+            { name: tr('stateArchived'), description: tr('stateArchivedText'), isMono: false },
+          ]}
+        />
+      </HelpSection>
+
+      <HelpSection title={tr('libraryTitle')} caption={tr('libraryCaption')}>
+        <OptionCards
+          minWidth={280}
+          items={[
+            { title: tr('libraryGroups'), text: tr('libraryGroupsText') },
+            { title: tr('librarySections'), text: tr('librarySectionsText') },
+            { title: tr('libraryCase'), text: tr('libraryCaseText') },
+            { title: tr('libraryChecklist'), text: tr('libraryChecklistText') },
+            { title: tr('librarySharedSteps'), text: tr('librarySharedStepsText') },
+            { title: tr('libraryParameters'), text: tr('libraryParametersText') },
+            { title: tr('libraryAttributes'), text: tr('libraryAttributesText') },
+            { title: tr('libraryTags'), text: tr('libraryTagsText') },
+          ]}
+        />
+      </HelpSection>
+
+      <TestsSetupSection />
 
       <HelpSection title={tr('plansTitle')} caption={tr('plansCaption')}>
         <OptionCards
@@ -243,182 +297,11 @@ export function TestsTopic() {
         </Callout>
       </HelpSection>
 
-      {/* Единственный вид, отвечающий на «что мы вообще не проверяем»: список
-          кейсов отвечает на обратный вопрос, и дыру по нему не видно. */}
-      <HelpSection title={tr('coverageTitle')} caption={tr('coverageCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('coverageLinks'), text: tr('coverageLinksText') },
-            { title: tr('coverageJira'), text: tr('coverageJiraText') },
-            { title: tr('coverageOrder'), text: tr('coverageOrderText') },
-            { title: tr('coverageOrphans'), text: tr('coverageOrphansText') },
-          ]}
-        />
-        <Callout tone="info" title={tr('coverageArchivedTitle')}>
-          {tr('coverageArchivedText')}
-        </Callout>
-      </HelpSection>
+      <TestsHealthSections />
 
-      <HelpSection title={tr('quarantineTitle')} caption={tr('quarantineCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('quarantineWhat'), text: tr('quarantineWhatText') },
-            { title: tr('quarantineReason'), text: tr('quarantineReasonText') },
-            { title: tr('quarantineCi'), text: tr('quarantineCiText') },
-            { title: tr('quarantineFilter'), text: tr('quarantineFilterText') },
-          ]}
-        />
-        <Callout tone="warning" title={tr('quarantineNotArchiveTitle')}>
-          {tr('quarantineNotArchiveText')}
-        </Callout>
-      </HelpSection>
+      <TestsExchangeSections />
 
-      {/* Карантин и устаревание — единственное место, где сказано, по каким
-          числам панель предлагает выключить кейс и вернуть его в строй. */}
-      <HelpSection title={tr('ageingTitle')} caption={tr('ageingCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('ageingLift'), text: tr('ageingLiftText') },
-            { title: tr('ageingMute'), text: tr('ageingMuteText') },
-            { title: tr('ageingStale'), text: tr('ageingStaleText') },
-            { title: tr('ageingNotRun'), text: tr('ageingNotRunText') },
-          ]}
-        />
-        <Callout tone="warning" title={tr('ageingManualTitle')}>
-          {tr('ageingManualText')}
-        </Callout>
-      </HelpSection>
-
-      {/* Риск — единственное место, где написана формула: пять множителей и
-          почему ни один из них не обнуляется. Без неё порядок «по риску»
-          читается как мнение панели, а он счётный. */}
-      <HelpSection title={tr('riskTitle')} caption={tr('riskCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('riskPriority'), text: tr('riskPriorityText') },
-            { title: tr('riskOutcome'), text: tr('riskOutcomeText') },
-            { title: tr('riskInstability'), text: tr('riskInstabilityText') },
-            { title: tr('riskAge'), text: tr('riskAgeText') },
-            { title: tr('riskImpact'), text: tr('riskImpactText') },
-          ]}
-        />
-        <Callout tone="info" title={tr('riskBudgetTitle')}>
-          {tr('riskBudgetText')}
-        </Callout>
-        <Callout tone="warning" title={tr('riskUnknownTitle')}>
-          {tr('riskUnknownText')}
-        </Callout>
-      </HelpSection>
-
-      {/* Готовность релиза — единственное место, где сказано, что вердикт
-          означает и чего он НЕ означает: панель ничего не подписывает. */}
-      <HelpSection title={tr('releaseTitle')} caption={tr('releaseCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('releaseSet'), text: tr('releaseSetText') },
-            { title: tr('releaseTag'), text: tr('releaseTagText') },
-            { title: tr('releaseUntested'), text: tr('releaseUntestedText') },
-            { title: tr('releaseDoc'), text: tr('releaseDocText') },
-          ]}
-        />
-        <Callout tone="warning" title={tr('releaseVerdictTitle')}>
-          {tr('releaseVerdictText')}
-        </Callout>
-        <Callout tone="info" title={tr('releasePrintTitle')}>
-          {tr('releasePrintText')}
-        </Callout>
-      </HelpSection>
-
-      {/* Доступы стенда — единственное место, где сказано, ГДЕ лежит пароль и
-          почему его не видно обратно: без этого его ищут в файле проекта. */}
-      <HelpSection title={tr('secretsTitle')} caption={tr('secretsCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('secretsWhere'), text: tr('secretsWhereText') },
-            { title: tr('secretsSplit'), text: tr('secretsSplitText') },
-            { title: tr('secretsRun'), text: tr('secretsRunText') },
-            { title: tr('secretsMissing'), text: tr('secretsMissingText') },
-          ]}
-        />
-        <Callout tone="info" title={tr('secretsShowTitle')}>
-          {tr('secretsShowText')}
-        </Callout>
-        <Callout tone="warning" title={tr('secretsReservedTitle')}>
-          {tr('secretsReservedText')}
-        </Callout>
-      </HelpSection>
-
-      <HelpSection title={tr('importTitle')} caption={tr('importCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('importResults'), text: tr('importResultsText') },
-            { title: tr('importCases'), text: tr('importCasesText') },
-            { title: tr('importExport'), text: tr('importExportText') },
-          ]}
-        />
-        <Callout tone="warning" title={tr('importMatchTitle')}>
-          {tr('importMatchText')}
-        </Callout>
-      </HelpSection>
-
-      <HelpSection title={tr('defectsTitle')} caption={tr('defectsCaption')}>
-        <StepList
-          steps={[
-            { title: tr('defectStep1'), text: tr('defectStep1Text') },
-            { title: tr('defectStep2'), text: tr('defectStep2Text') },
-            { title: tr('defectStep3'), text: tr('defectStep3Text') },
-          ]}
-        />
-      </HelpSection>
-
-      {/* Терминальный вход стоит СРАЗУ после импорта из CI: человек, который
-          дочитал до «результаты приходят из CI», следующим вопросом спрашивает,
-          как в том же CI позвать линтер, сравнение и сборку плана. */}
-      <HelpSection title={tr('cliTitle')} caption={tr('cliCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('cliLint'), text: tr('cliLintText') },
-            { title: tr('cliDiff'), text: tr('cliDiffText') },
-            { title: tr('cliPlan'), text: tr('cliPlanText') },
-          ]}
-        />
-      </HelpSection>
-
-      {/* Что раздел умеет ТОЛЬКО с настроенными интеграциями. Подробности —
-          отдельный документ; здесь достаточно знать, что эти кнопки есть и
-          откуда они берутся, иначе их ищут в разделе и не находят. */}
-      <HelpSection title={tr('externalTitle')} caption={tr('externalCaption')}>
-        <OptionCards
-          items={[
-            { title: tr('externalDefect'), text: tr('externalDefectText') },
-            { title: tr('externalDefectState'), text: tr('externalDefectStateText') },
-            { title: tr('externalPublish'), text: tr('externalPublishText') },
-            { title: tr('externalPdf'), text: tr('externalPdfText') },
-            { title: tr('externalBaseline'), text: tr('externalBaselineText') },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canLibrary'),
-            tr('canPlans'),
-            tr('canManual'),
-            tr('canAgent'),
-            tr('canDraft'),
-            tr('canImport'),
-            tr('canDefect'),
-            tr('canCoverage'),
-            tr('canQuarantine'),
-            tr('canRelease'),
-            tr('canPhone'),
-          ]}
-          cant={[tr('cantDatabase'), tr('cantSchedule'), tr('cantMerge'), tr('cantUsers')]}
-        />
-      </HelpSection>
+      <TestsLimitsSections />
 
       <TestsNotesSection />
     </>

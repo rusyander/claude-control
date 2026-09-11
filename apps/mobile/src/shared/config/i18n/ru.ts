@@ -334,6 +334,24 @@ export const ru = {
     thisPhone: 'Телефон',
   },
 
+  platform: {
+    title: 'Контур',
+    readOnly: 'Только чтение: ключ вводят в панели, на своей машине.',
+    empty: 'Контуров нет.',
+    state_ok: 'работает',
+    state_off: 'выключен в панели',
+    state_noKey: 'ключ не сохранён',
+    state_failed: 'проба не прошла',
+    state_unchecked: 'ещё не проверялся',
+    state_exhausted: 'контур отказал по бюджету',
+    budget: (spent: string, budget: string, percent: number) =>
+      `Оценка расхода: $${spent} из $${budget} (${percent}%)`,
+    budgetOff: (spent: string) => `Оценка расхода: $${spent}, бюджет не задан`,
+    estimate: 'Это оценка панели по её прайсу, а не счёт контура.',
+    exhaustedAt: (at: string, level: string) =>
+      level ? `Отказ ${at}, предел: ${level}` : `Отказ ${at}`,
+  },
+
   pair: {
     title: 'Подключение',
     screenTitle: 'Спаривание',

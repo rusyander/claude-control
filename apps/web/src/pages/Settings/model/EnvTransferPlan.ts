@@ -1,4 +1,4 @@
-import type { EnvTransferPlanEntry } from '../EnvTransfer.types';
+import type { EnvTransferPlanEntry, EnvTransferPlatformEntry } from '../EnvTransfer.types';
 
 /**
  * Разбор плана разворота архива — отдельно от разметки, потому что это правила,
@@ -17,6 +17,15 @@ export function selectableEntries(entries: EnvTransferPlanEntry[]): EnvTransferP
 /** Что отмечено при открытии плана: только новое. */
 export function defaultSelection(entries: EnvTransferPlanEntry[]): string[] {
   return entries.filter((entry) => entry.status === 'new').map((entry) => entry.archivePath);
+}
+
+/**
+ * Что отмечено в секции контуров при открытии — тоже только новое. Контур,
+ * который здесь уже настроен, перезаписывается чужой настройкой только руками:
+ * на этой машине у него может быть свой адрес, свои проекты и свой бюджет.
+ */
+export function defaultPlatformSelection(entries: EnvTransferPlatformEntry[]): string[] {
+  return entries.filter((entry) => entry.status === 'new').map((entry) => entry.id);
 }
 
 /** Отмечено ли всё, что можно отметить (для переключателя «отметить всё»). */

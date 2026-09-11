@@ -24,6 +24,7 @@ import { ProvidersTopic } from '../topics/ProvidersTopic';
 import { EndpointsTopic } from '../topics/EndpointsTopic';
 import { DlpTopic } from '../topics/DlpTopic';
 import { IntegrationsTopic } from '../topics/IntegrationsTopic';
+import { PlatformTopic } from '../topics/PlatformTopic';
 
 export { HELP_ROUTE } from '@shared/config/routes';
 
@@ -119,6 +120,9 @@ export const HELP_GROUPS: HelpGroup[] = [
       // Рядом со «своим эндпоинтом» намеренно: вопрос один и тот же — куда
       // уходят данные, — и читать эти два документа надо подряд.
       { id: 'dlp', icon: 'lock', pagePath: '/dlp', Content: DlpTopic },
+      // Контур — третий документ того же вопроса: куда уходит запрос, если
+      // моделью распоряжается не вендор, а компания.
+      { id: 'platform', icon: 'flag', pagePath: '/platform', Content: PlatformTopic },
       // Единственный сквозной документ: он объясняет не свой раздел, а почему
       // набор разделов вообще меняется. Своей страницы у него нет, поэтому
       // `pagePath` ведёт в «Настройки» — там стоит переключатель провайдера.

@@ -33,8 +33,9 @@ export function buildPrompt(
   maxChars: number = MAX_PROMPT_CHARS,
 ): BuiltPrompt {
   // Неудавшиеся ответы в контекст не идут: там текст ошибки CLI, а не слова
-  // модели — модель приняла бы их за свою реплику.
-  const usable = history.filter((message) => !message.failed);
+  // модели — модель приняла бы их за свою реплику. Заметки панели — тем более:
+  // это её слова человеку о том, чего не получилось, а не часть разговора.
+  const usable = history.filter((message) => !message.failed && message.role !== 'notice');
   if (usable.length === 0) return { text: '', droppedMessages: 0 };
 
   let start = 0;

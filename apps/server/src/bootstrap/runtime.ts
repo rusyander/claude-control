@@ -12,11 +12,20 @@ import {
 import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { HandoffChains } from '../domains/chat/ChatHandoff.ts';
 import { TreePause } from '../domains/chat/tree-pause.ts';
-import { createForeignStagePlanner, ProviderChatService } from '../domains/provider-chat.ts';
+import { createTreeRuns } from '../domains/chat/tree-runs.ts';
+import { createParentNotice } from '../domains/chat/parent-notice.ts';
+import {
+  appendMessage,
+  createForeignStagePlanner,
+  foreignChatPrefix,
+  readChatCascade,
+  ProviderChatService,
+} from '../domains/provider-chat.ts';
 import { DEFAULT_PROVIDER_ID, getProvider, isKnownProviderId } from '../providers/registry.ts';
 import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/project-tests.ts';
 import { DlpProxy } from '../domains/dlp.ts';
+import { PlatformGateway } from '../domains/platform/gateway/listener.ts';
 import { createRunNotifier } from '../domains/remote-notify.ts';
 import { createTelegramNotifier, type TelegramNotice } from '../domains/notify/telegram.ts';
 import { createWebhookNotifier } from '../domains/notify/webhook.ts';
@@ -68,6 +77,8 @@ export interface Runtime {
   splitReview: SplitReview;
   /** Прокси защиты данных; поднимается отдельно, если включён в настройках. */
   dlpProxy: DlpProxy;
+  /** Шлюз контуров: тот же порядок — создаётся всегда, поднимается по настройке. */
+  platformGateway: PlatformGateway;
   /** Подписчики `/api/events` и рассылка об изменениях файлов. */
   events: EventHub;
   /** Адрес самой панели: его получает переходник MCP при регистрации. */
@@ -204,9 +215,29 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // правок откладывается ею), и запуск прогонов. Ссылка вперёд именно поэтому:
   // узел дерева спрашивает карточку у домена, а домен к тому моменту уже есть.
   const splitReviewRef: { current?: SplitReview } = {};
+  // Заводится ДО дерева: его прогоны входят в дерево переходником
+  // (`createTreeRuns`), а не отдельным деревом.
+  const providerChats = new ProviderChatService();
   const treePause = new TreePause({
     links: () => ctx.store.getChatLinks(),
-    runs: chatRuns,
+    // Прогоны дерева у любого провайдера: реализация выбирается по КЛЮЧУ связи
+    // — именованный (`codex:c1a2…`) ведёт к чужому чату, обычный к реестру.
+    runs: createTreeRuns({
+      registry: chatRuns,
+      chats: providerChats,
+      appDataDir: () => ctx.location.paths.appData,
+      provider: (id) =>
+        id !== DEFAULT_PROVIDER_ID && isKnownProviderId(id) ? getProvider(id) : undefined,
+      models: (provider) => ctx.models.current(provider.modelVendors ?? []).models,
+      // Дописка продолженного прогона собирается заново по шапке разговора: она
+      // нигде не хранится, а без неё продолжённая после паузы работа поехала бы
+      // без инициатив панели и без планки сдачи (Т5).
+      systemPrefix: (providerId, chatId) =>
+        foreignChatPrefix(
+          readChatCascade(ctx.location.paths.appData, providerId, chatId),
+          ctx.store.getSettings(),
+        ) || undefined,
+    }),
     store: {
       get: (root) => ctx.store.getTreePause(root),
       all: () => ctx.store.getTreePauses(),
@@ -219,7 +250,6 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     },
     reviewView: (link) => splitReviewRef.current?.view(link),
   });
-  const providerChats = new ProviderChatService();
   /**
    * Конвейер уровней разделения (Т1). Память — в хранилище (`splitPlans`),
    * запуск групп — тем же лаунчером, что у маршрута `POST /api/chat/split`:
@@ -240,6 +270,19 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * же записи: разбор уровня 1 обещал границы, а здесь панель спрашивает у git,
    * что вышло на самом деле. Ничего не сливает и не правит — только читает.
    */
+  // Слова панели родителю разделения: у Claude — событие прогона, у чужого CLI —
+  // реплика его хранилища. Развилка одна на всех, кому есть что сказать (Т4).
+  const sayToParent = createParentNotice({
+    emitRun: (chatId, event) => chatRuns.emitExternal(chatId, event),
+    appendForeign: (providerId, chatId, text) =>
+      Boolean(
+        appendMessage(ctx.location.paths.appData, providerId, chatId, {
+          role: 'notice',
+          content: text,
+        }),
+      ),
+  });
+
   const splitOverlap = new SplitOverlap({
     git: {
       mergeBase: (mainDir) => readCurrentBranch(mainDir),
@@ -251,7 +294,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     },
     // Заметка идёт в ленту РОДИТЕЛЯ: разделение — его решение, и сводка групп
     // тоже его. Прогона у родителя нет — `false`, и факт подождёт (см. домен).
-    emit: (parentChatId, event) => chatRuns.emitExternal(parentChatId, event),
+    emit: (parentChatId, event) => sayToParent(parentChatId, event),
     log: (message, error) => console.warn(message, error),
   });
   /**
@@ -265,6 +308,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     store: {
       all: () => ctx.store.getChatLinks(),
       set: (chatId, link) => ctx.store.setChatLink(chatId, link),
+      remove: (chatId) => ctx.store.clearChatLink(chatId),
     },
     post: async (url, body) => {
       const token = forgeToken();
@@ -281,8 +325,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       return forgeToken() ? undefined : 'токен форджа не сохранён в настройках панели';
     },
     start: createReviewStarter(ctx, launchDeps),
-    // Заметка — в ленту родителя: карточку решения человек ищет в хабе.
-    emit: (parentChatId, event) => chatRuns.emitExternal(parentChatId, event),
+    // Заметка — в ленту родителя: карточку решения человек ищет в хабе. У
+    // чужого родителя прогона в реестре нет, и та же заметка ложится репликой
+    // его хранилища — развилка одна на всех (Т4).
+    emit: (parentChatId, event) => sayToParent(parentChatId, event),
     log: (message, error) => console.warn(message, error),
   });
   splitReviewRef.current = splitReview;
@@ -300,13 +346,13 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       });
     },
     launch: (record, groups, context) => launchFromRecord(ctx, launchDeps, record, groups, context),
-    startTriage: (record, prompt) =>
+    startTriage: (record, prompt, claim) =>
       createSplitLauncher(ctx, launchDeps, {
         projectPath: record.projectPath,
         parentChatId: record.parentChatId,
         ...(record.request.model ? { model: record.request.model } : {}),
         ...(record.request.effort ? { effort: record.request.effort } : {}),
-      }).startTriage(prompt),
+      }).startTriage(prompt, claim),
     log: (message, error) => console.warn(message, error),
   });
   chatRuns.setHandoffPlanner(
@@ -377,11 +423,35 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       models: (provider) => ctx.models.current(provider.modelVendors ?? []).models,
       settings: () => ctx.store.getSettings(),
       hasWork: (cwd, since) => hasWorkSince(cwd, since),
+      // Связи звеньев: та же группа и тот же родитель, новая стадия — без них
+      // дерево чужого разделения видит одну работу.
+      linkOf: (key) => ctx.store.getChatLink(key),
+      saveLink: (key, link) => ctx.store.setChatLink(key, link),
+      // Стоящее дерево звеньев не запускает: чат заведён, старт в очереди (Т5).
+      gate: treePause,
+      // Уровни (Т3): разбор у чужого CLI кончился — итог применяет тот же
+      // конвейер, что и у Claude, а строка о нём уходит в ленту разбора.
+      onTriage: ({ chatKey, ok, text }) => {
+        const event = splitConveyor.onTriageFinished({ ok, text }, [chatKey]);
+        return event?.kind === 'notice' ? event.text : undefined;
+      },
+      onChainEnded: (link, ok) => splitConveyor.onChainEnded(link, ok),
+      // Ревью MR по ссылке (Т6): тот же домен, что у Claude, — замечания
+      // читаются один раз и ложатся в связь, а решение ждёт человека.
+      onReviewFinished: (input) => splitReview.finished(input),
+      // Продолжение в чистой сессии (Т7): память цепочек ОДНА на оба
+      // провайдера — тумблер, номер шага и отпечаток файла-опоры общие, иначе
+      // «те же пределы» у чужого CLI оказались бы другими.
+      chains: handoffChains,
     }),
   );
   // Прокси защиты данных: тоже слушатель, тоже переживает запрос. Создаётся
   // всегда, поднимается — только если человек включил его в настройках.
   const dlpProxy = new DlpProxy();
+  // Шлюз контуров: тоже слушатель на петле, тоже переживает запрос. Ключ он
+  // читает сам, в момент запроса, — поэтому создаётся без настроек и знает
+  // только состояние панели.
+  const platformGateway = new PlatformGateway();
   const events = createEventHub();
 
   /**
@@ -419,6 +489,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     providerChats.stopAll();
     projectTestRuns.stopAll();
     projectTestManual.stopAll(new Date().toISOString());
+    // Хвост учёта расхода — тоже: он копится пачкой в памяти шлюза, и панель,
+    // закрытая по Ctrl+C или перезапущенная сторожем, унесла бы с собой
+    // последние секунды. Запись синхронная, выход она не задерживает.
+    platformGateway.flushSpend();
   };
 
   return {
@@ -435,6 +509,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     splitOverlap,
     splitReview,
     dlpProxy,
+    platformGateway,
     events,
     selfBaseUrl,
     shutdown,

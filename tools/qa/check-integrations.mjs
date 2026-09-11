@@ -70,7 +70,11 @@ let forgotten;
 let telegramTested = false;
 let savedLink;
 
-await bypassOnboarding(page, { integrations: settings });
+// Заплата настроек держится ссылкой: проверка меняет карточки по ходу, а
+// `bypassOnboarding` захватывает объект один раз — переприсваивание `settings`
+// до страницы бы не дошло.
+const settingsPatch = { integrations: settings };
+await bypassOnboarding(page, settingsPatch);
 
 const problems = [];
 page.on('pageerror', (error) => problems.push(error.message));
@@ -213,6 +217,37 @@ await page.route('**/api/project-tests/plans*', async (route) =>
   route.fulfill({ json: { plans: [] } }),
 );
 await page.route('**/api/project-tests/manual*', async (route) => route.fulfill({ json: {} }));
+// Разбор, риск, карантин и веха спрашиваются самим разделом при открытии. Проект
+// здесь выдуман, поэтому без подмены это 400 в консоли — то есть красная проверка
+// «ошибок нет» про чужую страницу, а не про интеграции.
+await page.route('**/api/project-tests/lint*', async (route) =>
+  route.fulfill({
+    json: {
+      findings: [],
+      byRule: [],
+      duplicates: [],
+      checked: 0,
+      checkedAt: '2026-09-08T10:00:00.000Z',
+    },
+  }),
+);
+await page.route('**/api/project-tests/risk*', async (route) =>
+  route.fulfill({ json: { items: [], checkedAt: '2026-09-08T10:00:00.000Z' } }),
+);
+await page.route('**/api/project-tests/quarantine*', async (route) =>
+  route.fulfill({
+    json: {
+      lift: [],
+      quarantine: [],
+      stale: [],
+      thresholds: { greenStreak: 5, stability: 70, minRuns: 4 },
+      checkedAt: '2026-09-08T10:00:00.000Z',
+    },
+  }),
+);
+await page.route('**/api/project-tests/release*', async (route) =>
+  route.fulfill({ json: { releases: [] } }),
+);
 await page.route('**/api/project-tests/impact*', async (route) =>
   route.fulfill({ json: { files: [], cases: [] } }),
 );
@@ -335,6 +370,48 @@ if ((await forgetButton.count()) > 0) {
   check(forgotten === 'atlassian', `«Забыть» ушло на сервер: ${forgotten}`);
 } else {
   check(false, 'есть кнопка «Забыть токен» у коннектора с ключом');
+}
+
+// ── Включённая карточка без обязательного поля (находка M7 ревью Т9) ────────
+// Test IT без адреса раньше сохранялся ВКЛЮЧЁННЫМ: правило «чего не хватает»
+// гасило тумблер, но не кнопку сохранения — карточка горела зелёным, а первая
+// же операция отвечала «не указан адрес Test IT».
+settings = {
+  ...settings,
+  tms: { enabled: true, kind: 'testit', baseUrl: '', projectKey: 'PRJ-1', groupId: '' },
+};
+settingsPatch.integrations = settings;
+statuses = statuses.map((card) =>
+  card.id === 'tms' ? { ...card, enabled: true, state: 'ok' } : card,
+);
+saved = undefined;
+await page.goto(`${BASE}/settings?tab=integrations`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(1200);
+
+const tmsCard = page
+  .locator('div[class*="padding-md"]')
+  .filter({ hasText: 'Тест-менеджмент' })
+  .last();
+check((await tmsCard.count()) > 0, 'карточка тест-менеджмента на месте');
+if ((await tmsCard.count()) > 0) {
+  const projectField = tmsCard.getByLabel(/Проект/).first();
+  await projectField.fill('PRJ-2');
+  await page.waitForTimeout(300);
+  const tmsSave = tmsCard.getByRole('button', { name: /Сохранить/ }).first();
+  check(
+    await tmsSave.isDisabled(),
+    'правку включённой карточки нельзя сохранить, пока пуст обязательный адрес',
+  );
+
+  await tmsCard.getByLabel(/Адрес/).first().fill('https://testit.acme.local');
+  await page.waitForTimeout(300);
+  check(await tmsSave.isEnabled(), 'адрес заполнен — сохранение снова доступно');
+  await tmsSave.click();
+  await page.waitForTimeout(1000);
+  check(
+    saved?.id === 'tms' && saved?.settings?.baseUrl === 'https://testit.acme.local',
+    `настройка уехала с адресом: ${saved?.settings?.baseUrl}`,
+  );
 }
 
 // ── Привязка проекта в разделе тестов ───────────────────────────────────────

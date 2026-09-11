@@ -6,7 +6,8 @@ import type {
 } from '@agentdeck/contracts';
 import { stepText } from '@agentdeck/contracts/test-format';
 import type { AppStore } from '../../lib/app-store.ts';
-import { gitSync } from '../project-git/exec.ts';
+import { gitSync, gitSyncOutcome } from '../project-git/exec.ts';
+import { GIT_READ_TIMEOUT_MS } from '../project-git/constants.ts';
 import { toAccess } from '../integrations/atlassian/client.ts';
 import { readIssue } from '../integrations/atlassian/jira.ts';
 import { readIntegrations, readToken } from '../integrations/store.ts';
@@ -126,9 +127,37 @@ const RANGE_CANDIDATES = [DEFAULT_DIFF_RANGE, 'origin/master..HEAD', 'main..HEAD
 /** Подпись источника, когда сравнивали не ветки, а незакоммиченные правки. */
 export const WORKING_TREE_RANGE = 'рабочая копия';
 
+/**
+ * Срок диффа — не тот же, что у вопроса «изменилось ли хоть что-то».
+ *
+ * `gitSync` заведён с пятисекундным потолком под мгновенный вопрос планировщика,
+ * а здесь git обходит настоящий дифф ветки: на большом репозитории, на медленном
+ * диске и под антивирусом это дольше пяти секунд легко. Вышедший срок отдавался
+ * тем же «ответа нет», и человек читал про несуществующую ветку в каталоге, где
+ * и репозиторий, и ветка на месте.
+ */
+const DIFF_TIMEOUT_MS = GIT_READ_TIMEOUT_MS;
+
 function changedFiles(root: string, range: string): string[] | undefined {
-  const names = gitSync(root, ['diff', '--name-only', range]);
+  const names = gitSync(root, ['diff', '--name-only', range], DIFF_TIMEOUT_MS);
   return names === undefined ? undefined : cleanPaths(names);
+}
+
+/**
+ * Почему сравнение не получилось — словами, а не одним «не вышло». Срок,
+ * отсутствующий git и настоящий отказ git чинятся в разных местах, а иногда
+ * (срок) не чинятся вовсе, и тогда честнее сказать это прямо.
+ */
+function diffFailure(root: string, range: string): string {
+  const outcome = gitSyncOutcome(root, ['diff', '--name-only', range], DIFF_TIMEOUT_MS);
+  if (outcome.ok) return `Сравнение «${range}» не сделалось.`;
+  if (outcome.reason === 'timeout') {
+    return `Сравнение «${range}» не сделалось: git не ответил за ${DIFF_TIMEOUT_MS / 1000} с. Репозиторий тут ни при чём — так бывает на большом дереве, на медленном диске и под антивирусом.`;
+  }
+  if (outcome.reason === 'no-git') {
+    return 'Команда git не найдена. Установите git или добавьте его в PATH.';
+  }
+  return `Сравнение «${range}» не сделалось: каталог не репозиторий или такой ветки нет.`;
 }
 
 function cleanPaths(raw: string): string[] {
@@ -139,7 +168,8 @@ function cleanPaths(raw: string): string[] {
 }
 
 function statOf(root: string, range: string): string | undefined {
-  return gitSync(root, ['diff', '--stat', range])?.trim().split('\n').slice(-1)[0];
+  // Сводка — тот же обход дерева, что и сам дифф, и срок ей нужен тот же.
+  return gitSync(root, ['diff', '--stat', range], DIFF_TIMEOUT_MS)?.trim().split('\n').slice(-1)[0];
 }
 
 /**
@@ -154,11 +184,7 @@ function diff(root: string, range?: string): ProjectTestGenerateMaterial['diff']
   const explicit = range?.trim();
   if (explicit) {
     const files = changedFiles(root, explicit);
-    if (files === undefined) {
-      throw new ProjectTestsError(
-        `Сравнение «${explicit}» не сделалось: каталог не репозиторий или такой ветки нет.`,
-      );
-    }
+    if (files === undefined) throw new ProjectTestsError(diffFailure(root, explicit));
     if (files.length === 0) {
       throw new ProjectTestsError(`Между «${explicit}» нет изменений — генерировать нечего.`);
     }
@@ -180,7 +206,9 @@ function diff(root: string, range?: string): ProjectTestGenerateMaterial['diff']
   // Ветки чистые или их нет: незакоммиченные правки плюс новые файлы — то, над
   // чем человек работает прямо сейчас.
   const tracked = changedFiles(root, 'HEAD') ?? [];
-  const untracked = cleanPaths(gitSync(root, ['ls-files', '--others', '--exclude-standard']) ?? '');
+  const untracked = cleanPaths(
+    gitSync(root, ['ls-files', '--others', '--exclude-standard'], DIFF_TIMEOUT_MS) ?? '',
+  );
   const files = [...new Set([...tracked, ...untracked])];
   if (files.length === 0) {
     throw new ProjectTestsError(

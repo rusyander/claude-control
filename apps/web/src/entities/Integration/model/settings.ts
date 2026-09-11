@@ -42,7 +42,7 @@ export const DEFAULT_INTEGRATIONS: IntegrationsSettings = {
   atlassian: { enabled: false, baseUrl: '', email: '', deployment: '', confluenceUrl: '' },
   forge: { enabled: false, kind: '', baseUrl: '', repo: '' },
   telegram: { enabled: false, chatId: '', events: [] },
-  tms: { enabled: false, kind: '', projectKey: '', groupId: '' },
+  tms: { enabled: false, kind: '', baseUrl: '', projectKey: '', groupId: '' },
   ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
   webhook: { enabled: false, url: '', events: [] },
 };
@@ -102,7 +102,8 @@ export function readIntegrations(settings: AppSettings | undefined): Integration
     },
     tms: {
       enabled: asFlag(tms.enabled),
-      kind: asOneOf(tms.kind, ['zephyr', 'xray'] as const),
+      kind: asOneOf(tms.kind, ['zephyr', 'xray', 'testit'] as const),
+      baseUrl: asText(tms.baseUrl),
       projectKey: asText(tms.projectKey),
       groupId: asText(tms.groupId),
     },

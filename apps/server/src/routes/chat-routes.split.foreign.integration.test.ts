@@ -36,6 +36,8 @@ describe('POST /api/chat/split — чужой провайдер', () => {
   let appData: string;
   let providerChats: ProviderChatService;
   let runs: ProviderChatRunOptions[];
+  let deferred: string[];
+  let paused = false;
 
   const catalog = [
     { id: 'gpt-5.3-codex-spark', name: 'spark', family: 'gpt-codex-spark', releaseDate: '2026-02' },
@@ -90,10 +92,19 @@ describe('POST /api/chat/split — чужой провайдер', () => {
       start: async () => undefined,
       stop: () => undefined,
     }));
+    deferred = [];
     registerChatSplitRoutes(app, ctx, {
       runs: registry,
       providerChats,
       session: new ChatSession(registry),
+      // Ворота паузы дерева (Т5): по умолчанию открыты, тест их закрывает.
+      gate: {
+        defer: (kind, chatId) => {
+          if (!paused) return false;
+          deferred.push(`${kind}:${chatId}`);
+          return true;
+        },
+      },
     });
     await app.ready();
   });
@@ -189,14 +200,73 @@ describe('POST /api/chat/split — чужой провайдер', () => {
     expect(runs.at(-1)?.effort).toBe('medium');
   });
 
-  it('связь с родителем чужому чату не пишется — ключа, под которым её искать, нет', async () => {
+  /**
+   * Связь чужого чата (Т2). До этой партии её не было вовсе, и без неё слепло
+   * всё разом: хаб родителя, стадии, сверка веток, пауза дерева. Ключ
+   * именованный — идентификатор чужому разговору выдаёт его хранилище, и в одном
+   * пространстве с сессиями Claude он обязан быть однозначным.
+   */
+  it('связь пишется на каждую группу — именованным ключом и с теми же полями', async () => {
     await split();
 
-    // Связь под временным ключом `new-…` была бы записью о разговоре, которого не
-    // существует: у чужого CLI идентификатор выдаёт его собственное хранилище.
-    expect(store.getChatLink('родитель')).toBe(undefined);
-    for (const chat of listChats(appData, 'codex')) {
+    const chats = listChats(appData, 'codex');
+    expect(chats).toHaveLength(2);
+    for (const chat of chats) {
+      // «Голым» идентификатором связь чужого чата не находится: под ним живут
+      // разговоры Claude.
       expect(store.getChatLink(chat.id)).toBe(undefined);
+      const link = store.getChatLink(`codex:${chat.id}`);
+      expect(link).toMatchObject({ parentChatId: 'codex:родитель', title: chat.title });
+      expect(link?.branch).toBeTruthy();
+      expect(link?.createdAt).toBeTruthy();
+    }
+
+    // Понижённая группа несёт в связи то же, что и у Claude: назначение и класс.
+    const lowered = chats.find((item) => item.title === 'Переименования');
+    expect(store.getChatLink(`codex:${lowered?.id}`)).toMatchObject({
+      stage: 'work',
+      model: 'gpt-5.3-codex-spark',
+      effort: 'medium',
+      kind: 'mechanical',
+      lowered: true,
+    });
+
+    // Родитель — не потомок: своей связи у него нет ни под каким ключом.
+    expect(store.getChatLink('родитель')).toBe(undefined);
+    expect(store.getChatLink('codex:родитель')).toBe(undefined);
+  });
+
+  it('родителя не назвали — связей нет, и разделение работает как раньше', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true },
+    });
+    expect(response.statusCode).toBe(200);
+
+    for (const chat of listChats(appData, 'codex')) {
+      expect(store.getChatLink(`codex:${chat.id}`)).toBe(undefined);
+    }
+  });
+
+  /**
+   * Пауза дерева (Т5). Копия и связь заводятся как обычно — иначе после
+   * «Продолжить всё» запускать было бы нечего, — а прогон не идёт.
+   */
+  it('дерево на паузе — группы заведены и связаны, но ни один CLI не запущен', async () => {
+    paused = true;
+    try {
+      const body = await split();
+
+      expect(body.chats.every((chat) => !chat.started)).toBe(true);
+      expect(runs).toHaveLength(0);
+      // Отложены именованные ключи — по ним продолжение и запустит группы.
+      expect(deferred).toHaveLength(2);
+      expect(deferred.every((key) => key.startsWith('split:codex:'))).toBe(true);
+      const links = Object.keys(store.getChatLinks()).filter((key) => key.startsWith('codex:'));
+      expect(links).toHaveLength(2);
+    } finally {
+      paused = false;
     }
   });
 

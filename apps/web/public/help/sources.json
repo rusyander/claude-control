@@ -1,0 +1,166 @@
+{
+  "note": "Какой код описывает каждый раздел справки и каким он был на последней сверке. Код изменился — `pnpm shots` краснеет и называет раздел, файлы и команду. Подтвердить, перечитав документ: node tools/help-shots/sources.mjs <раздел>. Добавить раздел под наблюдение — одна запись в topics: id раздела из pages/Help/model/topics.ts, путь документа, список исходников с причиной и пустыми sha, затем та же команда. Список путей узкий намеренно: модули, несущие описанное поведение, а не дерево целиком.",
+  "topics": [
+    {
+      "topic": "platform",
+      "document": "apps/web/src/pages/Help/topics/PlatformTopic.tsx",
+      "confirmedAt": "2026-09-11T10:37:58.170Z",
+      "sources": [
+        {
+          "path": "packages/contracts/src/compromises.ts",
+          "why": "«Что уже решено»: реестр подписанных компромиссов документ показывает целиком",
+          "sha": "81739a036aff602c"
+        },
+        {
+          "path": "apps/server/src/domains/platform/probe.ts",
+          "why": "«Состояния связи»: пять исходов пробы и что панель узнаёт о ключе",
+          "sha": "868ce5fda74ae6d5"
+        },
+        {
+          "path": "apps/server/src/domains/platform/store.ts",
+          "why": "«Что происходит с ключом»: где он лежит, что уезжает в экспорт, что видно в ответе",
+          "sha": "20083ff1a4602431"
+        },
+        {
+          "path": "apps/server/src/domains/platform/gateway/listener.ts",
+          "why": "«Путь одного запроса»: адрес шлюза, три маршрута, занятый порт",
+          "sha": "5ea0a2ad1c66d7c9"
+        },
+        {
+          "path": "apps/server/src/domains/platform/gateway/pipeline.ts",
+          "why": "«Путь одного запроса»: что панель делает с запросом между CLI и контуром",
+          "sha": "950d528d4d334254"
+        },
+        {
+          "path": "apps/server/src/domains/platform/gateway/status.ts",
+          "why": "«Коды отказов»: таблица 401/402/403/404/429/451/503 и что делать человеку",
+          "sha": "aaff9fda9268a749"
+        },
+        {
+          "path": "apps/server/src/domains/platform/violations.ts",
+          "why": "«Проверки контура»: заблокировано / прервано / замаскировано / без имени",
+          "sha": "466b5ac2a5a6b6c5"
+        },
+        {
+          "path": "apps/web/src/pages/Platform/lib/violationsView.ts",
+          "why": "«Проверки контура»: три разные тишины на карточке, о которых говорит документ",
+          "sha": "4d2512df6f70508c"
+        },
+        {
+          "path": "apps/server/src/domains/platform/agents.ts",
+          "why": "«Агенты контура»: ростер руками, сессия на стороне контура, исходы вызова",
+          "sha": "e9f86da84c59520e"
+        },
+        {
+          "path": "apps/server/src/domains/platform/spend.ts",
+          "why": "«Бюджет и расход»: две цифры, период, исчерпанный ключ (402)",
+          "sha": "4ae4109a3eee67ec"
+        },
+        {
+          "path": "apps/server/src/domains/platform/apply/targets.ts",
+          "why": "«Что работает и что нет», «Как отключить»: цели применения и четыре причины прочерка",
+          "sha": "b62b1ba28144775c"
+        },
+        {
+          "path": "apps/web/src/features/PlatformEditor/model/wizard-logic.ts",
+          "why": "«Подключение»: четыре шага мастера, которые показывает путеводитель по снимкам",
+          "sha": "b5094e7c2247ee44"
+        }
+      ]
+    },
+    {
+      "topic": "chat",
+      "document": "apps/web/src/pages/Help/topics/ChatTopic.tsx",
+      "sources": [
+        {
+          "path": "apps/server/src/domains/chat/ChatRunner.ts",
+          "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
+          "sha": "eef03aa762d7a6f5"
+        },
+        {
+          "path": "apps/server/src/domains/chat/ChatPermissions.ts",
+          "why": "«Карточка разрешения»: как вопрос агента доходит до человека и что значит ответ",
+          "sha": "a99ee03832e86434"
+        },
+        {
+          "path": "apps/server/src/domains/chat/auto-approve.ts",
+          "why": "«Меню разговора»: тумблеры прав и правила, разрешающие без вопроса",
+          "sha": "789ec78a780d3aa9"
+        },
+        {
+          "path": "apps/server/src/domains/chat/ChatHandoff.ts",
+          "why": "«Чистая сессия»: предложение прозой или блоком, потолок цепочки, зацикливание",
+          "sha": "807145d6997bad3b"
+        },
+        {
+          "path": "apps/server/src/domains/chat/ChatSplit.ts",
+          "why": "«Разделить»: карточка предложения, дерево, группы",
+          "sha": "70a4d4b9a9141dbf"
+        },
+        {
+          "path": "apps/server/src/domains/chat/split-conveyor.ts",
+          "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
+          "sha": "91a9ecf65d594ea1"
+        },
+        {
+          "path": "apps/server/src/domains/chat/split-overlap.ts",
+          "why": "«Пересечения веток»: когда считаются и что красное",
+          "sha": "9ecd87b531301e8a"
+        },
+        {
+          "path": "apps/server/src/domains/chat/tree-pause.ts",
+          "why": "«Пауза дерева»: ответ всегда от корня, продолжение всего дерева",
+          "sha": "8b6028cf09486e2d"
+        }
+      ],
+      "confirmedAt": "2026-09-11T11:24:06.128Z"
+    },
+    {
+      "topic": "tests",
+      "document": "apps/web/src/pages/Help/topics/TestsTopic.tsx",
+      "sources": [
+        {
+          "path": "apps/server/src/domains/project-tests/runs.ts",
+          "why": "«Запись прогона»: собирается из файлов кейсов, штамп lastRunId, пустая запись",
+          "sha": "7e587477e8291d48"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/impact.ts",
+          "why": "«Только изменённое»: git status → codePaths → area, пусто ≠ всё",
+          "sha": "8c4bdad0eb14d833"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/manual.ts",
+          "why": "«Ручной проход»: шаги, провал с разбором, доказательство",
+          "sha": "213ca72cedbb67c9"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/quarantine.ts",
+          "why": "«Карантин»: причина, срок, самоочистка, что остаётся видимым",
+          "sha": "1030cd6da7d9e60b"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/baselines.ts",
+          "why": "«Вехи»: вердикт вехи и что его красит",
+          "sha": "36d0f1498e8b693c"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/export-cases.ts",
+          "why": "«Выгрузка junit»: карантинный кейс уезжает как skipped с причиной",
+          "sha": "dfc99a85a4e93fcb"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/import-results.ts",
+          "why": "«Импорт из CI»: отчёт junit становится записью прогона",
+          "sha": "b4117dcf9ed1d5bd"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/coverage.ts",
+          "why": "«Покрытие требований»: ссылки кейсов и JQL, архив не считается",
+          "sha": "fa543dcf41d56e0e"
+        }
+      ],
+      "confirmedAt": "2026-09-11T11:47:40.709Z"
+    }
+  ]
+}

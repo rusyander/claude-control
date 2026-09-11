@@ -1,0 +1,638 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import Fastify, { type FastifyInstance } from 'fastify';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import type { Platform } from '@agentdeck/contracts';
+import { AppStore } from '../lib/app-store.ts';
+import type { ServerContext } from '../context.ts';
+import { writePlatform, writeToken } from '../domains/platform/store.ts';
+import { PlatformGateway } from '../domains/platform/gateway/listener.ts';
+import { registerPlatformRoutes } from './platform-routes.ts';
+
+/**
+ * Маршруты контура целиком, как их видит браузер.
+ *
+ * Два свойства этого файла важнее остальных проверок, и оба — инварианты партии:
+ *
+ * 1. НИ ОДИН ответ раздела не содержит ключа. Проверяется не выборочно, а
+ *    перебором всех маршрутов: маска и «ключ сохранён» — весь наружный след.
+ * 2. Панель не ходит в сеть, пока её не попросили. `fetch` подменён счётчиком, и
+ *    любой маршрут кроме тех, что человек нажимает сам (`/check`, вызов агента,
+ *    сессия агента, эмбеддинги), обязан оставить счётчик на нуле — включённый
+ *    контур с ключом в том числе (инвариант 7: мёртвый контур не мешает панели).
+ */
+
+/** Латиница обязательна: ключ вне печатного ASCII панель не сохраняет (Т12). */
+const SECRET = 'CONTOUR-KEY-CORPORATE-4f21';
+
+const PLATFORM: Platform = {
+  id: 'enterprise-platform-dev',
+  title: 'EnterprisePlatform · dev',
+  driver: 'enterprise-platform',
+  baseUrl: 'https://api.dev.example.ru',
+  enabled: true,
+  mode: 'required',
+  budgetUsd: 100,
+  capabilities: [],
+  targets: ['assistant'],
+  projectPaths: [],
+  agents: [],
+  budgetSince: '',
+  caCertPath: '',
+};
+
+const MODELS = JSON.stringify({ data: [{ id: 'gpt-4o', kind: 'chat' }] });
+
+let root: string;
+let appData: string;
+let app: FastifyInstance;
+let store: AppStore;
+/** Сколько раз панель вышла наружу за тест. Ноль везде, кроме `/check`. */
+let calls: string[];
+
+beforeEach(async () => {
+  root = mkdtempSync(join(tmpdir(), 'cc-platform-routes-'));
+  appData = join(root, 'agentdeck');
+  mkdirSync(appData, { recursive: true });
+  store = new AppStore(appData);
+
+  calls = [];
+  vi.stubGlobal('fetch', (url: string) => {
+    calls.push(String(url));
+    return Promise.resolve(
+      new Response(MODELS, { headers: { 'content-type': 'application/json' } }),
+    );
+  });
+
+  app = Fastify();
+  registerPlatformRoutes(
+    app,
+    {
+      location: { paths: { root, appData } },
+      store,
+    } as unknown as ServerContext,
+    new PlatformGateway(),
+  );
+  await app.ready();
+});
+
+afterEach(async () => {
+  await app.close();
+  vi.unstubAllGlobals();
+  rmSync(root, { recursive: true, force: true });
+});
+
+describe('platform routes: настройка контура', () => {
+  it('контуров нет — пустой список, а не отказ', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/platforms' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().platforms).toEqual([]);
+  });
+
+  it('сохранённый контур возвращается карточкой и переживает перезапуск панели', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: PLATFORM },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().platform.title).toBe('EnterprisePlatform · dev');
+    // Читаем с диска новым хранилищем: настройка легла в state.json, а не в память.
+    expect(new AppStore(appData).getSettings().platforms).toHaveLength(1);
+  });
+
+  it('идентификатор в адресе и в теле обязаны совпадать: ключ лежит под старым', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: { ...PLATFORM, id: 'enterprise-platform-prod' } },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().detail).toBe('id');
+  });
+
+  it('непрочитанный корневой сертификат — отказ при СОХРАНЕНИИ, с именем поля', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: { ...PLATFORM, caCertPath: join(root, 'нет-такого.pem') } },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().detail).toBe('caCertPath');
+    expect(calls).toEqual([]);
+  });
+
+  it('настоящий сертификат сохраняется молча — файл разобран, а не угадан', async () => {
+    const pem = join(root, 'corp-root.pem');
+    writeFileSync(
+      pem,
+      readFileSync(
+        join(import.meta.dirname, '..', 'domains', 'platform', '__fixtures__', 'corp-root.pem'),
+      ),
+    );
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: { ...PLATFORM, caCertPath: pem } },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('не сертификат под видом сертификата — 400 при сохранении, а не отказ связи потом', async () => {
+    const fake = join(root, 'не-сертификат.pem');
+    writeFileSync(fake, '-----BEGIN CERTIFICATE-----\nтекст\n-----END CERTIFICATE-----\n');
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: { ...PLATFORM, caCertPath: fake } },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().detail).toBe('caCertPath');
+    expect(store.getSettings().platforms).toEqual([]);
+  });
+
+  it('ключ можно сохранить вместе с настройкой — мастер делает это одним нажатием', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: PLATFORM, token: SECRET },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().hasToken).toBe(true);
+    expect(res.body).not.toContain(SECRET);
+  });
+
+  it('настройка БЕЗ поля ключа сохранённый ключ не трогает', async () => {
+    writePlatform(store, PLATFORM);
+    writeToken(appData, PLATFORM.id, SECRET);
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: { ...PLATFORM, title: 'EnterprisePlatform · prod' } },
+    });
+
+    expect(res.json().hasToken).toBe(true);
+    expect(res.json().platform.title).toBe('EnterprisePlatform · prod');
+  });
+
+  it('ключ не строкой рядом с настройкой — 400, и настройка не сохранена', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: PLATFORM, token: 42 },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().detail).toBe('token');
+    expect(store.getSettings().platforms).toEqual([]);
+  });
+
+  it('слишком длинный ключ тоже не оставляет половину сохранённого', async () => {
+    // Отказ на ключе ПОСЛЕ записанной настройки оставил бы контур, которого
+    // человек отдельно от ключа не просил.
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: PLATFORM, token: 'x'.repeat(9_000) },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().detail).toBe('token');
+    expect(store.getSettings().platforms).toEqual([]);
+  });
+
+  it('слишком короткий ключ отклонён: чистка чужого текста его бы не поймала', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: PLATFORM, token: 'sk-live' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().detail).toBe('token');
+    expect(store.getSettings().platforms).toEqual([]);
+  });
+
+  it('идентификатор с пробелом или слэшем отклонён: из него собирается адрес шлюза', async () => {
+    for (const id of ['enterprise-platform dev', 'enterprise-platform/dev', '../etc']) {
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/platforms/${encodeURIComponent(id)}`,
+        payload: { settings: { ...PLATFORM, id } },
+      });
+
+      expect(res.statusCode).toBe(400);
+    }
+    expect(store.getSettings().platforms).toEqual([]);
+  });
+
+  it('удаление уносит контур; повторное удаление — 404 с его именем', async () => {
+    writePlatform(store, PLATFORM);
+
+    const first = await app.inject({ method: 'DELETE', url: '/api/platforms/enterprise-platform-dev' });
+    expect(first.statusCode).toBe(200);
+    expect(first.json().platforms).toEqual([]);
+
+    const second = await app.inject({ method: 'DELETE', url: '/api/platforms/enterprise-platform-dev' });
+    expect(second.statusCode).toBe(404);
+    expect(second.json().code).toBe('platform_not_found');
+    expect(second.json().message).toContain('enterprise-platform-dev');
+  });
+
+  it('несуществующий контур — 404 на каждом маршруте, который его требует', async () => {
+    const answers = await Promise.all([
+      app.inject({ method: 'POST', url: '/api/platforms/нет-такого/check' }),
+      app.inject({ method: 'DELETE', url: '/api/platforms/нет-такого' }),
+      app.inject({
+        method: 'PUT',
+        url: '/api/platforms/нет-такого/token',
+        payload: { token: SECRET },
+      }),
+    ]);
+
+    for (const res of answers) {
+      expect(res.statusCode).toBe(404);
+      expect(res.json().code).toBe('platform_not_found');
+    }
+  });
+
+  it('ключ не строкой — 400 с именем поля, а не 500', async () => {
+    writePlatform(store, PLATFORM);
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev/token',
+      payload: { token: 42 },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().detail).toBe('token');
+  });
+});
+
+describe('platform routes: проверка связи', () => {
+  it('проба запоминается и приезжает в следующем списке', async () => {
+    writePlatform(store, PLATFORM);
+
+    const check = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/check' });
+    expect(check.statusCode).toBe(200);
+    expect(check.json().outcome).toBe('ok');
+    expect(calls).toEqual(['https://api.dev.example.ru/v1/models']);
+
+    const list = await app.inject({ method: 'GET', url: '/api/platforms' });
+    expect(list.json().platforms[0].health.outcome).toBe('ok');
+  });
+
+  it('недоступный контур — 200 с причиной, а не 502 в консоли браузера', async () => {
+    writePlatform(store, PLATFORM);
+    vi.stubGlobal('fetch', () => Promise.reject(new Error('ECONNREFUSED')));
+
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/check' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().outcome).toBe('unreachable');
+    expect(res.json().detail).toContain('ECONNREFUSED');
+  });
+
+  it('выключенный контур проверяется по кнопке: мастер проверяет ДО включения', async () => {
+    writePlatform(store, { ...PLATFORM, enabled: false });
+
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/check' });
+
+    expect(res.json().outcome).toBe('ok');
+  });
+});
+
+describe('инвариант 1: ни один ответ раздела не содержит ключа', () => {
+  it('перебор всех маршрутов — наружу уходит только маска', async () => {
+    writePlatform(store, PLATFORM);
+
+    const answers = [
+      await app.inject({
+        method: 'PUT',
+        url: '/api/platforms/enterprise-platform-dev/token',
+        payload: { token: SECRET },
+      }),
+      await app.inject({ method: 'GET', url: '/api/platforms' }),
+      await app.inject({
+        method: 'PUT',
+        url: '/api/platforms/enterprise-platform-dev',
+        payload: { settings: { ...PLATFORM, title: 'EnterprisePlatform · prod' } },
+      }),
+      await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/check' }),
+      await app.inject({ method: 'DELETE', url: '/api/platforms/enterprise-platform-dev' }),
+    ];
+
+    for (const res of answers) {
+      expect(res.statusCode).toBe(200);
+      expect(res.body).not.toContain(SECRET);
+    }
+
+    // Маска при этом человеку видна: иначе он не узнает, какой ключ сохранён.
+    expect(answers[0]!.json().maskedToken).toContain('…');
+    expect(answers[1]!.json().platforms[0].hasToken).toBe(true);
+    // Ключ уехал в контур заголовком — и только туда.
+    expect(calls).toEqual(['https://api.dev.example.ru/v1/models']);
+  });
+
+  it('в сеть ходят ровно два маршрута — и это видно по исходникам, а не по одному модулю', () => {
+    // Тест с поднятым Fastify доказывает только свой модуль. Настоящее свойство
+    // — «панель ходит наружу ПО НАЖАТИЮ» — держится тем, что позвать пробу
+    // больше неоткуда: ни из старта, ни из наблюдателя, ни по расписанию.
+    const src = join(import.meta.dirname, '..');
+    const callers: string[] = [];
+
+    const walk = (path: string): void => {
+      for (const entry of readdirSync(path, { withFileTypes: true })) {
+        const full = join(path, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith('.ts') && !entry.name.includes('.test.')) {
+          if (/\bcheckPlatform\s*\(|\bprobePlatform\s*\(/.test(readFileSync(full, 'utf8'))) {
+            callers.push(entry.name);
+          }
+        }
+      }
+    };
+    walk(src);
+
+    // Объявление в самих модулях домена — не вызов, поэтому они здесь законны.
+    //
+    // `model-routes.ts` добавлен Т5 ОСОЗНАННО и ровно с той же оговоркой:
+    // каталог из контура обновляется только по кнопке (`refresh=true`), а без
+    // неё берётся из следа последней пробы. Открытие настроек к контуру не
+    // ходит — это проверяет отдельный тест ниже. Список здесь короткий
+    // намеренно: он и есть перечень мест, откуда панель вообще может позвонить
+    // в контур, и вырасти он может только правкой этой строки.
+    expect(callers.sort()).toEqual([
+      'check.ts',
+      'model-routes.ts',
+      'platform-routes.ts',
+      'probe.ts',
+    ]);
+  });
+
+  describe('агенты и эмбеддинги', () => {
+    const AGENT = '4b0d1f5e-0000-4000-8000-000000000000';
+
+    /** Ответ контура на нужной ручке; остальные оставляем счётчику. */
+    const answerWith = (body: string, status = 200): void => {
+      vi.stubGlobal('fetch', (url: string) => {
+        calls.push(String(url));
+        return Promise.resolve(
+          new Response(status === 204 ? null : body, {
+            status,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
+      });
+    };
+
+    it('вызов агента у неподключённого контура — 404 и НИ ОДНОГО запроса наружу', async () => {
+      writePlatform(store, { ...PLATFORM, enabled: false });
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/platforms/${PLATFORM.id}/agents/ask`,
+        payload: { agent: AGENT, message: 'привет' },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json().code).toBe('platform_not_connected');
+      expect(calls).toEqual([]);
+    });
+
+    it('нет лицензии agentbox — 200 с исходом «недоступно», а не отказ маршрута', async () => {
+      writePlatform(store, PLATFORM);
+      writeToken(appData, PLATFORM.id, SECRET);
+      answerWith(JSON.stringify({ error: 'module_not_licensed' }), 403);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/platforms/${PLATFORM.id}/agents/ask`,
+        payload: { agent: AGENT, message: 'привет' },
+      });
+
+      // 200 намеренно: отсутствующая возможность — это состояние карточки, а не
+      // сбой панели, и красной ошибки в консоли браузера здесь быть не должно.
+      expect(res.statusCode).toBe(200);
+      expect(res.json().outcome).toBe('unavailable');
+      expect(res.payload).not.toContain(SECRET);
+    });
+
+    it('без вопроса — 400 с именем поля, без похода по сети', async () => {
+      writePlatform(store, PLATFORM);
+      writeToken(appData, PLATFORM.id, SECRET);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/platforms/${PLATFORM.id}/agents/ask`,
+        payload: { agent: AGENT },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(calls).toEqual([]);
+    });
+
+    it('сессия читается и сбрасывается по адресу контура', async () => {
+      writePlatform(store, PLATFORM);
+      writeToken(appData, PLATFORM.id, SECRET);
+      answerWith(JSON.stringify({ sessions: [] }));
+
+      const read = await app.inject({
+        method: 'GET',
+        url: `/api/platforms/${PLATFORM.id}/agents/sessions/ses-1?agent=${AGENT}`,
+      });
+      expect(read.statusCode).toBe(200);
+      expect(read.json().empty).toBe(true);
+
+      answerWith('', 204);
+      const reset = await app.inject({
+        method: 'DELETE',
+        url: `/api/platforms/${PLATFORM.id}/agents/sessions/ses-1`,
+      });
+      expect(reset.statusCode).toBe(200);
+      expect(calls.every((url) => url.includes('/v1/agent/sessions/ses-1'))).toBe(true);
+    });
+
+    it('эмбеддинги: один текст строкой принимается, ключ в ответе не появляется', async () => {
+      writePlatform(store, PLATFORM);
+      writeToken(appData, PLATFORM.id, SECRET);
+      answerWith(
+        JSON.stringify({ model: 'ru-embed', data: [{ index: 0, embedding: [0.1, 0.2] }] }),
+      );
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/platforms/${PLATFORM.id}/embeddings`,
+        payload: { model: 'ru-embed', input: 'раз' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().dimensions).toBe(2);
+      expect(res.payload).not.toContain(SECRET);
+    });
+
+    it('эмбеддинги без модели — 400, и в сеть панель не идёт', async () => {
+      writePlatform(store, PLATFORM);
+      writeToken(appData, PLATFORM.id, SECRET);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/platforms/${PLATFORM.id}/embeddings`,
+        payload: { input: ['раз'] },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(calls).toEqual([]);
+    });
+  });
+
+  it.each([true, false])(
+    'контур (enabled=%s) не делает НИ ОДНОГО запроса при старте панели',
+    async (enabled) => {
+      writePlatform(store, { ...PLATFORM, enabled });
+      writeToken(appData, PLATFORM.id, SECRET);
+
+      // Заново поднятая панель с готовым контуром: это и есть «старт панели».
+      const booted = Fastify();
+      registerPlatformRoutes(
+        booted,
+        {
+          location: { paths: { root, appData } },
+          store: new AppStore(appData),
+        } as unknown as ServerContext,
+        new PlatformGateway(),
+      );
+      await booted.ready();
+
+      const list = await booted.inject({ method: 'GET', url: '/api/platforms' });
+      await booted.close();
+
+      expect(list.json().platforms[0].hasToken).toBe(true);
+      expect(calls).toEqual([]);
+    },
+  );
+});
+
+describe('platform routes: расход и бюджет (Т8)', () => {
+  /** Расход прямо в состоянии панели — так его пишет шлюз, минуя маршруты. */
+  const seedSpend = (patch: { usd?: number; exhaustedAt?: string } = {}): void => {
+    store.savePlatformSpend({
+      platformId: PLATFORM.id,
+      days: [
+        {
+          day: '2026-09-01',
+          requests: 1,
+          promptTokens: 3_000_000,
+          completionTokens: 0,
+          totalTokens: 3_000_000,
+          money: { usd: 9, pricedTokens: 3_000_000, unpricedTokens: 0, unpricedModels: [] },
+        },
+        {
+          day: '2026-09-10',
+          requests: 2,
+          promptTokens: 2_000_000,
+          completionTokens: 0,
+          totalTokens: 2_000_000,
+          money: {
+            usd: patch.usd ?? 20,
+            pricedTokens: 0,
+            unpricedTokens: 2_000_000,
+            unpricedModels: ['corp-l'],
+          },
+        },
+      ],
+      ...(patch.exhaustedAt ? { exhaustedAt: patch.exhaustedAt } : {}),
+    });
+  };
+
+  it('карточка списка несёт итог по бюджету и расход за период', async () => {
+    writePlatform(store, { ...PLATFORM, budgetUsd: 100, budgetSince: '2026-09-10' });
+    seedSpend();
+
+    const card = (await app.inject({ method: 'GET', url: '/api/platforms' })).json().platforms[0];
+    // Период считается от названного дня: сентябрьское первое в бюджет не вошло.
+    // И считается она по НАШЕМУ прайсу: «внутренней единицы контура» больше нет.
+    expect(card.budget).toMatchObject({ tracked: true, spentUsd: 20, share: 0.2 });
+    expect(card.budget).not.toHaveProperty('spentUnitUsd');
+    expect(card.periodSpend.requests).toBe(2);
+    expect(card.periodSpend.money.unpricedModels).toEqual(['corp-l']);
+    // И ни одного похода наружу ради этих цифр.
+    expect(calls).toEqual([]);
+  });
+
+  it('маршрут расхода отдаёт дни целиком, а период — суммой', async () => {
+    writePlatform(store, { ...PLATFORM, budgetSince: '2026-09-10' });
+    seedSpend();
+
+    const res = await app.inject({ method: 'GET', url: '/api/platforms/enterprise-platform-dev/spend' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.days).toHaveLength(2);
+    expect(body.total.totalTokens).toBe(5_000_000);
+    expect(body.period.totalTokens).toBe(2_000_000);
+    expect(calls).toEqual([]);
+  });
+
+  it('расхода ещё не было — ноль, а не отказ', async () => {
+    writePlatform(store, PLATFORM);
+    const body = (
+      await app.inject({ method: 'GET', url: '/api/platforms/enterprise-platform-dev/spend' })
+    ).json();
+    expect(body.days).toEqual([]);
+    expect(body.budget.exhausted).toBe(false);
+  });
+
+  it('нет такого контура — 404, а не пустой расход', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/platforms/чужой/spend' });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('отметку «исчерпан» снимает только человек, и она переживает перезапуск', async () => {
+    writePlatform(store, PLATFORM);
+    seedSpend({ exhaustedAt: '2026-09-10T10:00:00.000Z' });
+
+    // Читается из состояния на диске — то есть переживает перезапуск панели.
+    const before = (await app.inject({ method: 'GET', url: '/api/platforms' })).json().platforms[0];
+    expect(before.budget).toMatchObject({
+      exhausted: true,
+      exhaustedAt: '2026-09-10T10:00:00.000Z',
+    });
+
+    const cleared = await app.inject({
+      method: 'DELETE',
+      url: '/api/platforms/enterprise-platform-dev/spend/exhausted',
+    });
+    expect(cleared.json().cleared).toBe(true);
+    expect(cleared.json().budget.exhausted).toBe(false);
+
+    // Повтор — не отказ: снимать уже нечего, и это законное состояние кнопки.
+    const again = await app.inject({
+      method: 'DELETE',
+      url: '/api/platforms/enterprise-platform-dev/spend/exhausted',
+    });
+    expect(again.statusCode).toBe(200);
+    expect(again.json().cleared).toBe(false);
+    // Расход при этом не потерян: снимается отметка, а не учёт.
+    expect(again.json().total.totalTokens).toBe(5_000_000);
+  });
+
+  it('удалённый контур уносит свой расход: идентификатор заводят заново', async () => {
+    writePlatform(store, PLATFORM);
+    seedSpend();
+
+    await app.inject({ method: 'DELETE', url: '/api/platforms/enterprise-platform-dev' });
+    expect(store.getPlatformSpend()['enterprise-platform-dev']).toBeUndefined();
+  });
+});

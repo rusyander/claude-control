@@ -116,6 +116,27 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     summary,
     draft: parseDraftOutcome(record.draft),
     generate: parseStamp(record.generate),
+    tms: parseTms(record.tms),
+  };
+}
+
+/**
+ * След отправки в тест-менеджмент. Разбирается так же придирчиво, как всё
+ * остальное: по этому полю повторная отправка решает, что ран уже есть, и
+ * мусор в нём означал бы либо отказ чужой системы, либо попадание в чужой ран.
+ */
+function parseTms(raw: unknown): ProjectTestRunRecord['tms'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = raw as Record<string, unknown>;
+  const kind = optional(value.kind);
+  const runId = optional(value.runId);
+  if (!runId || (kind !== 'zephyr' && kind !== 'xray' && kind !== 'testit')) return undefined;
+  return {
+    kind,
+    runId,
+    url: optional(value.url),
+    pushed: typeof value.pushed === 'number' ? value.pushed : 0,
+    pushedAt: optional(value.pushedAt) ?? '',
   };
 }
 

@@ -24,6 +24,7 @@ export type {
   ProviderCli,
   ProviderEndpointApiKind,
   ProviderEndpointConfig,
+  ProviderEndpointFile,
   ProviderEndpointVars,
 } from './types/assistant.ts';
 

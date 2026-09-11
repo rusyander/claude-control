@@ -93,6 +93,57 @@ describe('integrations-routes: поверхность', () => {
     expect(response.json()).toMatchObject({ code: 'invalid_body' });
   });
 
+  /**
+   * Находка M7 ревью Т9: карточка тест-менеджмента включалась без адреса.
+   * Проверка идёт через настоящий PUT — тем же маршрутом ходят телефон и curl,
+   * а форма браузера была единственным местом, где правило вообще жило.
+   */
+  describe('включённый тест-менеджмент обязан быть рабочим', () => {
+    const tms = (extra: Record<string, unknown>) => ({
+      settings: {
+        enabled: true,
+        kind: 'testit',
+        baseUrl: 'https://testit.acme.local',
+        projectKey: 'PRJ-1',
+        groupId: '',
+        ...extra,
+      },
+    });
+
+    it('Test IT без адреса не сохраняется включённым', async () => {
+      const response = await put('/api/integrations/tms', tms({ baseUrl: '   ' }));
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ code: 'invalid_body' });
+      expect(JSON.stringify(response.json())).toContain('baseUrl');
+    });
+
+    it('без вида и без проекта — тоже отказ, и поле названо', async () => {
+      for (const [field, patch] of [
+        ['kind', { kind: '' }],
+        ['projectKey', { projectKey: '' }],
+      ] as const) {
+        const response = await put('/api/integrations/tms', tms(patch));
+        expect(response.statusCode).toBe(400);
+        expect(JSON.stringify(response.json())).toContain(field);
+      }
+    });
+
+    it('Zephyr адреса не требует: у облака он общий на всех', async () => {
+      const response = await put(
+        '/api/integrations/tms',
+        tms({ kind: 'zephyr', baseUrl: '', projectKey: 'GOR' }),
+      );
+      expect(response.statusCode).toBe(200);
+    });
+
+    it('выключенную карточку заполняют в несколько заходов — половина формы сохраняется', async () => {
+      const response = await put('/api/integrations/tms', {
+        settings: { enabled: false, kind: 'testit', baseUrl: '', projectKey: '', groupId: '' },
+      });
+      expect(response.statusCode).toBe(200);
+    });
+  });
+
   it('проверка связи отвечает состоянием карточки, а не отказом', async () => {
     await connect();
     vi.stubGlobal('fetch', () => Promise.resolve(new Response('denied', { status: 401 })));

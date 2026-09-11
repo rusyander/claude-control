@@ -24,6 +24,11 @@ export const DEFAULT_STATE: AppState = {
   // Пусто — ни одна внешняя система ещё не проверялась и ничего не привязано.
   integrationHealth: {},
   integrationLinks: {},
+  // Пусто — ни один контур не проверялся. Панель не ходит наружу, пока её не
+  // попросили: пробы при старте нет ни одной, даже у включённого контура.
+  platformHealth: {},
+  platformApplied: {},
+  platformSpend: {},
   // Пусто — копии получают встроенный список зеркала; сюда пишутся только проекты,
   // где человек его дополнил.
   worktreeMirror: {},
@@ -60,8 +65,18 @@ export const DEFAULT_STATE: AppState = {
     handoffContextLimit: 0,
     handoffAutoDefault: true,
     autoUpdateModels: true,
+    // Каталог по умолчанию открытый: контур есть не у всех, а список ключа
+    // появляется только после того, как контур настроен и проверен.
+    modelSource: 'models.dev',
+    modelSourcePlatform: '',
     previewProviderWrites: true,
     endpointProfiles: [],
+    // Ни одного контура: панель ходит туда, куда ходила, пока его не завели.
+    platforms: [],
+    // Шлюз выключен: слушатель на петле поднимается только по просьбе человека.
+    // Поток по умолчанию включён — не-потоковый вызов контур рвёт на 120-й
+    // секунде, и выключать это значит соглашаться на обрыв длинного ответа.
+    platformGateway: { enabled: false, port: 5179, forceStream: true },
     assistantEndpointId: '',
     dlp: {
       enabled: false,
@@ -88,7 +103,7 @@ export const DEFAULT_STATE: AppState = {
       atlassian: { enabled: false, baseUrl: '', email: '', deployment: '', confluenceUrl: '' },
       forge: { enabled: false, kind: '', baseUrl: '', repo: '' },
       telegram: { enabled: false, chatId: '', events: ['runError', 'testFailed'] },
-      tms: { enabled: false, kind: '', projectKey: '', groupId: '' },
+      tms: { enabled: false, kind: '', baseUrl: '', projectKey: '', groupId: '' },
       ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
       webhook: { enabled: false, url: '', events: ['runError', 'testFailed'] },
     },

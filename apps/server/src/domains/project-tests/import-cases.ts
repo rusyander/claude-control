@@ -396,6 +396,21 @@ function columnIndex(reference: string): number {
 }
 
 /** Таблица → кейсы. Первая строка — заголовки; строки без названия пропускаются. */
+/**
+ * Поле кейса по человеческому заголовку — ТЕМ ЖЕ словарём, что и колонки
+ * таблицы. Существует ради импорта из markdown: у него заголовки разделов, а не
+ * колонки, но словарь обязан быть один — второй разошёлся бы с первым молча.
+ */
+export function caseFieldOf(name: string): keyof ParsedCaseRow | undefined {
+  return HEADERS[normalizeHeader(name)];
+}
+
+/** Обратная сторона того же словаря: имя колонки, под которым читается поле. */
+export function headerFor(field: keyof ParsedCaseRow): string {
+  for (const [name, value] of Object.entries(HEADERS)) if (value === field) return name;
+  return field;
+}
+
 export function parseRows(rows: string[][]): ParsedCaseRow[] {
   const header = rows[0];
   if (!header) return [];
@@ -584,6 +599,16 @@ export function toCase(row: ParsedCaseRow, id: string, now: string): ProjectTest
   };
 }
 
+/**
+ * Идентификатор кейса, который можно взять из чужого файла как есть.
+ *
+ * Буквы ЛЮБОГО алфавита: ручные кейсы в русских командах называются `ТК-12`, и
+ * латинская `\w` переименовывала их в `<группа>-001` — то есть теряла ровно то,
+ * по чему человек этот кейс и ищет. Двоеточие и пробел не пускаем: пара
+ * «группа:кейс» служит ключом результатов прогона.
+ */
+export const CASE_ID = /^[\p{L}\p{N}_-]{1,40}$/u;
+
 /** Свободный идентификатор кейса в группе. */
 export function freeCaseId(groupId: string, taken: Set<string>, seed: number): string {
   let index = seed;
@@ -608,8 +633,10 @@ export function applyRows(
   groupId: string,
   rows: ParsedCaseRow[],
   now: string,
-): { matched: number; created: number } {
+): { matched: number; created: number; conflicts: string[] } {
   const group = requireGroup(root, groupId);
+  /** Строки, чей номер уже занят другой строкой этого же импорта. */
+  const conflicts: string[] = [];
   const taken = new Set(group.cases.map((item) => item.id));
   const byId = new Map(group.cases.map((item) => [item.id.toLowerCase(), item.id]));
   const byTitle = new Map(group.cases.map((item) => [item.title.trim().toLowerCase(), item.id]));
@@ -618,11 +645,31 @@ export function applyRows(
   let created = 0;
   let seed = group.cases.length + 1;
   const cases = [...group.cases];
+  /** Идентификаторы, уже занятые строками ЭТОГО импорта. */
+  const seenInBatch = new Set<string>();
 
   for (const row of rows) {
-    const existingId =
-      (row.id ? byId.get(row.id.toLowerCase()) : undefined) ??
-      byTitle.get(row.title.trim().toLowerCase());
+    const rowId = row.id?.trim();
+    const usableId = rowId && CASE_ID.test(rowId) ? rowId : undefined;
+
+    // Два файла с одним номером (`QA/auth/ТК-1.md` и `QA/billing/ТК-1.md`) —
+    // конфликт в самих исходниках, а не повод придумать второму другой номер.
+    // Придуманный номер жил ровно до следующего импорта: тогда ОБЕ строки
+    // находили один кейс по номеру, и вторая затирала первую насмерть. Первая
+    // строка выигрывает, остальные названы в «не легло».
+    if (usableId && seenInBatch.has(usableId.toLowerCase())) {
+      conflicts.push(row.title || usableId);
+      continue;
+    }
+    if (usableId) seenInBatch.add(usableId.toLowerCase());
+
+    // Номер сильнее названия. Раньше совпадение по названию перебивало ЖИВОЙ,
+    // свободный и отличный от него номер: два кейса с одинаковым заголовком в
+    // разных разделах схлопывались в один, и `ТК-11` не появлялся никогда —
+    // при том что весь смысл номера в том, что им кейс зовут в дефекте и в MR.
+    const existingId = usableId
+      ? byId.get(usableId.toLowerCase())
+      : byTitle.get(row.title.trim().toLowerCase());
     if (existingId) {
       const at = cases.findIndex((item) => item.id === existingId);
       const previous = cases[at];
@@ -641,19 +688,19 @@ export function applyRows(
       matched += 1;
       continue;
     }
-    const id =
-      row.id && !taken.has(row.id) && /^[\w-]{1,40}$/.test(row.id)
-        ? row.id
-        : freeCaseId(groupId, taken, seed);
+    const id = usableId && !taken.has(usableId) ? usableId : freeCaseId(groupId, taken, seed);
     taken.add(id);
     seed += 1;
     cases.push(toCase(row, id, now));
     byTitle.set(row.title.trim().toLowerCase(), id);
+    // Заведённый кейс обязан быть виден следующим строкам ТОГО ЖЕ импорта:
+    // иначе повторная строка с тем же номером заводила бы двойник.
+    byId.set(id.toLowerCase(), id);
     created += 1;
   }
 
   writeGroup(root, { ...group, cases });
-  return { matched, created };
+  return { matched, created, conflicts };
 }
 
 /** Импорт кейсов в одну группу. Группа должна существовать — её заводит панель. */
@@ -668,13 +715,15 @@ export function importCases(root: string, input: ImportCasesInput): ProjectTestI
     );
   }
 
-  const { matched, created } = applyRows(root, input.groupId, parsed, now);
+  const { matched, created, conflicts } = applyRows(root, input.groupId, parsed, now);
   return {
     format: input.format,
     read: parsed.length,
     matched,
     created,
-    unmatched: [],
+    // Строки с занятым номером названы, а не проглочены: молча придуманный
+    // номер жил ровно до следующего импорта и затирал чужой кейс.
+    unmatched: conflicts,
   };
 }
 

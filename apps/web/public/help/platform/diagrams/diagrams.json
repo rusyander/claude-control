@@ -1,0 +1,33 @@
+{
+  "topic": "platform",
+  "source": "docs/diagrams/platform-guide/platform-guide.drawio",
+  "pages": [
+    {
+      "name": "request-path",
+      "file": "request-path.png",
+      "page": 1,
+      "source": "09e6210bbf623307",
+      "width": 1060,
+      "height": 1218,
+      "exportedAt": "2026-09-11T11:00:20.085Z"
+    },
+    {
+      "name": "who-creates-what",
+      "file": "who-creates-what.png",
+      "page": 2,
+      "source": "6eb4d5db3b98892d",
+      "width": 1118,
+      "height": 1008,
+      "exportedAt": "2026-09-11T11:00:23.180Z"
+    },
+    {
+      "name": "two-systems",
+      "file": "two-systems.png",
+      "page": 3,
+      "source": "31b4487f9983bbc2",
+      "width": 1717,
+      "height": 1328,
+      "exportedAt": "2026-09-11T11:00:26.361Z"
+    }
+  ]
+}

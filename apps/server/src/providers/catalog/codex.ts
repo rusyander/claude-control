@@ -43,6 +43,11 @@ export const codexProvider: ConfigProvider = {
     instructions: 'AGENTS.md',
     mcp: { format: 'toml', relativePath: '.codex/config.toml' },
   },
+  // Адрес модели у codex задаётся не переменной окружения, а таблицей
+  // `model_providers` в том же config.toml (его документация: провайдер
+  // описывается блоком с `base_url`/`wire_api`, и выбирается корневым ключом
+  // `model_provider`). Значит контур сюда переносится — но не через env.
+  endpointFile: { format: 'codex-toml', path: codexConfigToml, apiKind: 'openai-compat' },
   // Детект «конфиг найден» (Ф7): каталог ~/.codex. Только проверка существования.
   configLocations: () => [codexHome()],
   // Ассистент Codex: API — OpenAI (ключ OPENAI_API_KEY), есть рабочий CLI (`codex`).

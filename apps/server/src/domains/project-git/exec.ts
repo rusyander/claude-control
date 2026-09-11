@@ -96,8 +96,27 @@ export async function git(
  * которого есть право быть асинхронным, идёт через `git`.
  */
 export function gitSync(projectDir: string, args: string[], timeout = 5_000): string | undefined {
+  const outcome = gitSyncOutcome(projectDir, args, timeout);
+  return outcome.ok ? outcome.stdout : undefined;
+}
+
+/**
+ * Почему ответа нет. `timeout` отделён от остального намеренно: у вызывающих
+ * это РАЗНЫЕ вещи. «Каталог не репозиторий» чинит человек, а «git не ответил за
+ * пять секунд» не чинит никто — так бывает на большом репозитории, на медленном
+ * диске и под антивирусом, и назвать это «каталог не репозиторий или такой ветки
+ * нет» значит отправить человека искать поломку, которой нет.
+ */
+export type GitSyncOutcome =
+  { ok: true; stdout: string } | { ok: false; reason: 'timeout' | 'no-git' | 'failed' };
+
+export function gitSyncOutcome(
+  projectDir: string,
+  args: string[],
+  timeout = 5_000,
+): GitSyncOutcome {
   try {
-    return execFileSync('git', [...LONG_PATHS_ARGS, ...args], {
+    const stdout = execFileSync('git', [...LONG_PATHS_ARGS, ...args], {
       cwd: resolve(projectDir),
       timeout,
       maxBuffer: GIT_MAX_BUFFER,
@@ -106,10 +125,15 @@ export function gitSync(projectDir: string, args: string[], timeout = 5_000): st
       stdio: ['ignore', 'pipe', 'ignore'],
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
     });
-  } catch {
-    // Не репозиторий, git не найден, таймаут — всё это значит «ответа нет», а не
-    // «изменений нет». Отличать причины здесь незачем: решение по `undefined`
-    // одно и то же, и принимает его вызывающий.
-    return undefined;
+    return { ok: true, stdout };
+  } catch (error) {
+    // Вышедший срок узнаётся двумя способами сразу: node ставит код
+    // `ETIMEDOUT`, а убитый по сроку процесс приходит с сигналом убийства — на
+    // Windows заполнено то одно, то другое.
+    const shell = error as { code?: string | number; signal?: string | null };
+    if (shell.code === 'ETIMEDOUT' || shell.signal === 'SIGTERM') {
+      return { ok: false, reason: 'timeout' };
+    }
+    return { ok: false, reason: shell.code === 'ENOENT' ? 'no-git' : 'failed' };
   }
 }

@@ -1,0 +1,7 @@
+// Пометка «ещё не в коде» — плашкой, а не одним цветом: цвет в этой панели
+// никогда не единственный носитель смысла.
+.planned {
+  padding: 1px 6px;
+  border: 1px solid var(--color-warning);
+  border-radius: 999px;
+}

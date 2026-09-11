@@ -6,7 +6,8 @@ answers to the user stay Russian.
 
 **Read on demand** (working notes, kept out of git — absent in a fresh clone):
 [.agent/code-map.agent.md](.agent/code-map.agent.md) — which module owns what, per app; read it
-before touching code you have not touched this session ·
+before touching code you have not touched this session; chat at a foreign CLI has its own map,
+[.agent/code-map-foreign-chat.agent.md](.agent/code-map-foreign-chat.agent.md) ·
 [.claude/gotchas.md](.claude/gotchas.md) — traps already paid for; read the
 entry BEFORE touching pricing/analytics, enable-disable of hooks/rules/groups, sessions & chat
 resume, MCP OAuth, secrets, help texts, Windows file ops ·
@@ -85,6 +86,17 @@ neither audit ever sees it.
 ## Symptom → cause → fix
 
 **`bad option --experimental-strip-types`** — Node < 22.6 (`.nvmrc` = 22). The only hard blocker.
+
+**Server refuses to boot at all: `ERR_MODULE_NOT_FOUND … contracts/src/claude-location`** — nothing
+is wrong with that file. `packages/contracts/src/index.ts` re-exports its neighbours WITHOUT
+extensions, so the barrel is loadable by Vite and by tsc but never by the server, which runs under
+`--experimental-strip-types`. The server therefore takes **only types** from `@agentdeck/contracts`;
+one value imported from the barrel loads it at runtime and kills the whole process — and `node --watch`
+plus `keepalive` then relive the crash every few seconds. Fix: import the value from the package's
+subpath (`@agentdeck/contracts/<module>`), adding it to `exports` in
+`packages/contracts/package.json` if it is not there yet. Guarded since 09.09.2026 by the
+`server-contracts-barrel-types-only` rule in `.dependency-cruiser.cjs` — `pnpm depcruise` names the
+offending edge, so this must never reach a running panel again.
 
 **Panel opens, everything zero** — wrong config dir. `/api/location` → `source` names the rule that
 picked it. Order in `claude-paths.ts`, first match wins: `manual` (Settings → config dir,
@@ -209,8 +221,13 @@ branched FROM its branch, one with `hold` gets no chat at all until the human an
 (`POST /api/chat/split/:parent/hold`, repeat ⇒ 409). Each started group then gets a `plan` run at the
 ceiling in its own copy, and the work prompt carries that plan verbatim (`workAfterPlanPrompt`). No block
 or a failed level never blocks: a feed notice says so and the groups run as before. Conveyor links do not
-count toward the handoff cap. Guard `tools/qa/check-split-levels.mjs` (stubs only); live
-`.agent/tmp/t1-live.mjs`; detail `.agent/code-map-chat.agent.md` (server, «Two levels before the work»).
+count toward the handoff cap. **A foreign CLI runs the same two levels** (Т3 of the foreign batch,
+09.09.2026) — there the ceiling IS a run with no model flag, so what enables the levels is the
+project's model-routing toggle, not a recognised ceiling model; the plan's chat carries no model and
+its header holds what the WORK will use. Guard `tools/qa/check-split-levels.mjs` (stubs only); live
+`.agent/tmp/t1-live.mjs`, foreign `.agent/tmp/f3-levels-live.mjs`; detail
+`.agent/code-map-chat.agent.md` («Two levels before the work») plus
+`.agent/code-map-foreign-chat.agent.md` («Foreign levels»).
 
 **The agent wrote «Перезапустите сессию» / «/clear» in words and the panel started a new chat by itself; or
 it did NOT and the toast says «файл-опора не изменился»** — both by design (T3). Prose in the tail of the
@@ -219,8 +236,13 @@ the checkpoint AND the original task, auto-continue is on by default (an explici
 `state.json` still wins — the owner's stand has one), the chain cap is 8 handoffs (cascade stages excluded),
 and a checkpoint whose sha1 equals the one at the previous handoff stops the chain: the agent is looping.
 «Перезапустить сессию» in the chat header menu = `POST /api/chat/:id/restart` (409 while running; stale
-checkpoint ⇒ the agent is asked to update it, auto forced on). Guard `tools/qa/check-handoff.mjs`; detail
-`.agent/code-map-chat.agent.md` §Handoff.
+checkpoint ⇒ the agent is asked to update it, auto forced on). Since 10.09.2026 a FOREIGN CLI does the same
+with the same safeties (`domains/provider-chat/handoff.ts` reuses `evaluateHandoff`/`HandoffChains` — never
+a second copy), with one difference it states out loud: there is no session, so the continuation is a NEW
+chat in the same dir carrying the checkpoint and the chain's root task; button in the chat header,
+`POST /api/provider-chat/chats/:id/restart`. Guards `tools/qa/check-handoff.mjs` and
+`check-provider-handoff.mjs`; detail `.agent/code-map-chat.agent.md` §Handoff and
+`.agent/code-map-foreign-chat.agent.md` §Foreign clean-session restart.
 
 **The hub says «Пересечения веток: N», or it says «не сверялись» and never counts on its own** — both
 by design (T6). The panel compares the split branches ONLY on the end of a group's chain and on the
@@ -232,8 +254,25 @@ two rightful owners of one file are work for the merge, not a violation. A new f
 the parent's feed once (`path@groups`); the parent is usually idle, and then the notice is skipped
 and the fact stays in the hub instead of being lost. Nothing is merged, rebased or checked out here
 and never will be — merging stays with the user; the `after` order is a hint beside the list. A
-branch git could not read is NAMED with its reason, never folded into «no overlap». Guard: the
-overlap block of `node tools/qa/check-parent-hub.mjs`.
+branch git could not read is NAMED with its reason, never folded into «no overlap». **A foreign CLI
+counts the same way** (Т4 of the foreign batch, 09.09.2026): the domain reads the conveyor record, not
+links, so only the two ends were foreign-specific — the notice goes to the parent through
+`domains/chat/parent-notice.ts` (a registry event for Claude, a `notice` reply in the provider's store
+for a foreign parent, `false` still meaning «nowhere to say it»), and the hub button comes from
+`ProviderChatPage` passing `useCheckOverlap`. Guards: the overlap block of `node
+tools/qa/check-parent-hub.mjs` and of `check-provider-hub.mjs`; live `.agent/tmp/f4-overlap-live.mjs`.
+
+**A group's feed shows the whole split's control panel, or a review card asks for a decision the human
+never opened** — one rule behind both: a tree is always answered from its ROOT. `TreePause.view()`
+walks up via `rootOf`, so a child asking for its own tree gets the parent's, and the hub is drawn only
+when `tree.data.root === treeKey` (`ProviderChatPage`). Review cards split the same way: the parent
+sees every review of the tree (one «ко всем» closes six MRs), a group only its own. The state is
+`ChatLink.review`, NOT the cascade header — a review group has no header at all, which is why the
+foreign conveyor parses that answer before reading one. The fix stage lives under the provider's OWN
+chat id: the domain's temporary `new-…` key is moved onto it and dropped (`clearChatLink`). Nothing is
+posted to a forge without a click, and with the integration off the button is disabled WITH the
+reason. Guards: `node tools/qa/check-provider-review.mjs`, `node tools/qa/check-provider-hub.mjs`;
+detail `.agent/code-map-foreign-chat.agent.md` §Foreign review by link.
 
 **A parallel working copy refuses to be removed (409)** — an agent is running inside it. That is why
 `routes/project-git-routes.ts` takes the run registry as its third argument, and the check holds for
@@ -252,6 +291,16 @@ never produce results, and a run's own proposals land in its draft, never in a g
 --porcelain -uall` (without `-uall` a new folder collapses to `src/` and matches no `codePaths`) →
 `codePaths` → the `area` word; nothing attributed ⇒ empty list, never "run everything".
 Detail: `.agent/code-map-tests.agent.md`.
+Every one of those reads goes through `gitSync`, whose 5 s cap is meant for ONE thing — the sync
+"did the work change anything?" of the completion planner — and which returns a bare `undefined` for
+"not a repo", "no git" and "timed out" alike. A tree-walking read (`status -uall`, `diff`, `ls-files`,
+`log --follow`) takes `GIT_READ_TIMEOUT_MS` instead: on the short cap a big repo, a slow disk or an
+antivirus turned a plain timeout into "nothing changed" or, in `generate-sources`, into «каталог не
+репозиторий или такой ветки нет» about a repository and a branch that were both there. Reason needed
+in a message ⇒ `gitSyncOutcome`, which names `timeout` / `no-git` / `failed`. That mismatch is also
+what reddened `pnpm test` with a DIFFERENT set of files each run (fixed 10.09.2026, with
+`hookTimeout` — the hooks that `git init` real repos had kept the 10 s default while `testTimeout`
+was raised long ago).
 
 **A red case does not fail `pnpm tests report`, or a CI junit shows it as skipped** — quarantine, by
 design. `muted` removes exactly one right, colouring the run: the case still runs, keeps its real
@@ -275,6 +324,26 @@ live panel with the token gate answers 401), restarts the silent half, adopts a 
 Autostart is user-level (Startup folder + 5-min pickup task). Log
 `%LOCALAPPDATA%\agentdeck\keepalive.log`, state `pnpm keepalive:status`.
 
+**A CLI pointed at a contour gets a connection refusal after a reboot** — by design, and the signed
+compromise says so (`gateway-required`): the gateway is a listener of the panel's own process
+(`domains/platform/gateway/listener.ts`, 127.0.0.1 only, requested port from settings), so a dead
+panel means no models rather than a silent slide into the vendor cloud. `pnpm keepalive:install`
+keeps the stand up. The requested port busy ⇒ the listener takes a neighbour (up to 10) and writes
+the one it GOT into `state.platformGatewayPort`; everything applied to a CLI takes its port from
+there (`apply/profile.ts → activeGatewaySettings`) — until 10.09.2026 it took the settings port and
+sent a corporate request to whatever process had occupied it. Configs applied BEFORE a shift keep the
+old address: the plan shows it as a conflict, and a re-apply WITH the target's overwrite tick closes
+it — a conflict is never overwritten silently.
+
+**An agent through a contour does not edit files, and its MCP servers are invisible** — not a
+misconfiguration and not fixable here (`no-client-tools`): the platform assembles the tool set itself,
+by model, skill and key owner, runs it on its own side, and its public schema DROPS the client's
+tools field as an extra key. Faking tool calls through the prompt text is a homemade protocol over a
+foreign one and is refused deliberately. Agent work keeps going through the CLI's own key; a contour
+carries what needs no tools plus the platform's own agents. Detail: help «Контур»
+(`pages/Help/topics/Platform*`), [docs/PLATFORM.ru.md](docs/PLATFORM.ru.md),
+[.agent/code-map-platform.agent.md](.agent/code-map-platform.agent.md).
+
 ## Working rules
 
 - Verify by running, not by reasoning — `tools/qa/` drives the real UI per area.
@@ -284,10 +353,19 @@ Autostart is user-level (Startup folder + 5-min pickup task). Log
   the user reads help inside the panel, drift here beats a stale README in damage. New document =
   entry in `HELP_GROUPS` + component beside it; index, `?topic=`, "?" button and next-section link
   follow automatically.
+- **That "change its help document" is GATED, not remembered.** `apps/web/public/help/sources.json`
+  holds, per topic, the modules whose BEHAVIOUR the document describes + a content fingerprint of each
+  (EOL and comment-only lines ignored — a rule reddening on every refactor gets ignored). One of them
+  moves ⇒ `pnpm shots` RED, naming topic, files and command. Clearing it is a human act: re-read the
+  document, fix the text, then `node tools/help-shots/sources.mjs <topic>` (rewrites the fingerprints;
+  nothing auto-heals). Seeded with `platform` only — an unwatched topic never reddens and the guard
+  prints how many are watched. **Adding a topic = ONE entry** (topic id from `HELP_GROUPS`, document
+  path, narrow `path`+`why` list, empty `sha`) then that command. Narrow = the modules carrying what
+  the human reads about, never a whole tree.
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
 
-Gate before "done": `pnpm type-check && pnpm lint && pnpm test && pnpm depcruise && node
-tools/qa/audit-layout.mjs && node tools/qa/check-a11y.mjs && node tools/qa/check-keyboard.mjs && node
+Gate before "done": `pnpm type-check && pnpm lint && pnpm test && pnpm depcruise && pnpm compromises
+&& pnpm negatives && pnpm shots && node tools/qa/audit-layout.mjs && node tools/qa/check-a11y.mjs && node tools/qa/check-keyboard.mjs && node
 tools/qa/check-etag.mjs` (the last four drive the live stand; `check-etag` reads the wire status through CDP,
 because Playwright reports a 304 revalidation as the cached 200). `pnpm test` measures coverage every run and fails below the thresholds
 pinned in each `vitest.config.ts` (raise them when coverage grows, never lower silently). The same

@@ -40,6 +40,18 @@ describe('missingFields', () => {
   it('заполненное обязательное поле снимает запрет', () => {
     expect(missingFields('forge', { kind: 'github' })).toEqual([]);
   });
+
+  it('адрес тест-менеджмента обязателен только своей установке', () => {
+    // Zephyr и Xray живут по общему адресу, и требовать его у них значило бы
+    // не дать включить коннектор без выдуманного значения.
+    expect(missingFields('tms', { kind: 'zephyr', baseUrl: '', projectKey: 'GOR' })).toEqual([]);
+    expect(missingFields('tms', { kind: 'testit', baseUrl: '', projectKey: 'PRJ' })).toEqual([
+      'baseUrl',
+    ]);
+    expect(
+      missingFields('tms', { kind: 'testit', baseUrl: 'https://testit.local', projectKey: 'PRJ' }),
+    ).toEqual([]);
+  });
 });
 
 describe('buildSettings', () => {

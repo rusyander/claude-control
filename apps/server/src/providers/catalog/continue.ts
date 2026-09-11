@@ -53,6 +53,14 @@ export const continueProvider: ConfigProvider = {
     blockDir: () => join(continueHome(), 'mcpServers'),
   },
   envConfig: { format: 'dotenv', path: () => join(continueHome(), '.env') },
+  // Адрес у Continue — поле `apiBase` КОНКРЕТНОЙ модели в config.yaml (его
+  // документация): общей переменной окружения для этого нет. Контур добавляет
+  // свою запись в список моделей и не трогает чужие.
+  endpointFile: {
+    format: 'continue-yaml',
+    path: () => join(continueHome(), 'config.yaml'),
+    apiKind: 'openai-compat',
+  },
   permissionsConfig: {
     format: 'continue-yaml',
     path: () => join(continueHome(), 'permissions.yaml'),

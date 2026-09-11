@@ -52,6 +52,33 @@ export const PANEL_PAGES = [
   { path: '/tests?tab=coverage', name: 'Тестирование — покрытие' },
   { path: '/compare', name: 'Сравнение' },
   { path: '/dlp', name: 'Защита данных' },
+  {
+    path: '/platform',
+    name: 'Контур',
+    // Значок компромисса закрыт по умолчанию, а проверять надо именно открытую
+    // подсказку: в ней и текст, и связь aria-describedby, и разворот у края.
+    // Открываем фокусом, как это делает человек с клавиатуры.
+    interact: async (page) => {
+      const trigger = page.locator('[data-compromise-mark] button').first();
+      if ((await trigger.count()) === 0) return;
+      await trigger.focus();
+      await page.waitForTimeout(200);
+    },
+  },
+  {
+    path: '/platform',
+    name: 'Контур — мастер',
+    slug: 'platform-wizard',
+    // Мастер — самая плотная форма раздела: четыре шага, поля, галки целей и
+    // значки компромиссов внутри модального окна. Закрытым его не проверяет ни
+    // один обход, а именно в нём человек проводит первые пять минут.
+    interact: async (page) => {
+      const open = page.getByRole('button', { name: 'Подключить контур' }).first();
+      if ((await open.count()) === 0) return;
+      await open.click();
+      await page.waitForTimeout(300);
+    },
+  },
   { path: '/search', name: 'Поиск' },
   { path: '/history', name: 'История изменений' },
   { path: '/settings', name: 'Настройки' },
@@ -68,7 +95,7 @@ export const PANEL_PAGES = [
  * даёт данным раздела догрузиться. Один путь для axe и для клавиатуры, чтобы
  * оба обхода смотрели на одинаковую страницу.
  */
-export async function openPanelPage(page, base, { path, prepare, ready }) {
+export async function openPanelPage(page, base, { path, prepare, ready, interact }) {
   await page.goto(`${base}${path}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('nav', { timeout: 15000 });
   if (prepare) {
@@ -78,11 +105,21 @@ export async function openPanelPage(page, base, { path, prepare, ready }) {
     await page.waitForSelector(ready, { timeout: 15000 });
   }
   await page.waitForTimeout(1200);
+  // Шаг после загрузки, а не вместо неё: `prepare` перезагружает страницу и
+  // всё открытое им теряется, поэтому раскрытые состояния (подсказка значка,
+  // раскрытая карточка) доводятся здесь.
+  if (interact) await interact(page);
 }
 
-/** Имя файла отчёта из пути: `/` → `root`, `/claude-md` → `claude-md`. */
-export const pageSlug = (path) =>
-  path === '/' ? 'root' : path.replace(/^\//, '').replace(/[^a-z0-9-]+/gi, '-');
+/**
+ * Имя файла отчёта из пути: `/` → `root`, `/claude-md` → `claude-md`. Два
+ * состояния одного раздела (закрытый и открытый мастер контура) живут по одному
+ * пути — второму даётся собственный `slug`, иначе его отчёт затирал бы первый.
+ */
+export const pageSlug = (path, slug) => {
+  if (slug) return slug;
+  return path === '/' ? 'root' : path.replace(/^\//, '').replace(/[^a-z0-9-]+/gi, '-');
+};
 
 /**
  * Кнопка, открывающая модалку создания, — по тексту, без знания о разделе:

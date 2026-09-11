@@ -31,6 +31,18 @@ export interface ManifestSkipped {
   reason: string;
 }
 
+/**
+ * Опись секции контуров. Только опознавательные поля: сама настройка лежит
+ * рядом файлом (`panel/platforms.json`), и дублировать её в описи значило бы
+ * завести второй источник истины, который однажды разойдётся с первым.
+ */
+export interface ManifestPanel {
+  archivePath: string;
+  bytes: number;
+  sha256: string;
+  platforms: { id: string; title: string; driver: string; baseUrl: string }[];
+}
+
 export interface ArchiveManifest {
   kind: string;
   formatVersion: number;
@@ -42,6 +54,12 @@ export interface ArchiveManifest {
   skipped: ManifestSkipped[];
   /** Что придётся ввести руками: секреты в архив не кладутся. */
   checklist: ChecklistItem[];
+  /**
+   * Контуры панели — настройка без ключа. Поля нет вовсе, если контуров на
+   * машине-источнике не было: пустая секция в описи читалась бы как «контуры
+   * были, но не поехали».
+   */
+  panel?: ManifestPanel;
 }
 
 export interface BuiltArchive {

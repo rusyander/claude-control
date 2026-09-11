@@ -1,5 +1,5 @@
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
-import type { ReviewDecisionItem } from '@features/ChatMessages';
+import type { ReviewDecisionItem } from '../ui/ReviewDecisionCard.types';
 
 /**
  * Карточки решения по ревью чужих MR (Т7) для открытого разговора.

@@ -3,7 +3,25 @@
 export interface EnvTransferChecklistItem {
   source: string;
   keys: string[];
-  reason: 'redacted' | 'env-file' | 'secret-file';
+  /** `panel-key` — ключ контура: он не лежал в файлах и переносу не подлежит. */
+  reason: 'redacted' | 'env-file' | 'secret-file' | 'panel-key';
+}
+
+/** Контур в архиве: настройка едет, ключ остаётся на прежней машине. */
+export interface EnvTransferPlatformEntry {
+  id: string;
+  title: string;
+  driver: string;
+  baseUrl: string;
+  status: 'new' | 'same' | 'differs';
+  hasToken: boolean;
+  notes: string[];
+}
+
+export interface EnvTransferPlatformsPlan {
+  entries: EnvTransferPlatformEntry[];
+  gateway?: { enabled: boolean; port: number; forceStream: boolean };
+  problem?: string;
 }
 
 export interface EnvTransferSkipped {
@@ -16,6 +34,8 @@ export interface EnvTransferPreview {
   locations: { index: number; kind: 'dir' | 'file'; role: string; path: string; exists: boolean }[];
   files: number;
   bytes: number;
+  /** Контуры панели, которые уедут вместе с конфигурацией CLI. */
+  platforms: { id: string; title: string; baseUrl: string }[];
   skipped: EnvTransferSkipped[];
   checklist: EnvTransferChecklistItem[];
 }
@@ -25,6 +45,8 @@ export interface EnvTransferExportResult {
   path: string;
   bytes: number;
   files: number;
+  /** Сколько контуров легло в архив. */
+  platforms: number;
   skipped: EnvTransferSkipped[];
   checklist: EnvTransferChecklistItem[];
 }
@@ -50,4 +72,6 @@ export interface EnvTransferPlan {
   entries: EnvTransferPlanEntry[];
   counts: { new: number; same: number; differs: number; unresolved: number };
   checklist: EnvTransferChecklistItem[];
+  /** Секции нет — контуров в архиве не было. */
+  platforms?: EnvTransferPlatformsPlan;
 }

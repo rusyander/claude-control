@@ -65,8 +65,11 @@ export function registerIntegrationExchangeRoutes(
         optionalString(body?.groupId) ??
         requireString(settings.tms.groupId, 'groupId', 'не указана группа тестов');
 
-      const cases = await tmsClient(settings.tms, token).pullCases();
-      return pullIntoGroup(root, groupId, cases, new Date().toISOString());
+      const batch = await tmsClient(settings.tms, token).pullCases();
+      const result = pullIntoGroup(root, groupId, batch.cases, new Date().toISOString());
+      // Обрезанную выборку называем вслух: «привезено 2000» человек читает как
+      // «это все кейсы проекта» и об остальных не узнает.
+      return batch.truncated ? { ...result, truncated: true } : result;
     }),
   );
 

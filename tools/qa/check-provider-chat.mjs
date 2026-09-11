@@ -89,6 +89,12 @@ await page.route('**/api/provider-chat/chats/qa1', async (route) => {
   return json(route, { ...CHAT, messageCount: messages.length, messages });
 });
 
+// Время ответов: у чужого CLI его меряет сама панель по своему прогону, и в
+// ленте под ответом стоят шаг и сумма по разговору. Здесь числа заданы, чтобы
+// проверять текст, а не часы машины.
+const DURATIONS = [4200, 72_000];
+let answered = 0;
+
 // Поток ответа: куски идут с паузами — ровно так его печатает настоящий CLI.
 await page.route('**/api/provider-chat/chats/qa1/stream', async (route) => {
   const chunks = ['Первая ', 'часть ', 'ответа'];
@@ -100,6 +106,7 @@ await page.route('**/api/provider-chat/chats/qa1/stream', async (route) => {
     content: partial,
     at: new Date().toISOString(),
     transport: 'stream',
+    durationMs: DURATIONS[answered++ % DURATIONS.length],
   });
   isRunning = false;
   const done = `data: ${JSON.stringify({ type: 'done' })}\n\n`;
@@ -141,6 +148,11 @@ const afterSend = await page.textContent('body');
 check(afterSend.includes('Привет'), 'своя реплика видна в ленте');
 check(afterSend.includes('Первая часть ответа'), 'ответ пришёл потоком и виден целиком');
 check(afterSend.includes('поток CLI'), 'способ ответа помечен');
+check(afterSend.includes('Ответ шёл 4с'), 'под первым ответом стоит время шага');
+check(
+  !afterSend.includes('всего по разговору'),
+  'суммы по разговору у единственного ответа нет: она равна шагу',
+);
 
 // Второй вопрос: переписка должна помнить первый.
 await composer.fill('Второй вопрос');
@@ -150,6 +162,10 @@ await page.waitForTimeout(1500);
 const afterSecond = await page.textContent('body');
 check(afterSecond.includes('Привет'), 'первый вопрос остался в переписке');
 check(afterSecond.includes('Второй вопрос'), 'второй вопрос виден');
+check(
+  afterSecond.includes('Ответ шёл 1м 12с, всего по разговору 1м 16с'),
+  'у второго ответа время шага и сумма по разговору',
+);
 
 // Ответ ревьюера из конвейера звеньев: блок вердикта служебный — по нему панель
 // заводит правки, а человеку в ленте нужен разбор словами. У Claude блок убирает
@@ -177,6 +193,12 @@ check(afterReview.includes('Два пункта требуют правки'), '
 check(
   !afterReview.includes('agentdeck:review') && !afterReview.includes('"findings"'),
   'служебный блок вердикта в ленте не показывается',
+);
+// Реплика без времени — запись, сделанная до появления поля. Строки времени у
+// неё нет вовсе: выдуманный ноль хуже пустого места.
+check(
+  afterReview.split('Ответ шёл').length - 1 === 2,
+  'реплика без записанного времени строки времени не получает',
 );
 
 // Удаление разговора спрашивает подтверждение: переписка исчезает с диска.

@@ -7,6 +7,7 @@ import { formatDate } from '@shared/lib/format';
 import { Badge } from '@shared/ui/badge';
 import { Button } from '@shared/ui/button';
 import { Card } from '@shared/ui/card';
+import { CompromiseMark } from '@shared/ui/compromise-mark';
 import { Stack } from '@shared/ui/stack';
 import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
@@ -123,6 +124,16 @@ export function PricingCard() {
         <Typography variant="body-sm" color="muted" className="prose">
           {t('settings.pricingHint')}
         </Typography>
+
+        <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
+          <Typography variant="body-sm" color="muted" className="prose">
+            {t('settings.pricingPlatform')}
+          </Typography>
+          {
+            // compromise: pricing-local — контур цен наружу не публикует, поэтому расход через него считается по этому справочнику как оценка
+            <CompromiseMark id="pricing-local" />
+          }
+        </Stack>
 
         <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>
           <Badge tone={data.source === 'anthropic' ? 'success' : 'warning'}>

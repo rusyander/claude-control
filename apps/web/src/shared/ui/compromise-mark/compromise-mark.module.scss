@@ -1,0 +1,84 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-fg-muted);
+  cursor: help;
+
+  &:hover {
+    background-color: var(--color-surface-raised);
+  }
+}
+
+// Уровень несёт цвет, но не только цвет: рядом в подсказке всегда стоит слово
+// «Ограничение», «Обход» или «С риском», и оно же уходит в aria-label кнопки.
+.limitation {
+  color: var(--color-fg-muted);
+}
+
+.workaround {
+  color: var(--color-warning);
+}
+
+.risk {
+  color: var(--color-danger);
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: 340px;
+  max-width: min(340px, calc(100vw - 24px));
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  // Подсказка длинная, а места под ней бывает мало: даём прокрутку внутри, а
+  // не выпуск текста за пределы экрана.
+  max-height: 60vh;
+  overflow: hidden auto;
+  text-align: left;
+}
+
+// Флажок у правого края — подсказка растёт влево, а не за экран.
+.alignEnd {
+  left: auto;
+  right: 0;
+}
+
+.head {
+  margin-bottom: 2px;
+}
+
+.subhead {
+  margin-top: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  color: var(--color-accent);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

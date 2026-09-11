@@ -1,5 +1,6 @@
 import type { ProjectTestHistoryEntry } from '@agentdeck/contracts';
 import { gitSync } from '../project-git/exec.ts';
+import { GIT_READ_TIMEOUT_MS } from '../project-git/constants.ts';
 import { TESTS_DIR } from './files.ts';
 
 /**
@@ -23,17 +24,24 @@ const LIMIT = 30;
 /** История файла группы: коммиты, тронувшие `.agent/tests/<id>.tests.json`. */
 export function historyOf(root: string, groupId: string, limit = LIMIT): ProjectTestHistoryEntry[] {
   const file = `${TESTS_DIR}/${groupId}.tests.json`;
-  const output = gitSync(root, [
-    'log',
-    // `--follow`: файл группы переживает переименование, и обрывать историю на
-    // нём значило бы показать «кейсы завели вчера» там, где им год.
-    '--follow',
-    `-n${limit}`,
-    `--format=${MARK}%H%x09%aI%x09%an%x09%s`,
-    '--numstat',
-    '--',
-    file,
-  ]);
+  const output = gitSync(
+    root,
+    [
+      'log',
+      // `--follow`: файл группы переживает переименование, и обрывать историю на
+      // нём значило бы показать «кейсы завели вчера» там, где им год.
+      '--follow',
+      `-n${limit}`,
+      `--format=${MARK}%H%x09%aI%x09%an%x09%s`,
+      '--numstat',
+      '--',
+      file,
+      // `--follow` заставляет git искать переименование по всей истории, и на
+      // большом репозитории это не мгновенная команда: на коротком потолке лента
+      // истории просто оказывалась бы пустой, без единого слова почему.
+    ],
+    GIT_READ_TIMEOUT_MS,
+  );
   if (!output) return [];
 
   const entries: ProjectTestHistoryEntry[] = [];

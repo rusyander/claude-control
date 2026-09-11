@@ -111,10 +111,13 @@ export function registerChatSplitRoutes(
     // Уровни (Т1): подбор включён, прогоны нужны, родитель известен — разбор
     // идёт первым, группы заводит конвейер. «Только завести чаты» уровней не
     // получает: человек просил заготовки, а не работу.
-    if (deps.conveyor && launcher.planned && wantRuns && parentChatId) {
+    if (deps.conveyor && launcher.planned && wantRuns && launcher.parentKey) {
       const manual = parseAssignments(request.body?.assignments);
       const { result } = await deps.conveyor.begin({
-        parentChatId,
+        // Запись конвейера ключуется ТЕМ ЖЕ ключом, что и связи: у чужого CLI
+        // именованным. Иначе конец цепочки группы (`onChainEnded` смотрит в
+        // связь) и хаб родителя искали бы запись по разным адресам.
+        parentChatId: launcher.parentKey,
         projectPath: projectPath as string,
         proposal,
         request: {

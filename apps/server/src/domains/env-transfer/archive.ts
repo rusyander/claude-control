@@ -1,12 +1,19 @@
 import type { ConfigProvider } from '../../providers/types.ts';
 import { createZip, readZip, type ZipEntry } from '../../lib/zip.ts';
-import { collectProviderFiles, type ChecklistItem } from './collect.ts';
+import { collectProviderFiles, sha256, type ChecklistItem } from './collect.ts';
+import {
+  panelPlatformsChecklist,
+  panelPlatformsFile,
+  PANEL_PLATFORMS_PATH,
+  type PanelPlatformsDocument,
+} from './platforms.ts';
 import { buildArchiveReadme } from './readme.ts';
 import type {
   ArchiveManifest,
   BuiltArchive,
   ManifestEntry,
   ManifestLocation,
+  ManifestPanel,
   ManifestSkipped,
 } from './archive.types.ts';
 
@@ -31,6 +38,7 @@ export const README_PATH = 'README.md';
 export type {
   ManifestLocation,
   ManifestEntry,
+  ManifestPanel,
   ManifestSkipped,
   ArchiveManifest,
   BuiltArchive,
@@ -44,8 +52,27 @@ export function buildEnvironmentArchive(
   provider: ConfigProvider,
   exportedAt: string,
   override?: string,
+  panel?: PanelPlatformsDocument,
 ): BuiltArchive {
   const collected = collectProviderFiles(provider, override);
+
+  // Секция контуров кладётся ТОЛЬКО когда контуры есть: пустой файл в архиве
+  // читался бы как «контуры были и не поехали».
+  const panelPlatforms = panel?.platforms ?? [];
+  const panelData = panelPlatforms.length > 0 && panel ? panelPlatformsFile(panel) : undefined;
+  const panelEntry: ManifestPanel | undefined = panelData
+    ? {
+        archivePath: PANEL_PLATFORMS_PATH,
+        bytes: panelData.length,
+        sha256: sha256(panelData),
+        platforms: panelPlatforms.map((platform) => ({
+          id: platform.id,
+          title: platform.title,
+          driver: platform.driver,
+          baseUrl: platform.baseUrl,
+        })),
+      }
+    : undefined;
 
   const manifest: ArchiveManifest = {
     kind: ARCHIVE_KIND,
@@ -74,13 +101,15 @@ export function buildEnvironmentArchive(
       sourcePath: item.sourcePath,
       reason: item.reason,
     })),
-    checklist: collected.checklist,
+    checklist: [...collected.checklist, ...panelPlatformsChecklist(panelPlatforms)],
+    ...(panelEntry ? { panel: panelEntry } : {}),
   };
 
   const entries: ZipEntry[] = [
     { path: MANIFEST_PATH, data: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, 'utf8') },
     { path: README_PATH, data: Buffer.from(buildArchiveReadme(manifest), 'utf8') },
     ...collected.files.map((file) => ({ path: file.archivePath, data: file.data })),
+    ...(panelData ? [{ path: PANEL_PLATFORMS_PATH, data: panelData }] : []),
   ];
 
   const stamp = new Date(exportedAt);
@@ -144,6 +173,7 @@ export function parseEnvironmentArchive(zip: Buffer): ParsedArchive {
 
   const locations = parsed.locations.map(parseLocation);
   const entries = parsed.entries.map((entry, index) => parseEntry(entry, index, files));
+  const panel = parsePanelSection(parsed.panel, files);
 
   return {
     manifest: {
@@ -165,9 +195,42 @@ export function parseEnvironmentArchive(zip: Buffer): ParsedArchive {
       entries,
       skipped: Array.isArray(parsed.skipped) ? parsed.skipped.filter(isSkipped) : [],
       checklist: Array.isArray(parsed.checklist) ? parsed.checklist.filter(isChecklistItem) : [],
+      ...(panel ? { panel } : {}),
     },
     files,
   };
+}
+
+/**
+ * Секция контуров из описи. Отсутствует — значит контуров на прежней машине не
+ * было; заявлена, но файла в архиве нет — говорим об этом вслух: молча
+ * потерянная настройка контура выглядела бы как «панель ничего не перенесла».
+ */
+function parsePanelSection(value: unknown, files: Map<string, Buffer>): ManifestPanel | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const archivePath = typeof value.archivePath === 'string' ? value.archivePath : '';
+  if (!archivePath) throw archiveError('В описи есть секция контуров без пути к файлу.');
+  if (!files.has(archivePath)) {
+    throw archiveError(`Секция контуров «${archivePath}» есть в описи, но отсутствует в архиве.`);
+  }
+
+  return {
+    archivePath,
+    bytes: typeof value.bytes === 'number' ? value.bytes : 0,
+    sha256: typeof value.sha256 === 'string' ? value.sha256 : '',
+    platforms: Array.isArray(value.platforms) ? value.platforms.filter(isPanelPlatform) : [],
+  };
+}
+
+function isPanelPlatform(value: unknown): value is ManifestPanel['platforms'][number] {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.driver === 'string' &&
+    typeof value.baseUrl === 'string'
+  );
 }
 
 function parseLocation(value: unknown, index: number): ManifestLocation {

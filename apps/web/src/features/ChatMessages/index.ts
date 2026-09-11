@@ -11,11 +11,29 @@ export type { TaskSplitCardProps } from './ui/TaskSplitCard.types';
 export { HandoffCard } from './ui/HandoffCard';
 export type { HandoffCardProps } from './ui/HandoffCard.types';
 export type { ChildPermission, ChildQuestion, HandoffControls } from './ui/ChatMessages.types';
-/** Сводка звеньев у родителя: страница собирает её из списка чатов и прогонов. */
-export type { ChildStageGroup } from './ui/ChildStages.types';
 /**
- * Карточка решения по ревью чужого MR (Т7). Наружу выставлен только её предмет:
- * саму карточку лента ставит сама, а собирает список страница — по дереву,
- * которое она и так опрашивает.
+ * Сводка звеньев у родителя. Наружу выставлена по той же причине, что и
+ * карточка разделения: хаб нужен ОБЕИМ лентам — у Claude его ставит `ChatMessages`,
+ * у чужого провайдера страница его чата. Строки собирает страница: у Claude из
+ * списка чатов и прогонов, у чужого CLI из дерева (`pages/ProviderChat/lib`).
  */
+export { ChildStages } from './ui/ChildStages';
+export type { ChildStageGroup, ChildStagesProps } from './ui/ChildStages.types';
+/**
+ * Склейка строк хаба с записью конвейера уровней. Наружу — по той же причине:
+ * группу, у которой чата ещё нет, показывают обе ленты, а собрать её можно
+ * только из записи конвейера, и второй копии этого счёта быть не должно.
+ */
+export { mergeSplitGroups } from './lib/mergeSplitGroups';
+/**
+ * Карточка решения по ревью чужого MR (Т7) и её сбор по дереву. Наружу — по той
+ * же причине, что и хаб: лент ДВЕ, у Claude карточку ставит `ChatMessages`, у
+ * чужого провайдера — страница его чата, а состояние у обеих одно, узел дерева.
+ * Вторая копия сбора решала бы, кому какую карточку показывать, по-своему —
+ * это либо чужое решение под рукой человека, либо своё, потерянное молча.
+ */
+export { ReviewDecisionCard } from './ui/ReviewDecisionCard';
+export type { ReviewDecisionCardProps } from './ui/ReviewDecisionCard.types';
 export type { ReviewDecisionItem } from './ui/ReviewDecisionCard.types';
+export { collectReviews, reviewTreeOf } from './lib/reviewItems';
+export { waitsDecision } from './lib/reviewWaiting';

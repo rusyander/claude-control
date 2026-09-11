@@ -41,6 +41,8 @@ interface LiveRun {
   transport?: ProviderChatTransport;
   subscribers: Set<ProviderChatSubscriber>;
   isRunning: boolean;
+  /** Когда прогон начался: по нему считается время ответа (Т1 партии чужих CLI). */
+  startedAt: number;
   /**
    * Ответ сняли кнопкой. Записанным он остаётся (сказанное — сказано), но
    * ЗАКОНЧЕННЫМ не считается: снятая на полуслове работа не повод заводить по
@@ -49,6 +51,9 @@ interface LiveRun {
   stopped?: boolean;
   cleanupTimer?: ReturnType<typeof setTimeout>;
 }
+
+/** След остановленного прогона, который не успел ответить ни словом. */
+const STOPPED_TEXT = 'Прогон остановлен: ответа не было.';
 
 /** Разговор, у которого закончился ответ, — то, что видит слушатель. */
 export interface ProviderChatFinished {
@@ -59,6 +64,11 @@ export interface ProviderChatFinished {
   ok: boolean;
   /** Текст ответа целиком. */
   text: string;
+  /**
+   * Когда прогон начался. Нужен продолжению в чистой сессии (Т7): файл-опора
+   * обязан быть свежее старта, иначе новая сессия читала бы вчерашнее.
+   */
+  startedAt: number;
 }
 
 /**
@@ -127,6 +137,7 @@ export class ProviderChatService {
       partial: '',
       subscribers: existing?.subscribers ?? new Set(),
       isRunning: true,
+      startedAt: Date.now(),
     };
     if (existing?.cleanupTimer) clearTimeout(existing.cleanupTimer);
     this.runs.set(chatId, live);
@@ -155,10 +166,18 @@ export class ProviderChatService {
 
           if (event.type === 'done') {
             live.transport = event.transport;
+            // Остановленный прогон, не успевший сказать НИЧЕГО, — оборванная
+            // работа, а не пустой ответ: пустой пузырь в ленте читается как
+            // «CLI ответил молчанием», а при паузе дерева таких пузырей копится
+            // по одному на каждую остановку. Сказанное до остановки, наоборот,
+            // остаётся ответом — им разговор и продолжается.
+            const cut = Boolean(live.stopped) && event.reply.trim() === '';
             const stored = appendMessage(appDataDir, providerId, chatId, {
               role: 'assistant',
-              content: event.reply,
+              content: cut ? STOPPED_TEXT : event.reply,
+              ...(cut ? { failed: true } : {}),
               transport: event.transport,
+              durationMs: Date.now() - live.startedAt,
             });
             this.finish(chatId, live, {
               type: 'done',
@@ -167,10 +186,13 @@ export class ProviderChatService {
             return;
           }
 
+          // Провалившийся прогон время тоже несёт: «сколько мы ждали зря» —
+          // такой же вопрос человека, как «сколько шла работа».
           appendMessage(appDataDir, providerId, chatId, {
             role: 'assistant',
             content: event.error,
             failed: true,
+            durationMs: Date.now() - live.startedAt,
           });
           this.finish(chatId, live, { type: 'error', error: event.error, reason: event.reason });
         },
@@ -183,6 +205,7 @@ export class ProviderChatService {
           role: 'assistant',
           content: text,
           failed: true,
+          durationMs: Date.now() - live.startedAt,
         });
         this.finish(chatId, live, { type: 'error', error: text, reason: 'cli_error' });
       });
@@ -261,6 +284,7 @@ export class ProviderChatService {
         providerId: live.providerId,
         appDataDir: live.appDataDir,
         chatId,
+        startedAt: live.startedAt,
         ok: event.type === 'done' && !live.stopped,
         text: event.type === 'done' ? (event.message?.content ?? live.partial) : '',
       });

@@ -29,7 +29,14 @@ export interface ChecklistItem {
   source: string;
   /** Имена ключей без значений. */
   keys: string[];
-  reason: 'redacted' | 'env-file' | 'secret-file';
+  /**
+   * `panel-key` отличается от остальных трёх происхождением: этот секрет не
+   * лежал ни в каком файле прежней машины и потому не мог быть ни вырезан, ни
+   * пропущен — ключ контура живёт в зашифрованном хранилище панели. В чек-лист
+   * он попадает не как «мы это не взяли», а как «этого в архиве нет по
+   * устройству, введите руками».
+   */
+  reason: 'redacted' | 'env-file' | 'secret-file' | 'panel-key';
 }
 
 export interface CollectResult {

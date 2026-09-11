@@ -1,23 +1,26 @@
 import { useTranslation } from 'react-i18next';
-import { Stack } from '@shared/ui/stack';
-import { FlowDiagram } from '@shared/ui/diagram';
-import {
-  HelpSection,
-  StorageCard,
-  FieldTable,
-  StepList,
-  Callout,
-  CapabilityGrid,
-  OptionCards,
-} from '../ui';
+import { HelpSection, StorageCard, Callout, OptionCards, StepList } from '../ui';
+import { ChatGuideSections } from './ChatGuideSections';
 import { ChatParallelSections } from './ChatParallelSections';
+import { ChatFieldSections } from './ChatFieldSections';
+import { ChatLimitsSections } from './ChatLimitsSections';
 
 /**
- * Документ раздела «Чат».
+ * Документ раздела «Чат» — самый длинный в справке, и порядок в нём один:
+ * зачем это нужно → чем отличается от соседнего → весь путь шагами со
+ * снимками → таблицы полей и состояний → ограничения и отказы → как отменить.
  *
- * Раздел самый большой в панели, поэтому и блоков здесь больше: кроме общего
- * скелета есть вкладки проектов, цветные точки, режим правок и продолжение
- * сессии — то, о чём спрашивают чаще всего.
+ * Раньше документ был перечнем возможностей: человек читал, ЧТО умеет раздел,
+ * и не видел ни одного экрана, пока не открывал панель. Теперь середина —
+ * настоящие кадры двух путей, снятые на отдельной панели с выдуманным
+ * проектом, и каждый шаг назван значениями из своего кадра. Список
+ * возможностей остался, но уехал в конец: он отвечает на вопрос «а можно ли», а
+ * этот вопрос возникает после того, как человек уже видел, как оно выглядит.
+ *
+ * Соседние файлы — не «вынесенные куски», а разделы с собственной работой:
+ * `ChatGuideSections` держит схемы и весь путь в снимках, `ChatParallelSections`
+ * — копии, разделение, подбор модели и продолжение этапа, `ChatFieldSections` —
+ * таблицы, `ChatLimitsSections` — границы, отказы и отмену.
  */
 export function ChatTopic() {
   const { t } = useTranslation();
@@ -25,6 +28,12 @@ export function ChatTopic() {
 
   return (
     <>
+      {/* Страница длинная, и первое, что ей нужно сказать, — из чего она
+          состоит: иначе человек, которому нужен один факт, листает наугад. */}
+      <Callout tone="info" title={tr('guideTitle')}>
+        {tr('guideText')}
+      </Callout>
+
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards
           items={[
@@ -35,6 +44,22 @@ export function ChatTopic() {
         />
       </HelpSection>
 
+      {/* Отличия — сразу после «зачем»: половина вопросов про чат на самом деле
+          вопросы «а это здесь или в другом разделе». */}
+      <HelpSection title={tr('diffTitle')} caption={tr('diffCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('diffTerminal'), text: tr('diffTerminalText') },
+            { title: tr('diffHistory'), text: tr('diffHistoryText') },
+            { title: tr('diffForeign'), text: tr('diffForeignText') },
+            { title: tr('diffSandbox'), text: tr('diffSandboxText') },
+          ]}
+        />
+      </HelpSection>
+
+      <ChatGuideSections tr={tr} />
+
       <HelpSection title={t('help.common.storageTitle')}>
         <StorageCard
           title={tr('title')}
@@ -44,85 +69,6 @@ export function ChatTopic() {
             { label: tr('storageSandbox'), value: tr('storageSandboxValue'), isMono: true },
             { label: tr('storageStream'), value: tr('storageStreamValue') },
           ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('flowTitle')} caption={tr('flowCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('flowTitle')}
-          nodes={[
-            {
-              id: 'composer',
-              label: tr('flowComposer'),
-              caption: tr('flowComposerCaption'),
-              tone: 'accent',
-              icon: 'chat',
-            },
-            {
-              id: 'server',
-              label: tr('flowServer'),
-              caption: tr('flowServerCaption'),
-              icon: 'send',
-              isMono: true,
-            },
-            {
-              id: 'process',
-              label: tr('flowProcess'),
-              caption: tr('flowProcessCaption'),
-              tone: 'info',
-              icon: 'scripts',
-            },
-            {
-              id: 'stream',
-              label: tr('flowStream'),
-              caption: tr('flowStreamCaption'),
-              tone: 'success',
-              icon: 'refresh',
-            },
-            {
-              id: 'transcript',
-              label: tr('flowTranscript'),
-              caption: tr('flowTranscriptCaption'),
-              icon: 'file',
-            },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={`${t('help.common.canTitle')} · ${t('help.common.cantTitle')}`}>
-        <CapabilityGrid
-          canTitle={t('help.common.canTitle')}
-          cantTitle={t('help.common.cantTitle')}
-          can={[
-            tr('canParallel'),
-            tr('canQueue'),
-            tr('canProgress'),
-            tr('canChatDots'),
-            tr('canVolume'),
-            tr('canContinue'),
-            tr('canFork'),
-            tr('canAnswerButtons'),
-            tr('canModel'),
-            tr('canApprove'),
-            tr('canSearchMessages'),
-            tr('canLoadMore'),
-            tr('canExport'),
-            tr('canRun'),
-            tr('canFreePort'),
-            tr('canAutostart'),
-            tr('canGit'),
-            tr('canWorktrees'),
-            tr('canOpenFolder'),
-            tr('canAttach'),
-            tr('canVoice'),
-            tr('canStop'),
-            tr('canRetry'),
-            tr('canSpend'),
-            tr('canEditor'),
-            tr('canCode'),
-            tr('canTests'),
-          ]}
-          cant={[tr('cantApprove'), tr('cantDelete'), tr('cantEditPlan'), tr('cantInterrupt')]}
         />
       </HelpSection>
 
@@ -207,20 +153,6 @@ export function ChatTopic() {
         </Callout>
       </HelpSection>
 
-      <HelpSection title={tr('dotsTitle')} caption={tr('dotsCaption')}>
-        <FieldTable
-          nameHeader={t('help.common.fieldName')}
-          descriptionHeader={t('help.common.fieldPurpose')}
-          rows={[
-            { name: tr('dotGreen'), description: tr('dotGreenText'), isMono: false },
-            { name: tr('dotGrey'), description: tr('dotGreyText'), isMono: false },
-            { name: tr('dotYellow'), description: tr('dotYellowText'), isMono: false },
-            { name: tr('dotRed'), description: tr('dotRedText'), isMono: false },
-            { name: tr('dotNone'), description: tr('dotNoneText'), isMono: false },
-          ]}
-        />
-      </HelpSection>
-
       <HelpSection title={tr('panelTitle')}>
         <OptionCards
           minWidth={320}
@@ -236,147 +168,7 @@ export function ChatTopic() {
         <Callout tone="info" title={tr('panelNote')} />
       </HelpSection>
 
-      <HelpSection title={tr('composerTitle')}>
-        <FieldTable
-          nameHeader={t('help.common.fieldName')}
-          descriptionHeader={t('help.common.fieldPurpose')}
-          rows={[
-            { name: tr('composerEnter'), description: tr('composerEnterText'), isMono: false },
-            { name: tr('composerVoice'), description: tr('composerVoiceText'), isMono: false },
-            { name: tr('composerFiles'), description: tr('composerFilesText'), isMono: false },
-            { name: tr('composerChips'), description: tr('composerChipsText'), isMono: false },
-            { name: tr('composerStop'), description: tr('composerStopText'), isMono: false },
-          ]}
-        />
-      </HelpSection>
-
-      <HelpSection title={tr('editsTitle')} caption={tr('editsCaption')}>
-        <Stack gap="var(--spacing-sm)">
-          <FlowDiagram
-            ariaLabel={tr('editsOff')}
-            nodes={[
-              {
-                id: 'off',
-                label: tr('editsOff'),
-                caption: tr('editsOffCaption'),
-                tone: 'info',
-                icon: 'eye',
-              },
-              {
-                id: 'off-mode',
-                label: tr('editsMode'),
-                caption: tr('editsModeCaption'),
-                isMono: true,
-                icon: 'permissions',
-              },
-              {
-                id: 'off-result',
-                label: tr('editsResult'),
-                caption: tr('editsResultCaption'),
-                icon: 'close',
-              },
-            ]}
-          />
-
-          <FlowDiagram
-            ariaLabel={tr('editsOn')}
-            nodes={[
-              {
-                id: 'on',
-                label: tr('editsOn'),
-                caption: tr('editsOnCaption'),
-                tone: 'warning',
-                icon: 'edit',
-              },
-              {
-                id: 'on-mode',
-                label: tr('editsOnMode'),
-                caption: tr('editsOnModeCaption'),
-                isMono: true,
-                icon: 'permissions',
-              },
-              {
-                id: 'on-result',
-                label: tr('editsOnResult'),
-                caption: tr('editsOnResultCaption'),
-                tone: 'success',
-                icon: 'check',
-              },
-            ]}
-          />
-        </Stack>
-
-        <Callout tone="warning" title={tr('editsResetTitle')}>
-          {tr('editsResetText')}
-        </Callout>
-
-        <Callout tone="info" title={tr('autoApproveTitle')}>
-          {tr('autoApproveText')}
-        </Callout>
-
-        <Callout tone="info" title={tr('rulesTitle')}>
-          {tr('rulesText')}
-        </Callout>
-      </HelpSection>
-
-      <HelpSection title={tr('historyTitle')} caption={tr('historyCaption')}>
-        <FlowDiagram
-          ariaLabel={tr('historyTitle')}
-          nodes={[
-            {
-              id: 'id',
-              label: tr('historyId'),
-              caption: tr('historyIdCaption'),
-              tone: 'accent',
-              icon: 'link',
-            },
-            {
-              id: 'resume',
-              label: tr('historyResume'),
-              caption: tr('historyResumeCaption'),
-              isMono: true,
-              icon: 'refresh',
-            },
-            {
-              id: 'cwd',
-              label: tr('historyCwd'),
-              caption: tr('historyCwdCaption'),
-              tone: 'info',
-              icon: 'folder',
-            },
-          ]}
-        />
-
-        <Callout tone="warning" title={tr('historyFolderTitle')}>
-          {tr('historyFolderText')}
-        </Callout>
-      </HelpSection>
-
-      <HelpSection title={tr('retryTitle')} caption={tr('retryCaption')}>
-        <OptionCards
-          minWidth={320}
-          items={[
-            { title: tr('retryRepeat'), text: tr('retryRepeatText') },
-            { title: tr('retryFull'), text: tr('retryFullText') },
-          ]}
-        />
-        <Callout tone="danger" title={tr('retryNoteTitle')}>
-          {tr('retryNoteText')}
-        </Callout>
-      </HelpSection>
-
-      <HelpSection title={tr('spendTitle')} caption={tr('spendCaption')}>
-        <FieldTable
-          nameHeader={t('help.common.fieldName')}
-          descriptionHeader={t('help.common.fieldPurpose')}
-          rows={[
-            { name: tr('spendRun'), description: tr('spendRunText'), isMono: false },
-            { name: tr('spendSession'), description: tr('spendSessionText'), isMono: false },
-            { name: tr('spendLimit'), description: tr('spendLimitText'), isMono: false },
-            { name: tr('spendStep'), description: tr('spendStepText'), isMono: false },
-          ]}
-        />
-      </HelpSection>
+      <ChatFieldSections />
 
       <HelpSection title={tr('recipesTitle')}>
         <StepList
@@ -389,40 +181,7 @@ export function ChatTopic() {
         />
       </HelpSection>
 
-      <HelpSection title={tr('notesTitle')}>
-        <Stack gap="var(--spacing-xs)">
-          <Callout tone="warning" title={tr('noteTabTitle')}>
-            {tr('noteTabText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteQuestionTitle')}>
-            {tr('noteQuestionText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteOutsideTitle')}>
-            {tr('noteOutsideText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteArtifactsTitle')}>
-            {tr('noteArtifactsText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteLimitTitle')}>
-            {tr('noteLimitText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteMemoryTitle')}>
-            {tr('noteMemoryText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteHistoryTitle')}>
-            {tr('noteHistoryText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteLiveTitle')}>
-            {tr('noteLiveText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteRestartTitle')}>
-            {tr('noteRestartText')}
-          </Callout>
-          <Callout tone="info" title={tr('noteProviderTitle')}>
-            {tr('noteProviderText')}
-          </Callout>
-        </Stack>
-      </HelpSection>
+      <ChatLimitsSections />
     </>
   );
 }

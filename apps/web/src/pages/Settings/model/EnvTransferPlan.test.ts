@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { EnvTransferPlanEntry, EnvTransferEntryStatus } from '../EnvTransfer.types';
 import {
+  defaultPlatformSelection,
   defaultSelection,
   isAllSelected,
   selectableEntries,
@@ -42,6 +43,23 @@ describe('План разворота окружения', () => {
     expect(isAllSelected(PLAN, new Set(defaultSelection(PLAN)))).toBe(false);
     // Пустой план не считается «отмеченным целиком»: отмечать нечего.
     expect(isAllSelected([], new Set())).toBe(false);
+  });
+
+  it('контур, уже настроенный здесь, по умолчанию НЕ перезаписывается', () => {
+    const entries = [
+      { id: 'новый', status: 'new' as const },
+      { id: 'такой-же', status: 'same' as const },
+      { id: 'другой', status: 'differs' as const },
+    ].map((item) => ({
+      ...item,
+      title: item.id,
+      driver: 'enterprise-platform',
+      baseUrl: 'https://api.example.ru',
+      hasToken: false,
+      notes: [],
+    }));
+
+    expect(defaultPlatformSelection(entries)).toEqual(['новый']);
   });
 
   it('размер архива показывается по-человечески', () => {

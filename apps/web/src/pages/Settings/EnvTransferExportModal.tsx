@@ -98,6 +98,22 @@ export function EnvTransferExportModal({
           ))}
         </Stack>
 
+        {/* Контуры едут вместе с конфигурацией CLI, и человек должен узнать об
+            этом ДО выбора папки: настройка корпоративного контура — не то, что
+            уезжает на чужую машину незамеченным. */}
+        {preview.platforms.length > 0 && (
+          <Stack gap="var(--spacing-3xs)">
+            <Typography variant="body-sm" color="subtle">
+              {t('envTransfer.previewPlatforms', { count: preview.platforms.length })}
+            </Typography>
+            {preview.platforms.map((platform) => (
+              <Typography key={platform.id} variant="mono" className={styles.path}>
+                {platform.title} — {platform.baseUrl}
+              </Typography>
+            ))}
+          </Stack>
+        )}
+
         <EnvTransferChecklist items={preview.checklist} />
       </Stack>
     </Modal>

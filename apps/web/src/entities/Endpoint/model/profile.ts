@@ -22,7 +22,17 @@ export const ENDPOINT_BASE_URL_SAMPLE: Record<EndpointApiKind, string> = {
 
 /** Новый профиль с заполненными по умолчанию полями. */
 export function newEndpointProfile(id: string, name: string): EndpointProfile {
-  return { id, name, baseUrl: '', apiKind: 'openai-compat', model: '', writeToken: false };
+  return {
+    id,
+    name,
+    baseUrl: '',
+    apiKind: 'openai-compat',
+    model: '',
+    writeToken: false,
+    // Профиль, заведённый человеком, никому не принадлежит: управляемые
+    // порождает контур, и только сервер (Т3).
+    ownerPlatformId: '',
+  };
 }
 
 /** Заменить профиль в списке по id (не мутируя исходный массив). */

@@ -50,6 +50,28 @@ describe('список выбора модели', () => {
     });
   });
 
+  it('пропавшая у контура модель в выбор не попадает', () => {
+    // В карточке каталога она остаётся объяснением («была, больше нет») и
+    // кнопки «сделать по умолчанию» не имеет. Выбор дефолта пишет ровно ту же
+    // настройку — запрет, который держится в одном из двух мест, не запрет.
+    const result = options([
+      model('claude-opus-5', 'Claude Opus 5'),
+      { ...model('ru-embed', 'ru-embed'), retired: true, lastSeenAt: '2026-09-01' },
+    ]);
+
+    expect(result.some((option) => option.value === 'ru-embed')).toBe(false);
+  });
+
+  it('уже выбранная пропавшая модель из поля не исчезает', () => {
+    // Иначе поле покажет чужое значение вместо того, что реально в настройках.
+    const shown = withCurrentValue(
+      options([{ ...model('ru-embed', 'ru-embed'), retired: true }]),
+      'ru-embed',
+    );
+
+    expect(shown.at(-1)).toEqual({ value: 'ru-embed', label: 'ru-embed' });
+  });
+
   it('модель, совпавшая с алиасом, не задваивается', () => {
     const result = options([model('opus', 'Opus')]);
 

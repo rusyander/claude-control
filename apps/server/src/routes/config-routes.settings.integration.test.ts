@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AppSettings } from '@agentdeck/contracts';
 import { AppStore } from '../lib/app-store.ts';
+import { getStoredKey, setStoredKey } from '../lib/provider-keys.ts';
 import type { ServerContext } from '../context.ts';
 import { registerConfigRoutes } from './config-routes.ts';
 
@@ -156,6 +157,104 @@ describe('config-routes: валидация настроек и импорта',
     it('кривые настройки внутри снимка отклоняются 400', async () => {
       const res = await importState({ settings: { backupKeep: 'нет' } });
       expect(res.statusCode).toBe(400);
+    });
+  });
+
+  /**
+   * Контуры — единственный ключ настроек, за которым тянется то, чего в
+   * настройках нет: ключ в шифрохранилище и след пробы. Этот маршрут про них не
+   * знает, поэтому у него есть вторая обязанность — убрать за собой.
+   */
+  describe('контуры через общий PATCH настроек', () => {
+    const platform = {
+      id: 'enterprise-platform-dev',
+      title: 'EnterprisePlatform · dev',
+      driver: 'enterprise-platform',
+      baseUrl: 'https://api.dev.example.ru',
+      enabled: true,
+      mode: 'required',
+      budgetUsd: 0,
+      capabilities: [],
+      targets: [],
+      projectPaths: [],
+      budgetSince: '',
+      caCertPath: '',
+    };
+
+    it('удалённый через настройки контур не оставляет ни ключа, ни следа пробы', async () => {
+      await patch({ platforms: [platform] });
+      setStoredKey(join(root, 'agentdeck'), 'platform:enterprise-platform-dev', 'sk-СЕКРЕТ-4f21');
+      store.savePlatformHealth('enterprise-platform-dev', { outcome: 'ok' } as never);
+
+      const res = await patch({ platforms: [] });
+
+      expect(res.statusCode).toBe(200);
+      expect(getStoredKey(join(root, 'agentdeck'), 'platform:enterprise-platform-dev')).toBeUndefined();
+      expect(store.getPlatformHealth()['enterprise-platform-dev']).toBeUndefined();
+    });
+
+    it('идентификатор с пробелом отклонён и здесь: адрес шлюза собирается из него', async () => {
+      const res = await patch({ platforms: [{ ...platform, id: 'enterprise-platform dev' }] });
+
+      expect(res.statusCode).toBe(400);
+      expect((await getSettings()).platforms).toEqual([]);
+    });
+
+    it('импорт чужого снимка не оставляет ключей от контуров, которых в нём нет', async () => {
+      setStoredKey(join(root, 'agentdeck'), 'platform:местный', 'sk-МЕСТНЫЙ-КЛЮЧ');
+
+      await importState({ settings: { platforms: [platform] } });
+
+      expect(getStoredKey(join(root, 'agentdeck'), 'platform:местный')).toBeUndefined();
+    });
+
+    /**
+     * Управляемый профиль эндпоинта — третья такая же зависимость. Он живёт в
+     * тех же настройках, но собирается ИЗ контура: контур исчез или сменил порт
+     * шлюза — профиль обязан исчезнуть или переехать вместе с ним, иначе
+     * ассистент панели молча ходит на мёртвый адрес.
+     */
+    const managed = {
+      id: 'contour-enterprise-platform-dev',
+      name: 'Контур · EnterprisePlatform · dev',
+      baseUrl: 'http://127.0.0.1:5179/enterprise-platform-dev/v1',
+      apiKind: 'openai-compat',
+      model: 'gpt-4o',
+      writeToken: false,
+      ownerPlatformId: 'enterprise-platform-dev',
+    };
+
+    it('контур убрали — управляемый профиль ушёл, ассистент вернулся в облако', async () => {
+      await patch({ platforms: [platform] });
+      store.updateSettings({
+        endpointProfiles: [managed as never],
+        assistantEndpointId: 'contour-enterprise-platform-dev',
+      });
+
+      await patch({ platforms: [] });
+
+      expect((await getSettings()).endpointProfiles).toEqual([]);
+      expect((await getSettings()).assistantEndpointId).toBe('');
+    });
+
+    it('сменился порт шлюза — адрес профиля переехал сам', async () => {
+      await patch({ platforms: [platform] });
+      store.updateSettings({ endpointProfiles: [managed as never] });
+
+      await patch({ platformGateway: { enabled: true, port: 5200, forceStream: true } });
+
+      expect((await getSettings()).endpointProfiles[0]?.baseUrl).toBe(
+        'http://127.0.0.1:5200/enterprise-platform-dev/v1',
+      );
+    });
+
+    it('импорт снимка без контура тоже убирает его профиль', async () => {
+      await patch({ platforms: [platform] });
+      store.updateSettings({ endpointProfiles: [managed as never] });
+
+      await importState({ settings: { platforms: [] } });
+
+      expect((await getSettings()).endpointProfiles).toEqual([]);
     });
   });
 });

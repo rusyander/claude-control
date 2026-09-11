@@ -21,7 +21,7 @@ import type { TestExchangeModalProps } from './TestExchangeModal.types';
 import styles from './ProjectTests.module.scss';
 
 const RESULTS_FORMATS: ResultsFormat[] = ['junit', 'playwright', 'allure'];
-const CASES_FORMATS: CasesFormat[] = ['csv', 'xlsx', 'testrail-csv'];
+const CASES_FORMATS: CasesFormat[] = ['csv', 'xlsx', 'testrail-csv', 'markdown'];
 const EXPORT_FORMATS = ['csv', 'xlsx', 'md'] as const;
 
 /** Книга Excel — байты, всё остальное разбирается как текст. */
@@ -74,6 +74,10 @@ export function TestExchangeModal({
 
   const importResults = useImportTestResults(path);
   const importCases = useImportTestCases(path);
+
+  // Ручные кейсы уже лежат в проекте: выбирать нечего, каталог необязателен —
+  // пустой означает `QA`, и кнопка «Взять из проекта» работает без единого поля.
+  const isManual = casesFormat === 'markdown';
 
   const run = async (send: () => Promise<ProjectTestImportResult>): Promise<void> => {
     setError(undefined);
@@ -188,7 +192,7 @@ export function TestExchangeModal({
             {t('tests.exchange.cases', { group: groupId })}
           </Typography>
           <Typography variant="caption" color="subtle">
-            {t('tests.exchange.casesHint')}
+            {t(isManual ? 'tests.exchange.casesHintMarkdown' : 'tests.exchange.casesHint')}
           </Typography>
           <Stack direction="row" gap="var(--spacing-xs)" wrap align="end">
             <SelectField
@@ -201,9 +205,11 @@ export function TestExchangeModal({
               }))}
             />
             <div className={styles.halfField}>
+              {/* У ручных кейсов поле означает КАТАЛОГ: файлов там десятки, и
+                  указывать их по одному было бы работой вместо импорта. */}
               <TextField
-                label={t('tests.exchange.file')}
-                hint={t('tests.exchange.fileHint')}
+                label={t(isManual ? 'tests.exchange.folder' : 'tests.exchange.file')}
+                hint={t(isManual ? 'tests.exchange.folderHint' : 'tests.exchange.fileHint')}
                 value={casesFile}
                 onChange={setCasesFile}
                 isMono
@@ -228,7 +234,7 @@ export function TestExchangeModal({
               variant="secondary"
               size="sm"
               isLoading={importCases.isPending}
-              disabled={groupId.length === 0 || casesFile.trim().length === 0}
+              disabled={groupId.length === 0 || (!isManual && casesFile.trim().length === 0)}
               onClick={() => void sendCases()}
             >
               {t('tests.exchange.importFromProject')}
@@ -237,7 +243,7 @@ export function TestExchangeModal({
               variant="ghost"
               size="sm"
               leftIcon={<Icon name="paperclip" size={16} />}
-              disabled={groupId.length === 0}
+              disabled={groupId.length === 0 || isManual}
               onClick={() => casesInput.current?.click()}
             >
               {t('tests.exchange.pickFile')}

@@ -102,6 +102,39 @@ export interface TopicNavProps {
   nextLabel: string;
 }
 
+/** Чья это сторона на снимке: подпись говорит это первым словом. */
+export type HelpShotSide = 'enterprise-platform' | 'panel';
+
+export interface HelpShotProps {
+  /** Раздел справки — он же папка каталога и первая часть ключа подписи. */
+  topic: string;
+  /** Один путь через раздел от начала до конца: `connect`, `split`, `run`. */
+  scenario: string;
+  /** Кадр: `NN-слаг`, имя файла без расширения и последняя часть ключа. */
+  frame: string;
+  side: HelpShotSide;
+}
+
+export interface HelpDiagramProps {
+  /** Раздел справки — папка каталога и первая часть ключа подписи. */
+  topic: string;
+  /** Имя схемы: файл `<name>.png` и последняя часть ключа подписи. */
+  name: string;
+}
+
+export interface GuideStepsProps {
+  children: ReactNode;
+}
+
+export interface GuideStepProps {
+  /** Что делается на шаге. Номер подставляет счётчик, в заголовке его нет. */
+  title: string;
+  /** Подробность: куда нажать, что ввести, что означает увиденное. */
+  text?: string;
+  /** Снимки шага и тонкости к нему. */
+  children?: ReactNode;
+}
+
 export interface TopicCardProps {
   title: string;
   /** Одна строка о разделе: чем он занимается. */

@@ -139,6 +139,8 @@ export function SettingsTopic() {
         <OptionCards
           items={[
             { title: tr('modelsWhere'), text: tr('modelsWhereText') },
+            { title: tr('modelsPlatform'), text: tr('modelsPlatformText') },
+            { title: tr('modelsRetired'), text: tr('modelsRetiredText') },
             { title: tr('modelsAuto'), text: tr('modelsAutoText') },
             { title: tr('modelsWho'), text: tr('modelsWhoText') },
             { title: tr('modelsOff'), text: tr('modelsOffText') },

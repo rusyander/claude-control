@@ -9,8 +9,10 @@ import {
   type infer as Infer,
 } from 'zod';
 import { endpointProfileSchema } from './endpoints';
+import { modelSources } from './models';
 import { permissionRulesSchema } from './permission-rules';
 import { dlpSettingsSchema } from './dlp';
+import { platformGatewaySettingsSchema, platformSchema } from './platform';
 import { promptGateSettingsSchema } from './prompt-gate';
 import { remoteAccessSettingsSchema } from './remote';
 
@@ -108,7 +110,8 @@ export const telegramSettingsSchema = object({
 
 export const tmsSettingsSchema = object({
   enabled: boolean().default(false),
-  kind: zodEnum(['', 'zephyr', 'xray']).default(''),
+  kind: zodEnum(['', 'zephyr', 'xray', 'testit']).default(''),
+  baseUrl: string().default(''),
   projectKey: string().default(''),
   groupId: string().default(''),
 });
@@ -305,6 +308,26 @@ export const appSettingsSchema = object({
    */
   autoUpdateModels: boolean().default(true),
   /**
+   * Откуда брать каталог моделей.
+   *
+   * `models.dev` — открытый каталог всех вендоров: полный, но про права ключа
+   * ничего не знает. `platform` — список КЛЮЧА из контура: короче ровно на то,
+   * чего ключу не выдали, и в этом его ценность — показывается то, чем реально
+   * можно пользоваться, а не то, что бывает на свете.
+   *
+   * Переключение не трогает кэш models.dev: списки лежат в разных местах
+   * (`models-cache.json` и след пробы контура), и вернуться обратно можно без
+   * похода в сеть.
+   */
+  modelSource: zodEnum(modelSources).default('models.dev'),
+  /**
+   * Какой именно контур служит источником каталога. Отдельным полем, а не
+   * «первый включённый»: контуров может быть несколько, и молча выбранный за
+   * человека источник моделей — это молча выбранный список того, что ему
+   * доступно. Пусто при `modelSource: 'platform'` — честный откат на models.dev.
+   */
+  modelSourcePlatform: string().default(''),
+  /**
    * Показывать дифф перед записью в конфигурацию ЧУЖОГО CLI. Включено по
    * умолчанию: файлы этих провайдеров человек вёл руками, и «сохранить» вслепую
    * в незнакомом формате — самый неприятный вид доверия. Для Claude
@@ -319,6 +342,22 @@ export const appSettingsSchema = object({
    * ТОКЕНА здесь нет: он в зашифрованном хранилище панели (см. endpoints.ts).
    */
   endpointProfiles: array(endpointProfileSchema).default([]),
+  /**
+   * Контуры — корпоративные платформы, к которым панель ходит по ключу. Рядом с
+   * профилями эндпоинта намеренно: это тот же уровень (панель, а не провайдер),
+   * и применение контура ПОРОЖДАЕТ управляемый профиль, а не второй механизм.
+   * КЛЮЧА здесь нет: он в зашифрованном хранилище панели (`platform:<id>`).
+   */
+  platforms: array(platformSchema).default([]),
+  /**
+   * Локальный шлюз контуров: слушатель на петле, через который CLI ходят в
+   * контур, не зная ключа. Отдельно от списка контуров, потому что слушатель
+   * один на все — порт и включённость общие, а контуры на нём различаются
+   * первым сегментом адреса.
+   */
+  platformGateway: platformGatewaySettingsSchema.default(() =>
+    platformGatewaySettingsSchema.parse({}),
+  ),
   /**
    * Профиль, по которому ходит ассистент САМОЙ панели (формы, проверка
    * провайдера). Пусто — ассистент идёт в облако вендора, как раньше. Отдельно

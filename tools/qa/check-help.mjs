@@ -47,8 +47,12 @@ for (const topic of TOPICS) {
   await page.waitForSelector('nav');
   await page.waitForTimeout(600);
   const text = await page.evaluate(() => document.body.innerText);
+  // `innerText` отдаёт текст таким, каким его видит человек, — с учётом
+  // `text-transform`. Шапка таблицы в верхнем регистре превращала утечку
+  // `help.topics.tests.limitColumn` в `HELP.TOPICS.TESTS.LIMITCOLUMN`, и
+  // регистрозависимый поиск её пропускал (два ключа нашли только глазами).
   const leaks = [
-    ...new Set(text.match(/\b(help|providerPermissions|common)\.[A-Za-z0-9_.]+/g) ?? []),
+    ...new Set(text.match(/\b(help|providerPermissions|common)\.[A-Za-z0-9_.]+/gi) ?? []),
   ];
   if (leaks.length) {
     bad++;

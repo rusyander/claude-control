@@ -15,6 +15,9 @@ import {
 } from '../lib/credentials.ts';
 import { buildOverview } from '../domains/overview.ts';
 import { readAccount } from '../domains/account.ts';
+import { forgetOrphanPlatforms } from '../domains/platform/store.ts';
+import { reconcileManagedProfiles } from '../domains/platform/apply/profile.ts';
+import { rollbackContour, type ContourRollbackDeps } from '../domains/platform/apply/rollback.ts';
 import {
   setBackupKeep,
   clampBackupKeep,
@@ -33,6 +36,17 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
   // перезапуска зашифрованные копии секретов не делаются, пока её не введут.
   setEncryptSecretBackups(ctx.store.getSettings().encryptSecretBackups);
   setSecretsBasename(basename(ctx.location.paths.secretsEnv));
+
+  /** Зависимости отката контура: живость шлюза ему не нужна — он только возвращает. */
+  const rollbackDeps = (): ContourRollbackDeps => ({
+    store: ctx.store,
+    paths: {
+      claudeSettings: ctx.location.paths.settings,
+      override: ctx.store.getSettings().claudeDirOverride,
+    },
+    backupDir: ctx.backupDir,
+  });
+
   app.get('/api/location', () => ctx.location);
 
   /**
@@ -153,6 +167,25 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     if (patch.encryptSecretBackups !== undefined) {
       setEncryptSecretBackups(settings.encryptSecretBackups);
     }
+    // Контуры — единственный ключ настроек, за которым тянутся данные ВНЕ
+    // настроек: ключ в шифрохранилище и след пробы. Этот маршрут про них не
+    // знает, поэтому убирает за собой сразу: контур, исчезнувший из списка,
+    // не оставляет ни живого секрета, ни результата проверки.
+    if (patch.platforms !== undefined) {
+      // Контур, исчезнувший отсюда, уносит и своё применение: иначе конфиги CLI
+      // остались бы указывать на маршрут шлюза, которого больше нет, а снять
+      // применение было бы уже нечем — маршрут отката спрашивает контур.
+      for (const id of forgetOrphanPlatforms(ctx.store, ctx.location.paths.appData)) {
+        rollbackContour(rollbackDeps(), id);
+      }
+    }
+    // Управляемые профили эндпоинтов — вторая такая же зависимость, и сверка
+    // нужна ещё и при смене НАСТРОЕК ШЛЮЗА: сменившийся порт оставил бы в
+    // списке профиль с устаревшим адресом, и ассистент панели молча ходил бы
+    // в никуда.
+    if (patch.platforms !== undefined || patch.platformGateway !== undefined) {
+      reconcileManagedProfiles(ctx.store);
+    }
     return ctx.effectiveSettings();
   });
 
@@ -174,7 +207,18 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     }
 
     ctx.store.importState(parsed.data);
-    // Импорт мог принести другие значения глобальных настроек ввода-вывода —
+    // Снимок принёс СВОЙ список контуров, а ключи остались от прежнего: те, чьих
+    // контуров в снимке нет, стали бы секретами без владельца — панель их больше
+    // не показывает, значит и стереть их было бы уже нечем.
+    for (const id of forgetOrphanPlatforms(ctx.store, ctx.location.paths.appData)) {
+      // Файлы CLI снимок с собой не привёз — они здешние, и правил их здешний
+      // контур. Уходящий контур забирает своё применение с собой.
+      rollbackContour(rollbackDeps(), id);
+    }
+    // Профили, порождённые контурами: снимок принёс свои и мог не принести
+    // прежних. Управляемый профиль без контура указывает на маршрут шлюза,
+    // которого нет, — сверка убирает его вместе с выбором ассистента.
+    reconcileManagedProfiles(ctx.store);
     // применяем их разом, а не только глубину ротации: иначе включённое в
     // снимке шифрование копий секретов не действовало бы до перезапуска.
     ctx.applyIoSettings();

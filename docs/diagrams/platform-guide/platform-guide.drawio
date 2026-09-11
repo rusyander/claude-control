@@ -1,0 +1,487 @@
+<mxfile host="app.diagrams.net" version="24.7.7">
+  <diagram id="p1" name="1. Путь запроса через контур">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1110" pageHeight="1260" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p1:title" value="Путь запроса через контур" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="760" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:sub" value="Сверху вниз — то, что происходит с одним сообщением. Ключ на этом пути есть ровно в одном месте." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="760" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:cli" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Агентный CLI или ассистент панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Claude Code, Codex, Qwen Code и ещё шесть.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;В конфигурации CLI стоит адрес шлюза, ключа контура там нет.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="130" width="300" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:cli:icon" value="CLI" style="shape=card;fillColor=#FFFFFF;strokeColor=#43A047;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1B5E20;informational=1;" vertex="1" parent="p1:cli">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:gw" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Локальный шлюз панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Слушатель процесса самой панели на 127.0.0.1.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Адрес — /&lt;идентификатор контура&gt;/v1, отсюда требование к латинице.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="320" width="300" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:gw:icon" value="API" style="shape=hexagon;fillColor=#FFFFFF;strokeColor=#EC407A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#AD1457;informational=1;" vertex="1" parent="p1:gw">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:contour" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#37474F;text-align:left&quot;&gt;Контур: публичный API платформы&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;/v1/models, /v1/chat/completions, /v1/embeddings.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Проверки контента работают в полосе запроса: отказ приходит статусом 451.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#ECEFF1;strokeColor=#78909C;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="510" width="300" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:contour:icon" value="вне" style="shape=cloud;fillColor=#FFFFFF;strokeColor=#78909C;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#37474F;informational=1;" vertex="1" parent="p1:contour">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:model" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1565C0;text-align:left&quot;&gt;Модель контура&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Та, что разрешена правами ключа: список приходит уже суженным.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Расход считает контур; панель показывает свою оценку и называет её оценкой.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E3F2FD;strokeColor=#42A5F5;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="700" width="300" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:model:icon" value="LLM" style="shape=process;fillColor=#FFFFFF;strokeColor=#42A5F5;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1565C0;informational=1;" vertex="1" parent="p1:model">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:key" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Ключ контура&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Лежит в панели зашифрованным. Ни в ответе API, ни в промпте, ни в логе, ни в конфигурации CLI его нет — наружу уходит маска.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="310" width="290" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:key:icon" value="key" style="shape=cylinder3;backgroundOutline=1;size=7;fillColor=#FFFFFF;strokeColor=#FB8C00;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#EF6C00;informational=1;" vertex="1" parent="p1:key">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:off" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Панель выключена — шлюз закрыт&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;CLI, направленный на шлюз, останется без модели: он получит отказ. Тихого возврата в облако вендора не будет — это подписанный компромисс, а не сбой.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="510" width="290" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:dialect" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Не всякий CLI умеет говорить со шлюзом&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Gemini CLI говорит на своём диалекте. В списке потребителей он стоит с этой причиной, а не молча не работает.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="700" width="290" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge:p1:cli:p1:gw" value="запрос по OpenAI-совместимому&lt;br&gt;протоколу" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:cli" target="p1:gw">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:gw:p1:contour" value="тот же запрос, ключ подставлен&lt;br&gt;шлюзом" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:gw" target="p1:contour">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:contour:p1:model" value="маршрут по имени модели" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:contour" target="p1:model">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:key:p1:gw" value="ключ из хранилища" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:key" target="p1:gw">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="560" y="350"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p1:model:p1:cli" value="ответ возвращается тем же путём" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:model" target="p1:cli">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="110" y="745"/>
+            <mxPoint x="110" y="170"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="850" width="390" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="880" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap0" value="потребитель: CLI или ассистент панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="880" width="330" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="910" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap1" value="шлюз панели — единственное место, где ключ подставляется" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="910" width="330" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#ECEFF1;strokeColor=#78909C;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="940" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap2" value="внешняя система: контур компании" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="940" width="330" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#E3F2FD;strokeColor=#42A5F5;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="970" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap3" value="модель и другие службы контура" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="970" width="330" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1000" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap4" value="хранилище панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1000" width="330" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1030" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap5" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1030" width="330" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw6" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1060" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap6" value="ограничение, о котором сказано прямо" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1060" width="330" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw7" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#78909C;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1090" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap7" value="значок формы: карточка, шлюз, облако, служба, хранилище" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1090" width="330" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1130" as="sourcePoint"/>
+            <mxPoint x="110" y="1130" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap8" value="запрос вперёд" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1120" width="330" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1160" as="sourcePoint"/>
+            <mxPoint x="110" y="1160" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap9" value="ответ обратно" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1150" width="330" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1190" as="sourcePoint"/>
+            <mxPoint x="110" y="1190" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap10" value="чтение из хранилища" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1180" width="330" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p2" name="2. Что заводится в админке, а что в панели">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="1050" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p2:title" value="Что заводится в админке контура, а что в панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="900" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:sub" value="Панель не пишет в контур ничего: всё, что слева, делает администратор руками. Через границу переходят две строки." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="900" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:admin" value="" style="rounded=1;arcSize=2;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="130" width="420" height="440" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:admin:tab" value="Админка контура&lt;div style=&quot;font-size:9px&quot;&gt;делает администратор инстанса&lt;/div&gt;" style="rounded=0;fillColor=#EC407A;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p2:admin">
+          <mxGeometry x="10" y="10" width="400" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:model" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Модель&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Название, ссылка на модель у провайдера, длина контекста. Нативный API провайдера указывается без /v1 — лишний хвост отвечает «404 page not found» уже внутри ответа модели.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:admin">
+          <mxGeometry x="20" y="70" width="380" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:key" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Ключ&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Выпускается с бюджетом и лимитами RPM и TPM. Показывается ровно один раз: потерян — значит выпустить новый.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:admin">
+          <mxGeometry x="20" y="170" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:access" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Доступ ключа к моделям&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Сужает то, что панель увидит пробой. Ключ получает не весь каталог инстанса, а свой список.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:admin">
+          <mxGeometry x="20" y="260" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:usage" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Использование&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Расход по моделям и ключам считает контур. Это исходные цифры, с которыми сверяется оценка панели.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:admin">
+          <mxGeometry x="20" y="350" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:panel" value="" style="rounded=1;arcSize=2;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="130" width="420" height="430" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:panel:tab" value="Панель&lt;div style=&quot;font-size:9px&quot;&gt;делает тот, кто ей пользуется&lt;/div&gt;" style="rounded=0;fillColor=#7E57C2;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p2:panel">
+          <mxGeometry x="10" y="10" width="400" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:wizard" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Мастер: адрес и ключ&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Два поля из админки и больше ничего. Идентификатор собирается латиницей — из него строится адрес локального шлюза.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:panel">
+          <mxGeometry x="20" y="70" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:probe" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Проба&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;К контуру ходит сервер панели по сохранённому черновику, а не браузер. Контур остаётся выключенным до последнего шага.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:panel">
+          <mxGeometry x="20" y="160" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:gateway" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Шлюз&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Поднимается кнопкой мастера. Пока не поднят, применять к CLI нечего — у каждого потребителя стоит прочерк с этой причиной.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:panel">
+          <mxGeometry x="20" y="250" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:targets" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Потребители&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Ассистент панели, Claude Code и восемь CLI. Применение правит их конфигурации, копия «до» уходит в раздел «История».&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:panel">
+          <mxGeometry x="20" y="340" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:note" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Границу переходят ровно две строки&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Адрес публичного API и ключ. Всё остальное панель выясняет пробой и показывает как ответ контура, а не как собственное знание: непроверенное стоит словами «не объявлено», а не галкой.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="610" width="1020" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge:p2:key:p2:wizard" value="ключ переносится один раз" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#EF6C00;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:key" target="p2:wizard">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="720" y="335"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p2:access:p2:probe" value="проба спрашивает список ключа" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:access" target="p2:probe">
+          <mxGeometry relative="1" x="0" y="22" as="geometry">
+            <Array as="points">
+            <mxPoint x="720" y="425"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p2:gateway:p2:usage" value="запросы попадают в учёт контура" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:gateway" target="p2:usage">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="590" y="415"/>
+            <mxPoint x="590" y="515"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="730" width="280" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="760" width="30" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw0b" value="" style="rounded=0;fillColor=#EC407A;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="760" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap0" value="сторона контура: админка инстанса" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="760" width="220" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="790" width="30" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw1b" value="" style="rounded=0;fillColor=#7E57C2;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="790" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap1" value="сторона панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="790" width="220" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="820" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap2" value="что именно заводится на этой стороне" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="820" width="220" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="850" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap3" value="то же самое на стороне панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="850" width="220" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="880" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:cap4" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="880" width="220" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#EF6C00;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="920" as="sourcePoint"/>
+            <mxPoint x="110" y="920" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2:legend:cap5" value="переносится руками, один раз" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="910" width="220" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="950" as="sourcePoint"/>
+            <mxPoint x="110" y="950" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2:legend:cap6" value="спрашивает панель" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="940" width="220" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2:legend:sw7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="980" as="sourcePoint"/>
+            <mxPoint x="110" y="980" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2:legend:cap7" value="учёт расхода" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="970" width="220" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p3" name="3. Две системы рядом">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1780" pageHeight="1370" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p3:title" value="Панель и контур: кто чем занят" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="1160" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:sub" value="Слева — всё, что происходит на вашей машине. Справа — сервисы инстанса платформа компании. Границу переходят три стрелки, и ни одна из них не ведёт в обратную сторону сама." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="1160" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:panel" value="" style="rounded=1;arcSize=2;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="150" width="520" height="610" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:panel:tab" value="Ваша машина&lt;div style=&quot;font-size:9px&quot;&gt;один процесс панели, 127.0.0.1&lt;/div&gt;" style="rounded=0;fillColor=#7E57C2;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p3:panel">
+          <mxGeometry x="10" y="10" width="500" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:cli" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Потребители: девять CLI и ассистент панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;В их конфигурации стоит только адрес локального шлюза вида http://127.0.0.1:5179/&lt;контур&gt;/v1. Ключа контура там нет.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
+          <mxGeometry x="20" y="70" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:gwl" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Локальный шлюз панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Слушатель процесса самой панели. Принимает запрос по OpenAI-совместимому протоколу, подставляет ключ и считает токены обеих сторон.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
+          <mxGeometry x="20" y="160" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:driver" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Реестр контуров и драйвер enterprise-platform&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Помнит адрес, режим и возможности контура. Драйвер знает диалект платформы: где у неё каталог моделей, эмбеддинги и агенты и как она отвечает на отказ.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
+          <mxGeometry x="20" y="250" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:keys" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Зашифрованное хранилище ключей&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Ключ лежит здесь и только здесь. Ни в ответе API, ни в промпте, ни в логе, ни в конфигурации CLI его нет — наружу уходит маска.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
+          <mxGeometry x="20" y="340" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:spend" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Расход и бюджет&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Расход — ОЦЕНКА по нашему справочнику цен, со знаком «≈». Бюджет вводится руками: маршрута для остатка у платформы нет.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
+          <mxGeometry x="20" y="430" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:apply" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Применение к конфигурациям&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Правит файлы потребителей, копию «до» кладёт в раздел «История», у каждой записи своя кнопка отката.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
+          <mxGeometry x="20" y="520" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:contour" value="" style="rounded=1;arcSize=2;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="860" y="150" width="520" height="700" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:contour:tab" value="Контур компании&lt;div style=&quot;font-size:9px&quot;&gt;инстанс платформа компании, развёрнутый у вас&lt;/div&gt;" style="rounded=0;fillColor=#EC407A;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p3:contour">
+          <mxGeometry x="10" y="10" width="500" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:ui" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;inst-admin-ui — админка инстанса&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Здесь администратор заводит модель, выпускает ключ и смотрит «Использование». Панель в админку не ходит вовсе: всё, что из неё нужно, переносится руками.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:contour">
+          <mxGeometry x="20" y="70" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:gwi" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;inst-gateway — единая точка входа&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Раскладывает пути по сервисам инстанса: /v1/* — публичный API, /api/v1/* — админский, /user/v1/* — пользовательский.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:contour">
+          <mxGeometry x="20" y="160" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:api" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;inst-api — публичный API /v1/*&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Совместим с OpenAI: chat/completions, embeddings, models. Разбирает ключ, сверяет его лимиты и отвечает 401 сразу пятью возможными причинами — какая именно, снаружи не различить.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:contour">
+          <mxGeometry x="20" y="250" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:admin" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;inst-admin-api — модели, ключи, учёт&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Держит каталог моделей и ключи, принимает расход от mod-llmbox. Именно его список видит проба панели — суженный правами вашего ключа.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:contour">
+          <mxGeometry x="20" y="340" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:llm" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;mod-llmbox — вызов модели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;LiteLLM Router: ходит к провайдеру и считает стоимость по ценам реестра инстанса. С нашей оценкой сходится как порядок величины, а не копейка в копейку.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:contour">
+          <mxGeometry x="20" y="430" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:boxes" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;mod-guardrailsbox, mod-kbbox, mod-agentbox&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Проверки контента, базы знаний и агенты платформы. Их вызывает сам контур на своей стороне; панель показывает результат, но ни одного из них не вызывает.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:contour">
+          <mxGeometry x="20" y="520" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:store" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Хранилища инстанса&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Postgres, Redis, MinIO, Qdrant. Панель в них не ходит и об их существовании ничего не предполагает.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="p3:contour">
+          <mxGeometry x="20" y="610" width="480" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:store:icon" value="DB" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;fillColor=#FFFFFF;strokeColor=#EC407A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#AD1457;informational=1;" vertex="1" parent="p3:store">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:vendor" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#37474F;text-align:left&quot;&gt;Провайдеры моделей&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;vLLM, Ollama, вендорское облако. Это уже не контур: до них доходит его ключ, а не ваш.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#ECEFF1;strokeColor=#78909C;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="580" width="280" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:vendor:icon" value="LLM" style="shape=cloud;fillColor=#FFFFFF;strokeColor=#78909C;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#37474F;informational=1;" vertex="1" parent="p3:vendor">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:note" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Что НЕ переходит границу&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Остаток бюджета и расход контура панель не читает — их маршрута у платформы нет, поэтому бюджет вводится руками, а расход панель считает сама и помечает «≈». Инструменты и MCP-серверы вашей машины контуру не отдаются: платформа собирает набор инструментов сама, по модели и правам ключа. И ни одна правка не уходит в контур: панель не создаёт в нём ни моделей, ни ключей.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="890" width="1380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge:p3:ui:p3:driver" value="адрес и ключ — переносятся руками,&lt;br&gt;один раз" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#EF6C00;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p3:ui" target="p3:driver">
+          <mxGeometry relative="1" x="-0.12" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="620" y="255"/>
+            <mxPoint x="620" y="435"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p3:gwl:p3:gwi" value="запрос по ключу контура" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p3:gwl" target="p3:gwi">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p3:api:p3:gwl" value="ответ модели и число токенов" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=1;entryY=0.8;entryDx=0;entryDy=0;" edge="1" parent="1" source="p3:api" target="p3:gwl">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="820" y="456"/>
+            <mxPoint x="820" y="366"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p3:gwi:p3:api" value="путь /v1/*" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p3:gwi" target="p3:api">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p3:api:p3:llm" value="вызов модели" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p3:api" target="p3:llm">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="1410" y="435"/>
+            <mxPoint x="1410" y="615"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p3:llm:p3:vendor" value="по ключу провайдера" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p3:llm" target="p3:vendor">
+          <mxGeometry relative="1" x="0" y="-44" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:p3:cli:p3:gwl" value="обычный запрос к модели" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p3:cli" target="p3:gwl">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1020" width="260" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1050" width="30" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw0b" value="" style="rounded=0;fillColor=#7E57C2;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="1050" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:cap0" value="сторона панели: ваша машина" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1050" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1080" width="30" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw1b" value="" style="rounded=0;fillColor=#EC407A;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="1080" width="20" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:cap1" value="сторона контура: инстанс платформа компании" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1080" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1110" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:cap2" value="составная часть панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1110" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1140" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:cap3" value="сервис инстанса" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1140" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#ECEFF1;strokeColor=#78909C;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1170" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:cap4" value="то, что уже вне контура" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1170" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1200" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:cap5" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1200" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#EF6C00;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1240" as="sourcePoint"/>
+            <mxPoint x="110" y="1240" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3:legend:cap6" value="переносится руками, один раз" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1230" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1270" as="sourcePoint"/>
+            <mxPoint x="110" y="1270" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3:legend:cap7" value="запрос вперёд" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1260" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1300" as="sourcePoint"/>
+            <mxPoint x="110" y="1300" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3:legend:cap8" value="ответ обратно" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1290" width="200" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

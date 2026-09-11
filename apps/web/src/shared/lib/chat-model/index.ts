@@ -35,6 +35,12 @@ export function modelLabel(model: string): string {
  * разворачивает в последнюю модель семейства, а `claude-opus-5` останется
  * ровно этой моделью и после выхода следующей (её потом подставит
  * автообновление). Поэтому конкретные идут отдельным блоком и подписаны id.
+ *
+ * Пропавшую у контура модель в выбор не кладём: в карточке каталога она
+ * остаётся объяснением («была, больше нет») и кнопки «сделать по умолчанию» не
+ * имеет — а выбор дефолта пишет ровно ту же настройку, и запрет, который
+ * держится в одном из двух мест, не запрет. Уже выбранное значение при этом не
+ * теряется: его возвращает `withCurrentValue`.
  */
 export function modelSelectOptions(
   models: ModelInfo[],
@@ -45,7 +51,7 @@ export function modelSelectOptions(
   const known = new Set(aliases);
 
   for (const model of models) {
-    if (known.has(model.id)) continue;
+    if (model.retired || known.has(model.id)) continue;
     known.add(model.id);
     options.push({ value: model.id, label: `${model.name} · ${model.id}` });
   }

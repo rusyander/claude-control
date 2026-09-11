@@ -80,8 +80,18 @@ export function parseContinueDocument(text: string): Document {
  * неуникальное имя → fail-closed: форма не наша, править её вслепую нельзя.
  */
 export function readContinueServers(text: string): ContinueRawServer[] {
+  return readNamedEntries(text, CONTINUE_MCP_KEY);
+}
+
+/**
+ * Список записей с именами (`mcpServers`, `models`) — одна форма на два ключа.
+ * Общая, потому что и правила у них общие: список отображений, у каждого
+ * непустое уникальное `name`, всё остальное — чужие поля, которые обязаны
+ * пережить нашу правку.
+ */
+function readNamedEntries(text: string, key: string): ContinueRawServer[] {
   const doc = parseContinueDocument(text);
-  const node = doc.get(CONTINUE_MCP_KEY, true);
+  const node = doc.get(key, true);
   if (node === undefined || node === null) return [];
   if (!isSeq(node)) throw new UnrecognizedFormatError();
 
@@ -112,14 +122,35 @@ export function readContinueServers(text: string): ContinueRawServer[] {
  * другого ключа. Не сошлось — `UnrecognizedFormatError`, файл не трогаем.
  */
 export function writeContinueServers(text: string, servers: ContinueRawServer[]): string {
+  return writeNamedEntries(text, CONTINUE_MCP_KEY, servers);
+}
+
+/** Ключ списка моделей Continue: там же живёт `apiBase` — адрес эндпоинта. */
+export const CONTINUE_MODELS_KEY = 'models';
+
+/**
+ * Модели Continue как они лежат в файле. Адрес эндпоинта у Continue — поле
+ * `apiBase` КОНКРЕТНОЙ модели, поэтому контур (Т3) добавляет сюда свою запись и
+ * не трогает чужие: переписать `apiBase` у чужой модели значило бы увести в
+ * контур работу, которую человек туда не отправлял.
+ */
+export function readContinueModels(text: string): ContinueRawServer[] {
+  return readNamedEntries(text, CONTINUE_MODELS_KEY);
+}
+
+export function writeContinueModels(text: string, models: ContinueRawServer[]): string {
+  return writeNamedEntries(text, CONTINUE_MODELS_KEY, models);
+}
+
+function writeNamedEntries(text: string, key: string, entries: ContinueRawServer[]): string {
   // Fail-closed на ВХОДЕ: существующий блок обязан читаться нашей моделью.
-  readContinueServers(text);
+  readNamedEntries(text, key);
 
   const original = parseContinueDocument(text);
   const draft = parseContinueDocument(text);
 
-  if (servers.length === 0) deleteYamlKey(draft, CONTINUE_MCP_KEY);
-  else draft.set(CONTINUE_MCP_KEY, servers);
+  if (entries.length === 0) deleteYamlKey(draft, key);
+  else draft.set(key, entries);
 
   // lineWidth: 0 — длинные аргументы и адреса не переносятся на следующую строку.
   // flowCollectionPadding: false — чужие потоковые списки (`roles: [chat, edit]`)
@@ -127,13 +158,10 @@ export function writeContinueServers(text: string, servers: ContinueRawServer[])
   const next = draft.toString({ lineWidth: 0, flowCollectionPadding: false });
 
   const check = parseContinueDocument(next);
-  if (JSON.stringify(servers) !== JSON.stringify(readContinueServers(next))) {
+  if (JSON.stringify(entries) !== JSON.stringify(readNamedEntries(next, key))) {
     throw new UnrecognizedFormatError();
   }
-  if (
-    otherYamlKeysProjection(original, [CONTINUE_MCP_KEY]) !==
-    otherYamlKeysProjection(check, [CONTINUE_MCP_KEY])
-  ) {
+  if (otherYamlKeysProjection(original, [key]) !== otherYamlKeysProjection(check, [key])) {
     throw new UnrecognizedFormatError();
   }
 

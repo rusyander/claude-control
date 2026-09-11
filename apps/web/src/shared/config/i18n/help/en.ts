@@ -72,6 +72,111 @@ export const helpEn: HelpSchema = {
     readOnly: 'read only',
   },
 
+  shots: {
+    sideEnterprisePlatform: 'Contour admin',
+    sidePanel: 'Panel',
+    chat: {
+      basics: {
+        '01-project-empty':
+          'An empty conversation in the project folder: header, git strip and prompts at hand',
+        '02-composer': 'A question with a file attached — the attachment shows as a chip',
+        '03-answer': 'The answer as it is generated: thinking, tool calls, spend, text',
+        '04-permission': 'The agent stands on a call and waits for a decision: deny or allow',
+        '05-question': 'The agent asks: three questions in a row, the next opens after an answer',
+        '06-branch': 'The git strip expanded: changed files, pull and push, branches and copies',
+        '07-menu': 'The conversation menu: permission toggles and the rules that skip the card',
+        '08-menu-actions': 'The bottom of the same menu: session restart, export, refresh, help',
+        '09-agents': 'The agents panel: who is running, whose spend, and one stop button',
+        '10-handoff': 'A stage is closed: an offer to continue in a clean session from a file',
+      },
+      split: {
+        '01-proposal': 'An offer to split: three groups, branches, kind of work and model',
+        '02-tree': 'After the split: links in the list on the left and the hub in the parent feed',
+        '03-hub': 'The hub: chain stages, model, time at work and the branch comparison button',
+        '04-child-ask': "A child's permission request lands in the parent with the group name",
+        '05-overlap': 'Branch overlap: a shared file and a file taken outside the group it owns',
+        '06-paused': 'The tree on pause: a mark on every group and the resume button',
+        '07-worktrees': 'Parallel copies of the repository: path, install trace and removal',
+      },
+    },
+    platform: {
+      connect: {
+        '01-admin-login': 'Signing in to the instance admin: email and password, or SSO',
+        '02-admin-dashboard': 'Dashboard: active models, keys and today’s requests',
+        '03-admin-models': 'The instance model catalogue — where the key’s own list comes from',
+        '04-admin-model-create':
+          'Model form: display name, the provider’s model reference, context length',
+        '05-admin-keys': 'The key list; the column holds a truncated key, masked here',
+        '06-admin-key-create': 'Issuing a key: budget, RPM and TPM limits, model access',
+        '07-admin-key-issued':
+          'The key is shown once — masked in the frame, as in the curl and Python samples',
+        '08-admin-usage': 'Usage analytics: spend by model and by key',
+        '09-panel-empty': 'The “Contour” section before connecting: one button and a promise',
+        '10-wizard-address': 'Step 1: contour type, title, identifier and API address',
+        '11-wizard-probe': 'A probe with no key answers “key rejected” — five causes are named',
+        '12-wizard-key': 'Step 2: the key. A stored one is never shown again, anywhere',
+        '13-wizard-capabilities':
+          'Step 3: what the probe confirmed, and what stayed “not declared”',
+        '14-wizard-targets':
+          'Step 4: consumers, mode, budget. The dashes stay until “Done” — the contour is still off',
+        '15-wizard-gateway':
+          'The gateway is up on 127.0.0.1:5179 — now CLIs have somewhere to point',
+        '16-panel-card': 'The contour card right after “Done”: no request has gone through yet',
+        '17-panel-spend': 'The same card after a live request: spend, budget and the check trace',
+        '18-panel-delete': 'Deleting asks for the title; the apply is removed before it by itself',
+      },
+    },
+    tests: {
+      workspace: {
+        '01-empty': 'The section with no cases: the console on top and the three steps that start a suite',
+        '02-environment': 'The environment step is closed: “Local” is picked, passwords live behind “Access”',
+        '03-group': 'A group is one field: “smoke” becomes the file name smoke.tests.json',
+        '04-case': 'The whole case form: purpose, area and section, steps with expectations, oracle and tags',
+        '05-library': 'Six cases in the library, all “not run”, with filters and the section tree on the left',
+        '06-runner': 'The manual run, case 1 of 6: steps with expectations, outcome buttons and the timer',
+        '07-runner-failed': 'Case 2 fails: the red step is marked and the note says what actually happened',
+        '08-library-after': 'The same library after the run: 5 passed, 1 failed, the counter on top',
+        '09-run-record': 'The run record: who ran it, what each case ended with, reports next to it',
+        '10-report': 'The Report tab: case states, automation coverage and the suite totals',
+      },
+      health: {
+        '01-changed-only': '“Changed only” on a clean tree: the panel says plainly that it matched no case',
+        '02-quarantine': 'One case selected, action “quarantine” — and the reason field it will not skip',
+        '03-muted': 'A quarantined case stays failed: the status is real, the reason sits in the row',
+        '04-release': 'The milestone verdict “Ready to ship” beside the line “Failures in quarantine: 1”',
+        '05-health': 'Further down the same tab: failure evidence, the suite linter and quarantine thresholds',
+        '06-coverage': 'Requirement coverage: two requirements from case links and two cases with none',
+        '07-exchange': 'Importing CI results: the format, the file in the project and what the report matched',
+        '08-runs-import': 'In the run history the import is its own record, signed as someone else’s run',
+      },
+    },
+  },
+
+  diagrams: {
+    label: 'Diagram',
+    open: 'open at full size',
+    chat: {
+      'message-path':
+        'The path of one message: composer to panel server to CLI process to the transcript on disk, and the answer back as a stream. The panel has no database of its own.',
+      'split-conveyor':
+        'What happens after Split: triage, plan, work and review by stage — and where the human decides.',
+    },
+    platform: {
+      'request-path':
+        'The path of one request: CLI → the panel’s local gateway → the contour → the model. The key appears at exactly one point on it.',
+      'who-creates-what':
+        'What gets created in the contour admin, what in the panel, and which two lines cross the border.',
+      'two-systems':
+        'The two systems side by side: the panel’s parts against the enterprise-platform instance services, and the three arrows that cross the border between them.',
+    },
+    tests: {
+      'where-cases-live':
+        'Where the suite lives and who writes into it: a human, a CLI agent and someone else’s CI run all put their result into the project’s own files. The section has no database.',
+      'what-turns-red':
+        'What turns the milestone verdict red and what quarantine does not: the two paths of one failure — an ordinary one, and one stripped of the right to colour the gate.',
+    },
+  },
+
   topics: {
     chat: {
       title: 'Chat',
@@ -176,21 +281,201 @@ export const helpEn: HelpSchema = {
       storageStream: 'How the answer arrives',
       storageStreamValue: 'as an SSE stream — text appears as it is generated',
 
-      flowTitle: 'What happens when you send a message',
-      flowCaption:
-        'The prompt goes to the process through standard input rather than as a ' +
-        'command-line argument: long text with quotes would otherwise fall apart in ' +
-        'the Windows shell.',
-      flowComposer: 'Composer',
-      flowComposerCaption: 'text, files, edit mode',
-      flowServer: 'POST /api/chat/send',
-      flowServerCaption: 'picks the working directory',
-      flowProcess: 'The claude process',
-      flowProcessCaption: 'the same CLI as in the terminal',
-      flowStream: 'Stream on screen',
-      flowStreamCaption: 'text, thinking, tools',
-      flowTranscript: 'Transcript',
-      flowTranscriptCaption: 'the conversation is saved to disk',
+      guideTitle: 'What this document holds',
+      guideText:
+        'First, why chat exists and how it differs from the terminal and from the ' +
+        'neighbouring sections. Then two diagrams and the whole path in screenshots: ' +
+        'one conversation from an empty window to the end of a run, then a ' +
+        'conversation that became several. After the shots come the tables of fields ' +
+        'and states, and at the end the limits and how to undo or remove each thing ' +
+        'listed above.',
+
+      diffTitle: 'How chat differs from its neighbours',
+      diffCaption:
+        'All of them show the same conversations from different sides — confusing ' +
+        'them costs most at the moment something appears to be missing.',
+      diffTerminal: 'Chat versus the terminal',
+      diffTerminalText:
+        'It is the same claude process in the same folder, started by the panel. A ' +
+        'conversation begun in the terminal shows up here and the other way round. ' +
+        'The panel adds several agents at once, permission cards, attachments and a ' +
+        'shared spend counter.',
+      diffHistory: 'Chat versus the History section',
+      diffHistoryText:
+        'Here conversations are held, there they are read: History shows finished ' +
+        'transcripts across projects with search over messages and starts no agents.',
+      diffForeign: 'Chat versus a foreign CLI',
+      diffForeignText:
+        'This section drives claude only. Codex, Gemini, Qwen and the rest live in ' +
+        'Providers: they keep their own list of conversations and have no session at ' +
+        'all — which is why a restart there opens a new chat instead of clearing this ' +
+        'one.',
+      diffSandbox: 'A project versus the sandbox',
+      diffSandboxText:
+        'A conversation on a project tab runs in its folder and sees git. The home ' +
+        'tab is the sandbox: a separate folder, no repository, nothing of yours at ' +
+        'risk.',
+
+      undoTitle: 'How to undo and remove',
+      undoCaption:
+        'Nothing in this section is irreversible except edits to files — those are ' +
+        'undone by git, not by the panel.',
+      undoStop: 'Stop the run',
+      undoStopText:
+        'Stop in the composer kills the current run and rejects a pending permission ' +
+        'request with it. The conversation stays; the next message continues it.',
+      undoDecline: 'Decline the split',
+      undoDeclineText:
+        '"Do it here one by one" on the card is a full answer: no chats are created, ' +
+        'no copies are made, and the agent gets the refusal as an ordinary reply.',
+      undoWorktree: 'Remove a copy of the repository',
+      undoWorktreeText:
+        'Remove sits under the copy card in the git strip. While an agent is running ' +
+        'inside the copy the panel refuses — stop its run first.',
+      undoHandoff: 'Decline the continuation',
+      undoHandoffText:
+        '"Stay here" on the stage card. Auto-continue is switched off by the "carry ' +
+        'on yourself" toggle in the same place and is remembered.',
+      undoCascade: 'Turn off model routing',
+      undoCascadeText:
+        'The "pick the model for the task" toggle in the conversation menu is a ' +
+        'project rule. Off, it restores the old behaviour: every child runs on the ' +
+        'model you chose.',
+      undoChat: 'Delete a conversation',
+      undoChatText:
+        'Not from the panel, and deliberately so: the transcript belongs to Claude ' +
+        'Code, not to the panel. It can only be deleted where it lives.',
+
+      guide: {
+        mapTitle: 'How it works',
+        mapCaption:
+          'Two diagrams answer what no state of the screen shows: where a message ' +
+          'goes, and what happens after Split.',
+        pathTextTitle: 'The same path in words',
+        pathTextText:
+          'The composer hands the message to the panel server, which starts a CLI ' +
+          'process in the project folder; the CLI writes the conversation into its own ' +
+          'transcript on disk and returns the answer as frames the panel shows at ' +
+          'once. The panel keeps no database of conversations: history is read from ' +
+          'the transcript, which is why a terminal conversation shows up here and one ' +
+          'started here shows up in the terminal.',
+
+        basicsTitle: 'One conversation from start to finish',
+        basicsCaption:
+          'Shot on the "Orders panel" project in C:/work/orders-panel: a conversation ' +
+          'about exporting orders to CSV.',
+        bEmpty: 'Open the project and start a conversation',
+        bEmptyText:
+          'The project tab, the New chat button. The header carries the model ' +
+          'Claude-opus-5 and the effort "High", and under it the git strip: ' +
+          '"feature/orders-export, 4 files changed, +128 −31, 2 ahead". The empty ' +
+          'screen says straight away that file edits are allowed and offers four ' +
+          'ready openings, from "explain the project structure" to "run the tests and ' +
+          'show what fails".',
+        bComposer: 'Write the task and attach a file',
+        bComposerText:
+          'The paperclip puts the attachment as a chip above the text — here ' +
+          'orders-export.md. Enter sends, Shift+Enter breaks the line; the microphone ' +
+          'dictates into the same field.',
+        bAnswer: 'Watch the answer as it is generated',
+        bAnswerText:
+          'A collapsible Thinking block, rows for the Grep and Write calls with spend ' +
+          'on the right (45.0k +3.8k for the first), then the text itself. A timer ' +
+          'runs under the answer, the header shows the accumulated 111.3k tok, and the ' +
+          'send button is replaced by Stop.',
+        bPermission: 'Decide about permissions',
+        bPermissionText:
+          'The "agent asks for permission" card shows the tool and the command itself ' +
+          '— here rm -rf dist. Until you press Allow or Deny the agent stands on that ' +
+          'call: the card is a fork, not a notification.',
+        bQuestion: 'Answer the agent',
+        bQuestionText:
+          'The heading "your choice is needed" and the counter "question 1 of 3": ' +
+          'questions come in turn, the next opens once the previous is answered. ' +
+          'Besides the offered options there is always a free-form answer.',
+        bBranch: 'Look into git without leaving the conversation',
+        bBranchText:
+          'The strip above the feed unfolds into a panel: changed files marked M and ' +
+          'A, the branch picker, Pull and Push, a new-branch field and a commit ' +
+          'message. Below are the parallel copies; a copy with an agent inside is ' +
+          'marked as busy.',
+        bMenu: 'Set what may happen without asking',
+        bMenuText:
+          'Chat settings holds the "auto permissions" and "edits allowed" toggles, ' +
+          'and below them rules for every project: commits, branches and a plain push ' +
+          'are on, while deleting files, rewriting git history and dropping database ' +
+          'data are not. A rule that is on removes the permission card; off brings it ' +
+          'back.',
+        bActions: 'Actions on the conversation are in the same menu',
+        bActionsText:
+          'Below the rules: restart the session, export, refresh and open this help. ' +
+          'Restart is greyed out while a run is going — wiping the context mid-move ' +
+          'means losing the move.',
+        bAgents: 'Watch every agent at once',
+        bAgentsText:
+          'The header panel says "3 active agents", each row telling where it works ' +
+          'and in what state (waiting for an answer versus working), the project one ' +
+          'showing 111.3k tok and claude-opus-5. Stop all kills them in one press.',
+        bHandoff: 'Continue a closed stage in a clean session',
+        bHandoffText:
+          'The "stage closed — continue in a clean session" card with the counter ' +
+          '"step 1 of 8" carries the checkpoint — here .agent/PROGRESS.md — and what ' +
+          'to do next. Continue opens the next conversation with that checkpoint; ' +
+          'Stay here leaves everything as it is.',
+
+        splitTitle: 'When one conversation becomes several',
+        splitCaption:
+          'The same project, a different entry: the agent offered to split three jobs ' +
+          'on the orders page, and from there nothing is decided in a single chat.',
+        sProposal: 'Read the offer',
+        sProposalText:
+          'The card "split the tasks: 3 groups" shows the composition: Orders export ' +
+          'on feature/orders-export, List filters on feature/orders-filters, Returns ' +
+          'report on feature/returns-report. Every group carries its kind of work, a ' +
+          'model and a "below the ceiling" mark. The line at the bottom counts the ' +
+          'price: 3 chats, 3 runs now, 2 below the ceiling, up to 11 runs including ' +
+          'triage, plans, work and reviews.',
+        sTree: 'Agree — and see what happened',
+        sTreeText:
+          'Split into 3 chats creates the links: the list on the left gains "Orders ' +
+          'export · plan", "· work", "· review" and the same for the second group, ' +
+          'each on its own branch. The offer card itself notes that 2 of 3 groups ' +
+          'have become chats.',
+        sHub: 'Follow the groups from the parent',
+        sHubText:
+          'The hub "2 split groups" with the "triage applied" chip shows, per group, ' +
+          'the chain of stages (plan, work, review), the model, the delay before the ' +
+          'first edit and the time at work. Until branches are compared it says so.',
+        sAsk: 'Answer the children without visiting them',
+        sAskText:
+          "A child's permission request arrives in the parent conversation signed " +
+          'with the group it came from. The decision goes back where it is awaited — ' +
+          'there is no need to open the group chat.',
+        sOverlap: 'Compare the branches once the work is done',
+        sOverlapText:
+          'Compare branches counts the overlaps: two here. ' +
+          'src/pages/Orders/OrdersPage.tsx is touched by both groups by right, while ' +
+          'src/shared/api/client.ts is red — outside what the second group owns. The ' +
+          'merge order sits below, and merging stays with you.',
+        sPause: 'Pause the whole tree with one button',
+        sPauseText:
+          'Stop all kills the conversation together with its children: every group ' +
+          'gets a "paused" mark and the button turns into Resume all, counting the ' +
+          'links that will come back.',
+        sWorktrees: 'Look at the copies on disk',
+        sWorktreesText:
+          'In the git strip, under Parallel branches, sit the main copy and one per ' +
+          'group: feature/orders-export has its own folder ' +
+          'orders-panel-worktrees/feature-orders-export, a "dependencies installed" ' +
+          'mark linking to the install log, "refresh the local layer" and Remove.',
+
+        shotsTitle: 'The screenshots are taken on an invented project',
+        shotsText:
+          '"Orders panel" and its branches do not exist: the frames were shot on a ' +
+          'separate panel with its own settings folder so that no real path, key or ' +
+          'name would travel into this help. The screens are real — only the data is ' +
+          'substituted.',
+      },
 
       tabsTitle: 'Tabs and projects',
       tabsCaption:
@@ -615,13 +900,42 @@ export const helpEn: HelpSchema = {
         'tier would choose a vendor for you, Kimi’s `-m` takes a name from your own ' +
         'model table, and Aider, Goose and Continue are shells over any model at all. ' +
         'The chosen model is shown in the conversation header and applies to every ' +
-        'message in it, not just the first. The work → review → fixes pipeline runs ' +
+        'message in it, not just the first. The levels — one triage for the whole ' +
+        'split and a plan per group — run here as well: for a foreign CLI the ' +
+        'ceiling means a run WITHOUT the chosen tier, that is, the model it would ' +
+        'have used without the panel. Triage reads the repository at its root and ' +
+        'edits nothing, the plan runs in the group’s own worktree, and the work ' +
+        'starts after it on the chosen tier carrying the plan in full. No level ' +
+        'blocks: if the block is missing or the run failed, the group goes as ' +
+        'before and a line in its feed says what did not come through. ' +
+        'The work → review → fixes pipeline runs ' +
         'here too, but the reviewer is the CLI itself: the panel starts the check ' +
         'WITHOUT the chosen tier, that is, on the model the work would have run on ' +
         'without the panel at all. The links show up in the provider’s conversation ' +
-        'list as “‹group› · ревью” and “‹group› · правки”; there is no chat tree and ' +
-        'no pipeline summary for other CLIs — the panel keeps those links for Claude ' +
-        'only.',
+        'list as “‹group› · ревью” and “‹group› · правки”, and the parent’s feed ' +
+        'carries the same group summary as Claude’s: branch, stages passed in order ' +
+        'and whether a run is going. The panel keeps links for other CLIs too — ' +
+        'under a key prefixed with the provider (`codex:…`), so a foreign ' +
+        'conversation’s address never collides with a Claude session. A group row ' +
+        'opens its conversation right here: a foreign chat has no worktree tabs. The same ' +
+        'summary compares the groups’ branches (“Сверить ветки”): the count is the same as ' +
+        'Claude’s and runs by itself when a group’s chain ends — red marks only a file ' +
+        'outside the declared ownership, and a new overlap is stated as a line in the ' +
+        'parent’s own feed. The whole ' +
+        'tree is stopped and resumed from there too (“Остановить всё” / “Продолжить всё”): ' +
+        'the pause lives on the server and mutes auto-starts, so a stage created while it ' +
+        'holds waits in the queue. One difference is stated on the button itself: a foreign ' +
+        'CLI has no session, so continuing means asking the same thing again rather than ' +
+        'returning to the same place. Clean-session continuation follows from that: ' +
+        'with a foreign CLI the panel reads “restart the session” in the tail of an ' +
+        'answer just as it reads the block, and opens a NEW conversation in the same ' +
+        'directory — with the checkpoint file and the original task of the whole run. ' +
+        'The limits are Claude’s: eight continuations in a row, a stop when the ' +
+        'checkpoint file has not changed, no continuation after a failed run; the ' +
+        'notice in the feed names both the step number and the reason for a refusal. ' +
+        'The “Перезапустить” button in the header does the same on your word: a fresh ' +
+        'checkpoint starts the continuation at once, a stale one asks the agent to write ' +
+        'it and the panel carries the end of that turn through to the continuation.',
       cascadeOff: 'How to turn it off',
       cascadeOffText:
         'Chat menu (the “···” button in the header) → “Match the model to the task”. ' +
@@ -1194,7 +1508,10 @@ export const helpEn: HelpSchema = {
         'conversations, memory between questions, the reply as the CLI prints it, a working ' +
         'directory and file attachments by path. The panel keeps the transcript there — these ' +
         'CLIs have no readable history of their own — and the context of the next question is ' +
-        'assembled from it. What is missing: parsed steps and tools, cost, branching, voice and ' +
+        'assembled from it. Every answer carries its time: how long the run took and the sum ' +
+        'over the conversation. The panel measures it on its own process, so it is there for ' +
+        'every CLI — unlike spend, which not all of them report and never the same way. ' +
+        'What is missing: parsed steps and tools, cost, branching, voice and ' +
         'parallel agents — all of that is read out of the claude streaming protocol, and no ' +
         'other CLI publishes such a format. OpenCode holds a session (opencode serve) instead ' +
         'of a run per question, so its answer arrives whole. The Aider, OpenCode, Continue, ' +
@@ -1727,6 +2044,24 @@ export const helpEn: HelpSchema = {
         'The open models.dev catalog — the same one OpenCode runs on. The request goes ' +
         'out no more than once a day, everything else comes from the cache; with no ' +
         'network the previous list is shown with its age.',
+      modelsPlatform: 'The contour as the source',
+      modelsPlatformText:
+        'Once a contour is set up, switched on and checked at least once, it can be ' +
+        'chosen as the catalog source. The list is then exactly what YOUR key was given — ' +
+        'shorter than the open catalog by everything you were not allowed, and carrying ' +
+        'the flags the contour declared itself (images, functions, strict JSON). The ' +
+        'panel never visits the contour of its own accord: the list comes from the last ' +
+        'connection check, and “Refresh” asks again. Switch the contour off or drop its ' +
+        'key and the panel falls back to models.dev and says why; the list is never ' +
+        'swapped silently. An empty list is an answer too: it means your key was granted ' +
+        'no models at all, and grants come from the key’s owner, not from the panel. ' +
+        'A contour publishes no prices, so money is computed from the ' +
+        'price list on this same tab.',
+      modelsRetired: 'A model gone from the contour',
+      modelsRetiredText:
+        'It stays in the list, marked, with the date it was last seen — but it cannot be ' +
+        'chosen: the contour would no longer accept the request. A row that vanished ' +
+        'silently would look like a panel bug, and the cause is not in the panel.',
       modelsAuto: 'A new model as the default',
       modelsAutoText:
         'When a CONCRETE model is set in the settings and a newer generation of the same ' +
@@ -4132,6 +4467,14 @@ export const helpEn: HelpSchema = {
         'the code and are visible to anyone who opens the repository without the panel. Here ' +
         'the panel is an editor, a remote and a report; the storage is the repository.',
 
+      guideTitle: 'How to read this page',
+      guideText:
+        'Two diagrams first: where the suite lives and what turns the milestone verdict ' +
+        'red. Then the whole path in screenshots — “the first suite” is done once, “a ' +
+        'suite that already lives” is what comes afterwards and repeats. After the ' +
+        'screenshots come the field and state tables, and at the end the refusals and how ' +
+        'to undo anything.',
+
       whyFiles: 'Cases live in the project',
       whyFilesText:
         'The .agent/tests files sit next to the code they check. A branch with a new feature ' +
@@ -4147,6 +4490,189 @@ export const helpEn: HelpSchema = {
         'Library, run, history and report are all here. A separate TMS next to the repository ' +
         'would be a third system to synchronise by hand, and the first diverged version of a ' +
         'case devalues both.',
+
+      vsTitle: 'What this is not',
+      vsCaption:
+        'The section has four neighbours and is confused with each of them differently. ' +
+        'Until it is said what it is not, half the questions about it are about things it ' +
+        'never did.',
+      vsTms: 'Not a TMS',
+      vsTmsText:
+        'No database of its own, no users or roles, no run schedule. Everything the ' +
+        'section knows is files inside the project under test, and the rights to them are ' +
+        'the rights to the repository. Cases can be imported from a TMS as a table, but ' +
+        'nothing syncs back.',
+      vsChat: 'Not the chat',
+      vsChatText:
+        'The agent starts through the same CLI as in the chat, but there is no ' +
+        'conversation: a run has no feed, no questions to the human and no permission ' +
+        'prompts — during a run the agent may touch only test files. The other way round ' +
+        'too: cases are not kept from the chat, which the console says out loud.',
+      vsCi: 'Not CI',
+      vsCiText:
+        'The panel runs nothing on a schedule and guards no branch. Build results arrive ' +
+        'here by import, as a separate record signed as someone else’s run, and what ' +
+        'turns a gate red is pnpm tests report in your pipeline, not the panel.',
+      vsProjects: 'Not the Projects section',
+      vsProjectsText:
+        'Projects registers a repository, its branches and parallel copies. Here there is ' +
+        'only the test suite of the selected project: the section takes the path and the ' +
+        'current branch from the registry and then lives in .agent/tests.',
+
+      guide: {
+        mapTitle: 'What actually happens here',
+        mapCaption:
+          'Two diagrams answer what the screenshots cannot: where everything is written, ' +
+          'and why a red case does not always colour the verdict.',
+        mapTextTitle: 'The same in words',
+        mapTextText:
+          'Three parties write into the suite: a human through a manual run, a CLI agent ' +
+          'through a run, CI through an imported report. All three write, via the panel, ' +
+          'into the project’s files: the group’s cases with their last status, the run ' +
+          'record and the failure evidence. From there they travel into a commit with the ' +
+          'code. After that one flag decides: a failure without quarantine goes into the ' +
+          'milestone verdict and reddens the gate; a failure in quarantine stays visible ' +
+          'and real but out of the verdict, and in the junit export it leaves as skipped ' +
+          'with its reason.',
+
+        startTitle: 'The first suite: from an empty section to a report',
+        startCaption:
+          'Ten steps done once per project. After that the suite is only run — that is ' +
+          'the second walkthrough.',
+        wEmpty: 'Step 1. The empty section',
+        wEmptyText:
+          'The project is selected, there are no cases yet — and the panel shows not an ' +
+          'empty table but three steps: environment, generation, first run. The line under ' +
+          'the project picker says where the files will go: “Cases: .agent/tests”. The ' +
+          'console on top is already complete: Run, Full retest, Changed only, Explore, ' +
+          'Automate.',
+        wEnvironment: 'Step 2. The environment',
+        wEnvironmentText:
+          'An environment is the stand address and the credentials for it; without one a ' +
+          'run is blind. Once created, it closes the first step with a tick and signs it: ' +
+          '“Done: Local. Passwords for it are behind the Access button.” The passwords ' +
+          'themselves never reach a case, an agent prompt or a report.',
+        wGroup: 'Step 3. The group',
+        wGroupText:
+          'A group is a file. The identifier in the field (“smoke”) becomes the name ' +
+          'smoke.tests.json in .agent/tests: latin letters, digits, hyphen. Everything in ' +
+          'the group travels as one file with one history.',
+        wCase: 'Step 4. The case',
+        wCaseText:
+          'The form asks for more than steps. “Why” is what the steps cannot imply: “The ' +
+          'cart is the entrance to payment: nothing further can be checked without it.” ' +
+          '“Oracle” is what the verdict is read from: “The header counter and the item row ' +
+          'in the cart.” The section is a slash path — “Cart/Adding” — and the tree on the ' +
+          'left is built from it.',
+        wLibrary: 'Step 5. The library',
+        wLibraryText:
+          'Six cases in the SMOKE group: the section tree on the left (Cart 3, Checkout 2, ' +
+          'Catalogue 1), filters on top by status, priority, type, readiness, automation, ' +
+          'area, tag and quarantine. The counter above the list reads at a glance: “0 ' +
+          'passed · 0 failed · 0 skipped · 6 not run”.',
+        wRunner: 'Step 6. The manual run',
+        wRunnerText:
+          'The “Run manually” button opens a pass over the suite: the header says “Case 1 ' +
+          'of 6 · closed 0” and runs a timer. The outcome is marked per step — passed, ' +
+          'failed, skipped, blocked — and the digit on a button works as a key. Inside ' +
+          'input fields the keys are deliberately inert.',
+        wFailed: 'Step 7. The failure',
+        wFailedText:
+          'The second case is red: the step “Press the plus in the item row” is marked, ' +
+          'the step note says “The quantity stayed 1, the sum was not recalculated”, and ' +
+          '“What happened” says “The plus button does not increase the quantity: the order ' +
+          'sum stays the same.” That note goes into the defect if the pass failed, and it ' +
+          'is what groups “identical failures”. Next to it: attach a file, file a defect.',
+        wAfter: 'Step 8. The library after the pass',
+        wAfterText:
+          'The same list with real statuses: “5 passed · 1 failed · 0 skipped · 0 not ' +
+          'run”. The status lives in the case file, not in the run record, so it is ' +
+          'visible to anyone opening the repository without the panel.',
+        wRecord: 'Step 9. The run record',
+        wRecordText:
+          'The Runs tab: “manually”, “human”, the date, branch main, environment local, ' +
+          '“passed: 5 failed: 1 skipped: 0 duration: 15 s”. The red case is marked ' +
+          'separately — “no evidence” — with “Rerun the failed (1)” and “Compare with the ' +
+          'previous” beside it.',
+        wReport: 'Step 10. The report',
+        wReportText:
+          'The Report tab sums the suite up: case states, automation coverage (“autotest: ' +
+          '0, to automate: 0, manual: 6”) and the totals (“Runs: 1”, the last run with its ' +
+          'date). There is nothing to compare with yet, and the panel says so: “this is ' +
+          'the first run with results”.',
+
+        liveTitle: 'A suite that already lives',
+        liveCaption:
+          'The second path: eight steps done afterwards and repeatedly — what the edits ' +
+          'touched, quarantine, the milestone verdict, requirement coverage and the CI ' +
+          'exchange.',
+        hChanged: 'Step 1. Run only what the edits touched',
+        hChangedText:
+          '“Changed only” looks at what the working tree changed and matches the paths ' +
+          'against the cases’ code links. Here the tree is clean — and the panel says so ' +
+          'plainly: “The working tree edits matched no case.” An empty list means “nothing ' +
+          'to attribute”, never “run everything”: a case with no code links can never land ' +
+          'here.',
+        hQuarantine: 'Step 2. Put a case in quarantine',
+        hQuarantineText:
+          'The case is ticked (“Selected: 1”), the action is “quarantine”, and the panel ' +
+          'asks for a reason: “Waiting for the sum recalculation fix, defect SHOP-31 is ' +
+          'open.” The caption under the field explains why: without a reason nobody will ' +
+          'ever take the case back out.',
+        hMuted: 'Step 3. What quarantine changes in the list',
+        hMutedText:
+          'Nothing but one line. The case is still “failed”, still in the list and still ' +
+          'runs, and the reason shows right in the row: “quarantine: Waiting for the sum ' +
+          'recalculation fix, defect SHOP-31 is open.” Quarantine removes exactly one ' +
+          'right — colouring the verdict and the gate.',
+        hRelease: 'Step 4. The milestone verdict',
+        hReleaseText:
+          'The same suite and the same red case — but the verdict is now “Ready to ship”: ' +
+          '“Milestone v1.4: 5 of 6 passed, nothing the panel checks stands in the way. 1 ' +
+          'in quarantine — their failures do not count.” The failure is not hidden: it ' +
+          'stands on its own line, “Failures in quarantine: 1”, with its reason.',
+        hHealth: 'Step 5. What the failures are proven by',
+        hHealthText:
+          'Further down the same tab: three counters — “red cases: 1”, “with evidence: 0”, ' +
+          '“with a step breakdown: 1” — and a “Re-run the unproven” button. Next to them ' +
+          'the suite linter (“Cases checked: 6”, 5 no-oracle notices and 1 ' +
+          'no-code-paths) and the quarantine thresholds: 5 green runs in a row suggest ' +
+          'lifting it, stability below 70% suggests setting it, and the panel applies ' +
+          'nothing itself.',
+        hCoverage: 'Step 6. Requirement coverage',
+        hCoverageText:
+          'The Coverage tab turns the suite the other way round: not “what we check” but ' +
+          '“what is left unchecked”. Here two requirements come from case links (SHOP-14 ' +
+          'and SHOP-21, two cases each) and “Cases with no requirement: 2”. The honest ' +
+          'caveat sits below: without Atlassian only requirements from case links are ' +
+          'shown — a JQL query would add the issues nobody linked.',
+        hExchange: 'Step 7. Importing CI results',
+        hExchangeText:
+          'The import dialog takes a build report: format “JUnit XML”, file in project ' +
+          '“test-results/junit.xml”. The outcome shows at once: “read: 3, matched cases: ' +
+          '2, not found: 1 — Nobody’s autotest”. A test that matched nothing spoils ' +
+          'nothing and reddens nobody: it is simply named.',
+        hImported: 'Step 8. Someone else’s run in the history',
+        hImportedText:
+          'The import landed as statuses on the cases and as its own record in the ' +
+          'history — “import”, “CI”, branch main, “passed: 2”. The manual run stays where ' +
+          'it was under its own signature: “manually”, “human”, “local”. Who ran it is ' +
+          'part of the record, not a guess from the timestamp.',
+
+        priceTitle: 'What quarantine costs',
+        priceText:
+          'Quarantine is neither a fix nor an archive. The case stays red and keeps ' +
+          'running, but stops colouring the milestone verdict and the CI gate: pnpm tests ' +
+          'report does not count it as a failure, and the junit export carries it as ' +
+          'skipped with its reason. Until the reason is cleared, the suite stays silent ' +
+          'about a real breakage — which is why the reason is demanded as text.',
+        shotsTitle: 'About the screenshots',
+        shotsText:
+          'Every shot was taken on a separate stand with a made-up project: six cases, ' +
+          'one milestone, one defect. None of your projects and none of your real ' +
+          'credentials appear in them. The numbers in the captions come from those same ' +
+          'frames.',
+      },
 
       storageCaption:
         'Everything inside the project under test. The panel keeps no database of its own: ' +
@@ -4274,6 +4800,69 @@ export const helpEn: HelpSchema = {
       fieldCodePaths: 'Code files the case touches: the diff-based selection is computed from them',
       fieldStatus: 'The last result, what was actually seen and when that was',
       fieldSource: 'agent or human: the agent is forbidden to delete what a human wrote',
+
+      statesTitle: 'Case states',
+      statesCaption:
+        'A case row carries status, readiness, automation and quarantine side by side — ' +
+        'four independent flags, not one scale. A case can be failed, ready, manual and ' +
+        'quarantined all at once.',
+      stateColumn: 'Flag',
+      stateMeaningColumn: 'What it means',
+      stateNotRun: 'not run',
+      stateNotRunText:
+        'Status. There is no result at all: the case exists but no run has touched it. In ' +
+        'a milestone summary these count as unchecked, not as green.',
+      stateRunning: 'running',
+      stateRunningText:
+        'Status. A run is in progress and has reached this case. If the panel restarted ' +
+        'mid-run, the status stays as it was until the current run closes — the truth is ' +
+        'always in the file, not on the screen.',
+      statePassed: 'passed',
+      statePassedText: 'Status. The last run closed the case green.',
+      stateFailed: 'failed',
+      stateFailedText:
+        'Status. The last run closed the case red. A failure goes into the milestone ' +
+        'verdict and into the CI gate — except for quarantined cases.',
+      stateSkipped: 'skipped',
+      stateSkippedText:
+        'Status. The executor deliberately did not check the case in this run. Neither ' +
+        'green nor red: out of the verdict, but not counted as covered either.',
+      stateBlocked: 'blocked',
+      stateBlockedText:
+        'Status. There was nothing to check with: the stand was down, the data missing, a ' +
+        'neighbouring feature broken. Unlike a failure, it says nothing about the case ' +
+        'itself.',
+      stateDraft: 'draft',
+      stateDraftText:
+        'Readiness. The case is written but nobody vouches for its wording. Nothing stops ' +
+        'it from running — the flag is for whoever reads the suite.',
+      stateReady: 'ready',
+      stateReadyText: 'Readiness. The case has been reviewed and can be measured with: the default state of a suite that is kept.',
+      stateStale: 'stale',
+      stateStaleText:
+        'Readiness. The case has diverged from the application and its result cannot be ' +
+        'trusted whatever it is. Set by hand or on the panel’s suggestion — the panel ' +
+        'never moves a case there itself.',
+      stateManual: 'manual',
+      stateManualText: 'Automation. The case is walked by a human or an agent step by step; there is no autotest behind it.',
+      stateToAutomate: 'to automate',
+      stateToAutomateText:
+        'Automation. The case is queued for an autotest. That is an intent, not a fact: ' +
+        'until the autotest exists the case is still walked by hand.',
+      stateAuto: 'autotest',
+      stateAutoText:
+        'Automation. An autotest is attached — file, name and the identifier by which a ' +
+        'run result finds the case even after the file moved.',
+      stateMuted: 'quarantine',
+      stateMutedText:
+        'A separate flag on top of the status. The case still runs and its status is ' +
+        'real, but the right to colour the milestone verdict and the CI gate has been ' +
+        'taken away. It is not set without a reason in words.',
+      stateArchived: 'archived',
+      stateArchivedText:
+        'A separate flag. The case is out of the lists and out of runs, but not lost: it ' +
+        'stays in the file, shows under the “Show archive” toggle and comes back in one ' +
+        'action. Archived cases do not count towards requirement coverage at all.',
 
       plansTitle: 'Plans and environments',
       plansCaption:
@@ -4577,7 +5166,10 @@ export const helpEn: HelpSchema = {
       importCases: 'Importing cases',
       importCasesText:
         'CSV, XLSX and a TestRail export. That is how a set from an old TMS moves into the ' +
-        'project at once instead of being retyped by hand.',
+        'project at once instead of being retyped by hand. One more format — “Manual cases ' +
+        '(ТК-*.md)”: files written straight in the repository. A FOLDER is given (empty — QA), ' +
+        'the number from the file name becomes the case id, folders become sections, and a ' +
+        'repeated import edits the same case instead of adding a second one.',
       importExport: 'Export',
       importExportText:
         'A group is exported to CSV, XLSX or Markdown — to attach to a report, to review, or ' +
@@ -4862,6 +5454,67 @@ export const helpEn: HelpSchema = {
         'why; «--save» writes the plan into the project. Jira requirements are not consulted ' +
         'from a terminal — the token lives in the panel — and the command says so.',
 
+      limitsTitle: 'Limits and refusals',
+      limitsCaption:
+        'On the left is what you saw on screen, on the right why it is so. Almost ' +
+        'everything here is a deliberate refusal rather than a fault: the panel would ' +
+        'rather say “nothing” than pretend it counted.',
+      limitColumn: 'What you saw',
+      limitMeaningColumn: 'Why it is so',
+      limitChanged: '“The working tree edits matched no case”',
+      limitChangedText:
+        'That is how “Changed only” works: the panel takes the changed files of the ' +
+        'working tree and matches them against the cases’ code links and area word. ' +
+        'Nothing matched — the list is empty, and that is NOT “run everything”. Common ' +
+        'causes: the cases have no codePaths, the edits lie outside those paths, or the ' +
+        'changes are already committed and the tree is clean.',
+      limitEmptyRun: 'The run ended with an empty record',
+      limitEmptyRunText:
+        'The panel keeps no counter of its own: the record is assembled from the case ' +
+        'files. It fingerprints the selected cases at the start and stamps the ones that ' +
+        'changed at the end. A case the executor never touched is not in the record — an ' +
+        'empty record means “the agent marked nothing”, not “the panel lost it”. ' +
+        'Generation and exploration produce no results at all.',
+      limitMuted: 'A red case does not redden the gate',
+      limitMutedText:
+        'Quarantine. The case runs, its status is real, it stays visible — but pnpm tests ' +
+        'report does not count it as a failure and does not exit 1, and the junit export ' +
+        'carries it as skipped with the quarantine reason. Want a red gate — lift the ' +
+        'quarantine, do not delete the case.',
+      limitBusy: 'The run buttons are disabled',
+      limitBusyText:
+        'The suite is busy: a run is already going for this project, or a manual session ' +
+        'is open. Two records of one suite would diverge in the files, so a second run ' +
+        'does not start until the first is closed or abandoned.',
+      limitGenerate: 'Generation wrote nothing',
+      limitGenerateText:
+        'By design: proposals land in a draft, not in a group. Until you accept them one ' +
+        'by one (or turn on “accept at once”), nothing in the project files changes, and ' +
+        'the acceptance can be undone as a whole.',
+      limitCoverage: 'A requirement nobody covered is not shown',
+      limitCoverageText:
+        'Without Atlassian there is one source of requirements — the cases’ own links — ' +
+        'and by construction it cannot show a requirement nobody linked. A connected ' +
+        'integration adds issues by a JQL query; until then the panel says so right under ' +
+        'the table. Archived cases are excluded: a requirement covered only by an ' +
+        'archived case is covered by nothing.',
+      limitArchived: 'A case disappeared from the list',
+      limitArchivedText:
+        'It is most likely archived or filtered out. The “Show archive” toggle brings ' +
+        'archived cases back into view; they are out of runs and out of coverage, but ' +
+        'still in the file and one action away.',
+      limitReserved: 'A field will not save or gets renamed',
+      limitReservedText:
+        'The name is taken by the format: a custom field cannot be named like a system ' +
+        'one. The panel names the taken word in the refusal — give your field another one.',
+      limitHonestTitle: 'The panel applies nothing by itself',
+      limitHonestText:
+        'Not quarantine by instability, not lifting quarantine after green runs, not ' +
+        'marking a case stale, not closing a defect. Thresholds are computed and shown; ' +
+        'the button is pressed by a human. The same rule holds for the milestone verdict: ' +
+        'the panel says “too early” or “ready to ship”, but signs nothing and lets nobody ' +
+        'through.',
+
       canLibrary: 'Keep the library: groups, sections, cases, checklists, shared steps, parameters',
       canPlans: 'Assemble test plans and environments and expand them into test points',
       canManual: 'Walk cases by hand with per-step marks, notes and attachments',
@@ -4879,6 +5532,45 @@ export const helpEn: HelpSchema = {
       cantMerge:
         'Merging branches with cases — conflicts are settled by git, like the rest of the code',
       cantUsers: 'Accounts and roles — the panel is local and works under your name',
+
+      undoTitle: 'How to undo and remove',
+      undoCaption:
+        'Almost nothing here is irreversible: the suite is project files, and files have ' +
+        'git. Below is what a button undoes and what a commit does.',
+      undoQuarantine: 'Lift the quarantine',
+      undoQuarantineText:
+        'Tick the case, action “lift quarantine”. The status, the history and the links ' +
+        'stay where they were — the case regains the right to colour the verdict and the ' +
+        'gate.',
+      undoArchive: 'Bring a case back from the archive',
+      undoArchiveText:
+        'Turn on “Show archive”, tick the case, action “restore from archive”. Archiving ' +
+        'deletes nothing: the case was in the same group file the whole time.',
+      undoDraft: 'Undo an accepted generation',
+      undoDraftText:
+        'Accepted proposals roll back as a whole in one action while the run draft is ' +
+        'still there. An unaccepted draft can simply be thrown away — nothing of it is ' +
+        'left in the group.',
+      undoRun: 'Abandon a manual pass',
+      undoRunText:
+        '“Abandon” closes the session without writing a run record. The statuses already ' +
+        'marked stay: they live in the case files, not in the session.',
+      undoGroup: 'Delete a group',
+      undoGroupText:
+        'The whole group file goes, with its cases and their status history. This is the ' +
+        'only genuinely large deletion in the section — and the only one worth doing on a ' +
+        'clean working tree.',
+      undoConvention: 'Remove the note from the project CLAUDE.md',
+      undoConventionText:
+        '“Write into the project CLAUDE.md” adds a paragraph about where the cases live ' +
+        'and how they are kept. It is an ordinary edit of an ordinary file: remove it by ' +
+        'hand or revert it with git.',
+      undoGitTitle: 'The last undo is git',
+      undoGitText:
+        'Cases, runs and attachments live in .agent/tests and travel into a commit with ' +
+        'the code. Every action of the section is a file edit, so git diff shows what ' +
+        'changed, git checkout brings it back, and a case’s history reads with git log ' +
+        'without any panel at all.',
 
       notesTitle: 'Things people trip over',
       noteBrokenTitle: 'A broken group file',
@@ -5215,6 +5907,686 @@ export const helpEn: HelpSchema = {
         'goes through and the human is told it was NOT checked. A script that started blocking ' +
         'every prompt after a format change would be switched off the same day — along with the ' +
         'protection.',
+    },
+
+    platform: {
+      title: 'Contour',
+      summary:
+        'A corporate platform behind one key: the whole path in screenshots and an honest ' +
+        'list of what it does differently',
+      lead:
+        'A contour is the company’s platform the panel talks to with a corporate key: its ' +
+        'models, embeddings and agents. The key stays in the panel and CLIs are pointed at its ' +
+        'local gateway — otherwise a corporate key would have to be spread across nine CLI ' +
+        'configs, from where it can never be recalled. The platform is somebody else’s, and ' +
+        'some of its properties cannot be worked around: every such place is named here as a ' +
+        'signed compromise, with a condition for revisiting it.',
+
+      guideTitle: 'How this page is laid out',
+      guideText:
+        'First three diagrams for the whole path. Then eighteen steps with real screenshots: ' +
+        'the contour admin first, the panel second — from “nothing here yet” to the first ' +
+        'answer from a model. And only after that the design of the section, its states, its ' +
+        'limits and its refusals. If the contour is already connected and you need one fact, ' +
+        'scroll straight to “What the section shows”.',
+
+      whyKey: 'The key never leaves the panel',
+      whyKeyText:
+        'Not in an API response, not in a prompt, not in a log, not in any CLI config — only a ' +
+        'mask goes out. The price of that decision is signed too: with the panel off, CLIs ' +
+        'pointed at the gateway are left without a model.',
+      whySigned: 'A workaround without a signature fails the build',
+      whySignedText:
+        'Every workaround carries a comment in the code, a row in the registry, texts in both ' +
+        'languages and a mark next to the thing it explains. The check compares those sets: ' +
+        'none of them can appear or vanish quietly.',
+      whyProbe: 'Nothing is promised beyond what was verified',
+      whyProbeText:
+        'A capability the panel has not confirmed by a probe or a live call is shown as “not ' +
+        'declared”, never as a tick. A capability guessed from a host name is a promise with ' +
+        'nothing behind it.',
+
+      screenTitle: 'What the section shows',
+      screenCaption:
+        'Five blocks of the card, top to bottom. None of them is drawn from a guess: everything ' +
+        'written there comes from the panel’s answer about your contour.',
+      screenColumn: 'Block',
+      screenPurposeColumn: 'What is in it',
+      screenCard: 'Contour card',
+      screenCardText:
+        'Name, address, connection state and the date of the last probe. “Not answering” and ' +
+        '“never answered” are different lines: the first carries the date of the last successful ' +
+        'probe next to it, the second has no date at all.',
+      screenMatrix: 'What is available',
+      screenMatrixText:
+        'Seven capabilities of the contour: models, chat models, embeddings, platform agents, ' +
+        'content checks, company knowledge, own tools. The state is “yes”, “indirect”, “no” or ' +
+        '“not declared”, and next to it stands where it came from: confirmed by a probe or ' +
+        'declared as a property of the platform.',
+      screenApplied: 'Applied to',
+      screenAppliedText:
+        'One row per consumer — the panel’s assistant and nine CLIs. Check mark: works fully. ' +
+        'Triangle: works as a chat without tools. Circle: can be applied. Dash: unavailable, and ' +
+        'the reason is spelled out — no environment file, no documented address variable, a ' +
+        'foreign dialect, a gateway that is down.',
+      screenJournal: 'Apply journal',
+      screenJournalText:
+        'One entry is one target, with its date and its own rollback button. A rollback removes ' +
+        'that row and returns the previous values to the file; the other targets stay on the ' +
+        'contour. The file edits themselves, with the before copies, live in the History section.',
+      screenBudget: 'Budget',
+      screenBudgetText:
+        'The figure from the contour’s admin panel, typed by hand: the platform exposes no route ' +
+        'for the remaining balance. Zero means “do not track” — then the card carries no bar, ' +
+        'while the spend is still shown. The period is counted from the day you name next to it: ' +
+        'when the contour resets its own counter is not visible from outside. At 85% the card ' +
+        'warns in words and figures, not by the bar’s colour alone, and the same warning ' +
+        'reaches the overview — before the refusal, not after. The budget is a number: write ' +
+        'a fraction with a dot or a comma.',
+      screenSpend: 'Spend',
+      screenSpendText:
+        'One figure, and it is an ESTIMATE — money by our own price book, carrying the “≈” sign. ' +
+        'A second one used to stand here, the contour’s “own internal unit” (total tokens × ' +
+        '$0.00001); that formula no longer exists on the platform — it charges by its own model ' +
+        'registry, input and output tokens priced apart — and showing it would pass our number ' +
+        'off as theirs. The rule is now shared: tokens of a model whose price we do not know are ' +
+        'not converted into money at all (the platform does not charge for them either), and the ' +
+        'model is named — you type its price by hand in settings. What differs is not the rule ' +
+        'but the price book: their registry against ours. So our figure estimates theirs, and is ' +
+        'worth reconciling with the admin panel as an order of magnitude, not to the cent.',
+      screenExhausted: 'Refused on a spend limit',
+      screenExhaustedText:
+        'A 402 is a fact, but NOT about your key’s budget. The platform issues it from three ' +
+        'other levels: a user’s daily limit, a team’s monthly one and the instance’s monthly ' +
+        'one; which one is named in the line itself. The key’s own budget is checked while the ' +
+        'key is parsed, and an exhausted one comes back as 401 — the same code as an unknown or ' +
+        'revoked key, an expired one, a key whose owner was deleted and a failed owner check, ' +
+        'with nothing outside to tell those five apart. That is why on a 401 the panel names all ' +
+        'five causes instead of advising ' +
+        'you to reissue the key. The 402 line survives a panel ' +
+        'restart and clears only through your button: dropping a fact on a guess would hand back ' +
+        'a cheerful “there is room” where the platform already refuses.',
+
+      driftTitle: 'A file edited after the apply is left alone by the rollback',
+      driftText:
+        'At the moment of writing the panel remembers the file’s fingerprint. If the file was ' +
+        'edited afterwards — by your own hand or by another tool — the journal row says so, and ' +
+        'the rollback leaves that file as it is. Writing the “previous” value over someone ' +
+        'else’s edit would erase it.',
+
+      wizardRequired: 'The “required” mode shows its price before it is switched on',
+      wizardRequiredText:
+        'Choosing “do not work if the contour is unavailable”, you see right there that with the ' +
+        'panel switched off a CLI pointed at the gateway gets a connection refusal instead of ' +
+        'quietly falling back to the vendor cloud. That is the whole point of the mode — but it ' +
+        'is better learned before, not after.',
+
+      statesTitle: 'Connection states',
+      statesCaption: 'Five words on the card and what stands behind each.',
+      stateColumn: 'State',
+      stateMeaningColumn: 'What stands behind it',
+      stateUnchecked: 'not probed',
+      stateUncheckedText:
+        'The panel has not gone to the contour yet and therefore claims nothing about it — ' +
+        'neither models nor capabilities.',
+      stateOk: 'connected',
+      stateOkText:
+        'The last probe returned the list of the key’s models; the card says when that was. The ' +
+        'answer usually arrives in seconds — longer means the network or the contour itself.',
+      stateUnauthorized: 'key rejected',
+      stateUnauthorizedText:
+        'The contour answered but did not accept the key, and named no cause: there are five — ' +
+        'from an expired term and an exhausted budget to an owner check that simply blinked. The ' +
+        'panel names all five and does not send you straight to reissuing the key: the last cause ' +
+        'is transient, and the first sensible move is to probe again. A failed probe does not ' +
+        'erase capabilities confirmed earlier. The other side of that same cache is signed on the ' +
+        '“connected” state: a successful probe does not mean the key is still alive.',
+      stateUnreachable: 'not answering',
+      stateUnreachableText:
+        'The request never reached the contour — usually the address or the network, not the ' +
+        'key. The date of the last successful probe stays in place: it shows whether this ever ' +
+        'worked at all.',
+      stateDisabled: 'switched off',
+      stateDisabledText:
+        'The settings and the key are in place, but the contour is not in use: the gateway does ' +
+        'not serve it and there is nothing to apply to the CLIs.',
+
+      checksTitle: 'Contour checks: shown, not governed',
+      checksCaption:
+        'Content checks belong to the company and are configured in its admin panel — the panel ' +
+        'does not call them, does not configure them and cannot switch them off. All it does ' +
+        'here is not lie about what they did. The card appears only with the contour enabled and ' +
+        'the gateway up.',
+      checksColumn: 'What happened',
+      checksMeaningColumn: 'What it looks like to you',
+      checksBlocked: 'the request was refused',
+      checksBlockedText:
+        'The contour refused before the model: there is no answer at all and the model never saw ' +
+        'the request. You noticed this yourself — the chat showed an error.',
+      checksInterrupted: 'the answer was cut off',
+      checksInterruptedText:
+        'A check fired in the middle of an answer already streaming: you read part of the text, ' +
+        'and there will be no continuation. A cut answer is easy to mistake for a short one — ' +
+        'which is why it is named separately.',
+      checksMasked: 'data was masked',
+      checksMaskedText:
+        'The answer arrived whole and looks normal, but the model answered something other than ' +
+        'what you sent: the contour replaced part of the data on the way. The quietest outcome, ' +
+        'and therefore highlighted louder than the rest.',
+      checksUnknown: 'the outcome was not named',
+      checksUnknownText:
+        'The contour named a check but did not say what happened to the request. The panel says ' +
+        'exactly that: passing it off as “fired and let it through” is impossible, because the ' +
+        'same silence can hide a refusal it never learned about.',
+      checksSilenceTitle: 'Three different silences never merge into “no violations”',
+      checksSilenceText:
+        'Not a single request went through the gateway — the panel knows nothing about the ' +
+        'checks. Requests went through and the checks stayed silent — that is already a claim. ' +
+        'Masking happened but the contour gave no names — “no violations” would be a lie there, ' +
+        'and such an answer gets a line of its own. The count runs over the last requests the ' +
+        'gateway still remembers: the trace is length-capped, the oldest firings drop out of it, ' +
+        'and restarting the panel clears it entirely. The card says from when it counts.',
+      checksTextTitle: 'The checked text is not in the panel',
+      checksTextText:
+        'Only the check names exactly as the contour named them, a counter and a date reach the ' +
+        'card. Neither the request, nor the answer, nor the masked fragment gets here or is ' +
+        'stored anywhere. The local Blind spot rules are a different thing and your own: those ' +
+        'the panel governs, these checks it does not.',
+
+      agentsTitle: 'Agents, knowledge and the bridge',
+      agentsCaption:
+        'An agent is built by the company: its own knowledge, its own tools, its own behaviour. ' +
+        'The panel can do exactly one thing — call it and show the answer. The card appears for ' +
+        'a contour that is switched on.',
+      agentsColumn: 'What is on the card',
+      agentsMeaningColumn: 'What to do with it',
+      agentsRoster: 'The agent list',
+      agentsRosterText:
+        'You keep it: the key has no “list the agents” route, and the panel did not invent one. ' +
+        'The id is the UUID from the agent’s card in the platform’s admin console; the name is ' +
+        'yours and lives only here. The list is stored with the contour, the key is not in it.',
+      agentsSession: 'The session',
+      agentsSessionText:
+        'The conversation is remembered by the CONTOUR — the panel keeps no copy of its own, ' +
+        'which is why the line under the answer says how many messages it remembers, not how ' +
+        'many you were shown. “Reset the session” erases it on the contour’s side. If an answer ' +
+        'arrived but the turn did not make it into the session, the panel says so on its own ' +
+        'line: otherwise you would learn about the hole from a “forgetful” agent.',
+      agentsOutcomes: 'The outcome',
+      agentsOutcomesText:
+        '“Agents are not in the licence” is not a breakage: the company’s agent module simply is ' +
+        'not granted, and it is not painted red. “The agent ended with an error” is not a panel ' +
+        'failure either: that is how its author built it. They are fixed in different places, ' +
+        'which is why they are named differently.',
+      agentsBridge: 'The MCP bridge',
+      agentsBridgeText:
+        'Switches on a local MCP server through which the contour’s agents, knowledge and models ' +
+        'are available to your CLI as tools. Only the panel’s address goes into the CLI config: ' +
+        'the contour key stays in the panel, as everywhere else. One record covers every contour — ' +
+        'the call itself picks which one — so the section shows a single button.',
+      agentsLimitTitle: 'One call — up to two minutes',
+      agentsLimitText:
+        'The agent answers all at once, the contour does not stream it, and on a long task the ' +
+        'answer may not fit into the time the contour allows. The outcome is then “the contour ' +
+        'did not answer”, not an empty answer — the panel will not pass a cut-off turn off as one.',
+
+      marksTitle: 'The compromise mark',
+      marksCaption:
+        'The flag stands right next to what it explains: a row of the capability matrix, the ' +
+        'budget field, a refusal state. It opens on hover and on focus, and closes on Escape.',
+      marksNote:
+        'The level is spelled out — “Limitation”, “Workaround”, “With risk” — rather than being ' +
+        'carried by colour alone: in this panel colour is never the only carrier of meaning.',
+
+      listTitle: 'Signed compromises',
+      listCaption:
+        'The same list as in the “Contour” section, from the same source: there is nowhere for ' +
+        'them to drift apart. The “not in the code yet” badge means the signature was filed ' +
+        'ahead of time — the workaround itself arrives with its own task of the batch.',
+
+      neighboursTitle: 'How a contour differs from its neighbours',
+      neighboursCaption:
+        'Three different things the panel can do that are easy to confuse. The difference is not ' +
+        'convenience — it is where the key lives and who provides the models.',
+      neighboursColumn: 'Way',
+      neighboursMeaningColumn: 'What it does and where the key ends up',
+      neighboursEndpoint: 'Your own endpoint',
+      neighboursEndpointText:
+        'The panel writes the model address and its key into the environment variables of the ' +
+        'CLIs you pick. After that the key sits in their configuration, is readable by any ' +
+        'process on the machine, and can only be revoked in the provider’s admin panel. It fits ' +
+        'a local model, where there is no key at all.',
+      neighboursDlp: 'A proxy with the blind spot',
+      neighboursDlpText:
+        'It edits traffic by your rules — masking secrets and personal data — but provides no ' +
+        'models: the request still goes wherever the endpoint points, with the endpoint’s key.',
+      neighboursContour: 'A contour',
+      neighboursContourText:
+        'It provides the company’s models, embeddings and agents behind one key, and keeps that ' +
+        'key to itself. CLIs are pointed at the panel’s local gateway; the key is substituted ' +
+        'there and never reaches a foreign configuration. The price: the panel has to be ' +
+        'running — a dead panel means a dead gateway.',
+
+      getKeyTitle: 'What else lives in the contour admin',
+      getKeyCaption:
+        'The eight steps above walked the path to a key screen by screen. This list is about ' +
+        'which admin page owns what, and what that turns into for you: part of the contour’s ' +
+        'settings reach you not through the panel but as a refusal code.',
+      getKeyProvider: 'A provider and its key — “Providers”',
+      getKeyProviderText:
+        'Who actually does the computing: a vendor cloud or the company’s own installation. The ' +
+        'provider’s key stays inside the platform and never reaches you.',
+      getKeyModel: 'A model — “Models”',
+      getKeyModelText:
+        'A model is created with a public name, and that is the name you later pick in the ' +
+        'panel. The vendor’s documented name and the contour’s name do not always match.',
+      getKeyOwner: 'An owner and a team — “Users”, “Teams”',
+      getKeyOwnerText:
+        'A key has an owner, and the owner drives both access to the knowledge bases and the set ' +
+        'of tools the platform picks for your request. A key with no owner still answers, but ' +
+        'sees none of the company’s knowledge.',
+      getKeyKey: 'The key — “Keys”',
+      getKeyKeyText:
+        'Allowed models, request and token limits per minute, a budget and an expiry are all set ' +
+        'here. All of it answers you later as refusal codes rather than as a route: there is no ' +
+        'way to ask the contour “how much is left”.',
+      getKeyChecks: 'Content checks — “Guardrails”',
+      getKeyChecksText:
+        'Optional, at the company’s discretion. They run on its side and are switched on and off ' +
+        'there; the panel only shows what they did.',
+      getKeyTools: 'Tools, skills, MCP',
+      getKeyToolsText:
+        'Also on the platform’s side. It picks the tool set itself — by model, skill and key ' +
+        'owner; a client cannot declare its own tools to it.',
+      getKeyProbe: 'Checking the key',
+      getKeyProbeText:
+        'The panel’s first probe shows what this key can see: the model list arrives already ' +
+        'narrowed by its rights. Until the probe succeeds the panel claims nothing about the ' +
+        'contour.',
+      getKeyOnceTitle: 'The key is shown once',
+      getKeyOnceText:
+        'The platform’s admin panel shows the key’s value at the moment it is created and never ' +
+        'again. A lost key is not recovered — it is reissued, and the old one stops working.',
+
+      keyLifeTitle: 'What happens to the key',
+      keyLifeCaption:
+        'The key is entered once in the wizard and after that lives only on this machine, in one ' +
+        'place.',
+      keyLifeColumn: 'Question',
+      keyLifeMeaningColumn: 'Answer',
+      keyLifeWhere: 'Where it lives',
+      keyLifeWhereText:
+        'In a separate key-store file inside the panel’s working directory. It is not in ' +
+        'state.json, not in the settings backups and not in the environment transfer.',
+      keyLifeCrypto: 'How it is encrypted',
+      keyLifeCryptoText:
+        'AES-256-GCM; the passphrase is a machine-local secret in a neighbouring file readable ' +
+        'by its owner only. Copied to another machine the key file is useless: without the ' +
+        'secret file it does not decrypt.',
+      keyLifeConfigs: 'Why it is not in a CLI configuration',
+      keyLifeConfigsText:
+        'What goes into the configuration is the local gateway address and a placeholder instead ' +
+        'of the key (panel-contour-no-key-needed). The real key is substituted by the gateway at ' +
+        'request time. So it reaches neither a file the human shows a colleague nor the ' +
+        'environment transfer.',
+      keyLifeOutside: 'What leaves the panel',
+      keyLifeOutsideText:
+        'In the panel’s own answers the key is always a mask of the form “first characters… last ' +
+        'four”. The value never reaches a prompt, a log or the page markup — separate checks ' +
+        'watch exactly that.',
+
+      pathTitle: 'The path of one request',
+      pathCaption:
+        'The same road in detail: the three places where a request can end in a refusal, and ' +
+        'which code each of them answers with.',
+      pathTextTitle: 'The same in words',
+      pathTextText:
+        'CLIs and the built-in assistant do not talk to the contour: they talk to the panel’s ' +
+        'local gateway on 127.0.0.1; the default port is 5179, and if it is busy the gateway ' +
+        'takes a neighbouring one and names what it got — that is the port the panel writes into ' +
+        'a CLI’s configuration. The gateway translates the request into the contour’s ' +
+        'dialect, applies your blind-spot rules, substitutes the key and sends the request out — ' +
+        'the single moment anything leaves the machine. On the contour’s side the request passes ' +
+        'the content checks, receives the company’s tools and knowledge, and reaches the model. ' +
+        'The gateway translates the answer back into the dialect the client expects and records ' +
+        'the spend. A refusal can arrive at any of three places: content checks — 451, a spend ' +
+        'limit — 402, request frequency — 429.',
+
+      d2Title: 'The path of one request: six steps and three places it can end in a refusal',
+      d2Dialect: 'Translation into the contour dialect',
+      d2Dlp: 'Blind-spot rules',
+      d2Key: 'Key substitution',
+      d2Contour: 'Contour',
+      d2Inside: 'inside: checks · tools · knowledge',
+      d2Translate: 'Answer translated back',
+      d2Spend: 'Spend recorded',
+      d2Blocked: '451 — the request was refused',
+      d2Budget: '402 — spend limit',
+      d2Limit: '429 — too often',
+
+      d3Title: 'Where the key lives: in the panel, and it never reaches the CLI files',
+      d3Panel: 'Panel',
+      d3Vault: 'Encrypted store',
+      d3Key: 'Contour key',
+      d3Files: 'CLI files',
+      d3Address: 'Local gateway address',
+      d3Stub: 'Placeholder instead of the key',
+      d3Never: 'the key never gets here',
+
+      d4Title: 'What works through a contour and what does not',
+
+      modulesTitle: 'The contour’s modules: what a key can see',
+      modulesCaption:
+        'The platform is built of modules, but a key has seven public routes. The rest arrives ' +
+        'not as a separate call but through what the platform does by itself while serving an ' +
+        'ordinary request to a model.',
+      modulesColumn: 'Module',
+      modulesMeaningColumn: 'Visible to a key?',
+      moduleLlm: 'Models and inference',
+      moduleLlmText:
+        'Directly: this IS the contour’s public API — chat, completions, embeddings, the model ' +
+        'list.',
+      moduleGuard: 'Content checks',
+      moduleGuardText:
+        'Indirectly: they fire on their own and answer with a 451. They are configured in the ' +
+        'company’s admin panel; the panel does not drive them.',
+      moduleTools: 'Tool registry',
+      moduleToolsText:
+        'Indirectly: the platform picks the tools for a request and runs them itself. A client ' +
+        'cannot declare its own — that is the main limitation, and it has its own section below.',
+      moduleKb: 'Company knowledge bases',
+      moduleKbText:
+        'Indirectly: the platform searches them itself when the key has an owner. There is no ' +
+        '“search the knowledge” route for a key.',
+      moduleMcp: 'The platform’s external MCP servers',
+      moduleMcpText: 'Indirectly: those are its tools, not yours; they never reach your CLI.',
+      moduleAgents: 'Platform agents',
+      moduleAgentsText:
+        'Directly: a separate route calls an agent. The panel calls it and shows the answer; the ' +
+        'conversation is remembered by the contour.',
+      moduleOther: 'Images, entities, document parsing, sentiment',
+      moduleOtherText: 'A key has no public route to them — so the panel does not show them.',
+      moduleSpeech: 'Speech and quality scoring',
+      moduleSpeechText: 'Present in the platform, with no public surface for a key.',
+      modulesIndirectTitle: 'The key word here is “indirectly”',
+      modulesIndirectText:
+        'The platform’s richness arrives not as separate buttons but through an ordinary request ' +
+        'to its model already carrying the company’s checks, knowledge and tools. They cannot be ' +
+        'driven one by one from the panel, and that is how the platform is built rather than ' +
+        'something the panel left undone.',
+
+      worksTitle: 'What works through a contour and what does not',
+      worksCaption:
+        'The list is complete and unsoftened. One line in it is the reason a contour does not ' +
+        'replace everything else in the panel.',
+      worksColumn: 'What we send through the contour',
+      worksWhyColumn: 'Why',
+      worksBadgeYes: 'works',
+      worksBadgePartial: 'formally yes',
+      worksBadgeNo: 'does not work',
+      workAssistant: 'The panel’s built-in assistant',
+      workAssistantWhy: 'Text in, text out — it needs no tools.',
+      workCases: 'Generating test cases, reading runs, translations',
+      workCasesWhy: 'The same: text work inside the panel.',
+      workAnalytics: 'Analytics and explanations in the panel',
+      workAnalyticsWhy: 'The same.',
+      workEmbeddings: 'Embeddings for search',
+      workEmbeddingsWhy: 'They have their own route in the contour’s public API.',
+      workAgent: 'Calling a contour agent',
+      workAgentWhy: 'That is the company’s agent with its own tools — it runs them on its side.',
+      workBridge: 'The MCP bridge: your CLI calls a contour model',
+      workBridgeWhy:
+        'The direction is reversed: the panel calls the contour, not the other way round. The ' +
+        'tools stay yours, the model work is the contour’s.',
+      workCliChat: 'A CLI as a plain chat partner without tools',
+      workCliChatWhy:
+        'It will answer, but there is little use in it: an agent that cannot open a file is a ' +
+        'chat in an awkward window.',
+      workCliAgent: 'Claude Code or another CLI as an agent editing files',
+      workCliAgentWhy:
+        'Does not work. The tool set is assembled by the platform, and its public schema does ' +
+        'not accept the client’s tools field — the field is dropped. So a CLI cannot tell the ' +
+        'model about reading a file, editing one, running a command or your MCP servers. This is ' +
+        'the platform’s limitation, not the panel’s, and the panel has nothing to work around ' +
+        'it with.',
+      worksHonestTitle: 'There is no workaround here that would not be a lie',
+      worksHonestText:
+        'The “put tool descriptions into the request text and parse the answer by hand” route is ' +
+        'a homemade protocol on top of a foreign one: it breaks on every model update, provides ' +
+        'neither call identifiers nor parallel calls, and the first wrong parse hands the agent ' +
+        'the right to run something the model never asked for. That is why the panel does not ' +
+        'have it. A CLI keeps working as an agent through its own usual key — the contour does ' +
+        'not stand in the way of that.',
+
+      errorsTitle: 'Refusals and what to do',
+      errorsCaption:
+        'The codes come from the contour, and the panel turns them into a reason in words. Here ' +
+        'is what stands behind each and where to go.',
+      errorsColumn: 'Code',
+      errorsActionColumn: 'What happened and what to do',
+      err401Badge: 'key',
+      err401:
+        'The contour did not accept the key, and there are five possible reasons: the key is ' +
+        'unknown or revoked, expired, has exhausted its budget, its owner was deleted — or the ' +
+        'owner check failed. Nothing from the outside tells them apart — the platform answers ' +
+        'with one code and one text — so the panel names all five instead of advising you to ' +
+        'reissue the key. The fifth is the only transient one: the key itself is fine, and the ' +
+        'first sensible move is to retry. If that does not help, check the expiry, the budget ' +
+        'and the owner in the admin panel before issuing a new one.',
+      err402Badge: 'spend limit',
+      err402:
+        'A refusal on a spend limit, and NOT on your key’s budget: the platform issues it from a ' +
+        'user’s daily limit, a team’s monthly one or the instance’s monthly one. Which one is ' +
+        'named in the line itself. It is lifted by a platform administrator or by waiting for a ' +
+        'new period.',
+      err403Badge: 'model',
+      err403:
+        'This key is not allowed the requested model — its name is in the refusal. The list of ' +
+        'allowed models is edited in the admin panel; the “Contour” section shows the same list.',
+      err404Badge: 'model gone',
+      err404:
+        'The contour does not know that model: it may have been removed between runs. In the ' +
+        '“Contour” section missing models are flagged and keep the date they were last seen — ' +
+        'pick another one.',
+      err429Badge: 'frequency',
+      err429:
+        'The key’s per-minute request or token limit was exceeded. The panel retries such a ' +
+        'request exactly once; if the refusal repeats, waiting or asking for a higher limit is ' +
+        'the way out.',
+      err451Badge: 'checks',
+      err451:
+        'The company’s content checks stopped the request. The panel names the checks that fired ' +
+        'exactly as the contour named them; the checked text itself is neither on the screen nor ' +
+        'in a log. The refusal is terminal: repeating the same request makes no sense.',
+      err503Badge: 'contour',
+      err503:
+        'The contour is still starting — its model registry is not ready. A retry a minute later ' +
+        'usually goes through, and the card’s state does not erase capabilities confirmed ' +
+        'earlier.',
+
+      disableTitle: 'How to switch it off',
+      disableCaption:
+        'Three different actions, and they remove different things. Top to bottom, gentlest first.',
+      disableStep1: '“Remove the apply”',
+      disableStep1Text:
+        'The CLI files go back to their previous values and the managed profile disappears. The ' +
+        'contour itself stays connected: the panel’s assistant and the bridge keep working. A ' +
+        'file you edited after the apply is left alone and named.',
+      disableStep2: 'Switch the contour toggle off',
+      disableStep2Text:
+        'The gateway stops serving it: the connection is still accepted, but the answer is a 502 ' +
+        'saying “the contour is switched off in the panel” — the contour is down, not the panel. ' +
+        'The settings, the key and the spend history stay in place — the same toggle brings it ' +
+        'back.',
+      disableStep3: '“Delete the contour”',
+      disableStep3Text:
+        'The settings, the key and the probe trace are gone. The apply is removed first, ' +
+        'automatically. The action cannot be undone: the key has to be entered again.',
+      disableKeepsTitle: 'What stays either way',
+      disableKeepsText:
+        'The “before” copies of every configuration edit live in the “History” section and ' +
+        'outlive the contour. The spend counted over past days stays too: that is your history, ' +
+        'not a connection state.',
+
+      guide: {
+        needTitle: 'What you need first',
+        needCaption:
+          'Three things. Without any one of them the path breaks halfway, and better to find out now.',
+        needAccess: 'Access to the contour admin',
+        needAccessText:
+          'Only an instance administrator can issue a key. With no admin access the key has to ' +
+          'be asked from whoever has it; everything else in the panel works without it.',
+        needModel: 'At least one chat model',
+        needModelText:
+          'A key gets the instance model list narrowed by its own rights. An empty instance ' +
+          'connects and reports “0 models” — a formal success with nothing to work with.',
+        needAddress: 'The public API address, not the admin one',
+        needAddressText:
+          'The admin address and the API address differ. The panel appends /v1 itself, and the ' +
+          'probe names an address mistake in a message of its own — yet half an hour is lost ' +
+          'on it regularly.',
+
+        mapTitle: 'First, the whole thing',
+        mapCaption:
+          'Three diagrams for the whole path: which road a request takes, who creates what, and ' +
+          'how the two systems sit next to each other. Then the same thing step by step, with screens.',
+
+        enterprise-platformTitle: 'First half: the contour admin',
+        enterprise-platformCaption:
+          'This is where a model is created and a key is issued. Eight steps, after which ' +
+          'exactly two lines move into the panel: the address and the key.',
+        gLogin: 'Sign in to the instance admin',
+        gLoginText:
+          'Email with a password or SSO — depends on how your contour is set up. The admin ' +
+          'address comes from whoever deployed the instance; on the screenshot it is a ' +
+          'different address from the API one, and mixing the two is the most common way to ' +
+          'lose half an hour on this path.',
+        gDashboard: 'Take a look at the dashboard',
+        gDashboardText:
+          'It answers the main question right away: does the instance have active models? A ' +
+          'zero here makes the next step mandatory rather than “just in case”. The other ' +
+          'numbers — requests, errors and spend for today — matter at the very end, when you ' +
+          'compare the panel’s estimate against them.',
+        gModels: 'Open the model catalog',
+        gModelsText:
+          'This is what the key will later get its list from. The panel does not invent models ' +
+          'from a host name — it asks the contour and shows the answer. Every row here has a ' +
+          'kind (chat or image) and a state: a chat model is mandatory, otherwise the panel has ' +
+          'nothing to answer with.',
+        gModelCreate: 'Create a model if there is none',
+        gModelCreateText:
+          'The title is human and arbitrary: “Qwen 2.5 0.5B (локальная)” on the screenshot. The ' +
+          'provider is not a brand but a call protocol: for a model living on your own machine ' +
+          'it is Ollama. The model id is written exactly as the provider knows it — qwen2.5:0.5b ' +
+          'on the screenshot, gpt-4o-mini for a cloud one — and that very string is what reaches ' +
+          'the panel later. “API Base URL” is the address of whoever answers: for a local Ollama ' +
+          'it is http://host.docker.internal:11434 and WITHOUT /v1, because its API is native, ' +
+          'and the extra tail yields “404 page not found” inside the model’s answer, not at ' +
+          'saving time.',
+        gKeys: 'Go to the keys',
+        gKeysText:
+          'The list shows a truncated key — not even an administrator sees it in full. Which is ' +
+          'why the next step is done once and carefully.',
+        gKeyCreate: 'Issue a key for the panel',
+        gKeyCreateText:
+          'The key title is there so you recognise it among the others later: “AgentDeck · ' +
+          'путеводитель” on the screenshot. Budget and limits are the contour’s restrictions, not ' +
+          'the panel’s: the panel reads and shows them but never works around them — $10, RPM 60, ' +
+          'TPM 100000 on the screenshot, with an empty expiry, i.e. a key that never expires. Model ' +
+          'access narrows what the panel will later see through the probe: leave it empty and ' +
+          'the key sees the whole catalog, name models and it sees only those — and that is ' +
+          'exactly the list that lands in the capability matrix.',
+        gKeyIssued: 'Copy the key — there is no second time',
+        gKeyIssuedText:
+          'The contour shows the key exactly once, in this dialog. Copy it whole, including the ' +
+          'sk- prefix: it goes into the panel as is, nothing to append or trim. Lost means ' +
+          'issue a new one; an existing key cannot be recovered either in the admin or in the ' +
+          'panel.',
+        gUsage: 'Remember where to look at spend',
+        gUsageText:
+          'Spend is counted by the contour, not by the panel. The panel shows its own estimate ' +
+          'by its own price list and honestly calls it an estimate — the figures are compared ' +
+          'here, and they agree as an order of magnitude rather than to the cent.',
+
+        panelTitle: 'Second half: the connection wizard',
+        panelCaption:
+          'Four wizard steps and three screens after it. The contour stays off until the very ' +
+          'end: a draft applies nothing and goes nowhere on its own.',
+        pEmpty: 'Open the “Contour” section',
+        pEmptyText:
+          'Before connecting there is one button and an explanation of what will happen. The ' +
+          'section sits next to “Data protection” for a reason: they share one question — where ' +
+          'does the request go.',
+        pAddress: 'Step 1: contour type, title and address',
+        pAddressText:
+          'The type is “EnterprisePlatform”; the title is arbitrary, “Платформа компании · стенд” on the screenshot. ' +
+          'The identifier is built from the title in Latin letters — a Russian title leaves it ' +
+          'empty and “Check connection” stays disabled, so type it in yourself, enterprise-platform-stand ' +
+          'on the screenshot: the local gateway address is built from it. The address is the public API ' +
+          'root, http://127.0.0.1:5300 on the screenshot (a stand behind a port-forward); ' +
+          'yours will be your instance’s address. The panel appends /v1 itself.',
+        pProbe: 'At this step the probe still has no key',
+        pProbeText:
+          'Pressed before the second step, “Check connection” returns “key rejected” — and that ' +
+          'is not a misconfiguration. The panel lists five causes right there, because the ' +
+          'contour itself names none: an unknown key, a revoked one, an expired one, one with a ' +
+          'deleted owner and one out of budget all answer with the same 401. The real ' +
+          'connection check happens at the third step.',
+        pKey: 'Step 2: paste the key',
+        pKeyText:
+          'The very sk-… copied at step seven, in full. After this it is never shown again: ' +
+          'not in an API response, not in a prompt, not in a log, not in a CLI config. An empty ' +
+          'field on a repeat setup means “keep the stored one”, not “erase it”.',
+        pCapabilities: 'Step 3: what the contour confirmed',
+        pCapabilitiesText:
+          'The panel went to the contour and shows the answer — “2 models” on the screenshot, ' +
+          'one of them a chat model and one for embeddings: how many models the key has, ' +
+          'which of them are chat ones, whether embeddings exist. This is also where you see ' +
+          'whether the access narrowing from step six worked — the model count must match what ' +
+          'you allowed the key. Anything unverified stands as “not declared” rather than as a ' +
+          'tick: there is nothing to promise beyond what was checked.',
+        pTargets: 'Step 4: whom to apply it to',
+        pTargetsText:
+          'The panel assistant, Claude Code and eight other CLIs. Each has its own row with a ' +
+          'reason when applying is impossible; Gemini CLI, for one, speaks a dialect the ' +
+          'gateway does not understand, and the list says so outright. Below the list come the ' +
+          'mode for a contour refusal (“required” = do not work), the key budget (the figure you ' +
+          'set in the admin; 100 on the screenshot) and the day the contour restarts its period ' +
+          'from, as 2026-09-01.',
+        pGateway: 'Raise the gateway',
+        pGatewayText:
+          'The “Raise the gateway” button sits on the same step. Once up, it names its address ' +
+          '— http://127.0.0.1:5179 on the screenshot — and that is what lands in the ' +
+          'consumers’ configs, with the contour identifier appended: ' +
+          'http://127.0.0.1:5179/enterprise-platform-stand/v1. The dashes next to the consumers stay to the very ' +
+          'end: the contour is switched on only by “Done”, and until then the row honestly says ' +
+          'there is nothing to apply yet.',
+        pCard: 'Done: the contour card',
+        pCardText:
+          'Right after the wizard not a single request has gone through the gateway, and the ' +
+          'panel says so plainly instead of showing a zero as a result.',
+        pSpend: 'Make one short request',
+        pSpendText:
+          'Any CLI pointed at the gateway, or the panel assistant; two characters such as “2+2” ' +
+          'are enough. After the very first answer the card shows spend, the budget left and ' +
+          'the content-check trace — now a measurement rather than a promise.',
+        pDelete: 'How to switch it off',
+        pDeleteText:
+          'Three actions of different strength are covered below, in “How to switch it off”. ' +
+          'The harshest is deletion: it asks for the contour title in full, while the apply is ' +
+          'removed before it by itself, returning the CLI files to their original state.',
+
+        shotsTitle: 'Where these screenshots come from and why they can be trusted',
+        shotsText:
+          'The frames are taken by a run of their own: the admin on a live stand, the panel on ' +
+          'a throwaway copy with its own config directory, so that nobody’s working stand is ' +
+          'touched. Keys, tokens and emails are masked in the markup BEFORE the shot, and the ' +
+          'visible text of the frame goes into an inventory next to the image. A separate check ' +
+          'reads that inventory looking for keys, tokens, foreign domains and values from the ' +
+          'private store — so a leak is caught by a run rather than by eye. The check has one ' +
+          'boundary and it is named outright: it sees what was in the markup, and would not see ' +
+          'a secret drawn as a picture.',
+      },
     },
 
     endpoints: {
@@ -5736,8 +7108,12 @@ export const helpEn: HelpSchema = {
         'none of them. With a secret set, the body is signed.',
       cardTms: 'Test management',
       cardTmsText:
-        'Zephyr Scale or Xray: pull cases into a panel group and push a run as a cycle. ' +
-        'The source of truth for cases stays in Jira, not in the panel.',
+        'Zephyr Scale, Xray or Test IT: pull cases into a panel group and push a run. Test IT ' +
+        'has its own URL — it is a company installation, not a cloud. The source of truth for ' +
+        'cases stays there, not in the panel, and pushing the same run again lands in the same ' +
+        'run instead of creating a second one — even if the previous push broke off midway. ' +
+        'The Test IT URL is required: without it the card can neither be enabled nor saved ' +
+        'while enabled.',
       cardCi: 'CI',
       cardCiText:
         'The last build’s report is fetched by token and goes into the same results import ' +

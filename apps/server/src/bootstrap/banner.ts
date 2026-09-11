@@ -10,6 +10,8 @@ export interface BannerInput {
   autostarted: Awaited<ReturnType<typeof autostartProjects>>;
   /** Строка о прокси защиты данных; пустая — прокси выключен. */
   dlpNote: string;
+  /** Строка о шлюзе контуров; пустая — шлюз выключен. */
+  gatewayNote: string;
 }
 
 /**
@@ -18,7 +20,7 @@ export interface BannerInput {
  * судьба автозапусков. Чистая функция над уже собранными фактами.
  */
 export function startupBanner(input: BannerInput): string {
-  const { host, port, location, sandboxSweep, autostarted, dlpNote } = input;
+  const { host, port, location, sandboxSweep, autostarted, dlpNote, gatewayNote } = input;
 
   return [
     `AgentDeck API: http://${host}:${port}`,
@@ -40,6 +42,7 @@ export function startupBanner(input: BannerInput): string {
     ),
     ...autostarted.failed.map((run) => `Автозапуск не удался: ${run.path} — ${run.message}`),
     dlpNote,
+    gatewayNote,
     '',
   ]
     .filter(Boolean)

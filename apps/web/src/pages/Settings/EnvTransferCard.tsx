@@ -13,6 +13,7 @@ import { useProviders } from '@entities/Provider';
 import { FolderPicker } from '@features/FolderPicker';
 import { EnvTransferExportModal } from './EnvTransferExportModal';
 import { EnvTransferImportModal } from './EnvTransferImportModal';
+import type { EnvTransferApplyChoice } from './EnvTransferImportModal.types';
 import type {
   EnvTransferExportResult,
   EnvTransferPlan,
@@ -96,17 +97,31 @@ export function EnvTransferCard() {
     }
   };
 
-  const applyPlan = async (selection: string[]): Promise<void> => {
+  const applyPlan = async (choice: EnvTransferApplyChoice): Promise<void> => {
     if (!plan || !archivePath) return;
     setBusyId(plan.provider.id);
     try {
-      await apiClient.post('/env-transfer/import/apply', {
-        provider: plan.provider.id,
-        archivePath,
-        selection,
-      });
+      const { data } = await apiClient.post<{ platforms?: { keysDropped?: string[] } }>(
+        '/env-transfer/import/apply',
+        {
+          provider: plan.provider.id,
+          archivePath,
+          selection: choice.selection,
+          platformSelection: choice.platforms,
+          applyGateway: choice.gateway,
+        },
+      );
       await queryClient.invalidateQueries();
-      toast.success(t('envTransfer.importDone', { count: selection.length }));
+      toast.success(
+        t('envTransfer.importDone', { count: choice.selection.length + choice.platforms.length }),
+      );
+      // Снятый ключ — единственное, что разворот УБИРАЕТ, а не добавляет. План
+      // предупреждал об этом до нажатия, но молча исчезнувший секрет человек
+      // обнаружил бы посреди работы отказом «не подключён».
+      const dropped = data.platforms?.keysDropped ?? [];
+      if (dropped.length > 0) {
+        toast.info(t('envTransfer.importKeysDropped', { ids: dropped.join(', ') }));
+      }
       setPlan(undefined);
       setArchivePath(undefined);
     } catch (error) {
@@ -187,7 +202,7 @@ export function EnvTransferCard() {
       <EnvTransferImportModal
         plan={plan}
         isBusy={Boolean(busyId)}
-        onApply={(selection) => void applyPlan(selection)}
+        onApply={(choice) => void applyPlan(choice)}
         onClose={() => {
           setPlan(undefined);
           setArchivePath(undefined);

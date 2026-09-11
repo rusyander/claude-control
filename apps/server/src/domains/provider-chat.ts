@@ -10,7 +10,8 @@
  * Модули: `store.ts` — переписка на диске, `prompt.ts` — сборка промпта из неё,
  * `ProviderChatRun.ts` — один ответ (поток CLI, сессия, API),
  * `ProviderChatService.ts` — живые прогоны, подписка и запись результата,
- * `cascade.ts` — конвейер «работа → ревью → правки» над понижёнными прогонами.
+ * `cascade.ts` — конвейер «работа → ревью → правки» над понижёнными прогонами,
+ * `handoff.ts` — продолжение работы в новом разговоре (у чужого CLI сессии нет).
  */
 
 export {
@@ -28,10 +29,19 @@ export {
 export {
   createForeignStagePlanner,
   foreignStagePrefix,
+  foreignChatPrefix,
   planForeignStage,
   type ForeignRunFinished,
   type ForeignStagePlan,
 } from './provider-chat/cascade.ts';
+export {
+  continuationTitle,
+  planForeignHandoff,
+  startForeignHandoff,
+  type ForeignHandoffDeps,
+  type ForeignHandoffInput,
+  type ForeignHandoffOutcome,
+} from './provider-chat/handoff.ts';
 export { MAX_PROMPT_CHARS, buildPrompt, composeUserMessage } from './provider-chat/prompt.ts';
 export {
   ProviderChatRun,

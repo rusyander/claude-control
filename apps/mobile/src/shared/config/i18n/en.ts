@@ -328,6 +328,24 @@ export const en: Dictionary = {
     thisPhone: 'Phone',
   },
 
+  platform: {
+    title: 'Contour',
+    readOnly: 'Read-only: the key is entered in the panel, on its own machine.',
+    empty: 'No contours.',
+    state_ok: 'working',
+    state_off: 'switched off in the panel',
+    state_noKey: 'no key saved',
+    state_failed: 'the probe did not pass',
+    state_unchecked: 'not checked yet',
+    state_exhausted: 'the contour refused on budget',
+    budget: (spent: string, budget: string, percent: number) =>
+      `Spend estimate: $${spent} of $${budget} (${percent}%)`,
+    budgetOff: (spent: string) => `Spend estimate: $${spent}, no budget set`,
+    estimate: "This is the panel's estimate by its own price table, not the contour's bill.",
+    exhaustedAt: (at: string, level: string) =>
+      level ? `Refused ${at}, limit: ${level}` : `Refused ${at}`,
+  },
+
   pair: {
     title: 'Connecting',
     screenTitle: 'Pairing',

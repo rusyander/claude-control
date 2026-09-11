@@ -23,6 +23,15 @@ export interface IntegrationField {
   options?: readonly string[];
   /** Без него включать коннектор бессмысленно. */
   isRequired?: boolean;
+  /**
+   * Обязательно только при таком значении другого поля.
+   *
+   * Существует из-за адреса тест-менеджмента: своей установке (Test IT) он
+   * необходим, а у Zephyr и Xray API общий на всех и поля нет вовсе. Без этого
+   * пришлось бы выбирать между «нельзя включить Zephyr» и «Test IT включается
+   * без адреса и падает на первой же кнопке».
+   */
+  requiredWhen?: { key: string; equals: readonly string[] };
 }
 
 /** Поля каждого коннектора в том порядке, в каком их заполняют. */
@@ -41,7 +50,8 @@ export const INTEGRATION_FIELDS: Record<IntegrationId, readonly IntegrationField
   telegram: [{ key: 'chatId', kind: 'text', isRequired: true }],
   webhook: [{ key: 'url', kind: 'text', isRequired: true }],
   tms: [
-    { key: 'kind', kind: 'select', options: ['', 'zephyr', 'xray'], isRequired: true },
+    { key: 'kind', kind: 'select', options: ['', 'zephyr', 'xray', 'testit'], isRequired: true },
+    { key: 'baseUrl', kind: 'text', requiredWhen: { key: 'kind', equals: ['testit'] } },
     { key: 'projectKey', kind: 'text', isRequired: true },
     { key: 'groupId', kind: 'text' },
   ],
@@ -69,10 +79,17 @@ export function draftFrom<T extends IntegrationId>(
   return draft;
 }
 
+/** Обязательно ли поле при том, что сейчас в форме. */
+function isRequiredNow(field: IntegrationField, draft: IntegrationDraft): boolean {
+  if (field.isRequired) return true;
+  const rule = field.requiredWhen;
+  return rule ? rule.equals.includes((draft[rule.key] ?? '').trim()) : false;
+}
+
 /** Незаполненные обязательные поля. Пусто — коннектор можно включать. */
 export function missingFields(id: IntegrationId, draft: IntegrationDraft): string[] {
   return INTEGRATION_FIELDS[id]
-    .filter((field) => field.isRequired && !(draft[field.key] ?? '').trim())
+    .filter((field) => isRequiredNow(field, draft) && !(draft[field.key] ?? '').trim())
     .map((field) => field.key);
 }
 

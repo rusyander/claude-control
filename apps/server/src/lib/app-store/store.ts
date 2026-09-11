@@ -8,6 +8,9 @@ import type {
   IntegrationLink,
   IntegrationLinks,
   WorktreeMirrorSettings,
+  PlatformAppliedRecord,
+  PlatformHealthRecord,
+  PlatformSpendRecord,
   Project,
   ProjectCodeLayout,
   ProjectCodeView,
@@ -36,6 +39,7 @@ import {
   setTestsAutoAccept as writeTestsAutoAccept,
 } from './tests-drafts.ts';
 import {
+  clearChatLink as dropChatLink,
   getChatLink as readChatLink,
   getChatLinks as readChatLinks,
   linkChatSession as moveChatLink,
@@ -69,6 +73,21 @@ import {
   getIntegrationHealth as readIntegrationHealth,
   saveIntegrationHealth as writeIntegrationHealth,
 } from './integration-health.ts';
+import {
+  forgetPlatformHealth as dropPlatformHealth,
+  getPlatformHealth as readPlatformHealth,
+  savePlatformHealth as writePlatformHealth,
+} from './platform-health.ts';
+import {
+  forgetPlatformApplied as dropPlatformApplied,
+  getPlatformApplied as readPlatformApplied,
+  savePlatformApplied as writePlatformApplied,
+} from './platform-applied.ts';
+import {
+  forgetPlatformSpend as dropPlatformSpend,
+  getPlatformSpend as readPlatformSpend,
+  savePlatformSpend as writePlatformSpend,
+} from './platform-spend.ts';
 import {
   getAllIntegrationLinks as readAllIntegrationLinks,
   getIntegrationLinks as readIntegrationLinks,
@@ -476,6 +495,15 @@ export class AppStore {
   }
 
   /**
+   * Связь под ключом, которого не будет: звено уехало на настоящий ключ
+   * разговора чужого провайдера. Молчит, когда связи нет, — зовут это на
+   * каждом заведённом звене, а переезд бывает только у чужих.
+   */
+  clearChatLink(chatId: string): void {
+    if (dropChatLink(this.state, chatId)) this.persist();
+  }
+
+  /**
    * Прогон назвал настоящий `sessionId` — переносим на него связь с временного
    * ключа. Зовётся на КАЖДОМ прогоне, поэтому молча ничего не делает, когда
    * связи нет: сохранять что-то на каждый чат панели здесь незачем.
@@ -542,6 +570,75 @@ export class AppStore {
   /** Интеграцию забыли (сняли токен) — след проверки уходит вместе с ней. */
   forgetIntegrationHealth(id: string): void {
     if (dropIntegrationHealth(this.state, id)) this.persist();
+  }
+
+  // --- Контуры: итог последней пробы ---
+
+  /** Итоги последних проб: id контура → запись (копия, не внутренний объект). */
+  getPlatformHealth(): Record<string, PlatformHealthRecord> {
+    return readPlatformHealth(this.state);
+  }
+
+  savePlatformHealth(id: string, record: PlatformHealthRecord): void {
+    writePlatformHealth(this.state, id, record);
+    this.persist();
+  }
+
+  /** Контур удалён — след пробы уходит вместе с ним. */
+  forgetPlatformHealth(id: string): void {
+    if (dropPlatformHealth(this.state, id)) this.persist();
+  }
+
+  // --- Контуры: след применения (Т3) ---
+
+  /** Что и куда записано применением контура; копия, не внутренний объект. */
+  getPlatformApplied(): Record<string, PlatformAppliedRecord> {
+    return readPlatformApplied(this.state);
+  }
+
+  savePlatformApplied(id: string, record: PlatformAppliedRecord): void {
+    writePlatformApplied(this.state, id, record);
+    this.persist();
+  }
+
+  /** Контур отключён или удалён — след применения уходит вместе с ним. */
+  forgetPlatformApplied(id: string): void {
+    if (dropPlatformApplied(this.state, id)) this.persist();
+  }
+
+  // --- Контуры: расход по дням (Т8) ---
+
+  /** Расход по контурам: id → дневные итоги (копия, не внутренний объект). */
+  getPlatformSpend(): Record<string, PlatformSpendRecord> {
+    return readPlatformSpend(this.state);
+  }
+
+  /**
+   * Заменить запись расхода целиком. Складывает её домен, здесь — только запись
+   * на диск, и зовут её ПАЧКОЙ: `persist` пишет весь `state.json` синхронно, а
+   * шлюз считает расход на каждом ответе модели.
+   */
+  savePlatformSpend(record: PlatformSpendRecord): void {
+    writePlatformSpend(this.state, record);
+    this.persist();
+  }
+
+  /** Контур удалён — расход уходит вместе с ним. */
+  forgetPlatformSpend(id: string): void {
+    if (dropPlatformSpend(this.state, id)) this.persist();
+  }
+
+  /**
+   * Порт, занятый шлюзом контуров. Ноль — шлюз не поднят.
+   *
+   * Пишется слушателем при старте и остановке: снаружи (сторож стенда) узнать
+   * ДОСТАВШИЙСЯ порт больше неоткуда, а задуманный совпадает с портом прокси
+   * защиты данных.
+   */
+  setPlatformGatewayPort(port: number): void {
+    if (this.state.platformGatewayPort === port) return;
+    this.state.platformGatewayPort = port;
+    this.persist();
   }
 
   getIntegrationLinks(path: string): IntegrationLinks {

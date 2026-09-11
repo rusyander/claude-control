@@ -14,6 +14,9 @@ import type { ServerContext } from '../../context.ts';
 import { ChatRunRegistry, type RunLike } from '../../domains/chat/ChatRunRegistry.ts';
 import type { RunOptions } from '../../domains/chat/ChatRunner.ts';
 import { TreePause } from '../../domains/chat/tree-pause.ts';
+import { createTreeRuns } from '../../domains/chat/tree-runs.ts';
+import { ProviderChatService, createChat } from '../../domains/provider-chat.ts';
+import type { ConfigProvider } from '../../providers/types.ts';
 import { registerChatTreeRoutes } from './tree-routes.ts';
 
 /**
@@ -153,5 +156,102 @@ describe('маршруты паузы дерева', () => {
       await app.inject({ method: 'POST', url: '/api/chat/parent/tree/resume' })
     ).json<ChatTreeResumed>();
     expect(again.wasPaused).toBe(false);
+  });
+});
+
+/**
+ * То же дерево у ЧУЖОГО CLI (Т2). Маршрут, домен и вид ответа те же — меняется
+ * только реализация прогонов, и выбирается она по ключу связи.
+ */
+describe('дерево у чужого провайдера', () => {
+  let root: string;
+  let appData: string;
+  let app: FastifyInstance;
+  let store: AppStore;
+  let chats: ProviderChatService;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), 'cc-tree-foreign-'));
+    appData = join(root, 'agentdeck');
+    mkdirSync(appData, { recursive: true });
+    store = new AppStore(appData);
+    chats = new ProviderChatService(() => ({
+      start: () => new Promise<void>(() => undefined),
+      stop: () => undefined,
+    }));
+
+    const tree = new TreePause({
+      links: () => store.getChatLinks(),
+      runs: createTreeRuns({
+        registry: new ChatRunRegistry((): RunLike => ({
+          start: async () => undefined,
+          stop: () => undefined,
+        })),
+        chats,
+        appDataDir: () => appData,
+        provider: () => ({ id: 'codex' }) as unknown as ConfigProvider,
+        models: () => [],
+      }),
+      store: {
+        get: (key) => store.getTreePause(key),
+        all: () => store.getTreePauses(),
+        set: (record) => store.setTreePause(record),
+        clear: (key) => store.clearTreePause(key),
+      },
+    });
+    app = Fastify();
+    registerChatTreeRoutes(app, { store } as unknown as ServerContext, tree);
+    await app.ready();
+
+    for (const id of ['c1', 'c2']) createChat(appData, 'codex', { id, workdir: root });
+    store.setChatLink('codex:c1', {
+      parentChatId: 'codex:parent',
+      title: 'Форма',
+      branch: 'split/form',
+      stage: 'work',
+      createdAt: '2026-09-09T10:00:00.000Z',
+    });
+    store.setChatLink('codex:c2', {
+      parentChatId: 'codex:parent',
+      title: 'Сборка',
+      branch: 'split/build',
+      stage: 'work',
+      createdAt: '2026-09-09T10:00:01.000Z',
+    });
+  });
+
+  afterEach(async () => {
+    chats.stopAll();
+    await app.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('маршрут отвечает по чужому родителю: дети, их звенья и кто идёт', async () => {
+    chats.send(appData, 'codex', 'c1', { text: 'Задание' }, {
+      provider: { id: 'codex' },
+    } as unknown as Parameters<ProviderChatService['send']>[4]);
+
+    const view = (
+      await app.inject({
+        method: 'GET',
+        url: `/api/chat/${encodeURIComponent('codex:parent')}/tree`,
+      })
+    ).json<ChatTreeView>();
+
+    expect(view.root).toBe('codex:parent');
+    expect(view.nodes.map((node) => node.chatId)).toEqual(['codex:c1', 'codex:c2']);
+    expect(view.nodes.map((node) => node.title)).toEqual(['Форма', 'Сборка']);
+    expect(view.nodes.map((node) => node.stage)).toEqual(['work', 'work']);
+    // Идёт ровно тот разговор, у которого идёт чужой прогон.
+    expect(view.nodes.map((node) => node.running)).toEqual([true, false]);
+    expect(view.running).toBe(1);
+  });
+
+  it('«голый» идентификатор родителя дерева не находит — ключ именованный', async () => {
+    const view = (
+      await app.inject({ method: 'GET', url: '/api/chat/parent/tree' })
+    ).json<ChatTreeView>();
+
+    expect(view.nodes).toEqual([]);
   });
 });

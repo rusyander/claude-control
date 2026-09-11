@@ -7,6 +7,9 @@ export { CapabilityGrid } from './CapabilityGrid';
 export { OptionCards } from './OptionCards';
 export { TopicNav } from './TopicNav';
 export { TopicCard } from './TopicCard';
+export { HelpShot } from './HelpShot';
+export { HelpDiagram } from './HelpDiagram';
+export { GuideSteps, GuideStep } from './GuideStep';
 export type {
   OptionCard,
   OptionCardsProps,
@@ -22,4 +25,9 @@ export type {
   CalloutTone,
   CalloutProps,
   TopicCardProps,
+  HelpShotSide,
+  HelpShotProps,
+  HelpDiagramProps,
+  GuideStepsProps,
+  GuideStepProps,
 } from './help-kit.types';

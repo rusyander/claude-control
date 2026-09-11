@@ -21,8 +21,18 @@ const messages = [
       'Это монорепа на pnpm: apps/server — Fastify, apps/web — React + Vite,\nобщие типы в packages/contracts.',
     at,
     transport: 'stream',
+    durationMs: 47_000,
   },
-  { id: 'u2', role: 'user', content: 'А тесты чем гоняются?', at },
+  { id: 'u2', role: 'user', content: 'А где общие типы?', at },
+  {
+    id: 'a2',
+    role: 'assistant',
+    content: 'В packages/contracts: zod-схемы и типы, оба приложения берут их оттуда.',
+    at,
+    transport: 'stream',
+    durationMs: 132_000,
+  },
+  { id: 'u3', role: 'user', content: 'А тесты чем гоняются?', at },
 ];
 
 const chat = {

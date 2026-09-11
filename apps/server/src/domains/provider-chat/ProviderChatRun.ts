@@ -207,7 +207,13 @@ export class ProviderChatRun implements ProviderChatRunLike {
     const result = await runProviderApi(
       options.provider,
       options.history
-        .filter((message) => !message.failed)
+        // Заметки панели — её слова человеку о том, чего не получилось, а не
+        // реплика разговора: в контекст модели они не идут ни здесь, ни в
+        // текстовом промпте (`prompt.ts`).
+        .filter(
+          (message): message is typeof message & { role: 'user' | 'assistant' } =>
+            !message.failed && message.role !== 'notice',
+        )
         .map((message) => ({ role: message.role, content: message.content })),
       key,
       {

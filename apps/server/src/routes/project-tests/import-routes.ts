@@ -3,6 +3,7 @@ import type { ServerContext } from '../../context.ts';
 import { exportGroup, type ExportFormat } from '../../domains/project-tests/export-cases.ts';
 import { exportRun, type RunExportFormat } from '../../domains/project-tests/export-run.ts';
 import { importCases } from '../../domains/project-tests/import-cases.ts';
+import { importManualCases } from '../../domains/project-tests/import-manual-cases.ts';
 import { importResults } from '../../domains/project-tests/import-results.ts';
 import { guard, requireRoot } from './shared.ts';
 
@@ -54,6 +55,10 @@ export function registerProjectTestsImportRoutes(app: FastifyInstance, _ctx: Ser
   /**
    * Кейсы из таблицы в выбранную группу. Книга Excel приходит в base64:
    * тело запроса — JSON, байты в него иначе не положить.
+   *
+   * `markdown` — единственный формат, у которого нет ни файла, ни содержимого:
+   * ручные кейсы уже лежат в самом проекте, и `file` для него означает КАТАЛОГ
+   * (по умолчанию `QA`), а не один файл.
    */
   app.post<{
     Body: { path?: string; groupId?: string; format?: string; content?: string; file?: string };
@@ -62,11 +67,22 @@ export function registerProjectTestsImportRoutes(app: FastifyInstance, _ctx: Ser
     if (!root) return reply;
 
     const format = request.body?.format;
-    if (format !== 'csv' && format !== 'xlsx' && format !== 'testrail-csv') {
-      return reply.code(400).send({ message: 'Формат кейсов: csv, xlsx или testrail-csv.' });
+    if (
+      format !== 'csv' &&
+      format !== 'xlsx' &&
+      format !== 'testrail-csv' &&
+      format !== 'markdown'
+    ) {
+      return reply
+        .code(400)
+        .send({ message: 'Формат кейсов: csv, xlsx, testrail-csv или markdown.' });
     }
     const groupId = request.body?.groupId?.trim();
     if (!groupId) return reply.code(400).send({ message: 'Не указана группа, куда класть кейсы.' });
+
+    if (format === 'markdown') {
+      return guard(reply, () => importManualCases(root, { groupId, dir: request.body?.file }));
+    }
 
     return guard(reply, () =>
       importCases(root, {

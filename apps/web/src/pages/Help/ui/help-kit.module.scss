@@ -399,3 +399,98 @@
     transition: none;
   }
 }
+
+/* ── Путеводитель: шаг со снимком ───────────────────────────────────── */
+
+.guideSteps {
+  display: flex;
+  flex-direction: column;
+  // Шаг здесь с картинкой, и на расстоянии рецепта (spacing-sm) снимок
+  // предыдущего шага склеивается с заголовком следующего.
+  gap: var(--spacing-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: help-guide;
+}
+
+.guideStep {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--spacing-3xs) var(--spacing-sm);
+  counter-increment: help-guide;
+
+  &::before {
+    content: counter(help-guide);
+    display: flex;
+    align-items: center;
+    grid-row: 1 / span 3;
+    justify-content: center;
+    align-self: start;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background-color: var(--color-accent-subtle);
+    color: var(--color-accent);
+    font-size: var(--font-size-caption);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.guideStepTitle,
+.guideStepText {
+  grid-column: 2;
+  margin: 0;
+}
+
+.guideStepBody {
+  display: flex;
+  flex-direction: column;
+  grid-column: 2;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-2xs);
+}
+
+/* ── Снимок экрана ──────────────────────────────────────────────────── */
+
+.shot {
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  // Снимки светлые: на тёмной теме рамка и подложка не дают белому
+  // прямоугольнику висеть в пустоте без границ.
+  background-color: var(--color-surface-sunken);
+}
+
+.shotImage {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+// У схемы белый фон нарисован внутри картинки, поэтому подложка под ней должна
+// быть такой же — иначе на тёмной теме вокруг схемы остаётся тёмная кайма.
+.diagram {
+  background-color: #ffffff;
+}
+
+.shotCaption {
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+// Схема кликается целиком: ссылка не должна ни подчёркивать картинку, ни
+// добавлять под ней лишнюю строку — но фокус на ней обязан быть виден.
+.diagramLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+}

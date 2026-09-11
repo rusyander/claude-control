@@ -69,7 +69,7 @@ for (const scheme of ['light', 'dark']) {
     const { path, name } = entry;
     await openPanelPage(page, BASE, entry);
 
-    const slug = pageSlug(path);
+    const slug = pageSlug(path, entry.slug);
     await audit(page, `[${scheme}] ${name} (${path})`, `${slug}.${scheme}.json`);
 
     // Модалка создания: самый насыщенный формами кусок раздела. Открылась —

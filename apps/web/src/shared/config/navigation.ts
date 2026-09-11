@@ -132,6 +132,9 @@ export const NAV_SECTIONS: NavSection[] = [
       // возможностям провайдера, и вечный пункт мешал бы секции исчезать
       // целиком, когда у провайдера нет ни одной интеграции.
       { path: '/dlp', label: 'nav.dlp', icon: 'lock', key: 'dlp' },
+      // Контур тоже панель-level: корпоративная платформа стоит между ЛЮБЫМ
+      // потребителем и моделью — и ассистентом самой панели в том числе.
+      { path: '/platform', label: 'nav.platform', icon: 'flag', key: 'platform' },
       { path: '/help', label: 'nav.help', icon: 'help', key: 'help' },
     ],
   },

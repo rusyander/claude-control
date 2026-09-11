@@ -1,6 +1,11 @@
 import type { ClaudePaths } from '@agentdeck/contracts';
 import type { CapabilityMap, ProviderStatus } from './capabilities.ts';
-import type { ProviderAssistant, ProviderCli, ProviderEndpointConfig } from './assistant.ts';
+import type {
+  ProviderAssistant,
+  ProviderCli,
+  ProviderEndpointConfig,
+  ProviderEndpointFile,
+} from './assistant.ts';
 import type {
   ProviderInstructionsListLocation,
   ProviderInstructionsRulesLocation,
@@ -281,6 +286,13 @@ export interface ConfigProvider {
    * CLI не переносится (fail-closed): переменную адреса панель не выдумывает.
    */
   endpointConfig?: ProviderEndpointConfig;
+  /**
+   * Адрес эндпоинта куском конфигурации, а не переменной окружения: codex
+   * (`model_providers` в `config.toml`) и continue (`apiBase` у модели в
+   * `config.yaml`). Задаётся ТОЛЬКО там, где документация CLI называет это
+   * место сама — угадывать структуру чужого конфига панель не станет.
+   */
+  endpointFile?: ProviderEndpointFile;
   /**
    * Вендоры каталога моделей (models.dev), чьи модели относятся к этому CLI:
    * claude → `anthropic`, codex → `openai`, gemini → `google`, qwen →

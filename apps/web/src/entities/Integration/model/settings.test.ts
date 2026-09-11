@@ -32,6 +32,17 @@ describe('readIntegrations', () => {
     expect(readIntegrations(settings).tms.kind).toBe('zephyr');
   });
 
+  it('своя установка тест-менеджмента приезжает вместе с адресом', () => {
+    const settings = {
+      integrations: { tms: { kind: 'testit', baseUrl: 'https://testit.local' } },
+    } as unknown as AppSettings;
+
+    expect(readIntegrations(settings).tms).toMatchObject({
+      kind: 'testit',
+      baseUrl: 'https://testit.local',
+    });
+  });
+
   it('события Telegram отбираются по списку и приходят в известном порядке', () => {
     const settings = {
       integrations: { telegram: { events: ['question', 'выдумка', 'runDone'] } },

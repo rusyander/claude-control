@@ -1,0 +1,24 @@
+{
+  "topic": "chat",
+  "source": "docs/diagrams/chat-guide/chat-guide.drawio",
+  "pages": [
+    {
+      "name": "message-path",
+      "file": "message-path.png",
+      "page": 1,
+      "source": "2f47df900845a179",
+      "width": 1117,
+      "height": 1438,
+      "exportedAt": "2026-09-11T11:00:35.660Z"
+    },
+    {
+      "name": "split-conveyor",
+      "file": "split-conveyor.png",
+      "page": 2,
+      "source": "8ef86dd2b2bb200f",
+      "width": 2005,
+      "height": 1118,
+      "exportedAt": "2026-09-11T11:00:38.788Z"
+    }
+  ]
+}

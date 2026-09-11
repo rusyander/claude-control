@@ -115,6 +115,21 @@ module.exports = {
       from: { path: '^apps/server/src/routes/', pathNot: '\\.test\\.ts$' },
       to: { path: '^apps/server/src/bootstrap/|^apps/server/src/index\\.ts$' },
     },
+    // Общая бочка контрактов: сервер берёт из неё ТОЛЬКО типы.
+    {
+      name: 'server-contracts-barrel-types-only',
+      comment:
+        '`packages/contracts/src/index.ts` реэкспортирует соседей без расширений, а сервер идёт под ' +
+        '--experimental-strip-types: первый же импорт ЗНАЧЕНИЯ из бочки грузит её в рантайме и валит ' +
+        'старт процесса целиком (ERR_MODULE_NOT_FOUND, панель не поднимается вовсе). Значение берётся ' +
+        'подпутём «@agentdeck/contracts/<модуль>» — ровно для этого он и заведён в exports пакета.',
+      severity: 'error',
+      from: { path: '^apps/server/src/', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^packages/contracts/src/index\\.ts$',
+        dependencyTypesNot: ['type-only'],
+      },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

@@ -9,6 +9,7 @@ import { registerEmptyBodyGuard } from './lib/empty-body.ts';
 import { detectProviders } from './providers/detect.ts';
 import { autostartProjects } from './domains/project-runner.ts';
 import { buildDlpRuntime } from './domains/dlp.ts';
+import { gatewayPricing } from './domains/platform/spend.ts';
 import { startSandboxHousekeeping } from './domains/sandbox/SandboxConfig.ts';
 import { createRuntime, installShutdownHandlers } from './bootstrap/runtime.ts';
 import { buildRouteTable } from './bootstrap/route-table.ts';
@@ -118,6 +119,30 @@ if (ctx.store.getSettings().dlp.enabled) {
   }
 }
 
+// Шлюз контуров — по тому же доводу, и по своему: адрес шлюза уже вписан в
+// конфигурацию CLI, а ключ контура есть только у панели. Не поднявшийся шлюз
+// означает CLI без модели, и человек обязан узнать об этом из баннера, а не из
+// «ошибки соединения» через полчаса.
+let gatewayNote = '';
+if (ctx.store.getSettings().platformGateway.enabled) {
+  const { platformGateway } = runtime;
+  const settings = ctx.store.getSettings().platformGateway;
+  try {
+    await platformGateway.start({
+      store: ctx.store,
+      appDataDir: ctx.location.paths.appData,
+      port: settings.port,
+      pricing: gatewayPricing(ctx.store, ctx.pricing),
+    });
+    const status = platformGateway.status();
+    gatewayNote =
+      `Шлюз контуров: ${status.address}` +
+      (status.port === status.requestedPort ? '' : ` (порт ${settings.port} был занят)`);
+  } catch (error) {
+    gatewayNote = `Шлюз контуров НЕ поднялся: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
 process.stdout.write(
   startupBanner({
     host: HOST,
@@ -126,5 +151,6 @@ process.stdout.write(
     sandboxSweep,
     autostarted,
     dlpNote,
+    gatewayNote,
   }),
 );

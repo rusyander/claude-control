@@ -202,6 +202,69 @@ describe('ProviderChatService', () => {
   });
 
   /**
+   * Время ответа (Т1 партии чужих CLI). Меряет панель по своему прогону —
+   * расход чужие CLI отдают не все и по-разному, а часы есть всегда. Меряется
+   * настоящими часами, поэтому проверяется не число, а его наличие и знак.
+   */
+  describe('время работы', () => {
+    it('готовый ответ несёт время прогона', () => {
+      send();
+      run.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
+
+      const last = readChat(dir, 'codex', 'chat')?.messages.at(-1);
+      expect(typeof last?.durationMs).toBe('number');
+      expect(last?.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('провалившийся прогон время тоже несёт', () => {
+      send();
+      run.emit?.({ type: 'error', error: 'CLI не найден', reason: 'cli_error' });
+
+      expect(readChat(dir, 'codex', 'chat')?.messages.at(-1)?.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('снятый кнопкой ответ время тоже несёт', () => {
+      send();
+      service.stop('chat');
+      run.emit?.({ type: 'done', reply: 'Половина', transport: 'stream' });
+
+      expect(readChat(dir, 'codex', 'chat')?.messages.at(-1)?.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    /**
+     * Пауза дерева (Т2) останавливает прогон, который может не успеть сказать
+     * ни слова. Пустой пузырь читался бы как «CLI ответил молчанием», а при
+     * ночной паузе их копилось бы по одному на каждую остановку.
+     */
+    it('остановленный молча прогон записан как оборванный, а не пустым ответом', () => {
+      send();
+      service.stop('chat');
+      run.emit?.({ type: 'done', reply: '   ', transport: 'stream' });
+
+      const last = readChat(dir, 'codex', 'chat')?.messages.at(-1);
+      expect(last?.failed).toBe(true);
+      expect(last?.content).toBe('Прогон остановлен: ответа не было.');
+      expect(last?.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('сказанное до остановки остаётся ответом, а не следом обрыва', () => {
+      send();
+      service.stop('chat');
+      run.emit?.({ type: 'done', reply: 'Половина', transport: 'stream' });
+
+      const last = readChat(dir, 'codex', 'chat')?.messages.at(-1);
+      expect(last?.content).toBe('Половина');
+      expect(last?.failed).toBeUndefined();
+    });
+
+    it('вопрос человека времени не несёт: он не прогон', () => {
+      send();
+
+      expect(readChat(dir, 'codex', 'chat')?.messages[0]?.durationMs).toBeUndefined();
+    });
+  });
+
+  /**
    * Точка, на которой висит конвейер звеньев (`cascade.ts`). Важно не «зовётся
    * ли», а ЧТО в ней написано: снятый человеком ответ не законченная работа, и
    * заводить по нему ревью нельзя.
@@ -214,12 +277,15 @@ describe('ProviderChatService', () => {
       run.emit?.({ type: 'delta', text: 'Гото' });
       run.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
 
+      // Момент старта уезжает вместе с ответом: по нему продолжение в чистой
+      // сессии (Т7) проверяет, что файл-опора обновлён ИМЕННО этим прогоном.
       expect(seen).toHaveBeenCalledWith({
         providerId: 'codex',
         appDataDir: dir,
         chatId: 'chat',
         ok: true,
         text: 'Готово',
+        startedAt: expect.any(Number),
       });
     });
 

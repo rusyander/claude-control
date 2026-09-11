@@ -5,7 +5,9 @@
  *  1. Tab по кругу — порядок фокуса, видимость кольца фокуса, ловушки
  *     (фокус застрял на одном элементе), досягаемость навигации и содержимого.
  *  2. Модалка создания (где кнопка ведёт в модалку): открывается с клавиатуры,
- *     Escape закрывает, фокус возвращается на кнопку.
+ *     Escape закрывает, фокус возвращается на кнопку. Раздел, доведённый до
+ *     ОТКРЫТОЙ модалки (мастер контура), судится по её правилам: фокус обязан
+ *     остаться внутри окна, а Escape — закрыть его.
  *  3. Enter на ссылке навигации в другой раздел ведёт туда.
  *
  * Список остановок каждого раздела складывается в `.agent/tmp/a11y/<раздел>.focus.json`,
@@ -142,6 +144,21 @@ async function checkDialog(page) {
   return { note, problem: focusInside && closed && returned ? null : note };
 }
 
+/**
+ * Модалка, уже открытая обходом раздела: жать её нечем — она на экране. Здесь
+ * проверяется единственное, что от неё требуется с клавиатуры: Escape закрывает.
+ */
+async function checkOpenDialog(page) {
+  const box = page.locator('[role="dialog"]').first();
+  await page.keyboard.press('Escape');
+  const closed = await box.waitFor({ state: 'hidden', timeout: 2500 }).then(
+    () => true,
+    () => false,
+  );
+  const note = `открытая модалка: Escape ${closed ? 'закрывает' : 'НЕ закрывает'}`;
+  return { note, problem: closed ? null : note };
+}
+
 /** Enter на ссылке навигации, ведущей в ДРУГОЙ раздел, меняет адрес. */
 async function checkNavEnter(page, path) {
   const hrefs = await page
@@ -174,23 +191,34 @@ for (const entry of PANEL_PAGES) {
 
   const { stops, trap, exhausted } = await sweep(page);
   const ringless = stops.filter((s) => s.visible && !s.ring);
+  const dialogOpen = (await page.locator('[role="dialog"]:visible').count()) > 0;
   const lines = [];
   if (stops.length === 0) lines.push('фокус не попадает ни на один элемент');
   if (trap) lines.push(`ловушка фокуса: ${trap.tag} «${trap.label}»`);
-  if (!stops.some((s) => s.inNav)) lines.push('навигация недосягаема с клавиатуры');
-  if (!stops.some((s) => s.inMain)) lines.push('содержимое раздела недосягаемо с клавиатуры');
+  if (dialogOpen) {
+    // За пределы открытого модального окна фокус не выходит — это не изъян
+    // обхода, а его смысл. Требовать здесь досягаемости навигации значило бы
+    // требовать дырявой модалки.
+    const outside = stops.find((s) => !s.inDialog);
+    if (outside) lines.push(`фокус уходит за модалку: ${outside.tag} «${outside.label}»`);
+  } else {
+    if (!stops.some((s) => s.inNav)) lines.push('навигация недосягаема с клавиатуры');
+    if (!stops.some((s) => s.inMain)) lines.push('содержимое раздела недосягаемо с клавиатуры');
+  }
   for (const s of ringless.slice(0, 4)) {
     lines.push(`фокус невидим: ${s.tag}${s.role ? `[${s.role}]` : ''} «${s.label}»`);
   }
   if (ringless.length > 4) lines.push(`… и ещё ${ringless.length - 4} без кольца фокуса`);
 
-  const dialog = await checkDialog(page);
+  const dialog = dialogOpen ? await checkOpenDialog(page) : await checkDialog(page);
   if (dialog.problem) lines.push(dialog.problem);
-  const nav = await checkNavEnter(page, path);
+  const nav = dialogOpen
+    ? { note: 'модалка открыта: навигация за ней закрыта по замыслу', problem: null }
+    : await checkNavEnter(page, path);
   if (nav.problem) lines.push(nav.problem);
 
   writeFileSync(
-    join(REPORT_DIR, `${pageSlug(path)}.focus.json`),
+    join(REPORT_DIR, `${pageSlug(path, entry.slug)}.focus.json`),
     JSON.stringify(
       { path, name, stops, trap, exhausted, dialog: dialog.note, navigation: nav.note },
       null,

@@ -59,6 +59,27 @@ export interface ProviderEndpointVars {
 export type ProviderEndpointConfig = Partial<Record<ProviderEndpointApiKind, ProviderEndpointVars>>;
 
 /**
+ * Адрес эндпоинта, задаваемый НЕ переменной окружения, а куском конфигурации.
+ *
+ * Заведено для двух CLI, у которых документация прямо говорит: адрес живёт в
+ * файле. Codex — таблица `model_providers` в `config.toml`, Continue — поле
+ * `apiBase` у модели в `config.yaml`. Через окружение эти двое адрес не берут,
+ * поэтому у них нет `endpointConfig`, — но и прочерком в списке они стоять не
+ * должны: способ задокументирован, просто он другой.
+ *
+ * Правка — всегда хирургическая, регионом: остальной файл обязан остаться
+ * байт-в-байт (`lib/codex-toml.ts`, `lib/continue-yaml.ts`).
+ */
+export interface ProviderEndpointFile {
+  /** Какой из двух форматов правится — по нему выбирается писатель. */
+  format: 'codex-toml' | 'continue-yaml';
+  /** Путь к файлу; `override` уважает только claude, у остальных он не при чём. */
+  path: (override?: string) => string;
+  /** Диалект, на котором CLI пойдёт по этому адресу. */
+  apiKind: ProviderEndpointApiKind;
+}
+
+/**
  * Метаданные ассистента провайдера (мульти-модельность, Ф6a).
  *
  * Гибрид выбора раннера: есть API-ключ (сохранён в панели или в стандартной

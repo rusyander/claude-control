@@ -170,7 +170,13 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
             size="sm"
             leftIcon={<Icon name="check" size={18} />}
             onClick={() => submit(saved.enabled)}
-            disabled={!isDirty}
+            // Незаполненное обязательное поле гасит не только тумблер, но и
+            // сохранение УЖЕ включённой карточки: иначе включённый Zephyr,
+            // переключённый на Test IT, сохранялся включённым и без адреса —
+            // карточка горела зелёным, а первая же кнопка отвечала отказом.
+            // Выключенную карточку это не трогает: её заполняют в несколько
+            // заходов, и запрещать сохранять половину формы незачем.
+            disabled={!isDirty || (saved.enabled && missing.length > 0)}
             isLoading={save.isPending}
           >
             {t('common.save')}

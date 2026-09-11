@@ -34,6 +34,7 @@ const profileOf = (patch: Partial<EndpointProfile> = {}): EndpointProfile => ({
   apiKind: 'openai-compat',
   model: 'qwen3-coder',
   writeToken: false,
+  ownerPlatformId: '',
   ...patch,
 });
 

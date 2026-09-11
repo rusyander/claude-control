@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { SplitReview, reviewSummaryComment, type SplitReviewDeps } from './split-review.ts';
+import {
+  SplitReview,
+  reviewNoticeText,
+  reviewSummaryComment,
+  type SplitReviewDeps,
+} from './split-review.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 
 /**
@@ -27,7 +32,18 @@ function reviewLink(overrides: Partial<ChatLink> = {}): ChatLink {
 }
 
 /** Стенд: связи в памяти, запуск и запись в MR — записываются, а не делаются. */
-function stand(options: { post?: SplitReviewDeps['post']; blocked?: string } = {}) {
+function stand(
+  options: {
+    post?: SplitReviewDeps['post'];
+    blocked?: string;
+    /**
+     * Ключ, который вернёт запуск. Так отвечает чужой CLI: разговор заводит его
+     * хранилище, и настоящий ключ известен только после создания.
+     */
+    realKey?: string;
+    started?: boolean;
+  } = {},
+) {
   const links: Record<string, ChatLink> = {};
   const started: { chatId: string; prompt: string; cwd: string; stage: string }[] = [];
   const posted: { url: string; body: string }[] = [];
@@ -37,6 +53,7 @@ function stand(options: { post?: SplitReviewDeps['post']; blocked?: string } = {
     store: {
       all: () => links,
       set: (chatId, link) => void (links[chatId] = link),
+      remove: (chatId) => void delete links[chatId],
     },
     post:
       options.post ??
@@ -51,7 +68,10 @@ function stand(options: { post?: SplitReviewDeps['post']; blocked?: string } = {
         cwd: input.cwd,
         stage: input.stage,
       });
-      return true;
+      return {
+        started: options.started ?? true,
+        ...(options.realKey ? { chatId: options.realKey } : {}),
+      };
     },
     emit: (parent, event) => {
       events.push({ parent, event });
@@ -404,6 +424,104 @@ describe('отправка правок в MR', () => {
 
     expect(review.push({ chatId: 'c1' }).applied).toEqual([]);
     expect(started).toEqual([]);
+  });
+});
+
+/**
+ * Ревью у чужого CLI (Т6). Домен про провайдеров не знает вовсе — вся разница
+ * приходит одним ответом запуска: разговору выдало ключ его собственное
+ * хранилище, и связь обязана переехать на него.
+ */
+describe('звено у чужого CLI', () => {
+  it('правки переезжают на настоящий ключ, временный в дереве не остаётся', async () => {
+    const { review, links, started } = stand({ realKey: 'codex:fix1' });
+    links.c1 = reviewLink({ review: { url: URL, path: '/copy', findings: ['одно'] } });
+
+    const outcome = await review.decide({ chatId: 'c1', decision: 'fix' });
+
+    const requested = started[0]?.chatId as string;
+    expect(requested.startsWith('new-')).toBe(true);
+    // Ответ панели и телефону называет тот ключ, под которым разговор есть.
+    expect(outcome.applied[0]?.fixChatId).toBe('codex:fix1');
+    expect(links['codex:fix1']?.stage).toBe('fix');
+    expect(links['codex:fix1']?.review?.url).toBe(URL);
+    expect(links[requested]).toBeUndefined();
+  });
+
+  it('отправка в MR переезжает так же', () => {
+    const { review, links, started } = stand({ realKey: 'codex:push1' });
+    links.fix = reviewLink({
+      stage: 'fix',
+      review: { url: URL, path: '/copy', findings: ['одно'], pushOffer: true },
+    });
+
+    const outcome = review.push({ chatId: 'fix' });
+
+    expect(outcome.applied[0]?.pushChatId).toBe('codex:push1');
+    expect(links['codex:push1']?.stage).toBe('push');
+    expect(links[started[0]?.chatId ?? '']).toBeUndefined();
+  });
+
+  it('запуск не удался — ключа в ответе нет, и в дереве не появляется чужой', async () => {
+    const { review, links } = stand({ started: false });
+    links.c1 = reviewLink({ review: { url: URL, path: '/copy', findings: ['одно'] } });
+
+    const outcome = await review.decide({ chatId: 'c1', decision: 'fix' });
+
+    // Решение принято (переспрашивать человека не за что), а чата правок нет.
+    expect(outcome.applied[0]?.decision).toBe('fix');
+    expect(outcome.applied[0]?.fixChatId).toBeUndefined();
+    expect(Object.keys(links).some((key) => key.startsWith('codex:'))).toBe(false);
+  });
+});
+
+describe('событие ревью словами', () => {
+  it('замечания без решения зовут человека и называют их число', () => {
+    const text = reviewNoticeText({ kind: 'review', chatId: 'c1', url: URL, findings: ['a', 'b'] });
+
+    expect(text).toContain(URL);
+    expect(text).toContain('2');
+    expect(text).toContain('решение за вами');
+  });
+
+  it('пустой список говорит о закрытой группе, а не о молчании', () => {
+    const text = reviewNoticeText({
+      kind: 'review',
+      chatId: 'c1',
+      url: URL,
+      findings: [],
+      decided: true,
+    });
+
+    expect(text).toContain('замечаний нет');
+  });
+
+  it('принятое решение называет обе половины и отказ форджа', () => {
+    const text = reviewNoticeText({
+      kind: 'review',
+      chatId: 'c1',
+      url: URL,
+      findings: ['одно'],
+      decision: 'both',
+      postError: 'токен форджа не сохранён',
+    });
+
+    expect(text).toContain('заведены правки');
+    expect(text).toContain('отписана в MR');
+    expect(text).toContain('токен форджа не сохранён');
+  });
+
+  it('предложение отправить правки говорит о кнопке, а не об отправке', () => {
+    const text = reviewNoticeText({
+      kind: 'review',
+      chatId: 'c1',
+      url: URL,
+      findings: [],
+      pushOffer: true,
+    });
+
+    expect(text).toContain('кнопкой');
+    expect(text).not.toContain('отправлены');
   });
 });
 

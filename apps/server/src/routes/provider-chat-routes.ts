@@ -5,15 +5,26 @@ import type {
   ProviderChatPatchRequest,
   ProviderChatSendRequest,
 } from '@agentdeck/contracts';
+import {
+  HANDOFF_DEFAULT_CHECKPOINT,
+  restartHandoffProposal,
+  restartRequestPrompt,
+} from '@agentdeck/contracts/chat-handoff';
+import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import type { ServerContext } from '../context.ts';
 import { initiativePrompt } from '../domains/chat/initiative.ts';
+import { checkpointInside, statMtime, type HandoffChains } from '../domains/chat/ChatHandoff.ts';
 import { getActiveProvider } from '../providers/registry.ts';
 import {
+  appendMessage,
   createChat,
   deleteChat,
   listChats,
   patchChat,
   readChat,
+  readChatCascade,
+  startForeignHandoff,
+  foreignChatPrefix,
   type ProviderChatService,
   type ProviderChatSubscriber,
 } from '../domains/provider-chat.ts';
@@ -40,6 +51,11 @@ export function registerProviderChatRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
   chats: ProviderChatService,
+  /**
+   * Память цепочек продолжения (Т7) — та же, что у Claude: кнопка перезапуска
+   * читает её номер шага и включает автомат, когда файл-опора ещё не готов.
+   */
+  chains: HandoffChains,
 ): void {
   /**
    * Активный провайдер или отказ. Claude отсекается здесь один раз, поэтому
@@ -169,6 +185,120 @@ export function registerProviderChatRoutes(
       return { message: outcome.message };
     },
   );
+
+  /**
+   * «Перезапустить сессию» у чужого CLI (Т7). Сессии у него нет вовсе, поэтому
+   * перезапуск — это НОВЫЙ разговор в том же каталоге, с контрольной точкой и
+   * исходным заданием; так это и называется человеку.
+   *
+   * Ответа два, как и у Claude. Файл-опора свежее последней реплики человека —
+   * продолжение заводится прямо здесь. Несвежий — панель возвращает просьбу его
+   * обновить, вкладка отправляет её обычным сообщением, а автомат для этого
+   * разговора включается: человек уже нажал кнопку, и спрашивать его согласие
+   * второй раз, когда агент допишет опору, незачем.
+   */
+  app.post<{ Params: { id: string } }>('/api/provider-chat/chats/:id/restart', (request, reply) => {
+    const providerId = requireProvider(reply);
+    if (!providerId) return reply;
+
+    const chatId = request.params.id;
+    if (chats.status(chatId).isRunning) {
+      return reply.code(409).send({
+        message: 'Ответ ещё идёт: дождитесь конца хода или остановите его, потом перезапускайте',
+      });
+    }
+
+    const chat = readChat(appData(), providerId, chatId);
+    if (!chat) return reply.code(404).send({ message: 'Разговор не найден' });
+    if (!chat.workdir) {
+      return reply
+        .code(400)
+        .send({ message: 'У разговора нет рабочего каталога — новый разговор заводить негде' });
+    }
+
+    const key = foreignChatKey(providerId, chatId);
+    // Свежесть — относительно последней реплики человека: всё, что агент
+    // записал после неё, записано в этом разговоре.
+    const target = checkpointInside(chat.workdir, HANDOFF_DEFAULT_CHECKPOINT);
+    const mtime = target ? statMtime(target) : undefined;
+    const lastHuman = chat.messages.findLast((message) => message.role === 'user');
+    const lastTurnAt = lastHuman ? Date.parse(lastHuman.at) : Number.NaN;
+
+    if (mtime === undefined || !Number.isFinite(lastTurnAt) || mtime < lastTurnAt) {
+      chains.setAuto([key], true);
+      return {
+        mode: 'requested' as const,
+        prompt: restartRequestPrompt(HANDOFF_DEFAULT_CHECKPOINT),
+      };
+    }
+
+    const provider = getActiveProvider(ctx.store);
+    const cascade = readChatCascade(appData(), providerId, chatId);
+    const outcome = startForeignHandoff(
+      {
+        providerId,
+        chatId,
+        ok: true,
+        text: '',
+        // Кнопку нажал человек, и предохранитель «файл-опора свежее старта»
+        // тут ни при чём: свежесть уже проверена по его последней реплике.
+        startedAt: 0,
+        cwd: chat.workdir,
+        title: chat.title,
+        task: chat.messages.find((message) => message.role === 'user')?.content ?? '',
+        proposal: restartHandoffProposal(HANDOFF_DEFAULT_CHECKPOINT, { foreign: true }),
+        ...(chat.model ? { model: chat.model } : {}),
+        ...(chat.effort ? { effort: chat.effort } : {}),
+        ...(cascade ? { cascade } : {}),
+        ...(ctx.store.getChatLink(key) ? { link: ctx.store.getChatLink(key) } : {}),
+      },
+      {
+        chains,
+        open: (input) =>
+          createChat(appData(), providerId, {
+            title: input.title,
+            workdir: input.cwd,
+            ...(input.model ? { model: input.model } : {}),
+            ...(input.effort ? { effort: input.effort } : {}),
+            ...(input.cascade ? { cascade: input.cascade } : {}),
+          })?.id,
+        run: (nextId, prompt, header) => {
+          const prefix = header
+            ? foreignChatPrefix(header, ctx.store.getSettings())
+            : initiativePrompt(ctx.store.getSettings(), { foreign: true });
+          chats.send(
+            appData(),
+            providerId,
+            nextId,
+            { text: prompt },
+            {
+              provider,
+              models: ctx.models.current(provider.modelVendors ?? []).models,
+              ...(prefix ? { systemPrefix: prefix } : {}),
+            },
+          );
+        },
+        saveLink: (chatKey, link) => ctx.store.setChatLink(chatKey, link),
+      },
+    );
+
+    if (!outcome?.chatId) {
+      return reply.code(500).send({ message: 'Продолжение не заведено: хранилище отказало' });
+    }
+    // Заметка в СТАРОМ разговоре: человек вернётся именно в него и должен
+    // увидеть, куда ушла работа.
+    if (outcome.notice) {
+      appendMessage(appData(), providerId, chatId, {
+        role: 'notice',
+        content: outcome.notice,
+      });
+    }
+    return {
+      mode: 'started' as const,
+      chatId: outcome.chatId,
+      ...(outcome.chainDepth !== undefined ? { chainDepth: outcome.chainDepth } : {}),
+    };
+  });
 
   app.post<{ Params: { id: string } }>('/api/provider-chat/chats/:id/stop', (request, reply) => {
     const providerId = requireProvider(reply);

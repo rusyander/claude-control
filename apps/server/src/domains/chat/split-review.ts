@@ -38,6 +38,11 @@ export interface SplitReviewStore {
   /** Все связи разом — по ним же находятся вторые ключи одного разговора. */
   all(): Record<string, ChatLink>;
   set(chatId: string, link: ChatLink): void;
+  /**
+   * Убрать связь под ключом, которого не будет: звено чужого CLI переехало на
+   * настоящий ключ своего хранилища (см. `settle`).
+   */
+  remove(chatId: string): void;
 }
 
 /** Что домен просит снаружи, чтобы решение человека что-то изменило. */
@@ -54,7 +59,15 @@ export interface SplitReviewDeps {
    * выключают, а кнопка, которая заведомо откажет, хуже отсутствующей.
    */
   postBlocked?: (url: string) => string | undefined;
-  /** Завести прогон стадии в копии группы; `false` — реестр отказал. */
+  /**
+   * Завести прогон стадии в копии группы. `started: false` — запустить не
+   * вышло (реестр или CLI отказали).
+   *
+   * `chatId` в ответе — НАСТОЯЩИЙ ключ заведённого разговора, когда он не
+   * совпал с запрошенным. Так отвечает чужой CLI: идентификатор разговору
+   * выдаёт его собственное хранилище, и до создания его не существует, а связь
+   * домен обязан написать раньше запуска.
+   */
   start: (input: {
     chatId: string;
     prompt: string;
@@ -65,7 +78,7 @@ export interface SplitReviewDeps {
     /** Ключи закончившегося разговора: от них наследуются тумблеры и дерево. */
     fromAliases: string[];
     title?: string;
-  }) => boolean;
+  }) => { started: boolean; chatId?: string };
   /** Заметка в ленту родителя; `false` — родителя никто не слушает. */
   emit?: (parentChatId: string, event: ChatEvent) => boolean;
   log: (message: string, error?: unknown) => void;
@@ -91,6 +104,35 @@ export function reviewSummaryComment(findings: readonly string[]): string {
     '',
     ...list.map((finding, index) => `${index + 1}. ${finding}`),
   ].join('\n');
+}
+
+/** Что стало с замечаниями по решению человека — словами, по одному на исход. */
+const DECISION_WORDS: Record<TaskSplitReviewDecision, string> = {
+  fix: 'заведены правки в копии',
+  post: 'сводка замечаний отписана в MR',
+  both: 'заведены правки в копии, сводка отписана в MR',
+  none: 'решено ничего не делать',
+};
+
+/**
+ * Событие ревью словами — для ленты, у которой карточки нет.
+ *
+ * Лента Claude рисует событие сама: у неё есть и карточка, и поля. У чужого
+ * CLI лента — реплики хранилища, и единственный способ что-то в ней сказать —
+ * сказать это по-русски одной строкой. Текст живёт здесь, а не у чужого
+ * провайдера: словарь ревью один, и вторая его копия разошлась бы с первой.
+ */
+export function reviewNoticeText(event: Extract<ChatEvent, { kind: 'review' }>): string {
+  if (event.pushOffer) {
+    return 'Правки по замечаниям сделаны — отправить их в MR можно кнопкой на карточке решения.';
+  }
+  const head = `Ревью ${event.url}`;
+  if (event.decision) {
+    const tail = event.postError ? ` Комментарий не записан: ${event.postError}.` : '';
+    return `${head}: ${DECISION_WORDS[event.decision]}.${tail}`;
+  }
+  if (event.findings.length === 0) return `${head}: замечаний нет — группа закрыта.`;
+  return `${head}: замечаний ${event.findings.length} — решение за вами, карточка ниже.`;
 }
 
 /** Связь под ключом `chatId` и все ключи того же разговора. */
@@ -264,7 +306,7 @@ export class SplitReview {
       review: { ...review, pushedAt: at, pushOffer: false },
     });
 
-    const started = this.deps.start({
+    const outcome = this.deps.start({
       chatId,
       prompt: reviewPushPrompt({
         url: review.url,
@@ -277,10 +319,11 @@ export class SplitReview {
       fromAliases: aliases,
       ...(link.title ? { title: link.title } : {}),
     });
-    if (!started) this.deps.log('split review: push run refused', input.chatId);
+    const pushChatId = this.settle(chatId, outcome);
+    if (!outcome.started) this.deps.log('split review: push run refused', input.chatId);
 
     return {
-      applied: [{ chatId: input.chatId, ...(started ? { pushChatId: chatId } : {}) }],
+      applied: [{ chatId: input.chatId, ...(outcome.started ? { pushChatId } : {}) }],
       skipped: [],
     };
   }
@@ -360,7 +403,7 @@ export class SplitReview {
         stage: 'fix',
         review: next,
       });
-      const started = this.deps.start({
+      const outcome = this.deps.start({
         chatId: fixChatId,
         prompt: fixStagePrompt(findings, review.branch ? { branch: review.branch } : {}),
         cwd: review.path ?? '',
@@ -370,7 +413,8 @@ export class SplitReview {
         fromAliases: aliases,
         ...(link.title ? { title: link.title } : {}),
       });
-      if (started) result.fixChatId = fixChatId;
+      const realId = this.settle(fixChatId, outcome);
+      if (outcome.started) result.fixChatId = realId;
       else this.deps.log('split review: fix run refused', chatId);
     }
 
@@ -385,6 +429,25 @@ export class SplitReview {
       ...(result.postError ? { postError: result.postError } : {}),
     });
     return result;
+  }
+
+  /**
+   * Под каким ключом звено на самом деле живёт.
+   *
+   * У Claude — под запрошенным: разговор заводит реестр прогонов, и связь
+   * пишется ДО запуска именно потому, что настоящий `sessionId` приезжает
+   * позже и связь на него переносится сама. У чужого CLI переносить нечему:
+   * ключ выдаёт хранилище провайдера в момент создания, и звено сообщает его
+   * ответом. Тогда связь переезжает, а временный ключ убирается — иначе он
+   * остался бы в дереве строкой, за которой нет разговора.
+   */
+  private settle(requested: string, outcome: { started: boolean; chatId?: string }): string {
+    const real = outcome.chatId;
+    if (!real || real === requested) return requested;
+    const link = this.deps.store.all()[requested];
+    if (link) this.deps.store.set(real, link);
+    this.deps.store.remove(requested);
+    return real;
   }
 
   /** Записать состояние ревью по ВСЕМ ключам разговора: их два, и оба живые. */

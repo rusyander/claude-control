@@ -53,10 +53,18 @@ export interface SplitConveyorDeps {
     groups: number[],
     context?: SplitGroupContext,
   ) => Promise<TaskSplitResult>;
-  /** Запустить разбор (уровень 1); `deferred` — дерево на паузе, старт отложен. */
+  /**
+   * Запустить разбор (уровень 1); `deferred` — дерево на паузе, старт отложен.
+   *
+   * `claim` зовётся, как только у разговора появился ключ, и ДО его запуска.
+   * Иначе разбор, ответивший мгновенно (у чужого CLI это обычное дело — прогон
+   * может кончиться ошибкой на первом же вздохе), искал бы свою запись в
+   * хранилище раньше, чем она туда попала, и его итог пропал бы молча.
+   */
   startTriage: (
     record: SplitPlanRecord,
     prompt: string,
+    claim: (chatId: string) => void,
   ) => { chatId: string; started: boolean; deferred: boolean };
   /**
    * Цепочка группы кончилась — самое время сверить ветки (Т6): работа легла, и
@@ -80,11 +88,16 @@ function absorb(record: SplitPlanRecord, result: TaskSplitResult, at: string): v
   for (const chat of result.chats) {
     const group = record.groups.find((item) => item.index === chat.index);
     if (!group) continue;
-    group.status = chat.started ? 'started' : 'failed';
     group.chatId = chat.chatId;
     group.path = chat.path;
     group.branch = chat.branch;
     group.startedAt = at;
+    // Цепочка группы могла кончиться РАНЬШЕ, чем вернулся её запуск: у чужого
+    // CLI ответ приходит в собственном темпе, и короткая работа успевает
+    // закрыться, пока порция ещё заводит соседние копии. Написать поверх этого
+    // «стартует» значило бы потерять факт: ждавшие её группы стояли бы вечно.
+    if (group.status === 'done' || group.status === 'failed') continue;
+    group.status = chat.started ? 'started' : 'failed';
     if (!chat.started) group.error = 'прогон не запустился';
   }
   for (const failure of result.failures) {
@@ -151,7 +164,10 @@ export class SplitConveyor {
         ...(group.kind ? { kind: group.kind } : {}),
       })),
     });
-    const triage = this.deps.startTriage(record, prompt);
+    const triage = this.deps.startTriage(record, prompt, (chatId) => {
+      record.triageChatId = chatId;
+      this.deps.store.set(record);
+    });
     record.triageChatId = triage.chatId;
     this.deps.store.set(record);
 
@@ -177,8 +193,14 @@ export class SplitConveyor {
    * Чат разбора закончился: применить блок к записи и завести порцию групп без
    * ожиданий. Событие — в ленту разбора, синхронно (планировщик реестра
    * синхронный); сами копии заводятся следом, вне этого вызова.
+   *
+   * От прогона нужны только исход и текст, и потому тип сужен: у чужого CLI
+   * прогона в реестре нет вовсе — есть законченный ответ его хранилища.
    */
-  onTriageFinished(finished: RunFinished, aliases: readonly string[]): ChatEvent | undefined {
+  onTriageFinished(
+    finished: Pick<RunFinished, 'ok' | 'text'> & Partial<RunFinished>,
+    aliases: readonly string[],
+  ): ChatEvent | undefined {
     const record = this.deps.store.findByTriage(aliases);
     if (!record || record.triage) return undefined;
 

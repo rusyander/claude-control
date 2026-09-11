@@ -21,7 +21,10 @@ import { testKeys } from './keys';
 
 /** Отчёты прогонов и таблицы кейсов — разные половины одного списка форматов. */
 export type ResultsFormat = Extract<ProjectTestImportFormat, 'junit' | 'playwright' | 'allure'>;
-export type CasesFormat = Extract<ProjectTestImportFormat, 'csv' | 'xlsx' | 'testrail-csv'>;
+export type CasesFormat = Extract<
+  ProjectTestImportFormat,
+  'csv' | 'xlsx' | 'testrail-csv' | 'markdown'
+>;
 
 export interface ImportResultsPayload {
   format: ResultsFormat;
@@ -34,6 +37,7 @@ export interface ImportCasesPayload {
   groupId: string;
   format: CasesFormat;
   content?: string;
+  /** Файл внутри проекта; у `markdown` — КАТАЛОГ с ручными кейсами. */
   file?: string;
 }
 

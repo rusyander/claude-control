@@ -19,6 +19,7 @@ import { PeriodFilter } from './PeriodFilter';
 import { StatCard } from './StatCard';
 import { LiveAgentsCard } from './LiveAgentsCard';
 import { LoweredRunsCard } from './LoweredRunsCard';
+import { ContourSpendCard } from './ContourSpendCard';
 import { DetailModal } from './DetailModal';
 import type { DetailKind } from './DetailModal.types';
 import { buildReportCsv, buildJson } from './model/report';
@@ -101,6 +102,11 @@ export function AnalyticsPage() {
       {/* Пустой журнал карточка не рисует вовсе — блока не будет, пока веер не
           уедет ступенью ниже. */}
       <LoweredRunsCard />
+      {/* Расход через контур стоит ОТДЕЛЬНО и в цифры выше не входит: там
+          транскрипты этой машины, здесь — кадры `usage` через наш шлюз, и у
+          работы через контур есть и то и другое. Сложенные, они посчитали бы
+          одни токены дважды. */}
+      <ContourSpendCard />
 
       {isLoading && (
         <>

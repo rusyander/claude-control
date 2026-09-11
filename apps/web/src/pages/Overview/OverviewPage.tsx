@@ -10,6 +10,7 @@ import { useLocation, useOverview } from '@entities/AppConfig';
 import { LocationCard } from './LocationCard';
 import { StatTile } from './StatTile';
 import { ChangesSummary } from './ChangesSummary';
+import { PlatformTile } from './PlatformTile';
 import styles from './OverviewPage.module.scss';
 
 /** Главный экран: где лежит конфигурация и что в ней есть. */
@@ -171,6 +172,9 @@ export function OverviewPage() {
             search={{ tab: 'safety' }}
             actions={[{ label: t('overview.quickHistory'), to: '/history', icon: 'history' }]}
           />
+          {/* Плитка контура появляется только когда контур заведён: до этого
+              нулевая строка в сетке ничего не объясняет. */}
+          <PlatformTile />
         </div>
       )}
 

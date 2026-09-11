@@ -43,6 +43,8 @@ import { registerProjectTestsPublishRoutes } from '../routes/project-tests/publi
 import { registerIntegrationsRoutes } from '../routes/integrations-routes.ts';
 import { registerProviderChatRoutes } from '../routes/provider-chat-routes.ts';
 import { registerDlpRoutes } from '../routes/dlp-routes.ts';
+import { registerCompromiseRoutes } from '../routes/compromise-routes.ts';
+import { registerPlatformRoutes } from '../routes/platform-routes.ts';
 import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
 import { registerRemoteRoutes } from '../routes/remote-routes.ts';
 import { registerEventsRoutes } from '../routes/events-routes.ts';
@@ -68,6 +70,7 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     projectTestRuns,
     projectTestManual,
     dlpProxy,
+    platformGateway,
     notifyRun,
     events,
     selfBaseUrl,
@@ -139,7 +142,8 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
         session: chatSession,
         providerChats,
       }),
-    (instance, context) => registerProviderChatRoutes(instance, context, providerChats),
+    (instance, context) =>
+      registerProviderChatRoutes(instance, context, providerChats, handoffChains),
     (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
     // Тестам нужны оба реестра: прогоны агента и ручная сессия человека. Оба
     // переживают запрос — вкладку закрывают, а прогон идёт дальше.
@@ -152,6 +156,15 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     // переменной окружения), а переходнику MCP он нужен, чтобы знать, куда идти.
     (instance, context) => registerIntegrationsRoutes(instance, context, selfBaseUrl),
     (instance, context) => registerDlpRoutes(instance, context, dlpProxy),
+    // Реестр подписанных компромиссов партии «контур». Своих зависимостей нет:
+    // список статичен, а ведёт его сервер, чтобы снятая подпись гасла сама.
+    registerCompromiseRoutes,
+    // Контуры: список, настройка, ключ и проба по кнопке. Сам поход в контур
+    // случается по нажатию, а не по расписанию; долгоживущий здесь только
+    // слушатель шлюза — он переживает запрос и потому приходит извне. Адрес
+    // панели нужен по той же причине, что и интеграциям: переходник MCP ходит
+    // не в контур, а сюда, и в его записи лежит только этот адрес.
+    (instance, context) => registerPlatformRoutes(instance, context, platformGateway, selfBaseUrl),
     (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
     registerPromptGateRoutes,
     // Поток событий об изменениях файлов: подписчиков держит хаб, рассылку по

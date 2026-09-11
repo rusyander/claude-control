@@ -1,7 +1,7 @@
 import type { TmsPushResult } from '@agentdeck/contracts';
 import { invalidField } from '../errors.ts';
 import { requestJson } from '../http.ts';
-import type { TmsCase, TmsClient, TmsRunPush } from './types.ts';
+import type { TmsCaseBatch, TmsClient, TmsRunPush } from './types.ts';
 
 /**
  * Xray (облако): импорт результатов документом и чтение кейсов через GraphQL.
@@ -17,6 +17,10 @@ import type { TmsCase, TmsClient, TmsRunPush } from './types.ts';
 
 const API = 'https://xray.cloud.getxray.app/api/v2';
 const SYSTEM = 'Xray';
+
+/** Страница `getTests` (у Xray это её потолок) и общий потолок выборки. */
+const PAGE = 100;
+const MAX_ITEMS = 2000;
 
 /** Статусы панели → статусы Xray. Остальное — «TODO». */
 const STATUS: Record<string, string> = {
@@ -68,6 +72,7 @@ export function xrayClient(token: string, projectKey: string): TmsClient {
   if (!key) throw invalidField('projectKey', 'не указан ключ проекта Jira');
 
   return {
+    kind: 'xray',
     title: SYSTEM,
 
     /** Проверка = выдача JWT: пара принята, значит связь есть. */
@@ -81,28 +86,41 @@ export function xrayClient(token: string, projectKey: string): TmsClient {
      * шагами — GraphQL самого Xray. JQL здесь именно фильтр проекта, а не поиск
      * по тексту: забирается весь набор проекта, дальше отбирает человек.
      */
-    async pullCases(): Promise<TmsCase[]> {
+    async pullCases(): Promise<TmsCaseBatch> {
       const jwt = await authenticate(token);
-      const query = `query { getTests(jql: "project = ${key}", limit: 100) { results { issueId jira(fields: ["key", "summary"]) steps { action result data } } } }`;
-      const payload = await requestJson<{
-        data?: { getTests?: { results?: XrayTestNode[] } };
-        errors?: { message?: string }[];
-      }>({
-        url: `${API}/graphql`,
-        method: 'POST',
-        system: SYSTEM,
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ query }),
-      });
+      const nodes: XrayTestNode[] = [];
+      let truncated = true;
+      // Раньше здесь стоял один запрос на 100 кейсов, и проект больше сотни
+      // приезжал обрезанным молча. `start` — штатная страница `getTests`.
+      for (let start = 0; start < MAX_ITEMS; start += PAGE) {
+        const query = `query { getTests(jql: "project = ${key}", limit: ${PAGE}, start: ${start}) { results { issueId jira(fields: ["key", "summary"]) steps { action result data } } } }`;
+        const payload = await requestJson<{
+          data?: { getTests?: { results?: XrayTestNode[] } };
+          errors?: { message?: string }[];
+        }>({
+          url: `${API}/graphql`,
+          method: 'POST',
+          system: SYSTEM,
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({ query }),
+        });
 
-      const failure = payload.errors?.[0]?.message;
-      if (failure) throw invalidField('projectKey', `Xray отказал: ${failure}`);
+        const failure = payload.errors?.[0]?.message;
+        if (failure) throw invalidField('projectKey', `Xray отказал: ${failure}`);
 
-      return (payload.data?.getTests?.results ?? []).map((node) => ({
+        const results = payload.data?.getTests?.results ?? [];
+        nodes.push(...results);
+        if (results.length < PAGE) {
+          truncated = false;
+          break;
+        }
+      }
+
+      const cases = nodes.map((node) => ({
         key: node.jira?.key ?? String(node.issueId ?? ''),
         title: node.jira?.summary ?? 'Без названия',
         steps: (node.steps ?? []).map((step) => ({
@@ -111,9 +129,16 @@ export function xrayClient(token: string, projectKey: string): TmsClient {
           data: step.data,
         })),
       }));
+      return { cases, truncated };
     },
 
-    /** Весь прогон одним документом: у Xray это штатный импорт результатов. */
+    /**
+     * Весь прогон одним документом: у Xray это штатный импорт результатов.
+     *
+     * Повторная отправка того же прогона называет уже созданное выполнение
+     * (`testExecutionKey`) и обновляет его: без этого каждое нажатие заводило бы
+     * в Jira новую задачу-выполнение с теми же результатами.
+     */
     async pushRun(push: TmsRunPush): Promise<TmsPushResult> {
       const jwt = await authenticate(token);
       const tests = push.run.results
@@ -129,6 +154,7 @@ export function xrayClient(token: string, projectKey: string): TmsClient {
 
       if (tests.length === 0) return { pushed: 0 };
 
+      const reused = Boolean(push.externalRunId);
       const created = await requestJson<{ key?: string; self?: string }>({
         url: `${API}/import/execution`,
         method: 'POST',
@@ -139,6 +165,7 @@ export function xrayClient(token: string, projectKey: string): TmsClient {
           Accept: 'application/json',
         },
         body: JSON.stringify({
+          testExecutionKey: push.externalRunId,
           info: {
             project: key,
             summary: `agentdeck ${push.run.startedAt}`,
@@ -152,7 +179,12 @@ export function xrayClient(token: string, projectKey: string): TmsClient {
         }),
       });
 
-      return { pushed: tests.length, url: created?.self };
+      return {
+        pushed: tests.length,
+        runId: created?.key ?? push.externalRunId,
+        reused,
+        url: created?.self,
+      };
     },
   };
 }

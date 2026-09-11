@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ProjectTestManualRegistry, remainingPoints } from './manual.ts';
 import { createGroup, readGroups, upsertCase } from './store.ts';
-import { readRuns } from './runs-store.ts';
+import { evidenceOf, readRuns } from './runs-store.ts';
 import { savePlan } from './plans.ts';
 import { ProjectTestsError, ProjectTestsLockedError, ProjectTestsNotFoundError } from './files.ts';
 
@@ -60,6 +60,58 @@ describe('project-tests/manual', () => {
     expect(run?.actor).toBe('human');
     expect(run?.results).toHaveLength(1);
     expect(run?.summary.failed).toBe(1);
+  });
+
+  /**
+   * Разбор провала обязан лежать И в кейсе, И в записи прогона: «чем доказаны
+   * провалы» считает его по записи (`evidenceOf` смотрит `result.failure`), и
+   * без этого честно отмеченный красный шаг с заметкой показывался как
+   * «с разбором шага: 0».
+   */
+  it('красный шаг с заметкой виден в доказательствах провала', () => {
+    const session = manual.start(project, { groupId: 'gui' }, now);
+    const point = session.points[0]!;
+
+    manual.record(
+      project,
+      {
+        runId: session.runId,
+        pointId: point.id,
+        status: 'failed',
+        note: 'кнопка не нажимается',
+        steps: [{ index: 0, status: 'failed', note: 'ничего не происходит' }],
+      },
+      '2026-09-07T10:05:00.000Z',
+    );
+
+    const [run] = readRuns(project);
+    expect(run?.results[0]?.failure).toEqual({ step: 1, actual: 'ничего не происходит' });
+
+    const evidence = evidenceOf(readRuns(project), readGroups(project));
+    expect(evidence.failed).toBe(1);
+    expect(evidence.detailed).toBe(1);
+  });
+
+  it('пройденный заново проход теряет прежний разбор провала', () => {
+    const session = manual.start(project, { groupId: 'gui' }, now);
+    const point = session.points[0]!;
+    const mark = (status: 'failed' | 'passed', at: string) =>
+      manual.record(
+        project,
+        {
+          runId: session.runId,
+          pointId: point.id,
+          status,
+          steps: [{ index: 0, status, note: status === 'failed' ? 'пусто' : undefined }],
+        },
+        at,
+      );
+
+    mark('failed', '2026-09-07T10:05:00.000Z');
+    mark('passed', '2026-09-07T10:06:00.000Z');
+
+    expect(readRuns(project)[0]?.results[0]?.failure).toBeUndefined();
+    expect(evidenceOf(readRuns(project), readGroups(project)).detailed).toBe(0);
   });
 
   it('курсор переезжает на первый неотмеченный проход', () => {

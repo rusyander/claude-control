@@ -8,7 +8,7 @@ Runs entirely on your machine: no account, no server, no telemetry.
 
 By default the panel configures Claude Code, where everything is available; it also edits the configuration of Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, Cursor, OpenCode and Aider — each in its native format, see [CLIs other than Claude](#clis-other-than-claude).
 
-🇷🇺 [Русская версия](README.ru.md) · 🔧 [Setup](docs/SETUP.md) · 🛠 [Troubleshooting](docs/TROUBLESHOOTING.md) · 🏗 [How it works](docs/ARCHITECTURE.md) · 🔒 [Security](docs/SECURITY.md) · 📱 [Access from a phone](docs/REMOTE.md) · 💬 [Chat and parallel agents](docs/CHAT.md) · 👥 [Groups](docs/GROUPS.md) · 🧑‍💻 [Development](docs/DEVELOPMENT.md) · 🚫 [What the panel does not do](docs/LIMITATIONS.md)
+🇷🇺 [Русская версия](README.ru.md) · 🔧 [Setup](docs/SETUP.md) · 🛠 [Troubleshooting](docs/TROUBLESHOOTING.md) · 🏗 [How it works](docs/ARCHITECTURE.md) · 🔒 [Security](docs/SECURITY.md) · 📱 [Access from a phone](docs/REMOTE.md) · 💬 [Chat and parallel agents](docs/CHAT.md) · 👥 [Groups](docs/GROUPS.md) · 📡 [Contour](docs/PLATFORM.md) · 🧑‍💻 [Development](docs/DEVELOPMENT.md) · 🚫 [What the panel does not do](docs/LIMITATIONS.md)
 
 > [!TIP]
 > **Won't start?** `pnpm doctor` explains every finding. Still stuck — open Claude Code in this
@@ -50,7 +50,7 @@ The panel answers them: a visible shape, a switch that deletes nothing, and a sa
 - **Several projects at once** — tabs, parallel agents, dev servers launched from the tab: one target per package in a monorepo, each on its own port, autostarted when the panel boots
 - **Parallel branches** — one button makes a working copy of the repository for a branch (`git worktree`) next to the project and opens it as an ordinary tab: three agents on three branches never collide, a copy with a live agent cannot be removed, and the panel never merges anything
 - **Task fan-out** — hand the agent a list of independent tasks and it proposes a split as a card: "do them here in turn" or "split into N chats", where every group gets its own branch, its own copy and its own chat
-- **Continuing in a clean session** — once a task is closed the agent tidies its working files and offers to carry on in a new conversation: the expensive context stays behind and the new session reads the checkpoint file. By button — or on its own, if you enable auto-continue in that conversation
+- **Continuing in a clean session** — once a task is closed the agent tidies its working files and offers to carry on in a new conversation: the expensive context stays behind and the new session reads the checkpoint file. By button — or on its own: auto-continue is on out of the box and held by safeties (a failed run is never continued, an unchanged checkpoint stops the chain, at most eight in a row). Other CLIs do it too: they have no session, so a continuation is a new conversation carrying the checkpoint and the original task
 - **Project git** — current branch, the list of changed files, switching, creating a branch, committing, `pull` and `push` right from the tab; the section shows up only when the project has a `.git`
 - **From a phone** — an Android/iOS app (`apps/mobile`) over the same API: the whole chat, the project's files and diffs read-only, git `push`, all of analytics; paired once by QR, reachable over your own Tailscale network
 - **Search** — one query across rules, skills, hooks, scripts, permissions, env, MCP and plugins (secret values are never revealed)
@@ -85,7 +85,7 @@ What the panel adds is concurrency: each project gets its own tab and its own pr
 
 - **The dot on the tab** — working, waiting on an answer, or stalled; a background agent that finished or hit a question sends a notification. The edits toggle, spend in tokens, the project dev server and its git live in the same tab.
 - **A branch per agent** — a working copy of the repository (`git worktree`) next to the project, opened as an ordinary tab; a copy with a live agent cannot be removed, and there is no merging in the panel at all.
-- **Splitting a list of tasks across chats** and **continuing in a clean session** — the agent offers a card, the decision and the button are yours.
+- **Splitting a list of tasks across chats** and **continuing in a clean session** — the split is offered as a card and the decision is yours; the continuation the panel also makes on its own, switched off by the conversation toggle or the global setting.
 - **A run belongs to the server, not to the tab** — F5 and a closed tab stop nothing.
 
 In detail — [Chat, tabs and parallel agents](docs/CHAT.md).

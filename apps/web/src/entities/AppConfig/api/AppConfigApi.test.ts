@@ -92,6 +92,38 @@ describe('applySettingsUpdate', () => {
     expect(client.getQueryData(queryKeys.models)).toEqual(['cursor model']);
   });
 
+  it('смена источника каталога помечает каталог устаревшим', () => {
+    // Ключ каталога источника не содержит, а `staleTime` у него десять минут:
+    // без сброса переключение «models.dev ↔ контур» десять минут не меняло на
+    // экране ничего, кроме подписи поля, и человек шёл жать «Обновить» — то
+    // есть в контур, куда панель сама ходить не должна.
+    const client = seed();
+
+    applySettingsUpdate(client, settings({ modelSource: 'platform' }), {
+      modelSource: 'platform',
+    });
+
+    expect(client.getQueryState(queryKeys.models)?.isInvalidated).toBe(true);
+  });
+
+  it('смена выбранного контура помечает каталог устаревшим', () => {
+    const client = seed();
+
+    applySettingsUpdate(client, settings({ modelSourcePlatform: 'enterprise-platform' }), {
+      modelSourcePlatform: 'enterprise-platform',
+    });
+
+    expect(client.getQueryState(queryKeys.models)?.isInvalidated).toBe(true);
+  });
+
+  it('правка темы каталог устаревшим не делает', () => {
+    const client = seed();
+
+    applySettingsUpdate(client, settings({ theme: 'dark' }), { theme: 'dark' });
+
+    expect(client.getQueryState(queryKeys.models)?.isInvalidated).toBe(false);
+  });
+
   it('ответ сервера кладётся в кеш настроек сразу', () => {
     const client = seed();
     const next = settings({ theme: 'dark' });

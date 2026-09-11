@@ -2,14 +2,14 @@ import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { AppSettings } from '@agentdeck/contracts';
 import {
-  HANDOFF_BLOCK_LANG,
   HANDOFF_DEFAULT_CHECKPOINT,
   HANDOFF_MAX_CHAIN,
   HANDOFF_SYSTEM_PROMPT,
   parseHandoffProposal,
+  restartHandoffProposal,
+  restartRequestPrompt,
   scanHandoffBlocks,
   scanHandoffProse,
-  type HandoffProposal,
 } from '@agentdeck/contracts/chat-handoff';
 import type { ServerContext } from '../../context.ts';
 import type { ChatEvent } from '../../domains/chat/ChatRunner.ts';
@@ -533,7 +533,7 @@ export function registerChatHandoffRoutes(
       .join('\n');
     const hash = hashFile(target);
     const started = startHandoff({
-      proposal: restartProposal(HANDOFF_DEFAULT_CHECKPOINT),
+      proposal: restartHandoffProposal(HANDOFF_DEFAULT_CHECKPOINT),
       cwd: dir,
       fromAliases,
       chains: deps.chains,
@@ -590,24 +590,6 @@ export function registerChatHandoffRoutes(
     prompt:
       'Заверши текущий этап и подготовь продолжение в чистой сессии. ' + HANDOFF_SYSTEM_PROMPT,
   }));
-}
-
-/** Предложение, собранное по кнопке: состояние уже в файле-опоре, задания у панели нет. */
-function restartProposal(checkpoint: string): HandoffProposal {
-  return {
-    done: 'Сессия перезапущена по кнопке',
-    next: `Продолжай работу по ${checkpoint}: прочитай файл и делай следующий шаг из «в работе».`,
-    checkpoint,
-  };
-}
-
-/** Просьба по кнопке, когда файл-опора старше последней реплики человека. */
-function restartRequestPrompt(checkpoint: string): string {
-  return (
-    `Обнови ${checkpoint} актуальным состоянием работы и конкретным следующим шагом, затем ` +
-    `выведи блок ${HANDOFF_BLOCK_LANG} — панель перезапустит сессию сама. ` +
-    HANDOFF_SYSTEM_PROMPT
-  );
 }
 
 /** Чьё продолжение заводится и с какими правами — общее у карточки и у кнопки перезапуска. */

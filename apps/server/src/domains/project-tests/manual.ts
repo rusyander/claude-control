@@ -101,6 +101,11 @@ export class ProjectTestManualRegistry {
     if (!point) throw new ProjectTestsNotFoundError('Такого прохода в этом прогоне нет.');
 
     const previous = session.results.find((item) => item.pointId === input.pointId);
+    // Разбор провала считается один раз и уходит в ОБА места: в файл кейса и в
+    // результат прохода. Запись прогона состоит из этих результатов, а «чем
+    // доказаны провалы» читает именно её — пока разбор был только в кейсе,
+    // честно отмеченный красный шаг с заметкой числился «с разбором шага: 0».
+    const failure = failureOf(input);
     const result: ProjectTestPointResult = {
       pointId: point.id,
       groupId: point.groupId,
@@ -115,6 +120,7 @@ export class ProjectTestManualRegistry {
       durationMs: input.durationMs ?? previous?.durationMs,
       steps: input.steps,
       attachments: input.attachments,
+      failure,
       defects: previous?.defects,
     };
 
@@ -134,7 +140,7 @@ export class ProjectTestManualRegistry {
           status: result.status,
           statusId: result.statusId,
           note: result.note,
-          failure: failureOf(input),
+          failure,
           attachments: result.attachments,
           runId: session.runId,
           at: now,

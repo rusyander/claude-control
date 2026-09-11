@@ -1,6 +1,10 @@
 import type { ProviderChatMessage } from '@agentdeck/contracts';
-import type { TaskSplitProposal } from '@agentdeck/contracts/task-split';
-import type { HandoffProposal } from '@agentdeck/contracts/chat-handoff';
+import type {
+  TaskSplitProposal,
+  TaskSplitReviewDecision,
+} from '@agentdeck/contracts/task-split';
+import type { ChatTreeView, HandoffProposal } from '@agentdeck/contracts/chat-handoff';
+import type { ChildStageGroup, ReviewDecisionItem } from '@features/ChatMessages';
 
 export interface ProviderChatMessagesProps {
   messages: ProviderChatMessage[];
@@ -29,4 +33,39 @@ export interface ProviderChatMessagesProps {
   /** Отказаться от продолжения — остаёмся в этом разговоре. */
   onHandoffKeepHere?: () => void;
   isHandoffPending?: boolean;
+  /**
+   * Хаб родителя (Т2 партии чужих CLI): группы разделения, их звенья и
+   * состояние. Собирает страница по дереву с сервера; пусто — карточки нет.
+   */
+  stages?: ChildStageGroup[];
+  tree?: ChatTreeView;
+  /** Открыть звено — тем же экраном: у чужого чата вкладок копий нет. */
+  onOpenChild?: (chatId: string) => void;
+  /** Остановить / продолжить всё дерево разом (Т5). */
+  onPauseAll?: () => void;
+  onResumeAll?: () => void;
+  /** Запрос паузы или продолжения в пути — кнопка крутится, второй клик не уходит. */
+  treeBusy?: boolean;
+  /**
+   * Ответ на вопрос разбора (Т3): группа стоит, чата у неё ещё нет, и ответ
+   * уходит родителю с её номером.
+   */
+  onAnswerHold?: (index: number, answer: string) => void;
+  holdBusy?: boolean;
+  /**
+   * Сверить ветки групп (Т4): считает сервер запросами к git, поэтому кнопка, а
+   * не постоянный пересчёт. Сам результат приезжает деревом.
+   */
+  onCheckOverlap?: () => void;
+  overlapBusy?: boolean;
+  /**
+   * Ревью MR по ссылке (Т6): карточки решения открытого разговора — все ревью
+   * дерева у родителя, своё собственное у группы. Пусто — решать нечего.
+   */
+  reviews?: ReviewDecisionItem[];
+  /** Решение человека; без него карточки не показываются вовсе. */
+  onReviewDecide?: (chatId: string, decision: TaskSplitReviewDecision, all: boolean) => void;
+  /** «Закоммитить и отправить в MR» — отдельный клик после правок. */
+  onReviewPush?: (chatId: string) => void;
+  reviewBusy?: boolean;
 }

@@ -218,15 +218,17 @@ function distribute(
   let matched = 0;
   let created = 0;
   const groups: string[] = [];
+  const unmatched: string[] = [];
   for (const [id, bucket] of byGroup) {
     createGroup(root, id, bucket.title, `Перенесено из внешней системы (${format}).`);
     const applied = applyRows(root, id, bucket.rows, moment);
     matched += applied.matched;
     created += applied.created;
+    unmatched.push(...applied.conflicts);
     groups.push(id);
   }
 
-  return { format, read: rows.length, matched, created, unmatched: [], groups };
+  return { format, read: rows.length, matched, created, unmatched, groups };
 }
 
 /** Имя сюиты → идентификатор группы (он же имя файла): латиница, цифры, дефис. */

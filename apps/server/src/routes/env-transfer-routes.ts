@@ -12,6 +12,23 @@ import {
 } from '../domains/env-transfer/archive.ts';
 import { applyEnvironmentImport, planEnvironmentImport } from '../domains/env-transfer/import.ts';
 import { providerLocations } from '../domains/env-transfer/locations.ts';
+import {
+  buildPanelPlatforms,
+  panelPlatformsChecklist,
+  platformsChangingAddress,
+  takePanelGateway,
+  takePanelPlatforms,
+} from '../domains/env-transfer/platforms.ts';
+import {
+  activeGatewaySettings,
+  reconcileManagedProfiles,
+} from '../domains/platform/apply/profile.ts';
+import {
+  forgetToken,
+  readPlatforms,
+  readToken,
+  writePlatforms,
+} from '../domains/platform/store.ts';
 
 /**
  * Перенос окружения: конфигурация ЛЮБОГО провайдера уезжает одним zip и
@@ -31,6 +48,21 @@ import { providerLocations } from '../domains/env-transfer/locations.ts';
 export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerContext): void {
   const override = (): string | undefined => ctx.store.getSettings().claudeDirOverride;
 
+  /**
+   * Контуры этой машины для архива. Ключа здесь нет и быть не может: берётся
+   * настройка (`readPlatforms`), а ключ лежит отдельно, в шифрохранилище.
+   * Порт шлюза — ДОСТАВШИЙСЯ, иначе на новой машине оказался бы адрес, по
+   * которому и на прежней никто не отвечал.
+   */
+  const panelSection = () =>
+    buildPanelPlatforms(readPlatforms(ctx.store), activeGatewaySettings(ctx.store));
+
+  /** Контекст этой машины для плана: с чем сравнивать и что уже есть. */
+  const panelContext = () => ({
+    current: readPlatforms(ctx.store),
+    hasToken: (id: string) => Boolean(readToken(ctx.location.paths.appData, id)),
+  });
+
   const requireProvider = (id: unknown, reply: FastifyReply): ConfigProvider | undefined => {
     if (typeof id !== 'string' || !isKnownProviderId(id)) {
       void reply.code(400).send({
@@ -42,10 +74,18 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
     return getProvider(id);
   };
 
+  /**
+   * Отказ разворота. Архив и панель ломаются по-разному, и называть это одним
+   * словом нельзя: «архив повреждён» о неудачной записи в состояние отправляет
+   * человека искать новый zip вместо настоящей причины — заблокированного файла,
+   * полного диска, сбоя сверки профилей.
+   */
   const fail = (reply: FastifyReply, error: unknown): FastifyReply => {
     const message = error instanceof Error ? error.message : String(error);
-    const code = (error as { code?: string }).code === 'invalid_archive' ? 400 : 500;
-    return reply.code(code).send({ error: 'invalid_archive', message });
+    const badArchive = (error as { code?: string }).code === 'invalid_archive';
+    return badArchive
+      ? reply.code(400).send({ error: 'invalid_archive', message })
+      : reply.code(500).send({ error: 'apply_failed', message });
   };
 
   /** Что попадёт в архив — до выбора папки, чтобы пользователь видел объём и чек-лист. */
@@ -54,8 +94,17 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
     if (!provider) return reply;
 
     const collected = collectProviderFiles(provider, override());
+    const platforms = readPlatforms(ctx.store);
     return {
       provider: { id: provider.id, name: provider.name },
+      // Контуры показываются ДО выбора папки: человек должен видеть, что его
+      // корпоративная настройка уедет вместе с конфигурацией CLI, и увидеть
+      // строку «ключ вводится заново» раньше, чем нажмёт «собрать».
+      platforms: platforms.map((platform) => ({
+        id: platform.id,
+        title: platform.title,
+        baseUrl: platform.baseUrl,
+      })),
       locations: providerLocations(provider, override()).map((location) => ({
         index: location.index,
         kind: location.kind,
@@ -66,7 +115,7 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
       files: collected.files.length,
       bytes: collected.totalBytes,
       skipped: collected.skipped,
-      checklist: collected.checklist,
+      checklist: [...collected.checklist, ...panelPlatformsChecklist(platforms)],
     };
   });
 
@@ -91,7 +140,7 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
 
       const exportedAt = body.exportedAt?.trim() || new Date().toISOString();
       try {
-        const built = buildEnvironmentArchive(provider, exportedAt, override());
+        const built = buildEnvironmentArchive(provider, exportedAt, override(), panelSection());
         const path = uniquePath(targetDir, archiveFileName(provider.id, exportedAt));
         writeFileSync(path, built.zip);
 
@@ -100,6 +149,7 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
           path,
           bytes: built.zip.length,
           files: built.manifest.entries.length,
+          platforms: built.manifest.panel?.platforms.length ?? 0,
           skipped: built.manifest.skipped,
           checklist: built.manifest.checklist,
         };
@@ -120,45 +170,115 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
       if (!zip) return reply;
 
       try {
-        return planEnvironmentImport(parseEnvironmentArchive(zip), provider, override());
+        return planEnvironmentImport(
+          parseEnvironmentArchive(zip),
+          provider,
+          override(),
+          panelContext(),
+        );
       } catch (error) {
         return fail(reply, error);
       }
     },
   );
 
-  app.post<{ Body: { provider?: string; archivePath?: string; selection?: unknown } }>(
-    '/api/env-transfer/import/apply',
-    (request, reply) => {
-      const body = request.body ?? {};
-      const provider = requireProvider(body.provider, reply);
-      if (!provider) return reply;
+  app.post<{
+    Body: {
+      provider?: string;
+      archivePath?: string;
+      selection?: unknown;
+      platformSelection?: unknown;
+      applyGateway?: unknown;
+    };
+  }>('/api/env-transfer/import/apply', (request, reply) => {
+    const body = request.body ?? {};
+    const provider = requireProvider(body.provider, reply);
+    if (!provider) return reply;
 
-      const selection = Array.isArray(body.selection)
-        ? body.selection.filter((item): item is string => typeof item === 'string')
-        : [];
-      if (selection.length === 0) {
-        return reply
-          .code(400)
-          .send({ error: 'empty_selection', message: 'Не отмечено ни одной записи.' });
-      }
+    const selection = stringList(body.selection);
+    const platformSelection = stringList(body.platformSelection);
+    // Настройка шлюза — такая же отметка, как файл и контур: её одну человек
+    // вправе принять, ничего больше не трогая. Без неё в этой проверке кнопка на
+    // экране была бы включена, а маршрут отвечал бы «не отмечено ни одной
+    // записи» на прямо отмеченную запись.
+    const applyGateway = body.applyGateway === true;
+    if (selection.length === 0 && platformSelection.length === 0 && !applyGateway) {
+      return reply
+        .code(400)
+        .send({ error: 'empty_selection', message: 'Не отмечено ни одной записи.' });
+    }
 
-      const zip = readArchive(body.archivePath, reply);
-      if (!zip) return reply;
+    const zip = readArchive(body.archivePath, reply);
+    if (!zip) return reply;
 
-      try {
-        const parsed = parseEnvironmentArchive(zip);
-        const summary = applyEnvironmentImport(parsed, provider, {
-          selection,
-          override: override(),
-          backupDir: ctx.backupDir,
-        });
-        return { ok: true, needsRestart: true, summary };
-      } catch (error) {
-        return fail(reply, error);
-      }
-    },
-  );
+    try {
+      const parsed = parseEnvironmentArchive(zip);
+      // Файлы пишутся, только если их отметили: отдельный контур можно принять,
+      // не трогая ни одного чужого конфига.
+      const summary =
+        selection.length > 0
+          ? applyEnvironmentImport(parsed, provider, {
+              selection,
+              override: override(),
+              backupDir: ctx.backupDir,
+            })
+          : { written: [], merged: [], skipped: [], backupPaths: [] };
+
+      const platforms = applyPanelSection(parsed, platformSelection, applyGateway);
+      return { ok: true, needsRestart: true, summary, platforms };
+    } catch (error) {
+      return fail(reply, error);
+    }
+  });
+
+  /**
+   * Записывает отмеченные контуры и, если попросили, настройку шлюза.
+   *
+   * Ключ не пишется и взяться ему неоткуда: в архиве его нет. Поэтому контур,
+   * приехавший включённым, останется без ключа — и `requireConnected` откажет
+   * честным «не подключён», а не уйдёт наружу с пустым заголовком.
+   *
+   * А контуру, которому разворот МЕНЯЕТ АДРЕС, ключ этой машины снимается вместе
+   * со следом пробы (`platformsChangingAddress`). Иначе одна галочка отправляла
+   * бы живой корпоративный ключ на адрес, приехавший в zip с чужой машины, и
+   * показывала бы при этом зелёную пробу прежнего адреса. Расход остаётся: это
+   * настоящие траты этой машины, и стирать их за человека панель не станет.
+   *
+   * Сверка управляемых профилей — обязательный хвост записи: без неё в списке
+   * эндпоинтов не появилось бы профиля нового контура, и ассистент панели о нём
+   * бы не узнал.
+   */
+  function applyPanelSection(
+    parsed: ReturnType<typeof parseEnvironmentArchive>,
+    selection: string[],
+    applyGateway: boolean,
+  ): { written: string[]; gateway: boolean; keysDropped: string[] } {
+    if (selection.length === 0 && !applyGateway) {
+      return { written: [], gateway: false, keysDropped: [] };
+    }
+
+    const data = parsed.manifest.panel
+      ? parsed.files.get(parsed.manifest.panel.archivePath)
+      : undefined;
+
+    const incoming = takePanelPlatforms(data, selection);
+    const keysDropped = platformsChangingAddress(readPlatforms(ctx.store), incoming);
+    for (const id of keysDropped) {
+      forgetToken(ctx.location.paths.appData, id);
+      ctx.store.forgetPlatformHealth(id);
+    }
+
+    // Одной записью: половина применённой пачки — состояние, которого человек не
+    // выбирал (`store.writePlatforms`).
+    writePlatforms(ctx.store, incoming);
+    const written = incoming.map((platform) => platform.id);
+
+    const gateway = applyGateway ? takePanelGateway(data) : undefined;
+    if (gateway) ctx.store.updateSettings({ platformGateway: gateway });
+
+    if (written.length > 0 || gateway) reconcileManagedProfiles(ctx.store);
+    return { written, gateway: Boolean(gateway), keysDropped };
+  }
 
   /** Читает архив с диска. Путь приходит из обзора файловой системы панели. */
   function readArchive(path: unknown, reply: FastifyReply): Buffer | undefined {
@@ -176,6 +296,13 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
       return undefined;
     }
   }
+}
+
+/** Список строк из тела запроса: всё остальное отбрасывается молча. */
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
 }
 
 /** Свободное имя в папке: если такой архив уже есть, добавляем номер. */

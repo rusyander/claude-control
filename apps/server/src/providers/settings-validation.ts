@@ -1,4 +1,10 @@
 import { object, string, boolean, number, record, array, unknown, enum as zodEnum } from 'zod';
+// Значение, а не тип, и потому ПОДПУТЁМ, а не из барреля: баррель под
+// `--experimental-strip-types` роняет сервер на старте (см. комментарий ниже).
+// Само правило формата берётся отсюда, а не переписывается: разъехавшись, две
+// копии дали бы «сохранилось в панели, не сохранилось в настройках».
+import { isPlatformDay, platformIdPattern } from '@agentdeck/contracts/platform';
+import { modelSources } from '@agentdeck/contracts/models';
 import { isKnownProviderId } from './registry.ts';
 
 /**
@@ -40,6 +46,68 @@ const endpointProfileSchema = object({
   apiKind: zodEnum(['anthropic', 'google', 'openai-compat']),
   model: string(),
   writeToken: boolean(),
+  // Профиль контура (Т3). Ключ обязан быть и здесь: вырезанный схемой, он
+  // означал бы «управляемый профиль сохранился обычным» — то есть остался бы
+  // после отключения контура и продолжал показывать мёртвый адрес шлюза.
+  // Умолчание, а не обязательность: снимок настроек с машины, где контура ещё
+  // не было, обязан читаться, а не отказывать целиком.
+  ownerPlatformId: string().default(''),
+});
+
+/**
+ * Контур: корпоративная платформа, к которой панель ходит по ключу. КЛЮЧА здесь
+ * нет — он в зашифрованном хранилище панели (`platform:<id>`), а `state.json`
+ * уезжает с машины на машину экспортом настроек.
+ *
+ * Повторяет `platformSchema` из contracts по той же причине, что и остальные
+ * схемы этого файла: contracts тянется в сервер ТОЛЬКО типом. Расходиться им
+ * нельзя — вырезанное поле означает «сохранил, а не сохранилось».
+ */
+export const platformSchema = object({
+  // Из идентификатора собирается адрес локального шлюза, поэтому набор символов
+  // сужен схемой: пробел или слэш разъехались бы адресом.
+  id: string().regex(
+    platformIdPattern,
+    'идентификатор: латиница, цифры, дефис, точка, подчёркивание',
+  ),
+  title: string().min(1),
+  driver: zodEnum(['enterprise-platform', 'openai-compat']),
+  baseUrl: string().min(1),
+  enabled: boolean(),
+  mode: zodEnum(['required', 'best-effort']),
+  // Умолчание парное контракту: у контура, настроенного до Т8, поля нет, и без
+  // него ВЕСЬ PATCH настроек получал бы отказ на записи, которую панель сама и
+  // произвела.
+  budgetUsd: number().nonnegative().default(0),
+  // День, с которого считается бюджет, — тоже руками: когда контур обнуляет
+  // свой счёт, снаружи не видно. Умолчание по той же причине, что у `agents`
+  // ниже: у контура, настроенного до Т8, поля нет, и без умолчания отказ
+  // получал бы ВЕСЬ PATCH настроек.
+  // Дата проверяется и здесь, и не только видом: дни учёта сравниваются
+  // посимвольно, «01.09.2026» отрезало бы весь расход молча, а `2026-13-45`
+  // проходит по виду, но такого дня нет — итог тот же.
+  budgetSince: string().refine(isPlatformDay).default(''),
+  capabilities: array(
+    zodEnum(['models', 'chat', 'embeddings', 'agents', 'guardrails', 'knowledge', 'client-tools']),
+  ),
+  targets: array(string()),
+  projectPaths: array(string()),
+  // Список агентов ведёт человек: маршрута «дай список агентов» на публичной
+  // поверхности ключа нет, и пробе взять его неоткуда. Умолчание обязательно:
+  // у контура, настроенного до Т7, поля нет вовсе, и без него ВЕСЬ PATCH
+  // настроек получал бы отказ — раздел откатывался бы на первом же сохранении.
+  agents: array(object({ id: string().min(1), title: string().min(1) })).default([]),
+  caCertPath: string(),
+});
+
+/**
+ * Локальный шлюз контуров: один слушатель на все контуры, различаемые первым
+ * сегментом адреса. Ключей здесь нет — они в зашифрованном хранилище.
+ */
+const platformGatewaySettingsSchema = object({
+  enabled: boolean(),
+  port: number().int().min(1024).max(65535),
+  forceStream: boolean(),
 });
 
 /**
@@ -104,9 +172,32 @@ export const integrationSettingsSchemas = {
   }),
   tms: object({
     enabled: boolean(),
-    kind: zodEnum(['', 'zephyr', 'xray']),
+    kind: zodEnum(['', 'zephyr', 'xray', 'testit']),
+    // Адрес читает только Test IT: своя установка у каждого своя, у двух
+    // облачных API общий на всех и поле остаётся пустым.
+    baseUrl: string(),
     projectKey: string(),
     groupId: string(),
+  }).superRefine((value, ctx) => {
+    // Включённая карточка обязана быть рабочей. Проверку «чего не хватает»
+    // форма делала только у себя, и это давало щель: включённый Zephyr,
+    // переключённый на Test IT, сохранялся ВКЛЮЧЁННЫМ и без адреса — карточка
+    // горела зелёным, а первая же кнопка отвечала «не указан адрес Test IT».
+    // Форма — не место для правила: телефон и curl ходят тем же маршрутом.
+    if (!value.enabled) return;
+    for (const [field, missing] of [
+      ['kind', !value.kind],
+      ['projectKey', !value.projectKey.trim()],
+      ['baseUrl', value.kind === 'testit' && !value.baseUrl.trim()],
+    ] as const) {
+      if (missing) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: `Включённый тест-менеджмент без поля «${field}» работать не может`,
+        });
+      }
+    }
   }),
   ci: object({
     enabled: boolean(),
@@ -171,8 +262,20 @@ export const settingsPatchSchema = object({
   modelPricing: record(string(), modelPricingSchema),
   encryptSecretBackups: boolean(),
   autoUpdateModels: boolean(),
+  // Источник каталога и контур-источник: без ключей здесь переключатель
+  // источника на экране настроек возвращался бы назад на первом же F5.
+  modelSource: zodEnum(modelSources),
+  modelSourcePlatform: string(),
   previewProviderWrites: boolean(),
   endpointProfiles: array(endpointProfileSchema),
+  // Контуры: без ключа в этой схеме PATCH отвечал бы 200 со старым списком, а
+  // раздел «Контур» откатывался бы к прежнему состоянию на первом же F5 — тот
+  // самый молча проглоченный ключ настроек, ради которого заведён аудит.
+  platforms: array(platformSchema),
+  // Шлюз: тот же довод, что и у контуров, плюс свой — порт слушателя правится с
+  // экрана настроек, и проглоченный ключ означал бы «сохранил порт, а CLI
+  // по-прежнему смотрят в старый».
+  platformGateway: platformGatewaySettingsSchema,
   assistantEndpointId: string(),
   dlp: dlpSettingsSchema,
   promptGate: promptGateSettingsSchema,
@@ -225,6 +328,10 @@ export const importStateSchema = object({
   // ради чего они заведены, — какая задача относится к какому проекту.
   integrationHealth: record(string(), unknown()),
   integrationLinks: record(string(), unknown()),
+  // Итог последней пробы контура. Без этого ключа снимок увозил бы настройки
+  // контура, но терял бы всё, что панель о нём УЗНАЛА, — и раздел на новой
+  // машине показывал бы «не проверялся» по работающему контуру.
+  platformHealth: record(string(), unknown()),
   // `secretBackupVerifier` намеренно НЕ импортируем: это отпечаток парольной
   // фразы, которая есть только в голове у владельца исходной машины. Чужой
   // verifier заблокировал бы шифрование копий здесь навсегда.

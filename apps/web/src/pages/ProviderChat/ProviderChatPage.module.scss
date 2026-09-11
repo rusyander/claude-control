@@ -149,10 +149,39 @@
   max-width: 90%;
 }
 
+// Заметка панели: не реплика разговора, а её слова человеку о том, чего не
+// получилось на уровнях разделения. Поэтому ни пузыря, ни стороны — строка во
+// всю ширину, отбитая линией слева.
+.noticeTurn {
+  align-self: stretch;
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-left: 2px solid var(--color-border, rgba(127, 127, 127, 0.35));
+}
+
 // Неудавшийся ответ виден сразу: это текст ошибки CLI, а не слова модели, и в
 // контекст следующего вопроса он не пойдёт.
 .failedTurn {
   border: 1px solid var(--color-danger, #d05353);
+}
+
+// Время под ответом: шаг и сумма по разговору. Моноширинные цифры — чтобы
+// столбик времени не дёргался от строки к строке.
+.turnTime {
+  display: flex;
+  gap: var(--spacing-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+// Фраза для читалки: на экране её место занимают сами числа.
+.turnTimeLabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .turnText {

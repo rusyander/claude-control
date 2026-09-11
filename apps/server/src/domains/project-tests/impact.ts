@@ -1,5 +1,6 @@
 import type { ProjectTestGroup, ProjectTestImpact } from '@agentdeck/contracts';
 import { gitSync } from '../project-git/exec.ts';
+import { GIT_READ_TIMEOUT_MS } from '../project-git/constants.ts';
 
 /**
  * Отбор по диффу: какие кейсы задеты тем, что сейчас лежит в рабочей копии.
@@ -46,7 +47,11 @@ export function releaseTag(root: string): string | undefined {
  * молча возвращал бы пусто там, где изменений как раз больше всего.
  */
 export function changedFiles(root: string): string[] {
-  const output = gitSync(root, ['status', '--porcelain', '-uall']);
+  // Потолок чтения, а не пятисекундный по умолчанию: `-uall` разворачивает
+  // каждую новую папку пофайлово, и на большом дереве это не мгновенная команда.
+  // Вышедший срок здесь читался бы как «ничего не трогали» — то есть «прогнать
+  // задетое» молча не нашло бы ничего сразу после большой правки.
+  const output = gitSync(root, ['status', '--porcelain', '-uall'], GIT_READ_TIMEOUT_MS);
   if (!output) return [];
   const files: string[] = [];
   for (const line of output.split('\n')) {

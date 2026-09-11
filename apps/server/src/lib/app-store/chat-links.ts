@@ -36,6 +36,20 @@ export function setChatLink(state: AppState, chatId: string, link: ChatLink): vo
 }
 
 /**
+ * Убрать связь под ключом, которого не будет.
+ *
+ * Повод ровно один, и он же единственный законный: звено заведено под временным
+ * ключом, а настоящий выдало хранилище чужого провайдера (`codex:c1a2…`).
+ * Дерево строится по КЛЮЧАМ связей, и оставленный временный висел бы в хабе
+ * строкой, за которой нет разговора.
+ */
+export function clearChatLink(state: AppState, chatId: string): boolean {
+  if (!state.chatLinks?.[chatId]) return false;
+  delete state.chatLinks[chatId];
+  return true;
+}
+
+/**
  * Прогон назвал свой настоящий `sessionId` — переносим связь на него.
  *
  * Ничего не делаем, когда связи нет: под этот путь попадает КАЖДЫЙ прогон

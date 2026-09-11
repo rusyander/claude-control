@@ -140,6 +140,36 @@ export function upsertCodexRootScalar(original: string, key: string, value: stri
   return lines.join('\n');
 }
 
+/**
+ * Убрать скалярный ключ КОРНЯ, если он там есть. Обратная операция к
+ * `upsertCodexRootScalar` и нужна ровно для отката: ключа, которого до нас не
+ * было, после отката быть не должно — иначе «вернули как было» означало бы
+ * «оставили наш выбор провайдера навсегда».
+ *
+ * Границы те же: только корневой регион, только строка-присваивание целиком.
+ * Ключа нет — текст возвращается без изменений, это не ошибка.
+ */
+export function removeCodexRootScalar(original: string, key: string): string {
+  const lines = original.split('\n');
+  let tableStart = lines.length;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (/^\s*\[/.test(lines[i]!.replace(/\r$/, ''))) {
+      tableStart = i;
+      break;
+    }
+  }
+
+  const keyName = `(?:${escapeRegExp(key)}|"${escapeRegExp(key)}")`;
+  const assignRe = new RegExp(`^\\s*${keyName}\\s*=`);
+  for (let i = 0; i < tableStart; i += 1) {
+    if (assignRe.test(lines[i]!.replace(/\r$/, ''))) {
+      lines.splice(i, 1);
+      return lines.join('\n');
+    }
+  }
+  return original;
+}
+
 export function spliceCodexTableRegion(original: string, block: string, prefix: string): string {
   const lines = original.split('\n');
   // Стиль переводов строк ФАЙЛА. Генератор TOML отдаёт блок с LF; вставить его как

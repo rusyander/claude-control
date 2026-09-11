@@ -1,0 +1,123 @@
+// Стили четырёх диаграмм документа «Контур».
+//
+// Ни одного цвета литералом: диаграмма живёт в обеих темах, и цвет, написанный
+// шестнадцатеричным числом, на тёмной теме превращается в белое пятно.
+// Толщина линий и размер шрифта заданы в единицах viewBox — картинка тянется
+// по ширине колонки, а не по размеру окна.
+
+.figure {
+  width: 100%;
+  height: auto;
+  // Рамка нужна: на светлой теме картинка иначе висит в воздухе, а сама она
+  // прозрачная — фон берётся у страницы и остаётся верным в обеих темах.
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  padding: var(--spacing-xs);
+}
+
+/* ── Блоки ───────────────────────────────────────────────────────────── */
+
+.plain,
+.accent,
+.muted,
+.danger,
+.row {
+  stroke-width: 1.5;
+}
+
+.plain {
+  fill: var(--color-surface-sunken);
+  stroke: var(--color-border-strong);
+}
+
+.accent {
+  fill: var(--color-accent-subtle);
+  stroke: var(--color-accent);
+}
+
+.muted {
+  fill: var(--color-surface-raised);
+  stroke: var(--color-border-strong);
+}
+
+.danger {
+  fill: var(--color-danger-subtle);
+  stroke: var(--color-danger);
+}
+
+.row {
+  fill: var(--color-surface-sunken);
+  stroke: var(--color-border);
+}
+
+// Область машины и область файлов CLI: пунктир, потому что это не коробка, а
+// граница ответственности.
+.zone {
+  fill: none;
+  stroke: var(--color-border-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 5;
+}
+
+/* ── Подписи ─────────────────────────────────────────────────────────── */
+
+.label {
+  fill: var(--color-fg);
+  font-size: 15px;
+}
+
+.zoneLabel {
+  fill: var(--color-fg-muted);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.note {
+  fill: var(--color-fg-muted);
+  font-size: 14px;
+}
+
+/* ── Связи ───────────────────────────────────────────────────────────── */
+
+.arrow {
+  stroke: var(--color-fg-muted);
+  stroke-width: 2;
+}
+
+.arrowHead {
+  fill: var(--color-fg-muted);
+}
+
+.leader {
+  stroke: var(--color-fg-subtle);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+// Перечёркнутая связь: ключ в файлы CLI не попадает.
+.cross {
+  stroke: var(--color-danger);
+  stroke-width: 3;
+}
+
+/* ── Матрица возможностей ────────────────────────────────────────────── */
+
+.markYes {
+  fill: var(--color-success);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.markPartial {
+  fill: var(--color-warning);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.markNo {
+  fill: var(--color-danger);
+  font-size: 20px;
+  font-weight: 700;
+}

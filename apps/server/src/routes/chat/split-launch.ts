@@ -12,8 +12,10 @@ import {
   planStagePrompt,
   TASK_MAX_CHARS,
 } from '@agentdeck/contracts/split-plan';
+import { foreignChatKey, parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import type { ServerContext } from '../../context.ts';
-import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
+import type { ChatRunRegistry, RunMeta } from '../../domains/chat/ChatRunRegistry.ts';
+import type { RunOptions } from '../../domains/chat/ChatRunner.ts';
 import type { ChatSession } from '../../domains/chat/ChatSession.ts';
 import type { TreeStartGate } from '../../domains/chat/tree-pause.ts';
 import {
@@ -24,7 +26,7 @@ import {
   type SplitStart,
 } from '../../domains/chat/ChatSplit.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
-import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
+import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
 import { activateGroupsQuietly } from '../../domains/group-activation.ts';
 import {
@@ -36,8 +38,17 @@ import { planForeignAssignment } from '../../domains/provider-cascade.ts';
 import { bootstrapCommandFor } from '../../domains/project-git.ts';
 import { readMergeRequestByUrl } from '../../domains/integrations/forge.ts';
 import { readIntegrations, readToken } from '../../domains/integrations/store.ts';
-import { createChat, type ProviderChatService } from '../../domains/provider-chat.ts';
-import { getActiveProvider } from '../../providers/registry.ts';
+import {
+  createChat,
+  type ProviderChatCascade,
+  type ProviderChatService,
+} from '../../domains/provider-chat.ts';
+import {
+  DEFAULT_PROVIDER_ID,
+  getActiveProvider,
+  getProvider,
+  isKnownProviderId,
+} from '../../providers/registry.ts';
 import { activeCliCommand } from '../../providers/cli.ts';
 
 /**
@@ -72,8 +83,13 @@ export interface SplitRequest {
 }
 
 export interface SplitLauncher {
-  /** Чужой CLI: связей и уровней нет, прогон идёт его хранилищем. */
+  /** Чужой CLI: разговор ведёт его хранилище, а связи ключуются с приставкой. */
   isForeign: boolean;
+  /**
+   * Ключ родителя в связях и в записи конвейера: у чужого CLI именованный.
+   * Пусто — родителя не назвали, и дерева у этого разделения не будет.
+   */
+  parentKey?: string;
   /**
    * Подбор включён и потолок распознан — группы идут через уровни (Т1):
    * разбор в корне, план в копии, затем работа.
@@ -90,8 +106,15 @@ export interface SplitLauncher {
       stage?: 'plan' | 'work';
     },
   ) => Promise<TaskSplitResult>;
-  /** Запустить разбор (уровень 1) в корне репозитория на потолке. */
-  startTriage: (prompt: string) => { chatId: string; started: boolean; deferred: boolean };
+  /**
+   * Запустить разбор (уровень 1) в корне репозитория на потолке. `claim` зовётся
+   * с ключом разговора ДО запуска: прогон может кончиться раньше, чем вернётся
+   * этот вызов, и тогда его итогу нужна уже записанная запись конвейера.
+   */
+  startTriage: (
+    prompt: string,
+    claim?: (chatId: string) => void,
+  ) => { chatId: string; started: boolean; deferred: boolean };
 }
 
 const TRIAGE_TITLE = 'Разбор разделения';
@@ -110,6 +133,20 @@ export function createSplitLauncher(
   // иначе — от лестницы провайдера, а не от потолка разговора (см.
   // `domains/provider-cascade.ts`). Развилка одна на весь запуск.
   const isForeign = provider.id !== 'claude';
+  /**
+   * Ключ родителя в связях: у Claude — идентификатор разговора как есть, у
+   * чужого CLI — именованный (`codex:c1a2…`).
+   *
+   * Приведение идемпотентное, и это не перестраховка: запись конвейера уровней
+   * хранит УЖЕ именованный ключ, а `launchFromRecord` собирает запуск из неё.
+   * Повесив приставку второй раз, панель отправила бы детей под родителя
+   * `codex:codex:…`, и дерево потеряло бы их все разом.
+   */
+  const parentKey = parentChatId
+    ? isForeign
+      ? foreignChatKey(provider.id, parseForeignChatKey(parentChatId)?.chatId ?? parentChatId)
+      : parentChatId
+    : undefined;
   // Замены человека: чем бы ни оказалось поле, отсюда выходит карта понятных
   // значений — незнакомое отброшено, потолок всё равно держится ниже.
   const manual = parseAssignments(request.assignments);
@@ -140,7 +177,15 @@ export function createSplitLauncher(
         return { ...clamped, model: expandAssignedModel(catalog, clamped.model) };
       })()
     : undefined;
-  const planned = Boolean(runnableCeiling) && Boolean(parentChatId);
+  /**
+   * Уровни (разбор, потом план) возможны там, где есть потолок. У Claude потолок
+   * — это модель; у чужого CLI её нет вовсе, и потолком партия назвала прогон
+   * БЕЗ флага модели (см. `domains/provider-cascade.ts`). Значит, у чужого CLI
+   * уровни включает то же правило проекта, что и подбор: выключив подбор в
+   * репозитории, человек выключил и уровни.
+   */
+  const canPlan = isForeign ? isCascadeEnabled(cascadeEntries, dir) : Boolean(runnableCeiling);
+  const planned = canPlan && Boolean(parentKey);
 
   /**
    * Ветка MR для ревью-группы (Т7). Спрашиваем фордж, а не верим блоку агента:
@@ -208,94 +253,109 @@ export function createSplitLauncher(
       : undefined;
 
   /**
-   * Дерево в списке чатов. Пишем ДО запуска прогона и только по удавшимся
-   * группам (см. `SplitLink`). Связь пишется только у Claude: у чужого CLI
-   * разговор заводит его хранилище со своим идентификатором.
+   * Запись связи с родителем по одной группе.
+   *
+   * Общая на обоих провайдеров и потому вынесена из колбэка: у Claude связь
+   * пишет разделение ДО старта прогона (см. `SplitLink`), у чужого CLI — сам
+   * запуск, потому что настоящий идентификатор разговору выдаёт хранилище
+   * провайдера, и до `createChat` его не существует. Поля обязаны быть одни и
+   * те же: иначе хаб и дерево показывали бы у чужого CLI половину того, что у
+   * Claude.
    *
    * Звено `plan` (Т1) кладёт в связь всё, из чего после плана соберётся работа:
    * задание, границы, назначение работы (`workModel/Effort`, `lowered`) — план
    * сам идёт на потолке, а работа на подобранной ступени.
    */
-  const link: SplitLink | undefined =
-    parentChatId && !isForeign
-      ? ({ chatId, title, branch, path, assignment, stage, group, prompt, context, review }) => {
-          const notes = composeGroupNotes({
-            ...(group.notes ? { notes: group.notes } : {}),
-            ...(context?.predecessors ? { predecessors: context.predecessors } : {}),
-            ...(context?.base ? { base: context.base } : {}),
-            ...(context?.holdAnswer ? { holdAnswer: context.holdAnswer } : {}),
-          });
-          const ceilingFields = runnableCeiling
-            ? { ceilingModel: runnableCeiling.model, ceilingEffort: runnableCeiling.effort }
-            : {};
-          if (stage === 'plan' && assignment && runnableCeiling) {
-            ctx.store.setChatLink(chatId, {
-              parentChatId,
-              title,
-              branch,
-              createdAt: new Date().toISOString(),
-              stage: 'plan',
-              model: runnableCeiling.model,
-              effort: runnableCeiling.effort,
-              workModel: assignment.model,
-              workEffort: assignment.effort,
-              lowered: assignment.lowered,
+  const linkRecord = (chat: Parameters<SplitLink>[0], parent: string): ChatLink => {
+    const { title, branch, path, assignment, stage, group, prompt, context, review } = chat;
+    const notes = composeGroupNotes({
+      ...(group.notes ? { notes: group.notes } : {}),
+      ...(context?.predecessors ? { predecessors: context.predecessors } : {}),
+      ...(context?.base ? { base: context.base } : {}),
+      ...(context?.holdAnswer ? { holdAnswer: context.holdAnswer } : {}),
+    });
+    const ceilingFields = runnableCeiling
+      ? { ceilingModel: runnableCeiling.model, ceilingEffort: runnableCeiling.effort }
+      : {};
+    if (stage === 'plan' && assignment && canPlan) {
+      return {
+        parentChatId: parent,
+        title,
+        branch,
+        createdAt: new Date().toISOString(),
+        stage: 'plan',
+        // План идёт на потолке. У чужого CLI потолок безымянный — это прогон
+        // БЕЗ флага модели, — и назначать плану модель нельзя: панель умеет
+        // только понижать относительно того, чем CLI настроен.
+        ...(runnableCeiling
+          ? { model: runnableCeiling.model, effort: runnableCeiling.effort }
+          : {}),
+        workModel: assignment.model,
+        workEffort: assignment.effort,
+        lowered: assignment.lowered,
+        ...(assignment.kind ? { kind: assignment.kind } : {}),
+        ...ceilingFields,
+        task: prompt.slice(0, TASK_MAX_CHARS),
+        ...(group.owns && group.owns.length > 0 ? { owns: group.owns } : {}),
+        ...(notes ? { notes } : {}),
+      };
+    }
+    // Ревью по ссылке (Т7): стадия у группы своя, и в связь ложится всё, из
+    // чего потом собирается карточка решения, — предмет, ветка и каталог
+    // копии. Каталог именно здесь: решение приходит через часы, из хаба
+    // или с телефона, и взять его в тот момент больше неоткуда.
+    if (review) {
+      return {
+        parentChatId: parent,
+        title,
+        branch,
+        createdAt: new Date().toISOString(),
+        stage: 'review',
+        ...(assignment
+          ? {
+              model: assignment.model,
+              effort: assignment.effort,
               ...(assignment.kind ? { kind: assignment.kind } : {}),
-              ...ceilingFields,
-              task: prompt.slice(0, TASK_MAX_CHARS),
-              ...(group.owns && group.owns.length > 0 ? { owns: group.owns } : {}),
-              ...(notes ? { notes } : {}),
-            });
-            return;
+            }
+          : {}),
+        ...ceilingFields,
+        review: {
+          url: review.url,
+          ...(review.branch ? { branch: review.branch } : {}),
+          ...(review.onMrBranch ? {} : { onMrBranch: false }),
+          path,
+        },
+      };
+    }
+    return {
+      parentChatId: parent,
+      title,
+      branch,
+      createdAt: new Date().toISOString(),
+      // Назначение живёт в связи, а не только в прогоне: второе сообщение
+      // ребёнку приходит уже без него.
+      ...(assignment
+        ? {
+            model: assignment.model,
+            effort: assignment.effort,
+            lowered: assignment.lowered,
+            stage: 'work',
+            ...(assignment.kind ? { kind: assignment.kind } : {}),
+            // Потолок ЭТОГО разговора — на нём пойдёт ревью работы.
+            ...ceilingFields,
           }
-          // Ревью по ссылке (Т7): стадия у группы своя, и в связь ложится всё, из
-          // чего потом собирается карточка решения, — предмет, ветка и каталог
-          // копии. Каталог именно здесь: решение приходит через часы, из хаба
-          // или с телефона, и взять его в тот момент больше неоткуда.
-          if (review) {
-            ctx.store.setChatLink(chatId, {
-              parentChatId,
-              title,
-              branch,
-              createdAt: new Date().toISOString(),
-              stage: 'review',
-              ...(assignment
-                ? {
-                    model: assignment.model,
-                    effort: assignment.effort,
-                    ...(assignment.kind ? { kind: assignment.kind } : {}),
-                  }
-                : {}),
-              ...ceilingFields,
-              review: {
-                url: review.url,
-                ...(review.branch ? { branch: review.branch } : {}),
-                ...(review.onMrBranch ? {} : { onMrBranch: false }),
-                path,
-              },
-            });
-            return;
-          }
-          ctx.store.setChatLink(chatId, {
-            parentChatId,
-            title,
-            branch,
-            createdAt: new Date().toISOString(),
-            // Назначение живёт в связи, а не только в прогоне: второе сообщение
-            // ребёнку приходит уже без него.
-            ...(assignment
-              ? {
-                  model: assignment.model,
-                  effort: assignment.effort,
-                  lowered: assignment.lowered,
-                  stage: 'work',
-                  ...(assignment.kind ? { kind: assignment.kind } : {}),
-                  // Потолок ЭТОГО разговора — на нём пойдёт ревью работы.
-                  ...ceilingFields,
-                }
-              : {}),
-          });
-        }
+        : {}),
+    };
+  };
+
+  /**
+   * Дерево в списке чатов у Claude. Пишем ДО запуска прогона и только по
+   * удавшимся группам (см. `SplitLink`). У чужого CLI связь пишет `startForeign`
+   * — там же, где хранилище провайдера выдаёт разговору настоящий ключ.
+   */
+  const link: SplitLink | undefined =
+    parentKey && !isForeign
+      ? (chat) => ctx.store.setChatLink(chat.chatId, linkRecord(chat, parentKey))
       : undefined;
 
   /** Прогон Claude — тот же путь, что и у обычной отправки в чат проекта. */
@@ -374,33 +434,150 @@ export function createSplitLauncher(
    * (`domains/provider-chat/cascade.ts`).
    */
   function startForeign(input: Parameters<SplitStart>[0]): boolean {
-    const { title, prompt, cwd, branch, assignment } = input;
+    const { title, prompt, cwd, branch, assignment, stage, group, context } = input;
     const appData = ctx.location.paths.appData;
-    const created = createChat(appData, provider.id, {
-      title,
-      workdir: cwd,
-      ...(assignment ? { model: assignment.model, effort: assignment.effort } : {}),
-      ...(assignment?.lowered
+    // План (Т3) идёт на потолке чужого CLI — то есть БЕЗ флага модели, — а
+    // назначение работы уезжает в шапку разговора: по нему конвейер заведёт
+    // работу, когда план кончится (`domains/provider-chat/cascade.ts`).
+    const isPlan = stage === 'plan' && Boolean(assignment) && canPlan;
+    const notes = composeGroupNotes({
+      ...(group.notes ? { notes: group.notes } : {}),
+      ...(context?.predecessors ? { predecessors: context.predecessors } : {}),
+      ...(context?.base ? { base: context.base } : {}),
+      ...(context?.holdAnswer ? { holdAnswer: context.holdAnswer } : {}),
+    });
+    const runPrompt =
+      isPlan && assignment
+        ? planStagePrompt({
+            title,
+            task: prompt,
+            branch,
+            ...(group.owns && group.owns.length > 0 ? { owns: group.owns } : {}),
+            ...(notes ? { notes } : {}),
+            ...(assignment.kind ? { kind: assignment.kind } : {}),
+            workModel: assignment.model,
+          })
+        : prompt;
+    // Шапка звена. У плана в ней лежит то, чем пойдёт РАБОТА, а не он сам:
+    // `lowered` здесь читается как «работа пойдёт ниже настройки CLI», и
+    // планировщик перенесёт это на работу вместе с моделью.
+    const cascade: ProviderChatCascade | undefined =
+      isPlan && assignment
         ? {
-            cascade: {
-              stage: 'work' as const,
+            stage: 'plan',
+            group: title,
+            branch,
+            ...(assignment.lowered ? { lowered: true } : {}),
+            workModel: assignment.model,
+            ...(assignment.effort ? { workEffort: assignment.effort } : {}),
+            ...(assignment.kind ? { kind: assignment.kind } : {}),
+          }
+        : assignment?.lowered
+          ? {
+              stage: 'work',
               group: title,
               branch,
               lowered: true,
               workModel: assignment.model,
               workEffort: assignment.effort,
               ...(assignment.kind ? { kind: assignment.kind } : {}),
-            },
-          }
-        : {}),
+            }
+          : undefined;
+    const created = createChat(appData, provider.id, {
+      title,
+      workdir: cwd,
+      // Плану модель не назначается: он и есть «потолок» чужого CLI.
+      ...(assignment && !isPlan ? { model: assignment.model, effort: assignment.effort } : {}),
+      ...(cascade ? { cascade } : {}),
     });
     if (!created) return false;
+    // Связь — сразу после того, как хранилище провайдера выдало ключ, и ДО
+    // запуска: ровно тот же порядок, что у Claude. Ключ именованный
+    // (`codex:c1a2…`), и родитель в связи назван так же — адрес дерева обязан
+    // быть однозначным по обе стороны ссылки.
+    if (parentKey) {
+      ctx.store.setChatLink(
+        foreignChatKey(provider.id, created.id),
+        linkRecord({ ...input, chatId: created.id, path: cwd }, parentKey),
+      );
+    }
     const initiative = [
       initiativePrompt(ctx.store.getSettings(), { splitMuted: true, foreign: true }),
-      assignment?.lowered ? loweredWorkPrompt(assignment.kind, { reviewer: 'cli' }) : '',
+      // План идёт на потолке — планка сдачи ему не нужна; её получит работа,
+      // когда план кончится (`foreignStagePrefix`).
+      !isPlan && assignment?.lowered ? loweredWorkPrompt(assignment.kind, { reviewer: 'cli' }) : '',
     ]
       .filter(Boolean)
       .join(' ');
+    // Родитель стоит на паузе — ребёнок заведён (чат и связь есть), но не
+    // запущен: старт лёг в очередь дерева и уйдёт по «Продолжить всё».
+    if (
+      deps.gate?.defer(
+        'split',
+        foreignChatKey(provider.id, created.id),
+        { prompt: runPrompt, cwd } as RunOptions,
+        { projectPath: cwd } as RunMeta,
+      )
+    ) {
+      return false;
+    }
+    const outcome = deps.providerChats.send(
+      appData,
+      provider.id,
+      created.id,
+      { text: runPrompt },
+      { provider, models: catalog, ...(initiative ? { systemPrefix: initiative } : {}) },
+    );
+    return outcome.ok;
+  }
+
+  /**
+   * Разбор (уровень 1) у чужого CLI: один прогон в КОРНЕ репозитория, на
+   * потолке — то есть без флага модели, — и без права правок.
+   *
+   * Права здесь не тумблер, а свойство запуска: чужому CLI панель ничего не
+   * разрешает сверх того, чем он настроен, и разбору правки не поручены самим
+   * заданием. Копий на этот момент ещё нет — они заводятся по его итогу, и
+   * потому каталог тут корень репозитория, а не копия группы.
+   */
+  function startForeignTriage(
+    prompt: string,
+    claim?: (chatId: string) => void,
+  ): { chatId: string; started: boolean; deferred: boolean } {
+    const appData = ctx.location.paths.appData;
+    const created = createChat(appData, provider.id, {
+      title: TRIAGE_TITLE,
+      workdir: dir,
+      cascade: { stage: 'triage' },
+    });
+    if (!created) return { chatId: '', started: false, deferred: false };
+
+    // Связь — ДО запуска, как у Claude: по ней разбор висит под родителем с
+    // подписью «разбор», а его завершение находит свою запись конвейера.
+    const chatKey = foreignChatKey(provider.id, created.id);
+    if (parentKey) {
+      ctx.store.setChatLink(chatKey, {
+        parentChatId: parentKey,
+        title: TRIAGE_TITLE,
+        createdAt: new Date().toISOString(),
+        stage: 'triage',
+      });
+    }
+    claim?.(chatKey);
+    if (
+      deps.gate?.defer(
+        'triage',
+        chatKey,
+        { prompt, cwd: dir } as RunOptions,
+        { projectPath: dir } as RunMeta,
+      )
+    ) {
+      return { chatId: chatKey, started: false, deferred: true };
+    }
+    const initiative = initiativePrompt(ctx.store.getSettings(), {
+      splitMuted: true,
+      foreign: true,
+    });
     const outcome = deps.providerChats.send(
       appData,
       provider.id,
@@ -408,7 +585,7 @@ export function createSplitLauncher(
       { text: prompt },
       { provider, models: catalog, ...(initiative ? { systemPrefix: initiative } : {}) },
     );
-    return outcome.ok;
+    return { chatId: chatKey, started: outcome.ok, deferred: false };
   }
 
   const start: SplitStart = (input) => {
@@ -424,6 +601,7 @@ export function createSplitLauncher(
 
   return {
     isForeign,
+    ...(parentKey ? { parentKey } : {}),
     planned,
     launch: (proposal, options) =>
       splitTasks({
@@ -437,16 +615,19 @@ export function createSplitLauncher(
         start,
         ...(options.groups ? { groups: options.groups } : {}),
         // План только там, где есть потолок: без него планировать не на чем.
-        stage: options.stage === 'plan' && runnableCeiling ? 'plan' : 'work',
+        stage: options.stage === 'plan' && canPlan ? 'plan' : 'work',
         ...(options.context ? { context: options.context } : {}),
       }),
-    startTriage: (prompt) => {
+    startTriage: (prompt, claim) => {
+      // У чужого CLI разбор — такой же разговор его хранилища, как и всё
+      // остальное: ни реестра прогонов, ни сессии, ни прав у него нет.
+      if (isForeign) return startForeignTriage(prompt, claim);
       const chatId = `new-${Date.now()}-triage`;
-      if (!runnableCeiling || !parentChatId) return { chatId, started: false, deferred: false };
+      if (!runnableCeiling || !parentKey) return { chatId, started: false, deferred: false };
       // Связь — ДО запуска (см. `SplitLink`): по ней разбор висит под родителем
       // с подписью «разбор», а его завершение находит свою запись конвейера.
       ctx.store.setChatLink(chatId, {
-        parentChatId,
+        parentChatId: parentKey,
         title: TRIAGE_TITLE,
         createdAt: new Date().toISOString(),
         stage: 'triage',
@@ -456,7 +637,7 @@ export function createSplitLauncher(
         ceilingEffort: runnableCeiling.effort,
       });
       deps.runs.muteSplit(chatId);
-      deps.session.inherit([parentChatId], chatId);
+      deps.session.inherit([parentKey], chatId);
       const initiative = initiativePrompt(ctx.store.getSettings(), { splitMuted: true });
       const options = {
         prompt,
@@ -471,6 +652,7 @@ export function createSplitLauncher(
         ...(initiative ? { appendSystemPrompt: initiative } : {}),
       };
       const meta = { projectPath: dir };
+      claim?.(chatId);
       if (deps.gate?.defer('triage', chatId, options, meta)) {
         return { chatId, started: false, deferred: true };
       }
@@ -494,23 +676,21 @@ export function createSplitLauncher(
 export function createReviewStarter(
   ctx: ServerContext,
   deps: SplitLaunchDeps,
-): (input: {
-  chatId: string;
-  prompt: string;
-  cwd: string;
-  model?: string;
-  effort?: string;
-  stage: 'fix' | 'push';
-  fromAliases: string[];
-  title?: string;
-}) => boolean {
+): (input: ReviewStageStart) => { started: boolean; chatId?: string } {
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
 
   return (input) => {
-    // Чужой CLI сюда не попадает: связей у его разговоров нет, а значит нет и
-    // карточки решения. Проверка на месте — провайдера меняют между запросами.
-    if (getActiveProvider(ctx.store).id !== 'claude') return false;
-    if (!input.cwd) return false;
+    if (!input.cwd) return { started: false };
+
+    // Чей это разговор, решают КЛЮЧИ закончившегося ревью, а не активный
+    // провайдер: карточка ждала человека часами, и за это время он мог
+    // переключить CLI. Запустить правки чужой группы через Claude значило бы
+    // отдать чужую ветку не тому агенту.
+    const foreign = input.fromAliases.map((key) => parseForeignChatKey(key)).find(Boolean);
+    if (foreign) return startForeignReviewStage(ctx, deps, foreign.providerId, input);
+    // У Claude команда запуска берётся из настроек панели, и при чужом активном
+    // провайдере это была бы команда чужого CLI с флагами Claude.
+    if (getActiveProvider(ctx.store).id !== DEFAULT_PROVIDER_ID) return { started: false };
 
     const settings = ctx.store.getSettings();
     activateGroupsQuietly(
@@ -535,9 +715,89 @@ export function createReviewStarter(
     const meta = { projectPath: input.cwd };
     // Дерево на паузе — прогон заведён, но ждёт «Продолжить всё»: решение
     // человека при этом не теряется, оно уже записано в связь.
-    if (deps.gate?.defer('stage', input.chatId, options, meta)) return true;
-    return deps.runs.start(input.chatId, options, meta);
+    if (deps.gate?.defer('stage', input.chatId, options, meta)) return { started: true };
+    return { started: deps.runs.start(input.chatId, options, meta) };
   };
+}
+
+/** Что домен ревью просит запустить: правки по замечаниям или их отправку в MR. */
+export interface ReviewStageStart {
+  chatId: string;
+  prompt: string;
+  cwd: string;
+  model?: string;
+  effort?: string;
+  stage: 'fix' | 'push';
+  fromAliases: string[];
+  title?: string;
+}
+
+/**
+ * Та же стадия ревью, но у чужого CLI (Т6).
+ *
+ * Разница ровно одна и она про ключи: разговор заводит хранилище провайдера,
+ * оно же и выдаёт идентификатор, — поэтому наружу уходит НАСТОЯЩИЙ ключ
+ * (`codex:c1a2…`), и связь, написанную доменом под временным, он переносит на
+ * него сам. Права здесь не тумблер: чужому CLI панель ничего не разрешает
+ * сверх того, чем он настроен.
+ */
+function startForeignReviewStage(
+  ctx: ServerContext,
+  deps: SplitLaunchDeps,
+  providerId: string,
+  input: ReviewStageStart,
+): { started: boolean; chatId?: string } {
+  // Claude сюда не попадает никогда, незнакомый провайдер — тем более:
+  // `getProvider` откатился бы на Claude и запустил чужую ветку не тем CLI.
+  if (providerId === DEFAULT_PROVIDER_ID || !isKnownProviderId(providerId)) {
+    return { started: false };
+  }
+  const provider = getProvider(providerId);
+  const appData = ctx.location.paths.appData;
+  activateGroupsQuietly(
+    { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
+    input.cwd,
+    (error) => deps.log.warn({ err: error }, 'group activation failed'),
+  );
+
+  const word = input.stage === 'fix' ? 'правки' : 'отправка';
+  const created = createChat(appData, providerId, {
+    title: input.title ? `${input.title} · ${word}` : word,
+    workdir: input.cwd,
+    // Модель — та же, что вела ревью-группу: список замечаний уже превратил
+    // неизвестное в понятное, и менять ступень под правки не за что.
+    ...(input.model ? { model: input.model } : {}),
+    ...(input.effort ? { effort: input.effort } : {}),
+  });
+  if (!created) return { started: false };
+
+  const chatKey = foreignChatKey(providerId, created.id);
+  // Дерево на паузе — разговор заведён, но не запущен: старт лёг в очередь и
+  // уйдёт по «Продолжить всё». Решение человека при этом не теряется.
+  if (
+    deps.gate?.defer(
+      'stage',
+      chatKey,
+      { prompt: input.prompt, cwd: input.cwd } as RunOptions,
+      { projectPath: input.cwd } as RunMeta,
+    )
+  ) {
+    return { started: true, chatId: chatKey };
+  }
+
+  const initiative = initiativePrompt(ctx.store.getSettings(), { splitMuted: true, foreign: true });
+  const outcome = deps.providerChats.send(
+    appData,
+    providerId,
+    created.id,
+    { text: input.prompt },
+    {
+      provider,
+      models: ctx.models.current(provider.modelVendors ?? []).models,
+      ...(initiative ? { systemPrefix: initiative } : {}),
+    },
+  );
+  return { started: outcome.ok, chatId: chatKey };
 }
 
 /** Запуск порции групп из записи конвейера — тем же запуском, что и у маршрута. */

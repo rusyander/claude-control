@@ -45,6 +45,35 @@ writeFileSync(
   'utf8',
 );
 
+// Ручные кейсы лежат в самом репозитории — их и кладём: у импорта markdown нет
+// ни файла с диска, ни содержимого в теле, только каталог внутри проекта.
+const MANUAL_ID = 'ТК-900';
+mkdirSync(join(ROOT, 'QA', 'auth'), { recursive: true });
+writeFileSync(
+  join(ROOT, 'QA', 'auth', `${MANUAL_ID}.md`),
+  [
+    `# ${MANUAL_ID}. Вход по одноразовому коду`,
+    '',
+    '**Зона:** авторизация',
+    '**Приоритет:** высокий',
+    '',
+    '## Предусловие',
+    '',
+    'Пользователь зарегистрирован',
+    '',
+    '## Шаги',
+    '',
+    '1. Открыть форму входа',
+    '   - Ожидание: форма открыта',
+    '',
+    '## Ожидаемый результат',
+    '',
+    'Пользователь внутри',
+    '',
+  ].join('\n'),
+  'utf8',
+);
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 await bypassOnboarding(page);
@@ -107,6 +136,39 @@ check(/легло на кейсы:\s*1/.test(badges), 'один результа
 check(/не нашлось:\s*1/.test(badges), 'несопоставленное названо, а не проглочено');
 check(badges.includes('ничей тест'), 'несопоставленный тест назван по имени');
 
+// Ручные кейсы: формат без файла и без содержимого — сервер сам обходит каталог
+// проекта. Номер из имени файла обязан стать номером кейса, иначе связь с тем,
+// как этот кейс зовут в дефекте и в MR, теряется ровно там, где она нужнее.
+const formatField = modal.getByLabel('Формат').nth(1);
+await formatField.selectOption({ label: 'Ручные кейсы (ТК-*.md)' });
+await page.waitForTimeout(400);
+check(
+  (await modal.getByLabel('Каталог в проекте').count()) > 0,
+  'у ручных кейсов спрашивается каталог, а не файл',
+);
+await modal.getByRole('button', { name: 'Взять из проекта' }).nth(1).click();
+await page.waitForTimeout(2500);
+
+const manual = await modal.innerText();
+check(
+  /прочитано:\s*1/.test(manual),
+  `прочитан один ручной кейс: ${/прочитано:\s*\d+/.exec(manual)}`,
+);
+// «Завёлся» ИЛИ «лёг на существующий»: живой проект переживает прогоны, и после
+// первого раза кейс в нём уже есть. Главное проверяет второй импорт ниже —
+// двойника появиться не должно.
+check(
+  /заведено:\s*1/.test(manual) || /легло на кейсы:\s*1/.test(manual),
+  'ручной кейс лёг в группу',
+);
+
+// Повторный импорт того же файла обязан ЛЕЧЬ НА ТОТ ЖЕ кейс.
+await modal.getByRole('button', { name: 'Взять из проекта' }).nth(1).click();
+await page.waitForTimeout(2500);
+const again = await modal.innerText();
+check(/легло на кейсы:\s*1/.test(again), 'повторный импорт обновил кейс');
+check(!/заведено:\s*1/.test(again), 'повторный импорт не завёл двойника');
+
 // Выгрузка — обычная ссылка: браузер отдаёт файл с именем от сервера.
 const download = page.waitForEvent('download', { timeout: 15000 }).catch(() => undefined);
 await modal.getByText('Скачать').first().click();
@@ -114,7 +176,23 @@ const file = await download;
 check(Boolean(file), `выгрузка скачалась: ${file ? await file.suggestedFilename() : 'нет'}`);
 
 await page.keyboard.press('Escape');
-await page.waitForTimeout(800);
+await page.waitForTimeout(1200);
+
+// Кейс виден в библиотеке без F5, а его номер — тот, что стоял в имени файла:
+// в списке колонки идентификатора нет, он показан в карточке кейса.
+const manualRow = main.getByText('Вход по одноразовому коду', { exact: false }).first();
+check((await manualRow.count()) > 0, 'ручной кейс появился в библиотеке без перезагрузки');
+if ((await manualRow.count()) > 0) {
+  await manualRow.click();
+  await page.waitForTimeout(1200);
+  const card = page.getByRole('dialog').first();
+  check(
+    (await card.getByText(MANUAL_ID, { exact: false }).count()) > 0,
+    `номер из имени файла сохранён: ${MANUAL_ID}`,
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(600);
+}
 
 // Импорт обязан быть виден там же, где кейсы: статус пришёл из CI, и библиотека
 // перечитывается сама, без F5.

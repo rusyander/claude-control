@@ -2,6 +2,7 @@ import type { TmsSettings } from '@agentdeck/contracts';
 import { IntegrationError } from '../errors.ts';
 import { zephyrClient } from './zephyr.ts';
 import { xrayClient } from './xray.ts';
+import { testitClient } from './testit.ts';
 import type { TmsClient } from './types.ts';
 
 export type { TmsCase, TmsClient, TmsRunPush } from './types.ts';
@@ -24,8 +25,13 @@ export function tmsClient(settings: TmsSettings, token: string | undefined): Tms
   }
   if (settings.kind === 'zephyr') return zephyrClient(token, settings.projectKey);
   if (settings.kind === 'xray') return xrayClient(token, settings.projectKey);
+  // Адрес читает только Test IT: у двух облачных он общий на всех и в настройке
+  // не спрашивается вовсе.
+  if (settings.kind === 'testit') {
+    return testitClient(token, settings.projectKey, settings.baseUrl);
+  }
   throw new IntegrationError(
     'integration_not_found',
-    'Тест-менеджмент не подключён: не выбрана система (Zephyr Scale или Xray).',
+    'Тест-менеджмент не подключён: не выбрана система (Zephyr Scale, Xray или Test IT).',
   );
 }

@@ -16,8 +16,16 @@ import { assistantRunReasons } from './assistant-run';
  * стоимости здесь нет: чужие CLI их не публикуют, а угадывать формат запрещено.
  */
 
-/** Роль реплики: спросил пользователь или ответил провайдер. */
-export const providerChatRoles = ['user', 'assistant'] as const;
+/**
+ * Роль реплики: спросил пользователь, ответил провайдер — или сказала ПАНЕЛЬ.
+ *
+ * Третья роль появилась с уровнями разделения (Т3 партии чужих CLI): разбор и
+ * план могут не дать блока или не завершиться вовсе, и об этом надо сказать в
+ * той же ленте, где человек читает ответ. Выдавать такие строки за реплику
+ * провайдера нельзя — их писала не модель; в контекст следующего запуска они
+ * тоже не идут (`domains/provider-chat/prompt.ts`).
+ */
+export const providerChatRoles = ['user', 'assistant', 'notice'] as const;
 
 /**
  * Чем именно отработал ответ:
@@ -38,6 +46,12 @@ export const providerChatMessageSchema = object({
   transport: zodEnum(providerChatTransports).optional(),
   /** Ответ не получен: в реплике текст ошибки, а не ответ модели. */
   failed: boolean().optional(),
+  /**
+   * Сколько шёл прогон, миллисекунды. Меряет ПАНЕЛЬ по своему процессу, а не
+   * парсит вывод CLI: расход в ответе отдают не все и по-разному, а часы есть
+   * всегда. Нет поля — разговор записан до этой партии, время не показывается.
+   */
+  durationMs: number().optional(),
 });
 export type ProviderChatMessage = Infer<typeof providerChatMessageSchema>;
 

@@ -13,6 +13,15 @@ import {
   useRemoteUpdate,
   useTestNotification,
 } from '../../src/entities/remote/api';
+import {
+  budgetPercent,
+  platformProblem,
+  platformTone,
+  usePlatforms,
+} from '../../src/entities/platform/api';
+
+/** Вердикт → стиль строки. Три состояния: успех, беда и «ещё не смотрели». */
+const STATE_STYLE = { ok: 'stateOk', bad: 'stateBad', quiet: 'stateQuiet' } as const;
 
 /**
  * Настройки: с какой панелью мы связаны и дойдут ли до телефона уведомления.
@@ -31,6 +40,7 @@ export default function SettingsScreen() {
   const update = useRemoteUpdate();
   const forget = useForgetDevice();
   const test = useTestNotification();
+  const platforms = usePlatforms();
 
   const [push, setPush] = useState('');
   const [busy, setBusy] = useState(false);
@@ -152,6 +162,48 @@ export default function SettingsScreen() {
         </Card>
       ) : null}
 
+      {/* Контур: состояние и бюджет, ничего больше. Кнопок нет намеренно —
+          включение контура меняет то, куда уходит трафик всех CLI на машине, и
+          решать это из кармана человек не должен. */}
+      {platforms.data && platforms.data.platforms.length > 0 ? (
+        <Card>
+          <Title>{t.platform.title}</Title>
+          <Muted>{t.platform.readOnly}</Muted>
+          {platforms.data.platforms.map((item) => {
+            const problem = platformProblem(item);
+            const spent = item.budget.spentUsd.toFixed(2);
+            return (
+              <View key={item.platform.id} style={styles.platform}>
+                <Text style={styles.name}>{item.platform.title}</Text>
+                {/* «Ещё не проверялся» — не беда: тревожным цветом это читалось
+                    бы как поломка, а панель просто ни разу туда не ходила. */}
+                <Text style={styles[STATE_STYLE[platformTone(problem)]]}>
+                  {t.platform[`state_${problem}`]}
+                </Text>
+                <Muted>
+                  {item.budget.tracked
+                    ? t.platform.budget(
+                        spent,
+                        item.budget.budgetUsd.toFixed(2),
+                        budgetPercent(item),
+                      )
+                    : t.platform.budgetOff(spent)}
+                </Muted>
+                {item.budget.exhaustedAt ? (
+                  <Mono style={styles.failed}>
+                    {t.platform.exhaustedAt(
+                      item.budget.exhaustedAt.slice(0, 16).replace('T', ' '),
+                      item.budget.exhaustedLevel ?? '',
+                    )}
+                  </Mono>
+                ) : null}
+                <Muted>{t.platform.estimate}</Muted>
+              </View>
+            );
+          })}
+        </Card>
+      ) : null}
+
       {status ? (
         <Card>
           <Title>{t.settings.outside}</Title>
@@ -189,6 +241,10 @@ const styles = StyleSheet.create({
   langOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
   langText: { color: colors.text, fontSize: font.body },
   name: { color: colors.text, fontSize: font.body },
+  platform: { paddingVertical: space.xs, gap: space.xs },
+  stateOk: { color: colors.text, fontSize: font.body },
+  stateBad: { color: colors.warning, fontSize: font.body },
+  stateQuiet: { color: colors.textDim, fontSize: font.body },
   note: { color: colors.warning },
   failed: { color: colors.danger },
   toggle: { paddingVertical: space.xs },

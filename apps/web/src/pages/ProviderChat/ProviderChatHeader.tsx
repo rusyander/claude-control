@@ -24,6 +24,8 @@ export function ProviderChatHeader({
   onPickWorkdir,
   onDelete,
   onStop,
+  onRestart,
+  isRestarting,
 }: ProviderChatHeaderProps) {
   const { t } = useTranslation();
   const transport = chat?.messages.findLast((message) => message.transport)?.transport;
@@ -76,6 +78,21 @@ export function ProviderChatHeader({
         <Button size="sm" variant="ghost" onClick={onPickWorkdir} disabled={!chat}>
           {t('providerChat.workdir')}
         </Button>
+        {/* Перезапуск (Т7): у чужого CLI сессии нет, и кнопка обещает ровно то,
+            что панель делает, — новый разговор с контрольной точкой. Пока идёт
+            ответ, перезапускать нечего: сервер ответил бы 409. */}
+        {onRestart && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onRestart}
+            disabled={!chat || isRunning}
+            isLoading={isRestarting}
+            title={t('providerChat.restartTitle')}
+          >
+            {t('providerChat.restart')}
+          </Button>
+        )}
         <Button size="sm" variant="ghost" onClick={rename} disabled={!chat}>
           {t('providerChat.rename')}
         </Button>

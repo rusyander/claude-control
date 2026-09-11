@@ -222,10 +222,15 @@ export interface PricingLookup {
 }
 
 /**
- * Тариф модели. Порядок: свои цены из настроек → прайс → запасная таблица →
- * ставка для неизвестной модели.
+ * Тариф модели, если он ИЗВЕСТЕН. Порядок: свои цены из настроек → прайс →
+ * запасная таблица; не нашлось — `undefined`, без запасной ставки.
+ *
+ * Отдельно от {@link getPricing} ради тех, кому запасная ставка вредна. Расход
+ * через контур — как раз такой случай: модели компании в прайсе Anthropic нет и
+ * быть не может, и посчитанные по «неизвестной модели» деньги выглядели бы на
+ * экране обычной суммой, ничем не отличаясь от настоящей.
  */
-export function getPricing(model: string, lookup: PricingLookup = {}): ModelPricing {
+export function findPricing(model: string, lookup: PricingLookup = {}): ModelPricing | undefined {
   const name = model.toLowerCase();
 
   // При нескольких подходящих фрагментах побеждает самый длинный (самый точный),
@@ -238,7 +243,49 @@ export function getPricing(model: string, lookup: PricingLookup = {}): ModelPric
   if (own) return withOwnLongCacheRate(own[1]);
 
   const entries = lookup.entries ?? BUILT_IN_ENTRIES;
-  return findEntry(model, entries, lookup.at)?.price ?? FALLBACK;
+  return findEntry(model, entries, lookup.at)?.price;
+}
+
+/**
+ * Тариф модели. Порядок: свои цены из настроек → прайс → запасная таблица →
+ * ставка для неизвестной модели.
+ */
+export function getPricing(model: string, lookup: PricingLookup = {}): ModelPricing {
+  return findPricing(model, lookup) ?? FALLBACK;
+}
+
+/**
+ * Деньги по ГОТОВОМУ тарифу. Отдельно от {@link estimateCost} для тех, кто уже
+ * решил, известна ли модель: сама формула у обоих одна, и второй её копии быть
+ * не должно.
+ */
+export function costOf(
+  price: ModelPricing,
+  tokens: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheCreation: number;
+    cacheCreation1h?: number;
+  },
+): number {
+  const perMillion = 1_000_000;
+
+  // Долю зажимаем в границы целого: транскрипт пишет не панель, и рассогласование
+  // полей usage не должно давать отрицательную стоимость.
+  const long = Math.min(Math.max(tokens.cacheCreation1h ?? 0, 0), tokens.cacheCreation);
+  const short = tokens.cacheCreation - long;
+  // getPricing уже проставил часовую ставку своей цене (как введена), поэтому
+  // множитель ниже достаётся только строкам прайса без часовой колонки.
+  const longRate = longCacheRate(price);
+
+  return (
+    (tokens.input * price.input) / perMillion +
+    (tokens.output * price.output) / perMillion +
+    (tokens.cacheRead * price.cacheRead) / perMillion +
+    (short * price.cacheWrite) / perMillion +
+    (long * longRate) / perMillion
+  );
 }
 
 export function estimateCost(
@@ -257,22 +304,5 @@ export function estimateCost(
   },
   lookup: PricingLookup = {},
 ): number {
-  const price = getPricing(model, lookup);
-  const perMillion = 1_000_000;
-
-  // Долю зажимаем в границы целого: транскрипт пишет не панель, и рассогласование
-  // полей usage не должно давать отрицательную стоимость.
-  const long = Math.min(Math.max(tokens.cacheCreation1h ?? 0, 0), tokens.cacheCreation);
-  const short = tokens.cacheCreation - long;
-  // getPricing уже проставил часовую ставку своей цене (как введена), поэтому
-  // множитель ниже достаётся только строкам прайса без часовой колонки.
-  const longRate = longCacheRate(price);
-
-  return (
-    (tokens.input * price.input) / perMillion +
-    (tokens.output * price.output) / perMillion +
-    (tokens.cacheRead * price.cacheRead) / perMillion +
-    (short * price.cacheWrite) / perMillion +
-    (long * longRate) / perMillion
-  );
+  return costOf(getPricing(model, lookup), tokens);
 }

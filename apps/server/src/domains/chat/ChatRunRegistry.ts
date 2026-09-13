@@ -659,8 +659,12 @@ export class ChatRunRegistry {
     };
     this.runs.set(chatId, registered);
 
-    void run
-      .start(routed, (event) => this.emit(registered, event))
+    // Отказ обязательного контура — ошибка прогона тем же путём, что и сбой
+    // CLI: процесс не поднимается вовсе, а человек видит причину в ленте.
+    const launch = route.refusal
+      ? Promise.reject(new Error(route.refusal))
+      : run.start(routed, (event) => this.emit(registered, event));
+    void launch
       .then(() => this.finish(registered))
       .catch((error) => {
         this.emit(registered, {

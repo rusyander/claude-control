@@ -87,6 +87,20 @@ export class PlatformGateway {
   #spend?: SpendFlusher;
   #port = 0;
   #error?: string;
+  /**
+   * Подъёмы и остановки идут строго по очереди. Зовут их с разных мест —
+   * активация, «Поднять шлюз» на карточке, перезапуск по настройке, — и без
+   * очереди остановка посреди подъёма возвращалась раньше, чем подъём назначал
+   * сервер: шлюз оживал после «погасить», а два подъёма разом теряли один
+   * слушатель, продолжавший держать порт.
+   */
+  #queue: Promise<void> = Promise.resolve();
+
+  #enqueue(task: () => Promise<void>): Promise<void> {
+    const next = this.#queue.then(task, task);
+    this.#queue = next.catch(() => undefined);
+    return next;
+  }
 
   /**
    * Дописать накопленный расход на диск прямо сейчас.
@@ -124,8 +138,16 @@ export class PlatformGateway {
     };
   }
 
-  async start(runtime: GatewayRuntime): Promise<void> {
-    await this.stop();
+  start(runtime: GatewayRuntime): Promise<void> {
+    return this.#enqueue(() => this.#startNow(runtime));
+  }
+
+  stop(): Promise<void> {
+    return this.#enqueue(() => this.#stopNow());
+  }
+
+  async #startNow(runtime: GatewayRuntime): Promise<void> {
+    await this.#stopNow();
     this.#error = undefined;
     this.#runtime = runtime;
     this.#spend = new SpendFlusher({
@@ -180,7 +202,7 @@ export class PlatformGateway {
     }
   }
 
-  async stop(): Promise<void> {
+  async #stopNow(): Promise<void> {
     const server = this.#server;
     const store = this.#runtime?.store;
     // Хвост учёта дописывается ДО всего остального: перезапуск шлюза — обычное

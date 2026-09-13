@@ -218,7 +218,13 @@ export const DIALECT_TABLE: DialectRow[] = [
     anthropic: 'usage.input_tokens ← usage.prompt_tokens',
     openai: 'usage.prompt_tokens',
     fate: 'renamed',
-    note: 'расход переименовывается, значения те же',
+    note: 'расход переименовывается; прочитанное из кэша вычитается — у Anthropic вход его не включает',
+  },
+  {
+    anthropic: 'usage.cache_read_input_tokens ← usage.prompt_tokens_details.cached_tokens',
+    openai: 'usage.prompt_tokens_details.cached_tokens',
+    fate: 'renamed',
+    note: 'есть только когда апстрим его прислал; сам контур кэш не считает и списывает весь вход',
   },
 ];
 
@@ -714,10 +720,54 @@ export function openAiResponseToAnthropic(payload: unknown, model: string): unkn
     content,
     stop_reason: stopReasonOf(isRecord(choice) ? choice.finish_reason : undefined, calls.length),
     stop_sequence: null,
-    usage: {
-      input_tokens: numberOf(usage.prompt_tokens),
-      output_tokens: numberOf(usage.completion_tokens),
-    },
+    usage: anthropicUsage(
+      numberOf(usage.prompt_tokens),
+      numberOf(usage.completion_tokens),
+      cachedTokensOf(usage),
+    ),
+  };
+}
+
+/**
+ * Сколько входа модель прочла из кэша. Контур тело модели не переписывает, и
+ * OpenAI-совместимый апстрим (OpenAI, vLLM) кладёт это в `prompt_tokens_details`.
+ */
+export function cachedTokensOf(usage: unknown): number {
+  const details =
+    isRecord(usage) && isRecord(usage.prompt_tokens_details) ? usage.prompt_tokens_details : {};
+  return numberOf(details.cached_tokens);
+}
+
+/**
+ * Расход в форме Anthropic. Там `input_tokens` кэша НЕ включает, а у OpenAI
+ * `prompt_tokens` — включает: перенос одним числом записывал в транскрипт CLI
+ * весь вход свежим, и прочитанное из кэша исчезало из учёта.
+ */
+export function anthropicUsage(
+  prompt: number,
+  completion: number,
+  cached: number,
+): Record<string, number> {
+  const read = Math.min(cached, prompt);
+  return {
+    input_tokens: prompt - read,
+    ...(read > 0 ? { cache_read_input_tokens: read } : {}),
+    output_tokens: completion,
+  };
+}
+
+/** Расход в форме OpenAI; кэш — только когда он был, как отдаёт сам OpenAI. */
+export function openAiUsage(
+  prompt: number,
+  completion: number,
+  total: number,
+  cached: number,
+): Record<string, unknown> {
+  return {
+    prompt_tokens: prompt,
+    completion_tokens: completion,
+    total_tokens: total,
+    ...(cached > 0 ? { prompt_tokens_details: { cached_tokens: cached } } : {}),
   };
 }
 

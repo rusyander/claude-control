@@ -243,6 +243,36 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     });
   });
 
+  /**
+   * Живое подключение 14.09.2026: обязательный контур, галочка «Чат», шлюз
+   * погашен — пустой маршрут отправлял сообщение в облако вендора. Отказ
+   * обязан остановить процесс ДО спавна и дойти до ленты ошибкой.
+   */
+  it('отказ обязательного контура: CLI не поднимается, в ленте ошибка с причиной', async () => {
+    let started = 0;
+    class CountingRun extends FakeRun {
+      override start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
+        started += 1;
+        return super.start(options, onEvent);
+      }
+    }
+    const refusing = new ChatRunRegistry(() => new CountingRun());
+    refusing.setPlatformRouting(() => ({
+      env: {},
+      refusal: 'Контур «EnterprisePlatform» обязателен, а шлюз панели не поднят',
+    }));
+    const { events, sub } = collector();
+    expect(refusing.start('r1', OPTIONS, {})).toBe(true);
+    refusing.attach('r1', 0, sub);
+    await flush();
+    expect(started).toBe(0);
+    expect(events.map((item) => item.event)).toContainEqual({
+      kind: 'error',
+      message: 'Контур «EnterprisePlatform» обязателен, а шлюз панели не поднят',
+    });
+    expect(refusing.describe('r1')?.status).not.toBe('running');
+  });
+
   it('происхождения нет — спрашивается «чат», и адрес прошлой жизни затирается', () => {
     registry.start(
       'c2',

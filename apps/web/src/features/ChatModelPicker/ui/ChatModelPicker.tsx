@@ -10,6 +10,7 @@ import {
   modelSelectOptions,
   platformLayersCaption,
   platformModelCaption,
+  platformRefusalCaption,
   withCurrentValue,
 } from '@shared/lib/chat-model';
 import type { ChatModelPickerProps } from './ChatModelPicker.types';
@@ -52,6 +53,7 @@ export function ChatModelPicker({
   // собственная галочка на карточке контура. Сказать надо ДО отправки
   // сообщения, а не объяснять постфактум.
   const layers = platformLayersCaption(routed?.layers);
+  const refusal = platformRefusalCaption(plan.data);
 
   // Как подписать пункт «по умолчанию»: показываем, что именно придёт из настроек.
   const defaultModelName = defaultModel ? modelLabel(defaultModel) : t('chat.modelClaudeDefault');
@@ -118,6 +120,16 @@ export function ChatModelPicker({
           aria-live="polite"
         >
           {t(caption.key, caption.params)}
+        </Typography>
+      )}
+
+      {refusal && (
+        <Typography variant="caption" color="warning" as="span" role="status" aria-live="polite">
+          {t(refusal.key, {
+            title: refusal.params.title,
+            reason: t(`chat.platformRefusedReason.${refusal.params.reason}`),
+            fix: t(`chat.platformRefusedFix.${refusal.params.reason}`),
+          })}
         </Typography>
       )}
 

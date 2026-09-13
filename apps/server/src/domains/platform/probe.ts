@@ -105,6 +105,18 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
   const contentType = response.headers.get('content-type') ?? '';
   const text = await readBody(response);
 
+  if ((status === 401 || status === 403) && !token) {
+    // Проба без ключа (первый шаг мастера): отказ здесь подтверждает адрес, а не
+    // бракует ключ, которого человек ещё не вводил.
+    return {
+      ...base,
+      reachable: true,
+      status,
+      outcome: 'no-key',
+      detail: `Адрес отвечает как API контура и без ключа отказал (${status}) — так и должно быть: ключ ещё не введён. Введите его на следующем шаге.`,
+    };
+  }
+
   if (status === 401 || status === 403) {
     return {
       ...base,

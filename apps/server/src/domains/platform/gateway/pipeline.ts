@@ -18,6 +18,7 @@ import {
   openAiModelsToAnthropic,
   openAiRequestWithShim,
   openAiResponseToAnthropic,
+  openAiUsage,
   statusOfErrorCode,
   type Dialect,
 } from './dialect.ts';
@@ -143,6 +144,18 @@ export async function handleGatewayRequest(
   // В след запроса путь идёт БЕЗ строки запроса: часть CLI носит в ней свой
   // ключ (`?key=…`), а журнал шлюза уезжает на экран панели целиком.
   const path = url.split('?')[0] ?? url;
+
+  // Проверка связи CLI: Claude Code при старте зовёт `<базовый адрес>/api/hello`.
+  // Вопрос в ней — «жив ли адрес», и живой шлюз отвечает на него сам: в контур
+  // не ходит, в журнал не пишет. Иначе каждый запуск CLI ложился сбоем 404.
+  if (platformId && rest.replace(/\/+$/, '') === '/api/hello') {
+    if (request.method === 'HEAD') {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end();
+      return;
+    }
+    return respond(response, 200, { message: 'hello' });
+  }
 
   if (!route) {
     return refuse(response, deps, {
@@ -1167,11 +1180,12 @@ async function collectForClient(
         finish_reason: answer.finishReason,
       },
     ],
-    usage: {
-      prompt_tokens: answer.promptTokens,
-      completion_tokens: answer.completionTokens,
-      total_tokens: answer.totalTokens,
-    },
+    usage: openAiUsage(
+      answer.promptTokens,
+      answer.completionTokens,
+      answer.totalTokens,
+      answer.cachedTokens,
+    ),
   };
 
   const body =

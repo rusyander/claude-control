@@ -101,6 +101,7 @@ export function PlatformTopic() {
               description: tr('stateUnauthorizedText'),
               isMono: false,
             },
+            { name: tr('stateNoKey'), description: tr('stateNoKeyText'), isMono: false },
             {
               name: tr('stateUnreachable'),
               description: tr('stateUnreachableText'),

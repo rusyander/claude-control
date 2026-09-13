@@ -1,7 +1,15 @@
 import { parseFrame, serializeFrame, splitFrames } from '../../dlp/sse.ts';
 import type { DriverViolationName, VendorFrame, VendorFrameKind } from '../drivers/driver.ts';
 import { readViolations } from './status.ts';
-import { errorBody, stopReasonOf, upstreamErrorCode, type Dialect } from './dialect.ts';
+import {
+  anthropicUsage,
+  cachedTokensOf,
+  errorBody,
+  openAiUsage,
+  stopReasonOf,
+  upstreamErrorCode,
+  type Dialect,
+} from './dialect.ts';
 import { expandContourAliases, strayAliases, strayPlatformLabels } from './tool-shim/aliases.ts';
 import { claimedWithoutCall } from './tool-shim/claims.ts';
 import type { ShimCall } from './tool-shim/parse.ts';
@@ -145,6 +153,8 @@ export interface FrameFacts {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /** Часть входа, прочитанная моделью из кэша (`prompt_tokens_details`). */
+  cachedTokens: number;
 }
 
 /** Что собралось из потока для клиента, просившего НЕ поток. */
@@ -163,6 +173,7 @@ export interface AssembledAnswer {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  cachedTokens: number;
   model: string;
   id: string;
 }
@@ -384,6 +395,7 @@ export class StreamTranslator {
     promptTokens: 0,
     completionTokens: 0,
     totalTokens: 0,
+    cachedTokens: 0,
   };
 
   constructor(options: TranslatorOptions) {
@@ -477,6 +489,7 @@ export class StreamTranslator {
       promptTokens: this.facts.promptTokens,
       completionTokens: this.facts.completionTokens,
       totalTokens: this.facts.totalTokens,
+      cachedTokens: this.facts.cachedTokens,
       model: this.#model,
       id: this.#id || `chatcmpl-${Date.now().toString(36)}`,
     };
@@ -949,11 +962,12 @@ export class StreamTranslator {
             object: 'chat.completion.chunk',
             model: this.#model,
             choices: [],
-            usage: {
-              prompt_tokens: this.facts.promptTokens,
-              completion_tokens: this.facts.completionTokens,
-              total_tokens: this.facts.totalTokens,
-            },
+            usage: openAiUsage(
+              this.facts.promptTokens,
+              this.facts.completionTokens,
+              this.facts.totalTokens,
+              this.facts.cachedTokens,
+            ),
           }),
         );
       }
@@ -1140,6 +1154,7 @@ export class StreamTranslator {
     this.facts.promptTokens = prompt;
     this.facts.completionTokens = completion;
     this.facts.totalTokens = total;
+    this.facts.cachedTokens = cachedTokensOf(payload.usage);
   }
 
   #done(): string {
@@ -1276,7 +1291,7 @@ export class StreamTranslator {
       content: [],
       stop_reason: null,
       stop_sequence: null,
-      usage: { input_tokens: this.facts.promptTokens, output_tokens: 0 },
+      usage: anthropicUsage(this.facts.promptTokens, 0, this.facts.cachedTokens),
     };
     const start = serializeFrame(
       'message_start',
@@ -1340,10 +1355,11 @@ export class StreamTranslator {
         // последним), а `message_start` ушёл на первой дельте с нулём. Anthropic
         // и сам отдаёт итоговый расход здесь — иначе строка таблицы
         // «usage.input_tokens ← usage.prompt_tokens» врала бы в потоке.
-        usage: {
-          input_tokens: this.facts.promptTokens,
-          output_tokens: this.facts.completionTokens,
-        },
+        usage: anthropicUsage(
+          this.facts.promptTokens,
+          this.facts.completionTokens,
+          this.facts.cachedTokens,
+        ),
       }),
     );
     out += serializeFrame('message_stop', JSON.stringify({ type: 'message_stop' }));

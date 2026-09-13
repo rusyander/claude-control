@@ -30,6 +30,7 @@ import type { PlatformGateway } from '../domains/platform/gateway/listener.ts';
 import { applyContour } from '../domains/platform/apply/apply.ts';
 import { buildPlatformApplyPlan, type ContourApplyDeps } from '../domains/platform/apply/plan.ts';
 import { rollbackContour } from '../domains/platform/apply/rollback.ts';
+import { reconcileManagedProfiles } from '../domains/platform/apply/profile.ts';
 import type { PanelBridgeTarget } from '../domains/panel-mcp.ts';
 import { askAgent, readAgentSession, resetAgentSession } from '../domains/platform/agents.ts';
 import {
@@ -105,6 +106,47 @@ export function registerPlatformRoutes(
    * здесь применяется уже сохранённое — иначе состояние экрана и состояние
    * слушателя разъехались бы на первом же отказе.
    */
+  const startGateway = (): Promise<unknown> =>
+    gateway.start({
+      store: ctx.store,
+      appDataDir: appData(),
+      port: ctx.store.getSettings().platformGateway.port,
+      pricing: gatewayPricing(ctx.store, ctx.pricing),
+    });
+
+  /**
+   * Активация поднимает погашенный шлюз сама: включает настройку тем же
+   * порядком, что мастер («Поднять шлюз»), и сверяет управляемые профили, как
+   * общий PATCH настроек шлюза.
+   */
+  const ensureGateway = async (): Promise<void> => {
+    if (gateway.status().running) return;
+    const settings = ctx.store.getSettings().platformGateway;
+    if (!settings.enabled) {
+      ctx.store.updateSettings({ platformGateway: { ...settings, enabled: true } });
+      reconcileManagedProfiles(ctx.store);
+    }
+    await startGateway();
+  };
+
+  /**
+   * «Поднять шлюз» с карточки контура: включить настройку и поднять слушатель
+   * одним вызовом — тем же `ensureGateway`, что и активация. Живой шлюз не
+   * перезапускается: кнопку жмут, когда он погас, а не чтобы оборвать прогоны.
+   */
+  app.post('/api/platforms/gateway/start', async (_request, reply) => {
+    try {
+      await ensureGateway();
+      return gatewayInfo();
+    } catch (error) {
+      return reply.code(409).send({
+        code: 'gateway_start_failed',
+        message: 'Шлюз не поднялся',
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   app.post('/api/platforms/gateway/restart', async (_request, reply) => {
     const settings = ctx.store.getSettings().platformGateway;
     try {
@@ -112,12 +154,7 @@ export function registerPlatformRoutes(
         await gateway.stop();
         return gatewayInfo();
       }
-      await gateway.start({
-        store: ctx.store,
-        appDataDir: appData(),
-        port: settings.port,
-        pricing: gatewayPricing(ctx.store, ctx.pricing),
-      });
+      await startGateway();
       return gatewayInfo();
     } catch (error) {
       // Не поднявшийся слушатель — это состояние с причиной, а не 500: адрес
@@ -291,6 +328,7 @@ export function registerPlatformRoutes(
     // запуска, и пробный запрос ушёл бы процессу, который занял порт после
     // убитой панели.
     gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
+    ensureGateway,
   });
 
   /**

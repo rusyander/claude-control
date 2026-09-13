@@ -520,11 +520,15 @@ const TOOL_SHIM = {
 
 /** Сводка прослойки в ответе шлюза. Меняется по ходу прогона. */
 let gatewayToolShim;
+/** Слушатель шлюза лежит; `gateway/start` его поднимает. */
+let gatewayDown = false;
+let gatewayStarts = 0;
 
 const gatewayInfo = () => ({
   ...GATEWAY,
   status: {
     ...GATEWAY.status,
+    ...(gatewayDown ? { running: false, address: undefined } : {}),
     ...(gatewayViolations
       ? { violations: gatewayViolations, events: [POISONED_EVENT] }
       : { events: [] }),
@@ -628,6 +632,11 @@ await page.route('**/api/platforms**', async (route) => {
 
   if (path === 'gateway') return json(gatewayInfo());
   if (path === 'gateway/restart') return json(gatewayInfo());
+  if (path === 'gateway/start' && method === 'POST') {
+    gatewayStarts += 1;
+    gatewayDown = false;
+    return json(gatewayInfo());
+  }
   if (path === '') {
     // Отказ списка — не редкость: панель поднята наполовину, удалённый доступ
     // закрыт токеном, сеть моргнула. Экран обязан пережить это, не выдумывая
@@ -2308,6 +2317,51 @@ check(!chatPlain.includes('EnterprisePlatform · dev'), 'без контура �
 check(
   !chatPlain.includes('не принимает глубину продумывания'),
   'без контура о глубине шапка ничего не утверждает',
+);
+
+// --- Шлюз лёг при активном контуре (живое подключение 14.09.2026) --------
+
+// Карточка говорила «Шлюз не поднят», а поднять его можно было только в мастере
+// на последнем шаге. Строка с кнопкой стоит на карточке АКТИВНОГО контура, и
+// только пока слушатель действительно лежит.
+activePlatformId = PLATFORM.id;
+platforms = [cardOf()];
+gatewayDown = true;
+await open();
+const downCard = page.locator(`[data-platform-card="${PLATFORM.id}"]`);
+check(
+  (await downCard.locator('[data-gateway-down]').count()) === 1,
+  'на активной карточке при лежащем шлюзе есть строка «шлюз не поднят»',
+);
+await downCard.locator('[data-gateway-down]').getByRole('button', { name: 'Поднять шлюз' }).click();
+await page.waitForTimeout(1500);
+check(gatewayStarts === 1, 'кнопка зовёт `POST gateway/start` ровно один раз');
+check(
+  (await page.locator('[data-gateway-down]').count()) === 0,
+  'шлюз поднялся — строка ушла сама, без перезагрузки',
+);
+activePlatformId = '';
+await open();
+check(
+  (await page.locator('[data-gateway-down]').count()) === 0,
+  'у неактивного контура строки о шлюзе нет',
+);
+
+// Отказ обязательного контура в чате называет не только причину, но и выход.
+runPlan = {
+  routed: false,
+  title: 'EnterprisePlatform · dev',
+  reason: 'gateway_down',
+  refused: true,
+  rules: { model: '', source: 'none', map: {}, catalog: [] },
+  effort: true,
+};
+await goto(`${BASE}/chat`);
+await page.waitForTimeout(1800);
+const refusedChat = await page.locator('body').innerText();
+check(
+  refusedChat.includes('сообщение будет отклонено') && refusedChat.includes('Поднять шлюз'),
+  'отказ в шапке чата говорит, что нажать, а не только почему',
 );
 
 // Итог по ключу — за весь прогон, а не за один экран: мастер, проверка, вопрос

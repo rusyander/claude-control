@@ -61,6 +61,7 @@ let app: FastifyInstance;
 let store: AppStore;
 /** Сколько раз панель вышла наружу за тест. Ноль везде, кроме `/check`. */
 let calls: string[];
+let gateway: PlatformGateway;
 
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'cc-platform-routes-'));
@@ -76,6 +77,12 @@ beforeEach(async () => {
     );
   });
 
+  // Активация поднимает погашенный шлюз сама — настоящий слушатель. Порт 0:
+  // занятый 5179 живой панели на этой же машине иначе увёл бы тест к соседу.
+  store.updateSettings({
+    platformGateway: { ...store.getSettings().platformGateway, port: 0 },
+  });
+  gateway = new PlatformGateway();
   app = Fastify();
   registerPlatformRoutes(
     app,
@@ -83,12 +90,13 @@ beforeEach(async () => {
       location: { paths: { root, appData } },
       store,
     } as unknown as ServerContext,
-    new PlatformGateway(),
+    gateway,
   );
   await app.ready();
 });
 
 afterEach(async () => {
+  await gateway.stop();
   await app.close();
   vi.unstubAllGlobals();
   rmSync(root, { recursive: true, force: true });
@@ -620,21 +628,47 @@ describe('platform routes: активность контура (Т2)', () => {
     ]);
   });
 
-  it('погашенный шлюз — это красный пробный запрос В ОТВЕТЕ, а не отказ маршрута', async () => {
-    // Шлюз этого теста не поднят, значит порт живого слушателя нулевой. Такая
-    // активация обязана состояться и назвать причину: «активировали, но
-    // спросить модель нечем» — состояние карточки, а не сбой панели.
+  it('погашенный шлюз активация поднимает сама: настройка включена, слушатель жив', async () => {
+    // Живое подключение 14.09.2026: шлюз был выключен, активация кончилась
+    // красным «Шлюз не поднят», и чат с галочкой уходил мимо контура. Теперь
+    // маршрут активации включает настройку и поднимает слушатель тем же
+    // порядком, что кнопка мастера.
     writePlatform(store, PLATFORM);
+    expect(store.getSettings().platformGateway.enabled).toBe(false);
 
     const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/activate' });
 
     expect(res.statusCode).toBe(200);
     expect(res.json().probe.outcome).toBe('ok');
-    expect(res.json().smoke.ok).toBe(false);
-    expect(res.json().smoke.detail).toContain('Шлюз не поднят');
     expect(store.getSettings().activePlatformId).toBe('enterprise-platform-dev');
-    // Наружу ходила только проба: пробный запрос идёт в 127.0.0.1 и до него не дошло.
-    expect(calls).toEqual(['https://api.dev.example.ru/v1/models']);
+    expect(store.getSettings().platformGateway.enabled).toBe(true);
+    expect(gateway.status().running).toBe(true);
+    // Пробный запрос дошёл до шлюза и дальше до контура: причина — не «шлюз не поднят».
+    expect(res.json().smoke.detail ?? '').not.toContain('Шлюз не');
+    expect(calls[0]).toBe('https://api.dev.example.ru/v1/models');
+  });
+
+  it('«Поднять шлюз» с карточки: выключенная настройка включается, слушатель жив, в сеть ни шагу', async () => {
+    // Живое подключение 14.09.2026: на карточке висело «Шлюз не поднят», а
+    // кнопка жила только в мастере на последнем шаге. Маршрут делает то же, что
+    // активация: включает настройку и поднимает слушатель одним вызовом.
+    writePlatform(store, { ...PLATFORM, enabled: true });
+    store.updateSettings({ activePlatformId: PLATFORM.id });
+    expect(store.getSettings().platformGateway.enabled).toBe(false);
+
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/gateway/start' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().settings.enabled).toBe(true);
+    expect(res.json().status.running).toBe(true);
+    expect(store.getSettings().platformGateway.enabled).toBe(true);
+    expect(gateway.status().running).toBe(true);
+    expect(calls).toEqual([]);
+
+    // Повтор по живому шлюзу — не перезапуск и не ошибка.
+    const again = await app.inject({ method: 'POST', url: '/api/platforms/gateway/start' });
+    expect(again.statusCode).toBe(200);
+    expect(again.json().status.port).toBe(res.json().status.port);
   });
 
   it('возврат по кнопке чистит поле активного контура и не ходит в сеть', async () => {

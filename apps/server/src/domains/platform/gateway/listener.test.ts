@@ -48,6 +48,52 @@ afterEach(async () => {
   rmSync(root, { recursive: true, force: true });
 });
 
+/** Жив ли кто-нибудь на порту — спрашиваем сокетом, а не у самого шлюза. */
+function portAnswers(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect(port, '127.0.0.1');
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once('error', () => resolve(false));
+  });
+}
+
+describe('очередь подъёма и остановки', () => {
+  /**
+   * Живое подключение 14.09.2026: активация поднимает шлюз сама, а рядом стоят
+   * кнопка «Поднять шлюз» и «перезапуск по настройке». Нажатые почти разом, два
+   * подъёма оставляли слушатель, о котором шлюз уже не знал: его `stop` закрывал
+   * второй, а первый держал порт до конца процесса.
+   */
+  it('два подъёма разом — один слушатель, и остановка освобождает порт', async () => {
+    const port = await occupy();
+    await new Promise<void>((resolve) => squatter?.close(() => resolve()));
+    squatter = undefined;
+
+    await Promise.all([
+      gateway.start({ store, appDataDir: appData, port }),
+      gateway.start({ store, appDataDir: appData, port }),
+    ]);
+    expect(gateway.status().port).toBe(port);
+
+    await gateway.stop();
+    expect(gateway.status().running).toBe(false);
+    for (let offset = 0; offset < 3; offset += 1) {
+      expect(await portAnswers(port + offset)).toBe(false);
+    }
+  });
+
+  it('остановка во время подъёма побеждает: шлюз не оживает после неё', async () => {
+    const starting = gateway.start({ store, appDataDir: appData, port: 0 });
+    const stopping = gateway.stop();
+    await Promise.all([starting, stopping]);
+
+    expect(gateway.status().running).toBe(false);
+  });
+});
+
 describe('порт', () => {
   it('занятый порт уступается соседнему, и разница видна', async () => {
     const busy = await occupy();

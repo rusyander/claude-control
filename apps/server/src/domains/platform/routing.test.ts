@@ -192,11 +192,44 @@ describe('прогон через контур', () => {
 
   it('погашенный шлюз и потерянный ключ названы по-разному', () => {
     connect(PLATFORM, 0);
-    expect(resolveRunRoute(deps, 'chat')).toEqual({ routed: false, reason: 'gateway_down' });
+    expect(resolveRunRoute(deps, 'chat')).toMatchObject({ routed: false, reason: 'gateway_down' });
 
     connect();
     writeToken(dir, PLATFORM.id, '');
-    expect(resolveRunRoute(deps, 'chat')).toEqual({ routed: false, reason: 'no_token' });
+    expect(resolveRunRoute(deps, 'chat')).toMatchObject({ routed: false, reason: 'no_token' });
+  });
+
+  /**
+   * Живое подключение 14.09.2026: активный обязательный контур с галочкой «Чат»
+   * при погашенном шлюзе отдавал пустой маршрут — и чат уходил в облако вендора,
+   * ровно то, чего «обязательно» обещает не делать.
+   */
+  it('обязательный контур без шлюза или ключа — отказ прогону, а не проход мимо', () => {
+    connect(PLATFORM, 0);
+    const down = resolveRunRoute(deps, 'chat');
+    expect(!down.routed && down.refusal).toContain('Контур «EnterprisePlatform · dev» обязателен');
+    expect(!down.routed && down.refusal).toContain('шлюз панели не поднят');
+    // Совет — ровно к своей причине: кнопка на карточке, а не три перехода в мастер.
+    expect(!down.routed && down.refusal).toContain('«Поднять шлюз» на карточке контура');
+    expect(describeRunPlan(deps, 'chat')).toMatchObject({ routed: false, refused: true });
+
+    connect();
+    writeToken(dir, PLATFORM.id, '');
+    const noKey = resolveRunRoute(deps, 'chat');
+    expect(!noKey.routed && noKey.refusal).toContain('ключ контура не сохранён');
+    // Без ключа шлюз поднимать бесполезно — совет про ключ, а не про шлюз.
+    expect(!noKey.routed && noKey.refusal).toContain('шаг «Ключ»');
+    expect(!noKey.routed && noKey.refusal).not.toContain('Поднять шлюз');
+
+    // Снятая галочка — не отказ: этот потребитель в контур и не просился.
+    connect({ ...PLATFORM, consumers: [] }, 0);
+    expect(resolveRunRoute(deps, 'chat')).toEqual({ routed: false, reason: 'consumer_off' });
+  });
+
+  it('«по возможности» оставляет проход мимо контура без отказа', () => {
+    connect({ ...PLATFORM, mode: 'best-effort' }, 0);
+    expect(resolveRunRoute(deps, 'chat')).toEqual({ routed: false, reason: 'gateway_down' });
+    expect(describeRunPlan(deps, 'chat').refused).toBeUndefined();
   });
 
   it('ассистент и терминал — не прогоны: у них свои пути', () => {

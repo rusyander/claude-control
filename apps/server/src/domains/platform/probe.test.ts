@@ -147,6 +147,26 @@ describe('probePlatform: пять исходов', () => {
     expect(result.detail).toContain('права ключа');
   });
 
+  it.each([401, 403])(
+    '%i без ключа — «адрес верный, нужен ключ», а не «ключ отклонён»',
+    async (status) => {
+      // Первый шаг мастера проверяет адрес ДО ввода ключа. Отклонять там нечего:
+      // отказ без ключа как раз подтверждает, что по адресу модельный API, и
+      // «ключ отклонён» отправлял человека перевыпускать ключ, которого он не вводил.
+      const result = await probePlatform({
+        platform: BASE,
+        token: undefined,
+        fetchImpl: reply('{"error":"missing authorization"}', { status }),
+      });
+
+      expect(result.outcome).toBe('no-key');
+      expect(result.reachable).toBe(true);
+      expect(result.status).toBe(status);
+      expect(result.detail).toContain('ключ ещё не введён');
+      expect(result.detail).not.toContain('Их пять');
+    },
+  );
+
   it('503 — контур ещё поднимается, а не «моделей нет»', async () => {
     const result = await probePlatform({
       platform: BASE,

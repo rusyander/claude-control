@@ -3,6 +3,7 @@ import type {
   Platform,
   PlatformApplyTarget,
   PlatformBudgetState,
+  PlatformProbeOutcome,
   PlatformStatus,
 } from '@agentdeck/contracts';
 import {
@@ -256,7 +257,7 @@ describe('состояние карточки', () => {
     ...patch,
   });
 
-  const probe = (outcome: 'ok' | 'unauthorized' | 'unreachable' | 'not-api' | 'not-ready') => ({
+  const probe = (outcome: PlatformProbeOutcome) => ({
     outcome,
     reachable: outcome !== 'unreachable',
     url: 'https://api.example.ru/v1/models',
@@ -297,5 +298,9 @@ describe('состояние карточки', () => {
   it('отклонённый ключ — своё состояние: чинится в админке, а не адресом', () => {
     expect(platformCardState(statusOf({ health: probe('unauthorized') }))).toBe('unauthorized');
     expect(platformCardState(statusOf({ health: probe('ok') }))).toBe('ok');
+  });
+
+  it('проба без ключа — «ключ не введён», а не «ключ отклонён» и не «не отвечает»', () => {
+    expect(platformCardState(statusOf({ health: probe('no-key') }))).toBe('no-key');
   });
 });

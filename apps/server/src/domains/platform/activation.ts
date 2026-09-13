@@ -77,6 +77,13 @@ export interface ContourActivationDeps extends ContourRollbackDeps {
    * после неё.
    */
   gatewayPort?: () => number;
+  /**
+   * Поднять шлюз, если он погашен. Активный контур без шлюза — маршрут, которым
+   * не пройдёт ни один прогон: живое подключение 14.09.2026 закончилось красным
+   * «Шлюз не поднят», а кнопка подъёма есть только на последнем шаге мастера.
+   * Отказ бросается и превращается в причину пробного запроса.
+   */
+  ensureGateway?: () => Promise<void>;
   now?: () => Date;
 }
 
@@ -114,6 +121,17 @@ export async function activatePlatform(
   };
 }
 
+/** Подъём шлюза при активации; причина отказа — строкой, а не исключением. */
+async function raiseGateway(deps: ContourActivationDeps): Promise<string | undefined> {
+  if (!deps.ensureGateway) return undefined;
+  try {
+    await deps.ensureGateway();
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
 /**
  * Сетевая половина активации: проба, пробный запрос и их запись. Ни один отказ
  * отсюда не поднимается выше — он превращается в красную пробу с причиной.
@@ -126,7 +144,10 @@ async function probeAfterActivation(
   const now = deps.now ?? (() => new Date());
   try {
     const probe = await checkPlatform(store, deps.appDataDir, platform.id, deps.probeFetch);
-    const smoke = await smokePlatform(deps, platform, probe);
+    const gatewayError = await raiseGateway(deps);
+    const asked = await smokePlatform(deps, platform, probe);
+    const smoke =
+      gatewayError && !asked.ok ? { ...asked, detail: `Шлюз не поднялся: ${gatewayError}` } : asked;
     // Контур могли удалить, пока шли эти два запроса: запись итога вернула бы в
     // состояние строку о том, чего больше нет, и убрать её было бы некому.
     if (readPlatforms(store).some((item) => item.id === platform.id)) {

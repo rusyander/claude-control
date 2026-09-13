@@ -474,7 +474,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     // прежний: продолжение остановленного прогона приходит со старыми
     // параметрами, и адрес контура пережил бы снятую галочку. Модели и усилия в
     // таком ответе нет вовсе: выбор человека остаётся его выбором.
-    if (!decision.routed) return { env: {} };
+    if (!decision.routed) {
+      return decision.refusal ? { env: {}, refusal: decision.refusal } : { env: {} };
+    }
     return {
       env: decision.env,
       model: decision.model,

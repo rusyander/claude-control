@@ -74,12 +74,21 @@ export type PlatformRouteSkipReason =
 
 export type PlatformRouteDecision =
   | ({ routed: true; platformId: string } & PlatformRunRoute)
-  | { routed: false; reason: PlatformRouteSkipReason };
+  | { routed: false; reason: PlatformRouteSkipReason; refusal?: string };
 
 /** Что прогон получает от контура: окружение и — если включён — свой промпт. */
 export interface PlatformRunRoute {
   /** Переменные окружения ОДНОГО процесса; ключа контура среди них нет. */
   env: Record<string, string>;
+  /**
+   * Прогон НЕ запускается вовсе, и это текст отказа для человека.
+   *
+   * Обязательный контур с отмеченной галочкой, у которого нет шлюза или ключа:
+   * пустое окружение здесь значило бы прогон мимо контура, то есть молча в
+   * облако вендора (живой прогон 14.09.2026 — чат ушёл бы туда при погашенном
+   * шлюзе). Место спавна обязано отказать этим текстом, а не запускать.
+   */
+  refusal?: string;
   /**
    * Модель, которой пойдёт прогон, и откуда она взялась (Т6).
    *
@@ -153,6 +162,37 @@ function contourSystemPrompt(appData: string): string {
     .join('\n\n');
 }
 
+const UNREACHABLE_TEXT: Record<'gateway_down' | 'no_token', string> = {
+  gateway_down: 'шлюз панели не поднят',
+  no_token: 'ключ контура не сохранён',
+};
+
+/** Что чинить — к каждой причине своё: без ключа поднимать шлюз бесполезно. */
+const UNREACHABLE_FIX: Record<'gateway_down' | 'no_token', string> = {
+  gateway_down: 'Нажмите «Поднять шлюз» на карточке контура (раздел «Контур»)',
+  no_token: 'Сохраните ключ («Настроить» на карточке контура → шаг «Ключ»)',
+};
+
+/**
+ * Галочка стоит, а дойти до контура нечем. Только эти две причины: остальные
+ * отказы (`file_only` и прочие) значат «этот CLI в контур окружением не ходит»,
+ * и у `file_only` адрес может жить в файле — отказ сломал бы рабочий маршрут.
+ * «По возможности» оставляет прежний проход мимо контура.
+ */
+function unreachable(
+  platform: Platform,
+  reason: 'gateway_down' | 'no_token',
+): PlatformRouteDecision {
+  if (platform.mode === 'best-effort') return { routed: false, reason };
+  return {
+    routed: false,
+    reason,
+    refusal:
+      `Контур «${platform.title}» обязателен, а ${UNREACHABLE_TEXT[reason]} — прогон не запущен, ` +
+      `чтобы не уйти в облако вендора. ${UNREACHABLE_FIX[reason]} либо верните провайдер по умолчанию.`,
+  };
+}
+
 /**
  * Решение по одному запуску. Зовётся из мест спавна — реестра прогонов, агента
  * тестов, чата чужого CLI, — и ни одно из них не знает про контуры ничего,
@@ -175,10 +215,10 @@ export function resolveRunRoute(
   if (unsupported) return { routed: false, reason: unsupported };
 
   const port = deps.gatewayPort();
-  if (port <= 0) return { routed: false, reason: 'gateway_down' };
+  if (port <= 0) return unreachable(platform, 'gateway_down');
   // Ключ читается ТОЛЬКО чтобы ответить «он есть»: в окружение прогона уходит
   // заглушка, а настоящий ключ подставляет шлюз — в этом весь смысл шлюза.
-  if (!readToken(deps.appDataDir, platform.id)) return { routed: false, reason: 'no_token' };
+  if (!readToken(deps.appDataDir, platform.id)) return unreachable(platform, 'no_token');
 
   const apiKind = pickApiKind(provider);
   const vars = apiKind ? provider.endpointConfig?.[apiKind] : undefined;
@@ -243,6 +283,7 @@ export function describeRunPlan(deps: PlatformRoutingDeps, consumer: string): Pl
       routed: false,
       title: platform?.title ?? '',
       ...(decision.routed ? {} : { reason: decision.reason }),
+      ...(!decision.routed && decision.refusal ? { refused: true as const } : {}),
       rules: { model: '', source: 'none', map: {}, catalog: [] },
       effort: true,
     };

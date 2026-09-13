@@ -54,6 +54,11 @@ interface LiveRun {
   cleanupTimer?: ReturnType<typeof setTimeout>;
 }
 
+/** Прогон, который не поднимает процесс: его старт — сразу отказ с этим текстом. */
+function refusedRun(refusal: string): ProviderChatRunLike {
+  return { start: () => Promise.reject(new Error(refusal)), stop: () => {} };
+}
+
 /** След остановленного прогона, который не успел ответить ни словом. */
 const STOPPED_TEXT = 'Прогон остановлен: ответа не было.';
 
@@ -174,6 +179,9 @@ export class ProviderChatService {
     // и другое решено маршрутом, а не здесь.
     const model = route.model?.model || chat.model || '';
     const effort = route.effort === false ? '' : (chat.effort ?? '');
+    // Отказ обязательного контура — тем же путём, что и упавший прогон: процесс
+    // не поднимается, а в переписке остаётся причина.
+    if (route.refusal) live.run = refusedRun(route.refusal);
 
     void live.run
       .start(

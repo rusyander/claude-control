@@ -27,6 +27,7 @@ import {
 } from '@entities/Platform';
 import { AppliedTargets } from './AppliedTargets';
 import { ApplyJournal } from './ApplyJournal';
+import { GatewayDownLine } from './GatewayDownLine';
 import { SmokeLine } from './SmokeLine';
 import { formatAgo } from './lib/formatAgo';
 import styles from './PlatformPage.module.scss';
@@ -205,6 +206,7 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
             шлюз отвечает на его адрес отказом «контур выключен в панели» — и
             зелёная строка под словом «не активен», и красная как будто про
             сейчас одинаково врут. Так же поступает телефон. */}
+        {isActive && <GatewayDownLine />}
         {isActive && status.smoke && <SmokeLine smoke={status.smoke} />}
 
         <Stack gap="var(--spacing-3xs)">
@@ -353,6 +355,7 @@ const TONE = {
   ok: 'success',
   unauthorized: 'danger',
   unreachable: 'warning',
+  'no-key': 'warning',
 } as const;
 
 /** Строка отказа 402 по тому, что назвал манифест драйвера. */

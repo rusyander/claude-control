@@ -133,7 +133,11 @@ export const platformEn: typeof platformRu = {
       'Choosing “do not work if the contour is unavailable”, you see right there that with the ' +
       'panel switched off a CLI pointed at the gateway gets a connection refusal instead of ' +
       'quietly falling back to the vendor cloud. That is the whole point of the mode — but it ' +
-      'is better learned before, not after.',
+      'is better learned before, not after. The same holds with the panel alive: if the gateway ' +
+      'is down or the key is not saved, a chat, group or test agent whose box is ticked does not ' +
+      'start at all — the chat header warns before sending, and the feed keeps the reason together ' +
+      'with what to press: “Start the gateway” on the contour card, or the “Key” step. ' +
+      '“Best effort” lets such a run bypass the contour instead.',
 
     activeTitle: 'The active contour: exactly one',
     activeCaption:
@@ -190,7 +194,7 @@ export const platformEn: typeof platformRu = {
       'gateway kept serving it — a divergence you would only notice through your CLI.',
 
     statesTitle: 'Connection states',
-    statesCaption: 'Five words on the card and what stands behind each.',
+    statesCaption: 'Six words on the card and what stands behind each.',
     stateColumn: 'State',
     stateMeaningColumn: 'What stands behind it',
     stateUnchecked: 'not probed',
@@ -209,6 +213,11 @@ export const platformEn: typeof platformRu = {
       'is transient, and the first sensible move is to probe again. A failed probe does not ' +
       'erase capabilities confirmed earlier. The other side of that same cache is signed on the ' +
       '“connected” state: a successful probe does not mean the key is still alive.',
+    stateNoKey: 'no key entered',
+    stateNoKeyText:
+      'The probe went without a key and the contour refused. This is not “key rejected”: there ' +
+      'was nothing to reject, and the refusal itself confirms the address is a model API rather ' +
+      'than a login page. Fixed by saving the key — “Configure” → the “Key” step.',
     stateUnreachable: 'not answering',
     stateUnreachableText:
       'The request never reached the contour — usually the address or the network, not the ' +
@@ -1054,11 +1063,11 @@ export const platformEn: typeof platformRu = {
         'puts the key into the api-key header itself.',
       pProbe: 'At this step the probe still has no key',
       pProbeText:
-        'Pressed before the second step, “Check connection” returns “key rejected” — and that ' +
-        'is not a misconfiguration. The panel lists five causes right there, because the ' +
-        'contour itself names none: an unknown key, a revoked one, an expired one, one with a ' +
-        'deleted owner and one out of budget all answer with the same 401. The real ' +
-        'connection check happens at the third step.',
+        'Pressed before the second step, “Check connection” answers “the address is right, a key ' +
+        'is needed”: the contour refused without a key, and that refusal is exactly what confirms ' +
+        'the address is a model API and not an admin console. “Key rejected” does not appear here ' +
+        '— there is nothing to reject; the panel keeps that word for a key the contour really ' +
+        'refused. The real connection check happens at the third step.',
       pKey: 'Step 2: paste the key',
       pKeyText:
         'The very sk-… copied at step seven, in full. After this it is never shown again: ' +
@@ -1107,7 +1116,10 @@ export const platformEn: typeof platformRu = {
         'consumers’ configs, with the contour identifier appended: ' +
         'http://127.0.0.1:5179/enterprise-platform-stand/v1. The dashes next to the consumers stay to the very ' +
         'end: the contour is switched on only by “Done”, and until then the row honestly says ' +
-        'there is nothing to apply yet.',
+        'there is nothing to apply yet. A forgotten button does not break the connection: ' +
+        'activation raises a stopped gateway itself, and one that fails to start names the reason ' +
+        'in the smoke-request line. If the gateway goes down later, the active contour’s card says ' +
+        '“The panel gateway is down” and keeps the same button right there — no trip to the wizard.',
       pCard: 'Done: the contour is active and has already answered',
       pCardText:
         'On “Done” the new contour becomes active at once, and the panel immediately asks the ' +
@@ -1355,7 +1367,7 @@ export const platformEn: typeof platformRu = {
       '08-admin-usage': 'Usage analytics: spend by model and by key',
       '09-panel-empty': 'The “Contour” section before connecting: one button and a promise',
       '10-wizard-address': 'Step 1: contour type, title, identifier and API address',
-      '11-wizard-probe': 'A probe with no key answers “key rejected” — five causes are named',
+      '11-wizard-probe': 'A probe with no key answers “the address is right, a key is needed”',
       '12-wizard-key': 'Step 2: the key. A stored one is never shown again, anywhere',
       '13-wizard-capabilities': 'Step 3: what the probe confirmed, and what stayed “not declared”',
       '14-wizard-targets':

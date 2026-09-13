@@ -833,6 +833,16 @@ export const en: TranslationSchema = {
     platformModelUnset:
       'The "{{title}}" contour assigned no model (empty catalog, or the probe never ran) — the request goes as it is.',
     platformNoEffort: 'The "{{title}}" contour takes no reasoning effort — it is not sent.',
+    platformRefused:
+      'The "{{title}}" contour is required, but {{reason}}: the message will be refused — it goes neither to the contour nor to the vendor cloud. {{fix}}',
+    platformRefusedReason: {
+      gateway_down: 'the panel gateway is down',
+      no_token: 'the contour key is not saved',
+    },
+    platformRefusedFix: {
+      gateway_down: 'Press “Start the gateway” on the contour card (the “Contour” section).',
+      no_token: 'Save the key: “Configure” on the contour card → the “Key” step.',
+    },
     platformLayers: 'Through the "{{title}}" contour the run goes without ours: {{list}}.',
     platformLayersAll:
       'Through the "{{title}}" contour the run goes without a single layer of ours: no rules, no ' +
@@ -1915,6 +1925,7 @@ export const en: TranslationSchema = {
       ok: 'online',
       unauthorized: 'key rejected',
       unreachable: 'not responding',
+      'no-key': 'no key entered',
     },
     driverLabel: 'Contour type',
     driver: {
@@ -2038,6 +2049,7 @@ export const en: TranslationSchema = {
       'not-api': 'answers, but not a model API',
       unauthorized: 'key rejected',
       'not-ready': 'contour is not answering right now',
+      'no-key': 'the address is right, a key is needed',
     },
     fix: {
       ok: 'The contour responds — nothing to fix.',
@@ -2048,6 +2060,8 @@ export const en: TranslationSchema = {
         'There are five causes and the contour tells none of them apart. Probe again — the last one is transient. If that does not help, check the key’s term, budget and owner in the admin console.',
       'not-ready':
         'The contour is alive but will not answer right now: it is starting, hit the key’s rate limit or failed on its side — the cause is in the line above. Probe again a little later.',
+      'no-key':
+        'The address is a model API, and it refused only because no key was sent. Save the key (“Configure” → the “Key” step) and probe again.',
     },
     tokenLabel: 'Contour key',
     tokenPlaceholder: 'sk-…',
@@ -2160,6 +2174,10 @@ export const en: TranslationSchema = {
     gatewayPortTaken: 'port {{requested}} was busy — the one it got is what gets written',
     gatewayDown: 'the gateway is down — there is nothing to apply to a CLI yet',
     gatewayStart: 'Start the gateway',
+    gatewayStarted: 'Gateway is up: {{address}}',
+    gatewayDownCard: 'The panel gateway is down',
+    gatewayDownCardHint:
+      'Chat and CLIs reach the contour only through the gateway. While it is down a required contour refuses to start a run, and a best-effort one lets the work bypass the contour.',
     modeLabel: 'If the contour does not respond',
     mode: { required: 'required', 'best-effort': 'best effort' },
     modeHint: {

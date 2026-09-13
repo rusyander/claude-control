@@ -93,9 +93,11 @@
   }
 }
 
+// Текст — инверсный токен, не белый: в тёмной теме фон светлеет до #f87171, и
+// белый на нём давал контраст 2.76 (axe, раздел «Контур», 14.09.2026).
 .danger {
   background-color: var(--color-danger);
-  color: #fff;
+  color: var(--color-fg-inverse);
 
   &:hover:not(:disabled) {
     filter: brightness(1.1);

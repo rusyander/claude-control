@@ -316,6 +316,8 @@ export class ProjectTestRunRegistry {
     // со следующего прогона.
     const route = this.platformRouting?.() ?? { env: {} };
     try {
+      // Обязательный контур без шлюза или ключа: мимо него агент не идёт.
+      if (route.refusal) throw new Error(route.refusal);
       await run.start(
         {
           prompt,

@@ -81,7 +81,10 @@ export function StepAddress({ model }: WizardStepProps) {
           </Button>
           {probe && (
             <Stack direction="row" gap="var(--spacing-2xs)" align="center">
-              <StatusDot tone={probe.outcome === 'ok' ? 'success' : 'warning'} />
+              {/* «Нужен ключ» на этом шаге — удача: адрес проверяется до ключа. */}
+              <StatusDot
+                tone={probe.outcome === 'ok' || probe.outcome === 'no-key' ? 'success' : 'warning'}
+              />
               <Typography variant="body-sm" as="span">
                 {t(`platform.outcome.${probe.outcome}`)}
               </Typography>

@@ -6,6 +6,7 @@ export {
   useDismissActivationNotice,
   usePlatformGateway,
   useRestartGateway,
+  useStartGateway,
   useSavePlatform,
   useCheckPlatform,
   usePlatformApplyPlan,

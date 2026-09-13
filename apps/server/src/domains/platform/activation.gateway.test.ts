@@ -154,6 +154,43 @@ describe('пробный запрос идёт через собственный
     expect(JSON.parse(calls[0]?.body ?? '{}').max_tokens).toBe(SMOKE_MAX_TOKENS);
   });
 
+  /**
+   * Живое подключение 14.09.2026: шлюз был погашен, активация закончилась
+   * красным «Шлюз не поднят», а подъём жил только на последнем шаге мастера.
+   * Настоящий слушатель поднимается САМОЙ активацией — и пробный запрос
+   * проходит через него.
+   */
+  it('погашенный шлюз активация поднимает сама, и пробный запрос проходит', async () => {
+    const result = await activatePlatform(
+      {
+        ...deps(),
+        ensureGateway: async () => {
+          await gateway.start({
+            store,
+            appDataDir: appData,
+            port: 0,
+            fetchImpl: upstream([DELTA, DONE]),
+            spendFlushMs: 0,
+          });
+        },
+      },
+      PLATFORM.id,
+    );
+    expect(gateway.status().running).toBe(true);
+    expect(result.smoke.ok).toBe(true);
+    expect(result.smoke.answer).toBe('готов');
+  });
+
+  it('шлюз не поднялся — причина в пробном запросе, активация остаётся', async () => {
+    const result = await activatePlatform(
+      { ...deps(), ensureGateway: () => Promise.reject(new Error('EADDRINUSE 5179')) },
+      PLATFORM.id,
+    );
+    expect(result.smoke.ok).toBe(false);
+    expect(result.smoke.detail).toBe('Шлюз не поднялся: EADDRINUSE 5179');
+    expect(store.getSettings().activePlatformId).toBe(PLATFORM.id);
+  });
+
   it('контур отказал — отказ виден словами, активация остаётся', async () => {
     await gateway.start({
       store,

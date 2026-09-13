@@ -44,6 +44,11 @@ async function restartGateway(): Promise<PlatformGatewayInfo> {
   return data;
 }
 
+async function startGateway(): Promise<PlatformGatewayInfo> {
+  const { data } = await apiClient.post<PlatformGatewayInfo>('/platforms/gateway/start');
+  return data;
+}
+
 /**
  * Сохранить контур. Ключ едет РЯДОМ с настройкой и только когда его тронули:
  * форма правки поля ключа не присылает вовсе, и сохранённый остаётся на месте.
@@ -263,6 +268,22 @@ export function useRestartGateway() {
       queryClient.setQueryData(queryKeys.platformGateway, info);
       // Поднявшийся шлюз меняет `ready` в плане применения каждого контура:
       // без сброса кнопка «Применить» осталась бы заблокированной у живого шлюза.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.platforms });
+    },
+  });
+}
+
+/**
+ * «Поднять шлюз» с карточки: сервер сам включает настройку и поднимает
+ * слушатель, живой не трогает. Сброс списка контуров снимает и отказ в шапке
+ * чата — план прогона лежит под тем же ключом.
+ */
+export function useStartGateway() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: startGateway,
+    onSuccess: (info) => {
+      queryClient.setQueryData(queryKeys.platformGateway, info);
       void queryClient.invalidateQueries({ queryKey: queryKeys.platforms });
     },
   });

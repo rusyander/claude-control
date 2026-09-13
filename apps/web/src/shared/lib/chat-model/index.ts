@@ -1,5 +1,10 @@
 import { ourLayerIds } from '@agentdeck/contracts';
-import type { ModelInfo, OurLayerId, PlatformRunLayers } from '@agentdeck/contracts';
+import type {
+  ModelInfo,
+  OurLayerId,
+  PlatformRunLayers,
+  PlatformRunPlan,
+} from '@agentdeck/contracts';
 import type { PlatformModelChoice } from '@agentdeck/contracts/platform-models';
 
 /**
@@ -91,6 +96,20 @@ export function platformModelCaption(
   if (choice.source === 'none') return { key: 'chat.platformModelUnset', params, warn: true };
   if (choice.replaced) return { key: 'chat.platformModelReplaced', params, warn: true };
   return { key: 'chat.platformModel', params, warn: false };
+}
+
+/**
+ * Подпись «прогон будет отклонён» — обязательный контур без шлюза или ключа.
+ * Сервер отказывает при отправке; без этой строки человек узнал бы об отказе
+ * только по ошибке в ленте, а раньше — не узнал бы вовсе: прогон молча уходил
+ * в облако вендора (живое подключение 14.09.2026).
+ */
+export function platformRefusalCaption(
+  plan: PlatformRunPlan | undefined,
+): { key: 'chat.platformRefused'; params: { title: string; reason: string } } | undefined {
+  if (!plan?.refused) return undefined;
+  const reason = plan.reason === 'no_token' ? 'no_token' : 'gateway_down';
+  return { key: 'chat.platformRefused', params: { title: plan.title, reason } };
 }
 
 /** Что сказать о наших слоях, снятых с прогона через контур (Т8). */

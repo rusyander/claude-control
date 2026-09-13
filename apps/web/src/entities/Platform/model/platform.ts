@@ -235,7 +235,8 @@ export function platformBudgetAlarming(budget: PlatformBudgetState): boolean {
  * `unchecked` отделён от `unreachable` намеренно: «не проверяли» и «не
  * отвечает» — разные утверждения, и второе про контур, который может работать.
  */
-export type PlatformCardState = 'disabled' | 'unchecked' | 'ok' | 'unauthorized' | 'unreachable';
+export type PlatformCardState =
+  'disabled' | 'unchecked' | 'ok' | 'unauthorized' | 'unreachable' | 'no-key';
 
 export function platformCardState(status: PlatformStatus): PlatformCardState {
   // Признак ровно один — `active`. Тумблер контура говорит о том же самом
@@ -248,5 +249,7 @@ export function platformCardState(status: PlatformStatus): PlatformCardState {
   if (!status.health) return 'unchecked';
   if (status.health.outcome === 'ok') return 'ok';
   if (status.health.outcome === 'unauthorized') return 'unauthorized';
+  // Проба шла без ключа: адрес подтверждён, отклонять было нечего.
+  if (status.health.outcome === 'no-key') return 'no-key';
   return 'unreachable';
 }

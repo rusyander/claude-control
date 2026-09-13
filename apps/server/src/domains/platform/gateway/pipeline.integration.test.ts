@@ -231,6 +231,21 @@ describe('маршруты шлюза', () => {
     expect(calls).toHaveLength(0);
   });
 
+  it('проверка связи CLI (`/api/hello`) — 200 без похода в контур и без записи в сбои', async () => {
+    // Claude Code при старте стучится в `<базовый адрес>/api/hello`. Шлюз жив —
+    // значит и ответ «жив»; прежний 404 ложился в журнал сбоем на каждый запуск
+    // CLI и краснил счётчик шлюза, который работал.
+    await start(upstream([]));
+    for (const method of ['GET', 'HEAD']) {
+      const answer = await fetch(`http://127.0.0.1:${port}/enterprise-platform/api/hello`, { method });
+      expect(answer.status).toBe(200);
+    }
+    expect(calls).toHaveLength(0);
+    const status = gateway.status();
+    expect(status.failures).toBe(0);
+    expect(status.events).toHaveLength(0);
+  });
+
   it('неизвестный контур — 404, а не поход неизвестно куда', async () => {
     await start(upstream([]));
     const answer = await ask('/чужой/v1/chat/completions', { model: 'm' });
@@ -503,6 +518,55 @@ describe('клиент просил не поток', () => {
     expect(body.type).toBe('message');
     expect(body.content[0]?.text).toBe('да');
     expect(body.usage.input_tokens).toBe(10);
+  });
+
+  describe('прочитанный из кэша вход доезжает до клиента Anthropic', () => {
+    // Контур отдаёт тело модели как есть (inst-api `handler_public_api.go`), и
+    // OpenAI-совместимый апстрим кладёт кэш в `prompt_tokens_details`. Мост терял
+    // его, и транскрипт CLI записывал весь вход свежим: у Anthropic
+    // `input_tokens` кэша НЕ включает, а `cache_read_input_tokens` оставался нулём.
+    const CACHED =
+      '{"id":"c1","choices":[],"usage":{"prompt_tokens":1000,"completion_tokens":5,"total_tokens":1005,"prompt_tokens_details":{"cached_tokens":800}}}';
+
+    it('без потока', async () => {
+      await start(upstream([DELTA, CACHED, '[DONE]']));
+      const answer = await ask('/enterprise-platform/v1/messages', {
+        model: 'gpt-x',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'привет' }],
+      });
+      const body = JSON.parse(answer.text) as { usage: Record<string, number> };
+      expect(body.usage).toEqual({
+        input_tokens: 200,
+        cache_read_input_tokens: 800,
+        output_tokens: 5,
+      });
+    });
+
+    it('потоком — в итоговом message_delta', async () => {
+      await start(upstream([DELTA, CACHED, '[DONE]']));
+      const answer = await ask('/enterprise-platform/v1/messages', {
+        model: 'gpt-x',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'привет' }],
+        stream: true,
+      });
+      const delta = answer.text.slice(answer.text.indexOf('event: message_delta'));
+      expect(delta).toContain('"input_tokens":200');
+      expect(delta).toContain('"cache_read_input_tokens":800');
+      expect(delta).toContain('"output_tokens":5');
+    });
+
+    it('клиент OpenAI без потока получает кэш в своём поле', async () => {
+      await start(upstream([DELTA, CACHED, '[DONE]']));
+      const answer = await ask('/enterprise-platform/v1/chat/completions', {
+        model: 'gpt-x',
+        messages: [{ role: 'user', content: 'привет' }],
+      });
+      const body = JSON.parse(answer.text) as { usage: Record<string, unknown> };
+      expect(body.usage.prompt_tokens).toBe(1000);
+      expect(body.usage.prompt_tokens_details).toEqual({ cached_tokens: 800 });
+    });
   });
 
   it('картинка-часть доезжает и без потока, а в след идёт её размер', async () => {

@@ -1,8 +1,12 @@
 import type { PlatformCapabilityFinding } from '@agentdeck/contracts';
+// Значение, а не тип: подпутём пакета, потому что сервер идёт под
+// `--experimental-strip-types` и бочка `index.ts` ему не грузится вовсе.
+import { platformToolModes } from '@agentdeck/contracts/platform';
 import type { CompromiseId } from '@agentdeck/contracts/compromises';
 import {
+  imageCapability,
   readPlatformModels,
-  versionedUrl,
+  readSubstitutionMap,
   type DriverReading,
   type PlatformDriver,
 } from './driver.ts';
@@ -38,6 +42,12 @@ export const KEY_REJECTED_DETAIL =
   'стороне контура не удалась (тогда ключ в порядке, и стоит повторить). Проверьте ключ, ' +
   'его срок, бюджет и владельца в админке платформы';
 
+/** Текст 402 — одной строкой по той же причине, что и у 401. */
+export const KEY_BUDGET_DETAIL =
+  'Исчерпан бюджет ключа — контур отказал до вызова модели. Поднять бюджет или дождаться ' +
+  'нового периода ключа можно в админке платформы; через полминуты контур начнёт ' +
+  'отклонять этот ключ кодом 401';
+
 /**
  * Строка матрицы. `evidence` обязателен и не имеет умолчания намеренно: это
  * граница между «панель увидела это в ответе ВАШЕГО контура» и «так устроена
@@ -59,31 +69,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Карта подмены из кадра: только пары «строка → строка».
- *
- * Кадр приходит от чужой стороны, и вложенный объект или число в значении
- * здесь не ошибка формата, а причина НЕ подставлять: замена текста на `[object
- * Object]` внутри аргумента вызова хуже неразвёрнутой метки — её хотя бы видно.
+ * Потолок ответа сервера контура: `http.Server{WriteTimeout: 120s}` без продления
+ * на потоке (`inst-api/cmd/inst-api/main.go`). Режет ЛЮБОЙ ответ, поток тоже, —
+ * поэтому одно число служит и пределом цельного ответа, и потолком потока.
  */
-function readMapping(value: unknown): Record<string, string> | undefined {
-  if (!isRecord(value)) return undefined;
-  const map: Record<string, string> = {};
-  for (const [alias, original] of Object.entries(value)) {
-    if (typeof original === 'string' && alias) map[alias] = original;
-  }
-  return Object.keys(map).length > 0 ? map : undefined;
-}
+const ENTERPRISE_PLATFORM_RESPONSE_CEILING_SEC = 120;
 
 export const enterprise-platformDriver: PlatformDriver = {
   id: 'enterprise-platform',
   title: 'Контур',
 
-  modelsUrl: (baseUrl) => versionedUrl(baseUrl, 'models'),
-
-  headers: (token) => ({
-    accept: 'application/json',
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
-  }),
+  auth: { header: 'authorization', scheme: 'Bearer' },
 
   read(payload): DriverReading {
     const models = readPlatformModels(payload);
@@ -169,6 +165,13 @@ export const enterprise-platformDriver: PlatformDriver = {
         'публичный API не принимает описания инструментов',
         { compromise: 'no-client-tools' },
       ),
+
+      // Рисование объявляет КАТАЛОГ ключа, и ответ у строки три, а не два:
+      // «модель с флагом есть», «ни одна модель флага не объявила» и «флага в
+      // ответе нет вовсе». Третий случай — молчание контура, и показывать его
+      // отказом нельзя: человек пойдёт просить у владельца ключа доступ,
+      // которого ему, возможно, и не нужно просить.
+      imageCapability(models),
     ];
 
     return {
@@ -176,7 +179,7 @@ export const enterprise-platformDriver: PlatformDriver = {
       capabilities,
       // Известные свойства платформы, которые обязан знать шлюз: не-потоковый
       // запрос рвётся на 120 с, а длинную историю платформа сжимает сама.
-      limits: { nonStreamTimeoutSec: 120, managedContext: true },
+      limits: { nonStreamTimeoutSec: ENTERPRISE_PLATFORM_RESPONSE_CEILING_SEC, managedContext: true },
       notes: [],
       compromises: ['kb-via-owner', 'no-client-tools'],
     };
@@ -249,6 +252,18 @@ export const enterprise-platformDriver: PlatformDriver = {
       note: 'принято схемой контура и до модели не доносится',
     },
     {
+      // Усилие рассуждения (Т6). Названо здесь по той же причине, что и `n`:
+      // поле уедет и исчезнет, а человек будет думать, что заплатил за глубину.
+      // Своим прогонам панель `--effort` через контур не отдаёт вовсе
+      // (`driver.effort = false`), но чужой CLI шлюзу его присылает сам, и без
+      // этой строки потеря не видна нигде. Уйдёт в схему контура (Т12) —
+      // строка удаляется вместе с переключением `effort` на `true`.
+      dialect: 'openai',
+      field: 'reasoning_effort',
+      fate: 'dropped',
+      note: 'схемой контура не объявлено: усилие рассуждения до модели не доходит (Т12)',
+    },
+    {
       dialect: 'openai',
       field: 'response_format',
       fate: 'dropped',
@@ -307,26 +322,43 @@ export const enterprise-platformDriver: PlatformDriver = {
     if (payload.enterprise-platform_tools_unavailable !== undefined) {
       return { kind: 'tools-dropped', field: 'enterprise-platform_tools_unavailable' };
     }
-    // Обе карты подмены читаются одинаково: ключ — метка, лежащая в тексте,
-    // значение — то, чем её надо заменить (`engine.go` отдаёт их этой стороной).
-    // Карта нужна не для показа, а для прослойки инструментов: метка, доехавшая
-    // до аргумента `Write`, окажется в файле (Р11).
+    // Итоговый текст ответа (`router.py:1086–1088`): проверки вывода поправили
+    // текст уже после потока, либо поток разошёлся с проверенным. Клиент обязан
+    // заменить им отданное — выброшенный, кадр оставлял обрезок под видом целого.
+    if (payload.enterprise-platform_deanonymized !== undefined) {
+      return {
+        kind: 'replacement',
+        field: 'enterprise-platform_deanonymized',
+        text: typeof payload.enterprise-platform_deanonymized === 'string' ? payload.enterprise-platform_deanonymized : '',
+      };
+    }
+    // Обе карты подмены приходят ТОЛЬКО чату самой платформы (`is_chat_caller`,
+    // `router.py:1094,1114`): клиенту API значения возвращаются прямо в потоке.
+    // Читаются они всё равно — ключ-метка, значение-оригинал, объектом
+    // (`enterprise-platform_anonymization_mapping`) или списком `{placeholder, value}`
+    // (`enterprise-platform_deanonymized_entities`): метка, доехавшая до аргумента `Write`,
+    // окажется в файле (Р11).
     if (payload.enterprise-platform_deanonymized_entities !== undefined) {
       return {
         kind: 'anonymization',
         field: 'enterprise-platform_deanonymized_entities',
-        mapping: readMapping(payload.enterprise-platform_deanonymized_entities),
+        mapping: readSubstitutionMap(payload.enterprise-platform_deanonymized_entities),
       };
     }
     if (payload.enterprise-platform_anonymization_mapping !== undefined) {
       return {
         kind: 'anonymization',
         field: 'enterprise-platform_anonymization_mapping',
-        mapping: readMapping(payload.enterprise-platform_anonymization_mapping),
+        mapping: readSubstitutionMap(payload.enterprise-platform_anonymization_mapping),
       };
     }
     return undefined;
   },
+
+  // Шаблон метки задаёт админ правила (`enterprise-platform_shared/masking.py`, умолчание
+  // `[{type}_{n}]`). Здесь — вид умолчания с любым типом; свой шаблон админа
+  // этим не узнаётся, и тогда защищает только несовпадение имён.
+  placeholderPattern: /\[\p{L}[\p{L}\d_]*_\d+\]/u,
 
   vendorFields: [
     'enterprise-platform_guardrails',
@@ -334,6 +366,20 @@ export const enterprise-platformDriver: PlatformDriver = {
     'enterprise-platform_status',
     'enterprise-platform_tools_unavailable',
   ],
+
+  // `mod-guardrailsbox/.../models.py:226 RuleViolation`: название правила пишет
+  // администратор, тип — перечисление. `message` не читается никогда: это текст
+  // сканера, и в нём бывает найденное.
+  violationNames: [
+    { field: 'rule_name', label: true },
+    { field: 'rule_type' },
+    { field: 'scanner_name' },
+  ],
+
+  // Трёхуровневое «budget exceeded: <level>» (`inst-api/internal/budget/budget.go`)
+  // отдают только JWT-маршруты интерфейса — ключом туда не попасть, строки для
+  // него нет.
+  budgetRefusals: [{ message: /^budget exceeded for this API key$/i, scope: 'key' }],
 
   statusRows: [
     // 401 значит ПЯТЬ разных вещей, и различить их снаружи нечем — причём не
@@ -346,13 +392,15 @@ export const enterprise-platformDriver: PlatformDriver = {
     // `inst-api/internal/auth/apikey.go`: на 401 от админки он отдаёт
     // `nil, nil`, и middleware пишет клиенту одно плоское «invalid API key».
     { upstream: 401, status: 401, code: 'authentication_error', message: KEY_REJECTED_DETAIL },
-    // 402 — это НЕ бюджет ключа: контур отдаёт его с дневного лимита
-    // пользователя, месячного команды или месячного инстанса.
+    // На `/v1` 402 — ТОЛЬКО бюджет ключа (`handler_public_api.go:338-341`,
+    // `handler_agent_api.go:447`). Окно у него узкое: проверку ключа inst-api
+    // помнит 30 с (`auth/apikey.go:63`), а свежая проверка на исчерпанном ключе
+    // даёт уже 401 (`inst-admin-api/.../store/keys.go:235`).
     {
       upstream: 402,
       status: 402,
       code: 'billing_error',
-      message: 'Контур отказал по лимиту расхода — до вызова модели. Это не бюджет ключа',
+      message: KEY_BUDGET_DETAIL,
     },
     // 451 клиенту отдаётся кодом 400: это отказ ПО СОДЕРЖИМОМУ запроса, и
     // единственный код, который любой клиент понимает как «запрос не приняли и
@@ -376,65 +424,114 @@ export const enterprise-platformDriver: PlatformDriver = {
   // публичного API нет, рисует модель вида `image_generation`.
   images: 'chat-part',
 
+  nonStreamTimeoutSec: ENTERPRISE_PLATFORM_RESPONSE_CEILING_SEC,
+  responseCeilingSec: ENTERPRISE_PLATFORM_RESPONSE_CEILING_SEC,
+
   // compromise: no-client-tools — публичная схема отбрасывает `tools` как лишний ключ
-  toolsPassthrough: false,
+  clientTools: 'shim',
+
+  // Свои инструменты контур подбирает сам, и включённым набором перебивал бы
+  // протокол прослойки: `none` — единственное значение `tool_choice`, которое у
+  // него работает (Т7).
+  shimRequestFields: { tool_choice: 'none' },
 
   /**
    * `false` значит «панель не отправляет усилие», а НЕ «контур его не умеет»:
    * в разведке публичной схемы `reasoning_effort` не встретился ни разу, но и
    * отказа в нём никто не видел. Отправить непроверенное поле — это 400 на
-   * ровном месте, а объявить его компромиссом — утверждение, которого никто не
-   * проверял. Живая сверка и подпись на экране — за Т6.
+   * ровном месте.
+   *
+   * Т6 добавила к этому два следствия и НИ ОДНОГО нового утверждения о контуре:
+   * прогон панели через такой контур уходит без `--effort` (решение владельца
+   * 12.09.2026 — платить за глубину, которой может не быть, человек не
+   * подписывался), а `reasoning_effort`, присланный чужим CLI, назван потерей в
+   * следе запроса. Живой сверки по-прежнему нет: на стенде контура нет чат-модели.
    */
+  // compromise: no-effort — усилие не объявлено публичной схемой контура, и панель его не отправляет (просьба добавить — Т12)
   effort: false,
+
+  // Агенты — модуль agentbox за тем же ключом; списка агентов маршруты не
+  // отдают (`agents-manual-roster`).
+  agents: { completions: 'agent/completions', sessions: 'agent/sessions' },
 
   controls: [
     {
       id: 'enterprise-platform_tools',
       title: 'Инструменты платформы',
       kind: 'request',
-      detail: 'набор инструментов контура; свои объявить нельзя',
+      field: 'platformTools',
+      // Имена, а не схемы: реестр инструментов контура закрыт ключом другого
+      // рода, и панели его не прочитать — список ведёт человек, как и список
+      // агентов. Пустой список означает `tool_choice: "none"`: единственное
+      // значение этого поля, которое публичная схема принимает всерьёз.
+      //
+      // Подпись эта была враньём до ревью Т7 (M2): `none` выставляла одна
+      // прослойка, и только когда клиент прислал свои инструменты. В самом
+      // частом случае — обычное сообщение без инструментов — наверх не уходило
+      // ничего, и контур брал свои по умолчанию. Теперь выключение отправляется
+      // полем `whenEmpty`, и подпись описывает провод.
+      detail: 'имена инструментов контура; пусто — наверх уходит «tool_choice: none»',
+      whenEmpty: { field: 'tool_choice', value: 'none' },
     },
     {
-      id: 'tool_choice',
-      title: 'Выбор инструмента платформы',
+      id: 'enterprise-platform_tool_mode',
+      title: 'Цикл вызовов платформы',
       kind: 'request',
-      detail: 'по умолчанию «none» — иначе два набора инструментов спорят за один ход',
+      field: 'toolMode',
+      options: platformToolModes,
+      // `mod-llmbox/.../chat/router.py:237-243`: с потоком — 400.
+      streamless: ['single_turn'],
+      detail:
+        '«loop» — контур ходит по кругу сам, «single_turn» — возвращает вызов клиенту; такой ход идёт к контуру не потоком',
     },
     {
       id: 'generation_preset',
       title: 'Пресет генерации',
       kind: 'request',
-      detail: 'именованный набор параметров на стороне контура',
+      field: 'generationPreset',
+      detail: 'именованный набор параметров на стороне контура; пусто — контур берёт свой',
     },
     {
       id: 'enable_thinking',
       title: 'Размышления модели',
       kind: 'request',
-      detail: 'ответ приедет кадрами размышления, наружу они не уходят',
+      field: 'enableThinking',
+      // Верхнего поля `enable_thinking` схема контура не знает и выбрасывает
+      // молча (`chat/schemas.py:103` extra=ignore, `:120` — только вложенное), а
+      // до модели его доносит лишь самохостед vLLM (`llm_router.py:1331`).
+      wireField: 'chat_template_kwargs.enable_thinking',
+      detail:
+        'включить или выключить доходит только до моделей на самохостед vLLM — остальным ' +
+        'провайдерам контур поле не передаёт; по умолчанию не отправляется, решает шаблон ' +
+        'модели. Размышления наружу не уходят',
     },
     {
       id: 'guardrails',
       title: 'Проверки содержимого',
       kind: 'observed',
+      where: 'включает владелец контура',
       detail: 'включает владелец контура; отказ приходит статусом 451',
     },
     {
       id: 'anonymization',
       title: 'Подмена данных',
       kind: 'observed',
-      detail: 'контур переписывает найденное сам и отдаёт карту кадрами (Р11)',
+      where: 'включает владелец контура',
+      detail:
+        'контур заменяет найденное метками и сам возвращает значения в потоке ответа; карту клиенту API не отдаёт',
     },
     {
       id: 'knowledge',
       title: 'Знания компании',
       kind: 'observed',
+      where: 'подмешивает владелец ключа',
       detail: 'подмешиваются владельцем ключа, отдельного маршрута нет',
     },
     {
       id: 'managed-context',
       title: 'Сжатие истории',
       kind: 'observed',
+      where: 'решает контур',
       detail: 'длинную переписку контур сжимает сам — наши контрольные точки об этом не знают',
     },
   ],

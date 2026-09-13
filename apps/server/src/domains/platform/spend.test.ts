@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import type { Platform, PlatformSpendDay, PlatformSpendRecord } from '@agentdeck/contracts';
 import type { PricingLookup } from '../analytics/pricing.ts';
 import {
@@ -17,6 +18,7 @@ import {
   sumDays,
   type SpendDelta,
 } from './spend.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Учёт расхода контура.
@@ -44,7 +46,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 const platformOf = (patch: Partial<Platform>): Platform => ({ ...PLATFORM, ...patch });
@@ -266,22 +273,22 @@ describe('итог по бюджету', () => {
     expect(verdict.overEstimate).toBe(false);
   });
 
-  it('402 — факт про ЧУЖОЙ лимит, и уровень доезжает до экрана', () => {
+  it('402 — факт, и чей это лимит доезжает до экрана', () => {
     const spend: PlatformSpendRecord = {
       ...record(1),
       exhaustedAt: '2026-09-10T10:00:00.000Z',
-      exhaustedLevel: 'user_daily',
+      exhaustedScope: 'limit',
+      exhaustedLevel: 'org_monthly',
     };
     const verdict = budgetVerdict(platformOf({ budgetUsd: 100 }), spend);
-    // Наш счёт далеко от бюджета — и всё равно контур уже отказывает. Но отказ
-    // пришёл с ДРУГОГО лимита: 402 у контура приходит с дневного лимита
-    // пользователя, месячного команды и месячного инстанса, а бюджет ключа он
-    // отдаёт кодом 401. Поэтому уровень обязан доехать до карточки — без него
-    // строка сообщала бы, что кончилось не то, что кончилось.
+    // Наш счёт далеко от бюджета — и всё равно контур уже отказывает. Что
+    // именно кончилось, обязано доехать до карточки: без этого строка
+    // сообщала бы, что кончилось не то, что кончилось.
     expect(verdict.overEstimate).toBe(false);
     expect(verdict.exhausted).toBe(true);
     expect(verdict.exhaustedAt).toBe('2026-09-10T10:00:00.000Z');
-    expect(verdict.exhaustedLevel).toBe('user_daily');
+    expect(verdict.exhaustedScope).toBe('limit');
+    expect(verdict.exhaustedLevel).toBe('org_monthly');
   });
 
   it('уровня контур не назвал — поля нет вовсе, а не пустая строка', () => {
@@ -291,6 +298,7 @@ describe('итог по бюджету', () => {
     });
     expect(verdict.exhausted).toBe(true);
     expect(verdict).not.toHaveProperty('exhaustedLevel');
+    expect(verdict).not.toHaveProperty('exhaustedScope');
   });
 });
 
@@ -311,9 +319,11 @@ describe('снятие отметки «исчерпан»', () => {
       platformId: 'enterprise-platform-dev',
       days: [],
       exhaustedAt: '2026-09-10T10:00:00.000Z',
+      exhaustedScope: 'key',
     });
     expect(clearExhausted(store, 'enterprise-platform-dev')).toBe(true);
-    expect(store.read()['enterprise-platform-dev']!.exhaustedAt).toBeUndefined();
+    // Снимается вся отметка: оставшийся scope всплыл бы у следующего отказа.
+    expect(store.read()['enterprise-platform-dev']).toEqual({ platformId: 'enterprise-platform-dev', days: [] });
   });
 
   it('снимать нечего — запись не трогается вовсе', () => {

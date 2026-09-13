@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -20,6 +21,7 @@ import {
   writePlatform,
   writeToken,
 } from './store.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Хранилище контуров: настройка видна, КЛЮЧ НЕ ВИДЕН НИКОМУ.
@@ -53,7 +55,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 let dir: string;
@@ -122,6 +129,117 @@ describe('domains/platform/store: контуры и ключи', () => {
     expect(card.platform.budgetUsd).toBe(0);
     expect(card.platform.budgetSince).toBe('');
     expect(card.budget.tracked).toBe(false);
+  });
+
+  /**
+   * Та же беда для правил Т7 — и она была самой дорогой из трёх: матрица
+   * обращается к `rules.platform` в трёх местах, и запись без поля роняла
+   * `describePlatform`, то есть ВЕСЬ раздел «Контур» (500) и каждый прогон через
+   * шлюз (502). Двери записи заполняют поле сами, поэтому ломается ровно та
+   * машина, где контур настроили однажды и он просто работает. Найдено
+   * враждебным ревью Т7, воспроизведено на живой панели.
+   */
+  it('у контура, настроенного до появления правил, карточка строится, а не падает', () => {
+    const older = { ...PLATFORM } as Partial<Platform>;
+    delete older.rules;
+    store.updateSettings({ platforms: [older as Platform] });
+
+    const card = describePlatforms(store, dir)[0]!;
+    expect(card.platform.rules.platform).toEqual({
+      platformTools: [],
+      toolMode: 'loop',
+      generationPreset: '',
+      enableThinking: 'default',
+    });
+    // И сама матрица собралась: строки правил и ячейки конфликтов на месте.
+    expect(card.rules.length).toBeGreaterThan(0);
+    expect(card.conflicts.some((conflict) => conflict.level === 'exclusive')).toBe(true);
+  });
+
+  /**
+   * И слои Т8 в том же месте. Цена пропуска здесь другая, но не меньше: пустой
+   * объект вместо умолчаний означал бы «все наши слои сняты», и контур, который
+   * человек настроил однажды и не трогал, вдруг начал бы запускать агента без
+   * личных правил, хуков и прав — молча и на каждом прогоне.
+   */
+  it('у контура, настроенного до появления слоёв, наше едет целиком', () => {
+    // Запись ровно такая, какой её оставила панель времён Т7: правила контура
+    // есть, наших слоёв в ней нет вовсе.
+    const older = {
+      ...PLATFORM,
+      rules: { platform: defaultPlatformRules() },
+    } as unknown as Platform;
+    store.updateSettings({ platforms: [older] });
+
+    const card = describePlatforms(store, dir)[0]!;
+    expect(card.platform.rules.ours).toEqual({
+      enabled: true,
+      settings: true,
+      skills: true,
+      mcp: true,
+      systemPrompt: true,
+    });
+    expect(card.layers.args).toEqual([]);
+    expect(card.layers.dropped).toEqual([]);
+  });
+
+  it('снятый слой личных настроек виден карточке флагом запуска и гасит гейт в матрице', () => {
+    const ours = (settings: boolean): Platform => ({
+      ...PLATFORM,
+      rules: { platform: defaultPlatformRules(), ours: { ...defaultOurRules(), settings } },
+    });
+    // Гейт включён в панели: без этого строка матрицы молчала бы и без слоёв.
+    store.updateSettings({
+      promptGate: { enabled: true, action: 'block' },
+      platforms: [ours(true)],
+    });
+    const guardrailsOf = (): boolean | undefined =>
+      describePlatforms(store, dir)[0]!.conflicts.find((conflict) => conflict.id === 'guardrails')
+        ?.oursOnly;
+    expect(guardrailsOf()).toBe(true);
+
+    store.updateSettings({ platforms: [ours(false)] });
+    const card = describePlatforms(store, dir)[0]!;
+    expect(card.layers.args).toEqual(['--setting-sources', 'project,local']);
+    // Гейт промпта — наш хук в `~/.claude/settings.json`: снятый слой уносит и
+    // его, и строка матрицы обязана перестать утверждать «наша сторона включена».
+    expect(guardrailsOf()).toBe(false);
+  });
+
+  it('испорченное поле правил чинится по одному, а не выбрасывается целиком', () => {
+    // Правку `state.json` руками и снимок чужой панели читатель принимает как
+    // есть: строка вместо списка не должна стоить человеку остальных правил.
+    const broken = {
+      ...PLATFORM,
+      rules: { platform: { platformTools: 'web_search', toolMode: 'бег', enableThinking: true } },
+    } as unknown as Platform;
+    store.updateSettings({ platforms: [broken] });
+
+    expect(describePlatforms(store, dir)[0]!.platform.rules.platform).toEqual({
+      platformTools: [],
+      toolMode: 'loop',
+      generationPreset: '',
+      // Запись до трёх состояний: `true` значило «включить».
+      enableThinking: 'on',
+    });
+  });
+
+  it('размышления из булевой записи: false — «по умолчанию», мусор — тоже', () => {
+    // До трёх состояний `false` значило «поле не отправлять», а не «выключить»:
+    // переведи его в `off`, и контур, которого человек не трогал, начал бы
+    // выключать размышления модели на каждом запросе.
+    const rulesWith = (enableThinking: unknown) =>
+      ({ ...PLATFORM, rules: { platform: { enableThinking } } }) as unknown as Platform;
+    for (const [stored, expected] of [
+      [false, 'default'],
+      ['вкл', 'default'],
+      ['off', 'off'],
+    ] as const) {
+      store.updateSettings({ platforms: [rulesWith(stored)] });
+      expect(describePlatforms(store, dir)[0]!.platform.rules.platform.enableThinking).toBe(
+        expected,
+      );
+    }
   });
 
   it('повторная запись заменяет контур на месте, а не плодит второй', () => {
@@ -341,6 +459,23 @@ describe('уборка сирот: секрет без владельца не �
     expect(forgetOrphanPlatforms(store, dir)).toEqual([]);
   });
 
+  it('запись без полей прослойки и промпта читается с умолчаниями пресета своего типа', () => {
+    const { toolShim: _shim, contourPrompt: _prompt, ...bare } = PLATFORM;
+    const compat = { ...bare, id: 'compat', driver: 'vllm' } as unknown as Platform;
+    writePlatform(store, bare as unknown as Platform);
+    writePlatform(store, compat);
+
+    const read = readPlatforms(store).map(({ id, toolShim, contourPrompt }) => ({
+      id,
+      toolShim,
+      contourPrompt,
+    }));
+    expect(read).toEqual([
+      { id: PLATFORM.id, toolShim: true, contourPrompt: true },
+      { id: 'compat', toolShim: false, contourPrompt: false },
+    ]);
+  });
+
   it('живые контуры уборка не трогает — и чужие секреты тоже', () => {
     writePlatform(store, PLATFORM);
     writeToken(dir, PLATFORM.id, SECRET);
@@ -366,7 +501,9 @@ describe('domains/platform/check: проба запоминается, но ни
 
     const saved = requirePlatform(store, PLATFORM.id);
     expect(saved.capabilities).toContain('models');
-    expect(saved.capabilities).toContain('knowledge');
+    // Свойство платформы, известное драйверу заранее, пробой не подтверждается
+    // (аудит DRV-19): «знания через владельца» — не то, что ответил контур.
+    expect(saved.capabilities).not.toContain('knowledge');
     // «Не объявлено» подтверждением не считается.
     expect(saved.capabilities).not.toContain('agents');
   });

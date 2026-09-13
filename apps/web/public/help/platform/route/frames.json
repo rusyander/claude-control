@@ -1,0 +1,42 @@
+{
+  "topic": "platform",
+  "scenario": "route",
+  "frames": [
+    {
+      "id": "01-model-card",
+      "side": "panel",
+      "file": "01-model-card.png",
+      "masked": 1,
+      "width": 988,
+      "height": 611,
+      "shotAt": "2026-09-13T09:57:10.452Z",
+      "text": "Модель контура · Платформа компании · стенд Чем контур отвечает и кому. Модель по умолчанию уезжает в конфигурации CLI и в профиль ассистента; переопределение на потребителя нужно там, где один ключ обслуживает и ваш разговор, и агента тестов. Карта соответствия переводит имена, которыми модели называет панель, в те, которые понимает контур, — без неё прогон со своим выбором модели получает отказ «модель не найдена». Модель по умолчанию Первая из каталога: qwen2.5:0.5b qwen2.5:0.5b Вы не выбирали: панель берёт первую подходящую модель каталога. Модель на потребителя Чат Как у контура qwen2.5:0.5b Карта соответствия имён Прогон, которому вы выбрали модель в шапке чата или в группе, уходит с этим именем — и контур его не знает. Здесь вы говорите, чем «sonnet» работает у вас. Имя без строки в карте заменяется моделью контура, и замена названа в шапке чата. Имя в панели Модель контура Выберите модель qwen2.5:0.5b Добавить Контур не принимает глубину продумывания: прогон уходит без неё, что бы вы ни выбрали в шапке чата. Платить за глубину, которой не будет, панель не станет.",
+      "en": {
+        "file": "01-model-card.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 611,
+        "shotAt": "2026-09-13T10:02:11.305Z",
+        "text": "Contour model · EnterprisePlatform · stand What the contour answers with, and for whom. The default model goes into the CLI configs and into the assistant’s profile; a per-consumer override matters where one key serves both your conversation and the test agent. The name map translates the names the panel uses for models into the ones the contour understands — without it a run that picked its own model is refused with “model not found”. Default model First from the catalog: qwen2.5:0.5b qwen2.5:0.5b You did not choose: the panel takes the first suitable model from the catalog. Model per consumer Chat Same as the contour qwen2.5:0.5b Name map A run you picked a model for — in the chat header or in a group — leaves with that name, and the contour does not know it. Here you say what “sonnet” means for you. A name with no row in the map is replaced by the contour’s model, and the chat header says so. Name in the panel Contour model Pick a model qwen2.5:0.5b Add The contour does not accept reasoning effort: the run goes without it, whatever you pick in the chat header. The panel will not pay for depth that will not happen."
+      }
+    },
+    {
+      "id": "02-chat-header",
+      "side": "panel",
+      "file": "02-chat-header.png",
+      "masked": 0,
+      "width": 1280,
+      "height": 900,
+      "shotAt": "2026-09-13T09:57:14.233Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Чат Проекты Новый чат По названию По сообщениям Показано 0 из 0 Новый чат Файлы этого чата — в отдельной папке, рабочие проекты не затрагиваются Агенты Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Оч. высокая Низкая Средняя Высокая Оч. высокая Максимум Через контур «Платформа компании · стенд»: qwen2.5:0.5b. Контур «Платформа компании · стенд» не принимает глубину продумывания — она не отправляется. Настройки чата Чат с Claude Code Полноценный разговор: можно приложить PDF, картинку или разметку, попросить собрать страницу или документ — и сразу посмотреть результат в превью. Собери страницу с графиком по этим данным Объясни, что делает этот код Сделай выжимку из приложенного документа Сообщение Enter — отправить, Shift+Enter — перенос строки",
+      "en": {
+        "file": "02-chat-header.en.png",
+        "masked": 0,
+        "width": 1280,
+        "height": 900,
+        "shotAt": "2026-09-13T10:02:15.086Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Chat Projects New chat By title In messages Showing 0 of 0 New chat This chat keeps its files in a separate folder; your projects stay untouched Agents Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Very high Low Medium High Very high Max Through the \"EnterprisePlatform · stand\" contour: qwen2.5:0.5b. The \"EnterprisePlatform · stand\" contour takes no reasoning effort — it is not sent. Chat settings Chat with Claude Code A full conversation: attach a PDF, an image or some markup, ask for a page or a document — and see the result in the preview straight away. Build a page with a chart from this data Explain what this code does Summarise the attached document Message Enter to send, Shift+Enter for a new line"
+      }
+    }
+  ]
+}

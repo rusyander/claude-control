@@ -10,12 +10,14 @@
  * её сам, даже если маршрут её не поймал.
  */
 
-export type PlatformErrorCode = 'invalid_body' | 'platform_not_found' | 'platform_not_connected';
+export type PlatformErrorCode =
+  'invalid_body' | 'platform_not_found' | 'platform_not_connected' | 'agents_not_declared';
 
 const STATUS: Record<PlatformErrorCode, number> = {
   invalid_body: 400,
   platform_not_found: 404,
   platform_not_connected: 404,
+  agents_not_declared: 404,
 };
 
 export class PlatformError extends Error {
@@ -79,5 +81,17 @@ export function notConnected(title: string): PlatformError {
   return new PlatformError(
     'platform_not_connected',
     `Контур «${title}» не подключён: включите его и сохраните ключ.`,
+  );
+}
+
+/**
+ * Тип контура не объявил агентов. 404 до сети: чужой форме запроса шлюз ответил
+ * бы своим 404, и человек пошёл бы искать в админке идентификатор агента,
+ * которого у этого шлюза не бывает.
+ */
+export function agentsNotDeclared(title: string): PlatformError {
+  return new PlatformError(
+    'agents_not_declared',
+    `У контура «${title}» нет опубликованных агентов: его тип их не объявляет.`,
   );
 }

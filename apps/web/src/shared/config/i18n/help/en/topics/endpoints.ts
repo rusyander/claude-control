@@ -70,6 +70,16 @@ export const endpointsEn: typeof endpointsRu = {
       'A gateway speaking the Gemini schema. The model list comes from /v1beta/models. ' +
       'Gemini CLI itself accepts an https address only; localhost is the sole exception.',
 
+    imagesTitle: 'The image generation address is a field of its own',
+    imagesText:
+      'An openai-compat profile has one more line in the form: the address of the image ' +
+      'generation endpoint (usually ending in /v1/images/generations). Filled in — the chat’s ' +
+      '«Image» mode works and your own server draws through this profile. Empty — the item in ' +
+      'chat stays locked, with the reason said in words. The panel does NOT derive it from the ' +
+      'base address: a guessed endpoint would answer 404 after you had already described the ' +
+      'picture. The anthropic and google kinds have no such endpoint at all, which is why they ' +
+      'have no such field.',
+
     targetsTitle: 'Who accepts a profile',
     targetsCaption:
       'The panel never invents the address variable: only what the CLI itself documents ' +
@@ -230,7 +240,11 @@ export const endpointsEn: typeof endpointsRu = {
     notContourText:
       'The corporate contour is its own section with a gateway inside the panel’s ' +
       'process, its own models and spend accounting. This is just an address in a foreign ' +
-      'config.',
+      'config. They meet in one place: the active contour creates its own profile here — ' +
+      'the address points at the panel’s local gateway, and the owning contour is named ' +
+      'above it. Such a profile cannot be deleted by hand, and editing its fields takes the ' +
+      'CLI past the contour; its only button is “Back to the default provider”, the same ' +
+      'action as on the contour card.',
 
     storageProfiles: 'Profiles',
     storageProfilesValue: 'agentdeck/state.json → endpointProfiles (address, API kind, model)',

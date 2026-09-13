@@ -7,8 +7,8 @@ export const promptsEn: typeof promptsRu = {
     summary: 'The texts the panel speaks to the model with, not on your behalf',
     lead:
       'Besides what you write to the agent yourself, the panel sends the model texts of ' +
-      'its own: how to call tools, how to behave inside a corporate contour, how to turn ' +
-      'a request into a picture or into a deck. Such a text used to live as a string in ' +
+      'its own: how to call tools, how to behave inside a corporate contour, what to treat ' +
+      'an image description as and how to lay a topic out as slides. Such a text used to live as a string in ' +
       'the code — there was nowhere to read it and no way to adjust it to your contour. ' +
       'The «Settings → Prompts» tab shows all five in full and lets you rewrite any of ' +
       'them without losing the built-in one.',
@@ -86,7 +86,7 @@ export const promptsEn: typeof promptsRu = {
 
     catalogTitle: 'Which prompts exist',
     catalogCaption:
-      'Five texts, and each one is read by exactly one place in the panel. Rewrite a ' +
+      'Six texts, and each one is read by exactly one place in the panel. Rewrite a ' +
       'text and the behaviour of that place changes — and nothing else.',
     catalogColumn: 'Prompt',
     catalogWhoColumn: 'Who reads it',
@@ -102,16 +102,33 @@ export const promptsEn: typeof promptsRu = {
       'and tool calls then stop appearing at all.',
     promptContourPreamble: 'Contour preamble',
     promptContourPreambleText:
-      'The opening of any conversation through the contour: how the contour differs from ' +
-      'a direct vendor request — its own rules, its own model catalog and the fact that ' +
-      'it assembles the tools itself.',
+      'How the contour differs from a direct vendor request: whose address and key, what is ' +
+      'checked in the request and the answer, why the client’s tools are described as text. ' +
+      'It travels right after «Agent through the contour» as one system prompt and only ' +
+      'together with it: switching the short contour prompt off drops both parts.',
     promptImage: 'Image',
     promptImageText:
-      'The picture mode: your request in your own words becomes a brief for the image ' +
-      'generator.',
+      'The image mode: the system message of the DRAWING model — what it should treat the ' +
+      'description as and what to do with what is left unsaid. A brief instead of a picture ' +
+      'would mean text in the answer, so this is not a request rewriter. It travels only on ' +
+      'the «part of the answer» road: the separate images endpoint has no system message, and ' +
+      'the panel says so in the mode menu. The panel draws the illustrations of presentation ' +
+      'slides with this very text.',
+    promptImageSvg: 'Picture as code',
+    promptImageSvgText:
+      'The agent road: the drawing is made not by a provider endpoint but by the ' +
+      'conversation agent itself — as SVG code. The text also describes what the panel ' +
+      'CHECKS when accepting a drawing: no scripts, no links out, no external fonts — ' +
+      'otherwise the file would stop being self-contained and the panel rejects it. The rest ' +
+      'is the rules of a good drawing: margin, grid, contrast, label sizes.',
     promptPresentation: 'Presentation',
     promptPresentationText:
-      'The presentation mode: a topic becomes slides — headings, bullets, speaker notes.',
+      'The presentation mode, one text for all three roads: a topic becomes the structure of ' +
+      'a deck. It names the seven slide layouts and six colour moods, the order of the story ' +
+      '(claim — sections — numbers and diagrams — conclusion), the rules for a diagram as ' +
+      'code and for the description of a photographic image the panel will draw, and the ' +
+      'duty of the agent to ask about the size of the deck first. The panel ceilings are ' +
+      'listed too: the trimming is done by the panel, not by the model.',
 
     notTitle: 'What this is not',
     notCaption:
@@ -125,8 +142,9 @@ export const promptsEn: typeof promptsRu = {
       'its own, and they are not visible in the chat.',
     notCli: 'Not the CLI system prompt as such',
     notCliText:
-      'Claude Code keeps its own prompt. Exactly one text from here replaces it — «Agent ' +
-      'through the contour», and only on runs through the contour.',
+      'Claude Code keeps its own prompt. Only one pair from here replaces it — «Agent ' +
+      'through the contour» followed by «Contour preamble», and only on runs through the ' +
+      'contour.',
     notClaudeMd: 'Not CLAUDE.md and not rules',
     notClaudeMdText:
       'Standing instructions to the agent live in «CLAUDE.md», «Rules» and «Skills». They ' +

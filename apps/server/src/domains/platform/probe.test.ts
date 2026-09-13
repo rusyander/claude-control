@@ -1,7 +1,20 @@
 import { describe, it, expect } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import type { Platform } from '@agentdeck/contracts';
+import {
+  defaultPlatformTransport,
+  type PlatformTransport,
+} from '@agentdeck/contracts/platform-transport';
 import { probePlatform } from './probe.ts';
 import type { PlatformFetch } from './ca-fetch.ts';
+import {
+  AZURE_MODELS,
+  ENTERPRISE_PLATFORM_MODELS,
+  MISTRAL_MODELS,
+  OPENROUTER_MODELS,
+  TOGETHER_MODELS,
+  VLLM_MODELS,
+} from './drivers/conformance/catalog-shapes.ts';
 
 /**
  * Проба контура: ПЯТЬ исходов, а не два.
@@ -29,7 +42,12 @@ const BASE: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 /** Ответ-заглушка: тело, код и тип содержимого — всё, что читает проба. */
@@ -138,6 +156,43 @@ describe('probePlatform: пять исходов', () => {
 
     expect(result.outcome).toBe('not-ready');
     expect(result.detail).toContain('поднимается');
+  });
+
+  /**
+   * Аудит DRV-16. Лимитёр платформа компании стоит на ВСЕХ маршрутах `/v1`, список моделей
+   * включён (main.go:482-483), — а проба читала 429 как «это не API» и слала
+   * человека проверять адрес админки. Причина «реестр моделей не готов» — смысл
+   * 503 у платформа компании, и произносить её чужому контуру общий код не вправе.
+   */
+  it('429 — лимит ключа и когда повторить, а не «похоже, это адрес админки»', async () => {
+    const result = await probePlatform({
+      platform: { ...BASE, baseUrl: 'https://enterprise-platform.example.ru' },
+      token: 'sk-live',
+      fetchImpl: () =>
+        Promise.resolve(
+          new Response('{"error":{"message":"rate limit exceeded"}}', {
+            status: 429,
+            headers: { 'content-type': 'application/json', 'retry-after': '7' },
+          }),
+        ),
+    });
+
+    expect(result.outcome).toBe('not-ready');
+    expect(result.detail).toContain('лимит');
+    expect(result.detail).toContain('7 с');
+    expect(result.detail).not.toContain('админк');
+  });
+
+  it('503 чужого контура не называет причину платформа компании', async () => {
+    const result = await probePlatform({
+      platform: { ...BASE, driver: 'openai-compat' },
+      token: 'sk-live',
+      fetchImpl: reply('{}', { status: 503 }),
+    });
+
+    expect(result.outcome).toBe('not-ready');
+    expect(result.detail).toContain('503');
+    expect(result.detail).not.toContain('реестр моделей');
   });
 
   it('500 — сторона контура, повторить позже', async () => {
@@ -355,5 +410,196 @@ describe('probePlatform: ключ и адрес', () => {
     const result = await probePlatform({ platform: BASE, token: secret, fetchImpl: leaky });
 
     expect(result.detail).not.toContain(secret);
+  });
+});
+
+/**
+ * Адрес и заголовок ключа (DRV-04/05) — через саму пробу, до сокета: подменён
+ * только `fetch`, и проверяется ровно то, что ушло бы в сеть.
+ */
+describe('probePlatform: адрес и ключ по настройке транспорта', () => {
+  const TRANSPORT = defaultPlatformTransport();
+
+  async function sent(
+    platform: Omit<Partial<Platform>, 'transport'> & { transport?: Partial<PlatformTransport> },
+  ): Promise<{ url: string; headers: Record<string, string> }> {
+    const seen: { url: string; headers: Record<string, string> }[] = [];
+    const fetchImpl: PlatformFetch = (url, init) => {
+      seen.push({ url: String(url), headers: { ...(init?.headers as Record<string, string>) } });
+      return reply(MODELS)();
+    };
+    await probePlatform({
+      platform: {
+        ...BASE,
+        driver: 'openai-compat',
+        ...platform,
+        transport: { ...TRANSPORT, ...platform.transport },
+      },
+      token: 'sk-ключ-7c1d',
+      fetchImpl,
+    });
+    expect(seen).toHaveLength(1);
+    return seen[0]!;
+  }
+
+  it.each([
+    [
+      'Gemini: версия в середине пути — вторая не дописывается',
+      'https://generativelanguage.googleapis.com/v1beta/openai',
+      'https://generativelanguage.googleapis.com/v1beta/openai/models',
+    ],
+    [
+      'DashScope: версия в конце',
+      'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      'https://dashscope.aliyuncs.com/compatible-mode/v1/models',
+    ],
+    [
+      'LiteLLM: корень хоста получает /v1',
+      'http://127.0.0.1:4000',
+      'http://127.0.0.1:4000/v1/models',
+    ],
+    [
+      'параметр в самом адресе остаётся строкой запроса, а не хвостом пути',
+      'https://gw.corp.example/llm?tenant=a',
+      'https://gw.corp.example/llm/v1/models?tenant=a',
+    ],
+  ])('%s', async (_name, baseUrl, url) => {
+    expect((await sent({ baseUrl })).url).toBe(url);
+  });
+
+  it('Azure: свой заголовок ключа, путь как есть и api-version; Authorization не уходит', async () => {
+    const { url, headers } = await sent({
+      baseUrl: 'https://corp.openai.azure.com/openai',
+      transport: { authHeader: 'api-key', version: 'as-is', query: 'api-version=2024-10-21' },
+    });
+    expect(url).toBe('https://corp.openai.azure.com/openai/models?api-version=2024-10-21');
+    expect(headers['api-key']).toBe('sk-ключ-7c1d');
+    expect(Object.keys(headers).map((name) => name.toLowerCase())).not.toContain('authorization');
+  });
+
+  it('без настройки — как было: Authorization: Bearer', async () => {
+    const { headers } = await sent({ baseUrl: 'https://api.dev.example.ru' });
+    expect(headers.authorization).toBe('Bearer sk-ключ-7c1d');
+  });
+});
+
+/**
+ * Каталоги настоящих шлюзов (DRV-06) — через саму пробу: подменён только
+ * `fetch`, форма ответа взята у шлюза, а не придумана под читатель. До задачи
+ * Together не проходил пробу вовсе, vLLM и Mistral теряли окно и вид, OpenRouter
+ * — зрение, инструменты, потолок вывода и цену.
+ */
+describe('probePlatform: каталоги шлюзов разной формы', () => {
+  async function modelsOf(payload: unknown, driver: Platform['driver'] = 'openai-compat') {
+    const result = await probePlatform({
+      platform: { ...BASE, driver },
+      token: 'sk-live',
+      fetchImpl: reply(JSON.stringify(payload)),
+    });
+    expect(result.outcome, result.detail).toBe('ok');
+    return result.models;
+  }
+
+  it('Together: голый массив — это каталог, вид из `type`', async () => {
+    expect(await modelsOf(TOGETHER_MODELS)).toEqual([
+      {
+        id: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+        name: 'Meta Llama 3.3 70B Instruct Turbo',
+        kind: 'chat',
+        contextLimit: 131072,
+      },
+      {
+        id: 'BAAI/bge-large-en-v1.5',
+        name: 'BAAI-Bge-Large-1p5',
+        kind: 'embedding',
+        contextLimit: 512,
+      },
+    ]);
+  });
+
+  it('vLLM: окно контекста из `max_model_len`, вида не объявлено', async () => {
+    expect(await modelsOf(VLLM_MODELS)).toEqual([
+      { id: 'Qwen/Qwen3-8B', ownedBy: 'vllm', contextLimit: 32768 },
+    ]);
+  });
+
+  it('Azure: вид из булевых возможностей', async () => {
+    const models = await modelsOf(AZURE_MODELS);
+    expect(models.map((model) => [model.id, model.kind])).toEqual([
+      ['gpt-4o-2024-08-06', 'chat'],
+      ['text-embedding-3-large', 'embedding'],
+    ]);
+  });
+
+  it('Mistral: `type: base` не вид — вид из `completion_chat`, окно из `max_context_length`', async () => {
+    expect(await modelsOf(MISTRAL_MODELS)).toEqual([
+      {
+        id: 'mistral-large-latest',
+        name: 'mistral-large-2411',
+        kind: 'chat',
+        ownedBy: 'mistralai',
+        contextLimit: 131072,
+        vision: false,
+        functionCalling: true,
+      },
+    ]);
+  });
+
+  it('OpenRouter: списки возможностей, потолок провайдера и цена за миллион', async () => {
+    const [mini, image, auto] = await modelsOf(OPENROUTER_MODELS);
+    expect(mini).toEqual({
+      id: 'openai/gpt-4o-mini',
+      name: 'OpenAI: GPT-4o-mini',
+      contextLimit: 128000,
+      outputLimit: 16384,
+      vision: true,
+      functionCalling: true,
+      jsonMode: true,
+      imageGeneration: false,
+      reasoning: false,
+      price: { input: 0.15, output: 0.6, cacheRead: 0.075 },
+    });
+    expect(image).toMatchObject({
+      imageGeneration: true,
+      functionCalling: false,
+      price: { input: 0.3, output: 2.5, cacheRead: 0.03, cacheWrite: 0.0833333333333 },
+    });
+    // `"-1"` — цена маршрутизатора неизвестна: не ноль и не минус доллар.
+    expect(auto).toMatchObject({ reasoning: true, contextLimit: 2000000 });
+    expect(auto!.price).toBeUndefined();
+    expect(auto!.outputLimit).toBeUndefined();
+  });
+
+  it('платформа компании: прежняя форма читается как раньше', async () => {
+    expect(await modelsOf(ENTERPRISE_PLATFORM_MODELS, 'enterprise-platform')).toEqual([
+      {
+        id: 'enterprise-platform-corp-l',
+        kind: 'chat',
+        ownedBy: 'enterprise-platform',
+        vision: false,
+        functionCalling: true,
+        jsonMode: true,
+        imageGeneration: false,
+      },
+      {
+        id: 'ru-embed-v2',
+        kind: 'embedding',
+        ownedBy: 'enterprise-platform',
+        vision: false,
+        functionCalling: false,
+        jsonMode: false,
+        imageGeneration: false,
+      },
+    ]);
+  });
+
+  it('объект без списка по-прежнему не каталог — и причина названа', async () => {
+    const result = await probePlatform({
+      platform: BASE,
+      token: 'sk-live',
+      fetchImpl: reply(JSON.stringify({ models: [] })),
+    });
+    expect(result.outcome).toBe('not-api');
+    expect(result.detail).toContain('нет списка моделей');
   });
 });

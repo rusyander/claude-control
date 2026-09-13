@@ -1,7 +1,7 @@
 import type { PlatformCapability, PlatformCapabilityFinding } from '@agentdeck/contracts';
 import {
+  imageCapability,
   readPlatformModels,
-  versionedUrl,
   type DriverReading,
   type PlatformDriver,
 } from './driver.ts';
@@ -34,12 +34,7 @@ export const openAiCompatDriver: PlatformDriver = {
   id: 'openai-compat',
   title: 'Совместимый шлюз',
 
-  modelsUrl: (baseUrl) => versionedUrl(baseUrl, 'models'),
-
-  headers: (token) => ({
-    accept: 'application/json',
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
-  }),
+  auth: { header: 'authorization', scheme: 'Bearer' },
 
   read(payload): DriverReading {
     const models = readPlatformModels(payload);
@@ -60,6 +55,12 @@ export const openAiCompatDriver: PlatformDriver = {
         detail: 'совместимый шлюз этого о себе не сообщает',
         compromise: 'probe-guess',
       })),
+      // Рисование читается из каталога тем же кодом, что и у платформа компании: поля
+      // каталога у OpenAI-вида те же самые, а объявленный флаг терять в общем
+      // «не сообщает» значило бы прятать факт, который шлюз как раз сообщил.
+      // Дорога к картинке у этого драйвера всё равно другая (`{ api }`) — её
+      // адрес объявлен профилем эндпоинта, а не строкой матрицы.
+      imageCapability(models),
     ];
 
     return {
@@ -92,16 +93,25 @@ export const openAiCompatDriver: PlatformDriver = {
   statusRows: [],
 
   /**
-   * Шлюзы OpenAI-вида публикуют `/v1/images/generations`. Ручка объявлена
-   * адресом эндпоинта (В4), а не угадывается по списку моделей.
+   * Ничего: произвольный совместимый шлюз умеет только отдать список моделей, и
+   * «у OpenAI такая ручка есть» — утверждение про OpenAI, а не про него
+   * (подписано как `probe-guess`). Угаданный `/v1/images/generations` дал бы 404
+   * после того, как человек уже описал картинку, — вместо честного «адрес не
+   * задан».
+   *
+   * Рисовать через такой шлюз всё равно можно, и дорога та же: профиль своего
+   * эндпоинта с ПОЛЕМ адреса генерации (решение В4). Разница в том, что там
+   * ручку объявляет человек, знающий свой сервер, а здесь её объявила бы панель,
+   * не знающая ничего.
    */
-  images: 'images-api',
+  images: 'none',
 
   /**
-   * Инструменты клиента проходят как есть: это и есть схема OpenAI. Прослойка
-   * такому шлюзу не нужна — агент работает руками.
+   * Инструменты клиента проходят полем: это и есть схема OpenAI. Прослойка
+   * такому шлюзу не нужна — агент работает руками. Своих инструментов у шлюза
+   * нет, поэтому и гасить прослойке нечего (`shimRequestFields` не объявлен).
    */
-  toolsPassthrough: true,
+  clientTools: 'native',
 
   /**
    * Усилие рассуждения совместимый шлюз может и принимать, и не принимать, а

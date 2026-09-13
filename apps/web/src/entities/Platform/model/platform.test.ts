@@ -12,8 +12,24 @@ import {
   platformCardState,
   platformIdFromTitle,
   sortApplyTargets,
+  toolRouteMark,
+  toolRouteOf,
   validatePlatform,
 } from './platform';
+
+describe('маршрут инструментов', () => {
+  it('подпись у CLI идёт за маршрутом, а не стоит у каждого типа', () => {
+    expect(toolRouteMark('native')).toBeNull();
+    expect(toolRouteMark('shim')).toBe('tool-shim');
+    expect(toolRouteMark('none')).toBe('no-client-tools');
+  });
+
+  it('ответ сервера сильнее тумблера, а без него — прежний смысл тумблера', () => {
+    expect(toolRouteOf({ toolRoute: 'native', platform: { toolShim: false } })).toBe('native');
+    expect(toolRouteOf({ platform: { toolShim: true } })).toBe('shim');
+    expect(toolRouteOf({ platform: { toolShim: false } })).toBe('none');
+  });
+});
 
 /**
  * Черновик контура и его проверки на стороне клиента.
@@ -63,7 +79,36 @@ describe('новый контур', () => {
       // включёнными, иначе агент через контур «работает как чат».
       toolShim: true,
       contourPrompt: true,
+      // Т6: модели у нового контура нет вовсе — ни общей, ни на потребителя, ни
+      // карты имён. Подставить сюда что-то значило бы выбрать за человека
+      // модель, которой контур, возможно, и не отдаёт: чем дополнить пустоту,
+      // решает каталог последней пробы, а её ещё не было.
+      defaultModel: '',
+      consumerModels: {},
+      modelMap: {},
+      // Т7: ни одного правила контура не задано. Пустой список инструментов
+      // платформы значит «не запрашиваются», и наверх уходит `tool_choice:
+      // "none"` — то же поведение, что было до задачи.
+      rules: {
+        platform: {
+          platformTools: [],
+          toolMode: 'loop',
+          generationPreset: '',
+          enableThinking: 'default',
+        },
+        // Т8: у нового контура едет ВСЁ наше. Снятый слой экономит бюджет
+        // промпта ценой того, что агент работает без правил человека, и такой
+        // размен панель за него не делает — он снимается галочкой на карточке.
+        ours: {
+          enabled: true,
+          settings: true,
+          skills: true,
+          mcp: true,
+          systemPrompt: true,
+        },
+      },
       caCertPath: '',
+      transport: { authHeader: '', authScheme: '', version: 'auto', query: '', headers: '' },
     });
   });
 });
@@ -107,6 +152,20 @@ describe('проверка черновика', () => {
     expect(validatePlatform(platformOf({ budgetSince: '2026-09-01' })).budgetSince).toBeUndefined();
     // Пусто — «с начала учёта», это не ошибка.
     expect(validatePlatform(platformOf({ budgetSince: '' })).budgetSince).toBeUndefined();
+  });
+
+  // DRV-04/05: ключ, вписанный в лишние заголовки, не сохраняется вовсе.
+  it('ошибка транспорта запирает сохранение', () => {
+    const transport = newPlatform('openai-compat', 'x').transport;
+    expect(
+      validatePlatform(
+        platformOf({ transport: { ...transport, headers: 'Authorization: Bearer k' } }),
+      ).transport,
+    ).toBe('pattern');
+    expect(
+      validatePlatform(platformOf({ transport: { ...transport, headers: 'X-Tenant: research' } }))
+        .transport,
+    ).toBeUndefined();
   });
 
   it('кнопка сохранения смотрит на ту же проверку, а не на свою', () => {
@@ -188,6 +247,12 @@ describe('состояние карточки', () => {
       totalTokens: 0,
       money: { usd: 0, pricedTokens: 0, unpricedTokens: 0, unpricedModels: [] },
     },
+    effort: false,
+    agents: true,
+    toolRoute: 'shim',
+    rules: [],
+    conflicts: [],
+    layers: { args: [], systemPrompt: true, dropped: [] },
     ...patch,
   });
 

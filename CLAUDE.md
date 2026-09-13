@@ -353,6 +353,32 @@ parsing. Detail: help «Контур» (`pages/Help/topics/Platform*`),
 [docs/PLATFORM.ru.md](docs/PLATFORM.ru.md),
 [.agent/code-map-platform.agent.md](.agent/code-map-platform.agent.md).
 
+**A contour answers 403 «модель», or a chat header names a model the request never carried** — through
+a contour the run's model is a REQUEST, not a decision: `sonnet`/`opus` are vendor names the contour
+never heard of. `chooseRunModel` (`contracts/src/platform-models.ts`, the ONE implementation server and
+both chat headers call) translates it through the contour's name map, accepts a name the probe catalog
+holds, and otherwise falls back to the contour model — **naming the substitution in the header**, because
+a badge showing the asked name while another one travels is the one thing nobody can discover. Reasoning
+effort follows the DRIVER MANIFEST, not the probe: `driver.effort === false` ⇒ it is not sent at all, said
+in a caption and signed as `no-effort`. Only `check-platform-run-env.mjs` proves the tail of this — it
+reads the spawned CLI's own argv, which is how the 12.09.2026 defect surfaced (the `--model` grammar in
+`lib/cli-args.ts` rejected `:` and `/`, so `qwen2.5:7b` was dropped without a word).
+
+**The «Картинка» mode is locked, or a drawn image is nowhere in the conversation** — both by design.
+The image is asked for by the PANEL, never by the CLI: the transcript is Claude Code's file and the
+panel writes not one line into it, so the picture is a card in the right column plus a file under
+`<appData>/media/` (bytes) with a sibling `.json` (record) — never a message, and there is no gallery.
+Availability is decided ONCE on the server (`GET /api/media/images/plan`, `domains/media/images.ts`) and
+the item stays visible and locked with one of six named reasons; a second, client-side guess would drift
+from the real route — the disease `chooseRunModel` cured in Т6. Three roads: the contour as part of an
+ordinary answer, through the panel's OWN gateway in the OpenAI dialect (journal, spend, DLP, 451 for
+free — and the anthropic dialect would drop the `image_url` part), the contour's images handle, or the
+endpoint profile's `imagesUrl`. That address is never guessed from `baseUrl`, which is also why
+`openai-compat` declares `images: 'none'`: a guessed `/v1/images/generations` would 404 after the human
+had already described the picture (invariant 13, `probe-guess`). The prompt from the Т4 catalog is the
+system message of the DRAWING model and travels only on the chat road; the menu says so, because silence
+reads as «my prompt edit did not work».
+
 ## Working rules
 
 - Verify by running, not by reasoning — `tools/qa/` drives the real UI per area.
@@ -386,9 +412,21 @@ depcruise, plus mobile type-check + tests). Touched help → also `node tools/qa
 `help.…` strings, i.e. a key called under a name that doesn't exist (`tsc` checks the dictionary, not
 call sites). Touched the contour (`domains/platform/**`) → also `node tools/qa/check-platform-wire.mjs`:
 it boots its own throwaway panel plus `tools/qa/stub-platform.mjs` as the upstream and drives the whole
-socket path client → gateway → contour, so it needs no stand and no installed CLI. Everything else
-about the contour is proved on frames built inside the test that reads them — green there is compatible
-with nothing passing over a real wire.
+socket path client → gateway → contour, so it needs no stand and no installed CLI — **and `node
+tools/qa/check-platform-run-env.mjs`**, which is the only check that sees what reaches a real process:
+its own throwaway panel, a gateway on port 0 and fake CLIs on PATH that dump their own env and argv.
+Touched our layers (`domains/platform/layers.ts`, the run registry's flags) → **`node
+tools/qa/check-run-layers.mjs`**, the only check that answers what a launch flag actually REMOVES:
+the real `claude` with a throwaway config dir carrying a unique marker in every layer, a stub for the
+model, and the body of the request that went up as the sole evidence. It needs an installed CLI
+(`CLAUDE_CLI` overrides the path) and touches no stand of the user's.
+Touched images (`domains/media/**`, the composer's mode menu, the gateway's content parts) → **`node
+tools/qa/check-chat-media.mjs`**, whose evidence is the FILE on disk: its own throwaway panel and stub
+upstream, 18 assertions, and the drawn bytes compared to what the upstream returned — plus `state.json`
+and the request trace searched for base64, because "no image in the settings" cannot be proved by
+reading code. No stand, no installed CLI.
+Everything else about the contour is proved on frames built inside the test that reads them — green
+there is compatible with nothing passing over a real wire.
 
 ## Layer boundaries — checked, not just described
 

@@ -1,10 +1,27 @@
-import type { Artifact } from '@agentdeck/contracts';
+import type { Artifact, MediaDeck, MediaImage } from '@agentdeck/contracts';
 
 export interface ChatPreviewPaneProps {
   chatId: string;
-  artifact: Artifact;
+  /** Файл из папки разговора. Пусто — столбец занят картинкой панели. */
+  artifact?: Artifact;
+  /**
+   * Нарисованная панелью картинка (Т9). Столбец один, и она сильнее артефакта:
+   * её только что попросили, а предпросмотр открывали раньше.
+   */
+  image?: MediaImage;
+  /**
+   * Колода, которую собрала сама панель (Т10). Показывается по тем же правилам,
+   * что и картинка: столбец один, и только что попрошенный результат сильнее
+   * предпросмотра, открытого раньше.
+   */
+  deck?: MediaDeck;
   /** Текущая ширина панели в пикселях — её же тянет ручка слева. */
   width: number;
   onResize: (width: number) => void;
   onClose: () => void;
+  /**
+   * Начать правку показанной колоды: композер перейдёт в режим презентации и
+   * скажет, что правит. Пусто — правку из столбца не начинают.
+   */
+  onReviseDeck?: (deck: MediaDeck) => void;
 }

@@ -58,6 +58,10 @@ export const COMPROMISE_IDS = [
   'agents-manual-roster',
   'tool-shim',
   'shim-no-cache',
+  'no-effort',
+  'rules-partial',
+  'media-by-capability',
+  'mask-unrestorable',
 ] as const;
 
 export type CompromiseId = (typeof COMPROMISE_IDS)[number];
@@ -188,6 +192,40 @@ const REGISTRY: Record<CompromiseId, Omit<CompromiseEntry, 'id'>> = {
     severity: 'limitation',
     since: '2026-09-12',
     codeAnchors: ['apps/server/src/domains/platform/gateway/tool-shim/protocol.ts'],
+  },
+  'no-effort': {
+    severity: 'limitation',
+    since: '2026-09-12',
+    codeAnchors: [
+      'apps/server/src/domains/platform/drivers/enterprise-platform.ts',
+      'apps/server/src/domains/platform/routing.ts',
+    ],
+  },
+  'rules-partial': {
+    severity: 'limitation',
+    since: '2026-09-12',
+    codeAnchors: [
+      'apps/server/src/domains/platform/layers.ts',
+      'apps/server/src/domains/platform/routing.ts',
+    ],
+  },
+  'media-by-capability': {
+    severity: 'limitation',
+    since: '2026-09-12',
+    codeAnchors: [
+      'apps/server/src/domains/media/images.ts',
+      // Презентации подписаны тем же компромиссом: мерка одна — возможность
+      // объявлена или дорога агента, — и решают её два места.
+      'apps/server/src/domains/media/presentations.ts',
+    ],
+  },
+  'mask-unrestorable': {
+    severity: 'risk',
+    since: '2026-09-12',
+    codeAnchors: ['apps/server/src/domains/platform/gateway/frames.ts'],
+    // Остановка называется в самом вызове — сообщением чата и строкой следа
+    // запроса; постоянного места на экране у неё нет.
+    uiHidden: true,
   },
 };
 

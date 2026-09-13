@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -8,6 +9,7 @@ import { getStoredKey, setStoredKey } from '../lib/provider-keys.ts';
 import { readZip } from '../lib/zip.ts';
 import type { ServerContext } from '../context.ts';
 import { registerEnvTransferRoutes } from './env-transfer-routes.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Контур в переносе окружения (Т12): настройка уезжает, КЛЮЧ остаётся.
@@ -54,7 +56,12 @@ const contour = {
   agents: [],
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 describe('перенос окружения: контуры', () => {

@@ -5,7 +5,6 @@ import type {
   PlatformApplyResult,
   PlatformAppliedRecord,
   PlatformAppliedTarget,
-  PlatformApplyTarget,
 } from '@agentdeck/contracts';
 import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
 import {
@@ -17,12 +16,11 @@ import { applyEndpointProfile } from '../../endpoints/endpoint-apply.ts';
 import { invalidField } from '../errors.ts';
 import { consumersOf } from '../store.ts';
 import { applyCodexEndpoint, applyContinueEndpoint, type FileWriteResult } from './config-files.ts';
-import { fingerprintOf, readCurrentEnv } from './current.ts';
+import { fingerprintOf, ownedFingerprintOf, readCurrentEnv } from './current.ts';
 import {
   activeGatewaySettings,
   buildManagedProfile,
   gatewayUrlFor,
-  managedModel,
   PLACEHOLDER_KEY,
 } from './profile.ts';
 import { buildPlatformApplyPlan, type ContourApplyDeps } from './plan.ts';
@@ -96,7 +94,6 @@ function previousEnvValues(
 /** Записать одну цель. Возвращает след для отката и строку ответа. */
 function writeTarget(
   target: ContourTarget,
-  planned: PlatformApplyTarget,
   deps: ContourApplyDeps,
   platform: Platform,
   managed: EndpointProfile,
@@ -129,7 +126,7 @@ function writeTarget(
       entry: {
         targetId: target.targetId,
         filePath: result.filePath,
-        written: planned.plan,
+        written: target.plan,
         ...(result.backupPath ? { backupPath: result.backupPath } : {}),
       },
       trace: {
@@ -137,6 +134,11 @@ function writeTarget(
         filePath: result.filePath,
         previous,
         fingerprint: fingerprintOf(result.filePath),
+        ownedFingerprint: ownedFingerprintOf(
+          { targetId: target.targetId, filePath: result.filePath, previous },
+          platform.id,
+          deps.paths.override,
+        ),
         ...(result.backupPath ? { backupPath: result.backupPath } : {}),
       },
     };
@@ -153,7 +155,7 @@ function writeTarget(
     entry: {
       targetId: target.targetId,
       filePath: write.filePath,
-      written: planned.plan,
+      written: target.plan,
       ...(result.backupPath ? { backupPath: result.backupPath } : {}),
     },
     trace: {
@@ -162,6 +164,11 @@ function writeTarget(
       previous: result.previous,
       ...(result.previousRegion === undefined ? {} : { previousRegion: result.previousRegion }),
       fingerprint: fingerprintOf(write.filePath),
+      ownedFingerprint: ownedFingerprintOf(
+        { targetId: target.targetId, filePath: write.filePath, previous: result.previous },
+        platform.id,
+        deps.paths.override,
+      ),
       ...(result.backupPath ? { backupPath: result.backupPath } : {}),
     },
   };
@@ -195,7 +202,8 @@ export function applyContour(
   platform: Platform,
   request: ContourApplyRequest,
 ): PlatformApplyResult {
-  const plan = buildPlatformApplyPlan(deps, platform);
+  // План — с той моделью, что уйдёт в файл: по нему проверяется занятое место.
+  const plan = buildPlatformApplyPlan(deps, platform, request.model);
   const overwrite = new Set(request.overwrite ?? []);
   const wanted = [...new Set(request.targets)];
 
@@ -235,10 +243,17 @@ export function applyContour(
 
   if (write.length === 0) return result;
 
-  // Модель: явно присланная выигрывает у хранимой, хранимая — у пустой. Профиль
-  // заводится ДО записи в файлы, потому что цели берут из него адрес и модель.
-  const model = request.model?.trim() ?? managedModel(deps.store, platform.id);
-  const managed = upsertManagedProfile(deps.store, platform, model);
+  // Модель: явно присланная выигрывает у настройки контура, настройка — у
+  // подстановки из каталога (Т6). Профиль заводится ДО записи в файлы, потому
+  // что цели берут из него адрес и модель.
+  //
+  // Пустая строка в запросе — НЕ выбор «пусть решает CLI» (ревью Т6, M5): у
+  // управляемого профиля модель есть всегда, иначе CLI уходит в контур с именем
+  // ВЕНДОРА и получает 403 на первом же сообщении, а план на том же состоянии
+  // продолжает обещать модель, которой в профиле нет. Поэтому пустое значение
+  // читается как «не выбрано» и разрешается тем же порядком, что и отсутствие
+  // поля. Разрешает её план — один раз на оба места (аудит DRV-21).
+  const managed = upsertManagedProfile(deps.store, platform, plan.model);
 
   const earlier = deps.store.getPlatformApplied()[platform.id];
   const gatewayPort = activeGatewaySettings(deps.store).port;
@@ -268,8 +283,7 @@ export function applyContour(
   try {
     for (const targetId of write) {
       const target = targets.find((item) => item.targetId === targetId)!;
-      const planned = plan.targets.find((item) => item.targetId === targetId)!;
-      const written = writeTarget(target, planned, deps, platform, managed);
+      const written = writeTarget(target, deps, platform, managed);
       traces.push({
         ...keepFirstPrevious(
           written.trace,

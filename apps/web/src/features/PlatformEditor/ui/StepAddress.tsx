@@ -5,8 +5,10 @@ import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
 import { Button } from '@shared/ui/button';
 import { StatusDot } from '@shared/ui/status-dot';
-import { PLATFORM_BASE_URL_SAMPLE, PLATFORM_DRIVERS, validatePlatform } from '@entities/Platform';
+import { PLATFORM_DRIVERS, platformBaseUrlSample, validatePlatform } from '@entities/Platform';
 import type { WizardStepProps } from './PlatformWizard.types';
+import { StepAddressTransport } from './StepAddressTransport';
+import { StepAddressManifest } from './StepAddressManifest';
 
 /**
  * Шаг 1 — адрес. Здесь же живая проверка связи, и это не украшение: самая
@@ -57,11 +59,14 @@ export function StepAddress({ model }: WizardStepProps) {
         label={t('platform.baseUrlLabel')}
         value={model.draft.baseUrl}
         onChange={(value) => model.patch({ baseUrl: value })}
-        placeholder={PLATFORM_BASE_URL_SAMPLE[model.draft.driver]}
+        placeholder={platformBaseUrlSample(model.draft.driver)}
         isMono
         hint={t('platform.baseUrlHint')}
         error={errors.baseUrl ? t(`platform.error.baseUrl_${errors.baseUrl}`) : undefined}
       />
+
+      <StepAddressTransport model={model} />
+      <StepAddressManifest model={model} />
 
       <Stack gap="var(--spacing-2xs)">
         <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>

@@ -1,9 +1,18 @@
 import {
   PLATFORM_ASSISTANT_TARGET,
   PLATFORM_DEFAULT_CONSUMERS,
+  PLATFORM_PRESETS,
+  defaultOurRules,
+  defaultPlatformRules,
+  defaultPlatformTransport,
   isPlatformDay,
+  platformDrivers,
+  platformManifestError,
+  platformTransportErrors,
   platformIdPattern,
+  type CompromiseId,
   type Platform,
+  type PlatformToolRoute,
   type PlatformApplyTarget,
   type PlatformBudgetState,
   type PlatformDriverId,
@@ -20,18 +29,20 @@ import {
  * тем, что панель на самом деле записала.
  */
 
-/** Драйверы в порядке показа. `enterprise-platform` первый — ради него партия и заводится. */
-export const PLATFORM_DRIVERS: PlatformDriverId[] = ['enterprise-platform', 'openai-compat'];
+/**
+ * Пресеты в порядке показа — данными контракта (DRV-03), а не своим списком:
+ * свой разошёлся бы с тем, что сервер согласен сохранить, на первом новом шлюзе.
+ */
+export const PLATFORM_DRIVERS: readonly PlatformDriverId[] = platformDrivers;
 
 /**
  * Образец адреса: сюда идёт корень публичного API, а не адрес админки. Самая
  * частая ошибка настройки — именно вторая, и проба её НАЗЫВАЕТ, но полчаса
  * человека к тому моменту уже потрачены.
  */
-export const PLATFORM_BASE_URL_SAMPLE: Record<PlatformDriverId, string> = {
-  enterprise-platform: 'https://api.example.ru',
-  'openai-compat': 'https://gateway.example.com/v1',
-};
+export function platformBaseUrlSample(driver: PlatformDriverId): string {
+  return PLATFORM_PRESETS[driver].sampleUrl;
+}
 
 /** Новый контур с заполненными по умолчанию полями. */
 export function newPlatform(id: string, title: string): Platform {
@@ -52,16 +63,27 @@ export function newPlatform(id: string, title: string): Platform {
     // увести туда рабочий чат значило бы сменить ему модель, ничего не сказав.
     consumers: [...PLATFORM_DEFAULT_CONSUMERS],
     projectPaths: [],
+    // Модель (Т6) — пустой: каталог появится только после первой пробы, и
+    // выбирать её из пустого списка человеку нечем. До выбора панель берёт
+    // первую чатовую модель каталога и говорит, что выбор не его.
+    defaultModel: '',
+    consumerModels: {},
+    modelMap: {},
     // Агентов человек вносит сам и уже после подключения: их идентификаторы
     // лежат в админке компании, и спросить их у контура нечем.
     agents: [],
     budgetSince: '',
-    // Прослойка инструментов и короткий промпт — включёнными (решение В1): без
-    // них агент через контур «работает как чат», а это ровно та беда, ради
-    // которой партия и заводилась.
-    toolShim: true,
-    contourPrompt: true,
+    // Прослойка инструментов и короткий промпт — по пресету драйвера: у платформа компании
+    // включёнными (решение В1, без них агент через неё «работает как чат»), у
+    // совместимого шлюза — нет, инструменты он принимает полем (аудит DRV-20).
+    ...PLATFORM_PRESETS.enterprise-platform.defaults,
+    // Правила контура (Т7) — умолчаниями контракта: список инструментов
+    // платформы пуст, и пока он пуст, наверх уходит `tool_choice: "none"`.
+    rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
     caCertPath: '',
+    // Транспорт — как было до DRV-04/05: ключ в `Authorization: Bearer`, `/v1`
+    // дописывается к адресу без версии. Нестандартный шлюз правится на шаге адреса.
+    transport: defaultPlatformTransport(),
   };
 }
 
@@ -100,6 +122,13 @@ export function validatePlatform(
   // бы, а тихо отрезало весь расход, а `2026-13-45` по виду проходит, но такого
   // дня нет — итог тот же. Отказ на форме объясняет это до сохранения.
   if (!isPlatformDay(draft.budgetSince.trim())) errors.budgetSince = 'pattern';
+  // Подробности (какое поле и почему) форма берёт из `platformTransportErrors`
+  // сама; здесь — только то, что сохранять такое нельзя.
+  if (platformTransportErrors(draft.transport ?? defaultPlatformTransport()).length > 0) {
+    errors.transport = 'pattern';
+  }
+  // Переопределения пресета — та же проверка, что в двери сохранения сервера.
+  if (platformManifestError(draft.manifest)) errors.manifest = 'pattern';
   return errors;
 }
 
@@ -115,6 +144,27 @@ function isHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Маршрут инструментов из ответа сервера. Сервер старее фронта поля не
+ * присылает — тогда прежний смысл тумблера: прослойка включена или инструментов
+ * нет вовсе.
+ */
+export function toolRouteOf(source: {
+  toolRoute?: PlatformToolRoute;
+  platform?: Pick<Platform, 'toolShim'>;
+}): PlatformToolRoute {
+  return source.toolRoute ?? (source.platform?.toolShim ? 'shim' : 'none');
+}
+
+/**
+ * Подпись у цели-CLI: чем её инструменты дойдут до модели. Полем — подписывать
+ * нечего; прослойкой — работает с её оговоркой; никак — собеседник без рук.
+ */
+export function toolRouteMark(route: PlatformToolRoute): CompromiseId | null {
+  if (route === 'native') return null;
+  return route === 'shim' ? 'tool-shim' : 'no-client-tools';
 }
 
 /**

@@ -13,7 +13,7 @@ import {
   saveProviderEnvVars,
 } from '../../provider-env.ts';
 import { rollbackCodexEndpoint, rollbackContinueEndpoint } from './config-files.ts';
-import { fingerprintOf } from './current.ts';
+import { driftedSinceApply } from './current.ts';
 import { managedProfileId } from './profile.ts';
 import type { ContourApplyDeps } from './plan.ts';
 import { contourEntryName } from './targets.ts';
@@ -22,11 +22,12 @@ import { contourEntryName } from './targets.ts';
  * Снятие применения: чужие файлы возвращаются в исходный вид, управляемый
  * профиль исчезает.
  *
- * Главное правило здесь — **не затирать чужую работу**. Файл, изменённый
- * человеком ПОСЛЕ применения, откат не трогает вовсе: он называется в ответе
- * (`kept`), и дальше решает человек. Отличить своё от чужого позволяет
- * отпечаток, снятый сразу после записи; по времени изменения это не отличается
- * никак — его меняет и наша собственная запись.
+ * Главное правило здесь — **не затирать чужую работу**. Цель, чьи НАШИ значения
+ * человек правил после применения, откат не трогает вовсе: она называется в
+ * ответе (`kept`), и дальше решает человек. Отличить своё от чужого позволяет
+ * отпечаток наших значений, снятый сразу после записи; правка остального файла
+ * (права, хуки, чужие переменные) ему не мешает — аудит DRV-02. По времени
+ * изменения это не отличается никак — его меняет и наша собственная запись.
  *
  * Второе правило — трогается ТОТ ЖЕ файл, в который писали, по пути из следа, а
  * не по пути, который панель вычислила бы сегодня. Человек мог сменить каталог
@@ -111,7 +112,9 @@ function rollbackTarget(
   }
 
   if (!trace.filePath || !existsSync(trace.filePath)) return { ...entry, outcome: 'missing' };
-  if (fingerprintOf(trace.filePath) !== trace.fingerprint) return { ...entry, outcome: 'kept' };
+  if (driftedSinceApply(trace, platformId, deps.paths.override)) {
+    return { ...entry, outcome: 'kept' };
+  }
   if (!isKnownProviderId(trace.targetId)) return { ...entry, outcome: 'kept' };
 
   const provider = getProvider(trace.targetId);

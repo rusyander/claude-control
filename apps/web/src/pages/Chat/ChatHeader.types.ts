@@ -24,6 +24,13 @@ export interface ChatHeaderProps {
   defaultModel: string;
   defaultEffort: string;
   models?: ModelInfo[];
+  /**
+   * Кем прогон этого разговора пойдёт через контур: `groups` у разговора,
+   * заведённого разделением, иначе `chat`. Спрашивать план всегда за «Чат»
+   * значило бы обещать в группе снятые слои чужого маршрута — ровно та подпись,
+   * ради которой она и заводилась (ревью Т8).
+   */
+  consumer: string;
   onModelChange: (value: string) => void;
   onEffortChange: (value: string) => void;
 

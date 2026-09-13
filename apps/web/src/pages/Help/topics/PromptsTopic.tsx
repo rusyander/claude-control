@@ -59,6 +59,7 @@ export function PromptsTopic() {
             { name: tr('promptContourAgent'), description: tr('promptContourAgentText') },
             { name: tr('promptContourPreamble'), description: tr('promptContourPreambleText') },
             { name: tr('promptImage'), description: tr('promptImageText') },
+            { name: tr('promptImageSvg'), description: tr('promptImageSvgText') },
             { name: tr('promptPresentation'), description: tr('promptPresentationText') },
           ].map((row) => ({ ...row, isMono: false }))}
         />

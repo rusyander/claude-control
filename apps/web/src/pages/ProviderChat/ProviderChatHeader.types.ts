@@ -3,6 +3,12 @@ import type { ProviderChatDetail, ProviderRunnerInfo } from '@agentdeck/contract
 export interface ProviderChatHeaderProps {
   chat?: ProviderChatDetail;
   providerName: string;
+  /**
+   * Идентификатор провайдера разговора: по нему спрашивается, чем прогон пойдёт
+   * через контур (Т6). Пусто — провайдер ещё не приехал, и о контуре шапка
+   * ничего не утверждает.
+   */
+  providerId: string;
   runner?: ProviderRunnerInfo;
   isRunning: boolean;
   onRename: (title: string) => void;

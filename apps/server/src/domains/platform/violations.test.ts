@@ -29,6 +29,7 @@ const event = (patch: Partial<PlatformGatewayEvent>): PlatformGatewayEvent => ({
   lost: [],
   shimmed: [],
   toolCalls: 0,
+  contourCalls: 0,
   toolFlaws: [],
   claimedWithoutCall: false,
   totalTokens: 0,

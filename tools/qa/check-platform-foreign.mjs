@@ -34,7 +34,7 @@
  * Запуск: `node tools/qa/check-platform-foreign.mjs`
  * Нужен установленный Ollama и хотя бы одна модель (`ollama pull qwen2.5:0.5b`).
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -83,6 +83,8 @@ function startWitness() {
         stream: parsed?.stream,
         auth: req.headers.authorization ?? '',
         accept: req.headers.accept ?? '',
+        anthropicVersion: req.headers['anthropic-version'] ?? '',
+        tools: Array.isArray(parsed?.tools) ? parsed.tools : undefined,
       });
 
       void (async () => {
@@ -92,6 +94,9 @@ function startWitness() {
             headers: {
               'content-type': 'application/json',
               accept: req.headers.accept ?? '*/*',
+              ...(req.headers['anthropic-version']
+                ? { 'anthropic-version': req.headers['anthropic-version'] }
+                : {}),
             },
             body: req.method === 'GET' || req.method === 'HEAD' ? undefined : body,
           });
@@ -164,6 +169,20 @@ const started = [];
  */
 class NotChecked extends Error {}
 
+/**
+ * Убить процесс вместе с детьми. `ollama serve` поднят через оболочку, и на
+ * Windows `kill()` гасит только `cmd.exe`: сама `ollama.exe` оставалась сиротой
+ * и держала порт и память видеокарты после прогона.
+ */
+function killTree(child) {
+  if (child.exitCode !== null || child.pid === undefined) return;
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  } else {
+    child.kill();
+  }
+}
+
 async function main() {
   // ── Чужой шлюз ───────────────────────────────────────────────────────────
   let models = await waitFor(`${OLLAMA}/v1/models`, 2);
@@ -178,7 +197,9 @@ async function main() {
   }
 
   const catalog = await models.json();
-  const model = catalog.data?.[0]?.id;
+  // Модель можно назвать: первая из каталога может оказаться 14B, а доказывает
+  // путь и самая маленькая.
+  const model = process.env.FOREIGN_MODEL ?? catalog.data?.[0]?.id;
   if (!model) {
     throw new NotChecked('у чужого шлюза нет ни одной модели (ollama pull qwen2.5:0.5b).');
   }
@@ -210,7 +231,7 @@ async function main() {
 
     await run(model, home);
   } finally {
-    for (const child of started) child.kill();
+    for (const child of started) killTree(child);
     witness.close();
     rmSync(home, { recursive: true, force: true });
   }
@@ -238,6 +259,9 @@ async function run(model, home) {
         capabilities: [],
         targets: [],
         projectPaths: [],
+        // Ассистент — отмеченный потребитель (Т3): без отметки применение к нему
+        // пропускается с `consumer_off`, и раздел 6 проверял бы пропуск.
+        consumers: ['assistant'],
         agents: [],
         caCertPath: '',
       },
@@ -248,6 +272,17 @@ async function run(model, home) {
     'контур на произвольном адресе сохраняется',
     saved.status === 200,
     JSON.stringify(saved.body),
+  );
+  // Сохранение контур НЕ включает (Т2, инвариант 1) — активность переключается
+  // своим маршрутом; без него шлюз отвечал бы «контур выключен в панели».
+  const activated = await api(`/platforms/${encodeURIComponent(CONTOUR)}/activate`, {
+    method: 'POST',
+    body: '{}',
+  });
+  check(
+    'контур сделан активным своим маршрутом',
+    activated.status === 200 && activated.body?.activePlatformId === CONTOUR,
+    JSON.stringify(activated.body)?.slice(0, 200),
   );
 
   const probe = await api(`/platforms/${encodeURIComponent(CONTOUR)}/check`, {
@@ -439,6 +474,64 @@ async function run(model, home) {
     (cardAfter?.periodSpend?.requests ?? 0) > (card?.periodSpend?.requests ?? 0),
     `${card?.periodSpend?.requests} → ${cardAfter?.periodSpend?.requests}`,
   );
+
+  // ── 7. Пресет ollama: клиент Anthropic к родной ручке (DRV-03, DRV-07) ───
+  // Мост Anthropic → OpenAI доказан разделами выше. Здесь другое: пресет
+  // объявляет родную `/v1/messages`, и клиент Anthropic (как Claude Code)
+  // должен дойти до неё у НАСТОЯЩЕЙ Ollama — со своими инструментами в
+  // Anthropic-форме, без захода в `/chat/completions`. Ответ пишет она, не мы.
+  const preset = await api(`/platforms/${encodeURIComponent(CONTOUR)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ settings: { ...card.platform, driver: 'ollama' } }),
+  });
+  check(
+    'контур переведён на пресет ollama',
+    preset.status === 200,
+    JSON.stringify(preset.body)?.slice(0, 300),
+  );
+  const anthropicTool = {
+    name: 'Write',
+    description: 'пишет файл',
+    input_schema: { type: 'object', properties: { file_path: { type: 'string' } } },
+  };
+  for (const stream of [true, false]) {
+    const mark = upstreamSeen.length;
+    const native = await fetch(`${base}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model,
+        stream,
+        max_tokens: 16,
+        tools: [anthropicTool],
+        messages: [{ role: 'user', content: 'Ответь одним словом: привет' }],
+      }),
+    });
+    const nativeText = await native.text();
+    const sent = upstreamSeen.slice(mark);
+    const messagesSeen = sent.find((item) => item.path === '/v1/messages');
+    // Маленькая модель с инструментом в запросе вправе ответить вызовом, а не
+    // словом, — годится любой досказанный ответ Anthropic-формы с содержимым.
+    const answered = stream
+      ? nativeText.includes('event: message_stop') &&
+        /"(text_delta|input_json_delta|tool_use)"/.test(nativeText)
+      : /"type"\s*:\s*"message"/.test(nativeText) &&
+        /"type"\s*:\s*"(text|tool_use)"/.test(nativeText);
+    check(
+      `ollama (${stream ? 'поток' : 'цельно'}): клиент Anthropic ответила родная /v1/messages, моста не было`,
+      native.status === 200 &&
+        answered &&
+        messagesSeen !== undefined &&
+        messagesSeen.tools?.[0]?.input_schema !== undefined &&
+        messagesSeen.anthropicVersion === '2023-06-01' &&
+        !sent.some((item) => item.path === '/v1/chat/completions'),
+      JSON.stringify({
+        status: native.status,
+        paths: sent.map((item) => item.path),
+        text: nativeText.slice(0, 300),
+      }),
+    );
+  }
 
   // Одноразовая панель живёт во временной папке — убирать за собой в её
   // состоянии незачем, но путь печатаем: он пригодится, если проверка упала.

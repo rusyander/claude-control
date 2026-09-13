@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import type { Platform } from '@agentdeck/contracts';
 import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
 import { listProviders } from '../../../providers/registry.ts';
 import { buildManagedProfile, PLACEHOLDER_KEY } from './profile.ts';
 import { contourEntryName, describeContourTargets, type ContourTarget } from './targets.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Куда контур переносится и почему у части CLI стоит прочерк.
@@ -31,7 +33,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 const GATEWAY = { enabled: true, port: 5179, forceStream: true };

@@ -353,8 +353,10 @@ export const ru = {
     smokeFailed: (detail: string) =>
       detail ? `Пробный запрос не прошёл: ${detail}` : 'Пробный запрос не прошёл',
     estimate: 'Это оценка панели по её прайсу, а не счёт контура.',
-    exhaustedAt: (at: string, level: string) =>
-      level ? `Отказ ${at}, предел: ${level}` : `Отказ ${at}`,
+    exhaustedAt: (at: string, keyBudget: boolean, level: string) => {
+      if (keyBudget) return `Отказ ${at}: исчерпан бюджет ключа`;
+      return level ? `Отказ ${at}, предел: ${level}` : `Отказ ${at}`;
+    },
   },
 
   pair: {

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { enterprise-platformDriver } from '../../drivers/enterprise-platform.ts';
+import { openAiCompatDriver } from '../../drivers/openai-compat.ts';
 import { encodeToolResult, encodeToolUse, shimOpenAiRequest, toolNamesById } from './encode.ts';
 
 /**
@@ -86,10 +88,23 @@ describe('запрос в диалекте OpenAI', () => {
     expect(String(system?.content)).toContain('### Write');
   });
 
-  it('свои инструменты платформы остаются выключенными', () => {
+  it('свои инструменты платформы гасятся тем, что объявил её драйвер', () => {
     // Включённый набор платформы перебивал бы протокол, которому мы только что
     // научили модель (Т7 отдаёт этот выключатель человеку).
-    expect(shimOpenAiRequest(request(), PROTOCOL).body.tool_choice).toBe('none');
+    const fields = enterprise-platformDriver.shimRequestFields;
+    expect(shimOpenAiRequest(request(), PROTOCOL, fields).body.tool_choice).toBe('none');
+  });
+
+  it('у шлюза без своих инструментов выбор снимается вместе с `tools`', () => {
+    // Без `tools` строгий шлюз отвергает и `tool_choice`, и `parallel_tool_calls`
+    // запросом целиком: прослойка у vLLM/OpenAI отвечала 400 вместо хода.
+    const { body } = shimOpenAiRequest(
+      { ...request(), tool_choice: 'auto', parallel_tool_calls: true },
+      PROTOCOL,
+      openAiCompatDriver.shimRequestFields,
+    );
+    expect(body).not.toHaveProperty('tool_choice');
+    expect(body).not.toHaveProperty('parallel_tool_calls');
   });
 
   it('прошлый вызов сворачивается в текст того же протокола', () => {

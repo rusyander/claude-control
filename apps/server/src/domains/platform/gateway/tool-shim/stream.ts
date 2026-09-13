@@ -41,6 +41,41 @@ function defaultId(): string {
 
 const OPENS = CALL_FORMS.map((form) => form.open);
 
+/** Строка забора CommonMark: до трёх пробелов отступа, три и больше ` или ~. */
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+
+/**
+ * Открыт ли блок кода к концу этого текста — по правилам CommonMark, а не счётом
+ * тройных кавычек.
+ *
+ * Счёт ошибался в обе стороны, и обе дорогие. Забор из тильд он не видел вовсе, и
+ * цитата `rm -rf build` внутри `~~~` выполнялась. А тройные кавычки посреди прозы
+ * («оберните в ```x```») переворачивали чётность, и настоящий вызов ниже читался
+ * цитатой — ход молча не делал ничего.
+ *
+ * Забор — только строка целиком: отступ до трёх пробелов, три и больше одинаковых
+ * знаков. Закрывает его строка из того же знака не короче открывшей и без текста
+ * после. У забора из кавычек в строке сведений кавычек быть не может — такая
+ * строка забором не считается.
+ */
+export function fenceOpenAt(text: string): boolean {
+  let open: { char: string; length: number } | undefined;
+  for (const line of text.split('\n')) {
+    const match = FENCE_LINE.exec(line.replace(/\r$/, ''));
+    const run = match?.[1];
+    if (!run) continue;
+    const rest = match[2] ?? '';
+    const char = run.charAt(0);
+    if (!open) {
+      if (char === '`' && rest.includes('`')) continue;
+      open = { char, length: run.length };
+    } else if (char === open.char && run.length >= open.length && rest.trim() === '') {
+      open = undefined;
+    }
+  }
+  return open !== undefined;
+}
+
 /**
  * Ответ, который ЦЕЛИКОМ является вызовом: голый объект или один забор без
  * метки и ничего вокруг. Так отвечает модель среднего класса, привыкшая к
@@ -239,20 +274,13 @@ export class ToolStreamParser {
   /**
    * Стоит ли знак с этим местом буфера внутри открытого блока кода.
    *
-   * Считается по ВСЕМУ тексту ответа до него: заборов нечётное число — значит
-   * последний открыт. Разборщик сами заборы не держит (обычный ответ агента
-   * полон кода, и держать его до закрытия значит останавливать выдачу на каждом
-   * блоке), поэтому «где мы» узнаётся счётом, а не состоянием.
+   * Считается по ВСЕМУ тексту ответа до него. Разборщик сами заборы не держит
+   * (обычный ответ агента полон кода, и держать его до закрытия значит
+   * останавливать выдачу на каждом блоке), поэтому «где мы» узнаётся проходом по
+   * тексту, а не состоянием.
    */
   #insideFence(index: number): boolean {
-    const before = this.#seen.slice(0, this.#seen.length - this.#buffer.length + index);
-    let fences = 0;
-    let at = before.indexOf('```');
-    while (at >= 0) {
-      fences += 1;
-      at = before.indexOf('```', at + 3);
-    }
-    return fences % 2 === 1;
+    return fenceOpenAt(this.#seen.slice(0, this.#seen.length - this.#buffer.length + index));
   }
 
   /**
@@ -268,7 +296,7 @@ export class ToolStreamParser {
     if (this.#noted || this.calls > 0) return;
     this.#noted = true;
 
-    for (const match of this.#seen.matchAll(/```[a-z_]*\r?\n([\s\S]*?)```/gi)) {
+    for (const match of this.#seen.matchAll(/(?:```|~~~)[a-z_]*\r?\n([\s\S]*?)(?:```|~~~)/gi)) {
       const reading = readCall(match[1] ?? '', this.#options.allowed, LOOSE_FORM);
       if ('call' in reading) {
         this.flaws.push({

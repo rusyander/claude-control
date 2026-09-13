@@ -22,6 +22,7 @@ export function ChatDock({
   onStop,
   onSplitTasks,
   onHandoff,
+  modes,
 }: ChatDockProps) {
   const { t } = useTranslation();
 
@@ -52,6 +53,7 @@ export function ChatDock({
         isRunning={isRunning}
         onSplitTasks={onSplitTasks}
         onHandoff={onHandoff}
+        {...(modes ? { modes } : {})}
       />
     </>
   );

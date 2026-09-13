@@ -347,8 +347,10 @@ export const en: Dictionary = {
     smokeFailed: (detail: string) =>
       detail ? `The test request failed: ${detail}` : 'The test request failed',
     estimate: "This is the panel's estimate by its own price table, not the contour's bill.",
-    exhaustedAt: (at: string, level: string) =>
-      level ? `Refused ${at}, limit: ${level}` : `Refused ${at}`,
+    exhaustedAt: (at: string, keyBudget: boolean, level: string) => {
+      if (keyBudget) return `Refused ${at}: the key budget is exhausted`;
+      return level ? `Refused ${at}, limit: ${level}` : `Refused ${at}`;
+    },
   },
 
   pair: {

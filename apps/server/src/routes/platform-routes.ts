@@ -17,6 +17,8 @@ import { EndpointApplyError } from '../domains/endpoints/endpoint-apply.ts';
 import { EnvKeyNotEncodableError, EnvKeyPreservedError } from '../domains/provider-env.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 import { readCaCert } from '../domains/platform/ca-fetch.ts';
+import { assertTransport } from '../domains/platform/transport.ts';
+import { assertManifest } from '../domains/platform/manifest.ts';
 import { checkPlatform } from '../domains/platform/check.ts';
 import {
   activatePlatform,
@@ -38,6 +40,9 @@ import {
   PLATFORM_MCP_ID,
 } from '../domains/platform/mcp-bridge.ts';
 import { embedTexts, EmbeddingError } from '../domains/platform/embeddings.ts';
+import { describeRunPlan } from '../domains/platform/routing.ts';
+import { driverOf } from '../domains/platform/drivers/index.ts';
+import { brokenExclusion } from '../domains/platform/rules-matrix.ts';
 import {
   clearExhausted,
   emptySpend,
@@ -48,6 +53,7 @@ import {
   assertToken,
   describePlatform,
   describePlatforms,
+  findPlatform,
   removePlatform,
   requireConnected,
   requirePlatform,
@@ -138,6 +144,29 @@ export function registerPlatformRoutes(
     };
   };
 
+  /**
+   * Чем пойдёт прогон этого потребителя, если запустить его сейчас (Т6): модель
+   * контура, правила её выбора и принимает ли контур усилие.
+   *
+   * Отдельным коротким маршрутом, а не полем карточки: спрашивает шапка чата на
+   * каждом открытии разговора, а карточка везёт каталог моделей, пробу и учёт
+   * расхода — мегабайты ради одной подписи под селектором.
+   *
+   * Своим корнем, а не сегментом внутри `/api/platforms/:id/…` (ревью Т6, m11):
+   * статический сегмент сильнее параметра, и контур с идентификатором
+   * `run-plan` перекрыл бы собственные маршруты.
+   */
+  app.get<{ Params: { consumer: string } }>('/api/platform-run-plan/:consumer', (request) =>
+    describeRunPlan(
+      {
+        store: ctx.store,
+        appDataDir: appData(),
+        gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
+      },
+      request.params.consumer,
+    ),
+  );
+
   app.get('/api/platforms', () => {
     // Хвост учёта дописываем ПЕРЕД чтением: расход копится пачкой (см.
     // `gateway/spend-flush.ts`), и карточка, открытая сразу после ответа
@@ -162,6 +191,9 @@ export function registerPlatformRoutes(
     if (settings === undefined) return reply;
 
     try {
+      // Сырое тело, а не разобранное: схема общего PATCH негодное поле
+      // переопределений роняет молча, и отказ с именем возможен только до неё.
+      assertManifest((body?.settings as { manifest?: unknown } | undefined)?.manifest);
       const platform = settings as Platform;
       if (platform.id !== id) {
         throw invalidField(
@@ -179,6 +211,27 @@ export function registerPlatformRoutes(
       // Сертификат проверяем ЗДЕСЬ, а не при пробе: человек узнаёт про
       // непрочитанный файл, сохраняя форму, а не через отказ связи потом.
       if (platform.caCertPath.trim()) readCaCert(platform.caCertPath.trim());
+      // Транспорт — там же и по той же причине; значение в отказ не попадает.
+      assertTransport(platform);
+      // Взаимное исключение матрицы (Т7) — отказ, а не тихая починка: панель,
+      // сама снявшая прослойку ради списка инструментов контура, приняла бы за
+      // человека решение, которого он не принимал, и он узнал бы о нём по
+      // молчащему агенту.
+      //
+      // Но отказ стоит РОВНО на попытке свести обе стороны, а не на каждом
+      // сохранении противоречивого контура. Противоречие приезжает мимо этой
+      // двери — разворот архива, `PATCH /api/settings`, импорт снимка, — и
+      // отказ «по состоянию» запирал бы контур насмерть: переименование,
+      // адрес, модель, агенты, ключ — всё получало 400 про инструменты, а
+      // выйти было нечем (ревью Т7, B3). Пришедшее противоречие, которое уже
+      // лежит в настройке, проходит: карточка о нём кричит и даёт оба выхода.
+      const driver = driverOf(platform);
+      const broken = brokenExclusion(platform, driver);
+      const known = findPlatform(ctx.store, id);
+      // Контура в настройках ещё нет — значит противоречие сводит ИМЕННО это
+      // сохранение, и оно получает отказ.
+      const wasBroken = known ? brokenExclusion(known, driver) : undefined;
+      if (broken && !wasBroken) throw invalidField('rules.platform.platformTools', broken.detail);
 
       // Тумблер контура сохранением НЕ меняется: включён — значит активен, а
       // активность переключается своим маршрутом, транзакцией (инвариант 1).

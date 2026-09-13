@@ -31,6 +31,8 @@ import {
 } from '@entities/ChatTree';
 
 import { useStartHandoff } from '@entities/ChatHandoff';
+import { MediaDeckCard, useChatMedia } from '@entities/Media';
+import { MediaFeedCard } from '@features/ChatMessages';
 import { ProviderChatSidebar } from './ProviderChatSidebar';
 import { ProviderChatHeader } from './ProviderChatHeader';
 import { ProviderChatMessages } from './ProviderChatMessages';
@@ -106,6 +108,26 @@ export function ProviderChatPage() {
     void run.send(text, attachments);
     setAttachments([]);
   };
+
+  /**
+   * Режимы «Картинка» и «Презентация» здесь тоже работают, и рабочая дорога у
+   * чужого CLI — просьба к самому агенту: панель отправляет обычное сообщение, а
+   * ответ приезжает блоком и становится карточкой в ленте. Тот же хук, что и у
+   * Claude: второй расчёт доступности разошёлся бы с настоящим маршрутом.
+   *
+   * Дороги, по которым панель делает сама (контур, ручка картинок, свой
+   * эндпоинт), остаются доступны — их результат показывается карточкой над полем
+   * ввода: правого столбца у этой страницы нет, а обещать в меню «нарисует
+   * контур» и не показать результат нельзя.
+   */
+  const media = useChatMedia({
+    chatId: activeChatId ?? '',
+    ask: (text) => {
+      if (!activeChatId || run.isRunning) return false;
+      send(text);
+      return true;
+    },
+  });
 
   /**
    * Перезапуск разговора в чистом виде (Т7). Сессии у чужого CLI нет, поэтому
@@ -360,6 +382,7 @@ export function ProviderChatPage() {
           <ProviderChatHeader
             {...(chat ? { chat } : {})}
             providerName={providerName}
+            providerId={runner?.providerId ?? ''}
             {...(runner ? { runner } : {})}
             isRunning={run.isRunning}
             onRename={(title) => {
@@ -408,15 +431,37 @@ export function ProviderChatPage() {
             onReviewDecide={reviews.decide}
             onReviewPush={reviews.push}
             reviewBusy={reviews.busy}
+            {...(activeChatId ? { mediaChatId: activeChatId } : {})}
+            {...(chat?.model ? { mediaModel: chat.model } : {})}
+            {...(media.topic ? { mediaTopic: media.topic } : {})}
+            mediaRevision={media.revision}
           />
+
+          {media.shownImage && (
+            <Stack padding="0 var(--spacing-xl)">
+              <MediaFeedCard picture={media.shownImage} onClose={media.close} />
+            </Stack>
+          )}
+          {media.shownDeck && (
+            <Stack padding="0 var(--spacing-xl)">
+              <MediaDeckCard
+                deck={media.shownDeck}
+                onClose={media.close}
+                onRevise={media.revision.onStart}
+              />
+            </Stack>
+          )}
 
           <ProviderChatComposer
             attachments={attachments}
             onAttach={() => setPicker('file')}
             onClearAttachments={() => setAttachments([])}
-            onSend={send}
+            // В неттекстовом режиме отправка делает, а не пишет агенту: на дороге
+            // агента это всё равно обычное сообщение, но собранное сервером.
+            onSend={media.isMediaMode ? (text) => media.submit(text) : send}
             isRunning={run.isRunning}
             isBlocked={isBlocked || !activeChatId}
+            modes={media.modes}
           />
         </div>
       </div>

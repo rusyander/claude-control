@@ -3,6 +3,7 @@ import type {
   PlatformAgentAnswer,
   PlatformAgentOutcome,
   PlatformAgentSession,
+  PlatformStatus,
 } from '@agentdeck/contracts';
 
 /**
@@ -100,12 +101,14 @@ export function sessionLine(state: {
  * Показывать ли карточку агентов вообще.
  *
  * Выключенный контур обязан вернуть панель к прежнему виду побайтно, поэтому
- * карточки у него нет. Возможность `agents` при этом НЕ требуется: проба про
- * агентов честно молчит («не объявлено»), и ждать от неё подтверждения значило
- * бы не показать карточку никогда.
+ * карточки у него нет. Возможность `agents` из пробы при этом НЕ требуется: проба
+ * про агентов честно молчит («не объявлено»), и ждать от неё подтверждения
+ * значило бы не показать карточку никогда. Решает манифест типа: у совместимого
+ * шлюза агентов нет, и карточка там звала бы чужую ручку (аудит DRV-12). Сервер
+ * старее фронта поля не присылает — тогда прежнее поведение.
  */
-export function showsAgents(platform: Platform): boolean {
-  return platform.enabled;
+export function showsAgents(status: Pick<PlatformStatus, 'platform' | 'agents'>): boolean {
+  return status.platform.enabled && status.agents !== false;
 }
 
 /**

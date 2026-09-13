@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { ModelInfo } from '@agentdeck/contracts';
+import type { PlatformModelChoice } from '@agentdeck/contracts/platform-models';
 import {
   modelLabel,
   MODEL_OPTIONS,
   EFFORT_LEVELS,
   modelSelectOptions,
+  platformLayersCaption,
+  platformModelCaption,
   withCurrentValue,
 } from './index';
 
@@ -100,5 +103,79 @@ describe('константы выбора', () => {
   it('первый уровень effort — пустой (по умолчанию)', () => {
     expect(EFFORT_LEVELS[0]).toBe('');
     expect(EFFORT_LEVELS).toContain('max');
+  });
+});
+
+/**
+ * Подпись «чем прогон пойдёт через контур» — одна на обе шапки. Ревью Т6 нашло
+ * здесь разрыв: подпись выбиралась по одному признаку `replaced`, и контур без
+ * модели объявлял подмену, которой не происходит, с прочерком вместо имени.
+ */
+describe('подпись модели через контур', () => {
+  const choice = (over: Partial<PlatformModelChoice>): PlatformModelChoice => ({
+    model: 'enterprise-platform-mid',
+    asked: '',
+    source: 'default',
+    replaced: false,
+    ...over,
+  });
+
+  it('обычный случай — просто называет модель, без тревоги', () => {
+    expect(platformModelCaption('EnterprisePlatform · dev', choice({}))).toEqual({
+      key: 'chat.platformModel',
+      params: { title: 'EnterprisePlatform · dev', asked: '', model: 'enterprise-platform-mid' },
+      warn: false,
+    });
+  });
+
+  it('подмена названа и подсвечена', () => {
+    const caption = platformModelCaption(
+      'EnterprisePlatform · dev',
+      choice({ asked: 'sonnet', replaced: true }),
+    );
+    expect(caption).toMatchObject({ key: 'chat.platformModelReplaced', warn: true });
+  });
+
+  it('у контура нет модели — своя строка, а не подмена с прочерком', () => {
+    const caption = platformModelCaption(
+      'EnterprisePlatform · dev',
+      choice({ model: 'sonnet', asked: 'sonnet', source: 'none' }),
+    );
+    expect(caption).toMatchObject({ key: 'chat.platformModelUnset', warn: true });
+  });
+});
+
+/**
+ * Подпись о снятых слоях (Т8). Считает их сервер — здесь проверяется выбор
+ * слов: молчание там, где сказать нечего, и отдельная строка на «не едет
+ * ничего», потому что перечислять все четыре слоя человеку незачем.
+ */
+describe('подпись о наших слоях', () => {
+  it('ничего не снято — шапка молчит', () => {
+    expect(platformLayersCaption({ args: [], systemPrompt: true, dropped: [] })).toBeUndefined();
+  });
+
+  it('прогон ведёт не Claude — поля нет вовсе, и подписи тоже', () => {
+    expect(platformLayersCaption(undefined)).toBeUndefined();
+  });
+
+  it('снятое называется поимённо', () => {
+    expect(
+      platformLayersCaption({
+        args: ['--disable-slash-commands'],
+        systemPrompt: true,
+        dropped: ['skills'],
+      }),
+    ).toEqual({ key: 'chat.platformLayers', dropped: ['skills'] });
+  });
+
+  it('снято всё — своя строка, а не перечисление из четырёх', () => {
+    expect(
+      platformLayersCaption({
+        args: ['--setting-sources', 'project,local'],
+        systemPrompt: false,
+        dropped: ['settings', 'skills', 'mcp', 'systemPrompt'],
+      }),
+    ).toMatchObject({ key: 'chat.platformLayersAll' });
   });
 });

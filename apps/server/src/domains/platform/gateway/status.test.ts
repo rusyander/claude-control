@@ -45,6 +45,67 @@ describe('перечень нарушений: только названия', (
     ).toEqual(['pii_inn']);
   });
 
+  describe('поля названия объявляет драйвер', () => {
+    // Нарушение в той форме, в какой его отдаёт настоящий контур:
+    // `mod-guardrailsbox/src/guardrailsbox/models.py:226 RuleViolation`. Общий
+    // белый список (`category`, `name`…) в нём не находит ничего, и каждый
+    // вердикт уезжал в журнал «без имён» (аудит GW-03).
+    const ruleViolation = (ruleName: string | null) => ({
+      rule_id: 'r-7',
+      rule_name: ruleName,
+      rule_type: 'SECRETS',
+      action: 'BLOCK',
+      mode: 'ENFORCE',
+      scope: 'GLOBAL',
+      scanner_name: 'Secrets',
+      score: 1,
+      message: 'Найден ключ AKIAIOSFODNN7EXAMPLE',
+      details: { secret_types: ['AWS'] },
+    });
+
+    it('название правила от администратора — прозой, текст сработки не выносится', () => {
+      const names = readViolations(
+        { violations: [ruleViolation('Секреты в запросах')] },
+        enterprise-platformDriver.violationNames,
+      );
+      expect(names).toEqual(['Секреты в запросах']);
+      expect(names.join(' ')).not.toContain('AKIA');
+    });
+
+    it('правило без названия называется своим типом', () => {
+      expect(
+        readViolations({ violations: [ruleViolation(null)] }, enterprise-platformDriver.violationNames),
+      ).toEqual(['SECRETS']);
+    });
+
+    it('проза в поле администратора чистится от управляющих знаков и длины', () => {
+      const [name] = readViolations(
+        { violations: [ruleViolation(`Строка\nвторая[31m${'я'.repeat(90)}`)] },
+        enterprise-platformDriver.violationNames,
+      );
+      expect(name).not.toMatch(/\p{C}/u);
+      expect(name?.length).toBeLessThanOrEqual(65);
+    });
+
+    it('451 контура называет правило в отказе клиенту', () => {
+      const bridged = bridgeUpstreamStatus(
+        451,
+        {
+          error: {
+            message: 'Request blocked',
+            type: 'guardrail_violation',
+            code: 'content_policy_violation',
+          },
+          violations: [ruleViolation('Секреты в запросах')],
+        },
+        { driverRows: enterprise-platformDriver.statusRows, violationNames: enterprise-platformDriver.violationNames },
+      );
+      expect(bridged.violations).toEqual(['Секреты в запросах']);
+      expect(bridged.message).toContain('Секреты в запросах');
+      expect(bridged.message).not.toContain('AKIA');
+    });
+  });
+
   it('перечень читается и из вложенного error', () => {
     expect(readViolations({ error: { violations: [{ code: 'policy_x' }] } })).toEqual(['policy_x']);
   });
@@ -77,6 +138,25 @@ describe('коды контура → отказ клиенту', () => {
     expect(bridged.status).toBe(to);
     expect(bridged.code).toBe(code);
     expect(bridged.message).not.toBe('');
+  });
+
+  it('422 FastAPI: поле и причина названы, а `input` (сам запрос) — нет', () => {
+    const bridged = bridgeUpstreamStatus(
+      422,
+      {
+        detail: [
+          {
+            type: 'missing',
+            loc: ['body', 'messages'],
+            msg: 'Field required',
+            input: { model: 'm', note: 'секрет-из-запроса' },
+          },
+        ],
+      },
+      { driverRows: enterprise-platformDriver.statusRows },
+    );
+    expect(bridged.message).toContain('messages: Field required');
+    expect(bridged.message).not.toContain('секрет-из-запроса');
   });
 
   it('451 становится обычным отказом запроса с перечнем нарушенного', () => {

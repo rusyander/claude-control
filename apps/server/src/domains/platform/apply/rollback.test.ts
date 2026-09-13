@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -6,8 +7,9 @@ import { parse as parseYaml } from 'yaml';
 import type { Platform } from '@agentdeck/contracts';
 import { AppStore } from '../../../lib/app-store.ts';
 import { applyContour } from './apply.ts';
-import { type ContourApplyDeps } from './plan.ts';
+import { buildPlatformApplyPlan, type ContourApplyDeps } from './plan.ts';
 import { rollbackContour } from './rollback.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Снятие применения — вторая половина обещания контура: то, что панель
@@ -37,7 +39,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 const CODEX_CONFIG = `# личные настройки codex
@@ -107,6 +114,9 @@ const deps = (): ContourApplyDeps => ({
   backupDir: join(root, 'backups'),
   gatewayRunning: true,
 });
+
+const targetOf = (plan: ReturnType<typeof buildPlatformApplyPlan>, id: string) =>
+  plan.targets.find((item) => item.targetId === id)!;
 
 const outcomeOf = (entries: { targetId: string; outcome: string }[], id: string): string =>
   entries.find((item) => item.targetId === id)?.outcome ?? 'нет такой цели';
@@ -247,6 +257,7 @@ describe('точечный откат', () => {
       apiKind: 'openai-compat' as const,
       model: '',
       writeToken: false,
+      imagesUrl: '',
       ownerPlatformId: '',
     };
     store.updateSettings({ endpointProfiles: [own], assistantEndpointId: 'ep-1' });
@@ -275,6 +286,61 @@ describe('точечный откат', () => {
 });
 
 describe('чужая работа', () => {
+  /**
+   * Аудит DRV-02. `settings.json` пишет не одно применение: права, хуки и
+   * переменные панели ложатся в тот же файл. Отпечаток ВСЕГО файла объявлял
+   * «чужой рукой» любую такую правку — откат уходил в `kept`, след стирался, и
+   * Claude оставался направленным на шлюз без единого способа это снять.
+   */
+  it('claude: правка ДРУГИХ ключей после применения откату не мешает и переживает его', () => {
+    writeFileSync(settingsPath, JSON.stringify({ env: { EXISTING: 'keep-me' } }));
+    applyContour(deps(), PLATFORM, { targets: ['claude'], model: 'gpt-4o' });
+
+    // Ровно то, что делают разделы «Права» и «Переменные» панели.
+    const after = JSON.parse(readFileSync(settingsPath, 'utf8')) as Record<string, unknown> & {
+      env: Record<string, string>;
+    };
+    after.permissions = { allow: ['Bash(git status)'] };
+    after.env = { ...after.env, MY_OWN: 'добавлено после' };
+    writeFileSync(settingsPath, JSON.stringify(after, null, 2));
+
+    expect(targetOf(buildPlatformApplyPlan(deps(), PLATFORM), 'claude').drifted).toBeUndefined();
+    const result = rollbackContour(deps(), PLATFORM.id);
+    expect(outcomeOf(result.entries, 'claude')).toBe('restored');
+    expect(JSON.parse(readFileSync(settingsPath, 'utf8'))).toEqual({
+      env: { EXISTING: 'keep-me', MY_OWN: 'добавлено после' },
+      permissions: { allow: ['Bash(git status)'] },
+    });
+  });
+
+  it('claude: правка НАШЕГО ключа — расхождение, и откат его не трогает', () => {
+    writeFileSync(settingsPath, JSON.stringify({ env: {} }));
+    applyContour(deps(), PLATFORM, { targets: ['claude'], model: 'gpt-4o' });
+    const after = JSON.parse(readFileSync(settingsPath, 'utf8')) as { env: Record<string, string> };
+    after.env.ANTHROPIC_MODEL = 'моя-модель';
+    const mine = JSON.stringify(after);
+    writeFileSync(settingsPath, mine);
+
+    expect(targetOf(buildPlatformApplyPlan(deps(), PLATFORM), 'claude').drifted).toBe(true);
+    expect(outcomeOf(rollbackContour(deps(), PLATFORM.id).entries, 'claude')).toBe('kept');
+    expect(readFileSync(settingsPath, 'utf8')).toBe(mine);
+  });
+
+  it('codex: правка чужой таблицы после применения откату не мешает', () => {
+    writeFileSync(codexPath, CODEX_CONFIG);
+    applyContour(deps(), PLATFORM, { targets: ['codex'], model: 'gpt-4o' });
+    writeFileSync(
+      codexPath,
+      readFileSync(codexPath, 'utf8').replace('command = "npx"', 'command = "pnpm"'),
+    );
+
+    const result = rollbackContour(deps(), PLATFORM.id);
+    expect(outcomeOf(result.entries, 'codex')).toBe('restored');
+    const text = readFileSync(codexPath, 'utf8');
+    expect(text).not.toContain('contour-enterprise-platform-dev');
+    expect(text).toContain('command = "pnpm"');
+  });
+
   it('файл, изменённый человеком после применения, не затирается — он назван', () => {
     writeFileSync(settingsPath, JSON.stringify({ env: {} }));
     applyContour(deps(), PLATFORM, { targets: ['claude'], model: 'gpt-4o' });
@@ -315,6 +381,7 @@ describe('профиль и ассистент', () => {
     apiKind: 'openai-compat' as const,
     model: '',
     writeToken: false,
+    imagesUrl: '',
     ownerPlatformId: '',
   };
 

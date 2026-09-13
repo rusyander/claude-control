@@ -77,7 +77,7 @@ export function usePlatformWizard({ existing, onDone }: PlatformWizardOptions) {
   const plan = usePlatformApplyPlan(draft.id, { enabled: stored && step === 'targets' });
 
   const patch = (fields: Partial<Platform>): void => {
-    setDraft((current) => draftWithPatch(current, fields, idTouched));
+    setDraft((current) => draftWithPatch(current, fields, idTouched, !existing));
   };
 
   const setId = (id: string): void => {

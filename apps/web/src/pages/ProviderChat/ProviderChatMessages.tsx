@@ -4,10 +4,12 @@ import type { ProviderChatMessage } from '@agentdeck/contracts';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
+import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
 import {
   TaskSplitCard,
   HandoffCard,
   ChildStages,
+  MediaFeedCard,
   ReviewDecisionCard,
   waitsDecision,
 } from '@features/ChatMessages';
@@ -51,6 +53,10 @@ export function ProviderChatMessages({
   onReviewDecide,
   onReviewPush,
   reviewBusy,
+  mediaChatId,
+  mediaModel,
+  mediaTopic,
+  mediaRevision,
 }: ProviderChatMessagesProps) {
   const { t } = useTranslation();
   const listRef = useRef<HTMLDivElement>(null);
@@ -110,13 +116,23 @@ export function ProviderChatMessages({
     // своя лента, и без этой строки звенья конвейера у чужого CLI показывали бы
     // сырой JSON (проверено на живом прогоне 08.09.2026).
     const review = scanReviewBlocks(handoff.text);
-    if (split.proposals.length === 0 && handoff.proposals.length === 0) {
-      return <Typography className={styles.turnText}>{review.text}</Typography>;
+    // Вложения агента (Т10): рисунок и колода приезжают блоками, и карточка
+    // встаёт на их место. Именно эта дорога и работает у чужого CLI — ни
+    // контура, ни ключа она не требует.
+    const media = scanMediaBlocks(review.text);
+    const hasCards =
+      split.proposals.length > 0 ||
+      handoff.proposals.length > 0 ||
+      media.decks.length > 0 ||
+      media.pictures.length > 0 ||
+      media.rejected > 0;
+    if (!hasCards) {
+      return <Typography className={styles.turnText}>{media.text}</Typography>;
     }
     const isLast = message.id === lastId;
     return (
       <>
-        {review.text && <Typography className={styles.turnText}>{review.text}</Typography>}
+        {media.text && <Typography className={styles.turnText}>{media.text}</Typography>}
         {split.proposals.map((proposal, index) => (
           <TaskSplitCard
             key={index}
@@ -137,6 +153,37 @@ export function ProviderChatMessages({
             disabled={isRunning}
           />
         ))}
+        {media.pictures.map((svg, index) => (
+          <MediaFeedCard
+            key={`svg-${index}`}
+            svg={svg}
+            {...(mediaChatId ? { chatId: mediaChatId } : {})}
+            {...(mediaModel ? { model: mediaModel } : {})}
+          />
+        ))}
+        {media.decks.map((deck, index) => (
+          <MediaFeedCard
+            key={`deck-${index}`}
+            deck={deck}
+            {...(mediaChatId ? { chatId: mediaChatId } : {})}
+            {...(mediaModel ? { model: mediaModel } : {})}
+            // Тема человека сильнее заголовка модели: искать колоду он будет по
+            // тому, о чём просил.
+            prompt={mediaTopic ?? deck.title}
+            // Правка действует только по последнему ответу — та же причина, что
+            // у разделения и продолжения выше.
+            {...(isLast && mediaRevision?.reviseOf ? { reviseOf: mediaRevision.reviseOf } : {})}
+            {...(isLast && mediaRevision?.onDone ? { onDeckSaved: mediaRevision.onDone } : {})}
+            {...(mediaRevision ? { onRevise: mediaRevision.onStart } : {})}
+          />
+        ))}
+        {/* Непринятый блок остаётся в тексте как есть, и решение об этом приняла
+            ПАНЕЛЬ — значит, она и говорит об этом. */}
+        {media.rejected > 0 && (
+          <Typography variant="caption" color="danger" as="p">
+            {t('chat.mode.block.rejected', { count: media.rejected })}
+          </Typography>
+        )}
       </>
     );
   };

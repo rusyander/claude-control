@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { defaultOurRules } from '@agentdeck/contracts';
 import type { Platform, PlatformAgentAnswer } from '@agentdeck/contracts';
 import {
   askBlocker,
@@ -8,6 +9,7 @@ import {
   warnsCut,
   warnsSessionGap,
 } from './agentsView';
+import { defaultPlatformTransport } from '@agentdeck/contracts';
 
 const PLATFORM: Platform = {
   id: 'enterprise-platform-dev',
@@ -25,7 +27,20 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: {
+    platform: {
+      platformTools: [],
+      toolMode: 'loop' as const,
+      generationPreset: '',
+      enableThinking: 'default',
+    },
+    ours: defaultOurRules(),
+  },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 const answer = (patch: Partial<PlatformAgentAnswer> = {}): PlatformAgentAnswer => ({
@@ -134,10 +149,14 @@ describe('sessionLine: что писать про переписку', () => {
 
 describe('showsAgents', () => {
   it('выключенный контур возвращает раздел к прежнему виду', () => {
-    expect(showsAgents({ ...PLATFORM, enabled: false })).toBe(false);
+    expect(showsAgents({ platform: { ...PLATFORM, enabled: false }, agents: true })).toBe(false);
   });
 
   it('подтверждения пробой не ждём: про агентов она честно молчит', () => {
-    expect(showsAgents({ ...PLATFORM, capabilities: [] })).toBe(true);
+    expect(showsAgents({ platform: { ...PLATFORM, capabilities: [] }, agents: true })).toBe(true);
+  });
+
+  it('тип контура без агентов карточки не получает', () => {
+    expect(showsAgents({ platform: PLATFORM, agents: false })).toBe(false);
   });
 });

@@ -21,6 +21,7 @@
  */
 import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
+import { bypassOnboarding } from './bypass-onboarding.mjs';
 
 const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 
@@ -43,6 +44,7 @@ let bad = 0;
 // таймауту на случайной теме. То же лечение стоит в `tools/qa/audit-layout.mjs`.
 for (const topic of TOPICS) {
   const page = await browser.newPage();
+  await bypassOnboarding(page);
   await page.goto(`${BASE}/help?topic=${topic}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('nav');
   await page.waitForTimeout(600);
@@ -67,6 +69,9 @@ for (const topic of TOPICS) {
 let noButton = 0;
 for (const path of PAGES) {
   const page = await browser.newPage();
+  // Мастер онбординга на свежем стенде перекрывает меню раздела, и клик по нему
+  // висел бы до таймаута.
+  await bypassOnboarding(page);
   await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('nav');
   // У части разделов заголовок с «?» сидит за загрузкой данных (настройки,

@@ -7,6 +7,7 @@ import type {
 import type { CascadeAssignment, CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 import type { ChatTreeView, HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 import type { StreamState } from '@entities/Chat';
+import type { MediaRevision } from '@entities/Media';
 import type { PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
 import type { ChildStageGroup } from './ChildStages.types';
 import type { ReviewDecisionItem } from './ReviewDecisionCard.types';
@@ -200,6 +201,23 @@ export interface ChatMessagesProps {
   queued?: QueuedMessage[];
   /** Убрать сообщение из очереди, пока оно не ушло. */
   onCancelQueued?: (queuedId: string) => void;
+  /**
+   * Модель этого разговора: карточка вложения из блока агента (Т10) называет,
+   * кто рисовал или диктовал. Разговор карточке известен и так —
+   * `conversationId`, а второго источника имени модели в ленте нет.
+   */
+  mediaModel?: string;
+  /**
+   * Тема, которую человек назвал в режиме презентации. Ею подписывается колода из
+   * блока: в самом блоке темы нет, заголовок придумала модель, и через день по
+   * нему не понять, о чём просили.
+   */
+  mediaTopic?: string;
+  /**
+   * Правка готовой колоды: какую именно заменит следующая сборка и чем начать
+   * новую. Состояние держит композер — карточка только называет его серверу.
+   */
+  mediaRevision?: MediaRevision;
 }
 
 export interface MessageBubbleProps {
@@ -239,4 +257,12 @@ export interface MessageBubbleProps {
   childBranches?: readonly string[];
   /** Продолжение в чистой сессии (карточка вместо блока в тексте). */
   handoff?: HandoffControls;
+  /** Разговор, к которому привязать файл вложения из блока агента (Т10). */
+  mediaChatId?: string;
+  /** Модель разговора — ею подписана карточка вложения. */
+  mediaModel?: string;
+  /** Тема человека — подпись колоды из блока (в блоке её нет). */
+  mediaTopic?: string;
+  /** Правка готовой колоды: что заменяем и чем начать новую. */
+  mediaRevision?: MediaRevision;
 }

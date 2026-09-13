@@ -1,7 +1,5 @@
 import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
-import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { Stack } from '@shared/ui/stack';
 import { SkeletonList, SkeletonText } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
@@ -9,7 +7,6 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { CrashCard, ErrorBoundary } from '@shared/ui/error-boundary';
-import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { toast } from '@shared/lib/toast';
 import { isStreamShown } from '@shared/lib/chat-stream';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
@@ -19,9 +16,8 @@ import { liveQuestionKey } from '../lib/questionKey';
 import { useMessageTimings } from '../lib/useMessageTimings';
 import { useFeedScroll } from '../lib/useFeedScroll';
 import { MessageBubble } from './MessageBubble';
+import { StreamedAnswer } from './StreamedAnswer';
 import { QuestionCard } from './QuestionCard';
-import { TaskSplitCard } from './TaskSplitCard';
-import { HandoffCard } from './HandoffCard';
 import { PermissionCard } from './PermissionCard';
 import { ChildBlocks } from './ChildBlocks';
 import { ReviewDecisionCard } from './ReviewDecisionCard';
@@ -81,6 +77,9 @@ export function ChatMessages({
   handoff,
   queued,
   onCancelQueued,
+  mediaModel,
+  mediaTopic,
+  mediaRevision,
   runStartedAt,
 }: ChatMessagesProps) {
   const { t } = useTranslation();
@@ -97,13 +96,6 @@ export function ChatMessages({
     stalled: stream.stalled,
     permissionCount: permissions?.length,
   });
-
-  // Разбор идущего ответа: каждый кусок текста заново, поэтому по памяти — это
-  // единственное место ленты, которое пересчитывается на каждое слово. Оба
-  // разбора идут цепочкой по одному и тому же тексту — языки блоков разные, и
-  // каждый скан видит только свой.
-  const streamed = useMemo(() => scanSplitBlocks(stream.text), [stream.text]);
-  const streamedHandoff = useMemo(() => scanHandoffBlocks(streamed.text), [streamed.text]);
 
   /** Где по ленте агент сменил ветку — по записям самого транскрипта. */
   const branches = useMemo(() => branchMarks(messages), [messages]);
@@ -189,6 +181,10 @@ export function ChatMessages({
               isRunning={isRunning}
               costUnit={costUnit}
               timing={timings.get(message.id)}
+              {...(conversationId ? { mediaChatId: conversationId } : {})}
+              {...(mediaModel ? { mediaModel } : {})}
+              {...(mediaTopic ? { mediaTopic } : {})}
+              {...(mediaRevision ? { mediaRevision } : {})}
               onSplit={onSplit}
               onKeepHere={onKeepHere}
               isSplitPending={isSplitPending}
@@ -270,56 +266,14 @@ export function ChatMessages({
               );
             })}
 
-            {stream.text && (
-              <div className={styles.block}>
-                {/*
-                  Предложение разделить задачи прячем из текста уже здесь, пока
-                  ответ печатается: иначе в ленте несколько секунд стоял бы голый
-                  JSON, а незакрытый блок показывался бы обрубком. Карточку
-                  рисуем сразу, но погашенной — решать можно, когда агент
-                  договорит, и это ровно то, что видно.
-                */}
-                <div className={styles.blockBody}>
-                  {streamedHandoff.text && (
-                    <div
-                      className={styles.text}
-                      // Разметку строит markdown-it с выключенным сырым html.
-                      dangerouslySetInnerHTML={{ __html: renderMarkdown(streamedHandoff.text) }}
-                    />
-                  )}
-                  {streamed.proposals.map((proposal, index) => (
-                    <TaskSplitCard
-                      key={index}
-                      proposal={proposal}
-                      ceiling={splitCeiling}
-                      disabled
-                    />
-                  ))}
-                  {streamed.rejected > 0 && (
-                    <div className={styles.splitRejected} role="status">
-                      {t('chat.split.notParsed')}
-                    </div>
-                  )}
-                  {streamedHandoff.proposals.map((proposal, index) => (
-                    <HandoffCard key={index} proposal={proposal} disabled />
-                  ))}
-                  {streamedHandoff.rejected > 0 && (
-                    <div className={styles.splitRejected} role="status">
-                      {t('chat.handoff.notParsed')}
-                    </div>
-                  )}
-                </div>
-                {stream.textUsage && (
-                  <TokenBadge
-                    usage={stream.textUsage}
-                    unit={costUnit}
-                    effort={effort}
-                    label={t('chat.usage.answer')}
-                    className={styles.spend}
-                  />
-                )}
-              </div>
-            )}
+            {/* Идущий ответ живёт своим компонентом: он один пересчитывается на
+                каждое слово, и разборы его блоков не должны трогать всю ленту. */}
+            <StreamedAnswer
+              stream={stream}
+              {...(splitCeiling ? { splitCeiling } : {})}
+              {...(costUnit ? { costUnit } : {})}
+              {...(effort ? { effort } : {})}
+            />
 
             {/*
               Пока ответа ещё нет, показываем, что работа идёт. Одной мигающей

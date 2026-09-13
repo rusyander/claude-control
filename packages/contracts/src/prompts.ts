@@ -36,6 +36,7 @@ export const PROMPT_IDS = [
   'contour-agent',
   'contour-preamble',
   'image',
+  'image-svg',
   'presentation',
 ] as const;
 

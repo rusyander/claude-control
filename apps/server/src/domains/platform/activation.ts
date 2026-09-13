@@ -8,9 +8,13 @@ import type {
 import type { AppStore } from '../../lib/app-store.ts';
 import type { PlatformFetch } from './ca-fetch.ts';
 import { checkPlatform } from './check.ts';
-import { driverFor } from './drivers/index.ts';
+import { driverOf } from './drivers/index.ts';
+import { contourUrl } from './transport.ts';
 import { rollbackContour, type ContourRollbackDeps } from './apply/rollback.ts';
-import { readPlatforms, requirePlatform, writePlatforms } from './store.ts';
+import { findPlatform, readPlatforms, requirePlatform, writePlatforms } from './store.ts';
+import { catalogDefaultModel } from '@agentdeck/contracts/platform-models';
+import { PLATFORM_TERMINAL_CONSUMER } from '@agentdeck/contracts/platform-consumers';
+import { modelRulesFor } from './models.ts';
 
 /**
  * Активный контур: не режим одной карточки, а режим приложения (Р3).
@@ -34,8 +38,13 @@ import { readPlatforms, requirePlatform, writePlatforms } from './store.ts';
  * проверить его можно только пройдя этот путь целиком.
  */
 
-/** Потолок ответа: пробный вопрос просит одно слово. */
-const SMOKE_MAX_TOKENS = 8;
+/**
+ * Потолок ответа. Вопрос просит одно слово, но reasoning-модель тратит токены на
+ * размышления ДО него, и восьми не хватало ни на что: здоровый контур получал
+ * красную карточку «модель промолчала» (аудит DRV-11). Потолок денег не стоит —
+ * модель, сказавшая слово, останавливается сама.
+ */
+export const SMOKE_MAX_TOKENS = 256;
 
 /**
  * Потолок ожидания пробного запроса. Меньше, чем у пробы: модель, которая
@@ -131,7 +140,7 @@ async function probeAfterActivation(
       probe: {
         outcome: 'unreachable',
         reachable: false,
-        url: driverFor(platform.driver).modelsUrl(platform.baseUrl),
+        url: contourUrl(platform, 'models') ?? platform.baseUrl,
         detail,
         models: [],
         capabilities: [],
@@ -322,7 +331,7 @@ export async function smokePlatform(
         model,
         max_tokens: SMOKE_MAX_TOKENS,
         stream: true,
-        messages: [{ role: 'user', content: driverFor(platform.driver).smokePrompt }],
+        messages: [{ role: 'user', content: driverOf(platform).smokePrompt }],
       }),
       signal: AbortSignal.timeout(SMOKE_TIMEOUT_MS),
     });
@@ -333,17 +342,20 @@ export async function smokePlatform(
       return { ...empty, latencyMs, detail: refusalText(body, response.status) };
     }
 
-    const answer = collectAnswer(body);
-    return answer
-      ? { ok: true, model, answer, latencyMs, at }
-      : {
-          ...empty,
-          latencyMs,
-          // Пустой ответ на просьбу сказать одно слово — не успех: путь прошёл,
-          // а модель промолчала, и списать это на «наверное, всё хорошо» значит
-          // выдать зелёную карточку неработающей связке.
-          detail: 'Модель не сказала ни слова: путь прошёл, ответа нет.',
-        };
+    const { answer, stopReason } = collectAnswer(body);
+    if (answer) return { ok: true, model, answer, latencyMs, at };
+    // Пустой ответ на просьбу сказать одно слово — не успех: путь прошёл, а
+    // модель промолчала, и списать это на «наверное, всё хорошо» значит выдать
+    // зелёную карточку неработающей связке. Но «упёрлась в потолок» и «ответила
+    // пустотой» лечатся по-разному, и первое называется отдельно.
+    return {
+      ...empty,
+      latencyMs,
+      detail:
+        stopReason === 'max_tokens'
+          ? `Модель израсходовала потолок пробного запроса (${SMOKE_MAX_TOKENS} токенов), не сказав ни слова, — похоже, всё ушло в размышления. Путь прошёл; у рабочих запросов потолок выше.`
+          : 'Модель не сказала ни слова: путь прошёл, ответа нет.',
+    };
   } catch (error) {
     const latencyMs = Date.now() - started;
     const name = error instanceof Error ? error.name : '';
@@ -363,19 +375,16 @@ export async function smokePlatform(
 }
 
 /**
- * Чем спрашивать. Порядок не случаен: модель управляемого профиля — это та
- * самая, которую человек выбрал применением и которой будет пользоваться CLI;
- * первая модель пробы — запасной вариант для контура, к которому ещё ничего не
- * применяли.
+ * Чем спрашивать — ТЕМ ЖЕ правилом, которым пойдёт CLI в терминале
+ * (`modelRulesFor`): его модель, иначе модель контура, иначе первая ЧАТОВАЯ
+ * модель каталога. Первая модель списка как есть уводила пробный запрос в
+ * эмбеддинг — контур отдаёт их одним списком с чатом (аудит DRV-11). Контур
+ * перечитывается: пока шла проба, модель могли поменять.
  */
 function smokeModel(store: AppStore, platform: Platform, probe: PlatformProbeResult): string {
-  const profile = store
-    .getSettings()
-    .endpointProfiles.find((item) => item.ownerPlatformId === platform.id);
-  if (profile?.model.trim()) return profile.model.trim();
-  const first = probe.models[0];
-  if (first) return first.id;
-  return store.getPlatformHealth()[platform.id]?.models[0]?.id ?? '';
+  const current = findPlatform(store, platform.id) ?? platform;
+  const rules = modelRulesFor(store, current, PLATFORM_TERMINAL_CONSUMER);
+  return rules.model || (catalogDefaultModel(probe.models)?.id ?? '');
 }
 
 /** Текст отказа шлюза — его же словами: он их и писал по-русски. */
@@ -390,24 +399,26 @@ function refusalText(body: string, status: number): string {
   return `Шлюз ответил ${status}.`;
 }
 
-/** Собрать ответ из кадров потока Anthropic: нас интересует только текст. */
-function collectAnswer(body: string): string {
+/** Собрать ответ из кадров потока Anthropic: текст и причину остановки. */
+function collectAnswer(body: string): { answer: string; stopReason: string } {
   let answer = '';
+  let stopReason = '';
   for (const line of body.split('\n')) {
     if (!line.startsWith('data:')) continue;
     const raw = line.slice('data:'.length).trim();
     if (!raw || raw === '[DONE]') continue;
     try {
-      const frame = JSON.parse(raw) as { delta?: { text?: unknown } };
+      const frame = JSON.parse(raw) as { delta?: { text?: unknown; stop_reason?: unknown } };
       if (typeof frame.delta?.text === 'string') answer += frame.delta.text;
+      if (typeof frame.delta?.stop_reason === 'string') stopReason = frame.delta.stop_reason;
     } catch {
       // Кадр, который не разобрался, — не причина терять остальные.
     }
   }
-  return answer.trim().replace(/\s+/g, ' ');
+  return { answer: answer.trim().replace(/\s+/g, ' '), stopReason };
 }
 
-/** Тело ответа целиком: поток здесь короткий по построению (восемь токенов). */
+/** Тело ответа целиком: поток здесь короткий по построению (потолок `SMOKE_MAX_TOKENS`). */
 async function readAll(response: Response): Promise<string> {
   try {
     return await response.text();

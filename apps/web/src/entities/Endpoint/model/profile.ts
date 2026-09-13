@@ -29,6 +29,9 @@ export function newEndpointProfile(id: string, name: string): EndpointProfile {
     apiKind: 'openai-compat',
     model: '',
     writeToken: false,
+    // Адрес генерации картинок пуст: угадывать его из базового нельзя —
+    // совместимый сервер вправе не иметь этой ручки вовсе (решение В4).
+    imagesUrl: '',
     // Профиль, заведённый человеком, никому не принадлежит: управляемые
     // порождает контур, и только сервер (Т3).
     ownerPlatformId: '',

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { PromptRecord, PromptSummary } from '@agentdeck/contracts/prompts';
-import { PROMPT_MAX_BYTES } from '@agentdeck/contracts/prompts';
+import { PROMPT_IDS, PROMPT_MAX_BYTES } from '@agentdeck/contracts/prompts';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerPromptRoutes } from './prompt-routes.ts';
@@ -52,7 +52,10 @@ describe('маршруты каталога промптов', () => {
     const items = res.json<{ items: PromptSummary[] }>().items;
 
     expect(res.statusCode).toBe(200);
-    expect(items).toHaveLength(5);
+    // Длина берётся у самого каталога: число в тесте пришлось бы править каждым
+    // новым промптом, а забытое оно краснеет не тем, чем нужно.
+    expect(items).toHaveLength(PROMPT_IDS.length);
+    expect(items.map((item) => item.id)).toEqual([...PROMPT_IDS]);
     expect(items.every((item) => !item.overridden)).toBe(true);
     expect(items.every((item) => item.bytes > 100)).toBe(true);
   });

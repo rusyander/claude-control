@@ -241,3 +241,13 @@
 .attachments {
   padding: 0 var(--spacing-xl) var(--spacing-2xs);
 }
+
+/* Чип «правим эту колоду»: тот же вид, что у Claude, — режимы одни и те же, и
+   различаться на глаз они не вправе. */
+.revise {
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  background: var(--color-accent-subtle);
+  font-size: var(--font-size-caption);
+}

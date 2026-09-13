@@ -375,19 +375,24 @@ export class ChatRunRegistry {
   private onSession?: (chatId: string, sessionId: string) => void;
 
   /**
-   * Маршрут контура: по происхождению прогона — переменные его окружения (Т3)
-   * и системный промпт контура, если тот включён (Т5.4а).
+   * Маршрут контура: по происхождению прогона — переменные его окружения (Т3),
+   * системный промпт контура, если тот включён (Т5.4а), и модель с усилием,
+   * которыми прогон пойдёт на самом деле (Т6). Имя, названное прогоном,
+   * передаётся вопросом, а не решением: перевести его в модель контура — дело
+   * домена, у реестра нет ни каталога, ни карты соответствия.
    *
    * Подаётся снаружи, как и оценка стоимости: реестр знает, ОТКУДА прогон, но
    * про контуры, шлюз и ключи не знает ничего и знать не должен. Спрашивается
    * на КАЖДОМ старте — снятая галочка обязана действовать со следующего
    * запуска, а не с перезапуска панели.
    */
-  setPlatformRouting(resolve: (origin: PlatformRunConsumer) => PlatformRunRoute): void {
+  setPlatformRouting(
+    resolve: (origin: PlatformRunConsumer, asked: string) => PlatformRunRoute,
+  ): void {
     this.platformRouting = resolve;
   }
 
-  private platformRouting?: (origin: PlatformRunConsumer) => PlatformRunRoute;
+  private platformRouting?: (origin: PlatformRunConsumer, asked: string) => PlatformRunRoute;
 
   setSessionListener(listener: (chatId: string, sessionId: string) => void): void {
     this.onSession = listener;
@@ -613,13 +618,26 @@ export class ChatRunRegistry {
     // чистой сессии), и адрес контура, оставшийся в них с прошлой жизни,
     // пережил бы снятую галочку. Пустой объект — законный ответ «не через
     // контур», и он затирает прежний.
-    const route = this.platformRouting?.(meta.origin ?? 'chat') ?? { env: {} };
+    const route = this.platformRouting?.(meta.origin ?? 'chat', options.model ?? '') ?? { env: {} };
     const routed: RunOptions = {
       ...options,
+      // Модель и усилие принадлежат КОНТУРУ, пока прогон идёт через него (Т6):
+      // имя вендора контур не знает (403 «модель»), а усилия он не принимает
+      // вовсе — `--effort` уехал бы платной просьбой, которую никто не выполнит.
+      // Не через контур — поля отсутствуют, и выбор человека остаётся как был.
+      ...(route.model?.model ? { model: route.model.model } : {}),
+      ...(route.effort === false ? { effort: '' } : {}),
       platformEnv: route.env,
       // Промпт контура ставится и СНИМАЕТСЯ здесь же: прогон, продолженный
       // после выключенной галочки, обязан вернуться к промпту CLI.
       platformSystemPrompt: route.systemPrompt ?? '',
+      // Наши слои (Т8): и флаги снятия, и судьба нашей дописки к системному
+      // промпту (инициативы, разделение, продолжение) решаются на КАЖДОМ старте
+      // и кладутся безусловно — прошлая жизнь прогона не переживает ни снятую
+      // галочку, ни возвращённую. Сам текст дописки при этом не трогается:
+      // затёртый, он не вернулся бы после паузы дерева (ревью Т8, MAJOR-4).
+      platformArgs: route.layers?.args ?? [],
+      platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
     };
     const registered: RegisteredRun = {
       chatId,

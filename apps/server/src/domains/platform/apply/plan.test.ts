@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -7,6 +8,7 @@ import { AppStore } from '../../../lib/app-store.ts';
 import { buildPlatformApplyPlan, type ContourApplyDeps } from './plan.ts';
 import { fingerprintOf } from './current.ts';
 import { managedProfileId } from './profile.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Предпросмотр применения.
@@ -33,7 +35,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 let root: string;
@@ -106,6 +113,25 @@ describe('готовность', () => {
     expect(plan.rootUrl).toBe('http://127.0.0.1:5181/enterprise-platform-dev');
     expect(targetOf(plan, 'claude').plan[0]?.value).toContain('5181');
   });
+
+  it('модель профиля показана вместе с тем, ОТКУДА она взялась (Т6)', () => {
+    // «Выбрал человек» и «панель взяла первую из каталога» человек чинит
+    // по-разному, а пустая модель означает, что CLI уйдёт в контур с именем
+    // вендора и получит 403.
+    const chosen = { ...PLATFORM, defaultModel: 'enterprise-platform-mid' };
+    store.updateSettings({ platforms: [chosen] });
+    const plan = buildPlatformApplyPlan(deps(), chosen);
+    expect(plan.model).toBe('enterprise-platform-mid');
+    expect(plan.modelSource).toBe('default');
+    // Записывается ровно она: строка плана и есть то, что уйдёт в файл.
+    expect(targetOf(plan, 'claude').plan.some((row) => row.value === 'enterprise-platform-mid')).toBe(true);
+  });
+
+  it('ни выбора, ни каталога — модель пуста, и источник это называет', () => {
+    const plan = buildPlatformApplyPlan(deps(), PLATFORM);
+    expect(plan.model).toBe('');
+    expect(plan.modelSource).toBe('none');
+  });
 });
 
 describe('занятое место', () => {
@@ -156,6 +182,7 @@ describe('занятое место', () => {
           apiKind: 'openai-compat',
           model: '',
           writeToken: false,
+          imagesUrl: '',
           ownerPlatformId: '',
         },
       ],

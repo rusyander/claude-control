@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Platform } from '@agentdeck/contracts';
 import { AppStore } from '../../../lib/app-store.ts';
 import { SpendFlusher } from './spend-flush.ts';
+import { checkPlatform } from '../check.ts';
+import { OPENROUTER_MODELS } from '../drivers/conformance/catalog-shapes.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Запись расхода пачкой.
@@ -32,7 +36,12 @@ const PLATFORM: Platform = {
   agents: [],
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 let dir: string;
@@ -180,5 +189,67 @@ describe('SpendFlusher', () => {
     });
     flusher.add('enterprise-platform-dev', delta(1_000_000));
     expect(store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.money.usd).toBe(3);
+  });
+});
+
+/**
+ * Цена, опубликованная в каталоге шлюза (DRV-06). Путь настоящий от кнопки
+ * «Проверить» до записи расхода: `checkPlatform` читает ответ формы OpenRouter и
+ * кладёт каталог в хранилище, пачка берёт цену оттуда. Подменён только `fetch`.
+ */
+describe('SpendFlusher: цена из каталога шлюза', () => {
+  const answer = () =>
+    Promise.resolve(
+      new Response(JSON.stringify(OPENROUTER_MODELS), {
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  const million = (model: string) => ({
+    model,
+    promptTokens: 1_000_000,
+    completionTokens: 1_000_000,
+    totalTokens: 2_000_000,
+  });
+
+  it('модель с опубликованной ценой считается по ней', async () => {
+    await checkPlatform(store, dir, 'enterprise-platform-dev', answer);
+    const flusher = new SpendFlusher({ store, flushMs: 0 });
+    flusher.add('enterprise-platform-dev', million('openai/gpt-4o-mini'));
+
+    const money = store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.money;
+    // 0.15 $ за миллион входа + 0.6 $ за миллион выхода.
+    expect(money.usd).toBe(0.75);
+    expect(money.unpricedModels).toEqual([]);
+  });
+
+  it('своя цена человека перебивает опубликованную', async () => {
+    await checkPlatform(store, dir, 'enterprise-platform-dev', answer);
+    const flusher = new SpendFlusher({
+      store,
+      flushMs: 0,
+      lookup: () => ({
+        overrides: { 'gpt-4o-mini': { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 } },
+      }),
+    });
+    flusher.add('enterprise-platform-dev', million('openai/gpt-4o-mini'));
+    expect(store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.money.usd).toBe(2);
+  });
+
+  it('«-1» — цена неизвестна: токены без денег, модель названа', async () => {
+    await checkPlatform(store, dir, 'enterprise-platform-dev', answer);
+    const flusher = new SpendFlusher({ store, flushMs: 0 });
+    flusher.add('enterprise-platform-dev', million('openrouter/auto'));
+    const money = store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.money;
+    expect(money.usd).toBe(0);
+    expect(money.unpricedModels).toEqual(['openrouter/auto']);
+  });
+
+  it('цена одного контура не считает расход другого', async () => {
+    await checkPlatform(store, dir, 'enterprise-platform-dev', answer);
+    const flusher = new SpendFlusher({ store, flushMs: 0 });
+    flusher.add('другой', million('openai/gpt-4o-mini'));
+    expect(store.getPlatformSpend()['другой']!.days[0]!.money.unpricedModels).toEqual([
+      'openai/gpt-4o-mini',
+    ]);
   });
 });

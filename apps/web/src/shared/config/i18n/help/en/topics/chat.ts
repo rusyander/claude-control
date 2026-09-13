@@ -83,6 +83,10 @@ export const chatEn: typeof chatRu = {
     canWorktrees:
       'Create a parallel working copy of the project on its own branch and run a ' +
       'separate agent there — several agents in one repository, out of each other’s way',
+    canImage:
+      'Ask for an image from a description or a presentation on a topic: a contour, your ' +
+      'endpoint or the conversation agent itself does it — the file lands in the data folder ' +
+      'and opens as a card',
 
     cantApprove:
       'Grant permissions in advance: the panel asks at the moment of the action, and ' +
@@ -95,6 +99,9 @@ export const chatEn: typeof chatRu = {
     cantInterrupt:
       'Interrupt the current turn with an added message: the CLI runs the turn to ' +
       'the end, so the addition goes out at the turn boundary — wait, or press Stop',
+    cantGallery:
+      'Keep a gallery of images and presentations: the panel holds the last hundred of each on ' +
+      'disk and shows no history of them — save what you need with «Download» right away',
 
     storageTranscripts: 'Transcripts',
     storageTranscriptsValue: '~/.claude/projects/<project-path>/<sessionId>.jsonl',
@@ -102,15 +109,117 @@ export const chatEn: typeof chatRu = {
     storageWhatRunsValue: 'claude -p --output-format stream-json',
     storageSandbox: 'Chats outside a project',
     storageSandboxValue: '~/.agentdeck/chats/<chat id>/',
+    storageImages: 'Drawn images',
+    storageImagesValue: '~/.agentdeck/media/<id>.png (or .svg) with <id>.json beside it',
+    storageDecks: 'Assembled presentations',
+    storageDecksValue: '~/.agentdeck/media/decks/<id>.{json,html,pptx,pdf}',
     storageStream: 'How the answer arrives',
     storageStreamValue: 'as an SSE stream — text appears as it is generated',
+
+    imageTitle: 'Images and presentations: the panel assembles the file',
+    imageCaption:
+      'The «Mode» button left of the input switches what sending does: a message goes to ' +
+      'the agent, the panel draws an image from your description, or it assembles a ' +
+      'presentation on your topic. Both modes work at any CLI and with no contour at all — ' +
+      'only WHO draws changes, and that is said in the caption under the item.',
+    imageWho: 'Raster is the panel asking, and the conversation holds nothing of it',
+    imageWhoText:
+      'When a contour model or your endpoint draws, sending starts no agent: the panel goes to ' +
+      'the model itself and shows the result. The conversation is a Claude Code file, and the ' +
+      'panel writes not one line into it — so such an image is neither in the thread nor in ' +
+      'anything the agent sees. You cannot ask it about the picture: it does not know there is one.',
+    imageAgent: 'With no contour the agent itself draws — in a block in its answer',
+    imageAgentText:
+      'There may be no contour and no key at all: then the mode sends the conversation agent a ' +
+      'request to answer with a single block — a drawing in code (SVG) or the structure of a ' +
+      'presentation. That is an ordinary turn of the conversation, paid for by the same ' +
+      'subscription, and it works at any CLI. The block itself is not shown in the feed: a card ' +
+      'stands in its place, and the panel assembles the file on your button. There is no raster ' +
+      'on this road — code draws vectors. A block the panel did NOT accept stays in the text as it ' +
+      'came, and the panel says so in a line: an example quoted inside another block is never ' +
+      'executed — it is a quotation, not a request.',
+    deckWho: 'A presentation: the model dictates, the panel makes the files',
+    deckWhoText:
+      'Only the structure travels upward — the title, the slides, the bullets and the speaker ' +
+      'notes; the files themselves are assembled on your machine: HTML to show, PPTX for ' +
+      'PowerPoint and PDF. The shown page has no network and no outside fonts — the HTML is ' +
+      'served forbidding every external resource. The PDF is printed by the system browser, and ' +
+      'if there is none it says so: HTML and PPTX do not disappear with it.',
+    deckAsk: 'You are asked how extensive it should be first',
+    deckAskText:
+      'You name the topic — and the agent asks one short question: a full deck (14–18 slides: ' +
+      'sections, diagrams, numbers, a comparison, risks, a conclusion), a medium one (8–10) or a ' +
+      'short one (5–6, one statement per slide). You may name your own slide count too; the ' +
+      'question carries a recommendation for THIS topic. It is asked once and only where there is ' +
+      'someone to ask: on routes with no conversation — the contour, your endpoint, the phone — ' +
+      'the panel takes the middle option and says so.',
+    deckLook: 'A presentation, not a to-do list',
+    deckLookText:
+      'A slide comes in seven shapes and the model picks one: bullets, a single large statement, ' +
+      'two to four numbers with captions, two columns of comparison, a quote, a dark section ' +
+      'divider and a full-slide diagram. The deck colour is its choice as well, but out of six ' +
+      'moods — the actual colours are the panel’s, so a deck never arrives unreadable. The rules ' +
+      'behind all those decisions live in «Промпты», in the «Презентация» text, and you can ' +
+      'rewrite them.',
+    deckPictures: 'The model draws diagrams, the panel draws photos',
+    deckPicturesText:
+      'A diagram is drawn by the model as code, straight into the deck: that costs nothing and ' +
+      'works with any CLI. A photographic picture is drawn by the PANEL itself through its raster ' +
+      'route — the contour or your endpoint — and embedded into the file as bytes, so the shown ' +
+      'page makes no network request at all. No more than two of those per deck: each one is a ' +
+      'separate request to a model. With no raster route the slides keep their diagrams and text, ' +
+      'and the card says what exactly was in the way.',
+    deckRevise: 'Rework: the panel remembers, not the agent',
+    deckReviseText:
+      'The «Переделать» button on a deck card turns the field into a rework: «make the third slide ' +
+      'shorter», «add a diagram at the end». The panel keeps the previous deck’s structure on disk ' +
+      'and sends it to the model together with your request — so the agent loses nothing even ' +
+      'after the conversation is restarted, and pictures already drawn carry over without ' +
+      'spending new requests. The previous files stay on disk: a failed rework does not take away ' +
+      'what you have already shown.',
+    imageRoute: 'What will do it is said before you press',
+    imageRouteText:
+      'The server picks the route once and names it under the menu item: the conversation agent, ' +
+      'the contour as part of an ordinary answer, the contour’s own images endpoint, or your ' +
+      'endpoint profile. Through a contour the request goes via the panel gateway — so it is in ' +
+      'the journal and counts toward the key’s spend like every other request; the agent road ' +
+      'costs no key at all.',
+    imageCard: 'The result is a card, and a file',
+    imageCardText:
+      'An image the panel drew opens in the right column: the description, who drew it, the size ' +
+      'and a «Download» button. The column is a single one, so the image replaces the file preview ' +
+      'and the cross brings it back. What the agent dictated is shown as a card right in the feed, ' +
+      'in the block’s place: a drawing at once, a presentation on the «Assemble» button. The bytes ' +
+      'are files in the panel’s data folder — not one byte of them is in the settings.',
+    imageLocked: 'Unavailable — with what exactly is in the way',
+    imageLockedText:
+      'Exactly one thing locks the mode: there is nobody to do it at all — no conversation beside ' +
+      'you, no contour, no endpoint profile. Everything else takes away the raster, not the mode: ' +
+      'this contour cannot, the key catalog holds no model with generation, the profile has no ' +
+      'address, the gateway is off, that API kind has no such endpoint. Then the item works by the ' +
+      'agent road, and the raster’s reason stands beside it — which is what can be fixed.',
+    imagePrompt: 'The rules of both modes live in Prompts',
+    imagePromptText:
+      'Your own texts live in the Prompts section: «Image» is the system message of the drawing ' +
+      'model, «Image in code» the drawing rules for the agent, «Presentation» the slide rules for ' +
+      'all three roads. The text travels as the system message wherever there is one; on the agent ' +
+      'road the same text begins the request into the conversation, and the separate images ' +
+      'endpoint has no system message at all — the caption under the item says so outright.',
+    imageLimitTitle: 'Bounds: one request at a time, a hundred files on disk',
+    imageLimitText:
+      'Drawing takes minutes — you can leave the page, but a second request waits for the first. ' +
+      'One image is capped at 8 MB, above that the panel refuses it; a presentation holds at most ' +
+      'forty slides, and a drawing in code at most half a megabyte of text. The last hundred images ' +
+      'and the last hundred presentations stay on disk and the oldest are swept with all their ' +
+      'files; there is no gallery and no history here, so download what you need right away.',
 
     guideTitle: 'What this document holds',
     guideText:
       'First, why chat exists and how it differs from the terminal and from the ' +
       'neighbouring sections. Then two diagrams and the whole path in screenshots: ' +
       'one conversation from an empty window to the end of a run, then a ' +
-      'conversation that became several. After the shots come the tables of fields ' +
+      'conversation that became several. Right after the shots come the image and presentation ' +
+      'modes — the one place in chat where the panel assembles the file itself. Then the tables of fields ' +
       'and states, and at the end the limits and how to undo or remove each thing ' +
       'listed above.',
 
@@ -185,7 +294,10 @@ export const chatEn: typeof chatRu = {
         'started here shows up in the terminal. One exception: a run routed to a ' +
         'contour starts with the panel’s short system prompt INSTEAD of the CLI’s ' +
         '(a switch on the contour itself, the “Contour” section), because the large ' +
-        'prompt drowns a mid-range model.',
+        'prompt drowns a mid-range model. The same card also drops our layers: such ' +
+        'a run may go without your personal rules, skills and MCP servers. What ' +
+        'exactly was dropped, the conversation header says BEFORE you send a ' +
+        'message — otherwise an agent working without your rules would look broken.',
 
       basicsTitle: 'One conversation from start to finish',
       basicsCaption:

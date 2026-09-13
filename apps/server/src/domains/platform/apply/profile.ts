@@ -98,6 +98,10 @@ export function buildManagedProfile(
     // подставляет его сам. Галочка «писать токен» здесь означала бы, что панель
     // готова положить чей-то ключ в чужой файл, — и она всегда выключена.
     writeToken: false,
+    // Адреса картинок у управляемого профиля нет и не будет: он смотрит на наш
+    // шлюз, а у шлюза ровно три маршрута, и ручки картинок среди них нет.
+    // Картинки через контур идут своей дорогой (`domains/media/images.ts`).
+    imagesUrl: '',
     ownerPlatformId: platform.id,
   };
 }
@@ -112,9 +116,11 @@ export function buildManagedProfile(
  * указывающий в никуда, и ассистент панели молча ходил бы на мёртвый порт.
  *
  * Правка управляемого профиля руками здесь же и отменяется: адрес, вид API и
- * имя пересобираются из контура. Сохраняется ровно одно поле — модель: её
- * выбирает человек, и терять этот выбор при каждой записи настроек было бы
- * ровно тем поведением, за которое ругают «умные» панели.
+ * имя пересобираются из контура. Модель тоже пересобирается — но не теряется:
+ * `managedModel` возвращает выбор человека, а при его отсутствии ту самую
+ * модель, которая в профиле уже стоит. Выбор в карточке контура (Т6) сильнее
+ * правки профиля руками намеренно: две настройки одного и того же должны
+ * иметь понятный порядок, иначе человек правит одну, а действует другая.
  */
 export function reconcileManagedProfiles(store: AppStore): string[] {
   const settings = store.getSettings();
@@ -134,7 +140,11 @@ export function reconcileManagedProfiles(store: AppStore): string[] {
       changed = true;
       continue;
     }
-    const fresh = buildManagedProfile(platform, activeGatewaySettings(store), profile.model);
+    const fresh = buildManagedProfile(
+      platform,
+      activeGatewaySettings(store),
+      managedModel(store, platform.id),
+    );
     if (JSON.stringify(fresh) !== JSON.stringify(profile)) changed = true;
     profiles.push(fresh);
   }
@@ -151,10 +161,24 @@ export function reconcileManagedProfiles(store: AppStore): string[] {
 }
 
 /**
- * Модель управляемого профиля: выбор человека переживает пересборку плана.
- * Пусто — CLI пойдёт с моделью по умолчанию, и это его собственное поведение.
+ * Модель, ВЫБРАННАЯ человеком: настройка контура (Т6), а при её отсутствии —
+ * та, что уже стоит в профиле. Второе не наследие ради наследия: до Т6 модель
+ * выбиралась прямо в диалоге применения, и терять этот выбор на первой же
+ * пересборке плана значило бы уводить работающий контур на другую модель.
+ *
+ * Пусто — человек не выбирал ничего; чем дополнить пустоту, решает
+ * `defaultModelOf` (`domains/platform/models.ts`), у которого есть каталог
+ * пробы. Здесь каталога нет намеренно: этот модуль импортирует `store.ts`, и
+ * обратный импорт замкнул бы круг.
  */
 export function managedModel(store: AppStore, platformId: string): string {
+  const settings = store.getSettings();
+  // Читается СЫРАЯ настройка, а не нормализованная (`readPlatforms`): та живёт
+  // в `store.ts`, который сам импортирует этот модуль. Поэтому у поля, которого
+  // у контура времён до Т6 нет вовсе, проверяется вид.
+  const chosen = settings.platforms.find((item) => item.id === platformId)?.defaultModel;
+  if (typeof chosen === 'string' && chosen.trim()) return chosen.trim();
+
   const id = managedProfileId(platformId);
-  return store.getSettings().endpointProfiles.find((item) => item.id === id)?.model ?? '';
+  return settings.endpointProfiles.find((item) => item.id === id)?.model.trim() ?? '';
 }

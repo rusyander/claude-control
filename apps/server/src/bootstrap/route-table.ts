@@ -45,6 +45,7 @@ import { registerProviderChatRoutes } from '../routes/provider-chat-routes.ts';
 import { registerDlpRoutes } from '../routes/dlp-routes.ts';
 import { registerCompromiseRoutes } from '../routes/compromise-routes.ts';
 import { registerPlatformRoutes } from '../routes/platform-routes.ts';
+import { registerMediaRoutes } from '../routes/media-routes.ts';
 import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
 import { registerPromptRoutes } from '../routes/prompt-routes.ts';
 import { registerRemoteRoutes } from '../routes/remote-routes.ts';
@@ -166,6 +167,13 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     // панели нужен по той же причине, что и интеграциям: переходник MCP ходит
     // не в контур, а сюда, и в его записи лежит только этот адрес.
     (instance, context) => registerPlatformRoutes(instance, context, platformGateway, selfBaseUrl),
+    // Картинки из чата (Т9). Порт спрашивается у ЖИВОГО слушателя, а не у
+    // настроек: запрос в контур идёт через шлюз, а задуманный порт мог быть
+    // занят — тогда настройка указывает на чужой процесс.
+    (instance, context) =>
+      registerMediaRoutes(instance, context, () =>
+        platformGateway.status().running ? platformGateway.status().port : 0,
+      ),
     (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
     registerPromptGateRoutes,
     // Каталог промптов приложения: тексты режимов лежат файлами, а не строками

@@ -1,13 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Platform } from '@agentdeck/contracts';
+import { chooseRunModel } from '@agentdeck/contracts/platform-models';
 import { AppStore } from '../../lib/app-store.ts';
 import { promptText, savePrompt } from '../prompts.ts';
 import { buildManagedProfile } from './apply/profile.ts';
 import { writePlatform, writeToken } from './store.ts';
-import { listConsumerOptions, resolveRunRoute, type PlatformRoutingDeps } from './routing.ts';
+import {
+  describeRunPlan,
+  listConsumerOptions,
+  resolveRunRoute,
+  type PlatformRoutingDeps,
+} from './routing.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Маршрут в момент запуска: кто идёт через контур и с каким окружением.
@@ -37,7 +45,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 let root: string;
@@ -101,15 +114,37 @@ describe('прогон через контур', () => {
     if (!decision.routed) return;
     // Текст ровно тот, которым панель работает: правка человека в разделе
     // «Промпты» меняет и его, поэтому сверяем с каталогом, а не с образцом.
-    expect(decision.systemPrompt).toBe(promptText(dir, 'contour-agent'));
+    expect(decision.systemPrompt).toContain(promptText(dir, 'contour-agent').trim());
     expect(decision.systemPrompt).toContain('инструмент');
+  });
+
+  /**
+   * Аудит MD-06: преамбула контура лежала в каталоге, человек мог её править —
+   * и ни один прогон её не читал. Правка, которая ничего не меняет, хуже
+   * отсутствия поля: человек решает, что модель слушает его текст.
+   */
+  it('преамбула контура едет прогону следом за промптом агента', () => {
+    connect();
+    const decision = resolveRunRoute(deps, 'chat');
+    if (!decision.routed) throw new Error('маршрут не собран');
+    const agent = promptText(dir, 'contour-agent').trim();
+    const preamble = promptText(dir, 'contour-preamble').trim();
+    expect(decision.systemPrompt).toBe(`${agent}\n\n${preamble}`);
   });
 
   it('правка человека в каталоге едет прогону, а не встроенный текст', () => {
     connect();
     savePrompt(dir, 'contour-agent', 'короткий свой промпт');
+    savePrompt(dir, 'contour-preamble', 'своя преамбула');
     const decision = resolveRunRoute(deps, 'chat');
-    expect(decision.routed && decision.systemPrompt).toBe('короткий свой промпт');
+    expect(decision.routed && decision.systemPrompt).toBe('короткий свой промпт\n\nсвоя преамбула');
+  });
+
+  it('пустая правка преамбулы снимает только её, промпт агента остаётся', () => {
+    connect();
+    savePrompt(dir, 'contour-preamble', '   ');
+    const decision = resolveRunRoute(deps, 'chat');
+    expect(decision.routed && decision.systemPrompt).toBe(promptText(dir, 'contour-agent').trim());
   });
 
   it('выключенный переключатель возвращает прогон к промпту CLI', () => {
@@ -183,6 +218,31 @@ describe('прогон через контур', () => {
     );
   });
 
+  /**
+   * Слои Т8 — флаги CLI Claude, и только его. Чужой CLI, получив
+   * `--setting-sources`, не пошёл бы «без наших правил»: он отказал бы ЗАПУСКОМ,
+   * и человек читал бы это как поломку контура.
+   */
+  it('наши слои едут прогону Claude и не едут чужому CLI', () => {
+    const stripped = {
+      ...PLATFORM,
+      consumers: ['chat', 'foreign:qwen'],
+      rules: { platform: defaultPlatformRules(), ours: { ...defaultOurRules(), skills: false } },
+    };
+    connect(stripped);
+
+    const own = resolveRunRoute(deps, 'chat');
+    expect(own.routed && own.layers).toEqual({
+      args: ['--disable-slash-commands'],
+      systemPrompt: true,
+      dropped: ['skills'],
+    });
+
+    const foreign = resolveRunRoute(deps, 'foreign:qwen');
+    expect(foreign.routed).toBe(true);
+    expect(foreign.routed && foreign.layers).toBeUndefined();
+  });
+
   it('CLI, который держит адрес в файле, отказывает с «только глобально»', () => {
     connect({ ...PLATFORM, consumers: ['foreign:codex', 'foreign:gemini'] });
     // Файл один на машину: «включить только для чата» там не получается
@@ -201,6 +261,94 @@ describe('прогон через контур', () => {
       routed: false,
       reason: 'not_a_run',
     });
+  });
+});
+
+describe('модель и усилие прогона (Т6)', () => {
+  it('имя, названное прогоном, переводится картой — и в окружение, и в ответ', () => {
+    // Ради этого Т6 и писался: «sonnet» уходит в `--model`, перебивает адресную
+    // переменную и доезжает до контура именем вендора — 403 «модель» на каждом
+    // сообщении, невидимый ровно до расхождения имён.
+    connect({ ...PLATFORM, defaultModel: 'enterprise-platform-mid', modelMap: { sonnet: 'enterprise-platform-small' } });
+
+    const decision = resolveRunRoute(deps, 'chat', 'sonnet');
+
+    expect(decision.routed).toBe(true);
+    if (!decision.routed) return;
+    expect(decision.model).toEqual({
+      model: 'enterprise-platform-small',
+      asked: 'sonnet',
+      source: 'mapped',
+      replaced: true,
+    });
+    // Одно и то же имя в переменной окружения и в ответе маршрута: расхождение
+    // означало бы, что шапка чата показывает не то, чем прогон пошёл.
+    expect(decision.env.ANTHROPIC_MODEL).toBe('enterprise-platform-small');
+  });
+
+  it('незнакомое имя заменяется моделью потребителя, а не уезжает как есть', () => {
+    connect({
+      ...PLATFORM,
+      consumers: ['chat', 'tests'],
+      defaultModel: 'enterprise-platform-mid',
+      consumerModels: { tests: 'enterprise-platform-small' },
+    });
+
+    const tests = resolveRunRoute(deps, 'tests', 'haiku');
+    expect(tests.routed && tests.model).toMatchObject({
+      model: 'enterprise-platform-small',
+      source: 'consumer',
+      replaced: true,
+    });
+    // Чат при этом идёт моделью контура: переопределение — на потребителя.
+    const chat = resolveRunRoute(deps, 'chat');
+    expect(chat.routed && chat.env.ANTHROPIC_MODEL).toBe('enterprise-platform-mid');
+  });
+
+  it('контур не принимает усилие — маршрут говорит это словом', () => {
+    // compromise: no-effort — панель не отправляет `--effort` вовсе (решение
+    // владельца 12.09.2026): контур его не примет, а человек заплатит за
+    // глубину, которой не будет.
+    connect();
+    const decision = resolveRunRoute(deps, 'chat');
+    expect(decision.routed && decision.effort).toBe(false);
+  });
+});
+
+describe('чем пойдёт прогон, если запустить сейчас', () => {
+  it('маршрут есть — отдаются правила целиком, чтобы шапка считала тем же кодом', () => {
+    connect({ ...PLATFORM, defaultModel: 'enterprise-platform-mid', modelMap: { sonnet: 'enterprise-platform-small' } });
+
+    const plan = describeRunPlan(deps, 'chat');
+
+    expect(plan).toEqual({
+      routed: true,
+      title: 'EnterprisePlatform · dev',
+      rules: {
+        model: 'enterprise-platform-mid',
+        source: 'default',
+        map: { sonnet: 'enterprise-platform-small' },
+        catalog: [],
+      },
+      effort: false,
+      // Слои (Т8) — тем же ответом: шапка обязана сказать о снятых ДО отправки
+      // сообщения, иначе «агент не читает мои правила» выглядит поломкой агента.
+      layers: { args: [], systemPrompt: true, dropped: [] },
+    });
+    // Правила отдаются целиком именно для этого: клиент пересчитывает выбор на
+    // каждое переключение модели сам, той же функцией контрактов.
+    expect(plan.routed && chooseRunModel(plan.rules, 'sonnet').model).toBe('enterprise-platform-small');
+  });
+
+  it('маршрута нет — причина названа, а усилие остаётся выбором человека', () => {
+    connect({ ...PLATFORM, consumers: [] });
+    const plan = describeRunPlan(deps, 'chat');
+    expect(plan.routed).toBe(false);
+    expect(plan.reason).toBe('consumer_off');
+    // `effort: true` здесь — не «контур принимает», а «контур ни при чём»:
+    // подпись о потерянной глубине в обычном разговоре была бы враньём.
+    expect(plan.effort).toBe(true);
+    expect(plan.rules).toEqual({ model: '', source: 'none', map: {}, catalog: [] });
   });
 });
 

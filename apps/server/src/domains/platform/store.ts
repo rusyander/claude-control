@@ -1,8 +1,25 @@
-import type { Platform, PlatformStatus } from '@agentdeck/contracts';
+import type {
+  OurRules,
+  Platform,
+  PlatformRules,
+  PlatformStatus,
+  PlatformThinkingMode,
+  PlatformToolMode,
+} from '@agentdeck/contracts';
 import {
   PLATFORM_ASSISTANT_CONSUMER,
   PLATFORM_TERMINAL_CONSUMER,
 } from '@agentdeck/contracts/platform-consumers';
+// Значения — подпутём: сервер идёт под `--experimental-strip-types`, и один
+// импорт значения из бочки контрактов убил бы процесс целиком (CLAUDE.md).
+import {
+  defaultOurRules,
+  defaultPlatformRules,
+  platformThinkingModes,
+  platformToolModes,
+  thinkingModeInput,
+} from '@agentdeck/contracts/platform';
+import { platformManifestOf, platformPreset } from '@agentdeck/contracts/platform-presets';
 import type { AppStore } from '../../lib/app-store.ts';
 import {
   clearStoredKey,
@@ -13,6 +30,10 @@ import {
   MAX_KEY_LENGTH,
 } from '../../lib/provider-keys.ts';
 import { managedProfileId } from './apply/profile.ts';
+import { driverOf } from './drivers/index.ts';
+import { effortAccepted, toolRouteOf } from './models.ts';
+import { layerOn, runLayers } from './layers.ts';
+import { platformRuleRows, ruleConflicts } from './rules-matrix.ts';
 import { HEADER_SAFE_KEY, invalidField, platformNotFound, notConnected } from './errors.ts';
 import { budgetVerdict, daysSince, emptySpend, sumDays } from './spend.ts';
 
@@ -67,7 +88,102 @@ export function readPlatforms(store: AppStore): Platform[] {
     // И потребители: они из Т3, а до неё контур работал файлами. Читатель
     // подставляет то, что контур делал до сих пор, — см. `consumersOf`.
     consumers: consumersOf(platform),
+    // Модель и карты имён — из Т6; у контура, настроенного раньше, полей нет
+    // вовсе, а тип обещает строку и два словаря. `undefined` в словаре стоил бы
+    // падения на первом же обращении к карте соответствия.
+    defaultModel: typeof platform.defaultModel === 'string' ? platform.defaultModel : '',
+    consumerModels: stringMap(platform.consumerModels),
+    modelMap: stringMap(platform.modelMap),
+    // И правила — из Т7. Тут цена пропущенной строки была самой высокой из всех
+    // шести: матрица обращается к `rules.platform` в трёх местах сразу, и запись
+    // без поля роняла `describePlatform` — то есть ВЕСЬ раздел «Контур», плитку
+    // обзора, карточки настроек, экран телефона (500) и каждый прогон через
+    // шлюз (502). Двери записи заполняют поле умолчанием сами, поэтому на машине,
+    // где контур пересохраняют, дефекта не видно вовсе; ломается ровно та,
+    // где контур настроили однажды и он просто работает. Найдено враждебным
+    // ревью Т7.
+    rules: { platform: rulesOf(platform), ours: ourRulesOf(platform) },
+    // Переопределения пресета (DRV-03) — поле за полем: негодный путь из записи,
+    // правленной руками, значит «как у пресета», а не сломанный шлюз.
+    manifest: platformManifestOf(platform.manifest),
+    // Прослойка и промпт — из Т5, и та же дыра: запись без полей читалась
+    // `undefined`, то есть у платформа компании прослойка молча выключена вопреки
+    // умолчанию контракта. Умолчание — пресета типа, как у обеих схем.
+    toolShim:
+      typeof platform.toolShim === 'boolean'
+        ? platform.toolShim
+        : platformPreset(platform.driver).defaults.toolShim,
+    contourPrompt:
+      typeof platform.contourPrompt === 'boolean'
+        ? platform.contourPrompt
+        : platformPreset(platform.driver).defaults.contourPrompt,
   }));
+}
+
+/**
+ * Правила контура из записи, пришедшей неизвестно откуда: старый `state.json`,
+ * снимок чужой панели, правка файла руками. Поле за полем, а не целиком: одна
+ * испорченная строка не должна стоить человеку всех остальных правил.
+ */
+function rulesOf(platform: Platform): PlatformRules {
+  const stored = (platform as { rules?: { platform?: Partial<PlatformRules> } }).rules?.platform;
+  const fallback = defaultPlatformRules();
+  if (!stored || typeof stored !== 'object') return fallback;
+  return {
+    platformTools: Array.isArray(stored.platformTools)
+      ? stored.platformTools.filter((name): name is string => typeof name === 'string')
+      : fallback.platformTools,
+    toolMode: platformToolModes.includes(stored.toolMode as PlatformToolMode)
+      ? (stored.toolMode as PlatformToolMode)
+      : fallback.toolMode,
+    generationPreset:
+      typeof stored.generationPreset === 'string'
+        ? stored.generationPreset
+        : fallback.generationPreset,
+    enableThinking: thinkingOf(stored.enableThinking) ?? fallback.enableThinking,
+  };
+}
+
+/** Булево значение до трёх состояний переводится; мусор — к умолчанию. */
+function thinkingOf(value: unknown): PlatformThinkingMode | undefined {
+  const mode = thinkingModeInput(value);
+  return platformThinkingModes.find((known) => known === mode);
+}
+
+/**
+ * Наши слои из той же записи (Т8). Отсутствие поля — «всё включено»: до Т8
+ * прогон через контур нёс полный `~/.claude`, и запись, которую человек не
+ * трогал, обязана вести себя ровно так же. Пустой объект здесь означал бы
+ * противоположное — тихо выключенные правила, хуки и права.
+ */
+function ourRulesOf(platform: Platform): OurRules {
+  const stored = (platform as { rules?: { ours?: Partial<OurRules> } }).rules?.ours;
+  const fallback = defaultOurRules();
+  if (!stored || typeof stored !== 'object') return fallback;
+  const flag = (value: unknown, unset: boolean): boolean =>
+    typeof value === 'boolean' ? value : unset;
+  return {
+    enabled: flag(stored.enabled, fallback.enabled),
+    settings: flag(stored.settings, fallback.settings),
+    skills: flag(stored.skills, fallback.skills),
+    mcp: flag(stored.mcp, fallback.mcp),
+    systemPrompt: flag(stored.systemPrompt, fallback.systemPrompt),
+  };
+}
+
+/**
+ * Словарь «строка → строка» из настройки, пришедшей неизвестно откуда (снимок
+ * чужой панели, правка `state.json` руками). Значения нестроковых видов
+ * выбрасываются поодиночке: один кривой ключ не должен стоить человеку всей
+ * карты соответствия.
+ */
+function stringMap(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === 'string' && item.trim()) out[key] = item;
+  }
+  return out;
 }
 
 /**
@@ -339,15 +455,34 @@ export function describePlatform(
   const health = store.getPlatformHealth()[platform.id];
   const spend = store.getPlatformSpend()[platform.id] ?? emptySpend(platform.id);
   const smoke = store.getPlatformSmoke()[platform.id];
+  const settings = store.getSettings();
+  const driver = driverOf(platform);
   return {
     platform,
     hasToken: Boolean(token),
     maskedToken: token ? maskKey(token) : '',
     health,
-    active: store.getSettings().activePlatformId === platform.id,
+    active: settings.activePlatformId === platform.id,
     ...(smoke ? { smoke } : {}),
     budget: budgetVerdict(platform, spend),
     periodSpend: sumDays(daysSince(spend.days, platform.budgetSince)),
+    effort: effortAccepted(platform),
+    agents: driver.agents !== undefined,
+    toolRoute: toolRouteOf(platform),
+    rules: platformRuleRows(platform, driver),
+    // Сжатие истории берётся из ПРОБЫ, а не из наличия ручки: ручку контур
+    // объявляет всегда, а сжимает ли он историю этому ключу — говорит ответ.
+    conflicts: ruleConflicts(platform, driver, {
+      dlp: settings.dlp.enabled,
+      // Гейт промпта — НАШ ХУК в `~/.claude/settings.json`, поэтому снятый слой
+      // личных настроек снимает и его (Т8). Строка матрицы обязана это знать:
+      // иначе человек, выключивший наши слои, читал бы «наша сторона включена»
+      // про проверку, которой в этом прогоне нет.
+      promptGate: settings.promptGate.enabled && layerOn(platform.rules.ours, 'settings'),
+      toolShim: platform.toolShim,
+      managedContext: health?.limits.managedContext === true,
+    }),
+    layers: runLayers(platform),
   };
 }
 

@@ -1,5 +1,5 @@
 import { object, string, array, boolean, enum as zodEnum, type infer as Infer } from 'zod';
-import { runnerModes } from './provider-keys';
+import { runnerModes } from './provider-keys.ts';
 
 /**
  * Реальный запуск ассистента активного провайдера (Ф6b).

@@ -1,6 +1,8 @@
 import type {
   Platform,
+  ModelPricing,
   PlatformBudgetState,
+  PlatformModelInfo,
   PlatformMoneyEstimate,
   PlatformSpendDay,
   PlatformSpendInfo,
@@ -31,19 +33,18 @@ import {
  *    вводится руками и сравнивается с НАШИМ счётом — оценкой.
  * 2. Когда контур обнуляет свой счёт. Период живёт в админке, наружу не выходит;
  *    считаем от дня, который назвал человек, и говорим, что это оценка.
- * 3. Цену моделей компании. Прайса контур не публикует (`pricing-local`), и
+ * 3. Цену моделей компании. Платформа компании прайса не публикует (`pricing-local`), и
  *    токены модели без цены в деньги НЕ ПЕРЕВОДЯТСЯ вовсе: подставить ставку
  *    «неизвестной модели» значило бы показать выдуманное число рядом с
- *    настоящими.
+ *    настоящими. Шлюз, который цену в каталоге ОПУБЛИКОВАЛ (OpenRouter), считается
+ *    по ней — {@link declaredPricing}; свои цены человека сильнее и её.
  *
- * 4. Исчерпан ли бюджет КЛЮЧА. Точного сигнала нет вовсе. Контур проверяет его
- *    при разборе ключа (`inst-admin-api/internal/store/keys.go` `ValidateKey`)
- *    и на исчерпанный отвечает 401 — тем же кодом, что и на отозванный. Отказ
- *    же 402 приходит с ТРЁХ ДРУГИХ уровней (дневной лимит пользователя,
- *    месячный команды, месячный инстанса — `inst-api/internal/budget/budget.go`,
- *    и комментарий самого контура: «бюджет ключа тут ни при чём»). Поэтому 402
- *    показывается отдельной строкой с названием уровня и полосу бюджета ключа
- *    не красит, а 401 сопровождается оговоркой про обе причины.
+ * 4. Исчерпан ли бюджет ключа — надёжно. У enterprise-platform 402 на `/v1` значит именно
+ *    его (`handler_public_api.go:340`), но приходит лишь в 30-секундном окне
+ *    кэша проверки ключа; дальше исчерпанный ключ отклоняется 401 — тем же
+ *    кодом, что и отозванный (`inst-admin-api/.../store/keys.go` `ValidateKey`).
+ *    Поэтому 402 — отдельная строка с тем, что назвал манифест драйвера, полосу
+ *    (оценку) не красит, а 401 сопровождается оговоркой про все причины.
  */
 
 /** Сколько дней храним. Дальше — обрезаем: учёт не архив. */
@@ -262,6 +263,7 @@ export function budgetVerdict(
     nearLimit: tracked && spentUsd >= budgetUsd * BUDGET_WARN_SHARE,
     exhausted,
     ...(record.exhaustedAt ? { exhaustedAt: record.exhaustedAt } : {}),
+    ...(record.exhaustedScope ? { exhaustedScope: record.exhaustedScope } : {}),
     ...(record.exhaustedLevel ? { exhaustedLevel: record.exhaustedLevel } : {}),
   };
 }
@@ -301,6 +303,29 @@ export function gatewayPricing(
 }
 
 /**
+ * Цены из каталога последней пробы — в форме справочника, по точному имени.
+ *
+ * Кэша в оценке расхода нет (см. `moneyOf`), но справочник требует его ставки;
+ * не объявленная шлюзом ставка кэша берётся равной входу — так шлюз без
+ * отдельной цены кэша и берёт деньги за эти токены.
+ */
+export function declaredPricing(
+  models: readonly PlatformModelInfo[],
+): Record<string, ModelPricing> {
+  const declared: Record<string, ModelPricing> = {};
+  for (const { id, price } of models) {
+    if (!price) continue;
+    declared[id.toLowerCase()] = {
+      input: price.input,
+      output: price.output,
+      cacheRead: price.cacheRead ?? price.input,
+      cacheWrite: price.cacheWrite ?? price.input,
+    };
+  }
+  return declared;
+}
+
+/**
  * Снять отметку «бюджет исчерпан». Возвращает `false`, когда снимать было
  * нечего.
  *
@@ -316,6 +341,8 @@ export function clearExhausted(
   if (!record?.exhaustedAt) return false;
   const next = { ...record };
   delete next.exhaustedAt;
+  delete next.exhaustedScope;
+  delete next.exhaustedLevel;
   store.savePlatformSpend(next);
   return true;
 }

@@ -62,7 +62,13 @@ const PROBE = {
   url: 'https://api.dev.example.ru/v1/models',
   status: 200,
   detail: 'список моделей получен',
-  models: ['gpt-4o', 'claude-sonnet-4-5'],
+  // Каталог объектами, как его отдаёт сервер: вид модели решает, попадёт ли она
+  // в выбор разговора (вложения не попадают), а строкой этого не сказать.
+  models: [
+    { id: 'gpt-4o', kind: 'chat' },
+    { id: 'claude-sonnet-4-5', kind: 'chat' },
+    { id: 'bge-m3', kind: 'embedding' },
+  ],
   capabilities: CAPABILITIES,
   limits: { nonStreamTimeoutSec: 120, managedContext: true },
   notes: [],
@@ -88,8 +94,150 @@ const PLATFORM = {
   projectPaths: [],
   agents: [{ id: '0f4b2a10-77c3-4d1e-9f0a-2b6c8d5e1a33', title: 'Юрист компании' }],
   budgetSince: '',
+  // Модель контура (Т6): здесь НЕ выбрана. Так карточка обязана сказать, что
+  // подставляет первую чатовую модель каталога сама, — молчание в этом месте
+  // человек читает как «модели нет», хотя модель уже выбрана за него.
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  // Прослойка инструментов и короткий промпт контура — включёнными (Т5,
+  // решение В1): именно так контур выходит из мастера, и именно на таком
+  // карточка правил обязана запереть набор инструментов контура.
+  toolShim: true,
+  contourPrompt: true,
+  // Правила контура (Т7): ни одного не задано. Пустой список инструментов —
+  // «не запрашиваются», и режим цикла при нём никуда не отправляется.
+  rules: {
+    platform: {
+      platformTools: [],
+      toolMode: 'loop',
+      generationPreset: '',
+      enableThinking: 'default',
+    },
+    // Наши слои (Т8): всё наше едет в прогон — так контур выходит из мастера.
+    ours: { enabled: true, settings: true, skills: true, mcp: true, systemPrompt: true },
+  },
   caCertPath: '',
 };
+
+/**
+ * Что унесёт прогон через этот контур — так, как это СЧИТАЕТ СЕРВЕР (Т8).
+ *
+ * Здесь это данные, а не расчёт: что флаги считаются правильно, доказывает
+ * `layers.test.ts`, а что они делают с настоящим CLI — `check-run-layers.mjs`.
+ * Эта проверка про экран: показывает ли карточка ровно то, что ей прислали.
+ */
+const LAYERS_FULL = { args: [], systemPrompt: true, dropped: [] };
+const LAYERS_NONE = {
+  args: ['--setting-sources', 'project,local', '--disable-slash-commands', '--strict-mcp-config'],
+  systemPrompt: false,
+  dropped: ['settings', 'skills', 'mcp', 'systemPrompt'],
+};
+
+/**
+ * Правила контура так, как их собирает сервер из МАНИФЕСТА драйвера (Т7).
+ *
+ * Переписаны с манифеста enterprise-platform, а не выдуманы удобными: заглушка со своим,
+ * более круглым списком доказывала бы, что панель умеет рисовать выдуманный
+ * ответ. Два вида строк здесь разные по смыслу — `request` панель отправляет
+ * полем запроса, `observed` включает владелец контура, и отсюда его не снять.
+ */
+const RULE_ROWS = [
+  {
+    id: 'enterprise-platform_tools',
+    title: 'Инструменты платформы',
+    kind: 'request',
+    field: 'platformTools',
+    detail: 'имена инструментов контура; пусто — наверх уходит «tool_choice: none»',
+    value: '',
+    where: '',
+  },
+  {
+    id: 'enterprise-platform_tool_mode',
+    title: 'Цикл вызовов платформы',
+    kind: 'request',
+    field: 'toolMode',
+    options: ['loop', 'single_turn'],
+    detail: '«loop» — контур ходит по кругу сам, «single_turn» — возвращает вызов клиенту',
+    value: 'loop',
+    where: '',
+  },
+  {
+    id: 'generation_preset',
+    title: 'Пресет генерации',
+    kind: 'request',
+    field: 'generationPreset',
+    detail: 'именованный набор параметров на стороне контура; пусто — контур берёт свой',
+    value: '',
+    where: '',
+  },
+  {
+    id: 'enable_thinking',
+    title: 'Размышления модели',
+    kind: 'request',
+    field: 'enableThinking',
+    detail:
+      'включить или выключить доходит только до моделей на самохостед vLLM — остальным ' +
+      'провайдерам контур поле не передаёт; по умолчанию не отправляется, решает шаблон ' +
+      'модели. Размышления наружу не уходят',
+    value: 'по умолчанию',
+    where: '',
+  },
+  {
+    id: 'guardrails',
+    title: 'Проверки содержимого',
+    kind: 'observed',
+    detail: 'включает владелец контура; отказ приходит статусом 451',
+    value: '',
+    where: 'включает владелец контура',
+  },
+  {
+    id: 'managed-context',
+    title: 'Сжатие истории',
+    kind: 'observed',
+    detail: 'длинную переписку контур сжимает сам — наши контрольные точки об этом не знают',
+    value: '',
+    where: 'решает контур',
+  },
+];
+
+/**
+ * Матрица конфликтов: ячейка появляется, только когда у контура есть ОБЕ
+ * стороны. Красная здесь ровно одна — два набора инструментов на один ход;
+ * жёлтая и серая нужны затем, чтобы человек НЕ выключил одну из сторон.
+ */
+const conflictsOf = ({ toolsActive = false } = {}) => [
+  {
+    id: 'tools',
+    level: 'exclusive',
+    platformRule: 'enterprise-platform_tools',
+    ourRule: 'toolShim',
+    title: 'Инструменты платформы ⟷ наша прослойка инструментов',
+    detail: 'Включить оба нельзя — выберите один.',
+    active: toolsActive,
+  },
+  {
+    id: 'compaction',
+    level: 'warning',
+    platformRule: 'managed-context',
+    ourRule: 'checkpoints',
+    title: 'Сжатие истории контуром ⟷ наши контрольные точки',
+    detail: 'После сжатия продолжение может не знать начала задачи — держите точку свежей.',
+    active: true,
+  },
+  {
+    id: 'guardrails',
+    level: 'info',
+    platformRule: 'guardrails',
+    ourRule: 'promptGate',
+    title: 'Проверки содержимого контура ⟷ наш гейт промпта',
+    detail: 'Второй отказ не означает, что первый не сработал.',
+    // Горит только НАША половина: включил ли владелец контура проверки, панель
+    // не знает — это видно лишь по сработавшему 451 (ревью Т7, M3).
+    active: false,
+    oursOnly: true,
+  },
+];
 
 /**
  * Расход и бюджет (Т8). Две величины и они РАЗНЫЕ: внутренняя единица самого
@@ -189,6 +337,21 @@ const cardOf = ({ active = true, platform = PLATFORM, ...patch } = {}) => ({
   active,
   budget: budgetOf(),
   periodSpend: PERIOD_SPEND,
+  // Приём усилия объявляет манифест драйвера, и сервер присылает ответ всегда
+  // (Т6). У enterprise-platform поля глубины в публичной схеме нет — значит `false`.
+  effort: false,
+  // Агенты — тоже ответ манифеста (DRV-12): у платформа компании они объявлены.
+  agents: true,
+  toolRoute: platform.toolShim ? 'shim' : 'none',
+  // Правила и матрица приезжают в той же карточке (Т7): сервер собирает их из
+  // манифеста драйвера и состояния наших слоёв, клиент только раскладывает.
+  rules: RULE_ROWS,
+  conflicts: conflictsOf({
+    toolsActive: platform.toolShim === true && platform.rules?.platform?.platformTools?.length > 0,
+  }),
+  // Наши слои (Т8) — тоже с сервера: экран их не пересчитывает, иначе карточка
+  // и запуск разошлись бы молча.
+  layers: platform.rules?.ours?.enabled === false ? LAYERS_NONE : LAYERS_FULL,
   ...patch,
 });
 
@@ -228,7 +391,11 @@ const target = (patch) => ({
   ...patch,
 });
 
+/** Чем дойдут инструменты целей-CLI — решение шлюза, присланное планом (DRV-13). */
+let planToolRoute = 'shim';
+
 const planOf = (applied) => ({
+  toolRoute: planToolRoute,
   platformId: 'enterprise-platform-dev',
   profileId: 'contour-enterprise-platform-dev',
   baseUrl: 'http://127.0.0.1:5179/enterprise-platform-dev/v1',
@@ -380,6 +547,22 @@ let activationSmoke = SMOKE_OK;
 let activateDelayMs = 0;
 /** Список контуров ОТКАЗАЛ. Так выглядит полупогасшая панель и закрытый доступ. */
 let platformsFail = false;
+/**
+ * Чем пойдёт прогон этого потребителя (Т6) — короткий ответ для шапки чата.
+ * Правила отдаются целиком: выбор пересчитывает клиент, той же функцией
+ * контрактов, что и сервер.
+ */
+let runPlan = {
+  routed: true,
+  title: 'EnterprisePlatform · dev',
+  rules: {
+    model: 'gpt-4o',
+    source: 'default',
+    map: { sonnet: 'claude-sonnet-4-5' },
+    catalog: ['gpt-4o', 'claude-sonnet-4-5'],
+  },
+  effort: false,
+};
 const platformsInfo = () => ({
   platforms,
   activePlatformId,
@@ -421,6 +604,11 @@ const noteSecret = (method, path, body) => {
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1500, height: 1100 } });
 await bypassOnboarding(page);
+
+// Чем пойдёт прогон (Т6) живёт СВОИМ корнем, а не сегментом внутри
+// `/api/platforms/:id/…`: статический сегмент сильнее параметра, и контур с
+// идентификатором `run-plan` перекрыл бы собственные маршруты (ревью Т6, m11).
+await page.route('**/api/platform-run-plan/**', (route) => route.fulfill({ json: runPlan }));
 
 // Один обработчик на весь раздел: порядок срабатывания нескольких перехватов
 // зависит от порядка регистрации, и разбирать адрес внутри честнее, чем
@@ -592,6 +780,10 @@ await page.getByRole('button', { name: 'Подключить контур' }).fi
 await page.waitForTimeout(400);
 check((await page.getByRole('dialog').count()) > 0, 'мастер открылся');
 
+// Драйвер нового контура приносит свои умолчания прослойки и промпта (DRV-20):
+// галочек этих в мастере нет, и совместимый шлюз, принимающий инструменты
+// полем, иначе уезжал бы с прослойкой платформа компании.
+await page.getByLabel('Тип контура').selectOption('openai-compat');
 await page.getByLabel('Название').fill('EnterprisePlatform · dev');
 await page.getByLabel('Адрес API').fill('https://api.dev.example.ru');
 const idValue = await page.getByLabel('Идентификатор').inputValue();
@@ -607,6 +799,106 @@ check(
   posted.some((item) => item.kind === 'save'),
   'проверка сохранила черновик — иначе серверу нечего проверять',
 );
+const compatSave = posted.filter((item) => item.kind === 'save').at(-1)?.body?.settings;
+check(
+  compatSave?.driver === 'openai-compat' &&
+    compatSave.toolShim === false &&
+    compatSave.contourPrompt === false,
+  `совместимый шлюз сохранён без прослойки и промпта: ${JSON.stringify({ toolShim: compatSave?.toolShim, contourPrompt: compatSave?.contourPrompt })}`,
+);
+// Нестандартный шлюз (DRV-04/05): заголовок ключа, путь как есть и параметр
+// уходят в сохранение, а итоговый адрес показан ДО пробы — собран той же
+// функцией контракта, что и на сервере.
+const dialog = page.locator('[role="dialog"]');
+await dialog.getByText('Нестандартный шлюз: ключ, версия, параметры').click();
+await page.getByLabel('Адрес API').fill('https://corp.openai.azure.com/openai');
+await page.getByLabel('Версия в адресе').selectOption('as-is');
+await page.getByLabel('Заголовок ключа').fill('api-key');
+await page.getByLabel('Параметры запроса').fill('api-version=2024-10-21');
+check(
+  (await dialog.innerText()).includes(
+    'https://corp.openai.azure.com/openai/models?api-version=2024-10-21',
+  ),
+  'итоговый адрес списка моделей показан до пробы',
+);
+// Ключ, вписанный в лишние заголовки, форма не сохраняет и значение не повторяет.
+await page.getByLabel('Дополнительные заголовки').fill('Authorization: Bearer sk-вписан-руками');
+await page.waitForTimeout(150);
+const refusedText = await dialog.innerText();
+check(
+  refusedText.includes('под этим именем едет ключ') && !refusedText.includes('sk-вписан-руками\n«'),
+  'ключ в лишних заголовках назван отказом по имени',
+);
+check(
+  await page.getByRole('button', { name: 'Проверить связь' }).isDisabled(),
+  'с ключом в лишних заголовках проверить и сохранить нельзя',
+);
+await page.getByLabel('Дополнительные заголовки').fill('X-Tenant: research');
+if (process.env.SHOTS) {
+  await dialog.screenshot({ path: `${process.env.SHOTS}/address-transport.png` });
+}
+await page.getByRole('button', { name: 'Проверить связь' }).click();
+await page.waitForTimeout(600);
+const transportSave = posted.filter((item) => item.kind === 'save').at(-1)?.body?.settings;
+check(
+  JSON.stringify(transportSave?.transport) ===
+    JSON.stringify({
+      authHeader: 'api-key',
+      authScheme: '',
+      version: 'as-is',
+      query: 'api-version=2024-10-21',
+      headers: 'X-Tenant: research',
+    }),
+  `транспорт сохранён поле в поле: ${JSON.stringify(transportSave?.transport)}`,
+);
+// Обратно к стандартному — дальше мастер идёт как прежде.
+await page.getByLabel('Дополнительные заголовки').fill('');
+await page.getByLabel('Параметры запроса').fill('');
+await page.getByLabel('Заголовок ключа').fill('');
+await page.getByLabel('Версия в адресе').selectOption('auto');
+await page.getByLabel('Адрес API').fill('https://api.dev.example.ru');
+
+// Пресеты (DRV-03): заголовок ключа Azure подсказан пресетом, а переопределение
+// поверх пресета vLLM уходит в сохранение ровно тем, что человек сказал, — пустая
+// строка «не объявлять» отличается от «как у пресета» отсутствием поля.
+await page.getByLabel('Тип контура').selectOption('azure-openai');
+check(
+  (await page.getByLabel('Заголовок ключа').getAttribute('placeholder')) === 'api-key',
+  'Azure: заголовок ключа подсказан пресетом, а не Authorization',
+);
+await page.getByLabel('Тип контура').selectOption('vllm');
+await dialog.getByText('Что умеет шлюз: ручки, размышления, инструменты').click();
+check(
+  (await dialog.innerText()).includes('Как у пресета: chat_template_kwargs.enable_thinking'),
+  'vLLM: рядом с выбором показано, что объявил пресет',
+);
+await page.getByLabel('Родная ручка Anthropic', { exact: true }).selectOption('custom');
+await page.getByLabel('Родная ручка Anthropic — значение').fill('../admin');
+await page.waitForTimeout(150);
+check(
+  (await dialog.innerText()).includes('Путь из строчной латиницы') &&
+    (await page.getByRole('button', { name: 'Проверить связь' }).isDisabled()),
+  'путь с «..» назван отказом, и сохранить его нельзя',
+);
+await page.getByLabel('Родная ручка Anthropic', { exact: true }).selectOption('none');
+await page.getByLabel('Предел цельного ответа, секунд').fill('300');
+await page.getByLabel('Потолок любого ответа, секунд').fill('60');
+if (process.env.SHOTS) {
+  await dialog.screenshot({ path: `${process.env.SHOTS}/address-manifest.png` });
+}
+await page.getByRole('button', { name: 'Проверить связь' }).click();
+await page.waitForTimeout(600);
+const presetSave = posted.filter((item) => item.kind === 'save').at(-1)?.body?.settings;
+check(
+  presetSave?.driver === 'vllm' &&
+    presetSave.toolShim === false &&
+    JSON.stringify(presetSave.manifest) ===
+      JSON.stringify({ anthropicMessages: '', nonStreamTimeoutSec: 300, responseCeilingSec: 60 }),
+  `пресет и переопределения сохранены: ${JSON.stringify({ driver: presetSave?.driver, manifest: presetSave?.manifest })}`,
+);
+
+// Обратно на платформа компании — пресет возвращается, и дальше мастер идёт как прежде.
+await page.getByLabel('Тип контура').selectOption('enterprise-platform');
 
 // --- Мастер: ключ ---------------------------------------------------------
 
@@ -749,6 +1041,12 @@ check(
   'снятый терминал в сохранённых не остался',
 );
 check(
+  saveCall?.body?.settings?.driver === 'enterprise-platform' &&
+    saveCall.body.settings.toolShim === true &&
+    saveCall.body.settings.manifest === undefined,
+  'возврат к платформа компании вернул её прослойку и не унёс переопределений vLLM',
+);
+check(
   applyCall?.body?.targets?.includes('claude') !== true,
   `со снятым терминалом файлы CLI в применение не уехали: ${JSON.stringify(applyCall?.body?.targets ?? [])}`,
 );
@@ -791,6 +1089,367 @@ check(card.includes('sk-…4f21'), 'ключ показан маской');
 check(card.includes('Применён к'), 'список «Применён к» на месте');
 check(card.includes('расход ≈ 62.00 из 100 $'), 'расход считается по единице контура');
 check(card.includes('Журнал применения'), 'журнал применения на месте');
+
+// --- Модель и усилие (Т6) -------------------------------------------------
+
+// Контур, возящий прогоны: только у такого есть кому переопределять модель.
+// Ассистент с терминалом в списке не появятся — у них модель ровно одна, та,
+// что записана в профиле.
+platforms = [
+  cardOf({ platform: { ...PLATFORM, consumers: ['chat', 'tests', 'assistant', 'foreign:qwen'] } }),
+];
+await open();
+const models = await page.locator('body').innerText();
+
+// Модель НЕ выбрана: панель берёт первую чатовую из каталога и обязана сказать
+// это словом. Молчание здесь читается как «модели нет», а на самом деле модель
+// уже выбрана за человека — и именно она уедет в CLI.
+check(models.includes('Модель по умолчанию'), 'карточка модели контура на экране');
+check(
+  models.includes('Первая из каталога: gpt-4o'),
+  'подстановка названа вместе с моделью, которой она подставилась',
+);
+check(models.includes('Вы не выбирали'), 'сказано, что выбор сделала панель, а не человек');
+// Вложение моделью разговора не бывает: выбрав его, человек получил бы отказ
+// на первом же сообщении.
+const modelOptions = await page
+  .getByLabel('Модель по умолчанию')
+  .locator('option')
+  .allTextContents();
+check(
+  modelOptions.includes('gpt-4o') && modelOptions.includes('claude-sonnet-4-5'),
+  `в выборе обе чатовые модели каталога: ${modelOptions.join(', ')}`,
+);
+check(!modelOptions.includes('bge-m3'), 'модель вложений в выбор разговора не попала');
+
+// Потребители, ходящие процессом, — и только отмеченные у контура. Ассистент с
+// терминалом сюда не попадают: у них модель ровно одна, та, что в профиле.
+check(models.includes('Модель на потребителя'), 'переопределение на потребителя на месте');
+check(
+  models.includes('Карта соответствия имён'),
+  'карта соответствия имён на месте — без неё «sonnet» уезжает в контур как есть',
+);
+check(
+  models.includes('Контур не принимает глубину продумывания'),
+  'потерянная глубина названа словом, а не молчанием',
+);
+
+// Строка карты сохраняется контуром, а не догадкой: без этого перевод имени не
+// пережил бы ни F5, ни перенос окружения.
+const before = posted.filter((item) => item.kind === 'save').length;
+await page.getByLabel('Имя в панели').fill('sonnet');
+await page.getByLabel('Модель контура').selectOption('claude-sonnet-4-5');
+await page.getByRole('button', { name: 'Добавить' }).first().click();
+await page.waitForTimeout(600);
+const saved = posted.filter((item) => item.kind === 'save').at(-1);
+check(
+  posted.filter((item) => item.kind === 'save').length > before &&
+    saved?.body?.settings?.modelMap?.sonnet === 'claude-sonnet-4-5',
+  `строка карты уехала на сервер: ${JSON.stringify(saved?.body?.settings?.modelMap ?? null)}`,
+);
+
+// Каталога нет — карточка не молчит и не притворяется пустым списком: «связь
+// ещё не проверяли» человек чинит кнопкой проверки, а не выбором модели.
+platforms = [cardOf({ health: undefined })];
+await open();
+const noCatalog = await page.locator('body').innerText();
+check(noCatalog.includes('Каталог пуст'), 'пустой каталог назван причиной, а не пустым списком');
+
+platforms = [cardOf()];
+await open();
+
+// --- Правила контура и матрица конфликтов (Т7) -----------------------------
+
+const rulesScreen = await page.locator('body').innerText();
+if (process.env.SHOTS) {
+  const thinking = page.getByText('Размышления модели', { exact: true }).first();
+  await thinking.scrollIntoViewIfNeeded();
+  const box = await thinking.boundingBox();
+  if (box) {
+    await page.screenshot({
+      path: `${process.env.SHOTS}/rules-thinking.png`,
+      clip: { x: 0, y: Math.max(0, box.y - 260), width: page.viewportSize().width, height: 420 },
+    });
+  }
+}
+
+// Два списка, а не один: верхний — поля запроса, нижний — то, что контур делает
+// сам. Человек, не нашедший галочки у «Сжатия истории», должен прочитать, КТО
+// её включает, а не решить, что панель потеряла настройку.
+check(rulesScreen.includes('Правила контура'), 'карточка правил контура на экране');
+check(rulesScreen.includes('Чем распоряжается панель'), 'управляемые правила названы заголовком');
+check(rulesScreen.includes('Что контур делает сам'), 'наблюдаемые правила отделены от управляемых');
+check(
+  rulesScreen.includes('включает владелец контура'),
+  'у наблюдаемого правила названо, кто его включает',
+);
+
+// Прослойка инструментов включена (умолчание Т5) — набор контура заперт. Поле,
+// молча принявшее имена, обернулось бы отказом при сохранении, и человек читал
+// бы его как поломку панели.
+check(
+  await page.getByLabel('Инструменты платформы').isDisabled(),
+  'при включённой прослойке набор инструментов контура выбрать нельзя',
+);
+check(
+  rulesScreen.includes('Выключите прослойку ниже, в разделе «Наша сторона»'),
+  'запертое поле называет причину и место, где она снимается',
+);
+// До ревью Т7 (B2) выключателя прослойки не было НИГДЕ: карточка, справка и
+// документ отправляли человека к кнопке, которой не существует.
+check(
+  (await page.getByRole('switch', { name: 'Прослойка инструментов панели' }).count()) > 0,
+  'выключатель прослойки есть на той же карточке, куда отправляет подсказка',
+);
+
+// Пустой список инструментов: режим цикла есть на экране, но никуда не уходит —
+// просить контур о цикле вызовов, которых нет, значит просить ни о чём.
+check(
+  rulesScreen.includes('режим цикла никуда не отправляется'),
+  'бездействующий режим цикла назван словом, а не пустым выбором',
+);
+
+// Матрица: красная строка ровно одна, остальные — порядок слоёв и
+// предупреждение. Уровень словами, а не только цветом.
+check(rulesScreen.includes('Матрица конфликтов'), 'матрица конфликтов на месте');
+check(rulesScreen.includes('Взаимное исключение'), 'красный уровень назван словом');
+check(rulesScreen.includes('Предупреждение'), 'жёлтый уровень назван словом');
+check(rulesScreen.includes('К сведению'), 'серый уровень назван словом');
+check(
+  rulesScreen.includes('сейчас включены обе стороны'),
+  'включённые обе стороны названы отдельно от самой ячейки',
+);
+// А там, где панель видит только свою половину, так и написано: утверждать
+// состояние чужой системы по своему тумблеру она не вправе (ревью Т7, M3).
+check(
+  rulesScreen.includes('наша сторона включена; сторона контура видна, только когда сработает'),
+  'про гардрейлы и подмену сказано «наша сторона», а не «обе»',
+);
+
+// Прослойка выключена — набор контура редактируется, и он уезжает на сервер
+// полем контура: без этого имена не пережили бы ни F5, ни перенос окружения.
+const shimOff = {
+  ...PLATFORM,
+  toolShim: false,
+  rules: { platform: { ...PLATFORM.rules.platform, generationPreset: '' } },
+};
+platforms = [cardOf({ platform: shimOff })];
+await open();
+check(
+  !(await page.getByLabel('Инструменты платформы').isDisabled()),
+  'с выключенной прослойкой набор инструментов контура редактируется',
+);
+const beforeRules = posted.filter((item) => item.kind === 'save').length;
+await page.getByLabel('Инструменты платформы').fill('web_search code_interpreter');
+await page.getByRole('button', { name: 'Сохранить' }).first().click();
+await page.waitForTimeout(600);
+const savedRules = posted.filter((item) => item.kind === 'save').at(-1);
+check(
+  posted.filter((item) => item.kind === 'save').length > beforeRules &&
+    JSON.stringify(savedRules?.body?.settings?.rules?.platform?.platformTools) ===
+      JSON.stringify(['web_search', 'code_interpreter']),
+  // Через пробел И через запятую: имена человек переписывает глазами из
+  // админки контура, и требовать одного разделителя — отказ на ровном месте.
+  `имена инструментов уехали на сервер списком: ${JSON.stringify(
+    savedRules?.body?.settings?.rules?.platform ?? null,
+  )}`,
+);
+
+// Размышления — выбор из трёх, а не выключатель: «не отправлять» и «выключить»
+// у reasoning-модели различаются (аудит MD-02). Выбор уезжает словом состояния.
+const thinkingPick = page.getByLabel('Размышления модели');
+check(
+  JSON.stringify(
+    await thinkingPick.locator('option').evaluateAll((items) => items.map((item) => item.value)),
+  ) === JSON.stringify(['default', 'on', 'off']),
+  'у размышлений три состояния: по умолчанию, включить, выключить',
+);
+const beforeThinking = posted.filter((item) => item.kind === 'save').length;
+await thinkingPick.selectOption('off');
+await page.waitForTimeout(600);
+const savedThinking = posted.filter((item) => item.kind === 'save').at(-1);
+check(
+  posted.filter((item) => item.kind === 'save').length > beforeThinking &&
+    savedThinking?.body?.settings?.rules?.platform?.enableThinking === 'off',
+  `«выключить» уехало на сервер состоянием off: ${JSON.stringify(
+    savedThinking?.body?.settings?.rules?.platform ?? null,
+  )}`,
+);
+
+// Противоречие, в которое обычной дорогой не попасть: его приносит разворот
+// чужого архива. Сохранение откажет, а до тех пор прогон идёт с инструментами
+// контура — и об этом сказано вслух, иначе прослойка «молчит без причины».
+const contradiction = {
+  ...PLATFORM,
+  toolShim: true,
+  rules: { platform: { ...PLATFORM.rules.platform, platformTools: ['web_search'] } },
+};
+platforms = [cardOf({ platform: contradiction })];
+await open();
+const broken = await page.locator('body').innerText();
+check(
+  broken.includes('Выберите сторону — вторую панель за вас не выключит'),
+  'противоречивое состояние названо отказом, а не починено молча',
+);
+check(
+  broken.includes('прослойка молчит'),
+  'сказано, чем идёт прогон до тех пор, — иначе молчание прослойки необъяснимо',
+);
+// Выход из противоречия — кнопкой, а не только словами: до ревью Т7 (B3) отказ
+// стоял на КАЖДОМ сохранении, и контур запирался насмерть.
+check(
+  (await page.getByRole('button', { name: 'Выключить нашу прослойку' }).count()) > 0 &&
+    (await page.getByRole('button', { name: 'Убрать инструменты контура' }).count()) > 0,
+  'из противоречия есть выход обеими сторонами, а не только чтение про отказ',
+);
+
+// --- Наши слои в прогоне (Т8) ----------------------------------------------
+
+platforms = [cardOf()];
+await open();
+const layersScreen = await page.locator('body').innerText();
+
+check(layersScreen.includes('Наши слои в прогоне'), 'раздел наших слоёв на карточке контура');
+check(
+  (await page.getByRole('switch', { name: 'Наши правила едут в прогон' }).count()) > 0,
+  'общий выключатель слоёв есть',
+);
+for (const name of [
+  'Личные правила, хуки и права',
+  'Скиллы',
+  'MCP-серверы',
+  'Дописка панели к системному промпту',
+]) {
+  check(
+    (await page.getByRole('switch', { name }).count()) > 0,
+    `слой «${name}» отдельной галочкой`,
+  );
+}
+// Про запертые GUI-соседи сказано словами: человек, не нашедший галочки, должен
+// прочитать почему, а не решить, что панель потеряла слой.
+check(
+  layersScreen.includes('Гейт промпта') && layersScreen.includes('Каскад моделей'),
+  'у гейта промпта и каскада названа причина, по которой галочки здесь нет',
+);
+check(
+  layersScreen.includes('Флагов нет — в прогон едет всё наше'),
+  'на полном наборе сказано, что флагов нет вовсе',
+);
+// Подпись `rules-partial`: снять правила отдельно от хуков и прав нельзя, и
+// сказано это у той галочки, которой касается.
+check(
+  (await page.locator('[data-compromise-mark="rules-partial"]').count()) > 0,
+  'подпись о неразделимости личных настроек стоит на карточке',
+);
+
+// Переключение слоя уезжает на сервер полем `rules.ours` — иначе снятая галочка
+// не пережила бы ни F5, ни перенос окружения.
+const beforeLayer = posted.filter((item) => item.kind === 'save').length;
+await page.getByRole('switch', { name: 'Скиллы' }).click();
+await page.waitForTimeout(600);
+const savedLayer = posted.filter((item) => item.kind === 'save').at(-1);
+check(
+  posted.filter((item) => item.kind === 'save').length > beforeLayer &&
+    savedLayer?.body?.settings?.rules?.ours?.skills === false &&
+    savedLayer?.body?.settings?.rules?.ours?.mcp === true,
+  `снятый слой уехал на сервер, не тронув соседние: ${JSON.stringify(
+    savedLayer?.body?.settings?.rules?.ours ?? null,
+  )}`,
+);
+
+// Снятый общий выключатель: частные галочки заперты, причина стоит НАД ними
+// (запертый тумблер выброшен из обхода табом), а флаги названы поимённо —
+// «личные правила сняты» без того, чем именно, это просьба верить на слово.
+platforms = [
+  cardOf({
+    platform: {
+      ...PLATFORM,
+      rules: {
+        ...PLATFORM.rules,
+        ours: { ...PLATFORM.rules.ours, enabled: false },
+      },
+    },
+  }),
+];
+await open();
+const layersOff = await page.locator('body').innerText();
+check(
+  layersOff.includes('Общий выключатель снят'),
+  'снятый общий выключатель объяснён там же, где запер галочки',
+);
+check(
+  await page.getByRole('switch', { name: 'Скиллы' }).isDisabled(),
+  'частные галочки заперты общим выключателем, а не спорят с ним',
+);
+// Запертая галочка обязана быть и НАРИСОВАНА снятой: в записи контура она
+// осталась включённой, и показ её включённой обещал бы слой, которого в
+// прогоне не будет (ревью Т8 — без этой проверки подмена расчёта на
+// `checked={ours[id]}` оставалась зелёной).
+check(
+  (await page.getByRole('switch', { name: 'Скиллы' }).isChecked()) === false,
+  'запертая галочка нарисована снятой, а не включённой под общим выключателем',
+);
+check(
+  layersOff.includes('--setting-sources project,local') &&
+    layersOff.includes('--disable-slash-commands') &&
+    layersOff.includes('--strict-mcp-config'),
+  'флаги запуска названы поимённо, а не обещаны словами',
+);
+check(
+  layersOff.includes('Дописку панели снимает сама панель'),
+  'про дописку сказано, почему её нет среди флагов',
+);
+// Флаги снимает ЗАПУСК Claude, и у этого контура (ассистент + терминал) их не
+// получает никто. Сказать это обязано ровно здесь, под списком флагов: иначе
+// карточка обещает снятые слои контуру, через который не идёт ни один прогон
+// (ревью Т8).
+check(
+  layersOff.includes('получить их пока некому'),
+  'у контура без прогонов Claude сказано, что флаги не достаются никому',
+);
+
+// Тот же контур с чатом в маршруте: оговорки быть не должно — иначе она
+// висела бы всегда и читалась как украшение.
+platforms = [
+  cardOf({
+    platform: {
+      ...PLATFORM,
+      consumers: ['chat', 'assistant'],
+      rules: { ...PLATFORM.rules, ours: { ...PLATFORM.rules.ours, enabled: false } },
+    },
+  }),
+];
+await open();
+check(
+  !(await page.locator('body').innerText()).includes('получить их пока некому'),
+  'с чатом в маршруте оговорки про «некому» нет',
+);
+
+// Ответ сервера старее панели: поля слоёв нет вовсе. Карточка обязана
+// остаться на экране — падение здесь уносило бы весь раздел (урок Т7, B1).
+platforms = [cardOf({ layers: undefined })];
+await open();
+const layersLegacy = await page.locator('body').innerText();
+check(
+  layersLegacy.includes('Наши слои в прогоне') && layersLegacy.includes('Правила контура'),
+  'ответ без слоёв не роняет ни карточку, ни раздел',
+);
+check(
+  !layersLegacy.includes('Флагов нет — в прогон едет всё наше'),
+  'и ничего про флаги в таком ответе не обещано',
+);
+
+// Драйвер, не объявивший о себе ничего (любой совместимый шлюз): пустой список
+// — это «неизвестно», а не «ничего не делает».
+platforms = [cardOf({ rules: [], conflicts: [] })];
+await open();
+check(
+  (await page.locator('body').innerText()).includes('о своих правилах не объявлял'),
+  'молчащий драйвер назван «неизвестно», а не пустым списком правил',
+);
+
+platforms = [cardOf()];
+await open();
 
 // --- Активный контур: ровно один (Т2) --------------------------------------
 
@@ -1049,6 +1708,9 @@ await page.route('**/api/settings', async (route) => {
     response,
     json: {
       ...settings,
+      // Этот перехват ПОСЛЕДНИЙ и перекрывает `bypassOnboarding`: без флага на
+      // стенде с непройденным мастером страница видна только модалкой.
+      onboardingDone: true,
       endpointProfiles: [
         {
           // Имя профиля нарочно НЕ содержит названия контура: иначе проверка
@@ -1143,6 +1805,8 @@ check(
 platformsFail = false;
 
 await page.unroute('**/api/settings');
+// `unroute` по адресу снимает ВСЕ его перехваты, обход мастера тоже.
+await bypassOnboarding(page);
 managedOwnerId = PLATFORM.id;
 activePlatformId = PLATFORM.id;
 // Возврат на карточку: проверки ниже смотрят на живой экран раздела, а не на
@@ -1195,40 +1859,68 @@ check(
 );
 check(!nearText.includes('бюджет исчерпан'), 'подход к бюджету не выдаётся за отказ контура');
 
-// Отказ 402 — факт, но НЕ про бюджет ключа: контур отдаёт его с дневного лимита
-// пользователя, месячного команды или месячного инстанса и называет уровень в
-// теле. Бюджет самого ключа он отклоняет кодом 401, неотличимым от отозванного
-// ключа. Карточка обязана назвать уровень, иначе она сообщает, что кончилось не
-// то, что кончилось.
+// Отказ 402 — факт, и ЧЕЙ это лимит, сервер прочитал из тела по манифесту
+// драйвера. У enterprise-platform на `/v1` это бюджет ключа (`handler_public_api.go:340`).
+// Карточка обязана сказать именно это: до 13.09.2026 она говорила обратное.
 platforms = [
   cardOf({
     platform: { ...PLATFORM, budgetSince: '2026-09-09' },
     budget: budgetOf({
       exhausted: true,
       exhaustedAt: EXHAUSTED_AT,
-      exhaustedLevel: 'user_daily',
+      exhaustedScope: 'key',
     }),
   }),
 ];
 exhausted = true;
 await open();
 const spentText = await page.locator('body').innerText();
+// Снимок строки отказа: `SHOTS=<каталог> node tools/qa/check-platform.mjs`.
+if (process.env.SHOTS) {
+  await page.screenshot({ path: `${process.env.SHOTS}/budget-exhausted.png`, fullPage: true });
+}
 check(
   spentText.includes('период с 2026-09-09'),
   'введённый день начала периода назван на карточке',
 );
 check(
-  spentText.includes('контур отказал по лимиту «user_daily»'),
-  'отказ назван словами и с УРОВНЕМ лимита, а не полосой у края',
+  spentText.includes('исчерпан бюджет ключа'),
+  'отказ назван словами и тем, ЧТО кончилось, а не полосой у края',
 );
 check(
-  spentText.includes('это не бюджет ключа'),
-  'сказано прямо, что кончился не бюджет ключа: иначе человек чинил бы не то',
+  !spentText.includes('не бюджет ключа'),
+  'про бюджет ключа не сказано обратное: иначе человек чинил бы не то',
 );
 check(
   spentText.includes('назад') || spentText.includes('час'),
   `сказано, КОГДА контур отказал: ${spentText.match(/отказал.{0,50}/)?.[0] ?? '—'}`,
 );
+
+// Лимит над ключом, названный платформой (не enterprise-platform) — назван её словом.
+platforms = [
+  cardOf({
+    budget: budgetOf({
+      exhausted: true,
+      exhaustedAt: EXHAUSTED_AT,
+      exhaustedScope: 'limit',
+      exhaustedLevel: 'org_monthly',
+    }),
+  }),
+];
+await open();
+const levelText = await page.locator('body').innerText();
+check(
+  levelText.includes('контур отказал по лимиту «org_monthly»') &&
+    !levelText.includes('бюджет ключа'),
+  'названный платформой лимит показан её словом и не выдан за бюджет ключа',
+);
+platforms = [
+  cardOf({
+    platform: { ...PLATFORM, budgetSince: '2026-09-09' },
+    budget: budgetOf({ exhausted: true, exhaustedAt: EXHAUSTED_AT, exhaustedScope: 'key' }),
+  }),
+];
+await open();
 
 const extended = page.getByRole('button', { name: 'Отметку снять' });
 check((await extended.count()) === 1, 'снять отметку можно кнопкой, и только ею');
@@ -1420,6 +2112,41 @@ check(
 );
 check(!offText.includes('Агенты контура'), 'контур выключен — карточки агентов нет вовсе');
 
+// Тип без агентов (DRV-12): карточка звала бы чужую ручку. Переходник остаётся —
+// модели через него спрашиваются у любого типа.
+// Тот же совместимый шлюз — и маршрут инструментов полем (DRV-13): платформа компанииьи
+// утверждения «как чат», «объявить нельзя» и карточка прослойки к нему не относятся.
+planToolRoute = 'native';
+platforms = [
+  cardOf({
+    agents: false,
+    toolRoute: 'native',
+    platform: { ...PLATFORM, driver: 'openai-compat', toolShim: false },
+    rules: [],
+  }),
+];
+await open();
+const compatText = await page.locator('body').innerText();
+check(!compatText.includes('Агенты контура'), 'у типа без агентов карточки агентов нет');
+check(
+  !compatText.includes('Платформа компании свои инструменты полем объявить нельзя'),
+  'факт «инструменты текстом» не показан разделу, где инструменты уходят полем',
+);
+check(
+  !compatText.includes('Инструменты через контур'),
+  'карточки прослойки у контура без прослойки нет, хотя сводка шлюза есть',
+);
+check(
+  compatText.includes('применён, инструменты уходят полем') &&
+    !compatText.includes('работает как чат без инструментов'),
+  'цель-CLI совместимого шлюза не названа «чатом без инструментов»',
+);
+check(
+  (await page.getByRole('button', { name: /переходник/ }).count()) === 1,
+  'переходник MCP у включённого контура без агентов на месте',
+);
+
+planToolRoute = 'shim';
 platforms = [cardOf()];
 await open();
 
@@ -1465,6 +2192,122 @@ const shifted = await page.locator('body').innerText();
 check(
   shifted.includes('Расход через контур') && shifted.includes('2026-09-10'),
   'пустой период не уносит с экрана историю, которая есть',
+);
+
+// --- Шапка чата: чем прогон пойдёт на самом деле (Т6) ---------------------
+
+// Единственное место, где человек видит подмену ДО отправки сообщения. Выбор
+// модели в шапке через контур — просьба: имя панели контур не знает, и оно
+// переводится картой. Показать выбранное как действующее значило бы соврать
+// ровно там, куда человек смотрит перед отправкой.
+await goto(`${BASE}/chat`);
+await page.waitForTimeout(1800);
+const chatHeader = await page.locator('body').innerText();
+check(
+  chatHeader.includes('EnterprisePlatform · dev') && chatHeader.includes('gpt-4o'),
+  'шапка чата называет контур и модель, которой пойдёт прогон',
+);
+check(
+  chatHeader.includes('Контур «EnterprisePlatform · dev» не принимает глубину продумывания'),
+  'о неотправляемой глубине сказано там же, где её выбирают',
+);
+// Слоёв в плане нет — значит снимать нечего (или прогон ведёт не Claude), и
+// строка «ничего не снято» в каждом разговоре была бы шумом.
+check(!chatHeader.includes('прогон пойдёт без'), 'на полном наборе слоёв шапка про них молчит');
+
+// А снятые слои названы ДО отправки сообщения: «агент не читает мои правила»
+// выглядит поломкой агента, пока человек не увидит собственную галочку.
+runPlan = {
+  ...runPlan,
+  layers: {
+    args: ['--disable-slash-commands', '--strict-mcp-config'],
+    systemPrompt: true,
+    dropped: ['skills', 'mcp'],
+  },
+};
+await goto(`${BASE}/chat`);
+await page.waitForTimeout(1800);
+const chatLayers = await page.locator('body').innerText();
+check(
+  chatLayers.includes('Через контур «EnterprisePlatform · dev» прогон пойдёт без нашего') &&
+    chatLayers.includes('Скиллы') &&
+    chatLayers.includes('MCP-серверы'),
+  'снятые слои названы в шапке чата поимённо',
+);
+
+// Снято всё — своя строка: перечислять человеку четыре слоя незачем.
+runPlan = {
+  ...runPlan,
+  layers: {
+    args: ['--setting-sources', 'project,local', '--disable-slash-commands', '--strict-mcp-config'],
+    systemPrompt: false,
+    dropped: ['settings', 'skills', 'mcp', 'systemPrompt'],
+  },
+};
+await goto(`${BASE}/chat`);
+await page.waitForTimeout(1800);
+check(
+  (await page.locator('body').innerText()).includes('без единого нашего слоя'),
+  'полностью снятые слои названы одной строкой, а не перечислением',
+);
+runPlan = { ...runPlan, layers: undefined };
+await goto(`${BASE}/chat`);
+await page.waitForTimeout(1200);
+
+// Выбранное имя, которого у контура нет: ветка подмены. До ревью Т6 ни один
+// свип по ней не проходил — проверялось только «подмены нет».
+const modelPick = page.getByRole('combobox', { name: 'Модель' }).first();
+if ((await modelPick.count()) > 0) {
+  await modelPick.selectOption('sonnet');
+  await page.waitForTimeout(900);
+  const replaced = await page.locator('body').innerText();
+  check(
+    replaced.includes('имени «sonnet» там нет, запрос уйдёт с claude-sonnet-4-5'),
+    'подмена имени названа в шапке словом, вместе с тем, что уедет',
+  );
+} else {
+  check(false, 'в шапке чата нет выбора модели — проверять подмену не на чем');
+}
+
+// У контура нет модели вовсе (пробы не было, каталог пуст). Заменять нечем, и
+// объявлять подмену нельзя: до ревью Т6 здесь стояло «имени „sonnet“ там нет,
+// запрос уйдёт с .» — с прочерком вместо модели.
+runPlan = {
+  routed: true,
+  title: 'EnterprisePlatform · dev',
+  rules: { model: '', source: 'none', map: {}, catalog: [] },
+  effort: false,
+};
+await goto(`${BASE}/chat`);
+await page.waitForTimeout(1800);
+const chatUnset = await page.locator('body').innerText();
+check(
+  chatUnset.includes('Контур «EnterprisePlatform · dev» модель не назначил'),
+  'контур без модели говорит об этом прямо, а не показывает подмену с прочерком',
+);
+// Любая подпись, в которой на месте имени модели пусто, — а их две формы:
+// «запрос уйдёт с .» у подмены и «Через контур «X»: .» у обычной.
+check(
+  !chatUnset.includes('запрос уйдёт с .') && !chatUnset.includes('«EnterprisePlatform · dev»: .'),
+  'ни одной подписи с пустым именем модели на экране нет',
+);
+
+// Не через контур — шапка обязана вернуться к прежнему виду: подпись о подмене
+// в обычном разговоре говорила бы о том, чего не происходит.
+runPlan = {
+  routed: false,
+  title: '',
+  reason: 'consumer_off',
+  rules: { model: '', source: 'none', map: {}, catalog: [] },
+  effort: true,
+};
+await goto(`${BASE}/chat`);
+await page.waitForTimeout(1800);
+const chatPlain = await page.locator('body').innerText();
+check(!chatPlain.includes('EnterprisePlatform · dev'), 'без контура подписи о нём в шапке нет вовсе');
+check(
+  !chatPlain.includes('не принимает глубину продумывания'),
+  'без контура о глубине шапка ничего не утверждает',
 );
 
 // Итог по ключу — за весь прогон, а не за один экран: мастер, проверка, вопрос

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { enterprise-platformDriver } from '../drivers/enterprise-platform.ts';
+import { openAiCompatDriver } from '../drivers/openai-compat.ts';
 import {
   DIALECT_TABLE,
   anthropicRequestToOpenAi,
@@ -8,6 +9,7 @@ import {
   openAiRequestLoss,
   openAiResponseToAnthropic,
   stopReasonOf,
+  upstreamErrorCode,
 } from './dialect.ts';
 
 /**
@@ -166,6 +168,165 @@ describe('таблица соответствий диалектов', () => {
   });
 });
 
+/**
+ * Инструменты полем (`clientTools: 'native'`, аудит DRV-01). Проверяется
+ * история ХОДА целиком, а не одна схема: агент, у которого прошлый вызов уехал
+ * без своего результата, вызывает инструмент второй раз, а строгий шлюз
+ * отвергает роль `tool`, стоящую не сразу за вызовами.
+ */
+describe('инструменты клиента полем', () => {
+  const NATIVE = { mode: 'native' } as const;
+
+  function turn() {
+    return {
+      model: 'qwen',
+      system: 'ты агент',
+      tools: [
+        {
+          name: 'Write',
+          description: 'пишет файл',
+          input_schema: { type: 'object', properties: { file_path: { type: 'string' } } },
+        },
+        { name: 'Read', input_schema: { type: 'object' } },
+      ],
+      tool_choice: { type: 'any', disable_parallel_tool_use: true },
+      messages: [
+        { role: 'user', content: 'перепиши a.ts' },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'читаю' },
+            { type: 'tool_use', id: 'toolu_1', name: 'Read', input: { file_path: 'a.ts' } },
+          ],
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: 'toolu_1', content: 'старое' },
+            { type: 'text', text: 'дальше' },
+          ],
+        },
+        {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 'toolu_2', name: 'Write', input: {} }],
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'toolu_2',
+              is_error: true,
+              content: [
+                { type: 'text', text: 'нет прав' },
+                { type: 'image', source: {} },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  it('схемы становятся функциями, выбор — значением диалекта OpenAI', () => {
+    const { body, lost, tools, shimmed } = anthropicRequestToOpenAi(
+      turn(),
+      openAiCompatDriver.requestFields,
+      NATIVE,
+    );
+    expect(body.tools).toEqual([
+      {
+        type: 'function',
+        function: {
+          name: 'Write',
+          description: 'пишет файл',
+          parameters: { type: 'object', properties: { file_path: { type: 'string' } } },
+        },
+      },
+      { type: 'function', function: { name: 'Read', parameters: { type: 'object' } } },
+    ]);
+    expect(body.tool_choice).toBe('required');
+    expect(body.parallel_tool_calls).toBe(false);
+    // Разбирать ответ прослойке нечего: вызов приедет полем, а не текстом.
+    expect(tools).toEqual([]);
+    expect(shimmed).toEqual([]);
+    expect(lost.map((item) => item.field)).not.toContain('tools');
+  });
+
+  it('вызовы и результаты доезжают упаковкой OpenAI, результат — сразу за вызовом', () => {
+    const { body, lost } = anthropicRequestToOpenAi(
+      turn(),
+      openAiCompatDriver.requestFields,
+      NATIVE,
+    );
+    expect(body.messages).toEqual([
+      { role: 'system', content: 'ты агент' },
+      { role: 'user', content: 'перепиши a.ts' },
+      {
+        role: 'assistant',
+        content: 'читаю',
+        tool_calls: [
+          {
+            id: 'toolu_1',
+            type: 'function',
+            function: { name: 'Read', arguments: '{"file_path":"a.ts"}' },
+          },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'toolu_1', content: 'старое' },
+      { role: 'user', content: 'дальше' },
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          { id: 'toolu_2', type: 'function', function: { name: 'Write', arguments: '{}' } },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'toolu_2', content: 'ошибка: нет прав' },
+    ]);
+    // Картинку роль `tool` не несёт — и это названо, а не выброшено молча.
+    expect(lost.map((item) => item.field)).toEqual(['content[].tool_result (внутри картинка)']);
+  });
+
+  it.each([
+    [{ type: 'auto' }, 'auto'],
+    [{ type: 'none' }, 'none'],
+    [
+      { type: 'tool', name: 'Read' },
+      { type: 'function', function: { name: 'Read' } },
+    ],
+  ])('выбор %j → %j', (choice, expected) => {
+    const { body } = anthropicRequestToOpenAi(
+      { ...turn(), tool_choice: choice },
+      openAiCompatDriver.requestFields,
+      NATIVE,
+    );
+    expect(body.tool_choice).toEqual(expected);
+    expect(body).not.toHaveProperty('parallel_tool_calls');
+  });
+
+  it('серверный инструмент вендора назван потерей, выбор без `tools` не уходит', () => {
+    const { body, lost } = anthropicRequestToOpenAi(
+      {
+        model: 'qwen',
+        messages: [{ role: 'user', content: 'найди' }],
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+        tool_choice: { type: 'auto' },
+      },
+      openAiCompatDriver.requestFields,
+      NATIVE,
+    );
+    expect(body).not.toHaveProperty('tools');
+    // Строгий шлюз отвергает `tool_choice` без `tools` запросом целиком.
+    expect(body).not.toHaveProperty('tool_choice');
+    expect(lost.map((item) => item.field)).toEqual([
+      'tools (серверные инструменты вендора)',
+      'tool_choice',
+    ]);
+    for (const item of lost) expect(item.note.trim()).not.toBe('');
+  });
+});
+
 describe('ответ контура → ответ Anthropic', () => {
   const completion = {
     id: 'chatcmpl-1',
@@ -194,12 +355,64 @@ describe('ответ контура → ответ Anthropic', () => {
   it.each([
     ['stop', 'end_turn'],
     ['length', 'max_tokens'],
-    ['tool_calls', 'tool_use'],
     ['content_filter', 'end_turn'],
     ['неизвестное', 'end_turn'],
     [undefined, 'end_turn'],
   ])('причина остановки %s → %s', (from, to) => {
-    expect(stopReasonOf(from)).toBe(to);
+    expect(stopReasonOf(from, 0)).toBe(to);
+  });
+
+  it('tool_use — только рядом с вызовом, и вызов перебивает любую причину', () => {
+    expect(stopReasonOf('tool_calls', 1)).toBe('tool_use');
+    expect(stopReasonOf('stop', 2)).toBe('tool_use');
+    // Причина «вызов» без единого блока: сообщение, в котором клиент ждёт вызов,
+    // которого нет, и ход повисает.
+    expect(stopReasonOf('tool_calls', 0)).toBe('end_turn');
+  });
+
+  it('цельный ответ с причиной «вызов», но без вызова, не объявляет tool_use', () => {
+    const body = openAiResponseToAnthropic(
+      { choices: [{ index: 0, message: { content: 'нет вызова' }, finish_reason: 'tool_calls' }] },
+      'm',
+    ) as Record<string, unknown>;
+    expect(body.stop_reason).toBe('end_turn');
+  });
+});
+
+describe('ошибка внутри потока — к коду моста', () => {
+  it.each([
+    // платформа компании: тип выведен из статуса, различает только code (provider_errors.py)
+    [
+      { message: 'x', type: 'invalid_request_error', code: 'content_policy' },
+      'content_policy_violation',
+    ],
+    [{ message: 'x', type: 'rate_limit_error', code: 'rate_limit' }, 'rate_limit_error'],
+    [
+      { message: 'x', type: 'invalid_request_error', code: 'context_length_exceeded' },
+      'invalid_request_error',
+    ],
+    [{ message: 'x', type: 'server_error', code: 'registry_not_loaded' }, 'overloaded_error'],
+    [{ message: 'x', type: 'server_error', code: 'timeout' }, 'api_error'],
+    // OpenRouter: code — статус числом
+    [{ message: 'x', code: 502 }, 'api_error'],
+    [{ message: 'x', code: 429 }, 'rate_limit_error'],
+    [{ message: 'x', code: 402 }, 'billing_error'],
+    // OpenAI
+    [{ message: 'x', type: 'insufficient_quota', code: null }, 'billing_error'],
+    [{ message: 'x' }, 'api_error'],
+  ])('%j → %s', (error, code) => {
+    expect(upstreamErrorCode(error)).toBe(code);
+  });
+
+  it('тип OpenAI-ошибки называет беду, а не всегда «исправьте запрос»', () => {
+    const type = (code: string): unknown =>
+      (errorBody('openai-compat', 'm', code) as { error: { type: string } }).error.type;
+    expect(type('rate_limit_error')).toBe('rate_limit_error');
+    expect(type('api_error')).toBe('server_error');
+    expect(type('overloaded_error')).toBe('server_error');
+    expect(type('authentication_error')).toBe('authentication_error');
+    expect(type('billing_error')).toBe('insufficient_quota');
+    expect(type('content_policy_violation')).toBe('invalid_request_error');
   });
 });
 

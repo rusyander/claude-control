@@ -216,6 +216,7 @@ export default function SettingsScreen() {
                   <Mono style={styles.failed}>
                     {t.platform.exhaustedAt(
                       item.budget.exhaustedAt.slice(0, 16).replace('T', ' '),
+                      item.budget.exhaustedScope === 'key',
                       item.budget.exhaustedLevel ?? '',
                     )}
                   </Mono>

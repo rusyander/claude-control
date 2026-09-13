@@ -7,6 +7,14 @@ import {
   toolNamesById,
 } from './tool-shim/encode.ts';
 import { readTools, systemAddendum, type ShimTool } from './tool-shim/protocol.ts';
+import {
+  collectNativeTrace,
+  emptyTraces,
+  nativeToolChoice,
+  nativeToolList,
+  SERVER_TOOL_LOSS,
+  type NativeTraces,
+} from './native-tools.ts';
 
 /**
  * Перевод диалектов: клиент говорит по-Anthropic, контур — по-OpenAI.
@@ -22,9 +30,10 @@ import { readTools, systemAddendum, type ShimTool } from './tool-shim/protocol.t
  * Поэтому каждая потеря названа строкой таблицы, попадает в след запроса и
  * подписана компромиссом `dialect-bridge`.
  *
- * Направление здесь ровно одно: наверх всегда уходит диалект OpenAI, потому что
- * так говорит контур (справочник §5). Обратно ответ переводится в тот диалект,
- * на котором спросил клиент.
+ * Направление здесь ровно одно: наверх уходит диалект OpenAI (справочник §5).
+ * Обратно ответ переводится в тот диалект, на котором спросил клиент. Мост
+ * работает только там, где у платформы нет родной ручки Anthropic: объявленная
+ * манифестом, она принимает запрос как есть (`anthropic-native.ts`).
  */
 
 /** Диалект — тот же словарь форм, что у прокси защиты данных: второго нет. */
@@ -61,6 +70,12 @@ export interface DialectRow {
    * говорить правду в обоих состояниях, а не в том, которое было первым.
    */
   withShim?: { fate: DialectFate; note: string };
+  /**
+   * Что с полем делает мост у платформы, принимающей инструменты полем
+   * (`clientTools: 'native'`). Та же причина, что у `withShim`: судьба этих строк
+   * зависит от драйвера, и таблица обязана говорить правду у каждого.
+   */
+  native?: { fate: DialectFate; note: string };
 }
 
 /**
@@ -122,6 +137,10 @@ export const DIALECT_TABLE: DialectRow[] = [
       fate: 'shimmed',
       note: 'схемы уезжают текстом в системную строку, вызов собирается обратно из ответа модели',
     },
+    native: {
+      fate: 'renamed',
+      note: 'схема инструмента клиента становится `tools[].function`; серверный инструмент вендора не переносится и назван отдельно',
+    },
   },
   {
     anthropic: 'tool_choice',
@@ -130,7 +149,11 @@ export const DIALECT_TABLE: DialectRow[] = [
     note: 'выбирать не из чего: набор инструментов не наш',
     withShim: {
       fate: 'shimmed',
-      note: 'наверх уходит `none`: свои инструменты платформы остаются выключенными, работает протокол прослойки',
+      note: 'поле снимается; платформа со своими инструментами получает то, чем они гасятся (`shimRequestFields` драйвера), и работает протокол прослойки',
+    },
+    native: {
+      fate: 'renamed',
+      note: 'auto → auto, any → required, tool → function по имени, none → none; `disable_parallel_tool_use` → `parallel_tool_calls: false`',
     },
   },
   {
@@ -166,14 +189,18 @@ export const DIALECT_TABLE: DialectRow[] = [
       fate: 'shimmed',
       note: 'вызов и его результат сворачиваются в текст того же протокола — история хода остаётся целой',
     },
+    native: {
+      fate: 'renamed',
+      note: 'вызов становится `tool_calls` реплики ассистента, результат — репликой с ролью `tool`',
+    },
   },
   {
-    // Строка живёт только при включённой прослойке: без неё результат вызова не
-    // переносится целиком строкой выше, и терять внутри него нечего.
+    // Строка живёт только там, где следы вызовов переносятся: без этого результат
+    // не переносится целиком строкой выше, и терять внутри него нечего.
     anthropic: 'content[].tool_result (внутри картинка)',
     openai: 'messages[].content (только текст)',
     fate: 'lossy',
-    note: 'картинку внутри результата инструмента текстовый протокол не переносит',
+    note: 'картинку внутри результата инструмента не переносят ни текст прослойки, ни роль `tool` диалекта OpenAI — обе несут только текст',
   },
   {
     anthropic: 'content[].text ← choices[].message.content',
@@ -258,10 +285,49 @@ export interface TranslatedRequest {
   tools: ShimTool[];
 }
 
-/** Прослойка инструментов включена: чем её кормить. */
-export interface ShimContext {
-  /** Текст протокола из каталога промптов (Т4). Здесь его копии нет и не будет. */
-  protocolText: string;
+/**
+ * Как инструменты клиента едут наверх на этом запросе. Решает конвейер —
+ * тумблером прослойки и манифестом драйвера; нет маршрута — инструменты
+ * теряются и названы потерей.
+ */
+export type ToolRoute =
+  /** Текстом протокола (Т5). */
+  | {
+      mode: 'shim';
+      /** Текст протокола из каталога промптов (Т4). Здесь его копии нет и не будет. */
+      protocolText: string;
+      /** Чем гасятся инструменты самой платформы (`driver.shimRequestFields`). */
+      requestFields?: Readonly<Record<string, unknown>>;
+    }
+  /** Полем `tools` диалекта OpenAI: платформа его принимает (`clientTools: 'native'`). */
+  | { mode: 'native' };
+
+/**
+ * Маршрут инструментов — одно решение на конвейер и на проверку драйверов.
+ *
+ * Порядок — от сильного к слабому:
+ * - инструменты САМОЙ платформы (Т7) — два набора на один ход взаимно
+ *   исключаются, и клиентские теряются, названные потерей;
+ * - тумблер прослойки — выбор человека: шлюз без разборщика вызовов у модели
+ *   принимает `tools` схемой и молча не зовёт ничего, и лечится это только им;
+ * - манифест драйвера: платформа, принимающая `tools` полем, получает их полем.
+ *
+ * Текст протокола читается только там, где он нужен: это файл каталога.
+ */
+export function chooseToolRoute(
+  platform: { toolShim: boolean; platformTools: boolean },
+  driver: { clientTools: 'native' | 'shim'; shimRequestFields?: Readonly<Record<string, unknown>> },
+  protocolText: () => string,
+): ToolRoute | undefined {
+  if (platform.platformTools) return undefined;
+  if (platform.toolShim) {
+    return {
+      mode: 'shim',
+      protocolText: protocolText(),
+      ...(driver.shimRequestFields ? { requestFields: driver.shimRequestFields } : {}),
+    };
+  }
+  return driver.clientTools === 'native' ? { mode: 'native' } : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -302,7 +368,12 @@ type OpenAiPart =
  * реплика из одних следов инструментов не отправляется вовсе, потому что
  * контур требует непустое содержимое у всех ролей, кроме assistant.
  */
-function blocksToParts(content: unknown, lost: DialectLoss[], fold?: FoldTraces): OpenAiPart[] {
+function blocksToParts(
+  content: unknown,
+  lost: DialectLoss[],
+  fold?: FoldTraces,
+  native?: NativeTraces,
+): OpenAiPart[] {
   if (typeof content === 'string') return content ? [{ type: 'text', text: content }] : [];
   if (!Array.isArray(content)) return [];
 
@@ -329,6 +400,12 @@ function blocksToParts(content: unknown, lost: DialectLoss[], fold?: FoldTraces)
       continue;
     }
     if (block.type === 'tool_use' || block.type === 'tool_result') {
+      // Платформа принимает вызовы полем — след уходит в своей упаковке, а не
+      // частью текста: реплику собирает вызывающий.
+      if (native) {
+        collectNativeTrace(block, native);
+        continue;
+      }
       // Прослойка выключена — след вызова уходит вместе с инструментами.
       if (!fold) {
         lose(lost, 'content[].tool_use / tool_result');
@@ -385,12 +462,14 @@ function partsToContent(parts: OpenAiPart[]): string | OpenAiPart[] | undefined 
 export function anthropicRequestToOpenAi(
   input: unknown,
   fields: readonly DriverRequestField[],
-  shim?: ShimContext,
+  route?: ToolRoute,
 ): TranslatedRequest {
   const lost: DialectLoss[] = [];
   const shimmed: string[] = [];
   if (!isRecord(input)) return { body: {}, lost, shimmed, tools: [] };
 
+  const shim = route?.mode === 'shim' ? route : undefined;
+  const native = route?.mode === 'native';
   const tools = shim ? readTools(input.tools) : [];
   // Свернуть следы вызовов можно только вместе с самими инструментами: без
   // списка модель прочтёт `<tool_call>` прошлого хода как форму, которой её
@@ -424,7 +503,19 @@ export function anthropicRequestToOpenAi(
     for (const message of input.messages) {
       if (!isRecord(message)) continue;
       const role = message.role === 'assistant' ? 'assistant' : 'user';
-      const content = partsToContent(blocksToParts(message.content, lost, fold));
+      const traces = native ? emptyTraces() : undefined;
+      const content = partsToContent(blocksToParts(message.content, lost, fold, traces));
+      if (traces) {
+        if (traces.droppedResultParts) lose(lost, 'content[].tool_result (внутри картинка)');
+        // Результаты — ПЕРЕД остальным текстом реплики: роль `tool` обязана идти
+        // сразу за репликой с вызовами, иначе строгий шлюз отвергает историю.
+        messages.push(...traces.results);
+        if (role === 'assistant' && traces.calls.length > 0) {
+          // Реплика из одних вызовов законна: содержимое `null`, вызовы рядом.
+          messages.push({ role, content: content ?? null, tool_calls: traces.calls });
+          continue;
+        }
+      }
       // Реплика, от которой после перевода ничего не осталось, не отправляется:
       // контур отвергает пустое содержимое у всех ролей, кроме assistant.
       if (content === undefined) continue;
@@ -449,25 +540,58 @@ export function anthropicRequestToOpenAi(
   if (input.top_k !== undefined) lose(lost, 'top_k', fields);
   if (input.thinking !== undefined) lose(lost, 'thinking', fields);
 
-  // Инструменты либо ТЕРЯЮТСЯ (поля для них у контура нет), либо уезжают
-  // текстом прослойки — третьего нет, и в след попадает ровно то, что случилось.
+  // Инструменты уезжают полем (платформа его принимает), текстом прослойки либо
+  // ТЕРЯЮТСЯ — четвёртого нет, и в след попадает ровно то, что случилось.
   //
-  // Условной эта потеря была ровно один час: драйвер, честно объявивший
-  // `toolsPassthrough: true`, получал пустой след при выброшенных инструментах —
-  // то есть панель обещала агенту руки и молчала о том, что их нет. Это худшая
-  // из двух ошибок: лишняя строка в следе человека пугает, отсутствие строки
-  // отправляет его искать поломку в модели.
-  if (tools.length > 0) {
+  // Потеря безусловна там, где нет маршрута: драйвер, объявивший инструменты
+  // полем, при выключенном маршруте получал бы пустой след при выброшенных
+  // инструментах — панель обещала бы агенту руки и молчала о том, что их нет.
+  if (native) {
+    translateNativeTools(input, body, lost, fields);
+  } else if (tools.length > 0) {
     noteShimmed(shimmed, 'tools');
     noteShimmed(shimmed, 'tool_choice');
     // compromise: tool-shim — контур не принимает `tools`, поэтому схемы едут текстом, а вызов собирается обратно
-    body.tool_choice = 'none';
+    Object.assign(body, shim?.requestFields);
   } else {
     if (input.tools !== undefined) lose(lost, 'tools', fields);
     if (input.tool_choice !== undefined) lose(lost, 'tool_choice', fields);
   }
 
-  return { body, lost, shimmed, tools };
+  return { body: renameRequestFields(body, fields), lost, shimmed, tools };
+}
+
+/**
+ * Схемы и выбор инструмента — полями диалекта OpenAI.
+ *
+ * `tool_choice` без `tools` не отправляется никогда: строгий шлюз отвергает
+ * такой запрос целиком, и агент, у которого все инструменты оказались
+ * серверными, получил бы 400 вместо ответа без рук.
+ */
+function translateNativeTools(
+  input: Record<string, unknown>,
+  body: Record<string, unknown>,
+  lost: DialectLoss[],
+  fields: readonly DriverRequestField[],
+): void {
+  const list = nativeToolList(input.tools);
+  if (list.cached) lose(lost, 'cache_control');
+  if (list.skipped && !lost.some((item) => item.field === SERVER_TOOL_LOSS.field)) {
+    lost.push({ ...SERVER_TOOL_LOSS });
+  }
+  if (list.tools.length === 0) {
+    if (input.tool_choice !== undefined) lose(lost, 'tool_choice', fields);
+    return;
+  }
+  body.tools = list.tools;
+  if (input.tool_choice === undefined) return;
+  const choice = nativeToolChoice(input.tool_choice);
+  if (choice.value === undefined) {
+    lose(lost, 'tool_choice', fields);
+    return;
+  }
+  body.tool_choice = choice.value;
+  if (choice.parallel === false) body.parallel_tool_calls = false;
 }
 
 /** Что нужно свёртке следов: имена вызовов и куда записать, что она сработала. */
@@ -476,30 +600,54 @@ interface FoldTraces {
   shimmed: () => void;
 }
 
+/**
+ * Переименованные поля манифеста (`fate: 'renamed'`) — ПОСЛЕДНИЙ шаг сборки
+ * тела, на копии: поля моста и прослойки собираются под общими именами, и
+ * переименовать их раньше значило бы разминуться с ними.
+ *
+ * Имя назначения, которое клиент прислал сам, побеждает: он знает, что просит,
+ * а старое имя рядом с ним — дубль, который строгий шлюз отверг бы целиком.
+ */
+export function renameRequestFields(
+  body: Record<string, unknown>,
+  fields: readonly DriverRequestField[],
+): Record<string, unknown> {
+  const renames = fields.filter((row) => row.fate === 'renamed' && row.dialect === 'openai');
+  if (!renames.some((row) => body[row.field] !== undefined)) return body;
+  const out = { ...body };
+  for (const row of renames) {
+    if (row.fate !== 'renamed' || out[row.field] === undefined) continue;
+    if (out[row.to] === undefined) out[row.to] = out[row.field];
+    delete out[row.field];
+  }
+  return out;
+}
+
 function noteShimmed(shimmed: string[], field: string): void {
   if (!shimmed.includes(field)) shimmed.push(field);
 }
 
 /**
  * Запрос в диалекте OpenAI. Переводить нечего — контур говорит на нём же, — но
- * инструменты всё равно надо снять с поля, которого у контура нет, и положить
- * текстом. Без прослойки остаётся только список потерь.
+ * при прослойке инструменты надо снять с поля и положить текстом. Без неё (и у
+ * платформы, принимающей их полем) остаётся только список потерь.
  */
 export function openAiRequestWithShim(
   body: Record<string, unknown>,
   fields: readonly DriverRequestField[],
-  shim?: ShimContext,
+  route?: ToolRoute,
 ): TranslatedRequest {
+  const shim = route?.mode === 'shim' ? route : undefined;
   if (!shim || readTools(body.tools).length === 0) {
     return {
-      body,
+      body: renameRequestFields(body, fields),
       lost: openAiRequestLoss(body, fields),
       shimmed: [],
       tools: [],
     };
   }
 
-  const shimmed = shimOpenAiRequest(body, shim.protocolText);
+  const shimmed = shimOpenAiRequest(body, shim.protocolText, shim.requestFields);
   const lost = openAiRequestLoss(shimmed.body, fields);
   if (shimmed.droppedResultParts) {
     lost.push({
@@ -508,16 +656,27 @@ export function openAiRequestWithShim(
     });
   }
   return {
-    body: shimmed.body,
+    body: renameRequestFields(shimmed.body, fields),
     lost,
     shimmed: ['tools', 'tool_choice'],
     tools: shimmed.tools,
   };
 }
 
-/** Причина остановки в диалекте Anthropic. */
-export function stopReasonOf(finishReason: unknown): string {
-  return typeof finishReason === 'string' ? (STOP_REASON[finishReason] ?? 'end_turn') : 'end_turn';
+/**
+ * Причина остановки в диалекте Anthropic — по причине контура И по числу блоков
+ * `tool_use`, которые клиент действительно получил.
+ *
+ * Вызов перебивает любую причину: клиент, прочитавший «ход закончен» рядом с
+ * вызовом, выполнит его и не пришлёт результат. И обратно: `tool_use` без единого
+ * блока — невалидное сообщение, клиент ждёт вызов, которого нет, и ход повисает.
+ * Причину «вызов» контур вправе назвать и тогда, когда собрать вызов не вышло.
+ */
+export function stopReasonOf(finishReason: unknown, calls: number): string {
+  if (calls > 0) return 'tool_use';
+  const reason =
+    typeof finishReason === 'string' ? (STOP_REASON[finishReason] ?? 'end_turn') : 'end_turn';
+  return reason === 'tool_use' ? 'end_turn' : reason;
 }
 
 /**
@@ -553,7 +712,7 @@ export function openAiResponseToAnthropic(payload: unknown, model: string): unkn
     role: 'assistant',
     model: typeof source.model === 'string' ? source.model : model,
     content,
-    stop_reason: stopReasonOf(isRecord(choice) ? choice.finish_reason : undefined),
+    stop_reason: stopReasonOf(isRecord(choice) ? choice.finish_reason : undefined, calls.length),
     stop_sequence: null,
     usage: {
       input_tokens: numberOf(usage.prompt_tokens),
@@ -619,7 +778,7 @@ function parseArguments(value: unknown): unknown {
 export function errorBody(dialect: Dialect, message: string, code: string): unknown {
   return dialect === 'anthropic'
     ? { type: 'error', error: { type: anthropicErrorType(code), message } }
-    : { error: { message, type: 'invalid_request_error', code } };
+    : { error: { message, type: openAiErrorType(code), code } };
 }
 
 function anthropicErrorType(code: string): string {
@@ -628,6 +787,99 @@ function anthropicErrorType(code: string): string {
   if (code === 'not_found_error') return 'not_found_error';
   if (code === 'rate_limit_error') return 'rate_limit_error';
   if (code === 'request_too_large') return 'request_too_large';
+  if (code === 'billing_error') return 'billing_error';
   if (code === 'api_error' || code === 'overloaded_error') return code;
   return 'invalid_request_error';
+}
+
+/**
+ * Тип ошибки в диалекте OpenAI. Раньше здесь для любого отказа стояло
+ * `invalid_request_error`, и лимит частоты или сбой контура клиент читал как
+ * «исправьте запрос» — повторять такой запрос он не станет, а чинить в нём нечего.
+ */
+function openAiErrorType(code: string): string {
+  if (code === 'authentication_error' || code === 'permission_error') return code;
+  if (code === 'not_found_error' || code === 'rate_limit_error') return code;
+  if (code === 'billing_error') return 'insufficient_quota';
+  if (code === 'api_error' || code === 'overloaded_error') return 'server_error';
+  return 'invalid_request_error';
+}
+
+/**
+ * Ошибка, пришедшая ВНУТРИ потока (`data: {"error": {...}}`), — к коду моста.
+ *
+ * Общая часть, а не строка драйвера: конверт `{error: {message, type, code}}`
+ * один у OpenAI, у LiteLLM, у OpenRouter и у платформа компании, различаются только
+ * значения. Порядок проверок — от узкого к широкому: у платформа компании `type` выведен из
+ * HTTP-статуса, и отказ проверок содержимого там `invalid_request_error`, а
+ * отличает его только `code`; у OpenRouter `code` — это сам статус числом.
+ */
+export function upstreamErrorCode(error: Record<string, unknown>): string {
+  const code = error.code;
+  if (typeof code === 'string') {
+    const word = code.toLowerCase();
+    if (word.includes('content_policy') || word.includes('content_filter')) {
+      return 'content_policy_violation';
+    }
+    if (word.includes('rate_limit')) return 'rate_limit_error';
+    if (word.includes('quota') || word.includes('budget')) return 'billing_error';
+    if (word.includes('context_length') || word === 'bad_request') return 'invalid_request_error';
+    if (word === 'unknown_model' || word === 'wrong_model_kind') return 'invalid_request_error';
+    if (word === 'registry_not_loaded' || word.includes('overloaded')) return 'overloaded_error';
+    if (word === 'timeout' || word.includes('upstream') || word.includes('internal')) {
+      return 'api_error';
+    }
+  }
+  const status = typeof code === 'number' ? code : Number.NaN;
+  if (Number.isFinite(status)) {
+    if (status === 401) return 'authentication_error';
+    if (status === 402) return 'billing_error';
+    if (status === 403) return 'permission_error';
+    if (status === 404) return 'not_found_error';
+    if (status === 413) return 'request_too_large';
+    if (status === 429) return 'rate_limit_error';
+    if (status === 503 || status === 529) return 'overloaded_error';
+    if (status >= 500) return 'api_error';
+    if (status >= 400) return 'invalid_request_error';
+  }
+  const type = typeof error.type === 'string' ? error.type : '';
+  if (type === 'server_error') return 'api_error';
+  if (type === 'insufficient_quota') return 'billing_error';
+  if (
+    [
+      'authentication_error',
+      'permission_error',
+      'not_found_error',
+      'rate_limit_error',
+      'overloaded_error',
+      'billing_error',
+      'api_error',
+      'invalid_request_error',
+      'request_too_large',
+    ].includes(type)
+  ) {
+    return type;
+  }
+  // Ни кода, ни типа — значит это сбой той стороны, а не ошибка запроса: отправить
+  // человека «исправлять запрос», в котором нечего исправлять, хуже, чем повтор.
+  return 'api_error';
+}
+
+/**
+ * HTTP-статус для кода моста: цельному телу и следу запроса. Клиенты ветвят
+ * повтор по статусу, а не по тексту, — 502 на лимит частоты значил бы немедленный
+ * повтор туда, где ждать надо минуту.
+ */
+export function statusOfErrorCode(code: string): number {
+  const statuses: Record<string, number> = {
+    authentication_error: 401,
+    billing_error: 402,
+    permission_error: 403,
+    not_found_error: 404,
+    request_too_large: 413,
+    rate_limit_error: 429,
+    overloaded_error: 503,
+    api_error: 502,
+  };
+  return statuses[code] ?? 400;
 }

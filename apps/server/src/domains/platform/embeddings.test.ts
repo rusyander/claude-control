@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import type { Platform } from '@agentdeck/contracts';
 import { embedTexts, EmbeddingError, MAX_EMBEDDING_INPUTS } from './embeddings.ts';
 import type { PlatformFetch } from './ca-fetch.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Эмбеддинги контура. Проверяется ровно то, на чём молчаливая ошибка стоит
@@ -25,7 +27,12 @@ const BASE: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 const TOKEN = 'sk-live-0123456789abcdef';

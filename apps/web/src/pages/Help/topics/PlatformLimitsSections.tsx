@@ -29,6 +29,15 @@ export function PlatformLimitsSections({ tr }: SectionProps) {
     // выглядит удачным. Обещать здесь «работает» значило бы скрыть ровно ту
     // разницу, ради которой человек сюда и пришёл.
     { label: tr('workCliAgent'), mark: 'partial' },
+    // Картинки — тоже «частично», и причина в таблице названа: рисует тот
+    // контур, чей драйвер это объявил, и та модель, что объявлена в каталоге
+    // ключа. Поставить здесь «да» значило бы обещать рисование у контура,
+    // который о нём ничего не сообщил.
+    { label: tr('workImages'), mark: 'partial' },
+    // Презентация не спрашивает у контура ни одной способности — это обычный
+    // запрос в чат, и файлы панель собирает сама. «Частично» здесь ровно по той
+    // же причине, что у агента: ответит ли модель структурой, решает она.
+    { label: tr('workDecks'), mark: 'partial' },
   ];
 
   return (
@@ -44,6 +53,7 @@ export function PlatformLimitsSections({ tr }: SectionProps) {
             { name: tr('moduleKb'), description: tr('moduleKbText'), isMono: false },
             { name: tr('moduleMcp'), description: tr('moduleMcpText'), isMono: false },
             { name: tr('moduleAgents'), description: tr('moduleAgentsText'), isMono: false },
+            { name: tr('moduleImages'), description: tr('moduleImagesText'), isMono: false },
             { name: tr('moduleOther'), description: tr('moduleOtherText'), isMono: false },
             { name: tr('moduleSpeech'), description: tr('moduleSpeechText'), isMono: false },
           ]}
@@ -114,6 +124,20 @@ export function PlatformLimitsSections({ tr }: SectionProps) {
             {
               name: tr('workCliAgent'),
               description: tr('workCliAgentWhy'),
+              isMono: false,
+              badge: tr('worksBadgePartial'),
+              badgeTone: 'warning',
+            },
+            {
+              name: tr('workImages'),
+              description: tr('workImagesWhy'),
+              isMono: false,
+              badge: tr('worksBadgePartial'),
+              badgeTone: 'warning',
+            },
+            {
+              name: tr('workDecks'),
+              description: tr('workDecksWhy'),
               isMono: false,
               badge: tr('worksBadgePartial'),
               badgeTone: 'warning',

@@ -46,7 +46,7 @@ const SETS = [
   {
     source: 'docs/diagrams/platform-guide/platform-guide.drawio',
     topic: 'platform',
-    pages: ['request-path', 'who-creates-what', 'two-systems'],
+    pages: ['request-path', 'who-creates-what', 'two-systems', 'tool-shim'],
   },
   {
     source: 'docs/diagrams/tests-guide/tests-guide.drawio',

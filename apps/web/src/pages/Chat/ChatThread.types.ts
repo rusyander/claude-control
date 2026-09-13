@@ -1,5 +1,6 @@
 import type { ChatMessage, ChatSummary } from '@agentdeck/contracts';
 import type { StreamState } from '@entities/Chat';
+import type { MediaRevision } from '@entities/Media';
 import type { ActiveRunView, PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
 import type { HandoffControls } from '@features/ChatMessages';
 import type { ChildHub } from './model/useChildHub';
@@ -67,4 +68,8 @@ export interface ChatThreadProps {
   onOpenEditor: (path: string) => void;
   /** Щелчок по подсказке подставляет её текст в поле ввода. */
   onPickPrompt: (prompt: string) => void;
+  /** Тема человека из режима презентации — ею подписана колода из блока (Т10). */
+  mediaTopic?: string;
+  /** Правка готовой колоды: карточка в ленте начинает её и называет серверу. */
+  mediaRevision?: MediaRevision;
 }

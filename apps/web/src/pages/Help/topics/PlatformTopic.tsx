@@ -11,9 +11,10 @@ import { PlatformLimitsSections } from './PlatformLimitsSections';
  * Путеводитель по снимкам был отдельным документом ровно один день: человек,
  * пришедший подключать контур, читает подряд, а две страницы означают два
  * оглавления и вопрос «это я уже читал?» на каждом переходе. Теперь порядок
- * один: зачем это нужно → чем отличается от соседнего → весь путь в снимках →
- * что ещё живёт в админке → что с ключом → куда идёт запрос → что показывает
- * раздел → ограничения и отказы → как отключить.
+ * один: зачем это нужно → чем отличается от соседнего → весь путь в снимках
+ * (подключение, затем работа через контур) → что ещё живёт в админке → что с
+ * ключом → куда идёт запрос → что показывает раздел → ограничения и отказы →
+ * как отключить → подписанные компромиссы и просьбы к платформе.
  *
  * Список компромиссов сюда не переписан — он тот же компонент, что стоит в
  * самом разделе. Два списка одного содержимого разъезжаются в первый же месяц,
@@ -155,6 +156,76 @@ export function PlatformTopic() {
         </Callout>
       </HelpSection>
 
+      {/* Модель и глубина — сразу после агентов и до ограничений: это первое,
+          что человек спрашивает, увидев в шапке чата подпись «запрос уйдёт с
+          другой моделью». Ограничения читаются после, а не вместо. */}
+      <HelpSection title={tr('modelsTitle')} caption={tr('modelsCaption')}>
+        <FieldTable
+          nameHeader={tr('modelsColumn')}
+          descriptionHeader={tr('modelsMeaningColumn')}
+          rows={[
+            { name: tr('modelsDefault'), description: tr('modelsDefaultText'), isMono: false },
+            { name: tr('modelsConsumer'), description: tr('modelsConsumerText'), isMono: false },
+            { name: tr('modelsMap'), description: tr('modelsMapText'), isMono: false },
+          ]}
+        />
+        <Callout tone="warning" title={tr('modelsUnknownTitle')}>
+          {tr('modelsUnknownText')}
+        </Callout>
+        <Callout tone="info" title={tr('modelsEffortTitle')}>
+          {tr('modelsEffortText')}
+        </Callout>
+      </HelpSection>
+
+      {/* Правила контура — сразу после модели: оба раздела об одном и том же
+          запросе, и человек, прочитавший «чем пойдёт», следом спрашивает «что с
+          ним сделают по дороге». Матрица конфликтов здесь же: её единственная
+          красная строка — про инструменты, а остальные три нужны ровно затем,
+          чтобы человек НЕ выключил одну из сторон. */}
+      <HelpSection title={tr('rulesTitle')} caption={tr('rulesCaption')}>
+        <FieldTable
+          nameHeader={tr('rulesColumn')}
+          descriptionHeader={tr('rulesMeaningColumn')}
+          rows={[
+            { name: tr('rulesTools'), description: tr('rulesToolsText'), isMono: false },
+            { name: tr('rulesMode'), description: tr('rulesModeText'), isMono: false },
+            { name: tr('rulesPreset'), description: tr('rulesPresetText'), isMono: false },
+            { name: tr('rulesThinking'), description: tr('rulesThinkingText'), isMono: false },
+            { name: tr('rulesObserved'), description: tr('rulesObservedText'), isMono: false },
+          ]}
+        />
+        <Callout tone="warning" title={tr('rulesExclusiveTitle')}>
+          {tr('rulesExclusiveText')}
+        </Callout>
+        <Callout tone="info" title={tr('rulesLayersTitle')}>
+          {tr('rulesLayersText')}
+        </Callout>
+      </HelpSection>
+
+      {/* Наши слои — следом за правилами контура: там сказано, что с запросом
+          делает ЧУЖАЯ сторона, здесь — что из своего мы в него не кладём.
+          Порядок не декоративный: человек, снявший слои, читает про них после
+          того, как понял, зачем экономить промпт. */}
+      <HelpSection title={tr('layersTitle')} caption={tr('layersCaption')}>
+        <FieldTable
+          nameHeader={tr('layersColumn')}
+          descriptionHeader={tr('layersMeaningColumn')}
+          rows={[
+            { name: tr('layersAll'), description: tr('layersAllText'), isMono: false },
+            { name: tr('layerSettings'), description: tr('layerSettingsText'), isMono: false },
+            { name: tr('layerSkills'), description: tr('layerSkillsText'), isMono: false },
+            { name: tr('layerMcp'), description: tr('layerMcpText'), isMono: false },
+            { name: tr('layerPrompt'), description: tr('layerPromptText'), isMono: false },
+          ]}
+        />
+        <Callout tone="info" title={tr('layersFlagsTitle')}>
+          {tr('layersFlagsText')}
+        </Callout>
+        <Callout tone="warning" title={tr('layersMissingTitle')}>
+          {tr('layersMissingText')}
+        </Callout>
+      </HelpSection>
+
       <PlatformLimitsSections tr={tr} />
 
       <HelpSection title={tr('marksTitle')} caption={tr('marksCaption')}>
@@ -163,6 +234,28 @@ export function PlatformTopic() {
 
       <HelpSection title={tr('listTitle')} caption={tr('listCaption')}>
         <CompromiseList />
+      </HelpSection>
+
+      {/* Просьбы к платформе — сразу за списком подписей: у каждой строки
+          здесь есть подпись там, и человек, дочитавший «что мы обходим»,
+          следом спрашивает «а просили ли снять». Весь список живёт в документе
+          репозитория; здесь — пять строк, которые меняют работу больше всего. */}
+      <HelpSection title={tr('asksTitle')} caption={tr('asksCaption')}>
+        <FieldTable
+          nameHeader={tr('asksColumn')}
+          descriptionHeader={tr('asksMeaningColumn')}
+          rows={[
+            { name: tr('askTools'), description: tr('askToolsText'), isMono: false },
+            { name: tr('askCache'), description: tr('askCacheText'), isMono: false },
+            { name: tr('askTimeout'), description: tr('askTimeoutText'), isMono: false },
+            { name: tr('askBudget'), description: tr('askBudgetText'), isMono: false },
+            { name: tr('askEffort'), description: tr('askEffortText'), isMono: false },
+            { name: tr('askMask'), description: tr('askMaskText'), isMono: false },
+          ]}
+        />
+        <Callout tone="info" title={tr('asksDocTitle')}>
+          {tr('asksDocText')}
+        </Callout>
       </HelpSection>
     </>
   );

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import {
   mkdtempSync,
   mkdirSync,
@@ -14,11 +15,12 @@ import type { Platform } from '@agentdeck/contracts';
 import { AppStore } from '../../../lib/app-store.ts';
 import { buildHistory } from '../../history.ts';
 import { claudeTrackedFiles } from '../../tracked-files.ts';
-import { writeToken } from '../store.ts';
+import { writePlatform, writeToken } from '../store.ts';
 import { PlatformError } from '../errors.ts';
 import { applyContour } from './apply.ts';
 import { type ContourApplyDeps } from './plan.ts';
 import { PLACEHOLDER_KEY } from './profile.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Применение контура — приёмка Т3 целиком.
@@ -53,7 +55,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 /** Живой config.toml codex: MCP, окружение, права, комментарии — всё чужое. */
@@ -157,6 +164,30 @@ describe('ассистент панели', () => {
     });
   });
 
+  it('пустая модель в запросе профиль без модели не оставляет', () => {
+    // Ревью Т6 (M5): пустая строка читалась как выбор «пусть решает CLI», и
+    // профиль оставался без модели НАВСЕГДА — а план на том же состоянии
+    // продолжал обещать модель каталога. Профиль без модели отправляет CLI в
+    // контур с именем вендора, то есть в 403 на первом сообщении.
+    store.savePlatformHealth(PLATFORM.id, {
+      outcome: 'ok',
+      reachable: true,
+      url: '',
+      detail: '',
+      models: [{ id: 'enterprise-platform-mid' }],
+      capabilities: [],
+      limits: {},
+      notes: [],
+      compromises: [],
+      checkedAt: '2026-09-12T10:00:00.000Z',
+    });
+    applyContour(deps(), PLATFORM, { targets: ['assistant'], model: '' });
+    const profile = store
+      .getSettings()
+      .endpointProfiles.find((item) => item.id === 'contour-enterprise-platform-dev');
+    expect(profile?.model).toBe('enterprise-platform-mid');
+  });
+
   it('прежний выбор ассистента запоминается — откату будет куда вернуться', () => {
     store.updateSettings({ assistantEndpointId: 'ep-1' });
     // Занятое место у ассистента — это его собственный выбор профиля, и без
@@ -205,6 +236,35 @@ describe('claude', () => {
     });
   });
 
+  /**
+   * Аудит DRV-21. Ответ и проверка занятого места строились по плану с моделью
+   * ПО УМОЛЧАНИЮ, а в файл уходила присланная: человек видел в ответе одно,
+   * в файле лежало другое, и ключ, уже стоящий ровно в нужное значение,
+   * читался как чужой.
+   */
+  it('ответ говорит о записанной модели, а не о модели по умолчанию', () => {
+    const platform = { ...PLATFORM, defaultModel: 'default-model' };
+    writePlatform(store, platform);
+    const result = applyContour(deps(), platform, { targets: ['claude'], model: 'picked-model' });
+
+    const written = result.applied[0]?.written.find((item) => item.key === 'ANTHROPIC_MODEL');
+    expect(written?.value).toBe('picked-model');
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf8')) as {
+      env: Record<string, string>;
+    };
+    expect(settings.env.ANTHROPIC_MODEL).toBe('picked-model');
+  });
+
+  it('ключ, уже стоящий в присланное значение, не считается занятым', () => {
+    writeFileSync(settingsPath, JSON.stringify({ env: { ANTHROPIC_MODEL: 'picked-model' } }));
+    const platform = { ...PLATFORM, defaultModel: 'default-model' };
+    writePlatform(store, platform);
+
+    const result = applyContour(deps(), platform, { targets: ['claude'], model: 'picked-model' });
+    expect(result.skipped).toEqual([]);
+    expect(result.applied.map((item) => item.targetId)).toEqual(['claude']);
+  });
+
   it('правка видна в History — той же лентой, что читает человек', () => {
     writeFileSync(settingsPath, JSON.stringify({ env: { EXISTING: 'keep-me' } }, null, 2));
     applyContour(deps(), PLATFORM, { targets: ['claude'], model: 'gpt-4o' });
@@ -225,7 +285,9 @@ describe('claude', () => {
 
   it('след применения помнит, чего в файле НЕ БЫЛО', () => {
     writeFileSync(settingsPath, JSON.stringify({ env: { ANTHROPIC_MODEL: 'opus' } }));
-    applyContour(deps(), PLATFORM, { targets: ['claude'], model: 'gpt-4o' });
+    // Своя модель человека в файле — занятое место: без согласия контур её не
+    // перебивает (до DRV-21 план без модели этого не видел и перебивал молча).
+    applyContour(deps(), PLATFORM, { targets: ['claude'], model: 'gpt-4o', overwrite: ['claude'] });
 
     const trace = store.getPlatformApplied()['enterprise-platform-dev']?.targets[0];
     expect(trace?.previous).toEqual([
@@ -238,7 +300,7 @@ describe('claude', () => {
 
   it('повтор применения не выдаёт наши значения за прежние', () => {
     writeFileSync(settingsPath, JSON.stringify({ env: { ANTHROPIC_MODEL: 'opus' } }));
-    applyContour(deps(), PLATFORM, { targets: ['claude'], model: 'gpt-4o' });
+    applyContour(deps(), PLATFORM, { targets: ['claude'], model: 'gpt-4o', overwrite: ['claude'] });
     applyContour(deps(), PLATFORM, { targets: ['claude'], model: 'gpt-4o' });
 
     // Иначе откат вернул бы файл в состояние, которое панель сама и сделала, —

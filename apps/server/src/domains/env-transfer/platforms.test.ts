@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PANEL_PLATFORMS_VERSION,
   panelPlatformsFile,
+  planPanelPlatforms,
   takePanelPlatforms,
   type PanelPlatformsDocument,
 } from './platforms.ts';
@@ -81,5 +82,33 @@ describe('секция контуров в архиве переноса', () =>
     );
 
     expect(taken[0]?.consumers).toEqual(['chat', 'tests']);
+  });
+
+  it('противоречие правил из чужого архива названо ДО разворота', () => {
+    // Единственная дорога в состояние «включены оба набора инструментов» — этот
+    // самый разворот: дверь сохранения его отклоняет. Промолчав здесь, панель
+    // отдала бы человеку контур, который отвечает 400 на первую же правку,
+    // которую он не делал (ревью Т7, M5).
+    const plan = planPanelPlatforms({
+      data: archive([
+        legacyEntry({ toolShim: true, rules: { platform: { platformTools: ['web_search'] } } }),
+      ]),
+      current: [],
+      hasToken: () => false,
+      fileExists: () => true,
+    });
+
+    expect(plan.entries[0]?.notes.some((note) => note.includes('сохранение'))).toBe(true);
+  });
+
+  it('контур без противоречия лишней заметки не получает', () => {
+    const plan = planPanelPlatforms({
+      data: archive([legacyEntry({ toolShim: true })]),
+      current: [],
+      hasToken: () => false,
+      fileExists: () => true,
+    });
+
+    expect(plan.entries[0]?.notes.some((note) => note.includes('сохранение'))).toBe(false);
   });
 });

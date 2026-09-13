@@ -9,6 +9,7 @@ import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
 import { scanPlanBlocks, scanSplitPlanBlocks } from '@agentdeck/contracts/split-plan';
+import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
 import { attachmentBasename, splitAttachments } from '@agentdeck/contracts/uploads';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
 import { parseQuestions } from '../lib/parseQuestions';
@@ -19,6 +20,7 @@ import { HandoffCard } from './HandoffCard';
 import { ReviewCard } from './ReviewCard';
 import { TriageCard } from './TriageCard';
 import { PlanCard } from './PlanCard';
+import { MediaFeedCard } from './MediaFeedCard';
 import type { MessageBubbleProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 
@@ -42,6 +44,10 @@ export function MessageBubble({
   splitCeiling,
   childBranches,
   handoff,
+  mediaChatId,
+  mediaModel,
+  mediaTopic,
+  mediaRevision,
 }: MessageBubbleProps) {
   const { t } = useTranslation();
   const isUser = message.role === 'user';
@@ -130,12 +136,16 @@ export function MessageBubble({
             // Уровни разделения (Т1): блок разбора и блок плана группы.
             const triage = scanSplitPlanBlocks(review.text);
             const plan = scanPlanBlocks(triage.text);
+            // Вложения агента (Т10): рисунок и колода приезжают блоками, и
+            // карточка встаёт на их место в самой ленте — эта дорога есть у
+            // любого CLI, а результат её остаётся частью разговора.
+            const media = scanMediaBlocks(plan.text);
             // Список путей вложений дописывает сервер, а не человек: в пузыре он
             // читался как сырой перечень абсолютных путей. Показываем чипами с
             // именем файла; сам текст для копирования и правки (`plainText`)
             // остаётся полным — агент получал именно его.
-            const attachments = isUser ? splitAttachments(plan.text) : undefined;
-            const bodyText = attachments ? attachments.text : plan.text;
+            const attachments = isUser ? splitAttachments(media.text) : undefined;
+            const bodyText = attachments ? attachments.text : media.text;
 
             return (
               <div key={index} className={styles.block}>
@@ -233,6 +243,43 @@ export function MessageBubble({
                     </div>
                   )}
                   {plan.plan && <PlanCard plan={plan.plan} />}
+                  {media.pictures.map((svg, position) => (
+                    <MediaFeedCard
+                      key={`svg-${position}`}
+                      svg={svg}
+                      {...(mediaChatId ? { chatId: mediaChatId } : {})}
+                      {...(mediaModel ? { model: mediaModel } : {})}
+                    />
+                  ))}
+                  {media.decks.map((deck, position) => (
+                    <MediaFeedCard
+                      key={`deck-${position}`}
+                      deck={deck}
+                      {...(mediaChatId ? { chatId: mediaChatId } : {})}
+                      {...(mediaModel ? { model: mediaModel } : {})}
+                      // Тема человека сильнее заголовка модели: заголовок
+                      // придумала она, а искать колоду человек будет по тому, о
+                      // чём просил.
+                      prompt={mediaTopic ?? deck.title}
+                      // Правка действует только по ПОСЛЕДНЕМУ ответу: блок из
+                      // середины истории заменил бы колоду десять ходов спустя.
+                      {...(isLast && mediaRevision?.reviseOf
+                        ? { reviseOf: mediaRevision.reviseOf }
+                        : {})}
+                      {...(isLast && mediaRevision?.onDone
+                        ? { onDeckSaved: mediaRevision.onDone }
+                        : {})}
+                      {...(mediaRevision ? { onRevise: mediaRevision.onStart } : {})}
+                    />
+                  ))}
+                  {/* Непринятый блок остаётся в тексте как есть, и решение об
+                      этом приняла ПАНЕЛЬ — значит, она и говорит об этом: иначе
+                      сырой SVG в ленте читается как поломка агента. */}
+                  {media.rejected > 0 && (
+                    <div className={styles.splitRejected} role="status">
+                      {t('chat.mode.block.rejected', { count: media.rejected })}
+                    </div>
+                  )}
                 </div>
                 {spend}
               </div>

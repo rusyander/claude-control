@@ -212,6 +212,13 @@ export interface PricingLookup {
    * пользователь мог договориться о своих условиях либо считать по-своему.
    */
   overrides?: Record<string, ModelPricing>;
+  /**
+   * Цены, опубликованные шлюзом в его каталоге: ТОЧНЫЙ идентификатор модели (в
+   * нижнем регистре) → цена. Не фрагмент: шлюз назвал цену своей модели, и
+   * соседняя модель с похожим именем стоит другого. Точнее прайса Anthropic
+   * (шлюз берёт деньги по своей цене), но слабее своих цен человека.
+   */
+  declared?: Record<string, ModelPricing>;
   /** Прайс, по которому считаем. Пусто — запасная встроенная таблица. */
   entries?: PricingEntry[];
   /**
@@ -222,8 +229,8 @@ export interface PricingLookup {
 }
 
 /**
- * Тариф модели, если он ИЗВЕСТЕН. Порядок: свои цены из настроек → прайс →
- * запасная таблица; не нашлось — `undefined`, без запасной ставки.
+ * Тариф модели, если он ИЗВЕСТЕН. Порядок: свои цены из настроек → цена из
+ * каталога шлюза → прайс → запасная таблица; не нашлось — `undefined`, без запасной ставки.
  *
  * Отдельно от {@link getPricing} ради тех, кому запасная ставка вредна. Расход
  * через контур — как раз такой случай: модели компании в прайсе Anthropic нет и
@@ -241,6 +248,9 @@ export function findPricing(model: string, lookup: PricingLookup = {}): ModelPri
     .filter(([fragment]) => name.includes(fragment.toLowerCase()))
     .sort((a, b) => b[0].length - a[0].length)[0];
   if (own) return withOwnLongCacheRate(own[1]);
+
+  const declared = lookup.declared?.[name];
+  if (declared) return declared;
 
   const entries = lookup.entries ?? BUILT_IN_ENTRIES;
   return findEntry(model, entries, lookup.at)?.price;

@@ -24,6 +24,7 @@ import {
 import { useProjects, useOpenInEditor } from '@entities/Project';
 import { useSettings } from '@entities/AppConfig';
 import { useModelCatalog } from '@entities/ModelCatalog';
+import { useChatMedia } from '@entities/Media';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatHeader } from './ChatHeader';
 import { ChatArtifactsBar } from './ChatArtifactsBar';
@@ -215,6 +216,34 @@ export function ChatPage() {
     showChat: session.viewRun,
   });
 
+  // Режимы «Картинка» и «Презентация». Две дороги, и человек видит, какая
+  // работает: панель делает сама (контур, ручка картинок, свой эндпоинт) — тогда
+  // результат живёт своей карточкой и в переписку Claude Code не попадает; либо
+  // просит АГЕНТА этого разговора, и тогда это обычное сообщение, а ответ
+  // приезжает блоком в ленту. Второй дорогой режимы работают и без контура.
+  const media = useChatMedia({
+    chatId: activeChat?.id ?? '',
+    ask: (text) => dispatch(text, []),
+    closePreview: () => session.setPreview(undefined),
+  });
+  // Столбец один: открытый результат сильнее предпросмотра артефакта — его
+  // только что попросили, а предпросмотр открывали раньше.
+  const isRightOpen = Boolean(preview || media.shownImage || media.shownDeck);
+
+  /**
+   * Отправка в режиме картинки или презентации.
+   *
+   * Поле очищается ЗДЕСЬ и только после приёма — ровно как в `useChatSend.send`.
+   * Своей очистки у композера нет (он снимает лишь чипы вложений), поэтому без
+   * этой строки описание оставалось в поле после удачной отправки: человек видел,
+   * что панель уже рисует, и не знал, ушло ли то, что осталось на экране.
+   */
+  const sendMedia = async (): Promise<boolean> => {
+    const accepted = await media.submit(input);
+    if (accepted) setInput('');
+    return accepted;
+  };
+
   // Автоподтверждение прав: запоминаем выбор для всех чатов и, если прогон уже
   // идёт, сообщаем о нём серверу — иначе тумблер подействовал бы только со
   // следующего сообщения.
@@ -242,9 +271,9 @@ export function ChatPage() {
       )}
 
       <div
-        className={`${styles.page} ${preview ? styles.pageWithPreview : ''}`}
+        className={`${styles.page} ${isRightOpen ? styles.pageWithPreview : ''}`}
         style={
-          preview
+          isRightOpen
             ? { gridTemplateColumns: `300px minmax(0, 1fr) auto ${previewWidth}px` }
             : undefined
         }
@@ -285,6 +314,11 @@ export function ChatPage() {
             defaultModel={models.defaultModel}
             defaultEffort={models.defaultEffort}
             models={modelCatalog?.models}
+            // Кем прогон пойдёт через контур. Связь с родителем заводит только
+            // разделение, и сервер по ней же спрашивает маршрут потребителем
+            // «Группы» — шапка обязана спрашивать тем же, иначе она говорит про
+            // чужой маршрут (ревью Т8).
+            consumer={activeChat?.parentId ? 'groups' : 'chat'}
             onModelChange={models.setModelOverride}
             onEffortChange={models.setEffortOverride}
             isEditorPending={openEditor.isPending}
@@ -318,7 +352,12 @@ export function ChatPage() {
 
           <ChatArtifactsBar
             artifacts={artifacts}
-            onPreview={(artifact) => session.setPreview(artifact)}
+            // Столбец один: открытый артефакт убирает картинку, как картинка
+            // убирает артефакт. Иначе выбранный файл не показывался бы вовсе.
+            onPreview={(artifact) => {
+              media.close();
+              session.setPreview(artifact);
+            }}
             onDelete={askDelete}
           />
 
@@ -359,6 +398,11 @@ export function ChatPage() {
             projectPath={projectPath}
             onOpenEditor={(path) => openEditor.mutate(path)}
             onPickPrompt={setInput}
+            // Тема и правка колоды: карточка в ленте подписывается темой
+            // человека и она же начинает правку — у блока агента другого места
+            // для этого нет.
+            {...(media.topic ? { mediaTopic: media.topic } : {})}
+            mediaRevision={media.revision}
           />
 
           <ChatDock
@@ -368,20 +412,33 @@ export function ChatPage() {
             onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
             value={input}
             onChange={setInput}
-            onSend={send}
+            // В неттекстовом режиме отправка делает, а не пишет агенту: на
+            // дорогах панели запрос в транскрипт не попадает вовсе, а на дороге
+            // агента он уходит обычным сообщением — просьбой ответить блоком.
+            onSend={media.isMediaMode ? sendMedia : send}
             onStop={() => chatId && agentRuns.stop(chatId)}
             onSplitTasks={taskSplit.askSplit}
             onHandoff={handoff.askHandoff}
+            modes={media.modes}
           />
         </div>
 
-        {preview && chatId && (
+        {isRightOpen && (
           <ChatPreviewPane
-            chatId={chatId}
-            artifact={preview}
+            // Картинке разговор не нужен — её адрес свой; артефакт без разговора
+            // не появляется, и пустая строка до него не доходит.
+            chatId={chatId ?? ''}
+            {...(media.shownImage ? { image: media.shownImage } : {})}
+            {...(media.shownDeck ? { deck: media.shownDeck } : {})}
+            {...(preview ? { artifact: preview } : {})}
             width={previewWidth}
             onResize={resizePreview}
-            onClose={() => session.setPreview(undefined)}
+            onClose={
+              (media.shownImage ?? media.shownDeck)
+                ? media.close
+                : () => session.setPreview(undefined)
+            }
+            onReviseDeck={media.revision.onStart}
           />
         )}
       </div>

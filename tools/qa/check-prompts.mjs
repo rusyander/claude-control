@@ -50,7 +50,19 @@ const summary = (id) => ({
   bytes: id === 'image' ? MINE.length : BUILTIN.length,
 });
 
-const IDS = ['tool-protocol', 'contour-agent', 'contour-preamble', 'image', 'presentation'];
+/**
+ * Весь список каталога, а не выборка: подмена, в которой промпта не хватает,
+ * гоняет экран по каталогу, которого в панели нет, — и проверка «карточек
+ * столько же, сколько промптов» перестаёт что-либо значить.
+ */
+const IDS = [
+  'tool-protocol',
+  'contour-agent',
+  'contour-preamble',
+  'image',
+  'image-svg',
+  'presentation',
+];
 
 const browser = await chromium.launch();
 

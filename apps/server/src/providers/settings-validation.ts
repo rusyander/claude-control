@@ -1,10 +1,37 @@
-import { object, string, boolean, number, record, array, unknown, enum as zodEnum } from 'zod';
+import {
+  object,
+  string,
+  boolean,
+  number,
+  record,
+  array,
+  unknown,
+  preprocess,
+  enum as zodEnum,
+} from 'zod';
 // Значение, а не тип, и потому ПОДПУТЁМ, а не из барреля: баррель под
 // `--experimental-strip-types` роняет сервер на старте (см. комментарий ниже).
 // Само правило формата берётся отсюда, а не переписывается: разъехавшись, две
 // копии дали бы «сохранилось в панели, не сохранилось в настройках».
-import { isPlatformDay, platformIdPattern } from '@agentdeck/contracts/platform';
+import {
+  defaultOurRules,
+  defaultPlatformRules,
+  isPlatformDay,
+  platformCapabilities,
+  platformIdPattern,
+  platformThinkingSchema,
+  platformToolModes,
+} from '@agentdeck/contracts/platform';
 import { platformConsumerSchema } from '@agentdeck/contracts/platform-consumers';
+import {
+  platformDrivers,
+  platformManifestOf,
+  withPresetDefaults,
+} from '@agentdeck/contracts/platform-presets';
+import {
+  defaultPlatformTransport,
+  platformTransportSchema,
+} from '@agentdeck/contracts/platform-transport';
 import { modelSources } from '@agentdeck/contracts/models';
 import { isKnownProviderId } from './registry.ts';
 
@@ -47,6 +74,12 @@ const endpointProfileSchema = object({
   apiKind: zodEnum(['anthropic', 'google', 'openai-compat']),
   model: string(),
   writeToken: boolean(),
+  // Адрес генерации картинок (Т9, решение В4). Умолчанием, а не обязательным
+  // полем: снимок настроек с машины, где этого поля ещё не было, обязан
+  // читаться. Вырезанный схемой, он означал бы, что заданный человеком адрес
+  // молча исчезает на первом же сохранении настроек — а пункт «Картинка» после
+  // этого запирается «адрес не задан» про адрес, который он только что вписал.
+  imagesUrl: string().default(''),
   // Профиль контура (Т3). Ключ обязан быть и здесь: вырезанный схемой, он
   // означал бы «управляемый профиль сохранился обычным» — то есть остался бы
   // после отключения контура и продолжал показывать мёртвый адрес шлюза.
@@ -64,7 +97,7 @@ const endpointProfileSchema = object({
  * схемы этого файла: contracts тянется в сервер ТОЛЬКО типом. Расходиться им
  * нельзя — вырезанное поле означает «сохранил, а не сохранилось».
  */
-export const platformSchema = object({
+const platformObjectSchema = object({
   // Из идентификатора собирается адрес локального шлюза, поэтому набор символов
   // сужен схемой: пробел или слэш разъехались бы адресом.
   id: string().regex(
@@ -72,7 +105,9 @@ export const platformSchema = object({
     'идентификатор: латиница, цифры, дефис, точка, подчёркивание',
   ),
   title: string().min(1),
-  driver: zodEnum(['enterprise-platform', 'openai-compat']),
+  // Перечень пресетов — из контракта (DRV-03): переписанный здесь, он отказал бы
+  // в сохранении первому же новому шлюзу, которого мастер уже показывает.
+  driver: zodEnum(platformDrivers),
   baseUrl: string().min(1),
   enabled: boolean(),
   mode: zodEnum(['required', 'best-effort']),
@@ -88,9 +123,11 @@ export const platformSchema = object({
   // посимвольно, «01.09.2026» отрезало бы весь расход молча, а `2026-13-45`
   // проходит по виду, но такого дня нет — итог тот же.
   budgetSince: string().refine(isPlatformDay).default(''),
-  capabilities: array(
-    zodEnum(['models', 'chat', 'embeddings', 'agents', 'guardrails', 'knowledge', 'client-tools']),
-  ),
+  // Список возможностей — из контракта, а не переписанный здесь: переписанный
+  // отставал ровно на одну новую возможность, и `image-generation`, который
+  // визард сам же записал в черновик после пробы, получал отказ на ВЕСЬ PATCH
+  // настроек — «сохранилось в панели, не сохранилось в файле».
+  capabilities: array(zodEnum(platformCapabilities)),
   targets: array(string()),
   // Потребители маршрута (Т3). Умолчание по той же причине, что у `agents`: у
   // контура, настроенного до Т3, поля нет вовсе, и без умолчания отказ получал
@@ -103,22 +140,64 @@ export const platformSchema = object({
   // Правило формата берётся из контракта, а не переписывается строкой: иначе
   // мусор в списке доехал бы сюда молча — схему контракта эти двери не видят.
   consumers: array(platformConsumerSchema).default([]),
+  // Модель контура, переопределение на потребителя и карта соответствия имён
+  // (Т6). Умолчания по той же причине, что у `consumers`: у контура,
+  // настроенного до Т6, полей нет вовсе, и без них ВЕСЬ PATCH настроек получал
+  // бы отказ. Пустая карта здесь безопасна ровно потому, что пустая означает
+  // «переводить нечего», а не «переводи как знаешь».
+  defaultModel: string().default(''),
+  consumerModels: record(string(), string()).default({}),
+  modelMap: record(string(), string()).default({}),
   projectPaths: array(string()),
   // Список агентов ведёт человек: маршрута «дай список агентов» на публичной
   // поверхности ключа нет, и пробе взять его неоткуда. Умолчание обязательно:
   // у контура, настроенного до Т7, поля нет вовсе, и без него ВЕСЬ PATCH
   // настроек получал бы отказ — раздел откатывался бы на первом же сохранении.
   agents: array(object({ id: string().min(1), title: string().min(1) })).default([]),
-  // Прослойка инструментов и свой короткий промпт (Т5). Умолчание `true` —
-  // парное контракту и по той же причине, что у `agents`: у контура,
-  // настроенного до Т5, полей нет вовсе, и без умолчания ВЕСЬ PATCH настроек
-  // получал бы отказ. Значение умолчания совпадает с контрактом намеренно:
-  // разойдись они, один и тот же контур вёл бы себя по-разному до первого
-  // сохранения и после него.
-  toolShim: boolean().default(true),
-  contourPrompt: boolean().default(true),
+  // Прослойка инструментов и свой короткий промпт (Т5). Умолчание — пресета
+  // типа, и ставит его `withPresetDefaults` над схемой той же функцией, что в
+  // контракте: разойдись они, один и тот же контур вёл бы себя по-разному до
+  // первого сохранения и после него. Без умолчания ВЕСЬ PATCH настроек получал
+  // бы отказ на контуре, настроенном до Т5.
+  toolShim: boolean(),
+  contourPrompt: boolean(),
+  // Правила контура (Т7). Умолчание обязательно по той же причине, что у
+  // соседей: у контура, настроенного до Т7, поля нет вовсе. Набор значений
+  // повторяет контракт поле в поле — вторую схему сверяет
+  // `settings-validation.audit.test.ts`, и разойтись они не могут молча.
+  // Рядом — наши слои (Т8). Умолчание `true` у каждого: запись, где поля нет,
+  // означает «прогон несёт весь `~/.claude`», как было до Т8. Умолчание `false`
+  // здесь тихо выключило бы человеку правила, хуки и права.
+  rules: object({
+    platform: object({
+      platformTools: array(string()).default([]),
+      toolMode: zodEnum(platformToolModes).default('loop'),
+      generationPreset: string().default(''),
+      enableThinking: platformThinkingSchema,
+    }).default(defaultPlatformRules),
+    ours: object({
+      enabled: boolean().default(true),
+      settings: boolean().default(true),
+      skills: boolean().default(true),
+      mcp: boolean().default(true),
+      systemPrompt: boolean().default(true),
+    }).default(defaultOurRules),
+  }).default(() => ({ platform: defaultPlatformRules(), ours: defaultOurRules() })),
   caCertPath: string(),
+  // Как запрос доезжает до контура (DRV-04/05). Схема контракта целиком, а не
+  // копия: полей пять, и копия разошлась бы с формой на первом же новом. Отказ
+  // на секретном имени ставит дверь сохранения контура, а не общий PATCH, — по
+  // той же причине, что у исключения матрицы: противоречие, приехавшее архивом,
+  // не должно запирать весь раздел; сборка запроса такие строки не отправляет.
+  transport: platformTransportSchema.default(defaultPlatformTransport),
+  // Что человек знает о своём шлюзе поверх пресета (DRV-03). Поле за полем, а
+  // не отказом: по той же причине, что у транспорта, негодный путь, приехавший
+  // архивом или правкой руками, не должен запирать весь раздел — он значит «как
+  // у пресета». Отказ с именем поля ставит дверь сохранения контура.
+  manifest: unknown().transform(platformManifestOf).optional(),
 });
+
+export const platformSchema = preprocess(withPresetDefaults, platformObjectSchema);
 
 /**
  * Локальный шлюз контуров: один слушатель на все контуры, различаемые первым

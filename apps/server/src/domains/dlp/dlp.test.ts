@@ -119,6 +119,20 @@ describe('метки', () => {
     expect(result.hits[0]).toMatchObject({ ruleId: 'people', count: 1, placeholder: '[ИМЯ_1]' });
   });
 
+  it('метка не совпадает по виду с меткой платформы, куда уходит запрос', () => {
+    // Вид меток платформа компании по умолчанию — `[{type}_{n}]`. Её деанонимизатор меняет
+    // строки по всему ответу, и наша `[ИМЯ_1]`, совпав с её ключом, развернулась
+    // бы в ЕЁ значение.
+    const avoid = /\[\p{L}[\p{L}\d_]*_\d+\]/u;
+    const vault = new AliasVault({ avoid });
+    const result = maskText('Рустам Урманов и Иванов, снова Рустам Урманов', [people], vault);
+    expect(result.text).toBe('[ИМЯ_1.1] и [ИМЯ_2.1], снова [ИМЯ_1.1]');
+    expect(result.text.match(new RegExp(avoid.source, 'gu'))).toBeNull();
+    expect(vault.reverse().get('[ИМЯ_2.1]')).toBe('Иванов');
+    // Платформа разворачивает свой ключ заменой строки — нашу метку он не задевает.
+    expect(result.text.split('[ИМЯ_1]').join('Чужой')).toBe(result.text);
+  });
+
   it('правило «отклонить» перевешивает замену и текст не меняется', () => {
     const vault = new AliasVault();
     const stop = rule({ id: 'stop', kind: 'terms', terms: ['Иванов'], action: 'block' });

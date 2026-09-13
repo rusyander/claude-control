@@ -60,6 +60,32 @@ export function ChatTopic() {
 
       <ChatGuideSections tr={tr} />
 
+      {/* Картинка и презентация стоят сразу после пути и ДО таблицы «где что
+          лежит»: это единственные два режима, где файл делает панель, а не
+          агент своими инструментами, и следующий вопрос человека — «где тогда
+          лежит результат». Ответ — строкой ниже. */}
+      <HelpSection title={tr('imageTitle')} caption={tr('imageCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('imageWho'), text: tr('imageWhoText') },
+            { title: tr('imageAgent'), text: tr('imageAgentText') },
+            { title: tr('deckWho'), text: tr('deckWhoText') },
+            { title: tr('deckAsk'), text: tr('deckAskText') },
+            { title: tr('deckLook'), text: tr('deckLookText') },
+            { title: tr('deckPictures'), text: tr('deckPicturesText') },
+            { title: tr('deckRevise'), text: tr('deckReviseText') },
+            { title: tr('imageRoute'), text: tr('imageRouteText') },
+            { title: tr('imageCard'), text: tr('imageCardText') },
+            { title: tr('imageLocked'), text: tr('imageLockedText') },
+            { title: tr('imagePrompt'), text: tr('imagePromptText') },
+          ]}
+        />
+        <Callout tone="warning" title={tr('imageLimitTitle')}>
+          {tr('imageLimitText')}
+        </Callout>
+      </HelpSection>
+
       <HelpSection title={t('help.common.storageTitle')}>
         <StorageCard
           title={tr('title')}
@@ -67,6 +93,8 @@ export function ChatTopic() {
             { label: tr('storageTranscripts'), value: tr('storageTranscriptsValue'), isMono: true },
             { label: tr('storageWhatRuns'), value: tr('storageWhatRunsValue'), isMono: true },
             { label: tr('storageSandbox'), value: tr('storageSandboxValue'), isMono: true },
+            { label: tr('storageImages'), value: tr('storageImagesValue'), isMono: true },
+            { label: tr('storageDecks'), value: tr('storageDecksValue'), isMono: true },
             { label: tr('storageStream'), value: tr('storageStreamValue') },
           ]}
         />

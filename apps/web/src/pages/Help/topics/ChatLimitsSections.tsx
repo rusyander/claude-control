@@ -50,8 +50,15 @@ export function ChatLimitsSections() {
             tr('canEditor'),
             tr('canCode'),
             tr('canTests'),
+            tr('canImage'),
           ]}
-          cant={[tr('cantApprove'), tr('cantDelete'), tr('cantEditPlan'), tr('cantInterrupt')]}
+          cant={[
+            tr('cantApprove'),
+            tr('cantDelete'),
+            tr('cantEditPlan'),
+            tr('cantInterrupt'),
+            tr('cantGallery'),
+          ]}
         />
       </HelpSection>
 

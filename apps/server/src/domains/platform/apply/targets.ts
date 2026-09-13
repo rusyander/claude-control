@@ -174,9 +174,9 @@ export function describeContourTargets(
     },
   ];
 
-  // compromise: no-client-tools — у каждой цели-CLI это ограничение одно и то
-  // же: публичная схема платформы отбрасывает поле `tools`, поэтому через контур
-  // агент работает как чат и файлы не правит.
+  // compromise: no-client-tools — чем дойдут инструменты цели-CLI, решает не цель, а
+  // маршрут контура (`toolRouteOf`, едет в плане): у платформа компании без прослойки агент
+  // работает как чат, совместимому шлюзу инструменты уходят полем.
   for (const provider of listProviders()) {
     const apiKind = pickApiKind(provider);
 

@@ -43,6 +43,8 @@ export function ChatThread({
   projectPath,
   onOpenEditor,
   onPickPrompt,
+  mediaTopic,
+  mediaRevision,
 }: ChatThreadProps) {
   const { t } = useTranslation();
 
@@ -132,6 +134,14 @@ export function ChatThread({
       onContinue={chatId ? onContinue : undefined}
       onRefresh={onRefresh}
       costUnit={costUnit}
+      // Кто рисовал и диктовал в карточке вложения (Т10): модель разговора
+      // известна здесь, а второго её источника в ленте нет.
+      mediaModel={childAnswerOptions.model}
+      // Тема человека и правка колоды: состояние держит композер страницы, а
+      // карточка в ленте — единственное место, откуда правку начинают у Claude
+      // для колоды, приехавшей блоком.
+      {...(mediaTopic ? { mediaTopic } : {})}
+      {...(mediaRevision ? { mediaRevision } : {})}
       effort={effort}
       onSplit={taskSplit.split}
       onKeepHere={taskSplit.keepHere}

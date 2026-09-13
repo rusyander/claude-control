@@ -171,6 +171,9 @@ server.registerTool(
       enabled: item.platform.enabled,
       hasToken: item.hasToken,
       capabilities: item.platform.capabilities,
+      // Тип без агентов вызов агента отвергнет до сети — агент узнаёт это здесь,
+      // а не попыткой: список, внесённый человеком, у такого типа пуст по смыслу.
+      agentsDeclared: item.agents !== false,
       agents: item.platform.agents,
       models: (item.health?.models ?? []).map((model) => model.id),
       lastCheck: item.health?.outcome ?? 'ни разу не проверяли',

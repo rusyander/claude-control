@@ -1,8 +1,7 @@
 import type { Platform } from '@agentdeck/contracts';
 import { createCaStreamFetch, type PlatformFetch } from '../ca-fetch.ts';
 import { headerUnsafeKeyReason } from '../errors.ts';
-import { driverFor } from '../drivers/index.ts';
-import { versionedUrl } from '../drivers/driver.ts';
+import { contourHeaders, contourUrl } from '../transport.ts';
 
 /**
  * Поход в контур: единственное место шлюза, где ключ попадает в запрос.
@@ -18,11 +17,57 @@ import { versionedUrl } from '../drivers/driver.ts';
  *    адрес, ни в тело, ни в след запроса, ни в лог.
  * 3. Ответ отдаётся ПОТОКОМ. Собранное тело убило бы весь смысл: первые токены
  *    видны до конца ответа, и ради этого шлюз и переводит не-потоковые вызовы
- *    в потоковые (`nonstream-120s`).
+ *    в потоковые (`nonstream-120s`). Потолок ответа платформы поток НЕ снимает
+ *    (у enterprise-platform 120 с режут и его, `responseCeilingSec`) — он лишь даёт клиенту
+ *    видеть ответ, пока тот идёт. Исключение объявляет драйвер
+ *    (`DriverControl.streamless`): тело, с которым контур поток отвергает
+ *    (платформа компании: `single_turn`), идёт целиком, а клиенту поток собирается из
+ *    готового ответа.
  */
 
 /** Сколько ждём ЗАГОЛОВКОВ ответа. Дальше поток может идти сколько угодно. */
 export const UPSTREAM_HEADERS_TIMEOUT_MS = 60_000;
+
+/**
+ * Сколько ждём цельного ответа, когда драйвер предела не объявил: его заголовки
+ * приезжают вместе с готовым текстом, и потоковые 60 с оборвали бы законный
+ * длинный ход. Потолок панели, а не число какой-то платформы.
+ */
+export const UPSTREAM_WHOLE_BODY_TIMEOUT_MS = 125_000;
+
+/** Запас на дорогу сверх объявленного предела: сдаться должен контур, а не мы. */
+const WHOLE_BODY_MARGIN_MS = 5_000;
+
+/** Ожидание цельного ответа у платформы с таким манифестом. */
+export function wholeBodyTimeoutMs(driver: { nonStreamTimeoutSec?: number }): number {
+  const declared = driver.nonStreamTimeoutSec;
+  if (declared === undefined || !Number.isFinite(declared) || declared <= 0) {
+    return UPSTREAM_WHOLE_BODY_TIMEOUT_MS;
+  }
+  return Math.round(declared * 1_000) + WHOLE_BODY_MARGIN_MS;
+}
+
+/** Запас до объявленного потолка: обрыв за пять секунд до него — уже он. */
+const CEILING_SLACK_MS = 5_000;
+
+/**
+ * Причина обрыва, если он пришёлся на потолок ответа платформы
+ * (`responseCeilingSec`). `undefined` — потолок не объявлен или до него далеко:
+ * называть потолком обрыв на тридцатой секунде значило бы соврать о причине.
+ */
+export function ceilingCutMessage(
+  driver: { responseCeilingSec?: number },
+  elapsedMs: number,
+): string | undefined {
+  const ceiling = driver.responseCeilingSec;
+  if (ceiling === undefined || !Number.isFinite(ceiling) || ceiling <= 0) return undefined;
+  if (elapsedMs < ceiling * 1_000 - CEILING_SLACK_MS) return undefined;
+  return (
+    `Ответ контура оборвался на ${ceiling}-й секунде — это потолок самой платформы на любой ` +
+    'ответ, поток тоже. Сеть здесь ни при чём: сократите ход (меньше размышлений, короче ' +
+    'ответ) или попросите владельца контура поднять потолок'
+  );
+}
 
 /** Пауза перед единственной повторной попыткой, когда контур сам её не назвал. */
 export const UPSTREAM_RETRY_PAUSE_MS = 700;
@@ -58,6 +103,11 @@ export interface UpstreamCall {
    * потолок оборвал бы законный длинный прогон — уже оплаченный.
    */
   headersTimeoutMs?: number;
+  /**
+   * Заголовки протокола (`anthropic-version`). Лежат ПОД заголовками контура:
+   * ни ключ, ни настроенные человеком заголовки ими не перебиваются.
+   */
+  headers?: Readonly<Record<string, string>>;
   /** Подстановка для тестов; по умолчанию — свой транспорт с корнем компании. */
   fetchImpl?: PlatformFetch;
 }
@@ -67,19 +117,30 @@ export class UpstreamError extends Error {}
 
 /** Адрес запроса к контуру. Ключа в нём нет никогда — он в заголовке. */
 export function upstreamUrl(platform: Platform, path: string): string {
-  return versionedUrl(platform.baseUrl, path);
+  const url = contourUrl(platform, path);
+  // Сохранённый контур адрес уже прошёл схему; сюда доезжает только подменённый
+  // мимо неё — и отказ называет адрес, а не падает внутри `fetch`.
+  if (url === undefined) throw new UpstreamError(`Адрес контура не http(s): ${platform.baseUrl}`);
+  return url;
 }
 
 /**
- * Тело для контура: поток включается ВСЕГДА, когда шлюзу разрешено, потому что
- * не-потоковый вызов контур рвёт на 120-й секунде (справочник §9). Расход в
- * потоке приходит отдельным кадром только если его попросить.
+ * Тело для контура: поток включается ВСЕГДА, когда шлюзу разрешено, — первые
+ * токены клиент видит, пока ответ идёт, а не через две минуты молчания. Потолок
+ * ответа платформы поток не снимает (`responseCeilingSec`). Расход в потоке
+ * приходит отдельным кадром только если его попросить.
  */
 export function forceStreamBody(
   body: Record<string, unknown>,
   forceStream: boolean,
+  /** Платформа не принимает поток с таким телом (`DriverControl.streamless`). */
+  refused = false,
 ): Record<string, unknown> {
-  // compromise: nonstream-120s — не-потоковый вызов контура рвётся на 120 с, поэтому наверх идём потоком
+  if (refused) {
+    const { stream: _stream, stream_options: _options, ...whole } = body;
+    return whole;
+  }
+  // compromise: nonstream-120s — контур режет любой ответ на 120 с; поток хотя бы показывает ответ, пока он идёт
   if (!forceStream && body.stream !== true) return body;
   return {
     ...body,
@@ -142,7 +203,6 @@ export function retryAfterSeconds(response: Response, now = Date.now()): number 
  * исполниться, и второй такой же — это второй списанный расход у контура.
  */
 export async function callUpstream(call: UpstreamCall): Promise<Response> {
-  const driver = driverFor(call.platform.driver);
   const url = upstreamUrl(call.platform, call.path);
   const fetchImpl = call.fetchImpl ?? createCaStreamFetch(call.platform.caCertPath);
 
@@ -164,7 +224,8 @@ export async function callUpstream(call: UpstreamCall): Promise<Response> {
       const response = await fetchImpl(url, {
         method: call.method ?? 'POST',
         headers: {
-          ...driver.headers(call.token),
+          ...call.headers,
+          ...contourHeaders(call.platform, call.token),
           'content-type': 'application/json',
           accept: call.accept ?? 'text/event-stream',
         },

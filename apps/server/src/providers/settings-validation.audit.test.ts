@@ -77,7 +77,10 @@ describe('settings-validation: контуры', () => {
     enabled: true,
     mode: 'required',
     budgetUsd: 100,
-    capabilities: ['models', 'chat'],
+    // Возможность из Т9 стоит в списке НАМЕРЕННО: визард сам записывает в
+    // черновик то, что подтвердила проба, и переписанный от руки список
+    // возможностей отставал бы ровно на одну — отказ получал бы весь PATCH.
+    capabilities: ['models', 'chat', 'image-generation'],
     targets: ['assistant'],
     projectPaths: ['c:/repo'],
     // Список агентов ведёт человек, и через PATCH он ездит так же, как всё
@@ -91,7 +94,36 @@ describe('settings-validation: контуры', () => {
     budgetSince: '2026-09-01',
     toolShim: true,
     contourPrompt: true,
+    // Модель контура, переопределения на потребителя и карта имён (Т6) — та же
+    // история: вырезанная молча карта означала бы, что «sonnet» снова уезжает в
+    // контур именем вендора, а человек читает 403 «модель» как поломку панели.
+    defaultModel: 'enterprise-platform-mid',
+    consumerModels: { tests: 'enterprise-platform-small' },
+    modelMap: { sonnet: 'enterprise-platform-mid' },
+    // Правила контура (Т7) — та же история в третий раз: вырезанный молча
+    // список инструментов платформы означал бы, что запрос уходит без них, а
+    // человек видит на карточке свой выбор.
+    // И наши слои (Т8) — в четвёртый: вырезанная молча галочка означала бы, что
+    // прогон уходит с личными правилами, которые человек с него снял.
+    rules: {
+      platform: {
+        platformTools: ['web_search'],
+        toolMode: 'single_turn',
+        generationPreset: 'creative',
+        enableThinking: 'off',
+      },
+      ours: { enabled: true, settings: false, skills: true, mcp: false, systemPrompt: true },
+    },
     caCertPath: 'c:/certs/corp-root.pem',
+    // Транспорт (DRV-04/05): вырезанный молча заголовок ключа означал бы, что
+    // Azure снова получает `Authorization` и отвечает 401 на верный ключ.
+    transport: {
+      authHeader: 'api-key',
+      authScheme: '',
+      version: 'as-is',
+      query: 'api-version=2024-10-21',
+      headers: 'X-Tenant: research',
+    },
   };
 
   it('PATCH проносит контур целиком, поле в поле', () => {
@@ -115,6 +147,75 @@ describe('settings-validation: контуры', () => {
     const parsed = settingsPatchSchema.safeParse({ platforms: [older] });
     expect(parsed.success).toBe(true);
     if (parsed.success) expect(parsed.data.platforms?.[0]?.agents).toEqual([]);
+  });
+
+  // И про Т6: контур, настроенный раньше, о модели не знает ничего. Отказ на
+  // нём стоил бы всего PATCH настроек.
+  it('контур без транспорта проходит: у настроенных до DRV-04/05 поля нет', () => {
+    const { transport: _t, ...older } = platform;
+    const parsed = settingsPatchSchema.safeParse({ platforms: [older] });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.platforms?.[0]?.transport).toEqual({
+        authHeader: '',
+        authScheme: '',
+        version: 'auto',
+        query: '',
+        headers: '',
+      });
+    }
+  });
+
+  it('контур без модели проходит: у настроенных до Т6 полей нет', () => {
+    const { defaultModel: _m, consumerModels: _c, modelMap: _map, ...older } = platform;
+    const parsed = settingsPatchSchema.safeParse({ platforms: [older] });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.platforms?.[0]?.defaultModel).toBe('');
+      expect(parsed.data.platforms?.[0]?.consumerModels).toEqual({});
+      expect(parsed.data.platforms?.[0]?.modelMap).toEqual({});
+    }
+  });
+
+  // Телефон старой сборки шлёт размышления булевым. Отказ стоил бы всего PATCH, а
+  // `false` значил «не отправлять», поэтому уходит в умолчание, а не в `off`.
+  it('булевы размышления старого клиента переводятся, незнакомая строка — отказ', () => {
+    const withThinking = (enableThinking: unknown) => ({
+      platforms: [{ ...platform, rules: { ...platform.rules, platform: { enableThinking } } }],
+    });
+    const modeOf = (enableThinking: unknown) => {
+      const parsed = settingsPatchSchema.safeParse(withThinking(enableThinking));
+      return parsed.success ? parsed.data.platforms?.[0]?.rules.platform.enableThinking : 'отказ';
+    };
+    expect([modeOf(true), modeOf(false), modeOf('off'), modeOf('вкл')]).toEqual([
+      'on',
+      'default',
+      'off',
+      'отказ',
+    ]);
+  });
+
+  // И про Т7 — тот самый класс, чьё отсутствие здесь стоило BLOCKER'а в ревью:
+  // у контура, настроенного раньше, поля `rules` нет вовсе. Отказ стоил бы всего
+  // PATCH настроек, а `undefined` дальше по дороге роняет матрицу.
+  it('контур без правил проходит, и правила становятся умолчанием', () => {
+    const { rules: _rules, ...older } = platform;
+    const parsed = settingsPatchSchema.safeParse({ platforms: [older] });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.platforms?.[0]?.rules).toEqual({
+        platform: {
+          platformTools: [],
+          toolMode: 'loop',
+          generationPreset: '',
+          enableThinking: 'default',
+        },
+        // Умолчание слоёв — «всё наше едет»: контур, настроенный до Т8, обязан
+        // вести себя ровно как до неё. Умолчание `false` тихо сняло бы человеку
+        // правила, хуки и права на каждом прогоне.
+        ours: { enabled: true, settings: true, skills: true, mcp: true, systemPrompt: true },
+      });
+    }
   });
 
   // То же самое про Т8: у контура, настроенного раньше, дня начала периода нет.

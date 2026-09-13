@@ -468,15 +468,23 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     appDataDir: ctx.location.paths.appData,
     gatewayPort: () => (platformGateway.status().running ? platformGateway.status().port : 0),
   };
-  const runRoute = (origin: string): PlatformRunRoute => {
-    const decision = resolveRunRoute(platformRouting, origin);
+  const runRoute = (origin: string, asked = ''): PlatformRunRoute => {
+    const decision = resolveRunRoute(platformRouting, origin, asked);
     // Пустой маршрут — законный ответ «не через контур», и он ОБЯЗАН затирать
     // прежний: продолжение остановленного прогона приходит со старыми
-    // параметрами, и адрес контура пережил бы снятую галочку.
+    // параметрами, и адрес контура пережил бы снятую галочку. Модели и усилия в
+    // таком ответе нет вовсе: выбор человека остаётся его выбором.
     if (!decision.routed) return { env: {} };
     return {
       env: decision.env,
+      model: decision.model,
+      effort: decision.effort,
       ...(decision.systemPrompt ? { systemPrompt: decision.systemPrompt } : {}),
+      // Наши слои (Т8) — тем же правилом, что и всё остальное в маршруте:
+      // отсутствие поля означает «прогон идёт со всем нашим», и продолжение
+      // прогона, у которого галочку сняли, обязано получить пустой ответ, а не
+      // прошлые флаги.
+      ...(decision.layers ? { layers: decision.layers } : {}),
     };
   };
   chatRuns.setPlatformRouting(runRoute);

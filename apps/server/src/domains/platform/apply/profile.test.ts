@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -11,6 +12,7 @@ import {
   managedProfileId,
   reconcileManagedProfiles,
 } from './profile.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Управляемый профиль: то, ЧЕМ контур применяется.
@@ -38,7 +40,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 let root: string;
@@ -77,6 +84,10 @@ describe('профиль контура', () => {
       // Ключ контура живёт в панели, подставляет его шлюз. Галочка «писать
       // токен» здесь означала бы готовность положить ключ в чужой файл.
       writeToken: false,
+      // Адрес генерации картинок (Т9) у управляемого профиля пуст, и это не
+      // пробел: картинка через контур идёт дорогой контура, а профили, которые
+      // он породил, режим картинки в расчёт не берёт вовсе.
+      imagesUrl: '',
       ownerPlatformId: 'enterprise-platform-dev',
     });
     expect(isManagedProfile(profile)).toBe(true);
@@ -90,6 +101,7 @@ describe('профиль контура', () => {
       apiKind: 'openai-compat',
       model: '',
       writeToken: false,
+      imagesUrl: '',
       ownerPlatformId: '',
     };
     expect(isManagedProfile(own)).toBe(false);
@@ -155,6 +167,7 @@ describe('сверка управляемых профилей', () => {
       apiKind: 'openai-compat',
       model: 'qwen3',
       writeToken: true,
+      imagesUrl: '',
       ownerPlatformId: '',
     };
     store.updateSettings({ platforms: [], endpointProfiles: [own] });

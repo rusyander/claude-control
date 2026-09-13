@@ -18,12 +18,33 @@ import { scanText, type RuleMatch } from './rules.ts';
 /** Потолок словаря меток: 20 000 значений — это уже не разговор, а утечка цикла. */
 const VAULT_LIMIT = 20_000;
 
+export interface AliasVaultOptions {
+  /**
+   * Вид меток, которые выдаёт САМА сторона, куда уходит запрос
+   * (`driver.placeholderPattern`). Наша метка этого вида не выдаётся никогда.
+   *
+   * Платформа разворачивает свои метки заменой строки по всему ответу, и наша
+   * `[EMAIL_1]`, совпав с её ключом, развернулась бы в ЕЁ значение — клиент
+   * получил бы чужой адрес молча (стенд платформа компании, 13.09.2026). Поэтому метка,
+   * попавшая в этот вид, всегда несёт номер формы: `[EMAIL_1.1]` — модели по-
+   * прежнему видно, что это одно лицо, а с ключом платформы она не совпадёт.
+   */
+  avoid?: RegExp;
+}
+
 export class AliasVault {
   readonly #byValue = new Map<string, string>();
   readonly #byPlaceholder = new Map<string, string>();
   readonly #counters = new Map<string, number>();
   /** Номер, уже выданный этой сущности, и сколько её форм уже встречалось. */
   readonly #identities = new Map<string, { number: number; forms: number }>();
+  /** Без флага `g`: `test` со своим `lastIndex` отвечал бы через раз. */
+  readonly #avoid: RegExp | undefined;
+
+  constructor(options: AliasVaultOptions = {}) {
+    const avoid = options.avoid;
+    this.#avoid = avoid ? new RegExp(avoid.source, avoid.flags.replace('g', '')) : undefined;
+  }
 
   /**
    * Метка для значения: та же самая при повторной встрече.
@@ -51,8 +72,11 @@ export class AliasVault {
     }
     entry.forms += 1;
 
-    const suffix = entry.forms === 1 ? '' : `.${entry.forms}`;
-    const placeholder = `[${safeLabel}_${entry.number}${suffix}]`;
+    const plain = `[${safeLabel}_${entry.number}]`;
+    const placeholder =
+      entry.forms === 1 && !this.#avoid?.test(plain)
+        ? plain
+        : `[${safeLabel}_${entry.number}.${entry.forms}]`;
     this.#byValue.set(value, placeholder);
     this.#byPlaceholder.set(placeholder, value);
     return placeholder;

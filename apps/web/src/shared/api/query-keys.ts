@@ -80,6 +80,12 @@ export const queryKeys = {
    */
   platformAgentSession: (id: string, sessionId: string) =>
     ['platforms', id, 'agent-session', sessionId] as const,
+  /**
+   * Чем пойдёт прогон одного потребителя: модель контура, правила её выбора и
+   * принимает ли контур усилие (Т6). Ветка `platforms` намеренно — ответ меняют
+   * и правка контура, и его включение, и оба сбрасывают этот корень целиком.
+   */
+  platformRunPlan: (consumer: string) => ['platforms', 'run-plan', consumer] as const,
   /** Зарегистрирован ли переходник контура в конфигурации активного CLI. */
   platformMcp: ['platforms', 'mcp'] as const,
   /**
@@ -91,6 +97,19 @@ export const queryKeys = {
   dlpJournal: ['dlp', 'journal'] as const,
   /** Гейт на промпте: настройки + что на самом деле лежит в каталоге хуков. */
   promptGate: ['prompt-gate'] as const,
+  /**
+   * Чем панель нарисует картинку и почему нет (Т9). Ответ меняют и контур, и
+   * профили эндпоинтов, поэтому ключ свой: он сбрасывается вместе с ними, а не
+   * живёт внутри разговора.
+   */
+  /**
+   * Признак разговора в ключе намеренно: с агентом рядом план ДРУГОЙ (дорога есть
+   * всегда), и один ключ на оба случая показывал бы в черновике доступность,
+   * которой там нет.
+   */
+  mediaImagePlan: (agent: boolean) => ['media', 'images', 'plan', agent] as const,
+  /** То же для презентаций (Т10): кто соберёт колоду и получится ли PDF. */
+  mediaDeckPlan: (agent: boolean) => ['media', 'decks', 'plan', agent] as const,
   /** Каталог промптов приложения: список без текстов — он дешёвый. */
   prompts: ['prompts'] as const,
   /** Один промпт целиком: рабочий текст и встроенный рядом. */

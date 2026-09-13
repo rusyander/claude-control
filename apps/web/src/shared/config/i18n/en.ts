@@ -396,6 +396,7 @@ export const en: TranslationSchema = {
     hint: 'Enter to send, Shift+Enter for a new line',
     send: 'Send',
     stop: 'Stop',
+    clearInput: 'Clear the field',
     queue: {
       title: 'Queued: {{count}}',
       add: 'Add to the queue',
@@ -403,6 +404,110 @@ export const en: TranslationSchema = {
       cancel: 'Remove from the queue',
       next: 'Goes out next',
       later: 'Goes out after that',
+    },
+    mode: {
+      title: 'What sending does',
+      hint: 'Send mode: a message to the agent, an image or a deck',
+      text: 'Message',
+      textHint: 'Goes to the agent in this conversation',
+      image: 'Image',
+      imageHint: 'The panel draws it from your description',
+      imageBlocked: 'Nothing to draw with',
+      imagePlaceholder: 'Describe the image — the panel draws it itself, without the agent',
+      imagePlaceholderAgent: 'Describe the image — the agent draws it as vector code',
+      deck: 'Presentation',
+      deckHint: 'Slides on a topic: HTML, PPTX and PDF',
+      deckBlocked: 'Nothing to build it with',
+      deckPlaceholder: 'Name the topic — the panel builds the slides and hands them over as files',
+      revisePlaceholder:
+        'Say what to fix: "make the third slide shorter", "add a diagram at the end"',
+      reviseTitle: 'Reworking: {{title}}',
+      reviseCancel: 'Cancel the rework',
+      draw: 'Draw',
+      build: 'Build',
+      drawing: 'Drawing — this takes minutes; you can leave the page',
+      note: 'Available where the capability is declared',
+      source: '{{title}} · {{model}}',
+      sourceNoModel: '{{title}}',
+      sourceAgent: 'The conversation agent draws it: vector code, not a photo',
+      deckSourceAgent: 'The conversation agent dictates the slides',
+      promptSkipped: 'The mode prompt is not sent here: the images endpoint has no system message',
+      blocked: {
+        'no-route': 'No active contour and no endpoint profile — nothing to draw with',
+        'driver-none': 'This contour does not draw: its driver declares no such capability',
+        'no-model': 'The key catalog holds no model with image generation',
+        'endpoint-no-url': 'The endpoint profile has no image generation address',
+        'gateway-off': 'The panel gateway is off, and the contour request goes through it',
+        'endpoint-api-kind': 'This API kind has no separate images endpoint',
+        'no-agent': 'Neither a raster route nor a conversation whose agent could be asked',
+      },
+      noRaster: {
+        'no-route': 'no raster: no active contour and no endpoint profile',
+        'driver-none': 'no raster: this contour does not draw images',
+        'no-model': 'no raster: the key catalog holds no image model',
+        'endpoint-no-url': 'no raster: the endpoint profile has no generation address',
+        'gateway-off': 'no raster: the panel gateway is off',
+        'endpoint-api-kind': 'no raster: this API kind has no images endpoint',
+        'no-agent': 'no raster: nothing to draw with',
+      },
+      noDeck: {
+        'no-route': 'No agent conversation, no contour, no endpoint of your own',
+        'no-model': 'The contour is active, but no model is named for the request',
+        'gateway-off': 'The panel gateway is off, and the contour request goes through it',
+        'endpoint-api-kind': 'Only an OpenAI-kind endpoint can hold this conversation',
+      },
+      noPdf: {
+        'no-browser': 'No PDF on this machine: no system browser was found',
+      },
+      card: {
+        title: 'Image',
+        by: 'Drawn by {{model}} · {{source}}',
+        byNoModel: 'Drawn by {{source}}',
+        source: {
+          'contour-chat': 'contour, part of the answer',
+          'contour-images': 'contour, images endpoint',
+          endpoint: 'endpoint profile',
+          contour: 'contour',
+          agent: 'conversation agent',
+        },
+        size: '{{width}}×{{height}}, {{size}}',
+        download: 'Download',
+        failed: 'Did not work out: {{message}}',
+      },
+      deckCard: {
+        untitled: 'Untitled presentation',
+        badge: 'Presentation',
+        slides: 'Slides: {{count}}',
+        open: 'View',
+        pptx: 'PPTX',
+        pdf: 'PDF',
+        pdfHint: 'The first request prints the PDF — a few seconds',
+        by: 'Dictated by {{model}} · {{source}}',
+        byNoModel: 'Dictated by {{source}}',
+        revise: 'Rework',
+        revision: 'Revision',
+        pictures: 'Pictures the panel drew: {{count}}',
+        noPictures: 'No pictures were drawn for the slides — {{reason}}',
+        truncated:
+          'The deck was trimmed to the panel ceilings: there were more slides, bullets or longer lines',
+        pictureReason: {
+          'no-route': 'no active contour and no endpoint profile',
+          'driver-none': 'this contour does not draw images',
+          'no-model': 'the key catalog holds no model with image generation',
+          'endpoint-no-url': 'the endpoint profile has no generation address',
+          'gateway-off': 'the panel gateway is off',
+          'endpoint-api-kind': 'this API kind has no images endpoint',
+          'no-agent': 'nothing to draw with',
+          'draw-failed': 'the drawing endpoint refused',
+        },
+      },
+      block: {
+        picture: 'Drawing from the agent',
+        deck: 'Presentation from the agent',
+        build: 'Build the files',
+        save: 'Save as a file',
+        rejected: 'Blocks the panel did not accept: {{count}} — they stay in the text as they came',
+      },
     },
     split: {
       title: 'Split the tasks: {{count}} groups',
@@ -722,6 +827,16 @@ export const en: TranslationSchema = {
     effort_high: 'High',
     effort_xhigh: 'Very high',
     effort_max: 'Max',
+    platformModel: 'Through the "{{title}}" contour: {{model}}.',
+    platformModelReplaced:
+      'Through the "{{title}}" contour: no "{{asked}}" there, the request goes with {{model}}.',
+    platformModelUnset:
+      'The "{{title}}" contour assigned no model (empty catalog, or the probe never ran) — the request goes as it is.',
+    platformNoEffort: 'The "{{title}}" contour takes no reasoning effort — it is not sent.',
+    platformLayers: 'Through the "{{title}}" contour the run goes without ours: {{list}}.',
+    platformLayersAll:
+      'Through the "{{title}}" contour the run goes without a single layer of ours: no rules, no ' +
+      'hooks, no permissions, no skills, no MCP servers, no addition from the panel.',
     copyMessage: 'Copy message',
     editMessage: 'Edit and send as a new branch',
     usage: {
@@ -1726,6 +1841,9 @@ export const en: TranslationSchema = {
     modelAuto: 'let the CLI decide',
     modelHint:
       'The model name on this address. Empty — the panel leaves the model variable alone. After a connection check the models reported by the address appear here.',
+    imagesUrl: 'Image generation address',
+    imagesUrlHint:
+      'The full address of the images endpoint — usually /v1/images/generations. Empty — the chat’s «Image» mode is locked with that reason: the panel does not guess the address from the base one, because a compatible server may have no such endpoint at all, and a guessed address would answer 404 instead of an honest refusal.',
     token: 'Endpoint token',
     tokenPlaceholder: 'paste the token (a local model usually needs none)',
     tokenHint:
@@ -1790,7 +1908,7 @@ export const en: TranslationSchema = {
     migratedDismiss: 'Got it',
     deleteTitle: 'Delete the contour?',
     deleteText:
-      'The settings, the key and the probe record go together. The apply is undone first: CLI files return to their original state and the managed profile disappears. A file you edited after the apply is left as it is — the panel names it.',
+      'The settings, the key and the probe record go together. The apply is undone first: CLI files return to their original state and the managed profile disappears. A file where you changed the values the panel wrote is left as it is — the panel names it.',
     state: {
       disabled: 'not active',
       unchecked: 'never checked',
@@ -1799,12 +1917,73 @@ export const en: TranslationSchema = {
       unreachable: 'not responding',
     },
     driverLabel: 'Contour type',
-    driver: { enterprise-platform: 'EnterprisePlatform', 'openai-compat': 'OpenAI-compatible' },
+    driver: {
+      enterprise-platform: 'EnterprisePlatform',
+      'openai-compat': 'OpenAI-compatible',
+      litellm: 'LiteLLM',
+      vllm: 'vLLM',
+      ollama: 'Ollama',
+      openrouter: 'OpenRouter',
+      'azure-openai': 'Azure OpenAI',
+      dashscope: 'DashScope (Qwen)',
+      together: 'Together AI',
+    },
     driverHint: {
       enterprise-platform:
         'The panel knows this platform up front: content checks, knowledge through the key owner, history summarised on its side.',
       'openai-compat':
-        'Any compatible gateway. The panel asks for the model list only — everything else honestly stays “not declared”.',
+        'Any compatible gateway. The panel asks for the model list only — everything else honestly stays “not declared”. Your CLI’s tools go to it as a request field, so the tool shim starts off.',
+      litellm:
+        'LiteLLM proxy. The Anthropic client goes to its native /v1/messages, the OpenAI client to /v1/chat/completions. The address is the proxy root; the panel appends /v1 itself.',
+      vllm: 'vLLM server. The Anthropic client goes to the native /v1/messages; thinking is switched with the chat_template_kwargs.enable_thinking field. vLLM accepts tools as a request field only when started with --enable-auto-tool-choice and --tool-call-parser — otherwise turn the tool shim on.',
+      ollama:
+        'Ollama. The Anthropic client goes to its native /v1/messages, the OpenAI client to /v1/chat/completions. Only models trained for tool calls accept tools as a field; turn the shim on for the rest.',
+      openrouter:
+        'OpenRouter. The Anthropic client goes to the native /v1/messages, the OpenAI client to /chat/completions. The key comes from your OpenRouter account.',
+      'azure-openai':
+        'Azure OpenAI, API v1: the address ends with /openai/v1 and the key travels in the api-key header — the preset sets it. The preset declares no native Anthropic endpoint: the Anthropic client goes through the bridge.',
+      dashscope:
+        'Alibaba Model Studio in OpenAI-compatible mode. Qwen thinking is switched with the enable_thinking field. The preset declares no native Anthropic endpoint: the Anthropic client goes through the bridge.',
+      together:
+        'Together AI: model list and chat on the OpenAI schema. The preset declares no image endpoint — it returns bytes in a shape other than the one the panel asks for.',
+    },
+    manifest: {
+      summary: 'What the gateway can do: endpoints, thinking, tools',
+      intro:
+        'The preset already declares what was checked against the gateway docs. Change it only when your gateway differs: no endpoint, another path, its own thinking field.',
+      source: 'Checked against: {{source}}',
+      notDeclared: 'not declared',
+      asPreset: 'As the preset: {{value}}',
+      custom: 'Own value',
+      none: 'Do not declare',
+      customValue: '{{field}} — value',
+      anthropicLabel: 'Native Anthropic endpoint',
+      anthropicHint:
+        'Path after the version, e.g. messages. Without it the Anthropic client goes through the bridge to /chat/completions.',
+      imagesLabel: 'Image endpoint',
+      imagesHint:
+        'Path after the version on the OpenAI schema, e.g. images/generations. The panel asks for bytes as b64_json.',
+      imagesInChat: 'image inside the chat answer',
+      thinkingLabel: 'Thinking field',
+      thinkingHint:
+        'Field name in the request body, nested with dots: enable_thinking, chat_template_kwargs.enable_thinking. Without a field the contour has no thinking rule.',
+      pathError: 'Path of lowercase latin, digits, “/”, “_” and “-”: messages, images/generations',
+      wireError: 'Field name of latin, digits and “_”, nested with dots',
+      toolsLabel: 'CLI tools',
+      tools: { native: 'as a request field', shim: 'through the shim' },
+      toolsHint:
+        'As a field — the gateway accepts tools itself. Through the shim — the gateway drops the tools field and calls travel as text.',
+      effortLabel: 'Reasoning effort',
+      effort: { on: 'sent', off: 'not sent' },
+      effortHint: 'Not sent — the panel omits reasoning_effort and says so in the chat header.',
+      timeoutLabel: 'Whole-answer limit, seconds',
+      timeoutHint:
+        'How long the gateway waits before cutting a non-streamed answer itself. Empty — as the preset ({{value}}), 0 — not declared, the panel ceiling applies.',
+      timeoutNone: 'not declared',
+      timeoutError: 'Whole seconds from 0 to 3600',
+      ceilingLabel: 'Ceiling for any answer, seconds',
+      ceilingHint:
+        'How long before the gateway or a proxy in front of it cuts the connection, streamed answers included. The panel names a declared ceiling when the cut happens. Empty — as the preset ({{value}}), 0 — not declared.',
     },
     titleLabel: 'Name',
     titlePlaceholder: 'EnterprisePlatform · dev',
@@ -1813,7 +1992,34 @@ export const en: TranslationSchema = {
       'The local gateway address is built from it, so latin letters, digits, dash, dot and underscore only. Renaming = delete and create: the key is stored under the old identifier.',
     baseUrlLabel: 'API address',
     baseUrlHint:
-      'The root of the contour public API — the panel appends /v1 itself. An admin console address will not do: the check names that, but half an hour is already gone.',
+      'The root of the contour public API — the panel appends /v1 itself when the path has no version. An admin console address will not do: the check names that, but half an hour is already gone.',
+    transport: {
+      summary: 'Non-standard gateway: key, version, parameters',
+      intro:
+        'Needed when the gateway expects the key somewhere other than Authorization: Bearer, or an address without /v1 — Azure OpenAI, a company gateway. For EnterprisePlatform and a plain compatible gateway leave it as is.',
+      versionLabel: 'Version in the address',
+      version: {
+        auto: 'Append /v1 when the path has no version',
+        'as-is': 'Address as is — leave the path alone',
+      },
+      authHeaderLabel: 'Key header',
+      authHeaderHint: 'Empty — Authorization. For Azure OpenAI — api-key.',
+      authSchemeLabel: 'Word before the key',
+      authSchemeHint: 'Only with a custom header. Empty — the key goes bare, as api-key expects.',
+      queryLabel: 'Query parameters',
+      queryHint: 'Sent with every request: api-version=2024-10-21. The key does not go here.',
+      headersLabel: 'Extra headers',
+      headersHint:
+        'One per line, “Name: value”. Not for the key: it is stored encrypted and travels in its own field.',
+      preview: 'The panel will ask for the model list at:',
+      previewNone: 'the address is built once “API address” holds an http(s) address',
+      error: {
+        token: '“{{subject}}” is not a header name: latin letters, digits and dash only',
+        line: 'Line {{subject}} is not “Name: value”',
+        secret: '“{{subject}}” is where a key travels; the key is entered on the next step',
+        reserved: '“{{subject}}” is set by the panel itself',
+      },
+    },
     error: {
       title_required: 'Without a name one contour cannot be told from the next',
       id_required: 'The identifier is required: the gateway address is built from it',
@@ -1831,7 +2037,7 @@ export const en: TranslationSchema = {
       unreachable: 'not responding',
       'not-api': 'answers, but not a model API',
       unauthorized: 'key rejected',
-      'not-ready': 'contour is still starting up',
+      'not-ready': 'contour is not answering right now',
     },
     fix: {
       ok: 'The contour responds — nothing to fix.',
@@ -1840,7 +2046,8 @@ export const en: TranslationSchema = {
         'Looks like an admin console or a login page. The API root is needed — usually the same domain with an api. prefix.',
       unauthorized:
         'There are five causes and the contour tells none of them apart. Probe again — the last one is transient. If that does not help, check the key’s term, budget and owner in the admin console.',
-      'not-ready': 'The model registry is not ready yet. Retry in a minute.',
+      'not-ready':
+        'The contour is alive but will not answer right now: it is starting, hit the key’s rate limit or failed on its side — the cause is in the line above. Probe again a little later.',
     },
     tokenLabel: 'Contour key',
     tokenPlaceholder: 'sk-…',
@@ -1873,6 +2080,7 @@ export const en: TranslationSchema = {
       guardrails: 'Content checks',
       knowledge: 'Company knowledge',
       'client-tools': 'Client tools',
+      'image-generation': 'Image generation',
     },
     capabilityState: {
       yes: 'yes',
@@ -1927,11 +2135,15 @@ export const en: TranslationSchema = {
       gateway_down: 'the gateway is down or the contour is not active',
     },
     targetApplied: 'applied',
-    targetAppliedChat: 'applied, works as a chat without tools',
+    targetAppliedTools: {
+      native: 'applied, tools go as a field',
+      shim: 'applied, tools go through the shim',
+      none: 'applied, works as a chat without tools',
+    },
     targetNotApplied: 'not applied',
     appliedTitle: 'Applied to',
     appliedLegend:
-      '✔ — works fully, ⚠ — works as a chat without tools, ○ — can be applied, — unavailable with a reason.',
+      '✔ — works fully, ⚠ — tools through the shim or none at all (the mark beside it says which), ○ — can be applied, — unavailable with a reason.',
     planPlaceholder: 'placeholder, the gateway substitutes the key',
     conflictLine: 'taken: {{key}} = {{current}}',
     overwriteLabel: 'overwrite this value',
@@ -1972,15 +2184,16 @@ export const en: TranslationSchema = {
     budgetNearLimit: 'by our estimate {{percent}} % of the budget is spent',
     budgetMeterLabel: 'Budget spent',
     budgetMeterValue: '≈ {{spent}} of {{budget}} $ — {{percent}} %',
-    budgetExhausted: 'the contour refused on a spend limit {{when}} — not the key budget',
-    budgetExhaustedLevel:
-      'the contour refused on the «{{level}}» limit {{when}} — not the key budget',
+    budgetExhausted: 'the contour refused on a spend limit {{when}}',
+    budgetExhaustedLevel: 'the contour refused on the «{{level}}» limit {{when}}',
+    budgetExhaustedKey: 'the contour refused {{when}}: the key budget is exhausted',
     budgetExhaustedRecently: 'just now',
     budgetExhaustedClear: 'Clear the mark',
     budgetExceeded: 'budget exhausted',
     journalTitle: 'Apply journal ({{total}})',
     journalEntry: '{{title}} written',
-    journalDrifted: 'the file changed after the apply — the rollback will not touch it',
+    journalDrifted:
+      'the written values changed after the apply — the rollback will not touch the file',
     journalHistoryHint:
       'The file edits themselves live in the History section, together with the copies taken before the edit.',
     rollbackOne: 'Undo',
@@ -2000,7 +2213,7 @@ export const en: TranslationSchema = {
     factKey:
       'The contour key stays in the panel: CLIs go to its local gateway, never to the contour itself',
     factTools:
-      'Through a contour a CLI works as a chat: client tools cannot be declared, and it edits no files',
+      'Client tools cannot be declared to enterprise-platform as a field: the panel declares them to the model as protocol text and reassembles the call out of the answer — an agent through a contour does edit files. A compatible gateway gets them as a field, as the vendor does',
     factCli:
       'Not every CLI takes a gateway address: four of the ten document no such setting, and the list shows them as a dash with its reason',
     violationsTitle: 'Contour content checks',
@@ -2047,9 +2260,10 @@ export const en: TranslationSchema = {
       'length-capped, and restarting the panel clears it entirely.',
     toolShimTitle: 'Tools through the contour',
     toolShimText:
-      'The contour does not accept a list of tools, so the panel declares them to the model as ' +
-      'protocol text and reassembles the call from its answer. The model is free to ignore it: ' +
-      'then it describes the action in words, the turn ends successfully, and no file appears.',
+      'The shim declares tools to the model as protocol text and reassembles the call from its ' +
+      'answer — there is no other way on enterprise-platform, and on a compatible gateway you turn it on ' +
+      'yourself. The model is free to ignore it: then it describes the action in words, the ' +
+      'turn ends successfully, and no file appears.',
     toolShimEmpty: {
       idle: 'No request with tools has gone through the gateway yet — the panel knows nothing about the shim so far.',
       quiet:
@@ -2072,6 +2286,152 @@ export const en: TranslationSchema = {
     toolShimSince:
       'Counted over the requests with tools the gateway still remembers, starting {{date}}: the ' +
       'trace is length-capped, and restarting the panel clears it entirely.',
+    modelTitle: 'Contour model · {{title}}',
+    modelText:
+      'What the contour answers with, and for whom. The default model goes into the CLI configs ' +
+      'and into the assistant’s profile; a per-consumer override matters where one key serves ' +
+      'both your conversation and the test agent. The name map translates the names the panel ' +
+      'uses for models into the ones the contour understands — without it a run that picked its ' +
+      'own model is refused with “model not found”.',
+    planModel: 'The configs will carry the {{model}} model.',
+    planModelNone:
+      'The configs will carry no model: the contour assigned none, so the CLI goes with its own.',
+    modelDefault: 'Default model',
+    modelFromCatalog: 'First from the catalog: {{model}}',
+    modelNoCatalog: 'No model yet',
+    modelMissing: '{{model}} — chosen by you, the contour does not serve it right now',
+    modelSource: {
+      default: 'Chosen by you — this is what goes into the CLI configs.',
+      catalog: 'You did not choose: the panel takes the first suitable model from the catalog.',
+      none: 'No model: the CLI goes with its own name, which the contour does not know.',
+    },
+    modelNeedsProbe:
+      'The catalog is empty — check the contour, and there will be something to pick.',
+    modelConsumers: 'Model per consumer',
+    modelInherit: 'Same as the contour',
+    modelMapTitle: 'Name map',
+    modelMapText:
+      'A run you picked a model for — in the chat header or in a group — leaves with that name, ' +
+      'and the contour does not know it. Here you say what “sonnet” means for you. A name with ' +
+      'no row in the map is replaced by the contour’s model, and the chat header says so.',
+    modelMapRow: '{{from}} → {{to}}',
+    modelMapRowMissing: '{{from}} → {{to}} — this model is no longer in the contour’s catalog',
+    modelMapRemove: 'Remove',
+    modelMapFrom: 'Name in the panel',
+    modelMapTo: 'Contour model',
+    modelMapPick: 'Pick a model',
+    modelMapAdd: 'Add',
+    modelEffortOk:
+      'The contour accepts reasoning effort: the one picked in the chat travels with the request.',
+    modelEffortNo:
+      'The contour does not accept reasoning effort: the run goes without it, whatever you pick ' +
+      'in the chat header. The panel will not pay for depth that will not happen.',
+    rulesTitle: 'Contour rules · {{title}}',
+    rulesText:
+      'What the contour does to a request on the way. The upper list is the panel’s to set — ' +
+      'request fields the contour accepts. The lower one is visible but not managed here: the ' +
+      'contour’s owner turns it on at their end.',
+    rulesEmpty:
+      'This contour declared no rules. That is “unknown”, not “does nothing”: a compatible ' +
+      'gateway tells only its list of models about itself.',
+    rulesManaged: 'Managed by the panel',
+    rulesObserved: 'What the contour does itself',
+    rulesOurs: 'Our side',
+    rulesShim: 'The panel’s tool shim',
+    rulesShimText:
+      'The agent’s tools travel to the contour as protocol text, and the panel reassembles the ' +
+      'call out of the answer. Turn it off and an agent through the contour only answers — but ' +
+      'then the contour’s own tools can be asked for.',
+    rulesShimBlocked:
+      'The contour has its own tools set — the shim cannot be turned on: two sets on one turn. ' +
+      'Clear that list above first.',
+    rulesApply: 'Save',
+    rulesToolsPlaceholder: 'e.g. web_search',
+    rulesToolsBlocked:
+      'While the tool shim is on, the contour’s own tool set cannot be added: two sets on one ' +
+      'turn are mutually exclusive. Turn the shim off below, under “Our side”.',
+    rulesModeIdle: 'With no contour tool names set, the loop mode is not sent anywhere.',
+    rulesPresetPlaceholder: 'balanced',
+    rulesToolMode: {
+      loop: 'loop — the contour runs the cycle itself',
+      single_turn: 'single_turn — the call comes back to the client',
+    },
+    rulesThinkingMode: {
+      default: 'Default — not sent, the model decides',
+      on: 'Turn on',
+      off: 'Turn off',
+    },
+    rulesConflicts: 'Conflict matrix',
+    rulesLevel: {
+      exclusive: 'Mutually exclusive',
+      warning: 'Warning',
+      info: 'For information',
+    },
+    rulesConflictActive: 'both sides are on right now',
+    rulesConflictOurs: 'our side is on; the contour’s side shows only when it fires',
+    rulesBlocked:
+      'Both sides of a mutual exclusion are on: {{detail}} The run goes with the contour’s tools ' +
+      'and the shim stays silent. Pick a side — the panel will not switch the other off for you.',
+    rulesFixShim: 'Turn our shim off',
+    rulesFixTools: 'Clear the contour’s tools',
+    rulesUnsupported:
+      'The panel does not manage this rule yet. The contour currently has: {{value}}',
+    rulesSaveFailed: 'The rules could not be saved.',
+    layersTitle: 'Our layers in the run',
+    layersText:
+      'What travels from your personal setup into a run through this contour. Dropping a layer ' +
+      'saves prompt budget and removes extra tools, but the agent loses your rules and the answer ' +
+      'will not show it. Two flags hit wider than `~/.claude`: skills and MCP servers are dropped ' +
+      'TOGETHER with the project’s own — said at the switches themselves, and that is the price of ' +
+      'the CLI having one flag for both sources. Layers are dropped by Claude Code flags: a ' +
+      'foreign CLI run through the contour goes with its own set, and these switches do not touch it.',
+    layersAll: 'Our rules travel into the run',
+    layersAllText:
+      'Turn it off and a run through this contour goes without anything of ours at once, whatever ' +
+      'the switches below say.',
+    layersAllOff:
+      'The master switch is off: not one of our layers travels through this contour, and the ' +
+      'switches below decide nothing. Turn it on to choose layer by layer.',
+    layerTitle: {
+      settings: 'Personal rules, hooks and permissions',
+      skills: 'Skills',
+      mcp: 'MCP servers',
+      systemPrompt: "The panel's addition to the system prompt",
+    },
+    layerText: {
+      settings:
+        'Everything from `~/.claude`: CLAUDE.md rules, hooks, permissions, personal skills and ' +
+        'personal MCP servers — the panel’s bridge to the contour’s own tools included, it lives ' +
+        'there too. The CLI knows one `user` source and drops it whole — with ' +
+        '`--setting-sources project,local`. Along with the permissions your `deny` rules stop ' +
+        'applying too — the fence you put around the agent. The project CLAUDE.md and repository ' +
+        'settings this flag does not touch: those are the rules of the task, not ours.',
+      skills:
+        'Skills and the `Skill` tool itself — with `--disable-slash-commands`. A separate switch ' +
+        'for a reason: built-in skills go away only this way. ALL skills are dropped, the ' +
+        'repository’s own (`.claude/skills`) included: the CLI has no flag for just the personal ones.',
+      mcp:
+        'MCP servers — with `--strict-mcp-config`, and ALL of them: personal, the project’s own ' +
+        'from the repository’s `.mcp.json`, and the panel’s bridge to the contour’s own tools. ' +
+        'Only the panel’s permission broker stays: without it every permission request would ' +
+        'become a silent refusal in the middle of the agent’s work.',
+      systemPrompt:
+        'What the panel adds of its own: initiatives, task splitting, session continuation. The ' +
+        'panel drops it itself — the CLI has no flag for that, which is why it is absent from the ' +
+        'flag list.',
+    },
+    layersFlags: 'The run will carry the flags: {{args}}',
+    layersFlagsNone: 'No flags — everything of ours travels into the run.',
+    layersPromptOff: 'The panel’s addition is dropped by the panel itself, it has no flag.',
+    layersNoRun:
+      'Nobody receives them yet: this contour’s route has neither chat, nor split groups, nor the ' +
+      'tests agent ticked. The terminal edits configuration files, the assistant travels by the ' +
+      'endpoint profile, a foreign CLI runs its own set — layers are dropped by a Claude run only.',
+    layersNotes:
+      'Three neighbouring settings are deliberately absent here. The prompt gate is physically our ' +
+      'hook in `~/.claude/settings.json`: it leaves together with the personal settings and has no ' +
+      'switch of its own. Data protection is not a layer at all: it is not traded for prompt ' +
+      'budget. The model cascade is switched on per project, not per contour.',
     agentsTitle: 'Contour agents',
     agentsOwner:
       'Agents are built by the company: each has its own knowledge and tools, and they run on ' +
@@ -2148,16 +2508,31 @@ export const en: TranslationSchema = {
     items: {
       'no-client-tools': {
         name: 'Client tools cannot be declared',
-        how: 'The contour’s public API does not accept tool descriptions: the platform picks the set itself, and a list sent by the client is dropped on the way in. By the field the vendor API declares them with, tools never reach the model.',
+        how: 'Applies to a contour whose type does not accept client tools as a field — that is enterprise-platform; a compatible gateway gets them as a field. EnterprisePlatform’s public API does not accept tool descriptions: the platform picks the set itself, and a list sent by the client is dropped on the way in. By the field the vendor API declares them with, tools never reach the model.',
         why: 'We do not change the platform. Worked around by the shim: the panel declares the tools to the model as protocol text and reassembles the call from its answer (“Tools are declared to the model as text”), so an agent through a contour does edit files and does see your MCP servers. But it is a protocol on top of someone else’s, and it is weaker than the vendor one; with the shim off the old behaviour stands — a CLI through a contour works as a chat.',
         revisitWhen:
           'If the contour starts accepting the client’s own tool schemas — at least in the mode where the client executes the calls itself.',
       },
+      'rules-partial': {
+        name: 'Personal rules, hooks and permissions come off together',
+        how: 'A run through the contour can start without our layers: personal `~/.claude` rules, skills, MCP servers and the panel’s own system-prompt addition are switched off on the contour card. Personal rules cannot be dropped separately from hooks and permissions: the CLI knows one `user` settings source and removes it whole, with a single `--setting-sources project,local`. Skills and MCP servers have flags of their own and stay separate switches; the project CLAUDE.md always stays.',
+        why: 'Measured on the real CLI rather than read off a flag description: the panel asks for exactly what the CLI can execute. Drawing three switches where one is executed would promise separate removal and remove everything anyway — the screen would say «hooks are in place» for a run without a single hook. The prompt gate goes with them for the same reason: physically it is our hook in `~/.claude/settings.json`.',
+        revisitWhen:
+          'If the CLI learns to tell the sources apart more finely — a separate flag for memory, hooks or permissions; then the switches split and this note is retired.',
+      },
+      'no-effort': {
+        name: 'The contour takes no reasoning effort',
+        how: 'The contour’s public API knows no effort field: the panel never adds it, and the value picked in the chat stays with the panel. A field the foreign CLI sends itself travels upstream as it is — the contour strips unknown keys on the way — and the request trace names it as a loss: a setting that quietly fails to reach the model would read as applied.',
+        why: 'Sending an effort the contour is known not to read would draw work on screen that does not happen: the human would pick “max”, get an ordinary answer and believe that is how the model thinks. While the field is absent from the schema, sending nothing and saying so where effort is picked is the honest option. The answer itself stays complete — only the depth of reasoning is lost.',
+        revisitWhen:
+          'If the contour starts accepting an effort field — its own or the vendor one; then the model card sends the picked value and the signature comes off.',
+      },
       'dialect-bridge': {
         name: 'Dialect translation lives on our side',
-        how: 'The contour speaks the OpenAI dialect, some CLIs speak the Anthropic one. The panel’s gateway rewrites request and response on the fly.',
+        how: 'Some CLIs speak the Anthropic dialect while the platform speaks the OpenAI one. Where the platform’s driver declares no native Anthropic endpoint, the panel’s gateway rewrites request and response on the fly; where it does, the request goes out as is and no bridge is needed.',
         why: 'Otherwise only CLIs that already speak OpenAI could use a contour. What the translation loses is listed next to the translation itself, not hidden.',
-        revisitWhen: 'If the contour starts accepting requests in the Anthropic dialect.',
+        revisitWhen:
+          'If the platform starts accepting requests in the Anthropic dialect: its driver declares the native endpoint, and the bridge switches off for it by itself.',
       },
       'vendor-sse-frames': {
         name: 'Vendor stream frames are parsed by us',
@@ -2186,12 +2561,12 @@ export const en: TranslationSchema = {
         revisitWhen: 'If such a CLI documents a variable or a key for the model address.',
       },
       'nonstream-120s': {
-        name: 'A non-streaming request dies at two minutes',
-        how: 'An ordinary, non-streaming call is cut off by the contour after 120 seconds. So the panel talks to a contour only by streaming — including where a human needs no stream at all.',
-        why: 'The limit sits on the platform side: the only way around it is the shape of the request.',
+        name: 'The contour cuts any answer at two minutes',
+        how: 'The contour server holds any answer for at most 120 seconds — whole and streamed alike. The panel talks to a contour by streaming so the answer is visible while it comes, and names a cut at that second as the platform ceiling rather than a network break. The exception is a “single_turn” turn: the contour accepts no stream with it, so that turn goes whole and the answer arrives at once.',
+        why: 'The limit sits on the platform side and no request shape gets around it: what is left is to name it and shorten the turn.',
         revisitWhen: 'If the contour’s response ceiling grows or becomes a setting.',
         hiddenReason:
-          'The gateway picks the shape of the request: there is nothing to mark beside it — the human only sees that the answer arrived.',
+          'There is no mark beside it: the limit shows where it happens — the gateway names the ceiling in the very error the CLI displays.',
       },
       'budget-manual': {
         name: 'The key budget is typed in by hand',
@@ -2202,7 +2577,7 @@ export const en: TranslationSchema = {
       },
       'pricing-local': {
         name: 'Prices are counted from our own catalog',
-        how: 'The contour does not publish model prices — they live in an internal catalog of the platform. The panel counts money from its own price list.',
+        how: 'The contour does not publish model prices — they live in an internal catalog of the platform. The panel counts money from its own price list. A gateway that publishes a price in its model list (OpenRouter) is counted by that price.',
         why: 'An empty space instead of a cost is worse than an honest estimate called an estimate.',
         revisitWhen:
           'If the contour starts returning model prices for a key — in the model list itself.',
@@ -2246,7 +2621,7 @@ export const en: TranslationSchema = {
       },
       'tool-shim': {
         name: 'Tools are declared to the model as text',
-        how: 'The contour does not accept a tool list at all, so the panel declares the tools to the model as protocol text and assembles the call back out of its answer: the agent gets a real tool_use block and edits files. A block left unclosed or unreadable never becomes a call — it stays in the answer as text, and the request trace says why.',
+        how: 'A contour whose type does not accept a tool list at all (enterprise-platform), or one where you turned the shim on yourself: the panel declares the tools to the model as protocol text and assembles the call back out of its answer: the agent gets a real tool_use block and edits files. A block left unclosed or unreadable never becomes a call — it stays in the answer as text, and the request trace says why.',
         why: 'Without the shim an agent behind a contour “works like a chat”: it says it will write the file and does not. Synthesis from text is the only way to give it hands without turning off the client CLI’s skills, hooks or MCP.',
         revisitWhen: 'If the contour starts accepting client tools in its own schema.',
       },
@@ -2255,6 +2630,22 @@ export const en: TranslationSchema = {
         how: 'Tool schemas travel in every request: the contour has no prompt cache. Measured on real runs: 24 tools — 58 thousand characters of system text and 86 KB per request on every turn (`claude -p` through the gateway), 108,546 characters and 154 KB on an interactive run with the full CLI prompt. Same order either way — tens of kilobytes for every step the agent takes; which is why a run through a contour uses the panel’s short prompt by default instead of the CLI’s.',
         why: 'A prompt cache is a vendor API feature and the contour has none; the panel will not trim schemas on the client’s behalf — a trimmed schema breaks the call silently.',
         revisitWhen: 'If the contour gains a prompt cache or accepts tools as a separate field.',
+      },
+      'media-by-capability': {
+        name: 'Images and slides by the declared capability',
+        how: 'RASTER is drawn only by whoever declared it: the contour driver plus a flagged model in the key catalog, or a generation address in the endpoint profile. With no such route the «Image» mode stays, but the conversation agent draws it as vector code — said under the field together with the reason there is no raster. The item is locked only where there is no agent conversation either. A presentation goes by the same measure: the agent, the contour or the endpoint dictates it, the panel builds the files from the structure — and draws the slide pictures through that same raster route while it exists.',
+        why: 'A capability may not be guessed from a model name: «vision» in a name means reading images, not drawing them, and such a request is refused with a 400 after the human has already described the picture. Taking the mode away where there IS something to draw with would promise less than the panel can do, though: vector code and a slide structure come from any text model, which is why that route works with any CLI and without a contour.',
+        revisitWhen:
+          'If the contour starts declaring image generation in the model catalog itself — the flag would then come from there rather than from the driver.',
+      },
+      'mask-unrestorable': {
+        name: 'A data-protection label stops the call',
+        how: 'The panel’s data protection and the contour’s substitution both replace e-mails, IP addresses and similar values with labels. The panel restores its own labels itself, and the contour turns its own back into values right in the answer stream. A label nobody restored — ours with no record, or one of the contour’s shape that was not in the request while the contour reported a substitution — never reaches the tool: the call stops, and the reason is in the chat and in the request trace (`mask-unrestorable`).',
+        why: 'A call carrying a label instead of the value would run silently and leave the label in a project file, to be found some other day. A stopped turn costs less than a forgery in the code.',
+        revisitWhen:
+          'If the contour lets a request leave the content between tool markers untouched, or starts sending the substitution map to key clients.',
+        hiddenReason:
+          'This behaviour has no permanent place on screen: the stop happens in one specific call and is named right there — as a chat message and a line of the request trace.',
       },
     },
   },
@@ -2764,6 +3155,7 @@ export const en: TranslationSchema = {
         'contour-agent': 'Agent behind a contour',
         'contour-preamble': 'Contour preamble',
         image: 'Image',
+        'image-svg': 'Image in code',
         presentation: 'Presentation',
       },
       hint: {
@@ -2771,8 +3163,15 @@ export const en: TranslationSchema = {
           'How a model with no tools of its own calls them in text, and the panel turns that into a real call.',
         'contour-agent':
           'The short system prompt of a run through a contour: it replaces the CLI’s own prompt.',
-        'contour-preamble': 'How a contour differs from a direct vendor request — said up front.',
-        image: 'A person’s request becomes a task for an image generator.',
+        'contour-preamble':
+          'How a contour differs from a direct vendor request. It travels right after the agent ' +
+          'prompt and only together with it: switching the short contour prompt off drops it too.',
+        image:
+          'The system message of the drawing model. It travels only on the «part of the answer» ' +
+          'road: the separate images endpoint has no system message.',
+        'image-svg':
+          'The rules for drawing in code (SVG), which the conversation agent does itself: the file ' +
+          'must stand alone — no outside links, no scripts — or the panel refuses it.',
         presentation: 'A topic becomes slides: titles, bullets, speaker notes.',
       },
     },

@@ -22,7 +22,25 @@ const base: PlatformStatus = {
     projectPaths: [],
     consumers: [],
     agents: [],
+    // Поля Т6–Т8 (модель, прослойка, преамбула, правила) карман не показывает и
+    // не меняет, но запись контура одна на панель и на телефон: без них фикстура
+    // перестаёт быть тем, что приезжает с сервера.
+    defaultModel: '',
+    consumerModels: {},
+    modelMap: {},
+    toolShim: true,
+    contourPrompt: true,
+    rules: {
+      platform: {
+        platformTools: [],
+        toolMode: 'loop',
+        generationPreset: '',
+        enableThinking: 'default',
+      },
+      ours: { enabled: true, settings: true, skills: true, mcp: true, systemPrompt: true },
+    },
     caCertPath: '',
+    transport: { authHeader: '', authScheme: '', version: 'auto', query: '', headers: '' },
   },
   hasToken: true,
   maskedToken: 'sk-…4f21',
@@ -44,6 +62,15 @@ const base: PlatformStatus = {
     totalTokens: 0,
     money: { usd: 5, pricedTokens: 0, unpricedTokens: 0, unpricedModels: [] },
   },
+  // Ответ карточки из Т6–Т8: усилие, правила контура, матрица конфликтов и наши
+  // слои. Карман их не рисует, но приезжают они в том же ответе, и фикстура
+  // обязана быть той же формы.
+  effort: true,
+  agents: true,
+  toolRoute: 'shim',
+  rules: [],
+  conflicts: [],
+  layers: { args: [], systemPrompt: true, dropped: [] },
   // Проба ЕСТЬ и она удачная: только такой контур телефон вправе назвать
   // работающим. Основа без пробы означала бы «работает» на пустом месте — и
   // ровно это здесь однажды и было записано в ожидание.

@@ -5,6 +5,7 @@ import type {
 } from '@agentdeck/contracts/task-split';
 import type { ChatTreeView, HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 import type { ChildStageGroup, ReviewDecisionItem } from '@features/ChatMessages';
+import type { MediaRevision } from '@entities/Media';
 
 export interface ProviderChatMessagesProps {
   messages: ProviderChatMessage[];
@@ -68,4 +69,18 @@ export interface ProviderChatMessagesProps {
   /** «Закоммитить и отправить в MR» — отдельный клик после правок. */
   onReviewPush?: (chatId: string) => void;
   reviewBusy?: boolean;
+  /**
+   * Разговор и его модель — ими подписана карточка вложения из блока агента
+   * (Т10). Реплика чужого CLI ни того, ни другого в себе не несёт: одно знает
+   * страница, второе — запись разговора.
+   */
+  mediaChatId?: string;
+  mediaModel?: string;
+  /** Тема человека из режима презентации — ею подписана колода из блока. */
+  mediaTopic?: string;
+  /**
+   * Правка готовой колоды. У чужого CLI карточка в ленте — ЕДИНСТВЕННОЕ место,
+   * откуда правку начинают: правого столбца здесь нет вовсе.
+   */
+  mediaRevision?: MediaRevision;
 }

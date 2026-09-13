@@ -1,11 +1,12 @@
 import { parseFrame, serializeFrame, splitFrames } from '../../dlp/sse.ts';
-import type { VendorFrame, VendorFrameKind } from '../drivers/driver.ts';
+import type { DriverViolationName, VendorFrame, VendorFrameKind } from '../drivers/driver.ts';
 import { readViolations } from './status.ts';
-import { errorBody, stopReasonOf, type Dialect } from './dialect.ts';
-import { expandContourAliases, strayAliases } from './tool-shim/aliases.ts';
+import { errorBody, stopReasonOf, upstreamErrorCode, type Dialect } from './dialect.ts';
+import { expandContourAliases, strayAliases, strayPlatformLabels } from './tool-shim/aliases.ts';
 import { claimedWithoutCall } from './tool-shim/claims.ts';
 import type { ShimCall } from './tool-shim/parse.ts';
-import { ToolStreamParser, type ShimEvent } from './tool-shim/stream.ts';
+import { strictObject } from './tool-shim/repair.ts';
+import { parseToolCalls, ToolStreamParser, type ShimEvent } from './tool-shim/stream.ts';
 
 /**
  * Поток контура → поток клиента.
@@ -81,6 +82,22 @@ export interface FrameFacts {
    * ответа как целый и не знает, что его обрезали.
    */
   truncated: boolean;
+  /**
+   * Та сторона оборвала ответ СВОЕЙ ошибкой, назвав её кадром `{"error": {...}}`.
+   *
+   * Отдельно от `truncated`: там «кончилось на полуслове, причины нет», здесь
+   * причина есть и она у человека должна быть своя. Сведённая к «оборвалось»,
+   * она теряла главное — лимит частоты не отличался от переполненного окна, и
+   * клиент повторял запрос, который повторять бессмысленно.
+   */
+  upstreamError?: { code: string; message: string };
+  /**
+   * Платформа прислала итоговый текст, который НЕ продолжает отданный потоком
+   * (её проверки вывода поправили ответ, либо поток разошёлся с проверенным).
+   * Цельное тело несёт итоговый; поток клиенту уже ушёл, и забрать его нельзя —
+   * поэтому это факт следа, а не молчание.
+   */
+  rewritten?: 'diverged';
   /** Имена полей незнакомых кадров — чтобы новый вид кадра было видно. */
   unknownFrames: string[];
   /**
@@ -97,8 +114,21 @@ export interface FrameFacts {
    * надо сказать, ЧТО именно пропало, а не показать пустой ответ.
    */
   droppedParts: string[];
+  /**
+   * Сколько байт картинок приехало частями содержимого (Т9). В след идёт РАЗМЕР,
+   * а не содержимое: журнал читает человек, и мегабайт base64 в нём не читается
+   * ни глазами, ни поиском. Ноль — картинок в ответе не было.
+   */
+  imageBytes: number;
   /** Вызовов инструментов, собранных прослойкой из текста ответа (Т5.5). */
   toolCalls: number;
+  /**
+   * Вызовов, которые прислал САМ контур полем `tool_calls` (Т7, режим
+   * `single_turn`). Отдельный счётчик, а не строка в `toolCalls`: там живёт
+   * работа прослойки, и сводка по ней считается именно оттуда. Здесь —
+   * инструменты контура, которые панель только перевела клиенту.
+   */
+  contourCalls: number;
   /** Блоки, которые вызовом не стали, — по причине на блок, без повторов. */
   toolFlaws: string[];
   /**
@@ -120,6 +150,13 @@ export interface FrameFacts {
 /** Что собралось из потока для клиента, просившего НЕ поток. */
 export interface AssembledAnswer {
   text: string;
+  /**
+   * Части содержимого, которые не текст, — как их прислал контур (картинка едет
+   * именно так, Т9). Потоком такая часть уходит клиенту в кадре байт в байт, и
+   * цельное тело обязано нести её же: собранный из одного текста ответ молча
+   * терял картинку у того клиента, который просил не поток.
+   */
+  parts: unknown[];
   /** Вызовы, собранные прослойкой: клиенту они уедут полем его диалекта. */
   calls: ShimCall[];
   finishReason: string;
@@ -143,6 +180,12 @@ export interface TranslatorOptions {
    * тогда как обычный OpenAI и теряет вердикты целиком.
    */
   driver: FrameDriver;
+  /**
+   * Причина обрыва точнее общей — например, потолок ответа платформы
+   * (`ceilingCutMessage`). Спрашивается в момент обрыва: раньше неизвестно,
+   * сколько длился ответ. `undefined` — остаётся `TRUNCATED_MESSAGE`.
+   */
+  truncatedReason?: () => string | undefined;
   /**
    * Прослойка инструментов включена (Т5): текст ответа разбирается на вызовы, и
    * клиент получает их полем СВОЕГО диалекта. Нет ключа — прослойки нет, и
@@ -168,6 +211,16 @@ export interface TranslatorOptions {
      */
     priorCalls?: boolean;
   };
+  /**
+   * Метки, которыми подменяет данные САМА платформа (`driver.placeholderPattern`),
+   * и тело, которое ушло к ней наверх.
+   *
+   * Метка этого вида в аргументе вызова — значение, которое платформа спрятала и
+   * не вернула, но только при двух условиях сразу: платформа сказала, что
+   * подменяла (`facts.masked`), и ровно такой строки не было в отправленном теле.
+   * Без второго условия `[TODO_1]` из файла человека останавливал бы ход.
+   */
+  placeholders?: { pattern: RegExp; sent: string };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -183,6 +236,29 @@ const MAX_STAGES = 8;
  * занять память панели целиком.
  */
 const MAX_CONTOUR_ALIASES = 2_000;
+
+/**
+ * Сколько НЕтекстовых частей содержимого шлюз держит для цельного тела (Т9).
+ * Каждая — мегабайтная картинка в base64, и без потолка ответ лежал бы в памяти
+ * дважды: кусками потока и собранным телом.
+ */
+const MAX_CONTENT_PARTS = 4;
+
+/**
+ * Размер части ответа в байтах — для следа запроса. Считается по её собственному
+ * JSON: у картинки это base64, то есть примерно на треть больше самих байтов. В
+ * след идёт порядок величины, а не точный вес файла, — и это ровно то, что нужно
+ * человеку, читающему «сколько проехало».
+ */
+function partBytes(part: unknown): number {
+  try {
+    return Buffer.byteLength(JSON.stringify(part) ?? '', 'utf8');
+  } catch {
+    // Часть с циклом внутри JSON не переживёт. Она всё равно уедет клиенту как
+    // есть — сказать про её размер нечего, но терять из-за этого ответ нельзя.
+    return 0;
+  }
+}
 
 /** Защита данных выключена: словаря меток нет, и остановить ход нечему. */
 const EMPTY_ALIASES: ReadonlyMap<string, string> = new Map();
@@ -225,6 +301,8 @@ export function classifyFrame(payload: unknown, driver: FrameDriver): FrameKind 
  */
 export interface FrameDriver {
   readFrame(payload: Record<string, unknown>): VendorFrame | undefined;
+  /** Где лежит название нарушения в перечне вердикта (`driver.violationNames`). */
+  violationNames?: readonly DriverViolationName[];
 }
 
 /**
@@ -244,6 +322,18 @@ export class StreamTranslator {
   /** Клиенту уже отдана терминальная ошибка — дальше не пишем ничего. */
   #closed = false;
   #text = '';
+  /**
+   * Весь текст ответа ровно так, как его прислала платформа, — до прослойки.
+   * С ним сверяется итоговый текст платформы: `#text` без блоков вызова с ним
+   * не сравнить.
+   */
+  #raw = '';
+  /** Итоговый текст платформы, разошедшийся с потоком (`facts.rewritten`). */
+  #replacement: string | undefined;
+  /** В потоке был расход — клиенту, просившему его, он уедет и с прослойкой. */
+  #usageSeen = false;
+  /** Метки вызовов контура, которые нечем развернуть: решает закрытие ответа. */
+  #contourStray: string[] = [];
   #finishReason = '';
   #id = '';
   #model = '';
@@ -260,6 +350,20 @@ export class StreamTranslator {
   /** Номер текущего блока содержимого в диалекте Anthropic. */
   #index = 0;
   #textOpen = false;
+  /**
+   * Вызовы, которые прислал сам контур (Т7, `single_turn`), — по номеру из его
+   * же кадров. Копятся кусками: имя приезжает в первом, аргументы дописываются
+   * следующими, и целым вызов становится только к концу ответа.
+   */
+  readonly #contourCalls = new Map<number, { id: string; name: string; args: string }>();
+  /** Те же вызовы, собранные целиком. Считаются однажды — вместе с пометками. */
+  #contourReady: ShimCall[] | undefined;
+  /**
+   * Части содержимого, которые не текст (картинка контура, Т9). Держатся вне
+   * `facts` намеренно: в след идёт только их РАЗМЕР, а сами байты уезжают
+   * клиенту цельным телом и в журнал панели не попадают.
+   */
+  readonly #parts: unknown[] = [];
 
   readonly facts: FrameFacts = {
     stages: [],
@@ -271,7 +375,9 @@ export class StreamTranslator {
     unknownFrames: [],
     toolsDropped: false,
     droppedParts: [],
+    imageBytes: 0,
     toolCalls: 0,
+    contourCalls: 0,
     toolFlaws: [],
     maskStop: [],
     claimedWithoutCall: false,
@@ -316,22 +422,21 @@ export class StreamTranslator {
       // Придержанное отдаётся текстом ДО ошибки: без прослойки клиент получил
       // бы прочитанную половину ответа, и терять её из-за того, что разборщик
       // держал блок, — регресс, который платит человек.
-      return out + this.#abortShim() + this.#terminal(TRUNCATED_MESSAGE, 'api_error');
+      return out + this.#abortShim() + this.#terminal(this.truncationMessage(), 'api_error');
     }
 
-    if (this.#options.dialect === 'anthropic') {
-      if (!this.#finished) out += this.#closeAnthropic();
-      return out;
-    }
-    // Придержанный хвост — раньше `[DONE]`: после него клиент читать перестаёт.
-    out += this.#flushShim();
-    // Контур назвал причину остановки, но `[DONE]` не прислал: дописываем сами
-    // — половина клиентов ждёт именно его, а ответ и правда закончен.
-    if (!this.#finished) {
-      this.#finished = true;
-      out += DONE_FRAME;
-    }
-    return out;
+    if (this.#finished) return out;
+    this.#finished = true;
+    // Контур назвал причину остановки, но `[DONE]` не прислал: закрываем сами —
+    // половина клиентов ждёт именно его, а ответ и правда закончен.
+    return (
+      out + (this.#options.dialect === 'anthropic' ? this.#closeAnthropic() : this.#closeOpenAi())
+    );
+  }
+
+  /** Чем назвать недосказанный ответ: причиной, если она известна, иначе общим обрывом. */
+  truncationMessage(): string {
+    return this.#options.truncatedReason?.() ?? TRUNCATED_MESSAGE;
   }
 
   /**
@@ -347,12 +452,28 @@ export class StreamTranslator {
 
   /** Ответ целиком — для клиента, который просил не поток. */
   assembled(): AssembledAnswer {
+    const own =
+      this.#replacement === undefined
+        ? { text: this.#text, calls: this.#calls }
+        : this.#replaced(this.#replacement);
+    // Вызовы контура в диалекте Anthropic уже лежат в `#calls` — их положило
+    // туда закрытие сообщения. В своём диалекте закрытия нет: кадры уходили
+    // клиенту как есть, а цельное тело собирается ЗДЕСЬ, и без этой строки
+    // вызов контура терялся бы ровно у того клиента, который просил не поток.
+    const calls =
+      this.#options.dialect === 'anthropic'
+        ? own.calls
+        : [...own.calls, ...this.#buildContourCalls()];
+    // Метка в вызове контура, которую нечем развернуть: цельное тело не уходит
+    // вовсе, и остановку объявляет конвейер по этому факту.
+    if (this.#contourStray.length > 0 && this.facts.maskStop.length === 0) {
+      this.facts.maskStop = this.#contourStray;
+    }
     return {
-      text: this.#text,
-      calls: this.#calls,
-      // Вызов перебивает причину остановки и здесь: клиент, прочитавший
-      // «ход закончен» рядом с вызовом, выполнит его и не пришлёт результат.
-      finishReason: this.#calls.length > 0 ? 'tool_calls' : this.#finishReason || 'stop',
+      text: own.text,
+      parts: this.#parts,
+      calls,
+      finishReason: this.#finishOf(calls.length),
       promptTokens: this.facts.promptTokens,
       completionTokens: this.facts.completionTokens,
       totalTokens: this.facts.totalTokens,
@@ -363,7 +484,7 @@ export class StreamTranslator {
 
   #frame(raw: string): string {
     const parsed = parseFrame(raw);
-    if (parsed.data.length === 0) return '';
+    if (parsed.data.length === 0) return this.#keepalive(raw);
     const data = parsed.data.join('\n').trim();
     if (!data) return '';
 
@@ -380,12 +501,30 @@ export class StreamTranslator {
       return '';
     }
 
+    if (isRecord(payload)) {
+      // Расход читается из ЛЮБОГО кадра, до разбора вида. LiteLLM, а с ним и
+      // платформа компании с OpenRouter, кладут его рядом с непустым `choices`; ждавший его
+      // только в кадре с пустым `choices` разборщик считал ноль на каждом ответе
+      // — и бюджет ключа, и счёт окна у Claude Code молча стояли на месте.
+      this.#takeUsage(payload);
+      // Конверт ошибки — терминальный кадр той стороны, и он старше
+      // `finish_reason` рядом с ним: OpenRouter шлёт оба в одном чанке, и
+      // «причина остановки есть» читалась удачным концом оборванного ответа.
+      if (payload.error !== undefined && payload.error !== null) {
+        return this.#upstreamFailure(
+          isRecord(payload.error)
+            ? payload.error
+            : { message: typeof payload.error === 'string' ? payload.error : '' },
+        );
+      }
+    }
+
     const driver = this.#options.driver;
     const vendorFrame = isRecord(payload) ? driver.readFrame(payload) : undefined;
     if (!vendorFrame) {
       const kind = classifyFrame(payload, driver);
       if (kind === 'delta') return this.#delta(payload as Record<string, unknown>);
-      if (kind === 'usage') return this.#usage(payload as Record<string, unknown>, data);
+      if (kind === 'usage') return this.#usage(data);
       this.#note(
         Object.keys(payload as object)
           .slice(0, 4)
@@ -405,7 +544,7 @@ export class StreamTranslator {
     if (!vendor && Array.isArray(frame.choices)) {
       const clean = this.#stripVendor(frame);
       return frame.choices.length === 0 && frame.usage !== undefined
-        ? this.#usage(clean, JSON.stringify(clean))
+        ? this.#usage(JSON.stringify(clean))
         : this.#delta(clean);
     }
     return vendor;
@@ -425,13 +564,17 @@ export class StreamTranslator {
     return clean;
   }
 
+  #stage(stage: string): void {
+    if (stage && !this.facts.stages.includes(stage) && this.facts.stages.length < MAX_STAGES) {
+      this.facts.stages.push(stage);
+    }
+  }
+
   /** Вендорный кадр: наружу не идёт никогда, в панель — фактом. */
   #vendor(frame: VendorFrame): string {
     if (frame.kind === 'status') {
       const stage = frame.stage ?? '';
-      if (stage && !this.facts.stages.includes(stage) && this.facts.stages.length < MAX_STAGES) {
-        this.facts.stages.push(stage);
-      }
+      this.#stage(stage);
       // compromise: context-managed — сжатие истории видно только этим кадром, поэтому его снимаем в панель
       if (stage === 'summarizing') this.facts.summarized = true;
       return '';
@@ -440,12 +583,12 @@ export class StreamTranslator {
       // Сам факт правки — отдельно от названий: контур вправе прислать кадр без
       // единого имени, и тогда «нарушений нет» означало бы «ничего не меняли».
       this.facts.masked = true;
-      this.#addViolations(readViolations(frame.verdict));
+      this.#addViolations(readViolations(frame.verdict, this.#options.driver.violationNames));
       return '';
     }
     if (frame.kind === 'guardrails') {
       const before = this.facts.violations.length;
-      this.#addViolations(readViolations(frame.verdict));
+      this.#addViolations(readViolations(frame.verdict, this.#options.driver.violationNames));
       // Кадр гардрейлов, из которого не вышло ни имени, ни вердикта, — это
       // форма, которой мост не знает. Молча выбросить её значило бы показать
       // «проверки молчали» там, где они что-то сказали.
@@ -474,8 +617,15 @@ export class StreamTranslator {
       }
       return '';
     }
-    // reasoning и кадры чата платформы: отбрасываем молча — они не про
-    // API-клиента, и подделывать ими ответ мост не станет.
+    if (frame.kind === 'replacement') return this.#replace(frame.text ?? '');
+    if (frame.kind === 'reasoning') {
+      // Наружу не идёт: подделать подписанный блок размышлений мост не может. Но
+      // стадией в след — это единственное свидетельство, что правило
+      // «Размышления модели» до модели дошло (аудит MD-02).
+      this.#stage('reasoning');
+      return '';
+    }
+    // Кадры чата платформы: отбрасываем молча — они не про API-клиента.
     return '';
   }
 
@@ -490,6 +640,16 @@ export class StreamTranslator {
     const text = this.#contentText(delta.content);
     const finishReason =
       isRecord(choice) && typeof choice.finish_reason === 'string' ? choice.finish_reason : '';
+    // «Кончилось ошибкой» — не конец ответа. Текст того же чанка ещё доезжает,
+    // а следом клиент получает ошибку: причину `error` мост в `end_turn` не
+    // переводит никогда.
+    if (finishReason === 'error' && isRecord(choice)) {
+      const kept = text
+        ? this.#delta({ ...payload, choices: [{ ...choice, finish_reason: null }] })
+        : '';
+      return kept + this.#upstreamFailure({});
+    }
+    if (text) this.#raw += text;
     if (finishReason) {
       this.#finishReason = finishReason;
       // Причина остановки — второе (кроме `[DONE]`) слово контура о том, что
@@ -499,12 +659,33 @@ export class StreamTranslator {
 
     // Прослойка включена: текст сначала проходит разбор — вызов, уехавший
     // клиенту текстом, агент показывает человеку вместо того, чтобы выполнить.
-    if (this.#parser) return this.#shimDelta(payload, this.#parser.push(text), finishReason);
+    if (this.#parser) {
+      // Инструменты контура и прослойка — взаимное исключение, и обычной дорогой
+      // такой запрос не собрать; приехать он может разворотом чужого архива.
+      // Кадр вызова здесь пересобирается без `tool_calls`, поэтому вызов контура
+      // до клиента не доедет — и это НАЗЫВАЕТСЯ, а не пропадает молча.
+      if (Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0) {
+        this.#note('вызов контура при включённой прослойке');
+      }
+      return this.#shimDelta(payload, this.#parser.push(text));
+    }
+
+    // Вызов, который контур сделал САМ (Т7, `enterprise-platform_tool_mode: single_turn`).
+    // Копится здесь, а отдаётся в конце ответа: в диалекте OpenAI кадр уходит
+    // клиенту как есть, а в диалекте Anthropic вызова нет вовсе — до ревью Т7
+    // (M1) клиент получал `stop_reason: tool_use` и ни одного блока `tool_use`,
+    // то есть ответ, невалидный по протоколу, и ни строки о потере.
+    this.#collectContourCalls(delta.tool_calls);
 
     if (text) this.#text += text;
     if (this.#options.dialect !== 'anthropic') {
       // Диалект тот же: кадр уходит как пришёл, байт в байт. Пересобирать его
-      // значило бы терять поля, которых мост не знает, — и молча.
+      // значило бы терять поля, которых мост не знает, — и молча. Кроме расхода:
+      // его клиент получает, только если просил, в каком бы чанке он ни ехал.
+      if (payload.usage !== undefined && !this.#options.includeUsage) {
+        const { usage: _usage, ...rest } = payload;
+        return serializeFrame(undefined, JSON.stringify(rest));
+      }
       return serializeFrame(undefined, JSON.stringify(payload));
     }
 
@@ -531,11 +712,7 @@ export class StreamTranslator {
    * `tool_calls`. Отдать и текст вызова, и вызов — значит показать человеку в
    * ответе служебный блок; отдать кадр как есть — значит не отдать вызов вовсе.
    */
-  #shimDelta(
-    payload: Record<string, unknown>,
-    events: readonly ShimEvent[],
-    finishReason: string,
-  ): string {
+  #shimDelta(payload: Record<string, unknown>, events: readonly ShimEvent[]): string {
     let out = '';
     for (const event of events) {
       if (event.type === 'text') {
@@ -549,17 +726,12 @@ export class StreamTranslator {
       this.#noteCalls();
       out += this.#renderCall(prepared.call, payload);
     }
-
-    if (!finishReason) return out;
-    // Причина остановки — слово контура о том, что ответ кончился; всё, что
-    // разборщик ещё держит, надо отдать ДО неё, иначе хвост ответа уедет
-    // клиенту после конца хода и будет им выброшен.
-    out += this.#flushShim();
-    if (this.#options.dialect === 'anthropic') return out;
-    // Саму причину нельзя ни потерять, ни оставить прежней: клиент, получивший
-    // вызов при `finish_reason: "stop"`, выполняет его и на этом заканчивает
-    // ход — ровно так, как если бы вызова не было.
-    return out + this.#openAiFrame(payload, {}, this.#openAiFinish(finishReason));
+    // Причина остановки здесь НЕ отдаётся и хвост разбора не сбрасывается —
+    // оба ждут `[DONE]` (или конца потока). Платформа с гейтом проверок вывода
+    // шлёт придержанный хвост ответа ПОСЛЕ чанка с `finish_reason`
+    // (`router.py:988–996`): сброшенный на причине разборщик терял вызов,
+    // закрывающий тег которого ехал в этом хвосте.
+    return out;
   }
 
   /** Текст ответа — в диалекте клиента. */
@@ -627,6 +799,98 @@ export class StreamTranslator {
     return out + this.#stopBlock();
   }
 
+  /**
+   * Куски вызова контура: имя приезжает однажды, аргументы дописываются.
+   *
+   * Собираем ВСЕГДА, а не только для диалекта Anthropic: счётчик вызовов
+   * контура человек читает и там, где кадр ушёл клиенту как есть, — иначе
+   * «контур звал свои инструменты» видно только у одного из двух видов CLI.
+   */
+  #collectContourCalls(raw: unknown): void {
+    if (!Array.isArray(raw)) return;
+    for (const item of raw) {
+      if (!isRecord(item)) continue;
+      const index = typeof item.index === 'number' ? item.index : this.#contourCalls.size;
+      const fn = isRecord(item.function) ? item.function : {};
+      const held = this.#contourCalls.get(index) ?? { id: '', name: '', args: '' };
+      this.#contourCalls.set(index, {
+        id: typeof item.id === 'string' && item.id ? item.id : held.id,
+        name: typeof fn.name === 'string' && fn.name ? fn.name : held.name,
+        args: held.args + (typeof fn.arguments === 'string' ? fn.arguments : ''),
+      });
+    }
+    this.facts.contourCalls = this.#contourCalls.size;
+  }
+
+  /**
+   * Куски вызовов контура — цельными вызовами. Считается один раз: пометки об
+   * испорченных вызовах не должны вставать дважды.
+   *
+   * Безымянный кусок вызовом не становится — он называется пометкой, потому что
+   * блок `tool_use` без имени клиент разбирает как поломку панели.
+   */
+  #buildContourCalls(): ShimCall[] {
+    if (this.#contourReady) return this.#contourReady;
+    const ready: ShimCall[] = [];
+    for (const call of this.#contourCalls.values()) {
+      if (!call.name) {
+        this.#noteFlaw('вызов контура без имени');
+        continue;
+      }
+      // Строго, без ремонта: аргументы собрал сервер контура, а не модель, и
+      // «почини как-нибудь» здесь означало бы выполнить догадку над файлами
+      // человека. Пусто — это законный вызов без аргументов.
+      const args = call.args.trim() ? strictObject(call.args) : {};
+      if (!args) {
+        this.#noteFlaw(`аргументы вызова контура не разбираются: ${call.name}`);
+        continue;
+      }
+      // Вызов контура едет в файлы человека так же, как вызов прослойки, и метки
+      // в нём проверяются так же. Решение — за закрытием ответа: здесь вызов
+      // только не становится готовым. В своём диалекте потоком кадры вызова уже
+      // ушли клиенту байт в байт, и остановить их нечем — проверка работает там,
+      // где вызов собирает сам мост: у Anthropic и в цельном теле.
+      const prepared = this.#prepareCall({
+        id: call.id || `contour_${ready.length}`,
+        name: call.name,
+        arguments: args,
+        round: 'none',
+      });
+      if ('stray' in prepared) {
+        for (const token of prepared.stray) {
+          if (!this.#contourStray.includes(token)) this.#contourStray.push(token);
+        }
+        continue;
+      }
+      ready.push(prepared.call);
+    }
+    this.#contourReady = ready;
+    return ready;
+  }
+
+  /**
+   * Вызовы контура — блоками `tool_use` клиенту диалекта Anthropic.
+   *
+   * Зовётся один раз, на закрытии сообщения: раньше конца ответа аргументы ещё
+   * не дописаны, и блок уехал бы с половиной JSON.
+   */
+  #flushContourCalls(): string {
+    if (this.#options.dialect !== 'anthropic' || this.#contourCalls.size === 0) return '';
+    const ready = this.#buildContourCalls();
+    if (this.#contourStray.length > 0) return this.#maskStop(this.#contourStray);
+    let out = '';
+    for (const call of ready) {
+      this.#calls.push(call);
+      out += this.#renderCall(call, {});
+    }
+    return out;
+  }
+
+  /** Пометка о вызове, который вызовом не стал, — без повторов. */
+  #noteFlaw(reason: string): void {
+    if (!this.facts.toolFlaws.includes(reason)) this.facts.toolFlaws.push(reason);
+  }
+
   /** Кадр диалекта OpenAI с нашей начинкой; скелет берётся у кадра контура. */
   #openAiFrame(
     payload: Record<string, unknown>,
@@ -643,9 +907,58 @@ export class StreamTranslator {
     return serializeFrame(undefined, JSON.stringify(frame));
   }
 
-  /** Причина остановки для клиента: вызов был — значит ход не закончен. */
-  #openAiFinish(finishReason: string): string {
-    return this.#calls.length > 0 ? 'tool_calls' : finishReason;
+  /**
+   * Причина остановки для клиента OpenAI: вызов был — значит ход не закончен.
+   *
+   * И обратно: `tool_calls` без единого вызова клиент читает как «ход идёт» и
+   * ждёт вызов, которого нет. Контур вправе назвать такую причину и тогда, когда
+   * собрать вызов не вышло, — это называется пометкой, а клиенту уходит `stop`.
+   */
+  #finishOf(calls: number): string {
+    if (calls > 0) return 'tool_calls';
+    if (this.#finishReason === 'tool_calls') {
+      this.#noteFlaw('причина остановки «вызов» без единого вызова');
+      return 'stop';
+    }
+    return this.#finishReason || 'stop';
+  }
+
+  /**
+   * Закрытие ответа в диалекте OpenAI: хвост разбора, причина остановки, расход,
+   * `[DONE]` — именно в этом порядке и именно здесь, а не на `finish_reason`.
+   *
+   * Без прослойки кадры ушли клиенту как есть, причина остановки — вместе с ними,
+   * и дописать остаётся только `[DONE]`.
+   */
+  #closeOpenAi(): string {
+    let out = this.#flushShim();
+    // Сброс хвоста мог остановить ход по метке — ошибка с `[DONE]` уже ушла.
+    if (this.#closed) return out;
+    if (this.#parser) {
+      // Саму причину нельзя ни потерять, ни оставить прежней: клиент, получивший
+      // вызов при `finish_reason: "stop"`, выполняет его и на этом заканчивает
+      // ход — ровно так, как если бы вызова не было.
+      out += this.#openAiFrame({}, {}, this.#finishOf(this.#calls.length));
+      // Пересобранные кадры расхода не несут, а просивший его клиент ждёт его
+      // отдельным кадром с пустым `choices` — после причины остановки.
+      if (this.#options.includeUsage && this.#usageSeen) {
+        out += serializeFrame(
+          undefined,
+          JSON.stringify({
+            id: this.#id,
+            object: 'chat.completion.chunk',
+            model: this.#model,
+            choices: [],
+            usage: {
+              prompt_tokens: this.facts.promptTokens,
+              completion_tokens: this.facts.completionTokens,
+              total_tokens: this.facts.totalTokens,
+            },
+          }),
+        );
+      }
+    }
+    return out + DONE_FRAME;
   }
 
   /**
@@ -708,6 +1021,14 @@ export class StreamTranslator {
   #prepareCall(call: ShimCall): { call: ShimCall } | { stray: string[] } {
     const args = expandContourAliases(call.arguments, this.#contourAliases);
     const stray = strayAliases(args, this.#options.shim?.aliases ?? EMPTY_ALIASES);
+    const platform = this.#options.placeholders;
+    // Метка платформы спрашивается, только если платформа сама сказала, что
+    // подменяла: без этого слова `[TODO_1]` в тексте файла — просто текст.
+    if (platform && this.facts.masked) {
+      for (const token of strayPlatformLabels(args, platform.pattern, platform.sent)) {
+        if (!stray.includes(token)) stray.push(token);
+      }
+    }
     if (stray.length > 0) return { stray };
     return { call: { ...call, arguments: args } };
   }
@@ -720,7 +1041,7 @@ export class StreamTranslator {
    * её в файле, где человек найдёт её не сегодня.
    */
   #maskStop(stray: string[]): string {
-    // compromise: tool-shim — вызов синтезируется из текста, и метка в аргументе останавливает ход
+    // compromise: mask-unrestorable — метку, которую нечем развернуть, вызов в файл не пропускает
     this.facts.maskStop = stray;
     this.facts.interrupted = true;
     const names = stray.join(', ');
@@ -731,7 +1052,10 @@ export class StreamTranslator {
 
   /** Причина остановки в диалекте Anthropic: вызов перебивает любую другую. */
   #stopReason(): string {
-    return this.#calls.length > 0 ? 'tool_use' : stopReasonOf(this.#finishReason || 'stop');
+    if (this.#calls.length === 0 && this.#finishReason === 'tool_calls') {
+      this.#noteFlaw('причина остановки «вызов» без единого вызова');
+    }
+    return stopReasonOf(this.#finishReason || 'stop', this.#calls.length);
   }
 
   #noteCalls(): void {
@@ -761,7 +1085,10 @@ export class StreamTranslator {
       // Потеря считается только там, где она есть. В своём диалекте кадр уходит
       // клиенту байт в байт вместе с этой частью — записать её в потерянное
       // значило бы соврать человеку о целом ответе.
-      if (this.#options.dialect !== 'anthropic') continue;
+      if (this.#options.dialect !== 'anthropic') {
+        this.#keepPart(part);
+        continue;
+      }
       const type = isRecord(part) && typeof part.type === 'string' ? part.type : 'часть';
       const name = `content[].${type}`;
       if (!this.facts.droppedParts.includes(name) && this.facts.droppedParts.length < 4) {
@@ -771,29 +1098,138 @@ export class StreamTranslator {
     return text;
   }
 
-  /** Финальный чанк с расходом: учёт — всегда, клиенту — только если просил. */
-  #usage(payload: Record<string, unknown>, raw: string): string {
-    const usage = isRecord(payload.usage) ? payload.usage : {};
-    this.facts.promptTokens = numberOf(usage.prompt_tokens);
-    this.facts.completionTokens = numberOf(usage.completion_tokens);
-    this.facts.totalTokens =
-      numberOf(usage.total_tokens) || this.facts.promptTokens + this.facts.completionTokens;
+  /**
+   * Часть содержимого, которая не текст, — для цельного тела (Т9).
+   *
+   * Потолок есть: ответ с десятком картинок иначе лежал бы в памяти панели
+   * дважды — кусками потока и собранным телом. Превышение НАЗЫВАЕТСЯ пометкой
+   * потери, потому что молча обнулённая картинка и есть тот самый пустой ответ,
+   * о котором человек ничего не узнаёт.
+   */
+  #keepPart(part: unknown): void {
+    this.facts.imageBytes += partBytes(part);
+    if (this.#parts.length >= MAX_CONTENT_PARTS) {
+      const name = 'content[].сверх предела';
+      if (!this.facts.droppedParts.includes(name)) this.facts.droppedParts.push(name);
+      return;
+    }
+    this.#parts.push(part);
+  }
 
+  /**
+   * Кадр только с расходом (`choices: []`). Учёт снят раньше, в `#takeUsage`;
+   * здесь решается одно — ехать ли кадру клиенту. С прослойкой он не едет сейчас:
+   * причина остановки ждёт `[DONE]`, а расход обязан прийти после неё.
+   */
+  #usage(raw: string): string {
     if (this.#closed) return '';
-    if (this.#options.dialect === 'anthropic') return '';
+    if (this.#options.dialect === 'anthropic' || this.#parser) return '';
     return this.#options.includeUsage ? serializeFrame(undefined, raw) : '';
+  }
+
+  /** Расход из любого кадра; последний ненулевой побеждает. */
+  #takeUsage(payload: Record<string, unknown>): void {
+    if (!isRecord(payload.usage)) return;
+    const prompt = numberOf(payload.usage.prompt_tokens);
+    const completion = numberOf(payload.usage.completion_tokens);
+    const total = numberOf(payload.usage.total_tokens) || prompt + completion;
+    this.#usageSeen = true;
+    // Нулевой расход рядом с ненулевым — это промежуточный чанк, а не итог:
+    // поверх итога он записал бы ноль.
+    if (total === 0) return;
+    this.facts.promptTokens = prompt;
+    this.facts.completionTokens = completion;
+    this.facts.totalTokens = total;
   }
 
   #done(): string {
     this.#complete = true;
     if (this.#closed) return '';
     this.#finished = true;
-    if (this.#options.dialect === 'anthropic') return this.#closeAnthropic();
     // Придержанный хвост — раньше `[DONE]`, и здесь тоже: после этого кадра
     // клиент читать перестаёт, а хвост — это и весь ответ, начавшийся со
-    // скобки, и недоразобранный забор. Без этой строки собранный из него вызов
-    // уходил уже за `[DONE]`, то есть в никуда, а счётчик рапортовал успех.
-    return this.#flushShim() + DONE_FRAME;
+    // скобки, и недоразобранный забор. Без этого собранный из него вызов уходил
+    // уже за `[DONE]`, то есть в никуда, а счётчик рапортовал успех.
+    return this.#options.dialect === 'anthropic' ? this.#closeAnthropic() : this.#closeOpenAi();
+  }
+
+  /**
+   * Комментарий потока (`: keepalive`, `: OPENROUTER PROCESSING`). Та сторона
+   * шлёт его, пока думает сама — долгий цикл инструментов у платформа компании идёт минутами.
+   * Проглоченный, он оставлял клиента в тишине, и клиент с таймаутом простоя
+   * рвал живой ответ. Anthropic ждёт `ping`, OpenAI — тот же комментарий.
+   */
+  #keepalive(raw: string): string {
+    if (this.#closed || !/^:/m.test(raw)) return '';
+    return this.#options.dialect === 'anthropic'
+      ? serializeFrame('ping', JSON.stringify({ type: 'ping' }))
+      : ': keepalive\n\n';
+  }
+
+  /**
+   * Ошибка, которую та сторона назвала кадром. Терминальная, как и обрыв
+   * проверками, но причина у неё своя и уходит клиенту словами той стороны.
+   *
+   * Поток при этом ЗАКОНЧЕН, а не оборван: `[DONE]` за конвертом ошибки не идёт
+   * по устройству (`provider_errors.py sse_error_event`), и без этой отметки
+   * конец потока дописал бы поверх настоящей причины «ответ оборвался».
+   */
+  #upstreamFailure(error: Record<string, unknown>): string {
+    const code = upstreamErrorCode(error);
+    const said = typeof error.message === 'string' ? error.message.trim().slice(0, 500) : '';
+    const message = said || 'та сторона закончила ответ ошибкой и не назвала её';
+    this.#complete = true;
+    if (this.#closed) return '';
+    this.facts.upstreamError = { code, message };
+    return this.#abortShim() + this.#terminal(`Контур прервал ответ: ${message}`, code);
+  }
+
+  /**
+   * Итоговый текст платформы.
+   *
+   * Совпал с потоком — сказать нечего. Продолжает поток — клиенту уходит только
+   * недоставленный хвост, обычной дельтой и через прослойку: закрывающий тег
+   * вызова вправе оказаться именно в нём. Разошёлся — забрать отданное нельзя:
+   * это факт следа, а итоговый текст несёт цельное тело.
+   */
+  #replace(final: string): string {
+    if (this.#closed || final === this.#raw) return '';
+    if (final.startsWith(this.#raw)) {
+      return this.#delta({
+        id: this.#id,
+        object: 'chat.completion.chunk',
+        model: this.#model,
+        choices: [{ index: 0, delta: { content: final.slice(this.#raw.length) } }],
+      });
+    }
+    this.facts.rewritten = 'diverged';
+    this.#replacement = final;
+    return '';
+  }
+
+  /**
+   * Итоговый текст платформы — текстом и вызовами для цельного тела. Тем же
+   * разборщиком и с теми же проверками меток, что и поток: второй путь «на
+   * цельное тело» разошёлся бы с первым молча.
+   */
+  #replaced(final: string): { text: string; calls: ShimCall[] } {
+    const shim = this.#options.shim;
+    if (!shim) return { text: final, calls: [] };
+    const parsed = parseToolCalls(final, { allowed: shim.allowed });
+    const calls: ShimCall[] = [];
+    for (const call of parsed.calls) {
+      const prepared = this.#prepareCall(call);
+      if ('stray' in prepared) {
+        this.#maskStop(prepared.stray);
+        continue;
+      }
+      calls.push(prepared.call);
+    }
+    for (const flaw of parsed.flaws) {
+      this.#noteFlaw(flaw.name ? `${flaw.reason}: ${flaw.name}` : flaw.reason);
+    }
+    this.facts.toolCalls = calls.length;
+    return { text: parsed.text, calls };
   }
 
   /**
@@ -821,16 +1257,7 @@ export class StreamTranslator {
     this.#finished = true;
 
     if (this.#options.dialect === 'anthropic') {
-      return serializeFrame(
-        'error',
-        JSON.stringify(
-          errorBody(
-            'anthropic',
-            message,
-            code === 'api_error' ? 'api_error' : 'invalid_request_error',
-          ),
-        ),
-      );
+      return serializeFrame('error', JSON.stringify(errorBody('anthropic', message, code)));
     }
     return (
       serializeFrame(undefined, JSON.stringify(errorBody('openai-compat', message, code))) +
@@ -894,7 +1321,16 @@ export class StreamTranslator {
     // пока тот может оказаться началом тега, и без этого последние знаки ответа
     // (а с ними и незакрытый блок) просто не доехали бы.
     if (this.#parser) out += this.#flushShim();
-    if (this.#textOpen || !this.#parser) out += this.#stopBlock();
+    // Сброс хвоста остановил ход по метке: `event: error` уже ушёл, и
+    // `message_stop` после него клиент прочёл бы удачным концом.
+    if (this.#closed) return out;
+    // Вызовы контура — после текста и до причины остановки: клиент, увидевший
+    // `stop_reason: tool_use` раньше блока, считает ответ испорченным. Блок
+    // текста закрывает первый же вызов, поэтому второй раз его закрывать нельзя.
+    const contour = this.#flushContourCalls();
+    if (this.#closed) return out + contour;
+    if (contour) out += contour;
+    else if (this.#textOpen || !this.#parser) out += this.#stopBlock();
     out += serializeFrame(
       'message_delta',
       JSON.stringify({

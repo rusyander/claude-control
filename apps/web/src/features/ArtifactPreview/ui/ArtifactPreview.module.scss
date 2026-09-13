@@ -37,6 +37,34 @@
   padding: var(--spacing-md);
 }
 
+// Скачивание нарисованной картинки — настоящая ссылка, а не кнопка: сохранение
+// файла делает браузер, а на телефоне — система, и обоим нужен href.
+.download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--color-fg-muted);
+
+  &:hover {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+}
+
+// Описание, по которому нарисовано: подпись под картинкой.
+.caption {
+  padding: 0 var(--spacing-md) var(--spacing-md);
+  overflow-wrap: anywhere;
+}
+
 .document {
   padding: var(--spacing-lg);
   overflow-wrap: anywhere;

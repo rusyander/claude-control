@@ -165,6 +165,7 @@ export interface ShimmedRequest {
 export function shimOpenAiRequest(
   body: Record<string, unknown>,
   protocolText: string,
+  requestFields: Readonly<Record<string, unknown>> = {},
 ): ShimmedRequest {
   const tools = readTools(body.tools);
   const names = toolNamesById(body.messages);
@@ -172,10 +173,15 @@ export function shimOpenAiRequest(
 
   const out: Record<string, unknown> = { ...body };
   delete out.tools;
+  // Без `tools` оба поля строгий шлюз отвергает запросом целиком — выбирать
+  // модели больше не из чего, протокол у неё в системной строке.
+  delete out.tool_choice;
+  delete out.parallel_tool_calls;
   // Инструменты САМОЙ платформы остаются выключенными, пока человек их не
   // включил (Т7): свой набор она подбирает сама, и включённым он перебивал бы
-  // протокол, которому мы только что научили модель.
-  out.tool_choice = 'none';
+  // протокол, которому мы только что научили модель. Чем они гасятся — знание
+  // драйвера, а не прослойки.
+  Object.assign(out, requestFields);
 
   const messages: Record<string, unknown>[] = [];
   let dropped = false;

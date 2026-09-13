@@ -5,6 +5,10 @@
     "jsx": "react-jsx",
     "types": ["vite/client"],
     "noEmit": true,
+    // Контракты — исходники, и там относительный импорт значения несёт `.ts`
+    // (иначе сервер не стартует, см. их tsconfig). Флаг нужен и здесь: эти файлы
+    // попадают в программу фронта.
+    "allowImportingTsExtensions": true,
     "baseUrl": ".",
     "paths": {
       "@app/*": ["./src/app/*"],

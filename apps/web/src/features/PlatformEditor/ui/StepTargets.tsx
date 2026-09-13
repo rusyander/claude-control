@@ -4,6 +4,7 @@ import {
   PLATFORM_ASSISTANT_TARGET,
   PLATFORM_TERMINAL_CONSUMER,
   foreignProviderId,
+  type CompromiseId,
   type PlatformApplyTarget,
   type PlatformConsumerOption,
 } from '@agentdeck/contracts';
@@ -17,7 +18,7 @@ import { SkeletonList } from '@shared/ui/skeleton';
 import { StatusDot } from '@shared/ui/status-dot';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
 import { TruncatedText } from '@shared/ui/truncated-text';
-import { sortApplyTargets, validatePlatform } from '@entities/Platform';
+import { sortApplyTargets, toolRouteMark, toolRouteOf, validatePlatform } from '@entities/Platform';
 import { budgetFromText } from '../model/wizard-logic';
 import type { WizardStepProps } from './PlatformWizard.types';
 import styles from './PlatformWizard.module.scss';
@@ -35,6 +36,11 @@ export function StepTargets({ model }: WizardStepProps) {
   const { t } = useTranslation();
   const plan = model.plan.data;
   const gatewayRunning = model.gateway?.status.running ?? false;
+  // Подпись у CLI — по решению шлюза из плана (DRV-13): совместимому шлюзу
+  // инструменты уходят полем, и «работает как чат» там было бы неправдой.
+  const toolMark = toolRouteMark(
+    toolRouteOf({ toolRoute: plan?.toolRoute, platform: model.draft }),
+  );
 
   // Бюджет держим СТРОКОЙ, пока человек его набирает: почему именно так —
   // в `budgetFromText`.
@@ -89,6 +95,7 @@ export function StepTargets({ model }: WizardStepProps) {
             // сохранённому контуру, и галочка, поставленная минуту назад,
             // отскакивала бы обратно при каждом обновлении плана.
             checked={model.draft.consumers.includes(consumer.id)}
+            toolMark={toolMark}
             fileWins={fileWins(consumer)}
             onToggle={() => model.toggleConsumer(consumer.id)}
           />
@@ -122,6 +129,7 @@ export function StepTargets({ model }: WizardStepProps) {
                   target={target}
                   checked={model.targets.includes(target.targetId)}
                   overwrite={model.overwrite.includes(target.targetId)}
+                  toolMark={toolMark}
                   onToggle={() => model.toggleTarget(target.targetId)}
                   onToggleOverwrite={() => model.toggleOverwrite(target.targetId)}
                 />
@@ -241,6 +249,8 @@ export function StepTargets({ model }: WizardStepProps) {
 interface ConsumerRowProps {
   consumer: PlatformConsumerOption;
   checked: boolean;
+  /** Подпись о том, чем дойдут инструменты прогона; нет — доходят полем. */
+  toolMark: CompromiseId | null;
   /** Галочка снята, но файл этого CLI применён — и он сильнее (см. `fileWins`). */
   fileWins: boolean;
   onToggle: () => void;
@@ -252,7 +262,7 @@ interface ConsumerRowProps {
  * сказать это словом честнее, чем дать галочку, которая сделает больше
  * обещанного.
  */
-function ConsumerRow({ consumer, checked, fileWins, onToggle }: ConsumerRowProps) {
+function ConsumerRow({ consumer, checked, toolMark, fileWins, onToggle }: ConsumerRowProps) {
   const { t } = useTranslation();
   // Имя собственное чужого CLI приходит с сервера; встроенных потребителей
   // называет клиент — сервер языка интерфейса не знает.
@@ -281,9 +291,9 @@ function ConsumerRow({ consumer, checked, fileWins, onToggle }: ConsumerRowProps
         <Typography variant="caption" color="muted" as="span">
           {t(`platform.consumerScope.${consumer.scope}`)}
         </Typography>
-        {/* Через шлюз у CLI нет своих инструментов — это относится к прогонам, а
-            не к ассистенту панели и не к записи в файлы. */}
-        {consumer.scope === 'run' && <CompromiseMark id="no-client-tools" />}
+        {/* Чем дойдут инструменты CLI — это про прогоны, а не про ассистента
+            панели и не про запись в файлы. */}
+        {consumer.scope === 'run' && toolMark && <CompromiseMark id={toolMark} />}
       </label>
 
       {consumer.id === PLATFORM_TERMINAL_CONSUMER && (
@@ -305,6 +315,8 @@ interface TargetRowProps {
   target: PlatformApplyTarget;
   checked: boolean;
   overwrite: boolean;
+  /** Подпись о том, чем дойдут инструменты CLI; нет — доходят полем, подписывать нечего. */
+  toolMark: CompromiseId | null;
   onToggle: () => void;
   onToggleOverwrite: () => void;
 }
@@ -315,7 +327,14 @@ interface TargetRowProps {
  * переменных нет, переменная не задокументирована, диалект шлюзу не по зубам,
  * шлюз не поднят).
  */
-function TargetRow({ target, checked, overwrite, onToggle, onToggleOverwrite }: TargetRowProps) {
+function TargetRow({
+  target,
+  checked,
+  overwrite,
+  toolMark,
+  onToggle,
+  onToggleOverwrite,
+}: TargetRowProps) {
   const { t } = useTranslation();
   const isAssistant = target.targetId === PLATFORM_ASSISTANT_TARGET;
 
@@ -345,7 +364,7 @@ function TargetRow({ target, checked, overwrite, onToggle, onToggleOverwrite }: 
             {t('platform.targetRecommended')}
           </Typography>
         ) : (
-          <CompromiseMark id="no-client-tools" />
+          toolMark && <CompromiseMark id={toolMark} />
         )}
       </label>
 

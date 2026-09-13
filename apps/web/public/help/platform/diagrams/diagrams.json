@@ -9,7 +9,7 @@
       "source": "09e6210bbf623307",
       "width": 1060,
       "height": 1218,
-      "exportedAt": "2026-09-11T14:33:36.456Z"
+      "exportedAt": "2026-09-13T09:58:18.404Z"
     },
     {
       "name": "who-creates-what",
@@ -18,7 +18,7 @@
       "source": "6eb4d5db3b98892d",
       "width": 1118,
       "height": 1008,
-      "exportedAt": "2026-09-11T14:33:39.520Z"
+      "exportedAt": "2026-09-13T09:58:21.443Z"
     },
     {
       "name": "two-systems",
@@ -27,7 +27,16 @@
       "source": "31b4487f9983bbc2",
       "width": 1717,
       "height": 1328,
-      "exportedAt": "2026-09-11T14:33:42.664Z"
+      "exportedAt": "2026-09-13T09:58:24.644Z"
+    },
+    {
+      "name": "tool-shim",
+      "file": "tool-shim.png",
+      "page": 4,
+      "source": "73ebc868e810dfe2",
+      "width": 1058,
+      "height": 1168,
+      "exportedAt": "2026-09-13T09:58:27.683Z"
     }
   ]
 }

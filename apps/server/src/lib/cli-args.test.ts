@@ -42,9 +42,31 @@ describe('cli-args', () => {
       expect(safeModel('claude-opus-4-8[1m]')).toBe('claude-opus-4-8[1m]');
     });
 
+    it('пропускает имена моделей контура — с двоеточием и косой', () => {
+      // Найдено живым прогоном 12.09.2026: `qwen2.5:7b` не проходил белый
+      // список, и модель контура молча не доезжала до `--model` — прогон уходил
+      // с моделью, которую CLI выберет сам.
+      expect(safeModel('qwen2.5:7b')).toBe('qwen2.5:7b');
+      expect(safeModel('vendor/gpt-4o')).toBe('vendor/gpt-4o');
+    });
+
+    it('пропускает версию модели через @ и длинный ARN профиля вывода', () => {
+      // Ревью Т6 (m1): соседи починенного дефекта. Имя панель не придумывает —
+      // она предлагает то, что прислал каталог контура, и выброшенное имя
+      // означает прогон чужой моделью без единой строки на экране.
+      expect(safeModel('gemini-1.5-pro@002')).toBe('gemini-1.5-pro@002');
+      const arn =
+        'arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-sonnet-4-5-v1:0';
+      expect(safeModel(arn)).toBe(arn);
+    });
+
     it('отбрасывает имя с пробелом или инъекцией', () => {
       expect(safeModel('opus & calc')).toBeUndefined();
       expect(safeModel('model`whoami`')).toBeUndefined();
+      // Двоеточие пустило в список ещё и это — проверяем, что не пустило:
+      // оболочка cmd.exe склеивает аргументы обратно в строку.
+      expect(safeModel('opus|calc')).toBeUndefined();
+      expect(safeModel('opus>out.txt')).toBeUndefined();
     });
   });
 

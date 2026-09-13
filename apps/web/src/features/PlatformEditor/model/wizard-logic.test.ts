@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { defaultOurRules } from '@agentdeck/contracts';
 import type { Platform, PlatformProbeResult, PlatformStatus } from '@agentdeck/contracts';
 import {
   WIZARD_STEPS,
@@ -6,12 +7,14 @@ import {
   confirmedCapabilities,
   draftWithPatch,
   initialTargets,
+  manifestWithField,
   needsGatewayEnable,
   savePayload,
   stepAfter,
   stepBefore,
   toggled,
 } from './wizard-logic';
+import { defaultPlatformTransport } from '@agentdeck/contracts';
 
 /**
  * Решения мастера подключения.
@@ -38,7 +41,20 @@ const DRAFT: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: {
+    platform: {
+      platformTools: [],
+      toolMode: 'loop' as const,
+      generationPreset: '',
+      enableThinking: 'default',
+    },
+    ours: defaultOurRules(),
+  },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 const probe = (overrides: Partial<PlatformProbeResult> = {}): PlatformProbeResult => ({
@@ -87,6 +103,45 @@ describe('черновик', () => {
     const next = draftWithPatch(DRAFT, { budgetUsd: 100 }, false);
     expect(next.id).toBe(DRAFT.id);
     expect(next.budgetUsd).toBe(100);
+  });
+
+  it('новый контур: смена драйвера приносит его умолчания прослойки и промпта', () => {
+    // Совместимый шлюз принимает `tools` полем: прослойка и короткий промпт,
+    // написанные ради моделей платформа компании, там только стоят места в каждом запросе
+    // и подменяют системный промпт CLI (аудит DRV-20).
+    const compat = draftWithPatch(DRAFT, { driver: 'openai-compat' }, true, true);
+    expect(compat.toolShim).toBe(false);
+    expect(compat.contourPrompt).toBe(false);
+    const back = draftWithPatch(compat, { driver: 'enterprise-platform' }, true, true);
+    expect(back.toolShim).toBe(true);
+    expect(back.contourPrompt).toBe(true);
+  });
+
+  it('новый контур: пресет шлюза приносит свои умолчания, переопределения прежнего уходят', () => {
+    const vllm = draftWithPatch(
+      { ...DRAFT, manifest: { anthropicMessages: '' } },
+      { driver: 'vllm' },
+      true,
+      true,
+    );
+    expect(vllm.toolShim).toBe(false);
+    expect(vllm.manifest).toBeUndefined();
+  });
+
+  it('переопределение: «как у пресета» убирает поле, «не объявлено» остаётся пустой строкой', () => {
+    const none = manifestWithField(undefined, 'anthropicMessages', '');
+    expect(none).toEqual({ anthropicMessages: '' });
+    const both = manifestWithField(none, 'imagesApi', 'images/generations');
+    expect(both).toEqual({ anthropicMessages: '', imagesApi: 'images/generations' });
+    expect(manifestWithField(both, 'imagesApi', undefined)).toEqual({ anthropicMessages: '' });
+    expect(manifestWithField(none, 'anthropicMessages', undefined)).toBeUndefined();
+  });
+
+  it('сохранённый контур при смене драйвера выбор человека не трогает', () => {
+    const edited = { ...DRAFT, toolShim: false, contourPrompt: true };
+    const next = draftWithPatch(edited, { driver: 'openai-compat' }, true, false);
+    expect(next.toolShim).toBe(false);
+    expect(next.contourPrompt).toBe(true);
   });
 });
 

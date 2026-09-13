@@ -22,7 +22,11 @@
  *   5. агент тестов — отдельное место запуска, и его галочка работает там же;
  *   6. чат чужого CLI с отмеченной галочкой `foreign:<cli>` тоже получает
  *      адрес — в переменных, которые задокументированы у ЭТОГО CLI, — а со
- *      снятой идёт своим провайдером.
+ *      снятой идёт своим провайдером;
+ *   7. снятые нами слои (Т8) доезжают до argv процесса флагами, дописка панели
+ *      к системному промпту не уезжает вовсе, а брокер прав встаёт ПОСЛЕ
+ *      `--strict-mcp-config` и потому переживает его. Что каждый флаг делает с
+ *      настоящим CLI — отдельная проверка, `check-run-layers.mjs`.
  *
  * Запуск: node tools/qa/check-platform-run-env.mjs
  */
@@ -39,6 +43,10 @@ const SECRET = ['contour', 'live', 'key', '9f3c'].join('-');
 const CONTOUR = 'live-enterprise-platform';
 const MODEL = 'qwen2.5:7b';
 const DUMP = 'cc-env-dump.txt';
+/** Ключ строки с argv в том же файле: разбор у него общий с переменными. */
+const ARGV_KEY = 'CC_ARGV';
+/** Копия системного промпта, снятая фальшивым CLI, пока файл панели ещё жив. */
+const SYSTEM_PROMPT_COPY = 'cc-system-prompt.txt';
 /** Чужой CLI для проверки: у него задокументирован и неинтерактивный флаг, и раздел переменных. */
 const FOREIGN = 'qwen';
 
@@ -69,13 +77,38 @@ async function waitForDump(dir, seconds = 30) {
   return undefined;
 }
 
-/** Фальшивый CLI под этим именем: печатает окружение в рабочую папку прогона. */
+/**
+ * Фальшивый CLI под этим именем: печатает окружение и СВОЙ argv в рабочую папку
+ * прогона.
+ *
+ * Argv здесь не для полноты: модель прогона уезжает флагом `--model`, и этот
+ * флаг сильнее адресной переменной (Т6). Проверять модель по окружению значило
+ * бы проверять то, что CLI перебьёт на следующей строке.
+ *
+ * Файл `--system-prompt-file` копируется ДО выгрузки: панель стирает свою
+ * временную папку, как только процесс вышел, а проверка ждёт именно выгрузку.
+ */
 function fakeCli(bin, name) {
   if (isWindows) {
-    writeFileSync(join(bin, `${name}.cmd`), `@echo off\r\nset > "%CD%\\${DUMP}"\r\nexit /b 0\r\n`);
+    const scan =
+      `:scan\r\nif "%~1"=="" goto dump\r\n` +
+      `if "%~1"=="--system-prompt-file" copy /y "%~2" "%CD%\\${SYSTEM_PROMPT_COPY}" >nul\r\n` +
+      `shift\r\ngoto scan\r\n:dump\r\n`;
+    writeFileSync(
+      join(bin, `${name}.cmd`),
+      `@echo off\r\n${scan}set > "%CD%\\${DUMP}"\r\necho ${ARGV_KEY}=%* >> "%CD%\\${DUMP}"\r\nexit /b 0\r\n`,
+    );
     return;
   }
-  writeFileSync(join(bin, name), `#!/bin/sh\nenv > "$PWD/${DUMP}"\nexit 0\n`, { mode: 0o755 });
+  const scan =
+    `prev=""\nfor a in "$@"; do\n` +
+    `  [ "$prev" = "--system-prompt-file" ] && cp "$a" "$PWD/${SYSTEM_PROMPT_COPY}"\n` +
+    `  prev="$a"\ndone\n`;
+  writeFileSync(
+    join(bin, name),
+    `#!/bin/sh\n${scan}env > "$PWD/${DUMP}"\necho "${ARGV_KEY}=$@" >> "$PWD/${DUMP}"\nexit 0\n`,
+    { mode: 0o755 },
+  );
 }
 
 const platform = {
@@ -92,6 +125,10 @@ const platform = {
   consumers: ['chat'],
   projectPaths: [],
   agents: [],
+  // Как у сохранённого панелью контура: схема настроек ставит оба по умолчанию,
+  // а запись в обход неё без поля выключила бы промпт контура молча.
+  toolShim: true,
+  contourPrompt: true,
   caCertPath: '',
 };
 
@@ -106,6 +143,7 @@ async function main() {
   const { buildManagedProfile, PLACEHOLDER_KEY } =
     await import('../../apps/server/src/domains/platform/apply/profile.ts');
   const { resolveRunRoute } = await import('../../apps/server/src/domains/platform/routing.ts');
+  const { promptText } = await import('../../apps/server/src/domains/prompts.ts');
   const { ChatRunRegistry } = await import('../../apps/server/src/domains/chat/ChatRunRegistry.ts');
   const { ProjectTestRunRegistry } =
     await import('../../apps/server/src/domains/project-tests/runs.ts');
@@ -115,6 +153,8 @@ async function main() {
     await import('../../apps/server/src/domains/provider-chat/ProviderChatService.ts');
   const { createChat } = await import('../../apps/server/src/domains/provider-chat/store.ts');
   const { getProvider } = await import('../../apps/server/src/providers/registry.ts');
+  const { defaultOurRules, defaultPlatformRules } =
+    await import('../../packages/contracts/src/platform.ts');
 
   const appData = mkdtempSync(join(tmpdir(), 'cc-t3-appdata-'));
   const configDir = mkdtempSync(join(tmpdir(), 'cc-t3-config-'));
@@ -162,9 +202,21 @@ async function main() {
       appDataDir: appData,
       gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
     };
-    const runRoute = (origin) => {
-      const decision = resolveRunRoute(deps, origin);
-      return decision.routed ? { env: decision.env } : { env: {} };
+    // Ровно тем же ответом, что и `bootstrap/runtime.ts`: маршрут отдаёт не
+    // только окружение, но и модель прогона с приёмом усилия (Т6), промпт
+    // контура и наши слои (Т8). Урезанный здесь ответ зеленел бы на панели,
+    // которая эти поля потеряла, — и ровно так эта проверка полдня показывала
+    // «слои не доезжают» на панели, где они доезжали.
+    const runRoute = (origin, asked = '') => {
+      const decision = resolveRunRoute(deps, origin, asked);
+      if (!decision.routed) return { env: {} };
+      return {
+        env: decision.env,
+        model: decision.model,
+        effort: decision.effort,
+        ...(decision.systemPrompt ? { systemPrompt: decision.systemPrompt } : {}),
+        ...(decision.layers ? { layers: decision.layers } : {}),
+      };
     };
 
     const chatRuns = new ChatRunRegistry();
@@ -198,6 +250,18 @@ async function main() {
       // поэтому проверяем то, что панель ему не клала.
       check(chat.env.has('PATH') || chat.env.has('Path'), 'PATH процесса на месте: это добавка');
       check(!chat.raw.includes(SECRET), 'настоящего ключа контура в окружении процесса нет');
+      // Аудит MD-06: преамбулу контура можно было править, а до процесса она не
+      // доезжала. Сверка — с файлом, который CLI получил флагом: решение маршрута
+      // не знает, что реестр и раннер из него донесли.
+      const copy = join(chatDir, SYSTEM_PROMPT_COPY);
+      const sent = existsSync(copy) ? readFileSync(copy, 'utf8') : '';
+      const agent = promptText(appData, 'contour-agent').trim();
+      const preamble = promptText(appData, 'contour-preamble').trim();
+      check(sent.includes(agent), 'CLI получил файлом промпт агента через контур');
+      check(
+        sent.includes(preamble) && sent.indexOf(preamble) > sent.indexOf(agent),
+        'следом за ним в том же файле — преамбула контура',
+      );
     }
 
     check(
@@ -233,10 +297,149 @@ async function main() {
       check(!group.raw.includes('stale-contour'), 'адрес прошлой жизни прогона не пережил старт');
     }
 
+    // ── 2а. Прогон со СВОИМ выбором модели и глубины (Т6) ────────────────────
+    // Тот самый случай, ради которого Т6 и делалась: человек выбрал «sonnet» в
+    // шапке чата. Имя панельное, контур его не знает, а уезжает оно флагом
+    // `--model`, который сильнее адресной переменной. Здесь проверяется argv
+    // РЕАЛЬНОГО процесса: решение маршрута об этом не говорит ничего.
+    const askedDir = mkdtempSync(join(tmpdir(), 'cc-t6-asked-'));
+    writePlatform(store, { ...platform, consumers: ['chat'], modelMap: { sonnet: MODEL } });
+    chatRuns.start(
+      'live-asked',
+      { prompt: 'привет', cwd: askedDir, configDir, model: 'sonnet', effort: 'high' },
+      { origin: 'chat' },
+    );
+    const asked = await waitForDump(askedDir);
+    check(Boolean(asked), 'фальшивый CLI запустился и у прогона со своим выбором модели');
+    if (asked) {
+      const argv = asked.env.get(ARGV_KEY) ?? '';
+      check(argv.includes(`--model ${MODEL}`), `в argv модель контура: ${argv}`);
+      // Именно это и было дырой Т3: панельное имя доезжало до контура как есть.
+      check(!argv.includes('sonnet'), `панельного имени в argv нет: ${argv}`);
+      // compromise: no-effort — глубину контур не принимает, и флага быть не
+      // должно вовсе: «--effort» уехал бы платной просьбой, которую никто не
+      // выполнит.
+      check(!argv.includes('--effort'), `глубина не отправлена: ${argv}`);
+    }
+    rmSync(askedDir, { recursive: true, force: true });
+
+    // ── 2б. Наши слои (Т8): снятое доезжает до argv, а брокер прав — переживает ──
+    // `layers.test.ts` проверяет, ЧТО панель решила; что из решения доехало до
+    // процесса — видно только здесь. Порядок флагов тоже проверяется: брокер
+    // прав приезжает своим `--mcp-config`, и встать он обязан ПОСЛЕ
+    // `--strict-mcp-config`, иначе каждый запрос разрешения станет молчаливым
+    // отказом посреди работы агента.
+    const layersDir = mkdtempSync(join(tmpdir(), 'cc-t8-layers-'));
+    writePlatform(store, {
+      ...platform,
+      consumers: ['chat'],
+      rules: {
+        platform: defaultPlatformRules(),
+        // Общий выключатель снят — значит снято всё, какими бы ни были частные.
+        ours: { ...defaultOurRules(), enabled: false },
+      },
+    });
+    chatRuns.start(
+      'live-layers',
+      {
+        prompt: 'привет',
+        cwd: layersDir,
+        configDir,
+        appendSystemPrompt: 'ДОПИСКА ПАНЕЛИ',
+        permissionPrompt: { runId: 'live-layers', baseUrl: 'http://127.0.0.1:1' },
+      },
+      { origin: 'chat' },
+    );
+    const dropped = await waitForDump(layersDir);
+    check(Boolean(dropped), 'фальшивый CLI запустился и у прогона со снятыми слоями');
+    if (dropped) {
+      const argv = dropped.env.get(ARGV_KEY) ?? '';
+      // Кавычки вокруг значения ставит не панель, а оболочка Windows: запятая в
+      // `project,local` для `cmd.exe` — разделитель, и без кавычек флаг уехал бы
+      // половиной. Поэтому проверяется обе формы, а не дословная строка.
+      check(
+        /--setting-sources "?project,local"?/.test(argv),
+        `личные правила, хуки и права сняты флагом: ${argv}`,
+      );
+      check(argv.includes('--disable-slash-commands'), 'скиллы сняты своим флагом');
+      check(argv.includes('--strict-mcp-config'), 'MCP-серверы сняты своим флагом');
+      check(
+        !argv.includes('--append-system-prompt'),
+        'дописки панели к системному промпту в запуске нет вовсе',
+      );
+      // Порядок этих двух флагов не решает НИЧЕГО, и прежняя проверка
+      // (`--mcp-config` строго после `--strict-mcp-config`) охраняла свойство,
+      // которого у CLI нет: `check-run-layers.mjs` запускает настоящий `claude` в
+      // обратном порядке, и брокер там жив (ревью Т8, MINOR-3). Важно другое и
+      // проверяется именно оно: снимая MCP, панель всё равно везёт конфиг
+      // брокера — без него каждый запрос прав стал бы молчаливым отказом посреди
+      // работы агента.
+      check(
+        argv.includes('--mcp-config'),
+        `конфиг брокера прав едет вместе со снятием MCP: ${argv}`,
+      );
+    }
+    rmSync(layersDir, { recursive: true, force: true });
+
+    // И обратная сторона: слои на месте — ни одного флага снятия, дописка едет.
+    const keptDir = mkdtempSync(join(tmpdir(), 'cc-t8-kept-'));
+    writePlatform(store, { ...platform, consumers: ['chat'] });
+    chatRuns.start(
+      'live-kept',
+      { prompt: 'привет', cwd: keptDir, configDir, appendSystemPrompt: 'ДОПИСКА ПАНЕЛИ' },
+      { origin: 'chat' },
+    );
+    const kept = await waitForDump(keptDir);
+    check(Boolean(kept), 'фальшивый CLI запустился и у прогона с полным набором слоёв');
+    if (kept) {
+      const argv = kept.env.get(ARGV_KEY) ?? '';
+      check(
+        !argv.includes('--setting-sources') &&
+          !argv.includes('--disable-slash-commands') &&
+          !argv.includes('--strict-mcp-config'),
+        `флагов снятия нет ни одного: ${argv}`,
+      );
+      check(argv.includes('--append-system-prompt'), 'дописка панели едет как обычно');
+    }
+    rmSync(keptDir, { recursive: true, force: true });
+
+    // И третья сторона, найденная ревью Т8 (MAJOR-4): прогон продолжают
+    // СОХРАНЁННЫМИ параметрами (пауза дерева переживает и перезапуск панели).
+    // Пока слой снимался затиранием текста дописки, возвращённая галочка уже
+    // ничего не возвращала: восстанавливать было нечего, и человек получал агента
+    // без инициатив и разделения при молчащей шапке чата.
+    const resumeDir = mkdtempSync(join(tmpdir(), 'cc-t8-resume-'));
+    const saved = chatRuns.describe('live-layers')?.options;
+    check(Boolean(saved), 'снимок параметров прогона со снятым слоем сохранён');
+    if (saved) {
+      chatRuns.start('live-resume', { ...saved, cwd: resumeDir }, { origin: 'chat' });
+      const resumed = await waitForDump(resumeDir);
+      check(Boolean(resumed), 'фальшивый CLI запустился и у продолженного прогона');
+      if (resumed) {
+        const argv = resumed.env.get(ARGV_KEY) ?? '';
+        check(
+          argv.includes('--append-system-prompt'),
+          `возвращённая галочка вернула дописку продолженному прогону: ${argv}`,
+        );
+      }
+    }
+    rmSync(resumeDir, { recursive: true, force: true });
+
     chatRuns.stopAll?.();
 
     // ── 3. Агент тестов — отдельное место запуска ────────────────────────────
-    writePlatform(store, { ...platform, consumers: ['tests'] });
+    // Слои сняты намеренно: до ревью Т8 (MAJOR-3) строку с флагами у агента
+    // тестов можно было удалить, и весь гейт оставался зелёным — «без наших
+    // слоёв» означало бы «без них в чате, со всеми в тестах», а через контур
+    // ходит модель среднего класса, которую полный `~/.claude` и топит.
+    writePlatform(store, {
+      ...platform,
+      consumers: ['tests'],
+      rules: {
+        platform: defaultPlatformRules(),
+        ours: { ...defaultOurRules(), enabled: false },
+      },
+    });
     createGroup(project, 'gui', 'GUI');
     upsertCase(project, 'gui', { title: 'Вход', steps: ['открыть'] }, new Date().toISOString());
 
@@ -252,6 +455,13 @@ async function main() {
         `галочка «Тесты» доводит адрес до своего прогона: ${tests.env.get('ANTHROPIC_BASE_URL')}`,
       );
       check(!tests.raw.includes(SECRET), 'ключа контура нет и в окружении агента тестов');
+      const argv = tests.env.get(ARGV_KEY) ?? '';
+      check(
+        /--setting-sources "?project,local"?/.test(argv) &&
+          argv.includes('--disable-slash-commands') &&
+          argv.includes('--strict-mcp-config'),
+        `снятые слои доезжают и до агента тестов: ${argv}`,
+      );
     }
     testRuns.stopAll();
 

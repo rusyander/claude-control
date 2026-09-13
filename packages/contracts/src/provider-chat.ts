@@ -1,5 +1,5 @@
 import { object, string, number, boolean, array, enum as zodEnum, type infer as Infer } from 'zod';
-import { assistantRunReasons } from './assistant-run';
+import { assistantRunReasons } from './assistant-run.ts';
 
 /**
  * Чат чужого провайдера — своя переписка панели.

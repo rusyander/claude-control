@@ -36,3 +36,44 @@
   gap: var(--spacing-2xs);
   cursor: pointer;
 }
+
+/* Нестандартный шлюз (DRV-04/05): свёрнутый блок на шаге адреса. */
+.transport {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-sm);
+}
+
+.transportSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  cursor: pointer;
+  list-style: none;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+}
+
+.chevron {
+  flex: none;
+  color: var(--color-fg-muted);
+  transition: transform 0.15s ease;
+
+  details[open] > .transportSummary > & {
+    transform: rotate(90deg);
+  }
+}
+
+.transportBody {
+  padding-top: var(--spacing-sm);
+}
+
+.transportCell {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.transportPreview {
+  overflow-wrap: anywhere;
+}

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { createServer, type Server } from 'node:http';
 import { connect } from 'node:net';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
@@ -6,6 +7,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../../../lib/app-store.ts';
 import { PlatformGateway } from './listener.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Слушатель шлюза: занятый порт — не падение.
@@ -114,7 +116,12 @@ describe('порт', () => {
           budgetSince: '',
           toolShim: true,
           contourPrompt: true,
+          defaultModel: '',
+          consumerModels: {},
+          modelMap: {},
+          rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
           caCertPath: '',
+          transport: defaultPlatformTransport(),
         },
       ],
       platformGateway: { enabled: true, port: busy, forceStream: true },
@@ -126,6 +133,7 @@ describe('порт', () => {
           apiKind: 'openai-compat',
           model: 'gpt-4o',
           writeToken: false,
+          imagesUrl: '',
           ownerPlatformId: 'enterprise-platform-dev',
         },
       ],

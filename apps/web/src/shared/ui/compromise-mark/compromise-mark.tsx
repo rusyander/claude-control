@@ -2,7 +2,7 @@ import { useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { findCompromise } from '@agentdeck/contracts';
-import { Typography } from '@shared/ui/typography';
+import { CodeText, Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { HELP_ROUTE } from '@shared/config/routes';
 import { formatDate } from '@shared/lib/format';
@@ -110,21 +110,21 @@ export function CompromiseMark({ id, className }: CompromiseMarkProps) {
             {t('compromise.how')}
           </Typography>
           <Typography variant="body-sm" as="p">
-            {t(`compromise.items.${id}.how`)}
+            <CodeText text={t(`compromise.items.${id}.how`)} />
           </Typography>
 
           <Typography variant="caption" weight="medium" as="p" className={styles.subhead}>
             {t('compromise.why')}
           </Typography>
           <Typography variant="body-sm" as="p">
-            {t(`compromise.items.${id}.why`)}
+            <CodeText text={t(`compromise.items.${id}.why`)} />
           </Typography>
 
           <Typography variant="caption" weight="medium" as="p" className={styles.subhead}>
             {t('compromise.revisit')}
           </Typography>
           <Typography variant="body-sm" as="p">
-            {t(`compromise.items.${id}.revisitWhen`)}
+            <CodeText text={t(`compromise.items.${id}.revisitWhen`)} />
           </Typography>
 
           <Link to={HELP_ROUTE} search={{ topic: 'platform' }} className={styles.more}>

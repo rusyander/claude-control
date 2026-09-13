@@ -10,8 +10,22 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { UPLOAD_ACCEPT_ATTRIBUTE } from '@agentdeck/contracts/uploads';
 import { planAttach, toAttachedFile } from '../lib/attachments';
-import type { AttachedFile, ChatComposerProps } from './ChatComposer.types';
+import { ChatModeMenu } from './ChatModeMenu';
+import type { AttachedFile, ChatComposerProps, ComposerMode } from './ChatComposer.types';
 import styles from './ChatComposer.module.scss';
+
+/** Значок кнопки отправки по режиму: действие видно не читая подписи. */
+const SEND_ICON: Record<ComposerMode, 'send' | 'image' | 'overview'> = {
+  text: 'send',
+  image: 'image',
+  deck: 'overview',
+};
+
+/** Подсказка в пустом поле: в неттекстовом режиме там описывают, а не пишут. */
+const MEDIA_PLACEHOLDER: Partial<Record<ComposerMode, string>> = {
+  image: 'chat.mode.imagePlaceholder',
+  deck: 'chat.mode.deckPlaceholder',
+};
 
 /**
  * Поле ввода чата: текст, надиктовка голосом и вложения. Пока идёт ответ,
@@ -27,12 +41,23 @@ export function ChatComposer({
   isRunning,
   onSplitTasks,
   onHandoff,
+  modes,
 }: ChatComposerProps) {
   const { t, i18n } = useTranslation();
   const [files, setFiles] = useState<AttachedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Режим картинки: вложения в нём не участвуют — просьба к контуру состоит из
+  // одного описания. Поэтому чипы и скрепка в нём не показываются, но и не
+  // стираются: человек ничего не отменял, и при возврате в текст файлы на месте.
+  const isImage = modes?.mode === 'image';
+  const isDeck = modes?.mode === 'deck';
+  // Оба неттекстовых режима ведут себя одинаково: описание вместо сообщения,
+  // вложения не участвуют, кнопка называется своим действием.
+  const isMedia = isImage || isDeck;
+  const isDrawing = Boolean(modes?.isDrawing);
 
   const speech = useSpeechRecognition(i18n.language === 'en' ? 'en-US' : 'ru-RU');
   const levels = useMicLevels(speech.listening);
@@ -88,6 +113,45 @@ export function ChatComposer({
       if (accepted !== false) setFiles([]);
     });
   };
+
+  // Подписи отправки: три разных действия одной кнопкой — нарисовать, дописать
+  // в очередь занятому агенту, отправить. Считаем заранее: вложенные тернарники
+  // в разметке здесь запрещены, и не зря — читать их в JSX нельзя.
+  const sendLabel = ((): string => {
+    if (isImage) return t('chat.mode.draw');
+    if (isDeck) return t('chat.mode.build');
+    return isRunning ? t('chat.queue.add') : t('chat.send');
+  })();
+  // Подсказка пустого поля. У правки она своя: в этом режиме описывают ПРАВКУ, а
+  // «назовите тему» здесь читалось бы как предложение собрать новую колоду.
+  const placeholderKey = ((): string => {
+    if (isDeck && modes?.reviseTitle) return 'chat.mode.revisePlaceholder';
+    // «Панель нарисует сама, без агента» на дороге агента — прямая неправда, а
+    // читают именно подсказку в поле, а не подпись маршрута под ним.
+    if (isImage && modes?.imageByAgent) return 'chat.mode.imagePlaceholderAgent';
+    return MEDIA_PLACEHOLDER[modes?.mode ?? 'text'] ?? 'chat.placeholder';
+  })();
+
+  const sendTitle = ((): string | undefined => {
+    if (isMedia) return sendLabel;
+    return isRunning ? t('chat.queue.hint') : undefined;
+  })();
+
+  // Нижняя строка: ошибка распознавания важнее всего, за ней — ход работы режима
+  // и то, чем его сделают. Место одно, и занимает его самое срочное.
+  const caption = ((): { text: string; isError: boolean } => {
+    if (speechErrorKey) return { text: t(speechErrorKey), isError: true };
+    if (isDrawing) return { text: t('chat.mode.drawing'), isError: false };
+    if (isImage && !modes?.imageAvailable) {
+      return { text: modes?.imageReason ?? t('chat.mode.imageBlocked'), isError: true };
+    }
+    if (isImage) return { text: modes?.imageSource ?? t('chat.mode.imageHint'), isError: false };
+    if (isDeck && !modes?.deckAvailable) {
+      return { text: modes?.deckReason ?? t('chat.mode.deckBlocked'), isError: true };
+    }
+    if (isDeck) return { text: modes?.deckSource ?? t('chat.mode.deckHint'), isError: false };
+    return { text: t('chat.hint'), isError: false };
+  })();
 
   if (isVoiceMode) {
     return (
@@ -150,7 +214,7 @@ export function ChatComposer({
           void attach(event.dataTransfer.files);
         }}
       >
-        {files.length > 0 && (
+        {files.length > 0 && !isMedia && (
           <Stack
             direction="row"
             wrap
@@ -183,6 +247,38 @@ export function ChatComposer({
           </Stack>
         )}
 
+        {/* Правка готовой колоды: что именно правится — на виду. «Поправь третий
+            слайд» без названия колоды легко отправить не в ту, а отмена стоит
+            рядом: человек вправе вернуться к сборке по теме, ничего не набирая
+            заново. */}
+        {isDeck && modes?.reviseTitle && (
+          <Stack
+            direction="row"
+            align="center"
+            gap="var(--spacing-3xs)"
+            padding="var(--spacing-xs) var(--spacing-md) 0"
+          >
+            <Stack
+              as="span"
+              direction="row"
+              align="center"
+              gap="var(--spacing-3xs)"
+              className={styles.revise}
+            >
+              <Icon name="edit" size={14} />
+              {t('chat.mode.reviseTitle', { title: modes.reviseTitle })}
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                icon={<Icon name="close" size={14} />}
+                aria-label={t('chat.mode.reviseCancel')}
+                onClick={() => modes.onReviseCancel?.()}
+              />
+            </Stack>
+          </Stack>
+        )}
+
         <textarea
           ref={inputRef}
           className={styles.input}
@@ -200,7 +296,7 @@ export function ChatComposer({
               submit();
             }
           }}
-          placeholder={t('chat.placeholder')}
+          placeholder={t(placeholderKey)}
           rows={3}
         />
 
@@ -212,13 +308,18 @@ export function ChatComposer({
           padding="var(--spacing-2xs) var(--spacing-xs) var(--spacing-xs)"
         >
           <Stack direction="row" align="center" gap="var(--spacing-3xs)">
-            <Button
-              variant="ghost"
-              iconOnly
-              icon={<Icon name="paperclip" size={24} />}
-              aria-label={t('chat.attach')}
-              onClick={() => fileRef.current?.click()}
-            />
+            {/* Режим стоит первым в ряду: он решает, что вообще сделает отправка,
+                а остальные кнопки — как её собрать. */}
+            {modes && <ChatModeMenu state={modes} disabled={isRunning || isDrawing} />}
+            {!isMedia && (
+              <Button
+                variant="ghost"
+                iconOnly
+                icon={<Icon name="paperclip" size={24} />}
+                aria-label={t('chat.attach')}
+                onClick={() => fileRef.current?.click()}
+              />
+            )}
             <Button
               variant="ghost"
               iconOnly
@@ -249,7 +350,7 @@ export function ChatComposer({
                 aria-label={t('chat.split.ask')}
                 title={t('chat.split.ask')}
                 onClick={onSplitTasks}
-                disabled={isRunning}
+                disabled={isRunning || isDrawing}
               />
             )}
             {/* «Закрыть этап» — та же просьба, что агент иногда высказывает сам,
@@ -263,7 +364,7 @@ export function ChatComposer({
                 aria-label={t('chat.handoff.ask')}
                 title={t('chat.handoff.ask')}
                 onClick={onHandoff}
-                disabled={isRunning}
+                disabled={isRunning || isDrawing}
               />
             )}
           </Stack>
@@ -272,6 +373,24 @@ export function ChatComposer({
               встанет в очередь и уйдёт на границе хода. Раньше кнопка тут просто
               исчезала — сказать агенту хоть слово можно было, только убив его. */}
           <Stack direction="row" align="center" gap="var(--spacing-2xs)">
+            {/* Очистить поле одним нажатием. Появляется только когда есть что
+                стирать: пустая кнопка рядом с отправкой сбивала бы прицел. Вместе
+                с текстом уходит и черновик в localStorage — он живёт тем же
+                значением, и «очистил, а после перезагрузки вернулось» было бы
+                худшим ответом на это нажатие. */}
+            {value.length > 0 && (
+              <Button
+                variant="ghost"
+                iconOnly
+                icon={<Icon name="close" size={20} />}
+                aria-label={t('chat.clearInput')}
+                title={t('chat.clearInput')}
+                onClick={() => {
+                  onChange('');
+                  inputRef.current?.focus();
+                }}
+              />
+            )}
             {isRunning && (
               <Button
                 variant="secondary"
@@ -281,14 +400,17 @@ export function ChatComposer({
                 {t('chat.stop')}
               </Button>
             )}
+            {/* В режиме картинки отправка — это ожидание на минуты, и очереди у
+                неё нет: показываем её занятой, а не запертой без причины. */}
             <Button
               variant="primary"
               iconOnly
-              icon={<Icon name="send" size={24} />}
-              aria-label={isRunning ? t('chat.queue.add') : t('chat.send')}
-              title={isRunning ? t('chat.queue.hint') : undefined}
+              icon={<Icon name={SEND_ICON[modes?.mode ?? 'text'] ?? 'send'} size={24} />}
+              aria-label={sendLabel}
+              title={sendTitle}
               onClick={submit}
-              disabled={!value.trim()}
+              isLoading={isDrawing}
+              disabled={!value.trim() || isDrawing}
             />
           </Stack>
         </Stack>
@@ -299,10 +421,10 @@ export function ChatComposer({
           она стоит вместо подсказки: место одно, а сказать важнее. */}
       <Typography
         variant="caption"
-        color={speechErrorKey ? 'danger' : 'subtle'}
+        color={caption.isError ? 'danger' : 'subtle'}
         className={styles.hint}
       >
-        {speechErrorKey ? t(speechErrorKey) : t('chat.hint')}
+        {caption.text}
       </Typography>
     </div>
   );

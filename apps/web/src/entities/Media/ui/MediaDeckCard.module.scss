@@ -1,0 +1,32 @@
+// Карточка колоды стоит и в правом столбце, и в ленте — поэтому у неё своя рамка
+// и никакой привязки к высоте столбца: в ленте она растёт по содержимому.
+.card {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+// Действия — настоящие ссылки, а не кнопки: открыть в новой вкладке и сохранить
+// средствами системы (в том числе на телефоне) умеет только ссылка.
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+
+  &:hover {
+    background: var(--color-surface-raised);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}

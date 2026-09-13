@@ -1,0 +1,60 @@
+{
+  "topic": "platform",
+  "scenario": "rules",
+  "frames": [
+    {
+      "id": "01-rules-panel",
+      "side": "panel",
+      "file": "01-rules-panel.png",
+      "masked": 1,
+      "width": 930,
+      "height": 394,
+      "shotAt": "2026-09-13T10:10:47.247Z",
+      "text": "Чем распоряжается панель Инструменты платформы Пока включена прослойка инструментов, добавить набор контура нельзя: два набора на один ход — взаимное исключение. Выключите прослойку ниже, в разделе «Наша сторона». Сохранить Цикл вызовов платформы loop — контур ходит по кругу сам single_turn — вызов возвращается клиенту Пока имена инструментов контура не заданы, режим цикла никуда не отправляется. Пресет генерации именованный набор параметров на стороне контура; пусто — контур берёт свой Сохранить Размышления модели ответ приедет кадрами размышления, наружу они не уходят",
+      "en": {
+        "file": "01-rules-panel.en.png",
+        "masked": 1,
+        "width": 930,
+        "height": 334,
+        "shotAt": "2026-09-13T10:11:47.926Z",
+        "text": "Managed by the panel Инструменты платформы While the tool shim is on, the contour’s own tool set cannot be added: two sets on one turn are mutually exclusive. Turn the shim off below, under “Our side”. Save Цикл вызовов платформы loop — the contour runs the cycle itself single_turn — the call comes back to the client With no contour tool names set, the loop mode is not sent anywhere. Пресет генерации именованный набор параметров на стороне контура; пусто — контур берёт свой Save Размышления модели ответ приедет кадрами размышления, наружу они не уходят"
+      }
+    },
+    {
+      "id": "02-rules-ours",
+      "side": "panel",
+      "file": "02-rules-ours.png",
+      "masked": 0,
+      "width": 930,
+      "height": 825,
+      "shotAt": "2026-09-13T10:10:47.757Z",
+      "text": "Наша сторона Прослойка инструментов панели Инструменты агента уезжают в контур текстом протокола, а вызов панель собирает обратно из ответа. Выключите — и агент через контур будет только отвечать, но зато можно попросить инструменты самого контура. Наши слои в прогоне Что из вашего личного поедет в прогон через этот контур. Снятое экономит бюджет промпта и уносит лишние инструменты, но агент теряет ваши правила, и по ответу этого не видно. Два флага бьют шире ~/.claude: скиллы и MCP-серверы снимаются ВМЕСТЕ с проектными — это сказано у самих галочек, и это цена того, что у CLI флаг один на оба источника. Слои снимаются флагами Claude Code: прогон чужого CLI через контур идёт со своим набором, и эти галочки на него не действуют. Наши правила едут в прогон Снимите — и через этот контур агент пойдёт без всего нашего разом, какие бы галочки ни стояли ниже. Личные правила, хуки и права Всё из ~/.claude: правила CLAUDE.md, хуки, права, личные скиллы и личные MCP-серверы — вместе с переходником панели к инструментам самого контура: он живёт там же. CLI знает один источник user и снимает его целиком — флагом --setting-sources project,local. Вместе с правами перестают действовать и ваши запреты (deny), которыми вы огораживали агента. Проектный CLAUDE.md и настройки репозитория этот флаг не трогает: это правила задачи, а не наши. Скиллы Скиллы и сам инструмент Skill — флагом --disable-slash-commands. Галочка отдельная от предыдущей не для красоты: встроенные скиллы уходят только так. Снимаются ВСЕ скиллы, включая скиллы репозитория (.claude/skills): раздельного флага у CLI нет. MCP-серверы MCP-серверы — флагом --strict-mcp-config, и снимаются ВСЕ: личные, проектные из .mcp.json репозитория и переходник панели к инструментам самого контура. Остаётся только брокер прав панели: без него каждый запрос разрешения стал бы молчаливым отказом посреди работы агента. Дописка панели к системному промпту То, что панель добавляет от себя: инициативы, разделение задачи, продолжение сессии. Снимает её сама панель — флага у CLI для этого нет, поэтому в списке флагов её не видно. Флагов нет — в прогон едет всё наше. Трёх соседних настроек здесь нет намеренно. Гейт промпта — физически наш хук в ~/.claude/settings.json: он уезжает вместе с личными настройками и своей галочки не имеет. Защита данных слоем не считается вовсе: её не разменивают на бюджет промпта. Каскад моделей включается у проекта, а не у контура.",
+      "en": {
+        "file": "02-rules-ours.en.png",
+        "masked": 0,
+        "width": 930,
+        "height": 789,
+        "shotAt": "2026-09-13T10:11:48.440Z",
+        "text": "Our side The panel’s tool shim The agent’s tools travel to the contour as protocol text, and the panel reassembles the call out of the answer. Turn it off and an agent through the contour only answers — but then the contour’s own tools can be asked for. Our layers in the run What travels from your personal setup into a run through this contour. Dropping a layer saves prompt budget and removes extra tools, but the agent loses your rules and the answer will not show it. Two flags hit wider than ~/.claude: skills and MCP servers are dropped TOGETHER with the project’s own — said at the switches themselves, and that is the price of the CLI having one flag for both sources. Layers are dropped by Claude Code flags: a foreign CLI run through the contour goes with its own set, and these switches do not touch it. Our rules travel into the run Turn it off and a run through this contour goes without anything of ours at once, whatever the switches below say. Personal rules, hooks and permissions Everything from ~/.claude: CLAUDE.md rules, hooks, permissions, personal skills and personal MCP servers — the panel’s bridge to the contour’s own tools included, it lives there too. The CLI knows one user source and drops it whole — with --setting-sources project,local. Along with the permissions your deny rules stop applying too — the fence you put around the agent. The project CLAUDE.md and repository settings this flag does not touch: those are the rules of the task, not ours. Skills Skills and the Skill tool itself — with --disable-slash-commands. A separate switch for a reason: built-in skills go away only this way. ALL skills are dropped, the repository’s own (.claude/skills) included: the CLI has no flag for just the personal ones. MCP servers MCP servers — with --strict-mcp-config, and ALL of them: personal, the project’s own from the repository’s .mcp.json, and the panel’s bridge to the contour’s own tools. Only the panel’s permission broker stays: without it every permission request would become a silent refusal in the middle of the agent’s work. The panel's addition to the system prompt What the panel adds of its own: initiatives, task splitting, session continuation. The panel drops it itself — the CLI has no flag for that, which is why it is absent from the flag list. No flags — everything of ours travels into the run. Three neighbouring settings are deliberately absent here. The prompt gate is physically our hook in ~/.claude/settings.json: it leaves together with the personal settings and has no switch of its own. Data protection is not a layer at all: it is not traded for prompt budget. The model cascade is switched on per project, not per contour."
+      }
+    },
+    {
+      "id": "03-rules-conflicts",
+      "side": "panel",
+      "file": "03-rules-conflicts.png",
+      "masked": 0,
+      "width": 930,
+      "height": 346,
+      "shotAt": "2026-09-13T10:10:48.251Z",
+      "text": "Матрица конфликтов Взаимное исключение Инструменты платформы ⟷ наша прослойка инструментов Два набора инструментов на один ход: наш едет текстом и собирается обратно из ответа, набор контура исполняет сам контур. Включить оба нельзя — выберите один. К сведению Подмена данных контура ⟷ наша защита данных Не выбор из двух: слои складываются по порядку. Наша маска накладывается первой и обратима, карта контура разворачивается на границе панели. Выключать ничего не нужно. Предупреждение Сжатие истории контуром ⟷ наши контрольные точки сейчас включены обе стороны Длинную переписку контур сжимает сам, а контрольная точка панели описывает историю целиком. После сжатия продолжение может не знать начала задачи — держите точку свежей. К сведению Проверки содержимого контура ⟷ наш гейт промпта Проверяют оба и по разным спискам: гейт панели откажет до отправки и назовёт правило, контур откажет у себя статусом 451. Второй отказ не означает, что первый не сработал.",
+      "en": {
+        "file": "03-rules-conflicts.en.png",
+        "masked": 0,
+        "width": 930,
+        "height": 346,
+        "shotAt": "2026-09-13T10:11:48.926Z",
+        "text": "Conflict matrix Mutually exclusive Инструменты платформы ⟷ наша прослойка инструментов Два набора инструментов на один ход: наш едет текстом и собирается обратно из ответа, набор контура исполняет сам контур. Включить оба нельзя — выберите один. For information Подмена данных контура ⟷ наша защита данных Не выбор из двух: слои складываются по порядку. Наша маска накладывается первой и обратима, карта контура разворачивается на границе панели. Выключать ничего не нужно. Warning Сжатие истории контуром ⟷ наши контрольные точки both sides are on right now Длинную переписку контур сжимает сам, а контрольная точка панели описывает историю целиком. После сжатия продолжение может не знать начала задачи — держите точку свежей. For information Проверки содержимого контура ⟷ наш гейт промпта Проверяют оба и по разным спискам: гейт панели откажет до отправки и назовёт правило, контур откажет у себя статусом 451. Второй отказ не означает, что первый не сработал."
+      }
+    }
+  ]
+}

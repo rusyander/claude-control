@@ -5,36 +5,89 @@ and agents. The key stays in the panel and agent CLIs are pointed at its local g
 corporate key would have to be spread across the configurations of nine CLIs, where it can no longer
 be taken back.
 
-This document is the overview. The detail, with diagrams, lives inside the panel: **Help → Contour**
-(four diagrams, the refusal table, and the list of signed compromises printed from the registry
-rather than retyped).
+This document is the overview. The detail lives inside the panel: **Help → Contour** — the whole
+path in screenshots of both sides (the company's admin panel and the panel itself), four diagrams,
+the refusal table, and the list of signed compromises printed from the registry rather than retyped.
 
 ## What works through a contour
 
-| What                                                             | How   |
-| ---------------------------------------------------------------- | ----- |
-| The panel's built-in assistant                                   | works |
-| Generating test cases, reading runs, translations, summarisation | works |
-| Analytics and explanations in the panel                          | works |
-| Embeddings for search                                            | works |
-| Calling a contour agent (with the company's knowledge and tools) | works |
-| The MCP bridge: your CLI calls a contour model as a tool         | works |
+| What                                                             | How                              |
+| ---------------------------------------------------------------- | -------------------------------- |
+| The panel's built-in assistant                                   | works                            |
+| Generating test cases, reading runs, translations, summarisation | works                            |
+| Analytics and explanations in the panel                          | works                            |
+| Embeddings for search                                            | works                            |
+| Calling a contour agent (with the company's knowledge and tools) | works                            |
+| The MCP bridge: your CLI calls a contour model as a tool         | works                            |
+| An agent CLI that edits files                                    | through the shim, with a caveat  |
+| An image from a description in chat                              | raster where a model is declared |
+| A slide deck on a topic from chat                                | works                            |
 
-## What does not work — and the panel cannot fix it
+## The active contour and the smoke request
 
-**An agent CLI (Claude Code, codex, any other) that edits files will not work through a contour.**
-The platform assembles the tool set itself — by model, skill and key owner — and runs the tools on
-its own side. Its public schema does not accept the client's tools field: it is dropped as an extra
-key. So a CLI cannot tell the model about reading a file, editing one, running a command, or your
-MCP servers.
+Several contours can be connected, but work goes through exactly one — the **active** one. A new
+contour becomes active right away, on the wizard's «Done», and the previous one goes dark; the others
+read «not active» on their card and carry a «Make it active» button. Switching is one action: the
+previous contour's applies are removed (CLI files return to their previous values), its badge goes
+out, and its key, budget and settings stay.
 
-There is no honest workaround in the panel. Putting tool descriptions into the request text and
-parsing the answer by hand is a homemade protocol on top of a foreign one: it breaks on every model
-update, provides neither call identifiers nor parallel calls, and the first wrong parse hands the
-agent the right to run something the model never asked for. It is not planned.
+Right after activation the panel asks the model a short question itself — through its own local
+gateway, the same path a CLI will take. A green line under the address (answer, latency, model)
+proves the whole path, not just that the contour is alive. A red one does **not** undo the
+activation: a stopped gateway, an exhausted key and a silent model are fixed in different places, and
+the cause is spelled out.
 
-A CLI keeps working as an agent through its own usual key — the contour does not stand in the way.
-What goes through a contour is the work that needs no tools, plus calls to the platform's own agents.
+«Back to the default provider» removes the applies, clears the badge and leaves the panel and CLIs on
+their usual provider. The button sits on the contour card and in «Settings → Models», on the endpoint
+profile the contour created itself — it is one and the same action.
+
+## An agent CLI that edits files: through the shim, with a caveat
+
+The platform assembles the tool set itself and drops the client's tools field as an extra key, so a
+CLI cannot declare reading a file, editing one, running a command or your MCP servers. The panel
+therefore declares those tools to the model as protocol TEXT and assembles the call back out of the
+answer, which does give the agent real hands.
+
+The caveat is named rather than hidden: whether the model obeys the protocol is up to the model. A
+weaker one describes the action in words instead of calling anything, and the turn then ends
+successfully with no file written — the panel flags such a turn on the «Tools through the contour»
+card. A call inside a code fence is never executed: a fence is also how a quoted protocol and a
+documentation file the agent has just read arrive.
+
+## Images and decks: the panel builds the file
+
+The chat composer has a «Mode» button: an ordinary message to the agent, an image from a
+description, or a slide deck on a topic. Both modes work for any CLI and without a contour — only who
+draws changes, and the caption under the item says so before you press.
+
+A raster image is asked for by the **panel**, not by the agent — the conversation lives in Claude
+Code's own files and the panel writes not one line into them. So the picture is its own request with
+its own answer: a card in the conversation's right column and a file in the panel's data folder. It
+is not in the thread, and the agent does not know it exists.
+
+Not every contour draws raster, and the server picks the road once: a contour that declares drawing
+returns the picture as part of an ordinary answer (through the panel's local gateway, so it is in the
+journal; it reaches the key's spend only if the contour sent usage — EnterprisePlatform does not for an image,
+and the journal marks it `usageUnreported` instead of a silent zero); a contour with its own images endpoint uses that; your endpoint
+profile works when its image-generation address field is filled — the address is never guessed from
+the base one, because a guess would 404 after you had already described the picture. Otherwise the
+conversation's agent draws in code — a vector, not a photo — and what took the raster away is named
+next to the item. The mode is locked only when nobody can draw at all: no conversation, no contour,
+no endpoint profile.
+
+A deck asks the contour for no capability: the model dictates the slide structure through an
+ordinary request, and the panel builds HTML, PPTX and PDF on your machine. Only photographic slide
+pictures depend on the contour — they take the same raster road. A sentence around the structure or
+`<think>` reasoning before it the panel drops by itself; an answer with no structure at all is named
+in the model's own words. In a conversation its agent dictates the deck; a contour or an own endpoint
+only outside one.
+
+The bounds are stated: one image at a time, 8 MB per image, the last hundred files on disk, and no
+gallery or image history — save what you need with «Download» right away.
+
+Some help screenshots of the shim, images and the red smoke request were taken on a scripted contour
+— a stub answering with prepared replies: the company stand has no drawing model, and a small model
+does not call tools reliably. Those frames say so in the help.
 
 ## Where the key lives
 
@@ -57,7 +110,7 @@ a choice for predictability: a corporate request that went somewhere else is wor
 | ---- | ------------------------------------------------------------------------------------------------- |
 | 401  | The key was not accepted. Five causes the contour does not tell apart: unknown or revoked,        |
 |      | expired, budget exhausted, owner deleted, owner check failed. The panel names all five.           |
-| 402  | A spend limit — user, team or instance. This is NOT the key's budget.                             |
+| 402  | The key budget is exhausted. Arrives only for the first half minute — then the same key gets 401. |
 | 403  | The key is not allowed the requested model; its name is in the refusal text.                      |
 | 404  | Either the model was removed, or the address does not point at the public API. Both are named.    |
 | 429  | Too often. The panel retries exactly once and tells you when to retry yourself.                   |
@@ -69,16 +122,21 @@ and is verified by `pnpm negatives`.
 
 ## How to switch it off
 
-Three different actions, gentlest first:
+Four different actions, gentlest first:
 
-1. **"Remove the apply"** — the CLI files go back to their previous values and the managed profile
-   disappears. The contour stays connected.
-2. **Switch the contour toggle off** — the gateway stops serving it. The settings, the key and the
-   spend history stay.
-3. **"Delete the contour"** — the settings, the key and the probe trace are gone; the apply is
-   removed first, automatically.
+1. **Untick a consumer** («Configure» → «Where the contour works») — takes effect from the next start,
+   the other consumers stay on the contour, no CLI file changes. If that CLI has its files applied, it
+   reads the contour address from its own config, and only the next step brings it back.
+2. **"Undo the apply"** — the CLI files go back to their previous values and the managed profile
+   disappears. The contour stays connected: the panel assistant and the bridge keep working.
+3. **"Back to the default provider"** — the contour stops being active, and the gateway answers its
+   address with a 502 «contour switched off in the panel». The settings, the key and the spend history
+   stay; «Make it active» brings the work back to it.
+4. **"Delete the contour"** — asks for the contour's full name; the settings, the key and the probe
+   trace are gone, the apply is removed first, automatically.
 
-The "before" copies of every configuration edit live in the History section and outlive the contour.
+The "before" copies of every configuration edit live in the History section and outlive the contour;
+spend already counted stays too.
 
 ## What the panel does NOT do about a contour
 

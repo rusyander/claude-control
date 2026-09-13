@@ -97,6 +97,22 @@ export function EndpointProfileForm({
         />
       )}
 
+      {/* Адрес генерации картинок — только у OpenAI-вида: у `anthropic` и
+          `google` такой ручки нет вовсе, и пустое поле обещало бы несуществующее.
+          Полем, а не выводом из базового адреса: совместимый сервер вправе не
+          иметь этой ручки, и угаданный адрес дал бы 404 вместо честного «не
+          задан» (решение В4). */}
+      {profile.apiKind === 'openai-compat' && (
+        <TextField
+          label={t('endpoints.imagesUrl')}
+          value={profile.imagesUrl}
+          onChange={(imagesUrl) => onChange({ ...profile, imagesUrl })}
+          placeholder="http://127.0.0.1:11434/v1/images/generations"
+          isMono
+          hint={t('endpoints.imagesUrlHint')}
+        />
+      )}
+
       <Stack gap="var(--spacing-2xs)">
         <Stack direction="row" align="end" gap="var(--spacing-xs)" wrap>
           <Stack flex={1} minWidth="220px">

@@ -4,12 +4,12 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic.tsx",
-      "confirmedAt": "2026-09-11T22:21:59.821Z",
+      "confirmedAt": "2026-09-13T10:50:29.117Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
           "why": "«Что уже решено»: реестр подписанных компромиссов документ показывает целиком",
-          "sha": "3a8131c898a5b891"
+          "sha": "47a21dcdd7f3c27f"
         },
         {
           "path": "apps/server/src/domains/platform/probe.ts",
@@ -24,7 +24,7 @@
         {
           "path": "apps/server/src/domains/platform/store.ts",
           "why": "«Что происходит с ключом»: где он лежит, что уезжает в экспорт, что видно в ответе",
-          "sha": "253468683600406c"
+          "sha": "44aa2c2c009932f9"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/listener.ts",
@@ -34,7 +34,7 @@
         {
           "path": "apps/server/src/domains/platform/gateway/pipeline.ts",
           "why": "«Путь одного запроса»: что панель делает с запросом между CLI и контуром",
-          "sha": "fd8f08a77e274ea6"
+          "sha": "c5f516c6086eb92f"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/status.ts",
@@ -55,6 +55,51 @@
           "path": "apps/server/src/domains/platform/agents.ts",
           "why": "«Агенты контура»: ростер руками, сессия на стороне контура, исходы вызова",
           "sha": "e9f86da84c59520e"
+        },
+        {
+          "path": "apps/server/src/domains/platform/models.ts",
+          "why": "«Модель и глубина продумывания»: модель контура и на потребителя, подстановка из каталога, приём усилия",
+          "sha": "a4e5578ca958a5a1"
+        },
+        {
+          "path": "packages/contracts/src/platform-models.ts",
+          "why": "«Модель и глубина продумывания»: порядок выбора модели прогона и подмена незнакомого имени",
+          "sha": "973bcec58fa2d025"
+        },
+        {
+          "path": "apps/web/src/pages/Platform/ModelCard.tsx",
+          "why": "«Модель и глубина продумывания»: таблица «что на карточке» описывает именно её поля",
+          "sha": "a26715e20ec01c48"
+        },
+        {
+          "path": "apps/web/src/pages/Platform/lib/modelsView.ts",
+          "why": "«Модель и глубина продумывания»: кто попадает в список потребителей и что видно при пустом каталоге",
+          "sha": "5b3ec0f819ec89bd"
+        },
+        {
+          "path": "apps/server/src/domains/platform/routing.ts",
+          "why": "«Модель и глубина продумывания»: чем пойдёт прогон и что отвечает шапке чата",
+          "sha": "4da7f8161e9cd5ce"
+        },
+        {
+          "path": "apps/server/src/domains/platform/rules-matrix.ts",
+          "why": "«Правила контура и конфликты»: что уходит в запрос, что делает контур сам, единственное взаимоисключение",
+          "sha": "8ad40c82d45e9ef3"
+        },
+        {
+          "path": "apps/web/src/pages/Platform/RulesCard.tsx",
+          "why": "«Правила контура и конфликты»: таблица «что на карточке» описывает именно её поля и запертый список инструментов",
+          "sha": "b27140c669222d97"
+        },
+        {
+          "path": "apps/web/src/pages/Platform/lib/rulesView.ts",
+          "why": "«Правила контура и конфликты»: как строки матрицы попадают на экран и почему жёлтая не предлагает выключить",
+          "sha": "86d6d8f697d5e91f"
+        },
+        {
+          "path": "apps/server/src/domains/platform/layers.ts",
+          "why": "«Наши слои»: какой флаг снимает какой слой и почему личные правила, хуки и права уходят вместе",
+          "sha": "772eea3eb623f4fe"
         },
         {
           "path": "apps/server/src/domains/platform/spend.ts",
@@ -95,6 +140,11 @@
           "path": "apps/server/src/domains/platform/gateway/tool-shim/claims.ts",
           "why": "«Ход удачный, а сделанного нет»: пометка по словам ответа, её условия и её молчание",
           "sha": "95a760eaa5de6bb7"
+        },
+        {
+          "path": "apps/server/src/domains/media/presentations.ts",
+          "why": "строка «Презентации» в таблице «что работает через контур»: обычный запрос в чат, файлы собирает панель",
+          "sha": "82797a5d9f26794a"
         }
       ]
     },
@@ -105,7 +155,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatRunner.ts",
           "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
-          "sha": "5819d37fd9fc977f"
+          "sha": "bec4f2abae420ffe"
         },
         {
           "path": "apps/server/src/domains/chat/ChatPermissions.ts",
@@ -141,9 +191,24 @@
           "path": "apps/server/src/domains/chat/tree-pause.ts",
           "why": "«Пауза дерева»: ответ всегда от корня, продолжение всего дерева",
           "sha": "8b6028cf09486e2d"
+        },
+        {
+          "path": "apps/server/src/domains/media/images.ts",
+          "why": "«Картинка: рисует панель»: три дороги, причина недоступности, промпт режима",
+          "sha": "35d7f36c68416762"
+        },
+        {
+          "path": "apps/server/src/domains/media/presentations.ts",
+          "why": "«Презентация»: три дороги колоды, что собирает панель и почему PDF может быть недоступен",
+          "sha": "82797a5d9f26794a"
+        },
+        {
+          "path": "packages/contracts/src/media-block.ts",
+          "why": "«Блоком в ответе»: что панель принимает от агента и что прячет из ленты",
+          "sha": "05557592fe914496"
         }
       ],
-      "confirmedAt": "2026-09-11T20:30:14.755Z"
+      "confirmedAt": "2026-09-12T21:55:12.242Z"
     },
     {
       "topic": "tests",
@@ -152,7 +217,7 @@
         {
           "path": "apps/server/src/domains/project-tests/runs.ts",
           "why": "«Запись прогона»: собирается из файлов кейсов, штамп lastRunId, пустая запись",
-          "sha": "187e4ca89e24c8c1"
+          "sha": "53bbdf4a3f0bbd4d"
         },
         {
           "path": "apps/server/src/domains/project-tests/impact.ts",
@@ -190,7 +255,7 @@
           "sha": "fa543dcf41d56e0e"
         }
       ],
-      "confirmedAt": "2026-09-11T20:30:14.842Z"
+      "confirmedAt": "2026-09-12T16:06:39.661Z"
     },
     {
       "topic": "rules",
@@ -833,7 +898,7 @@
     {
       "topic": "endpoints",
       "document": "apps/web/src/pages/Help/topics/EndpointsTopic.tsx",
-      "confirmedAt": "2026-09-11T15:51:04.564Z",
+      "confirmedAt": "2026-09-12T18:53:35.004Z",
       "sources": [
         {
           "path": "apps/server/src/domains/endpoints/endpoint-apply.ts",
@@ -853,7 +918,7 @@
         {
           "path": "packages/contracts/src/endpoints.ts",
           "why": "«Поля профиля»: его собственная форма и значения по умолчанию",
-          "sha": "2252e83c91fbe854"
+          "sha": "37d6bae271da45d9"
         }
       ]
     },
@@ -919,12 +984,12 @@
     {
       "topic": "prompts",
       "document": "apps/web/src/pages/Help/topics/PromptsTopic.tsx",
-      "confirmedAt": "2026-09-11T22:21:59.913Z",
+      "confirmedAt": "2026-09-12T21:55:12.323Z",
       "sources": [
         {
           "path": "apps/server/src/domains/prompts/catalog.ts",
           "why": "«Какие промпты есть»: состав каталога, версия встроенного текста, кто его читает",
-          "sha": "2dbf7994d9e7e952"
+          "sha": "6b8260cf900ba2b7"
         },
         {
           "path": "apps/server/src/domains/prompts/store.ts",

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,6 +11,7 @@ import { managedProfileId } from '../domains/platform/apply/profile.ts';
 import { writePlatform, writeToken } from '../domains/platform/store.ts';
 import { PlatformGateway } from '../domains/platform/gateway/listener.ts';
 import { registerPlatformRoutes } from './platform-routes.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Маршруты контура целиком, как их видит браузер.
@@ -43,7 +45,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 const MODELS = JSON.stringify({ data: [{ id: 'gpt-4o', kind: 'chat' }] });
@@ -108,6 +115,105 @@ describe('platform routes: настройка контура', () => {
     expect(new AppStore(appData).getSettings().platforms).toHaveLength(1);
   });
 
+  it('взаимное исключение правил (Т7) — отказ сохранения, а не тихая починка', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: {
+        settings: {
+          ...PLATFORM,
+          toolShim: true,
+          rules: {
+            ...PLATFORM.rules,
+            platform: { ...PLATFORM.rules.platform, platformTools: ['web_search'] },
+          },
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    // Отказ объясняется теми же словами, что строка матрицы на экране: два
+    // объяснения одного запрета человек читает как два разных запрета.
+    expect(res.json().message).toContain('Включить оба нельзя');
+    // Ничего не записано: отказ на правиле не смеет сохранить остальную форму
+    // наполовину.
+    expect(store.getSettings().platforms).toEqual([]);
+  });
+
+  /**
+   * Найдено враждебным ревью Т7: отказ стоял ПО СОСТОЯНИЮ, а противоречие
+   * приезжает мимо этой двери (разворот архива, `PATCH /api/settings`, импорт).
+   * Контур после такого не сохранялся вообще ничем — ни переименование, ни
+   * адрес, ни модель, ни ключ, — а убрать одну из сторон было нечем: выход был
+   * только через удаление контура вместе с ключом и историей расхода.
+   */
+  it('уже записанное противоречие не запирает контур: посторонняя правка проходит', async () => {
+    const contradiction = {
+      ...PLATFORM,
+      toolShim: true,
+      rules: {
+        ...PLATFORM.rules,
+        platform: { ...PLATFORM.rules.platform, platformTools: ['web_search'] },
+      },
+    };
+    // Так это и приезжает: мимо двери сохранения, прямо в настройки.
+    store.updateSettings({ platforms: [contradiction] });
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: { ...contradiction, title: 'EnterprisePlatform · prod' } },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(store.getSettings().platforms[0]?.title).toBe('EnterprisePlatform · prod');
+    // И карточка кричит о противоречии — молча его панель не чинит.
+    expect(res.json().conflicts.find((item: { id: string }) => item.id === 'tools')?.active).toBe(
+      true,
+    );
+  });
+
+  it('выход из противоречия: снятая прослойка сохраняется', async () => {
+    const contradiction = {
+      ...PLATFORM,
+      toolShim: true,
+      rules: {
+        ...PLATFORM.rules,
+        platform: { ...PLATFORM.rules.platform, platformTools: ['web_search'] },
+      },
+    };
+    store.updateSettings({ platforms: [contradiction] });
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: { ...contradiction, toolShim: false } },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(store.getSettings().platforms[0]?.toolShim).toBe(false);
+  });
+
+  it('одна сторона исключения сохраняется как обычно', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: {
+        settings: {
+          ...PLATFORM,
+          toolShim: false,
+          rules: {
+            ...PLATFORM.rules,
+            platform: { ...PLATFORM.rules.platform, platformTools: ['web_search'] },
+          },
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(store.getSettings().platforms[0]?.rules.platform.platformTools).toEqual(['web_search']);
+  });
+
   it('сохранение не включает контур: тумблер — это активация, и она своя ручка', async () => {
     // Тело просит `enabled: true`, как это делала бы форма до Т2.
     const res = await app.inject({
@@ -160,7 +266,9 @@ describe('platform routes: настройка контура', () => {
           ...PLATFORM,
           toolShim: true,
           contourPrompt: true,
+          rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
           caCertPath: join(root, 'нет-такого.pem'),
+          transport: defaultPlatformTransport(),
         },
       },
     });
@@ -201,6 +309,85 @@ describe('platform routes: настройка контура', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().detail).toBe('caCertPath');
     expect(store.getSettings().platforms).toEqual([]);
+  });
+
+  // DRV-04/05: ключ, вписанный в лишние заголовки, лёг бы открытым текстом в
+  // настройки и в экспорт окружения. Отказ называет поле и имя, но не значение.
+  it('ключ в лишних заголовках транспорта — 400 при сохранении, значение не отражается', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: {
+        settings: {
+          ...PLATFORM,
+          transport: {
+            ...defaultPlatformTransport(),
+            headers: 'Authorization: Bearer sk-live-51c0',
+          },
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().detail).toBe('transport.headers');
+    expect(res.body).not.toContain('sk-live-51c0');
+    expect(store.getSettings().platforms).toEqual([]);
+  });
+
+  // DRV-03: переопределение пресета с опечаткой общий PATCH роняет молча, а дверь
+  // сохранения контура — отказ с именем поля, иначе «сохранено» и шлюз как был.
+  it('негодное переопределение пресета — 400 с именем поля, контур не записан', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: { settings: { ...PLATFORM, manifest: { thinkingField: '__proto__.x' } } },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().detail).toBe('manifest.thinkingField');
+    expect(store.getSettings().platforms).toEqual([]);
+  });
+
+  it('пресет и его переопределения сохраняются и читаются обратно', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/enterprise-platform-dev',
+      payload: {
+        settings: {
+          ...PLATFORM,
+          driver: 'vllm',
+          manifest: { anthropicMessages: '', imagesApi: 'images/generations' },
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const [saved] = store.getSettings().platforms;
+    expect(saved?.driver).toBe('vllm');
+    expect(saved?.manifest).toEqual({ anthropicMessages: '', imagesApi: 'images/generations' });
+  });
+
+  // Живой прогон на Ollama (DRV-03): контур, сохранённый мимо мастера без полей
+  // прослойки, получал умолчание платформа компании, и включённая прослойка молча уводила
+  // клиента Anthropic с родной ручки пресета на мост.
+  it('без полей прослойки и промпта умолчание берётся из пресета типа, а не платформа компании', async () => {
+    const { toolShim: _shim, contourPrompt: _prompt, ...bare } = PLATFORM;
+    for (const [driver, expected] of [
+      ['ollama', false],
+      ['enterprise-platform', true],
+    ] as const) {
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/platforms/enterprise-platform-dev',
+        payload: { settings: { ...bare, driver } },
+      });
+      expect(res.statusCode, driver).toBe(200);
+      const [saved] = store.getSettings().platforms;
+      expect({ toolShim: saved?.toolShim, contourPrompt: saved?.contourPrompt }, driver).toEqual({
+        toolShim: expected,
+        contourPrompt: expected,
+      });
+    }
   });
 
   it('ключ можно сохранить вместе с настройкой — мастер делает это одним нажатием', async () => {
@@ -310,6 +497,37 @@ describe('platform routes: настройка контура', () => {
     }
   });
 
+  /**
+   * Чем пойдёт прогон (Т6). Маршрут спрашивает шапка чата на каждом открытии
+   * разговора, а до ревью его не покрывала ни одна проверка — ни серверная, ни
+   * свип.
+   */
+  describe('GET /api/platform-run-plan/:consumer', () => {
+    it('контура нет вовсе — ответ «не через контур», а не отказ', async () => {
+      const res = await app.inject({ method: 'GET', url: '/api/platform-run-plan/chat' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({ routed: false, title: '' });
+    });
+
+    it('живёт своим корнем: контур с именем `run-plan` его не перекрывает', async () => {
+      // Статический сегмент сильнее параметра, поэтому внутри
+      // `/api/platforms/:id/…` такой контур перекрыл бы собственные маршруты
+      // (ревью Т6, m11).
+      writePlatform(store, { ...PLATFORM, id: 'run-plan', title: 'Свой контур' });
+
+      // На прежнем адресе этот запрос попадал в план прогона с потребителем
+      // «apply» и отвечал чем угодно, кроме плана применения контура.
+      const own = await app.inject({ method: 'GET', url: '/api/platforms/run-plan/apply' });
+      expect(own.statusCode).toBe(200);
+      expect(own.json()).toHaveProperty('targets');
+
+      const plan = await app.inject({ method: 'GET', url: '/api/platform-run-plan/chat' });
+      expect(plan.statusCode).toBe(200);
+      expect(plan.json()).toHaveProperty('rules');
+    });
+  });
+
   it('ключ не строкой — 400 с именем поля, а не 500', async () => {
     writePlatform(store, PLATFORM);
 
@@ -374,6 +592,7 @@ describe('platform routes: активность контура (Т2)', () => {
     apiKind: 'anthropic',
     model: '',
     writeToken: false,
+    imagesUrl: '',
     ownerPlatformId: platformId,
   });
 
@@ -594,6 +813,32 @@ describe('инвариант 1: ни один ответ раздела не с�
       expect(res.statusCode).toBe(200);
       expect(res.json().outcome).toBe('unavailable');
       expect(res.payload).not.toContain(SECRET);
+    });
+
+    it('тип контура без агентов — 404 до сети и на вызове, и на сессиях', async () => {
+      writePlatform(store, { ...PLATFORM, driver: 'openai-compat' });
+      writeToken(appData, PLATFORM.id, SECRET);
+      answerWith(JSON.stringify({ error: { message: 'Not Found' } }), 404);
+
+      const ask = await app.inject({
+        method: 'POST',
+        url: `/api/platforms/${PLATFORM.id}/agents/ask`,
+        payload: { agent: AGENT, message: 'привет' },
+      });
+      const read = await app.inject({
+        method: 'GET',
+        url: `/api/platforms/${PLATFORM.id}/agents/sessions/ses-1`,
+      });
+      const reset = await app.inject({
+        method: 'DELETE',
+        url: `/api/platforms/${PLATFORM.id}/agents/sessions/ses-1`,
+      });
+
+      for (const res of [ask, read, reset]) {
+        expect(res.statusCode).toBe(404);
+        expect(res.json().code).toBe('agents_not_declared');
+      }
+      expect(calls).toEqual([]);
     });
 
     it('без вопроса — 400 с именем поля, без похода по сети', async () => {

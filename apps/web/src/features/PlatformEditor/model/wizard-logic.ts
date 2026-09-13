@@ -1,6 +1,9 @@
 import {
   PLATFORM_ASSISTANT_TARGET,
+  PLATFORM_PRESETS,
   type Platform,
+  type PlatformManifestField,
+  type PlatformManifestOverrides,
   type PlatformCapability,
   type PlatformGatewaySettings,
   type PlatformProbeResult,
@@ -38,15 +41,44 @@ export function stepBefore(step: WizardStep): WizardStep {
  * тронул его сам: он же кусок адреса шлюза, и придумывать его никто не обязан.
  * Тронутый однажды идентификатор имя за собой больше не тянет — иначе правка
  * названия молча уводила бы ключ, который лежит под старым.
+ *
+ * Драйвер нового контура приносит свои умолчания прослойки и промпта: в мастере
+ * этих галочек нет, и тронуть их человек ещё не мог. У сохранённого контура они
+ * уже выбор человека (карточка правил), и смена драйвера их не переписывает.
+ *
+ * Переопределения пресета у нового контура при смене пресета сбрасываются: они
+ * сказаны о ПРЕЖНЕМ шлюзе («у моего vLLM ручки Anthropic нет»), и молча
+ * перенесённые на другой стали бы утверждением, которого никто не делал.
  */
 export function draftWithPatch(
   current: Platform,
   fields: Partial<Platform>,
   idTouched: boolean,
+  isNew = false,
 ): Platform {
   const next = { ...current, ...fields };
   if (fields.title !== undefined && !idTouched) next.id = platformIdFromTitle(fields.title);
+  if (isNew && fields.driver !== undefined && fields.driver !== current.driver) {
+    Object.assign(next, PLATFORM_PRESETS[fields.driver].defaults);
+    delete next.manifest;
+  }
   return next;
+}
+
+/**
+ * Переопределения после правки одного поля. `undefined` убирает поле — «как у
+ * пресета»; пустая строка остаётся — «не объявлено», и это разные ответы.
+ * Пустой объект не хранится: у контура без переопределений поля нет вовсе.
+ */
+export function manifestWithField<F extends PlatformManifestField>(
+  manifest: PlatformManifestOverrides | undefined,
+  field: F,
+  value: PlatformManifestOverrides[F] | undefined,
+): PlatformManifestOverrides | undefined {
+  const next: PlatformManifestOverrides = { ...manifest };
+  if (value === undefined) delete next[field];
+  else next[field] = value;
+  return Object.keys(next).length > 0 ? next : undefined;
 }
 
 /**

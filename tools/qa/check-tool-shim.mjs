@@ -28,7 +28,9 @@
  *      доводит вызов до файла, а пример протокола в заборе посреди ответа не
  *      трогает файл ничем и назван человеку причиной;
  *   8. с ВЫКЛЮЧЕННОЙ прослойкой тот же прогон файла не создаёт — проверка
- *      умеет краснеть, и краснеет именно от прослойки.
+ *      умеет краснеть, и краснеет именно от прослойки;
+ *   9. совместимый шлюз (`clientTools: 'native'`) без прослойки доводит вызов
+ *      до файла ПОЛЕМ: схемы уходят `tools`, результат — ролью `tool`.
  *
  * Запуск: `node tools/qa/check-tool-shim.mjs`
  * Нужен установленный `claude` (путь можно задать `CLAUDE_CLI`); стенд человека
@@ -131,7 +133,7 @@ async function gatewayStatus() {
  * Один прогон настоящего CLI через шлюз. Возвращает, создался ли файл, его
  * содержимое, вывод и код выхода.
  */
-async function runClaude(exe, port, label, model = MODEL) {
+async function runClaude(exe, port, label, model = MODEL, contour = CONTOUR) {
   // Короткое имя 8.3 (`RUSYAN~1` в пути TEMP) CLI считает подозрительным путём
   // и требует ручного подтверждения даже в `acceptEdits` — разворачиваем путь в
   // настоящий, иначе запись не состоится по причине, к прослойке не
@@ -167,7 +169,7 @@ async function runClaude(exe, port, label, model = MODEL) {
         CLAUDE_CONFIG_DIR: home,
         // Ровно те переменные, которыми панель разворачивает прогон на контур
         // (Т3): адрес шлюза с контуром в пути и токен-заглушка.
-        ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}/${CONTOUR}`,
+        ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}/${contour}`,
         ANTHROPIC_AUTH_TOKEN: ROUTE_TOKEN,
         ANTHROPIC_MODEL: model,
         DISABLE_TELEMETRY: '1',
@@ -238,14 +240,14 @@ async function main() {
 }
 
 /** Контур с нужным состоянием прослойки + поднятый на него шлюз. */
-async function openGateway(stub, toolShim) {
-  await api(`/platforms/${encodeURIComponent(CONTOUR)}`, {
+async function openGateway(stub, toolShim, contour = CONTOUR, driver = 'enterprise-platform') {
+  await api(`/platforms/${encodeURIComponent(contour)}`, {
     method: 'PUT',
     body: JSON.stringify({
       settings: {
-        id: CONTOUR,
+        id: contour,
         title: 'Стаб контура для прослойки',
-        driver: 'enterprise-platform',
+        driver,
         baseUrl: stub.url,
         enabled: true,
         mode: 'best-effort',
@@ -263,7 +265,7 @@ async function openGateway(stub, toolShim) {
   });
   // Сохранение контур не включает (Т2, инвариант 1): активность переключается
   // своим маршрутом, иначе шлюз отвечал бы «контур выключен в панели».
-  await api(`/platforms/${encodeURIComponent(CONTOUR)}/activate`, { method: 'POST', body: '{}' });
+  await api(`/platforms/${encodeURIComponent(contour)}/activate`, { method: 'POST', body: '{}' });
   await api('/settings', {
     method: 'PATCH',
     body: JSON.stringify({
@@ -446,6 +448,82 @@ async function run(stub, exe) {
     'и потеря инструментов при этом названа человеку',
     (offEvent?.lost ?? []).some((item) => item.includes('tools')),
     JSON.stringify(offEvent?.lost ?? []),
+  );
+
+  await runNative(stub, exe);
+}
+
+/**
+ * ── 9. Совместимый шлюз: инструменты ПОЛЕМ (аудит DRV-01) ─────────────────
+ *
+ * Прослойка выключена, драйвер `openai-compat` объявляет `clientTools: 'native'`,
+ * модель отвечает полем `tool_calls`. До правки мост выбрасывал `tools` у любого
+ * драйвера: этот же прогон кончался без файла, а стаб звал инструмент заново,
+ * потому что роль `tool` до него не доезжала.
+ */
+async function runNative(stub, exe) {
+  const contour = 'native-compat';
+  const model = 'stub-tool-native';
+  console.log('Прогон 6: совместимый шлюз, инструменты полем…');
+  const port = await openGateway(stub, false, contour, 'openai-compat');
+  const before = stub.calls.length;
+  const seen = new Set(((await gatewayStatus()).events ?? []).map((item) => item.at));
+  const native = await runClaude(exe, port, 'native', model, contour);
+
+  check(
+    'настоящий CLI создал файл по вызову, пришедшему полем `tool_calls`',
+    native.created && native.content.includes('руки полем'),
+    `код ${native.code}, файл ${native.created ? 'есть' : 'НЕ создан'}: ${native.out.slice(-400)}`,
+  );
+
+  const upstream = stub.calls
+    .slice(before)
+    .filter((call) => call.path.endsWith('/chat/completions'))
+    .map((call) => JSON.parse(call.body || '{}'))
+    .filter((json) => json.model === model);
+  const first = upstream[0] ?? {};
+  const names = (first.tools ?? []).map((tool) => tool.function?.name);
+  check(
+    'наверх ушли схемы клиента полем `tools`, поимённо',
+    ['Write', 'Read', 'Bash'].every((name) => names.includes(name)) &&
+      first.tools.every((tool) => tool.type === 'function' && tool.function?.parameters),
+    `инструменты: ${JSON.stringify(names)}`,
+  );
+  check(
+    'текста протокола прослойки в запросе нет',
+    upstream.every((json) => !JSON.stringify(json.messages ?? []).includes('<tool_call>')),
+    'в сообщениях найден текст протокола',
+  );
+  const followUp = upstream.find((json) =>
+    (json.messages ?? []).some((message) => message.role === 'tool'),
+  );
+  const toolAt = (followUp?.messages ?? []).findIndex((message) => message.role === 'tool');
+  const callMessage = followUp?.messages?.[toolAt - 1];
+  check(
+    'результат вернулся ролью `tool` сразу за репликой с вызовом',
+    Boolean(followUp) &&
+      followUp.messages[toolAt].tool_call_id === 'call_native_1' &&
+      (callMessage?.tool_calls ?? []).some((call) => call.id === 'call_native_1'),
+    JSON.stringify((followUp?.messages ?? []).map((message) => message.role)),
+  );
+
+  const events = ((await gatewayStatus()).events ?? []).filter(
+    (item) => item.platformId === contour && !seen.has(item.at),
+  );
+  check(
+    'след: инструменты не потеряны и не «текстом», вызов посчитан рукой агента',
+    events.every((item) => !(item.lost ?? []).includes('tools')) &&
+      events.every((item) => (item.shimmed ?? []).length === 0) &&
+      events.some((item) => (item.nativeCalls ?? 0) >= 1),
+    JSON.stringify(
+      events.map((item) => ({
+        lost: item.lost,
+        shimmed: item.shimmed,
+        native: item.nativeCalls,
+        contour: item.contourCalls,
+        flaws: item.toolFlaws,
+      })),
+    ),
   );
 }
 

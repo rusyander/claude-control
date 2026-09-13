@@ -100,6 +100,21 @@ describe('факты, которые кадры оставляют панели'
     expect(translator.facts.summarized).toBe(true);
   });
 
+  it('кадры размышления в поток не идут, но оставляют стадию `reasoning` в следе', () => {
+    const translator = new StreamTranslator({
+      driver: enterprise-platformDriver,
+      dialect: 'anthropic',
+      model: 'm',
+      includeUsage: false,
+    });
+    const out = translator.push(
+      sse('{"enterprise-platform_reasoning":"я думаю"}', '{"enterprise-platform_reasoning":" дальше"}', DELTA),
+    );
+    // Единственное свидетельство, что правило «Размышления модели» дошло до модели.
+    expect(translator.facts.stages).toEqual(['reasoning']);
+    expect(out).not.toContain('я думаю');
+  });
+
   it('расход снимается всегда, даже когда клиент его не просил', () => {
     const translator = new StreamTranslator({
       driver: enterprise-platformDriver,

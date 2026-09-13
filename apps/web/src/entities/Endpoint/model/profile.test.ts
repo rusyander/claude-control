@@ -33,6 +33,9 @@ describe('новый профиль', () => {
       apiKind: 'openai-compat',
       model: '',
       writeToken: false,
+      // Адрес генерации картинок (Т9) пуст и НЕ выводится из `baseUrl`: угаданная
+      // ручка дала бы 404 после того, как человек уже описал картинку.
+      imagesUrl: '',
       ownerPlatformId: '',
     });
   });

@@ -117,6 +117,25 @@ await page.route('**/api/provider-chat/chats/qa1/stream', async (route) => {
   });
 });
 
+/**
+ * Чем прогон пойдёт через контур (Т6). Разговор просит `gpt-5.3-codex-spark` —
+ * имени контура он не знает, в каталоге контура его нет, и запрос уйдёт с
+ * моделью контура. Шапка обязана сказать это словом: метка с чужим именем
+ * читается как «идём этой моделью», а идём мы другой.
+ */
+let routedPlan = {
+  routed: true,
+  title: 'EnterprisePlatform · dev',
+  rules: {
+    model: 'enterprise-platform-mid',
+    source: 'default',
+    map: {},
+    catalog: ['enterprise-platform-mid', 'enterprise-platform-large'],
+  },
+  effort: false,
+};
+await page.route('**/api/platform-run-plan/**', (route) => json(route, routedPlan));
+
 const errors = [];
 page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text());
@@ -136,6 +155,16 @@ const body = await page.textContent('body');
 check(body.includes('Разговоры'), 'открылся чат чужого провайдера, а не чат Claude');
 check(body.includes('Проверка'), 'разговор виден в списке');
 check(body.includes('gpt-5.3-codex-spark'), 'подобранная панелью модель названа в шапке');
+// Т6: через контур выбор разговора — просьба. Подмена названа вслух, вместе с
+// тем, что уедет на самом деле.
+check(
+  body.includes('enterprise-platform-mid') && body.includes('EnterprisePlatform · dev'),
+  'сказано, чем разговор пойдёт через контур на самом деле',
+);
+check(
+  body.includes('не принимает глубину продумывания'),
+  'потерянная глубина названа и в шапке чужого чата',
+);
 
 const composer = page.getByRole('textbox', { name: /Сообщение провайдеру/ });
 check((await composer.count()) === 1, 'поле ввода на месте');
@@ -200,6 +229,26 @@ check(
   afterReview.split('Ответ шёл').length - 1 === 2,
   'реплика без записанного времени строки времени не получает',
 );
+
+// Разговор НЕ через контур обязан вернуть шапку к прежнему виду: метка «запрос
+// уйдёт с другой моделью» в обычном чате — ложь о том, чего не происходит.
+routedPlan = {
+  routed: false,
+  title: '',
+  reason: 'consumer_off',
+  rules: { model: '', source: 'none', map: {}, catalog: [] },
+  effort: true,
+};
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('nav');
+await page.waitForTimeout(1500);
+const offContour = await page.textContent('body');
+check(!offContour.includes('enterprise-platform-mid'), 'без контура метки модели контура нет вовсе');
+check(
+  !offContour.includes('не принимает глубину продумывания'),
+  'без контура о глубине шапка ничего не утверждает',
+);
+check(offContour.includes('gpt-5.3-codex-spark'), 'своя метка модели при этом на месте');
 
 // Удаление разговора спрашивает подтверждение: переписка исчезает с диска.
 await page.getByRole('button', { name: 'Удалить' }).first().click();

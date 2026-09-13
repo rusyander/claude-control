@@ -1,6 +1,8 @@
 import type { Platform, PlatformGatewaySettings } from '@agentdeck/contracts';
 import { platformGatewaySettingsSchema, platformsSchema } from '@agentdeck/contracts/platform';
 import { withLegacyConsumers } from '../platform/store.ts';
+import { driverOf } from '../platform/drivers/index.ts';
+import { brokenExclusion } from '../platform/rules-matrix.ts';
 import type { ChecklistItem } from './collect/types.ts';
 
 /**
@@ -158,6 +160,20 @@ export function planPanelPlatforms(input: PanelPlatformsInput): PanelPlatformsPl
       // другие, и молча применённый контур ушёл бы «во все проекты».
       if (platform.projectPaths.length > 0) {
         notes.push('пути проектов — с прежней машины, проверьте их на этой');
+      }
+
+      // Взаимное исключение правил (Т7): архив везёт `rules` целиком, а дверь
+      // сохранения такое состояние не пропускает — то есть единственная дорога
+      // к нему и есть разворот. Названо ДО нажатия: иначе человек развернул бы
+      // всё зелёным и упёрся в 400 на первой же правке контура, которую он не
+      // делал. Панель тут ничего не чинит сама — выбор, какую сторону оставить,
+      // принадлежит ему (ревью Т7, M5).
+      const broken = brokenExclusion(platform, driverOf(platform));
+      if (broken) {
+        notes.push(
+          `${broken.title}: обе стороны включены — сохранение этого контура будет отклонено, ` +
+            'выключите одну на карточке контура',
+        );
       }
 
       return {

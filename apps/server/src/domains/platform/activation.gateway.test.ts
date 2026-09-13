@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -6,8 +7,9 @@ import type { Platform } from '@agentdeck/contracts';
 import { AppStore } from '../../lib/app-store.ts';
 import type { PlatformFetch } from './ca-fetch.ts';
 import { PlatformGateway } from './gateway/listener.ts';
-import { activatePlatform, type ContourActivationDeps } from './activation.ts';
+import { activatePlatform, SMOKE_MAX_TOKENS, type ContourActivationDeps } from './activation.ts';
 import { writePlatform, writeToken } from './store.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Пробный запрос активации — через НАСТОЯЩИЙ шлюз: настоящий сокет на петле,
@@ -38,7 +40,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 /** Проба: список моделей прямо из контура, мимо шлюза. */
@@ -144,7 +151,7 @@ describe('пробный запрос идёт через собственный
     expect(JSON.stringify(calls[0]?.headers)).toContain(SECRET);
     // Вопрос — тот, что объявил драйвер, и потолок ответа при нём.
     expect(calls[0]?.body).toContain('готов');
-    expect(calls[0]?.body).toContain('"max_tokens":8');
+    expect(JSON.parse(calls[0]?.body ?? '{}').max_tokens).toBe(SMOKE_MAX_TOKENS);
   });
 
   it('контур отказал — отказ виден словами, активация остаётся', async () => {
@@ -177,5 +184,82 @@ describe('пробный запрос идёт через собственный
 
     expect(result.smoke.ok).toBe(false);
     expect(result.smoke.detail).toContain('не сказала ни слова');
+  });
+});
+
+/**
+ * Аудит DRV-11. Контур отдаёт чат и эмбеддинги одним списком
+ * (`handler_public_api.go:219-221`), а пробный запрос брал первую модель списка
+ * мимо выбора человека и восемь токенов — которые reasoning-модель целиком
+ * тратит на размышления (`chat/schemas.py:116-119`). Итог — красная карточка
+ * у здорового контура.
+ */
+describe('пробный запрос спрашивает ту модель, которой пойдёт работа', () => {
+  const catalog =
+    (models: unknown[]): PlatformFetch =>
+    () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ data: models }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+  const smokeModel = () => JSON.parse(calls[0]?.body ?? '{}').model as string;
+
+  it('выбор человека сильнее первой модели каталога', async () => {
+    writePlatform(store, { ...PLATFORM, defaultModel: 'chat-picked' });
+    await gateway.start({
+      store,
+      appDataDir: appData,
+      port: 0,
+      fetchImpl: upstream([DELTA, DONE]),
+      spendFlushMs: 0,
+    });
+
+    const probeFetch = catalog([
+      { id: 'embed-first', type: 'embedding' },
+      { id: 'chat-picked', type: 'chat' },
+    ]);
+    const result = await activatePlatform({ ...deps(), probeFetch }, PLATFORM.id);
+
+    expect(result.smoke.model).toBe('chat-picked');
+    expect(smokeModel()).toBe('chat-picked');
+  });
+
+  it('без выбора — первая ЧАТОВАЯ модель, а не эмбеддинг', async () => {
+    await gateway.start({
+      store,
+      appDataDir: appData,
+      port: 0,
+      fetchImpl: upstream([DELTA, DONE]),
+      spendFlushMs: 0,
+    });
+
+    const probeFetch = catalog([
+      { id: 'embed-first', type: 'embedding' },
+      { id: 'chat-1', type: 'chat' },
+    ]);
+    const result = await activatePlatform({ ...deps(), probeFetch }, PLATFORM.id);
+
+    expect(result.smoke.model).toBe('chat-1');
+    expect(smokeModel()).toBe('chat-1');
+  });
+
+  it('потолок ответа оставляет место размышлениям, а упёршийся в него ответ назван', async () => {
+    const LENGTH = '{"id":"c1","choices":[{"index":0,"delta":{},"finish_reason":"length"}]}';
+    await gateway.start({
+      store,
+      appDataDir: appData,
+      port: 0,
+      fetchImpl: upstream([LENGTH]),
+      spendFlushMs: 0,
+    });
+
+    const result = await activatePlatform(deps(), PLATFORM.id);
+
+    expect(SMOKE_MAX_TOKENS).toBeGreaterThanOrEqual(64);
+    expect(result.smoke.ok).toBe(false);
+    expect(result.smoke.detail).toContain(`${SMOKE_MAX_TOKENS}`);
+    expect(result.smoke.detail).toContain('размышлен');
   });
 });

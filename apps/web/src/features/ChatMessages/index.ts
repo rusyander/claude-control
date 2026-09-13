@@ -10,6 +10,13 @@ export type { TaskSplitCardProps } from './ui/TaskSplitCard.types';
 /** Карточка продолжения в чистой сессии — по той же причине, что и соседняя. */
 export { HandoffCard } from './ui/HandoffCard';
 export type { HandoffCardProps } from './ui/HandoffCard.types';
+/**
+ * Карточка вложения из ответа агента (Т10) — и снова по той же причине: блоки
+ * `agentdeck:{deck,svg}` приходят в обе ленты, а дорога агента и есть та,
+ * которая работает у любого CLI.
+ */
+export { MediaFeedCard } from './ui/MediaFeedCard';
+export type { MediaFeedCardProps } from './ui/MediaFeedCard.types';
 export type { ChildPermission, ChildQuestion, HandoffControls } from './ui/ChatMessages.types';
 /**
  * Сводка звеньев у родителя. Наружу выставлена по той же причине, что и

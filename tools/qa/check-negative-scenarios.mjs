@@ -135,12 +135,21 @@ const SCENARIOS = [
     id: '7б',
     title: 'Исчерпан лимит пользователя, команды или инстанса — 402 с уровнем',
     expects: 'с названием уровня',
+    note:
+      'ТАБЛИЦА ОШИБАЛАСЬ: на /v1 402 — только бюджет КЛЮЧА (handler_public_api.go:338-341, ' +
+      'handler_agent_api.go:447), трёхуровневый бюджет budget.go проверяется лишь на JWT-маршрутах, ' +
+      'куда панель не ходит. Уровня в теле нет; что кончилось, называет манифест драйвера ' +
+      '(budgetRefusals), а молчащий контур оставляет поля пустыми.',
     closedBy: [
       [
         `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
-        'уровень лимита из тела 402 доезжает до учёта',
+        '402 enterprise-platform назван бюджетом КЛЮЧА',
       ],
-      [`${SERVER}/domains/platform/spend.test.ts`, 'уровень доезжает до экрана'],
+      [
+        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        'новый отказ заменяет прежний целиком',
+      ],
+      [`${SERVER}/domains/platform/spend.test.ts`, 'чей это лимит доезжает до экрана'],
     ],
   },
   {

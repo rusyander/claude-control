@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,6 +10,8 @@ import type { ServerContext } from '../context.ts';
 import { writePlatform, writeToken } from '../domains/platform/store.ts';
 import { PlatformGateway } from '../domains/platform/gateway/listener.ts';
 import { registerPlatformRoutes } from './platform-routes.ts';
+import { savePermission } from '../domains/permissions.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Применение контура так, как его видит браузер.
@@ -41,7 +44,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 let root: string;
@@ -160,6 +168,34 @@ describe('POST /api/platforms/:id/disable', () => {
     expect(store.getSettings().endpointProfiles).toEqual([]);
     // Снимается применение, а не настройка: контур на месте и включён.
     expect(store.getSettings().platforms[0]?.id).toBe('enterprise-platform-dev');
+  });
+
+  // Аудит DRV-02: право, добавленное разделом «Права» ПОСЛЕ применения, пишет
+  // тот же settings.json целиком. Отпечаток всего файла объявлял это чужой рукой,
+  // отключение уходило в «kept», и Claude оставался направленным на шлюз.
+  it('право, добавленное панелью после применения, не мешает отключению', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/platforms/enterprise-platform-dev/apply',
+      payload: { targets: ['claude'] },
+    });
+    expect(envOf().ANTHROPIC_BASE_URL).toContain('127.0.0.1');
+    savePermission(settingsPath, null, {
+      decision: 'allow',
+      pattern: 'Bash(git status)',
+      groupIds: [],
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/platforms/enterprise-platform-dev/disable',
+    });
+    expect(response.statusCode).toBe(200);
+    expect(envOf()).toEqual({ EXISTING: 'keep-me' });
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf8')) as {
+      permissions?: { allow?: string[] };
+    };
+    expect(settings.permissions?.allow).toEqual(['Bash(git status)']);
   });
 
   it('со списком целей снимает точечно — строку журнала, а не всё разом', async () => {

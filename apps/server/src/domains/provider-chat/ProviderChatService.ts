@@ -124,11 +124,11 @@ export class ProviderChatService {
    * следующего запуска, а не с перезапуска панели. Слушателя нет — чат ходит
    * своим провайдером, как до контуров.
    */
-  setPlatformRouting(resolve: (consumer: string) => PlatformRunRoute): void {
+  setPlatformRouting(resolve: (consumer: string, asked: string) => PlatformRunRoute): void {
     this.platformRouting = resolve;
   }
 
-  private platformRouting?: (consumer: string) => PlatformRunRoute;
+  private platformRouting?: (consumer: string, asked: string) => PlatformRunRoute;
 
   /** Задать вопрос: реплика пользователя пишется сразу, ответ идёт потоком. */
   send(
@@ -165,7 +165,15 @@ export class ProviderChatService {
     // только отсюда: у `ProviderChatRunDeps` этого поля нет намеренно — иначе
     // адрес контура протащил бы в новый запуск отложенный вызов конвейера,
     // собранный при прежней галочке. Пустой объект — «не через контур».
-    const route = this.platformRouting?.(foreignConsumerId(providerId)) ?? { env: {} };
+    const route = this.platformRouting?.(foreignConsumerId(providerId), chat.model ?? '') ?? {
+      env: {},
+    };
+    // Подобранная модель живёт в шапке разговора и действует на КАЖДОЕ сообщение
+    // в нём, а не только на первое. Через контур её место занимает модель
+    // контура (Т6): имя вендора он не знает, а усилия не принимает вовсе — и то
+    // и другое решено маршрутом, а не здесь.
+    const model = route.model?.model || chat.model || '';
+    const effort = route.effort === false ? '' : (chat.effort ?? '');
 
     void live.run
       .start(
@@ -176,10 +184,8 @@ export class ProviderChatService {
           appDataDir,
           platformEnv: route.env,
           ...(chat.workdir ? { workdir: chat.workdir } : {}),
-          // Подобранная модель живёт в шапке разговора и действует на КАЖДОЕ
-          // сообщение в нём, а не только на первое.
-          ...(chat.model ? { model: chat.model } : {}),
-          ...(chat.effort ? { effort: chat.effort } : {}),
+          ...(model ? { model } : {}),
+          ...(effort ? { effort } : {}),
         },
         (event) => {
           if (event.type === 'delta') {

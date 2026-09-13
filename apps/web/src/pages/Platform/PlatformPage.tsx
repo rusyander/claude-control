@@ -14,15 +14,17 @@ import { CompromiseMark } from '@shared/ui/compromise-mark';
 import { CompromiseList } from '@features/CompromiseList';
 import { PlatformWizard } from '@features/PlatformEditor';
 import { useCompromises } from '@entities/Compromise';
-import { usePlatformGateway, usePlatformsInfo } from '@entities/Platform';
+import { toolRouteOf, usePlatformGateway, usePlatformsInfo } from '@entities/Platform';
 import { PlatformCard } from './PlatformCard';
 import { ActivationNotice } from './ActivationNotice';
 import { ViolationsCard } from './ViolationsCard';
 import { ToolShimCard } from './ToolShimCard';
 import { AgentsCard } from './AgentsCard';
+import { ModelCard } from './ModelCard';
+import { RulesCard } from './RulesCard';
 import { BridgeRow } from './BridgeRow';
 import { showsViolations } from './lib/violationsView';
-import { showsToolShim } from './lib/toolShimView';
+import { showsToolShim, showsToolsFact } from './lib/toolShimView';
 import { showsAgents } from './lib/agentsView';
 import styles from './PlatformPage.module.scss';
 
@@ -86,19 +88,43 @@ export function PlatformPage() {
         <PlatformCard key={status.platform.id} status={status} onEdit={() => openEdit(status)} />
       ))}
 
+      {/* Модель и усилие (Т6) — у каждого контура свои, поэтому карточка на
+          каждый, как и агенты. Ниже карточки контура намеренно: пока связь не
+          проверена, каталога моделей нет и выбирать не из чего. */}
+      {(data ?? []).map((status) => (
+        <ModelCard
+          key={status.platform.id}
+          platform={status.platform}
+          health={status.health}
+          effort={status.effort}
+        />
+      ))}
+
+      {/* Правила контура и матрица конфликтов (Т7) — ниже модели: сперва «чем
+          отвечает», потом «что он делает с запросом по дороге». */}
+      {(data ?? []).map((status) => (
+        <RulesCard
+          key={status.platform.id}
+          platform={status.platform}
+          rules={status.rules}
+          conflicts={status.conflicts}
+          layers={status.layers}
+        />
+      ))}
+
       {/* Агенты — у каждого включённого контура свои: список ведёт человек, и
           спросить агента одного контура через другой нельзя. А переходник MCP
-          один на все контуры, поэтому стоит отдельно и ровно один раз. */}
-      {(data ?? [])
-        .filter((status) => showsAgents(status.platform))
-        .map((status) => (
-          <AgentsCard
-            key={status.platform.id}
-            platform={status.platform}
-            hasToken={status.hasToken}
-          />
-        ))}
-      {(data ?? []).some((status) => showsAgents(status.platform)) && <BridgeRow />}
+          один на все контуры, поэтому стоит отдельно и ровно один раз; модели
+          через него спрашиваются у любого типа, поэтому и стоит он у любого
+          включённого контура, а не только у контура с агентами. */}
+      {(data ?? []).filter(showsAgents).map((status) => (
+        <AgentsCard
+          key={status.platform.id}
+          platform={status.platform}
+          hasToken={status.hasToken}
+        />
+      ))}
+      {(data ?? []).some((status) => status.platform.enabled) && <BridgeRow />}
 
       {/* Карточка проверок появляется только при живом шлюзе и включённом
           контуре: выключенный контур обязан вернуть панель к сегодняшнему
@@ -124,7 +150,7 @@ export function PlatformPage() {
           Отдельная карточка, а не строка в «Проверках»: там чужая работа
           (гардрейлы компании), здесь своя. */}
       {showsToolShim(
-        (data ?? []).some((status) => status.platform.enabled),
+        (data ?? []).some((status) => status.platform.enabled && toolRouteOf(status) === 'shim'),
         gateway.data?.status.running ?? false,
         gateway.data?.status.toolShim,
       ) && <ToolShimCard report={gateway.data?.status.toolShim} />}
@@ -142,12 +168,14 @@ export function PlatformPage() {
           </Typography>
           <CompromiseMark id="gateway-required" />
         </Stack>
-        <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
-          <Typography variant="body-sm" color="muted">
-            {t('platform.factTools')}
-          </Typography>
-          <CompromiseMark id="no-client-tools" />
-        </Stack>
+        {showsToolsFact((data ?? []).map((status) => toolRouteOf(status))) && (
+          <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
+            <Typography variant="body-sm" color="muted">
+              {t('platform.factTools')}
+            </Typography>
+            <CompromiseMark id="no-client-tools" />
+          </Stack>
+        )}
         <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
           <Typography variant="body-sm" color="muted">
             {t('platform.factCli')}

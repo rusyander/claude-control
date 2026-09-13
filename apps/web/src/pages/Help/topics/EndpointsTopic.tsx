@@ -52,6 +52,12 @@ export function EndpointsTopic() {
             { name: 'google', description: tr('kindGoogle') },
           ]}
         />
+        {/* Адрес генерации картинок — отдельным полем, и сказать об этом нужно
+            здесь же: правило поля («не выводится из основного адреса») человек
+            читает ровно тогда, когда видит в форме пустую строку. */}
+        <Callout tone="info" title={tr('imagesTitle')}>
+          {tr('imagesText')}
+        </Callout>
       </HelpSection>
 
       <HelpSection title={tr('targetsTitle')} caption={tr('targetsCaption')}>

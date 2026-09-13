@@ -253,6 +253,62 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     expect(registry.describe('c2')?.options.platformEnv).toEqual({});
   });
 
+  /**
+   * Слои Т8 со стороны реестра. Дописку панели (инициативы, разделение,
+   * продолжение) собирает маршрут чата, который про контур не знает ничего, —
+   * значит, снять её может только это место. Не снятая, она пережила бы
+   * снятую галочку и уезжала бы в контур на каждом сообщении.
+   */
+  it('снятые слои кладутся флагами, а наша дописка к промпту снимается тут же', () => {
+    registry.setPlatformRouting(() => ({
+      env: {},
+      layers: { args: ['--setting-sources', 'project,local'], systemPrompt: false, dropped: [] },
+    }));
+
+    registry.start('c4', { ...OPTIONS, appendSystemPrompt: 'инициатива панели' }, {});
+    const options = registry.describe('c4')?.options;
+    expect(options?.platformArgs).toEqual(['--setting-sources', 'project,local']);
+    expect(options?.platformDropAppend).toBe(true);
+    // Сам ТЕКСТ дописки при этом цел: снимает его запуск, а снимок параметров
+    // переживает паузу дерева и перезапуск панели.
+    expect(options?.appendSystemPrompt).toBe('инициатива панели');
+  });
+
+  it('маршрута нет — флагов нет, и дописка панели остаётся как была', () => {
+    registry.start('c5', { ...OPTIONS, appendSystemPrompt: 'инициатива панели' }, {});
+    const options = registry.describe('c5')?.options;
+    expect(options?.platformArgs).toEqual([]);
+    expect(options?.platformDropAppend).toBe(false);
+    expect(options?.appendSystemPrompt).toBe('инициатива панели');
+  });
+
+  /**
+   * Ревью Т8, MAJOR-4. Прогон с паузой дерева продолжают СОХРАНЁННЫМИ
+   * параметрами, и до правки в них лежала пустая дописка: человек снимал слой,
+   * ставил дерево на паузу, возвращал галочку — и продолжение уходило без
+   * инициатив, разделения и продолжения сессии, а шапка чата в этот момент
+   * честно молчала, снятых слоёв уже не было.
+   */
+  it('снятый и возвращённый слой не съедает дописку у продолженного прогона', () => {
+    registry.setPlatformRouting(() => ({
+      env: {},
+      layers: { args: ['--strict-mcp-config'], systemPrompt: false, dropped: ['systemPrompt'] },
+    }));
+    registry.start('c6', { ...OPTIONS, appendSystemPrompt: 'инициатива панели' }, {});
+    const paused = registry.describe('c6')?.options;
+    expect(paused?.platformDropAppend).toBe(true);
+
+    // Галочку вернули — и продолжение стартует ТЕМ ЖЕ снимком параметров.
+    registry.setPlatformRouting(() => ({
+      env: {},
+      layers: { args: [], systemPrompt: true, dropped: [] },
+    }));
+    registry.start('c7', { ...paused! }, {});
+    const resumed = registry.describe('c7')?.options;
+    expect(resumed?.platformDropAppend).toBe(false);
+    expect(resumed?.appendSystemPrompt).toBe('инициатива панели');
+  });
+
   it('завершившийся прогон рассказывает планировщику своё происхождение', async () => {
     const seen: (string | undefined)[] = [];
     registry.setHandoffPlanner((finished) => {

@@ -1,0 +1,132 @@
+{
+  "topic": "platform",
+  "scenario": "scripted",
+  "frames": [
+    {
+      "id": "01-shim-call",
+      "side": "panel",
+      "file": "01-shim-call.png",
+      "masked": 0,
+      "width": 1280,
+      "height": 1000,
+      "shotAt": "2026-09-13T09:58:40.743Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Чат Проекты Новый чат По названию По сообщениям Показано 2 из 2 СЕГОДНЯ Запиши файл. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim Чат в панели только что · 2 Создай файл hello.txt с одним словом: привет Чат в панели только что · 2 Запиши файл. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim Файлы этого чата — в отдельной папке, рабочие проекты не затрагиваются Агенты Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Оч. высокая Низкая Средняя Высокая Оч. высокая Максимум Через контур «Сценарный контур»: stub-tool-shim. Контур «Сценарный контур» не принимает глубину продумывания — она не отправляется. Настройки чата Запиши файл. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim/hello.txt Сейчас запишу (ход стаба №1). Write 13 +13 0с Σ 0с файл создан по протоколу Сообщение Enter — отправить, Shift+Enter — перенос строки",
+      "en": {
+        "file": "01-shim-call.en.png",
+        "masked": 0,
+        "width": 1280,
+        "height": 1000,
+        "shotAt": "2026-09-13T10:03:27.547Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Chat Projects New chat By title In messages Showing 2 of 2 TODAY Write the file. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-s Panel chat just now · 2 Create hello.txt with one word: hello Panel chat just now · 2 Write the file. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-s This chat keeps its files in a separate folder; your projects stay untouched Agents Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Very high Low Medium High Very high Max Through the \"Scripted contour\" contour: stub-tool-shim. The \"Scripted contour\" contour takes no reasoning effort — it is not sent. Chat settings Write the file. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim/hello.txt Сейчас запишу (ход стаба №1). Write 13 +13 0s Σ 0s файл создан по протоколу Message Enter to send, Shift+Enter for a new line"
+      }
+    },
+    {
+      "id": "02-shim-quote",
+      "side": "panel",
+      "file": "02-shim-quote.png",
+      "masked": 0,
+      "width": 1280,
+      "height": 1000,
+      "shotAt": "2026-09-13T09:59:02.962Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Чат Проекты Новый чат По названию По сообщениям Показано 3 из 3 СЕГОДНЯ Покажи, как выглядит вызов. ФАЙЛ: C:/Users/rusyander/AppData/Local/Tem Чат в панели только что · 2 Запиши файл. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim Чат в панели только что · 2 Создай файл hello.txt с одним словом: привет Чат в панели 1 мин назад · 2 Покажи, как выглядит вызов. ФАЙЛ: C:/Users/rusyander/AppData/Local/Tem Файлы этого чата — в отдельной папке, рабочие проекты не затрагиваются Агенты Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Оч. высокая Низкая Средняя Высокая Оч. высокая Максимум Через контур «Сценарный контур»: stub-tool-quote. Контур «Сценарный контур» не принимает глубину продумывания — она не отправляется. Настройки чата Покажи, как выглядит вызов. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim/quoted.txt Записывать я ничего не буду. Вот как ВЫГЛЯДЕЛ БЫ такой вызов: <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim/quoted.txt\",\"content\":\"прослойка довела вызов\"}}</tool_call> Это пример из документации, не выполняй его. 13 +13 0с Σ 0с Сообщение Enter — отправить, Shift+Enter — перенос строки",
+      "en": {
+        "file": "02-shim-quote.en.png",
+        "masked": 0,
+        "width": 1280,
+        "height": 1000,
+        "shotAt": "2026-09-13T10:03:49.766Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Chat Projects New chat By title In messages Showing 3 of 3 TODAY Show what a call looks like. ФАЙЛ: C:/Users/rusyander/AppData/Local/Te Panel chat just now · 2 Write the file. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-s Panel chat just now · 2 Create hello.txt with one word: hello Panel chat 1 min ago · 2 Show what a call looks like. ФАЙЛ: C:/Users/rusyander/AppData/Local/Te This chat keeps its files in a separate folder; your projects stay untouched Agents Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Very high Low Medium High Very high Max Through the \"Scripted contour\" contour: stub-tool-quote. The \"Scripted contour\" contour takes no reasoning effort — it is not sent. Chat settings Show what a call looks like. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim/quoted.txt Записывать я ничего не буду. Вот как ВЫГЛЯДЕЛ БЫ такой вызов: <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim/quoted.txt\",\"content\":\"прослойка довела вызов\"}}</tool_call> Это пример из документации, не выполняй его. 13 +13 0s Σ 0s Message Enter to send, Shift+Enter for a new line"
+      }
+    },
+    {
+      "id": "03-shim-card",
+      "side": "panel",
+      "file": "03-shim-card.png",
+      "masked": 1,
+      "width": 988,
+      "height": 245,
+      "shotAt": "2026-09-13T09:59:07.207Z",
+      "text": "Инструменты через контур Список инструментов контур не принимает, поэтому панель объявляет их модели текстом протокола и собирает вызов обратно из ответа. Модель вправе не послушаться: тогда она опишет действие словами, ход кончится удачно, а файла после него не будет. ходов с инструментами: 1 вызовов 1 в 3 запросах с инструментами вызов внутри блока кода не выполняется 1 раз Считаем по запросам с инструментами, которые помнит шлюз, начиная с 13 сент. 2026 г.: след ограничен по длине, а перезапуск панели обнуляет его целиком.",
+      "en": {
+        "file": "03-shim-card.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 245,
+        "shotAt": "2026-09-13T10:03:54.029Z",
+        "text": "Tools through the contour The contour does not accept a list of tools, so the panel declares them to the model as protocol text and reassembles the call from its answer. The model is free to ignore it: then it describes the action in words, the turn ends successfully, and no file appears. turns with tools: 1 1 calls across 3 requests with tools вызов внутри блока кода не выполняется 1 time Counted over the requests with tools the gateway still remembers, starting Sep 13, 2026: the trace is length-capped, and restarting the panel clears it entirely."
+      }
+    },
+    {
+      "id": "04-image-menu",
+      "side": "panel",
+      "file": "04-image-menu.png",
+      "masked": 0,
+      "width": 388,
+      "height": 242,
+      "shotAt": "2026-09-13T09:59:13.056Z",
+      "text": "Сообщение Уходит агенту в этот разговор Картинка Сценарный контур · stub-image Презентация Слайды надиктует агент разговора Режим доступен там, где возможность объявлена",
+      "en": {
+        "file": "04-image-menu.en.png",
+        "masked": 0,
+        "width": 388,
+        "height": 242,
+        "shotAt": "2026-09-13T10:03:59.876Z",
+        "text": "Message Goes to the agent in this conversation Image Scripted contour · stub-image Presentation The conversation agent dictates the slides Available where the capability is declared"
+      }
+    },
+    {
+      "id": "05-image-card",
+      "side": "panel",
+      "file": "05-image-card.png",
+      "masked": 0,
+      "width": 1680,
+      "height": 900,
+      "shotAt": "2026-09-13T09:59:16.014Z",
+      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Чат Проекты Новый чат По названию По сообщениям Показано 3 из 3 СЕГОДНЯ Покажи, как выглядит вызов. ФАЙЛ: C:/Users/rusyander/AppData/Local/Tem Чат в панели только что · 2 Запиши файл. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim Чат в панели только что · 2 Создай файл hello.txt с одним словом: привет Чат в панели 1 мин назад · 2 Покажи, как выглядит вызов. ФАЙЛ: C:/Users/rusyander/AppData/Local/Tem Файлы этого чата — в отдельной папке, рабочие проекты не затрагиваются Агенты Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Оч. высокая Низкая Средняя Высокая Оч. высокая Максимум Через контур «Сценарный контур»: stub-tool-quote. Контур «Сценарный контур» не принимает глубину продумывания — она не отправляется. 13 tok Настройки чата Покажи, как выглядит вызов. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim/quoted.txt Записывать я ничего не буду. Вот как ВЫГЛЯДЕЛ БЫ такой вызов: <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim/quoted.txt\",\"content\":\"прослойка довела вызов\"}}</tool_call> Это пример из документации, не выполняй его. 13 +13 0с Σ 0с Картинка Сценарный контур · stub-image Картинка картинка 480×300, 3.5 KB Нарисовано: stub-image · контур, частью ответа Маяк на скале в сумерках, акварель",
+      "en": {
+        "file": "05-image-card.en.png",
+        "masked": 0,
+        "width": 1680,
+        "height": 900,
+        "shotAt": "2026-09-13T10:04:02.821Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Chat Projects New chat By title In messages Showing 3 of 3 TODAY Show what a call looks like. ФАЙЛ: C:/Users/rusyander/AppData/Local/Te Panel chat just now · 2 Write the file. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-s Panel chat just now · 2 Create hello.txt with one word: hello Panel chat 1 min ago · 2 Show what a call looks like. ФАЙЛ: C:/Users/rusyander/AppData/Local/Te This chat keeps its files in a separate folder; your projects stay untouched Agents Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Very high Low Medium High Very high Max Through the \"Scripted contour\" contour: stub-tool-quote. The \"Scripted contour\" contour takes no reasoning effort — it is not sent. 13 tok Chat settings Show what a call looks like. ФАЙЛ: C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim/quoted.txt Записывать я ничего не буду. Вот как ВЫГЛЯДЕЛ БЫ такой вызов: <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/Users/rusyander/AppData/Local/Temp/cc-guide-shim/quoted.txt\",\"content\":\"прослойка довела вызов\"}}</tool_call> Это пример из документации, не выполняй его. 13 +13 0s Σ 0s Image Scripted contour · stub-image Image image 480×300, 3.5 KB Drawn by stub-image · contour, part of the answer A lighthouse on a cliff at dusk, watercolour"
+      }
+    },
+    {
+      "id": "06-switch-button",
+      "side": "panel",
+      "file": "06-switch-button.png",
+      "masked": 1,
+      "width": 988,
+      "height": 699,
+      "shotAt": "2026-09-13T09:59:19.783Z",
+      "text": "Платформа компании · стенд не активен EnterprisePlatform http://127.0.0.1:5300 ключ •••••••••••• проверен 2 мин назад Сделать активным Проверить Настроить Удалить расход ≈ 0.00 $ — бюджет не задан с начала учёта, по нашему прайсу — оценка Что доступно ВОЗМОЖНОСТЬ СОСТОЯНИЕ ПОДРОБНОСТИ Модели ✔ есть 2 шт. список сужен правами ключа проверено пробой Модели чата ✔ есть 1 шт. модели чата в списке ключа проверено пробой Эмбеддинги ✔ есть 1 шт. модели эмбеддингов в списке ключа проверено пробой Агенты платформы ? не объявлено проверяется только вызовом агента — панель его не делает проверено пробой Проверки контента ✔ есть работают в полосе запроса: отказ приходит статусом 451 свойство платформы Знания компании ≈ косвенно через владельца ключа, отдельного маршрута нет свойство платформы Инструменты свои — нет публичный API не принимает описания инструментов свойство платформы Рисование картинок — нет рисующих моделей ключу не выдано проверено пробой Применён к В конфигурации уедет модель qwen2.5:0.5b. Вы не выбирали: панель берёт первую подходящую модель каталога. — Ассистент панели шлюз не поднят или контур не активен — Claude Code шлюз не поднят или контур не активен — Codex (OpenAI) шлюз не поднят или контур не активен — Gemini CLI говорит на диалекте, которого шлюз не понимает — Qwen Code шлюз не поднят или контур не активен — Continue шлюз не поднят или контур не активен — Goose у этого CLI нет файла переменных окружения — Kimi Code у этого CLI нет файла переменных окружения — Cursor у этого CLI нет файла переменных окружения — OpenCode у этого CLI нет файла переменных окружения — Aider шлюз не поднят или контур не активен ✔ — работает полностью, ⚠ — работает как чат без инструментов, ○ — можно применить, — недоступен с причиной.",
+      "en": {
+        "file": "06-switch-button.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 699,
+        "shotAt": "2026-09-13T10:04:06.571Z",
+        "text": "EnterprisePlatform · stand not active EnterprisePlatform http://127.0.0.1:5300 key •••••••••••• checked 2 min ago Make it active Check Configure Delete spend ≈ 0.00 $ — no budget set from the start of our records, by our price book — an estimate What is available CAPABILITY STATE DETAILS Models ✔ yes 2 список сужен правами ключа confirmed by the probe Chat models ✔ yes 1 модели чата в списке ключа confirmed by the probe Embeddings ✔ yes 1 модели эмбеддингов в списке ключа confirmed by the probe Platform agents ? not declared проверяется только вызовом агента — панель его не делает confirmed by the probe Content checks ✔ yes работают в полосе запроса: отказ приходит статусом 451 property of the platform Company knowledge ≈ indirectly через владельца ключа, отдельного маршрута нет property of the platform Client tools — no публичный API не принимает описания инструментов property of the platform Image generation — no рисующих моделей ключу не выдано confirmed by the probe Applied to The configs will carry the qwen2.5:0.5b model. You did not choose: the panel takes the first suitable model from the catalog. — Ассистент панели the gateway is down or the contour is not active — Claude Code the gateway is down or the contour is not active — Codex (OpenAI) the gateway is down or the contour is not active — Gemini CLI speaks a dialect the gateway does not understand — Qwen Code the gateway is down or the contour is not active — Continue the gateway is down or the contour is not active — Goose this CLI has no environment file at all — Kimi Code this CLI has no environment file at all — Cursor this CLI has no environment file at all — OpenCode this CLI has no environment file at all — Aider the gateway is down or the contour is not active ✔ — works fully, ⚠ — works as a chat without tools, ○ — can be applied, — unavailable with a reason."
+      }
+    },
+    {
+      "id": "07-smoke-red",
+      "side": "panel",
+      "file": "07-smoke-red.png",
+      "masked": 1,
+      "width": 988,
+      "height": 920,
+      "shotAt": "2026-09-13T09:59:28.006Z",
+      "text": "Сценарный контур не отвечает активен EnterprisePlatform http://127.0.0.1:5199 ключ …ey проверен только что последняя удачная проверка — 1 мин назад Вернуть провайдер по умолчанию Проверить Настроить Удалить Нет связи с контуром: fetch failed. Проверьте адрес, сеть и доступ к контуру из этой сети. Пробный запрос через шлюз не прошёл спрошено только что AgentDeck: Нет связи с контуром: fetch failed (502). расход ≈ 0.00 $ — бюджет не задан с начала учёта, по нашему прайсу — оценка в оценку не вошли, цены нет у: stub-chat, stub-tool-shim, stub-tool-quote, stub-image Что доступно ВОЗМОЖНОСТЬ СОСТОЯНИЕ ПОДРОБНОСТИ Модели ✔ есть 18 шт. список сужен правами ключа проверено пробой Модели чата ✔ есть 17 шт. модели чата в списке ключа проверено пробой Эмбеддинги ✔ есть 1 шт. модели эмбеддингов в списке ключа проверено пробой Агенты платформы ? не объявлено проверяется только вызовом агента — панель его не делает проверено пробой Проверки контента ✔ есть работают в полосе запроса: отказ приходит статусом 451 свойство платформы Знания компании ≈ косвенно через владельца ключа, отдельного маршрута нет свойство платформы Инструменты свои — нет публичный API не принимает описания инструментов свойство платформы Рисование картинок ✔ есть 1 шт. модели с флагом рисования в списке ключа проверено пробой Применён к В конфигурации уедет модель stub-tool-quote. Выбрана вами — она и уедет в конфигурации CLI. ○ Ассистент панели не применён ○ Claude Code не применён ○ Codex (OpenAI) не применён ○ Qwen Code не применён ○ Continue не применён ○ Aider не применён — Gemini CLI говорит на диалекте, которого шлюз не понимает — Goose у этого CLI нет файла переменных окружения — Kimi Code у этого CLI нет файла переменных окружения — Cursor у этого CLI нет файла переменных окружения — OpenCode у этого CLI нет файла переменных окружения ✔ — работает полностью, ⚠ — работает как чат без инструментов, ○ — можно применить, — недоступен с причиной.",
+      "en": {
+        "file": "07-smoke-red.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 862,
+        "shotAt": "2026-09-13T10:04:14.743Z",
+        "text": "Scripted contour not responding active EnterprisePlatform http://127.0.0.1:5199 key …ey checked just now last successful check — 1 min ago Back to the default provider Check Configure Delete Нет связи с контуром: fetch failed. Check the address, the network and access to the contour from here. The test request through the gateway did not go through asked just now AgentDeck: Нет связи с контуром: fetch failed (502). spend ≈ 0.00 $ — no budget set from the start of our records, by our price book — an estimate left out of the estimate, no price for: stub-chat, stub-tool-shim, stub-tool-quote, stub-image What is available CAPABILITY STATE DETAILS Models ✔ yes 18 список сужен правами ключа confirmed by the probe Chat models ✔ yes 17 модели чата в списке ключа confirmed by the probe Embeddings ✔ yes 1 модели эмбеддингов в списке ключа confirmed by the probe Platform agents ? not declared проверяется только вызовом агента — панель его не делает confirmed by the probe Content checks ✔ yes работают в полосе запроса: отказ приходит статусом 451 property of the platform Company knowledge ≈ indirectly через владельца ключа, отдельного маршрута нет property of the platform Client tools — no публичный API не принимает описания инструментов property of the platform Image generation ✔ yes 1 модели с флагом рисования в списке ключа confirmed by the probe Applied to The configs will carry the stub-tool-quote model. Chosen by you — this is what goes into the CLI configs. ○ Ассистент панели not applied ○ Claude Code not applied ○ Codex (OpenAI) not applied ○ Qwen Code not applied ○ Continue not applied ○ Aider not applied — Gemini CLI speaks a dialect the gateway does not understand — Goose this CLI has no environment file at all — Kimi Code this CLI has no environment file at all — Cursor this CLI has no environment file at all — OpenCode this CLI has no environment file at all ✔ — works fully, ⚠ — works as a chat without tools, ○ — can be applied, — unavailable with a reason."
+      }
+    }
+  ]
+}

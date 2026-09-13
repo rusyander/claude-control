@@ -17,11 +17,12 @@ export const platformEn: typeof platformRu = {
 
     guideTitle: 'How this page is laid out',
     guideText:
-      'First three diagrams for the whole path. Then eighteen steps with real screenshots: ' +
-      'the contour admin first, the panel second — from “nothing here yet” to the first ' +
-      'answer from a model. And only after that the design of the section, its states, its ' +
-      'limits and its refusals. If the contour is already connected and you need one fact, ' +
-      'scroll straight to “What the section shows”.',
+      'First three diagrams for the whole path. Then the path in real screenshots: the ' +
+      'contour admin, the connection wizard in the panel, and work through the connected ' +
+      'contour — the test request and switching, the model, the rules on the way, an agent ' +
+      'that edits files, images. Only after that the design of the section, its states, its ' +
+      'limits, its refusals and our asks of the platform. If the contour is already connected ' +
+      'and you need one fact, scroll straight to “What the section shows”.',
 
     whyKey: 'The key never leaves the panel',
     whyKeyText:
@@ -53,8 +54,10 @@ export const platformEn: typeof platformRu = {
       'probe next to it, the second has no date at all.',
     screenMatrix: 'What is available',
     screenMatrixText:
-      'Seven capabilities of the contour: models, chat models, embeddings, platform agents, ' +
-      'content checks, company knowledge, own tools. The state is “yes”, “indirect”, “no” or ' +
+      'The contour’s capabilities. The contour type declares the set of rows: for EnterprisePlatform it is ' +
+      'models, chat models, embeddings, platform agents, content checks, company knowledge, own ' +
+      'tools and image generation; a compatible gateway knows less about itself — models and ' +
+      'images. The state is “yes”, “indirect”, “no” or ' +
       '“not declared”, and next to it stands where it came from: confirmed by a probe or ' +
       'declared as a property of the platform.',
     screenSmoke: 'Test request',
@@ -67,7 +70,10 @@ export const platformEn: typeof platformRu = {
     screenApplied: 'Applied to',
     screenAppliedText:
       'One row per consumer — the panel’s assistant and nine CLIs. Check mark: works fully. ' +
-      'Triangle: works as a chat without tools. Circle: can be applied. Dash: unavailable, and ' +
+      'For a CLI that means its tools go to the contour as a field, as on a compatible ' +
+      'gateway. Triangle: tools go through the shim, with its caveat, or not at all and the ' +
+      'CLI works as a chat — the mark beside it says which. Circle: can be applied. Dash: ' +
+      'unavailable, and ' +
       'the reason is spelled out — no environment file, no documented address variable, a ' +
       'foreign dialect, a gateway that is down.',
     screenJournal: 'Apply journal',
@@ -94,26 +100,33 @@ export const platformEn: typeof platformRu = {
       'not converted into money at all (the platform does not charge for them either), and the ' +
       'model is named — you type its price by hand in settings. What differs is not the rule ' +
       'but the price book: their registry against ours. So our figure estimates theirs, and is ' +
-      'worth reconciling with the admin panel as an order of magnitude, not to the cent.',
+      'worth reconciling with the admin panel as an order of magnitude, not to the cent. A ' +
+      'gateway that publishes prices in the model list itself (OpenRouter does) is counted by ' +
+      'them: the panel takes a model’s price from the last connection check, by exact name. ' +
+      'Your own prices in settings still win over it.',
     screenExhausted: 'Refused on a spend limit',
     screenExhaustedText:
-      'A 402 is a fact, but NOT about your key’s budget. The platform issues it from three ' +
-      'other levels: a user’s daily limit, a team’s monthly one and the instance’s monthly ' +
-      'one; which one is named in the line itself. The key’s own budget is checked while the ' +
-      'key is parsed, and an exhausted one comes back as 401 — the same code as an unknown or ' +
-      'revoked key, an expired one, a key whose owner was deleted and a failed owner check, ' +
-      'with nothing outside to tell those five apart. That is why on a 401 the panel names all ' +
+      'A 402 is a fact from the platform itself, and the panel reads what ran out from its ' +
+      'body. On the routes the panel uses, the platform issues 402 for one reason — your key’s ' +
+      'budget is exhausted — and the line says exactly that. Another platform may name a ' +
+      'different limit: the line then quotes its name, and with no name it just says “spend ' +
+      'limit”. A 402 does not always get to tell you: the platform remembers a key check for ' +
+      'half a minute and after that answers 401 — the same code as an unknown or revoked key, ' +
+      'an expired one, a key whose owner was deleted and a failed owner check, with nothing ' +
+      'outside to tell those five apart. That is why on a 401 the panel names all ' +
       'five causes instead of advising ' +
       'you to reissue the key. The 402 line survives a panel ' +
       'restart and clears only through your button: dropping a fact on a guess would hand back ' +
       'a cheerful “there is room” where the platform already refuses.',
 
-    driftTitle: 'A file edited after the apply is left alone by the rollback',
+    driftTitle: 'Values edited after the apply are left alone by the rollback',
     driftText:
-      'At the moment of writing the panel remembers the file’s fingerprint. If the file was ' +
-      'edited afterwards — by your own hand or by another tool — the journal row says so, and ' +
-      'the rollback leaves that file as it is. Writing the “previous” value over someone ' +
-      'else’s edit would erase it.',
+      'At the moment of writing the panel remembers a fingerprint of what it wrote itself: its ' +
+      'variables, or the contour’s own entry in the file. If exactly those were edited ' +
+      'afterwards — by your own hand or by another tool — the journal row says so, and the ' +
+      'rollback leaves that file as it is. Writing the “previous” value over someone else’s ' +
+      'edit would erase it. Edits to the rest of the file — permissions, hooks, other ' +
+      'variables — do not stand in the rollback’s way and survive it.',
 
     wizardRequired: 'The “required” mode shows its price before it is switched on',
     wizardRequiredText:
@@ -145,7 +158,10 @@ export const platformEn: typeof platformRu = {
     activeSmokeRow: 'Test request',
     activeSmokeRowText:
       'Right after activation the panel asks the model a short question itself — through its own ' +
-      'gateway, the very path a CLI takes. The model’s answer is shown on the card. A red test ' +
+      'gateway, the very path and the very model a CLI in the terminal takes: its model, otherwise ' +
+      'the contour’s model, otherwise the first chat model of the catalog. The model’s answer is ' +
+      'shown on the card, and a model that spent the answer ceiling on reasoning is named ' +
+      'separately. A red test ' +
       'request does NOT undo the activation: the reason is spelled out, and it is cured in ' +
       'different places — a gateway that is down, a key that ran out and a model that stays ' +
       'silent are three different troubles.',
@@ -153,7 +169,8 @@ export const platformEn: typeof platformRu = {
     activeReturnRowText:
       'Undoes the applies, clears the mark and leaves the panel and the CLIs on their usual ' +
       'provider. The button sits in two places and does exactly the same thing: on the contour ' +
-      'card and in Settings → Custom endpoint, next to the profile the contour created itself.',
+      'card and in Settings → Models, in the Custom endpoint card, next to the profile the ' +
+      'contour created itself.',
     activeWhyTitle: 'Why this is not a toggle',
     activeWhyText:
       'Several contours used to be on at once, and “which one does the work go through” had three ' +
@@ -249,7 +266,9 @@ export const platformEn: typeof platformRu = {
     agentsCaption:
       'An agent is built by the company: its own knowledge, its own tools, its own behaviour. ' +
       'The panel can do exactly one thing — call it and show the answer. The card appears for ' +
-      'a contour that is switched on.',
+      'a contour that is switched on and whose type declares agents: enterprise-platform has them, a ' +
+      'compatible gateway has no such surface and gets no card. The MCP bridge stays either ' +
+      'way — a model is asked through it on a contour of any type.',
     agentsColumn: 'What is on the card',
     agentsMeaningColumn: 'What to do with it',
     agentsRoster: 'The agent list',
@@ -282,6 +301,186 @@ export const platformEn: typeof platformRu = {
       'answer may not fit into the time the contour allows. The outcome is then “the contour ' +
       'did not answer”, not an empty answer — the panel will not pass a cut-off turn off as one.',
 
+    modelsTitle: 'Model and reasoning effort',
+    modelsCaption:
+      'The panel has its own model names — “sonnet”, “opus” — and the contour does not know ' +
+      'them. Through a contour the pick in the chat header becomes a request: the panel ' +
+      'translates it into a contour model, and the caption under the pick says what the ' +
+      'conversation will actually go with.',
+    modelsColumn: 'On the card',
+    modelsMeaningColumn: 'What it means',
+    modelsDefault: 'The contour’s model',
+    modelsDefaultText:
+      'Everything not overridden goes with it. Until you pick one, the panel takes the first ' +
+      'catalog model a conversation can be held with and says plainly that this is its own ' +
+      'substitution. A drawing model never becomes the substitution, even when declared a chat ' +
+      'model: EnterprisePlatform runs such a model without a tool loop and an agent cannot work behind it — it can ' +
+      'only be picked by hand. The substitution cannot be skipped: a profile with no model would send the CLI into the contour with a vendor ' +
+      'name, which is a 403 on the first message. Your pick always beats the catalog — even if ' +
+      'the contour does not currently list that model: a model gone from the list more often ' +
+      'means narrowed key rights than a decision by the platform. Such a model stays in the ' +
+      'list as a row of its own — “chosen by you, the contour does not serve it right now”: a ' +
+      'setting that is in force cannot be invisible.',
+    modelsConsumer: 'A model per consumer',
+    modelsConsumerText:
+      'One row for everyone who goes through the contour in their own process: chat, split ' +
+      'groups, the tests agent, a foreign CLI. Empty — the contour’s model is used. That is how ' +
+      '“a bigger model for chat, a cheaper one for tests” works without a second contour. The ' +
+      'assistant and the terminal are not in the list: they have exactly one model — the one ' +
+      'written into the profile.',
+    modelsMap: 'The name map',
+    modelsMapText:
+      'On the left the name the panel calls a model by (“sonnet”), on the right the contour’s ' +
+      'model. A run that names a model itself goes with the model flag, and that flag beats the ' +
+      'address variable: without the map the vendor name reaches the contour. Case does not ' +
+      'matter. A name the contour lists in its own catalog needs no translation — it travels ' +
+      'as is.',
+    modelsUnknownTitle: 'An unknown name is replaced, and the replacement is named',
+    modelsUnknownText:
+      'If the named model is in neither the map nor the contour’s catalog, the conversation ' +
+      'goes with the contour’s model and a line appears under the pick: “no such name there, ' +
+      'the request goes with this one”. Letting an unknown name through quietly would hand you ' +
+      'a 403 “model” on every message. And when the contour itself has no model — an empty ' +
+      'catalog, or a probe that never ran — there is nothing to replace it with: the caption ' +
+      'says exactly that, and the request goes as it is.',
+    modelsEffortTitle: 'The contour takes no reasoning effort',
+    modelsEffortText:
+      'The contour’s public interface has no effort field, so the panel does not send it at all ' +
+      'and says so in a caption beside the pick. The answer stays complete — only the depth of ' +
+      'reasoning is lost. An effort the foreign CLI sends itself travels upstream as it is — ' +
+      'the contour strips unknown keys on the way — and the request trace names it as a loss: ' +
+      'a setting that quietly fails to reach the model would look applied. Once the contour has ' +
+      'the field, the signature comes off and the picked value starts travelling.',
+
+    rulesTitle: 'Contour rules and conflicts',
+    rulesCaption:
+      'A contour does more with a request than hand it to a model: it checks the content, ' +
+      'substitutes data, mixes in company knowledge, compacts a long conversation. Part of that ' +
+      'the panel sets through request fields — they are on the “Contour rules” card; the rest is ' +
+      'turned on by the contour’s owner, and the panel only names it so the behaviour does not ' +
+      'look random. Whatever the contour did not declare will not appear there: the list comes ' +
+      'from the platform’s description, it is not guessed.',
+    rulesColumn: 'On the card',
+    rulesMeaningColumn: 'What it means',
+    rulesTools: 'Platform tools',
+    rulesToolsText:
+      'Tool names from the contour’s registry — you copy them from its admin console: the key ' +
+      'has no “list the tools” route, same as for agents. Empty — the panel sends ' +
+      '“tool_choice: none” upstream, asking the contour not to use its own tools at all: staying ' +
+      'silent would leave that to its default. While the tool shim is on, the field is locked: two ' +
+      'sets on one turn argue with each other — and the shim itself is switched off right here, ' +
+      'in “Our side”.',
+    rulesMode: 'Platform call loop',
+    rulesModeText:
+      '“loop” — the contour runs the call/result cycle itself and returns a finished answer; ' +
+      '“single_turn” — it returns the call to you: the panel translates it into your CLI’s ' +
+      'dialect, so the call reaches an Anthropic client too, not only an OpenAI one. The contour ' +
+      'accepts no stream in this mode, so the turn goes to it whole: your CLI still receives a ' +
+      'stream, but the answer arrives at once and breaks off if the contour thinks longer than ' +
+      '120 seconds. With no tool ' +
+      'names the mode is not sent anywhere: asking for a cycle of calls that do not exist is ' +
+      'pointless.',
+    rulesPreset: 'Generation preset',
+    rulesPresetText:
+      'A named parameter set on the contour’s side. Empty — the field is not sent and the ' +
+      'contour takes its own default; an empty string instead would be a refusal for nothing.',
+    rulesThinking: 'Model reasoning',
+    rulesThinkingText:
+      'Three states, not a switch. “Default” sends no field and leaves it to the model’s ' +
+      'template — a reasoning model such as Qwen3 then thinks. “Turn on” and “Turn off” go as an ' +
+      'explicit value, but the contour carries it only to models on self-hosted vLLM: other ' +
+      'providers never receive the field. Reasoning never reaches the outside — the chat shows an ' +
+      'ordinary answer.',
+    rulesObserved: 'What the contour does itself',
+    rulesObservedText:
+      'Content checks, data substitution, company knowledge, history compaction. None of it can ' +
+      'be switched from here — those are the owner’s knobs; the line “turned on by the contour’s ' +
+      'owner” stands beside each so a missing checkbox does not read as a broken panel.',
+    rulesExclusiveTitle: 'There is exactly one mutual exclusion',
+    rulesExclusiveText:
+      'Platform tools versus our tool shim: our set travels as text and is reassembled from the ' +
+      'answer, the contour’s set is executed by the contour, and one turn can only have one of ' +
+      'them. The panel will not let both be on — the save that CREATES the contradiction is ' +
+      'refused in the same words the matrix row is written in. Nor will it silently turn one side ' +
+      'off for you: you would learn of such a decision from an agent that went quiet. And if the ' +
+      'contradiction did arrive — someone restored a foreign archive — the contour is not locked: ' +
+      'the card carries two exit buttons, one per side, and the restore plan names such a contour ' +
+      'in advance.',
+    rulesLayersTitle: 'The other three rows are not a choice of two',
+    rulesLayersText:
+      'The contour’s data substitution and the panel’s data protection stack in order: our mask ' +
+      'goes first and is reversible, its labels have a different shape and the contour leaves ' +
+      'them alone, while the contour turns its own labels back into values right in the answer ' +
+      'stream — it never hands the substitution map to an API client. Nothing needs switching ' +
+      'off. The contour’s history compaction versus our checkpoints is a ' +
+      'warning: after a compaction the continuation may not know the start of the task. Content ' +
+      'checks versus the prompt gate is simply a fact: both refuse, by different lists, and the ' +
+      'second refusal does not mean the first one failed. In those two rows the panel marks only ' +
+      'ITS own half as on: whether the contour’s owner enabled substitution and checks it does ' +
+      'not know — that shows only when a frame fires.',
+
+    layersTitle: 'Our layers: what travels from `~/.claude` into a run',
+    layersCaption:
+      'The “Our layers in the run” block on the contour card. Through a corporate contour a ' +
+      'request goes without prompt caching, and everything the panel adds of its own is paid for ' +
+      'again on every turn — which is why layers can be dropped. The price is stated honestly: ' +
+      'the agent works without your rules and the answer will not show it, so what was dropped is ' +
+      'named both on the card and in the chat header.',
+    layersColumn: 'Switch',
+    layersMeaningColumn: 'What it drops, and with what',
+    layersAll: 'Our rules travel into the run',
+    layersAllText:
+      'The master switch. Off — not one of our layers travels through this contour, whatever the ' +
+      'switches below say: they turn grey rather than argue with it. This is the case where you ' +
+      'need not think about four settings at all.',
+    layerSettings: 'Personal rules, hooks and permissions',
+    layerSettingsText:
+      'Everything from `~/.claude` at once: CLAUDE.md rules, hooks, permissions, personal skills ' +
+      'and personal MCP servers — with `--setting-sources project,local`. They cannot be dropped ' +
+      'separately: for the CLI this is one `user` settings source, and promising separate ' +
+      'dropping would mean drawing three switches where one is executed. Along with the ' +
+      'permissions your `deny` rules stop applying — the fence you put around the agent. The ' +
+      'project CLAUDE.md and repository settings THIS flag does not touch: those are the rules of ' +
+      'the task, not ours (measured, not assumed).',
+    layerSkills: 'Skills',
+    layerSkillsText:
+      'Skills and the `Skill` tool itself — with `--disable-slash-commands`. A separate switch not ' +
+      'for symmetry: built-in skills go away only this way, the settings source does not touch ' +
+      'them. ALL skills go, the repository’s own (`.claude/skills`) included: the CLI has no flag ' +
+      'for just the personal ones, and that is worth knowing in a project that lives by its skills.',
+    layerMcp: 'MCP servers',
+    layerMcpText:
+      'MCP servers — with `--strict-mcp-config`, and ALL of them: personal, the project’s own from ' +
+      'the repository’s `.mcp.json`, and the panel’s bridge to the contour’s own tools. Only the ' +
+      'panel’s permission broker stays: it arrives with its own `--mcp-config`, and without it ' +
+      'every permission request would become a silent refusal in the middle of the agent’s work. ' +
+      'So the switch also removes the task’s tools — gitlab, atlassian, the browser — not just ' +
+      'your personal servers.',
+    layerPrompt: 'The panel’s addition to the system prompt',
+    layerPromptText:
+      'What the panel adds of its own: initiatives, task splitting, session continuation. The CLI ' +
+      'has no flag for it — the panel drops it itself, which is why it is absent from the flag ' +
+      'list.',
+    layersFlagsTitle: 'The flags shown are the real ones',
+    layersFlagsText:
+      'Under the switches stands the line of flags the run will carry — exactly the ones that ' +
+      'reach the CLI launch. “Personal rules dropped” without saying by what would be a request ' +
+      'to take it on trust. The server computes them, the screen only shows them; the chat header ' +
+      'says the same BEFORE a message is sent — otherwise “the agent does not read my rules” ' +
+      'looks like a broken agent rather than your own switch. In a conversation created by a ' +
+      'split the header asks with the same consumer the run itself will use (“Split groups”), not ' +
+      '“Chat”: otherwise it would describe a foreign route. And when the contour’s route has no ' +
+      'Claude launch ticked at all — no chat, no groups, no tests agent — the line under the ' +
+      'flags says exactly that: there is nobody to receive them yet.',
+    layersMissingTitle: 'Three neighbouring settings are absent here',
+    layersMissingText:
+      'The prompt gate is physically our hook in `~/.claude/settings.json`: it leaves together ' +
+      'with the personal settings and has no switch of its own. Data protection is not a layer at ' +
+      'all — it is not traded for prompt budget. The model cascade is switched on per project, ' +
+      'not per contour. And last: layers are dropped by Claude Code flags, so a foreign CLI going ' +
+      'through the same contour is untouched by these switches — it has its own files and its own ' +
+      'rules.',
+
     marksTitle: 'The compromise mark',
     marksCaption:
       'The flag stands right next to what it explains: a row of the capability matrix, the ' +
@@ -295,6 +494,55 @@ export const platformEn: typeof platformRu = {
       'The same list as in the “Contour” section, from the same source: there is nowhere for ' +
       'them to drift apart. The “not in the code yet” badge means the signature was filed ' +
       'ahead of time — the workaround itself arrives with its own task of the batch.',
+
+    asksTitle: 'What we asked the platform for',
+    asksCaption:
+      'The signatures above are what the panel works around on its own. Here is what would ' +
+      'lift them from the platform side: the six asks that change work through a contour the ' +
+      'most.',
+    asksColumn: 'Ask',
+    asksMeaningColumn: 'What changes',
+    askTools: 'Accept the client’s tools',
+    askToolsText:
+      'Tool schemas in single-turn mode, and that mode’s ban on streaming lifted. An agent ' +
+      'through the contour gets real calls, and the shim — with its price and its caveats — is ' +
+      'no longer needed, and a turn in that mode will stop arriving at once, with no first ' +
+      'words. A stream does not lift the 120-second cap — that is a separate ask below. The ' +
+      'platform would not have to run the tools: the CLI calls them locally.',
+    askCache: 'Stop dropping the prompt cache mark',
+    askCacheText:
+      'Today the tool schemas travel afresh on every turn — tens of kilobytes per agent step. ' +
+      'A cache mark passed through to the provider would remove that price. We do not ask the ' +
+      'platform to build a cache of its own.',
+    askTimeout: 'Raise the 120-second ceiling on an answer',
+    askTimeoutText:
+      'The contour’s server cuts any answer off in its second minute, streams included. A ' +
+      'long answer from a reasoning model ends as “the stream broke off”, and people go and ' +
+      'fix their network.',
+    askBudget: 'The budget left, the prices, and why a key was refused',
+    askBudgetText:
+      'A “what this key has” route: the budget and how much is spent — instead of a figure ' +
+      'typed in by hand. Model prices in the model list — so money is counted at the company’s ' +
+      'prices rather than the panel’s reference. And the five causes of a 401 told apart — ' +
+      'instead of one “key rejected”, after which a healthy key gets reissued for nothing.',
+    askMask: 'Leave the content between tool markers untouched',
+    askMaskText:
+      'The contour’s data substitution runs over the whole history, the tool descriptions and ' +
+      'the call in the model’s answer included, and does not give a key client the “label → ' +
+      'value” map. A label nothing can restore is never let into a file — the call stops. A ' +
+      'per-request switch would make that stop impossible.',
+    askEffort: 'Accept the reasoning effort',
+    askEffortText:
+      'The field is not in the public schema, so the panel does not send it: the effort chosen ' +
+      'in the chat header stays a “not sent” caption through the contour.',
+    asksDocTitle: 'The full list — a letter to the platform team',
+    asksDocText:
+      'All seventeen asks, plus the questions the code does not answer, live in the panel ' +
+      'repository: docs/PLATFORM-ЗАПРОС.ru.md (in Russian). Each row names the signature an ' +
+      'answer would lift, the place in the platform code it rests on, and what it costs the ' +
+      'platform. None of the asks blocks work: ' +
+      'everything already runs through workarounds, and each workaround is signed in the list ' +
+      'above.',
 
     neighboursTitle: 'How a contour differs from its neighbours',
     neighboursCaption:
@@ -404,8 +652,11 @@ export const platformEn: typeof platformRu = {
       'the spend. Translation can be incomplete both ways: a request field the contour does not ' +
       'take, and a part of the answer the client’s dialect cannot carry (a contour picture is ' +
       'exactly that), never reach the other side. It never happens silently — whatever did not ' +
-      'make it is named in the request trace, by name. A refusal can arrive at any of three ' +
-      'places: content checks — 451, a spend limit — 402, request frequency — 429.',
+      'make it is named in the request trace, by name. For a platform whose driver declares a ' +
+      'native Anthropic-dialect endpoint, such a CLI’s request goes out untranslated: thinking ' +
+      'and cache marks arrive intact, while key, rules and spend stay the same. A refusal can ' +
+      'arrive at any of three ' +
+      'places: content checks — 451, the key budget — 402, request frequency — 429.',
 
     d2Title: 'The path of one request: six steps and three places it can end in a refusal',
     d2Dialect: 'Translation into the contour dialect',
@@ -416,7 +667,7 @@ export const platformEn: typeof platformRu = {
     d2Translate: 'Answer translated back',
     d2Spend: 'Spend recorded',
     d2Blocked: '451 — the request was refused',
-    d2Budget: '402 — spend limit',
+    d2Budget: '402 — key budget',
     d2Limit: '429 — too often',
 
     d3Title: 'Where the key lives: in the panel, and it never reaches the CLI files',
@@ -459,7 +710,11 @@ export const platformEn: typeof platformRu = {
     moduleAgentsText:
       'Directly: a separate route calls an agent. The panel calls it and shows the answer; the ' +
       'conversation is remembered by the contour.',
-    moduleOther: 'Images, entities, document parsing, sentiment',
+    moduleImages: 'Image generation',
+    moduleImagesText:
+      'Indirectly: a key has no route of its own, but a drawing model answers with a picture as ' +
+      'part of an ordinary answer — which the panel shows in the «Image» mode.',
+    moduleOther: 'Entities, document parsing, sentiment',
     moduleOtherText: 'A key has no public route to them — so the panel does not show them.',
     moduleSpeech: 'Speech and quality scoring',
     moduleSpeechText: 'Present in the platform, with no public surface for a key.',
@@ -505,7 +760,38 @@ export const platformEn: typeof platformRu = {
       'receives a real call block and edits files. The caveat: whether the model obeys is up ' +
       'to the model. A weaker one describes the action in words instead of calling anything, ' +
       'and the turn ends successfully with no file written. The panel marks such a turn on the ' +
-      '“Tools through the contour” card.',
+      '“Tools through the contour” card. A compatible gateway needs no shim: it accepts the ' +
+      'tools field, and the calls are real.',
+    workImages: 'Images from a description in chat',
+    workImagesWhy:
+      'Drawing works on the contour whose driver declares it, with the model the key catalog ' +
+      'declares as capable of image generation: with enterprise-platform the picture arrives as part of an ' +
+      'ordinary answer — it has no separate images endpoint. A compatible gateway says nothing ' +
+      'about images, and the panel does NOT invent an endpoint for it: a guessed address would ' +
+      'return 404 after the person had already described the picture. The endpoint is declared ' +
+      'by a preset checked against the gateway docs, or by you — in the wizard’s “What the ' +
+      'gateway can do” block, when your gateway’s docs name it. The second road is your own ' +
+      'endpoint profile with a generation address field. ' +
+      'A contour request travels through the panel gateway, so it is in the gateway journal. It ' +
+      'reaches the key’s spend only if the contour sent a bill: EnterprisePlatform sends an image as part ' +
+      'of an answer without one, so such an image is not in the key’s spend.',
+    workDecks: 'Presentations on a topic from chat',
+    workDecksWhy:
+      'The deck itself asks the contour for no capability: the panel sends an ordinary chat ' +
+      'request and asks for the structure — title, slides with a layout and a mood, bullets, ' +
+      'speaker notes, diagrams as code. HTML, PPTX and PDF it assembles itself on your machine, ' +
+      'so not one file travels upward, and a PDF is promised only where a browser for printing ' +
+      'was found. Exactly one place needs a capability — the photographic slide pictures: the ' +
+      'panel draws those through the same raster route as the «Image» mode, with a low ceiling ' +
+      'per deck, and the first failure stops the rest. With no raster route the deck is still ' +
+      'assembled with its diagrams, and the reason is named on the card. It is «partial» here ' +
+      'for the same reason as the agent: whether the model answers with a structure is its own ' +
+      'affair — a sentence around the structure or reasoning before it the panel drops by ' +
+      'itself, and an answer with no structure at all it names in the model’s own words rather ' +
+      'than as «a panel error». And the mode does not depend on a contour: in a conversation ' +
+      'the agent dictates the presentation itself — a revision too, and the pictures already ' +
+      'drawn for the previous deck carry over into the new one — while a contour or an own ' +
+      'endpoint dictates it only outside a conversation.',
     worksHonestTitle: 'How the shim differs from real tools',
     worksHonestText:
       'It is a protocol on top of a foreign one, and it is weaker than the vendor’s: a call ' +
@@ -515,7 +801,10 @@ export const platformEn: typeof platformRu = {
       'is ENTIRELY one call — that is how models trained on the vendor function format reply. A ' +
       'call shown as an EXAMPLE inside a code block never runs, even a correct one: a quote of ' +
       'the protocol and a documentation file the agent has just read out to you look exactly ' +
-      'the same. The request trace names such a block as the reason, so that “no calls” is not ' +
+      'the same. A code block is what Markdown calls one: a line of its own made of three or ' +
+      'more backticks or tildes; backticks in the middle of a sentence open no block and do not ' +
+      'silence a real call below them. The request trace names such a block as the reason, so ' +
+      'that “no calls” is not ' +
       'read as a broken panel. ' +
       'The panel runs nothing whose name and arguments it could not parse: a ' +
       'wrong parse must not hand the agent the right to do something the model never asked ' +
@@ -524,16 +813,21 @@ export const platformEn: typeof platformRu = {
 
     shimTitle: 'Tools through the contour: how it works and what it costs',
     shimCaption:
-      'The shim is on by default. Here is what goes up, what comes back and the price you pay ' +
-      'on every turn.',
+      'On enterprise-platform the shim is on by default. On a compatible gateway it is off: that gateway ' +
+      'accepts tools as a request field, and the panel passes them through as real calls, ' +
+      'with no protocol text. The contour type sets the default when you connect; after that ' +
+      'the switch is yours, and changing the type of a saved contour does not rewrite it. ' +
+      'Here is what goes up with the shim on, what comes back and the price you pay on every ' +
+      'turn.',
     shimColumn: 'What',
     shimMeaningColumn: 'How',
     shimUp: 'What goes up',
     shimUpText:
       'The protocol rules and your tool schemas — as text, inside the system message. There is ' +
-      'no tools field in the request at all, and tool choice is sent switched off: the ' +
-      'platform picks its own set, and left on it would override the protocol we just taught ' +
-      'the model.',
+      'no tools field in the request at all, and no client tool choice either. EnterprisePlatform gets ' +
+      'tool choice switched off: the platform picks its own set, and left on it would ' +
+      'override the protocol we just taught the model. A compatible gateway gets nothing ' +
+      'beyond the text.',
     shimDown: 'What comes back',
     shimDownText:
       'The panel parses the call block out of the model’s answer and hands your CLI a real ' +
@@ -582,12 +876,12 @@ export const platformEn: typeof platformRu = {
       'reissue the key. The fifth is the only transient one: the key itself is fine, and the ' +
       'first sensible move is to retry. If that does not help, check the expiry, the budget ' +
       'and the owner in the admin panel before issuing a new one.',
-    err402Badge: 'spend limit',
+    err402Badge: 'key budget',
     err402:
-      'A refusal on a spend limit, and NOT on your key’s budget: the platform issues it from a ' +
-      'user’s daily limit, a team’s monthly one or the instance’s monthly one. Which one is ' +
-      'named in the line itself. It is lifted by a platform administrator or by waiting for a ' +
-      'new period.',
+      'Your key’s budget is exhausted — on the routes the panel uses, the platform issues 402 ' +
+      'for this reason only. A platform administrator raises the budget, or it resets with the ' +
+      'key’s new period if one is set. Within half a minute the platform starts rejecting the ' +
+      'same key with a 401.',
     err403Badge: 'model',
     err403:
       'This key is not allowed the requested model — its name is in the refusal. The list of ' +
@@ -619,15 +913,15 @@ export const platformEn: typeof platformRu = {
       'Four different actions, and they remove different things. Top to bottom, gentlest first.',
     disableStep0: 'Untick a consumer',
     disableStep0Text:
-      'The narrowest action of all: “Set up” → “Where the contour works” → clear the tick. It ' +
+      'The narrowest action of all: “Configure” → “Where the contour works” → clear the tick. It ' +
       'takes effect from the NEXT start — runs already going are left alone, the panel will ' +
       'not stop someone’s work over a setting. The other consumers stay on the contour, and ' +
       'no CLI file changes at all. Two caveats, both stated on screen: clearing “Panel ' +
       'assistant” moves the assistant back to its previous profile at once — that is a panel ' +
       'setting, not a run variable, and it has no next launch to wait for; and if the same ' +
       'CLI has its files applied, its runs read the contour address from its own config, so ' +
-      'clearing the box will not bring them back — “Undo apply” will.',
-    disableStep1: '“Remove the apply”',
+      'clearing the box will not bring them back — “Undo the apply” will.',
+    disableStep1: '“Undo the apply”',
     disableStep1Text:
       'The CLI files go back to their previous values and the managed profile disappears. The ' +
       'contour itself stays connected: the panel’s assistant and the bridge keep working. A ' +
@@ -637,8 +931,8 @@ export const platformEn: typeof platformRu = {
       'The contour stops being active and the gateway stops serving it: the connection is still ' +
       'accepted, but the answer is a 502 saying “the contour is switched off in the panel” — the ' +
       'contour is down, not the panel. The settings, the key and the spend history stay in place: ' +
-      '“Make it active” brings the work back to it. The same button sits in Settings → Custom ' +
-      'endpoint — the same action, not a second one.',
+      '“Make it active” brings the work back to it. The same button sits in Settings → Models, ' +
+      'in the Custom endpoint card — the same action, not a second one.',
     disableStep3: '“Delete the contour”',
     disableStep3Text:
       'The settings, the key and the probe trace are gone. The apply is removed first, ' +
@@ -731,8 +1025,9 @@ export const platformEn: typeof platformRu = {
 
       panelTitle: 'Second half: the connection wizard',
       panelCaption:
-        'Four wizard steps and three screens after it. The contour stays off until the very ' +
-        'end: a draft applies nothing and goes nowhere on its own.',
+        'Four wizard steps and what happens after them. While the wizard is open nothing is ' +
+        'applied and nothing goes anywhere; “Done” saves the contour, makes it active and ' +
+        'asks the model a test question right away.',
       pEmpty: 'Open the “Contour” section',
       pEmptyText:
         'Before connecting there is one button and an explanation of what will happen. The ' +
@@ -740,12 +1035,23 @@ export const platformEn: typeof platformRu = {
         'does the request go.',
       pAddress: 'Step 1: contour type, title and address',
       pAddressText:
-        'The type is “EnterprisePlatform”; the title is arbitrary, “Платформа компании · стенд” on the screenshot. ' +
-        'The identifier is built from the title in Latin letters — a Russian title leaves it ' +
-        'empty and “Check connection” stays disabled, so type it in yourself, enterprise-platform-stand ' +
+        'The type is “EnterprisePlatform”; the title is arbitrary, “EnterprisePlatform · stand” on the screenshot. ' +
+        'The identifier is built from the title in Latin letters — a title in another script ' +
+        'leaves it empty and “Check the connection” stays disabled, so check it and type it ' +
+        'in yourself if needed, enterprise-platform-stand ' +
         'on the screenshot: the local gateway address is built from it. The address is the public API ' +
         'root, http://127.0.0.1:5300 on the screenshot (a stand behind a port-forward); ' +
-        'yours will be your instance’s address. The panel appends /v1 itself.',
+        'yours will be your instance’s address. The panel appends /v1 itself when the path has ' +
+        'no version. For EnterprisePlatform leave both collapsed blocks under the address alone. ' +
+        '“Non-standard gateway” is for gateways that expect the key somewhere other than ' +
+        'Authorization: Bearer, or an address without /v1, and it also shows the final address ' +
+        'the check will use. “What the gateway can do” holds the native Anthropic endpoint, the ' +
+        'image endpoint, the thinking field, tools, effort, the whole-answer limit and the ceiling ' +
+        'for any answer (a gateway or proxy that cuts even a stream on a clock — the panel names a ' +
+        'declared ceiling when the cut happens) on top of what the type declares. Types other than EnterprisePlatform are gateway presets (LiteLLM, vLLM, ' +
+        'Ollama, OpenRouter, Azure OpenAI, DashScope, Together AI): each carries what was checked ' +
+        'against the gateway docs, with the link in that same block. Azure OpenAI, for example, ' +
+        'puts the key into the api-key header itself.',
       pProbe: 'At this step the probe still has no key',
       pProbeText:
         'Pressed before the second step, “Check connection” returns “key rejected” — and that ' +
@@ -802,26 +1108,232 @@ export const platformEn: typeof platformRu = {
         'http://127.0.0.1:5179/enterprise-platform-stand/v1. The dashes next to the consumers stay to the very ' +
         'end: the contour is switched on only by “Done”, and until then the row honestly says ' +
         'there is nothing to apply yet.',
-      pCard: 'Done: the contour card',
+      pCard: 'Done: the contour is active and has already answered',
       pCardText:
-        'Right after the wizard not a single request has gone through the gateway, and the ' +
-        'panel says so plainly instead of showing a zero as a result.',
+        'On “Done” the new contour becomes active at once, and the panel immediately asks the ' +
+        'model through its own gateway — the same way the CLIs will go. On the screenshot that ' +
+        'is the “active” badge, the “online” state and the line “Test request went through”, ' +
+        'with the model’s answer, the delay and qwen2.5:0.5b. EVERY new contour becomes active, ' +
+        'even when another one was working before it: the previous one goes dark but stays ' +
+        'configured. “Configure” on a connected contour opens the same wizard, and there ' +
+        '“Done” only saves the edit.',
       pSpend: 'Make one short request',
       pSpendText:
-        'Any CLI pointed at the gateway, or the panel assistant; two characters such as “2+2” ' +
-        'are enough. After the very first answer the card shows spend, the budget left and ' +
-        'the content-check trace — now a measurement rather than a promise.',
-      pDelete: 'How to switch it off',
+        'Any CLI pointed at the gateway, or the panel assistant; two characters such as “2+2=” ' +
+        'are enough. The gateway collects spend and writes it in batches every few seconds, ' +
+        'so it does not appear on the card instantly. For a model our price book has no price ' +
+        'for, the sum stays at “≈ 0.00 $”, and a line below names whose tokens were left out of ' +
+        'the money — you enter the price of such a model by hand in the settings. This step has ' +
+        'no screenshot yet, and that is not a gap in the shoot: with the live stand no spend ' +
+        'appeared on the card — the gateway does not recognise the frame in which enterprise-platform sends ' +
+        'the usage in a stream. Until that is fixed, compare spend in the admin analytics, at ' +
+        'step eight.',
+
+      useActiveTitle: 'Next: the contour is active',
+      useActiveCaption:
+        'Which contour the work goes through always has one answer. Four screens around that ' +
+        'answer: a test request that went through, a red one, switching to another contour and ' +
+        'going back to the usual provider.',
+      aSmoke: 'The test request went through',
+      aSmokeText:
+        'The line under the address is the result of a question the panel asked the model ' +
+        'itself: the answer in quotes, the delay, the model name and when it was asked. It goes ' +
+        'through the panel’s gateway, so a green line proves the whole CLI path, not just that ' +
+        'the contour is alive. Further down, in “Applied to”, the panel assistant has a tick, ' +
+        'the CLIs that can be applied have circles, and the rest have dashes with a flag ' +
+        'carrying the reason.',
+      aSmokeRed: 'The test request did not go through',
+      aSmokeRedText:
+        'This frame is from the scripted contour, stopped before activation. The activation ' +
+        'still happened — the “active” badge is in place — and the cause is written twice: at ' +
+        'the connection state as “no connection to the contour: fetch failed”, and at the test ' +
+        'request as “The test request through the gateway did not go through” with the ' +
+        'gateway’s 502. Under the address is the last successful check, at the bottom of the ' +
+        'screen a notification. A red line does not undo the activation on purpose: a gateway ' +
+        'that is down, a key that ran out and a silent model are fixed in different places, ' +
+        'and there is nothing to roll back on your behalf.',
+      aSwitch: 'Another contour: “Make it active”',
+      aSwitchText:
+        'Connect one more and it becomes the active one, while the previous one goes dark: its ' +
+        'card says “not active” and carries a “Make it active” button. Its key, budget and ' +
+        'settings are all in place; only its applies are gone — the CLI files returned to their ' +
+        'previous values, and every entry in “Applied to” is a dash. The button does the same ' +
+        'in reverse, as one action, and asks the model a test question again. On the ' +
+        'screenshot the previous contour is the stand, the new one the scripted contour.',
+      aReturn: 'Back to the default provider',
+      aReturnText:
+        'The button sits on the contour card, and the same button sits in Settings → Models, ' +
+        'in the profile the contour created itself: that profile’s address is the local ' +
+        'gateway with the contour identifier, its model the contour model. The action is the ' +
+        'same in both places: the applies are removed, the badge goes dark, the panel and the ' +
+        'CLIs stay on the usual provider. The profile fields can be edited by hand, but an edit ' +
+        'sends the CLI past the contour — it says so above the button.',
+
+      useRouteTitle: 'Which model the request leaves with',
+      useRouteCaption:
+        'The panel and the contour name models differently. Two screens: where that is set ' +
+        'up, and where it is visible before anything is sent.',
+      rModel: 'Contour model: default, per consumer, name map',
+      rModelText:
+        'The default model goes into the CLI configs and the assistant profile; if you did not ' +
+        'choose one, the first suitable model of the catalogue is taken, and the field says so. ' +
+        'Below is a model of its own for a consumer, for when one key serves both the ' +
+        'conversation and the tests (on the screenshot chat is the only run consumer switched ' +
+        'on). The name map answers what “sonnet” means for you: a run given a vendor model in ' +
+        'the chat header leaves with that name, and without a row in the map it is replaced ' +
+        'with the contour model. The last line of the card says the contour takes no reasoning ' +
+        'effort.',
+      rHeader: 'The chat header says it before sending',
+      rHeaderText:
+        'Under the model picker there are two lines: “Through the "EnterprisePlatform · stand" contour: ' +
+        'qwen2.5:0.5b.” and “takes no reasoning effort — it is not sent.” That is what really ' +
+        'leaves: the header’s model list holds vendor names, and through a contour the name map ' +
+        'translates them. A name that is neither in the map nor in the key catalogue is ' +
+        'replaced with the contour model, and the caption then says “no "…" there, the request ' +
+        'goes with …”. The same function the server uses computes it, so the caption and the ' +
+        'real request cannot drift apart.',
+
+      useRulesTitle: 'What is done to the request on the way',
+      useRulesCaption:
+        'The “Contour rules” card in three parts: what the panel manages on the contour side, ' +
+        'what we do ourselves, and where the two sides collide.',
+      ruPanel: 'Managed by the panel',
+      ruPanelText:
+        'What the panel sends the contour with every request: the platform tool set, the loop ' +
+        'of their calls, the generation preset, the model’s thinking. The notes under the ' +
+        'fields say why a field has no effect right now: the tool set is locked while our shim ' +
+        'is on, and the loop mode is not sent while no tool names are set. The preset on the ' +
+        'screenshot is balanced; an empty field means “the contour uses its own”.',
+      ruOurs: 'Our side: the shim and the layers',
+      ruOursText:
+        'The first switch is the tool shim; the next section is about it. Under it, “Our ' +
+        'layers in the run”: what of your ~/.claude travels into a run through this contour — ' +
+        'personal rules with hooks and permissions, skills, MCP servers and the panel’s ' +
+        'addition to the system prompt. Each switch names the real Claude Code flag that ' +
+        'removes the layer and says what goes with it: personal settings, for instance, take ' +
+        'your deny rules along. What you remove saves prompt, but the agent loses your rules, ' +
+        'and nothing in the answer shows it.',
+      ruConflicts: 'Conflict matrix',
+      ruConflictsText:
+        'Four pairs of “their mechanism ↔ ours”. There is exactly one mutual exclusion: the ' +
+        'platform tools and our shim — two tool sets on one turn, so pick one. The warning is ' +
+        'the contour compressing history next to our checkpoints: after compression a ' +
+        'continuation may not know how the task began, and the row says both sides are on ' +
+        'right now. The two “for information” rows exist precisely so that nothing gets ' +
+        'switched off: data masking and content checks stack in order rather than compete.',
+
+      useAgentTitle: 'An agent that edits files',
+      useAgentCaption:
+        'EnterprisePlatform does not accept the client’s tools, so the panel’s shim carries them (a ' +
+        'compatible gateway gets them as a field, without it). The ' +
+        'diagram shows how one turn works; the frames show two outcomes on the scripted contour ' +
+        'and one honest failure on the live stand.',
+      agCall: 'The call ran: the file is on disk',
+      agCallText:
+        'The scripted contour answered with a Write call in protocol tags. The shim rebuilt a ' +
+        'real call out of it, and Claude Code itself ran it — with its own permissions, as with ' +
+        'the vendor: the conversation shows a Write chip followed by the answer. The shoot ' +
+        'checks the file on disk, not the text on screen: no file, no frame. The header reads ' +
+        '“Through the "Scripted contour" contour: stub-tool-shim.”',
+      agQuote: 'An example in a code block does not run',
+      agQuoteText:
+        'The same call, shown as an example in a code block, stays text: there is no Write ' +
+        'chip, and the shoot checks that the file is absent. A quoted protocol and a ' +
+        'documentation file the agent has just read look exactly like this — running them would ' +
+        'be more dangerous than missing a real call. Every such block is named as a reason in ' +
+        'the request trace.',
+      agCard: 'The shim card counts both outcomes',
+      agCardText:
+        'On the “Tools through the contour” card: “turns with tools: 1”, “1 calls across 3 ' +
+        'requests with tools”, and a separate row saying a call inside a code block is not run, ' +
+        '1 time. The count comes from the gateway trace: the trace is capped in length, and a ' +
+        'panel restart clears it entirely — it says so under the count.',
+      agLive: 'The live stand: the model made no call',
+      agLiveText:
+        'The same “create hello.txt” request through the real stand with qwen2.5:0.5b. The ' +
+        'protocol is declared to the model, but half a billion parameters cannot hold on to it: ' +
+        'the answer is a numbered list repeated two hundred times, and not a single call. No ' +
+        'file. This is neither a panel fault nor a rarity: a weak model talks about or ' +
+        'describes the action but does not do it, and whether a model answers with a call is ' +
+        'up to the model.',
+      agLiveCard: 'The card after such a run',
+      agLiveCardText:
+        '“Requests with tools did go through, but the model made no call and claimed no action ' +
+        'in words.” The “described in words” mark is a guess from the answer text, not a ' +
+        'verdict: it did not fire on an incoherent list, and it errs both ways. The panel does ' +
+        'not block a turn without a call.',
+      agPriceTitle: 'The price of every turn',
+      agPriceText:
+        'The contour has no prompt cache, so the tool schemas travel afresh on every turn: 24 ' +
+        'Claude Code tools are about 58 thousand characters of system text and 86 KB of request ' +
+        'per agent step. That is why a run through a contour uses the panel’s short prompt by ' +
+        'default, and why the shim is worth switching off on a contour you only use for text. ' +
+        'Details in the “Tools through the contour” section below.',
+
+      useMediaTitle: 'Images',
+      useMediaCaption:
+        'An image is drawn by the panel, not by the CLI, and only where the key catalogue ' +
+        'declares a drawing model. Two frames from the stand, which has no such model, and two ' +
+        'from the scripted contour, which does.',
+      mRow: 'The “Image generation” row',
+      mRowText:
+        'On the contour card, under “What is available”. For the stand key it says no — no ' +
+        'drawing models were granted to the key — confirmed by the probe. While it says no, ' +
+        'there will be no raster image through this contour, and the panel does not guess a ' +
+        'generation address: a guessed address would answer 404 only after you had described ' +
+        'the picture.',
+      mMenu: 'The mode menu without a drawing model',
+      mMenuText:
+        'The “Message” button under the input opens the modes. “Image” is named honestly here: ' +
+        '“The conversation agent draws it: vector code, not a photo · no raster: the key ' +
+        'catalog holds no image model”. So you get a diagram or an illustration in code, not a ' +
+        'photograph. “Presentation” says “The conversation agent dictates the slides”.',
+      mStubMenu: 'The mode menu when there is a model',
+      mStubMenuText:
+        'The scripted contour’s key catalogue has a drawing model, and “Image” names it ' +
+        'outright: “Scripted contour · stub-image”. The same caption appears under the input, ' +
+        'and the input asks: “Describe the image — the panel draws it itself, without the ' +
+        'agent”.',
+      mCard: 'An image is a card, not a message',
+      mCardText:
+        'The description “A lighthouse on a cliff at dusk, watercolour” went through the ' +
+        'panel’s gateway — so the request is in the gateway journal (in the key’s spend if the ' +
+        'contour sent a bill). The image ' +
+        'lands as a card in the right-hand column: size, weight, “Drawn by stub-image · ' +
+        'contour, part of the answer” and your description under it. It does not enter the ' +
+        'conversation: the transcript is Claude Code’s file, and the panel writes not one line ' +
+        'into it. The image itself is a file in the panel’s data; there is no gallery. The ' +
+        'lighthouse on the screenshot came from a stub: there is no model behind the scripted ' +
+        'contour.',
+      mDecksTitle: 'Presentations — no frame of their own',
+      mDecksText:
+        'A deck asks the contour for no capability: the panel asks the model for the slide ' +
+        'structure with an ordinary chat request and builds HTML, PPTX and PDF on your machine. ' +
+        'Only the photographic slide images depend on the contour — they are drawn the same way ' +
+        'as in the frames above. A sentence around the structure the panel drops by itself; an ' +
+        'answer with no structure at all it names in the model’s own words.',
+
+      useEndTitle: 'When the contour is no longer needed',
+      useEndCaption:
+        'Four actions of different strength are covered below, in “How to switch it off”. ' +
+        'Here is the harshest one.',
+      pDelete: 'Deletion',
       pDeleteText:
-        'Three actions of different strength are covered below, in “How to switch it off”. ' +
-        'The harshest is deletion: it asks for the contour title in full, while the apply is ' +
-        'removed before it by itself, returning the CLI files to their original state.',
+        'Deletion asks for the contour title in full, while the apply is removed before it by ' +
+        'itself, returning the CLI files to their original state. The settings, the key and ' +
+        'the check trace go; the “before” copies in “History” and the spend already counted ' +
+        'stay.',
 
       shotsTitle: 'Where these screenshots come from and why they can be trusted',
       shotsText:
-        'The frames are taken by a run of their own: the admin on a live stand, the panel on ' +
-        'a throwaway copy with its own config directory, so that nobody’s working stand is ' +
-        'touched. Keys, tokens and emails are masked in the markup BEFORE the shot, and the ' +
+        'The frames are taken by a run of their own. The admin and most of the panel come ' +
+        'from a live enterprise-platform stand with the local qwen2.5:0.5b model; the panel there is a ' +
+        'throwaway copy with its own config directory, so that nobody’s working stand is ' +
+        'touched. What the stand cannot show — a successful tool call, a drawing model, a ' +
+        'contour gone dark — was shot on the scripted contour: a stub from the panel’s own ' +
+        'checks that answers with pre-recorded turns, and the steps call it exactly that. ' +
+        'Everything else in those frames is real: the panel, its gateway, Claude Code and the ' +
+        'file on disk. Keys, tokens and emails are masked in the markup BEFORE the shot, and the ' +
         'visible text of the frame goes into an inventory next to the image. A separate check ' +
         'reads that inventory looking for keys, tokens, foreign domains and values from the ' +
         'private store — so a leak is caught by a run rather than by eye. The check has one ' +
@@ -849,9 +1361,44 @@ export const platformEn: typeof platformRu = {
       '14-wizard-targets':
         'Step 4: consumers, mode, budget. The dashes stay until “Done” — the contour is still off',
       '15-wizard-gateway': 'The gateway is up on 127.0.0.1:5179 — now CLIs have somewhere to point',
-      '16-panel-card': 'The contour card right after “Done”: no request has gone through yet',
-      '17-panel-spend': 'The same card after a live request: spend, budget and the check trace',
+      '16-panel-card': 'Right after “Done”: the contour is active, the test request went through',
       '18-panel-delete': 'Deleting asks for the title; the apply is removed before it by itself',
+    },
+    activate: {
+      '01-smoke-ok': 'The active contour card: the model’s answer to the test request, delay, name',
+      '02-return-settings':
+        'Settings → Models: the profile the contour created, and the same way back to the provider',
+    },
+    route: {
+      '01-model-card': 'Contour model: the default, per consumer, and the name map',
+      '02-chat-header':
+        'The chat header before sending: which contour and model the run leaves with, no effort',
+    },
+    rules: {
+      '01-rules-panel': 'Managed by the panel: platform tools, the loop, the preset, thinking',
+      '02-rules-ours': 'Our side: the tool shim and the ~/.claude layers with their real flags',
+      '03-rules-conflicts':
+        'Conflict matrix: one mutual exclusion, one warning, two rows for information',
+    },
+    agent: {
+      '01-chat-run': 'The live stand, a 0.5B model: a numbered list instead of a call — no file',
+      '02-shim-card': 'The shim card after such a run: requests went through, no calls were made',
+    },
+    media: {
+      '01-capability-row': 'The capability row for the stand key: no drawing models were granted',
+      '02-mode-menu': 'The mode menu on the stand: the agent draws in code, no raster — and why',
+    },
+    scripted: {
+      '01-shim-call':
+        'Scripted contour: a call in protocol tags run by the real Claude Code — the file is on disk',
+      '02-shim-quote': 'Scripted contour: the same call as an example in a code block did not run',
+      '03-shim-card': 'The shim card: one real call and a code block named as the reason',
+      '04-image-menu': 'Scripted contour: the key has a drawing model, and “Image” leads to it',
+      '05-image-card':
+        'A drawn image is a card in the right-hand column, not a conversation message',
+      '06-switch-button': 'The previous contour after a new one: “not active”, “Make it active”',
+      '07-smoke-red':
+        'Scripted contour stopped: activation went through, the test request is red, cause named',
     },
   },
   diagrams: {
@@ -861,5 +1408,7 @@ export const platformEn: typeof platformRu = {
       'What gets created in the contour admin, what in the panel, and which two lines cross the border.',
     'two-systems':
       'The two systems side by side: the panel’s parts against the enterprise-platform instance services, and the three arrows that cross the border between them.',
+    'tool-shim':
+      'One agent turn through the shim: tool schemas travel as text, the call is rebuilt from the answer, and a code block never runs.',
   },
 };

@@ -8,13 +8,9 @@ import type {
 import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
 import type { AppStore } from '../../../lib/app-store.ts';
 import { maskKey } from '../../../lib/provider-keys.ts';
-import { fingerprintOf, readCurrentEnv, readCurrentFileValues } from './current.ts';
-import {
-  activeGatewaySettings,
-  buildManagedProfile,
-  gatewayUrlFor,
-  managedModel,
-} from './profile.ts';
+import { driftedSinceApply, readCurrentEnv, readCurrentFileValues } from './current.ts';
+import { activeGatewaySettings, buildManagedProfile, gatewayUrlFor } from './profile.ts';
+import { defaultModelOf, toolRouteOf } from '../models.ts';
 import { describeContourTargets, type ContourTarget, type ContourTargetPaths } from './targets.ts';
 import { listConsumerOptions } from '../routing.ts';
 
@@ -88,15 +84,16 @@ function describeTarget(
         ? conflictsFor(target.plan, readCurrentEnv(target, deps.paths))
         : conflictsFor(target.plan, readCurrentFileValues(target, platform.id));
 
-  // Расхождение — это «человек правил файл ПОСЛЕ нас»: отпечаток снят сразу
-  // после нашей записи, и любой другой отпечаток значит чужую руку. У
-  // ассистента файла нет, и расхождением там будет чужой выбор профиля.
+  // Расхождение — это «человек правил НАШИ значения после нас»: отпечаток снят
+  // сразу после записи, и любой другой значит чужую руку. Правка других ключей
+  // того же файла сюда не входит (аудит DRV-02). У ассистента файла нет, и
+  // расхождением там будет чужой выбор профиля.
   const drifted =
     applied === undefined
       ? false
       : target.write?.kind === 'assistant'
         ? deps.store.getSettings().assistantEndpointId !== profileId
-        : fingerprintOf(target.filePath) !== applied.fingerprint;
+        : driftedSinceApply(applied, platform.id, deps.paths.override);
 
   return {
     targetId: target.targetId,
@@ -125,11 +122,20 @@ function describeTarget(
 export function buildPlatformApplyPlan(
   deps: ContourApplyDeps,
   platform: Platform,
+  requestedModel = '',
 ): PlatformApplyPlan {
   // Порт — доставшийся, а не задуманный: предпросмотр обязан показать тот же
   // адрес, который запишется в файл, и тот же, что стоит в карточке шлюза.
   const gateway = activeGatewaySettings(deps.store);
-  const managed = buildManagedProfile(platform, gateway, managedModel(deps.store, platform.id));
+  // Откуда взялась модель — не украшение: «выбрал человек» и «панель взяла
+  // первую из каталога» человек чинит по-разному, а пустая означает, что CLI
+  // уйдёт с именем вендора и получит 403 (Т6). Присланная применением модель
+  // сильнее: план с моделью по умолчанию проверял бы занятое место и отвечал
+  // человеку не про то, что легло в файл (аудит DRV-21).
+  const model = requestedModel.trim()
+    ? { model: requestedModel.trim(), source: 'default' as const }
+    : defaultModelOf(deps.store, platform);
+  const managed = buildManagedProfile(platform, gateway, model.model);
   const ready = platform.enabled && gateway.enabled && deps.gatewayRunning;
 
   const targets = describeContourTargets(managed, platform.id, gateway.port, deps.paths).map(
@@ -147,6 +153,9 @@ export function buildPlatformApplyPlan(
     // спрашивает «что будет, если я это включу», и файлы без прогонов ответом
     // больше не являются (Т3).
     consumers: listConsumerOptions(platform),
+    model: managed.model,
+    modelSource: model.source,
+    toolRoute: toolRouteOf(platform),
   };
 }
 

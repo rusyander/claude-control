@@ -7,6 +7,7 @@ import {
   HelpShot,
   HelpDiagram,
 } from '../ui';
+import { PlatformUseSections } from './PlatformUseSections';
 
 interface SectionProps {
   /** Перевод ключа `help.topics.platform.<key>` — словарь у документа один. */
@@ -14,7 +15,8 @@ interface SectionProps {
 }
 
 /**
- * Середина документа «Контур»: весь путь подключения в снимках.
+ * Середина документа «Контур»: весь путь подключения в снимках, а за ним —
+ * работа через подключённый контур (`PlatformUseSections`).
  *
  * Это не отдельный документ и больше им не будет. Разделять «как устроено» и
  * «куда нажимать» на две страницы оказалось ошибкой: человек, пришедший
@@ -42,7 +44,7 @@ export function PlatformGuideSections({ tr }: SectionProps) {
         />
       </HelpSection>
 
-      {/* Схемы стоят ПЕРЕД шагами: восемнадцать снимков подряд отвечают на
+      {/* Схемы стоят ПЕРЕД шагами: три десятка снимков подряд отвечают на
           вопрос «куда нажимать», но не на вопрос «что вообще происходит», а
           второй возникает первым. */}
       <HelpSection title={g('mapTitle')} caption={g('mapCaption')}>
@@ -141,12 +143,11 @@ export function PlatformGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('pCard')} text={g('pCardText')}>
             <HelpShot topic="platform" scenario="connect" frame="16-panel-card" side="panel" />
           </GuideStep>
-          <GuideStep title={g('pSpend')} text={g('pSpendText')}>
-            <HelpShot topic="platform" scenario="connect" frame="17-panel-spend" side="panel" />
-          </GuideStep>
-          <GuideStep title={g('pDelete')} text={g('pDeleteText')}>
-            <HelpShot topic="platform" scenario="connect" frame="18-panel-delete" side="panel" />
-          </GuideStep>
+          {/* Без кадра до починки учёта: 13.09.2026 живой стенд присылал
+              расход кадром, которого шлюз не узнавал, и карточка после запроса
+              ничем не отличалась от карточки до него. Кадр вернёт съёмка
+              (`platform-stand-panel.mjs` снимает его, только увидев расход). */}
+          <GuideStep title={g('pSpend')} text={g('pSpendText')} />
         </GuideSteps>
         {/* Цена режима «обязательно» — рядом с шагом, на котором его выбирают,
             а не в конце документа: узнать её лучше до, а не после. */}
@@ -154,6 +155,8 @@ export function PlatformGuideSections({ tr }: SectionProps) {
           {tr('wizardRequiredText')}
         </Callout>
       </HelpSection>
+
+      <PlatformUseSections tr={tr} />
 
       <Callout tone="info" title={g('shotsTitle')}>
         {g('shotsText')}

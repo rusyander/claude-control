@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,6 +10,7 @@ import { setStoredKey } from '../lib/provider-keys.ts';
 import { ModelCatalogStore } from '../domains/models/model-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerModelRoutes } from './model-routes.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Маршрут каталога моделей глазами панели: открыли настройки — список приехал,
@@ -166,7 +168,12 @@ describe('маршрут каталога моделей: источник «к�
           budgetSince: '',
           toolShim: true,
           contourPrompt: true,
+          defaultModel: '',
+          consumerModels: {},
+          modelMap: {},
+          rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
           caCertPath: '',
+          transport: defaultPlatformTransport(),
         },
       ],
     });
@@ -324,7 +331,9 @@ describe('маршрут каталога моделей: источник «к�
         agents: [],
         toolShim: true,
         contourPrompt: true,
+        rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
         caCertPath: join(root, 'нет-такого.pem'),
+        transport: defaultPlatformTransport(),
       })),
     });
 

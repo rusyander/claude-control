@@ -19,16 +19,19 @@ export {
   useConnectPlatformBridge,
   usePlatformSpend,
   useClearExhausted,
+  usePlatformRunPlan,
 } from './api/PlatformApi';
 export { CapabilityMatrix } from './ui/CapabilityMatrix';
 export {
   PLATFORM_DRIVERS,
-  PLATFORM_BASE_URL_SAMPLE,
+  platformBaseUrlSample,
   newPlatform,
   platformIdFromTitle,
   validatePlatform,
   isPlatformValid,
   sortApplyTargets,
+  toolRouteOf,
+  toolRouteMark,
   platformBudgetAlarming,
   platformBudgetOf,
   platformSpendOf,

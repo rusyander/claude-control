@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { PLATFORM_PRESETS } from '@agentdeck/contracts/platform-presets';
 import type { PlatformDriver } from '../driver.ts';
 import { allDrivers } from '../index.ts';
+import { contourHeaders, contourUrl } from '../../transport.ts';
 import {
   anthropicRequestToOpenAi,
+  chooseToolRoute,
   openAiRequestLoss,
   type Dialect,
 } from '../../gateway/dialect.ts';
@@ -63,19 +66,48 @@ describe.each(allDrivers)('набор соответствия: $id', (driver: P
   });
 
   it('адрес моделей не удваивает версию', () => {
-    expect(driver.modelsUrl('https://api.example.ru')).toBe('https://api.example.ru/v1/models');
-    expect(driver.modelsUrl('http://127.0.0.1:11434/v1')).toBe('http://127.0.0.1:11434/v1/models');
+    const url = (baseUrl: string): string | undefined =>
+      contourUrl({ baseUrl, driver: driver.id }, 'models');
+    expect(url('https://api.example.ru')).toBe('https://api.example.ru/v1/models');
+    expect(url('http://127.0.0.1:11434/v1')).toBe('http://127.0.0.1:11434/v1/models');
     // Хвостовой слэш — самый частый вид адреса из буфера обмена.
-    expect(driver.modelsUrl('https://api.example.ru/')).toBe('https://api.example.ru/v1/models');
+    expect(url('https://api.example.ru/')).toBe('https://api.example.ru/v1/models');
+  });
+
+  it('заголовок ключа объявлен токеном HTTP в нижнем регистре', () => {
+    expect(driver.auth.header).toMatch(/^[a-z0-9-]+$/);
   });
 
   it('ключ уходит только в заголовки и только когда он есть', () => {
-    const withKey = JSON.stringify(driver.headers('секрет'));
+    const withKey = JSON.stringify(contourHeaders({ baseUrl: '', driver: driver.id }, 'секрет'));
     expect(withKey).toContain('секрет');
     // Без ключа заголовка авторизации быть не должно: пустой Bearer читается
     // контуром как «ключ неверный», а человеком — как «панель сломалась».
-    const without = JSON.stringify(driver.headers(undefined)).toLowerCase();
-    expect(without).not.toContain('bearer');
+    const without = contourHeaders({ baseUrl: '', driver: driver.id }, undefined);
+    expect(JSON.stringify(without).toLowerCase()).not.toContain('bearer');
+    expect(without[driver.auth.header]).toBeUndefined();
+  });
+
+  // Аудит DRV-04: заголовок ключа назначается настройкой, а не драйвером навсегда.
+  it('свой заголовок ключа заменяет драйверный, а не добавляется к нему', () => {
+    // Свой — заведомо не драйверный: у пресета Azure драйверный и есть `api-key`.
+    const own = driver.auth.header === 'api-key' ? 'x-api-key' : 'api-key';
+    const headers = contourHeaders(
+      {
+        baseUrl: '',
+        driver: driver.id,
+        transport: {
+          authHeader: own,
+          authScheme: '',
+          version: 'auto',
+          query: '',
+          headers: '',
+        },
+      },
+      'секрет',
+    );
+    expect(headers[own]).toBe('секрет');
+    expect(headers[driver.auth.header]).toBeUndefined();
   });
 
   it('читает модели из ответа OpenAI-формы', () => {
@@ -113,35 +145,91 @@ describe.each(allDrivers)('набор соответствия: $id', (driver: P
       // Потеря без причины — это «исчезло молча», то есть ровно то, против чего
       // таблица и заведена.
       expect(row.note.trim()).not.toBe('');
+      // Переименование без нового имени — судьба без кода за ней (DRV-18).
+      if (row.fate === 'renamed') {
+        expect(row.to.trim()).not.toBe('');
+        expect(row.to).not.toBe(row.field);
+      }
     }
+  });
+
+  it('родная ручка Anthropic, если объявлена, — путь относительно версии', () => {
+    if (!driver.anthropic) return;
+    expect(driver.anthropic.messages).toMatch(/^[a-z0-9][a-z0-9/_-]*$/);
+  });
+
+  it('предел цельного ответа, если объявлен, — положительное число секунд', () => {
+    if (driver.nonStreamTimeoutSec === undefined) return;
+    expect(Number.isFinite(driver.nonStreamTimeoutSec)).toBe(true);
+    expect(driver.nonStreamTimeoutSec).toBeGreaterThan(0);
+  });
+
+  it('потолок любого ответа, если объявлен, — положительное число секунд', () => {
+    if (driver.responseCeilingSec === undefined) return;
+    expect(Number.isFinite(driver.responseCeilingSec)).toBe(true);
+    expect(driver.responseCeilingSec).toBeGreaterThan(0);
   });
 
   it('инструменты клиента в диалекте OpenAI живут ровно так, как объявлено', () => {
     // Не сверка двух полей манифеста, а прогон через ту самую функцию, которая
-    // считает потери живого запроса: `toolsPassthrough: false` без строки в
+    // считает потери живого запроса: `clientTools: 'shim'` без строки в
     // манифесте даёт ПУСТОЙ след при выброшенных схемах — панель обещает агенту
     // руки и молчит о том, что их нет.
     const loss = openAiRequestLoss(
       { tools: ANTHROPIC_REQUEST_WITH_TOOLS.tools },
       driver.requestFields,
     );
-    expect(loss.some((item) => item.field === 'tools')).toBe(!driver.toolsPassthrough);
+    expect(loss.some((item) => item.field === 'tools')).toBe(driver.clientTools !== 'native');
     for (const item of loss) expect(item.note.trim()).not.toBe('');
   });
 
-  it('инструменты в диалекте Anthropic теряются у всех и с причиной', () => {
-    // Мост не переводит схемы Anthropic в схемы OpenAI (это Т5) — значит теряет
-    // их у ЛЮБОГО контура, хоть трижды passthrough. Проверяется по телу,
-    // уходящему наверх, а не по манифесту.
+  it('инструменты в диалекте Anthropic без прослойки: полем либо потерей с причиной', () => {
+    // Маршрут выбирается ТЕМ ЖЕ решением, что на живом запросе, и проверяется по
+    // телу, уходящему наверх. Прежняя строка здесь закрепляла потерю у всех
+    // драйверов «хоть трижды passthrough» — и зеленела, пока совместимый шлюз
+    // оставался без рук (аудит DRV-01).
+    const route = chooseToolRoute({ toolShim: false, platformTools: false }, driver, () => '');
     const { body, lost } = anthropicRequestToOpenAi(
       ANTHROPIC_REQUEST_WITH_TOOLS,
       driver.requestFields,
+      route,
     );
+    if (driver.clientTools === 'native') {
+      expect(body.tools).toEqual([
+        {
+          type: 'function',
+          function: { name: 'calc', description: 'счёт', parameters: { type: 'object' } },
+        },
+      ]);
+      expect(body.tool_choice).toBe('auto');
+      expect(lost).toEqual([]);
+      return;
+    }
     expect(body.tools).toBeUndefined();
     expect(body.tool_choice).toBeUndefined();
     const tools = lost.find((item) => item.field === 'tools');
     expect(tools?.note.trim()).not.toBe('');
     expect(lost.some((item) => item.field === 'tool_choice')).toBe(true);
+  });
+
+  it('умолчание прослойки нового контура совпадает с тем, как платформа принимает инструменты', () => {
+    // Пресет читает мастер фронта, манифест — конвейер. Разойдясь, они включали бы
+    // прослойку шлюзу, принимающему `tools` полем, или выключали её платформа компании, у
+    // которой других рук нет (аудит DRV-20).
+    const preset = PLATFORM_PRESETS[driver.id];
+    expect(preset, `нет пресета у драйвера ${driver.id}`).toBeDefined();
+    expect(preset.defaults.toolShim).toBe(driver.clientTools === 'shim');
+  });
+
+  it('прослойка не шлёт выбор инструмента без `tools`, кроме объявленного драйвером', () => {
+    const route = chooseToolRoute({ toolShim: true, platformTools: false }, driver, () => 'п');
+    const { body } = anthropicRequestToOpenAi(
+      ANTHROPIC_REQUEST_WITH_TOOLS,
+      driver.requestFields,
+      route,
+    );
+    expect(body.tools).toBeUndefined();
+    expect(body.tool_choice).toBe(driver.shimRequestFields?.tool_choice);
   });
 
   it('обычный поток драйвер вендорным не считает', () => {
@@ -250,12 +338,27 @@ describe.each(allDrivers)('набор соответствия: $id', (driver: P
     }
   });
 
-  it('путь картинок назван одним из трёх', () => {
-    expect(['chat-part', 'images-api', 'none']).toContain(driver.images);
+  it('путь картинок назван одним из трёх, и у ручки объявлен путь', () => {
+    if (typeof driver.images === 'object') {
+      // Путь относительно версии: ведущая черта или адрес целиком обошли бы
+      // транспорт контура (прокси, свои заголовки) так же, как угаданный.
+      expect(driver.images.api).toMatch(/^[a-z0-9][a-z0-9/_-]*$/);
+    } else {
+      expect(['chat-part', 'none']).toContain(driver.images);
+    }
   });
 
   it('усилие рассуждения объявлено, а не подразумевается', () => {
     expect(typeof driver.effort).toBe('boolean');
+  });
+
+  it('агенты объявлены путями под версией API либо не объявлены вовсе', () => {
+    if (!driver.agents) return;
+    for (const path of [driver.agents.completions, driver.agents.sessions]) {
+      // Ведущий `/` или версия в пути удвоили бы то, что дописывает `callUpstream`.
+      expect(path).toMatch(/^[a-z][a-z0-9_/-]*[a-z0-9]$/);
+      expect(path).not.toMatch(/^v\d/);
+    }
   });
 
   it('у каждой ручки есть механизм и слова', () => {

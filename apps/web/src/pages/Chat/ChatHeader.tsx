@@ -36,6 +36,7 @@ export function ChatHeader({
   defaultModel,
   defaultEffort,
   models,
+  consumer,
   onModelChange,
   onEffortChange,
   isEditorPending,
@@ -79,7 +80,9 @@ export function ChatHeader({
         </Typography>
       </Stack>
 
-      <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap justify="end">
+      {/* По верху: выбор модели с подписями контура выше кнопок, и по центру
+          «Агенты» и «Настройки» висели бы посреди подписей. */}
+      <Stack direction="row" align="start" gap="var(--spacing-xs)" wrap justify="end">
         <AgentsPanel
           activeRuns={activeRuns}
           totalCost={totalCost}
@@ -96,6 +99,7 @@ export function ChatHeader({
           defaultModel={defaultModel}
           defaultEffort={defaultEffort}
           models={models}
+          consumer={consumer}
           onModelChange={onModelChange}
           onEffortChange={onEffortChange}
         />

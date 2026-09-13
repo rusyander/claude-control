@@ -8,6 +8,8 @@ import { reconcileManagedProfiles } from '../apply/profile.ts';
 import { toolShimReport } from '../tool-shim-report.ts';
 import { violationReport } from '../violations.ts';
 import type { PricingLookup } from '../../analytics/pricing.ts';
+import { driverOf } from '../drivers/index.ts';
+import { nativeMessagesPath } from './anthropic-native.ts';
 import { GATEWAY_ROUTES, handleGatewayRequest } from './pipeline.ts';
 import { SpendFlusher } from './spend-flush.ts';
 import { GatewayJournal } from './usage.ts';
@@ -74,6 +76,8 @@ export interface GatewayRuntime {
   pricing?: () => PricingLookup;
   /** Раз во сколько учёт уезжает на диск. Ноль — сразу, так его и проверяют. */
   spendFlushMs?: number;
+  /** Подстановка часов для тестов: потолок ответа в минуты тест не ждёт. */
+  now?: () => Date;
 }
 
 export class PlatformGateway {
@@ -116,7 +120,7 @@ export class PlatformGateway {
       // смотрит, а выключение обязано возвращать раздел к прежнему виду.
       violations: violationReport(this.#journal.events(), { platformIds: this.#enabledIds() }),
       toolShim: toolShimReport(this.#journal.events(), { platformIds: this.#enabledIds() }),
-      compromises: GATEWAY_COMPROMISES,
+      compromises: this.#compromises(),
     };
   }
 
@@ -137,6 +141,7 @@ export class PlatformGateway {
         journal: this.#journal,
         spend: this.#spend,
         fetchImpl: runtime.fetchImpl,
+        ...(runtime.now ? { now: runtime.now } : {}),
       }).catch(() => {
         // Беда ОДНОГО запроса не делает слушатель сломанным: `#error` — это
         // «шлюз не поднялся», и записанная сюда чужая ошибка красила бы
@@ -204,6 +209,25 @@ export class PlatformGateway {
 
   /** Адреса, которые человек копирует в CLI, — по одному на контур. */
   /** Контуры, которые шлюз обслуживает прямо сейчас. Без рантайма — ни одного. */
+  /**
+   * Мост диалектов подписан, пока хоть одному включённому контуру он нужен:
+   * у платформы, идущей на родную ручку Anthropic (DRV-07), моста нет, и
+   * подпись о нём была бы неправдой. Ни одного включённого — подпись остаётся: так шлюз
+   * говорит, чем станет, а не молчит.
+   */
+  #compromises(): CompromiseId[] {
+    const runtime = this.#runtime;
+    const enabled = runtime
+      ? readPlatforms(runtime.store).filter((platform) => platform.enabled)
+      : [];
+    const bridged =
+      enabled.length === 0 ||
+      enabled.some((platform) => !nativeMessagesPath(platform, driverOf(platform)));
+    return bridged
+      ? GATEWAY_COMPROMISES
+      : GATEWAY_COMPROMISES.filter((id) => id !== 'dialect-bridge');
+  }
+
   #enabledIds(): string[] {
     const runtime = this.#runtime;
     if (!runtime) return [];

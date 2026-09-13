@@ -1,0 +1,42 @@
+{
+  "topic": "platform",
+  "scenario": "media",
+  "frames": [
+    {
+      "id": "01-capability-row",
+      "side": "panel",
+      "file": "01-capability-row.png",
+      "masked": 1,
+      "width": 932,
+      "height": 49,
+      "shotAt": "2026-09-13T09:57:59.837Z",
+      "text": "Рисование картинок — нет рисующих моделей ключу не выдано проверено пробой",
+      "en": {
+        "file": "01-capability-row.en.png",
+        "masked": 1,
+        "width": 932,
+        "height": 49,
+        "shotAt": "2026-09-13T10:02:46.628Z",
+        "text": "Image generation — no рисующих моделей ключу не выдано confirmed by the probe"
+      }
+    },
+    {
+      "id": "02-mode-menu",
+      "side": "panel",
+      "file": "02-mode-menu.png",
+      "masked": 0,
+      "width": 388,
+      "height": 278,
+      "shotAt": "2026-09-13T09:58:06.174Z",
+      "text": "Сообщение Уходит агенту в этот разговор Картинка Нарисует агент разговора: вектор кодом, а не снимок · растра нет: в каталоге ключа нет модели с генерацией картинок Презентация Слайды надиктует агент разговора Режим доступен там, где возможность объявлена",
+      "en": {
+        "file": "02-mode-menu.en.png",
+        "masked": 0,
+        "width": 388,
+        "height": 260,
+        "shotAt": "2026-09-13T10:02:52.996Z",
+        "text": "Message Goes to the agent in this conversation Image The conversation agent draws it: vector code, not a photo · no raster: the key catalog holds no image model Presentation The conversation agent dictates the slides Available where the capability is declared"
+      }
+    }
+  ]
+}

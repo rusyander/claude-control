@@ -1,5 +1,6 @@
 import type { ChatProgress } from '@agentdeck/contracts';
 import type { QueuedMessage } from '@shared/lib/agent-runs';
+import type { ComposerModeState } from '@features/ChatComposer';
 import type { ChatSendFile } from './ChatPage.types';
 
 export interface ChatDockProps {
@@ -18,4 +19,6 @@ export interface ChatDockProps {
   onSplitTasks?: () => void;
   /** Попросить закрыть этап и продолжить в чистой сессии; пусто — вне проекта. */
   onHandoff?: () => void;
+  /** Режимы отправки (Т9): сообщение агенту или картинка от панели. */
+  modes?: ComposerModeState;
 }

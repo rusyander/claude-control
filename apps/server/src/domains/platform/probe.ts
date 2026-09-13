@@ -3,9 +3,11 @@ import type { CompromiseId } from '@agentdeck/contracts/compromises';
 import { createCaFetch, type PlatformFetch } from './ca-fetch.ts';
 import { headerUnsafeKeyReason } from './errors.ts';
 import { foreignTail as tail, redactSecrets } from './redact.ts';
-import { driverFor } from './drivers/index.ts';
-import type { PlatformDriver } from './drivers/driver.ts';
+import { driverOf } from './drivers/index.ts';
+import { contourHeaders, contourUrl } from './transport.ts';
+import { catalogItems, type PlatformDriver } from './drivers/driver.ts';
 import { bridgeUpstreamStatus } from './gateway/status.ts';
+import { retryAfterSeconds } from './gateway/upstream.ts';
 
 /**
  * Проба контура: панель спрашивает у него СПИСОК МОДЕЛЕЙ.
@@ -73,12 +75,12 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
   const { platform, token } = options;
   const now = options.now ?? (() => new Date());
   const checkedAt = now().toISOString();
-  const driver = driverFor(platform.driver);
-  const url = driver.modelsUrl(platform.baseUrl);
-  const base = empty(url, checkedAt);
+  const driver = driverOf(platform);
+  const url = contourUrl(platform, 'models');
+  const base = empty(url ?? platform.baseUrl, checkedAt);
 
-  const parsed = parseHttpUrl(url);
-  if (!parsed) {
+  const parsed = url === undefined ? undefined : parseHttpUrl(url);
+  if (!parsed || url === undefined) {
     return {
       ...base,
       outcome: 'unreachable',
@@ -92,7 +94,7 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
   try {
     response = await fetchImpl(parsed.toString(), {
       method: 'GET',
-      headers: driver.headers(token),
+      headers: contourHeaders(platform, token),
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
   } catch (error) {
@@ -125,13 +127,24 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
     };
   }
 
-  if (status === 503) {
+  // 429 и 503 — «контур жив, но сейчас не ответит», и объясняются ТЕМ ЖЕ
+  // переводом, что и отказ шлюза (аудит DRV-16): лимитёр платформа компании стоит и на
+  // списке моделей, а «реестр моделей не готов» — смысл 503 у неё, не у всех.
+  if (status === 429 || status === 503) {
+    const bridged = bridgeUpstreamStatus(
+      status,
+      {},
+      {
+        driverRows: driver.statusRows,
+        retryAfterSeconds: retryAfterSeconds(response),
+      },
+    );
     return {
       ...base,
       reachable: true,
       status,
       outcome: 'not-ready',
-      detail: 'Контур ещё поднимается: реестр моделей не готов (503). Повторите проверку.',
+      detail: `${bridged.message} (${status}). Повторите проверку.`,
     };
   }
 
@@ -185,17 +198,18 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
     };
   }
 
-  if (
-    !payload ||
-    typeof payload !== 'object' ||
-    !Array.isArray((payload as { data?: unknown }).data)
-  ) {
+  if (!catalogItems(payload)) {
     return {
       ...base,
       reachable: true,
       status,
       outcome: 'not-api',
-      detail: notApiDetail(driver, url, status, 'в ответе нет списка моделей (поле data)'),
+      detail: notApiDetail(
+        driver,
+        url,
+        status,
+        'в ответе нет списка моделей (ни поля data, ни массива)',
+      ),
     };
   }
 

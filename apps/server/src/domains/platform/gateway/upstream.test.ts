@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import type { Platform } from '@agentdeck/contracts';
 import {
   callUpstream,
@@ -8,6 +9,7 @@ import {
   UPSTREAM_RETRY_PAUSE_MS,
   type UpstreamCall,
 } from './upstream.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Поход в контур: адрес, ключ и единственная повторная попытка (план §3).
@@ -33,7 +35,12 @@ const PLATFORM: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 const call = (
@@ -205,5 +212,34 @@ describe('повтор в бою', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     const [, init] = fetchImpl.mock.calls[1] ?? [];
     expect((init as { signal: AbortSignal } | undefined)?.signal.aborted).toBe(true);
+  });
+});
+
+describe('транспорт контура (DRV-04/05)', () => {
+  it('Azure deployments: путь как есть, api-version, api-key голым, лишний заголовок', async () => {
+    const { run, fetchImpl } = call([new Response('data: ok\n\n', { status: 200 })], {
+      platform: {
+        ...PLATFORM,
+        driver: 'openai-compat',
+        baseUrl: 'https://corp.openai.azure.com/openai/deployments/gpt4o',
+        transport: {
+          authHeader: 'api-key',
+          authScheme: '',
+          version: 'as-is',
+          query: 'api-version=2024-10-21',
+          headers: 'X-Tenant: research',
+        },
+      } as Platform,
+    });
+    await run();
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(
+      'https://corp.openai.azure.com/openai/deployments/gpt4o/chat/completions?api-version=2024-10-21',
+    );
+    const headers = init.headers as Record<string, string>;
+    expect(headers['api-key']).toBe('platform-token-9f2b');
+    expect(headers.authorization).toBeUndefined();
+    expect(headers['x-tenant']).toBe('research');
+    expect(headers['content-type']).toBe('application/json');
   });
 });

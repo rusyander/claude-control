@@ -62,6 +62,16 @@
   font-size: var(--font-size-caption);
 }
 
+/* Что правит следующая отправка. Отдельной строкой над полем, а не подписью
+   внизу: внизу уже стоит причина доступности режима, и вытеснить её нельзя. */
+.revise {
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  background: var(--color-accent-subtle);
+  font-size: var(--font-size-caption);
+}
+
 .hiddenInput {
   display: none;
 }

@@ -14,7 +14,7 @@
  * ключ доступа от названия проверки не отличается.
  */
 
-import type { DriverStatusRow } from '../drivers/driver.ts';
+import type { DriverStatusRow, DriverViolationName } from '../drivers/driver.ts';
 
 /** Как отвечать клиенту на каждый известный код контура. */
 export interface BridgedStatus {
@@ -87,8 +87,21 @@ const CODES: Record<number, { status: number; code: string; message: string }> =
   503: { status: 503, code: 'overloaded_error', message: 'Контур сейчас недоступен' },
 };
 
-/** Поля, из которых берутся названия нарушений. Всё прочее не читается. */
-const VIOLATION_FIELDS = ['category', 'guardrail', 'name', 'rule', 'type', 'code'];
+/**
+ * Поля, из которых берутся названия нарушений, когда драйвер своих не объявил.
+ * Всё прочее не читается.
+ */
+const VIOLATION_FIELDS: readonly DriverViolationName[] = [
+  'category',
+  'guardrail',
+  'name',
+  'rule',
+  'type',
+  'code',
+].map((field) => ({ field }));
+
+/** Потолок названия правила, написанного прозой. */
+const LABEL_MAX = 64;
 
 /**
  * Название нарушения — только идентификатор: латиница, цифры и разделители, без
@@ -111,8 +124,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * Название, написанное администратором: управляющие знаки и переводы строк
+ * схлопываются (его читают в консоли CLI), длина режется с видимой обрезкой.
+ */
+function labelOf(value: string): string {
+  const flat = value
+    .replace(/\p{C}+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return flat.length > LABEL_MAX ? `${flat.slice(0, LABEL_MAX)}…` : flat;
+}
+
 /** Названия сработавших проверок из тела контура. Текста запроса здесь нет. */
-export function readViolations(payload: unknown): string[] {
+export function readViolations(
+  payload: unknown,
+  fields: readonly DriverViolationName[] = VIOLATION_FIELDS,
+): string[] {
   const source = isRecord(payload) ? payload : {};
   const list = Array.isArray(source.violations)
     ? source.violations
@@ -127,9 +155,15 @@ export function readViolations(payload: unknown): string[] {
       continue;
     }
     if (!isRecord(item)) continue;
-    for (const field of VIOLATION_FIELDS) {
-      const value = item[field];
-      if (typeof value !== 'string' || !IDENTIFIER.test(value)) continue;
+    // Сначала поля платформы, за ними общий список: другая сборка той же
+    // платформы или соседний шлюз вправе назвать нарушение `category`.
+    for (const { field, label } of fields === VIOLATION_FIELDS
+      ? fields
+      : [...fields, ...VIOLATION_FIELDS]) {
+      const raw = item[field];
+      if (typeof raw !== 'string') continue;
+      const value = label ? labelOf(raw) : raw;
+      if (!value || (!label && !IDENTIFIER.test(value))) continue;
       if (!names.includes(value)) names.push(value);
       break;
     }
@@ -137,13 +171,39 @@ export function readViolations(payload: unknown): string[] {
   return names;
 }
 
-/** Русская фраза из тела контура, если он её прислал. */
+/** Потолок фразы из `detail`: объяснение отказа, а не дамп. */
+const DETAIL_LIMIT = 300;
+
+/** Фраза из тела контура, если он её прислал. */
 function upstreamMessage(payload: unknown): string {
   if (!isRecord(payload)) return '';
   if (isRecord(payload.error) && typeof payload.error.message === 'string') {
     return payload.error.message.trim();
   }
-  return typeof payload.message === 'string' ? payload.message.trim() : '';
+  if (typeof payload.message === 'string') return payload.message.trim();
+  return fastApiDetail(payload.detail);
+}
+
+/**
+ * `detail` FastAPI: строка у `HTTPException`, список у ошибки схемы (422).
+ * Из элементов списка берутся только `loc` и `msg` — в `input` лежит сам
+ * запрос, и наружу он не уезжает.
+ */
+function fastApiDetail(detail: unknown): string {
+  if (typeof detail === 'string') return detail.trim().slice(0, DETAIL_LIMIT);
+  if (!Array.isArray(detail)) return '';
+  return detail
+    .filter(isRecord)
+    .filter((item) => typeof item.msg === 'string')
+    .slice(0, 3)
+    .map((item) => {
+      const loc = Array.isArray(item.loc)
+        ? item.loc.filter((part) => typeof part === 'string' && part !== 'body').join('.')
+        : '';
+      return loc ? `${loc}: ${String(item.msg)}` : String(item.msg);
+    })
+    .join('; ')
+    .slice(0, DETAIL_LIMIT);
 }
 
 /** Про что был запрос — этим уточняются отказы, зависящие от модели. */
@@ -160,6 +220,8 @@ export interface BridgeContext {
    * новом маршруте, он молча превращал бы 451 в общий отказ без перечня.
    */
   driverRows: readonly DriverStatusRow[];
+  /** Где у этой платформы лежит название нарушения (`driver.violationNames`). */
+  violationNames?: readonly DriverViolationName[];
 }
 
 /**
@@ -216,7 +278,7 @@ export function bridgeUpstreamStatus(
   // теле есть. Общего «на 451 читаем violations» тут нет намеренно: код чужого
   // шлюза может значить что угодно, а разбор чужого тела наугад — это способ
   // вынести наружу проверявшийся текст.
-  const violations = row?.violations ? readViolations(payload) : [];
+  const violations = row?.violations ? readViolations(payload, context.violationNames) : [];
   const detail = upstreamMessage(payload);
   const model = modelName(context.model);
 

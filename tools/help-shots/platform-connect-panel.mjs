@@ -1,43 +1,51 @@
 /**
- * Кадры путеводителя «Контур», сторона ПАНЕЛИ.
+ * Кадры путеводителя «Контур», сторона ПАНЕЛИ: все сценарии одной съёмкой.
  *
  * Панель поднимается СВОЯ, одноразовая: каталог конфигурации во временной
  * папке, свои порты, свой фронт. Рабочий стенд человека не трогается — ни его
  * контуры, ни его ассистент, ни его конфигурации CLI. Тот же приём, что в
  * `tools/qa/check-platform-foreign.mjs`.
  *
- * Контур — настоящий: локальный стенд платформа компании через `kubectl port-forward
- * svc/inst-api 5300:8080`. Ключ читается из `~/.agentdeck/enterprise-platform-credentials.env`
- * и не печатается: в кадре он закрыт набором, а в поле ввода он и так под точками.
+ * Сценарии идут путём человека, потому что каждый опирается на состояние,
+ * оставленное предыдущим: подключение → активация с пробным запросом →
+ * маршрут → правила → агент → режимы → сценарный контур → удаление.
+ * Живой контур — локальный стенд платформа компании через `kubectl port-forward
+ * svc/inst-api 5300:8080`, ключ из `~/.agentdeck/enterprise-platform-credentials.env`
+ * (не печатается). Сценарный — `tools/qa/stub-platform.mjs` (см.
+ * `platform-scripted-panel.mjs`, зачем он и что в нём подменено).
  *
- * Запуск: node tools/help-shots/platform-connect-panel.mjs
- * Переменные: ENTERPRISE_PLATFORM_API (адрес контура), GUIDE_PANEL_PORT, GUIDE_WEB_PORT.
+ * `finish()` зовётся только после ПОЛНОСТЬЮ удачной съёмки: он удаляет кадры
+ * своей стороны, не снятые этим прогоном, и упавшая на середине съёмка
+ * стёрла бы честные кадры прошлой.
+ *
+ * Запуск: node tools/help-shots/platform-connect-panel.mjs   (GUIDE_LANG=en — английские)
+ * Переменные: ENTERPRISE_PLATFORM_API, ENTERPRISE_PLATFORM_MODEL, GUIDE_PANEL_PORT, GUIDE_WEB_PORT, GUIDE_STUB_PORT,
+ * GUIDE_HEADED=1; отладка упавшей съёмки — GUIDE_KEEP, GUIDE_REUSE, GUIDE_STEPS (ниже).
  */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario } from './kit.mjs';
+import { applyShotLanguage, openScenario } from './kit.mjs';
+import { LANG } from './platform-shots-lib.mjs';
+import {
+  shootActivate,
+  shootAgent,
+  shootConnect,
+  shootDelete,
+  shootMedia,
+  shootRoute,
+  shootRules,
+} from './platform-stand-panel.mjs';
+import { shootScripted } from './platform-scripted-panel.mjs';
 
 const CONTOUR_URL = process.env.ENTERPRISE_PLATFORM_API ?? 'http://127.0.0.1:5300';
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5192);
 const WEB_PORT = Number(process.env.GUIDE_WEB_PORT ?? 8899);
 const PANEL = `http://127.0.0.1:${PANEL_PORT}`;
 const WEB = `http://127.0.0.1:${WEB_PORT}`;
-/** Идентификатор контура в панели: из него собран адрес шлюза. */
-const CONTOUR_ID = 'enterprise-platform-stand';
-/** Модель контура, которой доказывается связь. */
-const MODEL = process.env.ENTERPRISE_PLATFORM_MODEL ?? 'qwen2.5:0.5b';
-
-function contourKey() {
-  const file = join(homedir(), '.agentdeck', 'enterprise-platform-credentials.env');
-  const key = readFileSync(file, 'utf8')
-    .match(/^ENTERPRISE_PLATFORM_LOCAL_INST_KEY=(.+)$/m)?.[1]
-    ?.trim();
-  if (!key) throw new Error(`в ${file} нет ENTERPRISE_PLATFORM_LOCAL_INST_KEY`);
-  return key;
-}
+const SCENARIOS = ['connect', 'activate', 'route', 'rules', 'agent', 'media', 'scripted'];
 
 async function waitFor(url, seconds) {
   for (let i = 0; i < seconds * 2; i += 1) {
@@ -52,26 +60,86 @@ async function waitFor(url, seconds) {
   return false;
 }
 
-const scenario = openScenario('platform', 'connect');
+/**
+ * Отладка съёмки: `GUIDE_KEEP=1` оставляет панель жить после падения,
+ * `GUIDE_REUSE=1 GUIDE_STEPS=scripted,delete` продолжает на ней с упавшего
+ * шага. Кадры такой съёмки честные, но опись дочищается только у снятых ею
+ * сценариев.
+ */
+const KEEP = process.env.GUIDE_KEEP === '1';
+const REUSE = process.env.GUIDE_REUSE === '1';
+const ONLY = (process.env.GUIDE_STEPS ?? '').split(',').filter(Boolean);
+
 const started = [];
 const home = mkdtempSync(join(tmpdir(), 'cc-guide-'));
 mkdirSync(join(home, 'agentdeck'), { recursive: true });
 writeFileSync(join(home, 'settings.json'), '{}\n', 'utf8');
 writeFileSync(join(home, 'CLAUDE.md'), '# путеводитель\n', 'utf8');
+let ok = false;
 
 try {
+  if (!REUSE) await startPanel();
+  await applyShotLanguage(PANEL, LANG);
+  const shots = Object.fromEntries(SCENARIOS.map((id) => [id, openScenario('platform', id)]));
+  const browser = await chromium.launch({ headless: process.env.GUIDE_HEADED !== '1' });
+  const ran = new Set();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+    const ctx = { page, web: WEB, panel: PANEL, shots, contourUrl: CONTOUR_URL };
+    const steps = [
+      ['connect', shootConnect],
+      ['activate', shootActivate],
+      ['route', shootRoute],
+      ['rules', shootRules],
+      ['agent', shootAgent],
+      ['media', shootMedia],
+      ['scripted', shootScripted],
+      ['delete', shootDelete],
+    ];
+    for (const [name, step] of steps) {
+      if (ONLY.length && !ONLY.includes(name)) continue;
+      console.log(`— ${name}`);
+      try {
+        await step(ctx);
+      } catch (error) {
+        // Кадр места падения: без него причину пришлось бы угадывать по тексту ошибки.
+        const shot = join(tmpdir(), 'cc-guide-fail.png');
+        await page.screenshot({ path: shot }).catch(() => {});
+        console.log(`упало на «${name}», экран: ${shot}`);
+        throw error;
+      }
+      ran.add(name);
+    }
+  } finally {
+    await browser.close();
+  }
+  // Удаление дописывает кадр в «connect»: без съёмки самого «connect» его
+  // опись не дочищается, иначе кадры 09–17 считались бы неснятыми.
+  for (const id of SCENARIOS) if (ran.has(id)) shots[id].finish();
+  ok = true;
+} finally {
+  if (REUSE || ok || !KEEP) {
+    // При REUSE `started` пуст, а `home` — своя пустая папка этого запуска.
+    for (const child of started) child.kill();
+    rmSync(home, { recursive: true, force: true });
+  } else {
+    for (const child of started) child.unref();
+    console.log(`панель оставлена: ${WEB}, дом ${home}`);
+  }
+}
+
+async function startPanel() {
   const env = {
     ...process.env,
     CLAUDE_CONFIG_DIR: home,
     PORT: String(PANEL_PORT),
     WEB_PORT: String(WEB_PORT),
   };
-
   started.push(
     spawn(
       process.execPath,
       ['--experimental-strip-types', '--no-warnings', 'apps/server/src/index.ts'],
-      { env, stdio: 'ignore', shell: false },
+      { env, stdio: 'ignore', shell: false, detached: KEEP },
     ),
   );
   if (!(await waitFor(`${PANEL}/api/system`, 40)))
@@ -95,144 +163,10 @@ try {
         env: { ...env, API_PORT: String(PANEL_PORT), BROWSER: 'none' },
         stdio: 'ignore',
         shell: false,
+        detached: KEEP,
       },
     ),
   );
   if (!(await waitFor(WEB, 90))) throw new Error('фронт одноразовой панели не поднялся');
   console.log(`фронт на ${WEB}`);
-
-  await shootPanel();
-  scenario.finish();
-} finally {
-  for (const child of started) child.kill();
-  rmSync(home, { recursive: true, force: true });
-}
-
-async function shootPanel() {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
-  try {
-    await page.goto(`${WEB}/platform`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(3000);
-
-    // Свежая панель встречает мастером онбординга. Он ЗАКРЫВАЕТСЯ по-настоящему,
-    // а не перехватом ответа настроек: подменять на съёмке нечего — кадры
-    // должны быть тем, что человек увидит сам.
-    const skip = page.getByRole('button', { name: 'Пропустить' });
-    if (await skip.count()) {
-      await skip.first().click();
-      await page.waitForTimeout(1200);
-    }
-    await scenario.shot(page, '09-panel-empty');
-
-    // ── Мастер: адрес ──────────────────────────────────────────────────────
-    await page.getByRole('button', { name: 'Подключить контур' }).first().click();
-    await page.waitForTimeout(600);
-    await page.getByLabel('Название').fill('Платформа компании · стенд');
-    // Идентификатор собирается из названия, но собирается ЛАТИНИЦЕЙ: у русского
-    // имени он выходит пустым, и «Проверить связь» остаётся выключенной. В
-    // кадре это выглядело бы ошибкой панели, хотя поле просто ждёт ввода.
-    await page.getByLabel('Идентификатор').fill('enterprise-platform-stand');
-    await page.getByLabel('Адрес API').fill(CONTOUR_URL);
-    await page.waitForTimeout(400);
-    await scenario.shot(page, '10-wizard-address', { clip: '[role="dialog"]' });
-
-    await page.getByRole('button', { name: 'Проверить связь' }).click();
-    await page.waitForTimeout(2500);
-    await scenario.shot(page, '11-wizard-probe', { clip: '[role="dialog"]' });
-
-    // ── Мастер: ключ ───────────────────────────────────────────────────────
-    await page.getByRole('button', { name: 'Далее' }).click();
-    await page.waitForTimeout(500);
-    await page.getByLabel('Ключ контура').fill(contourKey());
-    await page.waitForTimeout(300);
-    await scenario.shot(page, '12-wizard-key', { clip: '[role="dialog"]' });
-
-    // ── Мастер: что умеет контур ───────────────────────────────────────────
-    await page.getByRole('button', { name: 'Далее' }).click();
-    await page.waitForTimeout(3000);
-    await scenario.shot(page, '13-wizard-capabilities', { clip: '[role="dialog"]' });
-
-    // ── Мастер: куда применять ─────────────────────────────────────────────
-    // Окно выше остальных: на последнем шаге под списком потребителей стоят
-    // поля, которые человеку и нужно заполнить, — режим на случай отказа,
-    // бюджет и день сброса. В окне 820px они уходят под срез, и кадр обещает
-    // меньше, чем шаг на самом деле просит.
-    await page.setViewportSize({ width: 1280, height: 1200 });
-    await page.getByRole('button', { name: 'Далее' }).click();
-    await page.waitForTimeout(1200);
-    await scenario.shot(page, '14-wizard-targets', { clip: '[role="dialog"]' });
-
-    // ── Мастер: шлюз ───────────────────────────────────────────────────────
-    // Пока шлюз не поднят, применять НЕ К ЧЕМУ: у всех потребителей стоит
-    // прочерк с этой самой причиной. Шаг нельзя пропустить в путеводителе —
-    // именно здесь человек чаще всего застревает.
-    const raise = page.getByRole('button', { name: 'Поднять шлюз' });
-    if (await raise.count()) {
-      await raise.first().click();
-      await page.waitForTimeout(3000);
-    }
-    await scenario.shot(page, '15-wizard-gateway', { clip: '[role="dialog"]' });
-
-    // Дальше кадры снимаются окном целиком — окно возвращается к общему размеру.
-    await page.setViewportSize({ width: 1280, height: 820 });
-    await page.getByRole('button', { name: 'Готово' }).click();
-    await page.waitForTimeout(3000);
-    await scenario.shot(page, '16-panel-card');
-
-    // ── Живой запрос через шлюз панели ─────────────────────────────────────
-    // Запрос нарочно в два символа: доказать связь, а не потратить бюджет.
-    // Идёт он ровно тем путём, которым пойдёт любой потребитель — через
-    // локальный шлюз панели, а не мимо него.
-    const gateway = await fetch(`${PANEL}/api/platforms/gateway`).then((r) => r.json());
-    // Адрес берётся у самого шлюза, а не собирается из настроек: занятый порт
-    // он отдаёт соседу и пишет в ответ тот, который ДОСТАЛСЯ. Пустая строка —
-    // не «адреса нет», а «шлюз не поднялся», и `??` её не ловит: падать надо
-    // здесь, с ответом шлюза в руках, а не в fetch по обрывку URL.
-    const address = gateway?.status?.address || '';
-    if (!address)
-      throw new Error(`шлюз панели не поднят: ${JSON.stringify(gateway).slice(0, 300)}`);
-    const answer = await fetch(`${address}/${CONTOUR_ID}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: '2+2=' }],
-        stream: true,
-        max_tokens: 24,
-      }),
-    });
-    const body = await answer.text();
-    const said = body
-      .split('\n')
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => {
-        try {
-          return JSON.parse(line.slice(5))?.choices?.[0]?.delta?.content ?? '';
-        } catch {
-          return '';
-        }
-      })
-      .join('');
-    console.log(
-      `  живой запрос через шлюз: ${answer.status}, ответ ${JSON.stringify(said.slice(0, 60))}`,
-    );
-    if (!answer.ok || !said.trim()) throw new Error('контур не ответил через шлюз панели');
-
-    // ── Что видно после живого запроса ─────────────────────────────────────
-    await page.goto(`${WEB}/platform`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(3500);
-    await scenario.shot(page, '17-panel-spend', { clip: '[data-testid="platform-card"], main' });
-
-    // ── Как отключить ──────────────────────────────────────────────────────
-    // Снимается ДИАЛОГ удаления, а не страница ещё раз: он один объясняет обе
-    // развилки — применение снимается перед удалением, а файл, изменённый
-    // человеком после применения, остаётся и будет назван. Кадр целой страницы
-    // здесь повторял бы кадр 16 слово в слово.
-    await page.getByRole('button', { name: 'Удалить', exact: true }).first().click();
-    await page.waitForTimeout(1000);
-    await scenario.shot(page, '18-panel-delete', { clip: '[role="dialog"]' });
-  } finally {
-    await browser.close();
-  }
 }

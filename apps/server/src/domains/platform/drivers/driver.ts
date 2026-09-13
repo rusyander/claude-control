@@ -1,8 +1,10 @@
 import type {
   PlatformCapabilityFinding,
   PlatformDriverId,
+  PlatformExhaustedScope,
   PlatformLimits,
   PlatformModelInfo,
+  PlatformRuleField,
 } from '@agentdeck/contracts';
 import type { CompromiseId } from '@agentdeck/contracts/compromises';
 
@@ -27,7 +29,9 @@ import type { CompromiseId } from '@agentdeck/contracts/compromises';
 export type DriverFieldFate = 'mapped' | 'renamed' | 'lossy' | 'dropped';
 
 /** Чем ЭТОТ контур отличается от общей судьбы поля. */
-export interface DriverRequestField {
+export type DriverRequestField = DriverFieldLoss | DriverFieldRename;
+
+interface DriverFieldLoss {
   /**
    * В каком диалекте назван `field`. `anthropic` — строка общей таблицы
    * перевода (её судьба и текст заменяются); `openai` — поле, которое контур
@@ -39,7 +43,22 @@ export interface DriverRequestField {
    */
   dialect: 'anthropic' | 'openai';
   field: string;
-  fate: DriverFieldFate;
+  fate: Exclude<DriverFieldFate, 'renamed'>;
+  note: string;
+}
+
+/**
+ * Поле, которое платформа принимает под другим именем. Только диалект OpenAI:
+ * переименование применяется к телу, которое уходит наверх, а оно всегда в нём.
+ * Судьба без имени назначения была бы словом манифеста без кода за ним — поле
+ * уехало бы под старым именем, и шлюз, ждущий новое, молча его не увидел бы.
+ */
+interface DriverFieldRename {
+  dialect: 'openai';
+  field: string;
+  fate: 'renamed';
+  /** Имя, под которым поле уходит наверх. */
+  to: string;
   note: string;
 }
 
@@ -55,8 +74,16 @@ export type VendorFrameKind =
   | 'guardrails'
   | 'anonymization'
   /**
+   * Платформа прислала ИТОГОВЫЙ текст ответа, которым надо заменить уже
+   * отданный потоком: её проверки вывода поправили текст после того, как он
+   * ушёл, либо поток разошёлся с проверенным и замер на полуслове. Отдельный
+   * вид, а не «незнакомый кадр»: выброшенный, он оставлял клиенту обрезок
+   * ответа под видом целого.
+   */
+  | 'replacement'
+  /**
    * Контур сам сообщил, что инструменты клиента до модели не дошли. Отдельный
-   * вид, а не «незнакомый кадр»: это подтверждение `toolsPassthrough: false`
+   * вид, а не «незнакомый кадр»: это подтверждение `clientTools: 'shim'`
    * самой платформой, и молча выброшенным оно объясняло бы человеку пустой
    * ответ агента как каприз модели.
    */
@@ -91,6 +118,8 @@ export interface VendorFrame {
    * читающий кадр наоборот, обязан перевернуть карту у себя.
    */
   mapping?: Record<string, string>;
+  /** Итоговый текст ответа целиком (`kind === 'replacement'`). */
+  text?: string;
 }
 
 /**
@@ -124,14 +153,119 @@ export interface DriverControl {
   /** `request` — задаётся в запросе; `observed` — только видно в ответе. */
   kind: 'request' | 'observed';
   detail: string;
+  /**
+   * Настройка панели, которой это правило правится, и ОДНОВРЕМЕННО разрешение
+   * класть поле `id` в запрос (Т7). Ручка без неё остаётся рассказом: контур,
+   * не объявивший правило, не получит его ни при каком состоянии настройки —
+   * даже если значение осталось от другого контура.
+   */
+  field?: PlatformRuleField;
+  /**
+   * Имя поля НА ПРОВОДЕ, если оно не совпадает с `id`. `id` — идентификатор
+   * строки: им же пользуются матрица конфликтов и `declared()`. Драйвер, назвавший
+   * ручку по-человечески, без этого поля отправил бы имя строки наверх (ревью Т7, m6).
+   * Точка в имени — вложенное поле (`chat_template_kwargs.enable_thinking`):
+   * объект клиента по этому пути дополняется, а не затирается.
+   */
+  wireField?: string;
+  /**
+   * Чем ПУСТОЕ значение правила уезжает наверх. Пустой список инструментов — не
+   * молчание, а выключение: контур, ничего не получивший, берёт свои по
+   * умолчанию. Знание о том, каким полем это сказать, принадлежит манифесту —
+   * общий модуль правил имён контура не знает (ревью Т7, M2).
+   */
+  /** `field` — тоже путь на проводе, с точками для вложенного поля. */
+  whenEmpty?: { field: string; value: unknown };
+  /**
+   * Допустимые значения, когда их набор конечен (`enterprise-platform_tool_mode`). Пусто —
+   * значение произвольное (имя пресета) или булево.
+   */
+  options?: readonly string[];
+  /**
+   * Значения, которые платформа отвергает вместе со `stream: true`. Ход с
+   * таким значением шлюз шлёт наверх цельным запросом, а клиенту поток
+   * собирает сам.
+   */
+  streamless?: readonly string[];
+  /**
+   * Где правилом распоряжаются, если не в панели. Только для `observed`: строка
+   * «включает владелец контура» и есть ответ на «почему тут нет галочки».
+   */
+  where?: string;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Карта подмены из кадра платформы: только пары «метка → значение».
+ *
+ * Форм две, и обе встречаются у одной и той же платформы: объект `{метка:
+ * значение}` и список `[{placeholder, value}]` (так платформа компании отдаёт сущности,
+ * видимые в ответе). Список раньше отбрасывался целиком — карта оказывалась
+ * пустой ровно там, где она была. Вложенный объект или число в значении — не
+ * ошибка формата, а причина НЕ подставлять: `[object Object]` в аргументе
+ * вызова хуже неразвёрнутой метки, её хотя бы видно.
+ */
+export function readSubstitutionMap(value: unknown): Record<string, string> | undefined {
+  const map: Record<string, string> = {};
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (!isPlainRecord(item)) continue;
+      const alias = item.placeholder;
+      const original = item.value;
+      if (typeof alias === 'string' && alias && typeof original === 'string') map[alias] = original;
+    }
+  } else if (isPlainRecord(value)) {
+    for (const [alias, original] of Object.entries(value)) {
+      if (typeof original === 'string' && alias) map[alias] = original;
+    }
+  }
+  return Object.keys(map).length > 0 ? map : undefined;
+}
+
+/** Строка разбора отказа 402 (см. `budgetRefusals`). */
+export interface DriverBudgetRefusal {
+  message: RegExp;
+  scope: PlatformExhaustedScope;
+}
+
+/** Поле названия в элементе перечня нарушений (см. `violationNames`). */
+export interface DriverViolationName {
+  field: string;
+  label?: boolean;
+}
+
+/** Заголовок ключа: `authorization` + `Bearer` у обоих драйверов сегодня. */
+export interface DriverAuth {
+  header: string;
+  /** Слово перед ключом; пусто — ключ уходит голым. */
+  scheme: string;
+}
+
+/** Как инструменты клиента доходят до модели (см. `clientTools`). */
+export type DriverClientTools = 'native' | 'shim';
+
+/** Поверхность агентов контура (см. `agents`). */
+export interface DriverAgents {
+  /** Вызов агента: `POST`, тело `{agent, messages, session?}`. */
+  completions: string;
+  /** Сессии: `GET`/`DELETE <sessions>/<id>?agent=`. */
+  sessions: string;
 }
 
 /** Откуда у контура берутся картинки. */
 export type DriverImages =
   /** Частью ответа модели `image_generation` в обычном `chat/completions`. */
   | 'chat-part'
-  /** Отдельной ручкой OpenAI-вида `/v1/images/generations`. */
-  | 'images-api'
+  /**
+   * Отдельной ручкой OpenAI-вида. Путь ОБЪЯВЛЕН, относительно версии API, как
+   * и остальные ручки манифеста (`images/generations`): панель его не угадывает,
+   * потому что у шлюзов он разный, а угаданный адрес дал бы 404 после того, как
+   * человек уже описал картинку.
+   */
+  | { api: string }
   /** Ниоткуда: пункт в панели недоступен с названной причиной. */
   | 'none';
 
@@ -151,12 +285,11 @@ export interface PlatformDriver {
   /** Как называть контур человеку в тексте отказа. */
   title: string;
   /**
-   * Адрес списка моделей. Базовый адрес берётся как есть: панель дописывает
-   * только версию, и то лишь когда её в адресе нет (см. `versionedUrl`).
+   * Заголовок ключа по умолчанию. Адрес и сами заголовки собирает
+   * `platform/transport.ts` — одна сборка на пробу, шлюз и картинки; человек
+   * перебивает этот заголовок настройкой транспорта (DRV-04/05).
    */
-  modelsUrl(baseUrl: string): string;
-  /** Заголовки запроса. Ключ уходит ТОЛЬКО сюда и никуда больше. */
-  headers(token: string | undefined): Record<string, string>;
+  auth: DriverAuth;
   /** Смысл удачного ответа: что за модели и что из этого следует. */
   read(payload: unknown): DriverReading;
   /**
@@ -196,18 +329,100 @@ export interface PlatformDriver {
   /** Отказы, которые умеет объяснить только эта платформа. */
   statusRows: DriverStatusRow[];
 
+  /**
+   * Где в элементе перечня нарушений лежит его название — по порядку
+   * предпочтения. Пусто — общий белый список (`category`, `name`…).
+   *
+   * `label` — поле пишет администратор платформы (название правила), а не
+   * проверявшийся текст: ему разрешена короткая проза. Всё остальное
+   * принимается только идентификатором, иначе наружу уехал бы сам текст.
+   */
+  violationNames?: readonly DriverViolationName[];
+
+  /**
+   * Как тело 402 называет, ЧТО кончилось. Сверяется `error.message`; группа 1,
+   * если есть, — название лимита. Пусто или не совпало — панель говорит «лимит
+   * расхода» и не угадывает: один и тот же код у разных платформ значит
+   * бюджет ключа, пользователя или всей организации.
+   */
+  budgetRefusals?: readonly DriverBudgetRefusal[];
+
+  /**
+   * Вид меток, которыми платформа САМА подменяет найденные данные (`[EMAIL_1]`).
+   * Пусто — своей подмены у платформы нет.
+   *
+   * Нужен дважды, и оба раза из-за того, что карту подмены платформа клиенту API
+   * не отдаёт — возвращает значения в поток сама:
+   * - наша метка не должна совпасть с её меткой. Платформа разворачивает свои
+   *   метки обычной заменой строки по всему ответу, и `[EMAIL_1]` панели она
+   *   переписала бы в СВОЁ значение — клиент получил бы чужой адрес молча
+   *   (замер на стенде 13.09.2026);
+   * - метка этого вида, оставшаяся в аргументе вызова, когда платформа сказала,
+   *   что подменяла, — это значение, которое никто не вернул, и в файл оно не
+   *   уходит (Р11).
+   */
+  placeholderPattern?: RegExp;
+
   /** Откуда берутся картинки; `none` — пункт недоступен с причиной. */
   images: DriverImages;
 
   /**
-   * Контур принимает описания инструментов клиента как есть. `false` означает,
-   * что список инструментов до модели не доходит, и «агент через контур»
-   * возможен только прослойкой (Т5).
+   * Через сколько секунд платформа сама рвёт НЕ-потоковый вызов. Шлюз ждёт
+   * цельный ответ столько плюс запас на дорогу: меньше — панель обрывала бы
+   * законный длинный ход, больше — держала бы клиента на линии после того, как
+   * контур уже сдался. Не объявлено — ждём потолок панели
+   * (`UPSTREAM_WHOLE_BODY_TIMEOUT_MS`), а не чужое число.
    */
-  toolsPassthrough: boolean;
+  nonStreamTimeoutSec?: number;
+
+  /**
+   * Через сколько секунд платформа рвёт ЛЮБОЙ ответ, поток тоже (аудит MD-04).
+   * Отдельно от `nonStreamTimeoutSec`: у большинства шлюзов поток живёт сколько
+   * угодно, и одно число на оба случая приписало бы им чужой обрыв. Объявлен —
+   * поток, оборвавшийся на этой секунде, назван потолком платформы, а не «ответ
+   * оборвался»: иначе человек идёт чинить сеть, а сократить надо сам ход.
+   */
+  responseCeilingSec?: number;
+
+  /**
+   * Родная ручка диалекта Anthropic, путь относительно версии (`messages`).
+   * Объявлена — клиент Anthropic идёт к ней без моста, и размышления, метки
+   * кэша и подписанные блоки доезжают целыми (`gateway/anthropic-native.ts`).
+   * Не объявлена — мост в OpenAI с названными потерями: ручку не угадывают, у
+   * шлюза, её не имеющего, угаданный путь дал бы 404 на каждом ходе.
+   */
+  anthropic?: { messages: string };
+
+  /**
+   * Как инструменты клиента доходят до модели:
+   * - `native` — полем `tools` диалекта OpenAI. Мост переводит схемы, выбор,
+   *   вызовы и их результаты, и агент работает руками без прослойки;
+   * - `shim` — поля для них у платформы нет, и «агент через контур» возможен
+   *   только прослойкой (Т5).
+   *
+   * Решает конвейер, а не только документирует: поле, которое никто не читал,
+   * объявляло `native` у совместимого шлюза, пока мост выбрасывал инструменты у
+   * всех (аудит DRV-01).
+   */
+  clientTools: DriverClientTools;
+
+  /**
+   * Поля тела, которыми включённая прослойка гасит инструменты САМОЙ платформы.
+   * Нет — своих инструментов у платформы нет, и прослойка только снимает
+   * `tool_choice` и `parallel_tool_calls`: без `tools` строгий шлюз отвергает оба.
+   */
+  shimRequestFields?: Readonly<Record<string, unknown>>;
 
   /** Контур принимает усилие рассуждения (`reasoning_effort` и родня). */
   effort: boolean;
+
+  /**
+   * Опубликованные агенты: пути относительно версии API. Нет — у контура этой
+   * поверхности нет, и маршруты агентов отказывают до сети, а карточки агентов
+   * на экране нет вовсе (аудит DRV-12: платформа компанииья форма `agent/completions`
+   * уходила любому шлюзу и возвращалась человеку «проверьте идентификатор»).
+   */
+  agents?: DriverAgents;
 
   /** Ручки контура: что можно задать, а что только видно (Р5). */
   controls: DriverControl[];
@@ -220,124 +435,44 @@ export interface PlatformDriver {
 }
 
 /**
- * Дописать `/v1`, если его нет в адресе.
- *
- * Два вида адресов встречаются одинаково часто: корень API
- * (`https://api.example.ru`) и адрес вместе с версией
- * (`http://127.0.0.1:11434/v1`, как этого ждёт `OPENAI_BASE_URL`). Молча
- * приклеенная вторая `/v1` даёт 404, который человек читает как «контур не
- * работает», — поэтому версию дописываем ТОЛЬКО когда её в адресе нет.
+ * Каталог моделей читается одним модулем на все драйверы и шлюзы — таблицами
+ * правил, а не ветками по шлюзу (DRV-06). Реэкспорт держит прежние пути импорта.
  */
-export function versionedUrl(baseUrl: string, path: string): string {
-  const base = baseUrl.trim().replace(/\/+$/, '');
-  return /\/v\d+[a-z]*$/.test(base) ? `${base}/${path}` : `${base}/v1/${path}`;
-}
+export { catalogItems, readPlatformModels } from './catalog.ts';
 
 /**
- * Модели из ответа OpenAI-формы: `{ data: [{ id, … }] }`.
+ * Строка возможности «рисование» по каталогу ключа — ОДНА на все драйверы.
  *
- * Читается ВСЁ, что контур объявил, и НИЧЕГО сверх того. Поле, которого в ответе
- * нет, остаётся пустым и означает «контур молчит»: вывести зрение модели из
- * подстроки `vision` в её имени панель не станет ни за какие удобства — это и
- * есть инвариант 13, и цена ошибки тут не косметическая (человек выберет модель
- * под картинки, а она их не примет).
- *
- * Форма полей у платформ разная, поэтому каждое ищется по нескольким именам —
- * но именно ищется, а не угадывается: не нашли ни одного, значит не объявлено.
+ * Второй такой расчёт разошёлся бы там, где человек этого не проверит: пункт
+ * «Картинка» заперт, а модель с флагом в списке есть. Ответов три, а не два, и
+ * третий — молчание: контур не объявил флаг ни у одной модели. Показывать
+ * молчание отказом нельзя (инвариант 13) — человек пойдёт просить у владельца
+ * ключа доступ, которого, возможно, просить не нужно.
  */
-export function readPlatformModels(payload: unknown): PlatformModelInfo[] {
-  if (!payload || typeof payload !== 'object') return [];
-  const data = (payload as { data?: unknown }).data;
-  if (!Array.isArray(data)) return [];
+export function imageCapability(models: PlatformModelInfo[]): PlatformCapabilityFinding {
+  const drawing = models.filter((model) => model.imageGeneration === true).length;
+  const declared = models.some((model) => model.imageGeneration !== undefined);
 
-  const models: PlatformModelInfo[] = [];
-  for (const item of data) {
-    const model = readOneModel(item);
-    if (model) models.push(model);
-  }
-  return models;
-}
-
-/** Имена полей вида модели — от точного к общему. */
-const KIND_FIELDS = ['kind', 'type', 'mode', 'model_type'];
-/** Где платформы держат окно контекста. */
-const CONTEXT_FIELDS = [
-  'context_length',
-  'context_window',
-  'max_context_tokens',
-  'max_input_tokens',
-];
-/** Где платформы держат потолок вывода. */
-const OUTPUT_FIELDS = ['max_output_tokens', 'max_tokens', 'output_limit'];
-
-/** Флаги возможностей: наше поле → имена, под которыми его публикуют. */
-const FLAG_FIELDS: Array<[keyof PlatformModelInfo, string[]]> = [
-  ['vision', ['supports_vision', 'vision']],
-  ['functionCalling', ['supports_function_calling', 'function_calling', 'supports_tools']],
-  ['jsonMode', ['supports_json_mode', 'json_mode', 'supports_response_schema']],
-];
-
-function readOneModel(item: unknown): PlatformModelInfo | undefined {
-  if (!item || typeof item !== 'object') return undefined;
-  const raw = item as Record<string, unknown>;
-
-  const id = typeof raw.id === 'string' ? raw.id.trim() : '';
-  if (!id) return undefined;
-
-  const model: PlatformModelInfo = { id };
-
-  // Часть платформ кладёт возможности в отдельный объект, часть — рядом с id.
-  // Смотрим в оба места, но по одним и тем же именам полей.
-  const nested = raw.capabilities && typeof raw.capabilities === 'object' ? raw.capabilities : {};
-  const fields = { ...(nested as Record<string, unknown>), ...raw };
-
-  const name = pickString(fields, ['name', 'display_name']);
-  if (name && name !== id) model.name = name;
-
-  const kind = pickString(fields, KIND_FIELDS);
-  if (kind) model.kind = kind.toLowerCase();
-
-  const ownedBy = pickString(fields, ['owned_by', 'owner', 'provider']);
-  if (ownedBy) model.ownedBy = ownedBy;
-
-  const context = pickNumber(fields, CONTEXT_FIELDS);
-  if (context !== undefined) model.contextLimit = context;
-
-  const output = pickNumber(fields, OUTPUT_FIELDS);
-  if (output !== undefined) model.outputLimit = output;
-
-  for (const [field, names] of FLAG_FIELDS) {
-    const flag = pickBoolean(fields, names);
-    // Именно `!== undefined`: объявленное `false` — это ЗНАНИЕ («модель картинки
-    // не принимает»), и терять его, схлопывая в «не объявлено», нельзя.
-    if (flag !== undefined) Object.assign(model, { [field]: flag });
+  if (!declared) {
+    return {
+      id: 'image-generation',
+      state: models.length > 0 ? 'unknown' : 'no',
+      detail:
+        models.length > 0
+          ? 'флаг рисования не объявлен ни одной моделью'
+          : 'моделей ключу не выдано',
+      evidence: 'answer',
+      compromise: 'media-by-capability',
+    };
   }
 
-  return model;
-}
-
-function pickString(fields: Record<string, unknown>, names: string[]): string | undefined {
-  for (const name of names) {
-    const value = fields[name];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-  }
-  return undefined;
-}
-
-function pickNumber(fields: Record<string, unknown>, names: string[]): number | undefined {
-  for (const name of names) {
-    const value = fields[name];
-    // Ноль и отрицательное — это не лимит, а мусор в ответе: показывать «окно
-    // контекста: 0» хуже, чем не показывать ничего.
-    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
-  }
-  return undefined;
-}
-
-function pickBoolean(fields: Record<string, unknown>, names: string[]): boolean | undefined {
-  for (const name of names) {
-    const value = fields[name];
-    if (typeof value === 'boolean') return value;
-  }
-  return undefined;
+  return {
+    id: 'image-generation',
+    state: drawing > 0 ? 'yes' : 'no',
+    detail:
+      drawing > 0 ? 'модели с флагом рисования в списке ключа' : 'рисующих моделей ключу не выдано',
+    evidence: 'answer',
+    compromise: 'media-by-capability',
+    ...(drawing > 0 ? { count: drawing } : {}),
+  };
 }

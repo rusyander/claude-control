@@ -8,6 +8,9 @@ import type {
 import type { PlatformFetch } from './ca-fetch.ts';
 import { foreignTail } from './redact.ts';
 import { callUpstream, UpstreamError } from './gateway/upstream.ts';
+import { driverOf } from './drivers/index.ts';
+import type { DriverAgents } from './drivers/driver.ts';
+import { agentsNotDeclared } from './errors.ts';
 
 /**
  * Опубликованные агенты контура: спросить агента компании из панели.
@@ -66,11 +69,23 @@ export interface AgentSessionOptions {
 }
 
 /**
- * Спросить агента. Возвращает ответ ЛЮБЫМ исходом и не бросает: недоступный
- * агент — это карточка с причиной, а не сбой панели (инвариант 7).
+ * Пути агентов из манифеста драйвера. Тип контура их не объявил — отказ ДО
+ * сети (`agents_not_declared`): это свойство типа, а не исход вызова.
+ */
+export function requireAgents(platform: Platform): DriverAgents {
+  const agents = driverOf(platform).agents;
+  if (!agents) throw agentsNotDeclared(platform.title);
+  return agents;
+}
+
+/**
+ * Спросить агента. Исход контура возвращает ЛЮБЫМ и не бросает: недоступный
+ * агент — это карточка с причиной, а не сбой панели (инвариант 7). Бросает
+ * только тип контура без агентов — до сети.
  */
 export async function askAgent(options: AskAgentOptions): Promise<PlatformAgentAnswer> {
   const { platform, token, agentId, messages, sessionId } = options;
+  const paths = requireAgents(platform);
   const checkedAt = (options.now ?? (() => new Date()))().toISOString();
   const base = { agentId, text: '', checkedAt, ...(sessionId ? { sessionId } : {}) };
 
@@ -82,7 +97,7 @@ export async function askAgent(options: AskAgentOptions): Promise<PlatformAgentA
     response = await callUpstream({
       platform,
       token,
-      path: 'agent/completions',
+      path: paths.completions,
       // Тело ровно из тех полей, которые контур принимает. `model`,
       // `temperature`, `stream` и прочие привычки соседней ручки он отвергает
       // четырёхсотым: настройки модели задаёт автор агента, а не зовущий.
@@ -220,12 +235,13 @@ async function sessionRequest(
   method: string,
   query: string,
 ): Promise<{ text: string } | { error: string }> {
+  const paths = requireAgents(options.platform);
   let response: Response;
   try {
     response = await callUpstream({
       platform: options.platform,
       token: options.token,
-      path: `agent/sessions/${encodeURIComponent(options.sessionId)}${query}`,
+      path: `${paths.sessions}/${encodeURIComponent(options.sessionId)}${query}`,
       method,
       accept: 'application/json',
       headersTimeoutMs: SESSION_TIMEOUT_MS,
@@ -307,10 +323,10 @@ function describeRefusal(
     };
   }
   if (status === 402) {
-    // Не бюджет ключа: 402 приходит с лимитов пользователя, команды и инстанса.
+    // `handler_agent_api.go:447`: на маршруте агентов 402 — бюджет ключа.
     return {
       outcome: 'rejected',
-      detail: `Контур отказал по лимиту расхода (402) — это не бюджет ключа.${suffix}`,
+      detail: `Исчерпан бюджет ключа (402).${suffix}`,
     };
   }
   if (status === 404) {

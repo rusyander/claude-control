@@ -225,4 +225,30 @@ describe('цитата протокола не выполняется', () => {
     expect(shape(events)).toContain('«Write:{"file_path":"a.ts"}»');
     expect(flaws).toEqual(['вызов внутри блока кода не выполняется']);
   });
+
+  it('забор из тильд — такой же блок кода, и цитата в нём не выполняется', () => {
+    // CommonMark знает два забора. Счёт одних кавычек пропускал `~~~`, и цитата
+    // вызова в нём выполнялась (враждебный аудит контура, 13.09.2026).
+    const answer =
+      'Не запускай это:\n~~~\n<tool_call>{"name":"Write","arguments":{"file_path":"rm.sh"}}</tool_call>\n~~~\n';
+    const { events, flaws } = run([answer]);
+    expect(shape(events)).toBe(answer);
+    expect(flaws).toEqual(['вызов внутри блока кода не выполняется']);
+  });
+
+  it('тройные кавычки посреди прозы не открывают блок и не гасят настоящий вызов', () => {
+    const answer =
+      'Блок кода начинается строкой из ``` — ниже не он. <tool_call>{"name":"Write","arguments":{"file_path":"a.ts"}}</tool_call>';
+    const { events, flaws } = run([answer]);
+    expect(shape(events)).toContain('«Write:{"file_path":"a.ts"}»');
+    expect(flaws).toEqual([]);
+  });
+
+  it('забор закрывается только своим знаком и не короче открывшего', () => {
+    // Внутри блока из четырёх кавычек три кавычки — это текст блока, а не его конец.
+    const answer =
+      '````\n```\n<tool_call>{"name":"Write","arguments":{"file_path":"a.ts"}}</tool_call>\n````\n';
+    const { flaws } = run([answer]);
+    expect(flaws).toEqual(['вызов внутри блока кода не выполняется']);
+  });
 });

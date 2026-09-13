@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import type { CompromiseView } from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
-import { Typography } from '@shared/ui/typography';
+import { CodeText, Typography } from '@shared/ui/typography';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { LoadErrorCard } from '@shared/ui/load-error';
 import { formatDate } from '@shared/lib/format';
@@ -76,12 +76,15 @@ function CompromiseRow({ item, locale }: { item: CompromiseView; locale: string 
           )}
         </Stack>
 
-        <Typography variant="body-sm">{t(`compromise.items.${item.id}.how`)}</Typography>
+        <Typography variant="body-sm">
+          <CodeText text={t(`compromise.items.${item.id}.how`)} />
+        </Typography>
         <Typography variant="body-sm" color="muted">
-          {t(`compromise.items.${item.id}.why`)}
+          <CodeText text={t(`compromise.items.${item.id}.why`)} />
         </Typography>
         <Typography variant="caption" color="muted">
-          {t('compromise.revisit')}: {t(`compromise.items.${item.id}.revisitWhen`)}
+          {t('compromise.revisit')}:{' '}
+          <CodeText text={t(`compromise.items.${item.id}.revisitWhen`)} />
         </Typography>
         {item.uiHidden && (
           <Typography variant="caption" color="muted">

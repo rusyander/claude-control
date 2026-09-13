@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import type { PlatformToolShimReport } from '@agentdeck/contracts';
-import { shimEmptyKind, showsToolShim } from './toolShimView';
+import { shimEmptyKind, showsToolShim, showsToolsFact } from './toolShimView';
+
+describe('showsToolsFact', () => {
+  it('раздел, где все контуры получают инструменты полем, факта о тексте не показывает', () => {
+    expect(showsToolsFact(['native'])).toBe(false);
+    expect(showsToolsFact(['native', 'shim'])).toBe(true);
+    expect(showsToolsFact(['none'])).toBe(true);
+  });
+
+  it('до первого контура факт объясняет обычную цену раздела', () => {
+    expect(showsToolsFact([])).toBe(true);
+  });
+});
 
 /**
  * Решения карточки «Инструменты через контур».

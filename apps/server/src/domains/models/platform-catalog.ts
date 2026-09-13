@@ -27,7 +27,7 @@ import type { ModelInfo, PlatformHealthRecord, PlatformModelInfo } from '@agentd
  * контур: у моделей одного ключа вендоры разные, и сваливать их в одну кучу
  * значило бы потерять единственный признак, по которому человек их различает.
  */
-// compromise: pricing-local — контур цен не публикует, каталог приходит без них, и деньги считаются по своему справочнику
+// compromise: pricing-local — платформа компании цен не публикует, каталог приходит без них, и деньги считаются по своему справочнику; опубликованную шлюзом цену читает drivers/catalog.ts
 export function platformModels(health: PlatformHealthRecord, platformId: string): ModelInfo[] {
   const live = health.models.map((model) => toModelInfo(model, platformId));
   const retired = (health.retired ?? []).map((model) => toModelInfo(model, platformId));
@@ -56,6 +56,7 @@ function toModelInfo(model: PlatformModelInfo, platformId: string): ModelInfo {
   if (model.vision !== undefined) info.vision = model.vision;
   if (model.functionCalling !== undefined) info.functionCalling = model.functionCalling;
   if (model.jsonMode !== undefined) info.jsonMode = model.jsonMode;
+  if (model.reasoning !== undefined) info.reasoning = model.reasoning;
   if (model.retired) info.retired = true;
   if (model.lastSeenAt) info.lastSeenAt = model.lastSeenAt;
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -13,7 +14,9 @@ import {
   reconcileActivePlatform,
   type ContourActivationDeps,
 } from './activation.ts';
-import { writePlatforms, writeToken } from './store.ts';
+import { checkPlatform } from './check.ts';
+import { readPlatforms, removePlatform, writePlatforms, writeToken } from './store.ts';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
  * Активация контура — транзакция, а не флаг (Р3, инвариант 1).
@@ -49,7 +52,12 @@ const BASE: Platform = {
   budgetSince: '',
   toolShim: true,
   contourPrompt: true,
+  defaultModel: '',
+  consumerModels: {},
+  modelMap: {},
+  rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
   caCertPath: '',
+  transport: defaultPlatformTransport(),
 };
 
 const SECOND: Platform = { ...BASE, id: 'second', title: 'Второй контур', enabled: false };
@@ -203,6 +211,69 @@ describe('активен ровно один контур', () => {
 
     await expect(activatePlatform(deps(), 'нет-такого')).rejects.toThrow();
     expect(store.getSettings().activePlatformId).toBe(BASE.id);
+  });
+});
+
+/**
+ * Аудит DRV-10. Проба идёт до 15 с, а писала она контур, прочитанный ДО неё,
+ * целиком: активация другого контура, правка названия или удаление, случившиеся
+ * за это время, стирались, и включёнными оказывались два контура сразу.
+ */
+describe('проба не стирает то, что случилось, пока она шла', () => {
+  /** Транспорт, который отвечает только по команде — окно гонки под контролем теста. */
+  const held = (): { fetch: PlatformFetch; release: () => void } => {
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return { fetch: async (...args) => (await gate, modelsOk(...args)), release };
+  };
+
+  it('проверка, начатая до активации другого контура, не включает свой обратно', async () => {
+    await activatePlatform(deps(), BASE.id);
+    const slow = held();
+    const check = checkPlatform(store, appData, BASE.id, slow.fetch);
+
+    await activatePlatform(deps(), SECOND.id);
+    expect(enabledIds()).toEqual([SECOND.id]);
+
+    slow.release();
+    await check;
+    expect(enabledIds()).toEqual([SECOND.id]);
+    expect(store.getSettings().activePlatformId).toBe(SECOND.id);
+  });
+
+  it('правка названия во время пробы переживает её, а возможности записаны', async () => {
+    const slow = held();
+    const check = checkPlatform(store, appData, BASE.id, slow.fetch);
+    writePlatforms(store, [{ ...BASE, title: 'Переименован во время пробы' }]);
+
+    slow.release();
+    await check;
+    const after = readPlatforms(store).find((item) => item.id === BASE.id);
+    expect(after?.title).toBe('Переименован во время пробы');
+    expect(after?.capabilities).toContain('models');
+  });
+
+  it('контур, удалённый во время пробы, не воскресает', async () => {
+    const slow = held();
+    const check = checkPlatform(store, appData, SECOND.id, slow.fetch);
+    removePlatform(store, appData, SECOND.id);
+
+    slow.release();
+    await check;
+    expect(readPlatforms(store).map((item) => item.id)).toEqual([BASE.id]);
+  });
+
+  it('в возможности контура ложится подтверждённое ответом, а не известное заранее (аудит DRV-19)', async () => {
+    // Поле обещает «что панель подтвердила пробой»; свойства платформы, которые
+    // драйвер знает наперёд (гардрейлы, знания через владельца), пробой не
+    // подтверждаются ничем и записанными туда выдавали бы себя за проверенные.
+    await checkPlatform(store, appData, BASE.id, modelsOk);
+    const after = readPlatforms(store).find((item) => item.id === BASE.id);
+    expect(after?.capabilities).toContain('models');
+    expect(after?.capabilities).not.toContain('guardrails');
+    expect(after?.capabilities).not.toContain('knowledge');
   });
 });
 

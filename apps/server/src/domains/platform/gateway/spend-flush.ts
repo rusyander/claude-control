@@ -1,7 +1,7 @@
-import type { PlatformSpendRecord } from '@agentdeck/contracts';
+import type { PlatformExhaustedScope, PlatformSpendRecord } from '@agentdeck/contracts';
 import type { AppStore } from '../../../lib/app-store.ts';
 import type { PricingLookup } from '../../analytics/pricing.ts';
-import { addSpend, emptySpend, type SpendDelta } from '../spend.ts';
+import { addSpend, declaredPricing, emptySpend, type SpendDelta } from '../spend.ts';
 import { readPlatforms } from '../store.ts';
 
 /**
@@ -22,6 +22,12 @@ import { readPlatforms } from '../store.ts';
  * знание панели о чужом бюджете, и потерять его в перезапуске значит вернуть
  * человеку бодрое «бюджет в порядке» ровно там, где контур уже отказывает.
  */
+
+/** Что кончилось, как это назвало тело отказа. */
+export interface BudgetRefusal {
+  scope: PlatformExhaustedScope;
+  level?: string;
+}
 
 /** Раз во сколько сбрасываем накопленное. */
 export const SPEND_FLUSH_MS = 5_000;
@@ -80,18 +86,20 @@ export class SpendFlusher {
    * Контур отказал по бюджету (402). Пишем сразу и вместе со всем, что
    * накопилось: это факт, а не оценка, и он переживает перезапуск.
    *
-   * `level` — какой именно лимит контур назвал (`user_daily`, `team_monthly`,
-   * `instance_monthly`). Бюджета КЛЮЧА среди них нет: его исчерпание контур
-   * отдаёт кодом 401, неотличимым от отозванного ключа. Поэтому уровень и
-   * хранится — без него отметка врала бы про то, что кончилось.
+   * `refusal` — чей лимит назван в теле (по манифесту драйвера). Прежние
+   * scope и уровень не наследуются: новый отказ без названия, записанный
+   * поверх старого с названием, выдавал бы старое за новое.
    */
-  markExhausted(platformId: string, at = this.#now(), level?: string): void {
+  markExhausted(platformId: string, at = this.#now(), refusal?: BudgetRefusal): void {
     try {
-      const record = this.#read(platformId);
+      const record = { ...this.#read(platformId) };
+      delete record.exhaustedScope;
+      delete record.exhaustedLevel;
       this.#write({
         ...record,
         exhaustedAt: at.toISOString(),
-        ...(level ? { exhaustedLevel: level } : {}),
+        ...(refusal ? { exhaustedScope: refusal.scope } : {}),
+        ...(refusal?.level ? { exhaustedLevel: refusal.level } : {}),
       });
     } catch (error) {
       // Учёт не отвечает за ответ клиенту: отказ 402 контура обязан доехать до
@@ -145,7 +153,10 @@ export class SpendFlusher {
     try {
       const known = readPlatforms(this.#store).some((platform) => platform.id === platformId);
       if (!known) return true;
-      const lookup = this.#lookup();
+      // Цена, опубликованная каталогом ЭТОГО контура (DRV-06): у двух контуров
+      // одна и та же модель стоит по-разному, и чужой каталог сюда не подмешан.
+      const health = this.#store.getPlatformHealth()[platformId];
+      const lookup = { ...this.#lookup(), declared: declaredPricing(health?.models ?? []) };
       let record = this.#read(platformId);
       for (const item of queue) record = addSpend(record, item.delta, item.at, lookup);
       return this.#write(record);

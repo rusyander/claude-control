@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { driverFor } from './index.ts';
-import { readPlatformModels, versionedUrl } from './driver.ts';
+import { readPlatformModels, readSubstitutionMap } from './driver.ts';
 
 /**
  * Драйверы: единственное место, где знают о конкретной платформе.
@@ -17,26 +17,35 @@ function findingOf(payload: unknown, id: string, driver: 'enterprise-platform' |
   return finding;
 }
 
-describe('versionedUrl: вторая /v1 не приклеивается', () => {
-  it('корень API получает версию', () => {
-    expect(versionedUrl('https://api.example.ru', 'models')).toBe(
-      'https://api.example.ru/v1/models',
-    );
+describe('карта подмены: обе формы, в которых её шлёт платформа', () => {
+  it('объект «метка → значение»', () => {
+    expect(readSubstitutionMap({ '[EMAIL_1]': 'a@b.ru' })).toEqual({ '[EMAIL_1]': 'a@b.ru' });
   });
 
-  it('адрес с версией остаётся как есть', () => {
-    expect(versionedUrl('http://127.0.0.1:11434/v1', 'models')).toBe(
-      'http://127.0.0.1:11434/v1/models',
-    );
-    expect(versionedUrl('https://x.example/v1beta/', 'models')).toBe(
-      'https://x.example/v1beta/models',
-    );
+  it('список {placeholder, value} — форма enterprise-platform_deanonymized_entities', () => {
+    // `anonymization.py deanonymized_entities`: список, а не объект. Прежнее чтение
+    // брало только объект, и карта оказывалась пустой ровно там, где она была.
+    expect(
+      readSubstitutionMap([
+        { placeholder: '[EMAIL_1]', value: 'a@b.ru' },
+        { placeholder: '[PERSON_1]', value: { nested: true } },
+        'мусор',
+      ]),
+    ).toEqual({ '[EMAIL_1]': 'a@b.ru' });
   });
 
-  it('хвостовые слэши не плодят пустых сегментов', () => {
-    expect(versionedUrl('https://api.example.ru///', 'models')).toBe(
-      'https://api.example.ru/v1/models',
-    );
+  it('ни одной годной пары — карты нет, а не пустой объект', () => {
+    expect(readSubstitutionMap({ a: 1 })).toBeUndefined();
+    expect(readSubstitutionMap([])).toBeUndefined();
+    expect(readSubstitutionMap('строка')).toBeUndefined();
+  });
+
+  it('итоговый текст платформа компании узнаётся заменой, а не незнакомым кадром', () => {
+    expect(driverFor('enterprise-platform').readFrame({ enterprise-platform_deanonymized: 'итог' })).toEqual({
+      kind: 'replacement',
+      field: 'enterprise-platform_deanonymized',
+      text: 'итог',
+    });
   });
 });
 
@@ -137,9 +146,8 @@ describe('драйвер совместимого шлюза: спросить �
     expect(driverFor('openai-compat').read(payload).limits).toEqual({});
   });
 
-  it('ключ уходит в заголовок, без ключа заголовка нет вовсе', () => {
-    expect(driverFor('openai-compat').headers('sk-1').authorization).toBe('Bearer sk-1');
-    expect(driverFor('openai-compat').headers(undefined).authorization).toBeUndefined();
+  it('ключ по умолчанию — Authorization: Bearer', () => {
+    expect(driverFor('openai-compat').auth).toEqual({ header: 'authorization', scheme: 'Bearer' });
   });
 });
 

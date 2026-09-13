@@ -16,6 +16,7 @@ import {
   platformBudgetOf,
   platformCardState,
   platformSpendOf,
+  toolRouteOf,
   useActivatePlatform,
   useCheckPlatform,
   useClearExhausted,
@@ -279,25 +280,18 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
             </Typography>
           )}
 
-          {/* Отказ 402 — факт, но НЕ про бюджет ключа: контур отдаёт его с
-              дневного лимита пользователя, месячного команды или месячного
-              инстанса, и называет уровень в теле. Бюджет же самого ключа он
-              отдаёт кодом 401, неотличимым от отозванного ключа, — поэтому эта
-              строка стоит рядом с полосой, а не красит её. */}
+          {/* Отказ 402 — факт, и ЧЕЙ это лимит, сервер прочитал из тела по
+              манифесту драйвера: бюджет ключа, названный лимит или ничего.
+              Полоса — наша оценка, поэтому строка стоит рядом, а не красит её. */}
           {budget.exhausted && (
             <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
               <Typography variant="body-sm" color="warning">
-                {t(
-                  budget.exhaustedLevel
-                    ? 'platform.budgetExhaustedLevel'
-                    : 'platform.budgetExhausted',
-                  {
-                    level: budget.exhaustedLevel,
-                    when: budget.exhaustedAt
-                      ? formatAgo(budget.exhaustedAt, i18n.language, t)
-                      : t('platform.budgetExhaustedRecently'),
-                  },
-                )}
+                {t(exhaustedTextKey(budget), {
+                  level: budget.exhaustedLevel,
+                  when: budget.exhaustedAt
+                    ? formatAgo(budget.exhaustedAt, i18n.language, t)
+                    : t('platform.budgetExhaustedRecently'),
+                })}
               </Typography>
               <Button
                 variant="secondary"
@@ -319,7 +313,14 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
           </Typography>
         )}
 
-        {plan.data && <AppliedTargets targets={plan.data.targets} />}
+        {plan.data && (
+          <AppliedTargets
+            targets={plan.data.targets}
+            model={plan.data.model}
+            modelSource={plan.data.modelSource}
+            toolRoute={toolRouteOf({ toolRoute: plan.data.toolRoute, platform })}
+          />
+        )}
 
         {plan.data && (
           <ApplyJournal
@@ -353,3 +354,9 @@ const TONE = {
   unauthorized: 'danger',
   unreachable: 'warning',
 } as const;
+
+/** Строка отказа 402 по тому, что назвал манифест драйвера. */
+function exhaustedTextKey(budget: PlatformStatus['budget']) {
+  if (budget.exhaustedScope === 'key') return 'platform.budgetExhaustedKey';
+  return budget.exhaustedLevel ? 'platform.budgetExhaustedLevel' : 'platform.budgetExhausted';
+}

@@ -1,4 +1,8 @@
 import { useTranslation } from 'react-i18next';
+import { chooseRunModel } from '@agentdeck/contracts/platform-models';
+import { foreignConsumerId } from '@agentdeck/contracts/platform-consumers';
+import { usePlatformRunPlan } from '@entities/Platform';
+import { platformModelCaption } from '@shared/lib/chat-model';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -18,6 +22,7 @@ import styles from './ProviderChatPage.module.scss';
 export function ProviderChatHeader({
   chat,
   providerName,
+  providerId,
   runner,
   isRunning,
   onRename,
@@ -29,6 +34,16 @@ export function ProviderChatHeader({
 }: ProviderChatHeaderProps) {
   const { t } = useTranslation();
   const transport = chat?.messages.findLast((message) => message.transport)?.transport;
+
+  // Через контур модель разговора — просьба, а не решение (Т6): имя вендора
+  // контур не знает, и оно переводится картой соответствия. Считается ТОЙ ЖЕ
+  // функцией, что на сервере: второй расчёт разошёлся бы молча, и метка модели
+  // показывала бы имя, которого в запросе нет.
+  const plan = usePlatformRunPlan(providerId ? foreignConsumerId(providerId) : '');
+  const routed = plan.data?.routed === true ? plan.data : undefined;
+  const caption = routed
+    ? platformModelCaption(routed.title, chooseRunModel(routed.rules, chat?.model ?? ''))
+    : undefined;
 
   const rename = (): void => {
     const next = window.prompt(t('providerChat.renamePrompt'), chat?.title ?? '');
@@ -58,6 +73,18 @@ export function ProviderChatHeader({
             настроено у CLI, — а знать он это обязан: подбор только ПОНИЖАЕТ. */}
         {chat?.model && (
           <Badge tone="neutral">{t('providerChat.modelBadge', { model: chat.model })}</Badge>
+        )}
+        {/* Метка контура стоит рядом с меткой модели и только когда разговор
+            идёт через контур: в обычном чате она была бы шумом, а здесь —
+            единственное место, где видно, что выбранное имя по дороге заменят
+            (или что модель есть, хотя чат её не выбирал). */}
+        {caption && (
+          <Badge tone={caption.warn ? 'warning' : 'neutral'}>
+            {t(caption.key, caption.params)}
+          </Badge>
+        )}
+        {routed && !routed.effort && (
+          <Badge tone="neutral">{t('chat.platformNoEffort', { title: routed.title })}</Badge>
         )}
         {chat?.workdir && (
           <Badge tone="neutral">{t('providerChat.workdirBadge', { path: chat.workdir })}</Badge>

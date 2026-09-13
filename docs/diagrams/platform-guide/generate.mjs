@@ -8,7 +8,7 @@
  * карточке, а положение подписи ребра решается перебором свободных мест. Ни
  * одно из трёх в рукописном XML не держится.
  *
- * Три страницы, и все компактные по ширине намеренно: экспорт уезжает в
+ * Четыре страницы, и все компактные по ширине намеренно: экспорт уезжает в
  * документ справки, который читают в том числе с телефона. Плотный
  * информационный лист того же скилла здесь был бы нечитаем — это осознанное
  * отступление от его умолчания, а не забывчивость.
@@ -17,6 +17,8 @@
  * Страница 2 — что заводится в админке контура, а что в панели.
  * Страница 3 — две системы рядом: части панели против сервисов инстанса
  *              платформа компании и три стрелки, которые переходят границу между ними.
+ * Страница 4 — вызов инструмента через прослойку шлюза: туда текстом, обратно
+ *              вызовом, и что не исполняется никогда.
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -856,6 +858,121 @@ legend(p3, 60, bottomOf(p3) + 60, [
   { caption: 'ответ обратно', edgeColour: FLOW.back, dashed: true },
 ]);
 
+// ─── Страница 4: вызов инструмента через прослойку ─────────────────────────
+
+const p4 = newPage('4. Вызов инструмента через прослойку', 'p4');
+heading(
+  p4,
+  60,
+  30,
+  'Вызов инструмента через прослойку',
+  'Контур отбрасывает поле инструментов, поэтому шлюз панели объявляет их текстом и собирает вызов обратно из ответа.',
+  760,
+);
+
+const cli4 = card(p4, 'p4:cli', SPINE_X, 130, SPINE_W, {
+  pal: C.actor,
+  icon: 'shape=card',
+  iconText: 'CLI',
+  title: 'Claude Code в чате панели',
+  lines: [
+    'Шлёт запрос с полем инструментов, как вендору.',
+    'Вызов исполняет сам CLI: Write пишет файл, права спрашиваются как обычно.',
+  ],
+});
+
+const shimIn = card(p4, 'p4:in', SPINE_X, cli4.y + cli4.h + 110, SPINE_W, {
+  pal: C.edge,
+  icon: 'shape=hexagon',
+  iconText: 'in',
+  title: 'Шлюз: прослойка на входе',
+  lines: [
+    'Поле инструментов снимается, их схемы уходят системным текстом протокола.',
+    'Схемы едут в каждом ходе: кэша промпта у контура нет.',
+  ],
+});
+
+const model4 = card(p4, 'p4:model', SPINE_X, shimIn.y + shimIn.h + 110, SPINE_W, {
+  pal: C.ext,
+  icon: 'shape=cloud',
+  iconText: 'LLM',
+  title: 'Контур и его модель',
+  lines: ['Видит только текст.', 'Отвечает текстом — вызовом по протоколу или словами.'],
+});
+
+const shimOut = card(p4, 'p4:out', SPINE_X, model4.y + model4.h + 110, SPINE_W, {
+  pal: C.edge,
+  icon: 'shape=hexagon',
+  iconText: 'out',
+  title: 'Шлюз: прослойка на выходе',
+  lines: [
+    'Исполняется блок в тегах протокола и ответ, который целиком — один вызов.',
+    'Он становится вызовом инструмента в том виде, какой CLI ждёт от вендора.',
+  ],
+});
+
+card(p4, 'p4:fence', RIGHT_X, shimOut.y - 10, RIGHT_W, {
+  pal: C.warn,
+  soft: true,
+  title: 'Не исполняется никогда',
+  lines: [
+    'Вызов в заборе кода и объект с текстом вокруг. Забором приходят цитата протокола и пример из прочитанной документации.',
+    'Каждый такой блок назван в следе запроса.',
+  ],
+});
+
+card(p4, 'p4:said', RIGHT_X, model4.y, RIGHT_W, {
+  pal: C.note,
+  soft: true,
+  title: 'Модель описала, но не сделала',
+  lines: [
+    'Ход кончился удачно, файла нет. Панель ставит пометку на карточке «Инструменты через контур», прогон не останавливает.',
+  ],
+});
+
+card(p4, 'p4:cost', RIGHT_X, shimIn.y, RIGHT_W, {
+  pal: C.store,
+  soft: true,
+  icon: 'shape=cylinder3;backgroundOutline=1;size=7',
+  iconText: 'KB',
+  title: 'Цена хода в цифрах',
+  lines: [
+    'Замер на настоящих прогонах: 24 инструмента — 58 тысяч знаков системного текста и 86 КБ запроса на каждом ходе.',
+  ],
+});
+
+link(p4, 'p4:cli', 'p4:in', 'запрос с полем инструментов', { colour: FLOW.client });
+link(p4, 'p4:in', 'p4:model', 'схемы текстом, поля нет', { colour: FLOW.client });
+link(p4, 'p4:model', 'p4:out', 'ответ текстом', { colour: FLOW.back, dashed: true });
+link(p4, 'p4:out', 'p4:cli', 'вызов инструмента, результат — следующим ходом', {
+  colour: FLOW.back,
+  dashed: true,
+  exit: [0, 0.5],
+  entry: [0, 0.5],
+  points: [
+    { x: 110, y: shimOut.cy },
+    { x: 110, y: cli4.cy },
+  ],
+  startDir: 'h',
+});
+
+routeEdges(p4);
+legend(p4, 60, bottomOf(p4) + 60, [
+  { caption: 'CLI: он же исполняет вызов', fill: C.actor.tint, stroke: C.actor.line },
+  { caption: 'шлюз панели и его прослойка', fill: C.edge.tint, stroke: C.edge.line },
+  { caption: 'внешняя система: контур компании', fill: C.ext.tint, stroke: C.ext.line },
+  { caption: 'цена, измеренная на прогонах', fill: C.store.tint, stroke: C.store.line },
+  { caption: 'пояснение', fill: C.note.tint, stroke: C.note.line },
+  { caption: 'чего прослойка не делает', fill: C.warn.tint, stroke: C.warn.line },
+  {
+    caption: 'значок формы: карточка, шлюз, облако, хранилище',
+    fill: '#FFFFFF',
+    stroke: C.ext.line,
+  },
+  { caption: 'запрос вперёд', edgeColour: FLOW.client },
+  { caption: 'ответ обратно', edgeColour: FLOW.back, dashed: true },
+]);
+
 // ─── Вывод ─────────────────────────────────────────────────────────────────
 
 function pageXml(p, width, height) {
@@ -885,14 +1002,17 @@ const bounds = (p) => {
 const b1 = bounds(p1);
 const b2 = bounds(p2);
 const b3 = bounds(p3);
+const b4 = bounds(p4);
 const xml =
   '<mxfile host="app.diagrams.net" version="24.7.7">\n' +
   `${pageXml(p1, b1.w, b1.h)}\n${pageXml(p2, b2.w, b2.h)}\n${pageXml(p3, b3.w, b3.h)}\n` +
+  `${pageXml(p4, b4.w, b4.h)}\n` +
   '</mxfile>\n';
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, xml, 'utf8');
 console.log(
   `записано ${OUT}: страница 1 ${b1.w}×${b1.h}, страница 2 ${b2.w}×${b2.h}, ` +
-    `страница 3 ${b3.w}×${b3.h}, ячеек ${p1.cells.length + p2.cells.length + p3.cells.length}`,
+    `страница 3 ${b3.w}×${b3.h}, страница 4 ${b4.w}×${b4.h}, ` +
+    `ячеек ${p1.cells.length + p2.cells.length + p3.cells.length + p4.cells.length}`,
 );

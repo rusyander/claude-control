@@ -1,4 +1,5 @@
-import type { DlpBuiltinPattern, DlpRule } from '@agentdeck/contracts';
+import type { DlpRule } from '@agentdeck/contracts';
+import { DLP_BUILTINS, type DlpBuiltinId } from './builtins.mjs';
 
 /**
  * Правила защиты данных: что считать чувствительным в теле запроса.
@@ -7,8 +8,9 @@ import type { DlpBuiltinPattern, DlpRule } from '@agentdeck/contracts';
  * здесь хуже пропуска. Пропуск оставляет систему такой же, какой она была без
  * прокси; ложное срабатывание ломает работу агента (подменяет путь к файлу,
  * номер версии, идентификатор) и учит выключать защиту целиком. Поэтому у
- * форматов с контрольной суммой — ИНН, СНИЛС, номер карты — проверяется именно
- * она, а не длина числа.
+ * форматов с контрольной суммой — ИНН, СНИЛС, номер карты, IBAN, ОГРН —
+ * проверяется именно она, а не длина числа. Сами образцы — в `builtins.mjs`,
+ * одной копией на прокси, шлюз и хук.
  *
  * Модуль чистый: ни диска, ни сети, ни состояния между вызовами.
  */
@@ -29,34 +31,6 @@ export interface RuleMatch {
    */
   identity: string;
 }
-
-/**
- * Встроенные образцы. Выражения намеренно широкие: отсев делает проверка
- * `validate`, а не сама регулярка — так видно, ГДЕ принимается решение.
- */
-const BUILTIN: Record<
-  DlpBuiltinPattern,
-  { source: string; validate?: (value: string) => boolean }
-> = {
-  email: { source: String.raw`[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+` },
-  // Российский номер в бытовых написаниях: +7, 8, скобки, дефисы, пробелы.
-  phone_ru: { source: String.raw`(?:\+7|8)[ \-(]*\d{3}[ \-)]*\d{3}[ \-]?\d{2}[ \-]?\d{2}` },
-  inn: { source: String.raw`\b\d{10}\b|\b\d{12}\b`, validate: isValidInn },
-  snils: { source: String.raw`\b\d{3}[- ]?\d{3}[- ]?\d{3}[- ]?\d{2}\b`, validate: isValidSnils },
-  card: { source: String.raw`\b(?:\d[ -]?){12,18}\d\b`, validate: isValidCard },
-  // Ключи с опознаваемым началом: у них форма задана самим вендором, гадать не
-  // приходится. Общего «длинная строка из букв и цифр» здесь нет намеренно —
-  // под него попадает половина хешей и идентификаторов в любом коде.
-  secret_key: {
-    source: [
-      String.raw`sk-[A-Za-z0-9_-]{16,}`,
-      String.raw`gh[pousr]_[A-Za-z0-9]{20,}`,
-      String.raw`AKIA[0-9A-Z]{16}`,
-      String.raw`xox[baprs]-[A-Za-z0-9-]{10,}`,
-      String.raw`-----BEGIN [A-Z ]*PRIVATE KEY-----`,
-    ].join('|'),
-  },
-};
 
 /** Проверить своё выражение до сохранения правила: разбирается ли оно вообще. */
 export function compileRulePattern(pattern: string): RegExp | undefined {
@@ -156,14 +130,14 @@ function matchesOf(text: string, rule: DlpRule): RuleMatch[] {
   }
 
   const source =
-    rule.kind === 'builtin' ? BUILTIN[rule.builtin as DlpBuiltinPattern]?.source : rule.pattern;
+    rule.kind === 'builtin' ? DLP_BUILTINS[rule.builtin as DlpBuiltinId]?.source : rule.pattern;
   if (!source) return out;
 
   const expression = compileRulePattern(source);
   if (!expression) return out;
 
   const validate =
-    rule.kind === 'builtin' ? BUILTIN[rule.builtin as DlpBuiltinPattern]?.validate : undefined;
+    rule.kind === 'builtin' ? DLP_BUILTINS[rule.builtin as DlpBuiltinId]?.validate : undefined;
   for (const match of text.matchAll(expression)) {
     if (!match[0]) continue;
     if (validate && !validate(match[0])) continue;
@@ -174,65 +148,4 @@ function matchesOf(text: string, rule: DlpRule): RuleMatch[] {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function digitsOf(value: string): number[] {
-  return [...value].filter((char) => char >= '0' && char <= '9').map(Number);
-}
-
-/**
- * ИНН: контрольные разряды считаются по опубликованным ФНС коэффициентам —
- * один для десятизначного (физлицо-ИП/организация), два для двенадцатизначного.
- */
-function isValidInn(value: string): boolean {
-  const digits = digitsOf(value);
-  const check = (weights: number[], upTo: number): number =>
-    (weights.reduce((sum, weight, index) => sum + weight * (digits[index] ?? 0), 0) % 11) % 10 ===
-    (digits[upTo] ?? -1)
-      ? 1
-      : 0;
-
-  if (digits.length === 10) return check([2, 4, 10, 3, 5, 9, 4, 6, 8], 9) === 1;
-  if (digits.length === 12) {
-    const first = check([7, 2, 4, 10, 3, 5, 9, 4, 6, 8], 10) === 1;
-    const second = check([3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8], 11) === 1;
-    return first && second;
-  }
-  return false;
-}
-
-/**
- * СНИЛС: сумма первых девяти цифр с весами 9…1, дальше правило остатка,
- * описанное в порядке ведения ПФР (100 и 101 дают контрольное «00»).
- */
-function isValidSnils(value: string): boolean {
-  const digits = digitsOf(value);
-  if (digits.length !== 11) return false;
-
-  const sum = digits.slice(0, 9).reduce((total, digit, index) => total + digit * (9 - index), 0);
-  const control = (digits[9] ?? 0) * 10 + (digits[10] ?? 0);
-
-  if (sum < 100) return sum === control;
-  if (sum === 100 || sum === 101) return control === 0;
-  const rest = sum % 101;
-  return rest === 100 ? control === 0 : rest === control;
-}
-
-/** Номер карты — алгоритм Луна плюс разумная длина (13…19 цифр). */
-function isValidCard(value: string): boolean {
-  const digits = digitsOf(value);
-  if (digits.length < 13 || digits.length > 19) return false;
-
-  let sum = 0;
-  let double = false;
-  for (let index = digits.length - 1; index >= 0; index -= 1) {
-    let digit = digits[index] ?? 0;
-    if (double) {
-      digit *= 2;
-      if (digit > 9) digit -= 9;
-    }
-    sum += digit;
-    double = !double;
-  }
-  return sum % 10 === 0;
 }

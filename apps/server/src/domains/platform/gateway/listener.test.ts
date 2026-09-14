@@ -48,6 +48,22 @@ afterEach(async () => {
   rmSync(root, { recursive: true, force: true });
 });
 
+/**
+ * Свободный порт с двумя свободными соседями ВНЕ диапазона, который ОС раздаёт
+ * сама (Windows 49152+, Linux 32768+). Порт из `listen(0)` не годится для
+ * проверки «соседи пусты»: Windows выдаёт такие порты подряд, и соседний тест,
+ * поднявший свой сервер в ту же секунду, садился на port+1 — зелёный код
+ * краснел на чужом слушателе.
+ */
+async function freeTrio(): Promise<number> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const port = 20000 + Math.floor(Math.random() * 12000);
+    const answers = await Promise.all([0, 1, 2].map((offset) => portAnswers(port + offset)));
+    if (answers.every((busy) => !busy)) return port;
+  }
+  throw new Error('не нашлось трёх свободных портов подряд');
+}
+
 /** Жив ли кто-нибудь на порту — спрашиваем сокетом, а не у самого шлюза. */
 function portAnswers(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -68,9 +84,7 @@ describe('очередь подъёма и остановки', () => {
    * второй, а первый держал порт до конца процесса.
    */
   it('два подъёма разом — один слушатель, и остановка освобождает порт', async () => {
-    const port = await occupy();
-    await new Promise<void>((resolve) => squatter?.close(() => resolve()));
-    squatter = undefined;
+    const port = await freeTrio();
 
     await Promise.all([
       gateway.start({ store, appDataDir: appData, port }),

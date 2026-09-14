@@ -596,7 +596,26 @@ export class AppStore {
 
   /** Контур удалён — след пробы уходит вместе с ним. */
   forgetPlatformHealth(id: string): void {
-    if (dropPlatformHealth(this.state, id)) this.persist();
+    const tail = this.state.platformThinkTail;
+    const hadTail = Boolean(tail && id in tail);
+    if (tail && hadTail) delete tail[id];
+    if (dropPlatformHealth(this.state, id) || hadTail) this.persist();
+  }
+
+  /** Модели контура, которые пишут размышления текстом до голого `</think>` (L9). */
+  getThinkTailModels(platformId: string): readonly string[] {
+    return this.state.platformThinkTail?.[platformId] ?? [];
+  }
+
+  /** Запомнить модель с голым `</think>`; повтор ничего не пишет. */
+  markThinkTail(platformId: string, model: string): void {
+    const known = this.state.platformThinkTail?.[platformId] ?? [];
+    if (!model || known.includes(model)) return;
+    this.state.platformThinkTail = {
+      ...this.state.platformThinkTail,
+      [platformId]: [...known, model],
+    };
+    this.persist();
   }
 
   // --- Контуры: след применения (Т3) ---

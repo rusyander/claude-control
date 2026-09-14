@@ -29,11 +29,17 @@ export interface GateScriptConfig {
   action: PromptGateAction;
 }
 
-/** Ядро читается из файла рядом: одна копия логики на прокси и на хук. */
-function coreSource(): string {
-  const url = new URL('./gate-core.mjs', import.meta.url);
-  // `export` снимается: ядро вставляется в тело скрипта, а не импортируется.
-  return readFileSync(url, 'utf8').replace(/^export /gm, '');
+/**
+ * Ядро читается из файлов рядом: одна копия логики и одна копия образцов на
+ * прокси и на хук. Образцы идут первыми — ядро ссылается на них по имени.
+ */
+export function coreSource(): string {
+  // `export` и импорт образцов снимаются: оба файла вставляются в тело скрипта.
+  const read = (path: string): string =>
+    readFileSync(new URL(path, import.meta.url), 'utf8')
+      .replace(/^export /gm, '')
+      .replace(/^import .*;\n/gm, '');
+  return `${read('../dlp/builtins.mjs').trim()}\n\n${read('./gate-core.mjs').trim()}\n`;
 }
 
 export function buildGateScript(config: GateScriptConfig): string {

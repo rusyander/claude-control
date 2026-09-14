@@ -24,16 +24,34 @@ export type DlpRuleKind = (typeof dlpRuleKinds)[number];
 
 /**
  * Встроенные образцы. Каждый — с проверкой контрольной суммы там, где она у
- * формата есть (ИНН, СНИЛС, номер карты): без неё правило ловило бы любое
- * число подходящей длины, а ложное срабатывание в DLP хуже пропуска — оно
+ * формата есть (ИНН, СНИЛС, ОГРН, номер карты, IBAN): без неё правило ловило бы
+ * любое число подходящей длины, а ложное срабатывание в DLP хуже пропуска — оно
  * ломает работу и учит выключать защиту.
+ *
+ * Сами выражения — на сервере (`domains/dlp/builtins.mjs`), одной копией на
+ * прокси, шлюз и хук; экран получает их в `DlpInfo.builtins`. Порядок списка
+ * совпадает с серверным — это сверяет тест сервера.
  */
 export const dlpBuiltinPatterns = [
   'email',
   'phone_ru',
+  'phone_intl',
   'inn',
   'snils',
+  'ogrn',
+  'passport_ru',
+  'passport_ru_foreign',
+  'passport_uz',
   'card',
+  'iban',
+  'crypto_wallet',
+  'ipv4',
+  'ipv6',
+  'mac',
+  'uuid',
+  'url',
+  'credentials_url',
+  'jwt',
   'secret_key',
 ] as const;
 export type DlpBuiltinPattern = (typeof dlpBuiltinPatterns)[number];
@@ -123,11 +141,23 @@ export interface DlpStatus {
   blocked: number;
 }
 
-/** Ответ `GET /api/dlp`: настройки, правила, состояние. */
+/**
+ * Встроенный образец так, как его видит экран: выражение — чтобы сделать из
+ * образца своё правило и поправить его; признак проверки — чтобы честно сказать,
+ * что при этом теряется (контрольная сумма живёт в коде, не в выражении).
+ */
+export interface DlpBuiltinInfo {
+  id: DlpBuiltinPattern;
+  pattern: string;
+  validated: boolean;
+}
+
+/** Ответ `GET /api/dlp`: настройки, правила, состояние, встроенные образцы. */
 export interface DlpInfo {
   settings: DlpSettings;
   rules: DlpRule[];
   status: DlpStatus;
+  builtins: DlpBuiltinInfo[];
 }
 
 /** Ответ проверки правил на пробном тексте — предпросмотр без сети. */

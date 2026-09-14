@@ -260,9 +260,12 @@ async function run(stub, appData) {
 
   // ── 3. След запроса ─────────────────────────────────────────────────────
   const status = await api('/platforms/gateway');
-  const event = (status.body?.status?.events ?? [])
-    .filter((item) => item.platformId === CONTOUR)
-    .at(-1);
+  // След — новые первыми. С тех пор как активация сама поднимает шлюз, её
+  // пробный запрос тоже ложится в след (`/v1/messages`), и «последний в списке»
+  // читал его, а не рисование. Рисование — самый свежий обычный чат контура.
+  const event = (status.body?.status?.events ?? []).find(
+    (item) => item.platformId === CONTOUR && item.path.endsWith('/chat/completions'),
+  );
   check(
     'рисование прошло через свой шлюз и попало в след запроса',
     Boolean(event) && event.status === 200,

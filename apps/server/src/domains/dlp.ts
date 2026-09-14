@@ -2,6 +2,7 @@ import type { AppStore } from '../lib/app-store.ts';
 import type { DlpInfo, DlpPreviewResult, DlpRule } from '@agentdeck/contracts';
 import type { DlpProxy, DlpRuntime } from './dlp/DlpProxy.ts';
 import { AliasVault, maskText } from './dlp/mask.ts';
+import { builtinInfos } from './dlp/default-rules.ts';
 import { readRules } from './dlp/rules-store.ts';
 
 /**
@@ -25,6 +26,7 @@ export {
 export { readJournal, clearJournal } from './dlp/journal.ts';
 export { AliasVault, maskText } from './dlp/mask.ts';
 export { scanText } from './dlp/rules.ts';
+export { builtinInfos, builtinRuleSet, maskRulesFor } from './dlp/default-rules.ts';
 export { apiKindForPath } from './dlp/api-shapes.ts';
 export { joinUpstream } from './dlp/DlpProxy.ts';
 
@@ -97,6 +99,7 @@ export function describeDlp(store: AppStore, appDataDir: string, proxy: DlpProxy
     settings: settings.dlp,
     rules,
     status: { ...status, error: status.error ?? error },
+    builtins: builtinInfos(),
   };
 }
 

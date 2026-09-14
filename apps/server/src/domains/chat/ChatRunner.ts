@@ -341,13 +341,23 @@ export class ChatRun {
     // ход), без них — до; интерфейсу порядок не важен, он сводит их по id.
     const tracker = new TurnTracker();
     const lines = createInterface({ input: child.stdout });
+    // Причину провала CLI уже назвал потоком (`result` с `is_error`): «API Error:
+    // 400 Проверки контента контура остановили ответ…». Код выхода при этом тоже
+    // ненулевой, а в stderr лежит только служебная строка CLI
+    // (`[claude-code:unrecognized_model]` у модели не из каталога Anthropic) —
+    // вторая ошибка затирала первую, и человек видел её вместо причины (живой
+    // прогон dev 14.09.2026).
+    let streamError = false;
     for await (const line of lines) {
       if (!line.trim()) continue;
 
       try {
         const raw = JSON.parse(line) as RawEvent;
         for (const event of tracker.track(raw)) onEvent(event);
-        for (const event of translate(raw)) onEvent(event);
+        for (const event of translate(raw)) {
+          if (event.kind === 'error') streamError = true;
+          onEvent(event);
+        }
       } catch {
         // Строка не JSON — предупреждение CLI, для чата это шум.
       }
@@ -363,7 +373,7 @@ export class ChatRun {
           kind: 'error',
           message: `Не удалось запустить «${command}»: ${spawnError.message}`,
         });
-      } else if (code !== 0) {
+      } else if (code !== 0 && !streamError) {
         onEvent({
           kind: 'error',
           message: stderr.join('').trim() || `claude завершился с кодом ${code}`,

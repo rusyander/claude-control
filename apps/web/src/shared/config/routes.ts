@@ -8,3 +8,5 @@ export const HELP_ROUTE: string = '/help';
 export const SETTINGS_ROUTE: string = '/settings';
 /** Прогон агента ссылается на свой разговор: `/chat?id=<сессия>`. */
 export const CHAT_ROUTE: string = '/chat';
+/** Маска контура ссылается на правила, которыми маскирует. */
+export const DLP_ROUTE: string = '/dlp';

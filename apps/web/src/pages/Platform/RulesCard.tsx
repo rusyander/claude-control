@@ -5,6 +5,7 @@ import { platformRunConsumers } from '@agentdeck/contracts/platform-consumers';
 import type {
   OurLayerId,
   Platform,
+  PlatformDataMask,
   PlatformRunLayers,
   PlatformRuleConflict,
   PlatformRuleRow,
@@ -20,6 +21,7 @@ import { SelectField } from '@shared/ui/select-field';
 import { Toggle } from '@shared/ui/toggle';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
 import { useSavePlatform } from '@entities/Platform';
+import { DataMaskRow } from './DataMaskRow';
 import {
   blockingConflict,
   conflictTone,
@@ -50,6 +52,8 @@ interface RulesCardProps {
    * причине, что и правила выше: ответ старого сервера их не приносит.
    */
   layers?: PlatformRunLayers;
+  /** Маска данных на этом контуре (Р11) — решение сервера, как и слои. */
+  dataMask?: PlatformDataMask;
 }
 
 /**
@@ -68,7 +72,8 @@ interface RulesCardProps {
  * сказано это прямо, потому что человек, увидевший слово «конфликт», по
  * привычке выключает одну сторону.
  */
-export function RulesCard({ platform, rules = [], conflicts = [], layers }: RulesCardProps) {
+export function RulesCard(props: RulesCardProps) {
+  const { platform, rules = [], conflicts = [], layers, dataMask } = props;
   const { t } = useTranslation();
   const save = useSavePlatform();
   const current = platformRules(platform);
@@ -307,6 +312,7 @@ export function RulesCard({ platform, rules = [], conflicts = [], layers }: Rule
           <Typography variant="body-sm" weight="medium">
             {t('platform.rulesOurs')}
           </Typography>
+          <DataMaskRow platform={platform} mask={dataMask} onChange={update} />
           <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
             <Toggle
               checked={platform.toolShim}

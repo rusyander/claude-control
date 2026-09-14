@@ -20,6 +20,7 @@ import {
   newRegexRule,
   newBuiltinRule,
   starterRules,
+  missingBuiltins,
   replaceRule,
   removeRule,
   dlpErrorMessage,
@@ -145,9 +146,18 @@ export function DlpPage() {
     });
   };
 
-  // Готовый набор — шесть встроенных образцов, сохранённых сразу, плюс пустой
+  // Готовый набор — все встроенные образцов, сохранённых сразу, плюс пустой
   // словарь черновиком: без слов сервер его не примет, а без него человек не
   // узнает, что своё добавляется именно здесь.
+  const missing = missingBuiltins(rules);
+  const addMissing = (): void =>
+    setDraft([
+      ...rules,
+      ...missing.map((builtin) =>
+        newBuiltinRule(builtin, builtinNames[builtin], builtinLabels[builtin]),
+      ),
+    ]);
+
   const addStarter = (): void => {
     const builtins = starterRules(builtinNames, builtinLabels);
     commit(builtins, () =>
@@ -233,10 +243,29 @@ export function DlpPage() {
         />
       ) : (
         <Stack gap="var(--spacing-sm)">
+          {missing.length > 0 && (
+            <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+              <Typography variant="body-sm" color="subtle">
+                {t('dlp.missingBuiltins', {
+                  count: missing.length,
+                  names: missing.map((builtin) => builtinNames[builtin]).join(', '),
+                })}
+              </Typography>
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Icon name="plus" size={16} />}
+                onClick={addMissing}
+              >
+                {t('dlp.addMissing')}
+              </Button>
+            </Stack>
+          )}
           {rules.map((rule) => (
             <DlpRuleRow
               key={rule.id}
               rule={rule}
+              builtins={data.builtins}
               builtinNames={builtinNames}
               builtinLabels={builtinLabels}
               onChange={(next) => setDraft(replaceRule(rules, next))}

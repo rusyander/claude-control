@@ -164,7 +164,8 @@ export const platformEn: typeof platformRu = {
       'Right after activation the panel asks the model a short question itself — through its own ' +
       'gateway, the very path and the very model a CLI in the terminal takes: its model, otherwise ' +
       'the contour’s model, otherwise the first chat model of the catalog. The model’s answer is ' +
-      'shown on the card, and a model that spent the answer ceiling on reasoning is named ' +
+      'shown on the card — without the reasoning draft some models write straight into the ' +
+      'answer text — and a model that spent the answer ceiling on reasoning is named ' +
       'separately. A red test ' +
       'request does NOT undo the activation: the reason is spelled out, and it is cured in ' +
       'different places — a gateway that is down, a key that ran out and a model that stays ' +
@@ -263,7 +264,9 @@ export const platformEn: typeof platformRu = {
       'Masking happened but the contour gave no names — “no violations” would be a lie there, ' +
       'and such an answer gets a line of its own. The count runs over the last requests the ' +
       'gateway still remembers: the trace is length-capped, the oldest firings drop out of it, ' +
-      'and restarting the panel clears it entirely. The card says from when it counts.',
+      'and restarting the panel clears it entirely. The card says from when it counts. Two ' +
+      'checks firing in one request do not share outcomes: each shows the one its own contour ' +
+      'frame brought, and only an outcome the contour did not attribute stays with all of them.',
     checksTextTitle: 'The checked text is not in the panel',
     checksTextText:
       'Only the check names exactly as the contour named them, a counter and a date reach the ' +
@@ -417,11 +420,16 @@ export const platformEn: typeof platformRu = {
       'in advance.',
     rulesLayersTitle: 'The other three rows are not a choice of two',
     rulesLayersText:
-      'The contour’s data substitution and the panel’s data protection stack in order: our mask ' +
-      'goes first and is reversible, its labels have a different shape and the contour leaves ' +
-      'them alone, while the contour turns its own labels back into values right in the answer ' +
-      'stream — it never hands the substitution map to an API client. Nothing needs switching ' +
-      'off. The contour’s history compaction versus our checkpoints is a ' +
+      'The contour’s data substitution and the panel’s data mask stack in order, but only ours ' +
+      'is worth relying on. Substitution by the contour is not guaranteed: a probe of a live ' +
+      'contour showed that on the API-key path the model sees email, phone and IP as they are. ' +
+      'So for a contour that declares substitution our mask turns on by itself — the “The ' +
+      'panel’s data mask” row under “Our side”; the global switch of the “Data protection” ' +
+      'section is neither needed nor touched. Your enabled rules mask, or, with none, the ' +
+      'built-in set of twenty patterns; an unreadable rules file refuses the request with the ' +
+      'reason instead of sending it in the clear. Our labels are reversible and of another shape, ' +
+      'the contour leaves them alone. The mask can be turned off in the same row, but the global ' +
+      'switch beats the toggle. The contour’s history compaction versus our checkpoints is a ' +
       'warning: after a compaction the continuation may not know the start of the task. Content ' +
       'checks versus the prompt gate is simply a fact: both refuse, by different lists, and the ' +
       'second refusal does not mean the first one failed. In those two rows the panel marks only ' +
@@ -663,7 +671,11 @@ export const platformEn: typeof platformRu = {
       'exactly that), never reach the other side. It never happens silently — whatever did not ' +
       'make it is named in the request trace, by name. For a platform whose driver declares a ' +
       'native Anthropic-dialect endpoint, such a CLI’s request goes out untranslated: thinking ' +
-      'and cache marks arrive intact, while key, rules and spend stay the same. A refusal can ' +
+      'and cache marks arrive intact, while key, rules and spend stay the same. A model that ' +
+      'writes its thinking straight into the answer text and closes it with a bare “</think>” ' +
+      'is remembered on the first such answer (usually the check at connection) and from then ' +
+      'on the client gets only the answer itself: the thinking goes to the trace as the ' +
+      '“reasoning” stage, and a tool call sketched inside it is never executed. A refusal can ' +
       'arrive at any of three ' +
       'places: content checks — 451, the key budget — 402, request frequency — 429.',
 

@@ -109,6 +109,7 @@ export function PlatformPage() {
           rules={status.rules}
           conflicts={status.conflicts}
           layers={status.layers}
+          dataMask={status.dataMask}
         />
       ))}
 

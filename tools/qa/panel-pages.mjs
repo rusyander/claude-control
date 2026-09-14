@@ -107,6 +107,23 @@ export async function openPanelPage(page, base, { path, prepare, ready, interact
     await page.waitForSelector('nav', { timeout: 15000 });
     await page.waitForSelector(ready, { timeout: 15000 });
   }
+  // Навигация рисуется сразу, а сам раздел — ленивым куском и после ответа API.
+  // Одной паузы под нагрузкой стенда не хватало: обход клавиатуры 14.09.2026
+  // назвал «содержимое недосягаемо» раздел, который просто ещё не приехал.
+  // Раздел, где фокусироваться и правда не на чем, ждёт потолок и идёт дальше —
+  // его назовут сами проверки.
+  await page
+    .waitForFunction(
+      () =>
+        Boolean(
+          document
+            .querySelector('main')
+            ?.querySelector('button, a[href], input, select, textarea, [tabindex]'),
+        ),
+      null,
+      { timeout: 10000 },
+    )
+    .catch(() => undefined);
   await page.waitForTimeout(1200);
   // Шаг после загрузки, а не вместо неё: `prepare` перезагружает страницу и
   // всё открытое им теряется, поэтому раскрытые состояния (подсказка значка,

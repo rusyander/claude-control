@@ -621,6 +621,23 @@ describe('отказы контура', () => {
     expect(JSON.stringify(event)).not.toContain('89001234567');
   });
 
+  it('два правила в одном запросе: исход приписан тому, чей кадр его принёс', async () => {
+    // Живой dev 14.09: одно правило замаскировало вход, другое оборвало ответ.
+    // Сводка вешала оба исхода на оба имени — запрет маркера «маскировал данные».
+    await start(
+      upstream([
+        '{"enterprise-platform_sanitized":{"violations":[{"rule_name":"секреты без NER"}]}}',
+        DELTA,
+        '{"enterprise-platform_guardrails":{"stream_interrupted":true,"violations":[{"rule_name":"запрет маркера"}]}}',
+      ]),
+    );
+    await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+
+    const rows = gateway.status().violations.rows;
+    expect(rows.find((row) => row.name === 'секреты без NER')?.actions).toEqual(['masked']);
+    expect(rows.find((row) => row.name === 'запрет маркера')?.actions).toEqual(['interrupted']);
+  });
+
   it('ошибка кадром посреди потока — отказ с причиной контура, а не пустой ответ 200', async () => {
     // litellm и прокси поверх него отдают отказ поставщика объектом `error` уже
     // после заголовков 200. Раньше это был «незнакомый кадр» и пустой успех.
@@ -896,6 +913,93 @@ describe('правила защиты данных в конвейере', () =>
     expect(answer.status).toBe(403);
     expect(answer.text).toContain('Фамилии сотрудников');
     expect(calls).toHaveLength(0);
+  });
+});
+
+// Р11, 15.09.2026. Проба dev показала: по ключу платформа компании не подменяет ничего, и
+// модель видела почту, телефон и IP как есть. Маска контура, объявившего подмену,
+// включается сама — без общего выключателя и без единого своего правила.
+describe('маска контура без общего выключателя (Р11)', () => {
+  const PERSONAL = 'пиши на a.b@example.com, сервер 192.168.1.10';
+
+  function personal(): Promise<{ status: number; text: string }> {
+    return ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      messages: [{ role: 'user', content: PERSONAL }],
+      stream: true,
+    });
+  }
+
+  it('контур с подменой данных маскирует встроенным набором и возвращает значения', async () => {
+    await start(
+      upstream([
+        '{"id":"c1","choices":[{"index":0,"delta":{"content":"пишу на [ПОЧТА_1.1]"}}]}',
+        '[DONE]',
+      ]),
+    );
+    const answer = await personal();
+
+    expect(store.getSettings().dlp.enabled).toBe(false);
+    expect(calls[0]?.body).not.toContain('a.b@example.com');
+    expect(calls[0]?.body).not.toContain('192.168.1.10');
+    expect(calls[0]?.body).toContain('[ПОЧТА_1.1]');
+    expect(answer.text).toContain('пишу на a.b@example.com');
+  });
+
+  it('ключ во встроенном наборе останавливает запрос до сети', async () => {
+    await start(upstream([DELTA, '[DONE]']));
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      messages: [{ role: 'user', content: `ключ ${['gh', 'p_', 'a'.repeat(36)].join('')}` }],
+      stream: true,
+    });
+
+    expect(answer.status).toBe(403);
+    expect(answer.text).toContain('Ключи и токены сервисов');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('выбор человека на карточке снимает маску контура, общий выключатель — нет', async () => {
+    writePlatform(store, { ...PLATFORM, dataMask: false });
+    await start(upstream([DELTA, '[DONE]']));
+    await personal();
+    expect(calls[0]?.body).toContain('a.b@example.com');
+
+    store.updateSettings({ dlp: { ...store.getSettings().dlp, enabled: true } });
+    await personal();
+    expect(calls[1]?.body).not.toContain('a.b@example.com');
+  });
+
+  it('контур, не объявивший подмену, без общего выключателя уходит без маски', async () => {
+    writePlatform(store, { ...PLATFORM, driver: 'openai-compat', toolShim: false });
+    await start(upstream([DELTA, '[DONE]']));
+    await personal();
+    expect(calls[0]?.body).toContain('a.b@example.com');
+  });
+
+  it('свои включённые правила раздела заменяют встроенный набор', async () => {
+    saveRules(appData, [
+      {
+        id: 'r1',
+        name: 'Фамилии сотрудников',
+        enabled: true,
+        kind: 'terms',
+        terms: ['Иванов'],
+        pattern: '',
+        action: 'mask',
+        label: 'ИМЯ',
+      },
+    ]);
+    await start(upstream([DELTA, '[DONE]']));
+    await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      messages: [{ role: 'user', content: `Иванов, ${PERSONAL}` }],
+      stream: true,
+    });
+    expect(calls[0]?.body).not.toContain('Иванов');
+    // Почту свой набор не ловит: человек выбрал свои правила, и карточка говорит
+    // «свои правила раздела», а не «встроенный набор».
+    expect(calls[0]?.body).toContain('a.b@example.com');
   });
 });
 

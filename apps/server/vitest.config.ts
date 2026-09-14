@@ -29,6 +29,8 @@ export default defineConfig({
       exclude: [
         'src/**/*.test.ts',
         'src/**/*.types.ts',
+        // Объявления типов к `.mjs` — не код: v8 разбирает их как JS и шумит PARSE_ERROR.
+        'src/**/*.d.mts',
         'src/**/__fixtures__/**',
         'src/domains/prompts/catalog/**',
       ],

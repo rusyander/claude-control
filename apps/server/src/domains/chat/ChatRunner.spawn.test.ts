@@ -119,6 +119,33 @@ describe('ChatRun.start: сбой запуска CLI', () => {
     expect(events.find((event) => event.kind === 'error')?.message).toContain('Invalid API key');
   });
 
+  /**
+   * Живой прогон dev 14.09.2026 (claude 2.1.263): отказ контура CLI называет
+   * потоком, выходит с кодом 1, а в stderr — только служебная строка про модель
+   * не из каталога Anthropic. Чат показывал её вместо причины.
+   */
+  it('причина из потока не затирается служебной строкой stderr', async () => {
+    const events: { kind: string; message?: string }[] = [];
+    const finished = runWithDeadline(events, process.cwd());
+    const reason = 'API Error: 400 Проверки контента контура остановили ответ: ТЕСТ · маркер';
+
+    process.nextTick(() => {
+      child.stdout.write(
+        `${JSON.stringify({ type: 'result', subtype: 'success', is_error: true, result: reason })}\n`,
+      );
+      child.stderr.write(
+        '[claude-code:unrecognized_model] {"model":"Qwen/Qwen3.8-27B-FP8","query_source":"sdk"}',
+      );
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', 1);
+    });
+
+    expect(await finished).toBe(true);
+    const errors = events.filter((event) => event.kind === 'error');
+    expect(errors.map((event) => event.message)).toEqual([reason]);
+  });
+
   it('pid процесса известен сразу после start — реестр пишет его в журнал на диске', async () => {
     child.pid = 4242;
     const run = new ChatRun();

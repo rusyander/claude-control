@@ -1020,7 +1020,10 @@ export const testsEn: typeof testsRu = {
       'files. It fingerprints the selected cases at the start and stamps the ones that ' +
       'changed at the end. A case the executor never touched is not in the record — an ' +
       'empty record means “the agent marked nothing”, not “the panel lost it”. ' +
-      'Generation and exploration produce no results at all.',
+      'Generation and exploration produce no results at all. A run that never started is ' +
+      'another matter: say a required contour is active in the panel while its gateway is ' +
+      'down or its key is not saved. The agent then does not start around the contour, the ' +
+      'run ends with an error, and the error names the reason and what to press.',
     limitMuted: 'A red case does not redden the gate',
     limitMutedText:
       'Quarantine. The case runs, its status is real, it stays visible — but pnpm tests ' +

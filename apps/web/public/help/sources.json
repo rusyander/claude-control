@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic.tsx",
-      "confirmedAt": "2026-09-13T10:50:29.117Z",
+      "confirmedAt": "2026-09-14T12:02:39.300Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -14,37 +14,37 @@
         {
           "path": "apps/server/src/domains/platform/probe.ts",
           "why": "«Состояния связи»: пять исходов пробы и что панель узнаёт о ключе",
-          "sha": "b13acd1f0688831a"
+          "sha": "fd47fef9d2b85a78"
         },
         {
           "path": "apps/server/src/domains/platform/activation.ts",
           "why": "«Активный контур: ровно один»: что снимается при переключении, пробный запрос через свой шлюз, возврат к провайдеру по умолчанию",
-          "sha": "07962ca5b239b106"
+          "sha": "a9b44c60f0d1f185"
         },
         {
           "path": "apps/server/src/domains/platform/store.ts",
           "why": "«Что происходит с ключом»: где он лежит, что уезжает в экспорт, что видно в ответе",
-          "sha": "44aa2c2c009932f9"
+          "sha": "4d79fdfa72447f5a"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/listener.ts",
           "why": "«Путь одного запроса»: адрес шлюза, три маршрута, занятый порт",
-          "sha": "f90e03e88f69b920"
+          "sha": "862b7ffe6062e112"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/pipeline.ts",
           "why": "«Путь одного запроса»: что панель делает с запросом между CLI и контуром",
-          "sha": "c5f516c6086eb92f"
+          "sha": "c5f8341e9e05e285"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/status.ts",
           "why": "«Коды отказов»: таблица 401/402/403/404/429/451/503 и что делать человеку",
-          "sha": "95f3ceb724df1eaa"
+          "sha": "539dbb7359ccc1eb"
         },
         {
           "path": "apps/server/src/domains/platform/violations.ts",
           "why": "«Проверки контура»: заблокировано / прервано / замаскировано / без имени",
-          "sha": "466b5ac2a5a6b6c5"
+          "sha": "c9251bd5dd9ed602"
         },
         {
           "path": "apps/web/src/pages/Platform/lib/violationsView.ts",
@@ -54,17 +54,17 @@
         {
           "path": "apps/server/src/domains/platform/agents.ts",
           "why": "«Агенты контура»: ростер руками, сессия на стороне контура, исходы вызова",
-          "sha": "e9f86da84c59520e"
+          "sha": "4cc33e77c346d28e"
         },
         {
           "path": "apps/server/src/domains/platform/models.ts",
           "why": "«Модель и глубина продумывания»: модель контура и на потребителя, подстановка из каталога, приём усилия",
-          "sha": "a4e5578ca958a5a1"
+          "sha": "cec1e60e2c50dde1"
         },
         {
           "path": "packages/contracts/src/platform-models.ts",
           "why": "«Модель и глубина продумывания»: порядок выбора модели прогона и подмена незнакомого имени",
-          "sha": "973bcec58fa2d025"
+          "sha": "de129b4e2804f2b0"
         },
         {
           "path": "apps/web/src/pages/Platform/ModelCard.tsx",
@@ -74,22 +74,22 @@
         {
           "path": "apps/web/src/pages/Platform/lib/modelsView.ts",
           "why": "«Модель и глубина продумывания»: кто попадает в список потребителей и что видно при пустом каталоге",
-          "sha": "5b3ec0f819ec89bd"
+          "sha": "2e9c27c924b4fa8d"
         },
         {
           "path": "apps/server/src/domains/platform/routing.ts",
           "why": "«Модель и глубина продумывания»: чем пойдёт прогон и что отвечает шапке чата",
-          "sha": "4da7f8161e9cd5ce"
+          "sha": "fe9b1af11114c8d4"
         },
         {
           "path": "apps/server/src/domains/platform/rules-matrix.ts",
           "why": "«Правила контура и конфликты»: что уходит в запрос, что делает контур сам, единственное взаимоисключение",
-          "sha": "8ad40c82d45e9ef3"
+          "sha": "757a83b1bc207fd6"
         },
         {
           "path": "apps/web/src/pages/Platform/RulesCard.tsx",
           "why": "«Правила контура и конфликты»: таблица «что на карточке» описывает именно её поля и запертый список инструментов",
-          "sha": "b27140c669222d97"
+          "sha": "1f18bab9d71d42c0"
         },
         {
           "path": "apps/web/src/pages/Platform/lib/rulesView.ts",
@@ -104,7 +104,7 @@
         {
           "path": "apps/server/src/domains/platform/spend.ts",
           "why": "«Бюджет и расход»: две цифры, период, исчерпанный ключ (402)",
-          "sha": "4ae4109a3eee67ec"
+          "sha": "eab9e37cfbb698e8"
         },
         {
           "path": "apps/server/src/domains/platform/apply/targets.ts",
@@ -114,17 +114,17 @@
         {
           "path": "apps/web/src/features/PlatformEditor/model/wizard-logic.ts",
           "why": "«Подключение»: четыре шага мастера, которые показывает путеводитель по снимкам",
-          "sha": "ff21a7487e00c2bf"
+          "sha": "0e167112bcf6e646"
         },
         {
           "path": "apps/web/src/features/PlatformEditor/ui/StepTargets.tsx",
           "why": "«Шаг 4: где работает контур» и «Файлы CLI — под галочкой „Терминал“»: список потребителей, файловые цели под отмеченным терминалом, оговорка про уже применённые файлы",
-          "sha": "e25de90af70299f6"
+          "sha": "40d9f58dc4aa271b"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/tool-shim/encode.ts",
           "why": "«Что уезжает наверх» и «Что возвращается»: схемы инструментов текстом системной строки, выключенный выбор инструмента, результат вызова обратно текстом протокола",
-          "sha": "d68eed1837db516d"
+          "sha": "cb1d49a29cdbd792"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/tool-shim/parse.ts",
@@ -134,7 +134,7 @@
         {
           "path": "apps/server/src/domains/platform/gateway/tool-shim/stream.ts",
           "why": "там же: ответ, который ЦЕЛИКОМ вызов, пример протокола в блоке кода и обрыв потока",
-          "sha": "bfdc3b9cbc36b9bb"
+          "sha": "1e15c9136a81ff81"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/tool-shim/claims.ts",
@@ -144,7 +144,17 @@
         {
           "path": "apps/server/src/domains/media/presentations.ts",
           "why": "строка «Презентации» в таблице «что работает через контур»: обычный запрос в чат, файлы собирает панель",
-          "sha": "82797a5d9f26794a"
+          "sha": "a008a5dbd553b8dc"
+        },
+        {
+          "path": "apps/server/src/domains/platform/data-mask.ts",
+          "why": "«Остальные три строки»: когда маска данных панели включается сама на контуре, чем маскирует и что сильнее галочки",
+          "sha": "d10e9445f4927039"
+        },
+        {
+          "path": "apps/web/src/pages/Platform/DataMaskRow.tsx",
+          "why": "«Остальные три строки»: строка «Маска данных панели» в «Наша сторона» и её подписи",
+          "sha": "c1265138a0533660"
         }
       ]
     },
@@ -155,7 +165,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatRunner.ts",
           "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
-          "sha": "bec4f2abae420ffe"
+          "sha": "5e5b30057ec4a105"
         },
         {
           "path": "apps/server/src/domains/chat/ChatPermissions.ts",
@@ -195,20 +205,20 @@
         {
           "path": "apps/server/src/domains/media/images.ts",
           "why": "«Картинка: рисует панель»: три дороги, причина недоступности, промпт режима",
-          "sha": "35d7f36c68416762"
+          "sha": "b6a3f33e0a9677a1"
         },
         {
           "path": "apps/server/src/domains/media/presentations.ts",
           "why": "«Презентация»: три дороги колоды, что собирает панель и почему PDF может быть недоступен",
-          "sha": "82797a5d9f26794a"
+          "sha": "a008a5dbd553b8dc"
         },
         {
           "path": "packages/contracts/src/media-block.ts",
           "why": "«Блоком в ответе»: что панель принимает от агента и что прячет из ленты",
-          "sha": "05557592fe914496"
+          "sha": "b05e474e51932146"
         }
       ],
-      "confirmedAt": "2026-09-12T21:55:12.242Z"
+      "confirmedAt": "2026-09-14T12:02:39.408Z"
     },
     {
       "topic": "tests",
@@ -217,7 +227,7 @@
         {
           "path": "apps/server/src/domains/project-tests/runs.ts",
           "why": "«Запись прогона»: собирается из файлов кейсов, штамп lastRunId, пустая запись",
-          "sha": "53bbdf4a3f0bbd4d"
+          "sha": "0376247c39f5abd2"
         },
         {
           "path": "apps/server/src/domains/project-tests/impact.ts",
@@ -255,7 +265,7 @@
           "sha": "fa543dcf41d56e0e"
         }
       ],
-      "confirmedAt": "2026-09-12T16:06:39.661Z"
+      "confirmedAt": "2026-09-14T10:31:13.986Z"
     },
     {
       "topic": "rules",
@@ -743,7 +753,7 @@
     {
       "topic": "analytics",
       "document": "apps/web/src/pages/Help/topics/AnalyticsTopic.tsx",
-      "confirmedAt": "2026-09-11T15:17:28.546Z",
+      "confirmedAt": "2026-09-14T10:31:14.064Z",
       "sources": [
         {
           "path": "apps/server/src/domains/analytics/scanner/scan.ts",
@@ -768,7 +778,7 @@
         {
           "path": "apps/server/src/domains/analytics/pricing.ts",
           "why": "«В эквиваленте API»: откуда тарифы и что перебивает прайс",
-          "sha": "6caebcbb6fe5ad25"
+          "sha": "52345e36fce9c3b8"
         },
         {
           "path": "apps/server/src/domains/analytics/runtime.ts",
@@ -952,7 +962,7 @@
     {
       "topic": "dlp",
       "document": "apps/web/src/pages/Help/topics/DlpTopic.tsx",
-      "confirmedAt": "2026-09-11T20:30:14.928Z",
+      "confirmedAt": "2026-09-14T10:25:33.071Z",
       "sources": [
         {
           "path": "apps/server/src/domains/dlp/DlpProxy.ts",
@@ -967,7 +977,7 @@
         {
           "path": "apps/server/src/domains/dlp/rules.ts",
           "why": "«Три вида правил»: порядок «сначала блок, потом маска»",
-          "sha": "2898d217d6c79e14"
+          "sha": "d84e009a169fc1b9"
         },
         {
           "path": "apps/server/src/domains/dlp/journal.ts",
@@ -977,19 +987,29 @@
         {
           "path": "apps/server/src/domains/prompt-gate/script.ts",
           "why": "«Проверка перед отправкой»: что видит хук, два его действия и fail-open",
-          "sha": "c95930d380eac1ee"
+          "sha": "555806cb8eede43e"
+        },
+        {
+          "path": "apps/server/src/domains/dlp/builtins.mjs",
+          "why": "«Виды правил» и «Завести правила»: список встроенных образцов и какие из них сверяют контрольную сумму",
+          "sha": "62d503fb2853a7b1"
+        },
+        {
+          "path": "apps/server/src/domains/prompt-gate.ts",
+          "why": "«Где лежит»: скрипт прошлой версии против правленного руками, пересборка",
+          "sha": "372079aa87de180b"
         }
       ]
     },
     {
       "topic": "prompts",
       "document": "apps/web/src/pages/Help/topics/PromptsTopic.tsx",
-      "confirmedAt": "2026-09-12T21:55:12.323Z",
+      "confirmedAt": "2026-09-14T10:31:14.167Z",
       "sources": [
         {
           "path": "apps/server/src/domains/prompts/catalog.ts",
           "why": "«Какие промпты есть»: состав каталога, версия встроенного текста, кто его читает",
-          "sha": "6b8260cf900ba2b7"
+          "sha": "d6b0fd008c8e1e8a"
         },
         {
           "path": "apps/server/src/domains/prompts/store.ts",

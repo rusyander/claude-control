@@ -72,7 +72,7 @@ export function PromptGateCard() {
   // поэтому спрятаны и тумблер, и выбор действия, и переустановка.
   const isClaude = (providers?.active ?? 'claude') === 'claude';
 
-  const { settings, installed, customized, problem, rulesCount, blockRulesCount } = data;
+  const { settings, installed, customized, outdated, problem, rulesCount, blockRulesCount } = data;
 
   const run = (enabled: boolean, action: PromptGateAction, force = false): void => {
     apply.mutate(
@@ -143,6 +143,28 @@ export function PromptGateCard() {
           </Typography>
           <Typography variant="mono">{data.scriptPath}</Typography>
         </Stack>
+
+        {/*
+         * Скрипт прошлой версии панели — не правка руками: пересборка кладёт
+         * новый без force, и новые образцы начинают проверяться и в промпте.
+         */}
+        {outdated && !customized && (
+          <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+            <Typography variant="body-sm" color="warning">
+              {t('gate.outdated')}
+            </Typography>
+            {isClaude && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => run(true, settings.action)}
+                isLoading={apply.isPending}
+              >
+                {t('gate.rebuild')}
+              </Button>
+            )}
+          </Stack>
+        )}
 
         {customized && (
           <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>

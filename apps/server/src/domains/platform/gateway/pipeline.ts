@@ -5,7 +5,8 @@ import type { PlatformFetch } from '../ca-fetch.ts';
 import { AliasVault } from '../../dlp/mask.ts';
 import { maskRequestBody } from '../../dlp/request-filter.ts';
 import { ResponseStreamFilter, restoreJsonResponse } from '../../dlp/response-filter.ts';
-import { readRules } from '../../dlp/rules-store.ts';
+import { maskRulesFor } from '../../dlp/default-rules.ts';
+import { dataMaskOn } from '../data-mask.ts';
 import { promptText } from '../../prompts.ts';
 import type { DriverBudgetRefusal, PlatformDriver } from '../drivers/driver.ts';
 import { driverOf } from '../drivers/index.ts';
@@ -425,7 +426,9 @@ async function chat(
   // бы нашу метку в своё значение.
   const vault = new AliasVault({ avoid: driver.placeholderPattern });
 
-  if (settings.dlp.enabled) {
+  // Маска контура (Р11): сама у контура, объявившего подмену данных, или по
+  // общему выключателю раздела — тем же решением, что показывает карточка.
+  if (dataMaskOn(platform, driver, settings.dlp.enabled)) {
     const guarded = applyRules(bodyText, deps, vault, 'openai-compat');
     if ('refusal' in guarded) {
       return refuse(response, deps, {
@@ -494,6 +497,9 @@ async function chat(
     includeUsage,
     driver,
     truncatedReason: ceilingReason,
+    // Модель, уже пойманная на голом `</think>`, держится до тега с первого
+    // куска; остальные — только если ответ начат с `<think>` (L9).
+    think: deps.store.getThinkTailModels(platform.id).includes(model) ? 'tail' : 'lead',
     // Прослойка разбирает ответ только там, где клиент объявил инструменты:
     // без списка имён любой `<tool_call>` в тексте — это текст, и выполнять
     // его от имени человека панель не станет.
@@ -548,6 +554,9 @@ async function chat(
   }
 
   const facts = translator.facts;
+  // Первый такой ответ уже ушёл с размышлением в тексте — исправить его нечем,
+  // но следующие ответы этой модели шлюз держит до тега.
+  if (facts.bareThinkClose) deps.store.markThinkTail(platform.id, model);
   countUsage(deps, platform.id, model, facts);
   const status = failure
     ? response.destroyed
@@ -569,6 +578,7 @@ async function chat(
     stages: facts.stages,
     summarized: facts.summarized,
     violations: facts.violations,
+    ...(facts.violations.length > 0 ? { violationActions: facts.violationActions } : {}),
     masked: facts.masked,
     interrupted: facts.interrupted,
     unknownFrames: facts.unknownFrames,
@@ -736,7 +746,7 @@ async function nativeChat(
     refuse(response, deps, { platformId: platform.id, path, dialect, status, code, message, lost });
 
   let bodyText = JSON.stringify(ruledBody);
-  if (deps.store.getSettings().dlp.enabled) {
+  if (dataMaskOn(platform, driver, deps.store.getSettings().dlp.enabled)) {
     const guarded = applyRules(bodyText, deps, vault, dialect);
     if ('refusal' in guarded) return refusal(403, 'invalid_request_error', guarded.refusal);
     bodyText = guarded.body;
@@ -1266,14 +1276,13 @@ function applyRules(
   vault: AliasVault,
   kind: Dialect,
 ): { body: string } | { refusal: string } {
-  let rules;
-  try {
-    rules = readRules(deps.appDataDir);
-  } catch (error) {
-    return {
-      refusal: `Защита данных включена, а правила не читаются (${error instanceof Error ? error.message : String(error)})`,
-    };
+  // Своих включённых правил нет — встроенный набор: маска, включённая с пустым
+  // списком, пропускала бы всё, называясь защитой.
+  const set = maskRulesFor(deps.appDataDir);
+  if (set.source === 'broken') {
+    return { refusal: `Защита данных включена, а правила не читаются (${set.error})` };
   }
+  const { rules } = set;
 
   // Вид тела — тот, что уходит наверх: маскируются документированные поля ЕГО
   // диалекта, и тело Anthropic, прочитанное как OpenAI, ушло бы немаскированным.
@@ -1335,6 +1344,7 @@ function record(deps: PipelineDeps, event: Partial<PlatformGatewayEvent>): void 
     stages: event.stages ?? [],
     summarized: event.summarized ?? false,
     violations: event.violations ?? [],
+    ...(event.violationActions ? { violationActions: event.violationActions } : {}),
     masked: event.masked ?? false,
     blocked: event.blocked ?? false,
     interrupted: event.interrupted ?? false,

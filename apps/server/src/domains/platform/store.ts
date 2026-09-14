@@ -32,6 +32,7 @@ import {
 import { managedProfileId } from './apply/profile.ts';
 import { driverOf } from './drivers/index.ts';
 import { effortAccepted, toolRouteOf } from './models.ts';
+import { dataMaskOn, describeDataMask } from './data-mask.ts';
 import { layerOn, runLayers } from './layers.ts';
 import { platformRuleRows, ruleConflicts } from './rules-matrix.ts';
 import { HEADER_SAFE_KEY, invalidField, platformNotFound, notConnected } from './errors.ts';
@@ -473,7 +474,7 @@ export function describePlatform(
     // Сжатие истории берётся из ПРОБЫ, а не из наличия ручки: ручку контур
     // объявляет всегда, а сжимает ли он историю этому ключу — говорит ответ.
     conflicts: ruleConflicts(platform, driver, {
-      dlp: settings.dlp.enabled,
+      dlp: dataMaskOn(platform, driver, settings.dlp.enabled),
       // Гейт промпта — НАШ ХУК в `~/.claude/settings.json`, поэтому снятый слой
       // личных настроек снимает и его (Т8). Строка матрицы обязана это знать:
       // иначе человек, выключивший наши слои, читал бы «наша сторона включена»
@@ -483,6 +484,7 @@ export function describePlatform(
       managedContext: health?.limits.managedContext === true,
     }),
     layers: runLayers(platform),
+    dataMask: describeDataMask(platform, driver, settings.dlp.enabled, appDataDir),
   };
 }
 

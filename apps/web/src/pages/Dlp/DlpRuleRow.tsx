@@ -1,5 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import type { DlpAction, DlpBuiltinPattern, DlpRule } from '@agentdeck/contracts';
+import type {
+  DlpAction,
+  DlpBuiltinInfo,
+  DlpBuiltinPattern,
+  DlpRule,
+} from '@agentdeck/contracts';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -9,10 +14,12 @@ import { Badge } from '@shared/ui/badge';
 import { Toggle } from '@shared/ui/toggle';
 import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
-import { DLP_BUILTINS, isRuleComplete, type BuiltinNames } from '@entities/Dlp';
+import { DLP_BUILTINS, builtinAsRegex, isRuleComplete, type BuiltinNames } from '@entities/Dlp';
 
 interface Props {
   rule: DlpRule;
+  /** Тексты встроенных образцов с сервера — из них правило становится своим выражением. */
+  builtins?: readonly DlpBuiltinInfo[];
   /** Названия и метки образцов по умолчанию — из словаря интерфейса. */
   builtinNames: BuiltinNames;
   builtinLabels: BuiltinNames;
@@ -29,9 +36,19 @@ const ACTIONS: DlpAction[] = ['mask', 'block', 'flag'];
  * не годится: в названиях компаний и адресах запятая встречается сама по себе,
  * и правило молча разъехалось бы на куски.
  */
-export function DlpRuleRow({ rule, builtinNames, builtinLabels, onChange, onRemove }: Props) {
+export function DlpRuleRow({
+  rule,
+  builtins,
+  builtinNames,
+  builtinLabels,
+  onChange,
+  onRemove,
+}: Props) {
   const { t } = useTranslation();
   const complete = isRuleComplete(rule);
+  // Старый сервер текстов образцов не отдаёт — тогда и превращать не во что.
+  const info =
+    rule.kind === 'builtin' ? builtins?.find((builtin) => builtin.id === rule.builtin) : undefined;
 
   // Смена образца тянет за собой название и метку, если человек их не трогал:
   // правило «Почта» с образцом «Номер карты» и меткой [ПОЧТА_1] путало бы всех.
@@ -93,6 +110,25 @@ export function DlpRuleRow({ rule, builtinNames, builtinLabels, onChange, onRemo
             }))}
             hint={rule.builtin ? t(`dlp.builtinHint.${rule.builtin}`) : undefined}
           />
+        )}
+
+        {/*
+         * Образец правится только своим выражением: человек, которому встроенный
+         * ловит лишнее или не всё, иначе переписывал бы его с нуля по памяти.
+         */}
+        {info && (
+          <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange(builtinAsRegex(rule, info.pattern))}
+            >
+              {t('dlp.toRegex')}
+            </Button>
+            <Typography variant="caption" color={info.validated ? 'warning' : 'subtle'}>
+              {info.validated ? t('dlp.toRegexHintValidated') : t('dlp.toRegexHint')}
+            </Typography>
+          </Stack>
         )}
 
         {rule.kind === 'terms' && (

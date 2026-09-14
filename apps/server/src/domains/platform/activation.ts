@@ -15,6 +15,7 @@ import { findPlatform, readPlatforms, requirePlatform, writePlatforms } from './
 import { catalogDefaultModel } from '@agentdeck/contracts/platform-models';
 import { PLATFORM_TERMINAL_CONSUMER } from '@agentdeck/contracts/platform-consumers';
 import { modelRulesFor } from './models.ts';
+import { withoutThink } from './gateway/think-tail.ts';
 
 /**
  * Активный контур: не режим одной карточки, а режим приложения (Р3).
@@ -436,7 +437,9 @@ function collectAnswer(body: string): { answer: string; stopReason: string } {
       // Кадр, который не разобрался, — не причина терять остальные.
     }
   }
-  return { answer: answer.trim().replace(/\s+/g, ' '), stopReason };
+  // Первый ответ модели, пишущей размышления текстом, шлюз ещё отдаёт целиком —
+  // по нему он и учится (L9). Карточке нужен ответ, а не черновик модели.
+  return { answer: withoutThink(answer).trim().replace(/\s+/g, ' '), stopReason };
 }
 
 /** Тело ответа целиком: поток здесь короткий по построению (потолок `SMOKE_MAX_TOKENS`). */

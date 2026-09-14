@@ -254,6 +254,7 @@ describe('состояние карточки', () => {
     rules: [],
     conflicts: [],
     layers: { args: [], systemPrompt: true, dropped: [] },
+    dataMask: { on: false, reason: 'none', declared: false, rules: 'builtin', count: 20 },
     ...patch,
   });
 

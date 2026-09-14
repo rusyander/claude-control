@@ -54,8 +54,11 @@ export const dlpEn: typeof dlpRu = {
       'Five steps; everything outside the panel is a single address line in the CLI config.',
     step1: 'Set up rules',
     step1Text:
-      'The ready-made set — email, phone, INN, SNILS, card, secret keys. INN, SNILS and card ' +
-      'numbers are checksum-verified: without that, the rule would catch any number of the ' +
+      'The ready-made set — twenty built-in patterns: email, phones, INN, SNILS, OGRN, ' +
+      'passports, cards, IBAN, crypto wallets, IP and MAC addresses, UUID, URL, a login with a ' +
+      'password in an address, JWT and secret keys. For a set built earlier the section names ' +
+      'the missing patterns and adds them with one button. INN, SNILS, OGRN, card numbers and ' +
+      'IBAN are checksum-verified: without that, the rule would catch any number of the ' +
       'right length, and a false positive in data protection is worse than a miss — it breaks ' +
       'work and teaches people to switch protection off.',
     step2: 'Add your own dictionary',
@@ -85,8 +88,11 @@ export const dlpEn: typeof dlpRu = {
     rulesWhat: 'What it matches',
     kindBuiltin: 'Built-in pattern',
     kindBuiltinText:
-      'Email, phone, INN, SNILS, card number, secret keys. Wherever the format has a ' +
-      'checksum, it is verified.',
+      'Email, phones, INN, SNILS, OGRN, Russian and Uzbek passports, cards, IBAN, crypto ' +
+      'wallets, IPv4 and IPv6, MAC, UUID, URL, a login with a password in an address, JWT, ' +
+      'secret keys. Wherever the format has a checksum, it is verified. A pattern that catches ' +
+      'too much becomes your own expression with the same text via “Turn into my own ' +
+      'expression” — but the expression no longer carries the checksum.',
     kindTerms: 'Own dictionary',
     kindTermsText:
       'A list of values: surnames, names, addresses. Case-insensitive, whole words; Russian ' +
@@ -213,7 +219,9 @@ export const dlpEn: typeof dlpRu = {
       'The script sits in the configuration hooks directory, its registration in settings.json ' +
       'as an ordinary hook. It is visible in the Hooks section and can be disabled or deleted ' +
       'there; the panel keeps no hidden mechanism. Changing the action rewrites the panel’s ' +
-      'script; a hand-edited file is left alone — “Restore the panel’s script” brings it back.',
+      'script; a hand-edited file is left alone — “Restore the panel’s script” brings it back. A ' +
+      'script built by an earlier panel version is not treated as a hand edit: the card says the ' +
+      'new patterns are missing from it, and “Rebuild the script” writes the current one.',
 
     gateLimitTitle: 'A second to bypass — and that is fine',
     gateLimitText:

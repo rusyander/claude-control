@@ -50,6 +50,22 @@ function actionsOf(event: PlatformGatewayEvent): PlatformViolationAction[] {
   return actions;
 }
 
+/**
+ * Исходы запроса, которые относятся к ЭТОЙ проверке. Исход, чей кадр назвал
+ * свои проверки, достаётся только им; исход без хозяина (отказ 451, кадр без
+ * имён, старый след) — по-прежнему всем названным: промолчать о нём хуже.
+ */
+function actionsOfName(
+  event: PlatformGatewayEvent,
+  name: string,
+  actions: PlatformViolationAction[],
+): PlatformViolationAction[] {
+  const own = event.violationActions;
+  if (!own) return actions;
+  const claimed = Object.values(own).flat();
+  return actions.filter((action) => !claimed.includes(action) || own[name]?.includes(action));
+}
+
 export interface ViolationReportOptions {
   /**
    * Считать только по этим контурам. Панель обслуживает их несколько, и след
@@ -95,13 +111,14 @@ export function violationReport(
 
     for (const name of event.violations) {
       total += 1;
+      const mine = actionsOfName(event, name, actions);
       const row = byName.get(name);
       if (!row) {
         byName.set(name, {
           name,
           count: 1,
           lastAt: event.at,
-          actions: [...actions],
+          actions: mine,
           platformIds: [event.platformId],
         });
         continue;
@@ -110,7 +127,7 @@ export function violationReport(
       // Последний по ВРЕМЕНИ, а не последний в списке: порядок следов зависит от
       // того, как их складывает журнал, и полагаться на него незачем.
       if (event.at > row.lastAt) row.lastAt = event.at;
-      for (const action of actions) {
+      for (const action of mine) {
         if (!row.actions.includes(action)) row.actions.push(action);
       }
       if (!row.platformIds.includes(event.platformId)) row.platformIds.push(event.platformId);

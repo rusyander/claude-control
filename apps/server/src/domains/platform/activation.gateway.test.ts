@@ -160,6 +160,28 @@ describe('пробный запрос идёт через собственный
    * Настоящий слушатель поднимается САМОЙ активацией — и пробный запрос
    * проходит через него.
    */
+  /**
+   * Живое подключение dev 14.09.2026: Qwen3.8 пишет размышления текстом до голого
+   * `</think>`, и карточка показывала черновик модели вместо ответа. Пробный
+   * запрос — первый ответ модели через шлюз: по нему шлюз и запоминает факт.
+   */
+  it('размышление текстом не попадает на карточку, а шлюз запоминает модель', async () => {
+    const thinking = (content: string): string =>
+      JSON.stringify({ id: 'c1', model: 'gpt-x', choices: [{ index: 0, delta: { content } }] });
+    await gateway.start({
+      store,
+      appDataDir: appData,
+      port: 0,
+      fetchImpl: upstream([thinking('Нужно одно слово. </th'), thinking('ink>\n\n'), DELTA, DONE]),
+      spendFlushMs: 0,
+    });
+
+    const result = await activatePlatform(deps(), PLATFORM.id);
+
+    expect(result.smoke.answer).toBe('готов');
+    expect(store.getThinkTailModels(PLATFORM.id)).toEqual(['gpt-x']);
+  });
+
   it('погашенный шлюз активация поднимает сама, и пробный запрос проходит', async () => {
     const result = await activatePlatform(
       {

@@ -1,3 +1,4 @@
+import type { PlatformViolationAction } from '@agentdeck/contracts';
 import { parseFrame, serializeFrame, splitFrames } from '../../dlp/sse.ts';
 import type { DriverViolationName, VendorFrame, VendorFrameKind } from '../drivers/driver.ts';
 import { readViolations } from './status.ts';
@@ -14,6 +15,7 @@ import { expandContourAliases, strayAliases, strayPlatformLabels } from './tool-
 import { claimedWithoutCall } from './tool-shim/claims.ts';
 import type { ShimCall } from './tool-shim/parse.ts';
 import { strictObject } from './tool-shim/repair.ts';
+import { ThinkSplitter, withoutThink, type ThinkMode } from './think-tail.ts';
 import { parseToolCalls, ToolStreamParser, type ShimEvent } from './tool-shim/stream.ts';
 
 /**
@@ -73,6 +75,8 @@ export interface FrameFacts {
   summarized: boolean;
   /** Названия сработавших проверок — только названия. */
   violations: string[];
+  /** Имя проверки → исход, который принёс ЕЁ кадр (маска, обрыв); пустой список — только вердикт. */
+  violationActions: Record<string, PlatformViolationAction[]>;
   /**
    * Контур замаскировал часть данных и всё-таки ответил (`enterprise-platform_sanitized`).
    *
@@ -155,6 +159,14 @@ export interface FrameFacts {
   totalTokens: number;
   /** Часть входа, прочитанная моделью из кэша (`prompt_tokens_details`). */
   cachedTokens: number;
+  /** Сколько знаков размышления снято с текста ответа (L9, `think-tail.ts`). */
+  reasoningChars: number;
+  /**
+   * В тексте, отданном клиенту, был голый `</think>`: модель пишет размышления
+   * текстом без открывающего тега. Конвейер записывает это фактом модели, и
+   * следующие ответы держатся до тега.
+   */
+  bareThinkClose: boolean;
 }
 
 /** Что собралось из потока для клиента, просившего НЕ поток. */
@@ -232,6 +244,12 @@ export interface TranslatorOptions {
    * Без второго условия `[TODO_1]` из файла человека останавливал бы ход.
    */
   placeholders?: { pattern: RegExp; sent: string };
+  /**
+   * Как отделять размышления, пришедшие текстом (L9): `tail` — модель уже
+   * замечена с голым `</think>`, держим всё до тега; `lead` — только ответ,
+   * начатый с `<think>`. Нет ключа — `lead`.
+   */
+  think?: ThinkMode;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -380,6 +398,7 @@ export class StreamTranslator {
     stages: [],
     summarized: false,
     violations: [],
+    violationActions: {},
     masked: false,
     interrupted: false,
     truncated: false,
@@ -396,11 +415,16 @@ export class StreamTranslator {
     completionTokens: 0,
     totalTokens: 0,
     cachedTokens: 0,
+    reasoningChars: 0,
+    bareThinkClose: false,
   };
+  /** Размышления, пришедшие текстом ответа, — до прослойки и до клиента (L9). */
+  readonly #think: ThinkSplitter;
 
   constructor(options: TranslatorOptions) {
     this.#options = options;
     this.#model = options.model;
+    this.#think = new ThinkSplitter(options.think ?? 'lead');
     if (options.shim) this.#parser = new ToolStreamParser({ allowed: options.shim.allowed });
   }
 
@@ -434,10 +458,12 @@ export class StreamTranslator {
       // Придержанное отдаётся текстом ДО ошибки: без прослойки клиент получил
       // бы прочитанную половину ответа, и терять её из-за того, что разборщик
       // держал блок, — регресс, который платит человек.
+      out += this.#releaseThink();
       return out + this.#abortShim() + this.#terminal(this.truncationMessage(), 'api_error');
     }
 
     if (this.#finished) return out;
+    out += this.#releaseThink();
     this.#finished = true;
     // Контур назвал причину остановки, но `[DONE]` не прислал: закрываем сами —
     // половина клиентов ждёт именно его, а ответ и правда закончен.
@@ -459,7 +485,7 @@ export class StreamTranslator {
   fail(message: string): string {
     if (this.#closed) return '';
     this.facts.truncated = true;
-    return this.#abortShim() + this.#terminal(message, 'api_error');
+    return this.#releaseThink() + this.#abortShim() + this.#terminal(message, 'api_error');
   }
 
   /** Ответ целиком — для клиента, который просил не поток. */
@@ -596,12 +622,18 @@ export class StreamTranslator {
       // Сам факт правки — отдельно от названий: контур вправе прислать кадр без
       // единого имени, и тогда «нарушений нет» означало бы «ничего не меняли».
       this.facts.masked = true;
-      this.#addViolations(readViolations(frame.verdict, this.#options.driver.violationNames));
+      this.#addViolations(
+        readViolations(frame.verdict, this.#options.driver.violationNames),
+        'masked',
+      );
       return '';
     }
     if (frame.kind === 'guardrails') {
       const before = this.facts.violations.length;
-      this.#addViolations(readViolations(frame.verdict, this.#options.driver.violationNames));
+      this.#addViolations(
+        readViolations(frame.verdict, this.#options.driver.violationNames),
+        frame.interrupted ? 'interrupted' : undefined,
+      );
       // Кадр гардрейлов, из которого не вышло ни имени, ни вердикта, — это
       // форма, которой мост не знает. Молча выбросить её значило бы показать
       // «проверки молчали» там, где они что-то сказали.
@@ -642,17 +674,65 @@ export class StreamTranslator {
     return '';
   }
 
+  /**
+   * Размышление, пришедшее строкой `content`, снимается ДО всего остального:
+   * до прослойки (вызов, прикинутый в рассуждении, не выполняется), до сборки
+   * текста и до клиента. Кадр своего диалекта уходит байт в байт — поэтому
+   * снятый текст переписывается в его же поле, а не в копию, которую никто не
+   * отправит. Незакрытое размышление отдаётся текстом только в конце потока
+   * (`#releaseThink`), не на причине остановки: платформа с гейтом вывода шлёт
+   * придержанный хвост ПОСЛЕ чанка с `finish_reason`.
+   */
+  #splitThink(
+    payload: Record<string, unknown>,
+    choice: unknown,
+  ): { payload: Record<string, unknown>; delta: Record<string, unknown> } {
+    const delta = isRecord(choice) && isRecord(choice.delta) ? choice.delta : {};
+    if (!isRecord(choice) || typeof delta.content !== 'string') return { payload, delta };
+    const incoming = delta.content;
+    const content = this.#think.push(incoming);
+    this.facts.reasoningChars = this.#think.reasoningChars;
+    this.facts.bareThinkClose = this.#think.sawBareClose;
+    if (this.#think.reasoningChars > 0) this.#stage('reasoning');
+    if (content === incoming) return { payload, delta };
+    const nextDelta = { ...delta, content };
+    return {
+      payload: { ...payload, choices: [{ ...choice, delta: nextDelta }] },
+      delta: nextDelta,
+    };
+  }
+
+  /**
+   * Поток кончился, а размышление так и не закрылось: придержанное — это ответ
+   * модели, которая на этот раз не размышляла. Уходит обычной дельтой, через
+   * прослойку, раньше закрытия или ошибки.
+   */
+  #releaseThink(): string {
+    if (this.#closed) return '';
+    const held = this.#think.end();
+    if (!held) return '';
+    return this.#delta({
+      id: this.#id,
+      object: 'chat.completion.chunk',
+      model: this.#model,
+      choices: [{ index: 0, delta: { content: held }, finish_reason: null }],
+    });
+  }
+
   /** Обычный чанк: клиенту — в его диалекте, себе — текст для сборки. */
-  #delta(payload: Record<string, unknown>): string {
+  #delta(source: Record<string, unknown>): string {
+    let payload = source;
     if (this.#closed) return '';
     if (typeof payload.id === 'string' && !this.#id) this.#id = payload.id;
     if (typeof payload.model === 'string') this.#model = payload.model;
 
     const choice = Array.isArray(payload.choices) ? payload.choices[0] : undefined;
-    const delta = isRecord(choice) && isRecord(choice.delta) ? choice.delta : {};
-    const text = this.#contentText(delta.content);
     const finishReason =
       isRecord(choice) && typeof choice.finish_reason === 'string' ? choice.finish_reason : '';
+    const split = this.#splitThink(payload, choice);
+    payload = split.payload;
+    const delta = split.delta;
+    const text = this.#contentText(delta.content);
     // «Кончилось ошибкой» — не конец ответа. Текст того же чанка ещё доезжает,
     // а следом клиент получает ошибку: причину `error` мост в `end_turn` не
     // переводит никогда.
@@ -1160,12 +1240,15 @@ export class StreamTranslator {
   #done(): string {
     this.#complete = true;
     if (this.#closed) return '';
+    const held = this.#releaseThink();
     this.#finished = true;
     // Придержанный хвост — раньше `[DONE]`, и здесь тоже: после этого кадра
     // клиент читать перестаёт, а хвост — это и весь ответ, начавшийся со
     // скобки, и недоразобранный забор. Без этого собранный из него вызов уходил
     // уже за `[DONE]`, то есть в никуда, а счётчик рапортовал успех.
-    return this.#options.dialect === 'anthropic' ? this.#closeAnthropic() : this.#closeOpenAi();
+    return (
+      held + (this.#options.dialect === 'anthropic' ? this.#closeAnthropic() : this.#closeOpenAi())
+    );
   }
 
   /**
@@ -1196,7 +1279,11 @@ export class StreamTranslator {
     this.#complete = true;
     if (this.#closed) return '';
     this.facts.upstreamError = { code, message };
-    return this.#abortShim() + this.#terminal(`Контур прервал ответ: ${message}`, code);
+    return (
+      this.#releaseThink() +
+      this.#abortShim() +
+      this.#terminal(`Контур прервал ответ: ${message}`, code)
+    );
   }
 
   /**
@@ -1207,7 +1294,10 @@ export class StreamTranslator {
    * вызова вправе оказаться именно в нём. Разошёлся — забрать отданное нельзя:
    * это факт следа, а итоговый текст несёт цельное тело.
    */
-  #replace(final: string): string {
+  #replace(said: string): string {
+    // Итог платформы — текст модели целиком, с размышлением; поток его уже снял.
+    // Сравнивать надо очищенное с очищенным, иначе любой такой ответ «разошёлся».
+    const final = this.#think.reasoningChars > 0 ? withoutThink(said) : said;
     if (this.#closed || final === this.#raw) return '';
     if (final.startsWith(this.#raw)) {
       return this.#delta({
@@ -1372,13 +1462,17 @@ export class StreamTranslator {
    * в панель полсотней штук. Обрезка не молчаливая — что список неполон, видно
    * по `unknownFrames`.
    */
-  #addViolations(names: string[]): void {
+  #addViolations(names: string[], action?: PlatformViolationAction): void {
     for (const name of names) {
-      if (this.facts.violations.length >= MAX_VIOLATIONS) {
-        this.#note('перечень проверок обрезан');
-        return;
+      if (!this.facts.violations.includes(name)) {
+        if (this.facts.violations.length >= MAX_VIOLATIONS) {
+          this.#note('перечень проверок обрезан');
+          return;
+        }
+        this.facts.violations.push(name);
       }
-      if (!this.facts.violations.includes(name)) this.facts.violations.push(name);
+      const own = (this.facts.violationActions[name] ??= []);
+      if (action && !own.includes(action)) own.push(action);
     }
   }
 

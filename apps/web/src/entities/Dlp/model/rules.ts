@@ -1,4 +1,8 @@
-import type { DlpBuiltinPattern, DlpRule } from '@agentdeck/contracts';
+import {
+  dlpBuiltinPatterns,
+  type DlpBuiltinPattern,
+  type DlpRule,
+} from '@agentdeck/contracts';
 
 /**
  * Работа со списком правил на стороне панели: заготовки, замена, удаление.
@@ -14,15 +18,19 @@ import type { DlpBuiltinPattern, DlpRule } from '@agentdeck/contracts';
  * должна быть английской — зашитое «ДАННЫЕ» там читалось как утечка.
  */
 
-/** Встроенные образцы в порядке, в котором их показываем. */
-export const DLP_BUILTINS: DlpBuiltinPattern[] = [
-  'email',
-  'phone_ru',
-  'inn',
-  'snils',
-  'card',
-  'secret_key',
-];
+/**
+ * Встроенные образцы в порядке, в котором их показываем, — список контракта,
+ * а не своя копия: сервер сверяет его со своими выражениями тестом, и третий
+ * список на экране разошёлся бы с обоими молча.
+ */
+export const DLP_BUILTINS: readonly DlpBuiltinPattern[] = dlpBuiltinPatterns;
+
+/**
+ * Образцы, которые отклоняют запрос, а не маскируют: ключ и токен уходят целиком
+ * или не уходят вовсе. Тот же выбор, что у встроенного набора маски контура на
+ * сервере (`dlp/default-rules.ts`).
+ */
+const BLOCKING: readonly DlpBuiltinPattern[] = ['secret_key', 'jwt'];
 
 export type BuiltinNames = Record<DlpBuiltinPattern, string>;
 
@@ -57,7 +65,7 @@ export function newBuiltinRule(builtin: DlpBuiltinPattern, name: string, label: 
     // Ключ уходит наружу целиком или не уходит вовсе: замена меткой сохранила бы
     // осмысленный запрос, но модель всё равно не сможет им воспользоваться, а
     // человек решил бы, что ключ ушёл безопасно.
-    action: builtin === 'secret_key' ? 'block' : 'mask',
+    action: BLOCKING.includes(builtin) ? 'block' : 'mask',
     label,
   };
 }
@@ -82,6 +90,34 @@ export function newRegexRule(name: string, label: string): DlpRule {
  */
 export function starterRules(names: BuiltinNames, labels: BuiltinNames): DlpRule[] {
   return DLP_BUILTINS.map((builtin) => newBuiltinRule(builtin, names[builtin], labels[builtin]));
+}
+
+/**
+ * Образцы, которых в наборе нет ни одним правилом. Набор, собранный до Р11,
+ * знает шесть образцов из двадцати, и без этой подсказки новые не появились бы
+ * у человека никогда: стартовый набор предлагается только пустому разделу.
+ */
+export function missingBuiltins(rules: readonly DlpRule[]): DlpBuiltinPattern[] {
+  const present = new Set(rules.map((rule) => rule.builtin).filter(Boolean));
+  return DLP_BUILTINS.filter((builtin) => !present.has(builtin));
+}
+
+/**
+ * Встроенный образец → своё выражение с тем же текстом. Правило остаётся тем же
+ * (id, название, действие, метка, выключатель) — меняется только то, чем оно
+ * ищет, и дальше его выражение правится как любое своё.
+ */
+export function builtinAsRegex(rule: DlpRule, pattern: string): DlpRule {
+  return {
+    id: rule.id,
+    name: rule.name,
+    enabled: rule.enabled,
+    kind: 'regex',
+    terms: [],
+    pattern,
+    action: rule.action,
+    label: rule.label,
+  };
 }
 
 export function replaceRule(rules: DlpRule[], next: DlpRule): DlpRule[] {

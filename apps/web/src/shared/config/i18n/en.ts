@@ -2355,6 +2355,35 @@ export const en: TranslationSchema = {
     rulesManaged: 'Managed by the panel',
     rulesObserved: 'What the contour does itself',
     rulesOurs: 'Our side',
+    dataMask: 'The panel’s data mask',
+    dataMaskReason: {
+      declared:
+        'Turned on by itself: the contour declares data anonymization, and our mask runs before it regardless of whether it replaced anything.',
+      global:
+        'Forced on by the global switch of the “Data protection” section — it beats this toggle.',
+      none: 'Off: the contour declares no anonymization, the request reaches it as is.',
+    },
+    dataMaskChosenOn: 'Turned on here.',
+    dataMaskChosenOff: 'Turned off here: the request reaches the contour as is.',
+    dataMaskRules: {
+      own_one: 'Masks with {{count}} own enabled rule.',
+      own_few: 'Masks with {{count}} own enabled rules.',
+      own_many: 'Masks with {{count}} own enabled rules.',
+      own_other: 'Masks with {{count}} own enabled rules.',
+      builtin_one: 'No own rules — the built-in set masks: {{count}} pattern.',
+      builtin_few: 'No own rules — the built-in set masks: {{count}} patterns.',
+      builtin_many: 'No own rules — the built-in set masks: {{count}} patterns.',
+      builtin_other: 'No own rules — the built-in set masks: {{count}} patterns.',
+      broken_one:
+        'The rules file is unreadable — the request is refused with the reason, never sent in the clear.',
+      broken_few:
+        'The rules file is unreadable — the request is refused with the reason, never sent in the clear.',
+      broken_many:
+        'The rules file is unreadable — the request is refused with the reason, never sent in the clear.',
+      broken_other:
+        'The rules file is unreadable — the request is refused with the reason, never sent in the clear.',
+    },
+    dataMaskOpen: 'Rules',
     rulesShim: 'The panel’s tool shim',
     rulesShimText:
       'The agent’s tools travel to the contour as protocol text, and the panel reassembles the ' +
@@ -2707,8 +2736,18 @@ export const en: TranslationSchema = {
     noActiveRules: 'No rule is enabled — the proxy will not start until at least one is.',
     emptyTitle: 'No rules yet',
     emptyText:
-      'Start with the ready-made set: email, phone, INN, SNILS, card number and secret keys. INN, SNILS and card numbers are checksum-verified — otherwise the rule would catch any number of the right length.',
+      'Start with the ready-made set: email, phones, INN, SNILS, OGRN, passports, cards, IBAN, IP and MAC addresses, UUID, URL, JWT and secret keys. INN, SNILS, OGRN, card numbers and IBAN are checksum-verified — otherwise the rule would catch any number of the right length.',
     addStarter: 'Add the ready-made set',
+    missingBuiltins_one: 'The set lacks {{count}} built-in pattern: {{names}}.',
+    missingBuiltins_few: 'The set lacks {{count}} built-in patterns: {{names}}.',
+    missingBuiltins_many: 'The set lacks {{count}} built-in patterns: {{names}}.',
+    missingBuiltins_other: 'The set lacks {{count}} built-in patterns: {{names}}.',
+    addMissing: 'Add the missing ones',
+    toRegex: 'Turn into my own expression',
+    toRegexHint:
+      'The rule becomes an expression with the same text, which you can then edit. Other rules using this pattern stay as they are.',
+    toRegexHintValidated:
+      'The rule becomes an expression with the same text, which you can then edit. The checksum lives in code, not in the expression — your own expression will not have it, and false matches will grow.',
     addTerms: 'Own dictionary',
     addRegex: 'Own expression',
     addBuiltin: 'Built-in pattern',
@@ -2727,6 +2766,20 @@ export const en: TranslationSchema = {
       snils: 'SNILS',
       card: 'Card number',
       secret_key: 'Secret keys',
+      phone_intl: 'International phone',
+      ogrn: 'OGRN / OGRNIP',
+      passport_ru: 'Russian passport',
+      passport_ru_foreign: 'Russian international passport',
+      passport_uz: 'Uzbek passport',
+      iban: 'IBAN',
+      crypto_wallet: 'Crypto wallet',
+      ipv4: 'IPv4 address',
+      ipv6: 'IPv6 address',
+      mac: 'MAC address',
+      uuid: 'UUID',
+      url: 'Web address (URL)',
+      credentials_url: 'Login and password in an address',
+      jwt: 'JWT',
     },
     builtinLabel: {
       email: 'EMAIL',
@@ -2735,6 +2788,20 @@ export const en: TranslationSchema = {
       snils: 'SNILS',
       card: 'CARD',
       secret_key: 'KEY',
+      phone_intl: 'PHONE',
+      ogrn: 'OGRN',
+      passport_ru: 'PASSPORT',
+      passport_ru_foreign: 'PASSPORT',
+      passport_uz: 'PASSPORT',
+      iban: 'ACCOUNT',
+      crypto_wallet: 'WALLET',
+      ipv4: 'IP',
+      ipv6: 'IP',
+      mac: 'MAC',
+      uuid: 'UUID',
+      url: 'URL',
+      credentials_url: 'ACCESS',
+      jwt: 'TOKEN',
     },
     builtinHint: {
       email: 'Email addresses.',
@@ -2743,7 +2810,26 @@ export const en: TranslationSchema = {
       snils: 'Eleven digits with the remainder-rule check digit.',
       card: 'Thirteen to nineteen digits verified by the Luhn algorithm.',
       secret_key:
-        'Keys shaped like sk-…, ghp_…, AKIA…, Slack tokens (xox…) and PEM private-key blocks inside the request text.',
+        'Keys with a recognisable prefix: OpenAI and Anthropic (sk-…), Stripe, GitHub, GitLab, AWS, Google, Slack, npm, Hugging Face, SendGrid, Telegram bots, a Bearer header and PEM private-key blocks.',
+      phone_intl:
+        'A number with a country code: +998, +1, +44 and any other, 10 to 15 digits. +7 numbers belong to “Phone”.',
+      ogrn: 'Thirteen or fifteen digits with the check digit and registration year verified — a timestamp will not pass.',
+      passport_ru:
+        'Series and number: “45 06 123456”, “4506 №123456”, or “4506 123456” next to the word “passport” or “series”. A passport has no checksum, so bare ten digits are not matched.',
+      passport_ru_foreign:
+        'Two digits and seven: with the number sign (“72 №1234567”) or next to the word “passport”.',
+      passport_uz:
+        'Two capital Latin letters and seven digits — the Uzbek passport form, shared by many other countries.',
+      iban: 'An ISO 13616 account number verified by the mod-97 remainder.',
+      crypto_wallet: 'Bitcoin addresses like bc1… and Ethereum ones like 0x plus 40 characters.',
+      ipv4: 'Addresses like 192.168.1.10. Loopback 127.x, 0.0.0.0 and broadcast are left alone — they reveal nothing.',
+      ipv6: 'Addresses like fe80::1ff:fe23:4567:890a. Times like 12:30:45 and ::1 are left alone.',
+      mac: 'Six pairs of characters separated by colons or dashes.',
+      uuid: 'Identifiers like 550e8400-e29b-41d4-…. Common in code — the model sees a label instead of the value, and the value comes back in the answer.',
+      url: 'http, https, ftp and ws addresses. The model stops seeing addresses and may understand the task worse; the value comes back in the answer.',
+      credentials_url:
+        'A login and password inside a connection address: postgres://login:password@host. Masked rather than refused — such addresses often sit in a README.',
+      jwt: 'Tokens like eyJ….eyJ….signature. Refuses the request by default, like keys.',
     },
     terms: 'Dictionary',
     termsHint:
@@ -2810,6 +2896,9 @@ export const en: TranslationSchema = {
     customized:
       'The script differs from the one the panel writes — it looks hand-edited. The panel leaves it alone.',
     reinstall: 'Restore the panel’s script',
+    outdated:
+      'The script was built by an earlier panel version: the new built-in patterns are not in it. This is not treated as a hand edit.',
+    rebuild: 'Rebuild the script',
     applied: 'Gate installed.',
     removed: 'Gate removed.',
     applyFailed: 'Could not change the gate.',

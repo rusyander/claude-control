@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Hook, PromptGateInfo, PromptGateSettings } from '@agentdeck/contracts';
@@ -68,14 +69,43 @@ function expectedScript(location: GateLocation, settings: PromptGateSettings): s
  * блокировать при выбранном «предупредить».
  */
 export function isPanelScript(source: string): boolean {
+  return panelScriptState(source) !== 'foreign';
+}
+
+/**
+ * Ядра, которые панель уже раскладывала по машинам (sha256 обрезанного текста).
+ * Скрипт с таким ядром — свой, просто собранный прошлой версией: без этого
+ * списка каждое изменение образцов объявляло бы установленный хук чужой правкой,
+ * и он навсегда остался бы со старым набором (15.09.2026, образцы Р11).
+ */
+const PAST_CORES = new Set(['d3f9e8a3b45bd7b34859a0e3ffd915307148409b7c3c9d0ff47d7e065bf3eb2e']);
+
+const CORE_END = '\n\n/** Ведём ли журнал';
+
+type ScriptState = 'current' | 'outdated' | 'foreign';
+
+function panelScriptState(source: string): ScriptState {
   const match = /^const CONFIG = (\{[\s\S]*?\n\});$/m.exec(source);
-  if (!match?.[1]) return false;
+  if (!match?.[1]) return 'foreign';
+  let expected: string;
   try {
-    const config = JSON.parse(match[1]) as GateScriptConfig;
-    return buildGateScript(config) === source;
+    expected = buildGateScript(JSON.parse(match[1]) as GateScriptConfig);
   } catch {
-    return false;
+    return 'foreign';
   }
+  if (expected === source) return 'current';
+
+  // Ядро — между блоком настроек и первой функцией шаблона. Всё вокруг обязано
+  // совпасть байт в байт: правка руками где угодно ещё остаётся чужой.
+  const coreStart = match.index + match[0].length;
+  const coreEnd = source.indexOf(CORE_END, coreStart);
+  const expectedEnd = expected.indexOf(CORE_END, coreStart);
+  if (coreEnd < 0 || expectedEnd < 0) return 'foreign';
+  const core = source.slice(coreStart, coreEnd).trim();
+  if (!PAST_CORES.has(createHash('sha256').update(core).digest('hex'))) return 'foreign';
+  const rebuilt =
+    source.slice(0, coreStart) + expected.slice(coreStart, expectedEnd) + source.slice(coreEnd);
+  return rebuilt === expected ? 'outdated' : 'foreign';
 }
 
 export function describePromptGate(store: AppStore, location: GateLocation): PromptGateInfo {
@@ -88,9 +118,12 @@ export function describePromptGate(store: AppStore, location: GateLocation): Pro
   const exists = existsSync(scriptPath);
 
   let customized = false;
+  let outdated = false;
   if (exists) {
     const current = safeRead(scriptPath);
-    customized = current === undefined || !isPanelScript(current);
+    const state = current === undefined ? 'foreign' : panelScriptState(current);
+    customized = state === 'foreign';
+    outdated = state === 'outdated';
   }
 
   let rulesCount = 0;
@@ -112,6 +145,7 @@ export function describePromptGate(store: AppStore, location: GateLocation): Pro
     scriptPath,
     command: gateCommand(location.hooksDir),
     customized,
+    outdated,
     rulesCount,
     blockRulesCount,
     problem,

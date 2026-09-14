@@ -71,6 +71,7 @@ const base: PlatformStatus = {
   rules: [],
   conflicts: [],
   layers: { args: [], systemPrompt: true, dropped: [] },
+  dataMask: { on: false, reason: 'none', declared: false, rules: 'builtin', count: 20 },
   // Проба ЕСТЬ и она удачная: только такой контур телефон вправе назвать
   // работающим. Основа без пробы означала бы «работает» на пустом месте — и
   // ровно это здесь однажды и было записано в ожидание.

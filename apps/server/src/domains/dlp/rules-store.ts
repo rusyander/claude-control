@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { object, string, boolean, array, number, enum as zodEnum } from 'zod';
 import type { DlpRule } from '@agentdeck/contracts';
 import { writeJsonFile } from '../../lib/safe-io.ts';
+import { DLP_BUILTIN_IDS } from './builtins.mjs';
 import { compileRulePattern } from './rules.ts';
 
 /**
@@ -24,7 +25,7 @@ const ruleSchema = object({
   name: string().min(1),
   enabled: boolean().default(true),
   kind: zodEnum(['builtin', 'terms', 'regex']),
-  builtin: zodEnum(['email', 'phone_ru', 'inn', 'snils', 'card', 'secret_key']).optional(),
+  builtin: zodEnum(DLP_BUILTIN_IDS).optional(),
   terms: array(string()).default([]),
   pattern: string().default(''),
   action: zodEnum(['mask', 'block', 'flag']).default('mask'),

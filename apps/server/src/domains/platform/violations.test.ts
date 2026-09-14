@@ -238,3 +238,21 @@ describe('текст проверки в сводку не попадает', ()
     expect(text).not.toContain('токсичность');
   });
 });
+
+describe('violationReport: исход — тому, чей кадр его принёс', () => {
+  it('исход без хозяина остаётся у всех названных, свой — только у своего', () => {
+    // Маску принёс кадр «секретов», а обрыв пришёл кадром без имён: молча
+    // отдать его никому было бы хуже, чем приписать обоим.
+    const report = violationReport([
+      event({
+        violations: ['секреты', 'маркер'],
+        violationActions: { секреты: ['masked'], маркер: [] },
+        masked: true,
+        interrupted: true,
+      }),
+    ]);
+    const actions = (name: string) => report.rows.find((row) => row.name === name)?.actions;
+    expect(actions('секреты')).toEqual(['masked', 'interrupted']);
+    expect(actions('маркер')).toEqual(['interrupted']);
+  });
+});

@@ -195,6 +195,58 @@ describe('гейт на промпте', () => {
     writeFileSync(join(appDataDir, 'dlp-rules.json'), '{ не json', 'utf8');
     expect(describePromptGate(store, location()).problem).toBeTruthy();
   });
+
+  // Образцы Р11 живут в `dlp/builtins.mjs` и попадают в хук вставкой. Проверка —
+  // запуском: новый образец обязан останавливать промпт в НАСТОЯЩЕМ скрипте,
+  // иначе вставка потеряла бы его молча, а прокси продолжал бы находить.
+  it('скрипт останавливает промпт по образцу, которого не было в прошлом ядре', () => {
+    const token = [
+      'ey',
+      'JhbGciOiJIUzI1NiJ9.ey',
+      'JzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N',
+    ];
+    saveRules(appDataDir, [
+      rule({ id: 'jwt', name: 'Токены', kind: 'builtin', builtin: 'jwt', action: 'block' }),
+    ]);
+    const result = run({ user_prompt: `вот токен ${token.join('')}` });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('Токены');
+  });
+
+  // Снимок настоящего скрипта, который раскладывала панель до Р11 (ядро с шестью
+  // образцами). Без распознавания прошлых ядер он читался бы правкой человека и
+  // навсегда остался бы со старым набором.
+  const PAST_SCRIPT = new URL(
+    './prompt-gate/__fixtures__/gate-script-2026-08.mjs.txt',
+    import.meta.url,
+  );
+
+  it('скрипт прошлой версии панели — «устарел», а не «правка», и применение его пересобирает', () => {
+    applyPromptGate(store, location(), { enabled: true, action: 'block' });
+    writeFileSync(gateScriptPath(hooksDir), readFileSync(PAST_SCRIPT, 'utf8'), 'utf8');
+
+    const before = describePromptGate(store, location());
+    expect(before.customized).toBe(false);
+    expect(before.outdated).toBe(true);
+
+    const after = applyPromptGate(store, location(), { enabled: true, action: 'block' });
+    expect(after.outdated).toBe(false);
+    expect(readFileSync(gateScriptPath(hooksDir), 'utf8')).toContain('passport_ru');
+  });
+
+  it('правка руками в скрипте прошлой версии остаётся правкой', () => {
+    applyPromptGate(store, location(), { enabled: true, action: 'block' });
+    const edited = readFileSync(PAST_SCRIPT, 'utf8').replace(
+      'function journalEnabled()',
+      'function journalEnabled() /* моё */',
+    );
+    writeFileSync(gateScriptPath(hooksDir), edited, 'utf8');
+
+    const info = applyPromptGate(store, location(), { enabled: true, action: 'block' });
+    expect(info.customized).toBe(true);
+    expect(info.outdated).toBe(false);
+    expect(readFileSync(gateScriptPath(hooksDir), 'utf8')).toBe(edited);
+  });
 });
 
 describe('ядро гейта совпадает с прокси', () => {

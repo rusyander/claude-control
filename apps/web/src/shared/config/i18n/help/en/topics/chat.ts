@@ -297,7 +297,9 @@ export const chatEn: typeof chatRu = {
         'prompt drowns a mid-range model. The same card also drops our layers: such ' +
         'a run may go without your personal rules, skills and MCP servers. What ' +
         'exactly was dropped, the conversation header says BEFORE you send a ' +
-        'message — otherwise an agent working without your rules would look broken.',
+        'message — otherwise an agent working without your rules would look broken. ' +
+        'When a run ends in an error, the feed shows the reason the CLI gave in the ' +
+        'answer itself (a contour refusal, say), not a service line from its error stream.',
 
       basicsTitle: 'One conversation from start to finish',
       basicsCaption:

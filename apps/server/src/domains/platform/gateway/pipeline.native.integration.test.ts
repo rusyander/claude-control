@@ -333,6 +333,16 @@ describe('родной диалект Anthropic у платформы', () => {
     expect(answer.text).toContain('нашёл Иванов');
   });
 
+  it('маска контура (Р11) работает и на родной ручке — без общего выключателя', async () => {
+    writePlatform(store, { ...PLATFORM, dataMask: true });
+    await start(platformAnswers(sse(EVENTS)));
+    await ask({ ...ASK, messages: [{ role: 'user', content: 'сервер 192.168.1.10' }] });
+
+    expect(store.getSettings().dlp.enabled).toBe(false);
+    expect(calls[0]?.body).not.toContain('192.168.1.10');
+    expect(calls[0]?.body).toContain('[IP_1.1]');
+  });
+
   it('человек включил прослойку — запрос идёт мостом, как шёл', async () => {
     writePlatform(store, { ...PLATFORM, toolShim: true });
     await start(

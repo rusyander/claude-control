@@ -173,6 +173,9 @@ export function usePlatformWizard({ existing, onDone }: PlatformWizardOptions) {
     setId,
     token,
     setToken,
+    // Маска сохранённого ключа (префикс и хвост) — только чтобы показать, что он
+    // есть и останется: само значение наружу из панели не выходит.
+    savedToken: existing?.hasToken ? existing.maskedToken : '',
     targets,
     toggleTarget,
     toggleConsumer,

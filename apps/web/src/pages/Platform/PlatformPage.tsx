@@ -26,6 +26,7 @@ import { BridgeRow } from './BridgeRow';
 import { showsViolations } from './lib/violationsView';
 import { showsToolShim, showsToolsFact } from './lib/toolShimView';
 import { showsAgents } from './lib/agentsView';
+import { activeFirst } from './lib/platformOrder';
 import styles from './PlatformPage.module.scss';
 
 /**
@@ -43,7 +44,9 @@ import styles from './PlatformPage.module.scss';
 export function PlatformPage() {
   const { t } = useTranslation();
   const { data: info, isLoading, isError, refetch } = usePlatformsInfo();
-  const data = info?.platforms;
+  // Активный контур первым: через него сейчас идёт работа, и все карточки ниже
+  // (модель, правила, агенты) идут в том же порядке.
+  const data = activeFirst(info?.platforms);
   const gateway = usePlatformGateway();
   const compromises = useCompromises();
   const [wizard, setWizard] = useState<{ open: boolean; existing?: PlatformStatus }>({

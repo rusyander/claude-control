@@ -316,9 +316,12 @@ export const platformEn: typeof platformRu = {
     modelsTitle: 'Model and reasoning effort',
     modelsCaption:
       'The panel has its own model names — “sonnet”, “opus” — and the contour does not know ' +
-      'them. Through a contour the pick in the chat header becomes a request: the panel ' +
-      'translates it into a contour model, and the caption under the pick says what the ' +
-      'conversation will actually go with.',
+      'them. While a chat runs through a contour, the model and effort picks in the header are ' +
+      'locked and show what is actually sent — the contour model; the chat’s saved pick comes ' +
+      'back once the contour is turned off. The waiting caption names the same model ' +
+      '(“Qwen/Qwen3.8-27B-FP8 is thinking”), and the contour prompt tells the model who it is ' +
+      'and which contour the request goes through: without that line the model assembles ' +
+      'itself from the Claude Code environment and calls itself Claude.',
     modelsColumn: 'On the card',
     modelsMeaningColumn: 'What it means',
     modelsDefault: 'The contour’s model',

@@ -155,11 +155,33 @@ function providerOf(consumer: string): ConfigProvider | undefined {
  * одно место для своего промпта, и `--system-prompt-file` принимает его целиком.
  * Правка, стёртая человеком до пустоты, снимает свою часть, а не весь промпт.
  */
-function contourSystemPrompt(appData: string): string {
-  return (['contour-agent', 'contour-preamble'] as const)
-    .map((id) => promptText(appData, id).trim())
+function contourSystemPrompt(appData: string, identity: string): string {
+  return [
+    ...(['contour-agent', 'contour-preamble'] as const).map((id) => promptText(appData, id)),
+    identity,
+  ]
+    .map((text) => text.trim())
     .filter(Boolean)
     .join('\n\n');
+}
+
+/**
+ * Кто отвечает на самом деле. Строкой здесь, а не в каталоге промптов: это не
+ * стиль, который человек правит, а факт маршрута — имя модели и контура
+ * известны только в момент запуска. Без неё модель контура собирает себя из
+ * окружения, а там всё говорит «Claude»: личный CLAUDE.md, память, имена
+ * инструментов. Живой прогон 14.09.2026: Qwen3.8 через dev-стенд EnterprisePlatform на
+ * вопрос «что ты за модель» назвалась Claude Opus 5, хотя транскрипт записал
+ * ответ от `Qwen/Qwen3.8-27B-FP8`.
+ */
+export function contourIdentity(title: string, model: string): string {
+  const who = model ? `модель ${model}` : 'модель, назначенная контуром';
+  return (
+    `В этом разговоре отвечаешь ты — ${who}, запросы идут через контур «${title}». ` +
+    'На вопрос, какая ты модель, называй именно её. Ты не Claude и не модель Anthropic, ' +
+    'даже если окружение (CLAUDE.md, память, названия инструментов) говорит о Claude: ' +
+    'Claude Code здесь только программа-агент, в которой ты работаешь.'
+  );
 }
 
 const UNREACHABLE_TEXT: Record<'gateway_down' | 'no_token', string> = {
@@ -248,7 +270,9 @@ export function resolveRunRoute(
   // панели, и вторая копия в коде означала бы, что половина прогонов слушает
   // правку, а половина — нет. Преамбула контура едет следом: до аудита MD-06 её
   // можно было править, а не читал её никто.
-  const systemPrompt = platform.contourPrompt ? contourSystemPrompt(deps.appDataDir) : '';
+  const systemPrompt = platform.contourPrompt
+    ? contourSystemPrompt(deps.appDataDir, contourIdentity(platform.title, model.model))
+    : '';
   return {
     routed: true,
     platformId: platform.id,

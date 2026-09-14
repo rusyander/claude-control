@@ -37,6 +37,7 @@ export function ChatMessages({
   messages,
   conversationId,
   stream,
+  modelName,
   isLoading,
   hasMore,
   isLoadingMore,
@@ -299,7 +300,9 @@ export function ChatMessages({
                   color="muted"
                   className={styles.pendingLabel}
                 >
-                  {stream.tools.length > 0 ? t('chat.pendingTools') : t('chat.pending')}
+                  {t(stream.tools.length > 0 ? 'chat.pendingTools' : 'chat.pending', {
+                    model: modelName ?? t('chat.pendingModelFallback'),
+                  })}
                 </Typography>
               </Stack>
             )}

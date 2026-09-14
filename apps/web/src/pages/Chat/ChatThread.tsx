@@ -15,6 +15,7 @@ export function ChatThread({
   messages,
   conversationId,
   stream,
+  modelName,
   isLoading,
   hasMore,
   isLoadingMore,
@@ -71,6 +72,7 @@ export function ChatThread({
       messages={messages}
       conversationId={conversationId}
       stream={stream}
+      modelName={modelName}
       isLoading={isLoading}
       hasMore={hasMore}
       isLoadingMore={isLoadingMore}

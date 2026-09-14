@@ -45,9 +45,8 @@ export function ChatModelPicker({
   // сервере, — второй расчёт разошёлся бы с первым молча.
   const plan = usePlatformRunPlan(consumer);
   const routed = plan.data?.routed === true ? plan.data : undefined;
-  const caption = routed
-    ? platformModelCaption(routed.title, chooseRunModel(routed.rules, model))
-    : undefined;
+  const choice = routed ? chooseRunModel(routed.rules, model) : undefined;
+  const caption = routed && choice ? platformModelCaption(routed.title, choice) : undefined;
   // Снятые нами слои (Т8) — здесь же и по той же причине: «агент не читает мои
   // правила» выглядит поломкой агента, пока человек не увидит, что это его
   // собственная галочка на карточке контура. Сказать надо ДО отправки
@@ -60,6 +59,8 @@ export function ChatModelPicker({
   const defaultEffortName = defaultEffort
     ? t(`chat.effort_${defaultEffort}`)
     : t('chat.effortAuto');
+  const effortName = (level: string): string =>
+    level ? t(`chat.effort_${level}`) : t('chat.fromSettings', { value: defaultEffortName });
 
   // Алиасы + конкретные модели каталога; выбранное значение остаётся в списке,
   // даже если каталог не скачался.
@@ -70,40 +71,76 @@ export function ChatModelPicker({
     model,
   );
 
+  // Через контур выбор ЗАПЕРТ и показывает то, что уедет: модель решает контур, а
+  // список моделей вендора рядом с подписью «через контур: Qwen» заставлял
+  // человека сверять две строки и гадать, какая из них правда (владелец,
+  // 14.09.2026). Сохранённый выбор чата не стирается — выключенный контур
+  // возвращает его как был. Один пункт в заблокированном select, а не текст:
+  // место и порядок в шапке остаются теми же, и диктор читает то же поле.
+  const locked = routed && choice;
+  const lockedTitle = routed ? t('chat.platformLocked', { title: routed.title }) : undefined;
+  const lockedModel = choice?.model || t('chat.platformModelNone');
+  const lockedEffort = routed?.effort ? effortName(effort) : t('chat.platformEffortOff');
+
   return (
     // Подписи контура узкой колонкой под выбором: во всю ширину они растягивали
     // блок, и соседние кнопки шапки уезжали на отдельную строку.
     <Stack gap="var(--spacing-3xs)" className={styles.picker}>
       <Stack direction="row" align="center" gap="var(--spacing-3xs)">
-        <select
-          className={styles.select}
-          value={model}
-          onChange={(event) => onModelChange(event.target.value)}
-          aria-label={t('chat.model')}
-          title={t('chat.modelHint')}
-        >
-          {modelOptions.map((option) => (
-            <option key={option.value || 'default'} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        {locked && (
+          <>
+            <select
+              className={styles.select}
+              value="locked"
+              disabled
+              aria-label={t('chat.model')}
+              title={lockedTitle}
+            >
+              <option value="locked">{lockedModel}</option>
+            </select>
+            <select
+              className={styles.select}
+              value="locked"
+              disabled
+              aria-label={t('chat.effort')}
+              title={lockedTitle}
+            >
+              <option value="locked">{lockedEffort}</option>
+            </select>
+          </>
+        )}
 
-        <select
-          className={styles.select}
-          value={effort}
-          onChange={(event) => onEffortChange(event.target.value)}
-          aria-label={t('chat.effort')}
-          title={t('chat.effortHint')}
-        >
-          {EFFORT_LEVELS.map((level) => (
-            <option key={level || 'default'} value={level}>
-              {level
-                ? t(`chat.effort_${level}`)
-                : t('chat.fromSettings', { value: defaultEffortName })}
-            </option>
-          ))}
-        </select>
+        {!locked && (
+          <>
+            <select
+              className={styles.select}
+              value={model}
+              onChange={(event) => onModelChange(event.target.value)}
+              aria-label={t('chat.model')}
+              title={t('chat.modelHint')}
+            >
+              {modelOptions.map((option) => (
+                <option key={option.value || 'default'} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className={styles.select}
+              value={effort}
+              onChange={(event) => onEffortChange(event.target.value)}
+              aria-label={t('chat.effort')}
+              title={t('chat.effortHint')}
+            >
+              {EFFORT_LEVELS.map((level) => (
+                <option key={level || 'default'} value={level}>
+                  {effortName(level)}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
       </Stack>
 
       {/* Подпись появляется ТОЛЬКО когда прогон идёт через контур: в обычном

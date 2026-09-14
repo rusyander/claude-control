@@ -20,6 +20,11 @@ const ADMIN_PATHS = ['/providers', '/models', '/users', '/keys'];
  */
 export function StepToken({ model }: WizardStepProps) {
   const { t } = useTranslation();
+  // При правке контура ключ уже лежит в панели: поле пустое, но в подсказке
+  // стоит его маска, и «Далее» его не сбрасывает — пустое поле значит «оставить
+  // как есть». Без этого пустое поле читалось как «ключ стёрт», и человек
+  // вставлял его заново только ради того, чтобы заглянуть на шаги 3 и 4.
+  const saved = model.savedToken;
 
   return (
     <Stack gap="var(--spacing-md)">
@@ -28,8 +33,8 @@ export function StepToken({ model }: WizardStepProps) {
         value={model.token}
         onChange={model.setToken}
         type="password"
-        placeholder={t('platform.tokenPlaceholder')}
-        hint={t('platform.tokenHint')}
+        placeholder={saved || t('platform.tokenPlaceholder')}
+        hint={saved ? t('platform.tokenSavedHint', { mask: saved }) : t('platform.tokenHint')}
         autoFocus
       />
 

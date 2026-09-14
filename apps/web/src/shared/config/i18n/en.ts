@@ -756,8 +756,9 @@ export const en: TranslationSchema = {
     attachments: 'Attached files',
     thinking: 'Thinking',
     /** Пока ответа ещё нет: без этого пустая лента выглядит зависшей. */
-    pending: 'Claude is thinking',
-    pendingTools: 'Claude is working with files',
+    pending: '{{model}} is thinking',
+    pendingTools: '{{model}} is working with files',
+    pendingModelFallback: 'The agent',
     reconnecting: 'Lost the connection to the answer — reconnecting',
     errorTitle: 'The agent stopped with an error',
     copyError: 'Copy the error',
@@ -833,6 +834,10 @@ export const en: TranslationSchema = {
     platformModelUnset:
       'The "{{title}}" contour assigned no model (empty catalog, or the probe never ran) — the request goes as it is.',
     platformNoEffort: 'The "{{title}}" contour takes no reasoning effort — it is not sent.',
+    platformLocked:
+      'This chat runs through the "{{title}}" contour: it sets the model and effort. Change them in the Contour section or return to the default provider.',
+    platformModelNone: 'contour model',
+    platformEffortOff: 'not sent',
     platformRefused:
       'The "{{title}}" contour is required, but {{reason}}: the message will be refused — it goes neither to the contour nor to the vendor cloud. {{fix}}',
     platformRefusedReason: {
@@ -2064,6 +2069,8 @@ export const en: TranslationSchema = {
         'The address is a model API, and it refused only because no key was sent. Save the key (“Configure” → the “Key” step) and probe again.',
     },
     tokenLabel: 'Contour key',
+    tokenSavedHint:
+      'Key {{mask}} is saved — Next keeps it. Paste a new one to replace it. The panel never shows the value itself.',
     tokenPlaceholder: 'sk-…',
     tokenHint:
       'A saved key is never shown — not here, not in any panel response. Leave the field empty to keep the saved one.',

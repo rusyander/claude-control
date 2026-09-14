@@ -10,6 +10,7 @@ import { promptText, savePrompt } from '../prompts.ts';
 import { buildManagedProfile } from './apply/profile.ts';
 import { writePlatform, writeToken } from './store.ts';
 import {
+  contourIdentity,
   describeRunPlan,
   listConsumerOptions,
   resolveRunRoute,
@@ -129,7 +130,23 @@ describe('прогон через контур', () => {
     if (!decision.routed) throw new Error('маршрут не собран');
     const agent = promptText(dir, 'contour-agent').trim();
     const preamble = promptText(dir, 'contour-preamble').trim();
-    expect(decision.systemPrompt).toBe(`${agent}\n\n${preamble}`);
+    expect(decision.systemPrompt).toBe(`${agent}\n\n${preamble}\n\n${identity()}`);
+  });
+
+  /** Строка «кто отвечает» при прогоне без названной модели — её собирает сам маршрут. */
+  const identity = (): string => contourIdentity(PLATFORM.title, '');
+
+  /**
+   * Живой прогон 14.09.2026: Qwen3.8 через dev-стенд EnterprisePlatform назвалась Claude
+   * Opus 5 — промпт контура заменил промпт CLI и не сказал, кто отвечает.
+   */
+  it('промпт контура называет модель и контур, которыми идёт прогон', () => {
+    connect();
+    const decision = resolveRunRoute(deps, 'chat', 'qwen-test');
+    if (!decision.routed) throw new Error('маршрут не собран');
+    expect(decision.systemPrompt).toContain('модель qwen-test');
+    expect(decision.systemPrompt).toContain(`«${PLATFORM.title}»`);
+    expect(decision.systemPrompt).toContain('Ты не Claude');
   });
 
   it('правка человека в каталоге едет прогону, а не встроенный текст', () => {
@@ -137,14 +154,18 @@ describe('прогон через контур', () => {
     savePrompt(dir, 'contour-agent', 'короткий свой промпт');
     savePrompt(dir, 'contour-preamble', 'своя преамбула');
     const decision = resolveRunRoute(deps, 'chat');
-    expect(decision.routed && decision.systemPrompt).toBe('короткий свой промпт\n\nсвоя преамбула');
+    expect(decision.routed && decision.systemPrompt).toBe(
+      `короткий свой промпт\n\nсвоя преамбула\n\n${identity()}`,
+    );
   });
 
   it('пустая правка преамбулы снимает только её, промпт агента остаётся', () => {
     connect();
     savePrompt(dir, 'contour-preamble', '   ');
     const decision = resolveRunRoute(deps, 'chat');
-    expect(decision.routed && decision.systemPrompt).toBe(promptText(dir, 'contour-agent').trim());
+    expect(decision.routed && decision.systemPrompt).toBe(
+      `${promptText(dir, 'contour-agent').trim()}\n\n${identity()}`,
+    );
   });
 
   it('выключенный переключатель возвращает прогон к промпту CLI', () => {

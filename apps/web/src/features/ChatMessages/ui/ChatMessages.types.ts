@@ -77,6 +77,11 @@ export interface ChatMessagesProps {
   conversationId?: string;
   /** Ответ, который набирается прямо сейчас. */
   stream: StreamState;
+  /**
+   * Кто отвечает — имя в подписи ожидания («Qwen думает над ответом»). Через
+   * контур это модель контура, а не Claude. Нет — нейтральное «Агент».
+   */
+  modelName?: string;
   isLoading: boolean;
   /** Есть ли более ранние сообщения до начала ленты — показывать «Загрузить ещё». */
   hasMore?: boolean;

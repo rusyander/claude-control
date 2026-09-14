@@ -26,6 +26,8 @@ export interface ChatThreadProps {
   /** Разговор на экране: по его смене лента прокручивается к последнему. */
   conversationId?: string;
   stream: StreamState;
+  /** Кто отвечает — для подписи ожидания; через контур это модель контура. */
+  modelName?: string;
   isLoading: boolean;
   hasMore?: boolean;
   isLoadingMore: boolean;

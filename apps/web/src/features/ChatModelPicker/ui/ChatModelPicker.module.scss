@@ -16,7 +16,16 @@
   cursor: pointer;
 }
 
-.select:hover {
+// Запертый контуром выбор: без прозрачности (текст обязан держать контраст), но
+// курсор и рамка говорят, что поле сейчас не выбирается.
+.select:disabled {
+  // Имя модели контура длиннее алиаса вендора (`Qwen/Qwen3.8-27B-FP8`).
+  max-width: 190px;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.select:not(:disabled):hover {
   border-color: var(--color-accent);
 }
 

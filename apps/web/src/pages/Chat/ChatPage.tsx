@@ -14,6 +14,7 @@ import { useDraft } from '@shared/lib/draft';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ProjectGitControls } from '@features/ProjectGit';
+import { useRunModelName } from '@features/ChatModelPicker';
 import {
   useChats,
   useChatMessages,
@@ -102,6 +103,12 @@ export function ChatPage() {
   // Модель и глубина продумывания: общий дефолт из настроек плюс выбор этого
   // разговора (подробности — в хуке).
   const models = useChatModelPrefs(draftKey, settings);
+  // Кто ответит: подпись ожидания называет модель, а через контур — модель контура.
+  const modelName = useRunModelName({
+    consumer: activeChat?.parentId ? 'groups' : 'chat',
+    model: models.modelOverride,
+    defaultModel: models.defaultModel,
+  });
 
   const shownChats = useMemo(
     () => visibleChats(chats.data ?? [], ws.activeProject?.id),
@@ -365,6 +372,7 @@ export function ChatPage() {
             messages={[...shownHistory, ...pending]}
             conversationId={activeChat?.id}
             stream={stream}
+            modelName={modelName}
             isLoading={messages.isLoading}
             hasMore={messages.data?.hasMore}
             isLoadingMore={messages.isFetching}

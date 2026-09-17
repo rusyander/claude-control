@@ -324,6 +324,40 @@ describe('ProviderChatService', () => {
     });
   });
 
+  describe('вызовы инструментов через контур (развилка 5)', () => {
+    const routed = (): void =>
+      service.setPlatformRouting(() => ({ env: { OPENAI_BASE_URL: 'http://127.0.0.1:1/x' } }));
+
+    it('ответ через контур несёт счёт вызовов из журнала шлюза с момента старта', () => {
+      routed();
+      const since = vi.fn(() => 0);
+      service.setContourToolCalls(since);
+      send();
+      run.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
+
+      const answer = readChat(dir, 'codex', 'chat')?.messages.at(-1);
+      expect(answer?.contourToolCalls).toBe(0);
+      expect(since).toHaveBeenCalledWith(expect.any(Number));
+    });
+
+    it('мимо контура счёта нет: подсказывать не о чем', () => {
+      service.setContourToolCalls(() => 3);
+      send();
+      run.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
+      expect(readChat(dir, 'codex', 'chat')?.messages.at(-1)?.contourToolCalls).toBeUndefined();
+    });
+
+    it('шлюз запросов не видел — поля нет, а не «ноль»', () => {
+      routed();
+      service.setContourToolCalls(() => undefined);
+      send();
+      run.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
+      expect(readChat(dir, 'codex', 'chat')?.messages.at(-1)).not.toHaveProperty(
+        'contourToolCalls',
+      );
+    });
+  });
+
   it('упавший прогон превращается в ошибку разговора, а не в тишину', async () => {
     const broken: ProviderChatRunLike = {
       start: () => Promise.reject(new Error('всё сломалось')),

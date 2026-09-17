@@ -300,6 +300,24 @@ describe('очередь дописанного', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('очередь под ключом прежнего имени продукта подхватывается и переезжает', async () => {
+    // Прежнее имя записано задом наперёд: литерала в дереве нет (историю
+    // переписывают заменой слова), а ошибку в сборке ключа тест должен поймать.
+    const legacyKey = `${[...'lortnoc-edualc'].reverse().join('')}:chat-queue:s1`;
+    storage.set(
+      legacyKey,
+      JSON.stringify({ savedAt: Date.now(), items: [{ id: 'q-1', prompt: 'из старой версии' }] }),
+    );
+    const stream = sseStream();
+    fetchMock.mockResolvedValueOnce(stream.response);
+    apiGet.mockResolvedValue([active({ chatId: 's1', sessionId: 's1' })]);
+
+    await restoreQueue('s1');
+    expect(getRun('s1').queued.map((item) => item.prompt)).toEqual(['из старой версии']);
+    expect(storage.has(legacyKey)).toBe(false);
+    expect(storage.has('agentdeck:chat-queue:s1')).toBe(true);
+  });
+
   it('протухшая очередь не досылается и стирается', async () => {
     storage.set(
       'agentdeck:chat-queue:s1',

@@ -29,7 +29,7 @@ export const integrationsEn: typeof integrationsRu = {
       'recognise their key without seeing it.',
 
     stepsTitle: 'How to connect',
-    stepsCaption: 'The Integrations tab in settings, five cards in one column.',
+    stepsCaption: 'The Integrations tab in settings, six cards in one column.',
     step1: 'Fill in the address and account details',
     step1Text:
       'For Atlassian that is the site address and an email (cloud only), for the forge — ' +
@@ -39,7 +39,7 @@ export const integrationsEn: typeof integrationsRu = {
     step2Text:
       'The token field is always empty: the server never hands the value back. Empty is ' +
       'what it sends, and that means “keep the current one”. Replace a key by typing a ' +
-      'new one; drop it with “Forget token”.',
+      'new one; drop it with “Forget the key” (which also switches the card off).',
     step3: 'Press “Check connection”',
     step3Text:
       'The only honest answer to “does it work”: the settings can be perfect while the ' +
@@ -51,7 +51,7 @@ export const integrationsEn: typeof integrationsRu = {
       'the Confluence page with the requirements, the project new defects go into. This ' +
       'is exactly what reaches the agent as a line in its task — it cannot know it itself.',
 
-    cardsTitle: 'The five connectors',
+    cardsTitle: 'The six connectors',
     cardsCaption: 'Each is enabled separately; a disabled one gets in nobody’s way.',
     cardsHeader: 'Connector',
     cardsWhat: 'What it gives',
@@ -144,15 +144,18 @@ export const integrationsEn: typeof integrationsRu = {
       'Not in an API response, not in a log, not in a prompt, not in an MCP config. The ' +
       'agent reaches Jira through the panel’s own MCP server, and that server through the ' +
       'panel’s own API; the key itself is never handed to the CLI process.',
-    noteWritesTitle: 'Writing outward happens on a click',
+    noteWritesTitle: 'The agent writes outward on its own through MCP',
     noteWritesText:
-      'Reads are free: searching issues, reading a page. The agent is allowed three ' +
-      'writes — file a defect, comment on it, attach a run result. Creating a Confluence ' +
-      'page and transitioning an issue are done by a human in the panel. Nothing is ever ' +
-      'deleted.',
+      'Reads are free: searching issues, reading a page. An agent with Atlassian MCP ' +
+      'connected is allowed four writes — create a Jira issue, comment on an issue, create ' +
+      'a Confluence page and overwrite the body of an existing one. The last two are held ' +
+      'back only by the tool description (“only when the human asks directly”), not by the ' +
+      'panel: the server cannot tell an agent call from a button press. The agent has no ' +
+      'issue transition. Nothing is ever deleted.',
     noteOfflineTitle: 'A dead integration stops nothing',
     noteOfflineText:
-      'Every outward call has its own timeout and a single retry. No answer is a state ' +
+      'Every outward request waits at most 15 seconds; there is one retry, and only when ' +
+      'the service answered 429, 502 or 503 — a dropped connection is not retried. No answer is a state ' +
       'of the card with a human reason, not a crash: neither a test run, nor a ' +
       'conversation, nor the panel’s startup suffers for it.',
     noteMcpTitle: 'The MCP server is registered by hand',
@@ -220,11 +223,12 @@ export const integrationsEn: typeof integrationsRu = {
         'installation address is set for a self-hosted GitLab; the repository may be left ' +
         'out — it is then derived from the checked project’s origin. After the check the ' +
         'card keeps the bot name and the time.',
-      contextForgotten: '6. “Forget the key” is not “switch off”',
+      contextForgotten: '6. “Forget the key” erases the key and switches the card off',
       contextForgottenText:
-        'The button removes only the key: the address, the system and the repository stay, ' +
-        'and the card returns to “not checked” and “no key yet”. These are two different ' +
-        'operations, and switching the integration off has its own toggle.',
+        'The button erases the key and the check result and also switches the integration ' +
+        'off: without a key there is no point in it being on. The address, the system and ' +
+        'the repository stay, and the card returns to “not checked” and “no key yet”. To ' +
+        'bring it back, type a key and turn the toggle on again.',
 
       notifyTitle: 'Path: get notifications without giving away too much',
       notifyCaption:
@@ -263,8 +267,10 @@ export const integrationsEn: typeof integrationsRu = {
       'request goes out when the screen that shows it is open, or a button is pressed.',
     notAuto: 'Not auto-publishing',
     notAutoText:
-      'A defect, a report or a comment leaves only on a click. A disabled integration ' +
-      'greys the button out together with the reason, rather than failing silently.',
+      'From the panel a defect, a report or a comment leaves only on a click. An agent ' +
+      'with Atlassian MCP connected writes on its own — see “The agent writes outward on ' +
+      'its own through MCP”. A disabled integration greys the button out together with ' +
+      'the reason, rather than failing silently.',
     notAgentKey: 'Not a key for the agent',
     notAgentKeyText:
       'The token lives in the panel. The agent gets access through its own button and ' +
@@ -272,15 +278,14 @@ export const integrationsEn: typeof integrationsRu = {
     notDelete: 'Not a deletion tool',
     notDeleteText:
       'The panel deletes nothing in Jira or Confluence and merges nothing in a forge. ' +
-      'Everything it can do outward is create and comment.',
+      'Everything it can do outward is create, comment and overwrite a Confluence page body.',
     notBlocker: 'Not a reason to stop',
     notBlockerText:
       'A dead integration breaks neither a test run, nor a conversation, nor the panel’s ' +
       'start: the refusal shows as card state and work goes on.',
 
     storageSettings: 'Card settings',
-    storageSettingsValue:
-      'agentdeck/state.json → integrations (addresses, deployment, events)',
+    storageSettingsValue: 'agentdeck/state.json → integrations (addresses, deployment, events)',
     storageTokens: 'Tokens',
     storageTokensValue: 'agentdeck/provider-keys.enc, keys int:<id> (AES-256-GCM)',
     storageHealth: 'Check verdicts',
@@ -295,7 +300,7 @@ export const integrationsEn: typeof integrationsRu = {
     canMcp: 'Hand the same access to the agent through a proxy, without giving it the key',
     canNotify: 'Push events to your own address and to Telegram, as picked',
     canSign: 'Sign the webhook body with HMAC-SHA256 when a secret is set',
-    canForget: 'Forget the key while leaving the rest of the card untouched',
+    canForget: 'Forget the key: token erased, card switched off, address and other fields kept',
     cantSso: 'Sign in via SSO or a password: integrations work by token only',
     cantDelete: 'Delete or close anything in an external system',
     cantBackground: 'Poll external systems in the background with no screen open',
@@ -344,7 +349,7 @@ export const integrationsEn: typeof integrationsRu = {
       '05-forge':
         'A forge by token: a self-hosted GitLab, “Signed in as qa-release-bot” and the check time',
       '06-forgotten':
-        'After “Forget the key”: settings intact, no key, state back to “not checked”',
+        'After “Forget the key”: address and repository kept, no key, toggle off, state back to “not checked”',
     },
     notify: {
       '01-webhook':

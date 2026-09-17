@@ -3,9 +3,13 @@ import type { ModelPricing, PricingEntry } from '@agentdeck/contracts';
 import {
   PRICING_FIELDS,
   draftFromPrice,
+  manualPrices,
+  manualPriceFromDraft,
   nextCustom,
   overrideFor,
   priceFromDraft,
+  withManualPrice,
+  withoutCustom,
 } from './PricingRow';
 
 /**
@@ -122,5 +126,34 @@ describe('overrideFor', () => {
     const own: ModelPricing = { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 };
     expect(overrideFor({ opus: own }, 'claude-opus-4-8')).toEqual(own);
     expect(overrideFor({ opus: own }, 'claude-haiku-4-5')).toBeUndefined();
+  });
+});
+
+/**
+ * Ручная цена модели, которой в прайсе нет (решение по контуру №7): каталог
+ * Company цены Qwen3.8 не отдаёт, и оценка расхода стояла на 0 $ при списании
+ * 0,46 $. Строка такой цены живёт в той же карточке и помечена как ручная.
+ */
+describe('ручные цены', () => {
+  const price: ModelPricing = { input: 0.4, output: 1.6, cacheRead: 0.4, cacheWrite: 0.4 };
+
+  it('своя цена строки прайса — не ручная; фрагмент, которого в прайсе нет, — ручная', () => {
+    const custom = { 'claude-opus-4-8': entry.price, 'qwen3.8': price };
+    expect(manualPrices(custom, [entry])).toEqual([{ model: 'qwen3.8', price }]);
+  });
+
+  it('имя пишется так, как его сверяет расчёт: без пробелов по краям и строчными', () => {
+    expect(withManualPrice({}, '  Qwen3.8 ', price)).toEqual({ 'qwen3.8': price });
+    expect(withManualPrice({ 'qwen3.8': price }, '', price)).toBeUndefined();
+  });
+
+  it('кэш не задан — берётся равным входу, как у шлюза без отдельной цены кэша', () => {
+    expect(manualPriceFromDraft({ input: '0.4', output: '1.6' })).toEqual(price);
+    expect(manualPriceFromDraft({ input: '0.4' })).toBeUndefined();
+    expect(manualPriceFromDraft({ input: 'x', output: '1' })).toBeUndefined();
+  });
+
+  it('убрать одну ручную цену — остальные свои цены остаются', () => {
+    expect(withoutCustom({ 'qwen3.8': price, opus: price }, 'qwen3.8')).toEqual({ opus: price });
   });
 });

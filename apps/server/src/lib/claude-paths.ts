@@ -1,6 +1,7 @@
 import { existsSync, accessSync, constants, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
+import { resolveAppDataDir } from './brand.mjs';
 import type { ClaudeLocation, ClaudePaths, DetectionSource } from '@agentdeck/contracts';
 
 /**
@@ -81,7 +82,9 @@ function buildPaths(root: string): ClaudePaths {
     hooks: join(root, 'hooks'),
     // Регистрация MCP-серверов лежит НЕ внутри .claude, а рядом с ним.
     mcpConfig: join(dirname(root), '.claude.json'),
-    appData: join(root, 'agentdeck'),
+    // Каталог данных панели. Прежнее имя (`agentdeck/`) переезжает сюда
+    // копией при первом обращении — `brand.mjs`.
+    appData: resolveAppDataDir(root),
   };
 }
 

@@ -12,8 +12,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
  */
 
 const BASE: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,

@@ -1,11 +1,19 @@
 import type { Dictionary } from './ru';
+import { serverMessagesEn } from './server-messages/en.ts';
 
 /**
  * English mirrors `ru.ts` and is typed against it: a missing or renamed key
  * fails the build instead of showing up as a blank line on the screen.
  */
 export const en: Dictionary = {
-  tabs: { chat: 'Chat', projects: 'Projects', analytics: 'Analytics', settings: 'Settings' },
+  serverMessages: serverMessagesEn,
+  tabs: {
+    chat: 'Chat',
+    projects: 'Projects',
+    analytics: 'Analytics',
+    settings: 'Settings',
+    agent: 'Agent',
+  },
 
   common: {
     loading: 'Loading…',
@@ -34,6 +42,12 @@ export const en: Dictionary = {
     // сырой JSON вместо них показывать незачем.
     offerSplit: 'The agent offered to split the tasks across chats — decide in the panel.',
     offerHandoff: 'The agent offered to continue in a clean session — decide in the panel.',
+    picture: {
+      title: 'Agent drawing',
+      broken: 'The drawing could not be rendered on the phone — open it in the panel.',
+    },
+    offerDeck: 'The agent dictated a presentation — the card is in the panel.',
+    blocksRejected: (count: number) => `Blocks the panel did not accept: ${count} — shown as is.`,
     plan: (done: number, total: number) => `Plan ${done}/${total}`,
     subagents: (count: number) => `Subagents: ${count}`,
     permission: 'Permission needed',
@@ -78,6 +92,81 @@ export const en: Dictionary = {
     effort: 'Thinking depth',
     unsupported: (names: string) => `Not supported: ${names}`,
     shot: (index: number) => `shot-${index}.jpg`,
+    platformModel: (title: string, model: string) => `Through the contour “${title}”: ${model}.`,
+    platformModelReplaced: (title: string, asked: string, model: string) =>
+      `Through the contour “${title}”: it has no “${asked}”, the request goes with ${model}.`,
+    platformModelUnset: (title: string) =>
+      `The contour “${title}” assigned no model (empty catalog or no probe yet) — the request goes as is.`,
+    platformNoEffort: (title: string) =>
+      `The contour “${title}” does not accept thinking depth — it is not sent.`,
+    platformLocked: (title: string) =>
+      `This chat goes through the contour “${title}”: it sets the model and depth. Change it in the panel's “Contour” section or return to the default provider.`,
+    platformModelNone: 'contour model',
+    platformEffortOff: 'not sent',
+    platformRefused: (title: string, reason: string, fix: string) =>
+      `The contour “${title}” is required, but ${reason}: the message will be refused — it goes neither to the contour nor to the vendor cloud. ${fix}`,
+    platformBypassed: (title: string, reason: string, fix: string) =>
+      `Bypassing the contour: “${title}” is set to “best effort”, but ${reason} — the message goes straight to the vendor cloud, without the contour’s protection. ${fix}`,
+    platformRefusedReason: {
+      gateway_down: 'the panel gateway is not up',
+      no_token: 'the contour key is not saved',
+    },
+    platformRefusedFix: {
+      gateway_down: 'Press “Start gateway” on the contour card in the panel (“Contour” section).',
+      no_token: 'Save the key in the panel: “Configure” on the contour card → “Key” step.',
+    },
+    platformLayers: (title: string, list: string) =>
+      `Through the contour “${title}” the run goes without our: ${list}.`,
+    platformLayersAll: (title: string) =>
+      `Through the contour “${title}” the run goes without any of our layers: no rules, hooks, permissions, skills, MCP servers or panel prompt addition.`,
+    layerTitle: {
+      settings: 'Personal rules, hooks and permissions',
+      skills: 'Skills',
+      mcp: 'MCP servers',
+      systemPrompt: 'Panel addition to the system prompt',
+    },
+    mode: {
+      text: 'Message',
+      image: 'Image',
+      imageBlocked: 'Nothing to draw with',
+      imagePlaceholder: 'Describe the image — the panel draws it itself, without the agent',
+      imagePlaceholderAgent: 'Describe the image — the agent draws it as code, a vector',
+      drawing: 'Drawing — this takes minutes',
+      source: (title: string, model: string) => (model ? `${title} · ${model}` : title),
+      sourceAgent: 'The chat agent draws it: a vector in code, not a photo',
+      promptSkipped: 'The mode prompt is not sent here: the images endpoint has no system message',
+      blocked: {
+        'no-route': 'No active contour and no endpoint profile — nobody to draw',
+        'driver-none': 'This contour does not draw images: its driver declares no such capability',
+        'no-model': 'The key catalog has no image-generation model',
+        'endpoint-no-url': 'The endpoint profile has no image generation address',
+        'gateway-off': 'The panel gateway is off, and contour requests go through it',
+        'endpoint-api-kind': 'This API kind has no separate images endpoint',
+        'no-agent': 'No raster route and no chat to ask an agent in',
+      },
+      noRaster: {
+        'no-route': 'no raster: no active contour and no endpoint profile',
+        'driver-none': 'no raster: this contour does not draw images',
+        'no-model': 'no raster: the key catalog has no image-generation model',
+        'endpoint-no-url': 'no raster: the endpoint profile has no generation address',
+        'gateway-off': 'no raster: the panel gateway is off',
+        'endpoint-api-kind': 'no raster: this API kind has no images endpoint',
+        'no-agent': 'no raster: nobody to draw',
+      },
+      card: {
+        by: (model: string, source: string) => `Drawn by: ${model} · ${source}`,
+        byNoModel: (source: string) => `Drawn by: ${source}`,
+        source: {
+          'contour-chat': 'contour, as part of the answer',
+          'contour-images': 'contour, images endpoint',
+          endpoint: 'endpoint profile',
+          agent: 'chat agent',
+        },
+        size: (width: number, height: number, size: string) => `${width}×${height}, ${size}`,
+        note: 'A file in the panel, not part of the conversation',
+        failed: (message: string) => `Did not work: ${message}`,
+      },
+    },
   },
 
   chats: {
@@ -384,6 +473,82 @@ export const en: Dictionary = {
     silent: 'The panel’s server did not answer',
     unreachable: 'The panel’s server is unreachable',
     tokenRejected: 'The token was rejected — pair the app again',
+  },
+
+  agent: {
+    title: 'Panel agent',
+    subtitle:
+      'Type or dictate — the agent does it in the panel. Every change waits for your decision.',
+    views: { conversation: 'Conversation', history: 'History', journal: 'Trail' },
+    empty:
+      'For example: “Create project C:/work/demo”. The agent opens panel pages on the computer.',
+    placeholder: 'What should be done in the panel?',
+    send: 'Send',
+    stop: 'Stop',
+    newConversation: 'New conversation',
+    thinking: 'The agent is thinking…',
+    context: (project: string) => `Project: ${project}`,
+    toolCalled: (name: string) => `Action: ${name}`,
+    toolFailed: (name: string) => `Action failed: ${name}`,
+    stopped: 'Turn stopped.',
+    runFailed: (message: string) => `The agent did not answer: ${message}`,
+    cut: 'The connection dropped before the turn ended — the agent was stopped. What was said is kept in history.',
+    refusal: {
+      invalid_body: 'Message not accepted: the server did not understand the request.',
+      busy: 'The agent is still answering in this conversation — wait for the turn to end.',
+      provider_unsupported:
+        'The panel agent works only with Claude Code for now: the active CLI is different.',
+      cli_not_found:
+        'Claude Code was not found in the computer PATH: the agent has nothing to run on.',
+      endpoint_unsupported:
+        'The assistant uses its own endpoint: its key would have to be handed to the agent process.',
+      contour_unreachable:
+        'The assistant goes through a contour, but the gateway is down or has no key — no silent fallback to the vendor cloud.',
+      data_mask_broken:
+        'The data masking rules are broken: without the mask no message goes to the agent.',
+    } as Record<string, string>,
+    card: {
+      heading: 'The agent asks for confirmation',
+      dangerHeading: 'Dangerous action — check carefully',
+      approve: 'Run',
+      reject: 'Reject',
+      expires: (time: string) => `Waits until ${time}`,
+      sent: 'Decision sent, waiting for the result…',
+      truncated:
+        'The preview is not complete — it cannot be approved. Reject and ask to split the action.',
+      diff: 'What changes',
+      truncatedRefused:
+        'The server refused the approval: the preview is incomplete. Reject the card.',
+      alreadyDecided: 'This card has already been decided.',
+      gone: 'The card is gone — it was withdrawn or timed out.',
+      failed: (message: string) => `Decision not accepted: ${message}`,
+    },
+    outcome: {
+      done: 'done',
+      rejected: 'rejected',
+      timeout: 'timed out',
+      invalid: 'invalid input',
+      unknown: 'no such action',
+      failed: 'failed',
+      'needs-secret': 'key needed — enter it in the panel on the computer',
+      cancelled: 'agent stopped before the decision',
+    },
+    decidedBy: {
+      auto: 'no question',
+      human: 'decided by a human',
+      timeout: 'by timeout',
+      client: 'agent left',
+    },
+    history: {
+      empty: 'No conversations yet',
+      messages: (count: number) => `Messages: ${count}`,
+      failed: 'Could not load conversations',
+    },
+    journal: {
+      empty: 'No agent actions yet',
+      failed: 'Could not load the action trail',
+    },
+    pendingBadge: (count: number) => `Waiting for decision: ${count}`,
   },
 
   run: {

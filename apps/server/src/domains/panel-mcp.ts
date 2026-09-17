@@ -41,6 +41,12 @@ export interface PanelBridge {
    * поверх настройки, которую панель не заводила.
    */
   id: string;
+  /**
+   * Имя той же записи до переименования продукта (17.09.2026). Такая запись уже
+   * лежит в конфигурации CLI у людей: она считается подключённой, повторная
+   * регистрация переименовывает её, снятие убирает и её.
+   */
+  legacyId?: string;
   /** Путь к скрипту переходника в репозитории панели. */
   script: string;
 }
@@ -107,10 +113,11 @@ export function bridgeScriptExists(bridge: PanelBridge): boolean {
 /** Завести или обновить запись о переходнике. Возвращает имя записи. */
 export function registerPanelBridge(bridge: PanelBridge, options: PanelBridgeTarget): string {
   const target = providerTarget(options);
+  const previous = registeredBridgeId(bridge, options.mcpConfigPath, options.store) ?? null;
   if (target) {
     upsertProviderMcpServer(
       target,
-      isRegisteredIn(target, bridge.id) ? bridge.id : null,
+      previous,
       universalDraft(bridge, options.selfBaseUrl),
       options.backupDir,
       { allowOverwrite: true },
@@ -120,7 +127,7 @@ export function registerPanelBridge(bridge: PanelBridge, options: PanelBridgeTar
 
   saveMcpServer(
     options.mcpConfigPath,
-    existing(options.mcpConfigPath, bridge.id),
+    previous,
     { ...universalDraft(bridge, options.selfBaseUrl), groupIds: [] },
     options.backupDir,
     { allowOverwrite: true },
@@ -130,10 +137,16 @@ export function registerPanelBridge(bridge: PanelBridge, options: PanelBridgeTar
 
 /** Убрать запись. Нет её — не ошибка: кнопку могли нажать дважды. */
 export function unregisterPanelBridge(bridge: PanelBridge, options: PanelBridgeTarget): boolean {
+  const fresh = unregisterById(bridge.id, options);
+  const legacy = bridge.legacyId ? unregisterById(bridge.legacyId, options) : false;
+  return fresh || legacy;
+}
+
+function unregisterById(id: string, options: PanelBridgeTarget): boolean {
   const target = providerTarget(options);
   if (target) {
     try {
-      deleteProviderMcpServer(target, bridge.id, options.backupDir);
+      deleteProviderMcpServer(target, id, options.backupDir);
       return true;
     } catch (error) {
       if (error instanceof ProviderMcpServerNotFoundError) return false;
@@ -142,7 +155,7 @@ export function unregisterPanelBridge(bridge: PanelBridge, options: PanelBridgeT
   }
 
   try {
-    deleteMcpServer(options.mcpConfigPath, bridge.id, options.backupDir);
+    deleteMcpServer(options.mcpConfigPath, id, options.backupDir);
     return true;
   } catch (error) {
     if (error instanceof McpServerNotFoundError) return false;
@@ -160,9 +173,21 @@ export function isPanelBridgeRegistered(
   mcpConfigPath: string,
   store?: ProviderMcpSettingsSource,
 ): boolean {
+  return registeredBridgeId(bridge, mcpConfigPath, store) !== undefined;
+}
+
+/** Под каким именем переходник записан: нынешним, прежним или никаким. */
+export function registeredBridgeId(
+  bridge: PanelBridge,
+  mcpConfigPath: string,
+  store?: ProviderMcpSettingsSource,
+): string | undefined {
   const target = store ? resolveProviderMcpTarget(store) : undefined;
-  if (target) return isRegisteredIn(target, bridge.id);
-  return existing(mcpConfigPath, bridge.id) !== null;
+  const has = (id: string): boolean =>
+    target ? isRegisteredIn(target, id) : existing(mcpConfigPath, id) !== null;
+  if (has(bridge.id)) return bridge.id;
+  if (bridge.legacyId && has(bridge.legacyId)) return bridge.legacyId;
+  return undefined;
 }
 
 /** Есть ли запись в разделе провайдера. Нечитаемый чужой конфиг — «нет». */

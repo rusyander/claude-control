@@ -10,6 +10,7 @@ import {
   modelSelectOptions,
   platformLayersCaption,
   platformModelCaption,
+  platformBypassCaption,
   platformRefusalCaption,
   withCurrentValue,
 } from '@shared/lib/chat-model';
@@ -53,6 +54,9 @@ export function ChatModelPicker({
   // сообщения, а не объяснять постфактум.
   const layers = platformLayersCaption(routed?.layers);
   const refusal = platformRefusalCaption(plan.data);
+  // «По возможности» без шлюза или ключа: уход мимо контура назван до отправки
+  // (решение по контуру №4) — молча данные в облако вендора не уезжают.
+  const bypass = platformBypassCaption(plan.data);
 
   // Как подписать пункт «по умолчанию»: показываем, что именно придёт из настроек.
   const defaultModelName = defaultModel ? modelLabel(defaultModel) : t('chat.modelClaudeDefault');
@@ -166,6 +170,16 @@ export function ChatModelPicker({
             title: refusal.params.title,
             reason: t(`chat.platformRefusedReason.${refusal.params.reason}`),
             fix: t(`chat.platformRefusedFix.${refusal.params.reason}`),
+          })}
+        </Typography>
+      )}
+
+      {bypass && (
+        <Typography variant="caption" color="warning" as="span" role="status" aria-live="polite">
+          {t(bypass.key, {
+            title: bypass.params.title,
+            reason: t(`chat.platformRefusedReason.${bypass.params.reason}`),
+            fix: t(`chat.platformRefusedFix.${bypass.params.reason}`),
           })}
         </Typography>
       )}

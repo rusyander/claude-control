@@ -1,9 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import type {
-  ProjectTestCase,
-  ProjectTestPriority,
-  ProjectTestStatus,
-} from '@agentdeck/contracts';
+import type { ProjectTestCase, ProjectTestPriority, ProjectTestStatus } from '@agentdeck/contracts';
 import { Chips, Muted } from '../../shared/ui';
 import { space } from '../../shared/config/theme';
 import { useT } from '../../shared/config/i18n';

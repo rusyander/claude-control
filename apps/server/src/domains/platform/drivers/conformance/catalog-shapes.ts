@@ -208,7 +208,7 @@ export const ENTERPRISE_PLATFORM_MODELS = {
   object: 'list',
   data: [
     {
-      id: 'enterprise-platform-corp-l',
+      id: 'company-corp-l',
       object: 'model',
       owned_by: 'enterprise-platform',
       kind: 'chat',

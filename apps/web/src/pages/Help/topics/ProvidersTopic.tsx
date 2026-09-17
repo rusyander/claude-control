@@ -95,6 +95,7 @@ export function ProvidersTopic() {
             { name: tr('mapHooks'), description: tr('mapHooksValue'), isMono: false },
             { name: tr('mapPlugins'), description: tr('mapPluginsValue'), isMono: false },
             { name: tr('mapSkills'), description: tr('mapSkillsValue'), isMono: false },
+            { name: tr('mapCommands'), description: tr('mapCommandsValue'), isMono: false },
             { name: tr('mapScripts'), description: tr('mapScriptsValue'), isMono: false },
             { name: tr('mapProjects'), description: tr('mapProjectsValue'), isMono: false },
             { name: tr('mapClaudeOnly'), description: tr('mapClaudeOnlyValue'), isMono: false },

@@ -9,6 +9,7 @@ import { armSandboxSweeper } from './SandboxSweep.ts';
 import { copyScripts, copySkills, writeRules } from './SandboxContents.ts';
 import { buildSettings } from './SandboxSettings.ts';
 import type { Sandbox, SandboxDescription, SandboxSelection } from './SandboxConfig.types.ts';
+import { brandEnvName, legacyEnvName } from '../../lib/brand.mjs';
 
 /**
  * Собирает песочницу под выбранные элементы.
@@ -77,7 +78,9 @@ export function createSandbox(
     // конкретной песочнице. Ключ API файлом не кладётся — Claude Code читает его
     // из окружения.
     env: {
-      AGENTDECK_SANDBOX_WORKDIR: workDir,
+      [brandEnvName('SANDBOX_WORKDIR')]: workDir,
+      // Прежнее имя — для хуков, написанных до переименования продукта.
+      [legacyEnvName('SANDBOX_WORKDIR')]: workDir,
       ...(credentials.apiKey ? { ANTHROPIC_API_KEY: credentials.apiKey } : {}),
     },
   };

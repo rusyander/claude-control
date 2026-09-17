@@ -114,7 +114,8 @@ export const searchEn: typeof searchRu = {
       'rules, skills, hooks, scripts, permissions, variables, MCP, plugins, panel ' +
       'groups and the test cases of an open project',
     storageNever: 'What it never opens',
-    storageNeverValue: '.mcp-secrets.env, provider-keys.enc, provider-keys.key',
+    storageNeverValue:
+      'provider-keys.enc, provider-keys.key; from .mcp-secrets.env only key names are taken, values never take part in search',
     storageWrites: 'What it writes',
     storageWritesValue:
       'nothing. Search is a read operation: it changes neither configuration files nor ' +
@@ -211,8 +212,9 @@ export const searchEn: typeof searchRu = {
     noteSecretTitle: 'Secret values never reach this page',
     noteSecretText:
       'For environment variables search works with key names alone. The .mcp-secrets.env ' +
-      'file and the provider key store are not opened at all — neither for a match nor ' +
-      'for a snippet.',
+      'file is read just like settings.json, but secret values take part neither in a ' +
+      'match nor in a snippet — only the key name can be found. The provider key store is ' +
+      'not opened at all.',
     noteSubstringTitle: 'A match is a plain substring',
     noteSubstringText:
       'Case does not matter, “migr” finds migrations. No masks and no regular ' +

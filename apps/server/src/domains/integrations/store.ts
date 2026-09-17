@@ -1,8 +1,4 @@
-import type {
-  IntegrationId,
-  IntegrationStatus,
-  IntegrationsSettings,
-} from '@agentdeck/contracts';
+import type { IntegrationId, IntegrationStatus, IntegrationsSettings } from '@agentdeck/contracts';
 import type { AppStore } from '../../lib/app-store.ts';
 import {
   clearStoredKey,

@@ -2,7 +2,11 @@ import { useTranslation } from 'react-i18next';
 import { chooseRunModel } from '@agentdeck/contracts/platform-models';
 import { foreignConsumerId } from '@agentdeck/contracts/platform-consumers';
 import { usePlatformRunPlan } from '@entities/Platform';
-import { platformModelCaption, platformRefusalCaption } from '@shared/lib/chat-model';
+import {
+  platformBypassCaption,
+  platformModelCaption,
+  platformRefusalCaption,
+} from '@shared/lib/chat-model';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -45,6 +49,8 @@ export function ProviderChatHeader({
     ? platformModelCaption(routed.title, chooseRunModel(routed.rules, chat?.model ?? ''))
     : undefined;
   const refusal = platformRefusalCaption(plan.data);
+  // Уход мимо контура — той же меткой, что и в шапке своего чата (решение №4).
+  const bypass = platformBypassCaption(plan.data);
 
   const rename = (): void => {
     const next = window.prompt(t('providerChat.renamePrompt'), chat?.title ?? '');
@@ -90,6 +96,15 @@ export function ProviderChatHeader({
               title: refusal.params.title,
               reason: t(`chat.platformRefusedReason.${refusal.params.reason}`),
               fix: t(`chat.platformRefusedFix.${refusal.params.reason}`),
+            })}
+          </Badge>
+        )}
+        {bypass && (
+          <Badge tone="warning">
+            {t(bypass.key, {
+              title: bypass.params.title,
+              reason: t(`chat.platformRefusedReason.${bypass.params.reason}`),
+              fix: t(`chat.platformRefusedFix.${bypass.params.reason}`),
             })}
           </Badge>
         )}

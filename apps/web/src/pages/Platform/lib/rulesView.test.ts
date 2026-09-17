@@ -35,7 +35,7 @@ const row = (patch: Partial<PlatformRuleRow>): PlatformRuleRow => ({
 const conflict = (patch: Partial<PlatformRuleConflict>): PlatformRuleConflict => ({
   id: 'tools',
   level: 'exclusive',
-  platformRule: 'enterprise-platform_tools',
+  platformRule: 'platform_tools',
   ourRule: 'toolShim',
   title: 'Инструменты',
   detail: 'выберите один',
@@ -44,7 +44,7 @@ const conflict = (patch: Partial<PlatformRuleConflict>): PlatformRuleConflict =>
 });
 
 const PLATFORM = {
-  id: 'enterprise-platform-dev',
+  id: 'company-dev',
   toolShim: true,
   rules: {
     platform: {
@@ -115,7 +115,7 @@ describe('имена инструментов из строки', () => {
  * одного пустого списка.
  */
 describe('запись без правил', () => {
-  const older = { id: 'enterprise-platform-dev', toolShim: true } as unknown as Platform;
+  const older = { id: 'company-dev', toolShim: true } as unknown as Platform;
 
   it('правила подставляются умолчанием, а не роняют карточку', () => {
     expect(platformRules(older)).toEqual({

@@ -1,8 +1,4 @@
-import type {
-  ProjectTestCase,
-  ProjectTestFilter,
-  ProjectTestGroup,
-} from '@agentdeck/contracts';
+import type { ProjectTestCase, ProjectTestFilter, ProjectTestGroup } from '@agentdeck/contracts';
 import { stepText } from '@agentdeck/contracts/test-format';
 
 /**

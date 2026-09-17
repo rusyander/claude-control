@@ -145,7 +145,8 @@ export const overviewEn: typeof overviewRu = {
     storageReadsValue:
       'CLAUDE.md, settings.json, settings.local.json, ~/.claude.json, skills/, hooks/',
     storageOwn: 'The panel’s own files',
-    storageOwnValue: 'agentdeck/state.json (groups, health checks), agentdeck/backups/',
+    storageOwnValue:
+      'agentdeck/state.json (groups, health checks), agentdeck/backups/. Before the rename the folder carried the former product name: the first start copies it here and leaves the old one as a backup',
     storageWrites: 'What it writes',
     storageWritesValue:
       'nothing. The overview is the only page of the panel that merely reads: opening ' +
@@ -239,6 +240,13 @@ export const overviewEn: typeof overviewRu = {
       'How many copies lie in the panel’s directory and when the latest was taken. It ' +
       'leads not into a section but into the “Safety” tab of the settings, where copies ' +
       'are managed.',
+    tileContour: 'Contour',
+    tileContourText:
+      'The last tile, and it is absent until at least one contour is set up. The number ' +
+      'is how many contours are enabled; the caption is the most alarming state there is: ' +
+      '“budget exhausted”, then a rejected key, then nearing the budget (“by our estimate ' +
+      'N % of the budget is spent”), otherwise the state of the first enabled one. The ' +
+      'first two turn the tile red. It leads to the Contour section.',
     tileChanges: 'The “Changes in 7 days” line',
     tileChangesText:
       'It stands above the tiles and is counted from the history feed: one edit of one ' +

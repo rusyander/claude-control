@@ -4,10 +4,7 @@ import {
   catalogDefaultModel,
   type PlatformModelSource,
 } from '@agentdeck/contracts/platform-models';
-import {
-  foreignProviderId,
-  platformRunConsumers,
-} from '@agentdeck/contracts/platform-consumers';
+import { foreignProviderId, platformRunConsumers } from '@agentdeck/contracts/platform-consumers';
 
 /**
  * Карточка модели контура: что показать и что человек вправе выбрать (Т6).

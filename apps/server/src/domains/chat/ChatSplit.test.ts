@@ -68,9 +68,7 @@ describe('блок предложения в ответе агента', () => {
   });
 
   it('недописанный блок прячется целиком: в ленте не должно быть обрубка JSON', () => {
-    const scan = scanSplitBlocks(
-      'Предлагаю разделить.\n\n```agentdeck:split\n{"groups":[{"ti',
-    );
+    const scan = scanSplitBlocks('Предлагаю разделить.\n\n```agentdeck:split\n{"groups":[{"ti');
 
     expect(scan.text).toBe('Предлагаю разделить.');
     expect(scan.proposals).toHaveLength(0);

@@ -31,7 +31,7 @@ describe('looksLikePermission', () => {
   });
 
   it('MCP-инструмент с обычным именем сервера', () => {
-    expect(looksLikePermission('mcp__gitlab-enterprise-platform__get_project')).toBe(true);
+    expect(looksLikePermission('mcp__gitlab-company__get_project')).toBe(true);
   });
 
   it('имя MCP-сервера с одиночным подчёркиванием — не предупреждение', () => {
@@ -41,7 +41,7 @@ describe('looksLikePermission', () => {
   });
 
   it('весь MCP-сервер без инструмента', () => {
-    expect(looksLikePermission('mcp__gitlab-enterprise-platform')).toBe(true);
+    expect(looksLikePermission('mcp__gitlab-company')).toBe(true);
     expect(looksLikePermission('mcp__my_server')).toBe(true);
   });
 

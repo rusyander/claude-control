@@ -68,8 +68,10 @@ export const historyEn: typeof historyRu = {
       traceDiff: 'The diff opens right inside the row',
       traceDiffText:
         'Removed lines in red, added ones in green, the rest of the file as context ' +
-        'around them. Every block of changes has its own return button: exactly that ' +
-        'block comes back, not the whole edit and not the whole file.',
+        'around them. In the newest copy’s diff (“against the current file”) every block ' +
+        'of changes has its own return button: exactly that block comes back, not the ' +
+        'whole edit and not the whole file. Older copies (“against the previous copy”) ' +
+        'show a read-only diff — no block can be returned from it.',
       traceRevert: 'The confirmation says what exactly will happen',
       traceRevertText:
         'The dialog names the file, promises to keep the current state as a separate ' +
@@ -132,7 +134,8 @@ export const historyEn: typeof historyRu = {
     canFeed: 'Watch the feed of edits for every configuration file',
     canDiff: 'Open the line diff of an individual edit',
     canCounts: 'See “+N/−M” — how many lines the edit added and removed',
-    canRevertHunk: 'Bring one block of changes back without touching the rest of the file',
+    canRevertHunk:
+      'Bring one block of changes back from the newest copy’s diff without touching the rest of the file',
     canOffline: 'Read the history even when taking new copies is switched off',
 
     cantSecrets: 'See the diff of .mcp-secrets.env — secrets are deliberately never diffed',

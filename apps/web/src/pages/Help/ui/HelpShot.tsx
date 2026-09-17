@@ -55,7 +55,8 @@ export function HelpShot({ topic, scenario, frame, side }: HelpShotProps) {
       />
       <figcaption className={styles.shotCaption}>
         <Typography variant="caption" color="muted" as="span">
-          {side === 'enterprise-platform' ? t('help.shots.sideEnterprisePlatform') : t('help.shots.sidePanel')} · {caption}
+          {side === 'platform' ? t('help.shots.sidePlatform') : t('help.shots.sidePanel')} ·{' '}
+          {caption}
         </Typography>
       </figcaption>
     </figure>

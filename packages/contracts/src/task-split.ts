@@ -22,9 +22,10 @@
  */
 
 import type { WorktreeBootstrapState } from './project-git';
+import { blockLang, blockLangPattern } from './brand.ts';
 
 /** Язык блока: он же признак, по которому панель узнаёт предложение. */
-export const SPLIT_BLOCK_LANG = 'agentdeck:split';
+export const SPLIT_BLOCK_LANG = blockLang('split');
 
 /** Потолки: предложение приходит из ответа модели, а не из формы. */
 export const SPLIT_MAX_GROUPS = 8;
@@ -449,7 +450,7 @@ export interface SplitScan {
 }
 
 /** Начало блока: тройная кавычка в начале строки и наш язык за ней. */
-const OPEN = new RegExp(`(^|\\n)[ \\t]*\`\`\`[ \\t]*${SPLIT_BLOCK_LANG}[ \\t]*\\r?\\n`);
+const OPEN = new RegExp(`(^|\\n)[ \\t]*\`\`\`[ \\t]*${blockLangPattern('split')}[ \\t]*\\r?\\n`);
 
 /**
  * Вырезать блоки предложений из текста ответа.

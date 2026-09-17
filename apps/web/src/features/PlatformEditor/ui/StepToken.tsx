@@ -3,6 +3,7 @@ import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Typography } from '@shared/ui/typography';
 import { TextField } from '@shared/ui/text-field';
+import { contourKeyAnchor } from '@entities/PanelAgent';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
 import type { WizardStepProps } from './PlatformWizard.types';
 
@@ -28,15 +29,19 @@ export function StepToken({ model }: WizardStepProps) {
 
   return (
     <Stack gap="var(--spacing-md)">
-      <TextField
-        label={t('platform.tokenLabel')}
-        value={model.token}
-        onChange={model.setToken}
-        type="password"
-        placeholder={saved || t('platform.tokenPlaceholder')}
-        hint={saved ? t('platform.tokenSavedHint', { mask: saved }) : t('platform.tokenHint')}
-        autoFocus
-      />
+      {/* Якорь агента панели: `save_contour_draft` без ключа открывает этот шаг
+          и ведёт фокус сюда — ключ вводит человек, агент его не видит. */}
+      <div data-agent-anchor={contourKeyAnchor(model.draft.id)}>
+        <TextField
+          label={t('platform.tokenLabel')}
+          value={model.token}
+          onChange={model.setToken}
+          type="password"
+          placeholder={saved || t('platform.tokenPlaceholder')}
+          hint={saved ? t('platform.tokenSavedHint', { mask: saved }) : t('platform.tokenHint')}
+          autoFocus
+        />
+      </div>
 
       <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
         <Typography variant="body-sm" color="muted">

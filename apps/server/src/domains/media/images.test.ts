@@ -68,7 +68,7 @@ function png(): Buffer {
 function contour(overrides: Partial<Platform> = {}): Platform {
   return {
     id: 'gor',
-    title: 'EnterprisePlatform · dev',
+    title: 'Company · dev',
     driver: 'enterprise-platform',
     baseUrl: 'https://api.example.ru',
     enabled: true,
@@ -159,7 +159,7 @@ describe('planImage: чем нарисуем и почему нельзя', () =
 
   it('модель без объявленной генерации не даёт РАСТРА, и это сказано отдельно', () => {
     // Ровно инвариант 13: в имени «vision» есть, объявления — нет.
-    useContour(contour(), [model('enterprise-platform-vision-7b', false)]);
+    useContour(contour(), [model('company-vision-7b', false)]);
 
     const plan = planImage(deps({ gatewayPort: () => 5100 }));
 
@@ -168,15 +168,15 @@ describe('planImage: чем нарисуем и почему нельзя', () =
   });
 
   it('объявленная модель + поднятый шлюз — дорога «частью ответа» с промптом режима', () => {
-    useContour(contour(), [model('enterprise-platform-chat', false), model('enterprise-platform-image', true)]);
+    useContour(contour(), [model('company-chat', false), model('company-image', true)]);
 
     const plan = planImage(deps({ gatewayPort: () => 5100 }));
 
     expect(plan).toMatchObject({
       available: true,
       source: 'contour-chat',
-      model: 'enterprise-platform-image',
-      title: 'EnterprisePlatform · dev',
+      model: 'company-image',
+      title: 'Company · dev',
       // Промпт режима на этой дороге уезжает системным сообщением — и панель
       // говорит это вслух, иначе правка промпта выглядит несработавшей.
       promptSent: true,
@@ -184,7 +184,7 @@ describe('planImage: чем нарисуем и почему нельзя', () =
   });
 
   it('шлюз не поднят — причина названа его тумблером, а не «нет модели»', () => {
-    useContour(contour(), [model('enterprise-platform-image', true)]);
+    useContour(contour(), [model('company-image', true)]);
 
     const plan = planImage(deps({ gatewayPort: () => 0 }));
 
@@ -240,7 +240,7 @@ describe('planImage: чем нарисуем и почему нельзя', () =
   });
 
   it('контур не рисует, а профиль сломан — причина та, которую человек чинит сам', () => {
-    useContour(contour(), [model('enterprise-platform-chat', false)]);
+    useContour(contour(), [model('company-chat', false)]);
     store.updateSettings({ endpointProfiles: [profile()] });
 
     const plan = planImage(deps({ gatewayPort: () => 5100 }));
@@ -261,7 +261,7 @@ describe('planImage: дорога агента — режим работает �
   });
 
   it('растровая дорога сильнее: с рисующим контуром выбирается она, а не агент', () => {
-    useContour(contour(), [model('enterprise-platform-image', true)]);
+    useContour(contour(), [model('company-image', true)]);
 
     const plan = planImage(deps({ gatewayPort: () => 5100 }), { agent: true });
 
@@ -272,7 +272,7 @@ describe('planImage: дорога агента — режим работает �
   });
 
   it('модель разговора панели неизвестна — и она её не выдумывает', () => {
-    useContour(contour(), [model('enterprise-platform-chat', false)]);
+    useContour(contour(), [model('company-chat', false)]);
 
     const plan = planImage(deps({ gatewayPort: () => 5100 }), { agent: true });
 
@@ -349,7 +349,7 @@ function savePictureError(request: { block: string }): unknown {
 
 describe('generateImage: дорога «частью ответа» через свой шлюз', () => {
   it('запрос уходит на свой шлюз в диалекте OpenAI, с промптом режима', async () => {
-    useContour(contour(), [model('enterprise-platform-image', true)]);
+    useContour(contour(), [model('company-image', true)]);
     const seen: Array<{ url: string; body: unknown }> = [];
     const fetchImpl: PlatformFetch = (url, init) => {
       seen.push({ url, body: JSON.parse(String(init?.body)) });
@@ -365,7 +365,7 @@ describe('generateImage: дорога «частью ответа» через �
     // отказов контура. И в диалекте OpenAI — мост Anthropic картинку не несёт.
     expect(seen[0]?.url).toBe('http://127.0.0.1:5100/gor/v1/chat/completions');
     expect(seen[0]?.body).toMatchObject({
-      model: 'enterprise-platform-image',
+      model: 'company-image',
       stream: true,
       messages: [
         { role: 'system', content: promptText(appData, 'image') },
@@ -375,7 +375,7 @@ describe('generateImage: дорога «частью ответа» через �
     expect(image).toMatchObject({
       chatId: 'chat-1',
       mime: 'image/png',
-      model: 'enterprise-platform-image',
+      model: 'company-image',
       source: 'contour-chat',
       prompt: 'кот на подоконнике',
       width: 2,
@@ -384,7 +384,7 @@ describe('generateImage: дорога «частью ответа» через �
   });
 
   it('байты ложатся файлом, а в настройках панели их нет ни одного', async () => {
-    useContour(contour(), [model('enterprise-platform-image', true)]);
+    useContour(contour(), [model('company-image', true)]);
     const bytes = png();
     const fetchImpl: PlatformFetch = () => Promise.resolve(reply(framesWithImage(bytes)));
 
@@ -405,7 +405,7 @@ describe('generateImage: дорога «частью ответа» через �
   });
 
   it('модель ответила словами — отказ несёт её слова, а не «панель сломалась»', async () => {
-    useContour(contour(), [model('enterprise-platform-image', true)]);
+    useContour(contour(), [model('company-image', true)]);
     const frames =
       `data: ${JSON.stringify({ choices: [{ delta: { content: 'Рисовать не буду, вот описание' } }] })}\n\n` +
       'data: [DONE]\n\n';
@@ -422,7 +422,7 @@ describe('generateImage: дорога «частью ответа» через �
   });
 
   it('ссылка вместо байтов — отказ: по чужим адресам панель не ходит', async () => {
-    useContour(contour(), [model('enterprise-platform-image', true)]);
+    useContour(contour(), [model('company-image', true)]);
     const frames =
       `data: ${JSON.stringify({
         choices: [
@@ -445,7 +445,7 @@ describe('generateImage: дорога «частью ответа» через �
   });
 
   it('отказ контура приезжает его словами и кодом 502, а не пустой картинкой', async () => {
-    useContour(contour(), [model('enterprise-platform-image', true)]);
+    useContour(contour(), [model('company-image', true)]);
     const fetchImpl: PlatformFetch = () =>
       Promise.resolve(reply(JSON.stringify({ error: { message: 'проверки контента' } }), 451));
 
@@ -509,6 +509,37 @@ describe('generateImage: ручка картинок своего эндпоин
     expect(image.mime).toBe('image/png');
   });
 
+  it('второй запрос ждёт первого: наверх уходит один рисунок за раз', async () => {
+    // Ревью Т9, MINOR 8: справка это обещала, а держала только кнопка одной
+    // страницы — две вкладки заказывали два рисунка разом и два списания.
+    store.updateSettings({
+      endpointProfiles: [profile({ imagesUrl: 'http://127.0.0.1:11434/v1/images/generations' })],
+    });
+    const bytes = png();
+    let inFlight = 0;
+    let peak = 0;
+    let calls = 0;
+    const fetchImpl: PlatformFetch = async () => {
+      calls += 1;
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      inFlight -= 1;
+      // Первый отказывает — очередь обязана пустить второй всё равно.
+      if (calls === 1) return reply('{"error":{"message":"занято"}}', 503);
+      return reply(JSON.stringify({ data: [{ b64_json: bytes.toString('base64') }] }));
+    };
+
+    const [first, second] = await Promise.allSettled([
+      generateImage(deps({ fetchImpl }), { chatId: 'a', prompt: 'кот' }),
+      generateImage(deps({ fetchImpl }), { chatId: 'b', prompt: 'пёс' }),
+    ]);
+
+    expect(peak).toBe(1);
+    expect(first.status).toBe('rejected');
+    expect(second.status).toBe('fulfilled');
+  });
+
   it('ответ без байтов и без адреса — названный отказ, а не пустой файл', async () => {
     store.updateSettings({
       endpointProfiles: [profile({ imagesUrl: 'http://127.0.0.1:11434/v1/images/generations' })],
@@ -543,7 +574,7 @@ describe('generateImage: ручка картинок своего эндпоин
  * контура — ручка картинок такую отвергает. Драйвер подменён на время теста тем
  * же объектом, который читает дорога: реестр драйверов закрыт.
  */
-describe('generateImage: ручка картинок контура по пути из манифеста', () => {
+describe('generateImage: ручка картинок контура — через свой шлюз', () => {
   const driver = driverFor('openai-compat');
   const declared = driver.images;
   afterEach(() => {
@@ -562,23 +593,56 @@ describe('generateImage: ручка картинок контура по пут�
   async function drawnVia(models: PlatformModelInfo[]) {
     driver.images = { api: 'images/create' };
     useContour(gateway(), models);
-    const seen: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const seen: Array<{
+      url: string;
+      headers: Record<string, string>;
+      body: Record<string, unknown>;
+    }> = [];
     const bytes = png();
     const fetchImpl: PlatformFetch = (url, init) => {
-      seen.push({ url, body: JSON.parse(String(init?.body)) as Record<string, unknown> });
+      seen.push({
+        url,
+        headers: (init?.headers ?? {}) as Record<string, string>,
+        body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+      });
       return Promise.resolve(
         reply(JSON.stringify({ data: [{ b64_json: bytes.toString('base64') }] })),
       );
     };
-    const image = await generateImage(deps({ fetchImpl }), { chatId: 'c', prompt: 'кот' });
+    const image = await generateImage(deps({ fetchImpl, gatewayPort: () => 5100 }), {
+      chatId: 'c',
+      prompt: 'кот',
+    });
     return { image, seen };
   }
 
-  it('адрес — объявленный путь относительно версии, а не угаданный', async () => {
+  // Объявленный путь ручки теперь знает ШЛЮЗ (`gateway/images.ts`); домен идёт на
+  // свой маршрут шлюза без ключа — ключ, след и расход подставляет шлюз.
+  it('адрес — свой шлюз, и ключа контура в запросе панели нет', async () => {
     const { image, seen } = await drawnVia([model('flux-1', true)]);
-    expect(seen[0]?.url).toBe('https://gw.example.ru/v1/images/create');
+    expect(seen[0]?.url).toBe(`http://127.0.0.1:5100/${gateway().id}/v1/images/generations`);
+    expect(Object.keys(seen[0]?.headers ?? {}).map((key) => key.toLowerCase())).not.toContain(
+      'authorization',
+    );
     expect(seen[0]?.body.model).toBe('flux-1');
     expect(image.source).toBe('contour-images');
+  });
+
+  it('шлюз погашен — дорога заперта причиной шлюза, наружу не уходит ничего', async () => {
+    driver.images = { api: 'images/create' };
+    useContour(gateway(), [model('flux-1', true)]);
+    const plan = planImage(deps({ gatewayPort: () => 0 }));
+    expect(plan.available).toBe(false);
+    expect(plan.rasterReason ?? plan.reason).toBe('gateway-off');
+    let called = false;
+    const fetchImpl: PlatformFetch = () => {
+      called = true;
+      return Promise.resolve(reply('{}'));
+    };
+    await expect(
+      generateImage(deps({ fetchImpl, gatewayPort: () => 0 }), { chatId: 'c', prompt: 'кот' }),
+    ).rejects.toMatchObject({ status: 409, reason: 'gateway-off' });
+    expect(called).toBe(false);
   });
 
   it('рисующей модели в каталоге нет — чатовая не подставляется, поле модели не шлётся', async () => {

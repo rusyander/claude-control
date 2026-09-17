@@ -55,6 +55,14 @@ describe('пустота карточки прослойки', () => {
     expect(shimEmptyKind(undefined)).toBe('none');
     expect(shimEmptyKind({ requests: 1 } as PlatformToolShimReport)).toBe('none');
   });
+
+  it('сводка без счётчиков вызовов и заявок — не «вызовов не было»', () => {
+    // Ревью Т5, m14: сервер другой версии без `calls`/`claimed` давал `quiet`,
+    // то есть панель утверждала факт там, где не поняла ответ.
+    const partial = { requests: 3, flaws: [] } as unknown as PlatformToolShimReport;
+    expect(shimEmptyKind(partial)).toBe('none');
+    expect(showsToolShim(true, true, partial)).toBe(false);
+  });
 });
 
 describe('показ карточки прослойки', () => {

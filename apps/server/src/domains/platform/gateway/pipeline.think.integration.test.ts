@@ -8,6 +8,7 @@ import type { Platform } from '@agentdeck/contracts';
 import { AppStore } from '../../../lib/app-store.ts';
 import { writePlatform, writeToken } from '../store.ts';
 import type { PlatformFetch } from '../ca-fetch.ts';
+import { driverFor } from '../drivers/index.ts';
 import { PlatformGateway } from './listener.ts';
 
 /**
@@ -157,5 +158,175 @@ describe('размышления текстом через шлюз', () => {
     const text = await askText(port);
     expect(text).toContain('Пользователь здоровается.');
     expect(store.getThinkTailModels(PLATFORM.id)).toEqual(['другая-модель', MODEL]);
+  });
+});
+
+/**
+ * Тот же L9 на пути диалекта Anthropic (решение по контуру №8). Два пути, и оба
+ * обязаны отделять размышление: мост (контур без родной ручки, ответ собирает
+ * переводчик потока) и родная ручка (DRV-07, байты платформы идут клиенту
+ * кадрами её же диалекта — до этой правки мимо разделителя вовсе).
+ */
+
+const ANTHROPIC_ASK = {
+  model: MODEL,
+  max_tokens: 100,
+  stream: true,
+  messages: [{ role: 'user', content: 'привет' }],
+};
+
+/** Текст, который получил клиент Anthropic: все `text_delta` подряд. */
+async function askAnthropicText(port: number, stream = true): Promise<string> {
+  const response = await fetch(`http://127.0.0.1:${port}/dev/v1/messages`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ ...ANTHROPIC_ASK, stream }),
+  });
+  expect(response.status).toBe(200);
+  const text = await response.text();
+  if (!stream) {
+    const message = JSON.parse(text) as { content?: { type: string; text?: string }[] };
+    return (message.content ?? [])
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text ?? '')
+      .join('');
+  }
+  return text
+    .split('\n')
+    .filter((line) => line.startsWith('data: {'))
+    .map((line) => {
+      const payload = JSON.parse(line.slice(6)) as {
+        type?: string;
+        delta?: { type?: string; text?: string };
+      };
+      return payload.type === 'content_block_delta' && payload.delta?.type === 'text_delta'
+        ? (payload.delta.text ?? '')
+        : '';
+    })
+    .join('');
+}
+
+const nativeEvent = (type: string, data: Record<string, unknown>): string =>
+  `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`;
+
+const textDelta = (text: string): string =>
+  nativeEvent('content_block_delta', { index: 0, delta: { type: 'text_delta', text } });
+
+/** Живая форма того же ответа, но родной ручкой Anthropic-вида (vLLM `/v1/messages`). */
+const QWEN_NATIVE = [
+  nativeEvent('message_start', {
+    message: {
+      id: 'msg_1',
+      type: 'message',
+      role: 'assistant',
+      model: MODEL,
+      content: [],
+      usage: { input_tokens: 5, output_tokens: 1 },
+    },
+  }),
+  nativeEvent('content_block_start', { index: 0, content_block: { type: 'text', text: '' } }),
+  textDelta('Пользователь здоровается.'),
+  textDelta(' Отвечу коротко.\n</th'),
+  textDelta('ink>\n\n'),
+  textDelta('Привет!'),
+  nativeEvent('content_block_stop', { index: 0 }),
+  nativeEvent('message_delta', { delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 9 } }),
+  nativeEvent('message_stop', {}),
+];
+
+const QWEN_NATIVE_WHOLE = {
+  id: 'msg_1',
+  type: 'message',
+  role: 'assistant',
+  model: MODEL,
+  content: [{ type: 'text', text: 'Пользователь здоровается.\n</think>\n\nПривет!' }],
+  stop_reason: 'end_turn',
+  usage: { input_tokens: 5, output_tokens: 9 },
+};
+
+function qwenNative(): PlatformFetch {
+  return (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}')) as { stream?: boolean };
+    if (body.stream !== true) {
+      return Promise.resolve(
+        new Response(JSON.stringify(QWEN_NATIVE_WHOLE), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    }
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        for (const frame of QWEN_NATIVE) controller.enqueue(encoder.encode(frame));
+        controller.close();
+      },
+    });
+    return Promise.resolve(
+      new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+    );
+  };
+}
+
+describe('размышления текстом через шлюз — клиент Anthropic', () => {
+  it('мост: первый ответ учит шлюз, второй приходит без размышления', async () => {
+    const port = await start();
+
+    const first = await askAnthropicText(port);
+    expect(first).toContain('</think>');
+    expect(store.getThinkTailModels(PLATFORM.id)).toEqual([MODEL]);
+
+    expect(await askAnthropicText(port)).toBe('Привет!');
+  });
+
+  describe('родная ручка', () => {
+    const driver = driverFor('enterprise-platform');
+    const declared = driver.anthropic;
+
+    beforeEach(() => {
+      writePlatform(store, { ...PLATFORM, toolShim: false });
+      Object.assign(driver, { anthropic: { messages: 'messages' } });
+    });
+    afterEach(() => {
+      Object.assign(driver, { anthropic: declared });
+    });
+
+    async function startNative(): Promise<number> {
+      await gateway.start({
+        store,
+        appDataDir: appData,
+        port: 0,
+        fetchImpl: qwenNative(),
+        spendFlushMs: 0,
+      });
+      return gateway.status().port;
+    }
+
+    it('поток: первый ответ учит шлюз, второй приходит без размышления', async () => {
+      const port = await startNative();
+
+      const first = await askAnthropicText(port);
+      expect(first).toContain('</think>');
+      expect(store.getThinkTailModels(PLATFORM.id)).toEqual([MODEL]);
+
+      const second = await askAnthropicText(port);
+      expect(second).toBe('Привет!');
+    });
+
+    it('цельный ответ модели, уже пойманной на голом теге, тоже без размышления', async () => {
+      const port = await startNative();
+      store.markThinkTail(PLATFORM.id, MODEL);
+      expect(await askAnthropicText(port, false)).toBe('Привет!');
+    });
+
+    it('ответ, начатый с <think>, отделяется и у незнакомой модели', async () => {
+      QWEN_NATIVE.splice(2, 0, textDelta('<think>'));
+      try {
+        const port = await startNative();
+        expect(await askAnthropicText(port)).toBe('Привет!');
+      } finally {
+        QWEN_NATIVE.splice(2, 1);
+      }
+    });
   });
 });

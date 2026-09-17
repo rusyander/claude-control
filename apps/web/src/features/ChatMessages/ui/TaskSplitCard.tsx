@@ -12,6 +12,9 @@ import {
   type CascadeAssignment,
   type CascadePlan,
 } from '@agentdeck/contracts/model-cascade';
+import { chooseRunModel } from '@agentdeck/contracts/platform-models';
+import { usePlatformRunPlan } from '@entities/Platform';
+import { platformModelCaption } from '@shared/lib/chat-model';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -69,6 +72,14 @@ export function TaskSplitCard({
   const effortOptions =
     ceiling && clampAssignment({}, ceiling).effort === '' ? ['', ...efforts] : efforts;
   const hasCascade = Boolean(ceiling) && models.length > 0;
+
+  // Группы разделения — свой потребитель контура. Через контур модель группы —
+  // просьба, а не решение: имя переводится картой или заменяется моделью
+  // контура, и сказать это надо под тем выбором, где человек её меняет, а не
+  // только в шапке чата (ревью Т6, m10). Считает та же `chooseRunModel`, что и
+  // сервер. Без подбора модели выбора нет — и спрашивать план незачем.
+  const runPlan = usePlatformRunPlan(hasCascade ? 'groups' : '');
+  const routed = runPlan.data?.routed === true ? runPlan.data : undefined;
 
   // Чем пойдёт каждая группа. Класс распознаётся подбором один раз и переживает
   // ручную замену: по нему группа подписана, и менять модель — не значит менять
@@ -144,6 +155,10 @@ export function TaskSplitCard({
             вполне может назвать две группы одинаково. */}
         {proposal.groups.map((group, index) => {
           const plan = plans[index];
+          const contourCaption =
+            routed && plan
+              ? platformModelCaption(routed.title, chooseRunModel(routed.rules, plan.model))
+              : undefined;
           return (
             <div key={index} className={styles.group}>
               <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
@@ -221,12 +236,33 @@ export function TaskSplitCard({
                       {t('chat.split.cascade.lowered')}
                     </span>
                   )}
+                  {/* Живой областью, как в шапке: подпись меняется от выбора
+                      модели рядом, и диктор иначе о подмене не узнал бы. */}
+                  {contourCaption && (
+                    <Typography
+                      variant="caption"
+                      color={contourCaption.warn ? 'warning' : 'muted'}
+                      as="span"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {t(contourCaption.key, contourCaption.params)}
+                    </Typography>
+                  )}
                 </Stack>
               )}
             </div>
           );
         })}
       </Stack>
+
+      {/* Глубину контур не принимает — одной строкой на всю карточку, а не у
+          каждой группы: выбор глубины у групп остаётся, но наверх не уедет. */}
+      {hasCascade && routed && !routed.effort && (
+        <Typography variant="caption" color="muted" as="p">
+          {t('chat.platformNoEffort', { title: routed.title })}
+        </Typography>
+      )}
 
       {/* Предложение уже отработано: вместо кнопок — итог. Карточка остаётся на
           месте (по ней читают, что и куда уехало), но заводить по ней второй раз

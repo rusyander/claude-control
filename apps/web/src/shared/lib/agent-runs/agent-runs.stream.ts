@@ -1,4 +1,5 @@
 import { apiClient } from '@shared/api/client';
+import { serverMessageFromPayload } from '@shared/config/i18n';
 import { STREAM_CONNECT_MS, STREAM_STALL_MS } from './agent-runs.constants';
 import { applyEvent } from './agent-runs.events';
 import { parseSseFrame } from './agent-runs.sse';
@@ -175,7 +176,8 @@ async function readRefusal(response: Response): Promise<{
     };
     return {
       code: body.code,
-      message: body.message || `Сервер ответил ${response.status}`,
+      message:
+        serverMessageFromPayload(body) || body.message || `Сервер ответил ${response.status}`,
       files: body.files,
       runId: body.runId,
     };

@@ -202,8 +202,8 @@ describe('atlassian/adf: документ облака и текст своей 
 
 describe('atlassian/jira', () => {
   it('проекты: у облака страница, у своей установки массив', async () => {
-    stubApi([[/project\/search/, { body: { values: [{ id: 1, key: 'GOR', name: 'Платформа компании' }] } }]]);
-    await expect(listProjects(CLOUD)).resolves.toEqual([{ id: '1', key: 'GOR', name: 'Платформа компании' }]);
+    stubApi([[/project\/search/, { body: { values: [{ id: 1, key: 'CMP', name: 'Компания' }] } }]]);
+    await expect(listProjects(CLOUD)).resolves.toEqual([{ id: '1', key: 'CMP', name: 'Компания' }]);
 
     stubApi([[/rest\/api\/2\/project$/, { body: [{ id: 2, key: 'QA', name: 'Тесты' }] }]]);
     await expect(listProjects(SERVER)).resolves.toEqual([{ id: '2', key: 'QA', name: 'Тесты' }]);

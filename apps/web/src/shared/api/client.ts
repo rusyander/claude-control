@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { serverMessageFromPayload } from '@shared/config/i18n';
 
 /**
  * Клиент локального API. Базовый путь относительный — Vite проксирует /api
@@ -70,6 +71,10 @@ export const LONG_TIMEOUTS = {
  */
 export function messageFromPayload(payload: unknown): string | undefined {
   if (typeof payload !== 'object' || payload === null) return undefined;
+  // Код текста — первым: русская строка сервера остаётся запасной (решение
+  // владельца: сервер по-английски не пишет, переводит клиент).
+  const translated = serverMessageFromPayload(payload);
+  if (translated) return translated;
   const { message, error } = payload as { message?: unknown; error?: unknown };
   for (const candidate of [message, error]) {
     if (typeof candidate === 'string' && candidate.trim()) return candidate;

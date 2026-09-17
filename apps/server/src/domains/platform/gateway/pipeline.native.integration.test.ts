@@ -333,6 +333,30 @@ describe('родной диалект Anthropic у платформы', () => {
     expect(answer.text).toContain('нашёл Иванов');
   });
 
+  it('правило «отклонить» на родной ручке — 400 invalid_request_error, наверх ничего', async () => {
+    store.updateSettings({ dlp: { ...store.getSettings().dlp, enabled: true } });
+    saveRules(appData, [
+      {
+        id: 'r1',
+        name: 'Фамилии сотрудников',
+        enabled: true,
+        kind: 'terms',
+        terms: ['Иванов'],
+        pattern: '',
+        action: 'block',
+        label: 'ИМЯ',
+      },
+    ]);
+    await start(platformAnswers(sse(EVENTS)));
+    const answer = await ask({ ...ASK, messages: [{ role: 'user', content: 'кто такой Иванов' }] });
+
+    // Не 403: его Claude Code читает как ошибку входа («Failed to authenticate.»).
+    expect(answer.status).toBe(400);
+    expect(JSON.parse(answer.text)).toMatchObject({ error: { type: 'invalid_request_error' } });
+    expect(answer.text).toContain('Фамилии сотрудников');
+    expect(calls).toHaveLength(0);
+  });
+
   it('маска контура (Р11) работает и на родной ручке — без общего выключателя', async () => {
     writePlatform(store, { ...PLATFORM, dataMask: true });
     await start(platformAnswers(sse(EVENTS)));

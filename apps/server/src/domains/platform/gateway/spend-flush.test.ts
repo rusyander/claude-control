@@ -21,8 +21,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
  */
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -62,7 +62,7 @@ afterEach(() => {
 });
 
 const delta = (totalTokens = 1_000) => ({
-  model: 'enterprise-platform-corp-l',
+  model: 'company-corp-l',
   promptTokens: totalTokens,
   completionTokens: 0,
   totalTokens,
@@ -73,45 +73,45 @@ describe('SpendFlusher', () => {
     vi.useFakeTimers();
     const flusher = new SpendFlusher({ store, flushMs: 5_000 });
 
-    flusher.add('enterprise-platform-dev', delta());
-    expect(store.getPlatformSpend()['enterprise-platform-dev']).toBeUndefined();
+    flusher.add('company-dev', delta());
+    expect(store.getPlatformSpend()['company-dev']).toBeUndefined();
 
     vi.advanceTimersByTime(5_000);
-    expect(store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.totalTokens).toBe(1_000);
+    expect(store.getPlatformSpend()['company-dev']!.days[0]!.totalTokens).toBe(1_000);
   });
 
   it('за один сброс уезжает всё накопленное, а не последний ответ', () => {
     const flusher = new SpendFlusher({ store, flushMs: 5_000 });
-    flusher.add('enterprise-platform-dev', delta(1_000));
-    flusher.add('enterprise-platform-dev', delta(2_000));
+    flusher.add('company-dev', delta(1_000));
+    flusher.add('company-dev', delta(2_000));
     flusher.add('другой', delta(500));
     flusher.flush();
 
     const spend = store.getPlatformSpend();
-    expect(spend['enterprise-platform-dev']!.days[0]!.totalTokens).toBe(3_000);
-    expect(spend['enterprise-platform-dev']!.days[0]!.requests).toBe(2);
+    expect(spend['company-dev']!.days[0]!.totalTokens).toBe(3_000);
+    expect(spend['company-dev']!.days[0]!.requests).toBe(2);
     expect(spend['другой']!.days[0]!.totalTokens).toBe(500);
   });
 
   it('ноль в задержке означает «сразу» — так учёт и проверяется прогоном', () => {
     const flusher = new SpendFlusher({ store, flushMs: 0 });
-    flusher.add('enterprise-platform-dev', delta());
-    expect(store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.totalTokens).toBe(1_000);
+    flusher.add('company-dev', delta());
+    expect(store.getPlatformSpend()['company-dev']!.days[0]!.totalTokens).toBe(1_000);
   });
 
   it('пустой расход не копится: лишний день означал бы «в этот день тратили»', () => {
     const flusher = new SpendFlusher({ store, flushMs: 0 });
-    flusher.add('enterprise-platform-dev', delta(0));
-    expect(store.getPlatformSpend()['enterprise-platform-dev']).toBeUndefined();
+    flusher.add('company-dev', delta(0));
+    expect(store.getPlatformSpend()['company-dev']).toBeUndefined();
   });
 
   it('отказ 402 пишется НЕМЕДЛЕННО и уносит с собой накопленное', () => {
     vi.useFakeTimers();
     const flusher = new SpendFlusher({ store, flushMs: 5_000 });
-    flusher.add('enterprise-platform-dev', delta());
-    flusher.markExhausted('enterprise-platform-dev', new Date('2026-09-10T10:00:00.000Z'));
+    flusher.add('company-dev', delta());
+    flusher.markExhausted('company-dev', new Date('2026-09-10T10:00:00.000Z'));
 
-    const record = store.getPlatformSpend()['enterprise-platform-dev']!;
+    const record = store.getPlatformSpend()['company-dev']!;
     expect(record.exhaustedAt).toBe('2026-09-10T10:00:00.000Z');
     // Накопленное не потеряно и не осталось ждать таймера.
     expect(record.days[0]!.totalTokens).toBe(1_000);
@@ -120,13 +120,13 @@ describe('SpendFlusher', () => {
   it('остановка шлюза дописывает хвост, а не выбрасывает его', () => {
     vi.useFakeTimers();
     const flusher = new SpendFlusher({ store, flushMs: 5_000 });
-    flusher.add('enterprise-platform-dev', delta());
+    flusher.add('company-dev', delta());
     flusher.stop();
-    expect(store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.totalTokens).toBe(1_000);
+    expect(store.getPlatformSpend()['company-dev']!.days[0]!.totalTokens).toBe(1_000);
 
     // Таймер снят: после остановки ничего больше не срабатывает.
     vi.advanceTimersByTime(60_000);
-    expect(store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.requests).toBe(1);
+    expect(store.getPlatformSpend()['company-dev']!.days[0]!.requests).toBe(1);
   });
 
   it('нечего сбрасывать — файл не трогаем вовсе', () => {
@@ -146,16 +146,16 @@ describe('SpendFlusher', () => {
       throw new Error('EPERM: rename state.json.tmp-1 -> state.json');
     });
 
-    flusher.add('enterprise-platform-dev', delta(1_000));
+    flusher.add('company-dev', delta(1_000));
     expect(() => vi.advanceTimersByTime(5_000)).not.toThrow();
     expect(save).toHaveBeenCalledTimes(1);
 
     // Диск отпустило — накопленное уезжает следующей пачкой целиком, вместе с
     // тем, что пришло после отказа.
     save.mockRestore();
-    flusher.add('enterprise-platform-dev', delta(500));
+    flusher.add('company-dev', delta(500));
     vi.advanceTimersByTime(5_000);
-    const day = store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!;
+    const day = store.getPlatformSpend()['company-dev']!.days[0]!;
     expect(day.totalTokens).toBe(1_500);
     expect(day.requests).toBe(2);
   });
@@ -166,11 +166,11 @@ describe('SpendFlusher', () => {
   it('удалённый контур пачкой не воскресает', () => {
     vi.useFakeTimers();
     const flusher = new SpendFlusher({ store, flushMs: 5_000 });
-    flusher.add('enterprise-platform-dev', delta(1_000));
+    flusher.add('company-dev', delta(1_000));
 
     store.updateSettings({ platforms: [] });
     vi.advanceTimersByTime(5_000);
-    expect(store.getPlatformSpend()['enterprise-platform-dev']).toBeUndefined();
+    expect(store.getPlatformSpend()['company-dev']).toBeUndefined();
   });
 
   it('деньги считаются по ценам НА МОМЕНТ сброса, а не заведения счётчика', () => {
@@ -180,15 +180,15 @@ describe('SpendFlusher', () => {
       lookup: () => ({
         entries: [
           {
-            id: 'enterprise-platform-corp-l',
-            label: 'EnterprisePlatform L',
+            id: 'company-corp-l',
+            label: 'Company L',
             price: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
           },
         ],
       }),
     });
-    flusher.add('enterprise-platform-dev', delta(1_000_000));
-    expect(store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.money.usd).toBe(3);
+    flusher.add('company-dev', delta(1_000_000));
+    expect(store.getPlatformSpend()['company-dev']!.days[0]!.money.usd).toBe(3);
   });
 });
 
@@ -212,18 +212,18 @@ describe('SpendFlusher: цена из каталога шлюза', () => {
   });
 
   it('модель с опубликованной ценой считается по ней', async () => {
-    await checkPlatform(store, dir, 'enterprise-platform-dev', answer);
+    await checkPlatform(store, dir, 'company-dev', answer);
     const flusher = new SpendFlusher({ store, flushMs: 0 });
-    flusher.add('enterprise-platform-dev', million('openai/gpt-4o-mini'));
+    flusher.add('company-dev', million('openai/gpt-4o-mini'));
 
-    const money = store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.money;
+    const money = store.getPlatformSpend()['company-dev']!.days[0]!.money;
     // 0.15 $ за миллион входа + 0.6 $ за миллион выхода.
     expect(money.usd).toBe(0.75);
     expect(money.unpricedModels).toEqual([]);
   });
 
   it('своя цена человека перебивает опубликованную', async () => {
-    await checkPlatform(store, dir, 'enterprise-platform-dev', answer);
+    await checkPlatform(store, dir, 'company-dev', answer);
     const flusher = new SpendFlusher({
       store,
       flushMs: 0,
@@ -231,21 +231,21 @@ describe('SpendFlusher: цена из каталога шлюза', () => {
         overrides: { 'gpt-4o-mini': { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 } },
       }),
     });
-    flusher.add('enterprise-platform-dev', million('openai/gpt-4o-mini'));
-    expect(store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.money.usd).toBe(2);
+    flusher.add('company-dev', million('openai/gpt-4o-mini'));
+    expect(store.getPlatformSpend()['company-dev']!.days[0]!.money.usd).toBe(2);
   });
 
   it('«-1» — цена неизвестна: токены без денег, модель названа', async () => {
-    await checkPlatform(store, dir, 'enterprise-platform-dev', answer);
+    await checkPlatform(store, dir, 'company-dev', answer);
     const flusher = new SpendFlusher({ store, flushMs: 0 });
-    flusher.add('enterprise-platform-dev', million('openrouter/auto'));
-    const money = store.getPlatformSpend()['enterprise-platform-dev']!.days[0]!.money;
+    flusher.add('company-dev', million('openrouter/auto'));
+    const money = store.getPlatformSpend()['company-dev']!.days[0]!.money;
     expect(money.usd).toBe(0);
     expect(money.unpricedModels).toEqual(['openrouter/auto']);
   });
 
   it('цена одного контура не считает расход другого', async () => {
-    await checkPlatform(store, dir, 'enterprise-platform-dev', answer);
+    await checkPlatform(store, dir, 'company-dev', answer);
     const flusher = new SpendFlusher({ store, flushMs: 0 });
     flusher.add('другой', million('openai/gpt-4o-mini'));
     expect(store.getPlatformSpend()['другой']!.days[0]!.money.unpricedModels).toEqual([

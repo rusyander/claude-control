@@ -272,19 +272,23 @@ export const endpointsEn: typeof endpointsRu = {
     refusalsCaption: 'Exactly what the panel shows, and what to do about it.',
     refusalsColumn: 'What is shown',
     refusalsMeaningColumn: 'Reason and way out',
-    refusalUrl: '“The endpoint address must be a valid http(s) address”',
+    refusalUrl: '“The address must be a valid http(s) address”',
     refusalUrlText:
-      'The address did not parse as http or https. Nothing is written — fix the address ' +
-      'and apply again.',
-    refusalHttps: '“Gemini CLI only accepts https in its address variable”',
+      'This is what “Check connection” answers when the address does not parse as http ' +
+      'or https. “Apply” with such an address is refused too, but only shows “Could not ' +
+      'write.”. Nothing is written — fix the address and apply again.',
+    refusalHttps: '“Could not write.” for an http address with Gemini',
     refusalHttpsText:
-      'A requirement of the CLI itself, with an exception only for localhost. Plain http ' +
-      'must not be written there: the CLI would silently reject the setting.',
-    refusalNoVar: '“no documented environment variable for this API kind”',
+      'Gemini CLI only accepts https in its address variable, with an exception only for ' +
+      'localhost; the hint under the address field says so, and the refusal itself comes ' +
+      'as the generic message. Plain http must not be written there: the CLI would ' +
+      'silently reject the setting.',
+    refusalNoVar: '“This CLI documents no environment variable for the model address”',
     refusalNoVarText:
-      'For that CLI the address is set only in its configuration file, by hand. The panel ' +
-      'will not guess a variable name.',
-    refusalNoEnv: '“no environment section — nowhere to write”',
+      'The “does not accept” reason in the “Apply to” list. For that CLI the ' +
+      'address is set only in its configuration file, by hand. The panel will not guess a ' +
+      'variable name.',
+    refusalNoEnv: '“This CLI has no environment file of its own — there is nowhere to write”',
     refusalNoEnvText:
       'That CLI has no environment file of its own. The profile does not apply to it — ' +
       'apply it to the ones that accept it.',

@@ -682,9 +682,12 @@ export function registerPlatformRoutes(
  */
 function fail(reply: FastifyReply, error: unknown): FastifyReply {
   if (error instanceof PlatformError) {
-    return reply
-      .code(error.statusCode)
-      .send({ code: error.code, message: error.message, detail: error.detail });
+    return reply.code(error.statusCode).send({
+      code: error.code,
+      message: error.message,
+      detail: error.detail,
+      ...(error.messageCode ? { messageCode: error.messageCode, params: error.params } : {}),
+    });
   }
   throw error;
 }

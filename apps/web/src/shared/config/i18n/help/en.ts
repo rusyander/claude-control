@@ -26,6 +26,7 @@ import { historyEn } from './en/topics/history';
 import { testsEn } from './en/topics/tests';
 import { projectsEn } from './en/topics/projects';
 import { dlpEn } from './en/topics/dlp';
+import { panelAgentEn } from './en/topics/panelAgent';
 import { platformEn } from './en/topics/platform';
 import { endpointsEn } from './en/topics/endpoints';
 import { providersEn } from './en/topics/providers';
@@ -105,7 +106,7 @@ export const helpEn: HelpSchema = {
   },
 
   shots: {
-    sideEnterprisePlatform: 'Contour admin',
+    sidePlatform: 'Contour admin',
     sidePanel: 'Panel',
     chat: chatEn.shots,
     platform: platformEn.shots,
@@ -133,6 +134,7 @@ export const helpEn: HelpSchema = {
     integrations: integrationsEn.shots,
     prompts: promptsEn.shots,
     dlp: dlpEn.shots,
+    panelAgent: panelAgentEn.shots,
   },
 
   diagrams: {
@@ -163,6 +165,7 @@ export const helpEn: HelpSchema = {
     endpoints: endpointsEn.diagrams,
     integrations: integrationsEn.diagrams,
     dlp: dlpEn.diagrams,
+    panelAgent: panelAgentEn.diagrams,
   },
 
   topics: {
@@ -187,6 +190,7 @@ export const helpEn: HelpSchema = {
     tests: testsEn.topic,
     projects: projectsEn.topic,
     dlp: dlpEn.topic,
+    panelAgent: panelAgentEn.topic,
     platform: platformEn.topic,
     endpoints: endpointsEn.topic,
     providers: providersEn.topic,

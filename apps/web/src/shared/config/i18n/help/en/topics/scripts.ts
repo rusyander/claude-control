@@ -85,7 +85,8 @@ export const scriptsEn: typeof scriptsRu = {
       fSearch: 'A missed search shows the query',
       fSearchText:
         'Nothing found — the panel says what was searched for rather than "there ' +
-        'are no scripts". Search covers both the file name and its content.',
+        'are no scripts". Search covers the file name and the description from its header; ' +
+        'the script body is not searched.',
       fDelete: 'Deletion states the consequence',
       fDeleteText:
         'The dialog does not ask "are you sure?"; it says what will happen: ' +

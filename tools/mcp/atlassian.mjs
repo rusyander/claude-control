@@ -18,9 +18,9 @@
  */
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { brandEnv, panelHomeFile } from '../../apps/server/src/lib/brand.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(join(here, '..', '..', 'apps', 'server', 'package.json'));
@@ -29,7 +29,7 @@ const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { z } = require('zod');
 
-const BASE = (process.env.AGENTDECK_URL || 'http://127.0.0.1:5178').replace(/\/+$/, '');
+const BASE = (brandEnv('URL') || 'http://127.0.0.1:5178').replace(/\/+$/, '');
 const TIMEOUT_MS = 20_000;
 
 /**
@@ -38,7 +38,7 @@ const TIMEOUT_MS = 20_000;
  */
 function panelToken() {
   try {
-    return readFileSync(join(homedir(), '.agentdeck', 'api-token'), 'utf8').trim();
+    return readFileSync(panelHomeFile('api-token'), 'utf8').trim();
   } catch {
     return '';
   }
@@ -111,9 +111,9 @@ const server = new McpServer(
   { name: 'agentdeck-atlassian', version: '1.0.0' },
   {
     instructions:
-      'Jira и Confluence через панель agentdeck. Читать можно свободно. Из записи разрешено ' +
-      'заводить дефект и писать комментарии; создание и правка страниц Confluence — действие ' +
-      'человека в панели, а не твоё. Куда именно писать, смотри в qa_links.',
+      'Jira и Confluence через панель AgentDeck. Читать можно свободно. Из записи разрешено ' +
+      'заводить дефект и писать комментарии; создавать и править страницы Confluence — только по ' +
+      'прямой просьбе человека, правку — после того, как прочитал страницу. Куда именно писать, смотри в qa_links.',
   },
 );
 

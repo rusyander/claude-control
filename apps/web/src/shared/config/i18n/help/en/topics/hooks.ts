@@ -114,7 +114,8 @@ export const hooksEn: typeof hooksRu = {
         'Not alphabetically: the event group is the answer to "what happens at this ' +
         'point". PreToolUse holds two guards, PostToolUse two handlers, and one of ' +
         'them carries a red "script file not found" mark: the entry is there, the ' +
-        'file is not, and such a hook does exactly nothing.',
+        'file is not, and such a hook does exactly nothing. The local SessionEnd hook ' +
+        'carries the same mark.',
       lLocal: 'Entries from the personal file are marked',
       lLocalText:
         'A hook from settings.local.json is shown with a "local" badge and no ' +
@@ -429,7 +430,7 @@ export const hooksEn: typeof hooksRu = {
       '05-bulk': 'Several at once: two of the five presets are ticked',
     },
     living: {
-      '01-list': 'Six hooks grouped by event; one carries a red mark about a missing file',
+      '01-list': 'Six hooks grouped by event; two carry a red mark about a missing file',
       '02-local': 'The dialog names the file the entry leaves and promises to keep the script',
       '03-order': 'The arrows change the order within an event — which is the order of execution',
       '04-off': 'The toggle removed the entry from settings.json; the panel keeps its text',

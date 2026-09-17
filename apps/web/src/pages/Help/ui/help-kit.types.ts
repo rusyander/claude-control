@@ -103,7 +103,7 @@ export interface TopicNavProps {
 }
 
 /** Чья это сторона на снимке: подпись говорит это первым словом. */
-export type HelpShotSide = 'enterprise-platform' | 'panel';
+export type HelpShotSide = 'platform' | 'panel';
 
 export interface HelpShotProps {
   /** Раздел справки — он же папка каталога и первая часть ключа подписи. */

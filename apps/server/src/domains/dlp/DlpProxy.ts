@@ -197,7 +197,8 @@ export class DlpProxy {
         hits: [],
         reason,
       });
-      return respondJson(response, 403, {
+      // 400, а не 403: отказ по настройке прокси, а не по доступу (см. respondBlocked).
+      return respondJson(response, 400, {
         error: `AgentDeck: ${reason}, запрос остановлен (настройка «пропускать неразобранное» выключена)`,
       });
     }
@@ -384,7 +385,9 @@ function respondBlocked(response: ServerResponse, kind: DlpApiKind, ruleName: st
       ? { type: 'error', error: { type: 'invalid_request_error', message } }
       : { error: { message, type: 'invalid_request_error', code: 'dlp_blocked' } };
 
-  respondJson(response, 403, payload);
+  // 400, а не 403: Claude Code читает 403 как ошибку входа и приписывает
+  // «Failed to authenticate.», и человек чинил бы ключ вместо правила.
+  respondJson(response, 400, payload);
 }
 
 function describeError(error: unknown): string {

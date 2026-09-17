@@ -14,7 +14,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { startStubPlatform } from '../qa/stub-platform.mjs';
-import { L, exact, mark, frameArea, pause, waitText } from './platform-shots-lib.mjs';
+import {
+  L,
+  exact,
+  mark,
+  frameArea,
+  openPlatformTab,
+  pause,
+  waitText,
+} from './platform-shots-lib.mjs';
 import { STAND_TITLE as standTitle } from './platform-stand-panel.mjs';
 
 export const SCRIPTED_TITLE = L('Сценарный контур', 'Scripted contour');
@@ -143,8 +151,7 @@ async function runChat(page, web, text) {
 }
 
 async function setDefaultModel(page, web, model) {
-  await page.goto(`${web}/platform`, { waitUntil: 'domcontentloaded' });
-  await pause(3500);
+  await openPlatformTab(page, web, 'model', SCRIPTED_TITLE);
   const card = await mark(
     page,
     L(`Модель контура · ${SCRIPTED_TITLE}`, `Contour model · ${SCRIPTED_TITLE}`),
@@ -205,11 +212,11 @@ export async function shootScripted({ page, web, shots }) {
       throw new Error('пример из забора исполнился — это дефект прослойки, а не кадр');
     await scripted.shot(page, '02-shim-quote');
 
-    await page.goto(`${web}/platform`, { waitUntil: 'domcontentloaded' });
-    await pause(3500);
+    await openPlatformTab(page, web, 'tools');
     let area = await frameArea(
       page,
       await mark(page, L('Инструменты через контур', 'Tools through the contour'), 'shim-card'),
+      { margin: 70 },
     );
     await scripted.shot(page, '03-shim-card', { clip: area });
 

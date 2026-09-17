@@ -224,8 +224,9 @@ export const promptsEn: typeof promptsRu = {
     transferPlanTitle: 'The plan shows every edit',
     transferPlanText:
       'In the import plan prompts stand as their own list: «new» — this prompt was never ' +
-      'edited here, «same» — the texts match, «differs» — your text will be replaced. You ' +
-      'tick the boxes; the panel picks nothing for you.',
+      'edited here, «identical» — the texts match, «overwrites» — your text will be ' +
+      'replaced. Only new ones are ticked in advance; your own edit is replaced only by ' +
+      'your own tick.',
     transferUnknownTitle: 'What applying cannot do',
     transferUnknownText:
       'Overwrite the built-in text: there is nowhere to write it — it lives in the panel ' +

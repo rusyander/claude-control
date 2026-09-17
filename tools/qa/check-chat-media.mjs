@@ -45,7 +45,7 @@ import { DECK_JSON, startStubPlatform } from './stub-platform.mjs';
 const PANEL_PORT = Number(process.env.MEDIA_PANEL_PORT ?? 5195);
 const GATEWAY_PORT = Number(process.env.MEDIA_GATEWAY_PORT ?? 5196);
 const PANEL = `http://127.0.0.1:${PANEL_PORT}`;
-const CONTOUR = 'media-enterprise-platform';
+const CONTOUR = 'media-company';
 
 /** Заглушка вместо ключа: собрана из кусков, чтобы в репозитории не лежал секрет. */
 const KEY = ['media', 'stub', 'key'].join('-');
@@ -276,7 +276,7 @@ async function run(stub, appData) {
     (event?.imageBytes ?? 0) > 0 && !JSON.stringify(event).includes('iVBORw0KGgo'),
     JSON.stringify(event).slice(0, 300),
   );
-  // Контур не прислал счёта за картинку (как enterprise-platform): след говорит это, а не
+  // Контур не прислал счёта за картинку (как платформа компании): след говорит это, а не
   // молчаливый ноль, который читался бы «бесплатно» (аудит MD-09).
   check(
     'расход не сообщён — след называет это, а не пишет ноль',
@@ -313,6 +313,8 @@ async function run(stub, appData) {
     traversal.status === 400 && missing.status === 404,
     `${traversal.status} / ${missing.status}`,
   );
+
+  await contourImagesViaGateway(stub, appData);
 
   // ── 7–8. Дорога отдельной ручки ─────────────────────────────────────────
   // Контур выключаем: дальше проверяется профиль человека, а рисующий контур
@@ -410,6 +412,116 @@ async function run(stub, appData) {
   );
 
   await mediaEverywhere(stub, appData);
+}
+
+/**
+ * 6б. Ручка картинок КОНТУРА (`images: { api }`) — тоже через свой шлюз.
+ *
+ * До 17.09.2026 эта дорога шла напрямую ключом контура: ни следа, ни расхода, ни
+ * перевода отказов, ни защиты данных. Доказательство здесь — строка в следе
+ * шлюза с путём ручки картинок: мимо шлюза её не записал бы никто. Отказ 451
+ * обязан прийти переведённым и помеченным как отказ проверок, а 503 — ровно ОДНИМ
+ * запросом наверх: платная картинка повтором рисуется и списывается дважды.
+ */
+async function contourImagesViaGateway(stub, appData) {
+  const put = await api(`/platforms/${encodeURIComponent(CONTOUR)}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      settings: {
+        id: CONTOUR,
+        title: 'Стаб контура для картинок',
+        driver: 'enterprise-platform',
+        baseUrl: stub.url,
+        enabled: true,
+        mode: 'best-effort',
+        budgetUsd: 0,
+        budgetSince: '',
+        capabilities: [],
+        targets: [],
+        projectPaths: [],
+        agents: [],
+        caCertPath: '',
+        manifest: { imagesApi: 'images/generations' },
+      },
+    }),
+  });
+  const plan = await api('/media/images/plan');
+  check(
+    'контур с ручкой картинок в манифесте: дорога «ручка контура» и модель с флагом',
+    put.status === 200 &&
+      plan.body?.available === true &&
+      plan.body?.source === 'contour-images' &&
+      plan.body?.model === 'stub-image',
+    `${put.status} ${JSON.stringify(plan.body)}`,
+  );
+
+  const before = stub.calls.length;
+  const drawn = await api('/media/images', {
+    method: 'POST',
+    body: JSON.stringify({ chatId: 'media-chat', prompt: 'маяк на скале' }),
+  });
+  const calls = stub.calls.slice(before);
+  const imageCall = calls.find((call) => call.path.endsWith('/images/generations'));
+  const sent = imageCall ? JSON.parse(imageCall.body) : undefined;
+  const onDisk = drawn.body?.id
+    ? readFileSync(join(appData, 'media', `${drawn.body.id}.png`))
+    : undefined;
+  check(
+    'ручка контура: запрос с просьбой о байтах, ключ подставлен шлюзом, файл байт в байт',
+    drawn.status === 200 &&
+      drawn.body?.source === 'contour-images' &&
+      sent?.prompt === 'маяк на скале' &&
+      sent?.response_format === 'b64_json' &&
+      imageCall?.authorization === `Bearer ${KEY}` &&
+      calls.length === 1 &&
+      Boolean(onDisk?.equals(PNG_1X1)),
+    `${drawn.status} ${JSON.stringify(drawn.body).slice(0, 200)} вызовов=${calls.length}`,
+  );
+
+  const gateway = await api('/platforms/gateway');
+  const imageEvents = (gateway.body?.status?.events ?? []).filter(
+    (item) => item.platformId === CONTOUR && item.path.endsWith('/v1/images/generations'),
+  );
+  const event = imageEvents[0];
+  check(
+    'рисование ручкой контура прошло через СВОЙ шлюз: в следе путь ручки, размер и «расход не сообщён»',
+    event?.status === 200 &&
+      (event?.imageBytes ?? 0) > 0 &&
+      event?.usageUnreported === true &&
+      !JSON.stringify(event).includes('iVBORw0KGgo'),
+    String(JSON.stringify(event)).slice(0, 300),
+  );
+
+  const beforeRefusal = stub.calls.length;
+  const refused = await api('/media/images', {
+    method: 'POST',
+    body: JSON.stringify({ chatId: '', prompt: 'stub-451 паспорт' }),
+  });
+  const afterRefusal = await api('/platforms/gateway');
+  const refusalEvent = (afterRefusal.body?.status?.events ?? []).find(
+    (item) => item.platformId === CONTOUR && item.path.endsWith('/v1/images/generations'),
+  );
+  check(
+    'отказ проверок ручки картинок переведён шлюзом: причина словами, в следе «заблокировано» и имена правил',
+    refused.status === 502 &&
+      String(refused.body?.message ?? '').includes('AgentDeck') &&
+      !String(refused.body?.message ?? '').includes('Иванов') &&
+      refusalEvent?.blocked === true &&
+      (refusalEvent?.violations ?? []).length > 0 &&
+      stub.calls.length - beforeRefusal === 1,
+    `${refused.status} ${JSON.stringify(refused.body)} ${String(JSON.stringify(refusalEvent)).slice(0, 240)}`,
+  );
+
+  const beforeDown = stub.calls.length;
+  const down = await api('/media/images', {
+    method: 'POST',
+    body: JSON.stringify({ chatId: '', prompt: 'stub-503 закат' }),
+  });
+  check(
+    'временный отказ ручки картинок НЕ повторяется: платная картинка — один запрос наверх',
+    down.status === 502 && stub.calls.length - beforeDown === 1,
+    `${down.status} вызовов=${stub.calls.length - beforeDown} ${JSON.stringify(down.body)}`,
+  );
 }
 
 /**

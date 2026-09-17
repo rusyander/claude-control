@@ -1,9 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  EndpointApplyResult,
-  EndpointProbeResult,
-  EndpointsInfo,
-} from '@agentdeck/contracts';
+import type { EndpointApplyResult, EndpointProbeResult, EndpointsInfo } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 

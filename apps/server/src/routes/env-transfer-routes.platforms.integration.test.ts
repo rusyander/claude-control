@@ -41,8 +41,8 @@ function makeCtx(root: string): ServerContext {
 }
 
 const contour = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform' as const,
   baseUrl: 'https://api.example.ru',
   enabled: true,
@@ -117,7 +117,7 @@ describe('перенос окружения: контуры', () => {
       gateway: { port: number };
     };
     expect(document.platforms).toHaveLength(1);
-    expect(document.platforms.at(0)?.id).toBe('enterprise-platform-dev');
+    expect(document.platforms.at(0)?.id).toBe('company-dev');
     expect(document.platforms.at(0)?.baseUrl).toBe('https://api.example.ru');
     expect(document.platforms.at(0)?.budgetUsd).toBe(25);
     expect(document.gateway.port).toBeGreaterThan(0);
@@ -141,9 +141,9 @@ describe('перенос окружения: контуры', () => {
       platforms: { id: string }[];
       checklist: { reason: string; keys: string[] }[];
     }>();
-    expect(preview.platforms.map((item) => item.id)).toEqual(['enterprise-platform-dev']);
+    expect(preview.platforms.map((item) => item.id)).toEqual(['company-dev']);
     const line = preview.checklist.find((item) => item.reason === 'panel-key');
-    expect(line?.keys.join()).toContain('enterprise-platform-dev');
+    expect(line?.keys.join()).toContain('company-dev');
   });
 
   it('план на чистой машине: контур новый, ключа нет, пути проектов названы чужими', async () => {
@@ -198,12 +198,12 @@ describe('перенос окружения: контуры', () => {
           provider: 'kimi',
           archivePath: path,
           selection: [],
-          platformSelection: ['enterprise-platform-dev'],
+          platformSelection: ['company-dev'],
         },
       });
       expect(res.statusCode).toBe(200);
       expect(res.json<{ platforms: { written: string[] } }>().platforms.written).toEqual([
-        'enterprise-platform-dev',
+        'company-dev',
       ]);
 
       const moved = otherCtx.store.getSettings().platforms;
@@ -211,7 +211,7 @@ describe('перенос окружения: контуры', () => {
       expect(moved.at(0)?.baseUrl).toBe('https://api.example.ru');
       // Ключа нет, и контур приехал включённым: панель ответит «не подключён»,
       // а не уйдёт наружу с пустым заголовком.
-      expect(getStoredKey(otherData, 'platform:enterprise-platform-dev')).toBeUndefined();
+      expect(getStoredKey(otherData, 'platform:company-dev')).toBeUndefined();
       expect(moved.at(0)?.enabled).toBe(true);
 
       // Управляемого профиля от переноса НЕ появляется, и это намеренно: профиль
@@ -219,7 +219,7 @@ describe('перенос окружения: контуры', () => {
       // применение. Иначе на новой машине CLI молча получил бы адрес шлюза,
       // которого человек здесь не включал.
       const profiles = otherCtx.store.getSettings().endpointProfiles;
-      expect(profiles.some((profile) => profile.ownerPlatformId === 'enterprise-platform-dev')).toBe(false);
+      expect(profiles.some((profile) => profile.ownerPlatformId === 'company-dev')).toBe(false);
     } finally {
       await otherApp.close();
       rmSync(other, { recursive: true, force: true });
@@ -234,7 +234,7 @@ describe('перенос окружения: контуры', () => {
     otherCtx.store.updateSettings({
       platforms: [{ ...contour, baseUrl: 'https://api.другой.ру', budgetUsd: 5 }],
     });
-    setStoredKey(join(other, 'agentdeck'), 'platform:enterprise-platform-dev', 'sk-местный-ключ-1234');
+    setStoredKey(join(other, 'agentdeck'), 'platform:company-dev', 'sk-местный-ключ-1234');
 
     const otherApp = Fastify();
     registerEnvTransferRoutes(otherApp, otherCtx);
@@ -273,8 +273,8 @@ describe('перенос окружения: контуры', () => {
     otherCtx.store.updateSettings({
       platforms: [{ ...contour, baseUrl: 'https://api.local.test' }],
     });
-    setStoredKey(otherData, 'platform:enterprise-platform-dev', LOCAL_TOKEN);
-    otherCtx.store.savePlatformHealth('enterprise-platform-dev', {
+    setStoredKey(otherData, 'platform:company-dev', LOCAL_TOKEN);
+    otherCtx.store.savePlatformHealth('company-dev', {
       outcome: 'ok',
       checkedAt: '2026-09-10T10:00:00.000Z',
       reachable: true,
@@ -287,7 +287,7 @@ describe('перенос окружения: контуры', () => {
       compromises: [],
     });
     otherCtx.store.savePlatformSpend({
-      platformId: 'enterprise-platform-dev',
+      platformId: 'company-dev',
       days: [
         {
           day: '2026-09-10',
@@ -312,23 +312,23 @@ describe('перенос окружения: контуры', () => {
           provider: 'kimi',
           archivePath: path,
           selection: [],
-          platformSelection: ['enterprise-platform-dev'],
+          platformSelection: ['company-dev'],
         },
       });
       expect(res.statusCode).toBe(200);
       expect(res.json<{ platforms: { keysDropped: string[] } }>().platforms.keysDropped).toEqual([
-        'enterprise-platform-dev',
+        'company-dev',
       ]);
 
       // Адрес стал тем, что в архиве, — и уходить туда с прежним ключом панель
       // не станет: ключ выдавали ПОД ТОТ адрес.
       expect(otherCtx.store.getSettings().platforms.at(0)?.baseUrl).toBe('https://api.example.ru');
-      expect(getStoredKey(otherData, 'platform:enterprise-platform-dev')).toBeUndefined();
+      expect(getStoredKey(otherData, 'platform:company-dev')).toBeUndefined();
       // След пробы принадлежал прежнему адресу: оставить его значило бы показать
       // зелёную галку про адрес, по которому панель не ходила ни разу.
-      expect(otherCtx.store.getPlatformHealth()['enterprise-platform-dev']).toBeUndefined();
+      expect(otherCtx.store.getPlatformHealth()['company-dev']).toBeUndefined();
       // А расход — настоящие траты этой машины, и стирать их за человека нельзя.
-      expect(otherCtx.store.getPlatformSpend()['enterprise-platform-dev']?.days?.length).toBe(1);
+      expect(otherCtx.store.getPlatformSpend()['company-dev']?.days?.length).toBe(1);
     } finally {
       await otherApp.close();
       rmSync(other, { recursive: true, force: true });

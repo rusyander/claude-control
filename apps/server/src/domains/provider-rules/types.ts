@@ -1,8 +1,4 @@
-import type {
-  AppSettings,
-  ProviderRulesFormat,
-  ProviderRulesScope,
-} from '@agentdeck/contracts';
+import type { AppSettings, ProviderRulesFormat, ProviderRulesScope } from '@agentdeck/contracts';
 import type { ConfigProvider } from '../../providers/types.ts';
 
 /** Минимум настроек, нужный резолверу (без импорта AppStore). */

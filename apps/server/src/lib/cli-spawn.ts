@@ -55,6 +55,13 @@ export interface CliSpawnOptions {
    * запуск.
    */
   env?: Record<string, string>;
+  /**
+   * `false` — `env` и есть ВСЁ окружение процесса, без `process.env` сервера.
+   * Для агента панели: его CLI не должен унаследовать ни ключ API, ни переменные
+   * контура и интеграций, лежащие в окружении панели. Список нужного CLI собирает
+   * вызывающий (`panel-agent/runner.ts → panelAgentEnv`).
+   */
+  inheritEnv?: boolean;
 }
 
 /** Либо запущенный процесс, либо причина, по которой запускать не стали. */
@@ -75,7 +82,11 @@ export function spawnCliProcess(
   const base = {
     windowsHide: true,
     ...(options.cwd ? { cwd: options.cwd } : {}),
-    ...(options.env ? { env: { ...process.env, ...options.env } } : {}),
+    ...(options.inheritEnv === false
+      ? { env: { ...options.env } }
+      : options.env
+        ? { env: { ...process.env, ...options.env } }
+        : {}),
   };
 
   try {

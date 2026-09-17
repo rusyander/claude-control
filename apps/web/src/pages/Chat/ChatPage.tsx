@@ -25,6 +25,8 @@ import {
 import { useProjects, useOpenInEditor } from '@entities/Project';
 import { useSettings } from '@entities/AppConfig';
 import { useModelCatalog } from '@entities/ModelCatalog';
+import { lastTurnFacts, TurnToolHintLine, useTurnToolHint } from '@entities/Platform';
+import { Stack } from '@shared/ui/stack';
 import { useChatMedia } from '@entities/Media';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatHeader } from './ChatHeader';
@@ -135,6 +137,13 @@ export function ChatPage() {
   // показывает те же вызовы дважды — по разу из каждого источника.
   const streamShown = isStreamShown(stream);
   const shownHistory = withoutLiveTurn(messageList, run.startedAt, streamShown);
+  // Ход через контур без вызовов или с вызовом текстом — назвать под лентой
+  // (развилки 3 и 5): иначе «агент ничего не сделал» выглядит поломкой панели.
+  const toolHint = useTurnToolHint(
+    activeChat?.parentId ? 'groups' : 'chat',
+    lastTurnFacts(messageList),
+    isRunning,
+  );
   // Разговор мог продолжиться мимо панели — из терминала или расширения
   // редактора. Такой ход не даёт потока событий, и лента жила бы снимком на
   // момент открытия: вопрос агента человек увидел бы только после F5. То же
@@ -279,9 +288,11 @@ export function ChatPage() {
 
       <div
         className={`${styles.page} ${isRightOpen ? styles.pageWithPreview : ''}`}
+        // Ширина превью — переменной, а не готовой сеткой: сетку держит CSS, и
+        // только он знает ширину экрана, чтобы разговору осталось место.
         style={
           isRightOpen
-            ? { gridTemplateColumns: `300px minmax(0, 1fr) auto ${previewWidth}px` }
+            ? ({ '--preview-width': `${previewWidth}px` } as React.CSSProperties)
             : undefined
         }
       >
@@ -412,6 +423,12 @@ export function ChatPage() {
             {...(media.topic ? { mediaTopic: media.topic } : {})}
             mediaRevision={media.revision}
           />
+
+          {toolHint && (
+            <Stack padding="0 var(--spacing-xl)">
+              <TurnToolHintLine hint={toolHint} />
+            </Stack>
+          )}
 
           <ChatDock
             progress={progress.data}

@@ -14,4 +14,4 @@ storybook-static/
 coverage/
 
 # Релизный APK телефонного приложения — пересобирается `pnpm mobile:apk`
-agentdeck.apk
+/*.apk

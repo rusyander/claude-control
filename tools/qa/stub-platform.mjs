@@ -10,7 +10,7 @@
  * местом, где правится форма провода, если она разойдётся с настоящей.
  *
  * Что умеет: список моделей OpenAI-формы с объявленными возможностями, поток
- * `chat/completions` с вендорными кадрами платформа компании, цельный ответ (когда клиент
+ * `chat/completions` с вендорными кадрами платформы компании, цельный ответ (когда клиент
  * не просил поток), картинка частью ответа и отдельной ручкой, свои коды отказа.
  *
  * Сценарий выбирается ИМЕНЕМ МОДЕЛИ (`stub-guardrails`, `stub-451`, …) — так
@@ -73,7 +73,7 @@ const MODELS = [
   // на проводе.
   { id: 'stub-summarizing', kind: 'chat', owned_by: 'stub', context_length: 8000 },
   { id: 'stub-anonymized', kind: 'chat', owned_by: 'stub', context_length: 32000 },
-  // Итоговый текст контура разошёлся с отданным потоком (`enterprise-platform_deanonymized`).
+  // Итоговый текст контура разошёлся с отданным потоком (`platform_deanonymized`).
   { id: 'stub-rewritten', kind: 'chat', owned_by: 'stub', context_length: 32000 },
   // Отказ поставщика объектом `error` ПОСЛЕ заголовков 200 — так делает litellm.
   { id: 'stub-stream-error', kind: 'chat', owned_by: 'stub', context_length: 32000 },
@@ -301,6 +301,17 @@ function nativeToolTurn(rawBody) {
   } catch {
     declared = [];
   }
+  // Пробный вызов активации (`smoke-tools.ts`): файла он не пишет, и зелёная
+  // строка «модель вызывает инструменты полем» снимается на настоящей пробе.
+  if (declared.includes('report_status') && !declared.includes('Write')) {
+    return {
+      call: {
+        id: 'call_native_probe',
+        name: 'report_status',
+        arguments: JSON.stringify({ status: 'ready' }),
+      },
+    };
+  }
   if (!declared.includes('Write')) return { text: 'инструментов мне не объявили' };
   return {
     call: {
@@ -355,12 +366,12 @@ function streamFrames(scenario, model, rawBody = '', png = PNG_1X1) {
 
   // Стадии платформы идут ПЕРЕД ответом: по ним панель показывает, что контур
   // делал с запросом, пока клиент ждал.
-  out.push(frame({ enterprise-platform_status: 'guardrails_input' }));
+  out.push(frame({ platform_status: 'guardrails_input' }));
   // Сжатие истории контур объявляет ОТДЕЛЬНОЙ стадией, и это единственный след
   // того, что модель видела не весь диалог (справочник §5.1).
-  if (scenario === 'summarizing') out.push(frame({ enterprise-platform_status: 'summarizing' }));
-  if (scenario === 'reasoning') out.push(frame({ enterprise-platform_reasoning: 'сначала посчитаю' }));
-  out.push(frame({ enterprise-platform_status: 'inference' }));
+  if (scenario === 'summarizing') out.push(frame({ platform_status: 'summarizing' }));
+  if (scenario === 'reasoning') out.push(frame({ platform_reasoning: 'сначала посчитаю' }));
+  out.push(frame({ platform_status: 'inference' }));
 
   if (scenario === 'image') {
     out.push(
@@ -421,10 +432,10 @@ function streamFrames(scenario, model, rawBody = '', png = PNG_1X1) {
     out.push(frame(delta('готов')));
   }
 
-  if (scenario === 'tools') out.push(frame({ enterprise-platform_tools_unavailable: true }));
+  if (scenario === 'tools') out.push(frame({ platform_tools_unavailable: true }));
   if (scenario === 'masked') {
     out.push(
-      frame({ enterprise-platform_sanitized: { violations: [ruleViolation('Телефоны', 'ANONYMIZE', '')] } }),
+      frame({ platform_sanitized: { violations: [ruleViolation('Телефоны', 'ANONYMIZE', '')] } }),
     );
   }
   if (scenario === 'anonymized') {
@@ -434,7 +445,7 @@ function streamFrames(scenario, model, rawBody = '', png = PNG_1X1) {
     // которых подмена и делалась.
     out.push(
       frame({
-        enterprise-platform_anonymization_mapping: {
+        platform_anonymization_mapping: {
           '[PERSON_1]': 'Иванов Иван Иванович',
           '[ORG_1]': 'ООО «Ромашка»',
         },
@@ -442,7 +453,7 @@ function streamFrames(scenario, model, rawBody = '', png = PNG_1X1) {
     );
     out.push(
       frame({
-        enterprise-platform_deanonymized_entities: [
+        platform_deanonymized_entities: [
           { placeholder: '[PERSON_1]', value: 'Иванов Иван Иванович' },
           { placeholder: '[ORG_1]', value: 'ООО «Ромашка»' },
         ],
@@ -452,7 +463,7 @@ function streamFrames(scenario, model, rawBody = '', png = PNG_1X1) {
   if (scenario === 'guardrails') {
     out.push(
       frame({
-        enterprise-platform_guardrails: {
+        platform_guardrails: {
           stream_interrupted: true,
           violations: [ruleViolation('Токсичность', 'TOXICITY', 'то, на чём сработали')],
         },
@@ -464,11 +475,11 @@ function streamFrames(scenario, model, rawBody = '', png = PNG_1X1) {
   }
 
   out.push(frame({ ...head, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }));
-  // Картинку частью ответа enterprise-platform отдаёт дорогой Responses API, и кадра расхода
+  // Картинку частью ответа платформа компании отдаёт дорогой Responses API, и кадра расхода
   // там нет вовсе (`responses_api.py stream_responses_api`, аудит MD-09).
   if (scenario !== 'image') out.push(frame(usageChunk(head)));
   // Итоговый текст шлётся после расхода и перед `[DONE]` (router.py:1086–1088).
-  if (scenario === 'rewritten') out.push(frame({ enterprise-platform_deanonymized: REWRITTEN_FINAL }));
+  if (scenario === 'rewritten') out.push(frame({ platform_deanonymized: REWRITTEN_FINAL }));
   out.push('data: [DONE]\n\n');
   return out;
 }
@@ -564,12 +575,12 @@ function wholeBody(scenario, model, rawBody = '', png = PNG_1X1) {
     ...(scenario === 'image'
       ? {}
       : { usage: { prompt_tokens: 11, completion_tokens: 2, total_tokens: 13 } }),
-    ...(scenario === 'tools' ? { enterprise-platform_tools_unavailable: true } : {}),
+    ...(scenario === 'tools' ? { platform_tools_unavailable: true } : {}),
     ...(scenario === 'masked'
-      ? { enterprise-platform_sanitized: { violations: [ruleViolation('Телефоны', 'ANONYMIZE', '')] } }
+      ? { platform_sanitized: { violations: [ruleViolation('Телефоны', 'ANONYMIZE', '')] } }
       : {}),
     ...(scenario === 'guardrails'
-      ? { enterprise-platform_guardrails: { violations: [ruleViolation('Токсичность', 'TOXICITY', '')] } }
+      ? { platform_guardrails: { violations: [ruleViolation('Токсичность', 'TOXICITY', '')] } }
       : {}),
   };
 }
@@ -688,14 +699,20 @@ function anthropicMessage(response, json) {
 /**
  * Поднять стаб. `port: 0` — свободный порт от системы: параллельные свипы не
  * дерутся за один номер. `png` — base64 картинки, которую «рисует» контур:
- * свипу хватает точки 1×1, кадру справки нужна видимая картинка.
+ * свипу хватает точки 1×1, кадру справки нужна видимая картинка. `vendorPrefix` —
+ * слово вендорных полей (`<префикс>_status`): у настоящей установки платформы
+ * оно своё, и проверка переезда говорит со стабом прежним словом.
  */
 export function startStubPlatform({
   port = 0,
   scenario = 'clean',
   delayMs = 0,
   png = PNG_1X1,
+  vendorPrefix = 'platform',
 } = {}) {
+  const vendor = (text) =>
+    vendorPrefix === 'platform' ? text : text.replaceAll('"platform_', `"${vendorPrefix}_`);
+  const field = (name) => `${vendorPrefix}_${name}`;
   /** След вызовов: свип проверяет по нему, ЧТО именно ушло наверх. */
   const calls = [];
 
@@ -734,6 +751,18 @@ export function startStubPlatform({
     }
 
     if (url.pathname.endsWith('/images/generations')) {
+      // Отказ ручки картинок выбирается СЛОВОМ В ПРОМПТЕ (`stub-451 …`): модель у
+      // неё одна, рисующая, и сценарий по имени модели здесь не выбрать.
+      const refusedWith = /\bstub-(\d{3})\b/.exec(String(json.prompt ?? ''))?.[1];
+      if (refusedWith && REFUSALS[refusedWith]) {
+        sendJson(
+          response,
+          Number(refusedWith),
+          REFUSALS[refusedWith],
+          REFUSAL_HEADERS[refusedWith] ?? {},
+        );
+        return;
+      }
       sendJson(response, 200, { created: 1, data: [{ b64_json: png }] });
       return;
     }
@@ -752,17 +781,17 @@ export function startStubPlatform({
 
     // `mod-llmbox/.../chat/router.py:237-243` дословно: `single_turn` с потоком —
     // 400 FastAPI, без потока — цельное тело, вызов в `message.tool_calls`.
-    if (json.enterprise-platform_tool_mode === 'single_turn') {
+    if (json[field('tool_mode')] === 'single_turn') {
       if (json.stream === true) {
         sendJson(response, 400, {
-          detail: 'enterprise-platform_tool_mode=single_turn is not supported with stream=true',
+          detail: `${field('tool_mode')}=single_turn is not supported with stream=true`,
         });
         return;
       }
       sendJson(
         response,
         200,
-        singleTurnBody(String(json.model ?? 'stub-chat'), json.enterprise-platform_tools),
+        singleTurnBody(String(json.model ?? 'stub-chat'), json[field('tools')]),
       );
       return;
     }
@@ -777,7 +806,11 @@ export function startStubPlatform({
 
     const model = String(json.model ?? 'stub-chat');
     if (!json.stream) {
-      sendJson(response, 200, wholeBody(picked, model, text, png));
+      sendJson(
+        response,
+        200,
+        JSON.parse(vendor(JSON.stringify(wholeBody(picked, model, text, png)))),
+      );
       return;
     }
 
@@ -788,7 +821,7 @@ export function startStubPlatform({
     });
     for (const chunk of streamFrames(picked, model, text, png)) {
       if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
-      response.write(chunk);
+      response.write(vendor(chunk));
     }
     response.end();
   });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { PlatformGatewayEvent } from '@agentdeck/contracts';
 import { violationReport } from './violations.ts';
-import { enterprise-platformDriver } from './drivers/enterprise-platform.ts';
+import { enterprisePlatformDriver } from './drivers/enterprise-platform.ts';
 import { bridgeUpstreamStatus } from './gateway/status.ts';
 
 /**
@@ -106,7 +106,7 @@ describe('безымянное срабатывание не теряется', 
   });
 
   it('обрыв без названий считается своим счётом', () => {
-    // Кадр `{"enterprise-platform_guardrails":{"stream_interrupted":true}}` — ровно тот,
+    // Кадр `{"platform_guardrails":{"stream_interrupted":true}}` — ровно тот,
     // что описан в справочнике: ни одного имени в нём нет.
     const report = violationReport([event({ status: 400, interrupted: true })]);
 
@@ -222,7 +222,7 @@ describe('текст проверки в сводку не попадает', ()
           ],
         },
       },
-      { driverRows: enterprise-platformDriver.statusRows },
+      { driverRows: enterprisePlatformDriver.statusRows },
     );
 
     const report = violationReport([

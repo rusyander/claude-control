@@ -28,8 +28,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
  */
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -82,11 +82,11 @@ afterEach(() => rmSync(root, { recursive: true, force: true }));
 describe('каталог: чем можно вести разговор', () => {
   it('вложения и пропавшие модели в выбор не попадают', () => {
     const models = catalogChatModels([
-      { id: 'enterprise-platform-large' },
+      { id: 'company-large' },
       { id: 'bge-m3', kind: 'Embedding' },
-      { id: 'enterprise-platform-old', retired: true },
+      { id: 'company-old', retired: true },
     ]);
-    expect(models.map((model) => model.id)).toEqual(['enterprise-platform-large']);
+    expect(models.map((model) => model.id)).toEqual(['company-large']);
   });
 
   it('объявленный не-чат в выбор разговора не попадает', () => {
@@ -97,9 +97,9 @@ describe('каталог: чем можно вести разговор', () => 
       { id: 'dall-e-3', kind: 'image' },
       { id: 'bge-reranker', kind: 'rerank' },
       { id: 'whisper-1', kind: 'audio' },
-      { id: 'enterprise-platform-mid', kind: 'chat' },
+      { id: 'company-mid', kind: 'chat' },
     ]);
-    expect(models.map((model) => model.id)).toEqual(['enterprise-platform-mid']);
+    expect(models.map((model) => model.id)).toEqual(['company-mid']);
   });
 
   it('нераспознанный вид чатом быть не перестаёт: `{"type":"model"}` — это молчание', () => {
@@ -115,7 +115,7 @@ describe('каталог: чем можно вести разговор', () => 
     // «Вид не объявлен» и «для чата не годится» — разные утверждения, и второе
     // панель не проверяла. Додумать его значило бы спрятать от человека модель,
     // которой контур отвечает.
-    expect(catalogChatModels([{ id: 'enterprise-platform-mid' }]).map((m) => m.id)).toEqual(['enterprise-platform-mid']);
+    expect(catalogChatModels([{ id: 'company-mid' }]).map((m) => m.id)).toEqual(['company-mid']);
   });
 
   it('без пробы каталога нет вовсе, а не пустая ошибка', () => {
@@ -128,35 +128,35 @@ describe('модель контура по умолчанию', () => {
     // Пропавшая из ответа модель чаще означает суженные права ключа, чем
     // осознанное решение: молча увести разговор на первую попавшуюся значило бы
     // сменить модель без единого слова.
-    writePlatform(store, { ...PLATFORM, defaultModel: 'enterprise-platform-large' });
-    store.savePlatformHealth(PLATFORM.id, health([{ id: 'enterprise-platform-mid' }]));
-    expect(defaultModelOf(store, PLATFORM)).toEqual({ model: 'enterprise-platform-large', source: 'default' });
+    writePlatform(store, { ...PLATFORM, defaultModel: 'company-large' });
+    store.savePlatformHealth(PLATFORM.id, health([{ id: 'company-mid' }]));
+    expect(defaultModelOf(store, PLATFORM)).toEqual({ model: 'company-large', source: 'default' });
   });
 
   it('человек не выбирал — берётся первая чатовая модель каталога, и это НАЗВАНО', () => {
     store.savePlatformHealth(
       PLATFORM.id,
-      health([{ id: 'bge-m3', kind: 'embedding' }, { id: 'enterprise-platform-mid' }]),
+      health([{ id: 'bge-m3', kind: 'embedding' }, { id: 'company-mid' }]),
     );
     // Источник `catalog` — не украшение: у профиля без модели CLI уходит в
     // контур с моделью ВЕНДОРА, и человек читает 403 как поломку панели.
-    expect(defaultModelOf(store, PLATFORM)).toEqual({ model: 'enterprise-platform-mid', source: 'catalog' });
+    expect(defaultModelOf(store, PLATFORM)).toEqual({ model: 'company-mid', source: 'catalog' });
   });
 
   it('модель рисования моделью по умолчанию не становится, хоть и объявлена чатом', () => {
-    // Аудит MD-13: у enterprise-platform модели рисования приходят видом `chat` с флагом
+    // Аудит MD-13: у платформы компании модели рисования приходят видом `chat` с флагом
     // `image_generation`, и контур ведёт их дорогой без цикла инструментов. Первая
     // в каталоге, она уводила бы в эту дорогу КАЖДЫЙ прогон агента.
     store.savePlatformHealth(
       PLATFORM.id,
       health([
-        { id: 'enterprise-platform-image', kind: 'chat', imageGeneration: true },
-        { id: 'enterprise-platform-mid', kind: 'chat', imageGeneration: false },
+        { id: 'company-image', kind: 'chat', imageGeneration: true },
+        { id: 'company-mid', kind: 'chat', imageGeneration: false },
       ]),
     );
-    expect(defaultModelOf(store, PLATFORM)).toEqual({ model: 'enterprise-platform-mid', source: 'catalog' });
+    expect(defaultModelOf(store, PLATFORM)).toEqual({ model: 'company-mid', source: 'catalog' });
     // Выбрать её руками по-прежнему можно: список разговора её не прячет.
-    expect(modelRulesFor(store, PLATFORM, 'chat').catalog).toContain('enterprise-platform-image');
+    expect(modelRulesFor(store, PLATFORM, 'chat').catalog).toContain('company-image');
   });
 
   it('ни выбора, ни каталога — модели нет, и это отдельный ответ', () => {
@@ -181,16 +181,16 @@ describe('правила потребителя', () => {
     // «Чат моделью покрупнее, тесты подешевле» — ради этого поле и заведено.
     const platform: Platform = {
       ...PLATFORM,
-      defaultModel: 'enterprise-platform-mid',
-      consumerModels: { tests: 'enterprise-platform-small' },
+      defaultModel: 'company-mid',
+      consumerModels: { tests: 'company-small' },
     };
     writePlatform(store, platform);
     expect(modelRulesFor(store, platform, 'tests')).toMatchObject({
-      model: 'enterprise-platform-small',
+      model: 'company-small',
       source: 'consumer',
     });
     expect(modelRulesFor(store, platform, 'chat')).toMatchObject({
-      model: 'enterprise-platform-mid',
+      model: 'company-mid',
       source: 'default',
     });
   });
@@ -198,23 +198,23 @@ describe('правила потребителя', () => {
   it('каталог правил — только чатовые модели: по нему имя прогона узнаётся своим', () => {
     store.savePlatformHealth(
       PLATFORM.id,
-      health([{ id: 'enterprise-platform-mid' }, { id: 'bge-m3', kind: 'embedding' }]),
+      health([{ id: 'company-mid' }, { id: 'bge-m3', kind: 'embedding' }]),
     );
-    expect(modelRulesFor(store, PLATFORM, 'chat').catalog).toEqual(['enterprise-platform-mid']);
+    expect(modelRulesFor(store, PLATFORM, 'chat').catalog).toEqual(['company-mid']);
   });
 });
 
 describe('выбор модели одного прогона', () => {
   const rules = {
-    model: 'enterprise-platform-mid',
+    model: 'company-mid',
     source: 'default' as const,
-    map: { sonnet: 'enterprise-platform-mid', opus: 'enterprise-platform-large' },
-    catalog: ['enterprise-platform-mid', 'enterprise-platform-large'],
+    map: { sonnet: 'company-mid', opus: 'company-large' },
+    catalog: ['company-mid', 'company-large'],
   };
 
   it('прогон ничего не просил — модель контура, и подмены нет', () => {
     expect(chooseRunModel(rules, '')).toEqual({
-      model: 'enterprise-platform-mid',
+      model: 'company-mid',
       asked: '',
       source: 'default',
       replaced: false,
@@ -223,7 +223,7 @@ describe('выбор модели одного прогона', () => {
 
   it('панельное имя переводится картой, и перевод назван подменой', () => {
     expect(chooseRunModel(rules, 'opus')).toEqual({
-      model: 'enterprise-platform-large',
+      model: 'company-large',
       asked: 'opus',
       source: 'mapped',
       replaced: true,
@@ -233,14 +233,30 @@ describe('выбор модели одного прогона', () => {
   it('регистр в карте не стоит человеку отказа', () => {
     // Карту человек пишет руками, и `Sonnet` против `sonnet` — не его ошибка:
     // регистр в именах моделей не значит ничего ни у одного контура.
-    const choice = chooseRunModel({ ...rules, map: { Sonnet: 'enterprise-platform-mid' } }, 'SONNET');
-    expect(choice).toMatchObject({ model: 'enterprise-platform-mid', source: 'mapped' });
+    const choice = chooseRunModel({ ...rules, map: { Sonnet: 'company-mid' } }, 'SONNET');
+    expect(choice).toMatchObject({ model: 'company-mid', source: 'mapped' });
+  });
+
+  it('полное имя ступени переводится строкой карты своего семейства', () => {
+    // Ступень разделения уезжает развёрнутым именем, а карту человек пишет
+    // семейством — строка «opus» обязана сработать и для `claude-opus-5`.
+    expect(chooseRunModel(rules, 'claude-opus-5')).toEqual({
+      model: 'company-large',
+      asked: 'claude-opus-5',
+      source: 'mapped',
+      replaced: true,
+    });
+    // Точное имя каталога сильнее догадки по семейству, а слово семейства в
+    // чужом имени семейством Claude не считается.
+    const catalogued = { ...rules, catalog: [...rules.catalog, 'claude-opus-5'] };
+    expect(chooseRunModel(catalogued, 'claude-opus-5')).toMatchObject({ source: 'asked' });
+    expect(chooseRunModel(rules, 'magnum-opus-7')).toMatchObject({ source: 'default' });
   });
 
   it('имя из каталога контура уходит как есть', () => {
-    expect(chooseRunModel(rules, 'enterprise-platform-large')).toEqual({
-      model: 'enterprise-platform-large',
-      asked: 'enterprise-platform-large',
+    expect(chooseRunModel(rules, 'company-large')).toEqual({
+      model: 'company-large',
+      asked: 'company-large',
       source: 'asked',
       replaced: false,
     });
@@ -250,7 +266,7 @@ describe('выбор модели одного прогона', () => {
     // Ровно тот случай, ради которого писался Т6: молча отпустить «haiku» в
     // контур — это 403 «модель» на каждом сообщении и ни одного слова о причине.
     expect(chooseRunModel(rules, 'haiku')).toEqual({
-      model: 'enterprise-platform-mid',
+      model: 'company-mid',
       asked: 'haiku',
       source: 'default',
       replaced: true,
@@ -259,8 +275,8 @@ describe('выбор модели одного прогона', () => {
 
   it('перевод в то же самое имя подменой не считается', () => {
     const choice = chooseRunModel(
-      { ...rules, map: { 'enterprise-platform-mid': 'enterprise-platform-mid' } },
-      'enterprise-platform-mid',
+      { ...rules, map: { 'company-mid': 'company-mid' } },
+      'company-mid',
     );
     expect(choice.replaced).toBe(false);
   });
@@ -299,7 +315,7 @@ describe('выбор модели одного прогона', () => {
     // действовать ровно тогда, когда проба не прошла.
     const empty = { ...rules, model: '', source: 'none' as const, catalog: [] };
     expect(chooseRunModel(empty, 'sonnet')).toMatchObject({
-      model: 'enterprise-platform-mid',
+      model: 'company-mid',
       source: 'mapped',
       replaced: true,
     });
@@ -308,7 +324,7 @@ describe('выбор модели одного прогона', () => {
 
 describe('усилие рассуждения', () => {
   it('отвечает манифест драйвера, а не проба', () => {
-    // compromise: no-effort — у enterprise-platform поля глубины в публичной схеме нет, и
+    // compromise: no-effort — у платформы компании поля глубины в публичной схеме нет, и
     // панель его не отправляет вовсе (решение владельца 12.09.2026).
     expect(effortAccepted(PLATFORM)).toBe(false);
   });

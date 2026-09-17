@@ -5,7 +5,7 @@ import { writeTextFile } from '../lib/safe-io.ts';
 import { slugify } from '../lib/slug.ts';
 import { saveSkill, SKILLS_DISABLED_DIR } from './skills.ts';
 import { readHooks, writeHooks } from './hooks.ts';
-import { SCENARIO_MARKER } from './compiled-markers.ts';
+import { hasScenarioMarker, SCENARIO_MARKER } from './compiled-markers.ts';
 import type { EntityToggleDeps } from './entity-toggle.ts';
 
 /**
@@ -154,7 +154,7 @@ export function buildTriggerScript(group: Group, skillId: string): string {
     `Запрос попадает под сценарий «${group.name}». ` +
     `Выполняй по шагам из ~/.claude/skills/${skillId}/SKILL.md, не пропуская признаки выполнения.`;
 
-  return `// Сгенерировано панелью agentdeck из сценария группы «${group.name}».
+  return `// Сгенерировано панелью AgentDeck из сценария группы «${group.name}».
 // Правки затираются при следующем сохранении группы — меняйте сценарий в панели.
 import { readFileSync } from 'node:fs';
 
@@ -182,7 +182,7 @@ export function compileScenarioHooks(deps: EntityToggleDeps): void {
   const { paths, store, backupDir } = deps;
 
   const hooks = readHooks(paths.settings, store);
-  const kept = hooks.filter((hook) => !hook.command.includes(SCENARIO_MARKER));
+  const kept = hooks.filter((hook) => !hasScenarioMarker(hook.command));
 
   const compiled: Hook[] = store
     .getGroups()

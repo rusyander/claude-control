@@ -297,7 +297,7 @@ describe('маршрут каталога моделей: источник «к�
 
   it('офлайн: контур не отвечает, но список и дата последнего успеха на месте', async () => {
     connectPlatform();
-    const okAt = store.getPlatformHealth().enterprise-platform!.checkedAt;
+    const okAt = store.getPlatformHealth()['enterprise-platform']!.checkedAt;
 
     store.savePlatformHealth('enterprise-platform', {
       outcome: 'unreachable',
@@ -349,7 +349,7 @@ describe('маршрут каталога моделей: источник «к�
   it('пропавшая у контура модель остаётся в списке с пометкой', async () => {
     connectPlatform();
     store.savePlatformHealth('enterprise-platform', {
-      ...store.getPlatformHealth().enterprise-platform!,
+      ...store.getPlatformHealth()['enterprise-platform']!,
       models: [{ id: 'gpt-4o', kind: 'chat' }],
       checkedAt: new Date().toISOString(),
     });

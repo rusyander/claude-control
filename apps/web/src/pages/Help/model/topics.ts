@@ -23,6 +23,7 @@ import { CompareTopic } from '../topics/CompareTopic';
 import { ProvidersTopic } from '../topics/ProvidersTopic';
 import { EndpointsTopic } from '../topics/EndpointsTopic';
 import { DlpTopic } from '../topics/DlpTopic';
+import { PanelAgentTopic } from '../topics/PanelAgentTopic';
 import { IntegrationsTopic } from '../topics/IntegrationsTopic';
 import { PlatformTopic } from '../topics/PlatformTopic';
 import { PromptsTopic } from '../topics/PromptsTopic';
@@ -135,6 +136,9 @@ export const HELP_GROUPS: HelpGroup[] = [
       // Идёт ПОСЛЕ settings: по этому порядку читают справку подряд, и документ
       // про сам раздел должен встретиться раньше сквозного.
       { id: 'providers', icon: 'swap', pagePath: '/settings', Content: ProvidersTopic },
+      // Окно агента есть на каждой странице, своего раздела у него нет: `pagePath`
+      // ведёт на «Обзор», откуда окно открывают чаще всего.
+      { id: 'panelAgent', icon: 'commands', pagePath: '/', Content: PanelAgentTopic },
     ],
   },
 ];

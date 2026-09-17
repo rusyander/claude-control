@@ -10,21 +10,21 @@ import {
   platformPreset,
 } from '@agentdeck/contracts/platform-presets';
 import type { DriverControl, PlatformDriver } from './driver.ts';
-import { enterprise-platformDriver } from './enterprise-platform.ts';
+import { buildEnterprisePlatformDriver, enterprisePlatformDriver } from './enterprise-platform.ts';
 import { openAiCompatDriver } from './openai-compat.ts';
 
 /**
  * Реестр драйверов. Ветвление по платформе кончается здесь: дальше все
  * спрашивают возможности, а не имя контура.
  *
- * Кода у драйверов два набора — у платформа компании и у совместимого шлюза. Всё прочее —
+ * Кода у драйверов два набора — у платформы компании и у совместимого шлюза. Всё прочее —
  * пресеты-данные из контракта (DRV-03) и переопределения самого контура: они
  * накладываются на код базы здесь, в одном месте, и дальше по панели едет уже
  * собранный драйвер. Второй сборки нигде нет: проба, шлюз, картинки и план
  * применения спрашивают один и тот же ответ.
  */
 const BASES: Record<PlatformDriverBase, PlatformDriver> = {
-  enterprise-platform: enterprise-platformDriver,
+  'enterprise-platform': enterprisePlatformDriver,
   'openai-compat': openAiCompatDriver,
 };
 
@@ -55,8 +55,31 @@ function withThinkingField(controls: DriverControl[], path: string): DriverContr
  * снимает объявленное: так и пресет, и человек могут сказать «у этого шлюза
  * ручки нет», не заводя для этого нового значения.
  */
+/**
+ * Префикс вендорных полей поверх собранного драйвера. Меняется всё, что
+ * называется префиксом, — разбор кадров, поля цельного ответа, правила на
+ * проводе, — а подписи и прочие переопределения остаются как были.
+ */
+function withVendorPrefix(driver: PlatformDriver, prefix: string): PlatformDriver {
+  const old = driver.vendorPrefix;
+  if (old === undefined || old === prefix) return driver;
+  const rebuilt = buildEnterprisePlatformDriver(prefix);
+  return {
+    ...driver,
+    vendorPrefix: prefix,
+    readFrame: rebuilt.readFrame,
+    vendorFields: rebuilt.vendorFields,
+    controls: driver.controls.map((control) =>
+      control.id.startsWith(`${old}_`)
+        ? { ...control, id: `${prefix}_${control.id.slice(old.length + 1)}` }
+        : control,
+    ),
+  };
+}
+
 function applyManifest(driver: PlatformDriver, patch: PlatformManifestOverrides): PlatformDriver {
-  const next: PlatformDriver = { ...driver };
+  let next: PlatformDriver = { ...driver };
+  if (patch.vendorPrefix !== undefined) next = withVendorPrefix(next, patch.vendorPrefix);
   if (patch.clientTools) next.clientTools = patch.clientTools;
   if (patch.effort !== undefined) next.effort = patch.effort;
   if (patch.anthropicMessages !== undefined) {

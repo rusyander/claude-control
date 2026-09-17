@@ -9,15 +9,15 @@ import { queryKeys } from '@shared/api/query-keys';
  * правка (добавить/забыть). Файлы проекта при удалении не трогаем — забываем путь.
  */
 
+/** Прочитать реестр проектов — для тех, кому нужен список вне компонента. */
+export async function fetchProjectRegistry(): Promise<Project[]> {
+  const { data } = await apiClient.get<Project[]>('/projects');
+  return data;
+}
+
 /** Зарегистрированные проекты. */
 export function useProjectRegistry() {
-  return useQuery({
-    queryKey: queryKeys.projects,
-    queryFn: async () => {
-      const { data } = await apiClient.get<Project[]>('/projects');
-      return data;
-    },
-  });
+  return useQuery({ queryKey: queryKeys.projects, queryFn: fetchProjectRegistry });
 }
 
 /** Добавить проект в реестр по пути к его каталогу. */

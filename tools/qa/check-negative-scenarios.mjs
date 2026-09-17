@@ -1,5 +1,5 @@
 /**
- * Негативные сценарии контура (§8 `TASKS-ENTERPRISE_PLATFORM.md`) — каждый закрыт ИМЕНЕМ
+ * Негативные сценарии контура (§8 `TASKS-PLATFORM.md`) — каждый закрыт ИМЕНЕМ
  * проверки, а не обещанием в таблице.
  *
  * Зачем скрипт, если строки уже перечислены в задаче: список в markdown стареет
@@ -29,7 +29,7 @@ import { resolve } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '../..');
 const SERVER = 'apps/server/src';
 const WEB = 'apps/web/src';
-const TABLE_FILE = 'TASKS-ENTERPRISE_PLATFORM.md';
+const TABLE_FILE = 'TASKS-PLATFORM.md';
 
 /** Короче — почти наверняка совпадёт со случайным местом («map(»). */
 const MIN_ANCHOR = 12;
@@ -42,7 +42,7 @@ const MIN_ANCHOR = 12;
  *
  * `note` стоит там, где ДЕЙСТВИТЕЛЬНОСТЬ РАЗОШЛАСЬ С ТАБЛИЦЕЙ. Молча
  * подгонять поведение под текст задачи нельзя: спецификация писалась до чтения
- * исходников платформа компании, и там, где она ошибается, побеждает контур.
+ * исходников платформы компании, и там, где она ошибается, побеждает контур.
  */
 const SCENARIOS = [
   {
@@ -111,7 +111,7 @@ const SCENARIOS = [
         `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
         '401 называет ВСЕ ПЯТЬ причин',
       ],
-      // Текст отказа переехал в драйвер (Т1): пять причин — знание о ПЛАТФОРМА КОМПАНИИ, и
+      // Текст отказа переехал в драйвер (Т1): пять причин — знание о ПЛАТФОРМЕ КОМПАНИИ, и
       // у произвольного совместимого шлюза их нет. Якорь идёт за текстом, а не
       // за файлом: он стережёт формулировку, а не её адрес.
       [`${SERVER}/domains/platform/drivers/enterprise-platform.ts`, 'истёк по сроку'],
@@ -143,7 +143,7 @@ const SCENARIOS = [
     closedBy: [
       [
         `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
-        '402 enterprise-platform назван бюджетом КЛЮЧА',
+        '402 платформы компании назван бюджетом КЛЮЧА',
       ],
       [
         `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
@@ -343,7 +343,12 @@ const SCENARIOS = [
       [`${SERVER}/domains/platform/store.test.ts`, 'два контура живут рядом'],
       // Именно перебор списка контуров: короткий «map(» совпал бы с любым
       // другим перебором на странице и пережил бы возврат к одному контуру.
-      [`${WEB}/pages/Platform/PlatformPage.tsx`, 'data?.map((status)'],
+      // После вкладок список идёт из `platforms` и рисует КАРТОЧКУ на каждый
+      // контур; перебор того же массива в выборе контура карточек не рисует.
+      [
+        `${WEB}/pages/Platform/PlatformPage.tsx`,
+        '<PlatformCard\n                    key={status.platform.id}',
+      ],
     ],
   },
   {
@@ -391,6 +396,24 @@ const SCENARIOS = [
     closedBy: [
       [`${SERVER}/domains/platform/ca-fetch.test.ts`, 'ключ контура не подписывается временем'],
       [`${SERVER}/domains/platform/spend.test.ts`, 'день местный, а не UTC'],
+    ],
+  },
+  {
+    id: '26',
+    title: 'Отказ панели по содержимому',
+    expects: '400 `invalid_request_error` с причиной, не 403',
+    // Решение по контуру №1: 403 Claude Code читает как ошибку входа и дописывает
+    // «Failed to authenticate.». Все три места отказа — мост, родная ручка, прокси.
+    closedBy: [
+      [
+        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        'правило «отклонить» останавливает запрос, и наружу он не уходит',
+      ],
+      [
+        `${SERVER}/domains/platform/gateway/pipeline.native.integration.test.ts`,
+        'правило «отклонить» на родной ручке — 400 invalid_request_error',
+      ],
+      [`${SERVER}/domains/dlp/DlpProxy.test.ts`, 'отклоняет запрос правилом block'],
     ],
   },
 ];

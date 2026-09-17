@@ -1,6 +1,7 @@
-import type { Deck } from '../media-deck.ts';
-import { DECK_BLOCK_LANG, parseDeckBlock } from './deck-parse.ts';
-import { PICTURE_BLOCK_LANG, checkPicture } from './picture.ts';
+import type { Deck } from '../media-deck-model.ts';
+import { parseDeckBlock } from './deck-parse.ts';
+import { checkPicture } from './picture.ts';
+import { isBlockLang } from '../brand.ts';
 
 /**
  * Что панель нашла в ответе агента: показываемый текст и принятые вложения.
@@ -46,7 +47,8 @@ export interface MediaScanOptions {
   streaming?: boolean;
 }
 
-const OUR_LANGS = [DECK_BLOCK_LANG, PICTURE_BLOCK_LANG] as const;
+/** Виды наших блоков; метка — под нынешним или прежним именем (`../brand.ts`). */
+const OUR_KINDS = ['deck', 'svg'] as const;
 
 /** Строка-забор: до трёх пробелов, три и больше кавычек или тильд, метка. */
 const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})[ \t]*([^\r\n]*?)[ \t]*$/;
@@ -153,7 +155,7 @@ export function fencedBlocks(source: string): FencedBlock[] {
 }
 
 function ours(lang: string): boolean {
-  return (OUR_LANGS as readonly string[]).includes(lang);
+  return OUR_KINDS.some((kind) => isBlockLang(lang, kind));
 }
 
 /** Начало забора, если эта строка им является. */
@@ -229,7 +231,7 @@ function take(
   decks: Deck[],
   pictures: string[],
 ): { ok: boolean; truncated?: boolean } {
-  if (lang === DECK_BLOCK_LANG) {
+  if (isBlockLang(lang, 'deck')) {
     const parsed = parseDeckBlock(body);
     if (parsed.deck) decks.push(parsed.deck);
     return { ok: Boolean(parsed.deck), truncated: parsed.truncated };

@@ -1,4 +1,5 @@
 import { DECK_BLOCK_LANG, parseDeckBlock, type DeckParse } from './deck-parse.ts';
+import { legacyBlockLang } from '../brand.ts';
 import { fencedBlocks } from './scan.ts';
 
 /**
@@ -52,7 +53,7 @@ export function stripReasoning(text: string): string {
 }
 
 /** Языки заборов, в которых лежит структура, а не цитата. */
-const STRUCTURE_LANGS = new Set(['', 'json', 'jsonc', DECK_BLOCK_LANG]);
+const STRUCTURE_LANGS = new Set(['', 'json', 'jsonc', DECK_BLOCK_LANG, legacyBlockLang('deck')]);
 
 /**
  * Сколько незакрытых `{` проверяется, прежде чем поиск сдаётся. Каждый такой

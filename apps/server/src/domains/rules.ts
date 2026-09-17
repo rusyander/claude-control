@@ -1,5 +1,10 @@
 import type { Rule, RuleDraft } from '@agentdeck/contracts';
-import { RULE_HEADING, RULE_PREFIX, DISABLED_SECTION } from '@agentdeck/contracts/rule-format';
+import {
+  RULE_HEADING,
+  RULE_PREFIX,
+  DISABLED_SECTION,
+  isDisabledSectionHeading,
+} from '@agentdeck/contracts/rule-format';
 import { readTextFile, writeTextFile } from '../lib/safe-io.ts';
 import { slugify } from '../lib/slug.ts';
 import type { AppStore } from '../lib/app-store.ts';
@@ -68,7 +73,7 @@ export function parseRules(markdown: string, scope: string, store: AppStore): Pa
   for (const line of lines) {
     // Служебный раздел выключенных: его заголовок — обычный h2, но правилом он
     // не является. Внутри лежат правила, помеченные `### …`.
-    if (line.trim() === DISABLED_SECTION) {
+    if (isDisabledSectionHeading(line.trim())) {
       flush();
       inDisabledSection = true;
       continue;

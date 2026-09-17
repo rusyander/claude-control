@@ -34,11 +34,13 @@ const app = Fastify({ logger: { level: 'warn' } });
 
 // Два рубежа до маршрутов и до CORS: Origin и — при включённом удалённом
 // доступе — токен. Тумблер читается на каждый запрос: он меняется на лету.
-registerAccessGate(app, {
+// Те же правила нужны агенту панели: его действия идут настоящими маршрутами.
+const access = {
   allowedOrigins: ALLOWED_ORIGINS,
   requiresToken: () => ctx.store.getSettings().remoteAccess.enabled,
   expectedToken: readApiToken,
-});
+};
+registerAccessGate(app, access);
 
 // Пустое тело — `{}`, а не `undefined`: почему это хук, а не правка по месту,
 // написано в самом модуле.
@@ -74,7 +76,7 @@ await app.register(cors, {
   origin: (origin, callback) => callback(null, !origin || ALLOWED_ORIGINS.has(origin)),
 });
 
-for (const register of buildRouteTable(runtime)) register(app, ctx);
+for (const register of buildRouteTable(runtime, access)) register(app, ctx);
 
 configWatcher.sync();
 

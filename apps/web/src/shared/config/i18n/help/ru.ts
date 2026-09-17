@@ -33,6 +33,7 @@ import { historyRu } from './ru/topics/history';
 import { testsRu } from './ru/topics/tests';
 import { projectsRu } from './ru/topics/projects';
 import { dlpRu } from './ru/topics/dlp';
+import { panelAgentRu } from './ru/topics/panelAgent';
 import { platformRu } from './ru/topics/platform';
 import { endpointsRu } from './ru/topics/endpoints';
 import { providersRu } from './ru/topics/providers';
@@ -119,7 +120,7 @@ export const helpRu = {
    * зрячему, а две формулировки разошлись бы в первый же месяц.
    */
   shots: {
-    sideEnterprisePlatform: 'Админка контура',
+    sidePlatform: 'Админка контура',
     sidePanel: 'Панель',
     chat: chatRu.shots,
     platform: platformRu.shots,
@@ -147,6 +148,7 @@ export const helpRu = {
     integrations: integrationsRu.shots,
     prompts: promptsRu.shots,
     dlp: dlpRu.shots,
+    panelAgent: panelAgentRu.shots,
   },
 
   /**
@@ -183,6 +185,7 @@ export const helpRu = {
     endpoints: endpointsRu.diagrams,
     integrations: integrationsRu.diagrams,
     dlp: dlpRu.diagrams,
+    panelAgent: panelAgentRu.diagrams,
   },
 
   topics: {
@@ -207,6 +210,7 @@ export const helpRu = {
     tests: testsRu.topic,
     projects: projectsRu.topic,
     dlp: dlpRu.topic,
+    panelAgent: panelAgentRu.topic,
     platform: platformRu.topic,
     endpoints: endpointsRu.topic,
     providers: providersRu.topic,

@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir, platform, release } from 'node:os';
 import { join, dirname } from 'node:path';
+import { brandEnv, panelHomeFile } from '../apps/server/src/lib/brand.mjs';
 
 const OS_NAME = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' }[platform()] ?? platform();
 
@@ -83,7 +84,7 @@ for (const [name, path] of [
 
 // === Доступ к аккаунту: главное различие между системами ===
 const credentialsFile = join(configDir, '.credentials.json');
-const panelFile = join(homedir(), '.agentdeck', 'credentials.json');
+const panelFile = panelHomeFile('credentials.json');
 
 if (existsSync(panelFile)) {
   // Заданное вручную идёт первым и в самой панели — ради этого оно и есть.
@@ -91,11 +92,9 @@ if (existsSync(panelFile)) {
 } else if (existsSync(credentialsFile)) {
   ok('Доступ: файл .credentials.json');
 } else if (platform() === 'darwin') {
-  const services = [
-    process.env.AGENTDECK_KEYCHAIN_SERVICE,
-    'Claude Code-credentials',
-    'Claude Code',
-  ].filter(Boolean);
+  const services = [brandEnv('KEYCHAIN_SERVICE'), 'Claude Code-credentials', 'Claude Code'].filter(
+    Boolean,
+  );
 
   const found = services.find((service) => {
     try {
@@ -149,7 +148,7 @@ else fail('Зависимости не установлены', 'Выполни�
 
 // === Длинные пути Windows: без них параллельные копии показывают ложные удаления ===
 //
-// Замерено 2 сентября 2026 на живом прогоне в enterprise-platform: агент внутри копии
+// Замерено 2 сентября 2026 на живом прогоне в рабочем репозитории: агент внутри копии
 // получал «could not open directory …: Filename too long» и видел настоящие
 // файлы УДАЛЁННЫМИ, а `git add -A` в такой копии записал бы эти удаления.
 // Панель включает ключ в конфиге каждого репозитория, где заводит копию, но

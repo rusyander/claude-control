@@ -79,6 +79,20 @@ export const PANEL_PAGES = [
       await page.waitForTimeout(300);
     },
   },
+  {
+    path: '/',
+    name: 'Агент панели — окно',
+    slug: 'panel-agent-window',
+    // Окно агента открывается из боковой панели на любой странице и закрытым
+    // не попадает ни в один обход: вкладки, поле ввода и карточки подтверждения
+    // живут только внутри открытого окна (немодального, у правого края).
+    interact: async (page) => {
+      const trigger = page.locator('[data-panel-agent-trigger]').first();
+      if ((await trigger.count()) === 0) return;
+      await trigger.click();
+      await page.waitForTimeout(300);
+    },
+  },
   { path: '/search', name: 'Поиск' },
   { path: '/history', name: 'История изменений' },
   { path: '/settings', name: 'Настройки' },

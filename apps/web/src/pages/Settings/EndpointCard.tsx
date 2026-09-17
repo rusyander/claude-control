@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import type { EndpointProbeResult, EndpointProfile } from '@agentdeck/contracts';
 import { Card } from '@shared/ui/card';
@@ -45,6 +46,15 @@ export function EndpointCard() {
   const [selectedId, setSelectedId] = useState('');
   const [probes, setProbes] = useState<Record<string, EndpointProbeResult>>({});
   const [applyingTo, setApplyingTo] = useState('');
+  // `/settings?tab=models&id=<профиль>` — так агент панели ведёт к полю токена
+  // только что сохранённого профиля: выбираем его, как только профиль в списке.
+  const { id: urlProfileId } = useSearch({ strict: false }) as { id?: string };
+  const hasUrlProfile = Boolean(
+    urlProfileId && settings?.endpointProfiles.some((item) => item.id === urlProfileId),
+  );
+  useEffect(() => {
+    if (hasUrlProfile && urlProfileId) setSelectedId(urlProfileId);
+  }, [hasUrlProfile, urlProfileId]);
 
   const { data } = useEndpoints(selectedId);
   const probe = useProbeEndpoint();

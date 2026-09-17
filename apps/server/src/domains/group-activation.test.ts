@@ -28,39 +28,39 @@ describe('Привязка группы к проекту', () => {
 
   describe('сопоставление путей', () => {
     it('сам каталог проекта и вложенный в него', () => {
-      expect(matchesProject('c:/work/enterprise-platform', 'c:/work/enterprise-platform')).toBe(true);
-      expect(matchesProject('c:/work/enterprise-platform', 'c:/work/enterprise-platform/apps/web')).toBe(true);
+      expect(matchesProject('c:/work/company', 'c:/work/company')).toBe(true);
+      expect(matchesProject('c:/work/company', 'c:/work/company/apps/web')).toBe(true);
     });
 
     it('копия ветки лежит РЯДОМ с репозиторием и всё равно считается проектом', () => {
       // `<репозиторий>-worktrees/<ветка>` — соседний каталог, обычной проверкой
       // «путь внутри проекта» он не ловится, а для человека это тот же проект.
-      expect(matchesProject('c:/work/enterprise-platform', 'c:/work/enterprise-platform-worktrees/fix-PRJ-1')).toBe(true);
+      expect(matchesProject('c:/work/company', 'c:/work/company-worktrees/fix-PRJ-1')).toBe(true);
     });
 
     it('чужой каталог с тем же началом имени не считается проектом', () => {
-      expect(matchesProject('c:/work/enterprise-platform', 'c:/work/enterprise-platform-old')).toBe(false);
-      expect(matchesProject('c:/work/enterprise-platform', 'c:/work/other')).toBe(false);
+      expect(matchesProject('c:/work/company', 'c:/work/company-old')).toBe(false);
+      expect(matchesProject('c:/work/company', 'c:/work/other')).toBe(false);
     });
 
     it('пустая привязка не совпадает ни с чем', () => {
-      expect(matchesProject('', 'c:/work/enterprise-platform')).toBe(false);
+      expect(matchesProject('', 'c:/work/company')).toBe(false);
     });
 
     it('слэши и регистр не мешают (Windows)', () => {
-      const same = matchesProject('c:\\work\\enterprise-platform\\', 'c:/work/EnterprisePlatform/apps');
+      const same = matchesProject('c:\\work\\company\\', 'c:/work/Company/apps');
       expect(same).toBe(process.platform === 'win32');
     });
   });
 
   it('к каталогу подбираются только привязанные к нему группы', () => {
     const groups = [
-      makeGroup({ id: 'a', projectPaths: ['c:/work/enterprise-platform'] }),
+      makeGroup({ id: 'a', projectPaths: ['c:/work/company'] }),
       makeGroup({ id: 'b', projectPaths: ['c:/work/other'] }),
       makeGroup({ id: 'c', projectPaths: [] }),
     ];
 
-    expect(groupsForCwd(groups, 'c:/work/enterprise-platform/apps').map((group) => group.id)).toEqual(['a']);
+    expect(groupsForCwd(groups, 'c:/work/company/apps').map((group) => group.id)).toEqual(['a']);
   });
 
   describe('включение при запуске прогона', () => {

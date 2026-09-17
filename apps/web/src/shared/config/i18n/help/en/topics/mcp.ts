@@ -188,8 +188,7 @@ export const mcpEn: typeof mcpRu = {
     storageOff: 'Disabled ones',
     storageOffValue: 'move to the mcpServersDisabled key, which Claude Code ignores',
     storageHealth: 'The check outcome',
-    storageHealthValue:
-      'agentdeck/state.json → mcpHealth: status, reason, tool count and time',
+    storageHealthValue: 'agentdeck/state.json → mcpHealth: status, reason, tool count and time',
     storageTokens: 'OAuth tokens',
     storageTokensValue:
       'in the panel’s own data, apart from the configuration — they are not in ~/.claude.json',

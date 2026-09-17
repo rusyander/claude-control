@@ -95,7 +95,7 @@ export function registerIntegrationExchangeRoutes(
       const token = requireConnected(deps.ctx.store, appDataOf(deps), 'telegram', 'Telegram');
       const settings = readIntegrations(deps.ctx.store).telegram;
       const chatId = requireString(settings.chatId, 'chatId', 'не указан чат для уведомлений');
-      await sendTelegramMessage(token, chatId, '🔔 Проверка связи из панели agentdeck.');
+      await sendTelegramMessage(token, chatId, '🔔 Проверка связи из панели AgentDeck.');
       return { ok: true };
     }),
   );
@@ -114,7 +114,7 @@ export function registerIntegrationExchangeRoutes(
       const url = requireString(settings.url, 'url', 'не указан адрес вебхука');
       await sendWebhook(url, readToken(appDataOf(deps), 'webhook'), {
         event: 'test',
-        text: 'Проверка связи из панели agentdeck.',
+        text: 'Проверка связи из панели AgentDeck.',
         at: new Date().toISOString(),
       });
       return { ok: true };

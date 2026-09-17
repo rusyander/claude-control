@@ -24,7 +24,6 @@ import { clearOverride, readOverride, readOverrides, writeOverride } from './pro
  */
 
 export { promptsDir } from './prompts/store.ts';
-export { PROMPT_CATALOG } from './prompts/catalog.ts';
 
 /**
  * Текст, которым работает панель. Единственная функция, которую зовут режимы:

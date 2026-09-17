@@ -18,7 +18,12 @@ export type {
 } from './api/ProjectApi';
 
 // Реестр проектов уровня конфигурации.
-export { useProjectRegistry, useAddProject, useRemoveProject } from './api/ProjectRegistryApi';
+export {
+  useProjectRegistry,
+  useAddProject,
+  useRemoveProject,
+  fetchProjectRegistry,
+} from './api/ProjectRegistryApi';
 
 // Проект, над которым работают в разделе тестирования: реестр плюс открытые
 // вкладки, выбор запоминается браузером. Живёт здесь, а не на странице тестов,

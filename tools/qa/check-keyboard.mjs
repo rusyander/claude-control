@@ -159,6 +159,30 @@ async function checkOpenDialog(page) {
   return { note, problem: closed ? null : note };
 }
 
+/**
+ * Немодальное окно (`aria-modal="false"`, окно агента у края): страница за ним
+ * живая, Tab выходит из окна на неё — это его смысл, а не утечка. Требуется
+ * другое: Escape изнутри закрывает окно, и фокус не падает на тело страницы.
+ */
+async function checkNonModalDialog(page) {
+  const box = page.locator('[role="dialog"][aria-modal="false"]').first();
+  await box.evaluate((el) => {
+    const target = el.querySelector('textarea, input, button') ?? el;
+    target.focus();
+  });
+  await page.keyboard.press('Escape');
+  const closed = await box.waitFor({ state: 'hidden', timeout: 2500 }).then(
+    () => true,
+    () => false,
+  );
+  const landed = await page.evaluate(() => {
+    const el = document.activeElement;
+    return el && el !== document.body ? el.getAttribute('aria-label') || el.tagName : '';
+  });
+  const note = `окно рядом со страницей: Escape ${closed ? 'закрывает' : 'НЕ закрывает'}, фокус ${landed ? `на «${landed}»` : 'УПАЛ на тело страницы'}`;
+  return { note, problem: closed && landed ? null : note };
+}
+
 /** Enter на ссылке навигации, ведущей в ДРУГОЙ раздел, меняет адрес. */
 async function checkNavEnter(page, path) {
   const hrefs = await page
@@ -191,7 +215,10 @@ for (const entry of PANEL_PAGES) {
 
   const { stops, trap, exhausted } = await sweep(page);
   const ringless = stops.filter((s) => s.visible && !s.ring);
-  const dialogOpen = (await page.locator('[role="dialog"]:visible').count()) > 0;
+  const dialogOpen =
+    (await page.locator('[role="dialog"]:not([aria-modal="false"]):visible').count()) > 0;
+  const nonModalOpen =
+    !dialogOpen && (await page.locator('[role="dialog"][aria-modal="false"]:visible').count()) > 0;
   const lines = [];
   if (stops.length === 0) lines.push('фокус не попадает ни на один элемент');
   if (trap) lines.push(`ловушка фокуса: ${trap.tag} «${trap.label}»`);
@@ -210,7 +237,11 @@ for (const entry of PANEL_PAGES) {
   }
   if (ringless.length > 4) lines.push(`… и ещё ${ringless.length - 4} без кольца фокуса`);
 
-  const dialog = dialogOpen ? await checkOpenDialog(page) : await checkDialog(page);
+  const dialog = dialogOpen
+    ? await checkOpenDialog(page)
+    : nonModalOpen
+      ? await checkNonModalDialog(page)
+      : await checkDialog(page);
   if (dialog.problem) lines.push(dialog.problem);
   const nav = dialogOpen
     ? { note: 'модалка открыта: навигация за ней закрыта по замыслу', problem: null }

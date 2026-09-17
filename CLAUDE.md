@@ -98,6 +98,24 @@ subpath (`@agentdeck/contracts/<module>`), adding it to `exports` in
 `server-contracts-barrel-types-only` rule in `.dependency-cruiser.cjs` — `pnpm depcruise` names the
 offending edge, so this must never reach a running panel again.
 
+**Settings/token/keys "lost" after the rename, or the pre-rename product name reappears** — the product
+had another name until 17.09.2026 (`LEGACY_BRAND_*` in `apps/server/src/lib/brand.mjs`). The old name is
+NEVER written literally anywhere in the tree — it is built from parts (`LEGACY_PARTS`), tests spell it
+reversed, the gate fixture holds a `%%PAST_BRAND_NAME%%` placeholder — because git history is rewritten by
+replacing the word, and a literal would silently become the new name. Same for the platform driver's old id
+(`packages/contracts/src/platform-legacy.ts`). Mobile ids (Expo slug, scheme, iOS bundle / Android package
+`ai.agentdeck.panel`) were renamed too: a phone keeps the old app installed beside the new one.
+Data MOVES BY COPY on first boot, one helper for server + `tools/` + vite: `brand.mjs`
+(`<config>/<old>` → `<config>/agentdeck`, `~/.<old>` → `~/.agentdeck`, `%LOCALAPPDATA%`
+likewise via keepalive; temp sibling + rename; non-empty new dir wins, never merged; copy failure ⇒ old dir
+used, one log line; old dir gets `MIGRATED-TO-agentdeck.txt`). Env `AGENTDECK_X` first, the old-prefix
+name (`legacyEnvName`) as fallback. Legacy block langs / hook markers / gate script name / webhook header / MCP bridge id /
+`localStorage` keys are still READ (`packages/contracts/src/brand.ts`, `shared/lib/legacy-storage`). So a
+"lost" state = the new dir existed non-empty before the copy (compare both, the new one wins by design);
+a keepalive started before the rename still spawns the old-named server package — restart it. Proof
+`node tools/qa/check-brand-migration.mjs` (real boot, throwaway home); guard `pnpm brand`
+(`tools/qa/check-brand.mjs`, EMPTY allowlist for the old words, self-test included).
+
 **Panel opens, everything zero** — wrong config dir. `/api/location` → `source` names the rule that
 picked it. Order in `claude-paths.ts`, first match wins: `manual` (Settings → config dir,
 remembered) → `env` (`CLAUDE_CONFIG_DIR`) → `home` (`~/.claude`). A once-set manual path beats the
@@ -226,7 +244,7 @@ count toward the handoff cap. **A foreign CLI runs the same two levels** (Т3 of
 project's model-routing toggle, not a recognised ceiling model; the plan's chat carries no model and
 its header holds what the WORK will use. Guard `tools/qa/check-split-levels.mjs` (stubs only); live
 `.agent/tmp/t1-live.mjs`, foreign `.agent/tmp/f3-levels-live.mjs`; detail
-`.agent/code-map-chat.agent.md` («Two levels before the work») plus
+`.agent/code-map-chat-split.agent.md` («Two levels before the work») plus
 `.agent/code-map-foreign-chat.agent.md` («Foreign levels»).
 
 **The agent wrote «Перезапустите сессию» / «/clear» in words and the panel started a new chat by itself; or
@@ -402,7 +420,7 @@ reads as «my prompt edit did not work».
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
 
 Gate before "done": `pnpm type-check && pnpm lint && pnpm test && pnpm depcruise && pnpm compromises
-&& pnpm negatives && pnpm shots && node tools/qa/audit-layout.mjs && node tools/qa/check-a11y.mjs && node tools/qa/check-keyboard.mjs && node
+&& pnpm negatives && pnpm shots && pnpm brand && node tools/qa/audit-layout.mjs && node tools/qa/check-a11y.mjs && node tools/qa/check-keyboard.mjs && node
 tools/qa/check-etag.mjs` (the last four drive the live stand; `check-etag` reads the wire status through CDP,
 because Playwright reports a 304 revalidation as the cached 200). `pnpm test` measures coverage every run and fails below the thresholds
 pinned in each `vitest.config.ts` (raise them when coverage grows, never lower silently). The same

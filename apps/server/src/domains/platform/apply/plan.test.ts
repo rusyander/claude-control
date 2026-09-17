@@ -20,8 +20,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
  */
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -100,8 +100,8 @@ describe('готовность', () => {
   it('оба адреса шлюза и имя профиля названы', () => {
     const plan = buildPlatformApplyPlan(deps(), PLATFORM);
     expect(plan.profileId).toBe(managedProfileId(PLATFORM.id));
-    expect(plan.baseUrl).toBe('http://127.0.0.1:5179/enterprise-platform-dev/v1');
-    expect(plan.rootUrl).toBe('http://127.0.0.1:5179/enterprise-platform-dev');
+    expect(plan.baseUrl).toBe('http://127.0.0.1:5179/company-dev/v1');
+    expect(plan.rootUrl).toBe('http://127.0.0.1:5179/company-dev');
   });
 
   it('шлюзу достался соседний порт — предпросмотр показывает его', () => {
@@ -109,8 +109,8 @@ describe('готовность', () => {
     const plan = buildPlatformApplyPlan(deps(), PLATFORM);
     // Иначе человек сверял бы с карточкой шлюза, где стоит доставшийся адрес,
     // строку плана с задуманным — и записал бы вторую.
-    expect(plan.baseUrl).toBe('http://127.0.0.1:5181/enterprise-platform-dev/v1');
-    expect(plan.rootUrl).toBe('http://127.0.0.1:5181/enterprise-platform-dev');
+    expect(plan.baseUrl).toBe('http://127.0.0.1:5181/company-dev/v1');
+    expect(plan.rootUrl).toBe('http://127.0.0.1:5181/company-dev');
     expect(targetOf(plan, 'claude').plan[0]?.value).toContain('5181');
   });
 
@@ -118,13 +118,13 @@ describe('готовность', () => {
     // «Выбрал человек» и «панель взяла первую из каталога» человек чинит
     // по-разному, а пустая модель означает, что CLI уйдёт в контур с именем
     // вендора и получит 403.
-    const chosen = { ...PLATFORM, defaultModel: 'enterprise-platform-mid' };
+    const chosen = { ...PLATFORM, defaultModel: 'company-mid' };
     store.updateSettings({ platforms: [chosen] });
     const plan = buildPlatformApplyPlan(deps(), chosen);
-    expect(plan.model).toBe('enterprise-platform-mid');
+    expect(plan.model).toBe('company-mid');
     expect(plan.modelSource).toBe('default');
     // Записывается ровно она: строка плана и есть то, что уйдёт в файл.
-    expect(targetOf(plan, 'claude').plan.some((row) => row.value === 'enterprise-platform-mid')).toBe(true);
+    expect(targetOf(plan, 'claude').plan.some((row) => row.value === 'company-mid')).toBe(true);
   });
 
   it('ни выбора, ни каталога — модель пуста, и источник это называет', () => {
@@ -144,7 +144,7 @@ describe('занятое место', () => {
       {
         key: 'ANTHROPIC_BASE_URL',
         current: 'https://свой-шлюз.local',
-        incoming: 'http://127.0.0.1:5179/enterprise-platform-dev',
+        incoming: 'http://127.0.0.1:5179/company-dev',
       },
     ]);
   });
@@ -152,7 +152,7 @@ describe('занятое место', () => {
   it('совпадающее значение конфликтом не считается', () => {
     writeFileSync(
       settingsPath,
-      JSON.stringify({ env: { ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/enterprise-platform-dev' } }),
+      JSON.stringify({ env: { ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/company-dev' } }),
     );
     // Это ровно то состояние, в которое приводит наше же применение: требовать
     // за него подтверждения значило бы поднимать тревогу на пустом месте.
@@ -189,7 +189,7 @@ describe('занятое место', () => {
       assistantEndpointId: 'ep-1',
     });
     expect(targetOf(buildPlatformApplyPlan(deps(), PLATFORM), 'assistant').conflicts).toEqual([
-      { key: 'assistantEndpointId', current: 'Локальная модель', incoming: 'contour-enterprise-platform-dev' },
+      { key: 'assistantEndpointId', current: 'Локальная модель', incoming: 'contour-company-dev' },
     ]);
   });
 });

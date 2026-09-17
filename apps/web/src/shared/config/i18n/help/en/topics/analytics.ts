@@ -138,8 +138,10 @@ export const analyticsEn: typeof analyticsRu = {
     storageSkillsValue: 'call statistics are taken from ~/.claude.json',
     storageWrites: 'What it writes',
     storageWritesValue:
-      'nothing from this section: transcripts are only read. The one panel file nearby is ' +
-      'the log of lowered runs, and the chat keeps it, not analytics',
+      'nothing from this section: transcripts are only read. There are two panel files ' +
+      'nearby, and analytics keeps neither: the chat writes the log of lowered runs, and ' +
+      'the contour gateway writes the spend through a contour (the “Spend through the contour” card, ' +
+      'agentdeck/state.json → platformSpend); the card only reads it',
     storageCache: 'Cache',
     storageCacheValue:
       'the summary is cached for a minute (the refresh button recounts), the process list ' +

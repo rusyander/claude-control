@@ -1,8 +1,4 @@
-import type {
-  ModelSourceFallback,
-  Platform,
-  PlatformHealthRecord,
-} from '@agentdeck/contracts';
+import type { ModelSourceFallback, Platform, PlatformHealthRecord } from '@agentdeck/contracts';
 
 /**
  * Решение: собирать каталог из контура или откатываться на models.dev.

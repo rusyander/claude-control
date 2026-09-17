@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { enterprise-platformDriver } from '../drivers/enterprise-platform.ts';
+import { enterprisePlatformDriver } from '../drivers/enterprise-platform.ts';
 import { openAiCompatDriver } from '../drivers/openai-compat.ts';
 import { StreamTranslator, TRUNCATED_MESSAGE, type TranslatorOptions } from './frames.ts';
 
@@ -7,7 +7,7 @@ import { StreamTranslator, TRUNCATED_MESSAGE, type TranslatorOptions } from './f
  * Поток в тех формах, в которых его РЕАЛЬНО шлёт та сторона.
  *
  * Каждый кадр здесь списан с источника, а не придуман под разборщик: LiteLLM
- * 1.93 (им платформа компании ходит к модели), `mod-llmbox` платформа компании @ eb18684f5 и
+ * 1.93 (им платформа компании ходит к модели), `mod-llmbox` платформы компании @ eb18684f5 и
  * документированный кадр ошибки OpenRouter. Разборщик, проверенный на кадрах,
  * собранных «как удобно», зеленел и тогда, когда живой контур отдавал нулевой
  * расход и терял хвост ответа (замер 13.09.2026 на стенде).
@@ -21,7 +21,7 @@ function sse(...frames: unknown[]): string {
 
 function translator(options: Partial<TranslatorOptions> = {}): StreamTranslator {
   return new StreamTranslator({
-    driver: enterprise-platformDriver,
+    driver: enterprisePlatformDriver,
     dialect: 'openai-compat',
     model: 'qwen',
     includeUsage: false,
@@ -83,7 +83,7 @@ describe('расход в чанке с непустым choices', () => {
 
 describe('ошибка внутри потока', () => {
   /** `provider_errors.py sse_error_event`: конверт ошибки и БЕЗ `[DONE]` за ним. */
-  const ENTERPRISE_PLATFORM_ERROR = {
+  const PLATFORM_ERROR = {
     error: {
       message: 'Превышен лимит запросов к провайдеру. Попробуйте позже.',
       type: 'rate_limit_error',
@@ -93,7 +93,7 @@ describe('ошибка внутри потока', () => {
 
   it('openai получает причину контура и её тип, а не «ответ оборвался»', () => {
     const t = translator();
-    const out = t.push(sse(text('нач'), ENTERPRISE_PLATFORM_ERROR)) + t.end();
+    const out = t.push(sse(text('нач'), PLATFORM_ERROR)) + t.end();
     expect(out).toContain('Превышен лимит запросов к провайдеру');
     expect(out).toContain('"type":"rate_limit_error"');
     expect(out).not.toContain(TRUNCATED_MESSAGE);
@@ -107,7 +107,7 @@ describe('ошибка внутри потока', () => {
 
   it('anthropic получает event: error своего типа', () => {
     const t = translator({ dialect: 'anthropic' });
-    const out = t.push(sse(text('нач'), ENTERPRISE_PLATFORM_ERROR)) + t.end();
+    const out = t.push(sse(text('нач'), PLATFORM_ERROR)) + t.end();
     expect(out).toContain('event: error');
     expect(out).toContain('"type":"rate_limit_error"');
     expect(out).toContain('Превышен лимит');
@@ -166,16 +166,16 @@ describe('хвост ответа после причины остановки (
   });
 });
 
-describe('итоговый текст платформы (enterprise-platform_deanonymized)', () => {
+describe('итоговый текст платформы (platform_deanonymized)', () => {
   it('дописывает недоставленный хвост, если поток — его начало', () => {
     const t = translator();
     const out =
       t.push(
-        sse(text('Адрес: ', 'stop'), { enterprise-platform_deanonymized: 'Адрес: ivan@corp.ru' }, '[DONE]'),
+        sse(text('Адрес: ', 'stop'), { platform_deanonymized: 'Адрес: ivan@corp.ru' }, '[DONE]'),
       ) + t.end();
     expect(out).toContain('ivan@corp.ru');
     expect(out.indexOf('ivan@corp.ru')).toBeLessThan(out.indexOf('[DONE]'));
-    expect(out).not.toContain('enterprise-platform_');
+    expect(out).not.toContain('platform_');
     expect(t.assembled().text).toBe('Адрес: ivan@corp.ru');
     expect(t.facts.rewritten).toBeUndefined();
   });
@@ -183,7 +183,8 @@ describe('итоговый текст платформы (enterprise-platform_de
   it('совпавший с потоком текст не дублируется', () => {
     const t = translator({ dialect: 'anthropic' });
     const out =
-      t.push(sse(text('Готово.', 'stop'), { enterprise-platform_deanonymized: 'Готово.' }, '[DONE]')) + t.end();
+      t.push(sse(text('Готово.', 'stop'), { platform_deanonymized: 'Готово.' }, '[DONE]')) +
+      t.end();
     expect(out.split('Готово.').length).toBe(2);
     expect(t.facts.rewritten).toBeUndefined();
   });
@@ -193,7 +194,7 @@ describe('итоговый текст платформы (enterprise-platform_de
     t.push(
       sse(
         text('Телефон 89001234567', 'stop'),
-        { enterprise-platform_deanonymized: 'Телефон [PHONE]' },
+        { platform_deanonymized: 'Телефон [PHONE]' },
         '[DONE]',
       ),
     );
@@ -208,7 +209,7 @@ describe('итоговый текст платформы (enterprise-platform_de
       sse(
         text('черновик', 'stop'),
         {
-          enterprise-platform_deanonymized:
+          platform_deanonymized:
             'итог <tool_call>{"name":"Write","arguments":{"file_path":"b.ts"}}</tool_call>',
         },
         '[DONE]',
@@ -228,7 +229,7 @@ describe('карта подмены контура списком', () => {
     const out =
       t.push(
         sse(
-          { enterprise-platform_deanonymized_entities: [{ placeholder: '[EMAIL_1]', value: 'ivan@corp.ru' }] },
+          { platform_deanonymized_entities: [{ placeholder: '[EMAIL_1]', value: 'ivan@corp.ru' }] },
           text(
             '<tool_call>{"name":"Write","arguments":{"content":"[EMAIL_1]"}}</tool_call>',
             'stop',
@@ -242,17 +243,50 @@ describe('карта подмены контура списком', () => {
   });
 });
 
+describe('карта подмены контура с ключом, не похожим на метку', () => {
+  /**
+   * Ревью Т5, m12: карта разворачивается заменой строки по всем аргументам
+   * вызова. Ключ «1» или «IP» из карты чужой стороны переписал бы содержимое
+   * записываемого файла; наша маска защищена формой своей метки, чужая — ничем.
+   */
+  it('ключ без номера и разделителя не разворачивается и назван в следе', () => {
+    const t = translator({ shim: { allowed: new Set(['Write']) } });
+    const out =
+      t.push(
+        sse(
+          {
+            platform_deanonymized_entities: {
+              '1': 'ОДИН',
+              IP: 'адрес',
+              '[EMAIL_1]': 'ivan@corp.ru',
+              ORG_7: 'Компания',
+            },
+          },
+          text(
+            '<tool_call>{"name":"Write","arguments":{"content":"v1 IP [EMAIL_1] ORG_7"}}</tool_call>',
+            'stop',
+          ),
+          '[DONE]',
+        ),
+      ) + t.end();
+    expect(out).toContain('v1 IP ivan@corp.ru Компания');
+    expect(out).not.toContain('ОДИН');
+    expect(out).not.toContain('адрес');
+    expect(t.facts.unknownFrames.some((note) => note.includes('не похож'))).toBe(true);
+  });
+});
+
 describe('метка платформы, которую никто не развернул', () => {
   const call = text(
     '<tool_call>{"name":"Write","arguments":{"content":"звонить [PHONE_1]"}}</tool_call>',
     'stop',
   );
-  const sanitized = { enterprise-platform_sanitized: true, violations: [{ rule_name: 'pii' }] };
+  const sanitized = { platform_sanitized: true, violations: [{ rule_name: 'pii' }] };
 
   function run(sent: string, frames: unknown[]): StreamTranslator {
     const t = translator({
       shim: { allowed: new Set(['Write']) },
-      placeholders: { pattern: enterprise-platformDriver.placeholderPattern as RegExp, sent },
+      placeholders: { pattern: enterprisePlatformDriver.placeholderPattern as RegExp, sent },
     });
     t.push(sse(...frames, '[DONE]'));
     t.end();

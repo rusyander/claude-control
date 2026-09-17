@@ -17,9 +17,10 @@ const path = require('node:path');
  * 260 символов), и подъёма на два уровня до репозитория оттуда уже нет.
  */
 const projectRoot = __dirname;
-const repoRoot = process.env.AGENTDECK_REPO_ROOT
-  ? path.resolve(process.env.AGENTDECK_REPO_ROOT)
-  : path.resolve(projectRoot, '../..');
+// Прежнее имя переменной (до переименования продукта) понимается тоже.
+const repoRootEnv =
+  process.env.AGENTDECK_REPO_ROOT || process.env[`${['CLAUDE', 'CONTROL'].join('_')}_REPO_ROOT`];
+const repoRoot = repoRootEnv ? path.resolve(repoRootEnv) : path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
@@ -38,7 +39,23 @@ config.resolver.disableHierarchicalLookup = true;
  * `@agentdeck/contracts` так подключать нельзя: она импортирует zod,
  * которого в node_modules приложения нет.
  */
-const VALUE_MODULES = ['uploads', 'task-split', 'chat-handoff', 'test-format', 'chat-timing'];
+// `platform-models` — выбор модели прогона через контур (Т6): телефон зовёт ту же
+// функцию, что сервер и шапка чата панели, а не третий расчёт.
+const VALUE_MODULES = [
+  'uploads',
+  'task-split',
+  'chat-handoff',
+  'test-format',
+  'chat-timing',
+  'platform-models',
+  // Разбор блоков агента (рисунок, колода): с 17.09.2026 без zod — колода берёт
+  // потолки из `media-deck-model.ts`, а не из модуля со схемами.
+  'media-block',
+  // Коды текстов сервера: телефон переводит отказы своим словарём.
+  'server-messages',
+  // Лента разговора с агентом панели (А8): тот же разбор кадров, что у окна панели.
+  'panel-agent-feed',
+];
 const aliases = new Map(
   VALUE_MODULES.map((name) => [
     `@agentdeck/contracts/${name}`,

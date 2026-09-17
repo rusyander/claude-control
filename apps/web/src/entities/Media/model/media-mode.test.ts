@@ -55,15 +55,15 @@ describe('слова режима «Картинка»', () => {
       {
         available: true,
         source: 'contour-chat',
-        title: 'EnterprisePlatform · dev',
-        model: 'enterprise-platform-image',
+        title: 'Company · dev',
+        model: 'company-image',
         promptSent: true,
       },
       t,
     );
 
     expect(view.available).toBe(true);
-    expect(view.sourceText).toBe('EnterprisePlatform · dev · enterprise-platform-image');
+    expect(view.sourceText).toBe('Company · dev · company-image');
     expect(view.reasonText).toBeUndefined();
   });
 
@@ -81,7 +81,7 @@ describe('слова режима «Картинка»', () => {
       {
         available: true,
         source: 'contour-images',
-        title: 'EnterprisePlatform · dev',
+        title: 'Company · dev',
         model: 'sd-xl',
         promptSent: false,
       },
@@ -90,7 +90,7 @@ describe('слова режима «Картинка»', () => {
 
     // Молчание здесь читалось бы как «моя правка промпта не сработала»: правка
     // жива, просто у ручки картинок системного сообщения нет вовсе.
-    expect(view.sourceText).toContain('EnterprisePlatform · dev · sd-xl');
+    expect(view.sourceText).toContain('Company · dev · sd-xl');
     expect(view.sourceText).toContain(ru.chat.mode.promptSkipped);
   });
 
@@ -183,14 +183,14 @@ describe('слова режима «Презентация»', () => {
       {
         available: true,
         source: 'contour',
-        title: 'EnterprisePlatform · dev',
+        title: 'Company · dev',
         model: 'qwen2.5',
         pdf: { available: true },
       },
       t,
     );
 
-    expect(view.sourceText).toBe('EnterprisePlatform · dev · qwen2.5');
+    expect(view.sourceText).toBe('Company · dev · qwen2.5');
   });
 
   it('машина без браузера говорит про PDF заранее, а не отказом на кнопке', () => {
@@ -216,7 +216,7 @@ describe('слова режима «Презентация»', () => {
       {
         available: true,
         source: 'contour',
-        title: 'EnterprisePlatform',
+        title: 'Company',
         model: 'm',
         pdf: { available: false },
       },

@@ -201,8 +201,9 @@ export const commandsEn: typeof commandsRu = {
     limitWriteValue: 'there is none at all: the section only reads directories and changes nothing',
     limitCollision: 'Name collision',
     limitCollisionValue:
-      'your file wins: your own /code-review hides the built-in of the same name, which is why ' +
-      'the frame shows 101 built-ins while the panel catalog holds 103',
+      'your file wins: the stand’s code-review and release-notes skills hide the built-ins of ' +
+      'the same name, which is why the frame shows 101 built-ins while the panel catalog ' +
+      'holds 103',
     limitRegistry: 'Plugin registry',
     limitRegistryValue:
       'version 2 only. For any other version Claude Code answers with an empty list — the panel ' +

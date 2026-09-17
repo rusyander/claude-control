@@ -21,7 +21,7 @@ interface ScriptWriteResult {
   needsRestart?: boolean;
 }
 
-const scriptsKey = ['scripts'] as const;
+export const scriptsKey = ['scripts'] as const;
 
 /** Кодируем каждый сегмент, но сохраняем слэши: id скрипта может быть вложенным путём. */
 function encodeScriptId(id: string): string {

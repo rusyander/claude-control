@@ -341,14 +341,16 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
         // машины — здесь это правка появилась сегодня. Потолок длины держит тот
         // же путь, поэтому архив с гигантским промптом отказывается ОДНОЙ
         // правкой, а не роняет весь разворот.
-        savePrompt(
+        const record = savePrompt(
           ctx.location.paths.appData,
           override.id,
           override.text,
           undefined,
           ctx.backupDir,
         );
-        written.push(override.id);
+        // Текст, совпавший со встроенным ЭТОЙ панели, правкой не становится —
+        // и записанным не называется: ответ говорит о том, что легло на диск.
+        if (record.overridden) written.push(override.id);
       } catch (error) {
         if (!(error instanceof PromptTooLongError)) throw error;
         skipped.push({ id: override.id, reason: error.message });

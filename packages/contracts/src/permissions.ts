@@ -8,7 +8,7 @@ export type PermissionDecision = Infer<typeof permissionDecisionSchema>;
 export const permissionRuleSchema = object({
   /** У прав из локального файла — с префиксом `local:`: без него совпал бы с одноимённым. */
   id: string(),
-  /** Сырой паттерн, например `mcp__gitlab-enterprise-platform__get_project` или `Bash(git push:*)`. */
+  /** Сырой паттерн, например `mcp__gitlab-company__get_project` или `Bash(git push:*)`. */
   pattern: string(),
   decision: permissionDecisionSchema,
   /** Для правил MCP — имя сервера, вытащенное из паттерна. Помогает группировать список. */

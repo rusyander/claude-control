@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ChatEvent, RawEvent } from './chat-events.ts';
@@ -9,6 +9,7 @@ import { safeSessionId, safeName, safeModel, safeEffort, shellArgs } from '../..
 import { killChildTree } from '../../lib/process-tree.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
 import { TurnTracker } from './stream-usage.ts';
+import { userMemorySettings } from '../platform/layers.ts';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
 const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs', import.meta.url));
@@ -251,6 +252,32 @@ export class ChatRun {
     // запрос прав стал бы молчаливым отказом посреди работы.
     if (options.platformArgs?.length) args.push(...options.platformArgs);
 
+    const env = {
+      ...process.env,
+      ...(options.configDir ? { CLAUDE_CONFIG_DIR: options.configDir } : {}),
+      ...options.env,
+      // Маршрут контура — ПОСЛЕДНИМ и отдельно от `env`: он пересобирается на
+      // каждом старте (реестр прогонов), и значение прошлой жизни разговора не
+      // должно пережить снятую галочку.
+      ...options.platformEnv,
+    };
+
+    // Снятые личные настройки обязаны снять и `~/.claude/CLAUDE.md`, который CLI
+    // находит поиском вверх у проекта под домом и читает как проектный
+    // (`userMemorySettings`). Дом и каталог конфигурации — из окружения САМОГО
+    // процесса: CLI берёт их оттуда же, и другой ответ исключил бы не тот файл.
+    const memory = userMemorySettings(options.platformArgs ?? [], {
+      cwd: options.cwd,
+      env,
+      platform: process.platform,
+      fallbackHome: homedir(),
+    });
+    if (memory) {
+      const file = join(this.ensureTempDir(), 'layers-settings.json');
+      writeFileSync(file, memory, 'utf8');
+      args.push('--settings', file);
+    }
+
     // Интерактивные права: добавляем свой MCP-сервер и указываем его инструмент
     // как обработчик запросов на разрешение. Конфиг сливается с настоящим (без
     // --strict-mcp-config), поэтому пользовательские MCP-серверы остаются. При
@@ -297,15 +324,7 @@ export class ChatRun {
       cwd: options.cwd,
       shell: isWindows,
       windowsHide: true,
-      env: {
-        ...process.env,
-        ...(options.configDir ? { CLAUDE_CONFIG_DIR: options.configDir } : {}),
-        ...options.env,
-        // Маршрут контура — ПОСЛЕДНИМ и отдельно от `env`: он пересобирается на
-        // каждом старте (реестр прогонов), и значение прошлой жизни разговора не
-        // должно пережить снятую галочку.
-        ...options.platformEnv,
-      },
+      env,
     });
     this.child = child;
 

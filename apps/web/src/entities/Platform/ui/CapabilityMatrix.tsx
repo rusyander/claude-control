@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { serverMessageText } from '@shared/config/i18n';
 import { Typography } from '@shared/ui/typography';
 import { Stack } from '@shared/ui/stack';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
@@ -50,7 +51,7 @@ export function CapabilityMatrix({ findings }: CapabilityMatrixProps) {
             <td>
               <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
                 <Typography variant="body-sm" color="muted" as="span">
-                  {finding.detail}
+                  {serverMessageText(finding.detailCode, finding.detailParams, t) ?? finding.detail}
                 </Typography>
                 {finding.compromise && <CompromiseMark id={finding.compromise} />}
                 <Typography variant="caption" color="subtle" as="span">

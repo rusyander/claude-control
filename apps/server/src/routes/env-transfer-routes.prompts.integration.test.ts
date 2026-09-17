@@ -7,8 +7,9 @@ import { AppStore } from '../lib/app-store.ts';
 import { readZip } from '../lib/zip.ts';
 import type { ServerContext } from '../context.ts';
 import { registerEnvTransferRoutes } from './env-transfer-routes.ts';
-import { promptText, savePrompt } from '../domains/prompts.ts';
+import { promptsDir, promptText, savePrompt } from '../domains/prompts.ts';
 import { builtinPromptText } from '../domains/prompts/catalog.ts';
+import { PROMPT_IDS } from '@agentdeck/contracts/prompts';
 
 /**
  * Промпты в переносе окружения (Т4): едут ПРАВКИ, встроенные тексты остаются
@@ -91,8 +92,14 @@ describe('перенос окружения: промпты', () => {
     expect(document?.overrides.at(0)?.text).toBe('мой текст картинки');
 
     // Ни одного встроенного текста в архиве: панель на той стороне привезёт свой.
-    const zip = readFileSync(await exportArchive()).toString('utf8');
-    expect(zip).not.toContain(builtinPromptText('presentation').slice(0, 60));
+    // Смотрим в РАСПАКОВАННЫЕ записи: архив сжимает всё, что сжимается, и поиск
+    // по сырым байтам был зелёным и с текстом внутри (ревью Т4, MINOR-2).
+    const entries = readZip(readFileSync(await exportArchive()));
+    for (const id of PROMPT_IDS) {
+      const sentinel = builtinPromptText(id).slice(0, 60);
+      const carrier = entries.find((entry) => entry.data.toString('utf8').includes(sentinel));
+      expect(carrier?.path, `встроенный текст «${id}» в архиве`).toBeUndefined();
+    }
   });
 
   it('план называет правку новой, а совпавшую — такой же', async () => {
@@ -163,6 +170,33 @@ describe('перенос окружения: промпты', () => {
     expect(promptText(clean.location.paths.appData, 'presentation')).toBe(
       builtinPromptText('presentation'),
     );
+
+    await target.close();
+    rmSync(targetRoot, { recursive: true, force: true });
+  });
+
+  it('правка, совпавшая со встроенным текстом этой панели, записанной не считается', async () => {
+    // Ревью Т4, MINOR-7: на той машине текст был правкой старого встроенного, а
+    // здесь встроенный уже он сам. Дверь записи такую «правку» не создаёт — и
+    // ответ не должен называть её записанной.
+    mkdirSync(promptsDir(appData), { recursive: true });
+    writeFileSync(join(promptsDir(appData), 'image.md'), builtinPromptText('image'), 'utf8');
+    const archivePath = await exportArchive();
+
+    const targetRoot = mkdtempSync(join(tmpdir(), 'cc-env-prompts-in-'));
+    const clean = makeCtx(targetRoot);
+    const target = Fastify();
+    registerEnvTransferRoutes(target, clean);
+    await target.ready();
+
+    const applied = await target.inject({
+      method: 'POST',
+      url: '/api/env-transfer/import/apply',
+      payload: { provider: 'kimi', archivePath, promptSelection: ['image'] },
+    });
+
+    expect(applied.statusCode).toBe(200);
+    expect(applied.json<{ prompts: { written: string[] } }>().prompts.written).toEqual([]);
 
     await target.close();
     rmSync(targetRoot, { recursive: true, force: true });

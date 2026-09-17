@@ -7,7 +7,7 @@ import {
 } from '@agentdeck/contracts/platform-presets';
 import { defaultOurRules, defaultPlatformRules, type Platform } from '@agentdeck/contracts';
 import { allDrivers, driverFor, driverOf } from './index.ts';
-import { enterprise-platformDriver } from './enterprise-platform.ts';
+import { enterprisePlatformDriver } from './enterprise-platform.ts';
 import { openAiCompatDriver } from './openai-compat.ts';
 import { contourHeaders } from '../transport.ts';
 import { applyManagedRules } from '../rules-matrix.ts';
@@ -53,7 +53,10 @@ describe('пресеты: каждый собран и проверяется н
 
   it('код у пресета — код его базы: новый шлюз не приносит своего разборщика', () => {
     for (const id of platformDrivers) {
-      const base = PLATFORM_PRESETS[id].base === 'enterprise-platform' ? enterprise-platformDriver : openAiCompatDriver;
+      const base =
+        PLATFORM_PRESETS[id].base === 'enterprise-platform'
+          ? enterprisePlatformDriver
+          : openAiCompatDriver;
       expect(driverFor(id).readFrame, id).toBe(base.readFrame);
       expect(driverFor(id).read, id).toBe(base.read);
     }
@@ -66,6 +69,7 @@ describe('пресеты: каждый собран и проверяется н
       { clientTools: 'shim' as const, effort: true, nonStreamTimeoutSec: 0 },
       { responseCeilingSec: 60 },
       { responseCeilingSec: 0 },
+      { vendorPrefix: 'acme' },
     ];
     for (const id of platformDrivers) {
       for (const patch of overrides) {
@@ -82,6 +86,7 @@ describe('пресеты: каждый собран и проверяется н
             nonStreamTimeoutSec: driver.nonStreamTimeoutSec ?? 0,
             responseCeilingSec: driver.responseCeilingSec ?? 0,
             thinkingField: thinking ? (thinking.wireField ?? thinking.id) : '',
+            vendorPrefix: driver.vendorPrefix ?? '',
           },
           `${id} ${JSON.stringify(patch)}`,
         ).toEqual(declared);
@@ -153,17 +158,21 @@ describe('переопределения контура поверх пресе�
     expect(driverFor('ollama').images).toBe('none');
   });
 
-  it('у платформа компании меняется только поле размышлений, подписи правила остаются её', () => {
-    const own = enterprise-platformDriver.controls.find((control) => control.field === 'enableThinking')!;
-    const moved = driverFor('enterprise-platform', { thinkingField: 'enable_thinking' }).controls.find(
+  it('у платформы компании меняется только поле размышлений, подписи правила остаются её', () => {
+    const own = enterprisePlatformDriver.controls.find(
       (control) => control.field === 'enableThinking',
     )!;
+    const moved = driverFor('enterprise-platform', {
+      thinkingField: 'enable_thinking',
+    }).controls.find((control) => control.field === 'enableThinking')!;
     expect(moved).toEqual({ ...own, wireField: 'enable_thinking' });
   });
 
   it('ноль снимает предел цельного ответа — действует потолок панели', () => {
     expect(driverFor('enterprise-platform').nonStreamTimeoutSec).toBeGreaterThan(0);
-    expect(driverFor('enterprise-platform', { nonStreamTimeoutSec: 0 }).nonStreamTimeoutSec).toBeUndefined();
+    expect(
+      driverFor('enterprise-platform', { nonStreamTimeoutSec: 0 }).nonStreamTimeoutSec,
+    ).toBeUndefined();
   });
 
   it('потолок ответа объявляется человеком для любого шлюза и снимается нулём', () => {
@@ -172,7 +181,9 @@ describe('переопределения контура поверх пресе�
     expect(driverFor('vllm').responseCeilingSec).toBeUndefined();
     expect(driverFor('vllm', { responseCeilingSec: 60 }).responseCeilingSec).toBe(60);
     expect(driverFor('enterprise-platform').responseCeilingSec).toBeGreaterThan(0);
-    expect(driverFor('enterprise-platform', { responseCeilingSec: 0 }).responseCeilingSec).toBeUndefined();
+    expect(
+      driverFor('enterprise-platform', { responseCeilingSec: 0 }).responseCeilingSec,
+    ).toBeUndefined();
     expect(platformManifestOf({ responseCeilingSec: -1 })).toEqual({});
   });
 

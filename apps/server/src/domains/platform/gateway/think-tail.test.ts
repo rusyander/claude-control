@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { enterprise-platformDriver } from '../drivers/enterprise-platform.ts';
+import { enterprisePlatformDriver } from '../drivers/enterprise-platform.ts';
 import { StreamTranslator } from './frames.ts';
 import { ThinkSplitter, withoutThink } from './think-tail.ts';
 
@@ -89,7 +89,7 @@ function openAiText(out: string): string {
 describe('размышления текстом в потоке шлюза', () => {
   it('OpenAI: клиент получает только ответ, след — стадию размышления', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'qwen',
       includeUsage: false,
@@ -113,7 +113,7 @@ describe('размышления текстом в потоке шлюза', () 
 
   it('Anthropic с прослойкой: вызов, прикинутый в размышлении, не выполняется', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'anthropic',
       model: 'qwen',
       includeUsage: false,
@@ -132,7 +132,7 @@ describe('размышления текстом в потоке шлюза', () 
 
   it('незакрытое размышление уходит текстом раньше [DONE]', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'qwen',
       includeUsage: false,
@@ -145,7 +145,7 @@ describe('размышления текстом в потоке шлюза', () 
 
   it('обрыв потока отдаёт придержанное текстом до ошибки', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'qwen',
       includeUsage: false,
@@ -158,7 +158,7 @@ describe('размышления текстом в потоке шлюза', () 
 
   it('lead без тега ничего не держит, а голый </think> ставит факт', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'qwen',
       includeUsage: false,

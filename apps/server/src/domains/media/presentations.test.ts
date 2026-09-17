@@ -4,12 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
-import type {
-  EndpointProfile,
-  MediaDeck,
-  Platform,
-  PlatformModelInfo,
-} from '@agentdeck/contracts';
+import type { EndpointProfile, MediaDeck, Platform, PlatformModelInfo } from '@agentdeck/contracts';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { DECK_MAX_RASTER } from '@agentdeck/contracts/media-deck';
 import { AppStore } from '../../lib/app-store.ts';
@@ -71,7 +66,7 @@ const DECK = {
 function contour(overrides: Partial<Platform> = {}): Platform {
   return {
     id: 'gor',
-    title: 'EnterprisePlatform · dev',
+    title: 'Company · dev',
     driver: 'enterprise-platform',
     baseUrl: 'https://api.example.ru',
     enabled: true,
@@ -165,7 +160,7 @@ describe('planDeck: кто соберёт колоду', () => {
   });
 
   it('дорога агента сильнее контура: за уже оплаченное подпиской ключ не тратится', () => {
-    useContour(contour({ defaultModel: 'enterprise-platform-chat' }));
+    useContour(contour({ defaultModel: 'company-chat' }));
 
     const plan = planDeck(deps({ gatewayPort: () => 5100 }), { agent: true });
 
@@ -175,8 +170,8 @@ describe('planDeck: кто соберёт колоду', () => {
   it('без разговора собирает контур — и БЕЗ всякой объявленной возможности', () => {
     // Каталог ключа пуст на флаги: диктовать структуру умеет любая текстовая
     // модель, и требовать объявления значило бы запереть режим на пустом месте.
-    useContour(contour({ defaultModel: 'enterprise-platform-chat' }), [
-      { id: 'enterprise-platform-chat', imageGeneration: false } as PlatformModelInfo,
+    useContour(contour({ defaultModel: 'company-chat' }), [
+      { id: 'company-chat', imageGeneration: false } as PlatformModelInfo,
     ]);
 
     const plan = planDeck(deps({ gatewayPort: () => 5100 }));
@@ -184,15 +179,15 @@ describe('planDeck: кто соберёт колоду', () => {
     expect(plan).toMatchObject({
       available: true,
       source: 'contour',
-      model: 'enterprise-platform-chat',
-      title: 'EnterprisePlatform · dev',
+      model: 'company-chat',
+      title: 'Company · dev',
     });
   });
 
   it('модель контура не выбрана — берётся первая из каталога ключа', () => {
-    useContour(contour(), [{ id: 'enterprise-platform-8b' } as PlatformModelInfo]);
+    useContour(contour(), [{ id: 'company-8b' } as PlatformModelInfo]);
 
-    expect(planDeck(deps({ gatewayPort: () => 5100 })).model).toBe('enterprise-platform-8b');
+    expect(planDeck(deps({ gatewayPort: () => 5100 })).model).toBe('company-8b');
   });
 
   it('модель по умолчанию — тем же правилом, что у прогонов: не эмбеддинг и не рисование', () => {
@@ -200,11 +195,11 @@ describe('planDeck: кто соберёт колоду', () => {
     // контур отдаёт вложения и модели рисования одним списком с чатом.
     useContour(contour(), [
       { id: 'bge-m3', kind: 'embedding' } as PlatformModelInfo,
-      { id: 'enterprise-platform-image', kind: 'chat', imageGeneration: true } as PlatformModelInfo,
-      { id: 'enterprise-platform-8b', kind: 'chat' } as PlatformModelInfo,
+      { id: 'company-image', kind: 'chat', imageGeneration: true } as PlatformModelInfo,
+      { id: 'company-8b', kind: 'chat' } as PlatformModelInfo,
     ]);
 
-    expect(planDeck(deps({ gatewayPort: () => 5100 })).model).toBe('enterprise-platform-8b');
+    expect(planDeck(deps({ gatewayPort: () => 5100 })).model).toBe('company-8b');
   });
 
   it('ни выбранной модели, ни каталога — причина про модель, а не «некому»', () => {
@@ -217,7 +212,7 @@ describe('planDeck: кто соберёт колоду', () => {
   });
 
   it('шлюз не поднят — причина названа его тумблером', () => {
-    useContour(contour({ defaultModel: 'enterprise-platform-chat' }));
+    useContour(contour({ defaultModel: 'company-chat' }));
 
     const plan = planDeck(deps({ gatewayPort: () => 0 }));
 
@@ -258,7 +253,7 @@ describe('planDeck: кто соберёт колоду', () => {
 
 describe('generateDeck: свой запрос через шлюз', () => {
   it('уходит на свой шлюз в диалекте OpenAI, без потока и с промптом каталога', async () => {
-    useContour(contour({ defaultModel: 'enterprise-platform-chat' }));
+    useContour(contour({ defaultModel: 'company-chat' }));
     const seen: Array<{ url: string; body: Record<string, unknown> }> = [];
     const fetchImpl: PlatformFetch = (url, init) => {
       seen.push({ url, body: JSON.parse(String(init?.body)) as Record<string, unknown> });
@@ -272,7 +267,7 @@ describe('generateDeck: свой запрос через шлюз', () => {
 
     expect(seen[0]?.url).toBe('http://127.0.0.1:5100/gor/v1/chat/completions');
     expect(seen[0]?.body).toMatchObject({
-      model: 'enterprise-platform-chat',
+      model: 'company-chat',
       // Не потоком: колода нужна целиком, кусками её не разобрать.
       stream: false,
       messages: [
@@ -289,14 +284,14 @@ describe('generateDeck: свой запрос через шлюз', () => {
       chatId: 'chat-1',
       title: 'Итоги квартала',
       source: 'contour',
-      model: 'enterprise-platform-chat',
+      model: 'company-chat',
       // Титульный лист плюс слайд на каждый пункт.
       slideCount: 3,
     });
   });
 
   it('файлы кладутся сразу, а PDF в списке нет, пока печатать нечем', async () => {
-    useContour(contour({ defaultModel: 'enterprise-platform-chat' }));
+    useContour(contour({ defaultModel: 'company-chat' }));
     const fetchImpl: PlatformFetch = () => Promise.resolve(answer(JSON.stringify(DECK)));
 
     const deck = await generateDeck(deps({ gatewayPort: () => 5100, fetchImpl }), {
@@ -316,7 +311,7 @@ describe('generateDeck: свой запрос через шлюз', () => {
   });
 
   it('с браузером PDF появляется в списке видов — но файл печатается позже', async () => {
-    useContour(contour({ defaultModel: 'enterprise-platform-chat' }));
+    useContour(contour({ defaultModel: 'company-chat' }));
     const fetchImpl: PlatformFetch = () => Promise.resolve(answer(JSON.stringify(DECK)));
 
     const deck = await generateDeck(
@@ -332,7 +327,7 @@ describe('generateDeck: свой запрос через шлюз', () => {
     // Аудит MD-07: модели средней руки и рассуждающие модели заворачивают JSON в
     // фразу или в `<think>`. Структура в ответе была, а панель говорила «ответила
     // не колодой» — и человек менял модель, которая работала.
-    useContour(contour({ defaultModel: 'enterprise-platform-chat' }));
+    useContour(contour({ defaultModel: 'company-chat' }));
     const fetchImpl: PlatformFetch = () =>
       Promise.resolve(
         answer(
@@ -351,7 +346,7 @@ describe('generateDeck: свой запрос через шлюз', () => {
   });
 
   it('модель ответила прозой — отказ несёт её слова, а не «панель сломалась»', async () => {
-    useContour(contour({ defaultModel: 'enterprise-platform-chat' }));
+    useContour(contour({ defaultModel: 'company-chat' }));
     const fetchImpl: PlatformFetch = () =>
       Promise.resolve(answer('Конечно! Вот план вашей презентации: сначала титул…'));
 

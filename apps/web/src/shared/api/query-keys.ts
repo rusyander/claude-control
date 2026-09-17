@@ -62,6 +62,11 @@ export const queryKeys = {
    * список, который к этой пробе отношения не имеет.
    */
   compromises: ['compromises'] as const,
+  /** Агент панели: ждущие карточки, след действий, разговоры (А3). */
+  panelAgentPending: ['panel-agent', 'pending'] as const,
+  panelAgentJournal: ['panel-agent', 'journal'] as const,
+  panelAgentConversations: ['panel-agent', 'conversations'] as const,
+  panelAgentConversation: (id: string) => ['panel-agent', 'conversations', id] as const,
   /** Контуры: настройки, маски ключей и итог последней пробы каждого. */
   platforms: ['platforms'] as const,
   /**

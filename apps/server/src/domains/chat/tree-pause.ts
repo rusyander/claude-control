@@ -175,7 +175,7 @@ export class TreePause implements TreeStartGate {
       const snapshot: PausedTreeChat = {
         cwd: run.options.cwd,
         ...(run.sessionId ? { sessionId: run.sessionId } : {}),
-        options: run.options as unknown as Record<string, unknown>,
+        options: withoutRoute(run.options) as unknown as Record<string, unknown>,
         meta: run.meta as unknown as Record<string, unknown>,
         ...(autoApprove ? { autoApprove: { ...autoApprove } } : {}),
         pausedAt: this.now(),
@@ -247,7 +247,7 @@ export class TreePause implements TreeStartGate {
     record.pendingStarts.push({
       kind,
       chatId,
-      options: options as unknown as Record<string, unknown>,
+      options: withoutRoute(options) as unknown as Record<string, unknown>,
       meta: meta as unknown as Record<string, unknown>,
       at: this.now(),
     });
@@ -312,4 +312,24 @@ export class TreePause implements TreeStartGate {
       nodes,
     };
   }
+}
+
+/**
+ * Параметры прогона без маршрута контура — то, что ложится в запись паузы.
+ *
+ * Адрес шлюза, промпт контура и флаги слоёв реестр решает на КАЖДОМ старте
+ * (`ChatRunRegistry.start`) и сохранённые не читает никогда. Записанные в
+ * `state.json`, они были бы мёртвым грузом: адрес, имя модели и целый системный
+ * промпт в файле состояния панели, которые при продолжении всё равно затрутся
+ * (ревью Т3, MINOR 15).
+ */
+function withoutRoute(options: RunOptions): RunOptions {
+  const {
+    platformEnv: _env,
+    platformSystemPrompt: _prompt,
+    platformArgs: _args,
+    platformDropAppend: _drop,
+    ...rest
+  } = options;
+  return rest;
 }

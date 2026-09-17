@@ -8,6 +8,7 @@ import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { NotificationCenter } from '@shared/ui/notification-center';
 import { Badge } from '@shared/ui/badge';
+import { PanelAgentLauncher } from '@features/PanelAgentWindow';
 import { useOverview } from '@entities/AppConfig';
 import {
   useProviders,
@@ -124,6 +125,9 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
 
         {/* Журнал уведомлений: колокольчик со счётчиком и списком последних тостов. */}
         <NotificationCenter isCollapsed={isCollapsed} />
+
+        {/* Агент панели: одна точка входа на всех страницах, окно поверх раздела. */}
+        <PanelAgentLauncher isCollapsed={isCollapsed} />
 
         {sections.map((section) => (
           <Stack key={section.label} gap="var(--spacing-3xs)">

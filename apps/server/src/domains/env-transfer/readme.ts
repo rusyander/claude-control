@@ -49,7 +49,7 @@ export function buildArchiveReadme(manifest: ArchiveManifest): string {
 
   return `# Окружение ${provider.name} — перенос на другую машину
 
-Собрано панелью agentdeck ${exportedAt} на платформе \`${source.platform}\`.
+Собрано панелью AgentDeck ${exportedAt} на платформе \`${source.platform}\`.
 Файлов: ${manifest.entries.length}, размер до сжатия: ${formatBytes(totalBytes)}.
 
 ## Что внутри

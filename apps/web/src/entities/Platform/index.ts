@@ -23,6 +23,14 @@ export {
   usePlatformRunPlan,
 } from './api/PlatformApi';
 export { CapabilityMatrix } from './ui/CapabilityMatrix';
+export { TurnToolHintLine } from './ui/TurnToolHintLine';
+export {
+  turnToolHint,
+  lastTurnFacts,
+  type TurnToolHint,
+  type TurnToolFacts,
+} from './model/turnToolHint';
+export { useTurnToolHint } from './model/useTurnToolHint';
 export {
   PLATFORM_DRIVERS,
   platformBaseUrlSample,
@@ -30,6 +38,7 @@ export {
   platformIdFromTitle,
   validatePlatform,
   isPlatformValid,
+  applyTargetTitle,
   sortApplyTargets,
   toolRouteOf,
   toolRouteMark,

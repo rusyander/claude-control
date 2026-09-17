@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { enterprise-platformDriver } from '../drivers/enterprise-platform.ts';
+import { enterprisePlatformDriver } from '../drivers/enterprise-platform.ts';
 import { openAiCompatDriver } from '../drivers/openai-compat.ts';
 import {
   DIALECT_TABLE,
@@ -74,7 +74,10 @@ describe('таблица соответствий диалектов', () => {
   it.each(DIALECT_TABLE.filter((row) => row.fate === 'dropped'))(
     'не переносится: $anthropic',
     (row) => {
-      const { body, lost } = anthropicRequestToOpenAi(fullRequest(), enterprise-platformDriver.requestFields);
+      const { body, lost } = anthropicRequestToOpenAi(
+        fullRequest(),
+        enterprisePlatformDriver.requestFields,
+      );
       const text = JSON.stringify(body);
 
       // Названо потерей — и НЕ уехало наверх ни под каким именем.
@@ -85,7 +88,10 @@ describe('таблица соответствий диалектов', () => {
   );
 
   it('каждая перенесённая строка доезжает под своим именем', () => {
-    const { body } = anthropicRequestToOpenAi(fullRequest(), enterprise-platformDriver.requestFields);
+    const { body } = anthropicRequestToOpenAi(
+      fullRequest(),
+      enterprisePlatformDriver.requestFields,
+    );
     expect(body.model).toBe('gpt-x');
     expect(body.max_tokens).toBe(100);
     expect(body.temperature).toBe(0.4);
@@ -96,7 +102,10 @@ describe('таблица соответствий диалектов', () => {
   });
 
   it('системная строка становится первой репликой с ролью system', () => {
-    const { body } = anthropicRequestToOpenAi(fullRequest(), enterprise-platformDriver.requestFields);
+    const { body } = anthropicRequestToOpenAi(
+      fullRequest(),
+      enterprisePlatformDriver.requestFields,
+    );
     const messages = body.messages as { role: string; content: unknown }[];
     expect(messages[0]).toEqual({ role: 'system', content: 'системная строка' });
   });
@@ -111,7 +120,7 @@ describe('таблица соответствий диалектов', () => {
         ],
         messages: [{ role: 'user', content: 'вопрос' }],
       },
-      enterprise-platformDriver.requestFields,
+      enterprisePlatformDriver.requestFields,
     );
     const messages = body.messages as { role: string; content: string }[];
     // Текст системного промпта ТЕРЯТЬ НЕЛЬЗЯ: молча выкинутые указания агенту
@@ -122,7 +131,10 @@ describe('таблица соответствий диалектов', () => {
   });
 
   it('картинка переносится data-адресом', () => {
-    const { body } = anthropicRequestToOpenAi(fullRequest(), enterprise-platformDriver.requestFields);
+    const { body } = anthropicRequestToOpenAi(
+      fullRequest(),
+      enterprisePlatformDriver.requestFields,
+    );
     const messages = body.messages as { role: string; content: unknown }[];
     const withImage = messages.at(-1)?.content as { type: string; image_url?: { url: string } }[];
     expect(withImage[0]).toEqual({
@@ -140,7 +152,7 @@ describe('таблица соответствий диалектов', () => {
           { role: 'user', content: 'настоящий вопрос' },
         ],
       },
-      enterprise-platformDriver.requestFields,
+      enterprisePlatformDriver.requestFields,
     );
     // Контур отвергает пустое содержимое схемой — отправить такую реплику
     // значило бы получить 422 вместо ответа.
@@ -156,15 +168,17 @@ describe('таблица соответствий диалектов', () => {
           { role: 'user', content: [{ type: 'document', source: {} }] },
         ],
       },
-      enterprise-platformDriver.requestFields,
+      enterprisePlatformDriver.requestFields,
     );
     expect(lost.filter((item) => item.field === 'content[].document')).toHaveLength(1);
     expect(lost.at(0)?.note).not.toBe('');
   });
 
   it('мусор вместо тела не роняет мост', () => {
-    expect(anthropicRequestToOpenAi(null, enterprise-platformDriver.requestFields).body).toEqual({});
-    expect(anthropicRequestToOpenAi('строка', enterprise-platformDriver.requestFields).lost).toEqual([]);
+    expect(anthropicRequestToOpenAi(null, enterprisePlatformDriver.requestFields).body).toEqual({});
+    expect(anthropicRequestToOpenAi('строка', enterprisePlatformDriver.requestFields).lost).toEqual(
+      [],
+    );
   });
 });
 
@@ -443,7 +457,7 @@ describe('отказ в форме диалекта', () => {
 });
 
 describe('потери в диалекте самого контура', () => {
-  const dropped = enterprise-platformDriver.requestFields.filter(
+  const dropped = enterprisePlatformDriver.requestFields.filter(
     (row) => row.dialect === 'openai' && row.field !== 'tool_choice',
   );
 
@@ -453,7 +467,7 @@ describe('потери в диалекте самого контура', () => {
     // выглядит работающая настройка.
     const lost = openAiRequestLoss(
       { model: 'm', [field]: 'что-нибудь' },
-      enterprise-platformDriver.requestFields,
+      enterprisePlatformDriver.requestFields,
     );
     expect(lost.map((item) => item.field)).toEqual([field]);
     expect(lost[0]?.note).not.toBe('');
@@ -463,15 +477,17 @@ describe('потери в диалекте самого контура', () => {
     expect(
       openAiRequestLoss(
         { model: 'm', messages: [], temperature: 0.2 },
-        enterprise-platformDriver.requestFields,
+        enterprisePlatformDriver.requestFields,
       ),
     ).toEqual([]);
   });
 
   it('tool_choice: "none" — единственное значение, которое у контура работает', () => {
-    expect(openAiRequestLoss({ tool_choice: 'none' }, enterprise-platformDriver.requestFields)).toEqual([]);
     expect(
-      openAiRequestLoss({ tool_choice: 'auto' }, enterprise-platformDriver.requestFields).map(
+      openAiRequestLoss({ tool_choice: 'none' }, enterprisePlatformDriver.requestFields),
+    ).toEqual([]);
+    expect(
+      openAiRequestLoss({ tool_choice: 'auto' }, enterprisePlatformDriver.requestFields).map(
         (item) => item.field,
       ),
     ).toEqual(['tool_choice']);

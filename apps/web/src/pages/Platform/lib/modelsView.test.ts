@@ -24,8 +24,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts';
  */
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -89,18 +89,18 @@ describe('кому имеет смысл переопределять модел
   });
 
   it('выбранное переопределение видно в строке', () => {
-    const platform = { ...PLATFORM, consumerModels: { tests: 'enterprise-platform-small' } };
+    const platform = { ...PLATFORM, consumerModels: { tests: 'company-small' } };
     expect(consumerModelRows(platform).find((row) => row.consumer === 'tests')?.model).toBe(
-      'enterprise-platform-small',
+      'company-small',
     );
   });
 });
 
 describe('модель карточки', () => {
   it('выбор человека сильнее каталога', () => {
-    const platform = { ...PLATFORM, defaultModel: 'enterprise-platform-large' };
-    expect(cardModel(platform, health([{ id: 'enterprise-platform-mid' }]))).toEqual({
-      model: 'enterprise-platform-large',
+    const platform = { ...PLATFORM, defaultModel: 'company-large' };
+    expect(cardModel(platform, health([{ id: 'company-mid' }]))).toEqual({
+      model: 'company-large',
       source: 'default',
     });
   });
@@ -109,17 +109,17 @@ describe('модель карточки', () => {
     // Вложение первым в ответе контура — обычное дело, и взять его моделью
     // разговора значило бы отправить чат в модель, которая не отвечает текстом.
     expect(
-      cardModel(PLATFORM, health([{ id: 'bge', kind: 'embedding' }, { id: 'enterprise-platform-mid' }])),
-    ).toEqual({ model: 'enterprise-platform-mid', source: 'catalog' });
+      cardModel(PLATFORM, health([{ id: 'bge', kind: 'embedding' }, { id: 'company-mid' }])),
+    ).toEqual({ model: 'company-mid', source: 'catalog' });
   });
 
   it('модель рисования подстановкой не становится — тем же правилом, что на сервере', () => {
     const record = health([
-      { id: 'enterprise-platform-image', kind: 'chat', imageGeneration: true },
-      { id: 'enterprise-platform-mid', kind: 'chat' },
+      { id: 'company-image', kind: 'chat', imageGeneration: true },
+      { id: 'company-mid', kind: 'chat' },
     ]);
-    expect(cardModel(PLATFORM, record)).toEqual({ model: 'enterprise-platform-mid', source: 'catalog' });
-    expect(catalogIds(record)).toEqual(['enterprise-platform-image', 'enterprise-platform-mid']);
+    expect(cardModel(PLATFORM, record)).toEqual({ model: 'company-mid', source: 'catalog' });
+    expect(catalogIds(record)).toEqual(['company-image', 'company-mid']);
   });
 
   it('пробы не было — модели нет, и карточка это говорит', () => {
@@ -129,11 +129,11 @@ describe('модель карточки', () => {
 
   it('вложения и пропавшие модели в выбор не попадают', () => {
     const record = health([
-      { id: 'enterprise-platform-mid' },
+      { id: 'company-mid' },
       { id: 'bge-m3', kind: 'Embedding' },
-      { id: 'enterprise-platform-old', retired: true },
+      { id: 'company-old', retired: true },
     ]);
-    expect(catalogIds(record)).toEqual(['enterprise-platform-mid']);
+    expect(catalogIds(record)).toEqual(['company-mid']);
   });
 });
 
@@ -142,24 +142,24 @@ describe('сохранённая модель вне каталога', () => {
     // Ревью Т6 (B2): такое значение исчезало из списка выбора, поле показывало
     // «Модели пока нет», а уезжала в каждый прогон именно эта модель. Узнать
     // правду можно было только из `state.json`.
-    expect(missingFromCatalog(['enterprise-platform-mid'], 'enterprise-platform-retired-2024')).toBe(true);
-    expect(missingFromCatalog(['enterprise-platform-mid'], 'enterprise-platform-mid')).toBe(false);
+    expect(missingFromCatalog(['company-mid'], 'company-retired-2024')).toBe(true);
+    expect(missingFromCatalog(['company-mid'], 'company-mid')).toBe(false);
     expect(missingFromCatalog([], '  ')).toBe(false);
   });
 });
 
 describe('карта соответствия имён', () => {
   it('строка пишется и стирается', () => {
-    const added = withMapRow(PLATFORM, ' sonnet ', ' enterprise-platform-mid ');
-    expect(mapRows(added)).toEqual([{ from: 'sonnet', to: 'enterprise-platform-mid', missing: false }]);
+    const added = withMapRow(PLATFORM, ' sonnet ', ' company-mid ');
+    expect(mapRows(added)).toEqual([{ from: 'sonnet', to: 'company-mid', missing: false }]);
     expect(mapRows(withoutMapRow(added, 'sonnet'))).toEqual([]);
   });
 
   it('правая часть, пропавшая из каталога, помечена', () => {
     // При ДОБАВЛЕНИИ выбор ограничен каталогом, но каталог меняется, и молчащая
     // строка переводила бы имя в будущий 404.
-    const added = withMapRow(PLATFORM, 'sonnet', 'enterprise-platform-old');
-    expect(mapRows(added, ['enterprise-platform-mid'])[0]?.missing).toBe(true);
+    const added = withMapRow(PLATFORM, 'sonnet', 'company-old');
+    expect(mapRows(added, ['company-mid'])[0]?.missing).toBe(true);
     expect(mapRows(added, [])[0]?.missing).toBe(false);
   });
 
@@ -167,18 +167,18 @@ describe('карта соответствия имён', () => {
     // Перевод ищется регистронезависимо и берёт первое совпадение: две строки
     // выглядели бы двумя настройками, а действовала бы одна — и какая, видно
     // не было.
-    const first = withMapRow(PLATFORM, 'sonnet', 'enterprise-platform-mid');
-    const second = withMapRow(first, 'Sonnet', 'enterprise-platform-large');
-    expect(mapRows(second)).toEqual([{ from: 'Sonnet', to: 'enterprise-platform-large', missing: false }]);
+    const first = withMapRow(PLATFORM, 'sonnet', 'company-mid');
+    const second = withMapRow(first, 'Sonnet', 'company-large');
+    expect(mapRows(second)).toEqual([{ from: 'Sonnet', to: 'company-large', missing: false }]);
   });
 
   it('пустое имя слева не сохраняется вовсе', () => {
     // Ключ, которого не бывает, тихо переводил бы ничто во что-то.
-    expect(withMapRow(PLATFORM, '   ', 'enterprise-platform-mid')).toEqual(PLATFORM);
+    expect(withMapRow(PLATFORM, '   ', 'company-mid')).toEqual(PLATFORM);
   });
 
   it('правка не трогает исходный контур', () => {
-    withMapRow(PLATFORM, 'sonnet', 'enterprise-platform-mid');
+    withMapRow(PLATFORM, 'sonnet', 'company-mid');
     expect(PLATFORM.modelMap).toEqual({});
   });
 });
@@ -187,8 +187,8 @@ describe('переопределение потребителя', () => {
   it('пустое значение УДАЛЯЕТ строку, а не пишет пустоту', () => {
     // Пустая модель в словаре читалась бы как «модели нет», и прогон ушёл бы
     // без модели вовсе — то есть с моделью по умолчанию самого CLI.
-    const set = withConsumerModel(PLATFORM, 'tests', 'enterprise-platform-small');
-    expect(set.consumerModels).toEqual({ tests: 'enterprise-platform-small' });
+    const set = withConsumerModel(PLATFORM, 'tests', 'company-small');
+    expect(set.consumerModels).toEqual({ tests: 'company-small' });
     expect(withConsumerModel(set, 'tests', '  ').consumerModels).toEqual({});
   });
 });

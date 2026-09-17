@@ -42,7 +42,7 @@ describe('маршрут инструментов', () => {
  */
 
 const platformOf = (patch: Partial<Platform> = {}): Platform => ({
-  ...newPlatform('enterprise-platform', 'EnterprisePlatform · dev'),
+  ...newPlatform('enterprise-platform', 'Company · dev'),
   ...patch,
 });
 
@@ -59,9 +59,9 @@ const targetOf = (patch: Partial<PlatformApplyTarget> = {}): PlatformApplyTarget
 
 describe('новый контур', () => {
   it('выключен и никому не применён', () => {
-    expect(newPlatform('enterprise-platform', 'EnterprisePlatform · dev')).toEqual({
+    expect(newPlatform('enterprise-platform', 'Company · dev')).toEqual({
       id: 'enterprise-platform',
-      title: 'EnterprisePlatform · dev',
+      title: 'Company · dev',
       driver: 'enterprise-platform',
       baseUrl: '',
       enabled: false,
@@ -116,8 +116,8 @@ describe('новый контур', () => {
 
 describe('идентификатор из имени', () => {
   it('схлопывает всё, что в адресе значит другое', () => {
-    expect(platformIdFromTitle('EnterprisePlatform · dev')).toBe('enterprise-platform-dev');
-    expect(platformIdFromTitle('EnterprisePlatform/prod 2')).toBe('enterprise-platform-prod-2');
+    expect(platformIdFromTitle('Company · dev')).toBe('company-dev');
+    expect(platformIdFromTitle('Company/prod 2')).toBe('company-prod-2');
   });
 
   it('имя без латиницы даёт пустую строку, а не мусор', () => {

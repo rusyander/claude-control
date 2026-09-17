@@ -81,7 +81,7 @@ export function modelRulesFor(
 /**
  * Контур принимает усилие рассуждения. Отвечает МАНИФЕСТ драйвера, а не проба:
  * усилие — это поле запроса, и узнать о нём можно только из документации
- * платформы (у enterprise-platform `reasoning_effort` в публичной схеме не встретился ни
+ * платформы (у платформы компании `reasoning_effort` в публичной схеме не встретился ни
  * разу — Т12 просит его добавить).
  */
 export function effortAccepted(platform: Platform): boolean {

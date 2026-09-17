@@ -1,9 +1,4 @@
-import type {
-  EnvVar,
-  McpServer,
-  PermissionRule,
-  UniversalMcpServer,
-} from '@agentdeck/contracts';
+import type { EnvVar, McpServer, PermissionRule, UniversalMcpServer } from '@agentdeck/contracts';
 
 /** Доступ к данным Claude — его читатели живут на своих файлах и знают про группы. */
 export interface ClaudeSide {

@@ -37,8 +37,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
 const SECRET = 'CONTOUR-KEY-ORG-4f21';
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -148,18 +148,18 @@ describe('ассистент панели', () => {
     // Ассистент живёт в настройках панели: ни одного нового файла в домашнем
     // каталоге появиться не может.
     expect(walk(home)).toEqual(before);
-    expect(store.getSettings().assistantEndpointId).toBe('contour-enterprise-platform-dev');
+    expect(store.getSettings().assistantEndpointId).toBe('contour-company-dev');
   });
 
   it('управляемый профиль появляется в общем списке эндпоинтов', () => {
     applyContour(deps(), PLATFORM, { targets: ['assistant'], model: 'gpt-4o' });
     const profile = store
       .getSettings()
-      .endpointProfiles.find((item) => item.id === 'contour-enterprise-platform-dev');
+      .endpointProfiles.find((item) => item.id === 'contour-company-dev');
     expect(profile).toMatchObject({
-      baseUrl: 'http://127.0.0.1:5179/enterprise-platform-dev/v1',
+      baseUrl: 'http://127.0.0.1:5179/company-dev/v1',
       model: 'gpt-4o',
-      ownerPlatformId: 'enterprise-platform-dev',
+      ownerPlatformId: 'company-dev',
       writeToken: false,
     });
   });
@@ -174,7 +174,7 @@ describe('ассистент панели', () => {
       reachable: true,
       url: '',
       detail: '',
-      models: [{ id: 'enterprise-platform-mid' }],
+      models: [{ id: 'company-mid' }],
       capabilities: [],
       limits: {},
       notes: [],
@@ -184,8 +184,8 @@ describe('ассистент панели', () => {
     applyContour(deps(), PLATFORM, { targets: ['assistant'], model: '' });
     const profile = store
       .getSettings()
-      .endpointProfiles.find((item) => item.id === 'contour-enterprise-platform-dev');
-    expect(profile?.model).toBe('enterprise-platform-mid');
+      .endpointProfiles.find((item) => item.id === 'contour-company-dev');
+    expect(profile?.model).toBe('company-mid');
   });
 
   it('прежний выбор ассистента запоминается — откату будет куда вернуться', () => {
@@ -193,7 +193,7 @@ describe('ассистент панели', () => {
     // Занятое место у ассистента — это его собственный выбор профиля, и без
     // явного согласия контур его не перебивает.
     applyContour(deps(), PLATFORM, { targets: ['assistant'], overwrite: ['assistant'] });
-    expect(store.getPlatformApplied()['enterprise-platform-dev']?.previousAssistantProfileId).toBe('ep-1');
+    expect(store.getPlatformApplied()['company-dev']?.previousAssistantProfileId).toBe('ep-1');
   });
 
   it('чужой выбор ассистента без согласия не перебивается', () => {
@@ -219,7 +219,7 @@ describe('claude', () => {
 
     expect(settings.env).toEqual({
       EXISTING: 'keep-me',
-      ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/enterprise-platform-dev',
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/company-dev',
       ANTHROPIC_MODEL: 'gpt-4o',
       ANTHROPIC_AUTH_TOKEN: PLACEHOLDER_KEY,
     });
@@ -289,7 +289,7 @@ describe('claude', () => {
     // перебивает (до DRV-21 план без модели этого не видел и перебивал молча).
     applyContour(deps(), PLATFORM, { targets: ['claude'], model: 'gpt-4o', overwrite: ['claude'] });
 
-    const trace = store.getPlatformApplied()['enterprise-platform-dev']?.targets[0];
+    const trace = store.getPlatformApplied()['company-dev']?.targets[0];
     expect(trace?.previous).toEqual([
       { key: 'ANTHROPIC_BASE_URL' },
       { key: 'ANTHROPIC_MODEL', value: 'opus' },
@@ -305,7 +305,7 @@ describe('claude', () => {
 
     // Иначе откат вернул бы файл в состояние, которое панель сама и сделала, —
     // то есть не вернул бы никуда.
-    expect(store.getPlatformApplied()['enterprise-platform-dev']?.targets[0]?.previous).toEqual([
+    expect(store.getPlatformApplied()['company-dev']?.targets[0]?.previous).toEqual([
       { key: 'ANTHROPIC_BASE_URL' },
       { key: 'ANTHROPIC_MODEL', value: 'opus' },
       { key: 'ANTHROPIC_AUTH_TOKEN' },
@@ -329,10 +329,10 @@ describe('codex', () => {
     expect(text).toContain('model = "o3"');
     expect(text).toContain('approval_policy = "on-request"');
 
-    expect(text).toContain('[model_providers.contour-enterprise-platform-dev]');
-    expect(text).toContain('base_url = "http://127.0.0.1:5179/enterprise-platform-dev/v1"');
+    expect(text).toContain('[model_providers.contour-company-dev]');
+    expect(text).toContain('base_url = "http://127.0.0.1:5179/company-dev/v1"');
     // Корневой выбор провайдера — иначе запись мертва.
-    expect(text).toContain('model_provider = "contour-enterprise-platform-dev"');
+    expect(text).toContain('model_provider = "contour-company-dev"');
   });
 
   it('прежний выбор провайдера сохраняется в следе', () => {
@@ -343,7 +343,7 @@ describe('codex', () => {
     // Уже выбранный провайдер — занятое место, и перебивается он только по
     // явному согласию; в след при этом уходит прежнее имя.
     applyContour(deps(), PLATFORM, { targets: ['codex'], overwrite: ['codex'] });
-    expect(store.getPlatformApplied()['enterprise-platform-dev']?.targets[0]?.previous).toEqual([
+    expect(store.getPlatformApplied()['company-dev']?.targets[0]?.previous).toEqual([
       { key: 'model_provider', value: 'openai' },
     ]);
   });
@@ -359,7 +359,7 @@ describe('занятое место и неподдержанные цели', (
     expect(result.skipped).toEqual([{ targetId: 'claude', reason: 'conflict' }]);
     expect(readFileSync(settingsPath, 'utf8')).toBe(before);
     // Пропущенная цель не оставляет следа: откатывать нечего.
-    expect(store.getPlatformApplied()['enterprise-platform-dev']).toBeUndefined();
+    expect(store.getPlatformApplied()['company-dev']).toBeUndefined();
   });
 
   it('названная в overwrite цель перебивается — но только она', () => {
@@ -372,7 +372,7 @@ describe('занятое место и неподдержанные цели', (
     expect(
       (JSON.parse(readFileSync(settingsPath, 'utf8')) as { env: Record<string, string> }).env
         .ANTHROPIC_BASE_URL,
-    ).toBe('http://127.0.0.1:5179/enterprise-platform-dev');
+    ).toBe('http://127.0.0.1:5179/company-dev');
   });
 
   it('цель с прочерком пропускается со СВОЕЙ причиной', () => {
@@ -402,11 +402,11 @@ describe('занятое место и неподдержанные цели', (
     expect(
       (JSON.parse(readFileSync(settingsPath, 'utf8')) as { env: Record<string, string> }).env
         .ANTHROPIC_BASE_URL,
-    ).toBe('http://127.0.0.1:5180/enterprise-platform-dev');
+    ).toBe('http://127.0.0.1:5180/company-dev');
     expect(
-      store.getSettings().endpointProfiles.find((item) => item.id === 'contour-enterprise-platform-dev')
+      store.getSettings().endpointProfiles.find((item) => item.id === 'contour-company-dev')
         ?.baseUrl,
-    ).toBe('http://127.0.0.1:5180/enterprise-platform-dev/v1');
+    ).toBe('http://127.0.0.1:5180/company-dev/v1');
   });
 
   it('незнакомая цель — отказ с именем поля, а не молчаливый пропуск', () => {

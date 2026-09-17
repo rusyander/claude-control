@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type {
-  ProjectTestCase,
-  ProjectTestGroup,
-  ProjectTestRiskItem,
-} from '@agentdeck/contracts';
+import type { ProjectTestCase, ProjectTestGroup, ProjectTestRiskItem } from '@agentdeck/contracts';
 import { dropEmpty, selectView } from './useTestFilters';
 
 /**

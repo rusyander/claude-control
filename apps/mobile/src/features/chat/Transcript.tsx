@@ -1,13 +1,11 @@
 import { useMemo, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { ChatBlock, ChatMessage } from '@agentdeck/contracts';
-import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
-import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { collectMessageTimings } from '@agentdeck/contracts/chat-timing';
 import { colors, font, radius, space } from '../../shared/config/theme';
 import { useT } from '../../shared/config/i18n';
 import type { CostUnit } from '../../shared/lib/format';
-import { Markdown } from './Markdown';
+import { AgentText } from './AgentText';
 import { TokenBadge } from './TokenBadge';
 import { summarizeToolInput } from './toolSummary';
 
@@ -61,26 +59,10 @@ export function Transcript({
           >
             {message.blocks.map((block, index) => {
               if (block.type === 'text') {
-                // Предложения панели приходят блоками кода внутри ответа. На
-                // телефоне карточек нет — решение принимают в панели, — но
-                // показывать вместо них сырой JSON тем более незачем: убираем
-                // блок и говорим строкой, что предложение было.
-                const split = scanSplitBlocks(block.text);
-                const handoff = scanHandoffBlocks(split.text);
-                const offers = [
-                  ...split.proposals.map(() => t.chat.offerSplit),
-                  ...handoff.proposals.map(() => t.chat.offerHandoff),
-                ];
-                return (
-                  <View key={index} style={styles.textBlock}>
-                    {handoff.text ? <Markdown>{handoff.text}</Markdown> : null}
-                    {offers.map((offer, position) => (
-                      <Text key={position} style={styles.offer}>
-                        {offer}
-                      </Text>
-                    ))}
-                  </View>
-                );
+                // Предложения панели и вложения агента приходят блоками кода
+                // внутри ответа: рисунок — карточкой, остальное (решается в
+                // панели) — строкой вместо сырого JSON.
+                return <AgentText key={index} text={block.text} />;
               }
               if (block.type === 'thinking') {
                 return (
@@ -160,8 +142,6 @@ const styles = StyleSheet.create({
   assistant: { backgroundColor: colors.surface, borderColor: colors.border },
   toolsOnly: { gap: space.xs, marginVertical: -space.xs },
   thinking: { color: colors.textFaint, fontSize: font.small, fontStyle: 'italic', lineHeight: 18 },
-  textBlock: { gap: space.sm },
-  offer: { color: colors.accent, fontSize: font.small, lineHeight: 18 },
   toolRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   tool: { color: colors.accent, fontSize: font.small, fontFamily: font.mono },
   toolError: { color: colors.danger },

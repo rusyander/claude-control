@@ -21,7 +21,7 @@ import { promptText } from '../prompts.ts';
 import { activeGatewaySettings, buildManagedProfile, PLACEHOLDER_KEY } from './apply/profile.ts';
 import { pickApiKind, targetProfile } from './apply/targets.ts';
 import { runLayers, type RunLayers } from './layers.ts';
-import { effortAccepted, modelRulesFor } from './models.ts';
+import { effortAccepted, modelRulesFor, toolRouteOf } from './models.ts';
 import { consumersOf, readPlatforms, readToken } from './store.ts';
 
 /**
@@ -70,6 +70,12 @@ export type PlatformRouteSkipReason =
   | 'no_token'
   /** Потребитель ходит не процессом: ассистент — профилем, терминал — файлами. */
   | 'not_a_run'
+  /**
+   * Прогон чужого CLI, которого нет в реестре провайдеров (`foreign:<cli>` из
+   * устаревшего архива или снятого провайдера). Отдельным словом от `not_a_run`:
+   * тот ответ значит «так задумано», а этот — «сохранено то, чего панель не знает».
+   */
+  | 'unknown_provider'
   | PlatformConsumerReason;
 
 export type PlatformRouteDecision =
@@ -170,7 +176,7 @@ function contourSystemPrompt(appData: string, identity: string): string {
  * стиль, который человек правит, а факт маршрута — имя модели и контура
  * известны только в момент запуска. Без неё модель контура собирает себя из
  * окружения, а там всё говорит «Claude»: личный CLAUDE.md, память, имена
- * инструментов. Живой прогон 14.09.2026: Qwen3.8 через dev-стенд EnterprisePlatform на
+ * инструментов. Живой прогон 14.09.2026: Qwen3.8 через dev-стенд платформы компании на
  * вопрос «что ты за модель» назвалась Claude Opus 5, хотя транскрипт записал
  * ответ от `Qwen/Qwen3.8-27B-FP8`.
  */
@@ -182,6 +188,17 @@ export function contourIdentity(title: string, model: string): string {
     'даже если окружение (CLAUDE.md, память, названия инструментов) говорит о Claude: ' +
     'Claude Code здесь только программа-агент, в которой ты работаешь.'
   );
+}
+
+/**
+ * Системный промпт хода через контур: пусто, когда промпт контура выключен. Одна
+ * функция на прогоны реестра и ход агента панели — вторая сборка разошлась бы
+ * с первой на первой правке каталога.
+ */
+export function contourRunPrompt(appData: string, platform: Platform, model: string): string {
+  return platform.contourPrompt
+    ? contourSystemPrompt(appData, contourIdentity(platform.title, model))
+    : '';
 }
 
 const UNREACHABLE_TEXT: Record<'gateway_down' | 'no_token', string> = {
@@ -226,6 +243,8 @@ export function resolveRunRoute(
   /** Модель, которую назвал сам прогон (шапка чата, каскад, «модель на группу»). */
   asked = '',
 ): PlatformRouteDecision {
+  const foreign = foreignProviderId(consumer);
+  if (foreign && !isKnownProviderId(foreign)) return { routed: false, reason: 'unknown_provider' };
   const provider = providerOf(consumer);
   if (!provider) return { routed: false, reason: 'not_a_run' };
 
@@ -270,9 +289,7 @@ export function resolveRunRoute(
   // панели, и вторая копия в коде означала бы, что половина прогонов слушает
   // правку, а половина — нет. Преамбула контура едет следом: до аудита MD-06 её
   // можно было править, а не читал её никто.
-  const systemPrompt = platform.contourPrompt
-    ? contourSystemPrompt(deps.appDataDir, contourIdentity(platform.title, model.model))
-    : '';
+  const systemPrompt = contourRunPrompt(deps.appDataDir, platform, model.model);
   return {
     routed: true,
     platformId: platform.id,
@@ -308,6 +325,7 @@ export function describeRunPlan(deps: PlatformRoutingDeps, consumer: string): Pl
       title: platform?.title ?? '',
       ...(decision.routed ? {} : { reason: decision.reason }),
       ...(!decision.routed && decision.refusal ? { refused: true as const } : {}),
+      ...(bypassed(decision) ? { bypassed: true as const } : {}),
       rules: { model: '', source: 'none', map: {}, catalog: [] },
       effort: true,
     };
@@ -317,11 +335,25 @@ export function describeRunPlan(deps: PlatformRoutingDeps, consumer: string): Pl
     title: platform.title,
     rules: modelRulesFor(deps.store, platform, consumer),
     effort: effortAccepted(platform),
+    // Путь инструментов — чтобы чат назвал вызов, написанный текстом при
+    // выключенной прослойке, а не показал его немым JSON (развилка 3).
+    toolRoute: toolRouteOf(platform),
     // Слои — из того же решения, что и запуск: шапка показывает снятые ДО
     // отправки, а не объясняет их постфактум. У чужого CLI поля нет вовсе, и
     // шапка про наши слои молчит — их там и не снимают.
     ...(decision.layers ? { layers: decision.layers } : {}),
   };
+}
+
+/**
+ * Галочка стоит, а прогон пойдёт мимо контура в облако вендора — «по
+ * возможности» без шлюза или ключа. Решение по контуру №4: режим остаётся,
+ * только пока каждый такой уход назван в шапке чата прямо. Обязательный контур
+ * здесь не уходит, а отказывает (`refusal`), и подпись у него своя.
+ */
+function bypassed(decision: PlatformRouteDecision): boolean {
+  if (decision.routed || decision.refusal) return false;
+  return decision.reason === 'gateway_down' || decision.reason === 'no_token';
 }
 
 /**

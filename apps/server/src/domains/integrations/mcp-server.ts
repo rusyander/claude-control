@@ -7,12 +7,14 @@ import {
   bridgeScriptExists,
   isPanelBridgeRegistered,
   registerPanelBridge,
+  registeredBridgeId,
   unregisterPanelBridge,
   type PanelBridge,
   type PanelBridgeTarget,
 } from '../panel-mcp.ts';
 import { IntegrationError } from './errors.ts';
 import { linkForCwd } from './links.ts';
+import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
 
 /**
  * Собственный MCP-сервер панели: то же самое окно наружу, но для АГЕНТА.
@@ -35,7 +37,7 @@ import { linkForCwd } from './links.ts';
  * вероятное имя ОФИЦИАЛЬНОГО сервера Atlassian, и совпадение имён означало бы
  * либо 409 на ровном месте, либо запись поверх чужой настройки.
  */
-export const ATLASSIAN_MCP_ID = 'agentdeck-atlassian';
+export const ATLASSIAN_MCP_ID = `${BRAND_SLUG}-atlassian`;
 
 /** Путь к скрипту переходника: он лежит в самом репозитории панели. */
 export function atlassianMcpScript(): string {
@@ -44,7 +46,11 @@ export function atlassianMcpScript(): string {
 
 /** Куда и чем писать запись — общее правило обоих переходников панели. */
 function bridge(): PanelBridge {
-  return { id: ATLASSIAN_MCP_ID, script: atlassianMcpScript() };
+  return {
+    id: ATLASSIAN_MCP_ID,
+    legacyId: `${LEGACY_BRAND_SLUG}-atlassian`,
+    script: atlassianMcpScript(),
+  };
 }
 
 export type McpRegistration = PanelBridgeTarget;
@@ -108,14 +114,16 @@ export function activateAtlassianMcp(
 ): boolean {
   try {
     if (!cwd || !linkForCwd(store, cwd)) return false;
-    if (!isAtlassianMcpRegistered(deps.paths.mcpConfig)) return false;
+    // Запись могла остаться под прежним именем продукта — включаем ту, что есть.
+    const id = registeredBridgeId(bridge(), deps.paths.mcpConfig);
+    if (!id) return false;
 
     // Уже включённый сервер не пишется никуда: `setMcpServerEnabled` молча
     // возвращает `undefined`, когда запись и так в нужной секции, — поэтому
     // вызов на каждом старте прогона ничего не стоит.
-    const moved = applyEntityState(deps, 'mcp', ATLASSIAN_MCP_ID, true).backupPath !== undefined;
-    const wasMarked = store.isDisabled('mcp', ATLASSIAN_MCP_ID);
-    if (wasMarked) store.setEnabled('mcp', ATLASSIAN_MCP_ID, true);
+    const moved = applyEntityState(deps, 'mcp', id, true).backupPath !== undefined;
+    const wasMarked = store.isDisabled('mcp', id);
+    if (wasMarked) store.setEnabled('mcp', id, true);
     return moved || wasMarked;
   } catch (error) {
     onError?.(error);

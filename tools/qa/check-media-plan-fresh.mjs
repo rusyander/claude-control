@@ -44,15 +44,15 @@ const CHATS = [
 const IMAGE_OPEN = {
   available: true,
   source: 'contour-chat',
-  title: 'EnterprisePlatform · dev',
-  model: 'enterprise-platform-image',
+  title: 'Company · dev',
+  model: 'company-image',
   promptSent: true,
 };
 const DECK_OPEN = {
   available: true,
   source: 'contour',
-  title: 'EnterprisePlatform · dev',
-  model: 'enterprise-platform-chat',
+  title: 'Company · dev',
+  model: 'company-chat',
   pdf: { available: true },
 };
 
@@ -191,7 +191,7 @@ await page.waitForTimeout(900);
 const dialog = page.getByRole('dialog', { name: 'Что сделает отправка' });
 check(await dialog.isVisible().catch(() => false), 'меню режимов открылось');
 check(
-  (await dialog.textContent().catch(() => ''))?.includes('EnterprisePlatform · dev') === true,
+  (await dialog.textContent().catch(() => ''))?.includes('Company · dev') === true,
   'первое открытие показывает рабочую дорогу',
 );
 
@@ -213,7 +213,7 @@ check(asksBeforeFirstOpen >= 0 && asksBeforeSecondOpen >= 1, 'план спра�
 const dialogAfter = page.getByRole('dialog', { name: 'Что сделает отправка' });
 const textAfter = (await dialogAfter.textContent().catch(() => '')) ?? '';
 check(textAfter.includes(REASON), `меню показывает новую причину: «${REASON}»`);
-check(!textAfter.includes('EnterprisePlatform · dev'), 'обещание прежней дороги с экрана ушло');
+check(!textAfter.includes('Company · dev'), 'обещание прежней дороги с экрана ушло');
 
 await page.keyboard.press('Escape');
 await page.waitForTimeout(400);

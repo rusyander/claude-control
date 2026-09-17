@@ -163,8 +163,8 @@ describe('stripGitProgress: в отказе видно причину, а не �
 
 describe('worktreeDirFor: копии лежат рядом с репозиторием, а не внутри', () => {
   it('соседний каталог <репозиторий>-worktrees', () => {
-    const target = worktreeDirFor(join('c:', 'work', 'enterprise-platform'), 'feature/x');
-    expect(basename(dirname(target))).toBe('enterprise-platform-worktrees');
+    const target = worktreeDirFor(join('c:', 'work', 'company'), 'feature/x');
+    expect(basename(dirname(target))).toBe('company-worktrees');
     expect(basename(target)).toBe('feature-x');
     // Внутрь рабочего дерева копия не попадает ни при каких именах.
     expect(target.startsWith(join('c:', 'work', 'enterprise-platform') + sep)).toBe(false);

@@ -1,9 +1,5 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type {
-  ProjectFileChanges,
-  ProjectFileContent,
-  ProjectFileTree,
-} from '@agentdeck/contracts';
+import type { ProjectFileChanges, ProjectFileContent, ProjectFileTree } from '@agentdeck/contracts';
 import { api } from '../../shared/api/client';
 
 /**

@@ -2,6 +2,7 @@
 // разошлись бы на первой правке. Импорт ТОЛЬКО типа: сервер работает без
 // сборки и значения из соседнего сабпата тянуть сюда незачем.
 import type { TaskSplitReviewDecision } from './task-split';
+import { blockLang, blockLangPattern } from './brand.ts';
 
 /**
  * Передача работы в чистую сессию («автоклир») — формат канала и его разбор.
@@ -40,7 +41,7 @@ import type { TaskSplitReviewDecision } from './task-split';
  */
 
 /** Язык блока: он же признак, по которому панель узнаёт предложение. */
-export const HANDOFF_BLOCK_LANG = 'agentdeck:handoff';
+export const HANDOFF_BLOCK_LANG = blockLang('handoff');
 
 /** Файл-опора по умолчанию: с него начинается новая сессия. */
 export const HANDOFF_DEFAULT_CHECKPOINT = '.agent/PROGRESS.md';
@@ -267,7 +268,7 @@ export interface HandoffScan {
 }
 
 /** Начало блока: тройная кавычка в начале строки и наш язык за ней. */
-const OPEN = new RegExp(`(^|\\n)[ \\t]*\`\`\`[ \\t]*${HANDOFF_BLOCK_LANG}[ \\t]*\\r?\\n`);
+const OPEN = new RegExp(`(^|\\n)[ \\t]*\`\`\`[ \\t]*${blockLangPattern('handoff')}[ \\t]*\\r?\\n`);
 
 /**
  * Вырезать блоки предложений из текста ответа.

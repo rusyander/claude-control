@@ -116,6 +116,22 @@ export class PlatformGateway {
     return Boolean(this.#server?.listening);
   }
 
+  /**
+   * Вызовы инструментов агента (прослойкой и полем) в запросах с момента
+   * `sinceMs` — чату чужого CLI, у которого своего транскрипта вызовов нет
+   * (развилка 5). `undefined` — запросов за это время не было.
+   */
+  toolCallsSince(sinceMs: number): number | undefined {
+    let requests = 0;
+    let calls = 0;
+    for (const event of this.#journal.events()) {
+      if (Date.parse(event.at) < sinceMs) continue;
+      requests += 1;
+      calls += event.toolCalls + (event.nativeCalls ?? 0);
+    }
+    return requests > 0 ? calls : undefined;
+  }
+
   status(): PlatformGatewayStatus {
     const totals = this.#journal.totals();
     return {

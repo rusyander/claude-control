@@ -106,11 +106,11 @@ describe('permissions', () => {
     });
 
     it('MCP-паттерн разбирается на сервер и инструмент', () => {
-      writeSettings({ permissions: { allow: ['mcp__gitlab-enterprise-platform__get_project'] } });
+      writeSettings({ permissions: { allow: ['mcp__gitlab-company__get_project'] } });
 
       const [rule] = readPermissions(settingsPath, store);
 
-      expect(rule?.mcpServer).toBe('gitlab-enterprise-platform');
+      expect(rule?.mcpServer).toBe('gitlab-company');
       expect(rule?.mcpTool).toBe('get_project');
     });
 

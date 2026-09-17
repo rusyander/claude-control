@@ -168,6 +168,11 @@ const SETS = [
     topic: 'dlp',
     pages: ['what-the-proxy-sees-and-what-the-gate-sees'],
   },
+  {
+    source: 'docs/diagrams/panelAgent-guide/panelAgent-guide.drawio',
+    topic: 'panelAgent',
+    pages: ['action-path', 'keys-and-files'],
+  },
 ];
 
 const browser = await chromium.launch();

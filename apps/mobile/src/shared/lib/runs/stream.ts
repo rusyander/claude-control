@@ -1,5 +1,7 @@
 import { fetch as streamingFetch } from 'expo/fetch';
+import type { ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import { apiUrl, authHeaders } from '../../api/client';
+import { serverMessage } from '../../api/server-message';
 import { dict } from '../../config/i18n';
 import { STREAM_CONNECT_MS, STREAM_STALL_MS } from './constants';
 import { applyEvent, lastSeqs, markLive, markStalled, runs, setRun } from './store';
@@ -138,6 +140,8 @@ async function readRefusal(response: Response): Promise<Refusal> {
     files?: string[];
     supported?: string[];
     cwd?: string;
+    messageCode?: unknown;
+    params?: ServerMessageParams;
   } = {};
   try {
     body = (await response.json()) as typeof body;
@@ -161,7 +165,12 @@ async function readRefusal(response: Response): Promise<Refusal> {
   if (body.code === 'workspace_missing') {
     return { code: body.code, message: t.run.notSent.workspaceMissing(body.cwd ?? '') };
   }
-  const detail = body.message || body.error || t.run.answered(response.status);
+  // Пустое сообщение и прочие отказы с кодом текста — на языке телефона.
+  const detail =
+    serverMessage(body.messageCode, body.params) ||
+    body.message ||
+    body.error ||
+    t.run.answered(response.status);
   return { code: body.code, message: t.run.notSent.other(detail), runId: body.runId };
 }
 

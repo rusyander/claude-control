@@ -246,7 +246,12 @@ function previousDeck(deps: MediaDeps, id: string | undefined): StoredDeck | und
   if (!wanted) return undefined;
   const record = readDeckRecord(deps.appDataDir, wanted);
   if (!record) {
-    throw new MediaError(404, 'Той презентации, которую просят поправить, у панели уже нет.');
+    throw new MediaError(
+      404,
+      'Той презентации, которую просят поправить, у панели уже нет.',
+      undefined,
+      { code: 'media-deck-revise-gone' },
+    );
   }
   return record;
 }
@@ -257,7 +262,11 @@ function previousDeck(deps: MediaDeps, id: string | undefined): StoredDeck | und
  */
 export function deckRevisePrompt(deps: MediaDeps, id: string, instruction: string): string {
   const previous = previousDeck(deps, id);
-  if (!previous) throw new MediaError(400, 'Не сказано, какую презентацию править.');
+  if (!previous) {
+    throw new MediaError(400, 'Не сказано, какую презентацию править.', undefined, {
+      code: 'media-deck-revise-unspecified',
+    });
+  }
   return deckReviseRequest(deckPromptRules(deps.appDataDir), previous.deck, instruction);
 }
 
@@ -279,7 +288,9 @@ export async function deckFromBlock(
 ): Promise<MediaDeck> {
   const parsed = parseDeckBlock(request.block);
   if (!parsed.deck) {
-    throw new MediaError(400, 'В блоке не колода: нет заголовка или ни одного слайда.');
+    throw new MediaError(400, 'В блоке не колода: нет заголовка или ни одного слайда.', undefined, {
+      code: 'media-deck-block-invalid',
+    });
   }
   const previous = previousDeck(deps, request.reviseOf);
   return await assemble(deps, {
@@ -434,7 +445,11 @@ export async function deckFile(
   format: MediaDeckFormat,
 ): Promise<{ record: StoredDeck; bytes: Buffer }> {
   const record = readDeckRecord(deps.appDataDir, id);
-  if (!record) throw new MediaError(404, 'Такой презентации у панели нет.');
+  if (!record) {
+    throw new MediaError(404, 'Такой презентации у панели нет.', undefined, {
+      code: 'media-deck-not-found',
+    });
+  }
 
   if (format === 'pdf' && !hasDeckFile(deps.appDataDir, id, 'pdf')) {
     const assets = deckAssets(deps.appDataDir, record.deck);

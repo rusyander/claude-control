@@ -35,7 +35,7 @@ export function DataMaskRow({ platform, mask, onChange }: Props) {
   const reason = mask.reason === 'chosen' ? chosen : t(`platform.dataMaskReason.${mask.reason}`);
 
   return (
-    <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+    <Stack direction="row" align="start" gap="var(--spacing-xs)" className={styles.toggleRow}>
       <Toggle
         checked={mask.on}
         onCheckedChange={(checked) => onChange({ ...platform, dataMask: checked })}

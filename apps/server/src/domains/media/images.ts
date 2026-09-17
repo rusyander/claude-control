@@ -1,16 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import type {
-  MediaImage,
-  MediaImagePlan,
-  MediaImageBlocker,
-  Platform,
-} from '@agentdeck/contracts';
+import type { MediaImage, MediaImagePlan, MediaImageBlocker, Platform } from '@agentdeck/contracts';
 import { MEDIA_SVG_MIME } from '@agentdeck/contracts/media';
 import { checkPicture } from '@agentdeck/contracts/media-block';
 import { createCaFetch, type PlatformFetch } from '../platform/ca-fetch.ts';
 import { driverOf } from '../platform/drivers/index.ts';
-import { contourHeaders, contourUrl } from '../platform/transport.ts';
-import { readToken } from '../platform/store.ts';
 import { readEndpointToken } from '../endpoints.ts';
 import { promptText } from '../prompts.ts';
 import { decodeBase64Image, decodeDataUrl } from './decode.ts';
@@ -20,6 +13,7 @@ import {
   activeContour,
   askUpstream,
   EXCERPT,
+  gatewayUrl,
   isRecord,
   ownProfiles,
   readCapped,
@@ -44,7 +38,12 @@ import {
  *   2. отдельная ручка картинок OpenAI-вида у контура (`images: { api }`) —
  *      адрес складывается из адреса контура и пути, ОБЪЯВЛЕННОГО манифестом, как
  *      и адрес списка моделей. Модель — только объявившая рисование в каталоге
- *      ключа; нет такой — поле не шлётся, и выбирает сама ручка;
+ *      ключа; нет такой — поле не шлётся, и выбирает сама ручка. С 17.09.2026 и
+ *      эта дорога идёт ЧЕРЕЗ СВОЙ ШЛЮЗ (`gateway/images.ts`): до того она шла
+ *      напрямую ключом контура, и рисунок корпоративным ключом не оставлял ни
+ *      следа, ни расхода, ни защиты данных (решение владельца). Ни один
+ *      встроенный драйвер её не объявляет — включает её только путь ручки,
+ *      вписанный в манифест;
  *   3. свой эндпоинт человека (решение В4) — адрес объявлен ПОЛЕМ профиля.
  *      Угадывать его из `baseUrl` нельзя: совместимый сервер вправе не иметь
  *      этой ручки вовсе, и угаданный адрес дал бы 404 вместо честного «адрес не
@@ -202,6 +201,11 @@ function contourPlan(deps: MediaDeps, contour: Platform): MediaImagePlan {
     };
   }
 
+  // Ручка контура — тоже через свой шлюз: погашенный шлюз запирает её той же
+  // причиной, что и дорогу «частью ответа».
+  const imagesPort = deps.gatewayPort?.() ?? 0;
+  if (imagesPort <= 0) return blocked('gateway-off', contour.title, drawing?.id ?? '', false);
+
   return {
     available: true,
     source: 'contour-images',
@@ -296,10 +300,44 @@ export function savePicture(
 }
 
 /**
+ * Очередь рисования на каталог данных панели: один запрос наверх за раз.
+ *
+ * Справка обещает «второй запрос ждёт первого», а держала это обещание только
+ * погашенная кнопка ОДНОЙ страницы: две вкладки, телефон или `curl` рядом с
+ * панелью заказывали два рисунка разом — два списания с ключа (ревью Т9,
+ * MINOR 8). Ключ — каталог данных, а не процесс: в тестах панелей несколько, и
+ * общая очередь сцепила бы чужие прогоны.
+ */
+const drawQueues = new Map<string, Promise<unknown>>();
+
+/**
  * Нарисовать и сохранить. Возвращает запись; байты уходят на диск и в ответ
  * не попадают — карточка забирает их отдельным запросом, как файл.
  */
-export async function generateImage(
+export function generateImage(
+  deps: MediaDeps,
+  request: { chatId: string; prompt: string },
+): Promise<MediaImage> {
+  const key = deps.appDataDir;
+  const before = drawQueues.get(key) ?? Promise.resolve();
+  // Отказ предыдущего — не причина отказать следующему: ждём его конца, каким
+  // бы он ни был. План спрашивается уже В СВОЮ очередь — за минуты ожидания
+  // контур могли выключить.
+  const turn = before.then(
+    () => drawNow(deps, request),
+    () => drawNow(deps, request),
+  );
+  const settled = turn.catch(() => undefined);
+  drawQueues.set(key, settled);
+  // Хвост очереди убирается за собой: иначе карта держала бы по записи на
+  // каждый каталог, где хоть раз рисовали.
+  void settled.then(() => {
+    if (drawQueues.get(key) === settled) drawQueues.delete(key);
+  });
+  return turn;
+}
+
+async function drawNow(
   deps: MediaDeps,
   request: { chatId: string; prompt: string },
 ): Promise<MediaImage> {
@@ -410,7 +448,13 @@ async function viaImagesApi(
   const target =
     source === 'contour-images' ? contourImagesTarget(deps) : endpointImagesTarget(deps);
 
-  const fetchImpl = deps.fetchImpl ?? createCaFetch(target.caCertPath);
+  // До своего шлюза корневой сертификат компании отношения не имеет: его знает
+  // шлюз, который и ходит в контур.
+  const fetchImpl =
+    deps.fetchImpl ??
+    (source === 'contour-images'
+      ? (globalThis.fetch as PlatformFetch)
+      : createCaFetch(target.caCertPath));
   const response = await ask(fetchImpl, target.url, target.headers, {
     ...(model ? { model } : {}),
     prompt,
@@ -438,14 +482,11 @@ function contourImagesTarget(deps: MediaDeps): {
   if (!contour) throw new MediaError(409, REFUSAL['no-route'], 'no-route');
   const { images } = driverOf(contour);
   if (typeof images !== 'object') throw new MediaError(409, REFUSAL['driver-none'], 'driver-none');
-  const url = contourUrl(contour, images.api);
-  if (!url) throw new MediaError(409, REFUSAL['no-route'], 'no-route');
-  const token = readToken(deps.appDataDir, contour.id) ?? '';
-  return {
-    url,
-    headers: contourHeaders(contour, token),
-    caCertPath: contour.caCertPath,
-  };
+  // Ключа здесь нет и не будет: адрес — свой шлюз, ключ контура подставляет он
+  // (`gateway/images.ts`), и там же след, расход, защита данных и перевод отказов.
+  const url = gatewayUrl(deps, contour, 'v1/images/generations');
+  if (!url) throw new MediaError(409, REFUSAL['gateway-off'], 'gateway-off');
+  return { url, headers: {}, caCertPath: '' };
 }
 
 function endpointImagesTarget(deps: MediaDeps): {

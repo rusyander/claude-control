@@ -1,6 +1,6 @@
 import { readdirSync, statSync, existsSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, extname, basename, resolve, sep } from 'node:path';
-import { homedir } from 'node:os';
+import { panelHomeDir } from '../../lib/brand.mjs';
 import type { Artifact } from '@agentdeck/contracts';
 
 /**
@@ -131,7 +131,7 @@ export function chatDirectory(chatId: string, create = true): string {
 
 /** Корень песочницы — папки чатов, заведённых в самой панели. */
 export function sandboxRoot(): string {
-  return join(homedir(), '.agentdeck', 'chats');
+  return join(panelHomeDir(), 'chats');
 }
 
 /**

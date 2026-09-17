@@ -58,20 +58,34 @@ const KEEP_DRAFTS = 20;
 /** Идентификатор прогона = имя файла: диапазон сужен так же, как у групп. */
 const RUN_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
-/** Поля, которые принадлежат ПРОГОНУ, а не описанию кейса. */
-type RunOwned = Pick<
-  ProjectTestCase,
-  | 'status'
-  | 'statusId'
-  | 'note'
-  | 'lastRunAt'
-  | 'lastRunId'
-  | 'attachments'
-  | 'defects'
-  | 'muted'
-  | 'muteReason'
-  | 'archived'
->;
+/**
+ * Поля, которые принадлежат ПРОГОНУ, а не описанию кейса. Приёмка `update`
+ * берёт их с диска, а не из предложения агента. Список экспортируется: карточка
+ * агента панели обязана показать ровно то, что ляжет, а не поля, которые
+ * приёмка молча выбросит.
+ */
+export const RUN_OWNED_FIELDS = [
+  'status',
+  'statusId',
+  'note',
+  'lastRunAt',
+  'lastRunId',
+  'attachments',
+  'defects',
+  'muted',
+  'muteReason',
+  'archived',
+] as const satisfies readonly (keyof ProjectTestCase)[];
+
+/** Что приёмка `add` сбрасывает: результат прогона черновиком не приезжает. */
+export const DRAFT_ADD_RESET_FIELDS = [
+  'status',
+  'note',
+  'lastRunAt',
+  'lastRunId',
+] as const satisfies readonly (typeof RUN_OWNED_FIELDS)[number][];
+
+type RunOwned = Pick<ProjectTestCase, (typeof RUN_OWNED_FIELDS)[number]>;
 
 /** Путь файла черновика внутри `.agent/tests/`. */
 export function draftRelativePath(runId: string): string {

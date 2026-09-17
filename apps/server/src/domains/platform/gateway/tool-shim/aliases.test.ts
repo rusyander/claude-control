@@ -2,6 +2,8 @@ import type { DlpRule } from '@agentdeck/contracts';
 import { describe, expect, it } from 'vitest';
 import { AliasVault, maskText } from '../../../dlp/mask.ts';
 import { ResponseStreamFilter, restoreJsonResponse } from '../../../dlp/response-filter.ts';
+import { enterprisePlatformDriver } from '../../drivers/enterprise-platform.ts';
+import { StreamTranslator } from '../frames.ts';
 import { expandContourAliases, strayAliases } from './aliases.ts';
 
 /**
@@ -59,7 +61,7 @@ const RULES: DlpRule[] = [
 
 /** Аргументы `Write`, в которых лежат все четыре вида сразу. */
 const SECRETS = {
-  email: 'ivanov@platform.example.com',
+  email: 'ivanov@example.com',
   ip: '10.1.2.3',
   uuid: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
   path: 'C:\\Users\\rusyander',
@@ -171,6 +173,60 @@ describe('метки защиты данных внутри вызова', () =>
     const restored = event.choices[0]!.delta.tool_calls[0]!.function.arguments;
     expect(JSON.parse(restored)).toEqual(ORIGINAL);
   });
+
+  /**
+   * Весь путь, а не стык (ревью Т5, m15): вызов СОБИРАЕТ прослойка из текста
+   * модели (`StreamTranslator`), а метки разворачивает граница шлюза
+   * (`ResponseStreamFilter`) — в том порядке, в каком их соединяет конвейер.
+   * Кадр вызова здесь не написан руками: его синтезирует сам переводчик.
+   */
+  it.each(['anthropic', 'openai-compat'] as const)(
+    'поток %s: вызов, синтезированный прослойкой, возвращает значения байт в байт',
+    (dialect) => {
+      const { args, vault } = maskedArguments();
+      const translator = new StreamTranslator({
+        driver: enterprisePlatformDriver,
+        dialect,
+        model: 'qwen',
+        includeUsage: false,
+        shim: { allowed: new Set(['Write']), aliases: vault.reverse() },
+      });
+      const restore = new ResponseStreamFilter(dialect, vault.reverse());
+      const upstream = (payload: unknown): string => `data: ${JSON.stringify(payload)}\n\n`;
+      const content = `<tool_call>${JSON.stringify({ name: 'Write', arguments: args })}</tool_call>`;
+
+      const out =
+        restore.push(
+          translator.push(
+            upstream({
+              id: 'c1',
+              object: 'chat.completion.chunk',
+              model: 'qwen',
+              choices: [{ index: 0, delta: { content }, finish_reason: 'stop' }],
+            }) + 'data: [DONE]\n\n',
+          ),
+        ) +
+        restore.push(translator.end()) +
+        restore.end();
+
+      expect(translator.facts.toolCalls).toBe(1);
+      expect(translator.facts.maskStop).toEqual([]);
+      expect(out).not.toMatch(/\[(ПОЧТА|IP|UUID|ПУТЬ)_\d/u);
+      const pieces: string[] = [];
+      for (const line of out.split('\n')) {
+        if (!line.startsWith('data: {')) continue;
+        const event = JSON.parse(line.slice('data: '.length)) as {
+          delta?: { type?: string; partial_json?: string };
+          choices?: { delta?: { tool_calls?: { function?: { arguments?: string } }[] } }[];
+        };
+        if (event.delta?.type === 'input_json_delta') pieces.push(event.delta.partial_json ?? '');
+        for (const call of event.choices?.[0]?.delta?.tool_calls ?? []) {
+          pieces.push(call.function?.arguments ?? '');
+        }
+      }
+      expect(JSON.parse(pieces.join(''))).toEqual(ORIGINAL);
+    },
+  );
 
   it('выданные метки остановкой не считаются', () => {
     const { args, vault } = maskedArguments();

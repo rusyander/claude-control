@@ -31,8 +31,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
  */
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -112,19 +112,19 @@ describe('расход одного ответа', () => {
   });
 
   it('модель без цены в деньги НЕ переводится и названа поимённо', () => {
-    const day = addToDay(emptyDay(), delta({ model: 'enterprise-platform-corp-l' }), LOOKUP);
+    const day = addToDay(emptyDay(), delta({ model: 'company-corp-l' }), LOOKUP);
     expect(day.money.usd).toBe(0);
     expect(day.money.pricedTokens).toBe(0);
     expect(day.money.unpricedTokens).toBe(1_000_000);
-    expect(day.money.unpricedModels).toEqual(['enterprise-platform-corp-l']);
+    expect(day.money.unpricedModels).toEqual(['company-corp-l']);
     // Токены при этом посчитаны: расход есть, неизвестна только его цена.
     expect(day.totalTokens).toBe(1_000_000);
   });
 
   it('одна и та же модель без цены не повторяется в списке', () => {
-    let day = addToDay(emptyDay(), delta({ model: 'enterprise-platform-corp-l' }), LOOKUP);
-    day = addToDay(day, delta({ model: 'enterprise-platform-corp-l' }), LOOKUP);
-    expect(day.money.unpricedModels).toEqual(['enterprise-platform-corp-l']);
+    let day = addToDay(emptyDay(), delta({ model: 'company-corp-l' }), LOOKUP);
+    day = addToDay(day, delta({ model: 'company-corp-l' }), LOOKUP);
+    expect(day.money.unpricedModels).toEqual(['company-corp-l']);
   });
 
   // Найдено враждебным ревью Т8: имя модели приходит из тела запроса КЛИЕНТА,
@@ -157,7 +157,7 @@ describe('расход одного ответа', () => {
 
 describe('запись контура', () => {
   it('расход ложится в свой день, а дни держатся по возрастанию', () => {
-    let record = emptySpend('enterprise-platform-dev');
+    let record = emptySpend('company-dev');
     record = addSpend(record, delta(), new Date(2026, 8, 10), LOOKUP);
     // Часы могли отъехать назад (перевод времени, правка системных часов):
     // «вчерашняя» запись обязана встать перед сегодняшней, а не в конец.
@@ -169,7 +169,7 @@ describe('запись контура', () => {
   });
 
   it('дней хранится ограниченное число — учёт не архив', () => {
-    let record = emptySpend('enterprise-platform-dev');
+    let record = emptySpend('company-dev');
     for (let index = 0; index < SPEND_DAYS_KEPT + 5; index += 1) {
       record = addSpend(record, delta(), new Date(2026, 0, 1 + index), LOOKUP);
     }
@@ -179,14 +179,14 @@ describe('запись контура', () => {
   });
 
   it('сумма дней складывает деньги и собирает все модели без цены', () => {
-    let record = emptySpend('enterprise-platform-dev');
+    let record = emptySpend('company-dev');
     record = addSpend(record, delta(), new Date(2026, 8, 9), LOOKUP);
-    record = addSpend(record, delta({ model: 'enterprise-platform-corp-l' }), new Date(2026, 8, 10), LOOKUP);
+    record = addSpend(record, delta({ model: 'company-corp-l' }), new Date(2026, 8, 10), LOOKUP);
 
     const total = sumDays(record.days);
     expect(total.requests).toBe(2);
     expect(total.money.usd).toBe(3);
-    expect(total.money.unpricedModels).toEqual(['enterprise-platform-corp-l']);
+    expect(total.money.unpricedModels).toEqual(['company-corp-l']);
     // Токены модели без цены в деньги НЕ вошли — ровно как у контура, который
     // модель без цены тоже не списывает.
     expect(total.money.pricedTokens).toBe(1_000_000);
@@ -216,7 +216,7 @@ describe('итог по бюджету', () => {
    * контур тарифицирует по ценам своего реестра.
    */
   const record = (usd: number): PlatformSpendRecord => ({
-    platformId: 'enterprise-platform-dev',
+    platformId: 'company-dev',
     days: [
       {
         ...dayOf('2026-09-10'),
@@ -254,7 +254,7 @@ describe('итог по бюджету', () => {
 
   it('период считается от названного дня — расход до него в бюджет не входит', () => {
     const spend: PlatformSpendRecord = {
-      platformId: 'enterprise-platform-dev',
+      platformId: 'company-dev',
       days: [
         {
           ...dayOf('2026-08-31'),
@@ -316,19 +316,19 @@ describe('снятие отметки «исчерпан»', () => {
 
   it('снимает отметку и говорит, что снимать было что', () => {
     const store = storeOf({
-      platformId: 'enterprise-platform-dev',
+      platformId: 'company-dev',
       days: [],
       exhaustedAt: '2026-09-10T10:00:00.000Z',
       exhaustedScope: 'key',
     });
-    expect(clearExhausted(store, 'enterprise-platform-dev')).toBe(true);
+    expect(clearExhausted(store, 'company-dev')).toBe(true);
     // Снимается вся отметка: оставшийся scope всплыл бы у следующего отказа.
-    expect(store.read()['enterprise-platform-dev']).toEqual({ platformId: 'enterprise-platform-dev', days: [] });
+    expect(store.read()['company-dev']).toEqual({ platformId: 'company-dev', days: [] });
   });
 
   it('снимать нечего — запись не трогается вовсе', () => {
-    const store = storeOf({ platformId: 'enterprise-platform-dev', days: [] });
-    expect(clearExhausted(store, 'enterprise-platform-dev')).toBe(false);
+    const store = storeOf({ platformId: 'company-dev', days: [] });
+    expect(clearExhausted(store, 'company-dev')).toBe(false);
     expect(clearExhausted(store, 'нет-такого')).toBe(false);
   });
 });
@@ -336,7 +336,7 @@ describe('снятие отметки «исчерпан»', () => {
 describe('расход для экрана', () => {
   it('дни отдаются целиком, а период — суммой: это разные вопросы', () => {
     const spend: PlatformSpendRecord = {
-      platformId: 'enterprise-platform-dev',
+      platformId: 'company-dev',
       days: [
         {
           ...dayOf('2026-08-31'),

@@ -64,18 +64,18 @@ The AI features (form assistant, skill generator, chat) shell out to the `claude
 
 Everything is under your home directory. The panel creates no files inside the repository.
 
-| Path                                  | Access        | What it is                                                  |
-| ------------------------------------- | ------------- | ----------------------------------------------------------- |
-| `~/.claude/CLAUDE.md`                 | read / write  | Rules                                                       |
-| `~/.claude/settings.json`             | read / write  | Hooks, permissions, env                                     |
-| `~/.claude/settings.local.json`       | read / write  | The same, personal — tagged "local"                         |
-| `~/.claude/skills/`                   | read / write  | Skills                                                      |
-| `~/.claude/skills-disabled/`          | read / write  | Disabled skills                                             |
-| `~/.claude/hooks/`                    | read / write  | Hook scripts                                                |
-| `~/.claude.json`                      | read / write  | MCP servers, account (note: _beside_ `.claude`, not inside) |
-| `~/.claude/.mcp-secrets.env`          | read / write  | MCP secrets                                                 |
-| `~/.claude/projects/`                 | **read only** | Transcripts — the source for chat and analytics             |
-| `~/.claude/.credentials.json`         | **read only** | Copied into a sandbox so the CLI is logged in               |
+| Path                             | Access        | What it is                                                  |
+| -------------------------------- | ------------- | ----------------------------------------------------------- |
+| `~/.claude/CLAUDE.md`            | read / write  | Rules                                                       |
+| `~/.claude/settings.json`        | read / write  | Hooks, permissions, env                                     |
+| `~/.claude/settings.local.json`  | read / write  | The same, personal — tagged "local"                         |
+| `~/.claude/skills/`              | read / write  | Skills                                                      |
+| `~/.claude/skills-disabled/`     | read / write  | Disabled skills                                             |
+| `~/.claude/hooks/`               | read / write  | Hook scripts                                                |
+| `~/.claude.json`                 | read / write  | MCP servers, account (note: _beside_ `.claude`, not inside) |
+| `~/.claude/.mcp-secrets.env`     | read / write  | MCP secrets                                                 |
+| `~/.claude/projects/`            | **read only** | Transcripts — the source for chat and analytics             |
+| `~/.claude/.credentials.json`    | **read only** | Copied into a sandbox so the CLI is logged in               |
 | `~/.claude/agentdeck/state.json` | read / write  | The panel's own state: groups, automations, settings        |
 | `~/.claude/agentdeck/backups/`   | write         | Timestamped backups                                         |
 | `~/.agentdeck/chats/`            | read / write  | Working folders for chats started in the panel              |

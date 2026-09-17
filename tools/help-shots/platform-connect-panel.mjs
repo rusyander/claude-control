@@ -9,9 +9,9 @@
  * Сценарии идут путём человека, потому что каждый опирается на состояние,
  * оставленное предыдущим: подключение → активация с пробным запросом →
  * маршрут → правила → агент → режимы → сценарный контур → удаление.
- * Живой контур — локальный стенд платформа компании через `kubectl port-forward
- * svc/inst-api 5300:8080`, ключ из `~/.agentdeck/enterprise-platform-credentials.env`
- * (не печатается). Сценарный — `tools/qa/stub-platform.mjs` (см.
+ * Живой контур — локальный стенд платформы компании через `kubectl port-forward
+ * svc/inst-api 5300:8080`, ключ — файлом из
+ * `PLATFORM_STAND_KEY_FILE` / `PLATFORM_STAND_KEY_VAR` (не печатается). Сценарный — `tools/qa/stub-platform.mjs` (см.
  * `platform-scripted-panel.mjs`, зачем он и что в нём подменено).
  *
  * `finish()` зовётся только после ПОЛНОСТЬЮ удачной съёмки: он удаляет кадры
@@ -19,7 +19,7 @@
  * стёрла бы честные кадры прошлой.
  *
  * Запуск: node tools/help-shots/platform-connect-panel.mjs   (GUIDE_LANG=en — английские)
- * Переменные: ENTERPRISE_PLATFORM_API, ENTERPRISE_PLATFORM_MODEL, GUIDE_PANEL_PORT, GUIDE_WEB_PORT, GUIDE_STUB_PORT,
+ * Переменные: PLATFORM_API, PLATFORM_MODEL, PLATFORM_STAND_KEY_FILE, PLATFORM_STAND_KEY_VAR, GUIDE_PANEL_PORT, GUIDE_WEB_PORT, GUIDE_STUB_PORT,
  * GUIDE_HEADED=1; отладка упавшей съёмки — GUIDE_KEEP, GUIDE_REUSE, GUIDE_STEPS (ниже).
  */
 import { spawn } from 'node:child_process';
@@ -40,7 +40,7 @@ import {
 } from './platform-stand-panel.mjs';
 import { shootScripted } from './platform-scripted-panel.mjs';
 
-const CONTOUR_URL = process.env.ENTERPRISE_PLATFORM_API ?? 'http://127.0.0.1:5300';
+const CONTOUR_URL = process.env.PLATFORM_API ?? 'http://127.0.0.1:5300';
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5192);
 const WEB_PORT = Number(process.env.GUIDE_WEB_PORT ?? 8899);
 const PANEL = `http://127.0.0.1:${PANEL_PORT}`;

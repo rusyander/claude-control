@@ -17,6 +17,7 @@ import { registerModelRoutes } from '../routes/model-routes.ts';
 import { registerEndpointRoutes } from '../routes/endpoint-routes.ts';
 import { registerProviderCheckRoutes } from '../routes/provider-check-routes.ts';
 import { registerProviderPreviewRoutes } from '../routes/provider-preview-routes.ts';
+import { registerConfigPreviewRoutes } from '../routes/config-preview-routes.ts';
 import { registerProviderCompareRoutes } from '../routes/provider-compare-routes.ts';
 import { registerFormatCheckRoutes } from '../routes/format-check-routes.ts';
 import { registerPluginRoutes } from '../routes/plugin-routes.ts';
@@ -50,6 +51,9 @@ import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
 import { registerPromptRoutes } from '../routes/prompt-routes.ts';
 import { registerRemoteRoutes } from '../routes/remote-routes.ts';
 import { registerEventsRoutes } from '../routes/events-routes.ts';
+import { registerPanelAgentRoutes } from '../routes/panel-agent/panel-agent-routes.ts';
+import { registerPanelAgentRunRoutes } from '../routes/panel-agent/run-routes.ts';
+import type { AccessGateDeps } from '../lib/access-gate.ts';
 import type { Runtime } from './runtime.ts';
 
 /**
@@ -58,7 +62,7 @@ import type { Runtime } from './runtime.ts';
  * тому, кому нужен долгоживущий объект, он подаётся замыканием — видно прямо
  * здесь, кто такой объект держит.
  */
-export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
+export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): RouteRegistrar[] {
   const {
     chatRuns,
     chatSession,
@@ -75,6 +79,7 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     platformGateway,
     notifyRun,
     events,
+    panelPending,
     selfBaseUrl,
   } = runtime;
 
@@ -97,6 +102,7 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     registerEndpointRoutes,
     registerProviderCheckRoutes,
     registerProviderPreviewRoutes,
+    registerConfigPreviewRoutes,
     registerProviderCompareRoutes,
     registerFormatCheckRoutes,
     registerPluginRoutes,
@@ -182,5 +188,19 @@ export function buildRouteTable(runtime: Runtime): RouteRegistrar[] {
     // Поток событий об изменениях файлов: подписчиков держит хаб, рассылку по
     // нему ведёт наблюдатель за конфигами.
     (instance, context) => registerEventsRoutes(instance, context, events),
+    // Агент панели: действия исполняются настоящими маршрутами через `inject`,
+    // поэтому ему нужен тот же гейт доступа (токен при удалённом доступе), а
+    // решению по карточке — список своих источников.
+    (instance, context) =>
+      registerPanelAgentRoutes(instance, context, { hub: events, pending: panelPending, access }),
+    // Ход агента: процесс `claude` с одним переходником. Адрес панели — тем же
+    // правилом, что у брокера прав чата; шлюз — живым портом, а не настройкой.
+    (instance, context) =>
+      registerPanelAgentRunRoutes(instance, context, {
+        selfBaseUrl: `http://127.0.0.1:${process.env.PORT ?? 5178}`,
+        gatewayPort: () =>
+          runtime.platformGateway.status().running ? runtime.platformGateway.status().port : 0,
+        pending: panelPending,
+      }),
   ];
 }

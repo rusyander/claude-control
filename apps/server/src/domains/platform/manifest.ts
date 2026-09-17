@@ -22,6 +22,7 @@ const WHY: Record<PlatformManifestField | 'manifest', string> = {
   nonStreamTimeoutSec: 'целое число секунд от 0 до 3600',
   responseCeilingSec: 'целое число секунд от 0 до 3600',
   thinkingField: 'поле на проводе: имена через точку, не больше пяти, без служебных имён объекта',
+  vendorPrefix: 'префикс полей: строчная латиница и цифры, первая — буква, до 32 знаков',
 };
 
 export function assertManifest(raw: unknown): void {

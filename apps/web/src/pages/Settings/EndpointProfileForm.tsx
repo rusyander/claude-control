@@ -13,6 +13,7 @@ import {
   useSaveEndpointToken,
   useClearEndpointToken,
 } from '@entities/Endpoint';
+import { endpointTokenAnchor } from '@entities/PanelAgent';
 import { SettingToggleRow } from './SettingToggleRow';
 import type { EndpointProfileFormProps } from './EndpointProfileForm.types';
 
@@ -115,7 +116,7 @@ export function EndpointProfileForm({
 
       <Stack gap="var(--spacing-2xs)">
         <Stack direction="row" align="end" gap="var(--spacing-xs)" wrap>
-          <Stack flex={1} minWidth="220px">
+          <Stack flex={1} minWidth="220px" data-agent-anchor={endpointTokenAnchor(profile.id)}>
             <TextField
               label={t('endpoints.token')}
               type="password"

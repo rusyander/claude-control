@@ -94,7 +94,7 @@ export function DlpTopic() {
               name: tr('actionBlock'),
               description: tr('actionBlockText'),
               isMono: false,
-              badge: '403',
+              badge: '400',
               badgeTone: 'danger',
             },
             {

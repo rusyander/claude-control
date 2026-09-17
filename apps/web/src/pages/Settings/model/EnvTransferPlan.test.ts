@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import type { EnvTransferPlanEntry, EnvTransferEntryStatus } from '../EnvTransfer.types';
+import type {
+  EnvTransferPlanEntry,
+  EnvTransferEntryStatus,
+  EnvTransferPromptEntry,
+} from '../EnvTransfer.types';
 import {
   defaultPlatformSelection,
+  defaultPromptSelection,
   defaultSelection,
   isAllSelected,
   selectableEntries,
@@ -60,6 +65,33 @@ describe('План разворота окружения', () => {
     }));
 
     expect(defaultPlatformSelection(entries)).toEqual(['новый']);
+  });
+
+  describe('промпты (ревью Т4, MINOR-4)', () => {
+    const prompt = (
+      id: string,
+      status: 'new' | 'same' | 'differs',
+      unknown = false,
+    ): EnvTransferPromptEntry => ({ id, status, bytes: 10, unknown });
+
+    it('отмечена только новая правка: свою перезаписывает человек сам', () => {
+      expect(
+        defaultPromptSelection([
+          prompt('image', 'new'),
+          prompt('presentation', 'differs'),
+          prompt('tool-protocol', 'same'),
+        ]),
+      ).toEqual(['image']);
+    });
+
+    it('промпт, которого эта панель не знает, не отмечается даже новым', () => {
+      // Записать такую правку некуда: отмеченная, она молча пропала бы при развороте.
+      expect(defaultPromptSelection([prompt('из-будущего', 'new', true)])).toEqual([]);
+    });
+
+    it('пустой план — пустой выбор', () => {
+      expect(defaultPromptSelection([])).toEqual([]);
+    });
   });
 
   it('размер архива показывается по-человечески', () => {

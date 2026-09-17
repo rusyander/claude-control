@@ -9,7 +9,11 @@ import {
   mediaDeckRequestSchema,
   type MediaDeckFormat,
 } from '@agentdeck/contracts/media-deck';
-import { deckBlockRequest, pictureBlockRequest } from '@agentdeck/contracts/media-block';
+import {
+  deckBlockRequest,
+  pictureBlockRequest,
+  PICTURE_MAX_CHARS,
+} from '@agentdeck/contracts/media-block';
 import type { ServerContext } from '../context.ts';
 import { generateImage, planImage, savePicture } from '../domains/media/images.ts';
 import type { MediaDeps } from '../domains/media/images.ts';
@@ -24,6 +28,40 @@ import { DECK_MIME } from '../domains/media/deck/store.ts';
 import { isMediaError } from '../domains/media/errors.ts';
 import { promptText } from '../domains/prompts.ts';
 import { assertId, readImageBytes, readImageRecord } from '../domains/media/store.ts';
+
+/**
+ * Потолок тела у приёма блоков агента. Рисунок меряется в ЗНАКАХ
+ * (`PICTURE_MAX_CHARS`), а Fastify по умолчанию режет тело на 1 МиБ — и законный
+ * рисунок с текстом не латиницей (кириллица — два байта на знак, иероглиф —
+ * три) умирал до проверки английским `Request body is too large` вместо отказа
+ * панели словами (ревью Т9, MINOR 7). Худший законный случай — каждый знак
+ * экранирован в JSON как `\uXXXX`, шесть байт, плюс описание и запас.
+ */
+const BLOCK_BODY_LIMIT = PICTURE_MAX_CHARS * 6 + 256 * 1024;
+
+/** Отказ по размеру тела — своими словами, а не фреймворка. */
+const BODY_TOO_LARGE = 'Блок слишком велик — панель такой не принимает.';
+
+/**
+ * Параметры маршрута приёма блока: поднятый потолок и перехват отказа по
+ * размеру. Тело больше потолка — заведомо больше любого законного рисунка, но и
+ * тогда человек (или телефон, `curl`) читает причину по-русски.
+ */
+const blockRoute = {
+  bodyLimit: BLOCK_BODY_LIMIT,
+  errorHandler: (
+    error: { code?: string; statusCode?: number },
+    _request: unknown,
+    reply: FastifyReply,
+  ) => {
+    if (error.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+      return reply
+        .code(413)
+        .send({ message: BODY_TOO_LARGE, messageCode: 'media-block-too-large' });
+    }
+    return reply.send(error);
+  },
+};
 
 /**
  * Картинки и презентации из чата: чем сделаем, сделать, отдать файлом.
@@ -55,9 +93,11 @@ export function registerMediaRoutes(
 
   const failed = (error: unknown, reply: FastifyReply): FastifyReply => {
     if (isMediaError(error)) {
-      return reply
-        .code(error.status)
-        .send({ message: error.message, ...(error.reason ? { reason: error.reason } : {}) });
+      return reply.code(error.status).send({
+        message: error.message,
+        ...(error.reason ? { reason: error.reason } : {}),
+        ...(error.messageCode ? { messageCode: error.messageCode, params: error.params } : {}),
+      });
     }
     return reply.code(500).send({
       message: `Не получилось: ${error instanceof Error ? error.message : String(error)}`,
@@ -89,7 +129,7 @@ export function registerMediaRoutes(
   });
 
   /** Рисунок из блока агента: панель его проверяет и кладёт файлом. */
-  app.post<{ Body: unknown }>('/api/media/images/block', (request, reply) => {
+  app.post<{ Body: unknown }>('/api/media/images/block', blockRoute, (request, reply) => {
     const parsed = mediaPictureBlockRequestSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
       return reply
@@ -107,7 +147,11 @@ export function registerMediaRoutes(
     try {
       const id = assertId(request.params.id);
       const record = readImageRecord(ctx.location.paths.appData, id);
-      if (!record) return reply.code(404).send({ message: 'Такой картинки у панели нет.' });
+      if (!record) {
+        return reply
+          .code(404)
+          .send({ message: 'Такой картинки у панели нет.', messageCode: 'media-image-not-found' });
+      }
       const bytes = readImageBytes(ctx.location.paths.appData, record);
       return (
         reply
@@ -151,7 +195,7 @@ export function registerMediaRoutes(
   });
 
   /** Колода из блока агента. */
-  app.post<{ Body: unknown }>('/api/media/decks/block', async (request, reply) => {
+  app.post<{ Body: unknown }>('/api/media/decks/block', blockRoute, async (request, reply) => {
     const parsed = mediaDeckBlockRequestSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
       return reply
@@ -170,7 +214,10 @@ export function registerMediaRoutes(
     async (request, reply) => {
       const format = request.params.format as MediaDeckFormat;
       if (!mediaDeckFormats.includes(format)) {
-        return reply.code(400).send({ message: 'Такого вида файла у презентации нет.' });
+        return reply.code(400).send({
+          message: 'Такого вида файла у презентации нет.',
+          messageCode: 'media-deck-format-unknown',
+        });
       }
       try {
         const { record, bytes } = await deckFile(deps(), request.params.id, format);
@@ -207,7 +254,11 @@ export function registerMediaRoutes(
     '/api/media/prompt',
     (request, reply) => {
       const topic = typeof request.body?.topic === 'string' ? request.body.topic.trim() : '';
-      if (!topic) return reply.code(400).send({ message: 'Опишите, что нужно.' });
+      if (!topic) {
+        return reply
+          .code(400)
+          .send({ message: 'Опишите, что нужно.', messageCode: 'media-topic-empty' });
+      }
 
       const appData = ctx.location.paths.appData;
       if (request.body?.kind === 'deck') {
@@ -220,7 +271,12 @@ export function registerMediaRoutes(
        */
       if (request.body?.kind === 'deck-revise') {
         const id = typeof request.body?.reviseOf === 'string' ? request.body.reviseOf.trim() : '';
-        if (!id) return reply.code(400).send({ message: 'Не сказано, какую презентацию править.' });
+        if (!id) {
+          return reply.code(400).send({
+            message: 'Не сказано, какую презентацию править.',
+            messageCode: 'media-deck-revise-unspecified',
+          });
+        }
         try {
           return { prompt: deckRevisePrompt(deps(), id, topic) };
         } catch (error) {
@@ -230,7 +286,9 @@ export function registerMediaRoutes(
       if (request.body?.kind === 'picture') {
         return { prompt: pictureBlockRequest(promptText(appData, 'image-svg'), topic) };
       }
-      return reply.code(400).send({ message: 'Неизвестный вид просьбы.' });
+      return reply
+        .code(400)
+        .send({ message: 'Неизвестный вид просьбы.', messageCode: 'media-prompt-kind-unknown' });
     },
   );
 }

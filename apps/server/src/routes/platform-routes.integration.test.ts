@@ -30,8 +30,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
 const SECRET = 'CONTOUR-KEY-CORPORATE-4f21';
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -113,12 +113,12 @@ describe('platform routes: настройка контура', () => {
   it('сохранённый контур возвращается карточкой и переживает перезапуск панели', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: { settings: PLATFORM },
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json().platform.title).toBe('EnterprisePlatform · dev');
+    expect(res.json().platform.title).toBe('Company · dev');
     // Читаем с диска новым хранилищем: настройка легла в state.json, а не в память.
     expect(new AppStore(appData).getSettings().platforms).toHaveLength(1);
   });
@@ -126,7 +126,7 @@ describe('platform routes: настройка контура', () => {
   it('взаимное исключение правил (Т7) — отказ сохранения, а не тихая починка', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: {
         settings: {
           ...PLATFORM,
@@ -169,12 +169,12 @@ describe('platform routes: настройка контура', () => {
 
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
-      payload: { settings: { ...contradiction, title: 'EnterprisePlatform · prod' } },
+      url: '/api/platforms/company-dev',
+      payload: { settings: { ...contradiction, title: 'Company · prod' } },
     });
 
     expect(res.statusCode).toBe(200);
-    expect(store.getSettings().platforms[0]?.title).toBe('EnterprisePlatform · prod');
+    expect(store.getSettings().platforms[0]?.title).toBe('Company · prod');
     // И карточка кричит о противоречии — молча его панель не чинит.
     expect(res.json().conflicts.find((item: { id: string }) => item.id === 'tools')?.active).toBe(
       true,
@@ -194,7 +194,7 @@ describe('platform routes: настройка контура', () => {
 
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: { settings: { ...contradiction, toolShim: false } },
     });
 
@@ -205,7 +205,7 @@ describe('platform routes: настройка контура', () => {
   it('одна сторона исключения сохраняется как обычно', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: {
         settings: {
           ...PLATFORM,
@@ -222,11 +222,24 @@ describe('platform routes: настройка контура', () => {
     expect(store.getSettings().platforms[0]?.rules.platform.platformTools).toEqual(['web_search']);
   });
 
+  it('потребитель не из списка отклоняется на записи, а не хранится молча', async () => {
+    // Ревью Т3, MINOR 10: форма потребителя проверялась только разбором архива,
+    // а дверь записи принимала любую строку.
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/platforms/company-dev',
+      payload: { settings: { ...PLATFORM, consumers: ['chat', '../мусор'] } },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(store.getSettings().platforms).toHaveLength(0);
+  });
+
   it('сохранение не включает контур: тумблер — это активация, и она своя ручка', async () => {
     // Тело просит `enabled: true`, как это делала бы форма до Т2.
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: { settings: { ...PLATFORM, enabled: true } },
     });
 
@@ -243,9 +256,9 @@ describe('platform routes: настройка контура', () => {
 
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       // Форма правки названия присылает то, что показывала: выключённый контур.
-      payload: { settings: { ...PLATFORM, title: 'EnterprisePlatform · прод', enabled: false } },
+      payload: { settings: { ...PLATFORM, title: 'Company · прод', enabled: false } },
     });
 
     expect(res.statusCode).toBe(200);
@@ -257,8 +270,8 @@ describe('platform routes: настройка контура', () => {
   it('идентификатор в адресе и в теле обязаны совпадать: ключ лежит под старым', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
-      payload: { settings: { ...PLATFORM, id: 'enterprise-platform-prod' } },
+      url: '/api/platforms/company-dev',
+      payload: { settings: { ...PLATFORM, id: 'company-prod' } },
     });
 
     expect(res.statusCode).toBe(400);
@@ -268,7 +281,7 @@ describe('platform routes: настройка контура', () => {
   it('непрочитанный корневой сертификат — отказ при СОХРАНЕНИИ, с именем поля', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: {
         settings: {
           ...PLATFORM,
@@ -297,7 +310,7 @@ describe('platform routes: настройка контура', () => {
 
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: { settings: { ...PLATFORM, toolShim: true, contourPrompt: true, caCertPath: pem } },
     });
 
@@ -310,7 +323,7 @@ describe('platform routes: настройка контура', () => {
 
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: { settings: { ...PLATFORM, toolShim: true, contourPrompt: true, caCertPath: fake } },
     });
 
@@ -324,7 +337,7 @@ describe('platform routes: настройка контура', () => {
   it('ключ в лишних заголовках транспорта — 400 при сохранении, значение не отражается', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: {
         settings: {
           ...PLATFORM,
@@ -347,7 +360,7 @@ describe('platform routes: настройка контура', () => {
   it('негодное переопределение пресета — 400 с именем поля, контур не записан', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: { settings: { ...PLATFORM, manifest: { thinkingField: '__proto__.x' } } },
     });
 
@@ -359,7 +372,7 @@ describe('platform routes: настройка контура', () => {
   it('пресет и его переопределения сохраняются и читаются обратно', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: {
         settings: {
           ...PLATFORM,
@@ -376,9 +389,9 @@ describe('platform routes: настройка контура', () => {
   });
 
   // Живой прогон на Ollama (DRV-03): контур, сохранённый мимо мастера без полей
-  // прослойки, получал умолчание платформа компании, и включённая прослойка молча уводила
+  // прослойки, получал умолчание платформы компании, и включённая прослойка молча уводила
   // клиента Anthropic с родной ручки пресета на мост.
-  it('без полей прослойки и промпта умолчание берётся из пресета типа, а не платформа компании', async () => {
+  it('без полей прослойки и промпта умолчание берётся из пресета типа, а не платформы компании', async () => {
     const { toolShim: _shim, contourPrompt: _prompt, ...bare } = PLATFORM;
     for (const [driver, expected] of [
       ['ollama', false],
@@ -386,7 +399,7 @@ describe('platform routes: настройка контура', () => {
     ] as const) {
       const res = await app.inject({
         method: 'PUT',
-        url: '/api/platforms/enterprise-platform-dev',
+        url: '/api/platforms/company-dev',
         payload: { settings: { ...bare, driver } },
       });
       expect(res.statusCode, driver).toBe(200);
@@ -401,7 +414,7 @@ describe('platform routes: настройка контура', () => {
   it('ключ можно сохранить вместе с настройкой — мастер делает это одним нажатием', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: { settings: PLATFORM, token: SECRET },
     });
 
@@ -416,18 +429,18 @@ describe('platform routes: настройка контура', () => {
 
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
-      payload: { settings: { ...PLATFORM, title: 'EnterprisePlatform · prod' } },
+      url: '/api/platforms/company-dev',
+      payload: { settings: { ...PLATFORM, title: 'Company · prod' } },
     });
 
     expect(res.json().hasToken).toBe(true);
-    expect(res.json().platform.title).toBe('EnterprisePlatform · prod');
+    expect(res.json().platform.title).toBe('Company · prod');
   });
 
   it('ключ не строкой рядом с настройкой — 400, и настройка не сохранена', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: { settings: PLATFORM, token: 42 },
     });
 
@@ -441,7 +454,7 @@ describe('platform routes: настройка контура', () => {
     // человек отдельно от ключа не просил.
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: { settings: PLATFORM, token: 'x'.repeat(9_000) },
     });
 
@@ -453,7 +466,7 @@ describe('platform routes: настройка контура', () => {
   it('слишком короткий ключ отклонён: чистка чужого текста его бы не поймала', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev',
+      url: '/api/platforms/company-dev',
       payload: { settings: PLATFORM, token: 'sk-live' },
     });
 
@@ -463,7 +476,7 @@ describe('platform routes: настройка контура', () => {
   });
 
   it('идентификатор с пробелом или слэшем отклонён: из него собирается адрес шлюза', async () => {
-    for (const id of ['enterprise-platform dev', 'enterprise-platform/dev', '../etc']) {
+    for (const id of ['company dev', 'company/dev', '../etc']) {
       const res = await app.inject({
         method: 'PUT',
         url: `/api/platforms/${encodeURIComponent(id)}`,
@@ -478,14 +491,17 @@ describe('platform routes: настройка контура', () => {
   it('удаление уносит контур; повторное удаление — 404 с его именем', async () => {
     writePlatform(store, PLATFORM);
 
-    const first = await app.inject({ method: 'DELETE', url: '/api/platforms/enterprise-platform-dev' });
+    const first = await app.inject({ method: 'DELETE', url: '/api/platforms/company-dev' });
     expect(first.statusCode).toBe(200);
     expect(first.json().platforms).toEqual([]);
 
-    const second = await app.inject({ method: 'DELETE', url: '/api/platforms/enterprise-platform-dev' });
+    const second = await app.inject({ method: 'DELETE', url: '/api/platforms/company-dev' });
     expect(second.statusCode).toBe(404);
     expect(second.json().code).toBe('platform_not_found');
-    expect(second.json().message).toContain('enterprise-platform-dev');
+    expect(second.json().message).toContain('company-dev');
+    // Код текста рядом с русской строкой: английский интерфейс переводит его.
+    expect(second.json().messageCode).toBe('platform-not-found');
+    expect(second.json().params).toEqual({ id: 'company-dev' });
   });
 
   it('несуществующий контур — 404 на каждом маршруте, который его требует', async () => {
@@ -541,7 +557,7 @@ describe('platform routes: настройка контура', () => {
 
     const res = await app.inject({
       method: 'PUT',
-      url: '/api/platforms/enterprise-platform-dev/token',
+      url: '/api/platforms/company-dev/token',
       payload: { token: 42 },
     });
 
@@ -554,7 +570,7 @@ describe('platform routes: проверка связи', () => {
   it('проба запоминается и приезжает в следующем списке', async () => {
     writePlatform(store, PLATFORM);
 
-    const check = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/check' });
+    const check = await app.inject({ method: 'POST', url: '/api/platforms/company-dev/check' });
     expect(check.statusCode).toBe(200);
     expect(check.json().outcome).toBe('ok');
     expect(calls).toEqual(['https://api.dev.example.ru/v1/models']);
@@ -567,7 +583,7 @@ describe('platform routes: проверка связи', () => {
     writePlatform(store, PLATFORM);
     vi.stubGlobal('fetch', () => Promise.reject(new Error('ECONNREFUSED')));
 
-    const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/check' });
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/company-dev/check' });
 
     expect(res.statusCode).toBe(200);
     expect(res.json().outcome).toBe('unreachable');
@@ -577,7 +593,7 @@ describe('platform routes: проверка связи', () => {
   it('выключенный контур проверяется по кнопке: мастер проверяет ДО включения', async () => {
     writePlatform(store, { ...PLATFORM, enabled: false });
 
-    const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/check' });
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/company-dev/check' });
 
     expect(res.json().outcome).toBe('ok');
   });
@@ -590,7 +606,7 @@ describe('platform routes: проверка связи', () => {
  * читается как «удалить контур с таким именем».
  */
 describe('platform routes: активность контура (Т2)', () => {
-  const SECOND: Platform = { ...PLATFORM, id: 'enterprise-platform-prod', title: 'EnterprisePlatform · прод' };
+  const SECOND: Platform = { ...PLATFORM, id: 'company-prod', title: 'Company · прод' };
 
   /** Управляемый профиль прежнего контура: по нему видно, что откат случился. */
   const managedProfile = (platformId: string): EndpointProfile => ({
@@ -612,19 +628,19 @@ describe('platform routes: активность контура (Т2)', () => {
       endpointProfiles: [managedProfile(PLATFORM.id)],
     });
 
-    const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-prod/activate' });
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/company-prod/activate' });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json().activePlatformId).toBe('enterprise-platform-prod');
-    expect(res.json().previousPlatformId).toBe('enterprise-platform-dev');
+    expect(res.json().activePlatformId).toBe('company-prod');
+    expect(res.json().previousPlatformId).toBe('company-dev');
     // Прежний контур не просто помечен неактивным: его применение снято, и
     // профиль, смотревший в шлюз, ушёл вместе с ним.
     expect(res.json().rollback.profileRemoved).toBe(true);
     expect(store.getSettings().endpointProfiles).toEqual([]);
-    expect(store.getSettings().activePlatformId).toBe('enterprise-platform-prod');
+    expect(store.getSettings().activePlatformId).toBe('company-prod');
     expect(store.getSettings().platforms.map((item) => [item.id, item.enabled])).toEqual([
-      ['enterprise-platform-dev', false],
-      ['enterprise-platform-prod', true],
+      ['company-dev', false],
+      ['company-prod', true],
     ]);
   });
 
@@ -636,11 +652,11 @@ describe('platform routes: активность контура (Т2)', () => {
     writePlatform(store, PLATFORM);
     expect(store.getSettings().platformGateway.enabled).toBe(false);
 
-    const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/activate' });
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/company-dev/activate' });
 
     expect(res.statusCode).toBe(200);
     expect(res.json().probe.outcome).toBe('ok');
-    expect(store.getSettings().activePlatformId).toBe('enterprise-platform-dev');
+    expect(store.getSettings().activePlatformId).toBe('company-dev');
     expect(store.getSettings().platformGateway.enabled).toBe(true);
     expect(gateway.status().running).toBe(true);
     // Пробный запрос дошёл до шлюза и дальше до контура: причина — не «шлюз не поднят».
@@ -678,7 +694,7 @@ describe('platform routes: активность контура (Т2)', () => {
       endpointProfiles: [managedProfile(PLATFORM.id)],
     });
 
-    const res = await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/deactivate' });
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/company-dev/deactivate' });
 
     expect(res.statusCode).toBe(200);
     expect(res.json().profileRemoved).toBe(true);
@@ -706,11 +722,11 @@ describe('platform routes: активность контура (Т2)', () => {
     store.setPlatformActivationNotice({
       activatedId: PLATFORM.id,
       activatedTitle: PLATFORM.title,
-      others: ['EnterprisePlatform · прод'],
+      others: ['Company · прод'],
     });
 
     const before = await app.inject({ method: 'GET', url: '/api/platforms' });
-    expect(before.json().activationNotice.others).toEqual(['EnterprisePlatform · прод']);
+    expect(before.json().activationNotice.others).toEqual(['Company · прод']);
 
     const res = await app.inject({ method: 'DELETE', url: '/api/platforms/activation-notice' });
 
@@ -733,17 +749,17 @@ describe('инвариант 1: ни один ответ раздела не с�
     const answers = [
       await app.inject({
         method: 'PUT',
-        url: '/api/platforms/enterprise-platform-dev/token',
+        url: '/api/platforms/company-dev/token',
         payload: { token: SECRET },
       }),
       await app.inject({ method: 'GET', url: '/api/platforms' }),
       await app.inject({
         method: 'PUT',
-        url: '/api/platforms/enterprise-platform-dev',
-        payload: { settings: { ...PLATFORM, title: 'EnterprisePlatform · prod' } },
+        url: '/api/platforms/company-dev',
+        payload: { settings: { ...PLATFORM, title: 'Company · prod' } },
       }),
-      await app.inject({ method: 'POST', url: '/api/platforms/enterprise-platform-dev/check' }),
-      await app.inject({ method: 'DELETE', url: '/api/platforms/enterprise-platform-dev' }),
+      await app.inject({ method: 'POST', url: '/api/platforms/company-dev/check' }),
+      await app.inject({ method: 'DELETE', url: '/api/platforms/company-dev' }),
     ];
 
     for (const res of answers) {
@@ -1021,7 +1037,7 @@ describe('platform routes: расход и бюджет (Т8)', () => {
     writePlatform(store, { ...PLATFORM, budgetSince: '2026-09-10' });
     seedSpend();
 
-    const res = await app.inject({ method: 'GET', url: '/api/platforms/enterprise-platform-dev/spend' });
+    const res = await app.inject({ method: 'GET', url: '/api/platforms/company-dev/spend' });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.days).toHaveLength(2);
@@ -1033,7 +1049,7 @@ describe('platform routes: расход и бюджет (Т8)', () => {
   it('расхода ещё не было — ноль, а не отказ', async () => {
     writePlatform(store, PLATFORM);
     const body = (
-      await app.inject({ method: 'GET', url: '/api/platforms/enterprise-platform-dev/spend' })
+      await app.inject({ method: 'GET', url: '/api/platforms/company-dev/spend' })
     ).json();
     expect(body.days).toEqual([]);
     expect(body.budget.exhausted).toBe(false);
@@ -1057,7 +1073,7 @@ describe('platform routes: расход и бюджет (Т8)', () => {
 
     const cleared = await app.inject({
       method: 'DELETE',
-      url: '/api/platforms/enterprise-platform-dev/spend/exhausted',
+      url: '/api/platforms/company-dev/spend/exhausted',
     });
     expect(cleared.json().cleared).toBe(true);
     expect(cleared.json().budget.exhausted).toBe(false);
@@ -1065,7 +1081,7 @@ describe('platform routes: расход и бюджет (Т8)', () => {
     // Повтор — не отказ: снимать уже нечего, и это законное состояние кнопки.
     const again = await app.inject({
       method: 'DELETE',
-      url: '/api/platforms/enterprise-platform-dev/spend/exhausted',
+      url: '/api/platforms/company-dev/spend/exhausted',
     });
     expect(again.statusCode).toBe(200);
     expect(again.json().cleared).toBe(false);
@@ -1077,7 +1093,7 @@ describe('platform routes: расход и бюджет (Т8)', () => {
     writePlatform(store, PLATFORM);
     seedSpend();
 
-    await app.inject({ method: 'DELETE', url: '/api/platforms/enterprise-platform-dev' });
-    expect(store.getPlatformSpend()['enterprise-platform-dev']).toBeUndefined();
+    await app.inject({ method: 'DELETE', url: '/api/platforms/company-dev' });
+    expect(store.getPlatformSpend()['company-dev']).toBeUndefined();
   });
 });

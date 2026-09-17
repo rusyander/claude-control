@@ -12,7 +12,7 @@ import {
   accessSync,
   constants,
 } from 'node:fs';
-import { homedir } from 'node:os';
+import { brandEnv, panelHomeDir } from './brand.mjs';
 import { join, dirname } from 'node:path';
 
 /**
@@ -56,7 +56,7 @@ export interface CredentialsLookup {
  * не трогая код.
  */
 const KEYCHAIN_SERVICES = [
-  process.env.AGENTDECK_KEYCHAIN_SERVICE,
+  brandEnv('KEYCHAIN_SERVICE'),
   'Claude Code-credentials',
   'Claude Code',
 ].filter((name): name is string => Boolean(name));
@@ -66,7 +66,7 @@ const KEYCHAIN_TIMEOUT_MS = 10_000;
 
 /** Файл панели: сюда попадает то, что ввели руками в настройках. */
 export function panelCredentialsPath(): string {
-  return join(homedir(), '.agentdeck', 'credentials.json');
+  return join(panelHomeDir(), 'credentials.json');
 }
 
 /**

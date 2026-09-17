@@ -144,18 +144,18 @@ describe('env', () => {
         comment: 'выпустить в GitLab → Settings',
       };
       saveEnvVar(settingsPath, secretsPath, draft);
-      saveEnvVar(settingsPath, secretsPath, { ...draft, comment: 'выпустить в git.platform.example.com' });
+      saveEnvVar(settingsPath, secretsPath, { ...draft, comment: 'выпустить в git.example.com' });
 
       const content = readFileSync(secretsPath, 'utf8');
       // Раньше ветка правки комментарий игнорировала: панель отвечала «сохранено»,
       // а в файле оставался прежний текст.
-      expect(content).toContain('# выпустить в git.platform.example.com');
+      expect(content).toContain('# выпустить в git.example.com');
       expect(content).not.toContain('Settings');
       // И ровно один комментарий, а не два подряд.
       expect(content.split('\n').filter((line) => line.startsWith('#'))).toHaveLength(1);
       expect(
         readEnvVars(settingsPath, secretsPath).find((v) => v.key === 'GITLAB_TOKEN')?.comment,
-      ).toBe('выпустить в git.platform.example.com');
+      ).toBe('выпустить в git.example.com');
     });
 
     it('пустой комментарий убирает его из файла, а не оставляет старый (#52)', () => {

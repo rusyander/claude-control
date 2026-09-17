@@ -4,6 +4,7 @@ import {
   PLATFORM_MANIFEST_TIMEOUT_MAX_SEC,
   PLATFORM_PRESETS,
   isManifestEndpointPath,
+  isManifestVendorPrefix,
   isManifestWirePath,
   platformManifestDeclared,
   type PlatformManifestOverrides,
@@ -109,6 +110,25 @@ export function StepAddressManifest({ model }: WizardStepProps) {
           error={t('platform.manifest.wireError')}
           onChange={(value) => set('thinkingField', value)}
         />
+
+        {declared.vendorPrefix !== '' && (
+          <TextField
+            key={`prefix-${driver}`}
+            label={t('platform.manifest.prefixLabel')}
+            value={manifest?.vendorPrefix ?? ''}
+            onChange={(next) => set('vendorPrefix', next.trim() === '' ? undefined : next.trim())}
+            placeholder={declared.vendorPrefix}
+            isMono
+            hint={t('platform.manifest.prefixHint', {
+              value: manifest?.vendorPrefix ?? declared.vendorPrefix,
+            })}
+            error={
+              manifest?.vendorPrefix === undefined || isManifestVendorPrefix(manifest.vendorPrefix)
+                ? undefined
+                : t('platform.manifest.prefixError')
+            }
+          />
+        )}
 
         <Stack direction="row" gap="var(--spacing-md)" wrap>
           <div className={styles.transportCell}>

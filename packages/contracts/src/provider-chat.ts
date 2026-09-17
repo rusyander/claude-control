@@ -52,6 +52,13 @@ export const providerChatMessageSchema = object({
    * всегда. Нет поля — разговор записан до этой партии, время не показывается.
    */
   durationMs: number().optional(),
+  /**
+   * Сколько вызовов инструментов агента насчитал шлюз контура за этот ответ
+   * (развилка 5). Чужой CLI вызовы не пишет ни в какой транскрипт, а журнал
+   * шлюза видит их на проводе. Ноль — повод подсказать, что модель могла не
+   * справиться с инструментами. Нет поля — прогон шёл мимо контура.
+   */
+  contourToolCalls: number().optional(),
 });
 export type ProviderChatMessage = Infer<typeof providerChatMessageSchema>;
 

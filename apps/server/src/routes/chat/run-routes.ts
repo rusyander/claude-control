@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../../context.ts';
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import { initiativePrompt, QUESTION_DENIED } from '../../domains/chat/initiative.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
 import { RUN_UNKNOWN_DENIED } from '../../domains/chat/run-ledger.ts';
@@ -52,7 +53,12 @@ const refuse = (
   status: number,
   code: string,
   message: string,
-  extra?: Record<string, unknown>,
+  // `messageCode` — перевод текста на клиенте (`server-messages.ts`); русский
+  // `message` остаётся запасным для клиентов, кода не знающих.
+  extra?: Record<string, unknown> & {
+    messageCode?: ServerMessageCode;
+    params?: ServerMessageParams;
+  },
 ): FastifyReply => reply.code(status).send({ code, message, ...extra });
 
 /**
@@ -135,6 +141,7 @@ export function registerChatRunRoutes(
       if (registry.isRunning(chatId, sessionId)) {
         return refuse(reply, 409, 'run_busy', RUN_BUSY_MESSAGE, {
           runId: registry.resolveKey(chatId, sessionId),
+          messageCode: 'run-busy',
         });
       }
 
@@ -142,7 +149,9 @@ export function registerChatRunRoutes(
       // вызов API могут. CLI на пустой ввод отвечает ошибкой уже после запуска —
       // прогон, транскрипт с пустой репликой и красная точка ради ничего.
       if (!prompt.trim() && (files ?? []).length === 0) {
-        return refuse(reply, 400, 'empty_prompt', 'Сообщение пустое — отправлять нечего.');
+        return refuse(reply, 400, 'empty_prompt', 'Сообщение пустое — отправлять нечего.', {
+          messageCode: 'run-empty-prompt',
+        });
       }
 
       // Вложение, которое панель не умеет передавать, раньше просто исчезало:
@@ -159,7 +168,12 @@ export function registerChatRunRoutes(
           'unsupported_upload',
           `Не поддерживаются вложения: ${names.join(', ')}. ` +
             `Сообщение не отправлено. Допустимые расширения: ${SUPPORTED_UPLOAD_EXTENSIONS.join(', ')}.`,
-          { files: names, supported: SUPPORTED_UPLOAD_EXTENSIONS },
+          {
+            files: names,
+            supported: SUPPORTED_UPLOAD_EXTENSIONS,
+            messageCode: 'run-unsupported-upload',
+            params: { names: names.join(', '), supported: SUPPORTED_UPLOAD_EXTENSIONS.join(', ') },
+          },
         );
       }
 
@@ -179,7 +193,11 @@ export function registerChatRunRoutes(
           422,
           'workspace_missing',
           `Рабочая папка этого чата не найдена: ${workspace.cwd}. Разговор начинался в ней, и продолжить его можно только оттуда.`,
-          { cwd: workspace.cwd },
+          {
+            cwd: workspace.cwd,
+            messageCode: 'run-workspace-missing',
+            params: { cwd: workspace.cwd },
+          },
         );
       }
 
@@ -352,6 +370,7 @@ export function registerChatRunRoutes(
       if (!started) {
         return refuse(reply, 409, 'run_busy', RUN_BUSY_MESSAGE, {
           runId: registry.resolveKey(chatId, sessionId),
+          messageCode: 'run-busy',
         });
       }
 

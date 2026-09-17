@@ -22,9 +22,9 @@
  */
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { brandEnv, panelHomeFile } from '../../apps/server/src/lib/brand.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(join(here, '..', '..', 'apps', 'server', 'package.json'));
@@ -33,7 +33,7 @@ const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { z } = require('zod');
 
-const BASE = (process.env.AGENTDECK_URL || 'http://127.0.0.1:5178').replace(/\/+$/, '');
+const BASE = (brandEnv('URL') || 'http://127.0.0.1:5178').replace(/\/+$/, '');
 const TIMEOUT_MS = 20_000;
 /**
  * Вызов агента ждём дольше: у контура свой потолок прогона около двух минут, и
@@ -43,7 +43,7 @@ const AGENT_TIMEOUT_MS = 130_000;
 
 function panelToken() {
   try {
-    return readFileSync(join(homedir(), '.agentdeck', 'api-token'), 'utf8').trim();
+    return readFileSync(panelHomeFile('api-token'), 'utf8').trim();
   } catch {
     return '';
   }
@@ -146,7 +146,7 @@ const server = new McpServer(
   { name: 'agentdeck-platform', version: '1.0.0' },
   {
     instructions:
-      'Контур компании через панель agentdeck: модели и опубликованные агенты. Ключ остаётся ' +
+      'Контур компании через панель AgentDeck: модели и опубликованные агенты. Ключ остаётся ' +
       'в панели. Начинай с contour_list — идентификаторы контуров и агентов сам ты знать не можешь. ' +
       'Инструментов панели у модели контура нет: попросить её отредактировать файл нельзя, только ' +
       'спросить.',

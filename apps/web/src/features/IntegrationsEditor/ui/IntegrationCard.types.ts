@@ -1,8 +1,4 @@
-import type {
-  IntegrationId,
-  IntegrationStatus,
-  IntegrationsSettings,
-} from '@agentdeck/contracts';
+import type { IntegrationId, IntegrationStatus, IntegrationsSettings } from '@agentdeck/contracts';
 
 export interface IntegrationCardProps {
   id: IntegrationId;

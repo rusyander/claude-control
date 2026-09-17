@@ -52,16 +52,30 @@ function readIndex(appData: string): PromptIndex {
       typeof raw === 'object' && raw !== null && 'entries' in raw
         ? (raw as { entries?: unknown }).entries
         : undefined;
-    return {
-      version: INDEX_VERSION,
-      entries:
-        typeof entries === 'object' && entries !== null
-          ? (entries as Record<string, PromptIndexEntry>)
-          : {},
-    };
+    return { version: INDEX_VERSION, entries: validEntries(entries) };
   } catch {
     return { version: INDEX_VERSION, entries: {} };
   }
+}
+
+/**
+ * Записи отметок, прочитанные по одной. Файл правят руками и переносят между
+ * версиями панели, поэтому форма не приводится к типу, а проверяется: числовой
+ * `baseSha` давал ложное «встроенный изменился», а на другой машине одна такая
+ * запись отбрасывала всю секцию правок в переносе (ревью Т4, MINOR-8). Чужая
+ * запись забывается — правка остаётся правкой без отметки, то есть молчит.
+ */
+function validEntries(entries: unknown): Record<string, PromptIndexEntry> {
+  if (typeof entries !== 'object' || entries === null || Array.isArray(entries)) return {};
+  const out: Record<string, PromptIndexEntry> = {};
+  for (const [id, entry] of Object.entries(entries)) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const { baseSha, updatedAt } = entry as Record<string, unknown>;
+    if (typeof baseSha === 'string' && typeof updatedAt === 'string') {
+      out[id] = { baseSha, updatedAt };
+    }
+  }
+  return out;
 }
 
 function writeIndex(appData: string, index: PromptIndex): void {

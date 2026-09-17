@@ -161,7 +161,7 @@ describe('порт', () => {
     store.updateSettings({
       platforms: [
         {
-          id: 'enterprise-platform-dev',
+          id: 'company-dev',
           title: 'Платформа компании',
           driver: 'enterprise-platform',
           baseUrl: 'https://api.dev.example.ru',
@@ -187,14 +187,14 @@ describe('порт', () => {
       platformGateway: { enabled: true, port: busy, forceStream: true },
       endpointProfiles: [
         {
-          id: 'contour-enterprise-platform-dev',
+          id: 'contour-company-dev',
           name: 'Контур · Платформа компании',
-          baseUrl: `http://127.0.0.1:${busy}/enterprise-platform-dev/v1`,
+          baseUrl: `http://127.0.0.1:${busy}/company-dev/v1`,
           apiKind: 'openai-compat',
           model: 'gpt-4o',
           writeToken: false,
           imagesUrl: '',
-          ownerPlatformId: 'enterprise-platform-dev',
+          ownerPlatformId: 'company-dev',
         },
       ],
     });
@@ -205,9 +205,9 @@ describe('порт', () => {
     // как есть: оставшийся в ней задуманный порт означал бы промпты, ушедшие
     // тому процессу, который порт и занял.
     expect(
-      store.getSettings().endpointProfiles.find((item) => item.id === 'contour-enterprise-platform-dev')
+      store.getSettings().endpointProfiles.find((item) => item.id === 'contour-company-dev')
         ?.baseUrl,
-    ).toBe(`http://127.0.0.1:${busy + 1}/enterprise-platform-dev/v1`);
+    ).toBe(`http://127.0.0.1:${busy + 1}/company-dev/v1`);
   });
 });
 

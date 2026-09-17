@@ -7,6 +7,7 @@ import { writeTextFile } from '../lib/safe-io.ts';
 import { readHooks, writeHooks } from './hooks.ts';
 import { readRules } from './dlp/rules-store.ts';
 import { buildGateScript, type GateScriptConfig } from './prompt-gate/script.ts';
+import { BRAND_NAME, BRAND_SLUG, LEGACY_BRAND_NAME, LEGACY_BRAND_SLUG } from '../lib/brand.mjs';
 
 /**
  * Гейт на промпте: установка и снятие хука `UserPromptSubmit`.
@@ -20,7 +21,13 @@ import { buildGateScript, type GateScriptConfig } from './prompt-gate/script.ts'
  * Правила общие с прокси (`dlp-rules.json`), второго словаря нет.
  */
 
-const SCRIPT_NAME = 'agentdeck-prompt-gate.mjs';
+const SCRIPT_NAME = `${BRAND_SLUG}-prompt-gate.mjs`;
+/**
+ * Имя скрипта до переименования продукта (17.09.2026). Такой хук уже стоит у
+ * людей и остаётся СВОИМ: его видно установленным, а применение настроек
+ * переносит его под новое имя, а не ставит рядом второй гейт.
+ */
+const LEGACY_SCRIPT_NAME = `${LEGACY_BRAND_SLUG}-prompt-gate.mjs`;
 const RULES_FILE = 'dlp-rules.json';
 const JOURNAL_FILE = 'dlp-journal.jsonl';
 const STATE_FILE = 'state.json';
@@ -40,8 +47,19 @@ export function gateCommand(hooksDir: string): string {
   return `node "${gateScriptPath(hooksDir).replace(/\\/g, '/')}"`;
 }
 
+function legacyGateScriptPath(hooksDir: string): string {
+  return join(hooksDir, LEGACY_SCRIPT_NAME);
+}
+
 function isGateHook(hook: Hook): boolean {
-  return hook.event === 'UserPromptSubmit' && hook.command.includes(SCRIPT_NAME);
+  return (
+    hook.event === 'UserPromptSubmit' &&
+    (hook.command.includes(SCRIPT_NAME) || hook.command.includes(LEGACY_SCRIPT_NAME))
+  );
+}
+
+function isLegacyGateHook(hook: Hook): boolean {
+  return hook.event === 'UserPromptSubmit' && hook.command.includes(LEGACY_SCRIPT_NAME);
 }
 
 /**
@@ -85,6 +103,27 @@ const CORE_END = '\n\n/** Ведём ли журнал';
 type ScriptState = 'current' | 'outdated' | 'foreign';
 
 function panelScriptState(source: string): ScriptState {
+  const direct = scriptStateAsIs(source);
+  if (direct !== 'foreign') return direct;
+  // Скрипт, собранный до переименования продукта: прежнее имя вписано в шапку и
+  // в предупреждения. С новым именем он совпал — значит свой, просто устарел.
+  const renamed = source.split(LEGACY_BRAND_NAME).join(BRAND_NAME);
+  if (renamed === source) return 'foreign';
+  return scriptStateAsIs(renamed) === 'foreign' ? 'foreign' : 'outdated';
+}
+
+/** Откуда скрипт читает правила — из его же блока настроек. */
+function scriptRulesPath(source: string): string | undefined {
+  const match = /^const CONFIG = (\{[\s\S]*?\n\});$/m.exec(source);
+  if (!match?.[1]) return undefined;
+  try {
+    return (JSON.parse(match[1]) as GateScriptConfig).rulesPath;
+  } catch {
+    return undefined;
+  }
+}
+
+function scriptStateAsIs(source: string): ScriptState {
   const match = /^const CONFIG = (\{[\s\S]*?\n\});$/m.exec(source);
   if (!match?.[1]) return 'foreign';
   let expected: string;
@@ -110,7 +149,9 @@ function panelScriptState(source: string): ScriptState {
 
 export function describePromptGate(store: AppStore, location: GateLocation): PromptGateInfo {
   const settings = store.getSettings().promptGate;
-  const scriptPath = gateScriptPath(location.hooksDir);
+  const freshPath = gateScriptPath(location.hooksDir);
+  const legacyPath = legacyGateScriptPath(location.hooksDir);
+  const scriptPath = !existsSync(freshPath) && existsSync(legacyPath) ? legacyPath : freshPath;
 
   const registered = readHooks(location.settingsPath, store).some(
     (hook) => isGateHook(hook) && hook.isEnabled,
@@ -123,7 +164,14 @@ export function describePromptGate(store: AppStore, location: GateLocation): Pro
     const current = safeRead(scriptPath);
     const state = current === undefined ? 'foreign' : panelScriptState(current);
     customized = state === 'foreign';
-    outdated = state === 'outdated';
+    // Свой скрипт устарел и тогда, когда лежит под прежним именем или читает
+    // правила из прежнего каталога данных: после переезда тот больше не
+    // обновляется, и гейт молча работал бы по застывшему списку.
+    outdated =
+      state === 'outdated' ||
+      (state === 'current' &&
+        (scriptPath === legacyPath ||
+          scriptRulesPath(current ?? '') !== join(location.appDataDir, RULES_FILE)));
   }
 
   let rulesCount = 0;
@@ -171,6 +219,15 @@ export function applyPromptGate(
   const scriptPath = gateScriptPath(location.hooksDir);
   const current = existsSync(scriptPath) ? safeRead(scriptPath) : undefined;
   const ours = current !== undefined && isPanelScript(current);
+  const legacyPath = legacyGateScriptPath(location.hooksDir);
+  const legacy = existsSync(legacyPath) ? safeRead(legacyPath) : undefined;
+  const legacyOurs = legacy !== undefined && isPanelScript(legacy);
+
+  // Правленный руками скрипт под прежним именем без явной перезаписи не
+  // трогаем вовсе: второй гейт рядом с ним проверял бы промпт дважды.
+  if (legacy !== undefined && !legacyOurs && !options.force && current === undefined) {
+    return describePromptGate(store, location);
+  }
 
   if (settings.enabled) {
     const wanted = expectedScript(location, settings);
@@ -178,11 +235,13 @@ export function applyPromptGate(
       writeTextFile(scriptPath, wanted, { backupDir: options.backupDir });
     }
     registerHook(store, location, true, options.backupDir);
+    if (legacyOurs) rmSync(legacyPath, { force: true });
   } else {
     registerHook(store, location, false, options.backupDir);
     // Свою правку не выбрасываем: снятие регистрации уже выключило хук, а файл
     // человек может забрать себе.
     if (ours) rmSync(scriptPath, { force: true });
+    if (legacyOurs) rmSync(legacyPath, { force: true });
   }
 
   return describePromptGate(store, location);
@@ -197,10 +256,11 @@ function registerHook(
   const all = readHooks(location.settingsPath, store);
   const hooks = all.filter((hook) => !isGateHook(hook));
   const registered = all.some((hook) => isGateHook(hook) && hook.isEnabled);
+  const legacyRegistered = all.some(isLegacyGateHook);
 
   // Нечего менять — не трогаем settings.json: смена действия при выключенном
   // гейте иначе переписывала бы чужой конфиг (и плодила резервные копии) зря.
-  if (registered === present) return;
+  if (registered === present && !legacyRegistered) return;
 
   if (present) {
     hooks.push({

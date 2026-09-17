@@ -73,10 +73,10 @@ export function newPlatform(id: string, title: string): Platform {
     // лежат в админке компании, и спросить их у контура нечем.
     agents: [],
     budgetSince: '',
-    // Прослойка инструментов и короткий промпт — по пресету драйвера: у платформа компании
+    // Прослойка инструментов и короткий промпт — по пресету драйвера: у платформы компании
     // включёнными (решение В1, без них агент через неё «работает как чат»), у
     // совместимого шлюза — нет, инструменты он принимает полем (аудит DRV-20).
-    ...PLATFORM_PRESETS.enterprise-platform.defaults,
+    ...PLATFORM_PRESETS['enterprise-platform'].defaults,
     // Правила контура (Т7) — умолчаниями контракта: список инструментов
     // платформы пуст, и пока он пуст, наверх уходит `tool_choice: "none"`.
     rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
@@ -165,6 +165,19 @@ export function toolRouteOf(source: {
 export function toolRouteMark(route: PlatformToolRoute): CompromiseId | null {
   if (route === 'native') return null;
   return route === 'shim' ? 'tool-shim' : 'no-client-tools';
+}
+
+/**
+ * Подпись цели. Имя ассистента сервер пишет по-русски, а CLI зовутся своими
+ * торговыми именами — поэтому переводится только ассистент, остальное как есть.
+ */
+export function applyTargetTitle(
+  target: Pick<PlatformApplyTarget, 'targetId' | 'title'>,
+  t: (key: string) => string,
+): string {
+  return target.targetId === PLATFORM_ASSISTANT_TARGET
+    ? t('platform.consumer.assistant')
+    : target.title;
 }
 
 /**

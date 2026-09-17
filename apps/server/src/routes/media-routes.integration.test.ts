@@ -284,6 +284,39 @@ describe('маршруты картинок: своя сеть, свои заг�
       expect(response.json().message).toContain('скрипт');
     });
 
+    it('потолок рисунка — в знаках: не-латинский рисунок под ним принимается, а не режется телом', async () => {
+      // Ревью Т9, MINOR 7: 400 тысяч иероглифов — под потолком в знаках, но
+      // 1,2 МБ тела, и Fastify по умолчанию отвечал 413 по-английски раньше
+      // проверки панели.
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg"><text>${'漢'.repeat(400_000)}</text></svg>`;
+      const accepted = await app.inject({
+        method: 'POST',
+        url: '/api/media/images/block',
+        payload: { chatId: 'c', prompt: 'иероглифы', block: svg, model: 'm' },
+      });
+      expect(accepted.statusCode).toBe(200);
+
+      // Больше знакового потолка — отказ панели словами, а не фреймворка.
+      const tooMany = await app.inject({
+        method: 'POST',
+        url: '/api/media/images/block',
+        payload: {
+          block: `<svg xmlns="http://www.w3.org/2000/svg"><text>${'ы'.repeat(600_000)}</text></svg>`,
+        },
+      });
+      expect(tooMany.statusCode).toBe(400);
+      expect(tooMany.json().message).toContain('полумиллиона знаков');
+
+      // Тело больше любого законного рисунка — тоже по-русски.
+      const huge = await app.inject({
+        method: 'POST',
+        url: '/api/media/images/block',
+        payload: { block: 'ы'.repeat(2_000_000) },
+      });
+      expect(huge.statusCode).toBe(413);
+      expect(huge.json().message).toBe('Блок слишком велик — панель такой не принимает.');
+    });
+
     it('колода из блока собирается панелью: HTML без сети, PPTX вложением', async () => {
       const deck = await makeDeck();
       expect(asked).toHaveLength(0);

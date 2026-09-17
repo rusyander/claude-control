@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { detectCliOnPath, pathExists } from '../../providers/detect.ts';
 import { ProjectTestsError, ProjectTestsUnavailableError } from './files.ts';
+import { brandEnv, brandEnvName } from '../../lib/brand.mjs';
 
 /**
  * PDF отчёта — тем браузером, который уже стоит на машине.
@@ -20,7 +21,7 @@ import { ProjectTestsError, ProjectTestsUnavailableError } from './files.ts';
  */
 
 /** Переопределение для нестандартной установки — путь к браузеру. */
-const OVERRIDE_ENV = 'AGENTDECK_CHROME';
+const OVERRIDE_ENV = brandEnvName('CHROME');
 
 /** Сколько ждём печать: страница локальная, дольше — значит браузер завис. */
 const RENDER_TIMEOUT_MS = 45_000;
@@ -90,7 +91,7 @@ export interface BrowserDeps {
 export function findChromium(deps: BrowserDeps = {}): string | undefined {
   const detect = deps.detectCli ?? detectCliOnPath;
   const exists = deps.exists ?? pathExists;
-  const override = (deps.env ?? process.env)[OVERRIDE_ENV]?.trim();
+  const override = brandEnv('CHROME', deps.env ?? process.env)?.trim();
   if (override) return exists(override) ? override : undefined;
 
   const names = COMMANDS[process.platform] ?? COMMANDS.linux ?? [];

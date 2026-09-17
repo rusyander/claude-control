@@ -112,6 +112,22 @@ export function platformRefusalCaption(
   return { key: 'chat.platformRefused', params: { title: plan.title, reason } };
 }
 
+/**
+ * Подпись «прогон уйдёт мимо контура» — «по возможности» без шлюза или ключа.
+ *
+ * Решение по контуру №4: режим остаётся, только пока каждый такой уход назван в
+ * шапке прямо. Без этой строки чат выглядел бы идущим через контур, а данные
+ * молча уезжали бы в облако вендора — ровно то, от чего контур защищает. Причины
+ * и советы — те же слова, что у отказа: чинится одно и то же.
+ */
+export function platformBypassCaption(
+  plan: PlatformRunPlan | undefined,
+): { key: 'chat.platformBypassed'; params: { title: string; reason: string } } | undefined {
+  if (!plan?.bypassed) return undefined;
+  const reason = plan.reason === 'no_token' ? 'no_token' : 'gateway_down';
+  return { key: 'chat.platformBypassed', params: { title: plan.title, reason } };
+}
+
 /** Что сказать о наших слоях, снятых с прогона через контур (Т8). */
 export interface PlatformLayersCaption {
   /** Ключ словаря: «снято вот это» или «не едет ничего нашего». */

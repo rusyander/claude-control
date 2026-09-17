@@ -48,6 +48,14 @@ import { connect } from 'node:net';
 import { homedir, platform } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  appDataDirOf,
+  BRAND_SLUG,
+  LEGACY_BRAND_PASCAL,
+  LEGACY_BRAND_SLUG,
+  legacyAppDataDirOf,
+  resolveBrandDir,
+} from '../apps/server/src/lib/brand.mjs';
 
 const WIN = platform() === 'win32';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -75,15 +83,24 @@ const BACKOFF_MAX_MS = 300_000;
 /** Столько прожил без падений — прошлые неудачи больше не в счёт. */
 const HEALTHY_RESET_MS = 600_000;
 
+// Прежнее имя каталога (`LEGACY_BRAND_SLUG`) переезжает копией: pid-файл едет
+// вместе с журналом, и сторож, запущенный ещё старым кодом, по-прежнему
+// удерживает единственный экземпляр.
 const STATE_DIR = WIN
-  ? join(process.env.LOCALAPPDATA ?? homedir(), 'agentdeck')
-  : join(homedir(), '.agentdeck');
+  ? resolveBrandDir(
+      join(process.env.LOCALAPPDATA ?? homedir(), LEGACY_BRAND_SLUG),
+      join(process.env.LOCALAPPDATA ?? homedir(), BRAND_SLUG),
+    )
+  : resolveBrandDir(join(homedir(), `.${LEGACY_BRAND_SLUG}`), join(homedir(), `.${BRAND_SLUG}`));
 const LOG_PATH = join(STATE_DIR, 'keepalive.log');
 const PID_PATH = join(STATE_DIR, 'keepalive.pid');
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
 
 const TASK_MAIN = 'AgentDeckKeepalive';
 const TASK_WATCH = 'AgentDeckKeepaliveWatch';
+/** Задачи и ярлык под прежним именем продукта: снимаются и при установке, и при снятии. */
+const LEGACY_TASKS = [`${LEGACY_BRAND_PASCAL}Keepalive`, `${LEGACY_BRAND_PASCAL}KeepaliveWatch`];
+const LEGACY_STARTUP_NAME = `${LEGACY_BRAND_SLUG}-keepalive.vbs`;
 
 function log(line) {
   // Местное время, а не UTC: журнал читает человек и сверяет его со своими
@@ -269,14 +286,12 @@ function gatewayPort() {
   roots.push(join(homedir(), '.claude'));
 
   for (const root of roots) {
-    const state = readState(join(root, 'agentdeck', 'state.json'));
+    const state = readPanelState(root);
     if (!state) continue;
     // Путь, заданный руками, лежит в состоянии по умолчанию и перекрывает всё
     // остальное — как и в самой панели (`detectClaudeLocation`).
     const override = state.settings?.claudeDirOverride?.trim?.();
-    const panel = override
-      ? readState(join(resolve(override), 'agentdeck', 'state.json'))
-      : state;
+    const panel = override ? readPanelState(resolve(override)) : state;
     if (!panel?.settings?.platformGateway?.enabled) return 0;
     const port = panel.platformGatewayPort;
     // Шлюз включён, но порта в состоянии нет — он ещё не поднимался в этой
@@ -284,6 +299,14 @@ function gatewayPort() {
     return Number.isInteger(port) && port > 0 ? port : 0;
   }
   return 0;
+}
+
+/** Состояние панели под новым именем каталога, иначе под прежним — до первого запуска новой версии. */
+function readPanelState(root) {
+  return (
+    readState(join(appDataDirOf(root), 'state.json')) ??
+    readState(join(legacyAppDataDirOf(root), 'state.json'))
+  );
 }
 
 function readState(path) {
@@ -330,17 +353,25 @@ function taskAction() {
 }
 
 /** Ярлык в «Автозагрузке» текущего пользователя. */
-function startupFile() {
+function startupFile(name = `${BRAND_SLUG}-keepalive.vbs`) {
   const base = process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming');
-  return join(
-    base,
-    'Microsoft',
-    'Windows',
-    'Start Menu',
-    'Programs',
-    'Startup',
-    'agentdeck-keepalive.vbs',
-  );
+  return join(base, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', name);
+}
+
+/** Снять автозапуск под прежним именем: иначе после переустановки сторожей два. */
+function removeLegacyAutostart() {
+  for (const name of LEGACY_TASKS) {
+    try {
+      schtasks(['/delete', '/tn', name, '/f']);
+    } catch {
+      // Задачи нет — цель уже достигнута.
+    }
+  }
+  try {
+    rmSync(startupFile(LEGACY_STARTUP_NAME), { force: true });
+  } catch {
+    // Ярлыка нет — тоже нормально.
+  }
 }
 
 function install() {
@@ -351,6 +382,7 @@ function install() {
     process.exit(1);
   }
   const action = taskAction();
+  removeLegacyAutostart();
 
   // Вход в систему держим на «Автозагрузке», а не на задаче /sc ONLOGON:
   // триггер логона планировщик отдаёт только администратору, а панель — вещь
@@ -385,6 +417,7 @@ function install() {
 }
 
 function uninstall() {
+  removeLegacyAutostart();
   for (const name of [TASK_MAIN, TASK_WATCH]) {
     try {
       schtasks(['/delete', '/tn', name, '/f']);

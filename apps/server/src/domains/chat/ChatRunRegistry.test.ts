@@ -259,7 +259,7 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     const refusing = new ChatRunRegistry(() => new CountingRun());
     refusing.setPlatformRouting(() => ({
       env: {},
-      refusal: 'Контур «EnterprisePlatform» обязателен, а шлюз панели не поднят',
+      refusal: 'Контур «Company» обязателен, а шлюз панели не поднят',
     }));
     const { events, sub } = collector();
     expect(refusing.start('r1', OPTIONS, {})).toBe(true);
@@ -268,7 +268,7 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     expect(started).toBe(0);
     expect(events.map((item) => item.event)).toContainEqual({
       kind: 'error',
-      message: 'Контур «EnterprisePlatform» обязателен, а шлюз панели не поднят',
+      message: 'Контур «Company» обязателен, а шлюз панели не поднят',
     });
     expect(refusing.describe('r1')?.status).not.toBe('running');
   });

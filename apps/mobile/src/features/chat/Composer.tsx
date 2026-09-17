@@ -10,6 +10,8 @@ import { useVoice } from '../../shared/lib/voice';
 import { useT } from '../../shared/config/i18n';
 import { Field, Mono, Row } from '../../shared/ui';
 import { colors, font, radius, space } from '../../shared/config/theme';
+import { runPlanView, usePlatformRunPlan } from '../../entities/platform/api';
+import type { ImageModeState } from './useImageMode';
 
 /**
  * Поле ввода со всем, что влияет на запуск: права на правки, автоподтверждение,
@@ -41,6 +43,7 @@ export function Composer({
   onStop,
   isRunning,
   busy,
+  image,
 }: {
   value: ComposerValue;
   onChange: (next: ComposerValue) => void;
@@ -48,6 +51,8 @@ export function Composer({
   onStop: () => void;
   isRunning: boolean;
   busy?: boolean;
+  /** Режим «Картинка» (Т9). Пусто — только сообщения. */
+  image?: ImageModeState;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -60,6 +65,23 @@ export function Composer({
   });
 
   const models = (catalog.data?.models ?? []).slice(0, 8);
+
+  // Чем прогон пойдёт НА САМОМ ДЕЛЕ (Т6/Т8) — как шапка чата панели: через
+  // контур выбор модели — просьба, а не решение, усилие может не отправляться, а
+  // наши слои сняты галочкой на карточке контура. Сказать это надо ДО отправки.
+  const runPlan = usePlatformRunPlan('chat');
+  const plan = runPlanView(runPlan.data, value, t.composer);
+  const imageMode = image?.mode === 'image';
+
+  const toggleOptions = (): void => {
+    // Открытие настроек — момент, когда план точно нужен свежим: дальше человек
+    // выбирает модель или режим, а контур могли выключить час назад.
+    if (!open) {
+      void runPlan.refetch();
+      image?.refresh();
+    }
+    setOpen((state) => !state);
+  };
 
   // Что было набрано руками до нажатия на микрофон: распознанное дописывается к
   // этому, иначе каждый промежуточный результат стирал бы предыдущий текст.
@@ -103,7 +125,17 @@ export function Composer({
   const drop = (name: string): void =>
     onChange({ ...value, files: value.files.filter((file) => file.name !== name) });
 
-  const note = voice.listening ? t.composer.voiceListening : voice.problem || refused;
+  const note = voice.listening
+    ? t.composer.voiceListening
+    : voice.problem || refused || image?.error || (image?.drawing ? t.composer.mode.drawing : '');
+  const placeholder = imageMode
+    ? image?.view.byAgent
+      ? t.composer.mode.imagePlaceholderAgent
+      : t.composer.mode.imagePlaceholder
+    : isRunning
+      ? t.composer.queue
+      : t.composer.ask;
+  const sendOff = !value.text.trim() || busy || image?.drawing;
 
   return (
     <View style={styles.root}>
@@ -122,36 +154,88 @@ export function Composer({
             />
           </Row>
 
-          <Mono>{t.composer.model}</Mono>
-          <Row gap={space.xs} style={styles.wrap}>
-            <Chip
-              label={t.composer.modelDefault}
-              on={!value.model}
-              onPress={() => onChange({ ...value, model: '' })}
-            />
-            {models.map((model) => (
-              <Chip
-                key={model.id}
-                label={model.name}
-                on={value.model === model.id}
-                onPress={() => onChange({ ...value, model: model.id })}
-              />
-            ))}
-          </Row>
+          {image ? (
+            <>
+              <Row gap={space.xs} style={styles.wrap}>
+                <Chip
+                  label={t.composer.mode.text}
+                  on={!imageMode}
+                  onPress={() => image.setMode('text')}
+                />
+                {/* Пункт виден всегда: запертый — с причиной сервера рядом, а не
+                    спрятан, иначе «картинок на телефоне нет» читалось бы как
+                    отсутствие возможности, а не как то, что чинится. */}
+                <Chip
+                  label={t.composer.mode.image}
+                  on={imageMode}
+                  disabled={!image.view.available}
+                  onPress={() => image.setMode('image')}
+                />
+              </Row>
+              {image.view.available && image.view.sourceText ? (
+                <Mono>{image.view.sourceText}</Mono>
+              ) : null}
+              {!image.view.available && image.view.reasonText ? (
+                <Mono style={styles.warn}>{image.view.reasonText}</Mono>
+              ) : null}
+            </>
+          ) : null}
 
-          <Mono>{t.composer.effort}</Mono>
-          <Row gap={space.xs} style={styles.wrap}>
-            {EFFORTS.map((effort) => (
-              <Chip
-                key={effort}
-                label={effort}
-                on={value.effort === effort}
-                onPress={() => onChange({ ...value, effort })}
-              />
-            ))}
-          </Row>
+          <Mono>{t.composer.model}</Mono>
+          {plan.locked ? (
+            // Через контур выбор ЗАПЕРТ и показывает то, что уедет: список моделей
+            // вендора рядом с подписью контура заставлял бы гадать, что правда.
+            <>
+              <Row gap={space.xs} style={styles.wrap}>
+                <Chip label={plan.locked.model} on disabled onPress={() => undefined} />
+              </Row>
+              <Mono>{t.composer.effort}</Mono>
+              <Row gap={space.xs} style={styles.wrap}>
+                <Chip label={plan.locked.effort} on disabled onPress={() => undefined} />
+              </Row>
+              <Mono>{plan.locked.hint}</Mono>
+            </>
+          ) : (
+            <>
+              <Row gap={space.xs} style={styles.wrap}>
+                <Chip
+                  label={t.composer.modelDefault}
+                  on={!value.model}
+                  onPress={() => onChange({ ...value, model: '' })}
+                />
+                {models.map((model) => (
+                  <Chip
+                    key={model.id}
+                    label={model.name}
+                    on={value.model === model.id}
+                    onPress={() => onChange({ ...value, model: model.id })}
+                  />
+                ))}
+              </Row>
+
+              <Mono>{t.composer.effort}</Mono>
+              <Row gap={space.xs} style={styles.wrap}>
+                {EFFORTS.map((effort) => (
+                  <Chip
+                    key={effort}
+                    label={effort}
+                    on={value.effort === effort}
+                    onPress={() => onChange({ ...value, effort })}
+                  />
+                ))}
+              </Row>
+            </>
+          )}
         </View>
       ) : null}
+
+      {/* Подписи контура — вне настроек: они про то, что случится с ЭТИМ
+          сообщением, и смотреть на них надо перед отправкой, не открывая шестерёнку. */}
+      {plan.lines.map((line) => (
+        <Mono key={line.text} style={line.warn ? styles.warn : undefined}>
+          {line.text}
+        </Mono>
+      ))}
 
       {value.files.length > 0 || note ? (
         <Row gap={space.xs} style={styles.wrap}>
@@ -163,13 +247,21 @@ export function Composer({
             </Pressable>
           ))}
           {note ? (
-            <Mono style={voice.listening ? styles.listening : styles.refused}>{note}</Mono>
+            <Mono
+              style={
+                voice.listening || (image?.drawing && !image.error)
+                  ? styles.listening
+                  : styles.refused
+              }
+            >
+              {note}
+            </Mono>
           ) : null}
         </Row>
       ) : null}
 
       <Row gap={space.sm} style={styles.bar}>
-        <Pressable onPress={() => setOpen((state) => !state)} style={styles.gear}>
+        <Pressable onPress={toggleOptions} style={styles.gear}>
           <Text style={styles.gearText}>{open ? '×' : '⚙'}</Text>
         </Pressable>
         <Pressable
@@ -185,7 +277,7 @@ export function Composer({
             typed.current = text.trim();
             onChange({ ...value, text });
           }}
-          placeholder={isRunning ? t.composer.queue : t.composer.ask}
+          placeholder={placeholder}
           multiline
           autoCapitalize="sentences"
           style={styles.input}
@@ -215,17 +307,17 @@ export function Composer({
         </Pressable>
         <Pressable
           onPress={onSend}
-          disabled={!value.text.trim() || busy}
+          disabled={sendOff}
           accessibilityRole="button"
           accessibilityLabel={t.composer.send}
           style={({ pressed }) => [
             styles.round,
             styles.send,
-            (!value.text.trim() || busy) && styles.sendOff,
+            sendOff && styles.sendOff,
             pressed && styles.pressed,
           ]}
         >
-          {busy ? (
+          {busy || image?.drawing ? (
             <ActivityIndicator color={colors.text} size="small" />
           ) : (
             <Text style={styles.sendText}>↑</Text>
@@ -247,9 +339,24 @@ function Toggle({ label, on, onPress }: { label: string; on: boolean; onPress: (
   );
 }
 
-function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+function Chip({
+  label,
+  on,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  on: boolean;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityState={{ disabled: Boolean(disabled), selected: on }}
+      style={[styles.chip, on && styles.chipOn, disabled && styles.chipOff]}
+    >
       <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>
         {label}
       </Text>
@@ -311,8 +418,10 @@ const styles = StyleSheet.create({
     maxWidth: 160,
   },
   chipOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  chipOff: { opacity: 0.5 },
   chipText: { color: colors.textFaint, fontSize: font.small },
   chipTextOn: { color: colors.text },
   refused: { color: colors.danger },
+  warn: { color: colors.warning },
   listening: { color: colors.accent },
 });

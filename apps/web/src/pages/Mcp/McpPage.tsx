@@ -13,6 +13,8 @@ import { ExplainBox } from '@shared/ui/explain-box';
 import { McpFormModal } from '@features/McpEditor';
 import { mcpServerApi } from '@entities/McpServer';
 import { useSettings } from '@entities/AppConfig';
+import { MCP_SECRET_TAB, mcpSecretAnchor } from '@entities/PanelAgent';
+import { useSearch } from '@tanstack/react-router';
 import { McpServerCard } from './McpServerCard';
 import styles from './McpPage.module.scss';
 
@@ -21,6 +23,10 @@ export function McpPage() {
   const { t } = useTranslation();
   const [editing, setEditing] = useState<McpServer | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  // Агент панели сохранил сервер без секретов и открыл `?id=<имя>&tab=secret`:
+  // форма открывается с полями пустых секретов и якорем для фокуса.
+  const [secretAnchor, setSecretAnchor] = useState<string | undefined>(undefined);
+  const search = useSearch({ strict: false }) as { tab?: string };
 
   const { data: servers = [], isLoading } = mcpServerApi.useList();
   const { data: settings } = useSettings();
@@ -28,11 +34,14 @@ export function McpPage() {
   const deleteServer = mcpServerApi.useDelete();
 
   const openCreate = (): void => {
+    setSecretAnchor(undefined);
     setEditing(undefined);
     setIsFormOpen(true);
   };
 
   const openEdit = (server: McpServer): void => {
+    // `tab` читается до записи адреса: `writeUrl` оставляет в нём только `id`.
+    setSecretAnchor(search.tab === MCP_SECRET_TAB ? mcpSecretAnchor(server.name) : undefined);
     setEditing(server);
     setIsFormOpen(true);
     writeUrl(server.id);
@@ -84,7 +93,12 @@ export function McpPage() {
         <Typography color="subtle">{t('common.empty')}</Typography>
       )}
 
-      <McpFormModal isOpen={isFormOpen} onOpenChange={closeForm} server={editing} />
+      <McpFormModal
+        isOpen={isFormOpen}
+        onOpenChange={closeForm}
+        server={editing}
+        secretAnchor={secretAnchor}
+      />
     </Stack>
   );
 }

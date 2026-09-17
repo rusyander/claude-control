@@ -1,9 +1,6 @@
 import type { ChatMessage } from '@agentdeck/contracts';
 import type { MessageTiming } from '@agentdeck/contracts/chat-timing';
-import type {
-  TaskSplitProposal,
-  TaskSplitReviewDecision,
-} from '@agentdeck/contracts/task-split';
+import type { TaskSplitProposal, TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import type { CascadeAssignment, CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 import type { ChatTreeView, HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 import type { StreamState } from '@entities/Chat';

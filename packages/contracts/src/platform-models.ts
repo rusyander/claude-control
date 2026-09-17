@@ -65,7 +65,7 @@ export function catalogChatModels<T extends PlatformCatalogModel>(models: readon
  * Модель, которую панель подставляет САМА, когда человек не выбирал: первая
  * чатовая модель каталога, не объявившая рисование.
  *
- * Рисование отсекается только здесь, а не в `catalogChatModels`. У enterprise-platform
+ * Рисование отсекается только здесь, а не в `catalogChatModels`. У платформы компании
  * модели рисования приходят видом `chat` с флагом `image_generation`, и контур
  * ведёт их дорогой без цикла инструментов (аудит MD-13): первая в каталоге, она
  * становилась моделью КАЖДОГО прогона агента. Но выбрать её руками человек
@@ -133,6 +133,20 @@ function lower(value: string): string {
   return value.trim().toLowerCase();
 }
 
+/** Семейства моделей Claude, которыми назначает ступени подбор модели. */
+const CLAUDE_FAMILIES = ['haiku', 'sonnet', 'opus'] as const;
+
+/**
+ * Семейство полного имени Claude: `claude-sonnet-5` → `sonnet`. Только имя вида
+ * `claude-…` с семейством отдельным сегментом: у чужой модели слово «opus»
+ * внутри названия семейством Claude не является.
+ */
+function familyOf(name: string): string | undefined {
+  const segments = lower(name).split(/[-_.:/]/);
+  if (segments[0] !== 'claude') return undefined;
+  return CLAUDE_FAMILIES.find((family) => segments.includes(family));
+}
+
 /**
  * Модель одного прогона. Порядок один и тот же на сервере и в шапке чата:
  *
@@ -183,6 +197,21 @@ export function chooseRunModel(rules: PlatformModelRules, asked: string): Platfo
   const known = rules.catalog.find((id) => lower(id) === lower(wanted));
   if (known) {
     return { model: known, asked: wanted, source: 'asked', replaced: false };
+  }
+
+  // Строка карты по СЕМЕЙСТВУ. Человек пишет карту так, как модель называется в
+  // шапке («sonnet»), а ступень разделения и веера уезжает развёрнутым именем
+  // (`claude-sonnet-5`, `expandAssignedModel` на сервере): без этой строки
+  // «модель на группу» молча уходила в модель контура по умолчанию, хотя карта
+  // говорила иное. Стоит ПОСЛЕ каталога: точное имя, которое контур знает сам,
+  // сильнее догадки по семейству.
+  const family = familyOf(wanted);
+  const byFamily = family
+    ? Object.entries(rules.map).find(([from]) => lower(from) === family)?.[1]
+    : undefined;
+  if (byFamily?.trim()) {
+    const model = byFamily.trim();
+    return { model, asked: wanted, source: 'mapped', replaced: model !== wanted };
   }
 
   return fallback;

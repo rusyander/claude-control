@@ -1,11 +1,12 @@
 import { object, string, boolean, number, enum as zodEnum, type infer as Infer } from 'zod';
+import { migrateLegacyPlatform } from '@agentdeck/contracts/platform-legacy';
 
 /**
  * Пресеты платформ — драйвер как ДАННЫЕ (аудит DRV-03).
  *
  * До этого модуля шлюз добавлялся кодом в шести местах: перечень в контракте,
  * реестр сервера, список и образец адреса на фронте, вторая схема сервера,
- * тексты. Кода у драйвера на деле два набора — у платформа компании (свои кадры, коды,
+ * тексты. Кода у драйвера на деле два набора — у платформы компании (свои кадры, коды,
  * ручки) и у совместимого шлюза, который ничего о себе не утверждает. Всё, чем
  * LiteLLM отличается от vLLM, а Azure от OpenRouter, — это данные: где ключ, есть
  * ли родная ручка Anthropic, каким полем включаются размышления. Пресет и есть
@@ -21,7 +22,7 @@ import { object, string, boolean, number, enum as zodEnum, type infer as Infer }
  * драйвер, мастер показывает список, образец адреса и то, что пресет объявил.
  */
 
-/** Код драйвера: у платформа компании свой, у всех остальных — совместимого шлюза. */
+/** Код драйвера: у платформы компании свой, у всех остальных — совместимого шлюза. */
 export type PlatformDriverBase = 'enterprise-platform' | 'openai-compat';
 
 /** Пресеты в порядке показа. `enterprise-platform` первый — ради него раздел и заводится. */
@@ -57,6 +58,19 @@ export function isManifestEndpointPath(value: string): boolean {
   return value === '' || ENDPOINT_PATH.test(value);
 }
 
+/**
+ * Префикс вендорных полей платформы компании на проводе: `<префикс>_status`,
+ * `<префикс>_guardrails`, `<префикс>_tools`. Своё слово у каждой установки
+ * платформы — поэтому данные, а не код драйвера; умолчание нейтральное.
+ */
+export const PLATFORM_VENDOR_PREFIX = 'platform';
+
+const VENDOR_PREFIX = /^[a-z][a-z0-9]{0,31}$/;
+
+export function isManifestVendorPrefix(value: string): boolean {
+  return VENDOR_PREFIX.test(value);
+}
+
 export function isManifestWirePath(value: string): boolean {
   if (value === '') return true;
   return WIRE_PATH.test(value) && value.split('.').every((key) => !OBJECT_KEYS.has(key));
@@ -89,6 +103,14 @@ export const platformManifestSchema = object({
   /** Поле включения размышлений на проводе; пусто — правила размышлений нет. */
   thinkingField: string()
     .refine(isManifestWirePath, 'поле на проводе: `enable_thinking` или `a.b`')
+    .optional(),
+  /**
+   * Префикс вендорных полей (только у базы платформы компании): кадры, правила
+   * инструментов и поля цельного ответа называются им. Совместимому шлюзу ничего
+   * не значит.
+   */
+  vendorPrefix: string()
+    .refine(isManifestVendorPrefix, 'префикс: латиница и цифры, `platform`')
     .optional(),
 });
 
@@ -149,9 +171,9 @@ export interface PlatformDriverPreset {
 }
 
 export const PLATFORM_PRESETS: Record<PlatformDriverId, PlatformDriverPreset> = {
-  enterprise-platform: {
+  'enterprise-platform': {
     base: 'enterprise-platform',
-    title: 'EnterprisePlatform',
+    title: 'Company platform',
     sampleUrl: 'https://api.example.ru',
     defaults: { toolShim: true, contourPrompt: true },
     manifest: {},
@@ -243,7 +265,7 @@ export interface PlatformManifestDeclared {
   anthropicMessages: string;
   /** Пусто — отдельной ручки картинок нет. */
   imagesApi: string;
-  /** Картинку рисует модель в ответе чата (дорога платформа компании). */
+  /** Картинку рисует модель в ответе чата (дорога платформы компании). */
   imagesInChat: boolean;
   /** 0 — не объявлен. */
   nonStreamTimeoutSec: number;
@@ -251,6 +273,8 @@ export interface PlatformManifestDeclared {
   responseCeilingSec: number;
   /** Пусто — правила размышлений нет. */
   thinkingField: string;
+  /** Пусто — вендорных полей у базы нет (совместимый шлюз). */
+  vendorPrefix: string;
 }
 
 /**
@@ -260,7 +284,7 @@ export interface PlatformManifestDeclared {
  * та ложь, от которой таблица и заведена.
  */
 export const PLATFORM_DRIVER_BASES: Record<PlatformDriverBase, PlatformManifestDeclared> = {
-  enterprise-platform: {
+  'enterprise-platform': {
     clientTools: 'shim',
     effort: false,
     anthropicMessages: '',
@@ -269,6 +293,7 @@ export const PLATFORM_DRIVER_BASES: Record<PlatformDriverBase, PlatformManifestD
     nonStreamTimeoutSec: 120,
     responseCeilingSec: 120,
     thinkingField: 'chat_template_kwargs.enable_thinking',
+    vendorPrefix: PLATFORM_VENDOR_PREFIX,
   },
   'openai-compat': {
     clientTools: 'native',
@@ -279,6 +304,7 @@ export const PLATFORM_DRIVER_BASES: Record<PlatformDriverBase, PlatformManifestD
     nonStreamTimeoutSec: 0,
     responseCeilingSec: 0,
     thinkingField: '',
+    vendorPrefix: '',
   },
 };
 
@@ -304,6 +330,10 @@ export function platformManifestDeclared(
       declared.responseCeilingSec = patch.responseCeilingSec;
     }
     if (patch.thinkingField !== undefined) declared.thinkingField = patch.thinkingField;
+    // Префикс есть только у базы, которая читает вендорные поля.
+    if (patch.vendorPrefix !== undefined && declared.vendorPrefix !== '') {
+      declared.vendorPrefix = patch.vendorPrefix;
+    }
   }
   return declared;
 }
@@ -316,13 +346,15 @@ export function platformPreset(id: string): PlatformDriverPreset {
 /**
  * Запись контура, где прослойки и промпта нет, — с умолчаниями пресета её типа.
  *
- * Не `default(true)` схемы: это умолчание платформа компании, и контур, сохранённый мимо
+ * Не `default(true)` схемы: это умолчание платформы компании, и контур, сохранённый мимо
  * мастера (API, снимок, старая запись), получал прослойку на любом шлюзе — а
  * включённая прослойка перебивает родную ручку Anthropic, и пресет Ollama молча
  * уходил на мост (живой прогон DRV-03). Заполняется только отсутствующее:
  * сказанное явно не трогается, а негодное значение остаётся отказу схемы.
  */
-export function withPresetDefaults<T>(value: T): T {
+export function withPresetDefaults<T>(input: T): T {
+  // Прежнее имя драйвера узнаётся раньше умолчаний: они берутся по типу контура.
+  const value = migrateLegacyPlatform(input);
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
   const record = value as Record<string, unknown>;
   if (record.toolShim !== undefined && record.contourPrompt !== undefined) return value;

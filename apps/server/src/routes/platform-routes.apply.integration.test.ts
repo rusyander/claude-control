@@ -27,8 +27,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
 const SECRET = 'CONTOUR-KEY-CORPORATE-4f21';
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -100,12 +100,12 @@ const envOf = (): Record<string, string> =>
 describe('GET /api/platforms/:id/apply', () => {
   it('предпросмотр не пишет ни одного файла и не отдаёт ключа', async () => {
     const before = readFileSync(settingsPath, 'utf8');
-    const response = await app.inject({ url: '/api/platforms/enterprise-platform-dev/apply' });
+    const response = await app.inject({ url: '/api/platforms/company-dev/apply' });
 
     expect(response.statusCode).toBe(200);
     const plan = response.json<PlatformApplyPlan>();
     expect(plan.ready).toBe(true);
-    expect(plan.profileId).toBe('contour-enterprise-platform-dev');
+    expect(plan.profileId).toBe('contour-company-dev');
     expect(plan.targets[0]?.targetId).toBe('assistant');
     expect(response.body).not.toContain(SECRET);
     expect(readFileSync(settingsPath, 'utf8')).toBe(before);
@@ -122,7 +122,7 @@ describe('POST /api/platforms/:id/apply', () => {
   it('пишет названные цели и не отдаёт ключа', async () => {
     const response = await app.inject({
       method: 'POST',
-      url: '/api/platforms/enterprise-platform-dev/apply',
+      url: '/api/platforms/company-dev/apply',
       payload: { targets: ['assistant', 'claude'], model: 'gpt-4o' },
     });
 
@@ -133,15 +133,15 @@ describe('POST /api/platforms/:id/apply', () => {
 
     const env = envOf();
     expect(env.EXISTING).toBe('keep-me');
-    expect(env.ANTHROPIC_BASE_URL).toContain('/enterprise-platform-dev');
+    expect(env.ANTHROPIC_BASE_URL).toContain('/company-dev');
     expect(readFileSync(settingsPath, 'utf8')).not.toContain(SECRET);
-    expect(store.getSettings().assistantEndpointId).toBe('contour-enterprise-platform-dev');
+    expect(store.getSettings().assistantEndpointId).toBe('contour-company-dev');
   });
 
   it('тело без списка целей — 400 с именем поля', async () => {
     const response = await app.inject({
       method: 'POST',
-      url: '/api/platforms/enterprise-platform-dev/apply',
+      url: '/api/platforms/company-dev/apply',
       payload: { targets: 'claude' },
     });
     expect(response.statusCode).toBe(400);
@@ -153,13 +153,13 @@ describe('POST /api/platforms/:id/disable', () => {
   it('возвращает файлы и удаляет профиль, а контур остаётся', async () => {
     await app.inject({
       method: 'POST',
-      url: '/api/platforms/enterprise-platform-dev/apply',
+      url: '/api/platforms/company-dev/apply',
       payload: { targets: ['assistant', 'claude'] },
     });
 
     const response = await app.inject({
       method: 'POST',
-      url: '/api/platforms/enterprise-platform-dev/disable',
+      url: '/api/platforms/company-dev/disable',
     });
     expect(response.statusCode).toBe(200);
     expect(response.json<{ profileRemoved: boolean }>().profileRemoved).toBe(true);
@@ -167,7 +167,7 @@ describe('POST /api/platforms/:id/disable', () => {
     expect(envOf()).toEqual({ EXISTING: 'keep-me' });
     expect(store.getSettings().endpointProfiles).toEqual([]);
     // Снимается применение, а не настройка: контур на месте и включён.
-    expect(store.getSettings().platforms[0]?.id).toBe('enterprise-platform-dev');
+    expect(store.getSettings().platforms[0]?.id).toBe('company-dev');
   });
 
   // Аудит DRV-02: право, добавленное разделом «Права» ПОСЛЕ применения, пишет
@@ -176,7 +176,7 @@ describe('POST /api/platforms/:id/disable', () => {
   it('право, добавленное панелью после применения, не мешает отключению', async () => {
     await app.inject({
       method: 'POST',
-      url: '/api/platforms/enterprise-platform-dev/apply',
+      url: '/api/platforms/company-dev/apply',
       payload: { targets: ['claude'] },
     });
     expect(envOf().ANTHROPIC_BASE_URL).toContain('127.0.0.1');
@@ -188,7 +188,7 @@ describe('POST /api/platforms/:id/disable', () => {
 
     const response = await app.inject({
       method: 'POST',
-      url: '/api/platforms/enterprise-platform-dev/disable',
+      url: '/api/platforms/company-dev/disable',
     });
     expect(response.statusCode).toBe(200);
     expect(envOf()).toEqual({ EXISTING: 'keep-me' });
@@ -201,13 +201,13 @@ describe('POST /api/platforms/:id/disable', () => {
   it('со списком целей снимает точечно — строку журнала, а не всё разом', async () => {
     await app.inject({
       method: 'POST',
-      url: '/api/platforms/enterprise-platform-dev/apply',
+      url: '/api/platforms/company-dev/apply',
       payload: { targets: ['assistant', 'claude'] },
     });
 
     const response = await app.inject({
       method: 'POST',
-      url: '/api/platforms/enterprise-platform-dev/disable',
+      url: '/api/platforms/company-dev/disable',
       payload: { targets: ['claude'] },
     });
 
@@ -220,13 +220,13 @@ describe('POST /api/platforms/:id/disable', () => {
     expect(result.profileRemoved).toBe(false);
     // Ассистент остаётся на контуре: его никто не снимал.
     expect(envOf()).toEqual({ EXISTING: 'keep-me' });
-    expect(store.getSettings().assistantEndpointId).toBe('contour-enterprise-platform-dev');
+    expect(store.getSettings().assistantEndpointId).toBe('contour-company-dev');
   });
 
   it('список целей не массивом — 400 с именем поля', async () => {
     const response = await app.inject({
       method: 'POST',
-      url: '/api/platforms/enterprise-platform-dev/disable',
+      url: '/api/platforms/company-dev/disable',
       payload: { targets: 'claude' },
     });
     expect(response.statusCode).toBe(400);
@@ -238,15 +238,15 @@ describe('DELETE /api/platforms/:id', () => {
   it('удаление контура снимает и применение — файлы не остаются с мёртвым адресом', async () => {
     await app.inject({
       method: 'POST',
-      url: '/api/platforms/enterprise-platform-dev/apply',
+      url: '/api/platforms/company-dev/apply',
       payload: { targets: ['claude'] },
     });
     expect(envOf().ANTHROPIC_BASE_URL).toBeDefined();
 
-    const response = await app.inject({ method: 'DELETE', url: '/api/platforms/enterprise-platform-dev' });
+    const response = await app.inject({ method: 'DELETE', url: '/api/platforms/company-dev' });
     expect(response.statusCode).toBe(200);
     expect(envOf()).toEqual({ EXISTING: 'keep-me' });
-    expect(store.getPlatformApplied()['enterprise-platform-dev']).toBeUndefined();
+    expect(store.getPlatformApplied()['company-dev']).toBeUndefined();
     expect(store.getSettings().endpointProfiles).toEqual([]);
   });
 });

@@ -70,8 +70,8 @@ describe('settings-validation: поля аудита', () => {
  */
 describe('settings-validation: контуры', () => {
   const platform = {
-    id: 'enterprise-platform-dev',
-    title: 'EnterprisePlatform · dev',
+    id: 'company-dev',
+    title: 'Company · dev',
     driver: 'enterprise-platform',
     baseUrl: 'https://api.dev.example.ru',
     enabled: true,
@@ -97,9 +97,9 @@ describe('settings-validation: контуры', () => {
     // Модель контура, переопределения на потребителя и карта имён (Т6) — та же
     // история: вырезанная молча карта означала бы, что «sonnet» снова уезжает в
     // контур именем вендора, а человек читает 403 «модель» как поломку панели.
-    defaultModel: 'enterprise-platform-mid',
-    consumerModels: { tests: 'enterprise-platform-small' },
-    modelMap: { sonnet: 'enterprise-platform-mid' },
+    defaultModel: 'company-mid',
+    consumerModels: { tests: 'company-small' },
+    modelMap: { sonnet: 'company-mid' },
     // Правила контура (Т7) — та же история в третий раз: вырезанный молча
     // список инструментов платформы означал бы, что запрос уходит без них, а
     // человек видит на карточке свой выбор.
@@ -268,7 +268,7 @@ describe('settings-validation: контуры', () => {
 
   it('импорт снимка сохраняет итог последней пробы контура', () => {
     const platformHealth = {
-      'enterprise-platform-dev': { outcome: 'ok', checkedAt: '2026-09-09T00:00:00.000Z' },
+      'company-dev': { outcome: 'ok', checkedAt: '2026-09-09T00:00:00.000Z' },
     };
     const parsed = importStateSchema.safeParse({
       settings: { platforms: [platform] },

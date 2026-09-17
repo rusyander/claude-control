@@ -22,6 +22,7 @@ import { Toggle } from '@shared/ui/toggle';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
 import { useSavePlatform } from '@entities/Platform';
 import { DataMaskRow } from './DataMaskRow';
+import styles from './PlatformPage.module.scss';
 import {
   blockingConflict,
   conflictTone,
@@ -132,7 +133,13 @@ export function RulesCard(props: RulesCardProps) {
   );
 
   const layerRow = (id: OurLayerId) => (
-    <Stack key={id} direction="row" align="center" gap="var(--spacing-xs)" wrap>
+    <Stack
+      key={id}
+      direction="row"
+      align="start"
+      gap="var(--spacing-xs)"
+      className={styles.toggleRow}
+    >
       <Toggle
         checked={layerOn(ours, id)}
         onCheckedChange={(checked) => update(withOurRule(platform, id, checked))}
@@ -287,115 +294,198 @@ export function RulesCard(props: RulesCardProps) {
           </Typography>
         </Stack>
 
-        {/* Драйвер, не объявивший о себе ничего (любой совместимый шлюз), даёт
-            пустой список — и это «неизвестно», а не «ничего не делает». */}
-        {rules.length === 0 && (
-          <Typography variant="body-sm" color="muted">
-            {t('platform.rulesEmpty')}
-          </Typography>
-        )}
-
-        {managed.length > 0 && (
-          <Stack gap="var(--spacing-2xs)">
-            <Typography variant="body-sm" weight="medium">
-              {t('platform.rulesManaged')}
-            </Typography>
-            {managed.map((row) => field(row))}
-          </Stack>
-        )}
-
-        {/* Наша сторона взаимного исключения — здесь же, а не «где-то на
-            карточке контура»: до ревью Т7 подпись отправляла человека к
-            выключателю, которого не было НИГДЕ, и два управляемых правила из
-            четырёх нельзя было задать вовсе. Т8 добавил сюда наши слои. */}
-        <Stack gap="var(--spacing-2xs)">
-          <Typography variant="body-sm" weight="medium">
-            {t('platform.rulesOurs')}
-          </Typography>
-          <DataMaskRow platform={platform} mask={dataMask} onChange={update} />
-          <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-            <Toggle
-              checked={platform.toolShim}
-              onCheckedChange={(checked) => update({ ...platform, toolShim: checked })}
-              aria-label={t('platform.rulesShim')}
-              disabled={shimLocked}
-            />
-            <Stack gap="var(--spacing-3xs)">
-              <Typography variant="body-sm" as="span">
-                {t('platform.rulesShim')}
-              </Typography>
-              <Typography
-                variant="caption"
-                color="muted"
-                as="span"
-                style={{ maxWidth: 'var(--text-measure)' }}
-              >
-                {shimLocked ? t('platform.rulesShimBlocked') : t('platform.rulesShimText')}
-              </Typography>
-            </Stack>
-          </Stack>
-
-          {/* Наши слои (Т8): что из `~/.claude` поедет в прогон через ЭТОТ
-              контур. Общий выключатель первым — им человек снимает всё разом,
-              не разбираясь в четырёх галочках. */}
-          <Stack gap="var(--spacing-2xs)">
-            <Typography variant="body-sm" weight="medium">
-              {t('platform.layersTitle')}
-            </Typography>
-            <Typography variant="caption" color="muted" style={{ maxWidth: 'var(--text-measure)' }}>
-              <CodeText text={t('platform.layersText')} />
-            </Typography>
-
-            <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-              <Toggle
-                checked={ours.enabled}
-                onCheckedChange={(checked) => update(withOurRule(platform, 'enabled', checked))}
-                aria-label={t('platform.layersAll')}
-              />
+        {/* Две колонки, подписанные по тому, ЧЬЁ правило: владелец раздела не
+            находил, где выбираются правила, потому что правила платформы и наши
+            слои шли одним списком без подписи стороны. Слева — что делает и
+            принимает контур, справа — что панель везёт в прогон от себя. */}
+        <div className={styles.rulesColumns}>
+          <section
+            className={`${styles.rulesColumn} ${styles.rulesColumnPlatform}`}
+            aria-labelledby={`rules-platform-${platform.id}`}
+            data-rules-side="platform"
+          >
+            <Stack gap="var(--spacing-sm)">
               <Stack gap="var(--spacing-3xs)">
-                <Typography variant="body-sm" as="span">
-                  {t('platform.layersAll')}
-                </Typography>
                 <Typography
-                  variant="caption"
-                  color="muted"
-                  as="span"
-                  style={{ maxWidth: 'var(--text-measure)' }}
+                  variant="body"
+                  weight="medium"
+                  as="h3"
+                  id={`rules-platform-${platform.id}`}
                 >
-                  {/* Причина запертых галочек стоит НАД ними: запертый тумблер
-                      выброшен из обхода табом, и объяснение под ним человек с
-                      клавиатуры не прочитал бы вовсе (урок ревью Т7, m3). */}
-                  {ours.enabled ? t('platform.layersAllText') : t('platform.layersAllOff')}
+                  {t('platform.rulesSidePlatform')}
+                </Typography>
+                <Typography variant="caption" color="muted">
+                  {t('platform.rulesSidePlatformText')}
                 </Typography>
               </Stack>
+              {/* Драйвер, не объявивший о себе ничего (любой совместимый шлюз), даёт
+                пустой список — и это «неизвестно», а не «ничего не делает». */}
+              {rules.length === 0 && (
+                <Typography variant="body-sm" color="muted">
+                  {t('platform.rulesEmpty')}
+                </Typography>
+              )}
+
+              {managed.length > 0 && (
+                <Stack gap="var(--spacing-2xs)">
+                  <Typography variant="body-sm" weight="medium">
+                    {t('platform.rulesManaged')}
+                  </Typography>
+                  {managed.map((row) => field(row))}
+                </Stack>
+              )}
+              {observed.length > 0 && (
+                <Stack gap="var(--spacing-2xs)">
+                  <Typography variant="body-sm" weight="medium">
+                    {t('platform.rulesObserved')}
+                  </Typography>
+                  {observed.map((row) => (
+                    <Stack key={row.id} gap="var(--spacing-3xs)">
+                      <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
+                        <Typography variant="body-sm" as="span">
+                          {row.title}
+                        </Typography>
+                        <Badge tone="neutral">{row.where}</Badge>
+                      </Stack>
+                      <Typography variant="caption" color="muted" as="span">
+                        {row.detail}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
             </Stack>
+          </section>
 
-            {ourLayerIds.map((id) => layerRow(id))}
+          <section
+            className={`${styles.rulesColumn} ${styles.rulesColumnOurs}`}
+            aria-labelledby={`rules-ours-${platform.id}`}
+            data-rules-side="ours"
+          >
+            <Stack gap="var(--spacing-sm)">
+              <Stack gap="var(--spacing-3xs)">
+                <Typography variant="body" weight="medium" as="h3" id={`rules-ours-${platform.id}`}>
+                  {t('platform.rulesSideOurs')}
+                </Typography>
+                <Typography variant="caption" color="muted">
+                  {t('platform.rulesSideOursText')}
+                </Typography>
+              </Stack>
+              {/* Наша сторона взаимного исключения — здесь же, а не «где-то на
+                карточке контура»: до ревью Т7 подпись отправляла человека к
+                выключателю, которого не было НИГДЕ, и два управляемых правила из
+                четырёх нельзя было задать вовсе. Т8 добавил сюда наши слои. */}
+              <Stack gap="var(--spacing-2xs)">
+                <Typography variant="body-sm" weight="medium">
+                  {t('platform.rulesOurs')}
+                </Typography>
+                <DataMaskRow platform={platform} mask={dataMask} onChange={update} />
+                <Stack
+                  direction="row"
+                  align="start"
+                  gap="var(--spacing-xs)"
+                  className={styles.toggleRow}
+                >
+                  <Toggle
+                    checked={platform.toolShim}
+                    onCheckedChange={(checked) => update({ ...platform, toolShim: checked })}
+                    aria-label={t('platform.rulesShim')}
+                    disabled={shimLocked}
+                  />
+                  <Stack gap="var(--spacing-3xs)">
+                    <Typography variant="body-sm" as="span">
+                      {t('platform.rulesShim')}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="muted"
+                      as="span"
+                      style={{ maxWidth: 'var(--text-measure)' }}
+                    >
+                      {shimLocked ? t('platform.rulesShimBlocked') : t('platform.rulesShimText')}
+                    </Typography>
+                  </Stack>
+                </Stack>
 
-            {/* Флаги показываются настоящие: «личные правила сняты» без того,
-                чем именно, — это просьба верить на слово. Считает их сервер. */}
-            {layers && (
-              <Typography
-                variant="caption"
-                color="muted"
-                style={{ maxWidth: 'var(--text-measure)' }}
-              >
-                {layers.args.length > 0
-                  ? t('platform.layersFlags', { args: layers.args.join(' ') })
-                  : t('platform.layersFlagsNone')}
-                {!layers.systemPrompt && ` ${t('platform.layersPromptOff')}`}
-                {!claudeRuns && ` ${t('platform.layersNoRun')}`}
-              </Typography>
-            )}
+                {/* Наши слои (Т8): что из `~/.claude` поедет в прогон через ЭТОТ
+                  контур. Общий выключатель первым — им человек снимает всё разом,
+                  не разбираясь в четырёх галочках. */}
+                <Stack gap="var(--spacing-2xs)">
+                  <Typography variant="body-sm" weight="medium">
+                    {t('platform.layersTitle')}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="muted"
+                    style={{ maxWidth: 'var(--text-measure)' }}
+                  >
+                    <CodeText text={t('platform.layersText')} />
+                  </Typography>
 
-            {/* Три соседние настройки, которых здесь НЕТ и не будет: человек,
-                не нашедший галочки, должен прочитать почему, а не решить, что
-                панель потеряла слой. */}
-            <Typography variant="caption" color="muted" style={{ maxWidth: 'var(--text-measure)' }}>
-              <CodeText text={t('platform.layersNotes')} />
-            </Typography>
-          </Stack>
-        </Stack>
+                  <Stack
+                    direction="row"
+                    align="start"
+                    gap="var(--spacing-xs)"
+                    className={styles.toggleRow}
+                  >
+                    <Toggle
+                      checked={ours.enabled}
+                      onCheckedChange={(checked) =>
+                        update(withOurRule(platform, 'enabled', checked))
+                      }
+                      aria-label={t('platform.layersAll')}
+                    />
+                    <Stack gap="var(--spacing-3xs)">
+                      <Typography variant="body-sm" as="span">
+                        {t('platform.layersAll')}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="muted"
+                        as="span"
+                        style={{ maxWidth: 'var(--text-measure)' }}
+                      >
+                        {/* Причина запертых галочек стоит НАД ними: запертый тумблер
+                          выброшен из обхода табом, и объяснение под ним человек с
+                          клавиатуры не прочитал бы вовсе (урок ревью Т7, m3). */}
+                        {ours.enabled ? t('platform.layersAllText') : t('platform.layersAllOff')}
+                      </Typography>
+                    </Stack>
+                  </Stack>
+
+                  {ourLayerIds.map((id) => layerRow(id))}
+
+                  {/* Флаги показываются настоящие: «личные правила сняты» без того,
+                    чем именно, — это просьба верить на слово. Считает их сервер. */}
+                  {layers && (
+                    <Typography
+                      variant="caption"
+                      color="muted"
+                      style={{ maxWidth: 'var(--text-measure)' }}
+                    >
+                      {layers.args.length > 0
+                        ? t('platform.layersFlags', { args: layers.args.join(' ') })
+                        : t('platform.layersFlagsNone')}
+                      {!layers.systemPrompt && ` ${t('platform.layersPromptOff')}`}
+                      {!claudeRuns && ` ${t('platform.layersNoRun')}`}
+                    </Typography>
+                  )}
+
+                  {/* Три соседние настройки, которых здесь НЕТ и не будет: человек,
+                    не нашедший галочки, должен прочитать почему, а не решить, что
+                    панель потеряла слой. */}
+                  <Typography
+                    variant="caption"
+                    color="muted"
+                    style={{ maxWidth: 'var(--text-measure)' }}
+                  >
+                    <CodeText text={t('platform.layersNotes')} />
+                  </Typography>
+                </Stack>
+              </Stack>
+            </Stack>
+          </section>
+        </div>
 
         {/* Отказ сервера читается вслух: сохранение, ушедшее в никуда, человек
             замечает по вернувшемуся старому значению и винит панель. */}
@@ -403,27 +493,6 @@ export function RulesCard(props: RulesCardProps) {
           <Typography variant="body-sm" color="danger" role="alert">
             {save.error instanceof Error ? save.error.message : t('platform.rulesSaveFailed')}
           </Typography>
-        )}
-
-        {observed.length > 0 && (
-          <Stack gap="var(--spacing-2xs)">
-            <Typography variant="body-sm" weight="medium">
-              {t('platform.rulesObserved')}
-            </Typography>
-            {observed.map((row) => (
-              <Stack key={row.id} gap="var(--spacing-3xs)">
-                <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
-                  <Typography variant="body-sm" as="span">
-                    {row.title}
-                  </Typography>
-                  <Badge tone="neutral">{row.where}</Badge>
-                </Stack>
-                <Typography variant="caption" color="muted" as="span">
-                  {row.detail}
-                </Typography>
-              </Stack>
-            ))}
-          </Stack>
         )}
 
         {conflicts.length > 0 && (

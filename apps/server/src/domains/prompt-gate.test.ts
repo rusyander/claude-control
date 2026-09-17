@@ -220,10 +220,18 @@ describe('гейт на промпте', () => {
     './prompt-gate/__fixtures__/gate-script-2026-08.mjs.txt',
     import.meta.url,
   );
+  // В снимке прежнее имя продукта заменено меткой: литерала в дереве нет (историю
+  // переписывают заменой слова). Метка раскрывается обратно в настоящие байты
+  // скрипта; имя записано задом наперёд, а не взято из `brand.mjs`, — иначе тест
+  // повторил бы ошибку в сборке имени вместо того, чтобы её поймать.
+  const readPastScript = () =>
+    readFileSync(PAST_SCRIPT, 'utf8')
+      .split('%%PAST_BRAND_NAME%%')
+      .join([...'lortnoC edualC'].reverse().join(''));
 
   it('скрипт прошлой версии панели — «устарел», а не «правка», и применение его пересобирает', () => {
     applyPromptGate(store, location(), { enabled: true, action: 'block' });
-    writeFileSync(gateScriptPath(hooksDir), readFileSync(PAST_SCRIPT, 'utf8'), 'utf8');
+    writeFileSync(gateScriptPath(hooksDir), readPastScript(), 'utf8');
 
     const before = describePromptGate(store, location());
     expect(before.customized).toBe(false);
@@ -236,7 +244,7 @@ describe('гейт на промпте', () => {
 
   it('правка руками в скрипте прошлой версии остаётся правкой', () => {
     applyPromptGate(store, location(), { enabled: true, action: 'block' });
-    const edited = readFileSync(PAST_SCRIPT, 'utf8').replace(
+    const edited = readPastScript().replace(
       'function journalEnabled()',
       'function journalEnabled() /* моё */',
     );
@@ -246,6 +254,55 @@ describe('гейт на промпте', () => {
     expect(info.customized).toBe(true);
     expect(info.outdated).toBe(false);
     expect(readFileSync(gateScriptPath(hooksDir), 'utf8')).toBe(edited);
+  });
+
+  // Гейт, поставленный до переименования продукта (17.09.2026): файл под прежним
+  // именем и запись в settings.json на него. Он свой — второй гейт рядом
+  // проверял бы каждый промпт дважды, а «правка человека» заморозила бы его.
+  const installLegacy = (source: string) => {
+    const legacyPath = join(
+      hooksDir,
+      `${[...'lortnoc-edualc'].reverse().join('')}-prompt-gate.mjs`,
+    );
+    writeFileSync(legacyPath, source, 'utf8');
+    const command = `node "${legacyPath.replace(/\\/g, '/')}"`;
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        hooks: { UserPromptSubmit: [{ hooks: [{ type: 'command', command, timeout: 10 }] }] },
+      }),
+      'utf8',
+    );
+    return legacyPath;
+  };
+
+  it('гейт под прежним именем виден установленным и устаревшим, а применение переносит его', () => {
+    const legacyPath = installLegacy(readPastScript());
+
+    const before = describePromptGate(store, location());
+    expect(before.installed).toBe(true);
+    expect(before.customized).toBe(false);
+    expect(before.outdated).toBe(true);
+
+    const after = applyPromptGate(store, location(), { enabled: true, action: 'block' });
+    expect(after.installed).toBe(true);
+    expect(after.outdated).toBe(false);
+    expect(existsSync(legacyPath)).toBe(false);
+    const hooks = JSON.parse(readFileSync(settingsPath, 'utf8')).hooks.UserPromptSubmit;
+    const commands = hooks.flatMap((group: { hooks: { command: string }[] }) =>
+      group.hooks.map((hook) => hook.command),
+    );
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toContain('agentdeck-prompt-gate.mjs');
+  });
+
+  it('правленный руками гейт под прежним именем не трогается и второй не ставится', () => {
+    const legacyPath = installLegacy('// мой гейт\n');
+
+    const info = applyPromptGate(store, location(), { enabled: true, action: 'block' });
+    expect(info.customized).toBe(true);
+    expect(readFileSync(legacyPath, 'utf8')).toBe('// мой гейт\n');
+    expect(existsSync(gateScriptPath(hooksDir))).toBe(false);
   });
 });
 

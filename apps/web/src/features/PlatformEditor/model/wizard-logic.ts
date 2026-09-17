@@ -1,7 +1,11 @@
 import {
   PLATFORM_ASSISTANT_TARGET,
   PLATFORM_PRESETS,
+  foreignProviderId,
   type Platform,
+  type PlatformApplyResult,
+  type PlatformApplyTarget,
+  type PlatformConsumerOption,
   type PlatformManifestField,
   type PlatformManifestOverrides,
   type PlatformCapability,
@@ -108,6 +112,9 @@ export function initialTargets(existing: PlatformStatus | undefined): string[] {
   return saved.filter((target) => target !== PLATFORM_ASSISTANT_TARGET);
 }
 
+/** Сохраняемое и применяемое при «Готово» — общая функция контрактов (её зовёт и агент панели). */
+export { finishPlan } from '@agentdeck/contracts';
+
 /**
  * Включать ли шлюз перед подъёмом. Уже включённый не трогаем: лишняя запись
  * настроек — лишний перезапуск слушателя, а его сейчас слушают живые CLI.
@@ -154,4 +161,45 @@ export function budgetFromText(value: string): { usd: number; broken: boolean } 
   const parsed = Number(text);
   if (!Number.isFinite(parsed) || parsed < 0) return { usd: 0, broken: true };
   return { usd: parsed, broken: false };
+}
+
+/**
+ * Закрывается ли мастер по «Готово» после применения (дефект D3 приёмки).
+ *
+ * Держать окно открытым имеет смысл ровно тогда, когда пропуск чинится В НЁМ:
+ * место занято, и галочка «перезаписать» стоит под строкой цели. Остальные
+ * причины здесь не чинятся — контур не активен, шлюз не поднят, у CLI нет
+ * файла переменных, — и окно, которое не закрывается на «Готово», оставляло
+ * человека с сохранённым контуром и кнопкой, которая «не работает». Такие
+ * пропуски мастер закрывает и называет вслух (`skippedNote`).
+ */
+export function finishCloses(result: PlatformApplyResult): boolean {
+  return !result.skipped.some((item) => item.reason === 'conflict');
+}
+
+/**
+ * Файл CLI сильнее снятой галочки потребителя: переменные панель кладёт в
+ * окружение процесса, а применённый файл CLI читает сам на каждом запуске.
+ * Пока файл этого CLI применён, «через контур не ходить» для такого прогона не
+ * выполнится — это говорится у строки, а не обещается молча.
+ */
+export function consumerFileWins(
+  consumer: PlatformConsumerOption,
+  consumers: readonly string[],
+  appliedFiles: ReadonlySet<string>,
+): boolean {
+  return (
+    consumer.scope === 'run' &&
+    !consumers.includes(consumer.id) &&
+    appliedFiles.has(foreignProviderId(consumer.id) ?? 'claude')
+  );
+}
+
+/** Файловые цели (не ассистент), в которые контур уже записан. */
+export function appliedFileTargets(targets: readonly PlatformApplyTarget[]): Set<string> {
+  return new Set(
+    targets
+      .filter((target) => target.targetId !== PLATFORM_ASSISTANT_TARGET && target.applied)
+      .map((target) => target.targetId),
+  );
 }

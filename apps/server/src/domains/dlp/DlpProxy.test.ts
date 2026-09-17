@@ -159,9 +159,11 @@ describe('DlpProxy', () => {
       JSON.stringify({ messages: [{ role: 'user', content: 'ключ sk-abc123def' }] }),
     );
 
-    expect(response.status).toBe(403);
+    // 400, а не 403: CLI читает 403 как ошибку входа, а это отказ по содержимому.
+    expect(response.status).toBe(400);
     expect(seen).toHaveLength(0);
-    const payload = (await response.json()) as { error?: { message?: string } };
+    const payload = (await response.json()) as { error?: { message?: string; type?: string } };
+    expect(payload.error?.type).toBe('invalid_request_error');
     expect(payload.error?.message).toContain('Ключи');
   });
 
@@ -169,7 +171,7 @@ describe('DlpProxy', () => {
     await start();
     const response = await post('/v2/unknown', JSON.stringify({ text: 'Рустам Урманов' }));
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(400);
     expect(seen).toHaveLength(0);
   });
 

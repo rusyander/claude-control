@@ -1,7 +1,4 @@
-import {
-  contextHandoffProposal,
-  type HandoffProposal,
-} from '@agentdeck/contracts/chat-handoff';
+import { contextHandoffProposal, type HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 
 /**
  * Второй повод продолжить работу в чистой сессии — размер окна, а не смысл.

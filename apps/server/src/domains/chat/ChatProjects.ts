@@ -1,6 +1,13 @@
 import { existsSync } from 'node:fs';
 import { readChats } from './ChatHistory.ts';
 import { isSandboxPath } from './ChatArtifacts.ts';
+import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
+
+/** Каталог чатов панели под нынешним или прежним именем. */
+const PANEL_CHATS_DIR = new RegExp(
+  `[\\\\/](?:${BRAND_SLUG}|${LEGACY_BRAND_SLUG})[\\\\/]chats[\\\\/]`,
+  'i',
+);
 
 /**
  * Перечисление проектов, с которыми работал Claude Code.
@@ -58,7 +65,7 @@ function shortName(path: string): string {
  */
 function isNonProject(path: string): boolean {
   return (
-    /[\\/]agentdeck[\\/]chats[\\/]/i.test(path) ||
+    PANEL_CHATS_DIR.test(path) ||
     /[\\/]chats[\\/](?:new|qa)-/i.test(path) ||
     /[\\/](?:AppData[\\/]Local[\\/]Temp|Temp|tmp)[\\/].*claude/i.test(path) ||
     /[\\/]scratchpad(?:[\\/]|$)/i.test(path) ||

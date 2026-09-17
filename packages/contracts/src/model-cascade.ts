@@ -1,3 +1,4 @@
+import { blockLang, blockLangPattern } from './brand.ts';
 /**
  * Подбор модели под задачу: какой моделью и с какой глубиной пойдёт каждый
  * ребёнок разделения задач.
@@ -381,7 +382,7 @@ export const CASCADE_STAGES = ['triage', 'plan', 'work', 'review', 'fix', 'push'
 export type CascadeStage = (typeof CASCADE_STAGES)[number];
 
 /** Язык блока вердикта: по нему панель узнаёт ответ ревьюера. */
-export const REVIEW_BLOCK_LANG = 'agentdeck:review';
+export const REVIEW_BLOCK_LANG = blockLang('review');
 
 /**
  * Сколько замечаний и какой длины панель принимает. Ограничение не про формат, а
@@ -438,7 +439,9 @@ export interface ReviewScan {
 }
 
 /** Начало блока: тройная кавычка в начале строки и наш язык за ней. */
-const REVIEW_OPEN = new RegExp(`(^|\\n)[ \\t]*\`\`\`[ \\t]*${REVIEW_BLOCK_LANG}[ \\t]*\\r?\\n`);
+const REVIEW_OPEN = new RegExp(
+  `(^|\\n)[ \\t]*\`\`\`[ \\t]*${blockLangPattern('review')}[ \\t]*\\r?\\n`,
+);
 
 /**
  * Вырезать блоки вердикта из ответа. Правила ровно те же, что у разделения задач

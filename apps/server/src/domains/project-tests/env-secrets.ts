@@ -11,6 +11,7 @@ import {
   setStoredKey,
 } from '../../lib/provider-keys.ts';
 import { ProjectTestsError } from './files.ts';
+import { brandEnvName, legacyEnvName } from '../../lib/brand.mjs';
 
 /**
  * Доступы стенда: логин, пароль, токен — то, без чего прогон упирается в форму
@@ -46,7 +47,7 @@ const NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
  * Оба случая выглядели бы как необъяснимая поломка прогона.
  */
 const RESERVED = ['PATH', 'PATHEXT', 'HOME', 'USERPROFILE', 'NODE_OPTIONS', 'SHELL', 'TEMP', 'TMP'];
-const RESERVED_PREFIXES = ['CLAUDE_', 'ANTHROPIC_', 'AWS_', 'AGENTDECK_'];
+const RESERVED_PREFIXES = ['CLAUDE_', 'ANTHROPIC_', 'AWS_', brandEnvName(''), legacyEnvName('')];
 
 /** Ключ окружения в общем хранилище секретов панели. */
 export function environmentSecretsKey(root: string, environmentId: string): string {

@@ -61,10 +61,12 @@ export const pluginsEn: typeof pluginsRu = {
       pathTextText:
         'A button in the panel launches the claude plugin command — the same one you ' +
         'would type in the terminal. The CLI reaches the marketplace (usually a ' +
-        'GitHub repository), puts the plugin into a directory on disk and records it ' +
-        'in installed_plugins.json; a plugin counts as enabled when the registry ' +
-        'explicitly says yes. The panel reads that registry itself and understands ' +
-        "version 2 only — exactly the one the CLI reads. The plugin's skills, hooks " +
+        'GitHub repository), puts the plugin into a directory on disk, records it in ' +
+        'its registry and sets enabledPlugins → true in settings.json. The section ' +
+        'takes the installed list and the “enabled” flag not from files but from the ' +
+        'answer of claude plugin list --json. The panel reads the installed_plugins.json ' +
+        'registry only for the command palette — and version 2 only, exactly the one ' +
+        "the CLI understands. The plugin's skills, hooks " +
         'and servers are picked up on the next session start, not immediately.',
 
       installTitle: "Installing someone else's plugin",
@@ -229,14 +231,16 @@ export const pluginsEn: typeof pluginsRu = {
     limitCliValue:
       'total: without claude in the PATH of the panel process not a single action of the ' +
       'section works',
-    limitRegistry: 'Registry',
+    limitRegistry: 'Where the list comes from',
     limitRegistryValue:
-      'installed_plugins.json version 2 only — the one the CLI itself reads; a plugin counts ' +
-      'as enabled when the registry explicitly says yes',
+      'the answer of claude plugin list --json; “enabled” lives in settings.json → ' +
+      'enabledPlugins. The installed_plugins.json registry (version 2 only) is read by the ' +
+      'command palette alone',
     limitSerial: 'Concurrency',
     limitSerialValue:
-      'operations run one at a time: while a command works, the buttons on the whole page ' +
-      'are disabled',
+      'plugin operations run one at a time: while an install, removal, toggle or update ' +
+      'works, those action buttons are disabled on every plugin; catalog search and ' +
+      'marketplaces stay available',
     limitSlow: 'Slow commands',
     limitSlowValue:
       'the list of installed plugins is waited on for up to a minute, the catalogue of ' +
@@ -293,8 +297,9 @@ export const pluginsEn: typeof pluginsRu = {
     noteSlowTitle: 'Installation can take a while',
     noteSlowText:
       'The command reaches the network and may take minutes. The panel waits for it ' +
-      'and shows the result when it arrives. While any operation runs, the buttons on ' +
-      'the whole page are disabled — plugin commands cannot be interleaved.',
+      'and shows the result when it arrives. While an install, removal, toggle or update ' +
+      'runs, those action buttons are disabled on every plugin — plugin commands cannot ' +
+      'be interleaved. Catalog search and marketplaces keep working meanwhile.',
     noteContentTitle: 'Plugin contents do not show up as yours in other sections',
     noteContentText:
       'A plugin’s skills and hooks belong to it. Editing them through the panel is not ' +
@@ -327,6 +332,6 @@ export const pluginsEn: typeof pluginsRu = {
 
   diagrams: {
     'plugin-install':
-      'The installation path: a panel button → the standard claude plugin command → the marketplace → a directory on disk and an entry in the version 2 registry. That is why the CLI has to be installed and why the plugin only works from the next session.',
+      'The installation path: a panel button → the standard claude plugin command → the marketplace → a directory on disk, an entry in the CLI registry and enabledPlugins in settings.json. That is why the CLI has to be installed and why the plugin only works from the next session.',
   },
 };

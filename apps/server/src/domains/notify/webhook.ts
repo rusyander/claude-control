@@ -3,6 +3,7 @@ import type { NotifyEvent, WebhookPayload, WebhookSettings } from '@agentdeck/co
 import { describeFailure, sendRequest } from '../integrations/http.ts';
 import { invalidField, unreachable } from '../integrations/errors.ts';
 import { compose, noticeEvent, type TelegramNotice } from './telegram.ts';
+import { LEGACY_BRAND_NAME } from '../../lib/brand.mjs';
 
 /**
  * Вебхук — те же события панели, но своим адресом.
@@ -24,6 +25,11 @@ import { compose, noticeEvent, type TelegramNotice } from './telegram.ts';
 
 const SYSTEM = 'Вебхук';
 const SIGNATURE_HEADER = 'X-AgentDeck-Signature';
+/**
+ * Та же подпись под заголовком до переименования продукта: приёмники, настроенные
+ * раньше, проверяют именно его. Уходит рядом с новым, значение то же.
+ */
+const LEGACY_SIGNATURE_HEADER = `X-${LEGACY_BRAND_NAME.replace(' ', '-')}-Signature`;
 
 export interface WebhookDeps {
   settings: () => WebhookSettings;
@@ -67,7 +73,9 @@ export async function sendWebhook(
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      ...(secret ? { [SIGNATURE_HEADER]: sign(secret, body) } : {}),
+      ...(secret
+        ? { [SIGNATURE_HEADER]: sign(secret, body), [LEGACY_SIGNATURE_HEADER]: sign(secret, body) }
+        : {}),
     },
     body,
   });

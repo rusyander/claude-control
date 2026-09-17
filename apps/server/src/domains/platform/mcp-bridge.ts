@@ -10,6 +10,7 @@ import {
   type PanelBridgeTarget,
 } from '../panel-mcp.ts';
 import { PlatformError } from './errors.ts';
+import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
 
 /**
  * Переходник к контуру для АГЕНТА: то же окно наружу, что у человека в разделе
@@ -27,10 +28,10 @@ import { PlatformError } from './errors.ts';
  */
 
 /**
- * Имя записи. С префиксом панели: «contour» или «enterprise-platform» — вероятные имена
+ * Имя записи. С префиксом панели: «contour» или «platform» — вероятные имена
  * чужих серверов, и совпадение означало бы запись поверх чужой настройки.
  */
-export const PLATFORM_MCP_ID = 'agentdeck-contour';
+export const PLATFORM_MCP_ID = `${BRAND_SLUG}-contour`;
 
 /** Путь к скрипту переходника: он лежит в самом репозитории панели. */
 export function platformMcpScript(): string {
@@ -38,7 +39,11 @@ export function platformMcpScript(): string {
 }
 
 function bridge(): PanelBridge {
-  return { id: PLATFORM_MCP_ID, script: platformMcpScript() };
+  return {
+    id: PLATFORM_MCP_ID,
+    legacyId: `${LEGACY_BRAND_SLUG}-contour`,
+    script: platformMcpScript(),
+  };
 }
 
 /** Завести или обновить запись. Повторное нажатие обновляет адрес панели. */

@@ -639,10 +639,24 @@ export class ChatRunRegistry {
       platformArgs: route.layers?.args ?? [],
       platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
     };
+    // Журнал понижений отвечает на «окупается ли понижение», и отвечать он обязан
+    // моделью, которой прогон ШЁЛ. Через контур это модель маршрута, а не имя из
+    // шапки: иначе расход считался бы по модели, которой прогона не было (ревью
+    // Т6, m8). Глубина, которую контур не принимает, в журнал тоже не пишется.
+    const routedMeta: RunMeta = meta.lowered
+      ? {
+          ...meta,
+          lowered: {
+            ...meta.lowered,
+            ...(route.model?.model ? { model: route.model.model } : {}),
+            ...(route.effort === false ? { effort: '' } : {}),
+          },
+        }
+      : meta;
     const registered: RegisteredRun = {
       chatId,
       run,
-      meta,
+      meta: routedMeta,
       options: routed,
       startedAt: Date.now(),
       text: '',

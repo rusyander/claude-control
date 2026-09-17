@@ -1,0 +1,24 @@
+{
+  "topic": "panelAgent",
+  "source": "docs/diagrams/panelAgent-guide/panelAgent-guide.drawio",
+  "pages": [
+    {
+      "name": "action-path",
+      "file": "action-path.png",
+      "page": 1,
+      "source": "32d702f163341afd",
+      "width": 1517,
+      "height": 1068,
+      "exportedAt": "2026-09-17T14:15:43.133Z"
+    },
+    {
+      "name": "keys-and-files",
+      "file": "keys-and-files.png",
+      "page": 2,
+      "source": "8cf20cd1c56dd437",
+      "width": 1517,
+      "height": 958,
+      "exportedAt": "2026-09-17T14:15:46.603Z"
+    }
+  ]
+}

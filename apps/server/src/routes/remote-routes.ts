@@ -1,9 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type {
-  PushDevice,
-  RemoteAccessSettings,
-  RemoteAccessStatus,
-} from '@agentdeck/contracts';
+import type { PushDevice, RemoteAccessSettings, RemoteAccessStatus } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import type { RunNotice } from '../domains/chat/ChatRunRegistry.ts';
 import { readApiToken, rotateApiToken } from '../lib/api-token.ts';

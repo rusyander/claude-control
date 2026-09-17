@@ -10,7 +10,7 @@ import { budgetPercent, platformProblem, platformTone } from './state';
 const base: PlatformStatus = {
   platform: {
     id: 'enterprise-platform',
-    title: 'EnterprisePlatform',
+    title: 'Company',
     driver: 'enterprise-platform',
     baseUrl: 'https://api.example.ru',
     enabled: true,

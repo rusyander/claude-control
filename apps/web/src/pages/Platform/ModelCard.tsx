@@ -11,6 +11,10 @@ import { SelectField } from '@shared/ui/select-field';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
 import { useSavePlatform } from '@entities/Platform';
 import {
+  modelSizeB,
+  PLATFORM_AGENT_VERIFIED_FROM_B,
+} from '@agentdeck/contracts/platform-tool-hint';
+import {
   cardModel,
   catalogIds,
   consumerModelRows,
@@ -53,6 +57,8 @@ export function ModelCard({ platform, health, effort }: ModelCardProps) {
   const catalog = catalogIds(health);
   const current = cardModel(platform, health);
   const rows = consumerModelRows(platform);
+  const size = current.model ? modelSizeB(current.model) : undefined;
+  const agentSmall = size !== undefined && size < PLATFORM_AGENT_VERIFIED_FROM_B;
 
   const update = (next: Platform): void => {
     save.mutate({ platform: next });
@@ -106,6 +112,16 @@ export function ModelCard({ platform, health, effort }: ModelCardProps) {
             {t('platform.modelNeedsProbe')}
           </Typography>
         )}
+
+        {/* Порог размера — из живых прогонов (развилка 5): ниже него модель
+            отвечает в чате, но с инструментами агента справляется через раз.
+            Размер берётся из имени; нет числа — говорим только порог, гадать
+            по семейству нельзя. */}
+        <Typography variant="caption" color={agentSmall ? 'warning' : 'muted'}>
+          {agentSmall
+            ? t('platform.modelAgentSmall', { size: PLATFORM_AGENT_VERIFIED_FROM_B, model: size })
+            : t('platform.modelAgentVerified', { size: PLATFORM_AGENT_VERIFIED_FROM_B })}
+        </Typography>
 
         {rows.length > 0 && (
           <Stack gap="var(--spacing-2xs)">

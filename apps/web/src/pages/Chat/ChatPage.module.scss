@@ -35,15 +35,35 @@
   overflow: hidden;
 }
 
+// Список | разговор | ручка | превью. Ширину превью человек тянет ручкой
+// (`--preview-width`), но она не вправе съесть разговор: превью уступает, пока
+// разговору не останется $thread-min. Раньше ширина стояла в inline-стиле
+// готовой сеткой, перебивала все правила ниже, и на 1280 разговор сжимался до
+// столбика в одну букву.
+$thread-min: 420px;
+
 .pageWithPreview {
-  grid-template-columns: 300px minmax(0, 1fr) minmax(360px, 40%);
+  grid-template-columns:
+    300px minmax(0, 1fr) auto
+    max(280px, min(var(--preview-width, 520px), calc(100% - 300px - #{$thread-min})));
 }
 
 // Планшет: колонка списка ужимается, чтобы разговору осталось больше места.
 @media (max-width: 900px) {
-  .page,
-  .pageWithPreview {
+  .page {
     grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  // Списку и превью рядом с разговором места нет — список уходит, пока
+  // превью открыто; закрыл превью — список вернулся.
+  .pageWithPreview {
+    grid-template-columns:
+      minmax(0, 1fr) auto
+      max(240px, min(var(--preview-width, 520px), calc(100% - 320px)));
+
+    > .sidebar {
+      display: none;
+    }
   }
 }
 
@@ -196,9 +216,11 @@
   color: var(--color-accent);
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1200px) and (min-width: 901px) {
   .pageWithPreview {
-    grid-template-columns: 260px minmax(0, 1fr);
+    grid-template-columns:
+      260px minmax(0, 1fr) auto
+      max(260px, min(var(--preview-width, 520px), calc(100% - 260px - #{$thread-min})));
   }
 }
 

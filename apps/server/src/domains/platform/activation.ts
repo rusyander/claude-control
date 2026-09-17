@@ -16,6 +16,7 @@ import { catalogDefaultModel } from '@agentdeck/contracts/platform-models';
 import { PLATFORM_TERMINAL_CONSUMER } from '@agentdeck/contracts/platform-consumers';
 import { modelRulesFor } from './models.ts';
 import { withoutThink } from './gateway/think-tail.ts';
+import { smokeTools } from './smoke-tools.ts';
 
 /**
  * Активный контур: не режим одной карточки, а режим приложения (Р3).
@@ -365,7 +366,12 @@ export async function smokePlatform(
     }
 
     const { answer, stopReason } = collectAnswer(body);
-    if (answer) return { ok: true, model, answer, latencyMs, at };
+    if (answer) {
+      // Инструменты спрашиваются ПОСЛЕ живого ответа: на мёртвом пути их отказ
+      // повторил бы уже названную причину другими словами.
+      const tools = await smokeTools({ platform, model, port, fetchImpl });
+      return { ok: true, model, answer, latencyMs, at, ...(tools ? { tools } : {}) };
+    }
     // Пустой ответ на просьбу сказать одно слово — не успех: путь прошёл, а
     // модель промолчала, и списать это на «наверное, всё хорошо» значит выдать
     // зелёную карточку неработающей связке. Но «упёрлась в потолок» и «ответила

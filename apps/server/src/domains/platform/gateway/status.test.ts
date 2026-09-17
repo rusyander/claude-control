@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { enterprise-platformDriver } from '../drivers/enterprise-platform.ts';
+import { enterprisePlatformDriver } from '../drivers/enterprise-platform.ts';
 import { bridgeUpstreamStatus, readViolations } from './status.ts';
 
 /**
@@ -66,7 +66,7 @@ describe('перечень нарушений: только названия', (
     it('название правила от администратора — прозой, текст сработки не выносится', () => {
       const names = readViolations(
         { violations: [ruleViolation('Секреты в запросах')] },
-        enterprise-platformDriver.violationNames,
+        enterprisePlatformDriver.violationNames,
       );
       expect(names).toEqual(['Секреты в запросах']);
       expect(names.join(' ')).not.toContain('AKIA');
@@ -74,14 +74,17 @@ describe('перечень нарушений: только названия', (
 
     it('правило без названия называется своим типом', () => {
       expect(
-        readViolations({ violations: [ruleViolation(null)] }, enterprise-platformDriver.violationNames),
+        readViolations(
+          { violations: [ruleViolation(null)] },
+          enterprisePlatformDriver.violationNames,
+        ),
       ).toEqual(['SECRETS']);
     });
 
     it('проза в поле администратора чистится от управляющих знаков и длины', () => {
       const [name] = readViolations(
         { violations: [ruleViolation(`Строка\nвторая[31m${'я'.repeat(90)}`)] },
-        enterprise-platformDriver.violationNames,
+        enterprisePlatformDriver.violationNames,
       );
       expect(name).not.toMatch(/\p{C}/u);
       expect(name?.length).toBeLessThanOrEqual(65);
@@ -98,7 +101,10 @@ describe('перечень нарушений: только названия', (
           },
           violations: [ruleViolation('Секреты в запросах')],
         },
-        { driverRows: enterprise-platformDriver.statusRows, violationNames: enterprise-platformDriver.violationNames },
+        {
+          driverRows: enterprisePlatformDriver.statusRows,
+          violationNames: enterprisePlatformDriver.violationNames,
+        },
       );
       expect(bridged.violations).toEqual(['Секреты в запросах']);
       expect(bridged.message).toContain('Секреты в запросах');
@@ -134,7 +140,11 @@ describe('коды контура → отказ клиенту', () => {
     [502, 502, 'api_error'],
     [503, 503, 'overloaded_error'],
   ])('%s → %s (%s)', (from, to, code) => {
-    const bridged = bridgeUpstreamStatus(from, {}, { driverRows: enterprise-platformDriver.statusRows });
+    const bridged = bridgeUpstreamStatus(
+      from,
+      {},
+      { driverRows: enterprisePlatformDriver.statusRows },
+    );
     expect(bridged.status).toBe(to);
     expect(bridged.code).toBe(code);
     expect(bridged.message).not.toBe('');
@@ -153,7 +163,7 @@ describe('коды контура → отказ клиенту', () => {
           },
         ],
       },
-      { driverRows: enterprise-platformDriver.statusRows },
+      { driverRows: enterprisePlatformDriver.statusRows },
     );
     expect(bridged.message).toContain('messages: Field required');
     expect(bridged.message).not.toContain('секрет-из-запроса');
@@ -167,7 +177,7 @@ describe('коды контура → отказ клиенту', () => {
         code: 'content_policy_violation',
         violations: [{ category: 'pii_phone', text: 'телефон 89001234567' }],
       },
-      { driverRows: enterprise-platformDriver.statusRows },
+      { driverRows: enterprisePlatformDriver.statusRows },
     );
     // Ни один CLI не ждёт 451: он покажет сырое тело или решит, что сервер лёг.
     expect(bridged.status).toBe(400);
@@ -181,7 +191,7 @@ describe('коды контура → отказ клиенту', () => {
     const bridged = bridgeUpstreamStatus(
       402,
       { error: { message: 'Квота API провайдера исчерпана' } },
-      { driverRows: enterprise-platformDriver.statusRows },
+      { driverRows: enterprisePlatformDriver.statusRows },
     );
     expect(bridged.message).toContain('Квота API провайдера исчерпана');
   });

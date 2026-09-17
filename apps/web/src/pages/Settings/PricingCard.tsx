@@ -21,6 +21,7 @@ import {
   type PricingDraft,
 } from './model/PricingRow';
 import { activeEntries, formatPrice } from './PricingCard.lib';
+import { PricingManual } from './PricingManual';
 import styles from './PricingCard.module.scss';
 
 /**
@@ -247,6 +248,13 @@ export function PricingCard() {
             </tbody>
           </table>
         </div>
+
+        <PricingManual
+          custom={custom}
+          entries={data.entries}
+          onSave={savePricing}
+          isSaving={patch.isPending}
+        />
 
         {hasCustom && (
           <Stack direction="row" gap="var(--spacing-xs)">

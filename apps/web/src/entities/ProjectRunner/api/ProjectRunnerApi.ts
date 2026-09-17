@@ -1,9 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  PortHoldersInfo,
-  ProjectRunnerInfo,
-  ProjectRunnerView,
-} from '@agentdeck/contracts';
+import type { PortHoldersInfo, ProjectRunnerInfo, ProjectRunnerView } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { normalizeProjectPath } from '@shared/lib/workspace';
 

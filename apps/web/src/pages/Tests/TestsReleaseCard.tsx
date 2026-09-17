@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
-import type {
-  ProjectTestReleaseCase,
-  ProjectTestReleaseRequirement,
-} from '@agentdeck/contracts';
+import type { ProjectTestReleaseCase, ProjectTestReleaseRequirement } from '@agentdeck/contracts';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Badge } from '@shared/ui/badge';

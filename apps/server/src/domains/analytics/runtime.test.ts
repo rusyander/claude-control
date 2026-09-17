@@ -51,6 +51,14 @@ describe('isClaudeAgentCommand — кого считаем работающим 
     expect(isClaudeAgentCommand(command)).toBe(false);
   });
 
+  it('и клон под прежним именем продукта тоже не считается', () => {
+    // CLI внутри каталога панели — без отсева по имени каталога это был бы агент.
+    const cli = 'node_modules\\@anthropic-ai\\claude-code\\cli.js';
+    expect(isClaudeAgentCommand(`node c:\\work\\other\\${cli}`)).toBe(true);
+    const old = [...'lortnoc-edualc'].reverse().join('');
+    expect(isClaudeAgentCommand(`node c:\\work\\${old}\\${cli}`)).toBe(false);
+  });
+
   it('MCP-сервер из ~/.claude — не агент: точка перед именем каталога', () => {
     const command = 'node C:/Users/me/.claude/mcp-servers/telegram-inbox/server.mjs';
     expect(isClaudeAgentCommand(command)).toBe(false);

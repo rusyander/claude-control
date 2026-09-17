@@ -8,4 +8,5 @@ export {
   useAddMarketplace,
   useRemoveMarketplace,
   useScaffoldPlugin,
+  pluginsKey,
 } from './api/PluginApi';

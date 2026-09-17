@@ -1,9 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { panelHomeFile } from '../server/src/lib/brand.mjs';
 
 const API_PORT = Number(process.env.API_PORT ?? 5178);
 
@@ -16,7 +15,7 @@ const API_PORT = Number(process.env.API_PORT ?? 5178);
  * ждёт новый, и с пятисекундным кэшем каждый клик в это окно получал 401.
  * `stat` на запрос стоит копейки, а окна не остаётся вовсе.
  */
-const TOKEN_PATH = join(homedir(), '.agentdeck', 'api-token');
+const TOKEN_PATH = panelHomeFile('api-token');
 let tokenCache = { value: '', mtimeMs: -1 };
 
 function apiToken(): string {

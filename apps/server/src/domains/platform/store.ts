@@ -108,7 +108,7 @@ export function readPlatforms(store: AppStore): Platform[] {
     // правленной руками, значит «как у пресета», а не сломанный шлюз.
     manifest: platformManifestOf(platform.manifest),
     // Прослойка и промпт — из Т5, и та же дыра: запись без полей читалась
-    // `undefined`, то есть у платформа компании прослойка молча выключена вопреки
+    // `undefined`, то есть у платформы компании прослойка молча выключена вопреки
     // умолчанию контракта. Умолчание — пресета типа, как у обеих схем.
     toolShim:
       typeof platform.toolShim === 'boolean'

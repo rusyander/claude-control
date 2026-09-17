@@ -215,7 +215,7 @@ export async function updatePage(
         status: 'current',
         title,
         body: { representation: 'storage', value: patch.body },
-        version: { number: version, message: 'Обновлено панелью agentdeck' },
+        version: { number: version, message: 'Обновлено панелью AgentDeck' },
       },
     });
     return {
@@ -236,7 +236,7 @@ export async function updatePage(
       type: 'page',
       title,
       body: { storage: { value: patch.body, representation: 'storage' } },
-      version: { number: version, message: 'Обновлено панелью agentdeck' },
+      version: { number: version, message: 'Обновлено панелью AgentDeck' },
     },
   });
   return {

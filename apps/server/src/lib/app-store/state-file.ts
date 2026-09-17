@@ -1,5 +1,6 @@
 import { renameSync } from 'node:fs';
 import { join } from 'node:path';
+import { migrateLegacyPlatforms } from '@agentdeck/contracts/platform-legacy';
 import { readJsonFile } from '../safe-io.ts';
 import { DEFAULT_STATE } from './app-store.constants.ts';
 import type { AppState } from './app-store.types.ts';
@@ -20,7 +21,8 @@ export function stateFilePath(appDataDir: string): string {
  * протекают в другие экземпляры и в сам дефолт — а экземпляров несколько
  * (песочницы, смена целевого каталога через claudeDirOverride).
  */
-export function mergeState(loaded: Partial<AppState>): AppState {
+export function mergeState(input: Partial<AppState>): AppState {
+  const loaded = withCurrentPlatformDrivers(input).state;
   const base = structuredClone(DEFAULT_STATE);
   return {
     ...base,
@@ -58,6 +60,24 @@ export function mergeState(loaded: Partial<AppState>): AppState {
         ...loaded.settings?.integrations,
       },
     },
+  };
+}
+
+/**
+ * Контуры под прежним именем драйвера — под нынешним (`platform-legacy.ts`).
+ * `changed` говорит загрузке, что файл пора переписать: иначе старое имя жило
+ * бы на диске вечно и узнавалось бы на каждом старте. Повторный запуск находит
+ * нынешнее имя и ничего не пишет.
+ */
+export function withCurrentPlatformDrivers(loaded: Partial<AppState>): {
+  state: Partial<AppState>;
+  changed: boolean;
+} {
+  const { platforms, changed } = migrateLegacyPlatforms(loaded.settings?.platforms);
+  if (!changed || !loaded.settings) return { state: loaded, changed: false };
+  return {
+    state: { ...loaded, settings: { ...loaded.settings, platforms } as AppState['settings'] },
+    changed: true,
   };
 }
 

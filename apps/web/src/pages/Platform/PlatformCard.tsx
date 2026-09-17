@@ -29,6 +29,7 @@ import { AppliedTargets } from './AppliedTargets';
 import { ApplyJournal } from './ApplyJournal';
 import { GatewayDownLine } from './GatewayDownLine';
 import { SmokeLine } from './SmokeLine';
+import { SmokeToolsLine } from './SmokeToolsLine';
 import { formatAgo } from './lib/formatAgo';
 import styles from './PlatformPage.module.scss';
 
@@ -208,6 +209,9 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
             сейчас одинаково врут. Так же поступает телефон. */}
         {isActive && <GatewayDownLine />}
         {isActive && status.smoke && <SmokeLine smoke={status.smoke} />}
+        {isActive && status.smoke?.tools && (
+          <SmokeToolsLine platform={platform} tools={status.smoke.tools} />
+        )}
 
         <Stack gap="var(--spacing-3xs)">
           {/* Величина ОДНА и она оценка: деньги по нашему прайсу. «Внутренней

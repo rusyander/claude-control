@@ -1,26 +1,27 @@
 /**
- * Кадры путеводителя «Контур», сторона ПЛАТФОРМА КОМПАНИИ: админка инстанса.
+ * Кадры путеводителя «Контур», сторона платформы компании: админка инстанса.
  *
  * Снимает живые экраны стенда — рисованных и «похожих» кадров в справке нет.
  * Ключи в кадре закрываются набором `kit.mjs` ДО снимка, и проверка
  * `tools/qa/check-help-shots.mjs` ищет их в описи того же кадра.
  *
- * Нужен поднятый стенд платформа компании и учётка админа инстанса. Вход — РОВНО ОДИН:
+ * Нужен поднятый стенд платформы компании и учётка админа инстанса. Вход — РОВНО ОДИН:
  * неудача останавливает съёмку, повторов нет (блокировка учётки дороже кадра).
  *
- * Запуск: node tools/help-shots/platform-connect-enterprise-platform.mjs
- * Переменные: ENTERPRISE_PLATFORM_ADMIN_URL (по умолчанию http://inst.localhost),
- *             ENTERPRISE_PLATFORM_ADMIN_LOGIN, ENTERPRISE_PLATFORM_ADMIN_PASSWORD_FILE.
+ * Запуск: node tools/help-shots/platform-connect-admin.mjs
+ * Переменные: PLATFORM_ADMIN_URL (по умолчанию http://inst.localhost),
+ *             PLATFORM_ADMIN_LOGIN, PLATFORM_ADMIN_PASSWORD_FILE.
  */
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { openScenario } from './kit.mjs';
 
-const BASE = process.env.ENTERPRISE_PLATFORM_ADMIN_URL ?? 'http://inst.localhost';
-const LOGIN = process.env.ENTERPRISE_PLATFORM_ADMIN_LOGIN ?? 'admin@instance.local';
-const PASSWORD_FILE =
-  process.env.ENTERPRISE_PLATFORM_ADMIN_PASSWORD_FILE ??
-  'c:/work/enterprise-platform-for-agentdeck/.dev/inst_admin_password.txt';
+const BASE = process.env.PLATFORM_ADMIN_URL ?? 'http://inst.localhost';
+const LOGIN = process.env.PLATFORM_ADMIN_LOGIN ?? 'admin@instance.local';
+// Пароль — только файлом из переменной: где лежит учётка стенда, репозиторий не знает.
+const PASSWORD_FILE = process.env.PLATFORM_ADMIN_PASSWORD_FILE;
+if (!PASSWORD_FILE)
+  throw new Error('нужна PLATFORM_ADMIN_PASSWORD_FILE: файл с паролем админа стенда');
 
 /** Имя ключа, который выпускается ради кадра и достаётся панели. */
 const KEY_NAME = 'AgentDeck · путеводитель';
@@ -41,7 +42,7 @@ try {
   // ── 1. Вход ──────────────────────────────────────────────────────────────
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
-  await scenario.shot(page, '01-admin-login', { side: 'enterprise-platform' });
+  await scenario.shot(page, '01-admin-login', { side: 'platform' });
 
   const password = readFileSync(PASSWORD_FILE, 'utf8').trim();
   await page.fill('input[name="email"]', LOGIN);
@@ -55,12 +56,12 @@ try {
   // ── 2. Куда попадаешь ────────────────────────────────────────────────────
   await page.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
-  await scenario.shot(page, '02-admin-dashboard', { side: 'enterprise-platform' });
+  await scenario.shot(page, '02-admin-dashboard', { side: 'platform' });
 
   // ── 3. Каталог моделей ───────────────────────────────────────────────────
   await page.goto(`${BASE}/models`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
-  await scenario.shot(page, '03-admin-models', { side: 'enterprise-platform' });
+  await scenario.shot(page, '03-admin-models', { side: 'platform' });
 
   // ── 4. Форма модели: заполнена, но НЕ сохраняется ────────────────────────
   // Заполняется и провайдер, и адрес: справка объясняет на этом шаге, почему у
@@ -76,12 +77,12 @@ try {
   if (await apiBase.count()) await apiBase.fill('http://host.docker.internal:11434');
   await page.fill('input[name="max_context_length"]', '32768');
   await page.waitForTimeout(400);
-  await scenario.shot(page, '04-admin-model-create', { side: 'enterprise-platform' });
+  await scenario.shot(page, '04-admin-model-create', { side: 'platform' });
 
   // ── 5. Список ключей: колонка ключа закрывается ──────────────────────────
   await page.goto(`${BASE}/keys`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
-  await scenario.shot(page, '05-admin-keys', { side: 'enterprise-platform', mask: [KEY_CELL] });
+  await scenario.shot(page, '05-admin-keys', { side: 'platform', mask: [KEY_CELL] });
 
   // ── 6. Форма выпуска ключа ───────────────────────────────────────────────
   // Форма ключа — отдельная страница, как и форма модели: окна здесь нет.
@@ -91,7 +92,7 @@ try {
   await page.fill('input[name="budget"]', '10');
   await page.fill('input[name="rpm_limit"]', '60');
   await page.fill('input[name="tpm_limit"]', '100000');
-  await scenario.shot(page, '06-admin-key-create', { side: 'enterprise-platform' });
+  await scenario.shot(page, '06-admin-key-create', { side: 'platform' });
 
   // ── 7. Ключ показан один раз ─────────────────────────────────────────────
   await page
@@ -99,7 +100,7 @@ try {
     .last()
     .click();
   await page.waitForTimeout(3500);
-  await scenario.shot(page, '07-admin-key-issued', { side: 'enterprise-platform' });
+  await scenario.shot(page, '07-admin-key-issued', { side: 'platform' });
 
   // ── Уборка: снятый ключ на стенде не нужен ───────────────────────────────
   // Он выпущен ради одного кадра и в кадре закрыт, то есть нигде не сохранён.
@@ -124,7 +125,7 @@ try {
   // ── 8. Где смотреть расход ───────────────────────────────────────────────
   await page.goto(`${BASE}/usage`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(3000);
-  await scenario.shot(page, '08-admin-usage', { side: 'enterprise-platform' });
+  await scenario.shot(page, '08-admin-usage', { side: 'platform' });
 
   scenario.finish();
 } finally {

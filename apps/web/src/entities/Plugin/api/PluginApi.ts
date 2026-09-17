@@ -10,7 +10,7 @@ import { apiClient } from '@shared/api/client';
 import { i18n } from '@shared/config/i18n';
 import { toast } from '@shared/lib/toast';
 
-const pluginsKey = ['plugins'] as const;
+export const pluginsKey = ['plugins'] as const;
 
 async function getPlugins(): Promise<PluginsState> {
   const { data } = await apiClient.get<PluginsState>('/plugins');

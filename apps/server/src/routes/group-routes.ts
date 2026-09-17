@@ -1,12 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import type {
-  Automation,
-  Group,
-  GroupDraft,
-  GroupScenario,
-  HookEvent,
-} from '@agentdeck/contracts';
+import type { Automation, Group, GroupDraft, GroupScenario, HookEvent } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import { readHooks, writeHooks } from '../domains/hooks.ts';
 import type { EntityToggleDeps } from '../domains/entity-toggle.ts';
@@ -24,7 +18,7 @@ import {
 } from '../domains/group-scenario.ts';
 import { activateGroupsForCwd } from '../domains/group-activation.ts';
 import { wouldCreateCycle } from '../domains/group-graph.ts';
-import { AUTOMATION_MARKER } from '../domains/compiled-markers.ts';
+import { AUTOMATION_MARKER, hasAutomationMarker } from '../domains/compiled-markers.ts';
 import {
   assertGroupDraft,
   assertGroupNameFree,
@@ -374,7 +368,7 @@ function triggerError(scenario?: Partial<GroupScenario>): string | undefined {
 function compileAutomations(ctx: ServerContext): void {
   const { settings } = ctx.location.paths;
   const manual = readHooks(settings, ctx.store).filter(
-    (hook) => !hook.command.includes(AUTOMATION_MARKER),
+    (hook) => !hasAutomationMarker(hook.command),
   );
 
   const compiled = ctx.store

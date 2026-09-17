@@ -166,7 +166,10 @@ describe('platformModels: ответ контура в общем виде ка�
   it('семейства и даты выхода нет — автозамена дефолта опоры не получает', () => {
     // Вывести семейство из имени модели значило бы дать панели переставлять
     // дефолт по выдуманному родству (инвариант 13).
-    const models = platformModels(health({ models: [{ id: 'claude-opus-4-8' }] }), 'enterprise-platform');
+    const models = platformModels(
+      health({ models: [{ id: 'claude-opus-4-8' }] }),
+      'enterprise-platform',
+    );
 
     expect(models[0]!.family).toBe('');
     expect(models[0]!.releaseDate).toBeUndefined();

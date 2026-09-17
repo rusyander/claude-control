@@ -1,8 +1,4 @@
-import type {
-  EndpointApiKind,
-  EndpointProbeResult,
-  EndpointProfile,
-} from '@agentdeck/contracts';
+import type { EndpointApiKind, EndpointProbeResult, EndpointProfile } from '@agentdeck/contracts';
 
 /**
  * Проверка связи со своим эндпоинтом: панель спрашивает у адреса СПИСОК МОДЕЛЕЙ.

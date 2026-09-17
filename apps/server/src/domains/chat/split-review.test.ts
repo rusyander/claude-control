@@ -86,9 +86,7 @@ function stand(
 
 /** Ответ ревьюера в том виде, в каком его печатает модель. */
 function answer(findings: string[]): string {
-  return ['Посмотрел дифф.', '```agentdeck:review', JSON.stringify({ findings }), '```'].join(
-    '\n',
-  );
+  return ['Посмотрел дифф.', '```agentdeck:review', JSON.stringify({ findings }), '```'].join('\n');
 }
 
 describe('конец прогона ревью', () => {

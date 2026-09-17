@@ -1,10 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import type {
-  DlpAction,
-  DlpBuiltinInfo,
-  DlpBuiltinPattern,
-  DlpRule,
-} from '@agentdeck/contracts';
+import type { DlpAction, DlpBuiltinInfo, DlpBuiltinPattern, DlpRule } from '@agentdeck/contracts';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';

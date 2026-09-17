@@ -22,8 +22,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
  */
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -160,7 +160,7 @@ describe('возврат файлов в исходное состояние', (
     rollbackContour(deps(), PLATFORM.id);
 
     const text = readFileSync(codexPath, 'utf8');
-    expect(text).not.toContain('contour-enterprise-platform-dev');
+    expect(text).not.toContain('contour-company-dev');
     expect(text).toContain('[model_providers.own]');
     expect(text).toContain('[mcp_servers.local]');
     expect(text).toContain('# личные настройки codex');
@@ -207,7 +207,7 @@ describe('точечный откат', () => {
     expect(outcomeOf(result.entries, 'claude')).toBe('restored');
     // Codex не тронут ни в файле, ни в следе: человек передумал про один CLI,
     // а не про весь контур.
-    expect(readFileSync(codexPath, 'utf8')).toContain('contour-enterprise-platform-dev');
+    expect(readFileSync(codexPath, 'utf8')).toContain('contour-company-dev');
     expect(store.getPlatformApplied()[PLATFORM.id]?.targets.map((item) => item.targetId)).toEqual([
       'codex',
     ]);
@@ -221,7 +221,7 @@ describe('точечный откат', () => {
     const result = rollbackContour(deps(), PLATFORM.id, { targetIds: ['claude'] });
     expect(result.profileRemoved).toBe(false);
     expect(store.getSettings().endpointProfiles.map((item) => item.id)).toEqual([
-      'contour-enterprise-platform-dev',
+      'contour-company-dev',
     ]);
   });
 
@@ -270,7 +270,7 @@ describe('точечный откат', () => {
 
     rollbackContour(deps(), PLATFORM.id, { targetIds: ['claude'] });
     // Ассистента никто не снимал — он и остаётся на контуре.
-    expect(store.getSettings().assistantEndpointId).toBe('contour-enterprise-platform-dev');
+    expect(store.getSettings().assistantEndpointId).toBe('contour-company-dev');
   });
 
   it('названа цель, которой в следе нет — не трогается ничего', () => {
@@ -337,7 +337,7 @@ describe('чужая работа', () => {
     const result = rollbackContour(deps(), PLATFORM.id);
     expect(outcomeOf(result.entries, 'codex')).toBe('restored');
     const text = readFileSync(codexPath, 'utf8');
-    expect(text).not.toContain('contour-enterprise-platform-dev');
+    expect(text).not.toContain('contour-company-dev');
     expect(text).toContain('command = "pnpm"');
   });
 
@@ -388,7 +388,7 @@ describe('профиль и ассистент', () => {
   it('управляемый профиль удаляется, а ассистент возвращается к прежнему', () => {
     store.updateSettings({ endpointProfiles: [own], assistantEndpointId: 'ep-1' });
     applyContour(deps(), PLATFORM, { targets: ['assistant'], overwrite: ['assistant'] });
-    expect(store.getSettings().assistantEndpointId).toBe('contour-enterprise-platform-dev');
+    expect(store.getSettings().assistantEndpointId).toBe('contour-company-dev');
 
     const result = rollbackContour(deps(), PLATFORM.id);
     expect(result.profileRemoved).toBe(true);
@@ -412,7 +412,7 @@ describe('профиль и ассистент', () => {
     writeFileSync(settingsPath, JSON.stringify({ env: {} }));
     applyContour(deps(), PLATFORM, { targets: ['claude'] });
     rollbackContour(deps(), PLATFORM.id);
-    expect(store.getPlatformApplied()['enterprise-platform-dev']).toBeUndefined();
+    expect(store.getPlatformApplied()['company-dev']).toBeUndefined();
   });
 
   it('применения не было — откат ничего не выдумывает', () => {

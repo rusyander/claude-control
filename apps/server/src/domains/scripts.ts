@@ -262,7 +262,7 @@ export class UnsafeScriptPathError extends Error {
  * Поэтому имя не переписываем — опасный путь отклоняем целиком, а собранный
  * путь дополнительно проверяем на выход за пределы hooks/.
  */
-function resolveScriptPath(hooksDir: string, id: string): string {
+export function resolveScriptPath(hooksDir: string, id: string): string {
   if (id.includes('\0')) throw new UnsafeScriptPathError(id, 'недопустимый символ.');
 
   // Разделители не схлопываем: пустой сегмент (`sub//a.mjs`) — уже странная

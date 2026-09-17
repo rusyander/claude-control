@@ -33,6 +33,8 @@ import {
 import { useStartHandoff } from '@entities/ChatHandoff';
 import { MediaDeckCard, useChatMedia } from '@entities/Media';
 import { MediaFeedCard } from '@features/ChatMessages';
+import { TurnToolHintLine, useTurnToolHint } from '@entities/Platform';
+import { foreignConsumerId } from '@agentdeck/contracts/platform-consumers';
 import { ProviderChatSidebar } from './ProviderChatSidebar';
 import { ProviderChatHeader } from './ProviderChatHeader';
 import { ProviderChatMessages } from './ProviderChatMessages';
@@ -67,6 +69,16 @@ export function ProviderChatPage() {
   const run = useProviderChatRun(activeChatId);
 
   const providerName = runner?.providerName ?? '';
+  // Вызовы чужого CLI видит только шлюз контура — их счёт приезжает в реплике
+  // (`contourToolCalls`). Проваленный ответ — не ход агента, о нём молчим.
+  const lastReply = chat?.messages.at(-1);
+  const toolHint = useTurnToolHint(
+    runner?.providerId ? foreignConsumerId(runner.providerId) : '',
+    lastReply?.role === 'assistant' && !lastReply.failed
+      ? { toolCalls: lastReply.contourToolCalls, text: lastReply.content }
+      : undefined,
+    run.isRunning,
+  );
   const isBlocked = runner?.mode === 'none';
 
   // Первый разговор открывается сам: пустой экран при непустом списке выглядел
@@ -436,6 +448,12 @@ export function ProviderChatPage() {
             {...(media.topic ? { mediaTopic: media.topic } : {})}
             mediaRevision={media.revision}
           />
+
+          {toolHint && (
+            <Stack padding="0 var(--spacing-xl)">
+              <TurnToolHintLine hint={toolHint} />
+            </Stack>
+          )}
 
           {media.shownImage && (
             <Stack padding="0 var(--spacing-xl)">

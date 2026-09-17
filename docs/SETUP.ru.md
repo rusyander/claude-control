@@ -61,7 +61,7 @@ Claude Code должен быть именно **залогинен**: запу�
 ## Установка
 
 ```bash
-git clone <адрес-репозитория>
+git clone <адрес-репозитория> agentdeck
 cd agentdeck
 pnpm install
 pnpm qa:setup     # только если будете гонять браузерные QA-скрипты

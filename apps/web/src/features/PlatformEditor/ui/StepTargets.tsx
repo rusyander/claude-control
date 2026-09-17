@@ -1,13 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PLATFORM_ASSISTANT_TARGET,
-  PLATFORM_TERMINAL_CONSUMER,
-  foreignProviderId,
-  type CompromiseId,
-  type PlatformApplyTarget,
-  type PlatformConsumerOption,
-} from '@agentdeck/contracts';
+import { PLATFORM_ASSISTANT_TARGET, PLATFORM_TERMINAL_CONSUMER } from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Typography } from '@shared/ui/typography';
@@ -17,11 +10,10 @@ import { SelectField } from '@shared/ui/select-field';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { StatusDot } from '@shared/ui/status-dot';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
-import { TruncatedText } from '@shared/ui/truncated-text';
 import { sortApplyTargets, toolRouteMark, toolRouteOf, validatePlatform } from '@entities/Platform';
-import { budgetFromText } from '../model/wizard-logic';
+import { appliedFileTargets, budgetFromText, consumerFileWins } from '../model/wizard-logic';
 import type { WizardStepProps } from './PlatformWizard.types';
-import styles from './PlatformWizard.module.scss';
+import { ConsumerRow, TargetRow } from './ConsumerRows';
 
 /**
  * Шаг 4 — куда применить. Ассистент панели предвыбран: это единственный
@@ -55,25 +47,8 @@ export function StepTargets({ model }: WizardStepProps) {
   // впечатление, что файлов больше нет. Они остались: снятый потребитель не
   // трогает уже записанное (это делает «Снять применение» на карточке). Пока
   // хоть одна файловая цель применена, об этом сказано прямо здесь.
-  const appliedFiles = new Set(
-    (plan?.targets ?? [])
-      .filter((target) => target.targetId !== PLATFORM_ASSISTANT_TARGET && target.applied)
-      .map((target) => target.targetId),
-  );
+  const appliedFiles = appliedFileTargets(plan?.targets ?? []);
   const filesStayApplied = !terminalOn && appliedFiles.size > 0;
-
-  /**
-   * У этого потребителя файл CLI уже применён, а галочка снята — и файл
-   * сильнее. Панель обещает выбор «на один прогон», но переменные она кладёт в
-   * окружение процесса, а применённый файл CLI читает сам CLI на КАЖДОМ
-   * запуске: пустым окружением записанное в его настройках не отменить.
-   * Единственное, что возвращает такой прогон провайдеру по умолчанию, — «Снять
-   * применение» на карточке, и сказать это здесь честнее, чем обещать обратное.
-   */
-  const fileWins = (consumer: PlatformConsumerOption): boolean =>
-    consumer.scope === 'run' &&
-    !model.draft.consumers.includes(consumer.id) &&
-    appliedFiles.has(foreignProviderId(consumer.id) ?? 'claude');
 
   return (
     <Stack gap="var(--spacing-md)">
@@ -96,7 +71,7 @@ export function StepTargets({ model }: WizardStepProps) {
             // отскакивала бы обратно при каждом обновлении плана.
             checked={model.draft.consumers.includes(consumer.id)}
             toolMark={toolMark}
-            fileWins={fileWins(consumer)}
+            fileWins={consumerFileWins(consumer, model.draft.consumers, appliedFiles)}
             onToggle={() => model.toggleConsumer(consumer.id)}
           />
         ))}
@@ -240,161 +215,6 @@ export function StepTargets({ model }: WizardStepProps) {
               {item.targetId} — {t(`platform.skipReason.${item.reason}`)}
             </Typography>
           ))}
-        </Stack>
-      )}
-    </Stack>
-  );
-}
-
-interface ConsumerRowProps {
-  consumer: PlatformConsumerOption;
-  checked: boolean;
-  /** Подпись о том, чем дойдут инструменты прогона; нет — доходят полем. */
-  toolMark: CompromiseId | null;
-  /** Галочка снята, но файл этого CLI применён — и он сильнее (см. `fileWins`). */
-  fileWins: boolean;
-  onToggle: () => void;
-}
-
-/**
- * Строка потребителя. Недоступный — прочерк с ПРИЧИНОЙ, как и у целей: чужой
- * CLI, который держит адрес в своём файле, нельзя включить «только для чата», и
- * сказать это словом честнее, чем дать галочку, которая сделает больше
- * обещанного.
- */
-function ConsumerRow({ consumer, checked, toolMark, fileWins, onToggle }: ConsumerRowProps) {
-  const { t } = useTranslation();
-  // Имя собственное чужого CLI приходит с сервера; встроенных потребителей
-  // называет клиент — сервер языка интерфейса не знает.
-  const title = consumer.title || t(`platform.consumer.${consumer.id}`);
-
-  if (consumer.reason) {
-    return (
-      <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap className={styles.row}>
-        <Typography variant="body-sm" color="subtle" as="span">
-          — {title}
-        </Typography>
-        <Typography variant="caption" color="muted" as="span">
-          {t(`platform.consumerReason.${consumer.reason}`)}
-        </Typography>
-      </Stack>
-    );
-  }
-
-  return (
-    <Stack gap="var(--spacing-3xs)" className={styles.row}>
-      <label className={styles.check}>
-        <input type="checkbox" checked={checked} onChange={onToggle} />
-        <Typography variant="body-sm" as="span">
-          {title}
-        </Typography>
-        <Typography variant="caption" color="muted" as="span">
-          {t(`platform.consumerScope.${consumer.scope}`)}
-        </Typography>
-        {/* Чем дойдут инструменты CLI — это про прогоны, а не про ассистента
-            панели и не про запись в файлы. */}
-        {consumer.scope === 'run' && toolMark && <CompromiseMark id={toolMark} />}
-      </label>
-
-      {consumer.id === PLATFORM_TERMINAL_CONSUMER && (
-        <Typography variant="caption" color="muted">
-          {t('platform.consumerTerminalHint')}
-        </Typography>
-      )}
-
-      {fileWins && (
-        <Typography variant="caption" color="warning">
-          {t('platform.consumerFileWins')}
-        </Typography>
-      )}
-    </Stack>
-  );
-}
-
-interface TargetRowProps {
-  target: PlatformApplyTarget;
-  checked: boolean;
-  overwrite: boolean;
-  /** Подпись о том, чем дойдут инструменты CLI; нет — доходят полем, подписывать нечего. */
-  toolMark: CompromiseId | null;
-  onToggle: () => void;
-  onToggleOverwrite: () => void;
-}
-
-/**
- * Строка цели. У неподдержанной — прочерк с ПРИЧИНОЙ и подписью: «нельзя» без
- * объяснения выглядит недоделкой, а причины здесь четыре и они разные (файла
- * переменных нет, переменная не задокументирована, диалект шлюзу не по зубам,
- * шлюз не поднят).
- */
-function TargetRow({
-  target,
-  checked,
-  overwrite,
-  toolMark,
-  onToggle,
-  onToggleOverwrite,
-}: TargetRowProps) {
-  const { t } = useTranslation();
-  const isAssistant = target.targetId === PLATFORM_ASSISTANT_TARGET;
-
-  if (!target.supported) {
-    return (
-      <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap className={styles.row}>
-        <Typography variant="body-sm" color="subtle" as="span">
-          — {target.title}
-        </Typography>
-        <Typography variant="caption" color="muted" as="span">
-          {t(`platform.targetReason.${target.reason ?? 'no_env_section'}`)}
-        </Typography>
-        <CompromiseMark id="cli-no-endpoint" />
-      </Stack>
-    );
-  }
-
-  return (
-    <Stack gap="var(--spacing-3xs)" className={styles.row}>
-      <label className={styles.check}>
-        <input type="checkbox" checked={checked} onChange={onToggle} />
-        <Typography variant="body-sm" as="span">
-          {target.title}
-        </Typography>
-        {isAssistant ? (
-          <Typography variant="caption" color="muted" as="span">
-            {t('platform.targetRecommended')}
-          </Typography>
-        ) : (
-          toolMark && <CompromiseMark id={toolMark} />
-        )}
-      </label>
-
-      {target.filePath && <TruncatedText text={target.filePath} variant="caption" color="subtle" />}
-
-      {checked &&
-        target.plan.map((item) => (
-          <Typography key={item.key} variant="caption" color="subtle" as="div">
-            <code>{item.key}</code>
-            {' = '}
-            {item.value}
-            {item.placeholder ? ` (${t('platform.planPlaceholder')})` : ''}
-          </Typography>
-        ))}
-
-      {/* Занятое место не перебивается молча: пока человек не увидел, что там
-          стоит, и не подтвердил — цель уйдёт в пропущенные с причиной. */}
-      {checked && target.conflicts.length > 0 && (
-        <Stack gap="var(--spacing-3xs)">
-          {target.conflicts.map((conflict) => (
-            <Typography key={conflict.key} variant="caption" color="warning" as="div">
-              {t('platform.conflictLine', { key: conflict.key, current: conflict.current })}
-            </Typography>
-          ))}
-          <label className={styles.check}>
-            <input type="checkbox" checked={overwrite} onChange={onToggleOverwrite} />
-            <Typography variant="caption" as="span">
-              {t('platform.overwriteLabel')}
-            </Typography>
-          </label>
         </Stack>
       )}
     </Stack>

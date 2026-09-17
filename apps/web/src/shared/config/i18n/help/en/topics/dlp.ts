@@ -170,8 +170,10 @@ export const dlpEn: typeof dlpRu = {
     limitRulesText:
       'This is not a model and not a heuristic: the proxy will not guess a surname you did ' +
       'not write down, will not notice a typo in it, and will not read a passport photo in an ' +
-      'attachment. An empty or incomplete rule set means there is no protection — while the ' +
-      'section still says "running".',
+      'attachment. With no enabled rule the proxy does not start at all — the panel refuses ' +
+      'with “no enabled rule” (нет ни одного включённого правила), and a running proxy whose ' +
+      'last rule is switched off stops. The real risk is an incomplete set: the section says ' +
+      '"running", and whatever the rules do not describe goes out as is.',
     limitParaphraseTitle: 'The model may paraphrase a placeholder',
     limitParaphraseText:
       'Restoration works on exact text. If the reply says "name 1" instead of [NAME_1], or ' +
@@ -349,8 +351,8 @@ export const dlpEn: typeof dlpRu = {
       'the network. It only handles the CLI that was pointed at it.',
     notAudit: 'Not an audit trail',
     notAuditText:
-      'The journal keeps the rule, the placeholder and a count — and only the last 500 ' +
-      'lines. Reconstructing what actually left is impossible by design.',
+      'The journal keeps the rule, the placeholder and a count; once the file passes 2 MB it ' +
+      'is cut down to the last 500 lines, and the screen shows the 200 newest. Reconstructing what actually left is impossible by design.',
     notGateProxy: 'The gate is not a substitute for the proxy',
     notGateProxyText:
       'The hook sees only text typed by the human. Everything the agent read itself passes ' +
@@ -359,7 +361,7 @@ export const dlpEn: typeof dlpRu = {
     storageRules: 'Rules',
     storageRulesValue: 'agentdeck/dlp-rules.json (one file for the proxy and the gate)',
     storageJournalFile: 'Journal',
-    storageJournalValue: 'agentdeck/dlp-journal.jsonl, the last 500 lines',
+    storageJournalValue: 'agentdeck/dlp-journal.jsonl; past 2 MB it is cut to the last 500 lines',
     storageSettingsRow: 'Port, address and toggles',
     storageSettingsValue: 'agentdeck/state.json → dlp',
     storageHook: 'The gate script',
@@ -371,7 +373,8 @@ export const dlpEn: typeof dlpRu = {
     canProxy: 'Bring a local proxy up on 127.0.0.1 and forward requests onward',
     canMask: 'Replace a match with a placeholder, the same one for the same value',
     canRestore: 'Put the real values back into the model’s reply',
-    canBlockReq: 'Stop a request entirely — a 403 in the API’s own error shape',
+    canBlockReq:
+      'Stop a request entirely — a 400 (invalid_request_error) in the API’s own error shape',
     canPreviewText: 'Show on sample text what the model will see, before saving and offline',
     canGate: 'Install a hook on the human’s prompt in Claude Code — reject or warn',
     cantUnderstand: 'Recognise a secret retold in different words',
@@ -384,11 +387,13 @@ export const dlpEn: typeof dlpRu = {
     refusalsCaption: 'Exactly what the CLI receives or the panel shows, and what to do about it.',
     refusalsColumn: 'What is shown',
     refusalsMeaningColumn: 'Reason and way out',
-    refusalBlocked: '“the request was stopped by rule ‘…’” (403)',
+    refusalBlocked: '“the request was stopped by rule ‘…’” (400)',
     refusalBlockedText:
       'A rule with the “block” action matched. The refusal arrives in the API’s own error ' +
-      'shape, so the CLI prints it as text rather than “unexpected response”. The journal ' +
-      'carries a “blocked” line with the rule name.',
+      'shape, so the CLI prints it as text rather than “unexpected response”. The code is 400, ' +
+      'not 403: Claude Code reads a 403 as a login failure and appends “Failed to ' +
+      'authenticate.” although the key is fine. The journal carries a “blocked” line with the ' +
+      'rule name.',
     refusalUnknown: '“…, request stopped (the ‘pass unparsed’ setting is off)”',
     refusalUnknownText:
       'The body was not parsed: a foreign path, not JSON, or an unfamiliar schema. Turn ' +

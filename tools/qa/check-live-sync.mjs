@@ -21,6 +21,7 @@
  *
  * Запуск: `node tools/qa/check-live-sync.mjs`.
  */
+import { basename } from 'node:path';
 import { chromium } from 'playwright';
 import { bypassOnboarding } from './bypass-onboarding.mjs';
 import { authHeaders } from './api-auth.mjs';
@@ -75,7 +76,8 @@ await reader.cancel();
 check(pulse.includes(': ping'), 'сервер держит поток событий пульсом');
 
 // 3. Чужой ход — и список разговоров перечитывается сам.
-const tab = page.locator('[role="tab"]', { hasText: 'agentdeck' }).first();
+// Вкладка проекта называется по папке, из которой идёт прогон (`projectPath` ниже).
+const tab = page.locator('[role="tab"]', { hasText: basename(process.cwd()) }).first();
 const hasTab = (await tab.count()) > 0;
 if (hasTab) {
   await tab.click();

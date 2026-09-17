@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { join, delimiter } from 'node:path';
+import { brandEnvName, legacyEnvName } from './brand.mjs';
 
 /**
  * Системный браузер на движке Chromium — единственное, чем панель умеет печатать
@@ -16,7 +17,7 @@ import { join, delimiter } from 'node:path';
  */
 
 /** Переменная для машины, где браузер лежит не там, где принято. */
-const ENV_KEYS = ['AGENTDECK_BROWSER', 'CHROME_PATH'] as const;
+const ENV_KEYS = [brandEnvName('BROWSER'), legacyEnvName('BROWSER'), 'CHROME_PATH'] as const;
 
 /** Windows: Edge стоит всегда, Chrome — часто; порядок от самого вероятного. */
 const WINDOWS = [

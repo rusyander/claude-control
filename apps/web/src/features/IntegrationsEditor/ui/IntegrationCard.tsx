@@ -16,6 +16,7 @@ import {
   useForgetIntegration,
   useSaveIntegration,
 } from '@entities/Integration';
+import { integrationSecretAnchor } from '@entities/PanelAgent';
 import { buildSettings, draftFrom, isDraftDirty, missingFields } from '../model/draft';
 import { IntegrationFields } from './IntegrationFields';
 import { IntegrationCardExtras } from './IntegrationCardExtras';
@@ -145,7 +146,7 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
         />
 
         <Stack direction="row" align="end" gap="var(--spacing-xs)" wrap>
-          <Stack flex={1} minWidth="220px">
+          <Stack flex={1} minWidth="220px" data-agent-anchor={integrationSecretAnchor(id)}>
             <TextField
               label={t('integrations.card.token')}
               type="password"

@@ -273,7 +273,7 @@ export function openScenario(topic, scenario, lang = shotLanguage()) {
      *
      * @param page      страница Playwright
      * @param id        идентификатор кадра: `NN-слаг`, он же имя файла
-     * @param options   side  — чья это сторона: `enterprise-platform` | `panel`
+     * @param options   side  — чья это сторона: `platform` | `panel`
      *                  mask  — селекторы, текст которых закрывается ДО снимка
      *                  maskText — выражения, закрываемые в ЛЮБОМ тексте кадра
      *                  clip  — селектор области; без него снимается окно

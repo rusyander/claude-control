@@ -27,8 +27,8 @@ import {
  */
 
 const BASE: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -179,14 +179,14 @@ describe('probePlatform: пять исходов', () => {
   });
 
   /**
-   * Аудит DRV-16. Лимитёр платформа компании стоит на ВСЕХ маршрутах `/v1`, список моделей
+   * Аудит DRV-16. Лимитёр платформы компании стоит на ВСЕХ маршрутах `/v1`, список моделей
    * включён (main.go:482-483), — а проба читала 429 как «это не API» и слала
    * человека проверять адрес админки. Причина «реестр моделей не готов» — смысл
-   * 503 у платформа компании, и произносить её чужому контуру общий код не вправе.
+   * 503 у платформы компании, и произносить её чужому контуру общий код не вправе.
    */
   it('429 — лимит ключа и когда повторить, а не «похоже, это адрес админки»', async () => {
     const result = await probePlatform({
-      platform: { ...BASE, baseUrl: 'https://enterprise-platform.example.ru' },
+      platform: { ...BASE, baseUrl: 'https://platform.example.ru' },
       token: 'sk-live',
       fetchImpl: () =>
         Promise.resolve(
@@ -203,7 +203,7 @@ describe('probePlatform: пять исходов', () => {
     expect(result.detail).not.toContain('админк');
   });
 
-  it('503 чужого контура не называет причину платформа компании', async () => {
+  it('503 чужого контура не называет причину платформы компании', async () => {
     const result = await probePlatform({
       platform: { ...BASE, driver: 'openai-compat' },
       token: 'sk-live',
@@ -226,7 +226,7 @@ describe('probePlatform: пять исходов', () => {
   });
 
   it('HTML вместо JSON — адрес админки назван отдельным сообщением', async () => {
-    const admin: Platform = { ...BASE, baseUrl: 'https://enterprise-platform.example.ru' };
+    const admin: Platform = { ...BASE, baseUrl: 'https://platform.example.ru' };
     const result = await probePlatform({
       platform: admin,
       token: 'sk-live',
@@ -593,7 +593,7 @@ describe('probePlatform: каталоги шлюзов разной формы',
   it('платформа компании: прежняя форма читается как раньше', async () => {
     expect(await modelsOf(ENTERPRISE_PLATFORM_MODELS, 'enterprise-platform')).toEqual([
       {
-        id: 'enterprise-platform-corp-l',
+        id: 'company-corp-l',
         kind: 'chat',
         ownedBy: 'enterprise-platform',
         vision: false,

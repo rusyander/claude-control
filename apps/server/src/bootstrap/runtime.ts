@@ -48,6 +48,9 @@ import {
 import { commentMergeRequestByUrl, parseMergeRequestUrl } from '../domains/integrations/forge.ts';
 import { readIntegrations, readToken } from '../domains/integrations/store.ts';
 import { createEventHub, type EventHub } from '../lib/event-hub.ts';
+import { PANEL_ACTION_CONFIRM_TIMEOUT_MS } from '@agentdeck/contracts/panel-agent';
+import { PanelPendingActions } from '../domains/panel-agent/pending.ts';
+import { reapPanelAgentOrphans } from '../domains/panel-agent/processes.ts';
 
 /**
  * Объекты, живущие дольше запроса. Создаются при сборке приложения — только
@@ -86,6 +89,11 @@ export interface Runtime {
   platformGateway: PlatformGateway;
   /** Подписчики `/api/events` и рассылка об изменениях файлов. */
   events: EventHub;
+  /**
+   * Карточки подтверждения агента панели: их держит открытый запрос переходника,
+   * а решает клик в окне — другой запрос, поэтому объект переживает оба.
+   */
+  panelPending: PanelPendingActions;
   /** Адрес самой панели: его получает переходник MCP при регистрации. */
   selfBaseUrl: string;
   /** Погасить всё, что спавнит процессы. Идемпотентно. */
@@ -495,7 +503,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // провайдеру разговора. Без этой строки галочка «Qwen Code» в мастере была бы
   // нарисованной — контур сохранил бы её, а прогон ушёл бы в облако вендора.
   providerChats.setPlatformRouting(runRoute);
+  // Вызовы инструментов через контур видит только шлюз: чужой CLI их никуда не
+  // пишет, а подсказка «модель могла не справиться» без счёта была бы гаданием.
+  providerChats.setContourToolCalls((since) => platformGateway.toolCallsSince(since));
   const events = createEventHub();
+  const panelPending = new PanelPendingActions(PANEL_ACTION_CONFIRM_TIMEOUT_MS);
 
   /**
    * Журнал идущих прогонов на диске и усыновление живых после перезапуска.
@@ -516,6 +528,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     looksLikeCli: pidLooksLikeCli,
   });
   for (const entry of drop) runLedger.remove(entry.key);
+  // Ход агента панели усыновлять некуда — его ответ читал закрытый поток. Живой
+  // процесс агента от прошлого запуска панели снимается, иначе он поднимал бы
+  // карточки для разговора, которого уже никто не видит.
+  reapPanelAgentOrphans(ctx.location.paths.appData);
   for (const entry of adopt) {
     if (entry.autoApprove) chatSession.armAutoApprove(entry.key, entry.autoApprove);
     if (!chatRuns.adopt(entry)) runLedger.remove(entry.key);
@@ -536,6 +552,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     // закрытая по Ctrl+C или перезапущенная сторожем, унесла бы с собой
     // последние секунды. Запись синхронная, выход она не задерживает.
     platformGateway.flushSpend();
+    // Ждущие карточки агента — ответить отменой: иначе запрос переходника висит
+    // до таймаута уже мёртвого процесса.
+    panelPending.cancelAll();
   };
 
   return {
@@ -554,6 +573,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     dlpProxy,
     platformGateway,
     events,
+    panelPending,
     selfBaseUrl,
     shutdown,
   };

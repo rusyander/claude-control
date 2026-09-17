@@ -1,5 +1,6 @@
 import type { MediaImageBlocker } from '@agentdeck/contracts/media';
 import type { MediaDeckBlocker } from '@agentdeck/contracts/media-deck';
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
 /** Машинная причина отказа: недоступность режима картинки или презентации. */
 export type MediaReason = MediaImageBlocker | MediaDeckBlocker;
@@ -17,12 +18,22 @@ export class MediaError extends Error {
   readonly status: number;
   /** Машинная причина, если отказ — это недоступность режима. */
   readonly reason?: MediaReason;
+  /** Код текста для перевода на клиенте; русский `message` остаётся запасным. */
+  readonly messageCode?: ServerMessageCode;
+  readonly params?: ServerMessageParams;
 
-  constructor(status: number, message: string, reason?: MediaReason) {
+  constructor(
+    status: number,
+    message: string,
+    reason?: MediaReason,
+    text?: { code: ServerMessageCode; params?: ServerMessageParams },
+  ) {
     super(message);
     this.name = 'MediaError';
     this.status = status;
     this.reason = reason;
+    this.messageCode = text?.code;
+    this.params = text?.params;
   }
 }
 

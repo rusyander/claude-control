@@ -56,6 +56,8 @@ export function SettingsTopic() {
             { title: tr('tabAccess'), text: tr('tabAccessText') },
             { title: tr('tabProviders'), text: tr('tabProvidersText') },
             { title: tr('tabModels'), text: tr('tabModelsText') },
+            { title: tr('tabPrompts'), text: tr('tabPromptsText') },
+            { title: tr('tabIntegrations'), text: tr('tabIntegrationsText') },
             { title: tr('tabSpend'), text: tr('tabSpendText') },
             { title: tr('tabSafety'), text: tr('tabSafetyText') },
             { title: tr('tabTransfer'), text: tr('tabTransferText') },

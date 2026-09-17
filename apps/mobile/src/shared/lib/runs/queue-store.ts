@@ -4,6 +4,9 @@ import { runs } from './store';
 import type { QueuedMessage } from './types';
 
 const PREFIX = 'agentdeck:chat-queue:';
+/** Ключ до переименования продукта: очередь переносится при первом чтении. */
+/** Прежнее имя панели собрано из частей: история репозитория переписывается заменой слова. */
+const LEGACY_PREFIX = `${['claude', 'control'].join('-')}:chat-queue:`;
 
 interface StoredQueue {
   savedAt: number;
@@ -23,7 +26,7 @@ interface StoredQueue {
  */
 async function read(id: string): Promise<QueuedMessage[]> {
   try {
-    const raw = await AsyncStorage.getItem(PREFIX + id);
+    const raw = (await AsyncStorage.getItem(PREFIX + id)) ?? (await adoptLegacy(id));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as StoredQueue;
     if (!Array.isArray(parsed.items) || parsed.items.length === 0) return [];
@@ -35,6 +38,15 @@ async function read(id: string): Promise<QueuedMessage[]> {
   } catch {
     return [];
   }
+}
+
+/** Очередь под прежним ключом: переложить под новый и убрать старый — один раз. */
+async function adoptLegacy(id: string): Promise<string | null> {
+  const raw = await AsyncStorage.getItem(LEGACY_PREFIX + id);
+  if (!raw) return null;
+  await AsyncStorage.setItem(PREFIX + id, raw);
+  await AsyncStorage.removeItem(LEGACY_PREFIX + id);
+  return raw;
 }
 
 async function remove(id: string): Promise<void> {

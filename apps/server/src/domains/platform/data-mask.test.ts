@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { afterAll, describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
@@ -38,29 +38,37 @@ const PLATFORM: Platform = {
   transport: defaultPlatformTransport(),
 };
 
-const enterprise-platform = driverFor('enterprise-platform');
+const enterprise = driverFor('enterprise-platform');
 const compat = driverFor('openai-compat');
-const dir = (): string => mkdtempSync(join(tmpdir(), 'data-mask-'));
+const made: string[] = [];
+const dir = (): string => {
+  const d = mkdtempSync(join(tmpdir(), 'data-mask-'));
+  made.push(d);
+  return d;
+};
+afterAll(() => {
+  for (const d of made) rmSync(d, { recursive: true, force: true });
+});
 
 describe('маска данных контура', () => {
   it('контур с подменой: включена сама, причина «объявлено», набор встроенный', () => {
-    const mask = describeDataMask(PLATFORM, enterprise-platform, false, dir());
+    const mask = describeDataMask(PLATFORM, enterprise, false, dir());
     expect(mask).toMatchObject({ on: true, reason: 'declared', declared: true, rules: 'builtin' });
     expect(mask.count).toBeGreaterThan(15);
-    expect(dataMaskOn(PLATFORM, enterprise-platform, false)).toBe(true);
+    expect(dataMaskOn(PLATFORM, enterprise, false)).toBe(true);
   });
 
   it('снятая человеком: выключена, причина «выбор», пока не включён общий выключатель', () => {
     const off = { ...PLATFORM, dataMask: false };
-    expect(describeDataMask(off, enterprise-platform, false, dir())).toMatchObject({
+    expect(describeDataMask(off, enterprise, false, dir())).toMatchObject({
       on: false,
       reason: 'chosen',
     });
-    expect(describeDataMask(off, enterprise-platform, true, dir())).toMatchObject({
+    expect(describeDataMask(off, enterprise, true, dir())).toMatchObject({
       on: true,
       reason: 'global',
     });
-    expect(dataMaskOn(off, enterprise-platform, true)).toBe(true);
+    expect(dataMaskOn(off, enterprise, true)).toBe(true);
   });
 
   it('совместимый шлюз: маски нет, пока её не включили на карточке или общим', () => {
@@ -90,7 +98,7 @@ describe('маска данных контура', () => {
         label: 'ИМЯ',
       },
     ]);
-    expect(describeDataMask(PLATFORM, enterprise-platform, false, where)).toMatchObject({
+    expect(describeDataMask(PLATFORM, enterprise, false, where)).toMatchObject({
       rules: 'own',
       count: 1,
     });

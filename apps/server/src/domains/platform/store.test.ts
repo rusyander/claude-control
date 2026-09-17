@@ -40,8 +40,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
 const SECRET = 'CONTOUR-KEY-CORPORATE-4f21';
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -98,7 +98,7 @@ describe('domains/platform/store: контуры и ключи', () => {
     writeToken(dir, PLATFORM.id, SECRET);
 
     const card = describePlatforms(store, dir)[0]!;
-    expect(card.platform.title).toBe('EnterprisePlatform · dev');
+    expect(card.platform.title).toBe('Company · dev');
     expect(card.hasToken).toBe(true);
     expect(card.maskedToken).not.toBe(SECRET);
     expect(card.maskedToken).toContain('…');
@@ -244,15 +244,15 @@ describe('domains/platform/store: контуры и ключи', () => {
 
   it('повторная запись заменяет контур на месте, а не плодит второй', () => {
     writePlatform(store, PLATFORM);
-    writePlatform(store, { ...PLATFORM, title: 'EnterprisePlatform · prod' });
+    writePlatform(store, { ...PLATFORM, title: 'Company · prod' });
 
     const list = describePlatforms(store, dir);
     expect(list).toHaveLength(1);
-    expect(list[0]!.platform.title).toBe('EnterprisePlatform · prod');
+    expect(list[0]!.platform.title).toBe('Company · prod');
   });
 
   it('ключ живёт под своим пространством имён', () => {
-    expect(tokenId('enterprise-platform-dev')).toBe('platform:enterprise-platform-dev');
+    expect(tokenId('company-dev')).toBe('platform:company-dev');
   });
 
   it('пустая строка стирает ключ — это осознанное «выкинуть»', () => {
@@ -329,11 +329,11 @@ describe('потребители: снятая галочка ассистент
       endpointProfiles: [
         { id: 'my-own', title: 'Свой', baseUrl: 'https://own.example', apiKind: 'anthropic' },
       ] as never,
-      assistantEndpointId: 'contour-enterprise-platform-dev',
+      assistantEndpointId: 'contour-company-dev',
     });
     store.savePlatformApplied(PLATFORM.id, {
       platformId: PLATFORM.id,
-      profileId: 'contour-enterprise-platform-dev',
+      profileId: 'contour-company-dev',
       targets: [],
       previousAssistantProfileId: 'my-own',
     });
@@ -344,10 +344,10 @@ describe('потребители: снятая галочка ассистент
   });
 
   it('прежнего профиля больше нет — ассистент уходит в облако вендора, а не на шлюз', () => {
-    store.updateSettings({ assistantEndpointId: 'contour-enterprise-platform-dev' });
+    store.updateSettings({ assistantEndpointId: 'contour-company-dev' });
     store.savePlatformApplied(PLATFORM.id, {
       platformId: PLATFORM.id,
-      profileId: 'contour-enterprise-platform-dev',
+      profileId: 'contour-company-dev',
       targets: [],
       previousAssistantProfileId: 'исчез',
     });
@@ -358,9 +358,9 @@ describe('потребители: снятая галочка ассистент
   });
 
   it('отмеченный ассистент на контуре и остаётся: сохранение его не сбрасывает', () => {
-    store.updateSettings({ assistantEndpointId: 'contour-enterprise-platform-dev' });
+    store.updateSettings({ assistantEndpointId: 'contour-company-dev' });
     writePlatform(store, { ...PLATFORM, consumers: ['assistant', 'terminal'] });
-    expect(store.getSettings().assistantEndpointId).toBe('contour-enterprise-platform-dev');
+    expect(store.getSettings().assistantEndpointId).toBe('contour-company-dev');
   });
 
   it('чужой выбор ассистента снятие галочки не трогает', () => {
@@ -415,13 +415,13 @@ describe('уборка сирот: секрет без владельца не �
     writePlatform(store, PLATFORM);
     writeToken(dir, PLATFORM.id, SECRET);
 
-    store.updateSettings({ platforms: [{ ...PLATFORM, id: 'enterprise-platform-prod' }] });
+    store.updateSettings({ platforms: [{ ...PLATFORM, id: 'company-prod' }] });
     forgetOrphanPlatforms(store, dir);
 
     expect(readToken(dir, PLATFORM.id) ?? '').toBe('');
     // Переносить ключ панель не вправе: она не знает, тот же это контур или уже
     // другой. Честный итог — контур без ключа, а не чужой ключ под новым именем.
-    expect(readToken(dir, 'enterprise-platform-prod') ?? '').toBe('');
+    expect(readToken(dir, 'company-prod') ?? '').toBe('');
   });
 
   it('учёт расхода — тоже след контура и уходит вместе с ним', () => {

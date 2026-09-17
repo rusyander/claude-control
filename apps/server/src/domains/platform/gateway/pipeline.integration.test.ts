@@ -9,6 +9,7 @@ import { AppStore } from '../../../lib/app-store.ts';
 import { saveRules } from '../../dlp/rules-store.ts';
 import { writePlatform, writeToken } from '../store.ts';
 import type { PlatformFetch } from '../ca-fetch.ts';
+import { gatewayPricing } from '../spend.ts';
 import { PlatformGateway } from './listener.ts';
 import { driverFor } from '../drivers/index.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
@@ -29,7 +30,7 @@ const SECRET = 'platform-token-9f2b8c1d4e7a0';
 
 const PLATFORM: Platform = {
   id: 'enterprise-platform',
-  title: 'EnterprisePlatform · dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -237,7 +238,9 @@ describe('маршруты шлюза', () => {
     // CLI и краснил счётчик шлюза, который работал.
     await start(upstream([]));
     for (const method of ['GET', 'HEAD']) {
-      const answer = await fetch(`http://127.0.0.1:${port}/enterprise-platform/api/hello`, { method });
+      const answer = await fetch(`http://127.0.0.1:${port}/enterprise-platform/api/hello`, {
+        method,
+      });
       expect(answer.status).toBe(200);
     }
     expect(calls).toHaveLength(0);
@@ -351,22 +354,29 @@ describe('поток клиенту', () => {
   it('вендорные кадры не доезжают, обычные доезжают, расход снят', async () => {
     await start(
       upstream([
-        '{"enterprise-platform_status":"thinking"}',
-        '{"enterprise-platform_status":"summarizing"}',
-        '{"enterprise-platform_reasoning":"я думаю"}',
+        '{"platform_status":"thinking"}',
+        '{"platform_status":"summarizing"}',
+        '{"platform_reasoning":"я думаю"}',
         DELTA,
         USAGE,
         '[DONE]',
       ]),
     );
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
 
-    expect(answer.text).not.toContain('enterprise-platform_');
+    expect(answer.text).not.toContain('platform_');
     expect(answer.text).toContain('"content":"да"');
     expect(answer.text.trimEnd().endsWith('data: [DONE]')).toBe(true);
 
     const status = gateway.status();
-    expect(status.usage[0]).toMatchObject({ platformId: 'enterprise-platform', totalTokens: 12, requests: 1 });
+    expect(status.usage[0]).toMatchObject({
+      platformId: 'enterprise-platform',
+      totalTokens: 12,
+      requests: 1,
+    });
     // Денег в журнале шлюза нет: «внутренняя единица контура» была выдумкой.
     expect(status.usage[0]).not.toHaveProperty('unitUsd');
     expect(status.events[0]).toMatchObject({ summarized: true, stages: expect.any(Array) });
@@ -433,7 +443,7 @@ describe('поток клиенту', () => {
   });
 
   it('контур не прислал расход — след называет это, а не пишет молчаливый ноль', async () => {
-    // Аудит MD-09: картинка частью ответа у enterprise-platform приходит без кадра usage, и
+    // Аудит MD-09: картинка частью ответа у платформы компании приходит без кадра usage, и
     // расход ключа получал ноль — справка при этом обещала «в расходе ключа».
     await start(
       upstream([
@@ -456,7 +466,7 @@ describe('поток клиенту', () => {
       upstream([
         '{"choices":[{"index":0,"delta":{"content":"Пишите на [EMAIL_1]"}}]}',
         '{"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}',
-        '{"enterprise-platform_deanonymized":"Пишите на ivan@example.ru"}',
+        '{"platform_deanonymized":"Пишите на ivan@example.ru"}',
         '[DONE]',
       ]),
     );
@@ -607,10 +617,13 @@ describe('отказы контура', () => {
     await start(
       upstream([
         DELTA,
-        '{"enterprise-platform_guardrails":{"stream_interrupted":true,"violations":[{"category":"pii_phone","text":"телефон 89001234567"}]}}',
+        '{"platform_guardrails":{"stream_interrupted":true,"violations":[{"category":"pii_phone","text":"телефон 89001234567"}]}}',
       ]),
     );
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
 
     expect(answer.text).toContain('content_policy_violation');
     expect(answer.text).toContain('pii_phone');
@@ -626,9 +639,9 @@ describe('отказы контура', () => {
     // Сводка вешала оба исхода на оба имени — запрет маркера «маскировал данные».
     await start(
       upstream([
-        '{"enterprise-platform_sanitized":{"violations":[{"rule_name":"секреты без NER"}]}}',
+        '{"platform_sanitized":{"violations":[{"rule_name":"секреты без NER"}]}}',
         DELTA,
-        '{"enterprise-platform_guardrails":{"stream_interrupted":true,"violations":[{"rule_name":"запрет маркера"}]}}',
+        '{"platform_guardrails":{"stream_interrupted":true,"violations":[{"rule_name":"запрет маркера"}]}}',
       ]),
     );
     await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
@@ -659,7 +672,10 @@ describe('отказы контура', () => {
     await gateway.stop();
 
     await start(upstream(frames));
-    const streamed = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const streamed = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
     // Заголовки потока уже ушли — отказ доезжает терминальным кадром ошибки.
     expect(streamed.text).toContain('rate_limit_error');
     expect(streamed.text).toContain('Лимит запросов модели исчерпан');
@@ -679,7 +695,10 @@ describe('отказы контура', () => {
         451,
       ),
     );
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
     expect(answer.status).toBe(400);
     expect(answer.text).toContain('secrets');
     expect(answer.text).not.toContain('secret-abc123def456');
@@ -699,11 +718,17 @@ describe('отказы контура', () => {
     ];
 
     await start(upstream(body, 451));
-    const streamed = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const streamed = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
     await gateway.stop();
 
     await start(upstream(body, 451));
-    const plain = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: false });
+    const plain = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: false,
+    });
 
     expect(plain.status).toBe(streamed.status);
     expect(plain.text).toBe(streamed.text);
@@ -737,7 +762,10 @@ describe('отказы контура', () => {
     await start(
       upstream([JSON.stringify({ error: { message: 'Запрос остановлен проверками' } })], 451),
     );
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
 
     expect(answer.status).toBe(400);
     const report = gateway.status().violations;
@@ -750,12 +778,15 @@ describe('отказы контура', () => {
     // запрос — а модель отвечала на исправленный.
     await start(
       upstream([
-        '{"enterprise-platform_sanitized":{"violations":[{"category":"pii_email","text":"ivanov@corp.ru"}]}}',
+        '{"platform_sanitized":{"violations":[{"category":"pii_email","text":"ivanov@corp.ru"}]}}',
         DELTA,
         '[DONE]',
       ]),
     );
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
 
     expect(answer.status).toBe(200);
     const status = gateway.status();
@@ -772,7 +803,10 @@ describe('отказы контура', () => {
 
   it('контур не отвечает ⇒ 502 с русской причиной и без ухода на другой адрес', async () => {
     await start(() => Promise.reject(new Error('ECONNREFUSED 10.0.0.1:443')));
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
     expect(answer.status).toBe(502);
     expect(answer.text).toContain('Нет связи с контуром');
     expect(gateway.status().failures).toBe(1);
@@ -780,7 +814,10 @@ describe('отказы контура', () => {
 
   it('402 приходит своим кодом и русской причиной контура', async () => {
     await start(upstream([JSON.stringify({ error: { message: 'Бюджет ключа исчерпан' } })], 402));
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
     expect(answer.status).toBe(402);
     expect(answer.text).toContain('Бюджет ключа исчерпан');
   });
@@ -803,7 +840,10 @@ describe('отказы контура', () => {
    */
   it('401 называет ВСЕ ПЯТЬ причин, а не советует перевыпустить ключ', async () => {
     await start(upstream([JSON.stringify({ error: { message: 'invalid API key' } })], 401));
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
     expect(answer.status).toBe(401);
     for (const cause of ['отозван', 'срок', 'бюджет', 'владельца', 'сверка владельца']) {
       expect(answer.text).toContain(cause);
@@ -822,7 +862,10 @@ describe('отказы контура', () => {
         'retry-after': '42',
       }),
     );
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
     expect(answer.status).toBe(429);
     expect(answer.text).toContain('42');
   });
@@ -834,11 +877,11 @@ describe('отказы контура', () => {
   it('403 называет МОДЕЛЬ и место, где лежит список разрешённых', async () => {
     await start(upstream([JSON.stringify({ error: { message: 'model not allowed' } })], 403));
     const answer = await ask('/enterprise-platform/v1/chat/completions', {
-      model: 'enterprise-platform-opus-x',
+      model: 'company-opus-x',
       stream: true,
     });
     expect(answer.status).toBe(403);
-    expect(answer.text).toContain('enterprise-platform-opus-x');
+    expect(answer.text).toContain('company-opus-x');
     expect(answer.text).toContain('админке');
   });
 
@@ -852,7 +895,10 @@ describe('отказы контура', () => {
    */
   it('404 на чате называет ОБА чтения: исчезнувшая модель и неверный адрес', async () => {
     await start(upstream([JSON.stringify({ error: { message: 'model not found' } })], 404));
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'ушедшая', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'ушедшая',
+      stream: true,
+    });
     expect(answer.status).toBe(404);
     expect(answer.text).toContain('ушедшая');
     expect(answer.text).toContain('пропавшие');
@@ -894,7 +940,7 @@ describe('правила защиты данных в конвейере', () =>
 
     // Наверх ушла метка, а не фамилия.
     expect(calls[0]?.body).not.toContain('Иванов');
-    // Метка — с номером формы: вид `[ИМЯ_1]` совпадает с видом меток платформа компании, и её
+    // Метка — с номером формы: вид `[ИМЯ_1]` совпадает с видом меток платформы компании, и её
     // деанонимизатор развернул бы нашу метку в своё значение.
     expect(calls[0]?.body).toContain('[ИМЯ_1.1]');
     // Клиенту метка возвращается значением: CLI видит свой текст.
@@ -910,7 +956,10 @@ describe('правила защиты данных в конвейере', () =>
       stream: true,
     });
 
-    expect(answer.status).toBe(403);
+    // 400, а не 403: Claude Code читает 403 как ошибку входа и дописывает «Failed to
+    // authenticate.» — человек чинил бы ключ, а остановило его правило данных.
+    expect(answer.status).toBe(400);
+    expect(answer.text).toContain('invalid_request_error');
     expect(answer.text).toContain('Фамилии сотрудников');
     expect(calls).toHaveLength(0);
   });
@@ -954,7 +1003,8 @@ describe('маска контура без общего выключателя (
       stream: true,
     });
 
-    expect(answer.status).toBe(403);
+    expect(answer.status).toBe(400);
+    expect(answer.text).toContain('invalid_request_error');
     expect(answer.text).toContain('Ключи и токены сервисов');
     expect(calls).toHaveLength(0);
   });
@@ -1077,7 +1127,7 @@ describe('контур ответил не потоком', () => {
           { index: 0, message: { role: 'assistant', content: 'ответ' }, finish_reason: 'stop' },
         ],
         usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 },
-        enterprise-platform_sanitized: { violations: [{ category: 'pii_phone' }] },
+        platform_sanitized: { violations: [{ category: 'pii_phone' }] },
       }),
     );
     const answer = await ask('/enterprise-platform/v1/chat/completions', {
@@ -1109,7 +1159,7 @@ describe('контур ответил не потоком', () => {
           { index: 0, message: { role: 'assistant', content: 'ответ' }, finish_reason: 'stop' },
         ],
         usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 },
-        enterprise-platform_tools_unavailable: true,
+        platform_tools_unavailable: true,
       }),
     );
     const answer = await ask('/enterprise-platform/v1/chat/completions', {
@@ -1122,7 +1172,7 @@ describe('контур ответил не потоком', () => {
     expect(event?.lost).toContain('tools');
     expect(event?.unknownFrames).toEqual([]);
     // Служебный кадр наружу не ушёл: строгий клиент на нём ломается.
-    expect(answer.text).not.toContain('enterprise-platform_tools_unavailable');
+    expect(answer.text).not.toContain('platform_tools_unavailable');
   });
 
   it('тело, которое и не поток, и не ответ модели, — честный отказ', async () => {
@@ -1137,7 +1187,10 @@ describe('контур ответил не потоком', () => {
 describe('поток оборвался', () => {
   it('обрыв связи посреди ответа: клиент видит ошибку, панель — событие и расход', async () => {
     await start(brokenStream([DELTA, USAGE], true));
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
 
     // Молча закрытый поток CLI показал бы как удачный короткий ответ.
     expect(answer.text).toContain('Ответ контура оборвался');
@@ -1211,12 +1264,15 @@ describe('поток оборвался', () => {
     });
 
     const client = new AbortController();
-    const response = await fetch(`http://127.0.0.1:${port}/enterprise-platform/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-x', stream: true }),
-      signal: client.signal,
-    });
+    const response = await fetch(
+      `http://127.0.0.1:${port}/enterprise-platform/v1/chat/completions`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'gpt-x', stream: true }),
+        signal: client.signal,
+      },
+    );
     const reader = response.body?.getReader();
     await reader?.read();
     client.abort();
@@ -1229,7 +1285,7 @@ describe('поток оборвался', () => {
   });
 
   /**
-   * Аудит MD-04: сервер enterprise-platform держит ЛЮБОЙ ответ не дольше 120 с (`WriteTimeout`
+   * Аудит MD-04: сервер платформы компании держит ЛЮБОЙ ответ не дольше 120 с (`WriteTimeout`
    * без продления на потоке), и поток рвётся так же, как цельный ответ. Обрыв на
    * этой секунде назывался «поток закончился без завершающего кадра» — и человек
    * шёл чинить сеть. Часы подставлены, потому что ждать две минуты тест не может:
@@ -1251,7 +1307,10 @@ describe('поток оборвался', () => {
         }),
         { now: () => new Date(clock) },
       );
-      const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream });
+      const answer = await ask('/enterprise-platform/v1/chat/completions', {
+        model: 'gpt-x',
+        stream,
+      });
 
       expect(answer.text, name).toContain('потолок');
       expect(answer.text, name).toContain('120');
@@ -1267,7 +1326,10 @@ describe('поток оборвался', () => {
       }),
       { now: () => new Date(clock) },
     );
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
 
     expect(answer.text).toContain('без завершающего кадра');
     expect(answer.text).not.toContain('потолок');
@@ -1372,11 +1434,14 @@ describe('след запроса для панели', () => {
 
   it('путь в следе идёт без строки запроса: в ней бывает ключ', async () => {
     await start(upstream([DELTA, USAGE, '[DONE]']));
-    await fetch(`http://127.0.0.1:${port}/enterprise-platform/v1/chat/completions?key=sk-secret-in-url`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-x', stream: true }),
-    });
+    await fetch(
+      `http://127.0.0.1:${port}/enterprise-platform/v1/chat/completions?key=sk-secret-in-url`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'gpt-x', stream: true }),
+      },
+    );
 
     const event = gateway.status().events[0];
     expect(event?.path).toBe('/enterprise-platform/v1/chat/completions');
@@ -1425,12 +1490,43 @@ describe('постоянный учёт расхода (Т8)', () => {
     expect(day.money.unpricedModels).toEqual(['gpt-x']);
 
     // Живой счётчик шлюза считает то же самое — но от запуска процесса.
-    expect(gateway.status().usage[0]).toMatchObject({ platformId: 'enterprise-platform', totalTokens: 12 });
+    expect(gateway.status().usage[0]).toMatchObject({
+      platformId: 'enterprise-platform',
+      totalTokens: 12,
+    });
+  });
+
+  it('ручная цена модели компании в прайсе панели — оценка считается по ней', async () => {
+    // Решение по контуру №7: каталог Company цены Qwen3.8 не отдаёт, панель
+    // оценивала 0 $ при списании 0,46 $. Цену вводят руками фрагментом имени.
+    store.updateSettings({
+      modelPricing: { 'qwen3.8': { input: 1, output: 4, cacheRead: 1, cacheWrite: 1 } },
+    });
+    const model = 'Qwen/Qwen3.8-27B-FP8';
+    await gateway.start({
+      store,
+      appDataDir: appData,
+      port: 0,
+      fetchImpl: upstream([DELTA.replace('gpt-x', model), USAGE]),
+      spendFlushMs: 0,
+      pricing: gatewayPricing(store, { current: () => ({ entries: [] }) }),
+    });
+    port = gateway.status().port;
+    await ask('/enterprise-platform/v1/chat/completions', { model, stream: true });
+
+    const day = store.getPlatformSpend()['enterprise-platform']!.days[0]!;
+    // 10 токенов входа по 1 $ и 2 выхода по 4 $ за миллион.
+    expect(day.money.usd).toBeCloseTo((10 * 1 + 2 * 4) / 1_000_000, 9);
+    expect(day.money.pricedTokens).toBe(12);
+    expect(day.money.unpricedModels).toEqual([]);
   });
 
   it('«бюджет исчерпан» (402) пишется в учёт — это факт, а не наша оценка', async () => {
     await start(upstream(['{"error":{"message":"budget exceeded"}}'], 402));
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
     expect(answer.status).toBeGreaterThanOrEqual(400);
 
     const record = store.getPlatformSpend()['enterprise-platform']!;
@@ -1448,9 +1544,12 @@ describe('постоянный учёт расхода (Т8)', () => {
   const KEY_BUDGET_402 =
     '{"error":{"message":"budget exceeded for this API key","type":"billing_error","code":"budget_exceeded"}}';
 
-  it('402 enterprise-platform назван бюджетом КЛЮЧА — и в учёте, и в ответе клиенту', async () => {
+  it('402 платформы компании назван бюджетом КЛЮЧА — и в учёте, и в ответе клиенту', async () => {
     await start(upstream([KEY_BUDGET_402], 402));
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
     expect(answer.status).toBe(402);
     expect(answer.text).toMatch(/исчерпан бюджет ключа/i);
     expect(answer.text).not.toContain('не бюджет ключа');
@@ -1560,7 +1659,10 @@ describe('прослойка инструментов', () => {
 
   it('диалект Anthropic, поток: клиент получает блок `tool_use` и `stop_reason: tool_use`', async () => {
     await start(upstream([callFrame(CALL_TEXT), STOP, USAGE, '[DONE]']));
-    const answer = await ask('/enterprise-platform/v1/messages', { ...ANTHROPIC_ASK, stream: true });
+    const answer = await ask('/enterprise-platform/v1/messages', {
+      ...ANTHROPIC_ASK,
+      stream: true,
+    });
 
     expect(answer.text).toContain('"type":"tool_use"');
     expect(answer.text).toContain('"name":"Write"');
@@ -1638,7 +1740,10 @@ describe('прослойка инструментов', () => {
         '[DONE]',
       ]),
     );
-    const answer = await ask('/enterprise-platform/v1/messages', { ...ANTHROPIC_ASK, stream: true });
+    const answer = await ask('/enterprise-platform/v1/messages', {
+      ...ANTHROPIC_ASK,
+      stream: true,
+    });
     expect(answer.text).toContain('"type":"tool_use"');
     expect(answer.text).not.toContain('<tool_call>');
   });
@@ -1661,7 +1766,10 @@ describe('прослойка инструментов', () => {
         '[DONE]',
       ]),
     );
-    const answer = await ask('/enterprise-platform/v1/messages', { ...ANTHROPIC_ASK, stream: true });
+    const answer = await ask('/enterprise-platform/v1/messages', {
+      ...ANTHROPIC_ASK,
+      stream: true,
+    });
 
     expect(answer.text).not.toContain('"type":"tool_use"');
     // Человек видит и текст блока, и причину: инструмент не объявлялся клиентом.
@@ -1674,7 +1782,10 @@ describe('прослойка инструментов', () => {
   it('прослойка выключена — конвейер работает ровно как до неё', async () => {
     writePlatform(store, { ...PLATFORM, toolShim: false });
     await start(upstream([callFrame(CALL_TEXT), STOP, USAGE, '[DONE]']));
-    const answer = await ask('/enterprise-platform/v1/messages', { ...ANTHROPIC_ASK, stream: true });
+    const answer = await ask('/enterprise-platform/v1/messages', {
+      ...ANTHROPIC_ASK,
+      stream: true,
+    });
 
     const sent = JSON.parse(calls[0]!.body) as { messages: { content: string }[] };
     expect(sent.messages[0]?.content).not.toContain('<tool_call>');
@@ -1827,7 +1938,7 @@ describe('метки защиты данных в вызове инструме�
   it('карта подмены контура разворачивается ДО синтеза вызова', async () => {
     await start(
       upstream([
-        JSON.stringify({ enterprise-platform_deanonymized_entities: { ORG_7: 'Платформа компании' } }),
+        JSON.stringify({ platform_deanonymized_entities: { ORG_7: 'Компания' } }),
         callFrame({ file_path: 'a.md', content: 'заказчик ORG_7' }),
         STOP,
         USAGE,
@@ -1838,10 +1949,10 @@ describe('метки защиты данных в вызове инструме�
 
     expect(JSON.parse(partialJson(answer.text))).toEqual({
       file_path: 'a.md',
-      content: 'заказчик Платформа компании',
+      content: 'заказчик Компания',
     });
     // Сам вендорный кадр клиенту по-прежнему не уезжает.
-    expect(answer.text).not.toContain('enterprise-platform_deanonymized_entities');
+    expect(answer.text).not.toContain('platform_deanonymized_entities');
     expect(gateway.status().events[0]?.masked).toBe(true);
   });
 });
@@ -1872,8 +1983,8 @@ describe('правила контура в теле запроса (Т7)', () =>
     await ask('/enterprise-platform/v1/messages', ASK_SIMPLE);
 
     const body = sent();
-    expect(body.enterprise-platform_tools).toBeUndefined();
-    expect(body.enterprise-platform_tool_mode).toBeUndefined();
+    expect(body.platform_tools).toBeUndefined();
+    expect(body.platform_tool_mode).toBeUndefined();
     expect(body.generation_preset).toBeUndefined();
     expect(body.enable_thinking).toBeUndefined();
     // Кроме одного: выключения. Обычное сообщение без инструментов клиента —
@@ -1915,8 +2026,8 @@ describe('правила контура в теле запроса (Т7)', () =>
     await start(upstream([DELTA, USAGE, '[DONE]']));
     await ask('/enterprise-platform/v1/messages', ASK_SIMPLE);
 
-    expect(sent().enterprise-platform_tools).toEqual(['web_search']);
-    expect(sent().enterprise-platform_tool_mode).toBe('single_turn');
+    expect(sent().platform_tools).toEqual(['web_search']);
+    expect(sent().platform_tool_mode).toBe('single_turn');
   });
 
   it('пресет генерации и размышления — своими полями', async () => {
@@ -1964,10 +2075,10 @@ describe('правила контура в теле запроса (Т7)', () =>
       body: init?.body ?? '',
     });
     const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-    if (body.enterprise-platform_tool_mode === 'single_turn' && body.stream === true) {
+    if (body.platform_tool_mode === 'single_turn' && body.stream === true) {
       return Promise.resolve(
         new Response(
-          '{"detail":"enterprise-platform_tool_mode=single_turn is not supported with stream=true"}',
+          '{"detail":"platform_tool_mode=single_turn is not supported with stream=true"}',
           { status: 400, headers: { 'content-type': 'application/json' } },
         ),
       );
@@ -2055,10 +2166,13 @@ describe('правила контура в теле запроса (Т7)', () =>
     await start(
       wholeBodyStatus(
         400,
-        '{"detail":"enterprise-platform_tool_mode=single_turn is not supported for image-generation models"}',
+        '{"detail":"platform_tool_mode=single_turn is not supported for image-generation models"}',
       ),
     );
-    const answer = await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    const answer = await ask('/enterprise-platform/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
 
     expect(answer.status).toBe(400);
     expect(answer.text).toContain('not supported for image-generation models');
@@ -2119,7 +2233,7 @@ describe('правила контура в теле запроса (Т7)', () =>
     });
 
     const body = sent();
-    expect(body.enterprise-platform_tools).toEqual(['web_search']);
+    expect(body.platform_tools).toEqual(['web_search']);
     // Прослойка молчит: текста протокола в теле нет, и «tools: shimmed» тоже.
     expect(JSON.stringify(body)).not.toContain('Протокол вызова инструментов');
     expect(JSON.stringify(body)).not.toContain('tool_call');
@@ -2231,7 +2345,7 @@ describe('инструменты клиента полем (совместимы
     await ask('/vllm/v1/messages', { ...TURN, tool_choice: { type: 'auto' } });
 
     expect(sent()).not.toHaveProperty('tools');
-    // `none` — знание платформа компании о СВОИХ инструментах; строгий шлюз на выбор без
+    // `none` — знание платформы компании о СВОИХ инструментах; строгий шлюз на выбор без
     // `tools` отвечает 400 вместо хода.
     expect(sent()).not.toHaveProperty('tool_choice');
     expect(JSON.stringify(sent())).toContain('tool_call>');

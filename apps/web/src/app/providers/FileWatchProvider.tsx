@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DOMAIN_KEYS } from '@shared/api/query-keys';
+import { publishPanelAgentEvent } from '@entities/PanelAgent';
 import type { FileWatchProviderProps } from './FileWatchProvider.types';
 
 /**
@@ -58,7 +59,11 @@ export function FileWatchProvider({ children }: FileWatchProviderProps) {
     let hiddenAt: number | undefined;
 
     const onMessage = (event: MessageEvent<string>): void => {
-      const payload = JSON.parse(event.data) as { domains?: string[]; path?: string };
+      const raw: unknown = JSON.parse(event.data);
+      // Кадры агента панели идут по этому же потоку: отдаём их окну агента и
+      // дальше не разбираем — доменов изменений в них нет.
+      if (publishPanelAgentEvent(raw)) return;
+      const payload = raw as { domains?: string[]; path?: string };
       for (const domain of payload.domains ?? []) {
         // Транскрипты — единственный домен, где важно, ЧТО именно изменилось:
         // разговоров сотни, они пишутся постоянно (в том числе из терминала и

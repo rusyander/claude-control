@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { panelHomeDir } from './brand.mjs';
 
 /**
  * Токен доступа к API — единственный секрет, которым приложение на телефоне
@@ -16,7 +16,7 @@ import { dirname, join } from 'node:path';
 const TOKEN_FILE = 'api-token';
 
 export function apiTokenPath(): string {
-  return join(homedir(), '.agentdeck', TOKEN_FILE);
+  return join(panelHomeDir(), TOKEN_FILE);
 }
 
 /**

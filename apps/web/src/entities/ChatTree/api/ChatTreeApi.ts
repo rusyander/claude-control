@@ -6,10 +6,7 @@ import type {
   SplitOverlapView,
   SplitReviewOutcome,
 } from '@agentdeck/contracts/chat-handoff';
-import type {
-  TaskSplitResult,
-  TaskSplitReviewDecision,
-} from '@agentdeck/contracts/task-split';
+import type { TaskSplitResult, TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import { apiClient } from '@shared/api/client';
 
 /**

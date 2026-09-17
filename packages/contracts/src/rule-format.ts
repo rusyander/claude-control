@@ -1,3 +1,4 @@
+import { BRAND_NAME, LEGACY_BRAND_NAME } from './brand.ts';
 /**
  * Формат правила в CLAUDE.md — контракт панели, ОДИН для сервера и клиента.
  *
@@ -19,7 +20,17 @@ export const RULE_HEADING = /^##\s+ПРАВИЛО:\s*(.+)$/i;
 /** Префикс, который снимается с заголовка выключенного правила при разборе служебного раздела. */
 export const RULE_PREFIX = /^ПРАВИЛО:\s*/i;
 /** Служебный раздел выключенных правил — заголовок второго уровня, но не правило и не «обычный» раздел. */
-export const DISABLED_SECTION = '## Отключённые правила (AgentDeck)';
+export const DISABLED_SECTION = `## Отключённые правила (${BRAND_NAME})`;
+/**
+ * Тот же раздел, записанный до переименования продукта: он лежит в CLAUDE.md у
+ * людей, и правила внутри обязаны по-прежнему читаться выключенными.
+ */
+export const LEGACY_DISABLED_SECTION = `## Отключённые правила (${LEGACY_BRAND_NAME})`;
+
+/** Строка (без хвостовых пробелов) — заголовок раздела выключенных под любым из имён. */
+export function isDisabledSectionHeading(line: string): boolean {
+  return line === DISABLED_SECTION || line === LEGACY_DISABLED_SECTION;
+}
 /** Пример заголовка в ожидаемом формате — показывается в подсказках. */
 export const RULE_HEADING_EXAMPLE = '## ПРАВИЛО: Отвечать по-русски';
 
@@ -37,7 +48,9 @@ export function isRuleHeading(line: string): boolean {
  */
 export function isPlainSectionHeading(line: string): boolean {
   const trimmed = line.trimEnd();
-  return H2_HEADING.test(trimmed) && !RULE_HEADING.test(trimmed) && trimmed !== DISABLED_SECTION;
+  return (
+    H2_HEADING.test(trimmed) && !RULE_HEADING.test(trimmed) && !isDisabledSectionHeading(trimmed)
+  );
 }
 
 export interface RuleFileSummary {

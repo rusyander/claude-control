@@ -1,10 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import type {
-  AppSettings,
-  ProviderDetectResponse,
-  ProviderDetection,
-} from '@agentdeck/contracts';
+import type { AppSettings, ProviderDetectResponse, ProviderDetection } from '@agentdeck/contracts';
 import { getActiveProviderId, listProviders } from './registry.ts';
 import { providerCliCandidates, providerCliCommand } from './cli.ts';
 import type { ConfigProvider } from './types.ts';

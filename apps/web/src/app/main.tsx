@@ -1,3 +1,5 @@
+// Первым: переносит ключи браузерного хранилища до того, как их прочтут модули ниже.
+import '@shared/lib/legacy-storage';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';

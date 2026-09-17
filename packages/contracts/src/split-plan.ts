@@ -1,3 +1,4 @@
+import { blockLang, blockLangPattern } from './brand.ts';
 /**
  * Два уровня плана ПЕРЕД работой групп разделения (Т1, 09.09.2026).
  *
@@ -16,8 +17,8 @@
  * блоков написано здесь заново, по тем же правилам, что у разделения и ревью.
  */
 
-export const SPLIT_PLAN_BLOCK_LANG = 'agentdeck:split-plan';
-export const PLAN_BLOCK_LANG = 'agentdeck:plan';
+export const SPLIT_PLAN_BLOCK_LANG = blockLang('split-plan');
+export const PLAN_BLOCK_LANG = blockLang('plan');
 
 /** Потолки разбора: всё сверх них — не план, а простыня. */
 const MAX_GROUPS = 8;
@@ -193,7 +194,7 @@ export interface SplitPlanScan {
 }
 
 const SPLIT_PLAN_OPEN = new RegExp(
-  `(^|\\n)[ \\t]*\`\`\`[ \\t]*${SPLIT_PLAN_BLOCK_LANG}[ \\t]*\\r?\\n`,
+  `(^|\\n)[ \\t]*\`\`\`[ \\t]*${blockLangPattern('split-plan')}[ \\t]*\\r?\\n`,
 );
 const CLOSE = /(^|\n)[ \t]*```[ \t]*(\r?\n|$)/;
 
@@ -242,7 +243,9 @@ export interface PlanScan {
   plan?: string;
 }
 
-const PLAN_OPEN = new RegExp(`(^|\\n)[ \\t]*\`\`\`[ \\t]*${PLAN_BLOCK_LANG}[ \\t]*\\r?\\n`);
+const PLAN_OPEN = new RegExp(
+  `(^|\\n)[ \\t]*\`\`\`[ \\t]*${blockLangPattern('plan')}[ \\t]*\\r?\\n`,
+);
 
 /**
  * Вырезать план группы. План — markdown, и внутри него бывают свои блоки

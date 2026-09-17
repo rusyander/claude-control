@@ -253,7 +253,7 @@ export const compareEn: typeof compareRu = {
       '02-env':
         'The variables section: CODEX_API_TOKEN right only as dem••••00, GIT_BASH_PATH left only, MAX_THINKING_TOKENS “same” — and under every secret row “The value is secret — only its presence was checked”',
       '03-instructions':
-        'Permissions with the “different models” badge — nine rows, not a single checkbox — and “Global instructions”: CLAUDE.md · 933 B against AGENTS.md · 226 B, labelled “differs”',
+        'Permissions with the “different models” badge — ten rows, not a single checkbox — and “Global instructions”: CLAUDE.md · 933 B against AGENTS.md · 226 B, labelled “differs”',
     },
     move: {
       '01-blocked':

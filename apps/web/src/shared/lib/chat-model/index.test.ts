@@ -6,6 +6,7 @@ import {
   MODEL_OPTIONS,
   EFFORT_LEVELS,
   modelSelectOptions,
+  platformBypassCaption,
   platformLayersCaption,
   platformModelCaption,
   withCurrentValue,
@@ -113,7 +114,7 @@ describe('константы выбора', () => {
  */
 describe('подпись модели через контур', () => {
   const choice = (over: Partial<PlatformModelChoice>): PlatformModelChoice => ({
-    model: 'enterprise-platform-mid',
+    model: 'company-mid',
     asked: '',
     source: 'default',
     replaced: false,
@@ -121,16 +122,16 @@ describe('подпись модели через контур', () => {
   });
 
   it('обычный случай — просто называет модель, без тревоги', () => {
-    expect(platformModelCaption('EnterprisePlatform · dev', choice({}))).toEqual({
+    expect(platformModelCaption('Company · dev', choice({}))).toEqual({
       key: 'chat.platformModel',
-      params: { title: 'EnterprisePlatform · dev', asked: '', model: 'enterprise-platform-mid' },
+      params: { title: 'Company · dev', asked: '', model: 'company-mid' },
       warn: false,
     });
   });
 
   it('подмена названа и подсвечена', () => {
     const caption = platformModelCaption(
-      'EnterprisePlatform · dev',
+      'Company · dev',
       choice({ asked: 'sonnet', replaced: true }),
     );
     expect(caption).toMatchObject({ key: 'chat.platformModelReplaced', warn: true });
@@ -138,7 +139,7 @@ describe('подпись модели через контур', () => {
 
   it('у контура нет модели — своя строка, а не подмена с прочерком', () => {
     const caption = platformModelCaption(
-      'EnterprisePlatform · dev',
+      'Company · dev',
       choice({ model: 'sonnet', asked: 'sonnet', source: 'none' }),
     );
     expect(caption).toMatchObject({ key: 'chat.platformModelUnset', warn: true });
@@ -177,5 +178,36 @@ describe('подпись о наших слоях', () => {
         dropped: ['settings', 'skills', 'mcp', 'systemPrompt'],
       }),
     ).toMatchObject({ key: 'chat.platformLayersAll' });
+  });
+});
+
+describe('platformBypassCaption', () => {
+  const RULES = { model: '', source: 'none', map: {}, catalog: [] } as const;
+
+  it('уход мимо контура назван вместе с причиной (решение по контуру №4)', () => {
+    expect(
+      platformBypassCaption({
+        routed: false,
+        title: 'Company',
+        reason: 'no_token',
+        bypassed: true,
+        rules: { ...RULES, catalog: [] },
+        effort: true,
+      }),
+    ).toEqual({ key: 'chat.platformBypassed', params: { title: 'Company', reason: 'no_token' } });
+  });
+
+  it('без признака ухода — молчит: снятая галочка и отказ обязательного не уход', () => {
+    const plan = {
+      routed: false,
+      title: 'Company',
+      rules: { ...RULES, catalog: [] },
+      effort: true,
+    };
+    expect(platformBypassCaption({ ...plan, reason: 'consumer_off' })).toBeUndefined();
+    expect(
+      platformBypassCaption({ ...plan, reason: 'gateway_down', refused: true }),
+    ).toBeUndefined();
+    expect(platformBypassCaption(undefined)).toBeUndefined();
   });
 });

@@ -77,8 +77,8 @@ const PROBE = {
 };
 
 const PLATFORM = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -144,7 +144,7 @@ const LAYERS_NONE = {
  */
 const RULE_ROWS = [
   {
-    id: 'enterprise-platform_tools',
+    id: 'platform_tools',
     title: 'Инструменты платформы',
     kind: 'request',
     field: 'platformTools',
@@ -153,7 +153,7 @@ const RULE_ROWS = [
     where: '',
   },
   {
-    id: 'enterprise-platform_tool_mode',
+    id: 'platform_tool_mode',
     title: 'Цикл вызовов платформы',
     kind: 'request',
     field: 'toolMode',
@@ -210,7 +210,7 @@ const conflictsOf = ({ toolsActive = false } = {}) => [
   {
     id: 'tools',
     level: 'exclusive',
-    platformRule: 'enterprise-platform_tools',
+    platformRule: 'platform_tools',
     ourRule: 'toolShim',
     title: 'Инструменты платформы ⟷ наша прослойка инструментов',
     detail: 'Включить оба нельзя — выберите один.',
@@ -264,7 +264,7 @@ const SPEND_DAYS = [
       usd: 7.2,
       pricedTokens: 2_400_000,
       unpricedTokens: 2_600_000,
-      unpricedModels: ['enterprise-platform-corp-l'],
+      unpricedModels: ['company-corp-l'],
     },
   },
 ];
@@ -280,7 +280,7 @@ const PERIOD_SPEND = {
     usd: 10.8,
     pricedTokens: 3_600_000,
     unpricedTokens: 2_600_000,
-    unpricedModels: ['enterprise-platform-corp-l'],
+    unpricedModels: ['company-corp-l'],
   },
 };
 
@@ -338,9 +338,9 @@ const cardOf = ({ active = true, platform = PLATFORM, ...patch } = {}) => ({
   budget: budgetOf(),
   periodSpend: PERIOD_SPEND,
   // Приём усилия объявляет манифест драйвера, и сервер присылает ответ всегда
-  // (Т6). У enterprise-platform поля глубины в публичной схеме нет — значит `false`.
+  // (Т6). У платформы компании поля глубины в публичной схеме нет — значит `false`.
   effort: false,
-  // Агенты — тоже ответ манифеста (DRV-12): у платформа компании они объявлены.
+  // Агенты — тоже ответ манифеста (DRV-12): у платформы компании они объявлены.
   agents: true,
   toolRoute: platform.toolShim ? 'shim' : 'none',
   // Правила и матрица приезжают в той же карточке (Т7): сервер собирает их из
@@ -385,7 +385,7 @@ const target = (patch) => ({
   title: 'Claude Code',
   supported: true,
   filePath: '/home/u/.claude/settings.json',
-  plan: [{ key: 'ANTHROPIC_BASE_URL', value: 'http://127.0.0.1:5179/enterprise-platform-dev' }],
+  plan: [{ key: 'ANTHROPIC_BASE_URL', value: 'http://127.0.0.1:5179/company-dev' }],
   conflicts: [],
   applied: false,
   ...patch,
@@ -396,10 +396,10 @@ let planToolRoute = 'shim';
 
 const planOf = (applied) => ({
   toolRoute: planToolRoute,
-  platformId: 'enterprise-platform-dev',
-  profileId: 'contour-enterprise-platform-dev',
-  baseUrl: 'http://127.0.0.1:5179/enterprise-platform-dev/v1',
-  rootUrl: 'http://127.0.0.1:5179/enterprise-platform-dev',
+  platformId: 'company-dev',
+  profileId: 'contour-company-dev',
+  baseUrl: 'http://127.0.0.1:5179/company-dev/v1',
+  rootUrl: 'http://127.0.0.1:5179/company-dev',
   ready: true,
   targets: [
     target({ targetId: 'assistant', title: 'Ассистент панели', filePath: '', applied }),
@@ -432,7 +432,7 @@ const GATEWAY = {
     routes: [],
     usage: [
       {
-        platformId: 'enterprise-platform-dev',
+        platformId: 'company-dev',
         requests: 42,
         promptTokens: 3_000_000,
         completionTokens: 3_200_000,
@@ -465,7 +465,7 @@ const row = (patch) => ({
   count: 4,
   lastAt: new Date().toISOString(),
   actions: ['masked'],
-  platformIds: ['enterprise-platform-dev'],
+  platformIds: ['company-dev'],
   ...patch,
 });
 
@@ -488,8 +488,8 @@ const VIOLATIONS = {
 /** След запроса — с текстом внутри. На экране его быть не должно нигде. */
 const POISONED_EVENT = {
   at: new Date().toISOString(),
-  platformId: 'enterprise-platform-dev',
-  path: '/enterprise-platform-dev/v1/chat/completions',
+  platformId: 'company-dev',
+  path: '/company-dev/v1/chat/completions',
   dialect: 'openai-compat',
   status: 400,
   stages: [],
@@ -558,7 +558,7 @@ let platformsFail = false;
  */
 let runPlan = {
   routed: true,
-  title: 'EnterprisePlatform · dev',
+  title: 'Company · dev',
   rules: {
     model: 'gpt-4o',
     source: 'default',
@@ -660,7 +660,7 @@ await page.route('**/api/platforms**', async (route) => {
     if (method === 'POST') bridged = true;
     if (method === 'DELETE') bridged = false;
     return json({
-      name: 'enterprise-platform-контур',
+      name: 'company-контур',
       connected: bridged,
       ...(method === 'DELETE' ? { removed: true } : {}),
     });
@@ -764,8 +764,10 @@ const goto = async (url) => {
   await page.waitForSelector('nav');
 };
 
-const open = async () => {
-  await goto(`${BASE}/platform`);
+// Раздел разложен по вкладкам (`?tab=`): каждая проверка открывает ту, где
+// живёт карточка, иначе текст страницы не содержит того, что она ищет.
+const open = async (tab) => {
+  await goto(tab ? `${BASE}/platform?tab=${tab}` : `${BASE}/platform`);
   await page.waitForTimeout(1200);
 };
 
@@ -791,12 +793,12 @@ check((await page.getByRole('dialog').count()) > 0, 'мастер открылс
 
 // Драйвер нового контура приносит свои умолчания прослойки и промпта (DRV-20):
 // галочек этих в мастере нет, и совместимый шлюз, принимающий инструменты
-// полем, иначе уезжал бы с прослойкой платформа компании.
+// полем, иначе уезжал бы с прослойкой платформы компании.
 await page.getByLabel('Тип контура').selectOption('openai-compat');
-await page.getByLabel('Название').fill('EnterprisePlatform · dev');
+await page.getByLabel('Название').fill('Company · dev');
 await page.getByLabel('Адрес API').fill('https://api.dev.example.ru');
 const idValue = await page.getByLabel('Идентификатор').inputValue();
-check(idValue === 'enterprise-platform-dev', `идентификатор собран из имени: ${idValue}`);
+check(idValue === 'company-dev', `идентификатор собран из имени: ${idValue}`);
 
 await page.getByRole('button', { name: 'Проверить связь' }).click();
 await page.waitForTimeout(600);
@@ -906,7 +908,7 @@ check(
   `пресет и переопределения сохранены: ${JSON.stringify({ driver: presetSave?.driver, manifest: presetSave?.manifest })}`,
 );
 
-// Обратно на платформа компании — пресет возвращается, и дальше мастер идёт как прежде.
+// Обратно на платформу компании — пресет возвращается, и дальше мастер идёт как прежде.
 await page.getByLabel('Тип контура').selectOption('enterprise-platform');
 
 // --- Мастер: ключ ---------------------------------------------------------
@@ -1053,7 +1055,7 @@ check(
   saveCall?.body?.settings?.driver === 'enterprise-platform' &&
     saveCall.body.settings.toolShim === true &&
     saveCall.body.settings.manifest === undefined,
-  'возврат к платформа компании вернул её прослойку и не унёс переопределений vLLM',
+  'возврат к платформе компании вернул её прослойку и не унёс переопределений vLLM',
 );
 check(
   applyCall?.body?.targets?.includes('claude') !== true,
@@ -1089,10 +1091,10 @@ check(
 // --- Карточка настроенного контура ----------------------------------------
 
 platforms = [cardOf()];
-await open();
+await open('contours');
 
 const card = await page.locator('body').innerText();
-check(card.includes('EnterprisePlatform · dev'), 'карточка контура на экране');
+check(card.includes('Company · dev'), 'карточка контура на экране');
 check(card.includes('на связи'), 'состояние названо словом');
 check(card.includes('sk-…4f21'), 'ключ показан маской');
 check(card.includes('Применён к'), 'список «Применён к» на месте');
@@ -1107,7 +1109,7 @@ check(card.includes('Журнал применения'), 'журнал прим
 platforms = [
   cardOf({ platform: { ...PLATFORM, consumers: ['chat', 'tests', 'assistant', 'foreign:qwen'] } }),
 ];
-await open();
+await open('model');
 const models = await page.locator('body').innerText();
 
 // Модель НЕ выбрана: панель берёт первую чатовую из каталога и обязана сказать
@@ -1160,12 +1162,12 @@ check(
 // Каталога нет — карточка не молчит и не притворяется пустым списком: «связь
 // ещё не проверяли» человек чинит кнопкой проверки, а не выбором модели.
 platforms = [cardOf({ health: undefined })];
-await open();
+await open('model');
 const noCatalog = await page.locator('body').innerText();
 check(noCatalog.includes('Каталог пуст'), 'пустой каталог назван причиной, а не пустым списком');
 
 platforms = [cardOf()];
-await open();
+await open('rules');
 
 // --- Правила контура и матрица конфликтов (Т7) -----------------------------
 
@@ -1201,7 +1203,7 @@ check(
   'при включённой прослойке набор инструментов контура выбрать нельзя',
 );
 check(
-  rulesScreen.includes('Выключите прослойку ниже, в разделе «Наша сторона»'),
+  rulesScreen.includes('Выключите прослойку в колонке «Наши слои», в разделе «Наша сторона»'),
   'запертое поле называет причину и место, где она снимается',
 );
 // До ревью Т7 (B2) выключателя прослойки не было НИГДЕ: карточка, справка и
@@ -1243,7 +1245,7 @@ const shimOff = {
   rules: { platform: { ...PLATFORM.rules.platform, generationPreset: '' } },
 };
 platforms = [cardOf({ platform: shimOff })];
-await open();
+await open('rules');
 check(
   !(await page.getByLabel('Инструменты платформы').isDisabled()),
   'с выключенной прослойкой набор инструментов контура редактируется',
@@ -1294,7 +1296,7 @@ const contradiction = {
   rules: { platform: { ...PLATFORM.rules.platform, platformTools: ['web_search'] } },
 };
 platforms = [cardOf({ platform: contradiction })];
-await open();
+await open('rules');
 const broken = await page.locator('body').innerText();
 check(
   broken.includes('Выберите сторону — вторую панель за вас не выключит'),
@@ -1315,7 +1317,7 @@ check(
 // --- Наши слои в прогоне (Т8) ----------------------------------------------
 
 platforms = [cardOf()];
-await open();
+await open('rules');
 const layersScreen = await page.locator('body').innerText();
 
 check(layersScreen.includes('Наши слои в прогоне'), 'раздел наших слоёв на карточке контура');
@@ -1380,7 +1382,7 @@ platforms = [
     },
   }),
 ];
-await open();
+await open('rules');
 const layersOff = await page.locator('body').innerText();
 check(
   layersOff.includes('Общий выключатель снят'),
@@ -1428,7 +1430,7 @@ platforms = [
     },
   }),
 ];
-await open();
+await open('rules');
 check(
   !(await page.locator('body').innerText()).includes('получить их пока некому'),
   'с чатом в маршруте оговорки про «некому» нет',
@@ -1437,7 +1439,7 @@ check(
 // Ответ сервера старее панели: поля слоёв нет вовсе. Карточка обязана
 // остаться на экране — падение здесь уносило бы весь раздел (урок Т7, B1).
 platforms = [cardOf({ layers: undefined })];
-await open();
+await open('rules');
 const layersLegacy = await page.locator('body').innerText();
 check(
   layersLegacy.includes('Наши слои в прогоне') && layersLegacy.includes('Правила контура'),
@@ -1451,14 +1453,14 @@ check(
 // Драйвер, не объявивший о себе ничего (любой совместимый шлюз): пустой список
 // — это «неизвестно», а не «ничего не делает».
 platforms = [cardOf({ rules: [], conflicts: [] })];
-await open();
+await open('rules');
 check(
   (await page.locator('body').innerText()).includes('о своих правилах не объявлял'),
   'молчащий драйвер назван «неизвестно», а не пустым списком правил',
 );
 
 platforms = [cardOf()];
-await open();
+await open('rules');
 
 // --- Активный контур: ровно один (Т2) --------------------------------------
 
@@ -1466,7 +1468,7 @@ await open();
 // обязана сказать это словом, а не отсутствием отметки.
 activePlatformId = '';
 platforms = [cardOf({ active: false })];
-await open();
+await open('contours');
 const idle = await page.locator('body').innerText();
 check(idle.includes('не активен'), 'неактивный контур назван словом');
 check(
@@ -1481,7 +1483,7 @@ check(
 // Ключа нет — спрашивать контур нечем: кнопка гаснет и называет причину, а не
 // отвечает отказом после нажатия.
 platforms = [cardOf({ active: false, hasToken: false, maskedToken: '' })];
-await open();
+await open('contours');
 const noKeyButton = page.getByRole('button', { name: 'Сделать активным' });
 check(await noKeyButton.isDisabled(), 'без ключа активировать нельзя');
 check(
@@ -1493,7 +1495,7 @@ check(
 // сервера, и всё переживает перезагрузку страницы.
 platforms = [cardOf({ active: false })];
 activationSmoke = SMOKE_OK;
-await open();
+await open('contours');
 await page.getByRole('button', { name: 'Сделать активным' }).click();
 await page.waitForTimeout(700);
 check(
@@ -1517,7 +1519,7 @@ check(
 activePlatformId = '';
 platforms = [cardOf({ active: false })];
 activationSmoke = SMOKE_FAILED;
-await open();
+await open('contours');
 await page.getByRole('button', { name: 'Сделать активным' }).click();
 await page.waitForTimeout(700);
 const smokeBad = await page.locator('body').innerText();
@@ -1546,9 +1548,9 @@ check(
 // — первый погас» на одной карточке не видно вовсе.
 activePlatformId = PLATFORM.id;
 activationSmoke = SMOKE_OK;
-const SECOND = { ...PLATFORM, id: 'enterprise-platform-prod', title: 'EnterprisePlatform · prod' };
+const SECOND = { ...PLATFORM, id: 'company-prod', title: 'Company · prod' };
 platforms = [cardOf({ smoke: SMOKE_OK }), cardOf({ active: false, platform: SECOND })];
-await open();
+await open('contours');
 
 const firstCard = page.locator(`[data-platform-card="${PLATFORM.id}"]`);
 const secondCard = page.locator(`[data-platform-card="${SECOND.id}"]`);
@@ -1602,7 +1604,7 @@ check(
 activePlatformId = '';
 platforms = [cardOf({ active: false })];
 activateDelayMs = 1_500;
-await open();
+await open('contours');
 posted.length = 0;
 const slowButton = page.getByRole('button', { name: 'Сделать активным' });
 await slowButton.click();
@@ -1618,7 +1620,7 @@ activateDelayMs = 0;
 // кнопки, ни заголовок.
 activePlatformId = PLATFORM.id;
 platforms = [cardOf({ smoke: SMOKE_OK }), cardOf({ active: false, platform: SECOND })];
-await open();
+await open('contours');
 posted.length = 0;
 await secondCard.getByRole('button', { name: 'Настроить' }).click();
 await page.waitForTimeout(500);
@@ -1672,13 +1674,13 @@ activePlatformId = PLATFORM.id;
 activationNotice = {
   activatedId: PLATFORM.id,
   activatedTitle: PLATFORM.title,
-  others: ['EnterprisePlatform · prod'],
+  others: ['Company · prod'],
 };
 platforms = [cardOf()];
-await open();
+await open('contours');
 const migrated = await page.locator('body').innerText();
 check(migrated.includes('Активным стал контур'), 'о переносе сказано на экране');
-check(migrated.includes('EnterprisePlatform · prod'), 'оставшиеся контуры названы поимённо');
+check(migrated.includes('Company · prod'), 'оставшиеся контуры названы поимённо');
 check(
   migrated.includes('остались настроенными') || migrated.includes('ключами и бюджетами'),
   'сказано, что остальные контуры не потеряны',
@@ -1689,7 +1691,7 @@ check(
   posted.some((item) => item.kind === 'notice-dismiss'),
   'закрытие рассказа дошло до сервера — иначе он вернулся бы после перезагрузки',
 );
-await open();
+await open('contours');
 check(
   !(await page.locator('body').innerText()).includes('Активным стал контур'),
   'закрытый рассказ не приезжает второй раз',
@@ -1726,9 +1728,9 @@ await page.route('**/api/settings', async (route) => {
           // «владелец назван» была бы зелена от самой заглушки.
           id: 'ep-managed',
           name: 'Профиль из панели',
-          baseUrl: 'http://127.0.0.1:5177/enterprise-platform-dev',
+          baseUrl: 'http://127.0.0.1:5177/company-dev',
           apiKind: 'openai-compat',
-          model: 'enterprise-platform-corp-m',
+          model: 'company-corp-m',
           writeToken: true,
           ownerPlatformId: managedOwnerId,
         },
@@ -1747,7 +1749,7 @@ platforms = [cardOf()];
 await openSettings();
 const managed = await page.locator('body').innerText();
 check(
-  managed.includes('Профиль ведёт контур «EnterprisePlatform · dev»'),
+  managed.includes('Профиль ведёт контур «Company · dev»'),
   'в настройках назван контур — владелец профиля',
 );
 check(
@@ -1773,7 +1775,7 @@ check(
 
 // Контур удалили, а профиль остался: возвращать нечего, и обычная кнопка
 // удаления обязана вернуться — иначе профиль-сирота не убрать вовсе.
-managedOwnerId = 'enterprise-platform-которого-нет';
+managedOwnerId = 'company-которого-нет';
 activePlatformId = '';
 platforms = [cardOf({ active: false })];
 await openSettings();
@@ -1821,7 +1823,7 @@ activePlatformId = PLATFORM.id;
 // Возврат на карточку: проверки ниже смотрят на живой экран раздела, а не на
 // снятый раньше текст, и настройки под ними — чужая страница.
 platforms = [cardOf()];
-await open();
+await open('contours');
 
 // --- Расход: величина одна, и она названа оценкой (Т8, правка 10.09.2026) ---
 
@@ -1836,7 +1838,7 @@ check(
   'ни следа «внутренней единицы контура» — этой формулы у контура нет',
 );
 check(
-  card.includes('в оценку не вошли, цены нет у: enterprise-platform-corp-l'),
+  card.includes('в оценку не вошли, цены нет у: company-corp-l'),
   'модель без цены названа поимённо и объявлена не вошедшей в оценку',
 );
 // День начала периода человек не вводил — панель говорит «с начала учёта», а не
@@ -1860,7 +1862,7 @@ check(
 // Обещанное предупреждение на 85 % было ТОЛЬКО цветом полосы: шесть пикселей,
 // сменившие оттенок, не видит ни человек на другой странице, ни скринридер.
 platforms = [cardOf({ budget: budgetOf({ spentUsd: 88, share: 0.88, nearLimit: true }) })];
-await open();
+await open('contours');
 const nearText = await page.locator('body').innerText();
 check(
   nearText.includes('израсходовано 88 % бюджета'),
@@ -1869,7 +1871,7 @@ check(
 check(!nearText.includes('бюджет исчерпан'), 'подход к бюджету не выдаётся за отказ контура');
 
 // Отказ 402 — факт, и ЧЕЙ это лимит, сервер прочитал из тела по манифесту
-// драйвера. У enterprise-platform на `/v1` это бюджет ключа (`handler_public_api.go:340`).
+// драйвера. У платформы компании на `/v1` это бюджет ключа (`handler_public_api.go:340`).
 // Карточка обязана сказать именно это: до 13.09.2026 она говорила обратное.
 platforms = [
   cardOf({
@@ -1882,7 +1884,7 @@ platforms = [
   }),
 ];
 exhausted = true;
-await open();
+await open('contours');
 const spentText = await page.locator('body').innerText();
 // Снимок строки отказа: `SHOTS=<каталог> node tools/qa/check-platform.mjs`.
 if (process.env.SHOTS) {
@@ -1916,7 +1918,7 @@ platforms = [
     }),
   }),
 ];
-await open();
+await open('contours');
 const levelText = await page.locator('body').innerText();
 check(
   levelText.includes('контур отказал по лимиту «org_monthly»') &&
@@ -1929,7 +1931,7 @@ platforms = [
     budget: budgetOf({ exhausted: true, exhaustedAt: EXHAUSTED_AT, exhaustedScope: 'key' }),
   }),
 ];
-await open();
+await open('contours');
 
 const extended = page.getByRole('button', { name: 'Отметку снять' });
 check((await extended.count()) === 1, 'снять отметку можно кнопкой, и только ею');
@@ -1943,24 +1945,27 @@ check(
 // Сервер СТАРЕЕ ФРОНТА расхода не присылает вовсе. Карточка обязана промолчать,
 // а не рухнуть, утащив за собой весь раздел: до Т8 этих полей не было.
 platforms = [{ platform: PLATFORM, hasToken: true, maskedToken: 'sk-…4f21', health: PROBE }];
-await open();
+await open('contours');
 const older = await page.locator('body').innerText();
-check(older.includes('EnterprisePlatform · dev'), 'без расхода в ответе карточка всё равно рисуется');
+check(older.includes('Company · dev'), 'без расхода в ответе карточка всё равно рисуется');
 check(older.includes('расход ≈ 0.00 $'), 'расход без данных — ноль с оговоркой, а не пусто');
 
 platforms = [cardOf()];
 exhausted = false;
-await open();
+await open('tools');
 
 // --- Проверки контура: показ, а не вызов ----------------------------------
 
 // Сводки в ответе шлюза сейчас НЕТ — так отвечает сервер старее фронта. Карточка
 // обязана промолчать, а не рухнуть, утащив за собой весь раздел: обе строки выше
 // («карточка контура на экране») об этом же, но здесь это сказано вслух.
-check(!card.includes('Проверки контента контура'), 'без сводки карточка проверок не рисуется');
+check(
+  !(await page.locator('body').innerText()).includes('Проверки контента контура'),
+  'без сводки карточка проверок не рисуется',
+);
 
 gatewayViolations = VIOLATIONS;
-await open();
+await open('tools');
 const checks = await page.locator('body').innerText();
 check(
   checks.includes('Проверки контента контура'),
@@ -1998,7 +2003,7 @@ check(checks.includes('Считаем по последним запросам')
 check(!checks.includes('Инструменты через контур'), 'без сводки прослойки карточка не рисуется');
 
 gatewayToolShim = { requests: 0, turns: 0, calls: 0, claimed: 0, flaws: [] };
-await open();
+await open('tools');
 const shimIdle = await page.locator('body').innerText();
 check(
   shimIdle.includes('Инструменты через контур') &&
@@ -2008,7 +2013,7 @@ check(
 check(!shimIdle.includes('ходов с инструментами'), 'счёт ходов без запросов не показывается вовсе');
 
 gatewayToolShim = TOOL_SHIM;
-await open();
+await open('tools');
 const shim = await page.locator('body').innerText();
 check(shim.includes('ходов с инструментами: 3'), 'ходы с настоящими вызовами посчитаны');
 check(
@@ -2038,14 +2043,17 @@ check(
 
 // --- Агенты контура -------------------------------------------------------
 
-check(checks.includes('Агенты контура'), 'карточка агентов на экране включённого контура');
+await open('agents');
+const agentsScreen = await page.locator('body').innerText();
+check(agentsScreen.includes('Агенты контура'), 'карточка агентов на экране включённого контура');
 check(
-  checks.includes('Список ведёте вы') || checks.includes('маршрута «покажи агентов» у ключа нет'),
+  agentsScreen.includes('Список ведёте вы') ||
+    agentsScreen.includes('маршрута «покажи агентов» у ключа нет'),
   'сказано, почему список агентов человек ведёт сам',
 );
-check(checks.includes('Юрист компании'), 'добавленный агент показан своим именем');
+check(agentsScreen.includes('Юрист компании'), 'добавленный агент показан своим именем');
 check(
-  checks.includes('0f4b2a10-77c3-4d1e-9f0a-2b6c8d5e1a33'),
+  agentsScreen.includes('0f4b2a10-77c3-4d1e-9f0a-2b6c8d5e1a33'),
   'идентификатор агента виден — его человек сверяет с админкой',
 );
 
@@ -2096,11 +2104,11 @@ check(
 platforms = [
   cardOf(),
   cardOf({
-    platform: { ...PLATFORM, id: 'enterprise-platform-prod', title: 'EnterprisePlatform · prod' },
+    platform: { ...PLATFORM, id: 'company-prod', title: 'Company · prod' },
     maskedToken: 'sk-…9c07',
   }),
 ];
-await open();
+await open('agents');
 const two = await page.locator('body').innerText();
 check(
   (two.match(/Агенты контура/g) ?? []).length === 2,
@@ -2113,17 +2121,21 @@ check(
 
 // Неактивный контур обязан вернуть раздел к прежнему виду побайтно.
 platforms = [cardOf({ active: false })];
-await open();
+await open('tools');
 const offText = await page.locator('body').innerText();
 check(
   !offText.includes('Проверки контента контура'),
   'контур выключен — карточки проверок нет вовсе',
 );
-check(!offText.includes('Агенты контура'), 'контур выключен — карточки агентов нет вовсе');
+await open('agents');
+check(
+  !(await page.locator('body').innerText()).includes('Агенты контура'),
+  'контур выключен — карточки агентов нет вовсе',
+);
 
 // Тип без агентов (DRV-12): карточка звала бы чужую ручку. Переходник остаётся —
 // модели через него спрашиваются у любого типа.
-// Тот же совместимый шлюз — и маршрут инструментов полем (DRV-13): платформа компанииьи
+// Тот же совместимый шлюз — и маршрут инструментов полем (DRV-13): платформенные
 // утверждения «как чат», «объявить нельзя» и карточка прослойки к нему не относятся.
 planToolRoute = 'native';
 platforms = [
@@ -2134,30 +2146,33 @@ platforms = [
     rules: [],
   }),
 ];
-await open();
+await open('agents');
 const compatText = await page.locator('body').innerText();
 check(!compatText.includes('Агенты контура'), 'у типа без агентов карточки агентов нет');
-check(
-  !compatText.includes('Платформа компании свои инструменты полем объявить нельзя'),
-  'факт «инструменты текстом» не показан разделу, где инструменты уходят полем',
-);
-check(
-  !compatText.includes('Инструменты через контур'),
-  'карточки прослойки у контура без прослойки нет, хотя сводка шлюза есть',
-);
-check(
-  compatText.includes('применён, инструменты уходят полем') &&
-    !compatText.includes('работает как чат без инструментов'),
-  'цель-CLI совместимого шлюза не названа «чатом без инструментов»',
-);
 check(
   (await page.getByRole('button', { name: /переходник/ }).count()) === 1,
   'переходник MCP у включённого контура без агентов на месте',
 );
+await open('contours');
+const compatContours = await page.locator('body').innerText();
+check(
+  !compatContours.includes('Платформе компании свои инструменты полем объявить нельзя'),
+  'факт «инструменты текстом» не показан разделу, где инструменты уходят полем',
+);
+check(
+  compatContours.includes('применён, инструменты уходят полем') &&
+    !compatContours.includes('работает как чат без инструментов'),
+  'цель-CLI совместимого шлюза не названа «чатом без инструментов»',
+);
+await open('tools');
+check(
+  !(await page.locator('body').innerText()).includes('Инструменты через контур'),
+  'карточки прослойки у контура без прослойки нет, хотя сводка шлюза есть',
+);
 
 planToolRoute = 'shim';
 platforms = [cardOf()];
-await open();
+await open('contours');
 
 const rollback = page.getByRole('button', { name: 'Откатить' }).first();
 check((await rollback.count()) > 0, 'у строки журнала есть точечный откат');
@@ -2213,11 +2228,11 @@ await goto(`${BASE}/chat`);
 await page.waitForTimeout(1800);
 const chatHeader = await page.locator('body').innerText();
 check(
-  chatHeader.includes('EnterprisePlatform · dev') && chatHeader.includes('gpt-4o'),
+  chatHeader.includes('Company · dev') && chatHeader.includes('gpt-4o'),
   'шапка чата называет контур и модель, которой пойдёт прогон',
 );
 check(
-  chatHeader.includes('Контур «EnterprisePlatform · dev» не принимает глубину продумывания'),
+  chatHeader.includes('Контур «Company · dev» не принимает глубину продумывания'),
   'о неотправляемой глубине сказано там же, где её выбирают',
 );
 // Слоёв в плане нет — значит снимать нечего (или прогон ведёт не Claude), и
@@ -2238,7 +2253,7 @@ await goto(`${BASE}/chat`);
 await page.waitForTimeout(1800);
 const chatLayers = await page.locator('body').innerText();
 check(
-  chatLayers.includes('Через контур «EnterprisePlatform · dev» прогон пойдёт без нашего') &&
+  chatLayers.includes('Через контур «Company · dev» прогон пойдёт без нашего') &&
     chatLayers.includes('Скиллы') &&
     chatLayers.includes('MCP-серверы'),
   'снятые слои названы в шапке чата поимённо',
@@ -2266,7 +2281,16 @@ await page.waitForTimeout(1200);
 // Выбранное имя, которого у контура нет: ветка подмены. До ревью Т6 ни один
 // свип по ней не проходил — проверялось только «подмены нет».
 const modelPick = page.getByRole('combobox', { name: 'Модель' }).first();
-if ((await modelPick.count()) > 0) {
+if ((await modelPick.count()) > 0 && (await modelPick.isDisabled())) {
+  // С 5a6111f выбор модели заперт, пока чат идёт через контур: выбрать чужое
+  // имя руками нельзя вовсе, и шапка обязана показать, чем уйдёт прогон.
+  // Ветка подмены сохранённого имени — в `shared/lib/chat-model/index.test.ts`.
+  const shown = (await modelPick.locator('option:checked').innerText()).trim();
+  check(
+    shown === runPlan.rules.model,
+    `выбор модели заперт на модели контура, а не на чужом имени (видно: «${shown}»)`,
+  );
+} else if ((await modelPick.count()) > 0) {
   await modelPick.selectOption('sonnet');
   await page.waitForTimeout(900);
   const replaced = await page.locator('body').innerText();
@@ -2283,7 +2307,7 @@ if ((await modelPick.count()) > 0) {
 // запрос уйдёт с .» — с прочерком вместо модели.
 runPlan = {
   routed: true,
-  title: 'EnterprisePlatform · dev',
+  title: 'Company · dev',
   rules: { model: '', source: 'none', map: {}, catalog: [] },
   effort: false,
 };
@@ -2291,13 +2315,13 @@ await goto(`${BASE}/chat`);
 await page.waitForTimeout(1800);
 const chatUnset = await page.locator('body').innerText();
 check(
-  chatUnset.includes('Контур «EnterprisePlatform · dev» модель не назначил'),
+  chatUnset.includes('Контур «Company · dev» модель не назначил'),
   'контур без модели говорит об этом прямо, а не показывает подмену с прочерком',
 );
 // Любая подпись, в которой на месте имени модели пусто, — а их две формы:
 // «запрос уйдёт с .» у подмены и «Через контур «X»: .» у обычной.
 check(
-  !chatUnset.includes('запрос уйдёт с .') && !chatUnset.includes('«EnterprisePlatform · dev»: .'),
+  !chatUnset.includes('запрос уйдёт с .') && !chatUnset.includes('«Company · dev»: .'),
   'ни одной подписи с пустым именем модели на экране нет',
 );
 
@@ -2313,7 +2337,7 @@ runPlan = {
 await goto(`${BASE}/chat`);
 await page.waitForTimeout(1800);
 const chatPlain = await page.locator('body').innerText();
-check(!chatPlain.includes('EnterprisePlatform · dev'), 'без контура подписи о нём в шапке нет вовсе');
+check(!chatPlain.includes('Company · dev'), 'без контура подписи о нём в шапке нет вовсе');
 check(
   !chatPlain.includes('не принимает глубину продумывания'),
   'без контура о глубине шапка ничего не утверждает',
@@ -2327,7 +2351,7 @@ check(
 activePlatformId = PLATFORM.id;
 platforms = [cardOf()];
 gatewayDown = true;
-await open();
+await open('contours');
 const downCard = page.locator(`[data-platform-card="${PLATFORM.id}"]`);
 check(
   (await downCard.locator('[data-gateway-down]').count()) === 1,
@@ -2341,7 +2365,7 @@ check(
   'шлюз поднялся — строка ушла сама, без перезагрузки',
 );
 activePlatformId = '';
-await open();
+await open('contours');
 check(
   (await page.locator('[data-gateway-down]').count()) === 0,
   'у неактивного контура строки о шлюзе нет',
@@ -2350,7 +2374,7 @@ check(
 // Отказ обязательного контура в чате называет не только причину, но и выход.
 runPlan = {
   routed: false,
-  title: 'EnterprisePlatform · dev',
+  title: 'Company · dev',
   reason: 'gateway_down',
   refused: true,
   rules: { model: '', source: 'none', map: {}, catalog: [] },

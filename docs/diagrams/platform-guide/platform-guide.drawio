@@ -303,7 +303,7 @@
         <mxCell id="p3:title" value="Панель и контур: кто чем занят" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="30" width="1160" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="p3:sub" value="Слева — всё, что происходит на вашей машине. Справа — сервисы инстанса платформа компании. Границу переходят три стрелки, и ни одна из них не ведёт в обратную сторону сама." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+        <mxCell id="p3:sub" value="Слева — всё, что происходит на вашей машине. Справа — сервисы инстанса платформы компании. Границу переходят три стрелки, и ни одна из них не ведёт в обратную сторону сама." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
           <mxGeometry x="60" y="60" width="1160" height="30" as="geometry"/>
         </mxCell>
         <mxCell id="p3:panel" value="" style="rounded=1;arcSize=2;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
@@ -318,7 +318,7 @@
         <mxCell id="p3:gwl" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Локальный шлюз панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Слушатель процесса самой панели. Принимает запрос по OpenAI-совместимому протоколу, подставляет ключ и считает токены обеих сторон.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
           <mxGeometry x="20" y="160" width="480" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="p3:driver" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Реестр контуров и драйвер enterprise-platform&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Помнит адрес, режим и возможности контура. Драйвер знает диалект платформы: где у неё каталог моделей, эмбеддинги и агенты и как она отвечает на отказ.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
+        <mxCell id="p3:driver" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Реестр контуров и драйвер платформы&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Помнит адрес, режим и возможности контура. Драйвер знает диалект платформы: где у неё каталог моделей, эмбеддинги и агенты и как она отвечает на отказ.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
           <mxGeometry x="20" y="250" width="480" height="70" as="geometry"/>
         </mxCell>
         <mxCell id="p3:keys" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Зашифрованное хранилище ключей&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Ключ лежит здесь и только здесь. Ни в ответе API, ни в промпте, ни в логе, ни в конфигурации CLI его нет — наружу уходит маска.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
@@ -333,7 +333,7 @@
         <mxCell id="p3:contour" value="" style="rounded=1;arcSize=2;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
           <mxGeometry x="860" y="150" width="520" height="700" as="geometry"/>
         </mxCell>
-        <mxCell id="p3:contour:tab" value="Контур компании&lt;div style=&quot;font-size:9px&quot;&gt;инстанс платформа компании, развёрнутый у вас&lt;/div&gt;" style="rounded=0;fillColor=#EC407A;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p3:contour">
+        <mxCell id="p3:contour:tab" value="Контур компании&lt;div style=&quot;font-size:9px&quot;&gt;инстанс платформы компании, развёрнутый у вас&lt;/div&gt;" style="rounded=0;fillColor=#EC407A;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p3:contour">
           <mxGeometry x="10" y="10" width="500" height="40" as="geometry"/>
         </mxCell>
         <mxCell id="p3:ui" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;inst-admin-ui — админка инстанса&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Здесь администратор заводит модель, выпускает ключ и смотрит «Использование». Панель в админку не ходит вовсе: всё, что из неё нужно, переносится руками.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:contour">
@@ -410,7 +410,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="p3:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="1020" width="260" height="20" as="geometry"/>
+          <mxGeometry x="60" y="1020" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1050" width="30" height="20" as="geometry"/>
@@ -419,7 +419,7 @@
           <mxGeometry x="90" y="1050" width="20" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:cap0" value="сторона панели: ваша машина" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1050" width="200" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1050" width="260" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1080" width="30" height="20" as="geometry"/>
@@ -427,32 +427,32 @@
         <mxCell id="p3:legend:sw1b" value="" style="rounded=0;fillColor=#EC407A;strokeColor=none;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="90" y="1080" width="20" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p3:legend:cap1" value="сторона контура: инстанс платформа компании" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1080" width="200" height="20" as="geometry"/>
+        <mxCell id="p3:legend:cap1" value="сторона контура: инстанс платформы компании" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1080" width="260" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1110" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:cap2" value="составная часть панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1110" width="200" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1110" width="260" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1140" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:cap3" value="сервис инстанса" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1140" width="200" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1140" width="260" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#ECEFF1;strokeColor=#78909C;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1170" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:cap4" value="то, что уже вне контура" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1170" width="200" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1170" width="260" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1200" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:cap5" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1200" width="200" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1200" width="260" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:sw6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#EF6C00;sample=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
@@ -461,7 +461,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="p3:legend:cap6" value="переносится руками, один раз" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1230" width="200" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1230" width="260" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:sw7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
@@ -470,7 +470,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="p3:legend:cap7" value="запрос вперёд" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1260" width="200" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1260" width="260" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p3:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;sample=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
@@ -479,7 +479,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="p3:legend:cap8" value="ответ обратно" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1290" width="200" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1290" width="260" height="20" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>

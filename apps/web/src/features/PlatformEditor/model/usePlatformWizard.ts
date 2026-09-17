@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import {
-  PLATFORM_ASSISTANT_TARGET,
-  PLATFORM_TERMINAL_CONSUMER,
   type Platform,
   type PlatformApplyResult,
   type PlatformProbeResult,
@@ -22,6 +20,8 @@ import { useUpdateSettings } from '@entities/AppConfig';
 import {
   confirmedCapabilities,
   draftWithPatch,
+  finishCloses,
+  finishPlan,
   initialTargets,
   needsGatewayEnable,
   savePayload,
@@ -51,11 +51,14 @@ import {
 export interface PlatformWizardOptions {
   /** Правка существующего контура: черновик и цели берутся из него. */
   existing?: PlatformStatus;
-  onDone: () => void;
+  /** С какого шага открыть: агент панели ведёт человека сразу к полю ключа. */
+  initialStep?: WizardStep;
+  /** Мастер завершён; `result` — что применение записало и что пропустило. */
+  onDone: (result?: PlatformApplyResult) => void;
 }
 
-export function usePlatformWizard({ existing, onDone }: PlatformWizardOptions) {
-  const [step, setStep] = useState<WizardStep>('address');
+export function usePlatformWizard({ existing, initialStep, onDone }: PlatformWizardOptions) {
+  const [step, setStep] = useState<WizardStep>(initialStep ?? 'address');
   const [draft, setDraft] = useState<Platform>(existing?.platform ?? newPlatform('', ''));
   /** Пусто — ключ не трогали: сохранённый останется на месте. */
   const [token, setToken] = useState('');
@@ -145,21 +148,18 @@ export function usePlatformWizard({ existing, onDone }: PlatformWizardOptions) {
    */
   const finish = async (): Promise<void> => {
     // Цели применения СОБИРАЮТСЯ из потребителей (Т3), а не спрашиваются
-    // вторично: ассистент панели — это его потребитель, файлы CLI — «Терминал».
-    // Снятый терминал означает, что файловые цели не уезжают вовсе, даже если
-    // человек отметил их до того, как снял галочку.
-    const applyTargets = [
-      ...(draft.consumers.includes(PLATFORM_ASSISTANT_TARGET) ? [PLATFORM_ASSISTANT_TARGET] : []),
-      ...(draft.consumers.includes(PLATFORM_TERMINAL_CONSUMER) ? targets : []),
-    ];
-    await save.mutateAsync(savePayload({ ...draft, targets: applyTargets }, token));
+    // вторично; что сохраняется и что применяется — разные списки (`finishPlan`).
+    const { platform, applyTargets } = finishPlan(draft, targets, plan.data?.consumers);
+    await save.mutateAsync(savePayload(platform, token));
     setStored(true);
     if (!existing) await activate.mutateAsync(draft.id);
     const result = await apply.mutateAsync({ id: draft.id, targets: applyTargets, overwrite });
     setApplied(result);
-    // Занятое место мастер не перебивает молча: пропущенные цели остаются на
-    // экране с причиной, и человек решает — перезаписать или оставить как есть.
-    if (result.skipped.length === 0) onDone();
+    // Занятое место мастер не перебивает молча: пока пропуск чинится галочкой
+    // «перезаписать» в этом окне, окно остаётся открытым. Остальные пропуски
+    // (контур не активен, шлюз не поднят) отсюда не чинятся — мастер
+    // закрывается и называет их вслух (D3).
+    if (finishCloses(result)) onDone(result);
   };
 
   const next = (): void => setStep(stepAfter(step));

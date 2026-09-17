@@ -89,7 +89,11 @@ export function readDeckRecord(appDataDir: string, id: string): StoredDeck | und
 /** Байты файла колоды. Отсутствие файла при живой записи — тоже «нет файла». */
 export function readDeckFile(appDataDir: string, id: string, format: MediaDeckFormat): Buffer {
   const path = deckFilePath(appDataDir, id, format);
-  if (!existsSync(path)) throw new MediaError(404, 'Файл презентации панель не нашла');
+  if (!existsSync(path)) {
+    throw new MediaError(404, 'Файл презентации панель не нашла', undefined, {
+      code: 'media-deck-file-missing',
+    });
+  }
   return readFileSync(path);
 }
 

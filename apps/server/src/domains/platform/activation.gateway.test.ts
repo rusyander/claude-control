@@ -26,7 +26,7 @@ const SECRET = 'contour-key-corporate-4f21';
 
 const PLATFORM: Platform = {
   id: 'enterprise-platform',
-  title: 'EnterprisePlatform · dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: false,

@@ -107,8 +107,8 @@ export const skillsEn: typeof skillsRu = {
       fBuilderText:
         'The second tab of the form offers three structure presets and names the ' +
         'files of each: a single SKILL.md; SKILL.md plus references/rules.md and ' +
-        'references/examples.md; and the same plus config/README.md and ' +
-        'templates/README.md. The button below reads "Create and build the structure".',
+        'references/examples.md; and SKILL.md plus references/rules.md, config/README.md ' +
+        'and templates/README.md — without examples.md. The button below reads "Create and build the structure".',
 
       livingTitle: 'A set you already have: search, files, switching off, editing',
       livingCaption:
@@ -285,8 +285,9 @@ export const skillsEn: typeof skillsRu = {
       'there too — no second, enabled copy appears',
     limitBackups: 'Backups',
     limitBackupsValue:
-      'before a deletion and before an overwrite the folder is copied into ' +
-      'agentdeck/backups — as long as "Back up before writing" is on in Settings',
+      'into agentdeck/backups, as long as "Back up before writing" is on in ' +
+      'Settings: before a deletion or a rename the whole folder is copied, before saving ' +
+      'the form only SKILL.md, before deleting a file in the tree that file alone',
 
     notesTitle: 'Things people trip over',
     noteNestedTitle: 'Nested files are read only through a link',
@@ -341,12 +342,15 @@ export const skillsEn: typeof skillsRu = {
       'Close the window with Cancel: until the save button is pressed, SKILL.md does not change.',
     undoFile: 'You deleted a file inside a skill',
     undoFileText:
-      'The tree asks for confirmation by typing the name, but no copy of the single file is ' +
-      'kept: the only way back is rolling the whole folder out of a backup.',
+      'The tree asks for confirmation by typing the name and, while backups before writing ' +
+      'are on, copies that file into agentdeck/backups as ' +
+      'skill-<skill>-<file>.<time>.bak. Such a copy has no Restore button: the file is ' +
+      'brought back by hand, copied into the skill folder again.',
     undoDelete: 'You deleted a skill',
     undoDeleteText:
       'The whole folder sits in agentdeck/backups. The Restore button in the backup list ' +
-      'on the settings page unfolds it back into skills/.',
+      'on the settings page unfolds it back where the skill lay when it was deleted: into ' +
+      'skills/, or into skills-disabled/ if it was switched off.',
     undoRename: 'You renamed it wrong',
     undoRenameText:
       'Rename it back with the same button: the panel carries the group marks over again. Links ' +

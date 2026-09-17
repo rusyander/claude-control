@@ -104,7 +104,12 @@ import {
   removeIntegrationLink as dropIntegrationLink,
   setIntegrationLink as writeIntegrationLink,
 } from './integration-links.ts';
-import { mergeState, readStateFile, stateFilePath } from './state-file.ts';
+import {
+  mergeState,
+  readStateFile,
+  stateFilePath,
+  withCurrentPlatformDrivers,
+} from './state-file.ts';
 import {
   getWorktreeMirror as readWorktreeMirror,
   setWorktreeMirror as writeWorktreeMirror,
@@ -171,7 +176,10 @@ export class AppStore {
     // Node исполняет TypeScript в режиме strip-only: он только срезает типы и
     // не поддерживает parameter properties, поэтому поле присваиваем вручную.
     this.appDataDir = appDataDir;
-    this.state = mergeState(readStateFile(appDataDir));
+    const loaded = readStateFile(appDataDir);
+    this.state = mergeState(loaded);
+    // Контур под прежним именем драйвера переписывается на диске сразу, один раз.
+    if (withCurrentPlatformDrivers(loaded).changed) this.persist();
   }
 
   private get stateFile(): string {
@@ -182,8 +190,28 @@ export class AppStore {
     return join(this.appDataDir, 'backups');
   }
 
+  /** Отстранённая копия (`detached`): живёт только в памяти, файла не касается. */
+  private isDetached?: boolean;
+
   private persist(): void {
+    if (this.isDetached) return;
     writeJsonFile(this.stateFile, this.state);
+  }
+
+  /**
+   * Копия состояния, которая НИКОГДА не пишет `state.json`. Нужна предпросмотру
+   * записи: доменная операция идёт по временной копии файла и попутно переносит
+   * отметки (`migrateRuleIds`, `removeEntity`). По настоящему хранилищу это
+   * сдвинуло бы отметки живого конфига ещё до того, как человек что-то решил.
+   */
+  detached(): AppStore {
+    const copy = Object.create(AppStore.prototype) as AppStore;
+    Object.assign(copy, {
+      appDataDir: this.appDataDir,
+      state: structuredClone(this.state),
+      isDetached: true,
+    });
+    return copy;
   }
 
   getState(): AppState {

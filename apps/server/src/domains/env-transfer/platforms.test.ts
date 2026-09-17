@@ -59,7 +59,9 @@ describe('секция контуров в архиве переноса', () =>
   });
 
   it('архив без целей применения не выдумывает потребителей', () => {
-    const taken = takePanelPlatforms(archive([legacyEntry({ targets: [] })]), ['enterprise-platform']);
+    const taken = takePanelPlatforms(archive([legacyEntry({ targets: [] })]), [
+      'enterprise-platform',
+    ]);
 
     expect(taken[0]?.consumers).toEqual([]);
   });

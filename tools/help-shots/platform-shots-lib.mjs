@@ -7,8 +7,6 @@
  * ни ролей — искать их приходится по заголовку. Атрибут на вид не влияет.
  */
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { shotLanguage } from './kit.mjs';
 
 export const LANG = shotLanguage();
@@ -21,13 +19,25 @@ export const exact = (ru, en) => new RegExp(`^\\s*(${ru}|${en})\\s*$`);
 
 export const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Ключ стенда: читается из личного хранилища и нигде не печатается. */
+/**
+ * Ключ стенда: нигде не печатается. Где он лежит, скрипт не знает — это личное
+ * хранилище владельца стенда, и имя файла в репозитории не живёт:
+ * `PLATFORM_STAND_KEY_FILE` — файл вида dotenv, `PLATFORM_STAND_KEY_VAR` — имя
+ * строки в нём.
+ */
 export function standKey() {
-  const file = join(homedir(), '.agentdeck', 'enterprise-platform-credentials.env');
+  const file = process.env.PLATFORM_STAND_KEY_FILE;
+  const name = process.env.PLATFORM_STAND_KEY_VAR;
+  if (!file || !name) {
+    throw new Error(
+      'нужны PLATFORM_STAND_KEY_FILE и PLATFORM_STAND_KEY_VAR: где лежит ключ стенда',
+    );
+  }
+  const escaped = name.replace(/[^A-Za-z0-9_]/g, '');
   const key = readFileSync(file, 'utf8')
-    .match(/^ENTERPRISE_PLATFORM_LOCAL_INST_KEY=(.+)$/m)?.[1]
+    .match(new RegExp(`^${escaped}=(.+)$`, 'm'))?.[1]
     ?.trim();
-  if (!key) throw new Error(`в ${file} нет ENTERPRISE_PLATFORM_LOCAL_INST_KEY`);
+  if (!key) throw new Error(`в ${file} нет строки ${escaped}`);
   return key;
 }
 
@@ -63,6 +73,28 @@ export async function mark(page, text, name, mode = 'card') {
   );
   if (!found) throw new Error(`область «${name}»: текст «${text}» на странице не найден`);
   return `[data-shot="${name}"]`;
+}
+
+/**
+ * Открыть вкладку раздела «Контур» (`/platform?tab=…`). Модель, правила и доступ
+ * разделов относятся к одному контуру: при нескольких контурах над вкладкой стоит
+ * выбор, и нужный выбирается по названию — иначе кадр снял бы активный контур.
+ */
+export async function openPlatformTab(page, web, tab, title) {
+  await page.goto(`${web}/platform?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  await pause(3500);
+  if (!title) return;
+  const picker = page.locator('[data-contour-picker] select');
+  if (!(await picker.count())) return;
+  const value = await picker
+    .locator('option')
+    .evaluateAll(
+      (options, wanted) => options.find((item) => item.textContent?.startsWith(wanted))?.value,
+      title,
+    );
+  if (!value) throw new Error(`контура «${title}» нет в выборе вкладки ${tab}`);
+  await picker.selectOption(value);
+  await pause(1500);
 }
 
 /**

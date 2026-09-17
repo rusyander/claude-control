@@ -1,3 +1,5 @@
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
+
 /**
  * Отказы контура — состояние, а не падение панели.
  *
@@ -25,19 +27,32 @@ export class PlatformError extends Error {
   readonly code: PlatformErrorCode;
   /** Подробность: имя незаполненного поля, путь к файлу, ответ системы. */
   readonly detail?: string;
+  /** Код текста для перевода на клиенте; русский `message` остаётся запасным. */
+  readonly messageCode?: ServerMessageCode;
+  readonly params?: ServerMessageParams;
 
-  constructor(code: PlatformErrorCode, message: string, detail?: string) {
+  constructor(
+    code: PlatformErrorCode,
+    message: string,
+    detail?: string,
+    text?: { code: ServerMessageCode; params?: ServerMessageParams },
+  ) {
     super(message);
     this.name = 'PlatformError';
     this.code = code;
     this.statusCode = STATUS[code];
     this.detail = detail;
+    this.messageCode = text?.code;
+    this.params = text?.params;
   }
 }
 
 /** Контура с таким идентификатором нет — 404 с его именем, а не «ошибка». */
 export function platformNotFound(id: string): PlatformError {
-  return new PlatformError('platform_not_found', `Контура «${id}» не существует.`);
+  return new PlatformError('platform_not_found', `Контура «${id}» не существует.`, undefined, {
+    code: 'platform-not-found',
+    params: { id },
+  });
 }
 
 /** Поле запроса не заполнено — 400 с ИМЕНЕМ поля, а не «неверный запрос». */
@@ -81,6 +96,8 @@ export function notConnected(title: string): PlatformError {
   return new PlatformError(
     'platform_not_connected',
     `Контур «${title}» не подключён: включите его и сохраните ключ.`,
+    undefined,
+    { code: 'platform-not-connected', params: { title } },
   );
 }
 
@@ -93,5 +110,7 @@ export function agentsNotDeclared(title: string): PlatformError {
   return new PlatformError(
     'agents_not_declared',
     `У контура «${title}» нет опубликованных агентов: его тип их не объявляет.`,
+    undefined,
+    { code: 'platform-agents-not-declared', params: { title } },
   );
 }

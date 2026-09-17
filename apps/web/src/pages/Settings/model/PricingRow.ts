@@ -95,6 +95,69 @@ export function overrideFor(
   return Object.entries(custom).find(([fragment]) => id.includes(fragment))?.[1];
 }
 
+/** Ручная цена: модель, которой в прайсе нет, и её ставки. */
+export interface ManualPrice {
+  /** Фрагмент имени, как его сверяет расчёт (`findPricing`): строчными. */
+  model: string;
+  price: ModelPricing;
+}
+
+/**
+ * Свои цены, которые не относятся ни к одной строке прайса, — ручные.
+ *
+ * Решение по контуру №7: каталог платформы компании цены Qwen3.8 не отдаёт, и оценка
+ * расхода через контур стояла на 0 $ при списании 0,46 $. Такой цене нет строки
+ * в прайсе Anthropic — без этого списка она сохранялась бы и работала невидимой,
+ * а человек не знал бы, по какой цифре считается оценка.
+ */
+export function manualPrices(
+  custom: Record<string, ModelPricing>,
+  entries: readonly PricingEntry[],
+): ManualPrice[] {
+  return Object.entries(custom)
+    .filter(([fragment]) => !entries.some((entry) => entry.id.includes(fragment)))
+    .map(([model, price]) => ({ model, price }))
+    .sort((a, b) => a.model.localeCompare(b.model));
+}
+
+/**
+ * Ручная цена из формы. Для модели компании обычно известны только вход и
+ * выход: незаданный кэш берётся равным входу — так шлюз без отдельной цены кэша
+ * и берёт деньги за эти токены (`declaredPricing` на сервере).
+ */
+export function manualPriceFromDraft(draft: PricingDraft): ModelPricing | undefined {
+  const input = (draft.input ?? '').trim();
+  const orInput = (value: string | undefined): string => ((value ?? '').trim() ? value! : input);
+  return priceFromDraft({
+    ...draft,
+    cacheRead: orInput(draft.cacheRead),
+    cacheWrite: orInput(draft.cacheWrite),
+  });
+}
+
+/**
+ * Свои цены после добавления ручной. Имя — строчными и без пробелов по краям:
+ * расчёт сверяет фрагмент с именем модели без учёта регистра, и «Qwen3.8 » с
+ * пробелом не совпал бы ни с чем. Пустое имя — `undefined`, а не цена на всё.
+ */
+export function withManualPrice(
+  custom: Record<string, ModelPricing>,
+  model: string,
+  price: ModelPricing,
+): Record<string, ModelPricing> | undefined {
+  const key = model.trim().toLowerCase();
+  if (!key) return undefined;
+  return { ...custom, [key]: price };
+}
+
+/** Свои цены без одной записи. */
+export function withoutCustom(
+  custom: Record<string, ModelPricing>,
+  key: string,
+): Record<string, ModelPricing> {
+  return Object.fromEntries(Object.entries(custom).filter(([fragment]) => fragment !== key));
+}
+
 function samePrice(a: ModelPricing, b: ModelPricing): boolean {
   return PRICING_FIELDS.every((field) => a[field] === b[field]);
 }

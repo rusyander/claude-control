@@ -1,9 +1,5 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import type {
-  EndpointApplyResult,
-  EndpointProbeResult,
-  EndpointsInfo,
-} from '@agentdeck/contracts';
+import type { EndpointApplyResult, EndpointProbeResult, EndpointsInfo } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import {
   applyEndpointProfile,

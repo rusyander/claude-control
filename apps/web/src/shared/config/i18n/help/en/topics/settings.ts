@@ -66,7 +66,7 @@ export const settingsEn: typeof settingsRu = {
 
     tabsTitle: 'Sections of the page',
     tabsCaption:
-      'Settings are split across seven tabs — exactly one section is open at a time. The ' +
+      'Settings are split across nine tabs — exactly one section is open at a time. The ' +
       'chosen one goes into the address (/settings?tab=…): the link can be shared and ' +
       'survives a reload. Tabs work from the keyboard too: Tab enters the strip, arrows ' +
       'switch sections, Home and End jump to the edges.',
@@ -82,6 +82,14 @@ export const settingsEn: typeof settingsRu = {
     tabModels: 'Models',
     tabModelsText:
       'Default model and effort, the model catalog, a custom endpoint and MCP server checks.',
+    tabPrompts: 'Prompts',
+    tabPromptsText:
+      'The texts the panel speaks to the model with, not on your behalf: the tool protocol, ' +
+      'the agent behind a contour, the image and presentation modes.',
+    tabIntegrations: 'Integrations',
+    tabIntegrationsText:
+      'Jira and Confluence, a forge by token, Telegram, a webhook, test management and CI ' +
+      'reports — covered in the Integrations article.',
     tabSpend: 'Spend',
     tabSpendText: 'Spend units — tokens or money — and the rates it is counted by.',
     tabSafety: 'Safety',
@@ -499,7 +507,7 @@ export const settingsEn: typeof settingsRu = {
       'old environment — a new session has to be started.',
 
     guide: {
-      firstRunTitle: 'Path 1. First run: from the wizard to the eight tabs',
+      firstRunTitle: 'Path 1. First run: from the wizard to the nine tabs',
       firstRunCaption:
         'Walked once. Everything the wizard asks about can be changed later on the Access ' +
         'tab — it only keeps you from starting blind.',
@@ -524,10 +532,10 @@ export const settingsEn: typeof settingsRu = {
         'A step about the sandbox, and only about it. A green badge means everything was ' +
         'found. “Not found” with a file path means the ordinary chat and the sections are ' +
         'fine; sign in with the claude command in a terminal, or set access manually.',
-      firstRunTabs: 'Eight tabs',
+      firstRunTabs: 'Nine tabs',
       firstRunTabsText:
         'After the wizard the page looks like this: general, access, providers, models, ' +
-        'integrations, spend, safety, transfer. The Contour tab opens as its own sidebar ' +
+        'prompts, integrations, spend, safety, transfer. The Contour tab opens as its own sidebar ' +
         'entry and has its own article.',
       firstRunDir: 'The directory card',
       firstRunDirText:
@@ -593,7 +601,7 @@ export const settingsEn: typeof settingsRu = {
         'Step 3 of 4: the CLIs found — Claude Code carries the “installed” and “recommended” badges',
       '04-wizard-access':
         'Step 4 of 4: access not found, the path to .credentials.json named, and a “Set manually” button',
-      '05-tabs': 'The settings page after the wizard: eight tabs, General open',
+      '05-tabs': 'The settings page after the wizard: nine tabs, General open',
       '06-access-dir': 'The “.claude directory” card: the path and a badge for where it came from',
       '07-access-credentials':
         'The “Claude Code access” card: a “not found” badge, the note about the sandbox, and the manual button',

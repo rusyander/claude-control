@@ -1,0 +1,222 @@
+{
+  "topic": "panelAgent",
+  "scenario": "guards",
+  "frames": [
+    {
+      "id": "01-contour-card",
+      "side": "panel",
+      "file": "01-contour-card.png",
+      "masked": 0,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-17T15:04:15.507Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Контур Подключи контур отдела: http://gateway.corp.internal:8080 Сохраню черновик контура. Ключ я не принимаю — его вводите вы. Действие: Сохранить черновик контура Агент думает… Агент просит подтвердить Сохранить черновик контура «Контур отдела» Действие Сохранить черновик контура изменение Идентификатор corp Адрес http://gateway.corp.internal:8080 Тип шлюза enterprise-platform Название Контур отдела Где работает assistant Ключ вводите вы: после сохранения откроется поле ключа Включение не включается — отдельным действием Ждёт до 20:14 Отклонить Выполнить",
+      "en": {
+        "file": "01-contour-card.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-17T15:05:30.226Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Contour Connect the team contour: http://gateway.corp.internal:8080 I will save a contour draft. I never take the key — you type it. Action: Save a contour draft The agent is thinking… The agent asks for confirmation Save contour draft “Team contour” Action Save a contour draft change Identifier corp Address http://gateway.corp.internal:8080 Gateway type enterprise-platform Title Team contour Where it works assistant Key you type it: the key field opens after saving Enabling not enabled — that is a separate action Waits until 08:15 PM Reject Run"
+      }
+    },
+    {
+      "id": "02-key-field",
+      "side": "panel",
+      "file": "02-key-field.png",
+      "masked": 1,
+      "width": 1400,
+      "height": 900,
+      "shotAt": "2026-09-17T15:04:19.125Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Контур Корпоративная платформа по ключу: её модели, эмбеддинги и агенты — из панели Подключить контур Контуры Модель Правила Доступ разделов Инструменты и проверки Агенты Подключённые контуры: связь, что нашла проба, к кому применён, расход. Здесь же — сделать активным, проверить, настроить и удалить. Что этот раздел делает, а чего не делает Контур отдела не активен Платформа компании http://gateway.corp.internal:8080 ключ не сохранён Сделать активным Проверить Настроить Удалить расход ≈ 0.00 $ — бюджет не задан с начала учёта, по нашему прайсу — оценка Панель ничего не утверждает о контуре, пока не сходила к нему. Нажмите «Проверить связь» — матрица заполнится ответом вашего контура на ваш ключ. Применён к Модели в конфигурациях не будет: контур её не назначил, и CLI пойдёт со своей. — Ассистент панели шлюз не поднят или контур не активен — Claude Code шлюз не поднят или контур не активен — Codex (OpenAI) шлюз не поднят или контур не активен — Gemini CLI говорит на диалекте, которого шлюз не понимает — Qwen Code шлюз не поднят или контур не активен — Continue шлюз не поднят или контур не активен — Goose у этого CLI нет файла переменных окружения — Kimi Code у этого CLI нет файла переменных окружения — Cursor у этого CLI нет файла переменных окружения — OpenCode у этого CLI нет файла переменных окружения — Aider шлюз не поднят или контур не активен ✔ — работает полностью, ⚠ — инструменты через прослойку или их нет вовсе (какое из двух — подпись рядом), ○ — можно применить, — недоступен с причиной. Что уже решено Ключ контура остаётся в панели: CLI ходят на её локальный шлюз, а не в контур напрямую Платформе компании свои инструменты полем объявить нельзя: панель объявляет их модели текстом протокола и собирает вызов обратно из ответа — агент через контур файлы правит. Совместимому шлюзу они уходят полем, как у вендора Адрес шлюза принимают не все CLI: у четверых из десяти задокументированной настройки нет, и в списке у них стоит прочерк с причиной Компромиссы (22) Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Контур Подключи контур отдела: http://gateway.corp.internal:8080 Сохраню черновик контура. Ключ я не принимаю — его вводите вы. Действие: Сохранить черновик контура Открыта страница /platform Сохранить черновик контура: сохранено, нужен ключ — его вводите вы Сохранено без ключа. Панель открыла своё поле — введите ключ там, мне его не присылайте. Поле ключа открыто в панели. Настройка контура Адрес и ключ, проба возможностей, выбор потребителей — четыре шага. 1. Адрес 2. Ключ 3. Что доступно 4. Где применять Ключ контура Сохранённый ключ не показывается никогда — ни здесь, ни в одном ответе панели. Оставьте поле пустым, чтобы сохранённый остался на месте. Ключ остаётся в панели: CLI ходят на её локальный шлюз, и подставляет ключ он. Где взять ключ Всё делается в админке контура, обычно https://inst.<ваш-домен>. /providers Провайдер моделей заведён и активен. /models Модель создана и отвечает в чате платформы. /users У ключа назначен владелец — иначе знания компании ему недоступны. /keys Ключ создан, бюджет и лимиты выставлены, значение скопировано. Владелец — не формальность: инструменты знаний работают от его лица, и ключ без владельца не найдёт ничего. Назад Далее",
+      "en": {
+        "file": "02-key-field.en.png",
+        "masked": 1,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-17T15:05:33.858Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Contour A corporate platform behind one key: its models, embeddings and agents, from the panel Connect a contour Contours Model Rules Section access Tools and checks Agents Connected contours: link state, what the probe found, where it is applied, spend. Make active, check, configure and delete from here. What this section does and what it does not Team contour not active Company platform http://gateway.corp.internal:8080 no key saved Make it active Check Configure Delete spend ≈ 0.00 $ — no budget set from the start of our records, by our price book — an estimate The panel claims nothing about a contour it has not visited. Press “Check the connection” — the matrix fills with your contour’s answer to your key. Applied to The configs will carry no model: the contour assigned none, so the CLI goes with its own. — Panel assistant the gateway is down or the contour is not active — Claude Code the gateway is down or the contour is not active — Codex (OpenAI) the gateway is down or the contour is not active — Gemini CLI speaks a dialect the gateway does not understand — Qwen Code the gateway is down or the contour is not active — Continue the gateway is down or the contour is not active — Goose this CLI has no environment file at all — Kimi Code this CLI has no environment file at all — Cursor this CLI has no environment file at all — OpenCode this CLI has no environment file at all — Aider the gateway is down or the contour is not active ✔ — works fully, ⚠ — tools through the shim or none at all (the mark beside it says which), ○ — can be applied, — unavailable with a reason. What is already decided The contour key stays in the panel: CLIs go to its local gateway, never to the contour itself Client tools cannot be declared to the company platform as a field: the panel declares them to the model as protocol text and reassembles the call out of the answer — an agent through a contour does edit files. A compatible gateway gets them as a field, as the vendor does Not every CLI takes a gateway address: four of the ten document no such setting, and the list shows them as a dash with its reason Compromises (22) Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Contour Connect the team contour: http://gateway.corp.internal:8080 I will save a contour draft. I never take the key — you type it. Action: Save a contour draft Opened page /platform Save a contour draft: saved, a key is needed — you type it Saved without the key. The panel opened its own field — type the key there, never send it to me. The key field is open in the panel. Contour settings Address and key, a probe of capabilities, the choice of consumers — four steps. 1. Address 2. Key 3. What is available 4. Where to apply Contour key A saved key is never shown — not here, not in any panel response. Leave the field empty to keep the saved one. The key stays in the panel: CLIs go to its local gateway, and the gateway substitutes the key. Where to get the key Everything happens in the contour admin console, usually https://inst.<your-domain>. /providers The model provider is registered and active. /models The model is created and answers in the platform chat. /users The key has an owner — without one company knowledge is out of its reach. /keys The key is created, budget and limits are set, the value is copied. The owner is not a formality: knowledge tools act on their behalf, and a key without an owner finds nothing. Back Next"
+      }
+    },
+    {
+      "id": "03-key-masked",
+      "side": "panel",
+      "file": "03-key-masked.png",
+      "masked": 1,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-17T15:04:29.703Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Контур Вот ключ: [КЛЮЧ_1] Ключ до меня не дошёл: вместо него панель прислала метку [КЛЮЧ_1]. Введите ключ в поле на странице контура.",
+      "en": {
+        "file": "03-key-masked.en.png",
+        "masked": 1,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-17T15:05:44.567Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Contour Here is the key: [КЛЮЧ_2] The key never reached me: the panel sent the label [КЛЮЧ_2] instead. Type the key into the field on the contour page."
+      }
+    },
+    {
+      "id": "04-stale",
+      "side": "panel",
+      "file": "04-stale.png",
+      "masked": 0,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-17T15:04:35.606Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Контур Добавь правило: сначала тесты, потом код Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Не выполнено: после показа карточки цель изменилась (файл, запись контура, кейсы или настройки). Ничего не записано — агент покажет новую карточку. Карточка устарела: файл изменился после показа. Перечитаю и покажу новую, если скажете.",
+      "en": {
+        "file": "04-stale.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-17T15:05:50.468Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Contour Add a rule: tests first, then code Preparing the rule — see what changes in the file. Action: Save a rule Not executed: the target changed after the card was shown (a file, the contour record, cases or settings). Nothing was written — the agent will show a fresh card. The card went stale: the file changed after it was shown. Say so and I will show a fresh one."
+      }
+    },
+    {
+      "id": "05-mcp-card",
+      "side": "panel",
+      "file": "05-mcp-card.png",
+      "masked": 0,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-17T15:04:38.658Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Контур Добавь MCP-сервер gitlab, токен введу сам Добавлю сервер. Значение токена оставляю пустым — его введёте вы. Действие: Сохранить MCP-сервер Агент думает… Агент просит подтвердить Добавить MCP-сервер «gitlab» Действие Сохранить MCP-сервер изменение Транспорт stdio Команда npx -y @example/gitlab-mcp Секреты введёте вы env.GITLAB_TOKEN Новый файл C:\\work\\claude-demo-panel-agent\\.claude.json (+15 −0) Что изменится --- a/C:\\work\\claude-demo-panel-agent\\.claude.json +++ b/C:\\work\\claude-demo-panel-agent\\.claude.json @@ -0,0 +1,15 @@ +{ + \"mcpServers\": { + \"gitlab\": { + \"type\": \"stdio\", + \"command\": \"npx\", + \"args\": [ + \"-y\", + \"@example/gitlab-mcp\" + ], + \"env\": { + \"GITLAB_TOKEN\": \"\" + } + } + } +} Ждёт до 20:14 Отклонить Выполнить",
+      "en": {
+        "file": "05-mcp-card.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-17T15:05:53.504Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Contour Add the gitlab MCP server, I will type the token myself Adding the server. I leave the token empty — you will type it. Action: Save an MCP server The agent is thinking… The agent asks for confirmation Add MCP server “gitlab” Action Save an MCP server change Transport stdio Command npx -y @example/gitlab-mcp Secrets you will type env.GITLAB_TOKEN New file C:\\work\\claude-demo-panel-agent\\.claude.json (+15 −0) What will change --- a/C:\\work\\claude-demo-panel-agent\\.claude.json +++ b/C:\\work\\claude-demo-panel-agent\\.claude.json @@ -0,0 +1,15 @@ +{ + \"mcpServers\": { + \"gitlab\": { + \"type\": \"stdio\", + \"command\": \"npx\", + \"args\": [ + \"-y\", + \"@example/gitlab-mcp\" + ], + \"env\": { + \"GITLAB_TOKEN\": \"\" + } + } + } +} Waits until 08:15 PM Reject Run"
+      }
+    },
+    {
+      "id": "06-mcp-secret",
+      "side": "panel",
+      "file": "06-mcp-secret.png",
+      "masked": 0,
+      "width": 1400,
+      "height": 900,
+      "shotAt": "2026-09-17T15:04:41.990Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 1 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка MCP-серверы Внешние источники инструментов для Claude Добавить сервер Как это работает gitlab stdio npx -y @example/gitlab-mcp Проверить Инструменты Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: MCP-серверы Добавь MCP-сервер gitlab, токен введу сам Добавлю сервер. Значение токена оставляю пустым — его введёте вы. Действие: Сохранить MCP-сервер Открыта страница /mcp Сохранить MCP-сервер: сохранено, нужен ключ — его вводите вы Сервер записан с пустым токеном. Откройте его правку в разделе «MCP-серверы» и введите значение там — мне его не присылайте. Поле ключа открыто в панели. Редактировать: gitlab Изменения применятся после перезапуска Claude Code Секреты, которые ждут значения Агент сохранил сервер без значений: введите их сами — агент их не видит. Значение попадёт в поле «Переменные окружения» или «Заголовки» и запишется по «Сохранить». Переменные окружения: GITLAB_TOKEN Имя сервера Под этим именем сервер попадёт в конфиг и в правила доступа Транспорт stdio sse http stdio — сервер запускается как процесс; sse и http — подключение к уже работающему адресу Команда запуска Аргументы Через пробел. Аргументы с пробелами внутри — в кавычках Переменные окружения По строке в формате KEY=VALUE. Секреты сюда не вписывайте — положите их в раздел «Переменные» и сошлитесь как ${VAR} Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "en": {
+        "file": "06-mcp-secret.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-17T15:05:56.835Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 1 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help MCP servers External tool providers for Claude Add server How it works gitlab stdio npx -y @example/gitlab-mcp Check Tools Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: MCP servers Add the gitlab MCP server, I will type the token myself Adding the server. I leave the token empty — you will type it. Action: Save an MCP server Opened page /mcp Save an MCP server: saved, a key is needed — you type it Server saved with an empty token. Open its edit form in MCP servers and type the value there — never send it to me. The key field is open in the panel. Edit: gitlab Changes apply after restarting Claude Code Secrets waiting for a value The agent saved the server without values: type them yourself — the agent never sees them. A value goes into “Environment variables” or “Headers” and is written on “Save”. Environment variables: GITLAB_TOKEN Server name This name goes into the config and into permission rules Transport stdio sse http stdio — the server runs as a process; sse and http — connect to an address already running Start command Arguments Space separated. Arguments containing spaces go in quotes Environment variables One KEY=VALUE per line. Do not put secrets here — keep them in the Environment section and reference them as ${VAR} Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+      }
+    },
+    {
+      "id": "07-other-cli",
+      "side": "panel",
+      "file": "07-other-cli.png",
+      "masked": 0,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-17T15:04:49.637Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Настройки Что ты умеешь? Агент не ответил: Агент панели пока работает только с Claude Code: активный CLI другой.",
+      "en": {
+        "file": "07-other-cli.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-17T15:06:04.370Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Settings What can you do? The agent did not answer: The panel agent works only with Claude Code for now: another CLI is active."
+      }
+    },
+    {
+      "id": "08-dlp-broken",
+      "side": "panel",
+      "file": "08-dlp-broken.png",
+      "masked": 0,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-17T15:04:56.272Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Обзор Что ты умеешь? Агент не ответил: Правила маскирования данных сломаны: без маски сообщение агенту не уходит. Почините их в «Защите данных».",
+      "en": {
+        "file": "08-dlp-broken.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-17T15:06:11.050Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Overview What can you do? The agent did not answer: The data masking rules are broken: without the mask no message goes to the agent. Fix them in Data protection."
+      }
+    },
+    {
+      "id": "09-cli-not-found",
+      "side": "panel",
+      "file": "09-cli-not-found.png",
+      "masked": 0,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-17T15:04:59.023Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Обзор Что ты умеешь? Агент не ответил: Claude Code не найден в PATH: агенту нечем работать.",
+      "en": {
+        "file": "09-cli-not-found.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-17T15:06:13.802Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Overview What can you do? The agent did not answer: Claude Code is not in PATH: the agent has nothing to run with."
+      }
+    },
+    {
+      "id": "10-endpoint-unsupported",
+      "side": "panel",
+      "file": "10-endpoint-unsupported.png",
+      "masked": 0,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-17T15:05:01.769Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Обзор Что ты умеешь? Агент не ответил: Ассистенту выбран свой эндпоинт: его ключ пришлось бы отдать процессу агента.",
+      "en": {
+        "file": "10-endpoint-unsupported.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-17T15:06:16.665Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Overview What can you do? The agent did not answer: The assistant uses its own endpoint: its key would have to be handed to the agent process."
+      }
+    },
+    {
+      "id": "11-contour-unreachable",
+      "side": "panel",
+      "file": "11-contour-unreachable.png",
+      "masked": 0,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-17T15:05:04.502Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Обзор Что ты умеешь? Агент не ответил: Ассистент идёт через контур, а шлюз не поднят или нет ключа — в облако вендора молча не уходим.",
+      "en": {
+        "file": "11-contour-unreachable.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-17T15:06:19.382Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Overview What can you do? The agent did not answer: The assistant goes through a contour, but its gateway is down or has no key — no silent fallback to the vendor cloud."
+      }
+    },
+    {
+      "id": "12-busy",
+      "side": "panel",
+      "file": "12-busy.png",
+      "masked": 0,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-17T15:05:07.254Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Обзор Что ты умеешь? Агент не ответил: В этом разговоре агент ещё отвечает — дождитесь конца хода.",
+      "en": {
+        "file": "12-busy.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-17T15:06:22.117Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Overview What can you do? The agent did not answer: The agent is still answering in this conversation — wait for the turn to end."
+      }
+    }
+  ]
+}

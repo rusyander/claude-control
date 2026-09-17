@@ -28,7 +28,30 @@ import styles from './McpFormModal.module.scss';
  * команда с аргументами, у sse и http — адрес. Показывать всё сразу вредно:
  * половина полей окажется лишней и запутает.
  */
-export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps) {
+/** Пустой секрет сервера: в каком поле формы он лежит и под каким именем. */
+interface SecretSlot {
+  field: 'env' | 'headers';
+  key: string;
+}
+
+/**
+ * Пустые значения env и заголовков сохранённого сервера — то, что агент панели
+ * оставил вводить человеку. Список фиксируется при открытии: иначе поле
+ * исчезало бы с первой набранной буквы.
+ */
+function emptySecretSlots(server: McpFormModalProps['server']): SecretSlot[] {
+  if (!server) return [];
+  const empty = (field: SecretSlot['field'], record: Record<string, string> = {}): SecretSlot[] =>
+    Object.entries(record)
+      .filter(([, value]) => value.trim() === '')
+      .map(([key]) => ({ field, key }));
+  return [
+    ...empty('env', server.env),
+    ...(server.transport === 'stdio' ? [] : empty('headers', server.headers)),
+  ];
+}
+
+export function McpFormModal({ isOpen, onOpenChange, server, secretAnchor }: McpFormModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [transport, setTransport] = useState<McpTransport>('stdio');
@@ -39,6 +62,7 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
   const [headersText, setHeadersText] = useState('');
   // Один сервер по полям или пачка из JSON-конфига.
   const [isImport, setIsImport] = useState(false);
+  const [secretSlots, setSecretSlots] = useState<SecretSlot[]>([]);
 
   const create = mcpServerApi.useCreate();
   const update = mcpServerApi.useUpdate();
@@ -53,7 +77,17 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
     setEnvText(server ? envToText(server.env) : '');
     setHeadersText(server ? envToText(server.headers) : '');
     setIsImport(false);
-  }, [isOpen, server]);
+    setSecretSlots(secretAnchor ? emptySecretSlots(server) : []);
+  }, [isOpen, server, secretAnchor]);
+
+  /** Значение секрета пишется в свою строку env или заголовков — сохраняет общая кнопка. */
+  const secretValue = (slot: SecretSlot): string =>
+    textToEnv(slot.field === 'env' ? envText : headersText)[slot.key] ?? '';
+  const setSecretValue = (slot: SecretSlot, value: string): void => {
+    const update = (text: string): string => envToText({ ...textToEnv(text), [slot.key]: value });
+    if (slot.field === 'env') setEnvText(update);
+    else setHeadersText(update);
+  };
 
   /**
    * Домашний каталог для заготовок, где нужен путь. Заготовка не может знать
@@ -180,6 +214,31 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
           }}
         >
           <Stack gap="var(--spacing-md)">
+            {secretAnchor && secretSlots.length > 0 && (
+              <div data-agent-anchor={secretAnchor}>
+                <Card padding="md">
+                  <Stack gap="var(--spacing-sm)">
+                    <Typography variant="body-sm" weight="medium">
+                      {t('mcp.secretTitle')}
+                    </Typography>
+                    <Typography variant="caption" color="subtle">
+                      {t('mcp.secretHint')}
+                    </Typography>
+                    {secretSlots.map((slot) => (
+                      <TextField
+                        key={`${slot.field}.${slot.key}`}
+                        label={`${slot.field === 'env' ? t('mcp.env') : t('mcp.headers')}: ${slot.key}`}
+                        type="password"
+                        value={secretValue(slot)}
+                        onChange={(value) => setSecretValue(slot, value)}
+                        isMono
+                      />
+                    ))}
+                  </Stack>
+                </Card>
+              </div>
+            )}
+
             {/* Заготовки показываем только при создании: у существующего сервера
             подмена всех полей разом почти наверняка не то, чего ждут. */}
             {!server && (
@@ -213,7 +272,7 @@ export function McpFormModal({ isOpen, onOpenChange, server }: McpFormModalProps
               label={t('mcp.serverName')}
               value={name}
               onChange={setName}
-              placeholder="например: gitlab-enterprise-platform"
+              placeholder="например: gitlab-company"
               hint={t('mcp.serverNameHint')}
               isMono
               autoFocus={!server}

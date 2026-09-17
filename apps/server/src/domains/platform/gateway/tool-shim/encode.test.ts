@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { enterprise-platformDriver } from '../../drivers/enterprise-platform.ts';
+import { enterprisePlatformDriver } from '../../drivers/enterprise-platform.ts';
 import { openAiCompatDriver } from '../../drivers/openai-compat.ts';
 import { encodeToolResult, encodeToolUse, shimOpenAiRequest, toolNamesById } from './encode.ts';
 
@@ -91,7 +91,7 @@ describe('запрос в диалекте OpenAI', () => {
   it('свои инструменты платформы гасятся тем, что объявил её драйвер', () => {
     // Включённый набор платформы перебивал бы протокол, которому мы только что
     // научили модель (Т7 отдаёт этот выключатель человеку).
-    const fields = enterprise-platformDriver.shimRequestFields;
+    const fields = enterprisePlatformDriver.shimRequestFields;
     expect(shimOpenAiRequest(request(), PROTOCOL, fields).body.tool_choice).toBe('none');
   });
 

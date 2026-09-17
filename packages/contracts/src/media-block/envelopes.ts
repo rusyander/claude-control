@@ -1,4 +1,4 @@
-import type { Deck } from '../media-deck.ts';
+import type { Deck } from '../media-deck-model.ts';
 import { DECK_BLOCK_LANG } from './deck-parse.ts';
 import { PICTURE_BLOCK_LANG } from './picture.ts';
 

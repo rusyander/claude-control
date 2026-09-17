@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { enterprise-platformDriver } from '../drivers/enterprise-platform.ts';
+import { enterprisePlatformDriver } from '../drivers/enterprise-platform.ts';
 import { StreamTranslator, classifyFrame, type FrameKind } from './frames.ts';
 
 /**
@@ -13,25 +13,25 @@ import { StreamTranslator, classifyFrame, type FrameKind } from './frames.ts';
 
 /** Кадры из справочника §7 — ровно в том виде, в каком их шлёт контур. */
 const VENDOR: { kind: FrameKind; frame: string; why: string }[] = [
-  { kind: 'status', frame: '{"enterprise-platform_status":"thinking"}', why: 'смена стадии' },
-  { kind: 'status', frame: '{"enterprise-platform_status":"summarizing"}', why: 'сжатие истории' },
-  { kind: 'reasoning', frame: '{"enterprise-platform_reasoning":"я думаю"}', why: 'размышления модели' },
+  { kind: 'status', frame: '{"platform_status":"thinking"}', why: 'смена стадии' },
+  { kind: 'status', frame: '{"platform_status":"summarizing"}', why: 'сжатие истории' },
+  { kind: 'reasoning', frame: '{"platform_reasoning":"я думаю"}', why: 'размышления модели' },
   {
     kind: 'sanitized',
-    frame: '{"enterprise-platform_sanitized":true,"violations":[{"category":"pii_phone"}]}',
+    frame: '{"platform_sanitized":true,"violations":[{"category":"pii_phone"}]}',
     why: 'вход замаскирован проверками',
   },
   {
     kind: 'anonymization',
-    frame: '{"enterprise-platform_deanonymized_entities":{"ИМЯ_1":"Иванов"}}',
+    frame: '{"platform_deanonymized_entities":{"ИМЯ_1":"Иванов"}}',
     why: 'кадр чата платформы, не для API-клиента',
   },
   {
     kind: 'anonymization',
-    frame: '{"enterprise-platform_anonymization_mapping":{"a":"b"}}',
+    frame: '{"platform_anonymization_mapping":{"a":"b"}}',
     why: 'то же самое обратной картой',
   },
-  { kind: 'unknown', frame: '{"enterprise-platform_невиданное":1}', why: 'кадр, которого шлюз не знает' },
+  { kind: 'unknown', frame: '{"platform_невиданное":1}', why: 'кадр, которого шлюз не знает' },
 ];
 
 function sse(...frames: string[]): string {
@@ -44,37 +44,37 @@ const USAGE =
 
 describe('распознавание кадров', () => {
   it.each(VENDOR)('$frame → $kind ($why)', ({ kind, frame }) => {
-    expect(classifyFrame(JSON.parse(frame), enterprise-platformDriver)).toBe(kind);
+    expect(classifyFrame(JSON.parse(frame), enterprisePlatformDriver)).toBe(kind);
   });
 
   it('обычный чанк и финальный расход различаются', () => {
-    expect(classifyFrame(JSON.parse(DELTA), enterprise-platformDriver)).toBe('delta');
-    expect(classifyFrame(JSON.parse(USAGE), enterprise-platformDriver)).toBe('usage');
+    expect(classifyFrame(JSON.parse(DELTA), enterprisePlatformDriver)).toBe('delta');
+    expect(classifyFrame(JSON.parse(USAGE), enterprisePlatformDriver)).toBe('usage');
   });
 });
 
 describe('ни один вендорный кадр не доезжает до клиента', () => {
   it.each(VENDOR)('$frame не появляется в потоке клиента (openai)', ({ frame }) => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'gpt-x',
       includeUsage: false,
     });
     const out = translator.push(sse(frame, DELTA)) + translator.end();
-    expect(out).not.toContain('enterprise-platform_');
+    expect(out).not.toContain('platform_');
     expect(out).toContain('"content":"да"');
   });
 
   it.each(VENDOR)('$frame не появляется в потоке клиента (anthropic)', ({ frame }) => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
     });
     const out = translator.push(sse(frame, DELTA)) + translator.end();
-    expect(out).not.toContain('enterprise-platform_');
+    expect(out).not.toContain('platform_');
     expect(out).toContain('content_block_delta');
   });
 });
@@ -82,17 +82,17 @@ describe('ни один вендорный кадр не доезжает до �
 describe('факты, которые кадры оставляют панели', () => {
   it('стадии копятся без повторов, а summarizing поднимает признак сжатия', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
     });
     translator.push(
       sse(
-        '{"enterprise-platform_status":"thinking"}',
-        '{"enterprise-platform_status":"summarizing"}',
-        '{"enterprise-platform_status":"thinking"}',
-        '{"enterprise-platform_status":"generating"}',
+        '{"platform_status":"thinking"}',
+        '{"platform_status":"summarizing"}',
+        '{"platform_status":"thinking"}',
+        '{"platform_status":"generating"}',
       ),
     );
     expect(translator.facts.stages).toEqual(['thinking', 'summarizing', 'generating']);
@@ -102,13 +102,13 @@ describe('факты, которые кадры оставляют панели'
 
   it('кадры размышления в поток не идут, но оставляют стадию `reasoning` в следе', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'anthropic',
       model: 'm',
       includeUsage: false,
     });
     const out = translator.push(
-      sse('{"enterprise-platform_reasoning":"я думаю"}', '{"enterprise-platform_reasoning":" дальше"}', DELTA),
+      sse('{"platform_reasoning":"я думаю"}', '{"platform_reasoning":" дальше"}', DELTA),
     );
     // Единственное свидетельство, что правило «Размышления модели» дошло до модели.
     expect(translator.facts.stages).toEqual(['reasoning']);
@@ -117,7 +117,7 @@ describe('факты, которые кадры оставляют панели'
 
   it('расход снимается всегда, даже когда клиент его не просил', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -130,7 +130,7 @@ describe('факты, которые кадры оставляют панели'
 
   it('расход уходит клиенту, если он сам его просил', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: true,
@@ -141,19 +141,19 @@ describe('факты, которые кадры оставляют панели'
 
   it('незнакомый кадр попадает в след ИМЕНАМИ ПОЛЕЙ, а не содержимым', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
     });
-    translator.push(sse('{"enterprise-platform_новое":"секретный текст"}'));
-    expect(translator.facts.unknownFrames).toEqual(['enterprise-platform_новое']);
+    translator.push(sse('{"platform_новое":"секретный текст"}'));
+    expect(translator.facts.unknownFrames).toEqual(['platform_новое']);
     expect(JSON.stringify(translator.facts)).not.toContain('секретный текст');
   });
 
   it('нечитаемый кадр наружу не идёт', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -166,11 +166,11 @@ describe('факты, которые кадры оставляют панели'
 
 describe('обрыв по проверкам содержимого', () => {
   const guard =
-    '{"enterprise-platform_guardrails":{"stream_interrupted":true,"violations":[{"category":"pii_inn"},{"text":"тут был телефон 89001234567"}]}}';
+    '{"platform_guardrails":{"stream_interrupted":true,"violations":[{"category":"pii_inn"},{"text":"тут был телефон 89001234567"}]}}';
 
   it('openai получает терминальную ошибку и [DONE], а не тихий конец', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -187,7 +187,7 @@ describe('обрыв по проверкам содержимого', () => {
 
   it('anthropic получает событие error', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'anthropic',
       model: 'm',
       includeUsage: false,
@@ -202,13 +202,13 @@ describe('обрыв по проверкам содержимого', () => {
     // Строгое чтение одного уровня давало худший исход: флаг терялся, `[DONE]`
     // следом закрывал поток, и ОБОРВАННЫЙ ответ приезжал человеку законченным.
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
     });
     const outside =
-      '{"enterprise-platform_guardrails":{"violations":[{"category":"pii"}]},"stream_interrupted":true}';
+      '{"platform_guardrails":{"violations":[{"category":"pii"}]},"stream_interrupted":true}';
     const out = translator.push(sse(DELTA, outside, '[DONE]')) + translator.end();
 
     expect(out).toContain('content_policy_violation');
@@ -218,27 +218,27 @@ describe('обрыв по проверкам содержимого', () => {
 
   it('перечень, присланный массивом, тоже читается', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
     });
-    translator.push(sse(DELTA, '{"enterprise-platform_guardrails":["pii_inn"]}'));
+    translator.push(sse(DELTA, '{"platform_guardrails":["pii_inn"]}'));
 
     expect(translator.facts.violations).toEqual(['pii_inn']);
   });
 
   it('кадр гардрейлов без имени и без вердикта становится незнакомым, а не тишиной', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
     });
-    translator.push(sse(DELTA, '{"enterprise-platform_guardrails":"сработало"}'));
+    translator.push(sse(DELTA, '{"platform_guardrails":"сработало"}'));
 
     expect(translator.facts.violations).toEqual([]);
-    expect(translator.facts.unknownFrames.join(' ')).toContain('enterprise-platform_guardrails');
+    expect(translator.facts.unknownFrames.join(' ')).toContain('platform_guardrails');
   });
 
   it('чанк с вердиктом И текстом отдаёт текст, а не проглатывается целиком', () => {
@@ -246,14 +246,14 @@ describe('обрыв по проверкам содержимого', () => {
     // вердиктом чанк уносил и текст, и `finish_reason`, после чего законченный
     // ответ приезжал человеку как оборванный.
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
     });
     const both =
       '{"id":"1","choices":[{"index":0,"delta":{"content":"часть два"},"finish_reason":"stop"}],' +
-      '"enterprise-platform_guardrails":{"violations":[{"category":"toxicity"}]}}';
+      '"platform_guardrails":{"violations":[{"category":"toxicity"}]}}';
     const out = translator.push(sse(DELTA, both)) + translator.end();
 
     expect(out).toContain('часть два');
@@ -263,7 +263,7 @@ describe('обрыв по проверкам содержимого', () => {
 
   it('после обрыва в поток клиента больше ничего не пишется', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: true,
@@ -279,7 +279,7 @@ describe('обрыв по проверкам содержимого', () => {
 describe('перевод потока в диалект Anthropic', () => {
   it('поток разворачивается в полный набор событий', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -305,7 +305,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('пустой поток закрывается ОШИБКОЙ, а не пустым удачным ответом', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -320,7 +320,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('поток без [DONE] и без причины остановки объявляется оборванным', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -334,7 +334,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('причина остановки без [DONE] считается законным концом', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -351,7 +351,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('итоговый расход входа доезжает до клиента', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'anthropic',
       model: 'gpt-x',
       includeUsage: false,
@@ -367,7 +367,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('кадр, разорванный между кусками TCP, не теряется', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'm',
       includeUsage: false,
@@ -380,7 +380,7 @@ describe('перевод потока в диалект Anthropic', () => {
 
   it('кириллица в escape-последовательностях доезжает как есть', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'anthropic',
       model: 'm',
       includeUsage: false,
@@ -398,7 +398,7 @@ describe('перевод потока в диалект Anthropic', () => {
 describe('сборка ответа для клиента, просившего не поток', () => {
   it('текст, причина и расход собираются из потока', () => {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'gpt-x',
       includeUsage: false,
@@ -433,7 +433,7 @@ describe('хвост прослойки на конце потока', () => {
 
   function withShim(dialect: 'openai-compat' | 'anthropic'): StreamTranslator {
     return new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect,
       model: 'gpt-x',
       includeUsage: false,
@@ -488,7 +488,7 @@ describe('хвост прослойки на конце потока', () => {
 describe('пометка заявки без вызова', () => {
   function say(text: string, priorCalls: boolean): boolean {
     const translator = new StreamTranslator({
-      driver: enterprise-platformDriver,
+      driver: enterprisePlatformDriver,
       dialect: 'openai-compat',
       model: 'gpt-x',
       includeUsage: false,

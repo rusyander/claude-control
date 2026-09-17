@@ -32,7 +32,9 @@ import type {
 export const ARCHIVE_FORMAT_VERSION = 1;
 
 /** Метка, по которой архив узнаётся среди прочих zip. */
-export const ARCHIVE_KIND = 'agentdeck-environment';
+export const ARCHIVE_KIND = `${BRAND_SLUG}-environment`;
+/** Метка архивов, собранных до переименования продукта: они по-прежнему разворачиваются. */
+export const LEGACY_ARCHIVE_KIND = `${LEGACY_BRAND_SLUG}-environment`;
 
 export const MANIFEST_PATH = 'MANIFEST.json';
 export const README_PATH = 'README.md';
@@ -46,6 +48,7 @@ export type {
   ArchiveManifest,
   BuiltArchive,
 } from './archive.types.ts';
+import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
 
 /**
  * Собирает архив окружения провайдера. `exportedAt` приходит извне (запрос или
@@ -173,7 +176,7 @@ export function parseEnvironmentArchive(zip: Buffer): ParsedArchive {
   }
   if (!isRecord(parsed)) throw archiveError('MANIFEST.json должен быть объектом.');
 
-  if (parsed.kind !== ARCHIVE_KIND) {
+  if (parsed.kind !== ARCHIVE_KIND && parsed.kind !== LEGACY_ARCHIVE_KIND) {
     throw archiveError('Этот архив собран не панелью — в описи другой тип.');
   }
   if (typeof parsed.formatVersion !== 'number') {

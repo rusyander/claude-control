@@ -2,15 +2,19 @@ import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { colors } from '../../src/shared/config/theme';
 import { useT } from '../../src/shared/config/i18n';
+import { PENDING_POLL_MS, usePanelAgentPending } from '../../src/entities/panel-agent/api';
 
 /**
- * Четыре вкладки — ровно то, ради чего приложение существует: разговор,
- * переключение проекта, аналитика и своя настройка. Остальные три десятка
+ * Пять вкладок — ровно то, ради чего приложение существует: разговор,
+ * переключение проекта, аналитика, агент панели (А8) и своя настройка. Остальные три десятка
  * разделов панели на телефон не переносятся: они настраивают конфигурацию, а
  * это работа за столом.
  */
 export default function TabLayout() {
   const t = useT();
+  // Значок на вкладке агента: карточка ждёт решения, а человек сейчас в чате.
+  const pending = usePanelAgentPending(PENDING_POLL_MS.badge);
+  const waiting = pending.data?.length ?? 0;
   return (
     <Tabs
       screenOptions={{
@@ -59,6 +63,22 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{ ios: 'chart.bar', android: 'bar_chart', web: 'bar_chart' }}
+              tintColor={color}
+              size={26}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="agent"
+        options={{
+          title: t.tabs.agent,
+          headerShown: false,
+          tabBarBadge: waiting > 0 ? waiting : undefined,
+          tabBarAccessibilityLabel: waiting > 0 ? t.agent.pendingBadge(waiting) : t.tabs.agent,
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name={{ ios: 'sparkles', android: 'assistant', web: 'assistant' }}
               tintColor={color}
               size={26}
             />

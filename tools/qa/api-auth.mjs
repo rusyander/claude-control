@@ -11,12 +11,11 @@
  * будет: проверка остаётся рабочей в обоих состояниях.
  */
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { panelHomeFile } from '../../apps/server/src/lib/brand.mjs';
 
 export function authHeaders() {
   try {
-    const token = readFileSync(join(homedir(), '.agentdeck', 'api-token'), 'utf8').trim();
+    const token = readFileSync(panelHomeFile('api-token'), 'utf8').trim();
     return token ? { Authorization: `Bearer ${token}` } : {};
   } catch {
     return {};

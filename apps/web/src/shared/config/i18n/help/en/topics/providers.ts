@@ -69,7 +69,9 @@ export const providersEn: typeof providersRu = {
     statusPlannedText:
       'Visible with a badge, but it opens a placeholder: the format adapter does not ' +
       'exist yet, so the section neither reads nor writes anything. That is a safeguard, ' +
-      'not an unfinished screen.',
+      'not an unfinished screen. No section is in this state right now: for every CLI a ' +
+      'section is either ready or hidden — although the hints on the Providers tab still ' +
+      'speak of sections “in development”.',
     statusPlannedBadge: 'in development',
     statusHidden: 'The section is not there at all',
     statusHiddenText:
@@ -182,7 +184,7 @@ export const providersEn: typeof providersRu = {
       'section.',
     mapSkills: 'Skills',
     mapSkillsValue:
-      'Works for Claude and OpenCode, and the concept is the same — a folder with a ' +
+      'Works for Claude, OpenCode, Qwen Code and Kimi Code, and the concept is the same — a folder with a ' +
       'SKILL.md and YAML front matter — but the directories and fields differ. Claude has ' +
       'its rich section (file tree per skill, enable by moving into skills-disabled, groups, ' +
       'templates). OpenCode keeps skills in ~/.config/opencode/skills/<name>/SKILL.md (and ' +
@@ -196,6 +198,15 @@ export const providersEn: typeof providersRu = {
       'the shared ~/.agents/skills). One difference: Kimi’s docs cap description at 240 ' +
       'characters. The panel holds skill names to the strictest of the rules, so the same ' +
       'skill is valid in any of these CLIs. The other CLIs have no such section.',
+    mapCommands: 'Commands',
+    mapCommandsValue:
+      'Works for Claude, Gemini, Qwen Code and OpenCode. For Claude the list is assembled ' +
+      'from several sources: built-in commands, the commands/ directory, skills and ' +
+      'plugins. For the others the panel shows what the CLI documents: for Gemini and Qwen ' +
+      'Code, .toml files in ~/.gemini/commands/ and ~/.qwen/commands/ (a subdirectory gives ' +
+      'a name like /git:fix); for OpenCode, .md files in ~/.config/opencode/commands/ plus ' +
+      'the command key in opencode.json. Codex, Continue, Goose, Kimi Code, Cursor and Aider ' +
+      'have no such section.',
     mapScripts: 'Scripts',
     mapScriptsValue:
       'Works everywhere: this is the panel’s own section — your files in its hooks/ ' +
@@ -302,7 +313,8 @@ export const providersEn: typeof providersRu = {
     noteSafeTitle: 'A placeholder writes nothing',
     noteSafeText:
       'An “in development” section opens a placeholder and sends no changes. That is ' +
-      'deliberate: an empty screen beats a guess at somebody else’s format.',
+      'deliberate: an empty screen beats a guess at somebody else’s format. No CLI has such ' +
+      'a section right now.',
     noteHistoryTitle: 'History and search follow the provider',
     noteHistoryText:
       'The feed and the search cover Claude’s files plus the working sections of the ' +

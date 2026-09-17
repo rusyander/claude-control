@@ -32,7 +32,7 @@ describe('маршруты групп: сценарий и привязка к �
 
   const scenarioPayload = {
     name: 'Задача из Jira',
-    projectPaths: ['c:/work/enterprise-platform'],
+    projectPaths: ['c:/work/company'],
     scenario: {
       when: 'прилетел тикет',
       trigger: 'GOR-\\d+',
@@ -141,7 +141,7 @@ describe('маршруты групп: сценарий и привязка к �
     const res = await app.inject({
       method: 'POST',
       url: '/api/groups/activate',
-      payload: { path: 'c:/work/enterprise-platform/apps/web' },
+      payload: { path: 'c:/work/company/apps/web' },
     });
 
     expect(res.json<{ activated: string[] }>().activated).toEqual(['Задача из Jira']);

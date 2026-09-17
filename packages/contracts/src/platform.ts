@@ -10,6 +10,7 @@ import {
   type infer as Infer,
 } from 'zod';
 import type { CompromiseId } from './compromises';
+import type { ServerMessageCode, ServerMessageParams } from './server-messages';
 import type { PlatformModelRules, PlatformModelSource } from './platform-models';
 // Собственным именем пакета, а не соседним путём, — и это единственный такой
 // импорт здесь. Сервер грузит этот модуль подпутём
@@ -22,6 +23,8 @@ import type { PlatformModelRules, PlatformModelSource } from './platform-models'
 // понятна Node, Vite и tsc, и не требует `allowImportingTsExtensions` ни от
 // одного приложения.
 import {
+  PLATFORM_ASSISTANT_CONSUMER,
+  PLATFORM_TERMINAL_CONSUMER,
   platformConsumerSchema,
   type PlatformConsumerOption,
   type PlatformConsumerId,
@@ -148,6 +151,13 @@ export interface PlatformCapabilityFinding {
   state: PlatformCapabilityState;
   /** Человеческая причина: «список ключа», «через владельца ключа», «не объявлено». */
   detail: string;
+  /**
+   * Код той же причины для перевода (`server-messages.ts`). Пусто — у старой
+   * записи из `state.json` или у причины, коду ещё не заведённой: тогда
+   * показывается `detail` как есть.
+   */
+  detailCode?: ServerMessageCode;
+  detailParams?: ServerMessageParams;
   /** Проверено на этом контуре или известно про платформу вообще. */
   evidence: PlatformEvidence;
   /** Подпись компромисса, если состояние объясняется подписанным обходом. */
@@ -318,7 +328,7 @@ export type PlatformHealthRecord = PlatformProbeResult & {
 // compromise: agents-manual-roster — список агентов панель получить неоткуда, его ведёт человек
 export const platformAgentSchema = object({
   /**
-   * Идентификатор агента у контура. Форму задаёт платформа (у платформа компании — UUID
+   * Идентификатор агента у контура. Форму задаёт платформа (у платформы компании — UUID
    * из админки), и проверять её здесь панель не станет: единственный, кто
    * вправе сказать «такого агента нет», — сам контур, и он это говорит.
    */
@@ -500,7 +510,7 @@ const platformObjectSchema = object({
     platformIdPattern,
     'идентификатор: латиница, цифры, дефис, точка, подчёркивание',
   ),
-  /** Имя для списка: «EnterprisePlatform · dev». */
+  /** Имя для списка: «Компания · dev». */
   title: string().min(1),
   driver: zodEnum(platformDrivers),
   /**
@@ -605,7 +615,7 @@ const platformObjectSchema = object({
    * Прослойка инструментов (Т5): объявлять ли модели инструменты клиента
    * ТЕКСТОМ и собирать ли вызов обратно из текста.
    *
-   * У платформа компании включена по умолчанию (решение владельца В1, 11.09.2026): без неё
+   * У платформы компании включена по умолчанию (решение владельца В1, 11.09.2026): без неё
    * агент через контур «работает как чат» — говорит, что запишет файл, и не
    * записывает, потому что платформа не принимает `tools` вовсе
    * (`no-client-tools`). У пресета, чей шлюз принимает `tools` полем, умолчание
@@ -793,7 +803,7 @@ export interface PlatformSpendRecord {
    * Когда контур последний раз отказал по бюджету (402).
    *
    * ЧТО кончилось, читается из тела отказа по манифесту драйвера
-   * (`budgetRefusals`), а не предполагается кодом: у enterprise-platform на `/v1` 402 —
+   * (`budgetRefusals`), а не предполагается кодом: у платформы компании на `/v1` 402 —
    * это бюджет самого ключа (`handler_public_api.go:340`), у другой платформы
    * он может значить лимит над ключом. Не разобралось — ни
    * {@link PlatformSpendRecord.exhaustedScope}, ни уровня нет, и строка
@@ -880,7 +890,7 @@ export interface PlatformGatewayEvent {
   /** Категории сработавших проверок. Проверявшийся текст сюда не попадает. */
   violations: string[];
   /**
-   * Контур ЗАМАСКИРОВАЛ часть данных и всё-таки ответил (`enterprise-platform_sanitized`).
+   * Контур ЗАМАСКИРОВАЛ часть данных и всё-таки ответил (`platform_sanitized`).
    *
    * Отдельно от `violations` потому, что это другое событие: не отказ, а
    * молчаливая правка того, что увидела модель. Человек, не знающий о ней,
@@ -966,7 +976,7 @@ export interface PlatformGatewayEvent {
   totalTokens: number;
   /**
    * Ответ пришёл, а расхода платформа не прислала: `totalTokens` ноль не потому,
-   * что бесплатно, а потому, что счёта нет (так у enterprise-platform приходит картинка
+   * что бесплатно, а потому, что счёта нет (так у платформы компании приходит картинка
    * частью ответа). Отсутствует — расход сообщён или ответа не было.
    */
   usageUnreported?: true;
@@ -1229,7 +1239,7 @@ export type PlatformRuleField = keyof PlatformRules;
  * ровно так же, как разошлись бы два расчёта модели.
  */
 export interface PlatformRuleRow {
-  /** Имя поля у контура: `enterprise-platform_tools`, `enable_thinking`. */
+  /** Имя поля у контура: `platform_tools`, `enable_thinking`. */
   id: string;
   title: string;
   detail: string;
@@ -1421,6 +1431,13 @@ export interface PlatformRunPlan {
    * отказе только по ошибке в ленте.
    */
   refused?: true;
+  /**
+   * Прогон пойдёт МИМО контура, в облако вендора: режим «по возможности», галочка
+   * стоит, а шлюза или ключа нет (`reason`). Решение по контуру №4 — режим живёт,
+   * только пока шапка чата называет такой уход прямо; тихий уход данных в облако
+   * ровно то, от чего контур защищает.
+   */
+  bypassed?: true;
   /** Правила выбора модели: ими считается имя на стороне клиента. */
   rules: PlatformModelRules;
   /**
@@ -1436,6 +1453,12 @@ export interface PlatformRunPlan {
    * прогон идёт с полным `~/.claude` (или ведёт его не Claude).
    */
   layers?: PlatformRunLayers;
+  /**
+   * Как инструменты доходят до модели в этом прогоне. Чат по нему решает,
+   * называть ли ответ-вызов текстом «не исполнен, включите прослойку». Нет поля —
+   * прогон мимо контура.
+   */
+  toolRoute?: PlatformToolRoute;
 }
 
 /**
@@ -1457,6 +1480,24 @@ export interface PlatformSmokeResult {
   latencyMs: number;
   at: string;
   /** Причина отказа словами. Пусто — отказа не было. */
+  detail?: string;
+  /**
+   * Вызывает ли модель инструмент ПОЛЕМ — один вопрос при активации, только
+   * когда прослойка выключена (развилка 3). Нет поля — не спрашивали: прослойка
+   * включена, у контура свои инструменты, или сам пробный запрос не прошёл.
+   */
+  tools?: PlatformSmokeTools;
+}
+
+/**
+ * Итог пробы инструментов. `no-call` — ответила текстом без вызова,
+ * `call-as-text` — написала вызов текстом (поле до модели не дошло или она его
+ * не понимает), `dropped` — тип контура поле выбрасывает, спрашивать бессмысленно,
+ * `refused` — запрос с инструментом отклонён.
+ */
+export interface PlatformSmokeTools {
+  ok: boolean;
+  reason?: 'no-call' | 'call-as-text' | 'dropped' | 'refused';
   detail?: string;
 }
 
@@ -1500,6 +1541,43 @@ export interface PlatformActivationResult {
 
 /** Ассистент самой панели — цель, у которой нет файла CLI. */
 export const PLATFORM_ASSISTANT_TARGET = 'assistant';
+
+/**
+ * Что сохранить и что применить при «Готово» — одна функция для мастера, карточки
+ * доступа и действия агента `enable_contour` (D2 волны A: путь агента включал
+ * контур, но ассистент оставался на облаке вендора, потому что цели применял
+ * только мастер).
+ *
+ * `targets` в контуре — выбор человека, `applyTargets` — то, что пишется сейчас.
+ * Это два РАЗНЫХ списка, и слить их значило бы потерять выбор человека.
+ * Применяется только то, что разрешают потребители: ассистент — своим
+ * потребителем, файлы CLI — «Терминалом». А сохраняется весь выбор файлов, даже
+ * при снятом терминале: иначе, вернув галочку, человек нашёл бы пустой список
+ * CLI, которые он никогда не снимал (ревью Т3, MINOR 14).
+ *
+ * Потребитель ассистента и цель ассистента — разные константы с одинаковым
+ * значением, и перевод из одной в другую сделан здесь явно (MINOR 13).
+ *
+ * `offered` — список «Где работает контур» из плана. Потребитель, которого там
+ * нет, галочкой на экране не стоит и снять его нечем, поэтому он не сохраняется
+ * снова (MINOR 12). Плана нет — сохранённое не трогается: отличить сироту не с чем.
+ */
+export function finishPlan(
+  draft: Platform,
+  fileTargets: string[],
+  offered: readonly { id: string }[] | undefined,
+): { platform: Platform; applyTargets: string[] } {
+  const known = offered ? new Set(offered.map((option) => option.id)) : undefined;
+  const consumers = known ? draft.consumers.filter((id) => known.has(id)) : draft.consumers;
+  const assistant = consumers.includes(PLATFORM_ASSISTANT_CONSUMER)
+    ? [PLATFORM_ASSISTANT_TARGET]
+    : [];
+  const terminal = consumers.includes(PLATFORM_TERMINAL_CONSUMER);
+  return {
+    platform: { ...draft, consumers, targets: [...assistant, ...fileTargets] },
+    applyTargets: [...assistant, ...(terminal ? fileTargets : [])],
+  };
+}
 
 /** Почему цель недоступна. Причина машиночитаемая: текст пишет клиент. */
 export const platformTargetReasons = [

@@ -22,12 +22,24 @@ import { builtinPromptText } from './prompts/catalog.ts';
 
 const SERVER_SRC = fileURLToPath(new URL('..', import.meta.url));
 const WEB_SRC = fileURLToPath(new URL('../../../web/src', import.meta.url));
+/**
+ * Не только приложения: свипы в `tools/` воспроизводят протокол скриптованной
+ * моделью — самое вероятное место для второй копии грамматики, а телефон и
+ * контракты — такие же исходники (ревью Т4, MINOR-3). Читатель каталога
+ * по-прежнему ищется только на сервере — фильтр ниже.
+ */
+const OTHER_SOURCES = [
+  '../../../../tools',
+  '../../../mobile/src',
+  '../../../mobile/app',
+  '../../../../packages/contracts/src',
+].map((relative) => fileURLToPath(new URL(relative, import.meta.url)));
 
 /** Кто имеет право читать файлы каталога. Один модуль, и он назван здесь. */
 const CATALOG_READER = join('domains', 'prompts', 'catalog.ts');
 
 describe('текст промпта живёт в одном месте', () => {
-  const sources = [...walk(SERVER_SRC), ...walk(WEB_SRC)];
+  const sources = [SERVER_SRC, WEB_SRC, ...OTHER_SOURCES].flatMap((root) => walk(root));
 
   it('исходников для проверки нашлось достаточно', () => {
     // Без этой строки пустой обход (переехал каталог, сменилось расширение)

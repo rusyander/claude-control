@@ -327,6 +327,28 @@ export function moveHook(
 }
 
 /**
+ * Черновик хука приезжает из формы, но к серверу ходит ещё и телефон, и
+ * оборванный запрос доходит сюда куском. Событие домыслить нечем — это и есть
+ * «когда запускать», без него запись в settings.json бессмысленна; списки же
+ * пустыми осмысленны (хук без фильтра ловит всё), поэтому их достаточно
+ * привести к массиву, а не отказывать. Без этой проверки нехватка поля падала
+ * пятисоткой в домене — снаружи «сломалась панель» вместо «не хватает поля».
+ */
+export function normalizeHookDraft(body: Partial<HookDraft>): HookDraft | undefined {
+  if (typeof body.event !== 'string' || !body.event) return undefined;
+
+  return {
+    ...body,
+    event: body.event,
+    matchers: Array.isArray(body.matchers) ? body.matchers : [],
+    guardPatterns: Array.isArray(body.guardPatterns) ? body.guardPatterns : [],
+    groupIds: Array.isArray(body.groupIds) ? body.groupIds : [],
+    isEnabled: body.isEnabled !== false,
+    command: typeof body.command === 'string' ? body.command : '',
+  };
+}
+
+/**
  * Правка хука. `targetPath` указывает, в какой файл писать: правка локальной
  * записи должна вернуться в `settings.local.json`, а не переехать в общий
  * конфиг — иначе она начала бы действовать не только у владельца машины.

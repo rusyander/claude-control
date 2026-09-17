@@ -66,13 +66,17 @@ export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const RUN_UNKNOWN_DENIED =
   'Панель перезапускалась, прогон не в реестре — отправьте сообщение заново.';
 
-export function ledgerPath(appDataDir: string): string {
-  return join(appDataDir, 'runs.json');
+/**
+ * `file` — имя файла журнала: у процессов агента панели свой файл
+ * (`panel-agent/processes.ts`), иначе реестр чата усыновил бы их как прогоны чата.
+ */
+export function ledgerPath(appDataDir: string, file = 'runs.json'): string {
+  return join(appDataDir, file);
 }
 
 /** Прочитать журнал. Битый или отсутствующий файл — пустой журнал, без крика. */
-export function readRunLedger(appDataDir: string): RunLedgerEntry[] {
-  const path = ledgerPath(appDataDir);
+export function readRunLedger(appDataDir: string, file?: string): RunLedgerEntry[] {
+  const path = ledgerPath(appDataDir, file);
   if (!existsSync(path)) return [];
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
@@ -102,13 +106,15 @@ function isEntry(value: unknown): value is RunLedgerEntry {
  */
 export class RunLedger {
   private readonly appDataDir: string;
+  private readonly file: string | undefined;
 
-  constructor(appDataDir: string) {
+  constructor(appDataDir: string, file?: string) {
     this.appDataDir = appDataDir;
+    this.file = file;
   }
 
   read(): RunLedgerEntry[] {
-    return readRunLedger(this.appDataDir);
+    return readRunLedger(this.appDataDir, this.file);
   }
 
   /** Записать или обновить запись по ключу; свежие — в конце. */
@@ -125,7 +131,7 @@ export class RunLedger {
 
   private write(entries: RunLedgerEntry[]): void {
     try {
-      writeJsonFile(ledgerPath(this.appDataDir), entries);
+      writeJsonFile(ledgerPath(this.appDataDir, this.file), entries);
     } catch {
       // Журнал — страховка, а не часть работы прогона: отказ диска не должен
       // ронять ни запуск, ни завершение.

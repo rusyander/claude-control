@@ -28,7 +28,10 @@ import { chatMessagesQuery, useChatMessages, useChatProgress } from '../../src/e
 import { useCostUnit } from '../../src/entities/settings/api';
 import { formatSpend, shortModel } from '../../src/shared/lib/format';
 import { Composer, type ComposerValue } from '../../src/features/chat/Composer';
+import { MediaImageCard } from '../../src/features/chat/MediaImageCard';
+import { useImageMode } from '../../src/features/chat/useImageMode';
 import { Markdown } from '../../src/features/chat/Markdown';
+import { AgentText } from '../../src/features/chat/AgentText';
 import { PermissionCard } from '../../src/features/chat/PermissionCard';
 import { Progress } from '../../src/features/chat/Progress';
 import { TokenBadge } from '../../src/features/chat/TokenBadge';
@@ -145,34 +148,56 @@ export default function ChatScreen() {
     quietRun(chatId);
   }, [messagesUpdatedAt, messages.data, isRunning, run.text, chatId]);
 
+  const image = useImageMode(chatId);
+
+  /** Отправить агенту текст. Истина — сервер сообщение принял. */
+  const dispatch = useCallback(
+    (prompt: string): Promise<boolean> =>
+      send({
+        chatId,
+        prompt,
+        // Разговор продолжается только с `--resume`, а сессия для него — либо та,
+        // что пришла потоком, либо сам id открытого чата: у чата из списка он и
+        // есть id сессии. Без второго слагаемого сообщение в старый разговор
+        // начинало новый, и ответ уходил мимо той переписки, что человек видел.
+        sessionId: run.sessionId ?? (isDraft(chatId) ? undefined : chatId),
+        projectPath: workspace.projectPath || undefined,
+        allowEdits: value.allowEdits,
+        autoApprove: value.autoApprove,
+        model: value.model || undefined,
+        effort: value.effort || undefined,
+        files: value.files.length > 0 ? value.files : undefined,
+      }).then((outcome) => {
+        if (!outcome.ok) setFailed(outcome.message);
+        return outcome.ok;
+      }),
+    [chatId, run.sessionId, value, workspace.projectPath],
+  );
+
   const onSend = useCallback(() => {
     const prompt = value.text.trim();
     if (!prompt) return;
-    setBusy(true);
     setFailed('');
-    void send({
-      chatId,
-      prompt,
-      // Разговор продолжается только с `--resume`, а сессия для него — либо та,
-      // что пришла потоком, либо сам id открытого чата: у чата из списка он и
-      // есть id сессии. Без второго слагаемого сообщение в старый разговор
-      // начинало новый, и ответ уходил мимо той переписки, что человек видел.
-      sessionId: run.sessionId ?? (isDraft(chatId) ? undefined : chatId),
-      projectPath: workspace.projectPath || undefined,
-      allowEdits: value.allowEdits,
-      autoApprove: value.autoApprove,
-      model: value.model || undefined,
-      effort: value.effort || undefined,
-      files: value.files.length > 0 ? value.files : undefined,
-    })
-      .then((outcome) => {
+    // Режим «Картинка»: дорогу решает план сервера — панель рисует сама (файл и
+    // карточка) или просит агента обычным сообщением, собранным сервером.
+    if (image.mode === 'image') {
+      void image.submit(prompt, dispatch).then((road) => {
+        // Вложения уехали только с сообщением агенту; панели, рисующей самой,
+        // они не нужны — и стирать их тогда нельзя.
+        if (road === 'agent') setValue((state) => ({ ...state, text: '', files: [] }));
+        if (road === 'image') setValue((state) => ({ ...state, text: '' }));
+      });
+      return;
+    }
+    setBusy(true);
+    void dispatch(prompt)
+      .then((ok) => {
         // Поле очищается, только когда сервер ПРИНЯЛ сообщение: иначе отказ
         // уничтожает набранный текст и печатать приходится заново.
-        if (outcome.ok) setValue((state) => ({ ...state, text: '', files: [] }));
-        else setFailed(outcome.message);
+        if (ok) setValue((state) => ({ ...state, text: '', files: [] }));
       })
       .finally(() => setBusy(false));
-  }, [chatId, run.sessionId, value, workspace.projectPath]);
+  }, [value.text, dispatch, image]);
 
   const projectName = useMemo(() => {
     if (!workspace.projectPath) return t.chat.homeChat;
@@ -268,7 +293,9 @@ export default function ChatScreen() {
             <ToolCall key={tool.id ?? `tool-${index}`} tool={tool} costUnit={costUnit} />
           ))}
 
-          {run.text ? <Markdown>{run.text}</Markdown> : null}
+          {/* Тот же разбор, что у транскрипта: рисунок агента — карточкой уже
+              в потоке, недописанный блок спрятан, пока ответ печатается. */}
+          {run.text ? <AgentText text={run.text} streaming={isRunning} /> : null}
           {/* Расход ответа виден сразу, а не только после того, как ход
               закончится и лента перечитается из транскрипта. */}
           {run.text && run.textUsage ? (
@@ -301,7 +328,10 @@ export default function ChatScreen() {
 
         <Progress progress={progress.data} />
 
+        {image.shown ? <MediaImageCard image={image.shown} onClose={image.close} /> : null}
+
         <Composer
+          image={image}
           value={value}
           onChange={setValue}
           onSend={onSend}

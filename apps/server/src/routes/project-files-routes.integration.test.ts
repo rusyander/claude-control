@@ -3,11 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type {
-  ProjectFileChanges,
-  ProjectFileContent,
-  ProjectFileTree,
-} from '@agentdeck/contracts';
+import type { ProjectFileChanges, ProjectFileContent, ProjectFileTree } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import { AppStore } from '../lib/app-store.ts';
 import { registerProjectFilesRoutes } from './project-files-routes.ts';

@@ -48,19 +48,22 @@ export const providersRu = {
     statusVerified: 'Провайдер проверен',
     statusVerifiedText:
       'Путь пройден вживую и покрыт тестами. Такой статус сейчас только у Claude Code.',
-    statusVerifiedBadge: 'verified',
+    statusVerifiedBadge: 'проверено',
     statusExperimental: 'Провайдер экспериментальный',
     statusExperimentalText:
       'Форматы взяты из документации этого CLI и закрыты round-trip-тестами, но живого ' +
       'прогона на нём не было. Мы не угадываем — но и не выдаём за проверенное.',
-    statusExperimentalBadge: 'experimental',
+    statusExperimentalBadge: 'экспериментально',
     statusReady: 'Раздел работает',
     statusReadyText: 'Читается и пишется настоящий файл этого CLI — как у Claude.',
     statusReadyBadge: 'готово',
     statusPlanned: 'Раздел в разработке',
     statusPlannedText:
       'Виден с пометкой, но открывается заглушкой: адаптера формата ещё нет, поэтому ' +
-      'раздел ничего не читает и ничего не пишет. Это защита, а не недоделанный экран.',
+      'раздел ничего не читает и ничего не пишет. Это защита, а не недоделанный экран. ' +
+      'Сейчас в таком состоянии нет ни одного раздела: у каждого CLI раздел либо готов, ' +
+      'либо скрыт, — хотя подсказки на вкладке «Провайдеры» по-прежнему говорят о ' +
+      'разделах «в разработке».',
     statusPlannedBadge: 'в разработке',
     statusHidden: 'Раздела нет совсем',
     statusHiddenText:
@@ -173,7 +176,7 @@ export const providersRu = {
       'У остальных раздела нет.',
     mapSkills: 'Скиллы',
     mapSkillsValue:
-      'Работает у Claude и OpenCode, и понятие одно — папка со SKILL.md и YAML-шапкой, — ' +
+      'Работает у Claude, OpenCode, Qwen Code и Kimi Code, и понятие одно — папка со SKILL.md и YAML-шапкой, — ' +
       'но каталоги и поля разные. У Claude свой богатый раздел (дерево файлов на скилл, ' +
       'включение переносом в skills-disabled, группы, шаблоны). У OpenCode скиллы лежат в ' +
       '~/.config/opencode/skills/<имя>/SKILL.md (и <проект>/.opencode/skills/); панель правит ' +
@@ -186,6 +189,14 @@ export const providersRu = {
       'подхватывает общий ~/.agents/skills). Отличие одно: у Kimi документация ограничивает ' +
       'description 240 символами. Имя скилла панель держит по самому строгому из правил, ' +
       'поэтому один и тот же скилл валиден в любом из этих CLI. У остальных раздела нет.',
+    mapCommands: 'Команды',
+    mapCommandsValue:
+      'Работает у Claude, Gemini, Qwen Code и OpenCode. У Claude список собирается из ' +
+      'нескольких источников: встроенные команды, каталог commands/, скиллы и плагины. У ' +
+      'остальных панель показывает то, что описано в документации CLI: у Gemini и Qwen Code ' +
+      '— файлы .toml в ~/.gemini/commands/ и ~/.qwen/commands/ (подкаталог даёт имя вида ' +
+      '/git:fix), у OpenCode — файлы .md в ~/.config/opencode/commands/ плюс ключ command ' +
+      'в opencode.json. У Codex, Continue, Goose, Kimi Code, Cursor и Aider раздела нет.',
     mapProjects: 'Проекты',
     mapProjectsValue:
       'Работает у всех, но по-разному. У Claude — правила проекта, его MCP-серверы и ' +
@@ -283,7 +294,8 @@ export const providersRu = {
     noteSafeTitle: 'Заглушка ничего не пишет',
     noteSafeText:
       'Раздел «в разработке» открывается плейсхолдером и не отправляет изменений. Это ' +
-      'сделано намеренно: лучше пустой экран, чем догадка о чужом формате.',
+      'сделано намеренно: лучше пустой экран, чем догадка о чужом формате. Сейчас таких ' +
+      'разделов нет ни у одного CLI.',
     noteHistoryTitle: 'История и поиск идут за провайдером',
     noteHistoryText:
       'В ленту и поиск попадают файлы Claude и рабочие разделы активного провайдера. ' +
@@ -400,8 +412,7 @@ export const providersRu = {
     storageKeysValue:
       'agentdeck/provider-keys.enc (AES-256-GCM) + provider-keys.key с правами 0600',
     storageFormatCache: 'Кэш сверки форматов',
-    storageFormatCacheValue:
-      'agentdeck/format-check.json (обновляется раз в неделю или кнопкой)',
+    storageFormatCacheValue: 'agentdeck/format-check.json (обновляется раз в неделю или кнопкой)',
     storageNever: 'Куда не пишется никогда',
     storageNeverValue: 'Ключ — в конфигурацию CLI и в журналы; выбор провайдера — в чужие файлы',
 

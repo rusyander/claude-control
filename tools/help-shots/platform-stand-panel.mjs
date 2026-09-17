@@ -1,5 +1,5 @@
 /**
- * Кадры панели на ЖИВОМ стенде платформа компании: подключение, активация с пробным
+ * Кадры панели на ЖИВОМ стенде платформы компании: подключение, активация с пробным
  * запросом, маршрут и модель, правила и слои, настоящий прогон агента и меню
  * режимов. Контур настоящий, модель настоящая (локальная qwen2.5:0.5b за
  * контуром), CLI настоящий — подменено здесь только то, что уже приходит
@@ -14,15 +14,16 @@ import {
   exact,
   mark,
   frameArea,
+  openPlatformTab,
   pause,
   skipOnboarding,
   standKey,
   waitText,
 } from './platform-shots-lib.mjs';
 
-export const STAND_TITLE = L('Платформа компании · стенд', 'EnterprisePlatform · stand');
-export const STAND_ID = 'enterprise-platform-stand';
-const MODEL = process.env.ENTERPRISE_PLATFORM_MODEL ?? 'qwen2.5:0.5b';
+export const STAND_TITLE = L('Платформа компании · стенд', 'Company · stand');
+export const STAND_ID = 'company-stand';
+const MODEL = process.env.PLATFORM_MODEL ?? 'qwen2.5:0.5b';
 
 const button = (page, ru, en) => page.getByRole('button', { name: exact(ru, en) }).first();
 
@@ -161,8 +162,8 @@ export async function shootActivate({ page, web, panel, shots }) {
 /** Маршрут: модель на потребителя и то, что шапка чата говорит до отправки. */
 export async function shootRoute({ page, web, shots }) {
   const { route } = shots;
-  await page.goto(`${web}/platform`, { waitUntil: 'domcontentloaded' });
-  await pause(3500);
+  // Модель живёт на своей вкладке раздела.
+  await openPlatformTab(page, web, 'model', STAND_TITLE);
   const area = await frameArea(
     page,
     await mark(
@@ -170,6 +171,8 @@ export async function shootRoute({ page, web, shots }) {
       L(`Модель контура · ${STAND_TITLE}`, `Contour model · ${STAND_TITLE}`),
       'model-card',
     ),
+    // Липкая полоса вкладок сверху: без отступа верх карточки уходил под неё.
+    { margin: 70 },
   );
   await route.shot(page, '01-model-card', { clip: area });
 
@@ -182,14 +185,14 @@ export async function shootRoute({ page, web, shots }) {
 /** Правила контура, наша сторона и слои, матрица конфликтов. */
 export async function shootRules({ page, web, shots }) {
   const { rules } = shots;
-  await page.goto(`${web}/platform`, { waitUntil: 'domcontentloaded' });
-  await pause(3500);
+  // Правила — вкладка «Правила»: слева правила платформы, справа наши слои.
+  await openPlatformTab(page, web, 'rules', STAND_TITLE);
   const card = await mark(
     page,
     L(`Правила контура · ${STAND_TITLE}`, `Contour rules · ${STAND_TITLE}`),
     'rules-card',
   );
-  await frameArea(page, card, { max: 3200 });
+  await frameArea(page, card, { max: 3200, margin: 70 });
   // «Наша сторона» — прослойка и слои одним блоком: слои лежат внутри него, и
   // отдельный кадр слоёв повторял бы половину этого.
   const parts = [
@@ -198,7 +201,7 @@ export async function shootRules({ page, web, shots }) {
     ['03-rules-conflicts', L('Матрица конфликтов', 'Conflict matrix')],
   ];
   for (const [id, heading] of parts) {
-    const area = await frameArea(page, await mark(page, heading, id, 1), { max: 1600 });
+    const area = await frameArea(page, await mark(page, heading, id, 1), { max: 1600, margin: 70 });
     // Блоки идут вплотную: стандартное поле затягивало в кадр заголовок соседа.
     await rules.shot(page, id, { clip: area, padding: 4 });
   }
@@ -223,11 +226,12 @@ export async function shootAgent({ page, web, shots }) {
   await pause(1500);
   await agent.shot(page, '01-chat-run');
 
-  await page.goto(`${web}/platform`, { waitUntil: 'domcontentloaded' });
-  await pause(3500);
+  // Карточка прослойки — вкладка «Инструменты и проверки».
+  await openPlatformTab(page, web, 'tools');
   const area = await frameArea(
     page,
     await mark(page, L('Инструменты через контур', 'Tools through the contour'), 'shim-card'),
+    { margin: 70 },
   );
   await agent.shot(page, '02-shim-card', { clip: area });
 }

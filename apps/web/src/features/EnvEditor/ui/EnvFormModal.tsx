@@ -14,6 +14,7 @@ import { Typography } from '@shared/ui/typography';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { Badge } from '@shared/ui/badge';
 import { BulkCreate } from '@shared/ui/bulk-create';
+import { envSecretAnchor } from '@entities/PanelAgent';
 import type { EnvFormModalProps } from './EnvFormModal.types';
 import { buildEnvDraft, envFileName, looksSecret } from './EnvFormModal.lib';
 import styles from './EnvFormModal.module.scss';
@@ -213,14 +214,18 @@ export function EnvFormModal({ isOpen, onOpenChange, envVar }: EnvFormModalProps
               autoFocus={!envVar}
             />
 
-            <TextField
-              label={t('env.varValue')}
-              value={value}
-              onChange={setValue}
-              placeholder={envVar?.isSecret ? t('env.secretHidden') : ''}
-              hint={envVar?.isSecret ? t('env.secretRewrite') : undefined}
-              isMono
-            />
+            {/* Якорь агента панели: после `set_env` с пустым секретом окно ведёт
+                фокус сюда — значение вводит человек, агент его не видит. */}
+            <div data-agent-anchor={envVar ? envSecretAnchor(envVar.key) : undefined}>
+              <TextField
+                label={t('env.varValue')}
+                value={value}
+                onChange={setValue}
+                placeholder={envVar?.isSecret ? t('env.secretHidden') : ''}
+                hint={envVar?.isSecret ? t('env.secretRewrite') : undefined}
+                isMono
+              />
+            </div>
 
             {envVar ? (
               <Stack gap="var(--spacing-3xs)">

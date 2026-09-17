@@ -1,8 +1,4 @@
-import type {
-  AtlassianDeployment,
-  IntegrationId,
-  IntegrationStatus,
-} from '@agentdeck/contracts';
+import type { AtlassianDeployment, IntegrationId, IntegrationStatus } from '@agentdeck/contracts';
 import type { AppStore } from '../../lib/app-store.ts';
 import { telegramMe } from '../notify/telegram.ts';
 import { sendWebhook } from '../notify/webhook.ts';

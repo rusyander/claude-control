@@ -58,39 +58,39 @@ export function PlatformGuideSections({ tr }: SectionProps) {
         </Callout>
       </HelpSection>
 
-      <HelpSection title={g('enterprise-platformTitle')} caption={g('enterprise-platformCaption')}>
+      <HelpSection title={g('adminTitle')} caption={g('adminCaption')}>
         <GuideSteps>
           <GuideStep title={g('gLogin')} text={g('gLoginText')}>
-            <HelpShot topic="platform" scenario="connect" frame="01-admin-login" side="enterprise-platform" />
+            <HelpShot topic="platform" scenario="connect" frame="01-admin-login" side="platform" />
           </GuideStep>
           <GuideStep title={g('gDashboard')} text={g('gDashboardText')}>
             <HelpShot
               topic="platform"
               scenario="connect"
               frame="02-admin-dashboard"
-              side="enterprise-platform"
+              side="platform"
             />
           </GuideStep>
           <GuideStep title={g('gModels')} text={g('gModelsText')}>
-            <HelpShot topic="platform" scenario="connect" frame="03-admin-models" side="enterprise-platform" />
+            <HelpShot topic="platform" scenario="connect" frame="03-admin-models" side="platform" />
           </GuideStep>
           <GuideStep title={g('gModelCreate')} text={g('gModelCreateText')}>
             <HelpShot
               topic="platform"
               scenario="connect"
               frame="04-admin-model-create"
-              side="enterprise-platform"
+              side="platform"
             />
           </GuideStep>
           <GuideStep title={g('gKeys')} text={g('gKeysText')}>
-            <HelpShot topic="platform" scenario="connect" frame="05-admin-keys" side="enterprise-platform" />
+            <HelpShot topic="platform" scenario="connect" frame="05-admin-keys" side="platform" />
           </GuideStep>
           <GuideStep title={g('gKeyCreate')} text={g('gKeyCreateText')}>
             <HelpShot
               topic="platform"
               scenario="connect"
               frame="06-admin-key-create"
-              side="enterprise-platform"
+              side="platform"
             />
           </GuideStep>
           <GuideStep title={g('gKeyIssued')} text={g('gKeyIssuedText')}>
@@ -98,11 +98,11 @@ export function PlatformGuideSections({ tr }: SectionProps) {
               topic="platform"
               scenario="connect"
               frame="07-admin-key-issued"
-              side="enterprise-platform"
+              side="platform"
             />
           </GuideStep>
           <GuideStep title={g('gUsage')} text={g('gUsageText')}>
-            <HelpShot topic="platform" scenario="connect" frame="08-admin-usage" side="enterprise-platform" />
+            <HelpShot topic="platform" scenario="connect" frame="08-admin-usage" side="platform" />
           </GuideStep>
         </GuideSteps>
       </HelpSection>

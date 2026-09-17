@@ -95,7 +95,7 @@ export const ВСтрокеСписка: Story = {
     <Stack gap="var(--spacing-xs)" style={{ maxWidth: 460 }}>
       {(
         [
-          ['GITLAB_API_URL', 'https://git.platform.example.com/api/v4'],
+          ['GITLAB_API_URL', 'https://git.example.com/api/v4'],
           [
             'CLAUDE_CONFIG_DIR',
             'C:\\Users\\rusyander\\AppData\\Roaming\\agentdeck\\configuration\\profiles\\default',

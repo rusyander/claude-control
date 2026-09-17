@@ -1,8 +1,5 @@
 import type { ProviderChatMessage } from '@agentdeck/contracts';
-import type {
-  TaskSplitProposal,
-  TaskSplitReviewDecision,
-} from '@agentdeck/contracts/task-split';
+import type { TaskSplitProposal, TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import type { ChatTreeView, HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 import type { ChildStageGroup, ReviewDecisionItem } from '@features/ChatMessages';
 import type { MediaRevision } from '@entities/Media';

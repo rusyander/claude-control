@@ -11,9 +11,9 @@ import { queryKeys } from './query-keys';
  */
 describe('ключи контура', () => {
   it('план применения зависит от контура, а шлюз и список — нет', () => {
-    expect(queryKeys.platformApply('enterprise-platform-dev')).toEqual(['platforms', 'enterprise-platform-dev', 'apply']);
-    expect(queryKeys.platformApply('enterprise-platform-prod')).not.toEqual(
-      queryKeys.platformApply('enterprise-platform-dev'),
+    expect(queryKeys.platformApply('company-dev')).toEqual(['platforms', 'company-dev', 'apply']);
+    expect(queryKeys.platformApply('company-prod')).not.toEqual(
+      queryKeys.platformApply('company-dev'),
     );
     expect(queryKeys.platforms).toEqual(['platforms']);
     expect(queryKeys.platformGateway).toEqual(['platforms', 'gateway']);

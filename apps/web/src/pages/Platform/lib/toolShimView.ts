@@ -22,7 +22,15 @@ export type ToolShimEmptyKind = 'idle' | 'quiet' | 'none';
  * не должен ронять весь раздел «Контур» ради одной карточки.
  */
 function isReport(report: PlatformToolShimReport | undefined): report is PlatformToolShimReport {
-  return Boolean(report) && Array.isArray(report?.flaws) && typeof report?.requests === 'number';
+  // Счётчики, на которых стоит «вызовов не было», проверяются тоже: без них
+  // `undefined > 0` читалось бы как ноль, и незнание выдавалось бы за факт.
+  return (
+    Boolean(report) &&
+    Array.isArray(report?.flaws) &&
+    typeof report?.requests === 'number' &&
+    typeof report?.calls === 'number' &&
+    typeof report?.claimed === 'number'
+  );
 }
 
 export function shimEmptyKind(report: PlatformToolShimReport | undefined): ToolShimEmptyKind {

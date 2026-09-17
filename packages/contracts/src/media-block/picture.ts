@@ -1,10 +1,11 @@
+import { blockLang } from '../brand.ts';
 /**
  * Рисунок из блока в ответе агента: проверка, после которой файл можно положить
  * на диск и открыть.
  */
 
 /** Язык блока с рисунком. Внутри — сам `<svg>`, а не JSON вокруг него. */
-export const PICTURE_BLOCK_LANG = 'agentdeck:svg';
+export const PICTURE_BLOCK_LANG = blockLang('svg');
 
 /**
  * Потолок рисунка — в ЗНАКАХ, а не в байтах: этот разбор идёт и в браузере, и в

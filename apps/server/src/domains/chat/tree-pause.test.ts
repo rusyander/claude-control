@@ -178,6 +178,34 @@ describe('пауза дерева', () => {
     });
   });
 
+  /**
+   * Ревью Т3, MINOR 15: маршрут контура (адрес шлюза, промпт контура, флаги
+   * слоёв) решает реестр на КАЖДОМ старте, а запись паузы лежит в `state.json`.
+   * Скопированный туда, он был бы мёртвым грузом в файле состояния — адрес
+   * шлюза, модель и целый системный промпт, которых никто не прочитает.
+   */
+  it('запись паузы не хранит маршрут контура — его решает реестр на старте', () => {
+    const route: Partial<RunOptions> = {
+      platformEnv: { ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/company-dev' },
+      platformSystemPrompt: 'промпт контура',
+      platformArgs: ['--disable-slash-commands'],
+      platformDropAppend: true,
+    };
+    const runs = fakeRuns({ root: { sessionId: 'root', options: route } });
+    const store = memoryStore();
+    const tree = new TreePause({ links: () => LINKS, runs, store });
+
+    tree.pause('root');
+    tree.defer('stage', 'new-a-review', { prompt: 'ревью', cwd: 'C:/p', ...route }, {});
+
+    const record = store.records.root as TreePauseRecord;
+    const saved = JSON.stringify(record);
+    for (const field of Object.keys(route)) expect(saved).not.toContain(field);
+    // Всё остальное снимка на месте: без него продолжать было бы нечем.
+    expect(record.chats.root?.options).toMatchObject({ prompt: 'задание root', model: 'sonnet' });
+    expect(record.pendingStarts[0]?.options).toMatchObject({ prompt: 'ревью', cwd: 'C:/p' });
+  });
+
   it('продолжение: остановленное — в тех же сессиях, очередь — по порядку, запись снята', () => {
     const runs = fakeRuns({
       'new-a': { sessionId: 'sess-a', options: { fork: true, model: 'opus' } },

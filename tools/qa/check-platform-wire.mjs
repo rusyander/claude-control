@@ -37,7 +37,7 @@
  *      кадра с непустым `choices` (проверен в шаге 3).
  *  13. эталонный драйвер `openai-compat`: нативные инструменты полем в обоих
  *      диалектах клиента, поля OpenAI без потерь, общие отказы без текстов
- *      платформа компании; им же идут разделы шлюзов Azure, Together и OpenRouter.
+ *      платформы компании; им же идут разделы шлюзов Azure, Together и OpenRouter.
  *
  * Запуск: `node tools/qa/check-platform-wire.mjs`
  * Своего окружения не требует: стаб и панель поднимаются здесь же.
@@ -51,7 +51,7 @@ import { REWRITTEN_FINAL, startStubPlatform } from './stub-platform.mjs';
 const PANEL_PORT = Number(process.env.WIRE_PANEL_PORT ?? 5191);
 const GATEWAY_PORT = Number(process.env.WIRE_GATEWAY_PORT ?? 5192);
 const PANEL = `http://127.0.0.1:${PANEL_PORT}`;
-const CONTOUR = 'wire-enterprise-platform';
+const CONTOUR = 'wire-company';
 /** Контур, настроенный ДО Т7: запись в `state.json` без поля `rules` вовсе. */
 const LEGACY = 'wire-legacy';
 
@@ -271,7 +271,7 @@ async function run(stub) {
   // кадре без `choices`, а таких клиентов большинство.
   check(
     'вендорный кадр наружу не уехал',
-    !clean.text.includes('enterprise-platform_'),
+    !clean.text.includes('platform_'),
     clean.text.slice(0, 300),
   );
 
@@ -618,7 +618,7 @@ async function run(stub) {
   const managedIds = (wired?.rules ?? []).filter((row) => row.field).map((row) => row.id);
   check(
     'правила контура пришли от сервера списком манифеста',
-    managedIds.join(',') === 'enterprise-platform_tools,enterprise-platform_tool_mode,generation_preset,enable_thinking',
+    managedIds.join(',') === 'platform_tools,platform_tool_mode,generation_preset,enable_thinking',
     JSON.stringify(managedIds),
   );
   check(
@@ -693,8 +693,8 @@ async function run(stub) {
   const singleSent = JSON.parse(singleUp?.body ?? '{}');
   check(
     'single_turn ушёл к контуру НЕ потоком',
-    singleSent.enterprise-platform_tool_mode === 'single_turn' && singleSent.stream !== true,
-    JSON.stringify({ mode: singleSent.enterprise-platform_tool_mode, stream: singleSent.stream }),
+    singleSent.platform_tool_mode === 'single_turn' && singleSent.stream !== true,
+    JSON.stringify({ mode: singleSent.platform_tool_mode, stream: singleSent.stream }),
   );
   check(
     '«выключить размышления» ушло вложенным false, а не верхним полем',
@@ -782,7 +782,7 @@ async function run(stub) {
   );
   check(
     'openai-compat: ни вендорного поля, ни протокола прослойки в теле',
-    Object.keys(nativeBody).every((key) => !key.startsWith('enterprise-platform_')) &&
+    Object.keys(nativeBody).every((key) => !key.startsWith('platform_')) &&
       !String(nativeSent?.body ?? '').includes('tool_call>'),
     Object.keys(nativeBody).join(','),
   );
@@ -834,7 +834,7 @@ async function run(stub) {
 
   const compat401 = await gateway(port, '/v1/chat/completions', chat('stub-401'));
   check(
-    'openai-compat: 401 общими словами, без пяти причин платформа компании',
+    'openai-compat: 401 общими словами, без пяти причин платформы компании',
     compat401.status === 401 &&
       compat401.text.includes('Проверьте сам ключ') &&
       !compat401.text.includes('истёк по сроку'),

@@ -3,6 +3,7 @@ import { Modal } from '@shared/ui/modal';
 import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
+import { toast } from '@shared/lib/toast';
 import { usePlatformWizard } from '../model/usePlatformWizard';
 import { WIZARD_STEPS } from '../model/wizard-logic';
 import { StepAddress } from './StepAddress';
@@ -20,11 +21,30 @@ import styles from './PlatformWizard.module.scss';
  * выбирающий цели, уже знает, что панель нашла на самом деле, — а не то, что
  * обещает документация платформы.
  */
-export function PlatformWizard({ isOpen, onOpenChange, existing }: PlatformWizardProps) {
+export function PlatformWizard({
+  isOpen,
+  onOpenChange,
+  existing,
+  initialStep,
+}: PlatformWizardProps) {
   const { t } = useTranslation();
   const model = usePlatformWizard({
     ...(existing ? { existing } : {}),
-    onDone: () => onOpenChange(false),
+    ...(initialStep ? { initialStep } : {}),
+    onDone: (result) => {
+      // Закрылись, но записали не всё: сказать, что именно и почему. Молча
+      // закрытое окно читалось бы как «применено везде».
+      if (result && result.skipped.length > 0) {
+        toast.warning(
+          t('platform.finishSkippedNote', {
+            list: result.skipped
+              .map((item) => `${item.targetId} — ${t(`platform.skipReason.${item.reason}`)}`)
+              .join('; '),
+          }),
+        );
+      }
+      onOpenChange(false);
+    },
   });
 
   const index = WIZARD_STEPS.indexOf(model.step);

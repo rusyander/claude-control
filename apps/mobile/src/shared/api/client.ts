@@ -1,5 +1,7 @@
 import { currentConnection } from './connection';
+import type { ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import { dict } from '../config/i18n';
+import { serverMessage } from './server-message';
 
 /**
  * Запросы к панели. Тонкий слой поверх fetch, а не axios: единственное, что
@@ -43,7 +45,12 @@ const TIMEOUT_MS = 20_000;
 async function request<T>(
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
-  options: { query?: Record<string, string | number | undefined>; body?: unknown } = {},
+  options: {
+    query?: Record<string, string | number | undefined>;
+    body?: unknown;
+    /** Свой потолок ожидания: рисование картинки — минуты, а не секунды. */
+    timeoutMs?: number;
+  } = {},
 ): Promise<T> {
   const { url } = currentConnection();
   if (!url) throw new ApiError(0, dict().api.notConfigured);
@@ -57,7 +64,7 @@ async function request<T>(
         ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS),
     });
   } catch (error) {
     // До сервера не дошли вовсе: выключен компьютер, оборвалась сеть, нет
@@ -73,9 +80,18 @@ async function request<T>(
     let message = dict().run.answered(response.status);
     let code: string | undefined;
     try {
-      const body = (await response.json()) as { message?: string; error?: string; code?: string };
-      message = body.message || body.error || message;
-      code = body.code;
+      const body = (await response.json()) as {
+        message?: string;
+        error?: string;
+        code?: string;
+        messageCode?: unknown;
+        params?: ServerMessageParams;
+      };
+      // Код текста — первым: русская строка сервера остаётся запасной.
+      message =
+        serverMessage(body.messageCode, body.params) || body.message || body.error || message;
+      // Маршруты панели называют отказ то `code`, то `error` (агент панели, карточки).
+      code = body.code ?? body.error;
     } catch {
       // Тело не JSON — остаётся статус.
     }
@@ -90,7 +106,8 @@ async function request<T>(
 export const api = {
   get: <T>(path: string, query?: Record<string, string | number | undefined>) =>
     request<T>('GET', path, { query }),
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, { body }),
+  post: <T>(path: string, body?: unknown, options?: { timeoutMs?: number }) =>
+    request<T>('POST', path, { body, ...options }),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, { body }),
   delete: <T>(path: string, body?: unknown) => request<T>('DELETE', path, { body }),
   /**

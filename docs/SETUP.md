@@ -60,7 +60,7 @@ and plugins do not work.
 ## Installing
 
 ```bash
-git clone <repository-url>
+git clone <repository-url> agentdeck
 cd agentdeck
 pnpm install
 pnpm qa:setup     # only if you plan to run the browser QA scripts

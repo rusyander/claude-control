@@ -1,7 +1,11 @@
 import type { TranslationSchema } from './ru';
+import { serverMessagesEn } from './server-messages/en.ts';
+import { panelAgentEn } from './panel-agent/en.ts';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
+  serverMessages: serverMessagesEn,
+  panelAgent: panelAgentEn,
   common: {
     duration: { h: 'h', m: 'm', s: 's' },
     appName: 'AgentDeck',
@@ -840,6 +844,8 @@ export const en: TranslationSchema = {
     platformEffortOff: 'not sent',
     platformRefused:
       'The "{{title}}" contour is required, but {{reason}}: the message will be refused — it goes neither to the contour nor to the vendor cloud. {{fix}}',
+    platformBypassed:
+      'Bypassing the contour: "{{title}}" is set to “best effort”, but {{reason}} — the message goes straight to the vendor cloud, without the contour’s protection. {{fix}}',
     platformRefusedReason: {
       gateway_down: 'the panel gateway is down',
       no_token: 'the contour key is not saved',
@@ -1903,6 +1909,60 @@ export const en: TranslationSchema = {
     emptyText:
       'Connect your corporate platform and the panel will run on its models with a single key: the list arrives already narrowed to what the key may use, and the key itself stays here — it reaches no CLI config. The wizard asks for the address and the key, goes to the contour and shows what it actually offers.',
     connect: 'Connect a contour',
+    tabsLabel: 'Parts of the Contour section',
+    tab: {
+      contours: 'Contours',
+      model: 'Model',
+      rules: 'Rules',
+      access: 'Section access',
+      tools: 'Tools and checks',
+      agents: 'Agents',
+    },
+    tabHint: {
+      contours:
+        'Connected contours: link state, what the probe found, where it is applied, spend. Make active, check, configure and delete from here.',
+      model:
+        'Which model the selected contour answers with: default model, name map and reasoning depth.',
+      rules:
+        'Which rules act on a request: on the left the platform rules (what the contour accepts and does itself), on the right our layers (what the panel adds to a run). Below, where they clash.',
+      access:
+        'Which panel sections go through the selected contour — chat, groups, tests, assistant, foreign CLIs, terminal — and what gets written for that.',
+      tools:
+        'Tool shim and the contour’s content checks. Shown while the contour is active and the panel gateway is up.',
+      agents: 'Platform agents of the active contour and the MCP bridge for CLI agents.',
+    },
+    tabEmpty: {
+      tools:
+        'Nothing to show yet: the shim and checks cards appear once a contour is active, the panel gateway is up and at least one request went through it.',
+      agents:
+        'Only the active contour has agents. Make a contour active on the Contours tab and its agent list appears here.',
+    },
+    contourPicker: 'Contour',
+    contourPickerActive: '{{title}} · active',
+    finishSkippedNote: 'The contour is saved, but not written everywhere: {{list}}.',
+    access: {
+      title: 'Section access · {{title}}',
+      text: 'Tick the sections that go through this contour. Chat, groups, tests and foreign CLIs are decided at every start and need no write. The panel assistant and the terminal write the gateway address into settings: exactly what is shown below before you click.',
+      active: 'The contour is active: ticked sections go through it from their next start.',
+      inactive:
+        'The contour is not active: no section goes through it right now. Ticked chat, groups, tests and foreign CLIs go through it as soon as you make it active. Writing to the assistant and CLI files is skipped with a reason until then — after activation press “Save and apply” again.',
+      writesTitle: 'What gets written',
+      runsNote:
+        'Chat, groups, tests and foreign CLIs write nothing: the gateway address goes into the environment of the start. Below is only what lands in settings.',
+      nothingToWrite:
+        'Nothing to write: neither the panel assistant nor the terminal is ticked. The choice is saved.',
+      save: 'Save the choice',
+      saveApply: 'Save and apply',
+      saved: 'Section choice saved',
+      applied: 'Choice saved and written',
+      dirty: 'unsaved changes',
+    },
+    rulesSidePlatform: 'Platform rules',
+    rulesSidePlatformText:
+      'What the contour accepts and does itself: the request fields the panel passes to it, and what the contour owner switches on.',
+    rulesSideOurs: 'Our layers',
+    rulesSideOursText:
+      'What the panel adds: the data mask, the tool shim and our rules, skills, MCP and prompt in a run.',
     check: 'Check',
     checkAgain: 'Check again',
     configure: 'Configure',
@@ -1917,6 +1977,23 @@ export const en: TranslationSchema = {
     smokeOk: 'Test request went through: “{{answer}}” in {{seconds}} s, model {{model}}',
     smokeFailed: 'The test request through the gateway did not go through',
     smokeAt: 'asked {{when}}',
+    smokeToolsOk: 'The model calls tools through the field — the agent will be able to edit files',
+    smokeTools: {
+      'no-call':
+        'The model did not call the tool through the field: without the shim an agent over this contour will most likely not edit files.',
+      'call-as-text':
+        'The model wrote the tool call as text: the field did not reach it or it does not understand it. The panel never executes such text — the shim is needed.',
+      dropped:
+        'This contour type drops the tools field: without the shim the agent cannot edit files.',
+      refused:
+        'The request with a tool failed: without the shim the agent will most likely not edit files.',
+    },
+    enableShim: 'Turn the shim on',
+    enableShimFailed: 'Could not turn the shim on',
+    turnNoTools:
+      'This turn had no tool calls at all. If you expected edits, the contour model may not have handled tools: an agent that edits files is verified on models from {{size}}B.',
+    turnCallAsText:
+      'The answer is a tool call written as text. It was not executed: the tool shim is off. Turn it on in the contour card.',
     migratedTitle: 'The contour “{{title}}” is now the active one',
     migratedText:
       'Several contours used to be on while the work went through one of them — and which one could only be told from the CLI files. Exactly one is active now. The rest stayed configured, with their keys and budgets; only their switches went off: {{others}}. Any of them can be made active from its own card.',
@@ -1934,7 +2011,7 @@ export const en: TranslationSchema = {
     },
     driverLabel: 'Contour type',
     driver: {
-      enterprise-platform: 'EnterprisePlatform',
+      'enterprise-platform': 'Company platform',
       'openai-compat': 'OpenAI-compatible',
       litellm: 'LiteLLM',
       vllm: 'vLLM',
@@ -1945,7 +2022,7 @@ export const en: TranslationSchema = {
       together: 'Together AI',
     },
     driverHint: {
-      enterprise-platform:
+      'enterprise-platform':
         'The panel knows this platform up front: content checks, knowledge through the key owner, history summarised on its side.',
       'openai-compat':
         'Any compatible gateway. The panel asks for the model list only — everything else honestly stays “not declared”. Your CLI’s tools go to it as a request field, so the tool shim starts off.',
@@ -1985,6 +2062,10 @@ export const en: TranslationSchema = {
         'Field name in the request body, nested with dots: enable_thinking, chat_template_kwargs.enable_thinking. Without a field the contour has no thinking rule.',
       pathError: 'Path of lowercase latin, digits, “/”, “_” and “-”: messages, images/generations',
       wireError: 'Field name of latin, digits and “_”, nested with dots',
+      prefixLabel: 'Platform field prefix',
+      prefixHint:
+        'The word the vendor fields start with on the wire: {{value}}_status, {{value}}_guardrails, {{value}}_tools. Empty — as the preset says.',
+      prefixError: 'Lowercase latin and digits, starting with a letter, up to 32 characters',
       toolsLabel: 'CLI tools',
       tools: { native: 'as a request field', shim: 'through the shim' },
       toolsHint:
@@ -2002,7 +2083,7 @@ export const en: TranslationSchema = {
         'How long before the gateway or a proxy in front of it cuts the connection, streamed answers included. The panel names a declared ceiling when the cut happens. Empty — as the preset ({{value}}), 0 — not declared.',
     },
     titleLabel: 'Name',
-    titlePlaceholder: 'EnterprisePlatform · dev',
+    titlePlaceholder: 'Company · dev',
     idLabel: 'Identifier',
     idHint:
       'The local gateway address is built from it, so latin letters, digits, dash, dot and underscore only. Renaming = delete and create: the key is stored under the old identifier.',
@@ -2012,7 +2093,7 @@ export const en: TranslationSchema = {
     transport: {
       summary: 'Non-standard gateway: key, version, parameters',
       intro:
-        'Needed when the gateway expects the key somewhere other than Authorization: Bearer, or an address without /v1 — Azure OpenAI, a company gateway. For EnterprisePlatform and a plain compatible gateway leave it as is.',
+        'Needed when the gateway expects the key somewhere other than Authorization: Bearer, or an address without /v1 — Azure OpenAI, a company gateway. For the company platform and a plain compatible gateway leave it as is.',
       versionLabel: 'Version in the address',
       version: {
         auto: 'Append /v1 when the path has no version',
@@ -2238,7 +2319,7 @@ export const en: TranslationSchema = {
     factKey:
       'The contour key stays in the panel: CLIs go to its local gateway, never to the contour itself',
     factTools:
-      'Client tools cannot be declared to enterprise-platform as a field: the panel declares them to the model as protocol text and reassembles the call out of the answer — an agent through a contour does edit files. A compatible gateway gets them as a field, as the vendor does',
+      'Client tools cannot be declared to the company platform as a field: the panel declares them to the model as protocol text and reassembles the call out of the answer — an agent through a contour does edit files. A compatible gateway gets them as a field, as the vendor does',
     factCli:
       'Not every CLI takes a gateway address: four of the ten document no such setting, and the list shows them as a dash with its reason',
     violationsTitle: 'Contour content checks',
@@ -2286,7 +2367,7 @@ export const en: TranslationSchema = {
     toolShimTitle: 'Tools through the contour',
     toolShimText:
       'The shim declares tools to the model as protocol text and reassembles the call from its ' +
-      'answer — there is no other way on enterprise-platform, and on a compatible gateway you turn it on ' +
+      'answer — there is no other way on the company platform, and on a compatible gateway you turn it on ' +
       'yourself. The model is free to ignore it: then it describes the action in words, the ' +
       'turn ends successfully, and no file appears.',
     toolShimEmpty: {
@@ -2351,11 +2432,12 @@ export const en: TranslationSchema = {
     modelEffortNo:
       'The contour does not accept reasoning effort: the run goes without it, whatever you pick ' +
       'in the chat header. The panel will not pay for depth that will not happen.',
+    modelAgentVerified: 'For an agent that edits files, verified from {{size}}B.',
+    modelAgentSmall:
+      'For an agent that edits files, verified from {{size}}B, and this model is {{model}}B: chat will answer, file edits may not happen.',
     rulesTitle: 'Contour rules · {{title}}',
     rulesText:
-      'What the contour does to a request on the way. The upper list is the panel’s to set — ' +
-      'request fields the contour accepts. The lower one is visible but not managed here: the ' +
-      'contour’s owner turns it on at their end.',
+      'What acts on a request through this contour. On the left, the platform rules: on top the request fields the panel sets, below what the contour owner switches on at their end and what is not managed here. On the right, our layers. Change anything at any time: switches and lists save at once, text fields with the Save button.',
     rulesEmpty:
       'This contour declared no rules. That is “unknown”, not “does nothing”: a compatible ' +
       'gateway tells only its list of models about itself.',
@@ -2403,7 +2485,7 @@ export const en: TranslationSchema = {
     rulesToolsPlaceholder: 'e.g. web_search',
     rulesToolsBlocked:
       'While the tool shim is on, the contour’s own tool set cannot be added: two sets on one ' +
-      'turn are mutually exclusive. Turn the shim off below, under “Our side”.',
+      'turn are mutually exclusive. Turn the shim off in the “Our layers” column, under “Our side”.',
     rulesModeIdle: 'With no contour tool names set, the loop mode is not sent anywhere.',
     rulesPresetPlaceholder: 'balanced',
     rulesToolMode: {
@@ -2562,7 +2644,7 @@ export const en: TranslationSchema = {
     items: {
       'no-client-tools': {
         name: 'Client tools cannot be declared',
-        how: 'Applies to a contour whose type does not accept client tools as a field — that is enterprise-platform; a compatible gateway gets them as a field. EnterprisePlatform’s public API does not accept tool descriptions: the platform picks the set itself, and a list sent by the client is dropped on the way in. By the field the vendor API declares them with, tools never reach the model.',
+        how: 'Applies to a contour whose type does not accept client tools as a field — that is the company platform; a compatible gateway gets them as a field. The company platform’s public API does not accept tool descriptions: the platform picks the set itself, and a list sent by the client is dropped on the way in. By the field the vendor API declares them with, tools never reach the model.',
         why: 'We do not change the platform. Worked around by the shim: the panel declares the tools to the model as protocol text and reassembles the call from its answer (“Tools are declared to the model as text”), so an agent through a contour does edit files and does see your MCP servers. But it is a protocol on top of someone else’s, and it is weaker than the vendor one; with the shim off the old behaviour stands — a CLI through a contour works as a chat.',
         revisitWhen:
           'If the contour starts accepting the client’s own tool schemas — at least in the mode where the client executes the calls itself.',
@@ -2675,7 +2757,7 @@ export const en: TranslationSchema = {
       },
       'tool-shim': {
         name: 'Tools are declared to the model as text',
-        how: 'A contour whose type does not accept a tool list at all (enterprise-platform), or one where you turned the shim on yourself: the panel declares the tools to the model as protocol text and assembles the call back out of its answer: the agent gets a real tool_use block and edits files. A block left unclosed or unreadable never becomes a call — it stays in the answer as text, and the request trace says why.',
+        how: 'A contour whose type does not accept a tool list at all (the company platform), or one where you turned the shim on yourself: the panel declares the tools to the model as protocol text and assembles the call back out of its answer: the agent gets a real tool_use block and edits files. A block left unclosed or unreadable never becomes a call — it stays in the answer as text, and the request trace says why.',
         why: 'Without the shim an agent behind a contour “works like a chat”: it says it will write the file and does not. Synthesis from text is the only way to give it hands without turning off the client CLI’s skills, hooks or MCP.',
         revisitWhen: 'If the contour starts accepting client tools in its own schema.',
       },
@@ -2700,6 +2782,15 @@ export const en: TranslationSchema = {
           'If the contour lets a request leave the content between tool markers untouched, or starts sending the substitution map to key clients.',
         hiddenReason:
           'This behaviour has no permanent place on screen: the stop happens in one specific call and is named right there — as a chat message and a line of the request trace.',
+      },
+      'agent-header-forgeable': {
+        name: 'The agent cannot approve itself — on the process’s word',
+        how: 'A panel-agent confirmation card is decided by the human from two places: the panel window (an allowed Origin) or the paired phone (the valid token in the Authorization header, no Origin, only while remote access is on). A request carrying the agent-bridge mark is always refused, even with the token; a wrong or empty token, a token in the URL and remote access switched off are refused too, and the card keeps waiting for a decision.',
+        why: 'All the signs are headers. The model does not choose them: the bridge sets the mark itself, the agent in the panel window has no other way to the API, and the token is never passed into its process environment. But any local process of the same user can send the right Origin without the mark or read the token file from the profile. The panel’s trust boundary is the machine user: such a process reads and edits the same files without any agent.',
+        revisitWhen:
+          'If the panel agent gets tools outside the bridge (shell, network) or the panel starts serving more than one machine user.',
+        hiddenReason:
+          'No permanent place on screen: the refusal happens on a specific card request and is named in its response, while the card itself keeps waiting.',
       },
     },
   },
@@ -3047,6 +3138,9 @@ export const en: TranslationSchema = {
     argsHint: 'Space separated. Arguments containing spaces go in quotes',
     url: 'Address',
     env: 'Environment variables',
+    secretTitle: 'Secrets waiting for a value',
+    secretHint:
+      'The agent saved the server without values: type them yourself — the agent never sees them. A value goes into “Environment variables” or “Headers” and is written on “Save”.',
     envHint:
       'One KEY=VALUE per line. Do not put secrets here — keep them in the Environment section and reference them as ${VAR}',
     headers: 'Request headers',
@@ -3321,7 +3415,7 @@ export const en: TranslationSchema = {
     language: 'Language',
     providerTitle: 'Configuration provider',
     providerHint:
-      'Which CLI the panel manages. Claude Code is fully supported; the other providers are experimental — some sections are still in development.',
+      'Which CLI the panel manages. Claude Code is fully supported; the other providers are experimental: the panel writes their configuration, but not every one has been verified against the real CLI.',
     providerVerified: 'verified',
     providerExperimental: 'experimental',
     providerActive: 'Active',
@@ -3330,7 +3424,7 @@ export const en: TranslationSchema = {
     providerPreviewMixed: 'Ready: {{ready}} · in development: {{planned}}',
     providerExperimentalBadge: 'Experimental provider',
     providerExperimentalNote:
-      'Some sections are still in development and marked accordingly. The panel does not write anything to this provider’s configuration yet.',
+      'The panel reads and writes this provider’s configuration by its published format, but writes are not verified against the real CLI everywhere — check the CLI itself after a change.',
     claudeDir: '.claude directory',
     claudeDirHint:
       'Detected automatically. Fill this in if the directory is non-standard or detection failed.',
@@ -3450,6 +3544,16 @@ export const en: TranslationSchema = {
     pricingCacheWriteHint:
       'Cache writes are billed by how long the entry lives: in the Anthropic price list the 1-hour rate is 1.6× the 5-minute one, and in transcripts almost all cache writes go to the 1-hour cache. Your own price is used exactly as you type it — the panel never scales it. Leave the 1-hour field empty and 1-hour writes are billed at your 5-minute rate.',
     pricingReset: 'Clear own prices',
+    pricingManualTitle: 'Manual prices for models missing from the price list',
+    pricingManualHint:
+      'For contour models whose price the catalog does not publish (for example, Qwen3.8 on the company platform): ' +
+      'without a price their tokens never reach the spend estimate. The name is part of the model ' +
+      'name, case does not matter. Prices are dollars per million tokens; cache left empty equals ' +
+      'input. Replace the manual price as soon as the contour publishes its own.',
+    pricingManual: 'manual price',
+    pricingManualModel: 'Model (part of the name)',
+    pricingManualAdd: 'Add manual price',
+    pricingManualRemove: 'Remove',
     backupsTitle: 'Backups',
     backupsHint:
       'A copy is made before every write to your configuration. Restoring replaces the file with the chosen state and saves the current one as a fresh copy — so even a restore can be undone.',

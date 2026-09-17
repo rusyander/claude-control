@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { BRAND_NAME, LEGACY_BRAND_NAME } from './brand.mjs';
 
 /**
  * Описание скрипта — первый блок комментария в шапке файла. Один разбор на две
@@ -29,7 +30,7 @@ const BLOCK_CLOSER = /\*\/|#>/;
 /** Строчный комментарий; текст — в группе. */
 const LINE_COMMENT = /^(?:\/\/|#)\s?(.*)$/;
 /** Служебная строка файлов, созданных панелью раньше: описание — не она. */
-const LEGACY_EVENT_LINE = /^Событие: .*AgentDeck/;
+const LEGACY_EVENT_LINE = new RegExp(`^Событие: .*(?:${BRAND_NAME}|${LEGACY_BRAND_NAME})`);
 
 /** Описание из текста файла — вынесено ради тестов без диска. */
 export function describeScript(text: string): string | undefined {

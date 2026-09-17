@@ -59,6 +59,7 @@ export function OverviewTopic() {
             { name: tr('tileMcp'), description: tr('tileMcpText'), isMono: false },
             { name: tr('tileGroups'), description: tr('tileGroupsText'), isMono: false },
             { name: tr('tileBackups'), description: tr('tileBackupsText'), isMono: false },
+            { name: tr('tileContour'), description: tr('tileContourText'), isMono: false },
             { name: tr('tileChanges'), description: tr('tileChangesText'), isMono: false },
           ]}
         />

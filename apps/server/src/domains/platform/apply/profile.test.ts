@@ -25,8 +25,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
  */
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -61,13 +61,13 @@ afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 describe('адрес шлюза под вид API', () => {
   it('openai-совместимым — с версией, anthropic — корень', () => {
-    expect(gatewayUrlFor(5179, 'enterprise-platform-dev', 'openai-compat')).toBe(
-      'http://127.0.0.1:5179/enterprise-platform-dev/v1',
+    expect(gatewayUrlFor(5179, 'company-dev', 'openai-compat')).toBe(
+      'http://127.0.0.1:5179/company-dev/v1',
     );
     // Клиенты anthropic дописывают `/v1` сами: отдать им адрес с версией
     // значило бы получить `/v1/v1/messages` на первом же запросе.
-    expect(gatewayUrlFor(5179, 'enterprise-platform-dev', 'anthropic')).toBe(
-      'http://127.0.0.1:5179/enterprise-platform-dev',
+    expect(gatewayUrlFor(5179, 'company-dev', 'anthropic')).toBe(
+      'http://127.0.0.1:5179/company-dev',
     );
   });
 });
@@ -76,9 +76,9 @@ describe('профиль контура', () => {
   it('собирается из контура и настроек шлюза, токен не пишет', () => {
     const profile = buildManagedProfile(PLATFORM, store.getSettings().platformGateway, 'gpt-4o');
     expect(profile).toEqual({
-      id: 'contour-enterprise-platform-dev',
-      name: 'Контур · EnterprisePlatform · dev',
-      baseUrl: 'http://127.0.0.1:5179/enterprise-platform-dev/v1',
+      id: 'contour-company-dev',
+      name: 'Контур · Company · dev',
+      baseUrl: 'http://127.0.0.1:5179/company-dev/v1',
       apiKind: 'openai-compat',
       model: 'gpt-4o',
       // Ключ контура живёт в панели, подставляет его шлюз. Галочка «писать
@@ -88,7 +88,7 @@ describe('профиль контура', () => {
       // пробел: картинка через контур идёт дорогой контура, а профили, которые
       // он породил, режим картинки в расчёт не берёт вовсе.
       imagesUrl: '',
-      ownerPlatformId: 'enterprise-platform-dev',
+      ownerPlatformId: 'company-dev',
     });
     expect(isManagedProfile(profile)).toBe(true);
   });
@@ -116,7 +116,7 @@ describe('сверка управляемых профилей', () => {
 
   it('контур исчез — профиль ушёл вместе с ним', () => {
     store.updateSettings({ platforms: [], endpointProfiles: [managed()] });
-    expect(reconcileManagedProfiles(store)).toEqual(['contour-enterprise-platform-dev']);
+    expect(reconcileManagedProfiles(store)).toEqual(['contour-company-dev']);
     expect(store.getSettings().endpointProfiles).toEqual([]);
   });
 
@@ -138,7 +138,7 @@ describe('сверка управляемых профилей', () => {
 
     expect(reconcileManagedProfiles(store)).toEqual([]);
     expect(store.getSettings().endpointProfiles[0]?.baseUrl).toBe(
-      'http://127.0.0.1:5200/enterprise-platform-dev/v1',
+      'http://127.0.0.1:5200/company-dev/v1',
     );
   });
 
@@ -152,8 +152,8 @@ describe('сверка управляемых профилей', () => {
 
     reconcileManagedProfiles(store);
     const profile = store.getSettings().endpointProfiles[0];
-    expect(profile?.baseUrl).toBe('http://127.0.0.1:5179/enterprise-platform-dev/v1');
-    expect(profile?.name).toBe('Контур · EnterprisePlatform · dev');
+    expect(profile?.baseUrl).toBe('http://127.0.0.1:5179/company-dev/v1');
+    expect(profile?.name).toBe('Контур · Company · dev');
     // Модель выбирает человек — терять её при каждой записи настроек было бы
     // ровно тем поведением, за которое ругают «умные» панели.
     expect(profile?.model).toBe('qwen-max');

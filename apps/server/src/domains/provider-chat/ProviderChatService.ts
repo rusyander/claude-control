@@ -135,6 +135,20 @@ export class ProviderChatService {
 
   private platformRouting?: (consumer: string, asked: string) => PlatformRunRoute;
 
+  /**
+   * Сколько вызовов инструментов агента видел шлюз контура с момента `sinceMs`
+   * (развилка 5). `undefined` — запросов через шлюз не было вовсе, и тогда
+   * молчать честнее, чем сказать «ноль вызовов».
+   *
+   * Счёт по журналу, а не по прогону: два чата через один контур в одно время
+   * сложатся. Цена — пропущенная подсказка, не ложная: сумма только больше.
+   */
+  setContourToolCalls(count: (sinceMs: number) => number | undefined): void {
+    this.contourToolCalls = count;
+  }
+
+  private contourToolCalls?: (sinceMs: number) => number | undefined;
+
   /** Задать вопрос: реплика пользователя пишется сразу, ответ идёт потоком. */
   send(
     appDataDir: string,
@@ -210,12 +224,15 @@ export class ProviderChatService {
             // по одному на каждую остановку. Сказанное до остановки, наоборот,
             // остаётся ответом — им разговор и продолжается.
             const cut = Boolean(live.stopped) && event.reply.trim() === '';
+            const routed = Object.keys(route.env).length > 0 && !route.refusal;
+            const toolCalls = routed && !cut ? this.contourToolCalls?.(live.startedAt) : undefined;
             const stored = appendMessage(appDataDir, providerId, chatId, {
               role: 'assistant',
               content: cut ? STOPPED_TEXT : event.reply,
               ...(cut ? { failed: true } : {}),
               transport: event.transport,
               durationMs: Date.now() - live.startedAt,
+              ...(toolCalls === undefined ? {} : { contourToolCalls: toolCalls }),
             });
             this.finish(chatId, live, {
               type: 'done',

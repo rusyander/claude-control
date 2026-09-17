@@ -15,7 +15,9 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
+import { useSearch } from '@tanstack/react-router';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
+import { ENV_SECRET_TAB } from '@entities/PanelAgent';
 import { useSettings } from '@entities/AppConfig';
 import { useGroups } from '@entities/Group';
 import { EnvFormModal, envFileName } from '@features/EnvEditor';
@@ -146,6 +148,22 @@ export function EnvPage() {
     if (!open) writeUrl(undefined);
   };
   useEntityUrl<EnvVar>({ items: vars, getId: (item) => item.id, onOpen: openEdit });
+
+  // Агент панели сохранил секрет без значения и открыл `?id=<ключ>&tab=secret`:
+  // сервер знает ключ, а не `источник:ключ`, поэтому ищем по ключу — сначала в
+  // .mcp-secrets.env, где секрет и лежит. Переменную группы здесь не правят.
+  const search = useSearch({ strict: false }) as { id?: string; tab?: string };
+  const openedSecret = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (search.tab !== ENV_SECRET_TAB || !search.id || openedSecret.current === search.id) return;
+    const own = vars.filter((item) => item.key === search.id && item.source !== 'group');
+    const found = own.find((item) => item.source === 'secrets') ?? own[0];
+    if (!found) return;
+    openedSecret.current = search.id;
+    openEdit(found);
+    // Открыть ровно один раз на ключ — за этим следит ref, а не зависимости.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.tab, search.id, vars]);
 
   const reveal = async (item: EnvVar): Promise<void> => {
     if (revealed[item.id] !== undefined) {

@@ -40,7 +40,7 @@ import { setTimeout as wait } from 'node:timers/promises';
 const isWindows = process.platform === 'win32';
 /** Собран из кусков: в репозитории не должно лежать присваивание, похожее на ключ. */
 const SECRET = ['contour', 'live', 'key', '9f3c'].join('-');
-const CONTOUR = 'live-enterprise-platform';
+const CONTOUR = 'live-company';
 const MODEL = 'qwen2.5:7b';
 const DUMP = 'cc-env-dump.txt';
 /** Ключ строки с argv в том же файле: разбор у него общий с переменными. */
@@ -323,6 +323,40 @@ async function main() {
     }
     rmSync(askedDir, { recursive: true, force: true });
 
+    // ── 2а'. Понижённая ступень: полное имя модели и журнал понижений ──────────
+    // Ступень разделения и веера уезжает РАЗВЁРНУТЫМ именем (`claude-sonnet-5`),
+    // а человек пишет карту семейством («sonnet»). Строка карты обязана сработать
+    // и для полного имени — иначе «модель на группу» молча уходила в модель
+    // контура по умолчанию. И журнал понижений обязан записать модель, которой
+    // прогон ШЁЛ, а не имя из шапки (ревью Т6, m8): по нему считают, окупается ли
+    // понижение.
+    const MAPPED = 'qwen2.5:14b';
+    const loweredDir = mkdtempSync(join(tmpdir(), 'cc-t6-lowered-'));
+    const journaled = [];
+    chatRuns.setLoweredJournal((record) => journaled.push(record));
+    writePlatform(store, { ...platform, consumers: ['chat'], modelMap: { sonnet: MAPPED } });
+    chatRuns.start(
+      'live-lowered',
+      { prompt: 'привет', cwd: loweredDir, configDir, model: 'claude-sonnet-5', effort: 'medium' },
+      { origin: 'chat', lowered: { model: 'claude-sonnet-5', effort: 'medium' } },
+    );
+    const lowered = await waitForDump(loweredDir);
+    check(Boolean(lowered), 'фальшивый CLI запустился и у понижённой ступени');
+    if (lowered) {
+      const argv = lowered.env.get(ARGV_KEY) ?? '';
+      check(
+        argv.includes(`--model ${MAPPED}`),
+        `строка карты «sonnet» переводит полное имя: ${argv}`,
+      );
+    }
+    for (let i = 0; i < 40 && journaled.length === 0; i += 1) await wait(250);
+    const record = journaled.find((item) => item.chatId === 'live-lowered');
+    check(
+      record?.model === MAPPED && record?.effort === '',
+      `журнал понижений пишет модель контура и не пишет глубину: ${JSON.stringify(record && { model: record.model, effort: record.effort })}`,
+    );
+    rmSync(loweredDir, { recursive: true, force: true });
+
     // ── 2б. Наши слои (Т8): снятое доезжает до argv, а брокер прав — переживает ──
     // `layers.test.ts` проверяет, ЧТО панель решила; что из решения доехало до
     // процесса — видно только здесь. Порядок флагов тоже проверяется: брокер
@@ -462,6 +496,14 @@ async function main() {
           argv.includes('--strict-mcp-config'),
         `снятые слои доезжают и до агента тестов: ${argv}`,
       );
+      // Модель маршрута — флагом, как у чата (ревью Т6, m9): переменная
+      // окружения слабее `--model`, и полагаться на неё одну значило бы ждать,
+      // пока кто-нибудь добавит флаг в обход перевода.
+      check(
+        argv.includes(`--model ${MODEL}`),
+        `агент тестов получает модель контура флагом: ${argv}`,
+      );
+      check(!argv.includes('--effort'), `глубина агенту тестов не отправлена: ${argv}`);
     }
     testRuns.stopAll();
 

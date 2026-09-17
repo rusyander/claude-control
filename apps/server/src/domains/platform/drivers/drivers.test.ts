@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { driverFor } from './index.ts';
 import { readPlatformModels, readSubstitutionMap } from './driver.ts';
+import { isServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /**
  * Драйверы: единственное место, где знают о конкретной платформе.
@@ -10,7 +11,11 @@ import { readPlatformModels, readSubstitutionMap } from './driver.ts';
  * объявлено», а не как «нет» и не как галка: инвариант 13 партии.
  */
 
-function findingOf(payload: unknown, id: string, driver: 'enterprise-platform' | 'openai-compat' = 'enterprise-platform') {
+function findingOf(
+  payload: unknown,
+  id: string,
+  driver: 'enterprise-platform' | 'openai-compat' = 'enterprise-platform',
+) {
   const reading = driverFor(driver).read(payload);
   const finding = reading.capabilities.find((item) => item.id === id);
   if (!finding) throw new Error(`в матрице нет строки «${id}»`);
@@ -22,7 +27,7 @@ describe('карта подмены: обе формы, в которых её �
     expect(readSubstitutionMap({ '[EMAIL_1]': 'a@b.ru' })).toEqual({ '[EMAIL_1]': 'a@b.ru' });
   });
 
-  it('список {placeholder, value} — форма enterprise-platform_deanonymized_entities', () => {
+  it('список {placeholder, value} — форма platform_deanonymized_entities', () => {
     // `anonymization.py deanonymized_entities`: список, а не объект. Прежнее чтение
     // брало только объект, и карта оказывалась пустой ровно там, где она была.
     expect(
@@ -40,10 +45,10 @@ describe('карта подмены: обе формы, в которых её �
     expect(readSubstitutionMap('строка')).toBeUndefined();
   });
 
-  it('итоговый текст платформа компании узнаётся заменой, а не незнакомым кадром', () => {
-    expect(driverFor('enterprise-platform').readFrame({ enterprise-platform_deanonymized: 'итог' })).toEqual({
+  it('итоговый текст платформы компании узнаётся заменой, а не незнакомым кадром', () => {
+    expect(driverFor('enterprise-platform').readFrame({ platform_deanonymized: 'итог' })).toEqual({
       kind: 'replacement',
-      field: 'enterprise-platform_deanonymized',
+      field: 'platform_deanonymized',
       text: 'итог',
     });
   });
@@ -226,11 +231,33 @@ describe('readPlatformModels: читаем объявленное, не доду
     expect(readPlatformModels({ data: 'нет' })).toEqual([]);
   });
 
-  it('вид модели у платформа компании считается по объявленному полю, а не по имени', () => {
+  it('вид модели у платформы компании считается по объявленному полю, а не по имени', () => {
     // Модель НАЗЫВАЕТСЯ embed, но вида не объявляет: строка матрицы обязана
     // остаться «не объявлено».
     const finding = findingOf({ data: [{ id: 'ru-embed-v2' }] }, 'embeddings');
     expect(finding.state).toBe('unknown');
     expect(finding.detail).toContain('не объявлен');
   });
+});
+
+describe('причина строки матрицы — кодом для перевода', () => {
+  // Английский интерфейс переводит `detailCode`; строка без кода показала бы
+  // русскую причину сервера как есть (решение владельца: сервер пишет по-русски).
+  const payloads: unknown[] = [
+    { data: [] },
+    { data: [{ id: 'm', kind: 'chat' }] },
+    { data: [{ id: 'm', kind: 'embedding', image_generation: true }] },
+    { data: [{ id: 'm' }] },
+  ];
+  for (const driver of ['enterprise-platform', 'openai-compat'] as const) {
+    it(`${driver}: у каждой строки известный код`, () => {
+      for (const payload of payloads) {
+        for (const finding of driverFor(driver).read(payload).capabilities) {
+          expect(isServerMessageCode(finding.detailCode), `${finding.id}: ${finding.detail}`).toBe(
+            true,
+          );
+        }
+      }
+    });
+  }
 });

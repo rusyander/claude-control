@@ -36,6 +36,13 @@
  *              с меткой; порядок флагов самой панели доказывает
  *              `check-platform-run-env.mjs`
  *   дописка  — наша добавка к системному промпту: её снимает сама панель
+ *   предок   — `.claude/CLAUDE.md` в каталоге ВЫШЕ рабочего: так до агента
+ *              панели доезжал `~/.claude/CLAUDE.md` — его временная папка лежит
+ *              под домашним каталогом, и CLI читает файл как правила проекта `~`
+ *              (случай 7, лёгкое окно агента панели)
+ *   дом      — `<дом>/.claude/CLAUDE.md` над проектом, а рядом `CLAUDE.md`
+ *   монорепо   монорепозитория между домом и проектом: снятые личные настройки
+ *              обязаны унести первый и оставить второй (случай 8, прогон чата)
  *
  * Запуск: `node tools/qa/check-run-layers.mjs`
  * Нужен установленный `claude` (путь можно задать `CLAUDE_CLI`); стенд человека
@@ -60,6 +67,9 @@ const MARK = {
   projectMcp: 'mcp__t8proj__marker',
   broker: 'mcp__t8broker__marker',
   append: 'T8APPENDMARKER',
+  ancestor: 'T8ANCESTORMARKER',
+  home: 'T8HOMEMARKER',
+  mono: 'T8MONOMARKER',
 };
 
 /** Сервер MCP с одной меткой: он же лежит рядом с пробой, откуда эта проверка выросла. */
@@ -220,8 +230,8 @@ function buildConfigDir(work) {
  * Именно он отвечает на вопрос, который важнее личных меток: какой флаг уносит
  * инструменты самой задачи, а какой — нет.
  */
-function buildProjectDir() {
-  const work = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-layers-work-')));
+function buildProjectDir(inside) {
+  const work = inside ?? realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-layers-work-')));
   writeFileSync(join(work, 'CLAUDE.md'), `# Проект\n\n${MARK.project}\n`, 'utf8');
 
   const skillDir = join(work, '.claude', 'skills', MARK.projectSkill);
@@ -263,6 +273,11 @@ function factsOf(body) {
     projectMcp: tools.includes(MARK.projectMcp),
     broker: tools.includes(MARK.broker),
     append: text.includes(MARK.append),
+    ancestor: text.includes(MARK.ancestor),
+    home: text.includes(MARK.home),
+    mono: text.includes(MARK.mono),
+    text,
+    tools,
   };
 }
 
@@ -274,6 +289,11 @@ async function main() {
   // типов, и на Node 22.6 сорвался бы на первом же `.ts`.
   const { ChatRunRegistry } = await import('../../apps/server/src/domains/chat/ChatRunRegistry.ts');
   const { runLayers } = await import('../../apps/server/src/domains/platform/layers.ts');
+  const { startPanelAgentRun } =
+    await import('../../apps/server/src/domains/panel-agent/runner.ts');
+  const { resolvePanelAgentLaunch } =
+    await import('../../apps/server/src/domains/panel-agent/launch.ts');
+  const { AppStore } = await import('../../apps/server/src/lib/app-store.ts');
   const { defaultOurRules, defaultPlatformRules } =
     await import('../../packages/contracts/src/platform.ts');
 
@@ -281,9 +301,9 @@ async function main() {
   console.log(`CLI: ${exe}\nСтаб: ${stub.url}\n`);
 
   /** Один прогон настоящего CLI через настоящий реестр панели. */
-  const runCase = async (label, ours) => {
-    const work = buildProjectDir();
-    const home = buildConfigDir(work);
+  const runCase = async (label, ours, tree) => {
+    const work = tree?.work ?? buildProjectDir();
+    const home = buildConfigDir(tree?.cwd ?? work);
 
     // Контур целиком выдуман здесь, но слои считает НАСТОЯЩИЙ `runLayers` —
     // вторая, «проверочная» копия списка флагов проверяла бы сама себя.
@@ -303,6 +323,7 @@ async function main() {
         DISABLE_AUTOUPDATER: '1',
         DISABLE_ERROR_REPORTING: '1',
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+        ...tree?.env,
       },
       layers,
     }));
@@ -312,7 +333,7 @@ async function main() {
       `layers-${label}`,
       {
         prompt: 'скажи ок',
-        cwd: work,
+        cwd: tree?.cwd ?? work,
         configDir: home,
         // Команда — панельная по умолчанию (`claude.cmd` через оболочку
         // Windows): именно этот путь и надо проверять, кавычки в нём разбирает
@@ -335,7 +356,7 @@ async function main() {
     // которого слои снимаются флагами, а не подменой каталога: подменив его,
     // панель потеряла бы переписку, продолжение и аналитику.
     const transcripts = existsSync(join(home, 'projects'));
-    rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    if (!tree) rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     return { facts, transcripts, args: layers.args };
   };
@@ -394,6 +415,141 @@ async function main() {
     rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     return { label, facts };
+  };
+
+  const stubEnv = {
+    ANTHROPIC_BASE_URL: stub.url,
+    ANTHROPIC_AUTH_TOKEN: 'layers-stub-token',
+    ANTHROPIC_API_KEY: 'layers-stub-token',
+    ANTHROPIC_MODEL: 'stub-layers',
+    DISABLE_TELEMETRY: '1',
+    DISABLE_AUTOUPDATER: '1',
+    DISABLE_ERROR_REPORTING: '1',
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+  };
+
+  /**
+   * Ход агента панели настоящим запускателем (`resolvePanelAgentLaunch` →
+   * `startPanelAgentRun`: те же флаги, та же оболочка, настоящий переходник) в
+   * дереве, где над временной папкой лежит `.claude/CLAUDE.md` с меткой — модель
+   * домашнего каталога человека. Временная папка подменяется через TEMP/TMP:
+   * запускатель берёт её у `os.tmpdir()`, и другого способа поставить над ней
+   * «предка» без записи в настоящий `~` нет.
+   */
+  const runPanelAgent = async () => {
+    const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-layers-ancestor-')));
+    mkdirSync(join(root, '.claude'), { recursive: true });
+    writeFileSync(
+      join(root, '.claude', 'CLAUDE.md'),
+      `# Предок
+
+${MARK.ancestor}
+`,
+      'utf8',
+    );
+    const temp = join(root, 'Temp');
+    mkdirSync(temp);
+    const home = buildConfigDir(temp);
+    const appData = join(root, 'appdata');
+    mkdirSync(appData);
+
+    const saved = { TEMP: process.env.TEMP, TMP: process.env.TMP, TMPDIR: process.env.TMPDIR };
+    const setTemp = (value) => {
+      for (const key of Object.keys(saved)) {
+        if (value === undefined) {
+          if (saved[key] === undefined) delete process.env[key];
+          else process.env[key] = saved[key];
+        } else process.env[key] = value;
+      }
+    };
+
+    // Положительный контроль: прежние флаги агента (`project,local`) в том же
+    // дереве. Метка предка обязана доехать — иначе зелень случая ниже значила бы
+    // только, что проба её не видит.
+    const control = join(temp, 'control');
+    mkdirSync(control);
+    const controlFrom = stub.seen.length;
+    const cli = spawn(
+      exe,
+      ['-p', 'скажи ок', '--setting-sources', 'project,local', '--strict-mcp-config'],
+      {
+        cwd: control,
+        env: { ...process.env, ...stubEnv, CLAUDE_CONFIG_DIR: home },
+        stdio: ['ignore', 'ignore', 'ignore'],
+      },
+    );
+    await new Promise((done) => {
+      const timer = setTimeout(() => (cli.kill(), done()), 120_000);
+      cli.on('close', () => (clearTimeout(timer), done()));
+      cli.on('error', () => (clearTimeout(timer), done()));
+    });
+    const controlFacts = factsOf(stub.seen[controlFrom]);
+
+    let facts;
+    let command;
+    setTemp(temp);
+    try {
+      const launch = resolvePanelAgentLaunch({
+        store: new AppStore(appData),
+        appDataDir: appData,
+        gatewayPort: () => 0,
+      });
+      if (!launch.ok) throw new NotChecked(`запускатель агента отказал: ${launch.message}`);
+      command = process.env.CLAUDE_CLI ?? launch.command;
+      const from = stub.seen.length;
+      const run = startPanelAgentRun({
+        command,
+        env: { ...launch.env, ...stubEnv, CLAUDE_CONFIG_DIR: home },
+        // Панели нет: переходник отдаст один инструмент `panel_unavailable`, и
+        // этого хватает — вопрос в том, что КРОМЕ него в запросе.
+        selfBaseUrl: 'http://127.0.0.1:1',
+        conversationId: 'layers-panel-agent',
+        context: { route: '/projects' },
+        messages: [{ role: 'user', content: 'скажи ок' }],
+        onEvent: () => {},
+      });
+      for (let i = 0; i < 4 * 120 && stub.seen.length === from; i += 1) await wait(250);
+      run.stop();
+      await Promise.race([run.done, wait(10_000)]);
+      facts = factsOf(stub.seen[from]);
+    } finally {
+      setTemp(undefined);
+    }
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    return { facts, controlFacts, command };
+  };
+
+  /**
+   * Проект ПОД домашним каталогом, как у человека: `<дом>/.claude/CLAUDE.md` с
+   * меткой, `<дом>/mono/CLAUDE.md` — правила монорепозитория, `<дом>/mono/proj` —
+   * сама задача. Дом подменяется переменными окружения процесса CLI
+   * (`USERPROFILE`/`HOME`), настоящий `~` не трогается. На Windows рабочий каталог
+   * отдаётся в НИЖНЕМ регистре: CLI сравнивает исключения с путём, собранным от
+   * рабочего каталога как он есть, с учётом регистра (замерено), а путь проекта в
+   * панели приходит в том регистре, в каком его выбрал человек.
+   */
+  const runUnderHome = async (label, ours) => {
+    const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-layers-under-home-')));
+    mkdirSync(join(root, '.claude'), { recursive: true });
+    writeFileSync(join(root, '.claude', 'CLAUDE.md'), `# Дом\n\n${MARK.home}\n`, 'utf8');
+    const mono = join(root, 'mono');
+    const work = join(mono, 'proj');
+    mkdirSync(work, { recursive: true });
+    writeFileSync(join(mono, 'CLAUDE.md'), `# Монорепозиторий\n\n${MARK.mono}\n`, 'utf8');
+    buildProjectDir(work);
+    const cwd = process.platform === 'win32' ? work.toLowerCase() : work;
+    try {
+      return await runCase(label, ours, { work, cwd, env: { USERPROFILE: root, HOME: root } });
+    } finally {
+      // Дерево CLI, остановленное реестром, отпускает рабочий каталог не сразу
+      // (EBUSY на Windows). Недоудалённая папка во временном каталоге — не повод
+      // ронять проверку, чей вердикт уже в записанном запросе.
+      try {
+        rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 500 });
+      } catch (error) {
+        console.log(`(не удалилось ${root}: ${error.code ?? error.message})`);
+      }
+    }
   };
 
   try {
@@ -489,6 +645,66 @@ async function main() {
     if (broker.facts) {
       check(!broker.facts.mcp, 'личный MCP-сервер снят и в прямом запуске');
       check(broker.facts.broker, 'сервер, приехавший своим --mcp-config, остался');
+    }
+
+    // ── 7. Агент панели — лёгкое окно ────────────────────────────────────────
+    // Ни одного нашего слоя и ни одного чужого проекта: только системная дописка
+    // агента и инструменты переходника панели. Проверяется НАСТОЯЩИМ
+    // запускателем агента, а не списком флагов: до 17.09.2026 флаги были
+    // «правильные», а `~/.claude/CLAUDE.md` доезжал до модели через поиск вверх.
+    const agent = await runPanelAgent();
+    check(Boolean(agent.controlFacts), 'контроль: запрос записан при прежних флагах агента');
+    if (agent.controlFacts) {
+      check(
+        agent.controlFacts.ancestor,
+        'контроль: при `project,local` .claude/CLAUDE.md предка доезжает (проба его видит)',
+      );
+    }
+    check(Boolean(agent.facts), `агент панели: запрос записан (${agent.command})`);
+    if (agent.facts) {
+      const f = agent.facts;
+      check(!f.ancestor, 'агент панели: CLAUDE.md предка (модель ~/.claude/CLAUDE.md) не доехал');
+      check(!f.rules, 'агент панели: личные правила каталога конфигурации не доехали');
+      check(
+        !f.hook && !f.skill && !f.mcp,
+        'агент панели: ни хука, ни личного скилла, ни личного MCP',
+      );
+      check(
+        f.text.includes('agent of the AgentDeck panel'),
+        'агент панели: его системная дописка на месте',
+      );
+      const foreign = f.tools.filter((name) => !name.startsWith('mcp__agentdeck-panel__'));
+      check(
+        f.tools.length > 0 && foreign.length === 0,
+        `агент панели: инструменты только переходника панели (${f.tools.join(', ') || 'нет'})`,
+      );
+    }
+
+    // ── 8. Проект под домашним каталогом ─────────────────────────────────────
+    // Случаи 1–5 кладут проект во временную папку без «дома» над ней, и там
+    // снятые личные настройки выглядели снятыми. У человека проект лежит под `~`,
+    // и CLI поиском вверх читал `~/.claude/CLAUDE.md` как правила ПРОЕКТА `~` —
+    // при `project,local` (находка A2b). Контроль с полным набором обязателен:
+    // без него «метки дома нет» могло бы значить «поиск вверх до дома не доходит».
+    const homeFull = await runUnderHome('home-full', {});
+    check(Boolean(homeFull.facts), 'под домом: запрос записан на полном наборе');
+    if (homeFull.facts) {
+      check(homeFull.facts.home, 'контроль: под домом ~/.claude/CLAUDE.md доезжает поиском вверх');
+      check(homeFull.facts.mono, 'контроль: CLAUDE.md монорепозитория доезжает');
+    }
+    const homeOff = await runUnderHome('home-settings', { settings: false });
+    check(Boolean(homeOff.facts), 'под домом: запрос записан со снятыми личными настройками');
+    if (homeOff.facts) {
+      check(
+        !homeOff.facts.home,
+        'под домом: ~/.claude/CLAUDE.md снят вместе с личными настройками',
+      );
+      check(!homeOff.facts.rules, 'под домом: CLAUDE.md каталога конфигурации снят');
+      check(
+        homeOff.facts.mono,
+        'под домом: CLAUDE.md монорепозитория остаётся — это правила задачи',
+      );
+      check(homeOff.facts.project, 'под домом: CLAUDE.md проекта остаётся');
     }
   } finally {
     stub.close();

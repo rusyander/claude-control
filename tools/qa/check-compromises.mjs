@@ -299,7 +299,7 @@ const QUESTION_ROWS = [
   { n: 3, says: 'Оборванный поток' },
   { n: 4, says: 'X-RateLimit' },
   { n: 5, says: 'расходует слот RPM' },
-  { n: 6, says: 'enterprise-platform_deanonymized' },
+  { n: 6, says: 'platform_deanonymized' },
   { n: 7, says: 'choices' },
   { n: 8, says: '451' },
   { n: 9, says: 'инструменты платформы включены' },
@@ -307,7 +307,7 @@ const QUESTION_ROWS = [
   { n: 11, says: 'proxy-body-size' },
   { n: 12, says: 'для автотестов' },
   { n: 13, says: 'Окна перезапуска' },
-  { n: 14, says: 'X-EnterprisePlatform-Source' },
+  { n: 14, says: 'X-Platform-Source' },
   { n: 15, says: 'image_generation' },
 ];
 
@@ -356,6 +356,12 @@ const SIGNATURE_PLACES = {
   // ручка изображений» снимает подпись; своей просьбы у неё нет, потому что
   // публиковать платформе нечего, кроме этого ответа.
   'media-by-capability': { question: 15 },
+  // Подпись агента панели, не контура: чужой платформе здесь просить не о чем —
+  // граница проходит между процессами одной машины.
+  'agent-header-forgeable': {
+    outside:
+      'граница доверия между локальными процессами одного пользователя, контур тут ни при чём',
+  },
 };
 
 /** Текст раздела `## <title>` до следующего заголовка того же уровня. */

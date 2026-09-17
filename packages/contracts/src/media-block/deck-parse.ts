@@ -6,7 +6,7 @@ import type {
   DeckSlide,
   DeckSource,
   DeckStat,
-} from '../media-deck.ts';
+} from '../media-deck-model.ts';
 import {
   DECK_MAX_BULLET,
   DECK_MAX_BULLETS,
@@ -24,8 +24,9 @@ import {
   deckAccents,
   deckLayouts,
   deckPresets,
-} from '../media-deck.ts';
+} from '../media-deck-model.ts';
 import { checkPicture } from './picture.ts';
+import { blockLang } from '../brand.ts';
 
 /**
  * Колода из тела блока: ручная проверка вместо схемы — те же правила нужны и на
@@ -34,7 +35,7 @@ import { checkPicture } from './picture.ts';
  */
 
 /** Язык блока с колодой. Он же признак, по которому панель узнаёт предложение. */
-export const DECK_BLOCK_LANG = 'agentdeck:deck';
+export const DECK_BLOCK_LANG = blockLang('deck');
 
 /** Что панель поняла в блоке. */
 export interface DeckParse {

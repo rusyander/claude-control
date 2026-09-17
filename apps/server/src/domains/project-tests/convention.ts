@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { writeTextFile } from '../../lib/safe-io.ts';
 import { TESTS_DIR } from './store.ts';
+import { LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
 
 /**
  * Соглашение о тест-кейсах в `CLAUDE.md` проекта.
@@ -20,6 +21,8 @@ import { TESTS_DIR } from './store.ts';
 
 /** По нему блок опознаётся при повторном нажатии и при чтении состояния. */
 const MARKER = '<!-- agentdeck:tests -->';
+/** Маркер блока, вписанного до переименования продукта: повтор его не продублирует. */
+const LEGACY_MARKER = `<!-- ${LEGACY_BRAND_SLUG}:tests -->`;
 
 const BLOCK = `${MARKER}
 ## Тест-кейсы проекта
@@ -85,7 +88,8 @@ export function hasConvention(root: string): boolean {
   const path = join(root, 'CLAUDE.md');
   if (!existsSync(path)) return false;
   try {
-    return readFileSync(path, 'utf8').includes(MARKER);
+    const text = readFileSync(path, 'utf8');
+    return text.includes(MARKER) || text.includes(LEGACY_MARKER);
   } catch {
     return false;
   }

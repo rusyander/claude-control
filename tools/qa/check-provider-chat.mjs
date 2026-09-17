@@ -125,12 +125,12 @@ await page.route('**/api/provider-chat/chats/qa1/stream', async (route) => {
  */
 let routedPlan = {
   routed: true,
-  title: 'EnterprisePlatform · dev',
+  title: 'Company · dev',
   rules: {
-    model: 'enterprise-platform-mid',
+    model: 'company-mid',
     source: 'default',
     map: {},
-    catalog: ['enterprise-platform-mid', 'enterprise-platform-large'],
+    catalog: ['company-mid', 'company-large'],
   },
   effort: false,
 };
@@ -158,7 +158,7 @@ check(body.includes('gpt-5.3-codex-spark'), 'подобранная панель
 // Т6: через контур выбор разговора — просьба. Подмена названа вслух, вместе с
 // тем, что уедет на самом деле.
 check(
-  body.includes('enterprise-platform-mid') && body.includes('EnterprisePlatform · dev'),
+  body.includes('company-mid') && body.includes('Company · dev'),
   'сказано, чем разговор пойдёт через контур на самом деле',
 );
 check(
@@ -243,7 +243,7 @@ await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
 await page.waitForTimeout(1500);
 const offContour = await page.textContent('body');
-check(!offContour.includes('enterprise-platform-mid'), 'без контура метки модели контура нет вовсе');
+check(!offContour.includes('company-mid'), 'без контура метки модели контура нет вовсе');
 check(
   !offContour.includes('не принимает глубину продумывания'),
   'без контура о глубине шапка ничего не утверждает',

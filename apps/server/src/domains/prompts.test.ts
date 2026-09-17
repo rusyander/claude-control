@@ -23,6 +23,7 @@ import {
 } from './prompts.ts';
 import { builtinPromptSha, builtinPromptText, PROMPT_CATALOG } from './prompts/catalog.ts';
 import { PromptTooLongError } from './prompts/errors.ts';
+import { buildPanelPrompts, panelPromptsFile, planPanelPrompts } from './env-transfer/prompts.ts';
 
 /**
  * Каталог промптов: два слоя и ни одного больше.
@@ -170,6 +171,32 @@ describe('обновление панели', () => {
 
     expect(() => listPrompts(appData)).not.toThrow();
     expect(listPrompts(appData)).toHaveLength(PROMPT_IDS.length);
+  });
+
+  it('отметка чужой формы не поднимает ложную тревогу и не выключает перенос', () => {
+    // Ревью Т4, MINOR-8: записи `index.json` приводились к типу, а не читались.
+    // Числовой `baseSha` давал «встроенный изменился» на нетронутом тексте, а
+    // на другой машине одна такая запись отбрасывала секцию правок ЦЕЛИКОМ.
+    mkdirSync(promptsDir(appData), { recursive: true });
+    writeFileSync(join(promptsDir(appData), 'image.md'), 'мой текст', 'utf8');
+    writeFileSync(join(promptsDir(appData), 'presentation.md'), 'мои слайды', 'utf8');
+    writeFileSync(
+      join(promptsDir(appData), 'index.json'),
+      JSON.stringify({
+        version: 1,
+        entries: {
+          image: { baseSha: 12345, updatedAt: '2026-09-11T10:00:00.000Z' },
+          presentation: 'не запись',
+        },
+      }),
+      'utf8',
+    );
+
+    expect(readPromptRecord(appData, 'image').builtinChanged).toBe(false);
+    const section = panelPromptsFile(buildPanelPrompts(exportPromptOverrides(appData)));
+    const plan = planPanelPrompts({ data: section, current: [] });
+    expect(plan.problem).toBeUndefined();
+    expect(plan.entries.map((entry) => entry.id)).toEqual(['image', 'presentation']);
   });
 
   it('отметка без файла правкой не считается', () => {

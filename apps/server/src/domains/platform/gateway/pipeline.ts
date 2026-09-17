@@ -33,7 +33,9 @@ import {
   nativeRequestBody,
   type NativeFacts,
 } from './anthropic-native.ts';
+import { NativeThinkFilter, withoutThinkMessage } from './native-think.ts';
 import { historyHasToolUse } from './tool-shim/encode.ts';
+import { imagesRequest } from './images.ts';
 import { bridgeUpstreamStatus } from './status.ts';
 import {
   callUpstream,
@@ -79,10 +81,19 @@ const MAX_BODY_BYTES = 32 * 1024 * 1024;
  */
 const MAX_ANSWER_BYTES = 8 * 1024 * 1024;
 
-/** Три маршрута, и это всё. Остальное — честный 404, а не притворство. */
-export const GATEWAY_ROUTES = ['/v1/chat/completions', '/v1/messages', '/v1/models'] as const;
+/**
+ * Четыре маршрута, и это всё. Остальное — честный 404, а не притворство.
+ * Четвёртый, ручка картинок, — с 17.09.2026: до того панель рисовала ею мимо
+ * шлюза, без следа, расхода и перевода отказов (`images.ts`).
+ */
+export const GATEWAY_ROUTES = [
+  '/v1/chat/completions',
+  '/v1/messages',
+  '/v1/models',
+  '/v1/images/generations',
+] as const;
 
-export type GatewayRoute = 'chat' | 'messages' | 'models';
+export type GatewayRoute = 'chat' | 'messages' | 'models' | 'images';
 
 export interface PipelineDeps {
   store: AppStore;
@@ -99,12 +110,13 @@ export interface PipelineDeps {
   now?: () => Date;
 }
 
-/** Какой из трёх маршрутов просят. Хвост `/v1` может отсутствовать у клиента. */
+/** Какой из маршрутов просят. Хвост `/v1` может отсутствовать у клиента. */
 export function resolveRoute(path: string): GatewayRoute | undefined {
   const clean = (path.split('?')[0] ?? path).replace(/\/+$/, '');
   if (clean.endsWith('/chat/completions')) return 'chat';
   if (clean.endsWith('/messages')) return 'messages';
   if (clean.endsWith('/models')) return 'models';
+  if (clean.endsWith('/images/generations')) return 'images';
   return undefined;
 }
 
@@ -197,13 +209,39 @@ export async function handleGatewayRequest(
   }
 
   if (route === 'models') return models(response, deps, platform, token, path, dialect);
+  if (route === 'images') {
+    return imagesRequest(
+      request,
+      {
+        platform,
+        token,
+        path,
+        store: deps.store,
+        appDataDir: deps.appDataDir,
+        ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
+      },
+      {
+        readBody,
+        refuse: (refusal) => refuse(response, deps, refusal),
+        refuseStatus: (upstream, context) =>
+          refuseUpstreamStatus(response, deps, upstream, context),
+        record: (event) => record(deps, event),
+        countUsage: (model, tokens) => countUsage(deps, platform.id, model, tokens),
+        respond: (status, text) => {
+          response.writeHead(status, { 'content-type': 'application/json' });
+          response.end(text);
+        },
+        signal: abortSignalOf(response),
+      },
+    );
+  }
   return chat(request, response, deps, platform, token, path, dialect);
 }
 
 /**
  * Отказ по бюджету (402) записывается, откуда бы ни пришёл.
  *
- * ЧЕЙ это лимит, читается из тела по манифесту драйвера: у enterprise-platform на `/v1`
+ * ЧЕЙ это лимит, читается из тела по манифесту драйвера: у платформы компании на `/v1`
  * это бюджет ключа, у другой платформы тот же код значит лимит над ключом, и
  * без разбора отметка сообщала бы, что кончилось не то, что кончилось.
  *
@@ -391,7 +429,7 @@ async function chat(
   // След потерь — список ИМЁН полей, и ничего кроме. Здесь стояла ещё одна
   // строка, «tools (прослойка уступила инструментам контура)»: с клиентскими
   // инструментами она дублировала `tools` из перевода, без них называла потерю,
-  // которой не было. Уступка видна и так — `shimmed` пуст, а `enterprise-platform_tools` в
+  // которой не было. Уступка видна и так — `shimmed` пуст, а `platform_tools` в
   // теле есть (ревью Т7, m4).
   const lost = translated.lost.map((item) => item.field);
   const allowed = new Set(translated.tools.map((tool) => tool.name));
@@ -407,7 +445,7 @@ async function chat(
     isRecord(clientBody.stream_options) && clientBody.stream_options.include_usage === true;
   const model = typeof ruledBody.model === 'string' ? ruledBody.model : '';
 
-  // Правило, которое платформа не принимает с потоком (у enterprise-platform — `single_turn`),
+  // Правило, которое платформа не принимает с потоком (у платформы компании — `single_turn`),
   // сильнее перевода в поток: иначе каждый такой ход кончался бы отказом. Клиенту
   // поток всё равно собирается — из цельного тела, см. `readSource`.
   const upstreamBody = forceStreamBody(
@@ -431,11 +469,14 @@ async function chat(
   if (dataMaskOn(platform, driver, settings.dlp.enabled)) {
     const guarded = applyRules(bodyText, deps, vault, 'openai-compat');
     if ('refusal' in guarded) {
+      // 400, а не 403: Claude Code читает 403 как ошибку входа и дописывает
+      // «Failed to authenticate.» — человек чинил бы ключ, а остановило запрос
+      // правило данных (решение по контуру №1).
       return refuse(response, deps, {
         platformId: platform.id,
         path,
         dialect,
-        status: 403,
+        status: 400,
         code: 'invalid_request_error',
         message: guarded.refusal,
         lost,
@@ -679,7 +720,7 @@ async function refuseUpstreamStatus(
 /**
  * Ответ модели дошёл, а счёта за него нет (аудит MD-09). Настоящий ответ без
  * токенов не бывает, поэтому ноль здесь значит «платформа не прислала `usage`»,
- * а не «бесплатно»: так у enterprise-platform приходит картинка частью ответа. Молчаливый
+ * а не «бесплатно»: так у платформы компании приходит картинка частью ответа. Молчаливый
  * ноль в расходе ключа читался бы как второе.
  */
 function usageUnreported(status: number, facts: { totalTokens: number }): boolean {
@@ -748,7 +789,8 @@ async function nativeChat(
   let bodyText = JSON.stringify(ruledBody);
   if (dataMaskOn(platform, driver, deps.store.getSettings().dlp.enabled)) {
     const guarded = applyRules(bodyText, deps, vault, dialect);
-    if ('refusal' in guarded) return refusal(403, 'invalid_request_error', guarded.refusal);
+    // Отказ по содержимому — 400, как на мосту: 403 CLI принял бы за ключ.
+    if ('refusal' in guarded) return refusal(400, 'invalid_request_error', guarded.refusal);
     bodyText = guarded.body;
   }
 
@@ -783,11 +825,17 @@ async function nativeChat(
 
   const restore = new ResponseStreamFilter(dialect, vault.reverse());
   const meter = new AnthropicStreamMeter();
+  // L9 и на родной ручке (решение по контуру №8): модель, уже пойманная на голом
+  // `</think>`, держится до тега; остальные — только ответ, начатый с `<think>`.
+  const thinkMode = deps.store.getThinkTailModels(platform.id).includes(model) ? 'tail' : 'lead';
+  const think = new NativeThinkFilter(thinkMode);
+  let thought = { reasoningChars: 0, sawBareClose: false };
   let whole: NativeFacts | undefined;
   let failure: string | undefined;
   try {
     if ((upstream.headers.get('content-type') ?? '').includes('event-stream')) {
-      await streamNative(response, upstream, meter, restore);
+      thought = think;
+      await streamNative(response, upstream, meter, restore, think);
     } else {
       const text = await readCappedAnswer(upstream, () => response.destroyed);
       if (text === undefined) {
@@ -802,7 +850,9 @@ async function nativeChat(
       if (!whole.complete) {
         return refusal(502, 'api_error', 'Платформа ответила не сообщением диалекта Anthropic');
       }
-      respond(response, 200, restoreJsonResponse(payload, dialect, vault.reverse()));
+      const split = withoutThinkMessage(payload, thinkMode);
+      thought = split;
+      respond(response, 200, restoreJsonResponse(split.payload, dialect, vault.reverse()));
     }
   } catch (error) {
     failure = response.destroyed
@@ -810,7 +860,9 @@ async function nativeChat(
       : `Ответ контура оборвался: ${error instanceof Error ? error.message : String(error)}`;
     if (!response.destroyed && !response.writableEnded) {
       if (response.headersSent) {
-        response.end(restore.end() + nativeErrorFrame(`AgentDeck: ${failure}`));
+        response.end(
+          restore.push(think.end()) + restore.end() + nativeErrorFrame(`AgentDeck: ${failure}`),
+        );
       } else {
         respond(response, 502, errorBody(dialect, `AgentDeck: ${failure}`, 'api_error'));
       }
@@ -819,6 +871,7 @@ async function nativeChat(
 
   const facts = whole ?? meter.facts;
   countUsage(deps, platform.id, model, facts);
+  if (thought.sawBareClose) deps.store.markThinkTail(platform.id, model);
   const status = failure
     ? response.destroyed
       ? 499
@@ -834,6 +887,8 @@ async function nativeChat(
     dialect,
     status,
     ...(usageUnreported(status, facts) ? { usageUnreported: true as const } : {}),
+    // Снятое размышление видно в следе той же стадией, что и на мосту.
+    ...(thought.reasoningChars > 0 ? { stages: ['reasoning'] } : {}),
     lost,
     toolCalls: facts.toolCalls,
     totalTokens: facts.totalTokens,
@@ -857,6 +912,7 @@ async function streamNative(
   upstream: Response,
   meter: AnthropicStreamMeter,
   restore: ResponseStreamFilter,
+  think: NativeThinkFilter,
 ): Promise<void> {
   response.writeHead(200, {
     'content-type': 'text/event-stream',
@@ -869,7 +925,7 @@ async function streamNative(
     { stream: upstream },
     async (text) => {
       meter.push(text);
-      await write(response, restore.push(text));
+      await write(response, restore.push(think.push(text)));
     },
     () => response.destroyed,
   );
@@ -880,7 +936,7 @@ async function streamNative(
     complete || upstreamError || response.destroyed
       ? ''
       : nativeErrorFrame(`AgentDeck: ${TRUNCATED_MESSAGE}`);
-  response.end(restore.end() + tail);
+  response.end(restore.push(think.end()) + restore.end() + tail);
 }
 
 /** Цельное тело с потолком собранного ответа; `undefined` — потолок превышен. */

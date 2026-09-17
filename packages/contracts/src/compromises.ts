@@ -62,6 +62,7 @@ export const COMPROMISE_IDS = [
   'rules-partial',
   'media-by-capability',
   'mask-unrestorable',
+  'agent-header-forgeable',
 ] as const;
 
 export type CompromiseId = (typeof COMPROMISE_IDS)[number];
@@ -225,6 +226,15 @@ const REGISTRY: Record<CompromiseId, Omit<CompromiseEntry, 'id'>> = {
     codeAnchors: ['apps/server/src/domains/platform/gateway/frames.ts'],
     // Остановка называется в самом вызове — сообщением чата и строкой следа
     // запроса; постоянного места на экране у неё нет.
+    uiHidden: true,
+  },
+  // Подписано 17.09.2026, при А1 агента панели: «агент не подтверждает сам себя»
+  // держится на заголовках, а заголовки подделает любой процесс того же
+  // пользователя. Граница доверия панели — пользователь машины, не процесс.
+  'agent-header-forgeable': {
+    severity: 'risk',
+    since: '2026-09-17',
+    codeAnchors: ['apps/server/src/routes/panel-agent/panel-agent-routes.ts'],
     uiHidden: true,
   },
 };

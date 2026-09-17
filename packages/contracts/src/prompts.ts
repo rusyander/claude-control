@@ -97,10 +97,6 @@ export interface PromptRecord {
   updatedAt?: string;
 }
 
-export const promptSaveSchema = object({
-  text: string().max(PROMPT_MAX_BYTES, 'промпт длиннее 64 КБ'),
-});
-
 /** Строка каталога в ответе списка — без текстов, чтобы список был дешёвым. */
 export interface PromptSummary {
   id: PromptId;

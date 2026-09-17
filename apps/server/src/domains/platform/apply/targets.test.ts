@@ -18,8 +18,8 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
  */
 
 const PLATFORM: Platform = {
-  id: 'enterprise-platform-dev',
-  title: 'EnterprisePlatform · dev',
+  id: 'company-dev',
+  title: 'Company · dev',
   driver: 'enterprise-platform',
   baseUrl: 'https://api.dev.example.ru',
   enabled: true,
@@ -95,7 +95,7 @@ describe('цели с переменными окружения', () => {
     const claude = byId('claude');
     expect(claude.filePath).toBe(PATHS.claudeSettings);
     // Диалект anthropic: адрес идёт КОРНЕМ, версию CLI дописывает сам.
-    expect(planValue(claude, 'ANTHROPIC_BASE_URL')).toBe('http://127.0.0.1:5179/enterprise-platform-dev');
+    expect(planValue(claude, 'ANTHROPIC_BASE_URL')).toBe('http://127.0.0.1:5179/company-dev');
     expect(planValue(claude, 'ANTHROPIC_MODEL')).toBe('gpt-4o');
     expect(planValue(claude, 'ANTHROPIC_AUTH_TOKEN')).toBe(PLACEHOLDER_KEY);
     expect(claude.plan.find((item) => item.key === 'ANTHROPIC_AUTH_TOKEN')?.placeholder).toBe(true);
@@ -103,14 +103,14 @@ describe('цели с переменными окружения', () => {
 
   it('qwen понимает оба диалекта — берётся родной для контура', () => {
     const qwen = byId('qwen');
-    expect(planValue(qwen, 'OPENAI_BASE_URL')).toBe('http://127.0.0.1:5179/enterprise-platform-dev/v1');
+    expect(planValue(qwen, 'OPENAI_BASE_URL')).toBe('http://127.0.0.1:5179/company-dev/v1');
     // Перевод в конвейере шлюза не понадобится вовсе: контур говорит на этом же.
     expect(planValue(qwen, 'ANTHROPIC_BASE_URL')).toBeUndefined();
   });
 
   it('aider: свои имена с префиксом, файл его собственный', () => {
     const aider = byId('aider');
-    expect(planValue(aider, 'AIDER_OPENAI_API_BASE')).toBe('http://127.0.0.1:5179/enterprise-platform-dev/v1');
+    expect(planValue(aider, 'AIDER_OPENAI_API_BASE')).toBe('http://127.0.0.1:5179/company-dev/v1');
     expect(aider.filePath).toContain('.aider.conf.yml');
   });
 
@@ -134,7 +134,7 @@ describe('цели с куском конфигурации', () => {
     const name = contourEntryName(PLATFORM.id);
     expect(codex.filePath).toContain('config.toml');
     expect(planValue(codex, `model_providers.${name}.base_url`)).toBe(
-      'http://127.0.0.1:5179/enterprise-platform-dev/v1',
+      'http://127.0.0.1:5179/company-dev/v1',
     );
     expect(planValue(codex, `model_providers.${name}.wire_api`)).toBe('chat');
     // Провайдер, которого никто не выбрал, — мёртвая запись.
@@ -148,7 +148,7 @@ describe('цели с куском конфигурации', () => {
     const cont = byId('continue');
     const name = contourEntryName(PLATFORM.id);
     expect(cont.filePath).toContain('config.yaml');
-    expect(planValue(cont, `models[${name}].apiBase`)).toBe('http://127.0.0.1:5179/enterprise-platform-dev/v1');
+    expect(planValue(cont, `models[${name}].apiBase`)).toBe('http://127.0.0.1:5179/company-dev/v1');
     expect(planValue(cont, `models[${name}].provider`)).toBe('openai');
     expect(planValue(cont, `models[${name}].model`)).toBe('gpt-4o');
     expect(planValue(cont, `models[${name}].apiKey`)).toBe(PLACEHOLDER_KEY);

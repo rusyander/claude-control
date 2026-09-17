@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { DIALOG, FADE, DURATION, EASE, withReducedMotion } from '@shared/lib/motion';
 import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMotion';
 import { Stack } from '@shared/ui/stack';
-import { Typography } from '@shared/ui/typography';
+import { CodeText, Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import styles from './modal.module.scss';
@@ -103,7 +103,7 @@ export function Modal({
                   {description && (
                     <Description asChild>
                       <Typography variant="body-sm" color="muted">
-                        {description}
+                        <CodeText text={description} />
                       </Typography>
                     </Description>
                   )}

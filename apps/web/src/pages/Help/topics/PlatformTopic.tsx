@@ -4,6 +4,7 @@ import { HelpSection, OptionCards, Callout, FieldTable } from '../ui';
 import { PlatformGuideSections } from './PlatformGuideSections';
 import { PlatformSetupSections } from './PlatformSetupSections';
 import { PlatformLimitsSections } from './PlatformLimitsSections';
+import { PlatformTabsSections } from './PlatformTabsSections';
 
 /**
  * Документ «Контур» — один на весь раздел, и намеренно длинный.
@@ -46,6 +47,8 @@ export function PlatformTopic() {
       </HelpSection>
 
       <PlatformSetupSections tr={tr} guide={<PlatformGuideSections tr={tr} />} />
+
+      <PlatformTabsSections tr={tr} />
 
       <HelpSection title={tr('screenTitle')} caption={tr('screenCaption')}>
         <FieldTable

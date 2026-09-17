@@ -52,7 +52,7 @@ import { startStubPlatform } from './stub-platform.mjs';
 const PANEL_PORT = Number(process.env.SHIM_PANEL_PORT ?? 5193);
 const GATEWAY_PORT = Number(process.env.SHIM_GATEWAY_PORT ?? 5194);
 const PANEL = `http://127.0.0.1:${PANEL_PORT}`;
-const CONTOUR = 'shim-enterprise-platform';
+const CONTOUR = 'shim-company';
 const MODEL = 'stub-tool-shim';
 
 /** Заглушки вместо ключей: собраны из кусков, чтобы в репозитории не лежало присваивание, похожее на секрет. */

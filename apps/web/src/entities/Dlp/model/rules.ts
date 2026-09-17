@@ -1,8 +1,4 @@
-import {
-  dlpBuiltinPatterns,
-  type DlpBuiltinPattern,
-  type DlpRule,
-} from '@agentdeck/contracts';
+import { dlpBuiltinPatterns, type DlpBuiltinPattern, type DlpRule } from '@agentdeck/contracts';
 
 /**
  * Работа со списком правил на стороне панели: заготовки, замена, удаление.

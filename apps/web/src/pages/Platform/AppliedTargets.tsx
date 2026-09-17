@@ -9,7 +9,7 @@ import {
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
-import { sortApplyTargets, toolRouteMark } from '@entities/Platform';
+import { applyTargetTitle, sortApplyTargets, toolRouteMark } from '@entities/Platform';
 import styles from './PlatformPage.module.scss';
 
 /**
@@ -65,7 +65,7 @@ export function AppliedTargets({
             >
               <span aria-hidden="true">{glyphOf(target, toolRoute)}</span>
               <Typography variant="caption" as="span">
-                {target.title}
+                {applyTargetTitle(target, t)}
               </Typography>
               {mark && <CompromiseMark id={mark} />}
               <span className={styles.srOnly}>{stateWord(target, toolRoute, t)}</span>

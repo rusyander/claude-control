@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFileSync, existsSync } from 'node:fs';
 import type { RunningAgent, ToolUsage } from '@agentdeck/contracts';
+import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -102,13 +103,14 @@ export const getRunningAgents = createProcessScanCache(scanRunningAgents);
  * всех системах. Нативная сборка (`claude.exe`) при этом тоже существует,
  * так что проверяем оба вида.
  *
- * Процессы самой панели отсеиваются: её каталог называется agentdeck, и
+ * Процессы самой панели отсеиваются по имени её каталога — нынешнему или
+ * прежнему (репозиторий мог быть клонирован под прежним именем), и
  * без этой проверки панель показывала бы в списке агентов саму себя.
  */
 export function isClaudeAgentCommand(commandLine: string): boolean {
   const value = commandLine.toLowerCase();
   if (!value.trim()) return false;
-  if (value.includes('agentdeck')) return false;
+  if (value.includes(BRAND_SLUG) || value.includes(LEGACY_BRAND_SLUG)) return false;
 
   // Пакет CLI — самый надёжный признак: он есть в пути к cli.js.
   if (value.includes('claude-code')) return true;

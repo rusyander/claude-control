@@ -181,9 +181,13 @@ export const chatEn: typeof chatRu = {
     imageRouteText:
       'The server picks the route once and names it under the menu item: the conversation agent, ' +
       'the contour as part of an ordinary answer, the contour’s own images endpoint, or your ' +
-      'endpoint profile. Through a contour the request goes via the panel gateway — so it is in ' +
-      'the journal and counts toward the key’s spend like every other request; the agent road ' +
-      'costs no key at all.',
+      'endpoint profile. Both contour roads — part of the answer and its own images endpoint — go ' +
+      'through the panel gateway: the request is in the journal, passes data protection, a ' +
+      'contour refusal arrives as a readable reason, and it counts toward the key’s spend when the ' +
+      'contour sent usage. The gateway never retries a paid image: a temporary contour refusal ' +
+      'comes back as a refusal, not as a second charge. The endpoint profile is your own address, ' +
+      'not the corporate key, so it goes directly, bypassing the gateway: its requests are in ' +
+      'neither the journal nor the key’s spend. The agent road costs no key at all.',
     imageCard: 'The result is a card, and a file',
     imageCardText:
       'An image the panel drew opens in the right column: the description, who drew it, the size ' +
@@ -209,7 +213,7 @@ export const chatEn: typeof chatRu = {
     imageLimitText:
       'Drawing takes minutes — you can leave the page, but a second request waits for the first. ' +
       'One image is capped at 8 MB, above that the panel refuses it; a presentation holds at most ' +
-      'forty slides, and a drawing in code at most half a megabyte of text. The last hundred images ' +
+      'forty slides, and a drawing in code at most half a million characters. The last hundred images ' +
       'and the last hundred presentations stay on disk and the oldest are swept with all their ' +
       'files; there is no gallery and no history here, so download what you need right away.',
 

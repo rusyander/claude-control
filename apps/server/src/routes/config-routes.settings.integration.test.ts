@@ -167,8 +167,8 @@ describe('config-routes: валидация настроек и импорта',
    */
   describe('контуры через общий PATCH настроек', () => {
     const platform = {
-      id: 'enterprise-platform-dev',
-      title: 'EnterprisePlatform · dev',
+      id: 'company-dev',
+      title: 'Company · dev',
       driver: 'enterprise-platform',
       baseUrl: 'https://api.dev.example.ru',
       enabled: true,
@@ -185,18 +185,18 @@ describe('config-routes: валидация настроек и импорта',
 
     it('удалённый через настройки контур не оставляет ни ключа, ни следа пробы', async () => {
       await patch({ platforms: [platform] });
-      setStoredKey(join(root, 'agentdeck'), 'platform:enterprise-platform-dev', 'sk-СЕКРЕТ-4f21');
-      store.savePlatformHealth('enterprise-platform-dev', { outcome: 'ok' } as never);
+      setStoredKey(join(root, 'agentdeck'), 'platform:company-dev', 'sk-СЕКРЕТ-4f21');
+      store.savePlatformHealth('company-dev', { outcome: 'ok' } as never);
 
       const res = await patch({ platforms: [] });
 
       expect(res.statusCode).toBe(200);
-      expect(getStoredKey(join(root, 'agentdeck'), 'platform:enterprise-platform-dev')).toBeUndefined();
-      expect(store.getPlatformHealth()['enterprise-platform-dev']).toBeUndefined();
+      expect(getStoredKey(join(root, 'agentdeck'), 'platform:company-dev')).toBeUndefined();
+      expect(store.getPlatformHealth()['company-dev']).toBeUndefined();
     });
 
     it('идентификатор с пробелом отклонён и здесь: адрес шлюза собирается из него', async () => {
-      const res = await patch({ platforms: [{ ...platform, id: 'enterprise-platform dev' }] });
+      const res = await patch({ platforms: [{ ...platform, id: 'company dev' }] });
 
       expect(res.statusCode).toBe(400);
       expect((await getSettings()).platforms).toEqual([]);
@@ -217,20 +217,20 @@ describe('config-routes: валидация настроек и импорта',
      * ассистент панели молча ходит на мёртвый адрес.
      */
     const managed = {
-      id: 'contour-enterprise-platform-dev',
-      name: 'Контур · EnterprisePlatform · dev',
-      baseUrl: 'http://127.0.0.1:5179/enterprise-platform-dev/v1',
+      id: 'contour-company-dev',
+      name: 'Контур · Company · dev',
+      baseUrl: 'http://127.0.0.1:5179/company-dev/v1',
       apiKind: 'openai-compat',
       model: 'gpt-4o',
       writeToken: false,
-      ownerPlatformId: 'enterprise-platform-dev',
+      ownerPlatformId: 'company-dev',
     };
 
     it('контур убрали — управляемый профиль ушёл, ассистент вернулся в облако', async () => {
       await patch({ platforms: [platform] });
       store.updateSettings({
         endpointProfiles: [managed as never],
-        assistantEndpointId: 'contour-enterprise-platform-dev',
+        assistantEndpointId: 'contour-company-dev',
       });
 
       await patch({ platforms: [] });
@@ -246,7 +246,7 @@ describe('config-routes: валидация настроек и импорта',
       await patch({ platformGateway: { enabled: true, port: 5200, forceStream: true } });
 
       expect((await getSettings()).endpointProfiles[0]?.baseUrl).toBe(
-        'http://127.0.0.1:5200/enterprise-platform-dev/v1',
+        'http://127.0.0.1:5200/company-dev/v1',
       );
     });
 

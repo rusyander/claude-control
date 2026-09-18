@@ -51,16 +51,28 @@ export interface SaveIntegrationPayload {
   settings: Record<string, unknown>;
   /** Не задан — прежний токен остаётся; пустая строка — забыть его. */
   token?: string;
+  /**
+   * Второй ключ Atlassian — личный токен Confluence. То же правило: не задан —
+   * прежний остаётся. У остальных коннекторов поля нет, и сервер его не читает.
+   */
+  confluenceToken?: string;
 }
 
 export function useSaveIntegration() {
-  return useIntegrationMutation(async ({ id, settings, token }: SaveIntegrationPayload) => {
-    const { data } = await apiClient.put<IntegrationStatus>(
-      `/integrations/${encodeURIComponent(id)}`,
-      token === undefined ? { settings } : { settings, token },
-    );
-    return data;
-  }, 'toasts.saved');
+  return useIntegrationMutation(
+    async ({ id, settings, token, confluenceToken }: SaveIntegrationPayload) => {
+      const { data } = await apiClient.put<IntegrationStatus>(
+        `/integrations/${encodeURIComponent(id)}`,
+        {
+          settings,
+          ...(token === undefined ? {} : { token }),
+          ...(confluenceToken === undefined ? {} : { confluenceToken }),
+        },
+      );
+      return data;
+    },
+    'toasts.saved',
+  );
 }
 
 /** Живая проверка связи. Тоста об успехе нет: результат виден в самой карточке. */

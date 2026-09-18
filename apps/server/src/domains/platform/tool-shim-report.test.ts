@@ -33,6 +33,33 @@ const event = (patch: Partial<PlatformGatewayEvent>): PlatformGatewayEvent => ({
 });
 
 describe('сводка прослойки инструментов', () => {
+  it('выброшенные инструменты считаются отдельно и не попадают в знаменатель прослойки', () => {
+    // Прослойка выключена, полем контур `tools` не принимает: агент просил руки
+    // и остался без них. Снаружи это неотличимо от «инструментов никто не
+    // звал», а чинится переключателем — значит, число обязано быть своим.
+    const report = toolShimReport([
+      event({ shimmed: [], lost: ['tools'] }),
+      event({ shimmed: [], lost: ['tools', 'top_k'] }),
+      // Обычный чат без инструментов: ни в прослойку, ни в выброшенные.
+      event({ shimmed: [], lost: [] }),
+      event({ toolCalls: 1 }),
+    ]);
+
+    expect(report.dropped).toBe(2);
+    expect(report.requests).toBe(1);
+    expect(report.turns).toBe(1);
+    expect(report.calls).toBe(1);
+  });
+
+  it('при работающей прослойке кадр «инструменты выброшены» выброшенным не считается', () => {
+    // Полем `tools` наверх не уезжало ничего — схемы уехали текстом. Записать
+    // такой запрос в выброшенные значило бы соврать о работающем агенте.
+    const report = toolShimReport([event({ shimmed: ['tools'], lost: ['tools'], toolCalls: 1 })]);
+
+    expect(report.dropped).toBe(0);
+    expect(report.requests).toBe(1);
+  });
+
   it('считает ходы и вызовы порознь: ход вправе нести несколько', () => {
     const report = toolShimReport([
       event({ toolCalls: 2 }),

@@ -7,7 +7,7 @@ import { Badge } from '@shared/ui/badge';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
 import { formatDate } from '@shared/lib/format';
 import { serverFieldText } from '@shared/config/i18n';
-import { shimEmptyKind } from './lib/toolShimView';
+import { shimDropped, shimEmptyKind } from './lib/toolShimView';
 
 interface ToolShimCardProps {
   /** Сводки может не быть и она может прийти неполной — карточка это переживает. */
@@ -30,6 +30,7 @@ interface ToolShimCardProps {
 export function ToolShimCard({ report }: ToolShimCardProps) {
   const { t, i18n } = useTranslation();
   const empty = shimEmptyKind(report);
+  const dropped = shimDropped(report);
 
   return (
     <Card padding="md">
@@ -63,6 +64,15 @@ export function ToolShimCard({ report }: ToolShimCardProps) {
               {t('platform.toolShimCalls', { calls: report.calls, requests: report.requests })}
             </Typography>
           </Stack>
+        )}
+
+        {/* Руки отобраны на входе: прослойка выключена, а полем контур список
+            не принимает. Снаружи неотличимо от «модель ленится», поэтому строка
+            называет и число, и переключатель — чинится он, а не панель. */}
+        {dropped > 0 && (
+          <Typography variant="body-sm" color="warning">
+            {t('platform.toolShimDropped', { count: dropped })}
+          </Typography>
         )}
 
         {/* Самая тихая беда раздела: ход выглядит удачным, а руками не сделано

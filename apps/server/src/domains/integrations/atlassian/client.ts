@@ -15,6 +15,13 @@ import { failedResponse, parseJson, sendRequest, type OutboundResponse } from '.
  *   Jira на `/rest/api/2`, Confluence на `/rest/api/content` без префикса.
  *
  * Всё остальное — те же ручки и те же поля, поэтому клиент один, а не два.
+ *
+ * ТОКЕНОВ при этом бывает ДВА. На своей установке Jira и Confluence — разные
+ * приложения, и personal access token каждое выдаёт своё: ключ Jira Confluence
+ * отклоняет с 401 на полностью рабочем доступе. Выбор ключа сделан здесь, в
+ * одном месте на все запросы (`authHeaders` по имени системы), а не на каждой
+ * ручке Confluence: пропущенная ручка вернула бы ровно тот же 401, ради
+ * которого всё и затевалось.
  */
 
 export interface AtlassianAccess {
@@ -24,7 +31,12 @@ export interface AtlassianAccess {
   deployment: AtlassianDeployment;
   /** Адрес Confluence, если он живёт не на хосте Jira. */
   confluenceUrl: string;
+  /** Личный токен Confluence; пусто = у сайта один ключ, работает `token`. */
+  confluenceToken: string;
 }
+
+/** Как `system` называет Confluence во всех его запросах — и в выборе ключа. */
+export const CONFLUENCE_SYSTEM = 'Confluence';
 
 /** Адрес без хвостового слэша: иначе пути склеиваются с двойным. */
 export function trimUrl(url: string): string {
@@ -36,12 +48,14 @@ export function trimUrl(url: string): string {
  * установка почты не знает вовсе и ждёт Bearer. Ошибиться диалектом = получить
  * 401 на верном токене, поэтому решает только `deployment`.
  */
-export function authHeaders(access: AtlassianAccess): Record<string, string> {
+export function authHeaders(access: AtlassianAccess, system?: string): Record<string, string> {
+  const token =
+    system === CONFLUENCE_SYSTEM && access.confluenceToken ? access.confluenceToken : access.token;
   if (access.deployment === 'cloud') {
-    const basic = Buffer.from(`${access.email}:${access.token}`, 'utf8').toString('base64');
+    const basic = Buffer.from(`${access.email}:${token}`, 'utf8').toString('base64');
     return { Authorization: `Basic ${basic}` };
   }
-  return { Authorization: `Bearer ${access.token}` };
+  return { Authorization: `Bearer ${token}` };
 }
 
 /** Корень Jira REST для этого диалекта. */
@@ -83,7 +97,7 @@ export async function raw(
     method: request.method ?? 'GET',
     system: request.system,
     headers: {
-      ...authHeaders(access),
+      ...authHeaders(access, request.system),
       Accept: 'application/json',
       ...(request.body === undefined ? {} : { 'Content-Type': 'application/json' }),
     },
@@ -156,7 +170,11 @@ function accountName(me: MyselfResponse): string {
  * он там не записан — считаем облаком при заданной почте и своей установкой без
  * неё: это ровно та подсказка, которую человек уже дал, заполняя форму.
  */
-export function toAccess(settings: AtlassianSettings, token: string): AtlassianAccess {
+export function toAccess(
+  settings: AtlassianSettings,
+  token: string,
+  confluenceToken = '',
+): AtlassianAccess {
   const baseUrl = trimUrl(settings.baseUrl);
   if (!baseUrl)
     throw invalidField('baseUrl', 'не указан адрес Atlassian', 'request-atlassian-url-missing', {
@@ -168,5 +186,6 @@ export function toAccess(settings: AtlassianSettings, token: string): AtlassianA
     token,
     deployment: settings.deployment || (settings.email.trim() ? 'cloud' : 'server'),
     confluenceUrl: settings.confluenceUrl.trim(),
+    confluenceToken: confluenceToken.trim(),
   };
 }

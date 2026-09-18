@@ -87,7 +87,7 @@ describe('detectClaudeLocation', () => {
   });
 
   describe('построение путей', () => {
-    it('все пути строятся от корня, а .claude.json лежит рядом с каталогом', () => {
+    it('все пути строятся от корня, а .claude.json — внутри заданного каталога', () => {
       const loc = detectClaudeLocation(dir);
       const root = loc.paths.root;
       expect(loc.paths.settings).toBe(join(root, 'settings.json'));
@@ -97,8 +97,11 @@ describe('detectClaudeLocation', () => {
       expect(loc.paths.skills).toBe(join(root, 'skills'));
       expect(loc.paths.hooks).toBe(join(root, 'hooks'));
       expect(loc.paths.appData).toBe(join(root, 'agentdeck'));
-      // Регистрация MCP-серверов — НЕ внутри .claude, а рядом.
-      expect(loc.paths.mcpConfig).toBe(join(dirname(root), '.claude.json'));
+      // Каталог задан руками — значит он каталог конфигурации целиком, и
+      // регистрация MCP-серверов берётся оттуда же: CLI с заданным каталогом
+      // соседний `.claude.json` не читает вовсе (см. `resolveMcpConfig`).
+      expect(loc.paths.mcpConfig).toBe(join(root, '.claude.json'));
+      expect(loc.paths.mcpConfig).not.toBe(join(dirname(root), '.claude.json'));
     });
   });
 
@@ -117,14 +120,15 @@ describe('detectClaudeLocation', () => {
     });
 
     it('когда все ожидаемые файлы на месте, missing пуст', () => {
-      // root вложен в dir, чтобы контролировать соседний .claude.json.
       const root = join(dir, '.claude');
       mkdirSync(root);
       writeFileSync(join(root, 'settings.json'), '{}');
       writeFileSync(join(root, 'CLAUDE.md'), '# правила');
       mkdirSync(join(root, 'skills'));
       mkdirSync(join(root, 'hooks'));
-      writeFileSync(join(dir, '.claude.json'), '{}'); // сосед каталога .claude
+      // Каталог указан руками — `.claude.json` ждём внутри него, а не рядом:
+      // соседний файл при заданном каталоге не читает и сам CLI.
+      writeFileSync(join(root, '.claude.json'), '{}');
       const loc = detectClaudeLocation(root);
       expect(loc.isValid).toBe(true);
       expect(loc.missing).toEqual([]);

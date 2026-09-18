@@ -160,6 +160,19 @@ export const PANEL_TEXTS_RU: PanelTextsRu = {
   'value-happens-probe': 'проба и пробный запрос через шлюз панели',
   'value-file-shape':
     '{{path}} перепишется целиком в формате панели (отступ 2 пробела): часть строк диффа меняет только отступы, не значения',
+  'note-rule-group-off':
+    'Правило остаётся выключенным: его гасит группа, одиночный переключатель её не пересилит.',
+  'note-skill-folder-delete': 'Папка {{dir}} удаляется целиком (копия — в истории).',
+  'note-skill-folder-files': 'Вместе с ней файлы: {{files}}',
+  'note-permission-mark-only':
+    'Право выключено и в файле отсутствует: снимается только отметка панели.',
+  'note-mcp-oauth-delete': 'Сохранённый вход OAuth этого сервера тоже удаляется.',
+  'note-mcp-rename': 'Переименование: отметки и вход OAuth переезжают с «{{from}}» на «{{to}}».',
+  'note-hook-group-off': 'Хук остаётся выключенным: его гасит группа.',
+  'note-hook-local-file': 'Хук из settings.local.json панель не переключает: файл не изменится.',
+  'note-copy-in-history': 'Копия файла остаётся в истории.',
+  'note-entity-group-off': 'Остаётся выключенным: его гасит группа.',
+  'note-folder-move': 'Папка {{from}} переносится в {{to}}.',
   'journal-list-groups': 'Список групп',
   'journal-save-group': 'Сохранение группы',
   'summary-group-create': 'Создать группу «{{name}}» (включится сразу)',

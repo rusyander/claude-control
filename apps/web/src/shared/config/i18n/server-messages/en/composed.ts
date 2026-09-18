@@ -21,6 +21,14 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'integration-check-telegram-ok': 'The bot {{account}} is reachable.',
   'integration-check-tms-ok': '{{detail}} — the connection works.',
   'integration-check-atlassian-ok': 'Logged in as {{account}} ({{deployment}}).',
+  'integration-check-atlassian-confluence-ok':
+    'Logged in as {{account}} ({{deployment}}). Confluence is reachable.',
+  'integration-check-atlassian-confluence-rejected':
+    'Logged in as {{account}} ({{deployment}}). Confluence rejected the token — fill in the separate Confluence key.',
+  'integration-check-atlassian-confluence-failed':
+    'Logged in as {{account}} ({{deployment}}). Confluence answered {{status}} — check the Confluence address.',
+  'integration-check-atlassian-confluence-unreachable':
+    'Logged in as {{account}} ({{deployment}}). Confluence is unreachable: {{reason}}.',
   'integration-deployment-cloud': 'cloud',
   'integration-deployment-own': 'own installation',
   'integration-tms-project': '{{system}}, project {{project}}',
@@ -116,4 +124,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Windows refused to create the copy at {{target}}: the path is longer than 260 characters.\nThe panel already asks git for long paths and shortens the directory name, but the depth of the\nrepository itself is not its choice. Turn long paths on in the system — Local Group Policy Editor\n→ Computer Configuration → Administrative Templates → System → Filesystem → “Enable Win32 long\npaths”, or in the registry\nHKLM\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\FileSystem\\\\LongPathsEnabled = 1 — and repeat.\nQuick workaround: move the repository closer to the drive root.\n\ngit answered: {{error}}',
   'git-failed-no-output': 'The git command failed',
   'worktree-install-started': 'Installation started: {{command}}',
+  'split-triage-interrupted-hold':
+    'The triage was cut short by a panel restart and will never give a result. Start the group as proposed? Your answer rides into its task.',
+  'split-triage-interrupted-notice':
+    'The triage was cut short by a panel restart — there will be no result. Groups waiting for your answer: {{groups}}; they will not start by themselves.',
 };

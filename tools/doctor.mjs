@@ -73,10 +73,18 @@ if (existsSync(configDir)) {
 }
 
 // === Файлы конфигурации ===
+// `.claude.json` лежит ВНУТРИ каталога, когда тот задан переменной, и рядом с
+// ним, когда каталог домашний: правило CLI, проверенное живьём (см. комментарий
+// в `apps/server/src/lib/claude-paths.ts`). Проверять не тот файл — значит
+// говорить «отсутствует» про существующий и наоборот.
+const claudeJson = process.env.CLAUDE_CONFIG_DIR
+  ? join(configDir, '.claude.json')
+  : join(dirname(configDir), '.claude.json');
+
 for (const [name, path] of [
   ['settings.json', join(configDir, 'settings.json')],
   ['CLAUDE.md', join(configDir, 'CLAUDE.md')],
-  ['.claude.json', join(dirname(configDir), '.claude.json')],
+  ['.claude.json', claudeJson],
 ]) {
   if (existsSync(path)) ok(`${name} на месте`);
   else warn(`${name} отсутствует`, `Появится сам, когда вы что-нибудь настроите. Путь: ${path}`);

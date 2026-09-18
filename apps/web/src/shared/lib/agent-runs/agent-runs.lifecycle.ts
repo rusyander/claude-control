@@ -51,8 +51,10 @@ function finalStatus(run: AgentRun): RunStatus {
  * лента показывает её до следующего прогона, иначе человек узнал бы об исходе
  * разбора только из тоста на пять секунд.
  */
-function outcomeNotice(run: AgentRun): string | undefined {
-  return run.detached ? undefined : run.notice;
+function outcomeNotice(run: AgentRun): Pick<AgentRun, 'notice' | 'noticeCode' | 'noticeParams'> {
+  return run.detached
+    ? { notice: undefined, noticeCode: undefined, noticeParams: undefined }
+    : { notice: run.notice, noticeCode: run.noticeCode, noticeParams: run.noticeParams };
 }
 
 export function finalize(id: string): void {
@@ -88,7 +90,7 @@ export function finalize(id: string): void {
           parked: undefined,
           // Подхваченный без потока закончился — строка про подхват больше не нужна.
           detached: undefined,
-          notice: outcomeNotice(run),
+          ...outcomeNotice(run),
         }
       : {
           ...run,
@@ -101,7 +103,7 @@ export function finalize(id: string): void {
           sentFromQueue: undefined,
           parked: undefined,
           detached: undefined,
-          notice: outcomeNotice(run),
+          ...outcomeNotice(run),
         };
   runs.set(id, finalized);
   // Сервер ещё минуту будет называть этот прогон в `/chat/active` — помечаем,
@@ -405,6 +407,8 @@ export function startRun(input: StartInput): Promise<SendOutcome> {
     // Усыновлённым был прошлый прогон — этот запущен нами, с трубой.
     detached: undefined,
     notice: undefined,
+    noticeCode: undefined,
+    noticeParams: undefined,
     // Запоминаем запрос, права, модель и глубину — для кнопки «Повторить».
     lastPrompt: input.prompt,
     // Старт по часам сервера придёт с событием session.

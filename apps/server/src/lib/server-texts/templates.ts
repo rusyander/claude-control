@@ -847,6 +847,22 @@ export const serverTextTemplates = {
     ru: 'Вошли как {{account}} ({{deployment}}).',
     en: 'Logged in as {{account}} ({{deployment}}).',
   },
+  'integration-check-atlassian-confluence-ok': {
+    ru: 'Вошли как {{account}} ({{deployment}}). Confluence на связи.',
+    en: 'Logged in as {{account}} ({{deployment}}). Confluence is reachable.',
+  },
+  'integration-check-atlassian-confluence-rejected': {
+    ru: 'Вошли как {{account}} ({{deployment}}). Confluence отклонил токен — заполните отдельный ключ Confluence.',
+    en: 'Logged in as {{account}} ({{deployment}}). Confluence rejected the token — fill in the separate Confluence key.',
+  },
+  'integration-check-atlassian-confluence-failed': {
+    ru: 'Вошли как {{account}} ({{deployment}}). Confluence ответил {{status}} — проверьте адрес Confluence.',
+    en: 'Logged in as {{account}} ({{deployment}}). Confluence answered {{status}} — check the Confluence address.',
+  },
+  'integration-check-atlassian-confluence-unreachable': {
+    ru: 'Вошли как {{account}} ({{deployment}}). Confluence недоступен: {{reason}}.',
+    en: 'Logged in as {{account}} ({{deployment}}). Confluence is unreachable: {{reason}}.',
+  },
   'integration-deployment-cloud': { ru: 'облако', en: 'cloud' },
   'integration-deployment-own': { ru: 'своя установка', en: 'own installation' },
   'integration-tms-project': {
@@ -1083,5 +1099,13 @@ export const serverTextTemplates = {
   'worktree-install-started': {
     ru: 'Установка запущена: {{command}}',
     en: 'Installation started: {{command}}',
+  },
+  'split-triage-interrupted-hold': {
+    ru: 'Разбор оборвался при перезапуске панели и итога не даст. Запустить группу как предложено? Ответ уедет в её задачу.',
+    en: 'The triage was cut short by a panel restart and will never give a result. Start the group as proposed? Your answer rides into its task.',
+  },
+  'split-triage-interrupted-notice': {
+    ru: 'Разбор оборвался перезапуском панели — итога не будет. Групп ждёт вашего ответа: {{groups}}; сами они не стартуют.',
+    en: 'The triage was cut short by a panel restart — there will be no result. Groups waiting for your answer: {{groups}}; they will not start by themselves.',
   },
 } as const satisfies Record<string, { ru: string; en: string }>;

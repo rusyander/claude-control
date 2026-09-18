@@ -121,7 +121,7 @@ async function filePreview(
       ...changed
         .filter((file) => file.reformatted)
         .map((file) => textField('label-file-shape', 'value-file-shape', { path: file.path })),
-      ...preview.notes.map((note) => dataField('label-besides-file', note)),
+      ...preview.notes.map((note) => textField('label-besides-file', note.code, note.params)),
     ],
     ...(changed.length > 0
       ? {

@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync } from '
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import type { EnvVarDraft, HookDraft } from '@agentdeck/contracts';
+import type { PanelPreviewNote } from '@agentdeck/contracts/panel-agent';
 import type { AppStore } from '../../lib/app-store.ts';
 import { readJsonFile, removeEntry } from '../../lib/safe-io.ts';
 import { isLocalId, stripLocalPrefix } from '../../lib/settings-source.ts';
@@ -67,7 +68,7 @@ export const EXTRA_PREVIEW_KINDS = ['hook', 'env', 'instructions', 'script', 'en
 
 export interface ExtraPreview {
   files: ConfigPreviewFile[];
-  notes: string[];
+  notes: PanelPreviewNote[];
   fingerprint: string;
 }
 
@@ -199,19 +200,19 @@ function previewHook(
 
   // Локальный хук панель не выключает (см. `applyEntityState`): карточка обязана
   // сказать это до клика, а не показать пустой дифф.
-  const notes: string[] = [];
+  const notes: PanelPreviewNote[] = [];
   const files = onCopies(paths, ['settings', 'settingsLocal'], (sandbox) => {
     const deps = { paths: sandbox, store: state };
     state.setEnabled('hook', id, request.isEnabled, found?.legacyId);
     const effective = !state.isDisabled('hook', id, found?.legacyId);
     if (effective !== request.isEnabled) {
-      notes.push('Хук остаётся выключенным: его гасит группа.');
+      notes.push({ code: 'note-hook-group-off' });
     }
     applyEntityState(deps, 'hook', id, effective);
     rewriteHooks(deps);
   });
   if (files.length === 0 && found?.source === 'settings-local') {
-    notes.push('Хук из settings.local.json панель не переключает: файл не изменится.');
+    notes.push({ code: 'note-hook-local-file' });
   }
   return { files, notes };
 }
@@ -223,10 +224,9 @@ function previewInstructions(
 ): Omit<ExtraPreview, 'fingerprint'> {
   const target = resolveInstructionsTarget(state, paths.claudeMd);
   if (!target) {
-    throw failure(
-      400,
-      'section_unsupported',
-      'Активный CLI не поддерживает глобальные инструкции.',
+    throw coded(
+      failure(400, 'section_unsupported', 'Активный CLI не поддерживает глобальные инструкции.'),
+      'instructions-section-unsupported',
     );
   }
   const root = mkdtempSync(join(tmpdir(), 'agentdeck-preview-'));
@@ -272,7 +272,7 @@ function previewScript(
     const after = readText(copy);
     return {
       files: before === after && existed ? [] : [fileDiff(real, before, after, existed)],
-      notes: request.action === 'delete' ? ['Копия файла остаётся в истории.'] : [],
+      notes: request.action === 'delete' ? [{ code: 'note-copy-in-history' as const }] : [],
     };
   } finally {
     removeEntry(root);
@@ -290,7 +290,8 @@ function previewEntityToggle(
   if (entity === 'mcp') assertMcpServerExists(paths.mcpConfig, id);
   state.setEnabled(entity, id, isEnabled);
   const effective = !state.isDisabled(entity, id);
-  const notes = effective === isEnabled ? [] : ['Остаётся выключенным: его гасит группа.'];
+  const notes: PanelPreviewNote[] =
+    effective === isEnabled ? [] : [{ code: 'note-entity-group-off' }];
 
   if (entity === 'skill') {
     // Скилл включается переносом папки — файлы не меняются, меняется место.
@@ -306,7 +307,9 @@ function previewEntityToggle(
     }
     return {
       files: [],
-      notes: existsSync(from) ? [...notes, `Папка ${from} переносится в ${to}.`] : notes,
+      notes: existsSync(from)
+        ? [...notes, { code: 'note-folder-move' as const, params: { from, to } }]
+        : notes,
     };
   }
 

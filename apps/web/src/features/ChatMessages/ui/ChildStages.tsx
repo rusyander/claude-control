@@ -8,6 +8,7 @@ import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { StatusDot } from '@shared/ui/status-dot';
 import { formatDuration } from '@shared/lib/format-duration';
+import { serverFieldText } from '@shared/config/i18n';
 import { triageChipState } from '../lib/triageChipState';
 import { SplitOverlapPanel } from './SplitOverlapPanel';
 import type { ChildStageGroup, ChildStagesProps } from './ChildStages.types';
@@ -129,7 +130,7 @@ export function ChildStages({
               <GroupText group={group} />
               {group.pending === 'held' && group.hold && onAnswerHold && (
                 <HoldAnswer
-                  question={group.hold.question}
+                  question={serverFieldText(group.hold, 'question')}
                   busy={holdBusy}
                   onSend={(answer) => onAnswerHold(group.hold?.index ?? 0, answer)}
                 />

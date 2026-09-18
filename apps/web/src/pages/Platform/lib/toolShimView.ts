@@ -13,8 +13,13 @@ import type { PlatformToolRoute, PlatformToolShimReport } from '@agentdeck/contr
  * прослойке панель не знает ничего. `quiet` — такие запросы шли, но ни одного
  * вызова не собралось и ни одной заявки не нашлось. Слить их в «вызовов нет»
  * значило бы выдать незнание за факт.
+ *
+ * `dropped` — третье состояние, и оно не пустое: запросы с инструментами шли, но
+ * прослойка была ВЫКЛЮЧЕНА, и полем контур их не принял. Сказать здесь `idle`
+ * («панель не знает ничего») — соврать ровно там, где панель знает всё: она сама
+ * и выбросила список, и знает переключатель, который это чинит.
  */
-export type ToolShimEmptyKind = 'idle' | 'quiet' | 'none';
+export type ToolShimEmptyKind = 'idle' | 'quiet' | 'dropped' | 'none';
 
 /**
  * Сводка приходит без проверки схемы (обычное приведение типа в `getGateway`),
@@ -33,9 +38,18 @@ function isReport(report: PlatformToolShimReport | undefined): report is Platfor
   );
 }
 
+/**
+ * Счётчик выброшенных: сервер прежней версии его не шлёт, и `undefined > 0`
+ * прочиталось бы как ноль — то самое незнание под видом факта, от которого
+ * заведена проверка формы выше.
+ */
+export function shimDropped(report: PlatformToolShimReport | undefined): number {
+  return typeof report?.dropped === 'number' ? report.dropped : 0;
+}
+
 export function shimEmptyKind(report: PlatformToolShimReport | undefined): ToolShimEmptyKind {
   if (!isReport(report)) return 'none';
-  if (report.requests === 0) return 'idle';
+  if (report.requests === 0) return shimDropped(report) > 0 ? 'dropped' : 'idle';
   if (report.calls > 0 || report.claimed > 0 || report.flaws.length > 0) return 'none';
   return 'quiet';
 }
@@ -50,7 +64,12 @@ export function showsToolShim(
   gatewayRunning: boolean,
   report: PlatformToolShimReport | undefined,
 ): boolean {
-  return hasShimPlatform && gatewayRunning && isReport(report);
+  // Выброшенные инструменты показываются и БЕЗ единого контура с прослойкой:
+  // это ровно тот случай, ради которого карточка нужна больше всего — руки у
+  // агента отобраны, а условие «есть контур с прослойкой» здесь ложно по
+  // определению, потому что прослойка и выключена.
+  if (!gatewayRunning || !isReport(report)) return false;
+  return hasShimPlatform || shimDropped(report) > 0;
 }
 
 /**

@@ -82,6 +82,16 @@ export interface PanelActionPreview {
  * держит); коды — то, что окно переводит своим словарём. Значение без кода —
  * данные (путь, адрес, промпт) и показывается как есть.
  */
+/**
+ * Заметка карточки «Кроме файла». Домен называет КОД, русский текст собирает
+ * маршрут: иначе домену пришлось бы тянуть словарь окна, а английская панель
+ * читала бы русскую строку в поле с уже переведённой подписью.
+ */
+export interface PanelPreviewNote {
+  code: PanelTextCode;
+  params?: PanelTextParams;
+}
+
 export interface PanelActionPreviewField {
   label: string;
   value: string;
@@ -218,6 +228,20 @@ export const panelTextParams = {
   'value-happens-rollback': ['previous'],
   'value-happens-probe': [],
   'value-file-shape': ['path'],
+  // Заметки карточки «Кроме файла»: значение пишет сама панель, поэтому оно
+  // едет кодом, а не русской строкой из домена (английское окно иначе читало
+  // бы русский текст в поле, подпись которого уже переведена).
+  'note-rule-group-off': [],
+  'note-skill-folder-delete': ['dir'],
+  'note-skill-folder-files': ['files'],
+  'note-permission-mark-only': [],
+  'note-mcp-oauth-delete': [],
+  'note-mcp-rename': ['from', 'to'],
+  'note-hook-group-off': [],
+  'note-hook-local-file': [],
+  'note-copy-in-history': [],
+  'note-entity-group-off': [],
+  'note-folder-move': ['from', 'to'],
   'journal-list-groups': [],
   'journal-save-group': [],
   'summary-group-create': ['name'],

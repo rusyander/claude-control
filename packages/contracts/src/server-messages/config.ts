@@ -206,4 +206,5 @@ export const configMessageParams = {
   'mcp-server-not-in-config': ['name'],
   'endpoint-probe-not-json': [],
   'endpoint-probe-status': ['detail', 'status'],
+  'instructions-section-unsupported': [],
 } as const satisfies Record<string, readonly string[]>;

@@ -143,7 +143,8 @@ export const overviewEn: typeof overviewRu = {
 
     storageReads: 'What it reads',
     storageReadsValue:
-      'CLAUDE.md, settings.json, settings.local.json, ~/.claude.json, skills/, hooks/',
+      'CLAUDE.md, settings.json, settings.local.json, .claude.json (beside ~/.claude, or ' +
+      'inside a directory that was set explicitly), skills/, hooks/',
     storageOwn: 'The panel’s own files',
     storageOwnValue:
       'agentdeck/state.json (groups, health checks), agentdeck/backups/. Before the rename the folder carried the former product name: the first start copies it here and leaves the old one as a backup',

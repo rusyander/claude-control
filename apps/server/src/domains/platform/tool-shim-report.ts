@@ -28,13 +28,23 @@ export function toolShimReport(
   let turns = 0;
   let calls = 0;
   let claimed = 0;
+  let dropped = 0;
   let since: string | undefined;
 
   for (const event of events) {
     if (options.platformIds && !options.platformIds.includes(event.platformId)) continue;
     // Прослойка работала ровно там, где клиент объявил инструменты. Остальные
     // запросы в знаменателе только мешают: обычный чат инструментов и не звал.
-    if (event.shimmed.length === 0) continue;
+    //
+    // Но «инструменты выброшены» — не «инструментов не было»: там агент просил
+    // руки и остался без них, потому что прослойка выключена, а полем контур
+    // `tools` не принимает. Считаем это отдельно и НЕ в знаменателе прослойки:
+    // она в таком запросе не работала, а человек иначе видит пустую сводку и
+    // ищет поломку в панели вместо переключателя.
+    if (event.shimmed.length === 0) {
+      if (event.lost.includes('tools')) dropped += 1;
+      continue;
+    }
 
     requests += 1;
     if (!since || (event.at && event.at < since)) since = event.at || since;
@@ -49,6 +59,7 @@ export function toolShimReport(
     turns,
     calls,
     claimed,
+    dropped,
     flaws: [...flaws.entries()]
       // Причина пришла из следа строкой: код к ней восстанавливается разбором,
       // иначе английский интерфейс показал бы русскую фразу шлюза.

@@ -934,7 +934,12 @@ export const platformEn: typeof platformRu = {
       'The panel runs nothing whose name and arguments it could not parse: a ' +
       'wrong parse must not hand the agent the right to do something the model never asked ' +
       'for. If you do not need the shim, switch it off on the contour: the CLI keeps working ' +
-      'as an agent through its own usual key, and the contour does not stand in the way.',
+      'as an agent through its own usual key, and the contour does not stand in the way. Runs ' +
+      'that go THROUGH a contour which does not accept a tools field are left without hands ' +
+      'after that: the list is dropped at the entrance, the model never sees it and has ' +
+      'nothing to call. The “Tools through the contour” card counts such requests on a line of ' +
+      'their own and names the switch — from the outside this is indistinguishable from a lazy ' +
+      'model, and without that line people go fixing the panel.',
 
     shimTitle: 'Tools through the contour: how it works and what it costs',
     shimCaption:

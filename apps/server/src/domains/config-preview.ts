@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import type { PermissionDraft, RuleDraft, SkillDraft } from '@agentdeck/contracts';
+import type { PanelPreviewNote } from '@agentdeck/contracts/panel-agent';
 import type { AppStore } from '../lib/app-store.ts';
 import { removeEntry } from '../lib/safe-io.ts';
 import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
@@ -63,7 +64,7 @@ export type { ConfigPreviewFile } from './config-preview/sandbox-diff.ts';
 export interface ConfigPreviewResponse {
   files: ConfigPreviewFile[];
   /** Что меняется помимо файлов (отметки панели, вход OAuth) — по-русски, для карточки. */
-  notes: string[];
+  notes: PanelPreviewNote[];
   /**
    * Хеш исходного состояния (байты целевых файлов, отметки) вместе с заметками.
    * Действие агента сверяет его перед записью одобренной карточки.
@@ -165,12 +166,7 @@ function previewRule(
       effective,
     ),
   );
-  const notes =
-    effective === request.isEnabled
-      ? []
-      : [
-          'Правило остаётся выключенным: его гасит группа, одиночный переключатель её не пересилит.',
-        ];
+  const notes = effective === request.isEnabled ? [] : [{ code: 'note-rule-group-off' as const }];
   return { files: [file], notes };
 }
 
@@ -202,8 +198,10 @@ function previewSkill(
     return {
       files: [fileDiff(skillFile, readText(skillFile), '', existsSync(skillFile))],
       notes: [
-        `Папка ${dir} удаляется целиком (копия — в истории).`,
-        ...(others.length > 0 ? [`Вместе с ней файлы: ${others.join(', ')}`] : []),
+        { code: 'note-skill-folder-delete', params: { dir } },
+        ...(others.length > 0
+          ? [{ code: 'note-skill-folder-files' as const, params: { files: others.join(', ') } }]
+          : []),
       ],
     };
   }
@@ -267,7 +265,7 @@ function previewPermission(
     }
     return {
       files: [],
-      notes: ['Право выключено и в файле отсутствует: снимается только отметка панели.'],
+      notes: [{ code: 'note-permission-mark-only' }],
     };
   }
   return {
@@ -283,7 +281,7 @@ function previewMcp(
   if (request.action === 'delete') {
     const file = onCopy(paths.mcpConfig, (copy) => deleteMcpServer(copy, request.id, undefined));
     const notes = hasOAuthTokens(paths.appData, request.id)
-      ? ['Сохранённый вход OAuth этого сервера тоже удаляется.']
+      ? [{ code: 'note-mcp-oauth-delete' as const }]
       : [];
     return { files: [file], notes };
   }
@@ -295,7 +293,12 @@ function previewMcp(
   );
   const notes =
     request.id !== undefined && request.id !== draft.name
-      ? [`Переименование: отметки и вход OAuth переезжают с «${request.id}» на «${draft.name}».`]
+      ? [
+          {
+            code: 'note-mcp-rename' as const,
+            params: { from: request.id, to: draft.name },
+          },
+        ]
       : [];
   return { files: [file], notes };
 }

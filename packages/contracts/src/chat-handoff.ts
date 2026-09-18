@@ -2,6 +2,7 @@
 // разошлись бы на первой правке. Импорт ТОЛЬКО типа: сервер работает без
 // сборки и значения из соседнего сабпата тянуть сюда незачем.
 import type { TaskSplitReviewDecision } from './task-split';
+import type { CodedFields } from './server-messages';
 import { blockLang, blockLangPattern } from './brand.ts';
 
 /**
@@ -589,7 +590,13 @@ export interface SplitPlanView {
   overlap?: SplitOverlapView;
   /** Порядок старта и слияния — индексы групп. */
   order: number[];
-  groups: {
+  /**
+   * Код вопроса (`holdCode`) — если его писал не агент, а ПАНЕЛЬ: разбор
+   * оборвало перезапуском. Вопрос агента — свободный текст на языке разговора,
+   * шаблоном он не читается и кода не получает: панель его не сочиняла и
+   * переводить ей нечего.
+   */
+  groups: (CodedFields<'hold'> & {
     index: number;
     title: string;
     branch: string;
@@ -604,7 +611,7 @@ export interface SplitPlanView {
     /** От какой ветки отведена копия. */
     base?: string;
     error?: string;
-  }[];
+  })[];
 }
 
 export interface ChatTreeView {

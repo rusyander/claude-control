@@ -183,6 +183,31 @@ describe('collectChildStages', () => {
     ).toBe(false);
   });
 
+  it('код вопроса едет в строку хаба — панель покажет свою фразу на языке интерфейса', () => {
+    const rows = collectChildStages([], 'parent', [], {
+      parentChatId: 'parent',
+      order: [0],
+      groups: [
+        {
+          index: 0,
+          title: 'Шапка',
+          branch: 'feature/header',
+          after: [],
+          status: 'held',
+          hold: 'Разбор оборвался при перезапуске панели и итога не даст.',
+          holdCode: 'split-triage-interrupted-hold',
+        },
+      ],
+    });
+
+    // Код переезжает под именем поля, в котором вопрос лежит в строке: его же
+    // ищет общий переводчик серверных текстов.
+    expect(rows[0]?.hold).toMatchObject({
+      index: 0,
+      questionCode: 'split-triage-interrupted-hold',
+    });
+  });
+
   it('уровни (Т1): разбор первой строкой, группы без чата — по порядку разбора, с тем, чего ждут', () => {
     const chats = [
       chat({ id: 'triage', parentId: 'parent', stage: 'triage', groupTitle: 'Разбор разделения' }),

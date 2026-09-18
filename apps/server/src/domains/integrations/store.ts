@@ -52,6 +52,33 @@ export function tokenId(id: IntegrationId): string {
   return `int:${id}`;
 }
 
+/**
+ * ВТОРОЙ ключ Atlassian — личный токен Confluence.
+ *
+ * На своей установке (Server/DC) Jira и Confluence выдают personal access token
+ * каждая отдельно: ключ Jira второй системой отклоняется с 401 на полностью
+ * рабочем доступе, и снаружи это выглядит как «Confluence не подключён», хотя
+ * подключено всё. У облака токен один на сайт, поэтому ключ НЕОБЯЗАТЕЛЕН: при
+ * пустом значении работает основной, и настройки, собранные до появления этого
+ * поля, ведут себя ровно как прежде.
+ */
+export const CONFLUENCE_TOKEN_ID = 'int:atlassian-confluence';
+
+/** Отдельный токен Confluence; пусто = его нет и в ход идёт основной. */
+export function readConfluenceToken(appDataDir: string): string | undefined {
+  return getStoredKey(appDataDir, CONFLUENCE_TOKEN_ID);
+}
+
+/** Сохранить второй ключ; пустая строка стирает его — как и у основного. */
+export function writeConfluenceToken(appDataDir: string, token: string): void {
+  if (token.length > MAX_KEY_LENGTH) {
+    throw invalidField('confluenceToken', 'токен длиннее допустимого', 'request-token-too-long', {
+      field: 'confluenceToken',
+    });
+  }
+  setStoredKey(appDataDir, CONFLUENCE_TOKEN_ID, token);
+}
+
 export function isIntegrationId(value: string): value is IntegrationId {
   return (INTEGRATION_IDS as readonly string[]).includes(value);
 }
@@ -115,6 +142,9 @@ export function describeIntegration(
   const settings = readIntegrations(store)[id];
   const token = readToken(appDataDir, id) ?? '';
   const health = readHealth(store, id);
+  // Второй ключ есть только у Atlassian: у остальных карточек поля нет вовсе, и
+  // признак «ключа нет» на них читался бы как «ключ забыли ввести».
+  const confluence = id === 'atlassian' ? (readConfluenceToken(appDataDir) ?? '') : '';
 
   return {
     id,
@@ -126,6 +156,12 @@ export function describeIntegration(
     checkedAt: health?.checkedAt,
     account: health?.account,
     deployment: health?.deployment,
+    ...(id === 'atlassian'
+      ? {
+          hasConfluenceToken: Boolean(confluence),
+          maskedConfluenceToken: confluence ? maskKey(confluence) : '',
+        }
+      : {}),
   };
 }
 
@@ -145,6 +181,9 @@ export function forgetIntegration(
   id: IntegrationId,
 ): IntegrationStatus {
   forgetToken(appDataDir, id);
+  // «Забыть» относится ко всему доступу карточки: оставленный второй ключ
+  // Confluence был бы секретом без единого следа в панели.
+  if (id === 'atlassian') clearStoredKey(appDataDir, CONFLUENCE_TOKEN_ID);
   store.forgetIntegrationHealth(tokenId(id));
   const settings = readIntegrations(store)[id];
   writeSettings(store, id, { ...settings, enabled: false });

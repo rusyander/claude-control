@@ -139,7 +139,8 @@ export const overviewRu = {
 
     storageReads: 'Что читает',
     storageReadsValue:
-      'CLAUDE.md, settings.json, settings.local.json, ~/.claude.json, skills/, hooks/',
+      'CLAUDE.md, settings.json, settings.local.json, .claude.json (рядом с ~/.claude, ' +
+      'а у заданного каталога — внутри него), skills/, hooks/',
     storageOwn: 'Свои файлы панели',
     storageOwnValue:
       'agentdeck/state.json (группы, проверки связи), agentdeck/backups/. До переименования каталог назывался прежним именем продукта: первый запуск копирует его сюда, прежний остаётся резервной копией',

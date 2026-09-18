@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlatformToolShimReport } from '@agentdeck/contracts';
-import { shimEmptyKind, showsToolShim, showsToolsFact } from './toolShimView';
+import { shimDropped, shimEmptyKind, showsToolShim, showsToolsFact } from './toolShimView';
 
 describe('showsToolsFact', () => {
   it('раздел, где все контуры получают инструменты полем, факта о тексте не показывает', () => {
@@ -27,11 +27,36 @@ const report = (patch: Partial<PlatformToolShimReport> = {}): PlatformToolShimRe
   turns: 0,
   calls: 0,
   claimed: 0,
+  dropped: 0,
   flaws: [],
   ...patch,
 });
 
 describe('пустота карточки прослойки', () => {
+  it('инструменты выброшены — это не «панель ничего не знает»', () => {
+    // Запросы с инструментами шли, но прослойка выключена: `idle` здесь врал бы
+    // ровно там, где панель сама выбросила список и знает, чем это чинится.
+    expect(shimEmptyKind(report({ dropped: 2 }))).toBe('dropped');
+  });
+
+  it('сервер прежней версии без счётчика не превращается в ноль-факт', () => {
+    // `undefined > 0` прочиталось бы как «выброшенных нет» — то же незнание под
+    // видом факта, от которого заведена проверка формы сводки.
+    const old = report();
+    delete (old as Partial<PlatformToolShimReport>).dropped;
+    expect(shimDropped(old)).toBe(0);
+    expect(shimEmptyKind(old)).toBe('idle');
+  });
+
+  it('карточка показывается ради выброшенных даже без контура с прослойкой', () => {
+    // Условие «есть контур с прослойкой» в этом случае ложно по определению:
+    // прослойка и выключена. Молчать здесь значило бы спрятать единственный
+    // экран, объясняющий безрукого агента.
+    expect(showsToolShim(false, true, report({ dropped: 1 }))).toBe(true);
+    expect(showsToolShim(false, true, report())).toBe(false);
+    expect(showsToolShim(false, false, report({ dropped: 1 }))).toBe(false);
+  });
+
   it('запросов с инструментами не было — это незнание, а не тишина', () => {
     expect(shimEmptyKind(report())).toBe('idle');
   });

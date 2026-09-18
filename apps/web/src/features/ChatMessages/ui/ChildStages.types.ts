@@ -1,5 +1,6 @@
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
+import type { CodedFields } from '@agentdeck/contracts/server-messages';
 
 /**
  * Группа разделения глазами родителя: где она сейчас и чем ведётся.
@@ -43,8 +44,12 @@ export interface ChildStageGroup {
   groupIndex?: number;
   /** Названия групп, чьи цепочки должны кончиться раньше этой. */
   waitsFor?: string[];
-  /** Вопрос разбора человеку — группа стоит, пока он не ответит. */
-  hold?: { index: number; question: string };
+  /**
+   * Вопрос разбора человеку — группа стоит, пока он не ответит. Код есть,
+   * только когда вопрос писала панель: свой текст она переводит, текст агента
+   * показывает как есть.
+   */
+  hold?: CodedFields<'question'> & { index: number; question: string };
   /** Ответ уже дан — группа стартует сама, как только кончатся предшественники. */
   holdAnswered?: boolean;
   /** От какой ветки отведена копия — когда это не ветка проекта по умолчанию. */

@@ -11,6 +11,7 @@ import type { ChatEvent } from './ChatRunner.ts';
 import type { RunFinished } from './ChatRunRegistry.ts';
 import type { SplitGroupContext } from './ChatSplit.ts';
 import { coded } from '../../lib/server-text.ts';
+import { matchText, serverText } from '../../lib/server-texts.ts';
 
 /**
  * Конвейер уровней разделения (Т1): разбор ПЕРЕД копиями, порции запуска
@@ -116,6 +117,29 @@ function absorb(record: SplitPlanRecord, result: TaskSplitResult, at: string): v
     group.error = failure.message;
     group.doneAt = at;
   }
+}
+
+/**
+ * Код вопроса, стоящего перед группой, — чтобы панель показала его на языке
+ * интерфейса, а не по-русски.
+ *
+ * Читается ИЗ ГОТОВОЙ СТРОКИ, а не хранится рядом с ней, по двум причинам.
+ * Вопрос обычно пишет агент — свободный текст, шаблоном он не читается и кода
+ * не получает, и поле рядом с ним стояло бы пустым у всех записей, кроме одной.
+ * А та одна, панельная, лежит на диске с прежних запусков: запись пережила
+ * перезапуск, который её и породил, и поле, заведённое сегодня, ей взяться
+ * неоткуда. Разбор же узнаёт её и там.
+ *
+ * Русская строка едет рядом и остаётся запасной: чужому CLI родительская лента
+ * умеет только строку, да и клиент постарше кода не знает.
+ */
+function holdCode(text: string): Pick<SplitPlanView['groups'][number], 'holdCode' | 'holdParams'> {
+  const matched = matchText(text);
+  if (!matched) return {};
+  return {
+    holdCode: matched.messageCode,
+    ...(matched.params ? { holdParams: matched.params } : {}),
+  };
 }
 
 export class SplitConveyor {
@@ -309,10 +333,7 @@ export class SplitConveyor {
         // Трогаем только нерешённые: всё остальное разбор и не держал.
         if (group.status !== 'pending') continue;
         group.status = 'held';
-        // TODO код: вопрос ждёт ключа словаря (`split.triageInterrupted`).
-        group.hold =
-          'Разбор оборвался при перезапуске панели и итога не даст. ' +
-          'Запустить группу как предложено? Ответ уедет в её задачу.';
+        group.hold = serverText('split-triage-interrupted-hold');
         frozen += 1;
       }
       record.triage = { at, received: false, interrupted: true, repairs: [], conflicts: [] };
@@ -323,10 +344,9 @@ export class SplitConveyor {
         event: {
           kind: 'notice',
           code: 'triageMissing',
-          // TODO код: строка ждёт ключа словаря (`split.triageInterruptedNotice`).
-          text:
-            `Разбор оборвался перезапуском панели — итога не будет. ` +
-            `Групп ждёт вашего ответа: ${frozen}; сами они не стартуют.`,
+          text: serverText('split-triage-interrupted-notice', { groups: frozen }),
+          textCode: 'split-triage-interrupted-notice',
+          textParams: { groups: frozen },
         },
       });
     }
@@ -446,7 +466,7 @@ export class SplitConveyor {
         branch: group.branch,
         after: group.after,
         status: group.status,
-        ...(group.hold ? { hold: group.hold } : {}),
+        ...(group.hold ? { hold: group.hold, ...holdCode(group.hold) } : {}),
         ...(group.holdAnswer ? { holdAnswer: group.holdAnswer } : {}),
         ...(group.chatId ? { chatId: group.chatId } : {}),
         ...(group.path ? { path: group.path } : {}),

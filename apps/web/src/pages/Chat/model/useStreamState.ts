@@ -20,6 +20,8 @@ export function useStreamState(run: AgentRun, isRunning: boolean): StreamState {
       parked: run.parked,
       detached: run.detached,
       notice: run.notice,
+      noticeCode: run.noticeCode,
+      noticeParams: run.noticeParams,
       error: run.error,
       sessionId: run.sessionId,
       costUsd: run.costUsd,

@@ -144,4 +144,42 @@ describe('усыновлённый прогон — без пузыря, с ка
 
     agentRuns.clear('new-6');
   });
+
+  it('код заметки доезжает и переживает конец хода — без него лента вернулась бы к русской строке', async () => {
+    const closed = (frames: string[]): Response => {
+      const body = new ReadableStream<Uint8Array>({
+        start(ctrl) {
+          const encoder = new TextEncoder();
+          for (const frame of frames)
+            ctrl.enqueue(
+              encoder.encode(`${frame}
+
+`),
+            );
+          ctrl.close();
+        },
+      });
+      return { ok: true, status: 200, body } as unknown as Response;
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        closed([
+          'data: {"kind":"notice","code":"triageMissing","text":"Разбор оборвался перезапуском панели.","textCode":"split-triage-interrupted-notice","textParams":{"groups":3}}',
+          'data: {"kind":"done"}',
+        ]),
+      ),
+    );
+
+    void agentRuns.start({ chatId: 'new-8', prompt: 'разбор' });
+    await settle();
+
+    // Код живёт ровно там же, где строка: `finalize` оставляет итог хода в
+    // ленте, и уехать он должен вместе с ней, а не раньше.
+    const run = getRun('new-8');
+    expect(run.noticeCode).toBe('split-triage-interrupted-notice');
+    expect(run.noticeParams).toEqual({ groups: 3 });
+
+    agentRuns.clear('new-8');
+  });
 });

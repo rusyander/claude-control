@@ -122,6 +122,8 @@ export function applyEvent(id: string, event: ChatEvent): void {
       // вместе с `done` — прогон закроется как обычный.
       if (event.code === 'adopted') next.detached = true;
       next.notice = event.text;
+      next.noticeCode = event.textCode;
+      next.noticeParams = event.textParams;
       break;
   }
   runs.set(id, next);

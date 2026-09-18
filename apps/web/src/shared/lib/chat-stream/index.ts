@@ -21,6 +21,11 @@ export interface StreamedTool {
   usage?: MessageUsage;
 }
 
+import type {
+  ServerMessageCode,
+  ServerMessageNestedParams,
+} from '@agentdeck/contracts/server-messages';
+
 export interface StreamState {
   /** Текст ответа, который набирается на глазах. */
   text: string;
@@ -55,6 +60,9 @@ export interface StreamState {
   detached?: boolean;
   /** Заметка панели про подхват — запасной текст, если код незнаком словарю. */
   notice?: string;
+  /** Код заметки: по нему лента читает её на языке интерфейса. */
+  noticeCode?: ServerMessageCode;
+  noticeParams?: ServerMessageNestedParams;
   error?: string;
   sessionId?: string;
   costUsd?: number;

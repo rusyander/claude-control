@@ -48,8 +48,8 @@
     "why": "agent prompt / text the model reads"
   },
   "domains/chat/split-conveyor.ts": {
-    "n": 15,
-    "why": "composed list explanation / git output assembly; +4 await codes (TODO): hold question and parent notice of a triage interrupted by a panel restart"
+    "n": 11,
+    "why": "composed list explanation / git output assembly"
   },
   "domains/chat/split-overlap.ts": {
     "n": 9,
@@ -62,14 +62,6 @@
   "domains/commands/claude.ts": {
     "n": 4,
     "why": "agent prompt / text the model reads"
-  },
-  "domains/config-preview.ts": {
-    "n": 6,
-    "why": "dry-run notes shown as a free-text field value of the panel-agent approval card (needs a value code in PanelActionPreview.fields first)"
-  },
-  "domains/config-preview/extra.ts": {
-    "n": 6,
-    "why": "dry-run notes shown as a free-text field value of the panel-agent approval card (needs a value code in PanelActionPreview.fields first)"
   },
   "domains/dlp/default-rules.ts": {
     "n": 32,
@@ -656,7 +648,7 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 316,
+    "n": 322,
     "why": "generated RU side of the server text table (gen.mjs from L-gen/manifest): every line here IS a code, this is the one file where a Russian literal is the data"
   },
   "providers/catalog/opencode.ts": {
@@ -724,7 +716,7 @@
     "why": "agent prompt / text the model reads"
   },
   "routes/panel-agent/texts.ts": {
-    "n": 237,
-    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the client"
+    "n": 248,
+    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window; +11 note codes of the preview card"
   }
 }

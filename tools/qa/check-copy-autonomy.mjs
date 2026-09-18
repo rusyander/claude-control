@@ -334,7 +334,11 @@ const home = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-qa-home-')));
 const configDir = join(home, '.claude');
 mkdirSync(configDir, { recursive: true });
 writeFileSync(join(configDir, 'settings.json'), '{}\n');
-const claudeJson = join(home, '.claude.json');
+// Каталог конфигурации задан переменной (см. запуск панели и настоящего CLI
+// ниже) — значит `.claude.json` лежит ВНУТРИ него: так его ищет сам CLI, и с
+// 18.09.2026 так же ищет панель. Пока запись клали рядом, настоящий CLI её не
+// видел вовсе, и «доверие досталось копии» доказывалось только панелью.
+const claudeJson = join(configDir, '.claude.json');
 const repo = makeRepo();
 const copies = join(dirname(repo), `${basename(repo)}-worktrees`);
 const stubBin = makeStubCli();

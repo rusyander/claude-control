@@ -252,4 +252,5 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'mcp-server-not-in-config': 'MCP-сервера «{{name}}» нет в конфигурации.',
   'endpoint-probe-not-json': 'Ответ не является JSON — по адресу отвечает не модельный API.',
   'endpoint-probe-status': 'Адрес ответил {{status}}{{detail}}',
+  'instructions-section-unsupported': 'Активный CLI не поддерживает глобальные инструкции.',
 };

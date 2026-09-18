@@ -5,7 +5,7 @@ import { readRun } from '../project-tests/runs-store.ts';
 import { runToMarkdown } from '../project-tests/export-run.ts';
 import { IntegrationError, invalidField } from './errors.ts';
 import { linkForCwd } from './links.ts';
-import { readIntegrations, requireConnected } from './store.ts';
+import { readConfluenceToken, readIntegrations, requireConnected } from './store.ts';
 import { toAccess } from './atlassian/client.ts';
 import { commentIssue } from './atlassian/jira.ts';
 import { createPage, readPage } from './atlassian/confluence.ts';
@@ -80,7 +80,13 @@ export async function publishRun(
   }
 
   const token = requireConnected(deps.store, deps.appDataDir, 'atlassian', 'Atlassian');
-  const access = toAccess(readIntegrations(deps.store).atlassian, token);
+  // Второй ключ — для публикации в Confluence: на своей установке он свой (см.
+  // `atlassian/client.ts`), и без него отчёт уезжал бы в 401 на рабочей Jira.
+  const access = toAccess(
+    readIntegrations(deps.store).atlassian,
+    token,
+    readConfluenceToken(deps.appDataDir) ?? '',
+  );
   // Ошибки в файлах групп молчаливо пропускаем: заголовки кейсов — украшение
   // отчёта, а сорванный из-за битой группы отчёт по успешному прогону — нет.
   const markdown = runToMarkdown(

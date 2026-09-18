@@ -166,6 +166,16 @@ export interface IntegrationStatus extends CodedFields<'detail'> {
   account?: string;
   /** Что ответил Atlassian на вопрос о себе: облако или своя установка. */
   deployment?: AtlassianDeployment;
+  /**
+   * Сохранён ли ОТДЕЛЬНЫЙ токен Confluence — только у Atlassian.
+   *
+   * На своей установке (Server/DC) Jira и Confluence выдают личные токены
+   * каждая своя: один ключ второй системой отклоняется с 401 на совершенно
+   * рабочем доступе. У облака токен один на весь сайт, и поле остаётся пустым.
+   */
+  hasConfluenceToken?: boolean;
+  /** `abc…4f21` второго ключа: узнать свой, не увидев его. */
+  maskedConfluenceToken?: string;
 }
 
 export interface JiraProject {

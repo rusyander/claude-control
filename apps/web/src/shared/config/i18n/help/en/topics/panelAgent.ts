@@ -162,7 +162,10 @@ export const panelAgentEn: typeof panelAgentRu = {
     cardChangeText:
       'Heading «The agent asks for confirmation», a human description of the action, its input ' +
       'fields and, when a file is edited, a «What will change» block with the diff. Focus is on ' +
-      '«Run».',
+      '«Run». On a line of its own, «Besides the file» names the consequences the diff does not ' +
+      'show: a panel mark being removed, an OAuth login being deleted, marks moving on a rename, ' +
+      'a group that holds the switch off anyway. The panel writes those lines itself, so they ' +
+      'are translated along with the interface instead of staying Russian in an English window.',
     cardDanger: 'Dangerous',
     cardDangerText:
       'Heading «Dangerous action — check carefully». Focus is on «Reject»: Enter pressed out of ' +

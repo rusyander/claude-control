@@ -57,6 +57,7 @@ const CLOUD = {
   token: 'CLOUD-SECRET',
   deployment: 'cloud' as const,
   confluenceUrl: '',
+  confluenceToken: '',
 };
 
 const SERVER = {
@@ -65,7 +66,14 @@ const SERVER = {
   token: 'PAT-SECRET',
   deployment: 'server' as const,
   confluenceUrl: 'https://wiki.acme.local',
+  confluenceToken: '',
 };
+
+/** Заголовок авторизации записанного запроса — по нему видно, какой ключ уехал. */
+function headerOf(call: { init: RequestInit } | undefined): string {
+  const headers = (call?.init.headers ?? {}) as Record<string, string>;
+  return headers.Authorization ?? '';
+}
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -79,6 +87,44 @@ describe('atlassian/client: два диалекта', () => {
     expect(authHeaders(SERVER).Authorization).toBe('Bearer PAT-SECRET');
     expect(jiraApi(CLOUD)).toBe('https://acme.atlassian.net/rest/api/3');
     expect(jiraApi(SERVER)).toBe('https://jira.acme.local/rest/api/2');
+  });
+
+  /**
+   * Живой дефект 18.09.2026: на своей установке Confluence отвечал 401 на
+   * полностью рабочем доступе. Причина — у Jira и Confluence там РАЗНЫЕ personal
+   * access token, а панель посылала обеим ключ Jira.
+   *
+   * Красное до правки: обе строки ниже возвращали `Bearer PAT-SECRET`, и
+   * `listSpaces` уходил с ключом Jira.
+   */
+  it('у Confluence свой ключ: Jira ходит основным, вики — вторым', async () => {
+    const twoKeys = { ...SERVER, confluenceToken: 'WIKI-SECRET' };
+    expect(authHeaders(twoKeys, 'Jira').Authorization).toBe('Bearer PAT-SECRET');
+    expect(authHeaders(twoKeys, 'Confluence').Authorization).toBe('Bearer WIKI-SECRET');
+
+    // Не только заголовок в отрыве: настоящая ручка Confluence обязана уехать
+    // со вторым ключом, а соседняя ручка Jira — с основным.
+    const { calls } = stubApi([
+      [/rest\/api\/space/, { body: { results: [{ id: 1, key: 'QA', name: 'QA' }] } }],
+      [/rest\/api\/2\/project/, { body: [] }],
+    ]);
+    await listSpaces(twoKeys);
+    await listProjects(twoKeys);
+    expect(headerOf(calls[0])).toBe('Bearer WIKI-SECRET');
+    expect(headerOf(calls[1])).toBe('Bearer PAT-SECRET');
+  });
+
+  it('второго ключа нет — Confluence по-прежнему ходит основным', async () => {
+    const { calls } = stubApi([[/rest\/api\/space/, { body: { results: [] } }]]);
+    await listSpaces(SERVER);
+    expect(headerOf(calls[0])).toBe('Bearer PAT-SECRET');
+  });
+
+  it('облако: второй ключ уходит тем же Basic, но с почтой и своим значением', () => {
+    const twoKeys = { ...CLOUD, confluenceToken: 'WIKI-CLOUD' };
+    expect(authHeaders(twoKeys, 'Confluence').Authorization).toBe(
+      `Basic ${Buffer.from('qa@acme.io:WIKI-CLOUD').toString('base64')}`,
+    );
   });
 
   it('Confluence облака живёт под /wiki, своя установка — в корне своего адреса', () => {
@@ -125,6 +171,7 @@ describe('atlassian/client: два диалекта', () => {
         email: 'qa@acme.io',
         token: 't',
         confluenceUrl: '',
+        confluenceToken: '',
       }),
     ).resolves.toEqual({ deployment: 'cloud', account: 'Ольга' });
     expect(calls).toHaveLength(1);
@@ -141,6 +188,7 @@ describe('atlassian/client: два диалекта', () => {
         email: 'qa@acme.io',
         token: 't',
         confluenceUrl: '',
+        confluenceToken: '',
       }),
     ).resolves.toEqual({ deployment: 'server', account: 'qa' });
   });
@@ -152,6 +200,7 @@ describe('atlassian/client: два диалекта', () => {
       email: '',
       token: 't',
       confluenceUrl: '',
+      confluenceToken: '',
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toContain('/rest/api/2/myself');
@@ -168,6 +217,7 @@ describe('atlassian/client: два диалекта', () => {
         email: 'qa@acme.io',
         token: 'bad',
         confluenceUrl: '',
+        confluenceToken: '',
       }),
     ).rejects.toMatchObject({
       statusCode: 502,
@@ -178,10 +228,22 @@ describe('atlassian/client: два диалекта', () => {
   it('нет адреса или нет токена — 400 с именем поля, без единого запроса', async () => {
     const { calls } = stubApi([]);
     await expect(
-      detectDeployment({ baseUrl: '', email: '', token: 't', confluenceUrl: '' }),
+      detectDeployment({
+        baseUrl: '',
+        email: '',
+        token: 't',
+        confluenceUrl: '',
+        confluenceToken: '',
+      }),
     ).rejects.toMatchObject({ detail: 'baseUrl' });
     await expect(
-      detectDeployment({ baseUrl: 'https://x', email: '', token: '', confluenceUrl: '' }),
+      detectDeployment({
+        baseUrl: 'https://x',
+        email: '',
+        token: '',
+        confluenceUrl: '',
+        confluenceToken: '',
+      }),
     ).rejects.toMatchObject({ detail: 'token' });
     expect(calls).toHaveLength(0);
   });

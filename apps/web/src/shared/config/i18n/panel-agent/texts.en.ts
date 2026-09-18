@@ -125,6 +125,20 @@ export const panelTextsEn: PanelTextDictionary = {
   'value-happens-probe': 'a probe and a smoke request through the panel gateway',
   'value-file-shape':
     '{{path}} will be rewritten whole in the panel format (2-space indent): some diff lines change only indentation, not values',
+  'note-rule-group-off':
+    'The rule stays off: a group holds it down, and a single switch does not overrule the group.',
+  'note-skill-folder-delete': 'The folder {{dir}} is deleted whole (a copy stays in history).',
+  'note-skill-folder-files': 'Along with it, the files: {{files}}',
+  'note-permission-mark-only':
+    'The permission is off and absent from the file: only the panel’s own mark is removed.',
+  'note-mcp-oauth-delete': 'The saved OAuth login of this server is deleted as well.',
+  'note-mcp-rename': 'Rename: the marks and the OAuth login move from “{{from}}” to “{{to}}”.',
+  'note-hook-group-off': 'The hook stays off: a group holds it down.',
+  'note-hook-local-file':
+    'A hook from settings.local.json is not switched by the panel: the file will not change.',
+  'note-copy-in-history': 'A copy of the file stays in history.',
+  'note-entity-group-off': 'Stays off: a group holds it down.',
+  'note-folder-move': 'The folder {{from}} is moved to {{to}}.',
   'journal-list-groups': 'List of groups',
   'journal-save-group': 'Save a group',
   'summary-group-create': 'Create group “{{name}}” (enabled at once)',

@@ -845,7 +845,10 @@ export const chatEn: typeof chatRu = {
       'verdict will come from it any more, so the groups stand on the question ' +
       '“start as proposed?” and never start by themselves, and the summary chip ' +
       'says exactly that — the triage was cut short by a restart and the groups are ' +
-      'waiting for your answer. A task lost in the triage is returned home, a circular ' +
+      'waiting for your answer. That question and the notice in the parent feed are ' +
+      'written by the panel itself, not by the agent, so both are shown in the ' +
+      'interface language; a question the agent asked stays as it asked it. ' +
+      'A task lost in the triage is returned home, a circular ' +
       'wait is cut, and the summary labels that “repaired by the panel”. In the ' +
       'chat list the links are labelled “triage” and “plan”; “Only create the ' +
       'chats” gets no levels.',

@@ -1,6 +1,6 @@
 import type { ConfluencePage, ConfluenceSpace } from '@agentdeck/contracts';
 import { invalidField, unreachable } from '../errors.ts';
-import { call, confluenceRoot, type AtlassianAccess } from './client.ts';
+import { call, confluenceRoot, CONFLUENCE_SYSTEM, type AtlassianAccess } from './client.ts';
 import { coded } from '../../../lib/server-text.ts';
 
 /**
@@ -16,7 +16,10 @@ import { coded } from '../../../lib/server-text.ts';
  * её молча нельзя. Удаления нет вовсе.
  */
 
-const CONTENT_SYSTEM = 'Confluence';
+// Имя системы здесь не только подпись отказа: по нему клиент выбирает ключ
+// (у своей установки Confluence выдаёт свой personal access token), поэтому
+// константа общая с клиентом, а не списанная с него строка.
+const CONTENT_SYSTEM = CONFLUENCE_SYSTEM;
 
 function isCloud(access: AtlassianAccess): boolean {
   return access.deployment === 'cloud';

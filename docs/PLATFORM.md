@@ -117,8 +117,71 @@ a choice for predictability: a corporate request that went somewhere else is wor
 | 451  | The company's content checks stopped the request. Check names are shown, the request text is not. |
 | 503  | The contour is still starting — its model registry is not ready.                                  |
 
-The full list of 26 negative scenarios, and what closes each of them, lives in `TASKS-PLATFORM.md` §8
-and is verified by `pnpm negatives`.
+## Negative scenarios — the mandatory list
+
+Twenty-six cases where something goes wrong. Each names what the panel must do: none of them may end
+in a crash, in silence, or in the request leaving for a different address.
+
+**The list is checked by a machine, not by eye:** `pnpm negatives`
+(`tools/qa/check-negative-scenarios.mjs`) reads THIS VERY TABLE and holds, for every row, the NAME of
+the check that closes it. A vanished anchor turns it red, so does a row added here, so does a
+rewritten "expected behaviour" column — otherwise staleness would simply move one floor up, into the
+registry. An anchor is looked for in code, never in a comment (a comment outlives what it explains),
+every row must own at least one anchor of its own in a test, and the guard itself has `--selftest`:
+it proves the guard can go red. The run is static — it needs no stand — and sits in CI next to the
+signed compromises. Three rows were corrected during reconnaissance of the contour: the table was
+written before it, and where the two disagree, the contour wins. The discrepancies are listed under
+the table and repeated by the run itself.
+
+| #   | Scenario                                             | Expected behaviour                                                                      |
+| --- | ---------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1   | Admin address instead of `api.`                      | the probe names an address error, not "the key was rejected"                            |
+| 2   | Typo in the address, DNS does not resolve            | "the address does not answer", a retry button, nothing stored as working                |
+| 3   | Corporate / self-signed certificate                  | a "your own root certificate" field; no TLS check is disabled anywhere in the code      |
+| 4   | No VPN                                               | a refusal with a plain reason; the panel keeps working                                  |
+| 5   | Key wrong / revoked                                  | 401 "the key was rejected", with a hint about the check cache                           |
+| 6   | Key expired                                          | no separate text is possible — discrepancy №1 under the table                           |
+| 7   | The KEY's budget is exhausted                        | **401**, indistinguishable from a revoked one: the panel names all FIVE causes (№1)     |
+| 7б  | A user / team / instance limit is exhausted          | 402 before the call, naming the level; a bar on Overview; this is NOT the key budget    |
+| 8   | The model is not allowed for the key                 | 403 with the model name and a pointer to the allowed list                               |
+| 9   | The key's RPM/TPM are exceeded                       | 429 "too often", when to retry; exactly one automatic retry                             |
+| 10  | A guardrail fired on the way in                      | 451 → a terminal error plus the list of violations, without the text                    |
+| 11  | A guardrail cut the stream mid-way                   | a `stream_interrupted` frame → a terminal error for the client, the reason in the panel |
+| 12  | The model registry is not ready                      | 503 "the contour is still starting", retry                                              |
+| 13  | A model disappeared between runs                     | a mark in the list and a clear refusal, not "unknown error"                             |
+| 14  | The contour answered non-JSON (HTML proxy, login)    | recognised and named; the body is never shown raw                                       |
+| 15  | A non-streaming request takes longer than 120 s      | the gateway goes by stream and assembles the answer itself                              |
+| 16  | The stream broke mid-way on the network              | the client gets a completion with an error; accounting is not doubled                   |
+| 17  | The dev server restarted during a request            | one retry BY RESPONSE CODE; a broken connection is never retried — discrepancy №2       |
+| 18  | The panel is off, a CLI points at the gateway        | connection refused; the behaviour is described in the wizard and in help                |
+| 19  | The gateway port is taken by another process         | the panel offers a neighbouring port instead of crashing                                |
+| 20  | A human edited the CLI config by hand after an apply | the undo names the file instead of overwriting their edit                               |
+| 21  | Two contours are configured at once                  | a list both in the data model and on screen: the section shows all — discrepancy №3     |
+| 22  | The key was changed in the admin UI                  | the old one works until the cache expires; a hint explains why                          |
+| 23  | The answer carries a vendor frame we do not know     | an unknown frame with no `choices` is dropped and lands in the diagnostics log          |
+| 24  | Request or assembled answer is over the limit        | 413 to both: the request is not read to the end, the answer is not piled up in memory   |
+| 25  | The machine clock drifted                            | no effect on the work (no JWT is used); log dates are marked as local                   |
+| 26  | The panel refuses by content (a data rule)           | 400 `invalid_request_error` with a reason, not 403 — no CLI writes "the key was wrong"  |
+
+**Three discrepancies with how the contour really behaves.** Each was found by reconnaissance, not by
+reasoning. Bending the behaviour to match this table would have been the worst possible outcome — the
+table was corrected against the contour.
+
+1. **№6, "expired gets its own text", is impossible, and there are FIVE causes.** The contour KNOWS
+   the cause: a key can be expired, out of budget, unknown, owned by a deleted owner, or fail the
+   owner check — the last meaning the check itself did not go through while the key is fine. All of
+   that is lost at the boundary of the public API: it does not pass the cause outward and writes the
+   client a flat "invalid API key". From outside, all five are indistinguishable — neither this panel
+   nor any other client can tell them apart. So the refusal names ALL FIVE: "reissue the key" sends
+   someone whose budget ran out, or whose owner check blinked, to fix the wrong thing. The same
+   correction applies to row №7: there are five causes, not two.
+2. **№17, "one retry", only BY RESPONSE CODE.** 429 and 5xx are retried exactly once, a broken
+   connection never: the request may have arrived and run, and a blind retry is a second charge at
+   the contour. A dev-server restart looks like a 5xx, so the row itself is closed — but there is no
+   blind retry on a dropped connection.
+3. **№21, "the UI shows one contour and says so", is already wrong, in the better direction.** The
+   row was written when the "Contour" section did not exist yet; today it shows contours as a list,
+   each with its own key in its own namespace and its own probe trace.
 
 ## How to switch it off
 

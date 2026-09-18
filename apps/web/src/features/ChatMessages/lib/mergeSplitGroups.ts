@@ -94,7 +94,18 @@ function pendingRow(group: SplitPlanView['groups'][number], split: SplitPlanView
     // ответ на вопрос разбора и «отпустить», не дожидаясь предшественников.
     groupIndex: group.index,
     ...(group.after.length > 0 ? { waitsFor: group.after.map(titleOf) } : {}),
-    ...(group.hold ? { hold: { index: group.index, question: group.hold } } : {}),
+    ...(group.hold
+      ? {
+          hold: {
+            index: group.index,
+            question: group.hold,
+            // Код переезжает под именем поля, в котором вопрос тут лежит:
+            // переводит его общий `serverFieldText`, а он ищет код по полю.
+            ...(group.holdCode ? { questionCode: group.holdCode } : {}),
+            ...(group.holdParams ? { questionParams: group.holdParams } : {}),
+          },
+        }
+      : {}),
     ...(group.holdAnswer ? { holdAnswered: true } : {}),
     ...(group.base ? { base: group.base } : {}),
     ...(group.error ? { error: group.error } : {}),

@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic.tsx",
-      "confirmedAt": "2026-09-18T11:08:11.801Z",
+      "confirmedAt": "2026-09-18T12:05:06.107Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -180,6 +180,16 @@
           "path": "apps/server/src/domains/platform/gateway/tool-shim/repair.ts",
           "why": "там же: круги починки блока — документ обещает «неразборчивый блок вызовом не становится вовсе»",
           "sha": "9de96e0851ae7400"
+        },
+        {
+          "path": "apps/server/src/domains/platform/tool-shim-report.ts",
+          "why": "«Чем прослойка отличается»: счёт выброшенных инструментов — строка карточки, объясняющая безрукого агента",
+          "sha": "59981145cbb7a2c8"
+        },
+        {
+          "path": "apps/web/src/pages/Platform/lib/toolShimView.ts",
+          "why": "«Чем прослойка отличается»: когда карточка вообще показывается и что она говорит вместо чисел",
+          "sha": "0448ccc629fb2f86"
         }
       ]
     },
@@ -215,7 +225,7 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "a9e2b0fb48c00ce4"
+          "sha": "6d6edbdfd7ffccc8"
         },
         {
           "path": "apps/server/src/domains/chat/split-overlap.ts",
@@ -263,7 +273,7 @@
           "sha": "96807b82231b83be"
         }
       ],
-      "confirmedAt": "2026-09-18T11:08:11.491Z"
+      "confirmedAt": "2026-09-18T12:49:51.835Z"
     },
     {
       "topic": "tests",
@@ -739,7 +749,7 @@
     {
       "topic": "overview",
       "document": "apps/web/src/pages/Help/topics/OverviewTopic.tsx",
-      "confirmedAt": "2026-09-18T11:08:10.620Z",
+      "confirmedAt": "2026-09-18T14:52:20.659Z",
       "sources": [
         {
           "path": "apps/server/src/domains/overview.ts",
@@ -749,7 +759,7 @@
         {
           "path": "apps/server/src/lib/claude-paths.ts",
           "why": "«Откуда панель берёт каталог»: порядок manual → env → home и список недостающих файлов",
-          "sha": "f67be492dd69ba78"
+          "sha": "3dbc200609ab5d29"
         },
         {
           "path": "apps/web/src/pages/Overview/StatTile.tsx",
@@ -904,7 +914,7 @@
     {
       "topic": "settings",
       "document": "apps/web/src/pages/Help/topics/SettingsTopic.tsx",
-      "confirmedAt": "2026-09-18T11:08:09.965Z",
+      "confirmedAt": "2026-09-18T14:52:26.103Z",
       "sources": [
         {
           "path": "apps/server/src/lib/safe-io.ts",
@@ -919,7 +929,7 @@
         {
           "path": "apps/server/src/lib/claude-paths.ts",
           "why": "«Каталог конфигурации»: порядок manual → env → home, которым выбран каталог",
-          "sha": "f67be492dd69ba78"
+          "sha": "3dbc200609ab5d29"
         },
         {
           "path": "apps/server/src/lib/credentials.ts",
@@ -985,17 +995,17 @@
     {
       "topic": "integrations",
       "document": "apps/web/src/pages/Help/topics/IntegrationsTopic.tsx",
-      "confirmedAt": "2026-09-18T11:08:09.871Z",
+      "confirmedAt": "2026-09-18T13:45:18.359Z",
       "sources": [
         {
           "path": "apps/server/src/domains/integrations/store.ts",
           "why": "«Подключено и настроено»: два разных состояния, токен вне любого ответа",
-          "sha": "8fd5e164ca88b6ef"
+          "sha": "de2451150437237f"
         },
         {
           "path": "apps/server/src/domains/integrations/check.ts",
           "why": "«Облако или Server/DC»: диалект определяется живой проверкой, а не вопросом",
-          "sha": "2ba878795347923a"
+          "sha": "08b8da62a3844c8f"
         },
         {
           "path": "apps/server/src/domains/integrations/mcp-server.ts",
@@ -1105,7 +1115,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-config.ts",
           "why": "«Что агент умеет»: правила, скиллы, хуки, MCP, права, CLAUDE.md и их классы риска",
-          "sha": "22e23bbb854d2b08"
+          "sha": "29eb39c7f289d396"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-config-secrets.ts",
@@ -1170,7 +1180,7 @@
         {
           "path": "packages/contracts/src/panel-agent.ts",
           "why": "«Ждёт до…»: 10 минут на решение карточки",
-          "sha": "6948753a7aac791e"
+          "sha": "ed5fcc977988d289"
         },
         {
           "path": "tools/mcp/panel.mjs",
@@ -1233,7 +1243,7 @@
           "sha": "dbdcab729b80a8de"
         }
       ],
-      "confirmedAt": "2026-09-18T11:10:53.532Z"
+      "confirmedAt": "2026-09-18T12:18:22.576Z"
     }
   ]
 }

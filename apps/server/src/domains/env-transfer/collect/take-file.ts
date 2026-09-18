@@ -75,7 +75,9 @@ export function takeFile(
 
   const partial = PARTIAL_JSON[provider.id];
   const isPartial =
-    partial !== undefined && location.role === partial.role && extension === '.json';
+    partial !== undefined &&
+    extension === '.json' &&
+    (location.role === partial.role || name === partial.name);
 
   let data = raw;
   let redactedKeys: string[] = [];

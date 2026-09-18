@@ -15,6 +15,10 @@ export const composedMessageParams = {
   'integration-check-telegram-ok': ['account'],
   'integration-check-tms-ok': ['detail'],
   'integration-check-atlassian-ok': ['account', 'deployment'],
+  'integration-check-atlassian-confluence-ok': ['account', 'deployment'],
+  'integration-check-atlassian-confluence-rejected': ['account', 'deployment'],
+  'integration-check-atlassian-confluence-failed': ['account', 'deployment', 'status'],
+  'integration-check-atlassian-confluence-unreachable': ['account', 'deployment', 'reason'],
   'integration-deployment-cloud': [],
   'integration-deployment-own': [],
   'integration-tms-project': ['project', 'system'],
@@ -93,4 +97,6 @@ export const composedMessageParams = {
   'worktree-longpath-refused': ['error', 'target'],
   'git-failed-no-output': [],
   'worktree-install-started': ['command'],
+  'split-triage-interrupted-hold': [],
+  'split-triage-interrupted-notice': ['groups'],
 } as const satisfies Record<string, readonly string[]>;

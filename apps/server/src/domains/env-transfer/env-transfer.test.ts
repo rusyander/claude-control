@@ -118,8 +118,10 @@ describe('Перенос окружения: что не уезжает у Claud
   let root: string;
 
   beforeEach(() => {
-    // Раскладка как в жизни: `~/.claude` с конфигурацией и `~/.claude.json`
-    // рядом с ним — второй файл лежит ВНЕ каталога и переносится отдельно.
+    // Каталог задан явно (`override` ниже), а значит `.claude.json` лежит ВНУТРИ
+    // него — так его ищет сам CLI, и с 18.09.2026 так же ищет панель
+    // (`claude-paths.ts → resolveMcpConfig`). У домашнего `~/.claude` тот же файл
+    // лежит рядом с каталогом; на что тут смотрят тесты, это не меняет.
     home = mkdtempSync(join(tmpdir(), 'cc-env-home-'));
     root = join(home, '.claude');
     mkdirSync(root, { recursive: true });
@@ -157,9 +159,9 @@ describe('Перенос окружения: что не уезжает у Claud
     expect(reasons.has('excluded')).toBe(true);
   });
 
-  it('из ~/.claude.json берутся только MCP-серверы, история и аккаунт остаются дома', () => {
+  it('из .claude.json берутся только MCP-серверы, история и аккаунт остаются дома', () => {
     writeFileSync(
-      join(home, '.claude.json'),
+      join(root, '.claude.json'),
       JSON.stringify({
         mcpServers: { local: { command: 'node' } },
         projects: { 'c--work': { history: ['мой приватный запрос'] } },
@@ -181,9 +183,9 @@ describe('Перенос окружения: что не уезжает у Claud
     expect(packed.data.toString()).not.toContain('user@example.com');
   });
 
-  it('вливание MCP не трогает остальные ключи целевого ~/.claude.json', () => {
+  it('вливание MCP не трогает остальные ключи целевого .claude.json', () => {
     writeFileSync(
-      join(home, '.claude.json'),
+      join(root, '.claude.json'),
       JSON.stringify({ mcpServers: { local: { command: 'node' } } }),
       'utf8',
     );
@@ -195,7 +197,7 @@ describe('Перенос окружения: что не уезжает у Claud
 
     // На «новой машине» в файле свои проекты и свой сервер.
     writeFileSync(
-      join(home, '.claude.json'),
+      join(root, '.claude.json'),
       JSON.stringify({
         mcpServers: { other: { command: 'python' } },
         projects: { 'd--other': { history: ['чужой запрос'] } },
@@ -211,7 +213,7 @@ describe('Перенос окружения: что не уезжает у Claud
       backupDir: join(home, 'backups'),
     });
 
-    const result = JSON.parse(readFileSync(join(home, '.claude.json'), 'utf8')) as Record<
+    const result = JSON.parse(readFileSync(join(root, '.claude.json'), 'utf8')) as Record<
       string,
       unknown
     >;

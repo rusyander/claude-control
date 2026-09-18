@@ -182,7 +182,8 @@ export const mcpEn: typeof mcpRu = {
       'the server is started and held by Claude Code',
 
     storageFile: 'Where it is stored',
-    storageFileValue: '~/.claude.json — outside the .claude directory',
+    storageFileValue:
+      '.claude.json: beside ~/.claude, and inside the directory when one is set explicitly',
     storageWhy: 'Why separately',
     storageWhyValue: 'this is a shared Claude Code file; the panel only rewrites its own section',
     storageOff: 'Disabled ones',

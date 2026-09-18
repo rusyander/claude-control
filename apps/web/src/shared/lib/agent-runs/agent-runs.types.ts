@@ -1,5 +1,9 @@
 import type { MessageUsage } from '@agentdeck/contracts';
 import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
+import type {
+  ServerMessageCode,
+  ServerMessageNestedParams,
+} from '@agentdeck/contracts/server-messages';
 import type { RunStatus } from './status';
 
 export interface StreamedTool {
@@ -135,6 +139,9 @@ export interface AgentRun {
   detached?: boolean;
   /** Текст последней заметки панели про этот прогон (запасной, если код незнаком). */
   notice?: string;
+  /** Код той же заметки — по нему она читается на языке интерфейса. */
+  noticeCode?: ServerMessageCode;
+  noticeParams?: ServerMessageNestedParams;
   /** Последний отправленный запрос — для кнопки «Повторить». */
   lastPrompt?: string;
   /** Разрешались ли правки в прошлом запуске — для повтора с теми же правами. */
@@ -286,6 +293,13 @@ export type ChatEvent =
         | 'groupsActivated'
         | 'modelDropped';
       text: string;
+      /**
+       * Код самой строки — отдельно от `code`, который называет повод. Есть не
+       * у всякой заметки: сводку разбора сервер собирает из счётчиков, шаблона
+       * у неё нет, и она остаётся русской строкой.
+       */
+      textCode?: ServerMessageCode;
+      textParams?: ServerMessageNestedParams;
     }
   | ({ kind: 'handoff' } & HandoffEvent)
   /**

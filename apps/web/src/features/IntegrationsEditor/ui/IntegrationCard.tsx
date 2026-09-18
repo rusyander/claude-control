@@ -64,6 +64,10 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
   const subscribed = eventsOf(settings, id);
   const [events, setEvents] = useState<TelegramEvent[]>(() => subscribed);
   const [token, setToken] = useState('');
+  // Второй ключ только у Atlassian: на своей установке Jira и Confluence выдают
+  // личные токены по отдельности, и одним ключом вики отвечает 401.
+  const hasConfluenceKey = id === 'atlassian';
+  const [confluenceToken, setConfluenceToken] = useState('');
 
   // Настройки приезжают запросом: до их прихода форма собрана из умолчаний, и
   // без пересборки человек правил бы пустые поля поверх сохранённых значений.
@@ -83,6 +87,7 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
   const isDirty =
     isDraftDirty(id, draft, saved) ||
     Boolean(token.trim()) ||
+    Boolean(confluenceToken.trim()) ||
     events.join(',') !== subscribed.join(',');
 
   const onFieldChange = (key: string, value: string): void => {
@@ -94,8 +99,11 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
       id,
       settings: buildSettings({ id, draft, enabled, events }),
       token: token.trim() ? token.trim() : undefined,
+      confluenceToken:
+        hasConfluenceKey && confluenceToken.trim() ? confluenceToken.trim() : undefined,
     });
     setToken('');
+    setConfluenceToken('');
   };
 
   const state = status?.state ?? 'unchecked';
@@ -166,6 +174,24 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
               ].join(' ')}
             />
           </Stack>
+
+          {hasConfluenceKey && (
+            <Stack flex={1} minWidth="220px">
+              <TextField
+                label={t('integrations.card.confluenceToken')}
+                type="password"
+                value={confluenceToken}
+                onChange={setConfluenceToken}
+                placeholder={t('integrations.card.tokenPlaceholder')}
+                hint={[
+                  status?.hasConfluenceToken
+                    ? t('integrations.card.tokenSaved', { mask: status.maskedConfluenceToken })
+                    : t('integrations.card.confluenceTokenEmpty'),
+                  t('integrations.card.atlassian.confluenceTokenHint'),
+                ].join(' ')}
+              />
+            </Stack>
+          )}
 
           <Button
             variant="primary"

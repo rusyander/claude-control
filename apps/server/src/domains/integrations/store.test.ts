@@ -11,10 +11,12 @@ import {
   describeIntegrations,
   forgetIntegration,
   isIntegrationId,
+  readConfluenceToken,
   readIntegrations,
   readToken,
   requireConnected,
   tokenId,
+  writeConfluenceToken,
   writeSettings,
   writeToken,
 } from './store.ts';
@@ -113,6 +115,36 @@ describe('domains/integrations/store: настройки и токены', () =>
       enabled: true,
     });
     expect(requireConnected(store, dir, 'atlassian', 'Atlassian')).toBe(SECRET);
+  });
+
+  /**
+   * Второй ключ Atlassian. На своей установке Jira и Confluence выдают личные
+   * токены по отдельности — панель обязана хранить их порознь и НЕ показывать
+   * ни одного целиком.
+   */
+  it('второй ключ Confluence живёт отдельно и наружу уходит только маской', () => {
+    const wiki = 'WIKI-PAT-7b2c-СЕКРЕТ';
+    writeToken(dir, 'atlassian', SECRET);
+    writeConfluenceToken(dir, wiki);
+
+    expect(readConfluenceToken(dir)).toBe(wiki);
+    // Он именно ОТДЕЛЬНЫЙ: основной ключ карточки от него не поменялся.
+    expect(readToken(dir, 'atlassian')).toBe(SECRET);
+
+    const card = describeIntegration(store, dir, 'atlassian');
+    expect(card.hasConfluenceToken).toBe(true);
+    expect(card.maskedConfluenceToken).not.toContain('СЕКРЕТ');
+    expect(JSON.stringify(card)).not.toContain(wiki);
+
+    // У чужой карточки поля нет вовсе: иначе «ключа нет» читалось бы как «не ввели».
+    expect(describeIntegration(store, dir, 'telegram').hasConfluenceToken).toBeUndefined();
+  });
+
+  it('«забыть» уносит и второй ключ: секрет без следа в панели недопустим', () => {
+    writeToken(dir, 'atlassian', SECRET);
+    writeConfluenceToken(dir, 'WIKI-PAT');
+    forgetIntegration(store, dir, 'atlassian');
+    expect(readConfluenceToken(dir)).toBeUndefined();
   });
 
   it('«забыть» снимает токен и гасит карточку, но адрес оставляет', () => {
@@ -250,6 +282,59 @@ describe('СЕКРЕТ НЕ ПОКИДАЕТ ХРАНИЛИЩА', () => {
     expect(card.state).toBe('error');
     expect(card.detail).toBe('Токен не сохранён.');
     expect(calls).toHaveLength(0);
+  });
+
+  /**
+   * «Проверить связь» отвечает за ОБЕ системы карточки. Дефект 18.09.2026: Jira
+   * отвечала «Вошли как …», а Confluence на том же доступе — 401, и узнать об
+   * этом можно было только нажав кнопку публикации.
+   */
+  it('Confluence отклонил ключ — это сказано в подписи, но Jira не гасится', async () => {
+    vi.stubGlobal('fetch', (url: string) =>
+      Promise.resolve(
+        String(url).includes('/rest/api/space')
+          ? new Response('denied', { status: 401 })
+          : new Response(JSON.stringify({ displayName: 'Ольга' }), { status: 200 }),
+      ),
+    );
+    const card = await checkIntegration(store, dir, 'atlassian');
+    // Jira работает — карточка обязана остаться зелёной.
+    expect(card.state).toBe('ok');
+    expect(card.detail).toContain('Вошли как Ольга');
+    expect(card.detail).toContain('отдельный ключ Confluence');
+    expect(everythingOnDisk(dir)).not.toContain(SECRET);
+  });
+
+  it('Confluence на связи — подпись говорит и это', async () => {
+    vi.stubGlobal('fetch', (url: string) =>
+      Promise.resolve(
+        String(url).includes('/rest/api/space')
+          ? new Response(JSON.stringify({ results: [] }), { status: 200 })
+          : new Response(JSON.stringify({ displayName: 'Ольга' }), { status: 200 }),
+      ),
+    );
+    const card = await checkIntegration(store, dir, 'atlassian');
+    expect(card.detail).toContain('Confluence на связи');
+  });
+
+  it('своя установка без адреса вики и без второго ключа — вики не трогаем вовсе', async () => {
+    writeSettings(store, 'atlassian', {
+      enabled: true,
+      baseUrl: 'https://jira.acme.local',
+      email: '',
+      deployment: 'server',
+      confluenceUrl: '',
+    });
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', (url: string) => {
+      calls.push(String(url));
+      return Promise.resolve(new Response(JSON.stringify({ name: 'qa' }), { status: 200 }));
+    });
+    const card = await checkIntegration(store, dir, 'atlassian');
+    // Корень Confluence там равен хосту Jira: 404 оттуда — ложная тревога про
+    // вики, которой у человека может не быть вовсе.
+    expect(calls.some((url) => url.includes('/rest/api/space'))).toBe(false);
+    expect(card.detail).toBe('Вошли как qa (своя установка).');
   });
 
   it('определённый диалект запоминается — иначе Confluence ищется не по тем путям', async () => {

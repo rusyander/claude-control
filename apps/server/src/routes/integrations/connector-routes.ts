@@ -9,6 +9,7 @@ import {
   describeIntegrations,
   forgetIntegration,
   isIntegrationId,
+  writeConfluenceToken,
   writeSettings,
   writeToken,
 } from '../../domains/integrations/store.ts';
@@ -51,7 +52,8 @@ export function registerIntegrationConnectorRoutes(
       });
     }
 
-    const body = request.body as { settings?: unknown; token?: unknown } | undefined;
+    const body = request.body as
+      { settings?: unknown; token?: unknown; confluenceToken?: unknown } | undefined;
     const schema: ZodType<unknown> = integrationSettingsSchemas[id];
     const settings = parseBody(schema, body?.settings, reply);
     if (settings === undefined) return reply;
@@ -59,6 +61,12 @@ export function registerIntegrationConnectorRoutes(
     try {
       writeSettings(store(), id, settings as IntegrationsSettings[IntegrationId]);
       if (typeof body?.token === 'string') writeToken(appDataOf(deps), id, body.token.trim());
+      // Второй ключ Atlassian — по тому же правилу: приехало поле = его тронули,
+      // пустая строка = «выкинуть». Чужой карточке поле не принадлежит и молча
+      // игнорируется, а не заводит секрет без места, где его увидеть.
+      if (id === 'atlassian' && typeof body?.confluenceToken === 'string') {
+        writeConfluenceToken(appDataOf(deps), body.confluenceToken.trim());
+      }
       return attachTextCodes(describeIntegration(store(), appDataOf(deps), id));
     } catch (error) {
       return fail(reply, error);

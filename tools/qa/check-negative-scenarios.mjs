@@ -1,15 +1,16 @@
 /**
- * Негативные сценарии контура (§8 `TASKS-PLATFORM.md`) — каждый закрыт ИМЕНЕМ
- * проверки, а не обещанием в таблице.
+ * Негативные сценарии контура (`docs/PLATFORM.ru.md` § «Негативные сценарии —
+ * обязательный список») — каждый закрыт ИМЕНЕМ проверки, а не обещанием в
+ * таблице.
  *
- * Зачем скрипт, если строки уже перечислены в задаче: список в markdown стареет
- * молча. Переименовали тест — строка §8 продолжает утверждать, что сценарий
+ * Зачем скрипт, если строки уже перечислены в документе: список в markdown
+ * стареет молча. Переименовали тест — строка таблицы продолжает утверждать, что сценарий
  * закрыт, и узнаётся это ровно тогда, когда сценарий случается у человека.
  *
  * Три правила, без которых прогон был бы украшением:
  *
  * 1. Прогон ЧИТАЕТ САМУ ТАБЛИЦУ. Иначе устаревание просто переезжает на этаж
- *    выше: реестр остаётся зелёным, пока §8 дописывают, переписывают колонку
+ *    выше: реестр остаётся зелёным, пока таблицу дописывают, переписывают колонку
  *    «ожидаемое поведение» или удаляют целиком. Сверяются и набор номеров, и
  *    кусок обещания (`expects`) в каждой строке.
  * 2. Якорь ищется в КОДЕ, а не в комментариях. Комментарий переживает удаление
@@ -29,13 +30,19 @@ import { resolve } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '../..');
 const SERVER = 'apps/server/src';
 const WEB = 'apps/web/src';
-const TABLE_FILE = 'TASKS-PLATFORM.md';
+/**
+ * Таблица живёт в документе для человека: план партии, где она стояла раньше,
+ * уехал из репозитория вместе с остальными материалами контура. Документ
+ * публичный, значит сторож читает то же, что читает человек.
+ */
+const TABLE_FILE = 'docs/PLATFORM.ru.md';
+const TABLE_SECTION = '## Негативные сценарии — обязательный список';
 
 /** Короче — почти наверняка совпадёт со случайным местом («map(»). */
 const MIN_ANCHOR = 12;
 
 /**
- * Строки §8. `closedBy` — файл и кусок текста, который обязан в нём быть:
+ * Строки таблицы. `closedBy` — файл и кусок текста, который обязан в нём быть:
  * название теста, инвариант или строка интерфейса, которую читает человек.
  * `expects` — кусок колонки «ожидаемое поведение» той же строки таблицы: по
  * нему видно, что закрывали ИМЕННО ТО, что обещано.
@@ -340,7 +347,7 @@ const SCENARIOS = [
     expects: 'расхождение №3',
     note:
       'Сильнее таблицы: раздел показывает СПИСОК контуров, а не один с оговоркой. ' +
-      'Строка §8 писалась, когда страницы ещё не было.',
+      'Строка таблицы писалась, когда страницы ещё не было.',
     closedBy: [
       [`${SERVER}/domains/platform/store.test.ts`, 'два контура живут рядом'],
       // Именно перебор списка контуров: короткий «map(» совпал бы с любым
@@ -448,10 +455,12 @@ function readCode(file) {
   return cache.get(file);
 }
 
-/** Строки таблицы §8 из самой задачи: номер → обещание. */
+/** Строки таблицы из самого документа: номер → обещание. */
 export function readTable(markdown) {
-  const section = markdown.split('## 8. Негативные сценарии')[1] ?? '';
-  const table = section.split('\n---')[0] ?? '';
+  const section = markdown.split(TABLE_SECTION)[1] ?? '';
+  // Раздел кончается следующим заголовком: соседняя таблица документа не должна
+  // приезжать сюда строками, которых реестр не знает.
+  const table = section.split('\n## ')[0] ?? '';
   const rows = new Map();
   for (const line of table.split('\n')) {
     if (!/^\|\s*(\d|№)/.test(line)) continue;
@@ -475,7 +484,8 @@ export function verify(scenarios, table, read = readCode) {
 
   const registryIds = new Set(scenarios.map((scenario) => scenario.id));
   for (const id of table.keys()) {
-    if (!registryIds.has(id)) problems.push(`§8 №${id} есть в таблице, но не заведён в реестре`);
+    if (!registryIds.has(id))
+      problems.push(`сценарий №${id} есть в таблице, но не заведён в реестре`);
   }
 
   // Якорь, встречающийся у двух строк, — это одно доказательство, посчитанное
@@ -492,7 +502,7 @@ export function verify(scenarios, table, read = readCode) {
     const missing = [];
 
     const row = table.get(scenario.id);
-    if (!row) missing.push(`строки №${scenario.id} нет в таблице §8 — реестр её выдумал`);
+    if (!row) missing.push(`строки №${scenario.id} нет в таблице документа — реестр её выдумал`);
     else if (!row.expected.includes(scenario.expects)) {
       missing.push(`колонка «ожидаемое поведение» разошлась: в таблице нет «${scenario.expects}»`);
     }
@@ -593,25 +603,25 @@ function main() {
   const table = readTable(readFileSync(resolve(ROOT, TABLE_FILE), 'utf8'));
   const { problems, ok } = verify(SCENARIOS, table);
 
-  for (const scenario of ok) console.log(`ок   §8 №${scenario.id}: ${scenario.title}`);
+  for (const scenario of ok) console.log(`ок   сценарий №${scenario.id}: ${scenario.title}`);
   for (const problem of problems) {
     if (typeof problem === 'string') {
       console.log(`ПЛОХО ${problem}`);
       continue;
     }
-    console.log(`ПЛОХО §8 №${problem.scenario.id}: ${problem.scenario.title}`);
+    console.log(`ПЛОХО сценарий №${problem.scenario.id}: ${problem.scenario.title}`);
     for (const line of problem.missing) console.log(`        ${line}`);
   }
 
   const notes = SCENARIOS.filter((scenario) => scenario.note);
   if (notes.length > 0) {
-    console.log('\nГде действительность расходится с таблицей §8:');
-    for (const scenario of notes) console.log(`  • §8 №${scenario.id}: ${scenario.note}`);
+    console.log('\nГде действительность расходится с таблицей документа:');
+    for (const scenario of notes) console.log(`  • сценарий №${scenario.id}: ${scenario.note}`);
   }
 
   console.log(
     problems.length === 0
-      ? `\nВсе ${SCENARIOS.length} строк §8 сверены с таблицей и закрыты названными проверками.`
+      ? `\nВсе ${SCENARIOS.length} строк сверены с таблицей ${TABLE_FILE} и закрыты названными проверками.`
       : `\nБед: ${problems.length}`,
   );
   return problems.length === 0 ? 0 : 1;

@@ -86,6 +86,33 @@ function checkDirectory(dir: string): { text: string; code: ServerMessageCode } 
   return null;
 }
 
+/**
+ * Где лежит `.claude.json` — регистрация MCP-серверов, запись аккаунта, доверие
+ * и история проектов. Правило не наше, а CLI, и оно НЕ одно на все случаи
+ * (проверено живьём на claude 2.1.263, 18.09.2026,
+ * `.agent/tmp/live-checks/mcp-config-dir-probe.mjs`):
+ *
+ * - каталог конфигурации задан явно (`CLAUDE_CONFIG_DIR`) — файл лежит ВНУТРИ
+ *   него, и отката на домашний CLI не делает: при отсутствии файла он заводит
+ *   свой, а `~/.claude.json` не читает вовсе (`mcp-config-dir-fallback.mjs`);
+ * - каталог домашний (`~/.claude`, переменной нет) — файл лежит РЯДОМ,
+ *   `~/.claude.json`.
+ *
+ * До 18.09.2026 панель всегда брала соседний файл. На домашнем каталоге это
+ * совпадало, а со своим (переменная или путь, указанный в настройках) панель
+ * читала и правила файл, которого CLI не видит: заведённый в панели MCP-сервер
+ * до агента не доезжал, а карточка аккаунта оставалась пустой, хотя вход был.
+ *
+ * Каталог, указанный руками, считается заданным явно: панель показывает его как
+ * каталог конфигурации целиком — значит и спутник берётся оттуда же.
+ */
+function resolveMcpConfig(root: string): string {
+  const fromEnv = process.env.CLAUDE_CONFIG_DIR?.trim();
+  const defaultRoot = join(homedir(), '.claude');
+  const explicit = root !== defaultRoot || (fromEnv ? resolve(fromEnv) === root : false);
+  return explicit ? join(root, '.claude.json') : join(dirname(root), '.claude.json');
+}
+
 function buildPaths(root: string): ClaudePaths {
   return {
     root,
@@ -95,8 +122,7 @@ function buildPaths(root: string): ClaudePaths {
     secretsEnv: join(root, '.mcp-secrets.env'),
     skills: join(root, 'skills'),
     hooks: join(root, 'hooks'),
-    // Регистрация MCP-серверов лежит НЕ внутри .claude, а рядом с ним.
-    mcpConfig: join(dirname(root), '.claude.json'),
+    mcpConfig: resolveMcpConfig(root),
     // Каталог данных панели. Прежнее имя (`agentdeck/`) переезжает сюда
     // копией при первом обращении — `brand.mjs`.
     appData: resolveAppDataDir(root),

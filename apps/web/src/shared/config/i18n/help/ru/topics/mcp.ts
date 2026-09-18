@@ -177,7 +177,8 @@ export const mcpRu = {
       'поднимает и держит сам Claude Code',
 
     storageFile: 'Где хранится',
-    storageFileValue: '~/.claude.json — вне каталога .claude',
+    storageFileValue:
+      '.claude.json: рядом с ~/.claude, а при своём каталоге конфигурации — внутри него',
     storageWhy: 'Почему отдельно',
     storageWhyValue: 'это общий файл Claude Code, панель меняет в нём только свою секцию',
     storageOff: 'Выключенные',

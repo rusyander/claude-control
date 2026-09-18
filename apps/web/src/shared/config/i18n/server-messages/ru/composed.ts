@@ -18,6 +18,14 @@ export const composedRu: Record<ComposedMessageCode, string> = {
   'integration-check-telegram-ok': 'Бот {{account}} на связи.',
   'integration-check-tms-ok': '{{detail}} — связь есть.',
   'integration-check-atlassian-ok': 'Вошли как {{account}} ({{deployment}}).',
+  'integration-check-atlassian-confluence-ok':
+    'Вошли как {{account}} ({{deployment}}). Confluence на связи.',
+  'integration-check-atlassian-confluence-rejected':
+    'Вошли как {{account}} ({{deployment}}). Confluence отклонил токен — заполните отдельный ключ Confluence.',
+  'integration-check-atlassian-confluence-failed':
+    'Вошли как {{account}} ({{deployment}}). Confluence ответил {{status}} — проверьте адрес Confluence.',
+  'integration-check-atlassian-confluence-unreachable':
+    'Вошли как {{account}} ({{deployment}}). Confluence недоступен: {{reason}}.',
   'integration-deployment-cloud': 'облако',
   'integration-deployment-own': 'своя установка',
   'integration-tms-project': '{{system}}, проект {{project}}',
@@ -112,4 +120,8 @@ export const composedRu: Record<ComposedMessageCode, string> = {
     'Windows не дал создать копию в {{target}}: путь длиннее 260 символов.\nПанель уже просит git о длинных путях и укорачивает имя каталога, но глубину самого\nрепозитория выбирает не она. Включите длинные пути в системе — «Редактор локальной\nгрупповой политики» → Конфигурация компьютера → Административные шаблоны → Система →\nФайловая система → «Включить длинные пути Win32», либо в реестре\nHKLM\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\FileSystem\\\\LongPathsEnabled = 1, — и повторите.\nБыстрый обходной путь: перенести репозиторий ближе к корню диска.\n\nОтвет git: {{error}}',
   'git-failed-no-output': 'Команда git завершилась с ошибкой',
   'worktree-install-started': 'Установка запущена: {{command}}',
+  'split-triage-interrupted-hold':
+    'Разбор оборвался при перезапуске панели и итога не даст. Запустить группу как предложено? Ответ уедет в её задачу.',
+  'split-triage-interrupted-notice':
+    'Разбор оборвался перезапуском панели — итога не будет. Групп ждёт вашего ответа: {{groups}}; сами они не стартуют.',
 };

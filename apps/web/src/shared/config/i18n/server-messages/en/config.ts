@@ -262,4 +262,5 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'endpoint-probe-not-json':
     'The answer is not JSON — what answers at this address is not a model API.',
   'endpoint-probe-status': 'The address answered {{status}}{{detail}}',
+  'instructions-section-unsupported': 'The active CLI does not support global instructions.',
 };

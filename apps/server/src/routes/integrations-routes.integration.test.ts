@@ -22,6 +22,7 @@ describe('integrations-routes: поверхность', () => {
   let mcpConfig = '';
 
   const SECRET = 'ATLASSIAN-TOKEN-СЕКРЕТ-42';
+  const WIKI_SECRET = 'CONFLUENCE-PAT-СЕКРЕТ-77';
 
   const post = async (url: string, payload?: Record<string, unknown>) =>
     app.inject({ method: 'POST', url, payload });
@@ -188,6 +189,46 @@ describe('integrations-routes: поверхность', () => {
 
     const issue = await app.inject({ method: 'GET', url: '/api/integrations/jira/issue/PRJ-1' });
     expect(issue.json()).toMatchObject({ key: 'PRJ-1' });
+  });
+
+  /**
+   * Дефект 18.09.2026, найден живьём на Server/DC: `GET .../confluence/spaces`
+   * отвечал 502 «токен отклонён» при рабочей Jira — у Confluence там свой
+   * personal access token, а панель посылала ключ Jira.
+   *
+   * Проверка идёт НАСТОЯЩИМ маршрутом: тем же PUT ходят браузер, телефон и
+   * curl, и ровно на нём ключ должен разделиться.
+   */
+  it('второй ключ Confluence сохраняется маршрутом и уезжает именно в вики', async () => {
+    await connect();
+    const saved = await put('/api/integrations/atlassian', {
+      settings: {
+        enabled: true,
+        baseUrl: 'https://jira.acme.local',
+        email: '',
+        deployment: 'server',
+        confluenceUrl: 'https://wiki.acme.local',
+      },
+      confluenceToken: WIKI_SECRET,
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.body).not.toContain(WIKI_SECRET);
+    expect(saved.json()).toMatchObject({ hasToken: true, hasConfluenceToken: true });
+
+    const headers: string[] = [];
+    vi.stubGlobal('fetch', (url: string, init: RequestInit = {}) => {
+      headers.push(String((init.headers as Record<string, string>)?.Authorization ?? ''));
+      return Promise.resolve(
+        new Response(JSON.stringify(String(url).includes('/space') ? { results: [] } : []), {
+          status: 200,
+        }),
+      );
+    });
+
+    await app.inject({ method: 'GET', url: '/api/integrations/confluence/spaces' });
+    await app.inject({ method: 'GET', url: '/api/integrations/jira/projects' });
+    expect(headers[0]).toBe(`Bearer ${WIKI_SECRET}`);
+    expect(headers[1]).toBe(`Bearer ${SECRET}`);
   });
 
   it('внешняя система не отвечает — 502 с причиной словами', async () => {

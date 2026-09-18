@@ -21,7 +21,12 @@ export const integrationsEn: typeof integrationsRu = {
     whyBothText:
       'Which Atlassian is on the other end is detected by a live check and remembered: ' +
       'the cloud takes Basic auth with an email, Server/DC takes a Bearer token, and ' +
-      'their API paths differ. None of that has to be chosen by hand.',
+      'their API paths differ. None of that has to be chosen by hand. What does have to ' +
+      'be chosen by hand: on an own installation Jira and Confluence are separate apps ' +
+      'and each issues its own token, so the card has a second field, "Confluence key". ' +
+      'Leaving it empty means "the same one as Jira" — which is how the cloud works, ' +
+      'where a site has a single key. "Check connection" asks both systems and says in ' +
+      'the caption what the wiki answered.',
     whySecret: 'The secret is never shown and never forwarded',
     whySecretText:
       'The token is stored encrypted on this machine. What leaves it — in a response, a ' +
@@ -299,7 +304,7 @@ export const integrationsEn: typeof integrationsRu = {
     storageLinksValue: 'agentdeck/state.json → keyed by the normalised project path',
     storageMcp: 'The “Connect MCP” button',
     storageMcpValue:
-      'the active CLI’s MCP configuration; for Claude Code that is .claude.json next to the configuration directory',
+      'the active CLI’s MCP configuration; for Claude Code that is .claude.json — beside ~/.claude, or inside a directory set explicitly',
 
     canCheck: 'Check the connection and show which account the panel signed in as',
     canDetect: 'Detect cloud or Server/DC by a live probe and remember the answer',

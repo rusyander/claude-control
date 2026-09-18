@@ -299,6 +299,10 @@ describe('SplitConveyor: ожидания и ответ человека', () =>
     expect(view?.triage?.received).toBe(true);
     expect(view?.groups.map((group) => group.status)).toEqual(['started', 'started', 'held']);
     expect(view?.groups[2]?.hold).toBe('какие браузеры?');
+    // Вопрос писал АГЕНТ — кода у него нет: панель его не сочиняла, и переводить
+    // нечего. Код рядом с чужим текстом означал бы, что панель покажет вместо
+    // него свою фразу.
+    expect(view?.groups[2]).not.toHaveProperty('holdCode');
     expect(conveyor.view(['никто'])).toBeUndefined();
   });
 
@@ -429,6 +433,27 @@ describe('SplitConveyor.recoverInterruptedTriage', () => {
     expect(notices).toHaveLength(1);
     expect(notices[0]?.parentChatId).toBe('родитель');
     expect(notices[0]?.event).toMatchObject({ kind: 'notice', code: 'triageMissing' });
+  });
+
+  it('вопрос и заметка панели едут с кодом — их читают словарём, а не по-русски', async () => {
+    const { conveyor, begin } = build();
+    await begin();
+
+    const notices = conveyor.recoverInterruptedTriage(() => false);
+
+    // Заметка родителю: повод (`code`) и код самой строки — разные вещи, и
+    // счёт вставших групп едет подстановкой, а не вплавлен в текст.
+    expect(notices[0]?.event).toMatchObject({
+      kind: 'notice',
+      code: 'triageMissing',
+      textCode: 'split-triage-interrupted-notice',
+      textParams: { groups: 3 },
+    });
+    // Вопрос группы писала ПАНЕЛЬ — в пульте он с кодом, и русская строка
+    // остаётся рядом запасной (её же читает чужой CLI и клиент постарше).
+    const group = conveyor.view(['родитель'])?.groups[0];
+    expect(group?.holdCode).toBe('split-triage-interrupted-hold');
+    expect(group?.hold).toContain('Разбор оборвался');
   });
 
   it('разбор пережил перезапуск — запись не трогаем', async () => {

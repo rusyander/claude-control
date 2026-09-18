@@ -377,6 +377,23 @@ describe('panel-agent actions: configuration', () => {
     expect(backups().some((name) => name.includes('review'))).toBe(true);
   });
 
+  it('заметка «Кроме файла» едет кодом: английское окно не читает русскую строку', async () => {
+    // Значение поля пишет сама панель, а не данные пользователя. Без кода
+    // подпись переводилась, а значение оставалось русским — ровно в том поле,
+    // ради которого карточку и читают перед одобрением.
+    const rejected = await decided('delete_skill', { id: 'review' }, 'reject');
+    const notes = rejected.card.preview.fields.filter(
+      (field) => field.labelCode === 'label-besides-file',
+    );
+
+    expect(notes.length).toBeGreaterThan(0);
+    for (const note of notes) {
+      expect(note.valueCode).toBeTruthy();
+      expect(note.value).not.toBe('');
+    }
+    expect(notes.map((note) => note.valueCode)).toContain('note-skill-folder-delete');
+  });
+
   it('MCP: секрет от агента не принимается, пустой секрет не затирает сохранённый, дальше — шаг человека', async () => {
     const mcp = paths().mcpConfig;
     const before = readFileSync(mcp, 'utf8');

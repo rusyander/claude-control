@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { serverMessageText } from '@shared/config/i18n';
 import type { FeedNoticesProps } from './FeedNotices.types';
 import styles from './ChatMessages.module.scss';
 
@@ -18,6 +19,9 @@ import styles from './ChatMessages.module.scss';
  */
 export function FeedNotices({ stream, onRefresh }: FeedNoticesProps) {
   const { t } = useTranslation();
+  // Заметку, которую панель написала по коду, читаем своим словарём; ту, что
+  // сервер собрал из счётчиков, показываем его русской строкой.
+  const notice = serverMessageText(stream.noticeCode, stream.noticeParams) ?? stream.notice;
 
   return (
     <>
@@ -80,10 +84,10 @@ export function FeedNotices({ stream, onRefresh }: FeedNoticesProps) {
         итог хода, а не тост на пять секунд. У подхваченного прогона своя строка
         стоит выше, и заметка про подхват в ней уже сказана.
       */}
-      {stream.notice && !stream.detached && (
+      {notice && !stream.detached && (
         <div className={styles.reconnecting} role="status" data-chat-notice>
           <Icon name="info" size={18} />
-          {stream.notice}
+          {notice}
         </div>
       )}
     </>

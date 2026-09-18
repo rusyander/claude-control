@@ -64,22 +64,22 @@ The AI features (form assistant, skill generator, chat) shell out to the `claude
 
 Everything is under your home directory. The panel creates no files inside the repository.
 
-| Path                             | Access        | What it is                                                  |
-| -------------------------------- | ------------- | ----------------------------------------------------------- |
-| `~/.claude/CLAUDE.md`            | read / write  | Rules                                                       |
-| `~/.claude/settings.json`        | read / write  | Hooks, permissions, env                                     |
-| `~/.claude/settings.local.json`  | read / write  | The same, personal — tagged "local"                         |
-| `~/.claude/skills/`              | read / write  | Skills                                                      |
-| `~/.claude/skills-disabled/`     | read / write  | Disabled skills                                             |
-| `~/.claude/hooks/`               | read / write  | Hook scripts                                                |
-| `~/.claude.json`                 | read / write  | MCP servers, account (note: _beside_ `.claude`, not inside) |
-| `~/.claude/.mcp-secrets.env`     | read / write  | MCP secrets                                                 |
-| `~/.claude/projects/`            | **read only** | Transcripts — the source for chat and analytics             |
-| `~/.claude/.credentials.json`    | **read only** | Copied into a sandbox so the CLI is logged in               |
-| `~/.claude/agentdeck/state.json` | read / write  | The panel's own state: groups, automations, settings        |
-| `~/.claude/agentdeck/backups/`   | write         | Timestamped backups                                         |
-| `~/.agentdeck/chats/`            | read / write  | Working folders for chats started in the panel              |
-| `~/.agentdeck/sandboxes/`        | read / write  | Temporary sandbox config and working dirs                   |
+| Path                             | Access        | What it is                                                                                                                                                                    |
+| -------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `~/.claude/CLAUDE.md`            | read / write  | Rules                                                                                                                                                                         |
+| `~/.claude/settings.json`        | read / write  | Hooks, permissions, env                                                                                                                                                       |
+| `~/.claude/settings.local.json`  | read / write  | The same, personal — tagged "local"                                                                                                                                           |
+| `~/.claude/skills/`              | read / write  | Skills                                                                                                                                                                        |
+| `~/.claude/skills-disabled/`     | read / write  | Disabled skills                                                                                                                                                               |
+| `~/.claude/hooks/`               | read / write  | Hook scripts                                                                                                                                                                  |
+| `~/.claude.json`                 | read / write  | MCP servers, account — _beside_ `.claude` for the home directory; **inside** a directory set through `CLAUDE_CONFIG_DIR` or the settings, which is where the CLI itself looks |
+| `~/.claude/.mcp-secrets.env`     | read / write  | MCP secrets                                                                                                                                                                   |
+| `~/.claude/projects/`            | **read only** | Transcripts — the source for chat and analytics                                                                                                                               |
+| `~/.claude/.credentials.json`    | **read only** | Copied into a sandbox so the CLI is logged in                                                                                                                                 |
+| `~/.claude/agentdeck/state.json` | read / write  | The panel's own state: groups, automations, settings                                                                                                                          |
+| `~/.claude/agentdeck/backups/`   | write         | Timestamped backups                                                                                                                                                           |
+| `~/.agentdeck/chats/`            | read / write  | Working folders for chats started in the panel                                                                                                                                |
+| `~/.agentdeck/sandboxes/`        | read / write  | Temporary sandbox config and working dirs                                                                                                                                     |
 
 The last two sit outside `~/.claude` deliberately: Claude Code treats its own directory as protected and refuses to write there, so chat artifacts would silently fail to appear.
 

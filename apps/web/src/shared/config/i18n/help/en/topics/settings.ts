@@ -13,7 +13,9 @@ export const settingsEn: typeof settingsRu = {
     whyPath: 'It decides what you are working with',
     whyPathText:
       'The configuration directory determines which rules, skills and hooks the panel ' +
-      'sees. It is changed here and applies at once, without a restart.',
+      'sees. It is changed here and applies at once, without a restart. The directory also ' +
+      'decides which .claude.json — the MCP registry and the account record — is read: beside ' +
+      '~/.claude for the home one, inside a directory that was set explicitly, exactly where the CLI looks.',
     whySandbox: 'It brings the sandbox to life',
     whySandboxText:
       'The sandbox runs Claude with a separate settings directory that your normal access ' +

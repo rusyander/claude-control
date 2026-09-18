@@ -2,11 +2,24 @@ import type { AtlassianDeployment, IntegrationId, IntegrationStatus } from '@age
 import type { AppStore } from '../../lib/app-store.ts';
 import { telegramMe } from '../notify/telegram.ts';
 import { sendWebhook } from '../notify/webhook.ts';
-import { detectDeployment, trimUrl } from './atlassian/client.ts';
+import {
+  confluenceRoot,
+  CONFLUENCE_SYSTEM,
+  detectDeployment,
+  raw,
+  trimUrl,
+  type AtlassianAccess,
+} from './atlassian/client.ts';
 import { IntegrationError } from './errors.ts';
 import { toForgeIdentity, whoAmI } from './forge.ts';
 import { saveHealth } from './health.ts';
-import { describeIntegration, readIntegrations, readToken, writeSettings } from './store.ts';
+import {
+  describeIntegration,
+  readConfluenceToken,
+  readIntegrations,
+  readToken,
+  writeSettings,
+} from './store.ts';
 import { tmsClient } from './tms/index.ts';
 import { coded } from '../../lib/server-text.ts';
 import { serverText } from '../../lib/server-texts.ts';
@@ -84,7 +97,7 @@ async function probeIntegration(
     );
   }
 
-  if (id === 'atlassian') return probeAtlassian(store, token);
+  if (id === 'atlassian') return probeAtlassian(store, appDataDir, token);
   if (id === 'forge') {
     const account = await whoAmI(toForgeIdentity(settings.forge, token));
     return { detail: serverText('integration-check-logged-in', { account }), account };
@@ -114,29 +127,85 @@ async function probeIntegration(
  * наличию почты, а Confluence у облака и у своей установки живёт по разным
  * путям: ошибка диалекта даёт 404 на верном токене.
  */
-async function probeAtlassian(store: AppStore, token: string): Promise<Probe> {
+async function probeAtlassian(store: AppStore, appDataDir: string, token: string): Promise<Probe> {
   const settings = readIntegrations(store).atlassian;
-  const probe = await detectDeployment({
+  const identity = {
     baseUrl: trimUrl(settings.baseUrl),
     email: settings.email.trim(),
     token,
     confluenceUrl: settings.confluenceUrl.trim(),
-  });
+    confluenceToken: readConfluenceToken(appDataDir) ?? '',
+  };
+  const probe = await detectDeployment(identity);
   if (settings.deployment !== probe.deployment) {
     writeSettings(store, 'atlassian', { ...settings, deployment: probe.deployment });
   }
+  const params = {
+    account: probe.account,
+    deployment: serverText(
+      probe.deployment === 'cloud' ? 'integration-deployment-cloud' : 'integration-deployment-own',
+    ),
+  };
+  const confluence = await probeConfluence({ ...identity, deployment: probe.deployment });
   return {
-    detail: serverText('integration-check-atlassian-ok', {
-      account: probe.account,
-      deployment: serverText(
-        probe.deployment === 'cloud'
-          ? 'integration-deployment-cloud'
-          : 'integration-deployment-own',
-      ),
-    }),
+    detail: confluence
+      ? serverText(confluence.code, { ...params, ...confluence.params })
+      : serverText('integration-check-atlassian-ok', params),
     account: probe.account,
     deployment: probe.deployment,
   };
+}
+
+type ConfluenceVerdict = {
+  code:
+    | 'integration-check-atlassian-confluence-ok'
+    | 'integration-check-atlassian-confluence-rejected'
+    | 'integration-check-atlassian-confluence-failed'
+    | 'integration-check-atlassian-confluence-unreachable';
+  params?: Record<string, string | number>;
+};
+
+/**
+ * Живёт ли Confluence на этом доступе — вторая половина той же кнопки.
+ *
+ * Спрашивается отдельно, потому что связь у них РАЗНАЯ: на своей установке Jira
+ * и Confluence — разные приложения с разными личными токенами, и «Вошли как …»
+ * по Jira ничего не обещает про вики. Живой случай: панель отвечала
+ * «Confluence не подключён» на 401, хотя ключ Confluence существовал — просто
+ * панель его не спрашивала.
+ *
+ * Итог НЕ красит карточку: Jira работает, и гасить её из-за вики нельзя. Итог
+ * дописывается в ту же подпись, чтобы причина была видна до первой кнопки.
+ *
+ * Не спрашиваем вовсе, когда спрашивать не у кого: у своей установки без адреса
+ * Confluence и без отдельного ключа корень равен хосту Jira, и 404 оттуда —
+ * ложная тревога про вики, которой у человека может не быть.
+ */
+async function probeConfluence(access: AtlassianAccess): Promise<ConfluenceVerdict | undefined> {
+  const asked =
+    access.deployment === 'cloud' || Boolean(access.confluenceUrl || access.confluenceToken);
+  if (!asked) return undefined;
+  try {
+    // Старый content-API отвечает у ОБОИХ диалектов (у облака — под `/wiki`),
+    // а `limit=1` делает пробу такой же дешёвой и безвредной, как «кто я».
+    const response = await raw(access, {
+      url: `${confluenceRoot(access)}/rest/api/space?limit=1`,
+      system: CONFLUENCE_SYSTEM,
+    });
+    if (response.ok) return { code: 'integration-check-atlassian-confluence-ok' };
+    if (response.status === 401 || response.status === 403) {
+      return { code: 'integration-check-atlassian-confluence-rejected' };
+    }
+    return {
+      code: 'integration-check-atlassian-confluence-failed',
+      params: { status: response.status },
+    };
+  } catch (error) {
+    return {
+      code: 'integration-check-atlassian-confluence-unreachable',
+      params: { reason: reasonOf(error) },
+    };
+  }
 }
 
 /** Причина отказа человеческой строкой — она же ляжет на карточку. */

@@ -2388,7 +2388,11 @@ export const en: TranslationSchema = {
       idle: 'No request with tools has gone through the gateway yet — the panel knows nothing about the shim so far.',
       quiet:
         'Requests with tools did go through, but the model made no call and claimed no action in words.',
+      dropped:
+        'Requests with tools did go through, but the shim is off: the model never saw them and had nothing to call.',
     },
+    toolShimDropped:
+      'Requests with tools dropped: {{count}}. The shim is off and this contour does not accept a tools field — the agent was left without hands. The “Tool shim” switch on the contour card turns it on.',
     toolShimTurns: 'turns with tools: {{turns}}',
     toolShimCalls: '{{calls}} calls across {{requests}} requests with tools',
     toolShimClaimed_one:
@@ -4870,6 +4874,8 @@ export const en: TranslationSchema = {
       tokenPlaceholder: 'Paste the key',
       tokenSaved: 'Key saved: {{mask}}. A new value replaces it, an empty field leaves it alone.',
       tokenEmpty: 'No key yet. It goes into the encrypted store and never returns to this screen.',
+      confluenceToken: 'Confluence key (if separate)',
+      confluenceTokenEmpty: 'No separate key — Confluence is asked with the Jira one.',
       check: 'Check connection',
       forget: 'Forget key',
       missing: 'Not filled in: {{fields}}',
@@ -4881,6 +4887,8 @@ export const en: TranslationSchema = {
         hint: 'Where requirements come from and where defects and reports go. One key for both systems when they share a site.',
         tokenHint:
           'Cloud: an API token from id.atlassian.com together with the email below. Server/DC: a personal access token, leave the email empty.',
+        confluenceTokenHint:
+          'Needed on an own installation only: there Jira and Confluence issue a personal access token each, and the wiki answers 401 to the Jira one. Cloud has a single key — leave this empty.',
       },
       forge: {
         title: 'Forge by token',

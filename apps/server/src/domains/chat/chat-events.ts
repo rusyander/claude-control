@@ -1,5 +1,6 @@
 import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
 /**
  * Словарь событий чата: что панель получает от CLI и что отдаёт интерфейсу.
@@ -81,6 +82,14 @@ export type ChatEvent =
         | 'groupsActivated'
         | 'modelDropped';
       text: string;
+      /**
+       * Код самого текста — отдельно от `code`, который называет ПОВОД. Повод
+       * один («разбор не дал итога»), а строк под ним две, и переводится
+       * строка. Есть не у всякой заметки: сводку разбора сервер собирает
+       * списком из счётчиков, и шаблона у неё нет.
+       */
+      textCode?: ServerMessageCode;
+      textParams?: ServerMessageParams;
     }
   /**
    * Работа продолжена в чистой сессии (или не продолжена — тогда есть `reason`).

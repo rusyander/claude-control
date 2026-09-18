@@ -28,6 +28,8 @@ import { readEnvLookup } from '../domains/env.ts';
 import { readMcpServers } from '../domains/mcp.ts';
 import { hasOAuthTokens, oauthProviderFor } from '../domains/mcp-oauth.ts';
 import { readArtifacts } from '../domains/chat/ChatArtifacts.ts';
+import { codeOf } from '../lib/server-text.ts';
+import { attachTextCodes } from '../lib/server-texts.ts';
 
 /**
  * Песочница: проверка отдельных настроек в изоляции.
@@ -61,7 +63,9 @@ function safeScriptPath(hooksDir: string, name: string): string | undefined {
 export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext): void {
   const running = new Map<string, ChatRun>();
 
-  app.get('/api/sandbox/fixtures', () => EVENT_FIXTURES);
+  // Подпись и пояснение образца собраны сервером строкой: код к ним
+  // восстанавливается разбором, и каталог читается на языке панели.
+  app.get('/api/sandbox/fixtures', () => attachTextCodes(EVENT_FIXTURES));
 
   /** Сборка песочницы: показываем состав до того, как что-либо запускать. */
   app.post<{ Body: { id?: string; selection?: SandboxSelection } }>(
@@ -70,7 +74,9 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       // Идентификатор задаёт КАТАЛОГ песочницы — домыслить его нельзя, а без
       // проверки запрос без тела собирал путь из `undefined` и отвечал 500.
       if (!request.body.id) {
-        return reply.code(400).send({ message: 'Не указана песочница' });
+        return reply
+          .code(400)
+          .send({ message: 'Не указана песочница', messageCode: 'sandbox-unspecified' });
       }
 
       const sandbox = createSandbox(
@@ -125,6 +131,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       return {
         results: [],
         error: 'Песочница ещё не собрана: дождитесь окончания сборки и повторите прогон.',
+        messageCode: 'sandbox-not-built',
       };
     }
 
@@ -147,13 +154,19 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
             results: [],
             error:
               'Скрипт этого хука не попал в песочницу — прогон отменён, чтобы не запустить настоящий файл. Соберите песочницу заново.',
+            messageCode: 'sandbox-hook-script-missing',
           };
         }
         command = command.split(hook.scriptPath).join(copy);
       }
     } else if (scriptName) {
       const copy = safeScriptPath(sandboxHooks, scriptName);
-      if (!copy) return { results: [], error: 'Недопустимое имя скрипта' };
+      if (!copy)
+        return {
+          results: [],
+          error: 'Недопустимое имя скрипта',
+          messageCode: 'sandbox-script-name-invalid',
+        };
 
       // Только копия: раньше при её отсутствии брался файл из настоящего
       // hooks/ — то есть песочница запускала оригинал.
@@ -162,6 +175,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
           results: [],
           error:
             'Скрипт не попал в песочницу — прогон отменён, чтобы не запустить настоящий файл. Соберите песочницу заново.',
+          messageCode: 'sandbox-script-missing',
         };
       }
       command = scriptCommand(copy);
@@ -178,6 +192,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
         error: needsPowerShell
           ? 'Скрипты .ps1 запускаются через PowerShell — вне Windows нужен pwsh (PowerShell Core). Установите его или перепишите хук на .sh либо .mjs.'
           : 'Нечего запускать: команда не найдена',
+        messageCode: needsPowerShell ? 'sandbox-ps1-needs-pwsh' : 'sandbox-nothing-to-run',
       };
     }
 
@@ -185,10 +200,10 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
     // это JSON-объект, затем прогоняем тем же механизмом, что и заготовки.
     if (customEvent !== undefined) {
       const parsed = parseCustomEvent(customEvent);
-      if (!parsed.ok) return { results: [], error: parsed.error, command };
+      if (!parsed.ok) return attachTextCodes({ results: [], error: parsed.error, command });
 
       const result = await runCustomHookProbe(command, parsed.payload, workDir);
-      return { results: [result], command };
+      return attachTextCodes({ results: [result], command });
     }
 
     const fixtures = EVENT_FIXTURES.filter(
@@ -200,7 +215,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       results.push(await runHookProbe(command, fixture, workDir));
     }
 
-    return { results, command };
+    return attachTextCodes({ results, command });
   });
 
   // Сетевой сервер с сохранёнными токенами опрашиваем через OAuth-провайдер —
@@ -227,14 +242,19 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
     const server = readMcpServers(ctx.location.paths.mcpConfig, ctx.store).find(
       (item) => item.id === request.body.mcpId,
     );
-    if (!server) return { tools: [], error: 'Сервер не найден' };
+    if (!server)
+      return { tools: [], error: 'Сервер не найден', messageCode: 'mcp-server-not-found' };
 
     try {
       return {
         tools: await listMcpTools(server, undefined, mcpAuthProvider(server), mcpEnvLookup()),
       };
     } catch (error) {
-      return { tools: [], error: error instanceof Error ? error.message : String(error) };
+      return {
+        tools: [],
+        error: error instanceof Error ? error.message : String(error),
+        ...codeOf(error),
+      };
     }
   });
 
@@ -244,7 +264,15 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       const server = readMcpServers(ctx.location.paths.mcpConfig, ctx.store).find(
         (item) => item.id === request.body.mcpId,
       );
-      if (!server) return { ok: false, content: 'Сервер не найден', isError: true, durationMs: 0 };
+      if (!server) {
+        return {
+          ok: false,
+          content: 'Сервер не найден',
+          messageCode: 'mcp-server-not-found',
+          isError: true,
+          durationMs: 0,
+        };
+      }
 
       return callMcpTool(
         server,
@@ -270,7 +298,10 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       // Ни песочницу, ни вопрос домыслить нечем. Без этой проверки запрос без
       // тела уходил собирать пути из `undefined` и отвечал 500.
       if (!id || !prompt) {
-        return reply.code(400).send({ message: 'Нужны песочница и текст вопроса' });
+        return reply.code(400).send({
+          message: 'Нужны песочница и текст вопроса',
+          messageCode: 'sandbox-ask-incomplete',
+        });
       }
 
       if (!existsSync(sandboxPaths(id).configDir)) {
@@ -284,6 +315,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
           return reply.code(410).send({
             message:
               'Песочница убрана по простою: копия доступа к аккаунту в ней не должна лежать часами. Откройте её заново — состав соберётся снова.',
+            messageCode: 'sandbox-reaped-idle',
           });
         }
 
@@ -326,7 +358,11 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       try {
         await run.start({ prompt, sessionId, cwd: workDir, configDir, env }, send);
       } catch (error) {
-        send({ kind: 'error', message: error instanceof Error ? error.message : String(error) });
+        send({
+          kind: 'error',
+          message: error instanceof Error ? error.message : String(error),
+          ...codeOf(error),
+        });
       } finally {
         running.delete(id);
         markSandboxFree(id);

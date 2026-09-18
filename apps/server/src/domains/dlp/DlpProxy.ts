@@ -5,6 +5,7 @@ import { AliasVault } from './mask.ts';
 import { maskRequestBody } from './request-filter.ts';
 import { ResponseStreamFilter, restoreJsonResponse } from './response-filter.ts';
 import { appendJournal } from './journal.ts';
+import { localizeText, serverText, type TextLanguage } from '../../lib/server-texts.ts';
 
 /**
  * Локальный прокси между CLI и моделью.
@@ -54,6 +55,11 @@ export interface DlpRuntime {
   passUnknown: boolean;
   journal: boolean;
   appDataDir: string;
+  /**
+   * Язык панели. Отказ прокси печатает CLI как есть — переводчика между ними
+   * нет, поэтому текст собирается на этом языке здесь, как и у шлюза.
+   */
+  language: TextLanguage;
 }
 
 export class DlpProxy {
@@ -90,7 +96,9 @@ export class DlpProxy {
 
     const server = createServer((request, response) => {
       void this.#handle(request, response).catch(() => {
-        respondJson(response, 502, { error: 'прокси не смог обработать запрос' });
+        respondJson(response, 502, {
+          error: localizeText(serverText('proxy-failed'), config.language),
+        });
       });
     });
 
@@ -118,14 +126,16 @@ export class DlpProxy {
 
   async #handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const config = this.#config;
-    if (!config) return respondJson(response, 503, { error: 'прокси не настроен' });
+    if (!config) return respondJson(response, 503, { error: serverText('proxy-not-configured') });
 
     const path = request.url ?? '/';
     const kind = apiKindForPath(path);
 
     const raw = await readBody(request);
     if (raw === undefined)
-      return respondJson(response, 413, { error: 'тело запроса слишком велико' });
+      return respondJson(response, 413, {
+        error: localizeText(serverText('proxy-body-too-large'), config.language),
+      });
 
     this.#stats.requests += 1;
 
@@ -140,13 +150,20 @@ export class DlpProxy {
         response,
         path,
         raw,
-        'форма запроса не разбирается',
+        serverText('proxy-shape-unknown'),
       );
     }
 
     const masked = maskRequestBody(raw.toString('utf8'), kind, config.rules, this.#vault);
     if (!masked) {
-      return this.#unknownShape(config, request, response, path, raw, 'тело запроса не JSON');
+      return this.#unknownShape(
+        config,
+        request,
+        response,
+        path,
+        raw,
+        serverText('proxy-body-not-json'),
+      );
     }
 
     if (masked.blockedBy) {
@@ -159,7 +176,7 @@ export class DlpProxy {
         hits: masked.hits,
         reason: masked.blockedBy.ruleName,
       });
-      return respondBlocked(response, kind, masked.blockedBy.ruleName);
+      return respondBlocked(response, kind, masked.blockedBy.ruleName, config.language);
     }
 
     if (masked.hits.length) this.#stats.masked += 1;
@@ -199,7 +216,7 @@ export class DlpProxy {
       });
       // 400, а не 403: отказ по настройке прокси, а не по доступу (см. respondBlocked).
       return respondJson(response, 400, {
-        error: `AgentDeck: ${reason}, запрос остановлен (настройка «пропускать неразобранное» выключена)`,
+        error: localizeText(serverText('proxy-stopped-unparsed', { reason }), config.language),
       });
     }
 
@@ -237,7 +254,10 @@ export class DlpProxy {
     } catch (error) {
       // Текст ошибки сети — без заголовков и без тела: там ключи.
       return respondJson(response, 502, {
-        error: `AgentDeck: адрес модели не отвечает (${describeError(error)})`,
+        error: localizeText(
+          serverText('proxy-upstream-unreachable', { reason: describeError(error) }),
+          config.language,
+        ),
       });
     }
 
@@ -377,8 +397,18 @@ function respondJson(response: ServerResponse, status: number, payload: unknown)
  * Отказ в форме самого API: CLI разбирает ошибку по своей схеме, и понятный
  * текст доходит до человека, а не превращается в «unexpected response».
  */
-function respondBlocked(response: ServerResponse, kind: DlpApiKind, ruleName: string): void {
-  const message = `AgentDeck: запрос остановлен правилом «${ruleName}» — в нём нашлись данные, которые не должны уходить в модель`;
+function respondBlocked(
+  response: ServerResponse,
+  kind: DlpApiKind,
+  ruleName: string,
+  language: TextLanguage,
+): void {
+  const message = localizeText(
+    serverText('gateway-prefixed', {
+      message: serverText('gateway-mask-blocked', { rule: ruleName }),
+    }),
+    language,
+  );
 
   const payload =
     kind === 'anthropic'

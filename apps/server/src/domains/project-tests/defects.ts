@@ -15,6 +15,7 @@ import { createForgeIssue, toForgeAccess } from '../integrations/forge.ts';
 import { linkForCwd } from '../integrations/links.ts';
 import { readIntegrations, readToken, requireConnected } from '../integrations/store.ts';
 import { ProjectTestsError } from './files.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Дефект по проваленному кейсу: черновик и, если есть чем, заведение задачи.
@@ -210,8 +211,11 @@ export async function createTokenDefect(
   if (target === 'jira') {
     const projectKey = jiraProjectOf(deps);
     if (!projectKey) {
-      throw new ProjectTestsError(
-        'К проекту не привязан проект Jira — привяжите его на карточке проекта.',
+      throw coded(
+        new ProjectTestsError(
+          'К проекту не привязан проект Jira — привяжите его на карточке проекта.',
+        ),
+        'defect-jira-project-unlinked',
       );
     }
     const token = requireConnected(deps.store, deps.appDataDir, 'atlassian', 'Atlassian');
@@ -240,10 +244,13 @@ export function createDefect(
 ): string {
   const command = findCliOnPath(target === 'github' ? GH : GLAB);
   if (!command) {
-    throw new ProjectTestsError(
-      target === 'github'
-        ? 'Не найден gh — поставьте GitHub CLI или скопируйте черновик руками.'
-        : 'Не найден glab — поставьте GitLab CLI или скопируйте черновик руками.',
+    throw coded(
+      new ProjectTestsError(
+        target === 'github'
+          ? 'Не найден gh — поставьте GitHub CLI или скопируйте черновик руками.'
+          : 'Не найден glab — поставьте GitLab CLI или скопируйте черновик руками.',
+      ),
+      target === 'github' ? 'defect-gh-missing' : 'defect-glab-missing',
     );
   }
 
@@ -260,15 +267,26 @@ export function createDefect(
   });
 
   if (result.error)
-    throw new ProjectTestsError(`Не удалось запустить ${command}: ${result.error.message}`);
+    throw coded(
+      new ProjectTestsError(`Не удалось запустить ${command}: ${result.error.message}`),
+      'defect-cli-start-failed',
+      { command, reason: result.error.message },
+    );
   if (result.status !== 0) {
     const reason = (result.stderr || result.stdout || '').trim().split('\n').slice(-3).join(' ');
-    throw new ProjectTestsError(
-      `${command} отказался заводить задачу: ${reason || 'без объяснения'}`,
+    throw coded(
+      new ProjectTestsError(`${command} отказался заводить задачу: ${reason || 'без объяснения'}`),
+      reason ? 'defect-cli-refused' : 'defect-cli-refused-silent',
+      reason ? { command, reason } : { command },
     );
   }
 
   const url = `${result.stdout ?? ''}`.match(/https?:\/\/\S+/)?.[0];
-  if (!url) throw new ProjectTestsError(`${command} не вернул ссылку на задачу.`);
+  if (!url)
+    throw coded(
+      new ProjectTestsError(`${command} не вернул ссылку на задачу.`),
+      'defect-cli-no-url',
+      { command },
+    );
   return url;
 }

@@ -1,0 +1,730 @@
+{
+  "bootstrap/banner.ts": {
+    "n": 10,
+    "why": "log line / internal error not shown as text"
+  },
+  "bootstrap/runtime.ts": {
+    "n": 5,
+    "why": "log line / internal error not shown as text"
+  },
+  "domains/analytics/pricing-source.ts": {
+    "n": 3,
+    "why": "log line / internal error not shown as text"
+  },
+  "domains/assistant-runner/api.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/assistant-runner/cli.ts": {
+    "n": 3,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/assistant.ts": {
+    "n": 10,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/chat/ChatExport.ts": {
+    "n": 3,
+    "why": "exported document / markdown written for another tool"
+  },
+  "domains/chat/ChatPermissions.ts": {
+    "n": 3,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/chat/ChatRecords.ts": {
+    "n": 2,
+    "why": "exported document / markdown written for another tool"
+  },
+  "domains/chat/ChatRunner.ts": {
+    "n": 4,
+    "why": "agent prompt / text the model reads; +1 the `modelDropped` feed notice — same shape as detached-run.ts: the code travels for translation, the text for a client with no dictionary"
+  },
+  "domains/chat/detached-run.ts": {
+    "n": 2,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/chat/initiative.ts": {
+    "n": 12,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/chat/split-conveyor.ts": {
+    "n": 15,
+    "why": "composed list explanation / git output assembly; +4 await codes (TODO): hold question and parent notice of a triage interrupted by a panel restart"
+  },
+  "domains/chat/split-overlap.ts": {
+    "n": 9,
+    "why": "composed list explanation / git output assembly"
+  },
+  "domains/chat/split-review.ts": {
+    "n": 11,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/commands/claude.ts": {
+    "n": 4,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/config-preview.ts": {
+    "n": 6,
+    "why": "dry-run notes shown as a free-text field value of the panel-agent approval card (needs a value code in PanelActionPreview.fields first)"
+  },
+  "domains/config-preview/extra.ts": {
+    "n": 6,
+    "why": "dry-run notes shown as a free-text field value of the panel-agent approval card (needs a value code in PanelActionPreview.fields first)"
+  },
+  "domains/dlp/default-rules.ts": {
+    "n": 32,
+    "why": "default data: built-in DLP rule names (user-editable records)"
+  },
+  "domains/dlp/mask.ts": {
+    "n": 1,
+    "why": "default mask label written into the masked text"
+  },
+  "domains/dlp/rules-store.ts": {
+    "n": 3,
+    "why": "default mask label + rule reference composed for the validation sentence"
+  },
+  "domains/dlp/rules.ts": {
+    "n": 1,
+    "why": "Russian word endings of the builtin patterns: matching data, never shown"
+  },
+  "domains/env-transfer/import.ts": {
+    "n": 1,
+    "why": "shape check of a foreign archive entry, folded into a coded refusal above"
+  },
+  "domains/env-transfer/prompts.ts": {
+    "n": 4,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/env-transfer/readme.ts": {
+    "n": 17,
+    "why": "exported document / markdown written for another tool"
+  },
+  "domains/env.ts": {
+    "n": 3,
+    "why": "internal invariant: a path the caller must pass (never reaches a response)"
+  },
+  "domains/format-check.ts": {
+    "n": 3,
+    "why": "log line / internal error not shown as text"
+  },
+  "domains/group-activation.ts": {
+    "n": 2,
+    "why": "feed notice: the code travels in the event ('groupsActivated'), the text is the fallback for a client without a dictionary"
+  },
+  "domains/group-draft.ts": {
+    "n": 9,
+    "why": "validation of a draft written by the agent: the text answers the agent, not a screen"
+  },
+  "domains/group-scenario.ts": {
+    "n": 7,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/hook-scripts.ts": {
+    "n": 8,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/integrations/atlassian/client.ts": {
+    "n": 1,
+    "why": "fallback display value of a foreign account record"
+  },
+  "domains/integrations/atlassian/confluence.ts": {
+    "n": 2,
+    "why": "version message written INTO Confluence"
+  },
+  "domains/integrations/check.ts": {
+    "n": 1,
+    "why": "probe text posted INTO the foreign system"
+  },
+  "domains/integrations/ci.ts": {
+    "n": 4,
+    "why": "source label composed from foreign CI ids (run/pipeline/job), data rather than a sentence"
+  },
+  "domains/integrations/errors.ts": {
+    "n": 2,
+    "why": "path-rejection detail composed inside an error class"
+  },
+  "domains/integrations/forge.ts": {
+    "n": 2,
+    "why": "composed forge reason + fallback display value of a foreign account"
+  },
+  "domains/integrations/http.ts": {
+    "n": 5,
+    "why": "RU twin of the already coded failureCode (the code travels beside it)"
+  },
+  "domains/integrations/links.ts": {
+    "n": 4,
+    "why": "context line assembled for the agent prompt"
+  },
+  "domains/integrations/publish.ts": {
+    "n": 6,
+    "why": "exported document / markdown written for another tool"
+  },
+  "domains/integrations/tms/testit.ts": {
+    "n": 3,
+    "why": "run description written INTO the foreign TMS + fallback title of a foreign case"
+  },
+  "domains/integrations/tms/xray.ts": {
+    "n": 3,
+    "why": "run description written INTO the foreign TMS + fallback title of a foreign case"
+  },
+  "domains/integrations/tms/zephyr.ts": {
+    "n": 2,
+    "why": "run description written INTO the foreign TMS"
+  },
+  "domains/mcp-oauth/callback.ts": {
+    "n": 5,
+    "why": "server-rendered OAuth callback HTML page"
+  },
+  "domains/media/deck/html/index.ts": {
+    "n": 3,
+    "why": "media: plan reasons translated client-side by key / nested decode reasons"
+  },
+  "domains/media/deck/html/slides.ts": {
+    "n": 1,
+    "why": "media: plan reasons translated client-side by key / nested decode reasons"
+  },
+  "domains/media/deck/html/styles-slides.ts": {
+    "n": 1,
+    "why": "media: plan reasons translated client-side by key / nested decode reasons"
+  },
+  "domains/media/deck/html/styles.ts": {
+    "n": 1,
+    "why": "media: plan reasons translated client-side by key / nested decode reasons"
+  },
+  "domains/media/deck/pdf.ts": {
+    "n": 3,
+    "why": "media: plan reasons translated client-side by key / nested decode reasons"
+  },
+  "domains/media/deck/pptx/slides.ts": {
+    "n": 1,
+    "why": "media: plan reasons translated client-side by key / nested decode reasons"
+  },
+  "domains/media/decode.ts": {
+    "n": 2,
+    "why": "media: nested decode reasons; the ceiling refusal moved to media-image-too-large (T13 m6)"
+  },
+  "domains/media/images.ts": {
+    "n": 7,
+    "why": "media: plan reasons translated client-side by key / nested decode reasons"
+  },
+  "domains/media/presentations.ts": {
+    "n": 7,
+    "why": "media: plan reasons translated client-side by key / nested decode reasons"
+  },
+  "domains/media/upstream.ts": {
+    "n": 5,
+    "why": "media: plan reasons translated client-side by key / nested decode reasons"
+  },
+  "domains/models/model-source.ts": {
+    "n": 3,
+    "why": "log line / internal error not shown as text"
+  },
+  "domains/models/model-store.ts": {
+    "n": 1,
+    "why": "stderr log line"
+  },
+  "domains/notify/telegram.ts": {
+    "n": 13,
+    "why": "outbound notification to an external channel (phone push / Telegram)"
+  },
+  "domains/notify/webhook.ts": {
+    "n": 1,
+    "why": "outbound notification to an external channel (phone push / Telegram)"
+  },
+  "domains/opencode-serve.ts": {
+    "n": 1,
+    "why": "log line / internal error not shown as text"
+  },
+  "domains/panel-agent/conversations.ts": {
+    "n": 1,
+    "why": "internal id invariant (never reaches a response)"
+  },
+  "domains/panel-agent/data-mask.ts": {
+    "n": 3,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/panel-agent/help-topics.ts": {
+    "n": 3,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/panel-agent/launch.ts": {
+    "n": 6,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/panel-agent/runner.ts": {
+    "n": 4,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/permissions.ts": {
+    "n": 1,
+    "why": "map key composed from a path and a decision word"
+  },
+  "domains/platform/apply/config-files.ts": {
+    "n": 1,
+    "why": "name written INTO the CLI config file (a foreign config entry, not panel text)"
+  },
+  "domains/platform/apply/profile.ts": {
+    "n": 1,
+    "why": "name written INTO the endpoint profile record the CLI config carries"
+  },
+  "domains/platform/drivers/conformance/fixtures.ts": {
+    "n": 4,
+    "why": "file content / template / parsed foreign format"
+  },
+  "domains/platform/drivers/enterprise-platform.ts": {
+    "n": 14,
+    "why": "driver manifest: per-field fate notes read by the dialect conversion and its tests, never rendered"
+  },
+  "domains/platform/embeddings.ts": {
+    "n": 3,
+    "why": "refusals of the embeddings API: no panel screen calls it, the body goes to the calling program"
+  },
+  "domains/platform/errors.ts": {
+    "n": 1,
+    "why": "composition around a zod issue name: the parts are data, the wrapper already carries the code"
+  },
+  "domains/platform/gateway/dialect.ts": {
+    "n": 33,
+    "why": "dialect table notes + dropped-key names: read by the conversion and its tests, never rendered"
+  },
+  "domains/platform/gateway/frames.ts": {
+    "n": 8,
+    "why": "frame notes for unknown upstream frames: trace payload, not rendered"
+  },
+  "domains/platform/gateway/native-tools.ts": {
+    "n": 4,
+    "why": "vendor-tool manifest note + the tool-result body handed to the model, never rendered"
+  },
+  "domains/platform/gateway/spend-flush.ts": {
+    "n": 7,
+    "why": "stderr log lines of the spend flush"
+  },
+  "domains/platform/gateway/tool-shim/claims.ts": {
+    "n": 4,
+    "why": "Russian word forms of the claim regex: matching data, never shown"
+  },
+  "domains/platform/gateway/tool-shim/encode.ts": {
+    "n": 3,
+    "why": "protocol text the model reads (tool name fallback, error prefix)"
+  },
+  "domains/platform/gateway/tool-shim/protocol.ts": {
+    "n": 2,
+    "why": "protocol text declaring the tools to the model"
+  },
+  "domains/platform/redact.ts": {
+    "n": 1,
+    "why": "mask placeholder inside the request trace"
+  },
+  "domains/platform/routing.ts": {
+    "n": 6,
+    "why": "model-routing prompt text the CLI reads"
+  },
+  "domains/platform/smoke-tools.ts": {
+    "n": 2,
+    "why": "smoke prompt the model reads"
+  },
+  "domains/plugins/actions.ts": {
+    "n": 2,
+    "why": "file content / template / parsed foreign format"
+  },
+  "domains/plugins/scaffold.ts": {
+    "n": 5,
+    "why": "file content / template / parsed foreign format"
+  },
+  "domains/plugins/templates.ts": {
+    "n": 7,
+    "why": "file content / template / parsed foreign format"
+  },
+  "domains/project-files/paths.ts": {
+    "n": 2,
+    "why": "path-rejection detail composed inside an error class"
+  },
+  "domains/project-git/bootstrap.ts": {
+    "n": 8,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/project-runner/registry.ts": {
+    "n": 3,
+    "why": "log line / internal error not shown as text"
+  },
+  "domains/project-tests/convention.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/project-tests/defect-status.ts": {
+    "n": 9,
+    "why": "exported document / markdown written for another tool"
+  },
+  "domains/project-tests/defects.ts": {
+    "n": 22,
+    "why": "exported document / markdown written for another tool"
+  },
+  "domains/project-tests/export-cases.ts": {
+    "n": 61,
+    "why": "exported document / markdown written for another tool"
+  },
+  "domains/project-tests/export-release.ts": {
+    "n": 68,
+    "why": "exported document / markdown written for another tool"
+  },
+  "domains/project-tests/export-run.ts": {
+    "n": 55,
+    "why": "exported document / markdown written for another tool"
+  },
+  "domains/project-tests/generate-sources.ts": {
+    "n": 1,
+    "why": "range name of the working copy used as a key, not a sentence"
+  },
+  "domains/project-tests/group-files.ts": {
+    "n": 1,
+    "why": "assertId label naming a field inside an internal invariant"
+  },
+  "domains/project-tests/impact.ts": {
+    "n": 2,
+    "why": "composed explanation list / stored user-owned default"
+  },
+  "domains/project-tests/import-cases.ts": {
+    "n": 63,
+    "why": "matching data: foreign header aliases / stopwords, never shown"
+  },
+  "domains/project-tests/import-manual-cases.ts": {
+    "n": 6,
+    "why": "heuristics of a foreign manual format: matching data, never shown"
+  },
+  "domains/project-tests/import-results.ts": {
+    "n": 2,
+    "why": "text written INTO the imported case record + import scope name stored with it"
+  },
+  "domains/project-tests/library.ts": {
+    "n": 8,
+    "why": "assertId/section labels naming a field inside an internal invariant"
+  },
+  "domains/project-tests/migrate.ts": {
+    "n": 1,
+    "why": "description written INTO the created group record"
+  },
+  "domains/project-tests/plan-recipes.ts": {
+    "n": 17,
+    "why": "composed explanation list / stored user-owned default"
+  },
+  "domains/project-tests/plans.ts": {
+    "n": 5,
+    "why": "assertId labels naming a field inside an internal invariant"
+  },
+  "domains/project-tests/png.ts": {
+    "n": 12,
+    "why": "media: plan reasons translated client-side by key / nested decode reasons"
+  },
+  "domains/project-tests/prompt.ts": {
+    "n": 188,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/project-tests/release.ts": {
+    "n": 8,
+    "why": "exported document / markdown written for another tool"
+  },
+  "domains/project-tests/risk.ts": {
+    "n": 16,
+    "why": "composed explanation list / stored user-owned default"
+  },
+  "domains/project-tests/run-permissions.ts": {
+    "n": 9,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/project-tests/runs-store.ts": {
+    "n": 1,
+    "why": "grouping key for cases without an area"
+  },
+  "domains/project-tests/runs.ts": {
+    "n": 15,
+    "why": "run-log notes: a free-text log of the run, kept as the agent wrote it"
+  },
+  "domains/project-tests/similar.ts": {
+    "n": 58,
+    "why": "matching data: foreign header aliases / stopwords, never shown"
+  },
+  "domains/project-tests/store.ts": {
+    "n": 7,
+    "why": "stored defaults of a new library (group descriptions, copy suffix) + strictValue field labels"
+  },
+  "domains/project-tests/taxonomy.ts": {
+    "n": 4,
+    "why": "composed explanation list / stored user-owned default"
+  },
+  "domains/projects.ts": {
+    "n": 8,
+    "why": "composed explanation list / stored user-owned default"
+  },
+  "domains/prompt-gate.ts": {
+    "n": 2,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/prompt-gate/script.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/prompts/catalog.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/prompts/errors.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/provider-chat/cascade.ts": {
+    "n": 7,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/provider-chat/handoff.ts": {
+    "n": 10,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/provider-chat/prompt.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/provider-chat/ProviderChatRun.ts": {
+    "n": 6,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/provider-chat/store.ts": {
+    "n": 3,
+    "why": "stored default title of a foreign-CLI chat record (the user renames it)"
+  },
+  "domains/provider-check/steps-assistant.ts": {
+    "n": 1,
+    "why": "probe prompt sent to the model"
+  },
+  "domains/provider-compare/sections.ts": {
+    "n": 5,
+    "why": "log line / internal error not shown as text"
+  },
+  "domains/provider-mcp/blocks.ts": {
+    "n": 4,
+    "why": "file content / template / parsed foreign format"
+  },
+  "domains/provider-plugins/errors.ts": {
+    "n": 2,
+    "why": "path-rejection detail composed inside an error class"
+  },
+  "domains/provider-plugins/files.ts": {
+    "n": 1,
+    "why": "path-rejection reason composed inside the error class"
+  },
+  "domains/provider-plugins/installed.ts": {
+    "n": 1,
+    "why": "record field of a plugin whose manifest is missing (stored, not a refusal)"
+  },
+  "domains/provider-plugins/paths.ts": {
+    "n": 2,
+    "why": "path-rejection detail composed inside an error class"
+  },
+  "domains/provider-projects.ts": {
+    "n": 1,
+    "why": "composed explanation list / stored user-owned default"
+  },
+  "domains/provider-rules/errors.ts": {
+    "n": 2,
+    "why": "path-rejection detail composed inside an error class"
+  },
+  "domains/provider-rules/paths.ts": {
+    "n": 3,
+    "why": "path-rejection detail composed inside an error class"
+  },
+  "domains/provider-rules/write.ts": {
+    "n": 2,
+    "why": "path-rejection reason composed inside the error class"
+  },
+  "domains/provider-skills/errors.ts": {
+    "n": 1,
+    "why": "path-rejection detail composed inside an error class"
+  },
+  "domains/provider-skills/paths.ts": {
+    "n": 2,
+    "why": "path-rejection detail composed inside an error class"
+  },
+  "domains/provider-skills/write.ts": {
+    "n": 9,
+    "why": "file content / template / parsed foreign format"
+  },
+  "domains/remote-notify.ts": {
+    "n": 5,
+    "why": "outbound notification to an external channel (phone push / Telegram)"
+  },
+  "domains/resources/ResourceAssistant.ts": {
+    "n": 17,
+    "why": "agent prompt / text the model reads"
+  },
+  "domains/resources/templates.ts": {
+    "n": 20,
+    "why": "file content / template / parsed foreign format"
+  },
+  "domains/rules.ts": {
+    "n": 3,
+    "why": "file content assembled for CLAUDE.md (blocks written to disk)"
+  },
+  "domains/sandbox/HookEvents.ts": {
+    "n": 4,
+    "why": "payload of the sample events: what the hook receives (command description, sample prompt), not a label"
+  },
+  "domains/sandbox/SandboxContents.ts": {
+    "n": 3,
+    "why": "file content assembled for the sandbox (rule blocks written to disk)"
+  },
+  "domains/sandbox/SandboxPaths.ts": {
+    "n": 2,
+    "why": "log line / internal error not shown as text"
+  },
+  "domains/sandbox/SandboxSweep.ts": {
+    "n": 3,
+    "why": "log line / internal error not shown as text"
+  },
+  "domains/scripts.ts": {
+    "n": 6,
+    "why": "path-rejection reason composed inside the error class"
+  },
+  "domains/skills/write.ts": {
+    "n": 1,
+    "why": "file content / template / parsed foreign format"
+  },
+  "index.ts": {
+    "n": 5,
+    "why": "boot banner lines printed to the terminal"
+  },
+  "lib/access-gate.ts": {
+    "n": 2,
+    "why": "log line / internal error not shown as text"
+  },
+  "lib/aider-yaml.ts": {
+    "n": 1,
+    "why": "reason of a foreign-format key check, folded into a coded refusal above"
+  },
+  "lib/app-store/state-file.ts": {
+    "n": 1,
+    "why": "stderr log line"
+  },
+  "lib/cli-args.ts": {
+    "n": 1,
+    "why": "internal invariant of an argv value (never reaches a response)"
+  },
+  "lib/cli-spawn.ts": {
+    "n": 3,
+    "why": "log line / internal error not shown as text"
+  },
+  "lib/cursor-mdc.ts": {
+    "n": 2,
+    "why": "file content / template / parsed foreign format"
+  },
+  "lib/dotenv-file.ts": {
+    "n": 2,
+    "why": "file content / template / parsed foreign format"
+  },
+  "lib/env-key.ts": {
+    "n": 1,
+    "why": "path/name rejection reason composed inside the error class"
+  },
+  "lib/format-errors.ts": {
+    "n": 1,
+    "why": "path-rejection detail composed inside an error class"
+  },
+  "lib/request-body.ts": {
+    "n": 2,
+    "why": "log line / internal error not shown as text"
+  },
+  "lib/safe-io/read.ts": {
+    "n": 1,
+    "why": "log line / internal error not shown as text"
+  },
+  "lib/safe-io/secrets.ts": {
+    "n": 2,
+    "why": "log line / internal error not shown as text"
+  },
+  "lib/script-description.ts": {
+    "n": 1,
+    "why": "file content / template / parsed foreign format"
+  },
+  "lib/secret-crypto.ts": {
+    "n": 1,
+    "why": "log line / internal error not shown as text"
+  },
+  "lib/secret-mask.ts": {
+    "n": 3,
+    "why": "log line / internal error not shown as text"
+  },
+  "lib/section-fs.ts": {
+    "n": 5,
+    "why": "path-rejection detail composed inside an error class"
+  },
+  "lib/server-texts/templates.ts": {
+    "n": 316,
+    "why": "generated RU side of the server text table (gen.mjs from L-gen/manifest): every line here IS a code, this is the one file where a Russian literal is the data"
+  },
+  "providers/catalog/opencode.ts": {
+    "n": 1,
+    "why": "file content / template / parsed foreign format"
+  },
+  "providers/settings-validation.ts": {
+    "n": 3,
+    "why": "zod issue detail list (issues[]) not rendered by clients"
+  },
+  "routes/chat/handoff-routes.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "routes/chat/run-routes.ts": {
+    "n": 2,
+    "why": "agent prompt / text the model reads"
+  },
+  "routes/chat/split-launch.ts": {
+    "n": 3,
+    "why": "agent prompt / text the model reads"
+  },
+  "routes/chat/split-routes.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "routes/entity/mcp-routes.ts": {
+    "n": 1,
+    "why": "server-rendered OAuth callback HTML page"
+  },
+  "routes/env-transfer-routes.ts": {
+    "n": 1,
+    "why": "shape check of an archive entry, folded into a coded refusal above"
+  },
+  "routes/integrations/exchange-routes.ts": {
+    "n": 4,
+    "why": "outbound notification to an external channel (phone push / Telegram)"
+  },
+  "routes/panel-agent/action-kit.ts": {
+    "n": 2,
+    "why": "agent prompt / text the model reads"
+  },
+  "routes/panel-agent/actions-app.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "routes/panel-agent/actions-config.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "routes/panel-agent/actions-contour.ts": {
+    "n": 2,
+    "why": "agent prompt / text the model reads"
+  },
+  "routes/panel-agent/registry.ts": {
+    "n": 2,
+    "why": "agent prompt / text the model reads"
+  },
+  "routes/panel-agent/run-routes.ts": {
+    "n": 1,
+    "why": "internal invariant of the conversation shape"
+  },
+  "routes/panel-agent/sections.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads"
+  },
+  "routes/panel-agent/texts.ts": {
+    "n": 237,
+    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the client"
+  }
+}

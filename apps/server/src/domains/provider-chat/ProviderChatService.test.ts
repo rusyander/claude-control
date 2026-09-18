@@ -347,6 +347,55 @@ describe('ProviderChatService', () => {
       expect(readChat(dir, 'codex', 'chat')?.messages.at(-1)?.contourToolCalls).toBeUndefined();
     });
 
+    it('сжатие ищется по метке ЭТОГО прогона, и та же метка ушла в маршрут', () => {
+      const resolve = vi.fn((_c: string, _a: string, _tag: string) => ({
+        env: { OPENAI_BASE_URL: 'http://127.0.0.1:1/x' },
+      }));
+      service.setPlatformRouting(resolve);
+      const check = vi.fn((tag: string) => tag === resolve.mock.calls[0]?.[2]);
+      service.setContourSummarized(check);
+      send();
+      run.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
+
+      const tag = resolve.mock.calls[0]?.[2];
+      expect(tag).toMatch(/^[0-9a-f-]{36}$/);
+      expect(check).toHaveBeenCalledWith(tag);
+      expect(readChat(dir, 'codex', 'chat')?.messages.at(-1)?.contextSummarized).toBe(true);
+    });
+
+    it('у каждого сообщения своя метка: сжатие прошлого прогона не подписывает новый', () => {
+      const tags: string[] = [];
+      service.setPlatformRouting((_c, _a, tag) => {
+        tags.push(tag);
+        return { env: { OPENAI_BASE_URL: 'http://127.0.0.1:1/x' } };
+      });
+      service.setContourSummarized((tag) => tag === tags[0]);
+      send();
+      run.emit?.({ type: 'done', reply: 'Первый', transport: 'stream' });
+      run.finish();
+      run = new FakeRun();
+      send('Ещё');
+      run.emit?.({ type: 'done', reply: 'Второй', transport: 'stream' });
+
+      expect(tags).toHaveLength(2);
+      expect(tags[0]).not.toBe(tags[1]);
+      const answers = readChat(dir, 'codex', 'chat')?.messages.filter(
+        (m) => m.role === 'assistant',
+      );
+      expect(answers?.map((m) => m.contextSummarized ?? false)).toEqual([true, false]);
+    });
+
+    it('мимо контура сжатие не спрашивается', () => {
+      const check = vi.fn(() => true);
+      service.setContourSummarized(check);
+      send();
+      run.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
+      expect(check).not.toHaveBeenCalled();
+      expect(readChat(dir, 'codex', 'chat')?.messages.at(-1)).not.toHaveProperty(
+        'contextSummarized',
+      );
+    });
+
     it('шлюз запросов не видел — поля нет, а не «ноль»', () => {
       routed();
       service.setContourToolCalls(() => undefined);

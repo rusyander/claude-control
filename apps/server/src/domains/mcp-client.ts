@@ -5,6 +5,8 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { McpServer, McpToolDetail, McpTransport } from '@agentdeck/contracts';
+import { coded } from '../lib/server-text.ts';
+import { serverText } from '../lib/server-texts.ts';
 
 /**
  * Один разговор с MCP-сервером — на любом из трёх транспортов.
@@ -113,9 +115,13 @@ export function resolveServerRefs(server: McpServer, lookup: EnvLookup): McpServ
       .sort()
       .map((name) => '${' + name + '}')
       .join(', ');
-    throw new Error(
-      `Не заданы переменные ${names}: добавьте их в разделе «Переменные» ` +
-        '(settings.json → env или .mcp-secrets.env) либо в окружение, из которого запущена панель',
+    throw coded(
+      new Error(
+        `Не заданы переменные ${names}: добавьте их в разделе «Переменные» ` +
+          '(settings.json → env или .mcp-secrets.env) либо в окружение, из которого запущена панель',
+      ),
+      'mcp-vars-missing',
+      { names },
     );
   }
 
@@ -198,7 +204,7 @@ export async function openMcpSession(
     await withDeadline(
       client.connect(transport, { timeout: connectMs }),
       connectMs,
-      'Сервер не ответил на рукопожатие вовремя',
+      serverText('mcp-handshake-timeout'),
     );
   } catch (error) {
     await client.close().catch(() => undefined);
@@ -265,13 +271,15 @@ export function createNetworkTransport(
   server: McpServer,
   authProvider?: OAuthClientProvider,
 ): NetworkTransport {
-  if (!server.url) throw new Error('Не задан адрес');
+  if (!server.url) throw coded(new Error('Не задан адрес'), 'mcp-url-missing');
 
   let url: URL;
   try {
     url = new URL(server.url);
   } catch {
-    throw new Error(`Адрес не разбирается как URL: ${server.url}`);
+    throw coded(new Error(`Адрес не разбирается как URL: ${server.url}`), 'mcp-url-unparsed', {
+      url: server.url,
+    });
   }
 
   const headers = Object.keys(server.headers).length > 0 ? server.headers : undefined;
@@ -298,7 +306,7 @@ function createTransport(server: McpServer, authProvider?: OAuthClientProvider):
 }
 
 function createStdioTransport(server: McpServer): PreparedTransport {
-  if (!server.command) throw new Error('Не задана команда запуска');
+  if (!server.command) throw coded(new Error('Не задана команда запуска'), 'mcp-command-missing');
 
   // Окружение наследуем целиком: серверы регулярно читают PATH, HOME и токены
   // из общего окружения, а SDK по умолчанию отдаёт им урезанный безопасный

@@ -17,6 +17,7 @@ import {
 } from '@entities/ProjectTest';
 import type { ProjectTestCoverageItem } from '@agentdeck/contracts';
 import styles from './TestsPage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Покрытие требований и судьба дефектов.
@@ -168,7 +169,7 @@ export function TestsCoverageTab({ projectPath }: { projectPath: string | undefi
 
       {data?.warning && (
         <Typography variant="caption" color="subtle">
-          {data.warning}
+          {serverFieldText(data, 'warning')}
         </Typography>
       )}
 

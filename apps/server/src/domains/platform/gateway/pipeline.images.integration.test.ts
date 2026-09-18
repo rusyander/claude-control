@@ -131,6 +131,14 @@ describe('шлюз: ручка картинок контура', () => {
     expect(event?.imageBytes).toBe(Buffer.from(PNG_B64, 'base64').length);
     expect(event?.usageUnreported).toBe(true);
     expect(JSON.stringify(event)).not.toContain(PNG_B64.slice(0, 16));
+
+    // И из УЧЁТА такой ответ не исчезает. Токенов у него нет и выдумывать их
+    // нечем, но платная картинка, пропавшая молча, занижала бы полосу бюджета
+    // без единого признака этого на экране.
+    const day = store.getPlatformSpend()['enterprise-platform']?.days[0];
+    expect(day?.unreportedAnswers).toBe(1);
+    expect(day?.totalTokens).toBe(0);
+    expect(day?.money.usd).toBe(0);
   });
 
   it('расход, присланный ручкой, считается', async () => {
@@ -144,6 +152,11 @@ describe('шлюз: ручка картинок контура', () => {
     const event = gateway.status().events[0];
     expect(event?.totalTokens).toBe(312);
     expect(event?.usageUnreported).toBeUndefined();
+    // Обратная сторона: отчитанный ответ считается токенами и счётчика
+    // неотчитанных не заводит — иначе «оценка неполна» стояло бы всегда.
+    const day = store.getPlatformSpend()['enterprise-platform']?.days[0];
+    expect(day?.totalTokens).toBe(312);
+    expect(day?.unreportedAnswers).toBeUndefined();
   });
 
   it('503 контура НЕ повторяется: платная картинка — один запрос наверх', async () => {

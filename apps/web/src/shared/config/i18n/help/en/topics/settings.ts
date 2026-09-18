@@ -464,7 +464,11 @@ export const settingsEn: typeof settingsRu = {
       'it lives in the server’s memory until it restarts. The panel’s own settings take no ' +
       'part in this: they live in agentdeck/state.json, no copies are made of them, and ' +
       'Claude Code never reads them. Exporting the environment packs the provider’s files ' +
-      'into an archive, replacing secret values with the __REDACTED__ marker.',
+      'into an archive, replacing secret values with the __REDACTED__ marker. The agentdeck ' +
+      'folder and the home ~/.agentdeck (access set by hand, and the phone token) arrived with ' +
+      'the product rename: the first start copies the former folders there, and those stay ' +
+      'where they are as a backup with a marker inside. Nothing is merged — a non-empty new ' +
+      'folder wins, and a copy that failed means the panel keeps working with the former folder.',
 
     platformLinkTitle: 'The Contour tab is a separate article',
     platformLinkCaption:

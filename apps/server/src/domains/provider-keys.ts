@@ -22,6 +22,7 @@ import {
   MAX_KEY_LENGTH,
 } from '../lib/provider-keys.ts';
 import { detectCliOnPath, findCliOnPath } from '../providers/detect.ts';
+import { coded } from '../lib/server-text.ts';
 
 /**
  * Резолвинг ключей и раннера ассистента (Ф6a). Инфраструктура мультимодельного
@@ -223,13 +224,21 @@ export class ProviderKeyError extends Error {
 /** Проверить, что провайдер известен и может держать ключ; иначе бросить ошибку. */
 function requireKeyableProvider(providerId: string): ConfigProvider {
   if (!isKnownProviderId(providerId)) {
-    throw new ProviderKeyError('unknown_provider', `Неизвестный провайдер «${providerId}».`);
+    throw coded(
+      new ProviderKeyError('unknown_provider', `Неизвестный провайдер «${providerId}».`),
+      'provider-unknown-quoted',
+      { providerId },
+    );
   }
   const provider = getProvider(providerId);
   if (!canHoldKey(provider)) {
-    throw new ProviderKeyError(
-      'unsupported_provider',
-      `У провайдера «${provider.name}» нет собственного модельного API — ключ задать нельзя.`,
+    throw coded(
+      new ProviderKeyError(
+        'unsupported_provider',
+        `У провайдера «${provider.name}» нет собственного модельного API — ключ задать нельзя.`,
+      ),
+      'provider-no-model-api',
+      { provider: provider.name },
     );
   }
   return provider;
@@ -243,7 +252,10 @@ export function saveProviderKey(appDataDir: string, providerId: string, key: str
   const provider = requireKeyableProvider(providerId);
   const trimmed = typeof key === 'string' ? key.trim() : '';
   if (!trimmed || trimmed.length > MAX_KEY_LENGTH) {
-    throw new ProviderKeyError('invalid_key', 'Ключ пуст или превышает допустимую длину.');
+    throw coded(
+      new ProviderKeyError('invalid_key', 'Ключ пуст или превышает допустимую длину.'),
+      'provider-key-invalid',
+    );
   }
   setStoredKey(appDataDir, providerId, trimmed);
   return resolveKey(provider, appDataDir);

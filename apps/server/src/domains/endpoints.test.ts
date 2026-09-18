@@ -256,6 +256,34 @@ describe('probeEndpoint: связь проверяется списком мод
     expect(result.ok).toBe(false);
   });
 
+  /**
+   * Отказ по коду читают ДВЕ стороны: запасная строка сервера и шаблон клиента
+   * `{{status}}{{detail}}`, у которого условий нет. Пока разделитель стоял
+   * только в строке, экран показывал «Адрес ответил 401Unauthorized».
+   */
+  it('код и тело отказа разделены и в строке, и в значениях для клиента', async () => {
+    const result = await probeEndpoint(profileOf(), undefined, (async () => {
+      return {
+        ok: false,
+        status: 401,
+        text: async () => 'Unauthorized',
+      } as unknown as Response;
+    }) as unknown as typeof fetch);
+    expect(result.ok).toBe(false);
+    expect(result.messageCode).toBe('endpoint-probe-status');
+    expect(result.error).toBe('Адрес ответил 401: Unauthorized');
+    // То же, что увидит экран: шаблон склеит их встык.
+    expect(`${result.params?.status}${result.params?.detail}`).toBe('401: Unauthorized');
+  });
+
+  it('пустое тело отказа не оставляет двоеточия в никуда', async () => {
+    const result = await probeEndpoint(profileOf(), undefined, (async () => {
+      return { ok: false, status: 503, text: async () => '' } as unknown as Response;
+    }) as unknown as typeof fetch);
+    expect(result.error).toBe('Адрес ответил 503');
+    expect(`${result.params?.status}${result.params?.detail}`).toBe('503');
+  });
+
   it('ответ не JSON — это не «моделей нет», а другой ответ', async () => {
     const result = await probeEndpoint(profileOf(), undefined, (async () => {
       return {

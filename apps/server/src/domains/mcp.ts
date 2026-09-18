@@ -18,6 +18,8 @@ import {
   type EnvLookup,
 } from './mcp-client.ts';
 import { hasOAuthTokens, renameOAuth } from './mcp-oauth.ts';
+import { coded } from '../lib/server-text.ts';
+import { serverText } from '../lib/server-texts.ts';
 
 /**
  * Регистрация MCP-серверов живёт в ~/.claude.json — рядом с каталогом .claude,
@@ -151,6 +153,7 @@ export class McpServerNotFoundError extends Error {
 
   constructor(serverName: string) {
     super(`MCP-сервера «${serverName}» нет в конфигурации.`);
+    coded(this, 'mcp-server-not-in-config', { name: serverName });
     this.name = 'McpServerNotFoundError';
     this.serverName = serverName;
   }
@@ -164,6 +167,7 @@ export class McpServerExistsError extends Error {
 
   constructor(serverName: string) {
     super(`MCP-сервер «${serverName}» уже есть в конфигурации.`);
+    coded(this, 'mcp-server-exists', { name: serverName });
     this.name = 'McpServerExistsError';
     this.serverName = serverName;
   }
@@ -180,7 +184,11 @@ const HEADER_NAME_PATTERN = /^[^\s:]+$/;
 function stringList(value: unknown, field: string): string[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
-    throw new InvalidMcpDraftError(`Поле ${field} должно быть списком строк.`);
+    throw coded(
+      new InvalidMcpDraftError(`Поле ${field} должно быть списком строк.`),
+      'mcp-field-string-list',
+      { field },
+    );
   }
   return value as string[];
 }
@@ -188,12 +196,20 @@ function stringList(value: unknown, field: string): string[] {
 function stringRecord(value: unknown, field: string, keyPattern: RegExp): Record<string, string> {
   if (value === undefined || value === null) return {};
   if (typeof value !== 'object' || Array.isArray(value)) {
-    throw new InvalidMcpDraftError(`Поле ${field} должно быть объектом «имя → строка».`);
+    throw coded(
+      new InvalidMcpDraftError(`Поле ${field} должно быть объектом «имя → строка».`),
+      'mcp-field-string-map',
+      { field },
+    );
   }
   for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
     if (!keyPattern.test(key) || typeof item !== 'string') {
-      throw new InvalidMcpDraftError(
-        `Поле ${field}: имя «${key}» без пробелов и служебных символов, значение — строкой.`,
+      throw coded(
+        new InvalidMcpDraftError(
+          `Поле ${field}: имя «${key}» без пробелов и служебных символов, значение — строкой.`,
+        ),
+        'mcp-field-map-invalid',
+        { field, key },
       );
     }
   }
@@ -218,42 +234,64 @@ export function assertMcpDraft(
   options?: { currentName?: string },
 ): asserts draft is McpServerDraft {
   if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
-    throw new InvalidMcpDraftError('Тело запроса должно быть объектом с описанием сервера.');
+    throw coded(
+      new InvalidMcpDraftError('Тело запроса должно быть объектом с описанием сервера.'),
+      'mcp-body-object',
+    );
   }
   const body = draft as Record<string, unknown>;
 
   if (typeof body.name !== 'string' || body.name.trim() === '') {
-    throw new InvalidMcpDraftError('Не указано имя MCP-сервера');
+    throw coded(new InvalidMcpDraftError('Не указано имя MCP-сервера'), 'mcp-name-missing');
   }
   const name = body.name.trim();
   const keepsName = options?.currentName !== undefined && name === options.currentName;
   if (!keepsName && (!NAME_PATTERN.test(name) || name.includes('__'))) {
-    throw new InvalidMcpDraftError(
-      `Имя «${name}» не годится: без пробелов, косых черт и двойного подчёркивания — ` +
-        'по нему строятся права вида mcp__сервер__инструмент.',
+    throw coded(
+      new InvalidMcpDraftError(
+        `Имя «${name}» не годится: без пробелов, косых черт и двойного подчёркивания — ` +
+          'по нему строятся права вида mcp__сервер__инструмент.',
+      ),
+      'mcp-name-invalid',
+      { name },
     );
   }
   body.name = name;
 
   const transport = TRANSPORTS.find((item) => item === body.transport);
   if (!transport) {
-    throw new InvalidMcpDraftError(`Транспорт должен быть одним из: ${TRANSPORTS.join(', ')}.`);
+    throw coded(
+      new InvalidMcpDraftError(`Транспорт должен быть одним из: ${TRANSPORTS.join(', ')}.`),
+      'mcp-transport-invalid',
+      { list: TRANSPORTS.join(', ') },
+    );
   }
 
   if (transport === 'stdio') {
     if (typeof body.command !== 'string' || body.command.trim() === '') {
-      throw new InvalidMcpDraftError('Для stdio нужна команда запуска.');
+      throw coded(
+        new InvalidMcpDraftError('Для stdio нужна команда запуска.'),
+        'mcp-stdio-command',
+      );
     }
     body.command = body.command.trim();
   } else {
     if (typeof body.url !== 'string' || body.url.trim() === '') {
-      throw new InvalidMcpDraftError(`Для ${transport} нужен адрес сервера.`);
+      throw coded(
+        new InvalidMcpDraftError(`Для ${transport} нужен адрес сервера.`),
+        'mcp-url-required',
+        { transport },
+      );
     }
     const url = body.url.trim();
     body.url = url;
     // Адрес со ссылкой ${VAR} разбирается только после подстановки — при проверке связи.
     if (!url.includes('${') && !isHttpUrl(url)) {
-      throw new InvalidMcpDraftError(`Адрес «${url}» не разбирается как http(s)-URL.`);
+      throw coded(
+        new InvalidMcpDraftError(`Адрес «${url}» не разбирается как http(s)-URL.`),
+        'mcp-url-invalid',
+        { url },
+      );
     }
   }
 
@@ -524,7 +562,11 @@ export async function listMcpServerTools(
   envLookup?: EnvLookup,
 ): Promise<McpToolsResult> {
   if (!server.isEnabled)
-    return { tools: [], error: 'Сервер выключен — включите его, чтобы увидеть инструменты' };
+    return {
+      tools: [],
+      error: 'Сервер выключен — включите его, чтобы увидеть инструменты',
+      messageCode: 'mcp-tools-server-disabled',
+    };
 
   try {
     const session = await openMcpSession(
@@ -555,8 +597,8 @@ export async function listMcpServerTools(
 function failureDetail(error: unknown, server: McpServer): string {
   if (isUnauthorized(error, server.transport)) {
     return hasOwnAuthorization(server)
-      ? 'Сервер отверг заголовок Authorization (401) — проверьте токен в заголовках'
-      : 'Требуется авторизация OAuth — нажмите «Авторизоваться»';
+      ? serverText('mcp-auth-header-rejected')
+      : serverText('mcp-oauth-needed');
   }
   const detail = error instanceof Error ? error.message : String(error);
   return detail.slice(0, 400);

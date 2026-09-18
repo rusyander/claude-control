@@ -30,6 +30,8 @@ export function ChildBlocks({
   treeBusy,
   onAnswerHold,
   holdBusy,
+  onRelease,
+  releaseBusy,
   onCheckOverlap,
   overlapBusy,
   permissions,
@@ -56,6 +58,8 @@ export function ChildBlocks({
           treeBusy={treeBusy}
           onAnswerHold={onAnswerHold}
           holdBusy={holdBusy}
+          onRelease={onRelease}
+          releaseBusy={releaseBusy}
           onCheckOverlap={onCheckOverlap}
           overlapBusy={overlapBusy}
         />

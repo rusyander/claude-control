@@ -14,6 +14,7 @@ import { readIntegrations, readToken } from '../integrations/store.ts';
 import { ProjectTestsError, ProjectTestsNotFoundError } from './files.ts';
 import { requirementKey } from './coverage.ts';
 import { readRun } from './runs-store.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Материал для генерации: требование, дифф или провал.
@@ -88,14 +89,21 @@ async function requirement(
   request: ProjectTestRunRequest,
 ): Promise<ProjectTestGenerateMaterial['requirement']> {
   const ref = request.sourceRef?.trim();
-  if (!ref) throw new ProjectTestsError('Не указано требование: нужен ключ задачи или ссылка.');
+  if (!ref)
+    throw coded(
+      new ProjectTestsError('Не указано требование: нужен ключ задачи или ссылка.'),
+      'generate-requirement-missing',
+    );
 
   const settings = readIntegrations(deps.store).atlassian;
   const token = readToken(deps.appDataDir, 'atlassian');
   if (!settings.enabled || !token) {
-    throw new ProjectTestsError(
-      'Jira не подключена, а «покрыть требование» пишет кейсы по тексту задачи. ' +
-        'Подключите Atlassian в разделе интеграций или выберите другой источник.',
+    throw coded(
+      new ProjectTestsError(
+        'Jira не подключена, а «покрыть требование» пишет кейсы по тексту задачи. ' +
+          'Подключите Atlassian в разделе интеграций или выберите другой источник.',
+      ),
+      'generate-jira-off',
     );
   }
 
@@ -111,8 +119,12 @@ async function requirement(
   } catch (error) {
     // Отказ трекера — состояние, а не поломка: человек прочитает причину и
     // либо поправит ключ, либо пойдёт другим источником.
-    throw new ProjectTestsError(
-      `Задача «${key}» не прочиталась: ${error instanceof Error ? error.message : String(error)}`,
+    throw coded(
+      new ProjectTestsError(
+        `Задача «${key}» не прочиталась: ${error instanceof Error ? error.message : String(error)}`,
+      ),
+      'generate-issue-unreadable',
+      { key, reason: error instanceof Error ? error.message : String(error) },
     );
   }
 }
@@ -148,16 +160,38 @@ function changedFiles(root: string, range: string): string[] | undefined {
  * отсутствующий git и настоящий отказ git чинятся в разных местах, а иногда
  * (срок) не чинятся вовсе, и тогда честнее сказать это прямо.
  */
-function diffFailure(root: string, range: string): string {
+function diffFailure(root: string, range: string): ProjectTestsError {
   const outcome = gitSyncOutcome(root, ['diff', '--name-only', range], DIFF_TIMEOUT_MS);
-  if (outcome.ok) return `Сравнение «${range}» не сделалось.`;
+  if (outcome.ok)
+    return coded(
+      new ProjectTestsError(`Сравнение «${range}» не сделалось.`),
+      'generate-diff-failed',
+      {
+        range,
+      },
+    );
   if (outcome.reason === 'timeout') {
-    return `Сравнение «${range}» не сделалось: git не ответил за ${DIFF_TIMEOUT_MS / 1000} с. Репозиторий тут ни при чём — так бывает на большом дереве, на медленном диске и под антивирусом.`;
+    return coded(
+      new ProjectTestsError(
+        `Сравнение «${range}» не сделалось: git не ответил за ${DIFF_TIMEOUT_MS / 1000} с. Репозиторий тут ни при чём — так бывает на большом дереве, на медленном диске и под антивирусом.`,
+      ),
+      'generate-diff-timeout',
+      { range, seconds: DIFF_TIMEOUT_MS / 1000 },
+    );
   }
   if (outcome.reason === 'no-git') {
-    return 'Команда git не найдена. Установите git или добавьте его в PATH.';
+    return coded(
+      new ProjectTestsError('Команда git не найдена. Установите git или добавьте его в PATH.'),
+      'git-command-missing',
+    );
   }
-  return `Сравнение «${range}» не сделалось: каталог не репозиторий или такой ветки нет.`;
+  return coded(
+    new ProjectTestsError(
+      `Сравнение «${range}» не сделалось: каталог не репозиторий или такой ветки нет.`,
+    ),
+    'generate-diff-no-repo',
+    { range },
+  );
 }
 
 function cleanPaths(raw: string): string[] {
@@ -184,17 +218,25 @@ function diff(root: string, range?: string): ProjectTestGenerateMaterial['diff']
   const explicit = range?.trim();
   if (explicit) {
     const files = changedFiles(root, explicit);
-    if (files === undefined) throw new ProjectTestsError(diffFailure(root, explicit));
+    if (files === undefined) throw diffFailure(root, explicit);
     if (files.length === 0) {
-      throw new ProjectTestsError(`Между «${explicit}» нет изменений — генерировать нечего.`);
+      throw coded(
+        new ProjectTestsError(`Между «${explicit}» нет изменений — генерировать нечего.`),
+        'generate-diff-empty',
+        { range: explicit },
+      );
     }
     return { range: explicit, files, summary: statOf(root, explicit) };
   }
 
   if (gitSync(root, ['rev-parse', '--verify', 'HEAD']) === undefined) {
-    throw new ProjectTestsError(
-      `Сравнение «${DEFAULT_DIFF_RANGE}» не сделалось: каталог не git-репозиторий ` +
-        'или в нём нет ни одного коммита.',
+    throw coded(
+      new ProjectTestsError(
+        `Сравнение «${DEFAULT_DIFF_RANGE}» не сделалось: каталог не git-репозиторий ` +
+          'или в нём нет ни одного коммита.',
+      ),
+      'generate-no-commits',
+      { range: DEFAULT_DIFF_RANGE },
     );
   }
   for (const candidate of RANGE_CANDIDATES) {
@@ -211,9 +253,13 @@ function diff(root: string, range?: string): ProjectTestGenerateMaterial['diff']
   );
   const files = [...new Set([...tracked, ...untracked])];
   if (files.length === 0) {
-    throw new ProjectTestsError(
-      `Ни «${RANGE_CANDIDATES.join('», «')}», ни рабочая копия изменений не дали — ` +
-        'генерировать нечего. Укажите диапазон явно, например «v1.0.0..HEAD».',
+    throw coded(
+      new ProjectTestsError(
+        `Ни «${RANGE_CANDIDATES.join('», «')}», ни рабочая копия изменений не дали — ` +
+          'генерировать нечего. Укажите диапазон явно, например «v1.0.0..HEAD».',
+      ),
+      'generate-nothing-changed',
+      { ranges: RANGE_CANDIDATES.join('», «') },
     );
   }
   return { range: WORKING_TREE_RANGE, files, summary: statOf(root, 'HEAD') };
@@ -232,12 +278,20 @@ function defect(
   groups: ProjectTestGroup[],
 ): ProjectTestGenerateMaterial['defect'] {
   const target = request.sourceCase;
-  if (!target?.caseId) throw new ProjectTestsError('Не указан кейс, из провала которого заводить.');
+  if (!target?.caseId)
+    throw coded(
+      new ProjectTestsError('Не указан кейс, из провала которого заводить.'),
+      'generate-case-unspecified',
+    );
 
   const group = groups.find((item) => item.id === target.groupId);
   const testCase = group?.cases.find((item) => item.id === target.caseId);
   if (!testCase) {
-    throw new ProjectTestsNotFoundError(`Кейса «${target.caseId}» в проекте нет.`);
+    throw coded(
+      new ProjectTestsNotFoundError(`Кейса «${target.caseId}» в проекте нет.`),
+      'generate-case-not-found',
+      { caseId: target.caseId },
+    );
   }
 
   const run = target.runId ? readRun(root, target.runId) : undefined;

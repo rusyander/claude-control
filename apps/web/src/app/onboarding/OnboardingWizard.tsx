@@ -28,6 +28,7 @@ import { IntroStep } from './steps/IntroStep';
 import { LocationStep } from './steps/LocationStep';
 import { ProvidersStep } from './steps/ProvidersStep';
 import { AccessStep } from './steps/AccessStep';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Приветственный мастер первого запуска. Появляется, пока пользователь не прошёл
@@ -283,7 +284,8 @@ function describeApplyProblem(
   error: unknown,
   fallback: string,
 ): string | undefined {
-  if (result && !result.isValid) return result.problem ?? fallback;
+  if (result && !result.isValid)
+    return result.problem ? serverFieldText(result, 'problem') : fallback;
   if (error) return toErrorMessage(error);
   return undefined;
 }

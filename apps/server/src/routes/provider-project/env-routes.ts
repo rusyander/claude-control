@@ -11,6 +11,7 @@ import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import { done } from '../write-result.ts';
 import { requireTarget } from './target.ts';
 import { ENV_UNSUPPORTED, FORMAT_UNRECOGNIZED, INVALID_ENV_DRAFT } from './messages.ts';
+import { codeOf } from '../../lib/server-text.ts';
 
 /** Переменные окружения проекта: тот же адаптер, что и глобально, файл в проекте. */
 export function registerProviderProjectEnvRoutes(app: FastifyInstance, ctx: ServerContext): void {
@@ -32,7 +33,7 @@ export function registerProviderProjectEnvRoutes(app: FastifyInstance, ctx: Serv
     } catch (error) {
       // Формат не распознан — отдаём раздел на чтение (пустой список) с пометкой.
       if (error instanceof UnrecognizedFormatError) {
-        return { ...base, vars: [], readOnly: true, error: error.message };
+        return { ...base, vars: [], readOnly: true, error: error.message, ...codeOf(error) };
       }
       throw error;
     }
@@ -54,13 +55,17 @@ export function registerProviderProjectEnvRoutes(app: FastifyInstance, ctx: Serv
         // Имя переменной непредставимо в формате провайдера — ошибка ввода (400),
         // а не сломанный файл: сообщение объясняет, что именно не так.
         if (error instanceof EnvKeyNotEncodableError) {
-          return reply.code(400).send({ error: 'invalid_draft', message: error.message });
+          return reply
+            .code(400)
+            .send({ error: 'invalid_draft', message: error.message, ...codeOf(error) });
         }
         // Имя занято немоделируемой записью файла — конфликт одного ключа (409),
         // а не сломанный формат: файл проекта разобран, править нужно одну
         // переменную. Общий 422 объявлял исправный config.toml нечитаемым.
         if (error instanceof EnvKeyPreservedError) {
-          return reply.code(409).send({ error: 'env_key_preserved', message: error.message });
+          return reply
+            .code(409)
+            .send({ error: 'env_key_preserved', message: error.message, ...codeOf(error) });
         }
         if (error instanceof UnrecognizedFormatError)
           return reply.code(422).send(FORMAT_UNRECOGNIZED);

@@ -9,6 +9,7 @@ import {
   freePort,
   resolveTargetDir,
 } from '../domains/project-runner.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Маршруты запуска/остановки dev-серверов проекта.
@@ -31,7 +32,10 @@ export function registerProjectRunnerRoutes(
     reply: { code: (n: number) => { send: (b: unknown) => unknown } },
   ): string | undefined => {
     if (!path || !isAbsolute(path)) {
-      reply.code(400).send({ message: 'Нужен абсолютный путь к каталогу проекта' });
+      reply.code(400).send({
+        message: 'Нужен абсолютный путь к каталогу проекта',
+        messageCode: 'runner-project-path-required',
+      });
       return undefined;
     }
     return path;
@@ -77,7 +81,8 @@ export function registerProjectRunnerRoutes(
         }
         return describeRunner(path, memoryOf);
       } catch (error) {
-        if (error instanceof RunnerError) return reply.code(400).send({ message: error.message });
+        if (error instanceof RunnerError)
+          return reply.code(400).send({ message: error.message, ...codeOf(error) });
         throw error;
       }
     },
@@ -93,7 +98,10 @@ export function registerProjectRunnerRoutes(
       const path = requirePath(request.body?.path, reply);
       if (!path) return reply;
       if (typeof request.body.enabled !== 'boolean') {
-        return reply.code(400).send({ message: 'Поле enabled должно быть булевым' });
+        return reply.code(400).send({
+          message: 'Поле enabled должно быть булевым',
+          messageCode: 'runner-enabled-boolean',
+        });
       }
 
       try {
@@ -104,7 +112,8 @@ export function registerProjectRunnerRoutes(
         });
         return describeRunner(path, memoryOf);
       } catch (error) {
-        if (error instanceof RunnerError) return reply.code(400).send({ message: error.message });
+        if (error instanceof RunnerError)
+          return reply.code(400).send({ message: error.message, ...codeOf(error) });
         throw error;
       }
     },
@@ -152,7 +161,9 @@ export function registerProjectRunnerRoutes(
       } catch (error) {
         if (error instanceof RunnerError) {
           // Занятый порт отдаём номером: по нему панель предложит освободить.
-          return reply.code(400).send({ message: error.message, busyPort: error.port });
+          return reply
+            .code(400)
+            .send({ message: error.message, ...codeOf(error), busyPort: error.port });
         }
         throw error;
       }
@@ -165,7 +176,7 @@ export function registerProjectRunnerRoutes(
     reply: { code: (n: number) => { send: (b: unknown) => unknown } },
   ): number | undefined => {
     if (!Number.isInteger(port) || !port || port < 1 || port > 65_535) {
-      reply.code(400).send({ message: 'Нужен номер порта' });
+      reply.code(400).send({ message: 'Нужен номер порта', messageCode: 'runner-port-required' });
       return undefined;
     }
     return port;
@@ -200,7 +211,8 @@ export function registerProjectRunnerRoutes(
       try {
         return { ok: registry.stop({ projectPath: path, dir: request.body.dir }) };
       } catch (error) {
-        if (error instanceof RunnerError) return reply.code(400).send({ message: error.message });
+        if (error instanceof RunnerError)
+          return reply.code(400).send({ message: error.message, ...codeOf(error) });
         throw error;
       }
     },

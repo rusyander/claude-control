@@ -12,6 +12,7 @@ import { scanPlanBlocks, scanSplitPlanBlocks } from '@agentdeck/contracts/split-
 import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
 import { attachmentBasename, splitAttachments } from '@agentdeck/contracts/uploads';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
+import { ContextSummarizedNote } from '@entities/Platform';
 import { parseQuestions } from '../lib/parseQuestions';
 import { questionKey } from '../lib/questionKey';
 import { QuestionCard } from './QuestionCard';
@@ -359,6 +360,9 @@ export function MessageBubble({
             </div>
           );
         })}
+        {/* Контур сжал историю перед этим ответом (`context-managed`): без
+            подписи ответ читается как ответ модели, видевшей весь разговор. */}
+        {!isUser && message.contextSummarized && <ContextSummarizedNote scope="answer" />}
       </div>
     </div>
   );

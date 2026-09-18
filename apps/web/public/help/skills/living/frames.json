@@ -9,15 +9,15 @@
       "masked": 0,
       "width": 1440,
       "height": 950,
-      "shotAt": "2026-09-11T14:19:29.788Z",
-      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Выключено 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 файла 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам.",
+      "shotAt": "2026-09-17T20:42:24.822Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Выключено 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 файла 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам.",
       "en": {
         "file": "01-list.en.png",
         "masked": 0,
         "width": 1440,
         "height": 950,
-        "shotAt": "2026-09-11T17:29:01.234Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Disabled 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 files 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам."
+        "shotAt": "2026-09-17T20:44:55.301Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Disabled 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 files 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам."
       }
     },
     {
@@ -27,15 +27,15 @@
       "masked": 0,
       "width": 1440,
       "height": 950,
-      "shotAt": "2026-09-11T14:19:31.065Z",
-      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает Ничего не найдено По запросу «миграции» совпадений ни в именах, ни в описаниях скиллов нет.",
+      "shotAt": "2026-09-17T20:42:26.100Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает Ничего не найдено По запросу «миграции» совпадений ни в именах, ни в описаниях скиллов нет.",
       "en": {
         "file": "02-search.en.png",
         "masked": 0,
         "width": 1440,
         "height": 950,
-        "shotAt": "2026-09-11T17:29:02.497Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works Nothing found No skill name or description matches “миграции”."
+        "shotAt": "2026-09-17T20:44:56.597Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works Nothing found No skill name or description matches “миграции”."
       }
     },
     {
@@ -45,15 +45,15 @@
       "masked": 0,
       "width": 1440,
       "height": 950,
-      "shotAt": "2026-09-11T14:19:33.706Z",
-      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Выключено 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 файла 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам. Файлы — можно открыть, поправить, создать или удалить Новый файл references 2 examples.md format.md SKILL.md Помощник структуры Опишите задачу — помощник создаст и дополнит файлы целиком. Существующее не удаляется. Собрать",
+      "shotAt": "2026-09-17T20:42:28.759Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Выключено 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 файла 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам. Файлы — можно открыть, поправить, создать или удалить Новый файл references 2 examples.md format.md SKILL.md Помощник структуры Опишите задачу — помощник создаст и дополнит файлы целиком. Существующее не удаляется. Собрать",
       "en": {
         "file": "03-files.en.png",
         "masked": 0,
         "width": 1440,
         "height": 950,
-        "shotAt": "2026-09-11T17:29:05.122Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Disabled 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 files 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам. Files — open, edit, create or delete them here New file references 2 examples.md format.md SKILL.md Structure assistant Describe the task — the assistant creates and fills files wholesale. Existing files are kept. Build"
+        "shotAt": "2026-09-17T20:44:59.379Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Disabled 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 files 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам. Files — open, edit, create or delete them here New file references 2 examples.md format.md SKILL.md Structure assistant Describe the task — the assistant creates and fills files wholesale. Existing files are kept. Build"
       }
     },
     {
@@ -63,15 +63,15 @@
       "masked": 0,
       "width": 1440,
       "height": 950,
-      "shotAt": "2026-09-11T14:19:36.295Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Выключено 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit Выключено 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 файла 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам. Файлы — можно открыть, поправить, создать или удалить Новый файл references 2 examples.md format.md SKILL.md Помощник структуры Опишите задачу — помощник создаст и дополнит файлы целиком. Существующее не удаляется. Собрать Обновлено",
+      "shotAt": "2026-09-17T20:42:31.359Z",
+      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Выключено 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit Выключено 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 файла 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам. Файлы — можно открыть, поправить, создать или удалить Новый файл references 2 examples.md format.md SKILL.md Помощник структуры Опишите задачу — помощник создаст и дополнит файлы целиком. Существующее не удаляется. Собрать Обновлено",
       "en": {
         "file": "04-off.en.png",
         "masked": 0,
         "width": 1440,
         "height": 950,
-        "shotAt": "2026-09-11T17:29:07.722Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Disabled 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit Disabled 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 files 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам. Files — open, edit, create or delete them here New file references 2 examples.md format.md SKILL.md Structure assistant Describe the task — the assistant creates and fills files wholesale. Existing files are kept. Build Updated"
+        "shotAt": "2026-09-17T20:45:02.025Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works code-review 697 B Use КОГДА просят разобрать чужой код, посмотреть правки перед отправкой или объяснить, почему решение спорное. db-migrations Disabled 300 B Use КОГДА просят изменить схему базы или написать миграцию. perf-audit Disabled 375 B Use КОГДА жалуются на медленную страницу или просят найти, что тормозит. release-notes 2 files 1.0 KB Use КОГДА просят собрать описание релиза, список изменений или текст для задачи по готовым коммитам. Files — open, edit, create or delete them here New file references 2 examples.md format.md SKILL.md Structure assistant Describe the task — the assistant creates and fills files wholesale. Existing files are kept. Build Updated"
       }
     },
     {
@@ -81,14 +81,14 @@
       "masked": 0,
       "width": 1428,
       "height": 856,
-      "shotAt": "2026-09-11T14:19:39.333Z",
+      "shotAt": "2026-09-17T20:42:34.402Z",
       "text": "Редактировать: release-notes Изменения применятся после перезапуска Claude Code Имя скилла Латиницей через дефис — станет именем папки в skills/ Новое имя (папки скилла) Имя папки в skills/ — оно же идентификатор. Переименует папку и перенесёт отметки. Переименовать Описание — когда применять Главное поле: по нему Claude решает, подключать ли скилл. Опишите ситуацию и слова, с которыми к вам придут («Use КОГДА пользователь просит…»). Инструкции Тело SKILL.md: что именно делать, по шагам. Markdown. Структура файлов Скилл может быть папкой с модулями. Соберите структуру шаблоном, помощником или вручную — SKILL.md уже создан. Файлы — можно открыть, поправить, создать или удалить Новый файл references 2 examples.md format.md SKILL.md Помощник структуры Опишите задачу — помощник создаст и дополнит файлы целиком. Существующее не удаляется. Собрать Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Закрыть Сохранить",
       "en": {
         "file": "05-edit.en.png",
         "masked": 0,
         "width": 1428,
         "height": 856,
-        "shotAt": "2026-09-11T17:29:10.749Z",
+        "shotAt": "2026-09-17T20:45:05.151Z",
         "text": "Edit: release-notes Changes apply after restarting Claude Code Skill name Latin letters with dashes — becomes the folder name in skills/ New name (skill folder) The folder name in skills/ — also the identifier. Renames the folder and moves its marks. Rename Description — when to apply The key field: Claude uses it to decide whether to pull the skill in. Describe the situation and the wording users will come with (\"Use WHEN the user asks…\"). Instructions The body of SKILL.md: what exactly to do, step by step. Markdown. File structure A skill can be a folder of modules. Build the structure from a template, the assistant, or by hand — SKILL.md already exists. Files — open, edit, create or delete them here New file references 2 examples.md format.md SKILL.md Structure assistant Describe the task — the assistant creates and fills files wholesale. Existing files are kept. Build Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Close Save"
       }
     }

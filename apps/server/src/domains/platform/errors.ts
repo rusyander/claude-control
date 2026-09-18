@@ -1,4 +1,5 @@
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Отказы контура — состояние, а не падение панели.
@@ -56,8 +57,18 @@ export function platformNotFound(id: string): PlatformError {
 }
 
 /** Поле запроса не заполнено — 400 с ИМЕНЕМ поля, а не «неверный запрос». */
-export function invalidField(field: string, why: string): PlatformError {
-  return new PlatformError('invalid_body', `Запрос не принят: ${why} (${field}).`, field);
+export function invalidField(
+  field: string,
+  why: string,
+  code?: ServerMessageCode,
+  params?: ServerMessageParams,
+): PlatformError {
+  return new PlatformError(
+    'invalid_body',
+    `Запрос не принят: ${why} (${field}).`,
+    field,
+    code ? { code, params } : undefined,
+  );
 }
 
 /**
@@ -77,7 +88,7 @@ export function invalidField(field: string, why: string): PlatformError {
  */
 export function headerUnsafeKeyReason(reason: string): string | undefined {
   return /ByteString|greater than 255|Invalid character in header/i.test(reason)
-    ? 'Ключ контура не годится для заголовка: в нём есть символы вне латиницы. Сохраните ключ заново, без лишних символов'
+    ? serverText('gateway-key-not-header-safe')
     : undefined;
 }
 

@@ -169,6 +169,13 @@ export const chatMessageSchema = object({
    * «когда он ушёл в другую ветку» задают к уже написанному разговору.
    */
   gitBranch: string().optional(),
+  /**
+   * Контур сжал историю перед этим ответом: модель видела не весь разговор.
+   * Ставит сервер по журналу сжатий шлюза, сопоставляя id сообщения, — в
+   * транскрипте Claude Code этого признака нет. Нет поля — сжатия не было или
+   * ответ шёл мимо контура.
+   */
+  contextSummarized: boolean().optional(),
 });
 
 export type ChatMessage = Infer<typeof chatMessageSchema>;

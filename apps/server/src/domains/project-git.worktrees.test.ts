@@ -120,8 +120,8 @@ describe('worktreeDirName: имя ветки → имя каталога', () =>
    * в копию первого.
    */
   it('длинное имя укорачивается, но остаётся своим у каждой ветки', () => {
-    const long = 'task/e-inst-admin-ui-polzovateli-huki-plaginy-komandy';
-    const other = 'task/e-inst-admin-ui-polzovateli-huki-plaginy-komandy-2';
+    const long = 'task/e-demo-admin-ui-polzovateli-huki-plaginy-komandy';
+    const other = 'task/e-demo-admin-ui-polzovateli-huki-plaginy-komandy-2';
 
     expect(long.length).toBeGreaterThan(40);
     expect(worktreeDirName(long).length).toBeLessThanOrEqual(40);
@@ -130,22 +130,22 @@ describe('worktreeDirName: имя ветки → имя каталога', () =>
     // Укорачивание детерминировано: тот же путь и после перезапуска панели.
     expect(worktreeDirName(long)).toBe(worktreeDirName(long));
     // Начало имени остаётся читаемым — каталог должен узнаваться глазами.
-    expect(worktreeDirName(long).startsWith('task-e-inst-admin-ui')).toBe(true);
+    expect(worktreeDirName(long).startsWith('task-e-demo-admin-ui')).toBe(true);
   });
 
   it('короткое имя не трогается вовсе', () => {
-    expect(worktreeDirName('task/d-inst-admin-ui-modeli-2')).toBe('task-d-inst-admin-ui-modeli-2');
+    expect(worktreeDirName('task/d-demo-admin-ui-modeli-2')).toBe('task-d-demo-admin-ui-modeli-2');
   });
 });
 
 describe('stripGitProgress: в отказе видно причину, а не полосу прогресса', () => {
   it('строки прогресса выкидываются, сообщение об ошибке остаётся', () => {
     const raw = [
-      "Preparing worktree (new branch 'task/d-inst-admin-ui-modeli-2')",
+      "Preparing worktree (new branch 'task/d-demo-admin-ui-modeli-2')",
       'Updating files:  20% (1614/7829)\rUpdating files:  33% (2584/7829)',
       'Receiving objects:  50% (10/20)',
-      "warning: unable to access 'inst-admin-ui/src/features/…/.gitattributes': Filename too long",
-      "fatal: cannot create directory at 'inst-admin-ui/src/features/…/ui': Filename too long",
+      "warning: unable to access 'demo-admin-ui/src/features/…/.gitattributes': Filename too long",
+      "fatal: cannot create directory at 'demo-admin-ui/src/features/…/ui': Filename too long",
     ].join('\n');
 
     const clean = stripGitProgress(raw);

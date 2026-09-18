@@ -64,9 +64,10 @@ export function registerProviderChatRoutes(
   const requireProvider = (reply: FastifyReply): string | undefined => {
     const provider = getActiveProvider(ctx.store);
     if (provider.id === 'claude') {
-      void reply
-        .code(400)
-        .send({ message: 'У Claude собственный чат — эти маршруты не для него.' });
+      void reply.code(400).send({
+        message: 'У Claude собственный чат — эти маршруты не для него.',
+        messageCode: 'foreign-chat-not-for-claude',
+      });
       return undefined;
     }
     return provider.id;
@@ -95,7 +96,12 @@ export function registerProviderChatRoutes(
       ...(workdir ? { workdir } : {}),
     });
 
-    return chat ?? reply.code(400).send({ message: 'Не удалось создать разговор' });
+    return (
+      chat ??
+      reply
+        .code(400)
+        .send({ message: 'Не удалось создать разговор', messageCode: 'conversation-create-failed' })
+    );
   });
 
   app.get<{ Params: { id: string } }>('/api/provider-chat/chats/:id', (request, reply) => {
@@ -103,7 +109,10 @@ export function registerProviderChatRoutes(
     if (!providerId) return reply;
 
     const chat = readChat(appData(), providerId, request.params.id);
-    return chat ?? reply.code(404).send({ message: 'Разговор не найден' });
+    return (
+      chat ??
+      reply.code(404).send({ message: 'Разговор не найден', messageCode: 'conversation-not-found' })
+    );
   });
 
   app.patch<{ Params: { id: string }; Body: ProviderChatPatchRequest }>(
@@ -124,7 +133,12 @@ export function registerProviderChatRoutes(
         ...(workdir === undefined ? {} : { workdir: workdir.trim() }),
       });
 
-      return chat ?? reply.code(404).send({ message: 'Разговор не найден' });
+      return (
+        chat ??
+        reply
+          .code(404)
+          .send({ message: 'Разговор не найден', messageCode: 'conversation-not-found' })
+      );
     },
   );
 
@@ -137,7 +151,9 @@ export function registerProviderChatRoutes(
 
     return deleteChat(appData(), providerId, request.params.id)
       ? { ok: true }
-      : reply.code(404).send({ message: 'Разговор не найден' });
+      : reply
+          .code(404)
+          .send({ message: 'Разговор не найден', messageCode: 'conversation-not-found' });
   });
 
   /**
@@ -152,7 +168,8 @@ export function registerProviderChatRoutes(
       if (!providerId) return reply;
 
       const text = typeof request.body?.text === 'string' ? request.body.text.trim() : '';
-      if (!text) return reply.code(400).send({ message: 'Пустой запрос' });
+      if (!text)
+        return reply.code(400).send({ message: 'Пустой запрос', messageCode: 'request-empty' });
 
       const attachments = Array.isArray(request.body?.attachments)
         ? request.body.attachments.filter((path): path is string => typeof path === 'string')
@@ -178,8 +195,13 @@ export function registerProviderChatRoutes(
 
       if (!outcome.ok) {
         return outcome.reason === 'already_running'
-          ? reply.code(409).send({ message: 'Ответ на предыдущий вопрос ещё идёт' })
-          : reply.code(404).send({ message: 'Разговор не найден' });
+          ? reply.code(409).send({
+              message: 'Ответ на предыдущий вопрос ещё идёт',
+              messageCode: 'foreign-answer-running',
+            })
+          : reply
+              .code(404)
+              .send({ message: 'Разговор не найден', messageCode: 'conversation-not-found' });
       }
 
       return { message: outcome.message };
@@ -205,15 +227,20 @@ export function registerProviderChatRoutes(
     if (chats.status(chatId).isRunning) {
       return reply.code(409).send({
         message: 'Ответ ещё идёт: дождитесь конца хода или остановите его, потом перезапускайте',
+        messageCode: 'foreign-restart-running',
       });
     }
 
     const chat = readChat(appData(), providerId, chatId);
-    if (!chat) return reply.code(404).send({ message: 'Разговор не найден' });
-    if (!chat.workdir) {
+    if (!chat)
       return reply
-        .code(400)
-        .send({ message: 'У разговора нет рабочего каталога — новый разговор заводить негде' });
+        .code(404)
+        .send({ message: 'Разговор не найден', messageCode: 'conversation-not-found' });
+    if (!chat.workdir) {
+      return reply.code(400).send({
+        message: 'У разговора нет рабочего каталога — новый разговор заводить негде',
+        messageCode: 'foreign-restart-no-cwd',
+      });
     }
 
     const key = foreignChatKey(providerId, chatId);
@@ -283,7 +310,10 @@ export function registerProviderChatRoutes(
     );
 
     if (!outcome?.chatId) {
-      return reply.code(500).send({ message: 'Продолжение не заведено: хранилище отказало' });
+      return reply.code(500).send({
+        message: 'Продолжение не заведено: хранилище отказало',
+        messageCode: 'foreign-continuation-store-failed',
+      });
     }
     // Заметка в СТАРОМ разговоре: человек вернётся именно в него и должен
     // увидеть, куда ушла работа.

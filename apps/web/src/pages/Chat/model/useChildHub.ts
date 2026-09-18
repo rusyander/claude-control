@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ChatSummary } from '@agentdeck/contracts';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import type { TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
+import { toErrorMessage } from '@shared/api/client';
 import { agentRuns, type ActiveRunView } from '@shared/lib/agent-runs';
 import { toast } from '@shared/lib/toast';
 import { chatKeys } from '@entities/Chat';
@@ -13,6 +14,7 @@ import {
   useChatTree,
   useCheckOverlap,
   usePauseTree,
+  useReleaseGroup,
   useResumeTree,
   useReviewDecision,
   useReviewPush,
@@ -66,6 +68,13 @@ export interface ChildHub {
   /** Ответ на вопрос разбора группе с этим номером; пока идёт — `holdBusy`. */
   answerHold: (index: number, answer: string) => void;
   holdBusy: boolean;
+  /**
+   * Отпустить группу с этим номером, не дожидаясь предшественников: их цепочка
+   * могла не кончиться вовсе — прогон остановили, чат удалили, панель
+   * перезапустилась. Пока идёт — `releaseBusy`.
+   */
+  release: (index: number) => void;
+  releaseBusy: boolean;
   /**
    * Пересчитать пересечения веток (Т6). Панель считает их и сама — по концу
    * цепочки любой группы, — но человек вправе спросить, не дожидаясь ничьего
@@ -137,6 +146,7 @@ export function useChildHub(
   const pause = usePauseTree();
   const resume = useResumeTree();
   const hold = useAnswerHold();
+  const release = useReleaseGroup();
   const overlap = useCheckOverlap();
   const settle = (): void => {
     void agentRuns.resumeActive();
@@ -146,7 +156,7 @@ export function useChildHub(
   const fail = (error: unknown): void => {
     toast.error(
       t('chat.cascade.tree.failed', {
-        message: error instanceof Error ? error.message : String(error),
+        message: toErrorMessage(error),
       }),
     );
   };
@@ -199,9 +209,36 @@ export function useChildHub(
         onError: (error) =>
           toast.error(
             t('chat.cascade.hub.holdFailed', {
-              message: error instanceof Error ? error.message : String(error),
+              message: toErrorMessage(error),
             }),
           ),
+      },
+    );
+  };
+
+  // Отпустить ждущую группу: тот же адрес и тот же номер, что у ответа на
+  // вопрос разбора, — чата у стоящей группы по-прежнему нет. Отказ (409, группа
+  // уже не ждёт) показываем кодом сервера, а не строкой axios: «Request failed
+  // with status code 409» человеку не объясняет ничего.
+  const releaseGroup = (index: number): void => {
+    if (!parentChatId || release.isPending) return;
+    release.mutate(
+      { parentChatId, index },
+      {
+        onSuccess: (result) => {
+          const started = result.chats.find((chat) => chat.started);
+          toast.success(
+            started
+              ? t('chat.cascade.hub.releaseStarted', { title: started.title })
+              : t('chat.cascade.hub.releaseQueued'),
+          );
+          for (const failure of result.failures) {
+            toast.error(t('chat.split.failed', { title: failure.title, message: failure.message }));
+          }
+          settle();
+        },
+        onError: (error) =>
+          toast.error(t('chat.cascade.hub.releaseFailed', { message: toErrorMessage(error) })),
       },
     );
   };
@@ -219,7 +256,7 @@ export function useChildHub(
       onError: (error) =>
         toast.error(
           t('chat.cascade.overlap.failed', {
-            message: error instanceof Error ? error.message : String(error),
+            message: toErrorMessage(error),
           }),
         ),
     });
@@ -269,7 +306,7 @@ export function useChildHub(
         onError: (error) =>
           toast.error(
             t('chat.review.failed', {
-              message: error instanceof Error ? error.message : String(error),
+              message: toErrorMessage(error),
             }),
           ),
       },
@@ -288,7 +325,7 @@ export function useChildHub(
         onError: (error) =>
           toast.error(
             t('chat.review.failed', {
-              message: error instanceof Error ? error.message : String(error),
+              message: toErrorMessage(error),
             }),
           ),
       },
@@ -313,6 +350,8 @@ export function useChildHub(
     treeBusy: pause.isPending || resume.isPending,
     answerHold,
     holdBusy: hold.isPending,
+    release: releaseGroup,
+    releaseBusy: release.isPending,
     checkOverlap,
     overlapBusy: overlap.isPending,
     reviews,

@@ -37,6 +37,7 @@ import {
   writeGroupSource,
 } from './group-files.ts';
 import { readSchema, readSharedSteps } from './library.ts';
+import { coded, codedIf } from '../../lib/server-text.ts';
 
 /**
  * Файлы тест-кейсов в `.agent/tests/` проверяемого проекта.
@@ -99,8 +100,12 @@ function oneOf<T extends string>(value: unknown, allowed: T[]): T | undefined {
 function strictValue<T extends string>(value: unknown, allowed: T[], what: string): T {
   const word = oneOf(value, allowed);
   if (!word) {
-    throw new ProjectTestsError(
-      `${what}: допустимо ${allowed.join(', ')}, а не «${text(value).trim()}».`,
+    throw coded(
+      new ProjectTestsError(
+        `${what}: допустимо ${allowed.join(', ')}, а не «${text(value).trim()}».`,
+      ),
+      'value-not-allowed',
+      { allowed: allowed.join(', '), value: text(value).trim() },
     );
   }
   return word;
@@ -293,7 +298,8 @@ export function readGroup(root: string, id: string): ProjectTestGroup {
   const base: ProjectTestGroup = { id, title: id.toUpperCase(), file, cases: [] };
 
   const source = readGroupSource(root, assertGroupId(id));
-  if (source.error) return { ...base, error: source.error };
+  if (source.error)
+    return { ...base, error: source.error, messageCode: source.messageCode, params: source.params };
 
   const cases = withUniqueIds(
     source.cases
@@ -318,7 +324,8 @@ export function readGroups(root: string): ProjectTestGroup[] {
 
 /** Запись группы целиком. Сломанную группу писать нельзя — иначе затрём файл. */
 export function writeGroup(root: string, group: ProjectTestGroup): void {
-  if (group.error) throw new ProjectTestsError(group.error);
+  if (group.error)
+    throw codedIf(new ProjectTestsError(group.error), group.messageCode, group.params);
   writeGroupSource(root, assertGroupId(group.id), {
     title: group.title,
     description: group.description,
@@ -336,8 +343,9 @@ export function writeGroup(root: string, group: ProjectTestGroup): void {
 export function loadForWrite(root: string, id: string): ProjectTestGroup {
   assertNotPart(root, assertGroupId(id));
   const group = readGroup(root, id);
-  if (group.error && groupFileExists(root, id)) throw new ProjectTestsError(group.error);
-  return { ...group, error: undefined };
+  if (group.error && groupFileExists(root, id))
+    throw codedIf(new ProjectTestsError(group.error), group.messageCode, group.params);
+  return { ...group, error: undefined, messageCode: undefined, params: undefined };
 }
 
 /**
@@ -351,7 +359,11 @@ export function loadForWrite(root: string, id: string): ProjectTestGroup {
 export function requireGroup(root: string, id: string): ProjectTestGroup {
   const group = loadForWrite(root, id);
   if (!groupFileExists(root, group.id)) {
-    throw new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`);
+    throw coded(
+      new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`),
+      'tests-group-not-found',
+      { id },
+    );
   }
   return group;
 }
@@ -390,7 +402,11 @@ export function updateGroup(
 ): ProjectTestGroup {
   const group = loadForWrite(root, assertGroupId(id));
   if (!groupFileExists(root, group.id)) {
-    throw new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`);
+    throw coded(
+      new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`),
+      'tests-group-not-found',
+      { id },
+    );
   }
   const next: ProjectTestGroup = {
     ...group,
@@ -405,7 +421,11 @@ export function updateGroup(
 export function removeGroup(root: string, id: string): void {
   const groupId = assertGroupId(id);
   if (!groupFileExists(root, groupId)) {
-    throw new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`);
+    throw coded(
+      new ProjectTestsNotFoundError(`Группы «${id}» в проекте нет.`),
+      'tests-group-not-found',
+      { id },
+    );
   }
   removeGroupFiles(root, groupId);
 }
@@ -437,7 +457,12 @@ function assertRefs(root: string, steps: ProjectTestStep[]): void {
   if (refs.length === 0) return;
   const known = new Set(readSharedSteps(root).map((step) => step.id));
   const missing = refs.find((ref) => !known.has(ref));
-  if (missing) throw new ProjectTestsError(`Общего шага «${missing}» в проекте нет.`);
+  if (missing)
+    throw coded(
+      new ProjectTestsError(`Общего шага «${missing}» в проекте нет.`),
+      'shared-step-not-found',
+      { missing },
+    );
 }
 
 /**
@@ -458,7 +483,11 @@ function assertAttributes(root: string, attributes?: Record<string, string>): vo
   for (const field of schema.attributes) {
     const value = values[field.key]?.trim();
     if (field.required && !value) {
-      throw new ProjectTestsError(`Поле «${field.title}» обязательно.`);
+      throw coded(
+        new ProjectTestsError(`Поле «${field.title}» обязательно.`),
+        'attribute-required',
+        { field: field.title },
+      );
     }
     if (
       value &&
@@ -466,12 +495,18 @@ function assertAttributes(root: string, attributes?: Record<string, string>): vo
       field.options?.length &&
       !field.options.includes(value)
     ) {
-      throw new ProjectTestsError(
-        `Поле «${field.title}»: допустимые значения — ${field.options.join(', ')}.`,
+      throw coded(
+        new ProjectTestsError(
+          `Поле «${field.title}»: допустимые значения — ${field.options.join(', ')}.`,
+        ),
+        'attribute-options',
+        { field: field.title, options: field.options.join(', ') },
       );
     }
     if (value && field.type === 'number' && !Number.isFinite(Number(value))) {
-      throw new ProjectTestsError(`Поле «${field.title}» — это число.`);
+      throw coded(new ProjectTestsError(`Поле «${field.title}» — это число.`), 'attribute-number', {
+        field: field.title,
+      });
     }
   }
 }
@@ -509,7 +544,8 @@ export function upsertCase(
   now: string,
 ): ProjectTestCase {
   const title = input.title?.trim();
-  if (!title) throw new ProjectTestsError('У теста должно быть название.');
+  if (!title)
+    throw coded(new ProjectTestsError('У теста должно быть название.'), 'case-title-required');
 
   const group = requireGroup(root, groupId);
   const existing = input.id ? group.cases.find((item) => item.id === input.id) : undefined;
@@ -517,8 +553,12 @@ export function upsertCase(
   // пока форма была открыта, и молча завести его заново было бы ошибкой. Новый
   // кейс сохраняют без id, идентификатор выдаёт панель.
   if (input.id && !existing) {
-    throw new ProjectTestsNotFoundError(
-      `Кейса «${input.id}» в группе «${groupId}» нет: новый кейс сохраняют без id.`,
+    throw coded(
+      new ProjectTestsNotFoundError(
+        `Кейса «${input.id}» в группе «${groupId}» нет: новый кейс сохраняют без id.`,
+      ),
+      'case-id-not-in-group',
+      { caseId: input.id, groupId },
     );
   }
   assertAttributes(root, input.attributes ?? existing?.attributes);
@@ -585,7 +625,11 @@ export function upsertCase(
 export function removeCase(root: string, groupId: string, caseId: string): void {
   const group = requireGroup(root, groupId);
   if (!group.cases.some((item) => item.id === caseId)) {
-    throw new ProjectTestsNotFoundError(`Кейса «${caseId}» в группе «${groupId}» нет.`);
+    throw coded(
+      new ProjectTestsNotFoundError(`Кейса «${caseId}» в группе «${groupId}» нет.`),
+      'case-not-in-named-group',
+      { caseId, groupId },
+    );
   }
   writeGroup(root, { ...group, cases: group.cases.filter((item) => item.id !== caseId) });
 }
@@ -810,11 +854,16 @@ export function bulkCases(root: string, input: ProjectTestBulkInput, now: string
   // Неизвестное действие раньше «трогало» кейсы вхолостую: штамп updatedAt
   // сдвигался у всех отмеченных, а ответ был 200 с честным touched.
   if (!BULK_ACTIONS.includes(input.action)) {
-    throw new ProjectTestsError(`Неизвестное действие «${String(input.action)}».`);
+    throw coded(
+      new ProjectTestsError(`Неизвестное действие «${String(input.action)}».`),
+      'bulk-action-unknown',
+      { action: String(input.action) },
+    );
   }
   const group = requireGroup(root, input.groupId);
   const ids = new Set(input.caseIds);
-  if (ids.size === 0) throw new ProjectTestsError('Не выбрано ни одного теста.');
+  if (ids.size === 0)
+    throw coded(new ProjectTestsError('Не выбрано ни одного теста.'), 'bulk-none-selected');
   const value = input.value?.trim();
 
   // Карантин без причины — тихое удаление кейса: он перестаёт красить прогон и
@@ -823,8 +872,11 @@ export function bulkCases(root: string, input: ProjectTestBulkInput, now: string
   if (input.action === 'mute' && !value) {
     const blank = group.cases.filter((item) => ids.has(item.id) && !item.muteReason?.trim());
     if (blank.length > 0) {
-      throw new ProjectTestsError(
-        'Карантин без причины не ставится: напишите, чего он ждёт и до каких пор.',
+      throw coded(
+        new ProjectTestsError(
+          'Карантин без причины не ставится: напишите, чего он ждёт и до каких пор.',
+        ),
+        'bulk-mute-reason-required',
       );
     }
   }
@@ -837,7 +889,11 @@ export function bulkCases(root: string, input: ProjectTestBulkInput, now: string
   }
 
   if (input.action === 'move') {
-    if (!value) throw new ProjectTestsError('Не указана группа-приёмник.');
+    if (!value)
+      throw coded(
+        new ProjectTestsError('Не указана группа-приёмник.'),
+        'bulk-target-group-missing',
+      );
     const target = requireGroup(root, value);
     const moving = group.cases.filter((item) => ids.has(item.id));
     if (moving.length === 0) return 0;

@@ -14,6 +14,7 @@ import {
   describeRunPlan,
   listConsumerOptions,
   resolveRunRoute,
+  runRouteOf,
   type PlatformRoutingDeps,
 } from './routing.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
@@ -315,6 +316,61 @@ describe('прогон через контур', () => {
     expect(foreign.routed && foreign.layers).toBeUndefined();
   });
 
+  /**
+   * Проекция решения в то, что получает место спавна. Ревью Т13: её исполнял
+   * ТОЛЬКО живой запуск панели (замыкание в `bootstrap/runtime.ts`), и удаление
+   * строки `layers` или `model` оставляло гейт зелёным — прогон молча уходил бы
+   * со всеми нашими слоями и с именем вендора, которого контур не знает.
+   * Решения здесь настоящие: их считает тот же `resolveRunRoute`.
+   */
+  describe('решение → маршрут места спавна', () => {
+    it('модель, усилие, промпт и снятые слои доезжают до места спавна', () => {
+      const stripped = {
+        ...PLATFORM,
+        rules: { platform: defaultPlatformRules(), ours: { ...defaultOurRules(), skills: false } },
+      };
+      connect(stripped);
+      savePrompt(dir, 'contour-agent', 'Отвечай коротко.');
+
+      const decision = resolveRunRoute(deps, 'chat', 'sonnet');
+      const route = runRouteOf(decision);
+
+      expect(route.env.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:5179/company-dev');
+      expect(route.model).toEqual(decision.routed && decision.model);
+      expect(route.effort).toBe(decision.routed && decision.effort);
+      expect(route.systemPrompt).toContain('Отвечай коротко.');
+      expect(route.layers).toEqual({
+        args: ['--disable-slash-commands'],
+        systemPrompt: true,
+        dropped: ['skills'],
+      });
+      // Признак контура наружу не течёт: место спавна знает маршрут, а не то,
+      // какой именно контур его выдал.
+      expect('platformId' in route).toBe(false);
+    });
+
+    it('не через контур — пустой маршрут, который затирает прежний', () => {
+      connect({ ...PLATFORM, consumers: ['tests'] });
+
+      const route = runRouteOf(resolveRunRoute(deps, 'chat'));
+
+      // Ни модели, ни усилия, ни слоёв: продолжение остановленного прогона
+      // приходит со старыми параметрами, и адрес контура пережил бы снятую
+      // галочку.
+      expect(route).toEqual({ env: {} });
+    });
+
+    it('обязательный контур без шлюза — отказ доезжает текстом, а не пустотой', () => {
+      connect(PLATFORM, 0);
+
+      const route = runRouteOf(resolveRunRoute(deps, 'chat'));
+
+      expect(route.env).toEqual({});
+      expect(route.refusal).toContain('Контур «Company · dev» обязателен');
+      expect(route.model).toBeUndefined();
+    });
+  });
+
   it('CLI, который держит адрес в файле, отказывает с «только глобально»', () => {
     connect({ ...PLATFORM, consumers: ['foreign:codex', 'foreign:gemini'] });
     // Файл один на машину: «включить только для чата» там не получается
@@ -324,6 +380,31 @@ describe('прогон через контур', () => {
     expect(resolveRunRoute(deps, 'foreign:gemini')).toEqual({
       routed: false,
       reason: 'gateway_dialect',
+    });
+  });
+
+  it('CLI без своего чата в панели маршрута не получает — тем же правилом, что и каталог', () => {
+    // Ревью Т13: каталог пропускает провайдера без `oneShotArgs` («галочка, за
+    // которой не запускается ничего»), а решатель раньше смотрел только на
+    // «известен ли id». Сохранённый мимо мастера `foreign:cursor` получил бы
+    // полное окружение контура в тот день, когда провайдеру допишут секцию
+    // переменных, — без единой галочки на экране.
+    connect({ ...PLATFORM, consumers: ['foreign:cursor'] });
+    expect(resolveRunRoute(deps, 'foreign:cursor')).toEqual({ routed: false, reason: 'not_a_run' });
+    // Второе полукольцо того же правила: в списке мастера его тоже нет.
+    expect(
+      listConsumerOptions({ ...PLATFORM, consumers: ['foreign:cursor'] }).map((item) => item.id),
+    ).not.toContain('foreign:cursor');
+  });
+
+  it('контура нет вовсе — об этом и сказано, а не про устаревший CLI', () => {
+    // Порядок проверок: диагноз про потребителя ниже «контура нет». Иначе
+    // панель без единого контура отвечала бы про `foreign:<cli>` словом, к её
+    // состоянию отношения не имеющим (ревью Т13).
+    store.updateSettings({ activePlatformId: '' });
+    expect(resolveRunRoute(deps, 'foreign:nosuchcli')).toEqual({
+      routed: false,
+      reason: 'no_active_platform',
     });
   });
 

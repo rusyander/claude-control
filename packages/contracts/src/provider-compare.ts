@@ -45,6 +45,8 @@ export interface CompareEntry {
   opaque: boolean;
   /** Почему запись нельзя перенести. Пусто — можно (если раздел переносим вообще). */
   blocked?: string;
+  /** Код `blocked` — клиент переводит его своим словарём. */
+  blockedCode?: string;
 }
 
 /** Одна сторона сравнения в конкретном разделе. */
@@ -57,6 +59,7 @@ export interface CompareSide {
   filePath?: string;
   /** Почему раздела нет или он не прочитался. */
   note?: string;
+  noteCode?: string;
 }
 
 export interface CompareSectionResult {
@@ -73,6 +76,7 @@ export interface CompareSectionResult {
   migratable: boolean;
   /** Пояснение к разделу целиком. */
   note?: string;
+  noteCode?: string;
 }
 
 export interface ProviderCompareResponse {
@@ -96,6 +100,7 @@ export interface ProviderMigrateRequest {
 export interface MigrateSkip {
   key: string;
   reason: string;
+  reasonCode?: string;
 }
 
 export interface ProviderMigrateResponse {

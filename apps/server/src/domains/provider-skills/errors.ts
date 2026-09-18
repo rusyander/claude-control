@@ -1,4 +1,5 @@
 import type { SkillFormatError } from '../../lib/opencode-skill.ts';
+import { coded, codeOf } from '../../lib/server-text.ts';
 
 /** Путь скилла выходит за пределы каталога скиллов — операция запрещена. */
 export class UnsafeSkillPathError extends Error {
@@ -17,6 +18,7 @@ export class SkillNotFoundError extends Error {
 
   constructor(path: string) {
     super(`Скилл «${path}» не найден в каталоге скиллов.`);
+    coded(this, 'skill-not-found-in-dir', { path });
     this.name = 'SkillNotFoundError';
     this.path = path;
   }
@@ -56,21 +58,34 @@ export function describeSkillError(
   error: unknown,
 ): { status: number; body: Record<string, unknown> } | undefined {
   if (error instanceof UnsafeSkillPathError) {
-    return { status: 400, body: { error: 'unsafe_path', message: error.message } };
+    return {
+      status: 400,
+      body: { error: 'unsafe_path', message: error.message, ...codeOf(error) },
+    };
   }
   if (error instanceof InvalidSkillDraftError) {
     return {
       status: 400,
-      body: { error: 'invalid_draft', reason: error.reason, message: error.message },
+      body: {
+        error: 'invalid_draft',
+        reason: error.reason,
+        message: error.message,
+        ...codeOf(error),
+      },
     };
   }
   if (error instanceof SkillNotFoundError) {
-    return { status: 404, body: { error: 'not_found', message: error.message } };
+    return { status: 404, body: { error: 'not_found', message: error.message, ...codeOf(error) } };
   }
   if (error instanceof SkillNotEditableError) {
     return {
       status: 422,
-      body: { error: 'skill_read_only', problem: error.problem, message: error.message },
+      body: {
+        error: 'skill_read_only',
+        problem: error.problem,
+        message: error.message,
+        ...codeOf(error),
+      },
     };
   }
   return undefined;

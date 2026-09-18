@@ -5,6 +5,8 @@ import { createNetworkTransport, type NetworkTransport } from '../mcp-client.ts'
 import { oauthCallbackUrl } from './callback.ts';
 import { PanelOAuthProvider } from './provider.ts';
 import { oauthStorePath } from './store.ts';
+import { coded } from '../../lib/server-text.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Интерактивный вход: старт (получить адрес авторизации) и завершение (обменять
@@ -57,7 +59,10 @@ export type StartOAuthResult =
  */
 export async function startOAuth(server: McpServer, appData: string): Promise<StartOAuthResult> {
   if (server.transport === 'stdio') {
-    throw new Error('OAuth доступен только у сетевых серверов (http/sse)');
+    throw coded(
+      new Error('OAuth доступен только у сетевых серверов (http/sse)'),
+      'oauth-network-only',
+    );
   }
   sweepFlows();
 
@@ -66,7 +71,7 @@ export async function startOAuth(server: McpServer, appData: string): Promise<St
   const client = new Client({ name: 'agentdeck', version: '0.1.0' }, { capabilities: {} });
 
   try {
-    await withDeadline(client.connect(transport), 20_000, 'Сервер не ответил вовремя');
+    await withDeadline(client.connect(transport), 20_000, serverText('mcp-oauth-timeout'));
     // Токены уже были и подошли — вход не требуется.
     await client.close().catch(() => undefined);
     return { status: 'authorized' };
@@ -92,7 +97,8 @@ export async function startOAuth(server: McpServer, appData: string): Promise<St
  */
 export async function finishOAuth(state: string, code: string): Promise<{ serverId: string }> {
   const flow = pending.get(state);
-  if (!flow) throw new Error('Сессия авторизации не найдена или истекла');
+  if (!flow)
+    throw coded(new Error('Сессия авторизации не найдена или истекла'), 'oauth-session-missing');
   pending.delete(state);
 
   try {

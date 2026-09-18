@@ -90,6 +90,9 @@ function pendingRow(group: SplitPlanView['groups'][number], split: SplitPlanView
     stages: [],
     isRunning: false,
     pending,
+    // Номер группы в конвейере: им адресуются обе двери к стоящей группе —
+    // ответ на вопрос разбора и «отпустить», не дожидаясь предшественников.
+    groupIndex: group.index,
     ...(group.after.length > 0 ? { waitsFor: group.after.map(titleOf) } : {}),
     ...(group.hold ? { hold: { index: group.index, question: group.hold } } : {}),
     ...(group.holdAnswer ? { holdAnswered: true } : {}),

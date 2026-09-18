@@ -1,3 +1,6 @@
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
+import { coded } from '../../lib/server-text.ts';
+
 /**
  * Отказы внешних интеграций — состояние, а не падение.
  *
@@ -43,9 +46,19 @@ export function notConnected(what: string): IntegrationError {
   );
 }
 
-/** Поле запроса не заполнено — 400 с ИМЕНЕМ поля, а не «неверный запрос». */
-export function invalidField(field: string, why: string): IntegrationError {
-  return new IntegrationError('invalid_body', `Запрос не принят: ${why} (${field}).`, field);
+/**
+ * Поле запроса не заполнено — 400 с ИМЕНЕМ поля, а не «неверный запрос».
+ * `code` — код всей фразы «Запрос не принят: … (поле).» для перевода на клиенте;
+ * `field` в подстановки кладёт сам вызывающий (так её видит сверка кодов).
+ */
+export function invalidField(
+  field: string,
+  why: string,
+  code?: ServerMessageCode,
+  params?: ServerMessageParams,
+): IntegrationError {
+  const error = new IntegrationError('invalid_body', `Запрос не принят: ${why} (${field}).`, field);
+  return code ? coded(error, code, params) : error;
 }
 
 /** Внешняя система не ответила или ответила отказом. */

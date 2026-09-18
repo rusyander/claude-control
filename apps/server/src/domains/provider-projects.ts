@@ -17,6 +17,7 @@ import type { ProviderRulesTarget } from './provider-rules.ts';
 import type { ProviderHooksTarget } from './provider-hooks.ts';
 import type { ProviderPluginsTarget } from './provider-plugins.ts';
 import type { ProviderSkillsTarget } from './provider-skills.ts';
+import { coded } from '../lib/server-text.ts';
 
 /**
  * Проектный уровень конфигурации у НЕ-Claude провайдеров (COMMON-2).
@@ -360,7 +361,10 @@ function requireInstructions(target: ProviderProjectTarget): {
   fileName: string;
 } {
   if (!target.instructions) {
-    throw new Error('У активного провайдера нет проектного файла инструкций.');
+    throw coded(
+      new Error('У активного провайдера нет проектного файла инструкций.'),
+      'project-instructions-unsupported',
+    );
   }
   return target.instructions;
 }

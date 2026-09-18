@@ -1,5 +1,6 @@
 import { CALL_CLOSE, CALL_OPEN } from './protocol.ts';
 import { repairJson, repaired, strictObject, type RepairRound } from './repair.ts';
+import { serverText } from '../../../../lib/server-texts.ts';
 
 /**
  * Разбор ОДНОГО вызова и границы блоков. Состояние потока живёт в `stream.ts`,
@@ -26,26 +27,26 @@ export interface CallForm {
   loose?: boolean;
 }
 
-export const CALL_FORMS: readonly CallForm[] = [
-  { open: CALL_OPEN, close: CALL_CLOSE },
-  // Терпимая форма: модель, привыкшая к markdown, пишет забор вместо тега.
-  { open: '```tool_call', close: '```' },
-];
+export const CALL_FORMS: readonly CallForm[] = [{ open: CALL_OPEN, close: CALL_CLOSE }];
 
 /**
- * Форма без тега — забор без метки и голый объект, — и она разбирается НЕ
- * здесь, а на конце ответа (`stream.ts`), потому что принимается только когда
- * составляет ВЕСЬ ответ.
+ * Форма без тега — забор (с меткой `tool_call` или без неё) и голый объект, — и
+ * она разбирается НЕ здесь, а на конце ответа (`stream.ts`), потому что
+ * принимается только когда составляет ВЕСЬ ответ.
+ *
+ * Метка забора границы не двигает. Забор ```tool_call посреди ответа стоял в
+ * общем списке форм и выполнялся с прозой вокруг — при том что справка, корневой
+ * `CLAUDE.md` и карта кода все трое обещают «никогда». Живой прогон 18 сентября
+ * 2026 показал, чем это кончается: настоящий `claude.exe` записал файл из блока,
+ * который модель пометила «не выполняй, это пример». Метку пишет та же модель,
+ * что пишет пример, — доверять ей ровно столько же, сколько безымянному забору.
  *
  * Так ответила живая `qwen2.5-coder:14b` (замер 12 сентября 2026): вызов верный,
  * обёртка markdown. Отказаться его разбирать значит оставить агента без рук
- * ровно там, ради чего прослойка и написана. Но поставить забор без метки в один
- * ряд с тегами нельзя: обычный ответ агента полон заборов с кодом, и любой
- * пример, любая цитата протокола и любой кусок ПРОЧИТАННОГО ФАЙЛА, попав в
- * ответ внутри забора, становился бы действием над файлами человека — это
- * доказано живым прогоном 12 сентября, где настоящий `claude.exe` записал файл
- * из блока, про который модель прямым текстом написала «не выполняй, это
- * пример».
+ * ровно там, ради чего прослойка и написана. Но поставить забор в один ряд с
+ * тегами нельзя: обычный ответ агента полон заборов с кодом, и любой пример,
+ * любая цитата протокола и любой кусок ПРОЧИТАННОГО ФАЙЛА, попав в ответ внутри
+ * забора, становился бы действием над файлами человека.
  *
  * Отсюда правило: весь ответ и есть вызов — или это не вызов.
  */
@@ -159,7 +160,7 @@ function readLooseCall(text: string, allowed: ReadonlySet<string>): CallReading 
     const quoted = declaredName(text, allowed);
     return {
       flaw: {
-        reason: 'вызов внутри блока кода не выполняется',
+        reason: serverText('gateway-flaw-fenced'),
         ...(quoted ? { name: quoted } : {}),
       },
     };
@@ -169,7 +170,7 @@ function readLooseCall(text: string, allowed: ReadonlySet<string>): CallReading 
   if (!value) {
     const named = declaredName(text, allowed);
     return named
-      ? { flaw: { reason: 'вызов без тега принимается только целым объектом JSON', name: named } }
+      ? { flaw: { reason: serverText('gateway-flaw-loose-whole'), name: named } }
       : { pass: true };
   }
 
@@ -182,11 +183,13 @@ function readLooseCall(text: string, allowed: ReadonlySet<string>): CallReading 
     // из package.json назвало «имя», но вызовом быть не пыталось.
     const shaped =
       value.arguments !== undefined || value.input !== undefined || value.parameters !== undefined;
-    return shaped ? { flaw: { reason: 'инструмент не объявлен клиентом', name } } : { pass: true };
+    return shaped
+      ? { flaw: { reason: serverText('gateway-flaw-undeclared'), name } }
+      : { pass: true };
   }
 
   const args = readArguments(value, true);
-  if (!args) return { flaw: { reason: 'аргументы не разбираются как объект', name } };
+  if (!args) return { flaw: { reason: serverText('gateway-flaw-args'), name } };
 
   return { call: { name, arguments: args, round: 'none' } };
 }
@@ -204,21 +207,21 @@ export function readCall(
   if (form?.loose === true) return readLooseCall(withoutLanguageTag(inner.trim()), allowed);
 
   const text = inner.trim();
-  if (!text) return { flaw: { reason: 'пустой блок вызова' } };
+  if (!text) return { flaw: { reason: serverText('gateway-flaw-empty') } };
   // Массив в корне — это «несколько вызовов в одном блоке» (правило 1 промпта).
   // Ремонт нашёл бы в нём первый объект и молча выполнил один вызов из двух.
-  if (text.startsWith('[')) return { flaw: { reason: 'несколько вызовов в одном блоке' } };
+  if (text.startsWith('[')) return { flaw: { reason: serverText('gateway-flaw-several') } };
 
   const parsed = repairJson(text);
   if (!repaired(parsed)) return { flaw: { reason: parsed.reason } };
 
   const value = parsed.value;
   const name = typeof value.name === 'string' ? value.name.trim() : '';
-  if (!name) return { flaw: { reason: 'в блоке нет имени инструмента' } };
-  if (!allowed.has(name)) return { flaw: { reason: 'инструмент не объявлен клиентом', name } };
+  if (!name) return { flaw: { reason: serverText('gateway-flaw-no-name') } };
+  if (!allowed.has(name)) return { flaw: { reason: serverText('gateway-flaw-undeclared'), name } };
 
   const args = readArguments(value, false);
-  if (!args) return { flaw: { reason: 'аргументы не разбираются как объект', name } };
+  if (!args) return { flaw: { reason: serverText('gateway-flaw-args'), name } };
 
   return { call: { name, arguments: args, round: parsed.round } };
 }

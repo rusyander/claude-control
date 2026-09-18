@@ -13,6 +13,7 @@ import type { ClaudePaths } from './shared.ts';
 const SECTION_UNSUPPORTED = {
   error: 'section_unsupported',
   message: 'У активного провайдера нет раздела глобальных инструкций.',
+  messageCode: 'instructions-global-missing',
 } as const;
 
 /**
@@ -38,7 +39,11 @@ export function registerRuleRoutes(app: FastifyInstance, ctx: ServerContext): vo
    * `deleteRule` — молча переписывал файл, оставляя лишнюю копию и запись в
    * истории. Неизвестный id — 404, файл не трогаем.
    */
-  const NOT_FOUND = { error: 'rule_not_found', message: 'Правило не найдено' } as const;
+  const NOT_FOUND = {
+    error: 'rule_not_found',
+    message: 'Правило не найдено',
+    messageCode: 'rule-not-found',
+  } as const;
   const hasRule = (id: string): boolean =>
     readRules(paths().claudeMd, ctx.store).some((rule) => rule.id === id);
 
@@ -81,6 +86,7 @@ export function registerRuleRoutes(app: FastifyInstance, ctx: ServerContext): vo
       return reply.code(400).send({
         error: 'invalid_content',
         message: 'Поле content обязано быть строкой (пустая строка допустима).',
+        messageCode: 'content-must-be-string',
       });
     }
 

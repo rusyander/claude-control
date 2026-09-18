@@ -46,10 +46,41 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createServer } from 'node:net';
 import { REWRITTEN_FINAL, startStubPlatform } from './stub-platform.mjs';
 
-const PANEL_PORT = Number(process.env.WIRE_PANEL_PORT ?? 5191);
-const GATEWAY_PORT = Number(process.env.WIRE_GATEWAY_PORT ?? 5192);
+/**
+ * Свободный порт у системы. Прежде здесь стояли числа 5191/5192, и это давало
+ * худший из возможных исходов: прогон, упавший до `finally`, оставлял свою
+ * панель на том же порту, а следующий прогон разговаривал С НЕЙ — с панелью
+ * ПРОШЛОГО дерева, отвечающей бодро и не тем. Зелень такого прогона не значит
+ * ничего, а краснота указывает не туда (ревью Т0→Т13, R3 MINOR-3).
+ */
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+/** Отзывается ли кто-нибудь на этом порту. Занят — прогон не начинается вовсе. */
+async function portTaken(port) {
+  try {
+    await fetch(`http://127.0.0.1:${port}/api/system`, {
+      signal: AbortSignal.timeout(1500),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const PANEL_PORT = Number(process.env.WIRE_PANEL_PORT ?? (await freePort()));
+const GATEWAY_PORT = Number(process.env.WIRE_GATEWAY_PORT ?? (await freePort()));
 const PANEL = `http://127.0.0.1:${PANEL_PORT}`;
 const CONTOUR = 'wire-company';
 /** Контур, настроенный ДО Т7: запись в `state.json` без поля `rules` вовсе. */
@@ -153,6 +184,13 @@ async function main() {
     'utf8',
   );
 
+  if (await portTaken(PANEL_PORT)) {
+    throw new NotChecked(
+      `порт ${PANEL_PORT} уже кем-то занят. Прогон против ЧУЖОЙ панели доказал бы не то, ` +
+        'что проверяется; вероятная причина — брошенная одноразовая панель прошлого прогона.',
+    );
+  }
+
   const panel = spawn(
     process.execPath,
     ['--experimental-strip-types', '--no-warnings', 'apps/server/src/index.ts'],
@@ -162,6 +200,20 @@ async function main() {
       shell: false,
     },
   );
+
+  // `finally` ниже не выполняется, когда процесс уносят снаружи: Ctrl-C, taskkill,
+  // падение самого узла. Без этих трёх строк одноразовая панель переживала свой
+  // прогон — тот самый случай, ради которого порт выше стал случайным.
+  const reap = () => panel.kill();
+  process.once('exit', reap);
+  process.once('SIGINT', () => {
+    reap();
+    process.exit(130);
+  });
+  process.once('SIGTERM', () => {
+    reap();
+    process.exit(143);
+  });
 
   try {
     if (!(await waitFor(`${PANEL}/api/system`, 30))) {
@@ -656,11 +708,11 @@ async function run(stub) {
     `${contradiction.status}: ${JSON.stringify(contradiction.body).slice(0, 200)}`,
   );
 
-  // `single_turn` через настоящий сокет: контур (как router.py) отвергает его с
+  // `single_turn` через настоящий сокет: контур, как и настоящая платформа, отвергает его с
   // потоком, поэтому ход обязан уйти наверх цельным, а клиенту Anthropic —
   // приехать потоком с блоком вызова. Тем же ходом — размышления «выключить»:
   // PUT проходит настоящую схему настроек и хранилище, а поле контура вложенное
-  // (`chat/schemas.py:120`), верхнее `enable_thinking` он выбрасывает молча.
+  // (поле контура вложенное), верхнее `enable_thinking` он выбрасывает молча.
   if (wired?.platform) {
     await api(`/platforms/${encodeURIComponent(CONTOUR)}`, {
       method: 'PUT',

@@ -2,6 +2,7 @@ import type { TmsPushResult } from '@agentdeck/contracts';
 import { invalidField } from '../errors.ts';
 import { requestJson } from '../http.ts';
 import type { TmsCaseBatch, TmsClient, TmsRunPush } from './types.ts';
+import { serverText } from '../../../lib/server-texts.ts';
 
 /**
  * Zephyr Scale (облако): кейсы и циклы поверх собственного REST.
@@ -49,7 +50,13 @@ function jsonHeaders(token: string): Record<string, string> {
 
 export function zephyrClient(token: string, projectKey: string): TmsClient {
   const key = projectKey.trim();
-  if (!key) throw invalidField('projectKey', 'не указан ключ проекта Jira');
+  if (!key)
+    throw invalidField(
+      'projectKey',
+      'не указан ключ проекта Jira',
+      'request-jira-project-key-missing',
+      { field: 'projectKey' },
+    );
 
   return {
     kind: 'zephyr',
@@ -62,7 +69,7 @@ export function zephyrClient(token: string, projectKey: string): TmsClient {
         system: SYSTEM,
         headers: headers(token),
       });
-      return `${SYSTEM}, проект ${key}`;
+      return serverText('integration-tms-project', { system: SYSTEM, project: key });
     },
 
     /**

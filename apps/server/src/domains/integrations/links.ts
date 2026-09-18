@@ -88,6 +88,9 @@ export function describeLink(link: IntegrationLink): string {
 
 function requirePath(path: string): string {
   const value = String(path ?? '').trim();
-  if (!value) throw invalidField('path', 'не указан каталог проекта');
+  if (!value)
+    throw invalidField('path', 'не указан каталог проекта', 'request-project-dir-missing', {
+      field: 'path',
+    });
   return value;
 }

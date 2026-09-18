@@ -387,7 +387,8 @@ The image is asked for by the PANEL, never by the CLI: the transcript is Claude 
 panel writes not one line into it, so the picture is a card in the right column plus a file under
 `<appData>/media/` (bytes) with a sibling `.json` (record) — never a message, and there is no gallery.
 Availability is decided ONCE on the server (`GET /api/media/images/plan`, `domains/media/images.ts`) and
-the item stays visible and locked with one of six named reasons; a second, client-side guess would drift
+answered with one of EIGHT named reasons, of which only `no-agent` locks the item — the other seven say
+why there is no RASTER while the agent road still draws; a second, client-side guess would drift
 from the real route — the disease `chooseRunModel` cured in Т6. Three roads: the contour as part of an
 ordinary answer, through the panel's OWN gateway in the OpenAI dialect (journal, spend, DLP, 451 for
 free — and the anthropic dialect would drop the `image_url` part), the contour's images handle, or the

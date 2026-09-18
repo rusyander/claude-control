@@ -33,6 +33,8 @@ import {
 import { buildPanelPrompts, takePanelPrompts } from '../domains/env-transfer/prompts.ts';
 import { PromptTooLongError } from '../domains/prompts/errors.ts';
 import { exportPromptOverrides, savePrompt } from '../domains/prompts.ts';
+import { codeOf } from '../lib/server-text.ts';
+import { attachTextCodes } from '../lib/server-texts.ts';
 
 /**
  * Перенос окружения: конфигурация ЛЮБОГО провайдера уезжает одним zip и
@@ -80,6 +82,7 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
       void reply.code(400).send({
         error: 'unknown_provider',
         message: 'Не указан известный провайдер.',
+        messageCode: 'transfer-provider-unknown',
       });
       return undefined;
     }
@@ -95,9 +98,10 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
   const fail = (reply: FastifyReply, error: unknown): FastifyReply => {
     const message = error instanceof Error ? error.message : String(error);
     const badArchive = (error as { code?: string }).code === 'invalid_archive';
+    const text = { message, ...codeOf(error) };
     return badArchive
-      ? reply.code(400).send({ error: 'invalid_archive', message })
-      : reply.code(500).send({ error: 'apply_failed', message });
+      ? reply.code(400).send({ error: 'invalid_archive', ...text })
+      : reply.code(500).send({ error: 'apply_failed', ...text });
   };
 
   /** Что попадёт в архив — до выбора папки, чтобы пользователь видел объём и чек-лист. */
@@ -107,28 +111,33 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
 
     const collected = collectProviderFiles(provider, override());
     const platforms = readPlatforms(ctx.store);
-    return {
-      provider: { id: provider.id, name: provider.name },
-      // Контуры показываются ДО выбора папки: человек должен видеть, что его
-      // корпоративная настройка уедет вместе с конфигурацией CLI, и увидеть
-      // строку «ключ вводится заново» раньше, чем нажмёт «собрать».
-      platforms: platforms.map((platform) => ({
-        id: platform.id,
-        title: platform.title,
-        baseUrl: platform.baseUrl,
-      })),
-      locations: providerLocations(provider, override()).map((location) => ({
-        index: location.index,
-        kind: location.kind,
-        role: location.role,
-        path: location.path,
-        exists: existsSync(location.path),
-      })),
-      files: collected.files.length,
-      bytes: collected.totalBytes,
-      skipped: collected.skipped,
-      checklist: [...collected.checklist, ...panelPlatformsChecklist(platforms)],
-    };
+    // Строка чек-листа про ключ контура собрана по коду — он восстанавливается
+    // разбором готовой строки, английский интерфейс переводит её словарём.
+    return attachTextCodes(
+      {
+        provider: { id: provider.id, name: provider.name },
+        // Контуры показываются ДО выбора папки: человек должен видеть, что его
+        // корпоративная настройка уедет вместе с конфигурацией CLI, и увидеть
+        // строку «ключ вводится заново» раньше, чем нажмёт «собрать».
+        platforms: platforms.map((platform) => ({
+          id: platform.id,
+          title: platform.title,
+          baseUrl: platform.baseUrl,
+        })),
+        locations: providerLocations(provider, override()).map((location) => ({
+          index: location.index,
+          kind: location.kind,
+          role: location.role,
+          path: location.path,
+          exists: existsSync(location.path),
+        })),
+        files: collected.files.length,
+        bytes: collected.totalBytes,
+        skipped: collected.skipped,
+        checklist: [...collected.checklist, ...panelPlatformsChecklist(platforms)],
+      },
+      ['keys'],
+    );
   });
 
   app.post<{ Body: { provider?: string; targetDir?: string; exportedAt?: string } }>(
@@ -140,14 +149,18 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
 
       const targetDir = body.targetDir;
       if (typeof targetDir !== 'string' || !targetDir || !isAbsolute(targetDir)) {
-        return reply
-          .code(400)
-          .send({ error: 'invalid_target', message: 'Нужен абсолютный путь к папке.' });
+        return reply.code(400).send({
+          error: 'invalid_target',
+          message: 'Нужен абсолютный путь к папке.',
+          messageCode: 'transfer-folder-absolute-required',
+        });
       }
       if (!existsSync(targetDir) || !statSync(targetDir).isDirectory()) {
-        return reply
-          .code(400)
-          .send({ error: 'invalid_target', message: 'Такой папки нет на диске.' });
+        return reply.code(400).send({
+          error: 'invalid_target',
+          message: 'Такой папки нет на диске.',
+          messageCode: 'transfer-folder-missing',
+        });
       }
 
       const exportedAt = body.exportedAt?.trim() || new Date().toISOString();
@@ -162,16 +175,19 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
         const path = uniquePath(targetDir, archiveFileName(provider.id, exportedAt));
         writeFileSync(path, built.zip);
 
-        return {
-          ok: true,
-          path,
-          bytes: built.zip.length,
-          files: built.manifest.entries.length,
-          platforms: built.manifest.panel?.platforms.length ?? 0,
-          prompts: built.manifest.panelPrompts?.prompts.length ?? 0,
-          skipped: built.manifest.skipped,
-          checklist: built.manifest.checklist,
-        };
+        return attachTextCodes(
+          {
+            ok: true,
+            path,
+            bytes: built.zip.length,
+            files: built.manifest.entries.length,
+            platforms: built.manifest.panel?.platforms.length ?? 0,
+            prompts: built.manifest.panelPrompts?.prompts.length ?? 0,
+            skipped: built.manifest.skipped,
+            checklist: built.manifest.checklist,
+          },
+          ['keys'],
+        );
       } catch (error) {
         return fail(reply, error);
       }
@@ -189,11 +205,11 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
       if (!zip) return reply;
 
       try {
-        return planEnvironmentImport(
-          parseEnvironmentArchive(zip),
-          provider,
-          override(),
-          panelContext(),
+        // Заметки плана контуров и строки чек-листа собраны по кодам: разбор
+        // возвращает код каждой, и английская страница переводит их словарём.
+        return attachTextCodes(
+          planEnvironmentImport(parseEnvironmentArchive(zip), provider, override(), panelContext()),
+          ['notes', 'keys'],
         );
       } catch (error) {
         return fail(reply, error);
@@ -229,9 +245,11 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
       promptSelection.length === 0 &&
       !applyGateway
     ) {
-      return reply
-        .code(400)
-        .send({ error: 'empty_selection', message: 'Не отмечено ни одной записи.' });
+      return reply.code(400).send({
+        error: 'empty_selection',
+        message: 'Не отмечено ни одной записи.',
+        messageCode: 'transfer-selection-empty',
+      });
     }
 
     const zip = readArchive(body.archivePath, reply);
@@ -362,16 +380,22 @@ export function registerEnvTransferRoutes(app: FastifyInstance, ctx: ServerConte
   /** Читает архив с диска. Путь приходит из обзора файловой системы панели. */
   function readArchive(path: unknown, reply: FastifyReply): Buffer | undefined {
     if (typeof path !== 'string' || !path || !isAbsolute(path)) {
-      void reply
-        .code(400)
-        .send({ error: 'invalid_archive', message: 'Нужен абсолютный путь к архиву.' });
+      void reply.code(400).send({
+        error: 'invalid_archive',
+        message: 'Нужен абсолютный путь к архиву.',
+        messageCode: 'transfer-archive-absolute-required',
+      });
       return undefined;
     }
     try {
       if (!statSync(path).isFile()) throw new Error('не файл');
       return readFileSync(path);
     } catch {
-      void reply.code(400).send({ error: 'invalid_archive', message: 'Архив недоступен.' });
+      void reply.code(400).send({
+        error: 'invalid_archive',
+        message: 'Архив недоступен.',
+        messageCode: 'transfer-archive-unavailable',
+      });
       return undefined;
     }
   }
@@ -398,5 +422,6 @@ function uniquePath(dir: string, fileName: string): string {
   }
   throw Object.assign(new Error('В папке слишком много архивов с таким именем.'), {
     code: 'invalid_archive',
+    messageCode: 'transfer-archive-names-exhausted',
   });
 }

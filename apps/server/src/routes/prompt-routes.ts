@@ -3,6 +3,7 @@ import { isPromptId, type PromptId } from '@agentdeck/contracts/prompts';
 import type { ServerContext } from '../context.ts';
 import { listPrompts, readPromptRecord, resetPrompt, savePrompt } from '../domains/prompts.ts';
 import { PromptTooLongError } from '../domains/prompts/errors.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Каталог промптов приложения: посмотреть, переписать, вернуть встроенный.
@@ -25,6 +26,7 @@ export function registerPromptRoutes(app: FastifyInstance, ctx: ServerContext): 
       void reply.code(404).send({
         error: 'unknown_prompt',
         message: 'Такого промпта в каталоге нет.',
+        messageCode: 'prompt-not-in-catalog',
       });
       return undefined;
     }
@@ -46,7 +48,11 @@ export function registerPromptRoutes(app: FastifyInstance, ctx: ServerContext): 
 
       const text = request.body?.text;
       if (typeof text !== 'string') {
-        return reply.code(400).send({ error: 'invalid_text', message: 'Нужен текст промпта.' });
+        return reply.code(400).send({
+          error: 'invalid_text',
+          message: 'Нужен текст промпта.',
+          messageCode: 'prompt-text-required',
+        });
       }
       try {
         // Потолок держит сам домен (в БАЙТАХ: кириллица весит вдвое, и «64 КБ»
@@ -55,11 +61,14 @@ export function registerPromptRoutes(app: FastifyInstance, ctx: ServerContext): 
         return savePrompt(appData(), id, text, undefined, ctx.backupDir);
       } catch (error) {
         if (error instanceof PromptTooLongError) {
-          return reply.code(400).send({ error: error.code, message: error.message });
+          return reply
+            .code(400)
+            .send({ error: error.code, message: error.message, ...codeOf(error) });
         }
         return reply.code(500).send({
           error: 'save_failed',
           message: error instanceof Error ? error.message : String(error),
+          ...codeOf(error),
         });
       }
     },
@@ -75,6 +84,7 @@ export function registerPromptRoutes(app: FastifyInstance, ctx: ServerContext): 
       return reply.code(500).send({
         error: 'reset_failed',
         message: error instanceof Error ? error.message : String(error),
+        ...codeOf(error),
       });
     }
   });

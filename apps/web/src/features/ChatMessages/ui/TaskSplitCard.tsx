@@ -12,9 +12,8 @@ import {
   type CascadeAssignment,
   type CascadePlan,
 } from '@agentdeck/contracts/model-cascade';
-import { chooseRunModel } from '@agentdeck/contracts/platform-models';
 import { usePlatformRunPlan } from '@entities/Platform';
-import { platformModelCaption } from '@shared/lib/chat-model';
+import { platformModelCaption, platformRunChoice } from '@shared/lib/chat-model';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -157,7 +156,7 @@ export function TaskSplitCard({
           const plan = plans[index];
           const contourCaption =
             routed && plan
-              ? platformModelCaption(routed.title, chooseRunModel(routed.rules, plan.model))
+              ? platformModelCaption(routed.title, platformRunChoice(routed.rules, plan.model))
               : undefined;
           return (
             <div key={index} className={styles.group}>

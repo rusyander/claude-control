@@ -11,6 +11,7 @@ import { callUpstream, UpstreamError } from './gateway/upstream.ts';
 import { driverOf } from './drivers/index.ts';
 import type { DriverAgents } from './drivers/driver.ts';
 import { agentsNotDeclared } from './errors.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Опубликованные агенты контура: спросить агента компании из панели.
@@ -134,7 +135,7 @@ export async function askAgent(options: AskAgentOptions): Promise<PlatformAgentA
       ...base,
       status,
       outcome: 'failed',
-      detail: 'Контур ответил не JSON — разобрать ответ агента нечем.',
+      detail: serverText('contour-agent-not-json'),
     };
   }
 
@@ -148,7 +149,7 @@ export async function askAgent(options: AskAgentOptions): Promise<PlatformAgentA
       ...base,
       status,
       outcome: 'failed',
-      detail: 'Контур ответил в форме, которую панель не узнала: разбирать нечего.',
+      detail: serverText('contour-agent-unknown-shape'),
     };
   }
   const answer = typeof choice.message?.content === 'string' ? choice.message.content : '';
@@ -159,7 +160,7 @@ export async function askAgent(options: AskAgentOptions): Promise<PlatformAgentA
     status,
     outcome: 'ok',
     text: answer,
-    detail: answer ? 'Агент ответил.' : 'Агент ответил пустым сообщением.',
+    detail: serverText(answer ? 'contour-agent-answered' : 'contour-agent-empty'),
     ...(typeof choice.finish_reason === 'string' ? { finishReason: choice.finish_reason } : {}),
     // Признак сессии переносим только когда контур его прислал: своего мнения о
     // чужом хранилище у панели нет, а `false` по умолчанию читался бы как
@@ -263,7 +264,7 @@ async function sessionRequest(
     // идемпотентность, «стирать было нечего».
     if (response.status === 404) return { text: '' };
     if (response.status === 422) {
-      return { error: 'Контур не принял идентификатор сессии (422).' };
+      return { error: serverText('contour-agent-session-rejected') };
     }
     const refusal = describeRefusal(response.status, text, options.token);
     return { error: refusal.detail };
@@ -288,64 +289,70 @@ function describeRefusal(
   const message = pickString(nested.message) || pickString(payload?.message);
   const code = pickString(nested.code) || flat;
   const detail = foreignTail(message || body, token);
-  const suffix = detail ? ` Контур сказал: ${detail}` : '';
+  // Слова контура вкладываются в нашу фразу, а не приклеиваются: вложенный
+  // текст клиент переводит своим словарём, чужой остаётся как есть.
+  const said = (message: string): string =>
+    detail ? serverText('contour-agent-said', { message, detail }) : message;
 
   if (code === 'module_not_licensed') {
     return {
       outcome: 'unavailable',
-      detail: 'Агенты не входят в лицензию этого контура — их включает компания, а не панель.',
+      detail: serverText('contour-agent-no-license'),
     };
   }
   if (code === 'license_inactive') {
     return {
       outcome: 'unavailable',
-      detail: 'Лицензия контура неактивна: агенты не работают, пока её не продлят.',
+      detail: serverText('contour-agent-license-inactive'),
     };
   }
   if (code === 'license_check_failed' || status === 503) {
     return {
       outcome: 'not-ready',
-      detail: 'Контур не смог проверить свою лицензию — это его сторона, повторите позже.',
+      detail: serverText('contour-agent-license-unchecked'),
     };
   }
   if (status === 401) {
     // Отозванный ключ и ключ с кончившимся бюджетом контур отдаёт ОДНИМ кодом
-    // (`inst-admin-api/.../store/keys.go` `ValidateKey`): называем обе причины.
+    // (обе причины сходятся в его проверке ключа): называем обе причины.
     return {
       outcome: 'unauthorized',
-      detail: `Ключ отклонён контуром (401): отозван либо исчерпан его бюджет.${suffix}`,
+      detail: said(serverText('contour-agent-key-rejected')),
     };
   }
   if (status === 403) {
     return {
       outcome: 'unauthorized',
-      detail: `Ключу не разрешено звать агентов (403).${suffix}`,
+      detail: said(serverText('contour-agent-key-forbidden')),
     };
   }
   if (status === 402) {
-    // `handler_agent_api.go:447`: на маршруте агентов 402 — бюджет ключа.
+    // На маршруте агентов контура 402 — бюджет ключа.
     return {
       outcome: 'rejected',
-      detail: `Исчерпан бюджет ключа (402).${suffix}`,
+      detail: said(serverText('contour-agent-key-budget')),
     };
   }
   if (status === 404) {
     return {
       outcome: 'rejected',
-      detail: `Контур не нашёл такого агента (404). Проверьте идентификатор в админке.${suffix}`,
+      detail: said(serverText('contour-agent-not-found')),
     };
   }
   if (status === 422) {
     // Объявленное автором завершение с ошибкой: запрос верный, исход такой.
-    return { outcome: 'agent-error', detail: `Агент завершился ошибкой.${suffix}` };
+    return { outcome: 'agent-error', detail: said(serverText('contour-agent-failed')) };
   }
   if (status === 429) {
-    return { outcome: 'not-ready', detail: `Контур ограничил частоту запросов (429).${suffix}` };
+    return { outcome: 'not-ready', detail: said(serverText('contour-agent-rate-limited')) };
   }
   if (status >= 500) {
-    return { outcome: 'not-ready', detail: `Контур ответил ошибкой ${status}.${suffix}` };
+    return {
+      outcome: 'not-ready',
+      detail: said(serverText('contour-agent-status', { status })),
+    };
   }
-  return { outcome: 'rejected', detail: `Контур не принял запрос (${status}).${suffix}` };
+  return { outcome: 'rejected', detail: said(serverText('contour-agent-rejected', { status })) };
 }
 
 /**
@@ -354,14 +361,14 @@ function describeRefusal(
  * называет: последний ход — вопрос человека, а с сессией `system` не живёт.
  */
 function validateMessages(messages: PlatformAgentMessage[], withSession: boolean): string {
-  if (messages.length === 0) return 'Нечего спрашивать: сообщений нет.';
+  if (messages.length === 0) return serverText('contour-agent-nothing-to-ask');
   if (messages[messages.length - 1]?.role !== 'user') {
-    return 'Последним сообщением должен быть вопрос человека.';
+    return serverText('contour-agent-last-must-be-question');
   }
   if (withSession && messages.some((message) => message.role === 'system')) {
     // Историю в сессии ведёт контур, а ролей у неё две: со второго хода
     // инструкция просто исчезла бы, и человек этого не увидел бы.
-    return 'С сессией системное сообщение не передаётся — контур его не хранит.';
+    return serverText('contour-agent-no-system-with-session');
   }
   return '';
 }

@@ -15,6 +15,7 @@ import {
   SERVER_TOOL_LOSS,
   type NativeTraces,
 } from './native-tools.ts';
+import { localizeText, type TextLanguage } from '../../../lib/server-texts.ts';
 
 /**
  * Перевод диалектов: клиент говорит по-Anthropic, контур — по-OpenAI.
@@ -690,7 +691,19 @@ export function stopReasonOf(finishReason: unknown, calls: number): string {
  * контуровский с приставкой: клиенты по нему ничего не ищут, а в журнале двух
  * сторон один и тот же вызов должно быть видно как один.
  */
-export function openAiResponseToAnthropic(payload: unknown, model: string): unknown {
+/**
+ * Id сообщения Anthropic, которое шлюз выдаёт клиенту: id контура с приставкой
+ * (тот же вызов виден в журналах обеих сторон как один) и суффиксом запроса.
+ * Суффикс нужен потому, что id контура не обязан быть уникальным — а Claude Code
+ * пишет этот id в транскрипт, и по нему лента находит ответ, где контур сжал
+ * историю: одинаковый id у двух ответов подписал бы оба.
+ */
+export function anthropicMessageId(upstreamId: unknown, suffix = ''): string {
+  const base = typeof upstreamId === 'string' && upstreamId ? upstreamId : Date.now().toString(36);
+  return suffix ? `msg_${base}-${suffix}` : `msg_${base}`;
+}
+
+export function openAiResponseToAnthropic(payload: unknown, model: string, idSuffix = ''): unknown {
   const source = isRecord(payload) ? payload : {};
   const choice = Array.isArray(source.choices) ? source.choices[0] : undefined;
   const message = isRecord(choice) && isRecord(choice.message) ? choice.message : {};
@@ -713,7 +726,7 @@ export function openAiResponseToAnthropic(payload: unknown, model: string): unkn
   }
 
   return {
-    id: `msg_${typeof source.id === 'string' ? source.id : Date.now().toString(36)}`,
+    id: anthropicMessageId(source.id, idSuffix),
     type: 'message',
     role: 'assistant',
     model: typeof source.model === 'string' ? source.model : model,
@@ -825,10 +838,18 @@ function parseArguments(value: unknown): unknown {
  * этом остаётся русским — контур присылает его по-русски и уже без секретов
  * (справочник §8), пересказывать его мост не берётся.
  */
-export function errorBody(dialect: Dialect, message: string, code: string): unknown {
+export function errorBody(
+  dialect: Dialect,
+  message: string,
+  code: string,
+  language: TextLanguage = 'ru',
+): unknown {
+  // Тело отказа читает CLI и печатает как есть — переводчика между ними нет,
+  // поэтому язык панели подставляется здесь (`lib/server-texts.ts`).
+  const said = localizeText(message, language);
   return dialect === 'anthropic'
-    ? { type: 'error', error: { type: anthropicErrorType(code), message } }
-    : { error: { message, type: openAiErrorType(code), code } };
+    ? { type: 'error', error: { type: anthropicErrorType(code), message: said } }
+    : { error: { message: said, type: openAiErrorType(code), code } };
 }
 
 function anthropicErrorType(code: string): string {

@@ -59,12 +59,14 @@ export function GroupsTopic() {
 
       <GroupsGuideSections tr={tr} />
 
-      {/* Автоматического включения не видно ни на одном экране: в этот момент
-          человек смотрит в чат, а не в раздел. Поэтому — словами. */}
+      {/* В самом разделе автоматического включения не видно: человек в этот
+          момент смотрит в чат. Единственный его след на экране — строка в ленте
+          прогона, и у чужого CLI нет даже её. Поэтому — словами. */}
       <HelpSection title={tr('bindTitle')} caption={tr('bindCaption')}>
         <OptionCards
           items={[
             { title: tr('bindProject'), text: tr('bindProjectText') },
+            { title: tr('bindNotice'), text: tr('bindNoticeText') },
             { title: tr('bindWorktree'), text: tr('bindWorktreeText') },
             { title: tr('bindNoOff'), text: tr('bindNoOffText') },
           ]}

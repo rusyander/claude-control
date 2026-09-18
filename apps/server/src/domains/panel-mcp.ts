@@ -9,6 +9,7 @@ import {
   McpServerNotFoundError as ProviderMcpServerNotFoundError,
 } from './provider-mcp.ts';
 import type { ProviderMcpSettingsSource, ProviderMcpTarget } from './provider-mcp/types.ts';
+import { serverText } from '../lib/server-texts.ts';
 import {
   McpServerNotFoundError,
   assertMcpServerExists,
@@ -88,7 +89,7 @@ export function bridgeRefusalReason(store?: ProviderMcpSettingsSource): string |
   if (!store) return undefined;
   const provider = getActiveProvider(store);
   if (provider.capabilities.mcp === 'ready') return undefined;
-  return `У активного CLI (${provider.name}) нет раздела MCP — переходнику некуда записаться. Переключите активный CLI в настройках.`;
+  return serverText('panel-mcp-no-section', { provider: provider.name });
 }
 
 function universalDraft(bridge: PanelBridge, selfBaseUrl: string): UniversalMcpServerDraft {

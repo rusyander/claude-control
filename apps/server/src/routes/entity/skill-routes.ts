@@ -11,6 +11,8 @@ import {
 import { readCommands } from '../../domains/commands.ts';
 import { done } from '../write-result.ts';
 import type { ClaudePaths } from './shared.ts';
+import { codeOf } from '../../lib/server-text.ts';
+import { attachTextCodes } from '../../lib/server-texts.ts';
 
 /**
  * Скиллы (папки в skills/) и сводный список слэш-команд.
@@ -31,7 +33,8 @@ export function registerSkillRoutes(app: FastifyInstance, ctx: ServerContext): v
    * скиллов, плагин — в разделе плагинов). Встроенных команд CLI здесь нет:
    * файла у них не существует, их каталог ведёт клиент.
    */
-  app.get('/api/commands', () => readCommands(paths(), ctx.store));
+  // Заметка про ненайденный каталог собрана строкой — код восстанавливается разбором.
+  app.get('/api/commands', () => attachTextCodes(readCommands(paths(), ctx.store), ['notes']));
 
   app.post<{ Body: SkillDraft }>('/api/skills', (request, reply) => {
     try {
@@ -40,7 +43,9 @@ export function registerSkillRoutes(app: FastifyInstance, ctx: ServerContext): v
       // Имя занято выключенным скиллом: молча писать поверх — потеря чужого
       // скилла, поэтому отвечаем конфликтом и оставляем решение человеку.
       if (error instanceof SkillExistsError) {
-        return reply.code(409).send({ error: 'skill_exists', message: error.message });
+        return reply
+          .code(409)
+          .send({ error: 'skill_exists', message: error.message, ...codeOf(error) });
       }
       throw error;
     }

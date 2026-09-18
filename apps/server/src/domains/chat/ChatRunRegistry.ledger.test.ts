@@ -48,6 +48,9 @@ class FakeRun implements RunLike {
 
 class FakeLedger implements RunLedgerSink {
   readonly entries = new Map<string, RunLedgerEntry>();
+  read(): RunLedgerEntry[] {
+    return [...this.entries.values()];
+  }
   upsert(entry: RunLedgerEntry): void {
     this.entries.set(entry.key, entry);
   }

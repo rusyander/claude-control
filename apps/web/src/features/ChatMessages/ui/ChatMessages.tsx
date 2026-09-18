@@ -59,6 +59,8 @@ export function ChatMessages({
   treeBusy,
   onAnswerHold,
   holdBusy,
+  onRelease,
+  releaseBusy,
   onCheckOverlap,
   overlapBusy,
   reviews,
@@ -354,6 +356,8 @@ export function ChatMessages({
         treeBusy={treeBusy}
         onAnswerHold={onAnswerHold}
         holdBusy={holdBusy}
+        onRelease={onRelease}
+        releaseBusy={releaseBusy}
         onCheckOverlap={onCheckOverlap}
         overlapBusy={overlapBusy}
         permissions={childPermissions}

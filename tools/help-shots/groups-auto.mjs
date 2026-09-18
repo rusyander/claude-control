@@ -44,7 +44,7 @@ export async function shootAuto(browser, web, scenario) {
     // ── 03. Негодное выражение триггера ──────────────────────────────────────
     // Панель проверяет выражение прямо в форме: сломанное упало бы внутри хука
     // на каждом запросе, и разбирать это пришлось бы уже по стеку в чужом чате.
-    await page.getByLabel(/Триггер по тексту запроса|Trigger on the prompt text/).fill('GOR-(\\d+');
+    await page.getByLabel(/Триггер по тексту запроса|Trigger on the prompt text/).fill('PRJ-(\\d+');
     await page.waitForTimeout(500);
     await scrollTo(page, dialog, /^(Порядок работы|Working order)$/);
     await scenario.shot(page, '03-trigger-error', { clip: '[role="dialog"]', padding: 40 });

@@ -4,6 +4,8 @@ import type { AtlassianAccess } from '../../domains/integrations/atlassian/clien
 import { toAccess } from '../../domains/integrations/atlassian/client.ts';
 import { IntegrationError, invalidField } from '../../domains/integrations/errors.ts';
 import { readIntegrations, requireConnected } from '../../domains/integrations/store.ts';
+import { codeOf } from '../../lib/server-text.ts';
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
 /**
  * Общее для всех маршрутов интеграций: доступ к Atlassian, перевод отказов в
@@ -42,7 +44,7 @@ export function fail(reply: FastifyReply, error: unknown): FastifyReply {
   if (error instanceof IntegrationError) {
     return reply
       .code(error.statusCode)
-      .send({ code: error.code, message: error.message, detail: error.detail });
+      .send({ code: error.code, message: error.message, ...codeOf(error), detail: error.detail });
   }
   throw error;
 }
@@ -60,9 +62,15 @@ export async function guard<T>(
 }
 
 /** Обязательная строка тела: пустая — 400 с именем поля. */
-export function requireString(value: unknown, field: string, why: string): string {
+export function requireString(
+  value: unknown,
+  field: string,
+  why: string,
+  code?: ServerMessageCode,
+  params?: ServerMessageParams,
+): string {
   const text = typeof value === 'string' ? value.trim() : '';
-  if (!text) throw invalidField(field, why);
+  if (!text) throw invalidField(field, why, code, params);
   return text;
 }
 

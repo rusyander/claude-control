@@ -327,6 +327,32 @@ describe('разделение задач по чатам', () => {
     expect(result.chats.map((chat) => chat.branch)).toEqual(['feature/login-2', 'feature/header']);
   });
 
+  it('настоящее имя ветки называется ДО старта прогона — по нему группу ищет конец цепочки', async () => {
+    const git = fakeGit({ takenBranches: async () => ['feature/login'] });
+    const order: string[] = [];
+
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git,
+      claimBranch: (index, branch) => order.push(`claim ${index} ${branch}`),
+      start: ({ index, branch }) => {
+        order.push(`start ${index} ${branch}`);
+        return true;
+      },
+    });
+
+    // Суффикс занятости приезжает учёту раньше, чем стартует прогон: между
+    // этими двумя моментами цепочка группы успевает и начаться, и кончиться.
+    expect(order).toEqual([
+      'claim 0 feature/login-2',
+      'claim 1 feature/header',
+      'start 0 feature/login-2',
+      'start 1 feature/header',
+    ]);
+  });
+
   it('сбой одной группы не откатывает остальные', async () => {
     const git = fakeGit({
       addWorktree: async (_dir, branch) => {

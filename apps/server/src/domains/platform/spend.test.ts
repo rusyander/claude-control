@@ -192,6 +192,29 @@ describe('запись контура', () => {
     expect(total.money.pricedTokens).toBe(1_000_000);
     expect(total.money.unpricedTokens).toBe(1_000_000);
   });
+
+  it('неотчитанные ответы считаются отдельно и доживают до итога за период', () => {
+    let record = emptySpend('company-dev');
+    record = addSpend(record, delta(), new Date(2026, 8, 9), LOOKUP);
+    record = addSpend(
+      record,
+      delta({ promptTokens: 0, totalTokens: 0, unreported: true }),
+      new Date(2026, 8, 9),
+      LOOKUP,
+    );
+    record = addSpend(
+      record,
+      delta({ promptTokens: 0, totalTokens: 0, unreported: true }),
+      new Date(2026, 8, 10),
+      LOOKUP,
+    );
+
+    const total = sumDays(record.days);
+    expect(total.unreportedAnswers).toBe(2);
+    // Оценка не выдумана: неотчитанный ответ не добавил ни токена, ни запроса.
+    expect(total.requests).toBe(1);
+    expect(total.totalTokens).toBe(1_000_000);
+  });
 });
 
 describe('период бюджета', () => {

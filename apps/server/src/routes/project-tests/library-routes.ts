@@ -117,7 +117,10 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
       if (!root) return reply;
       const input = request.body?.testCase;
       if (!input || typeof input !== 'object') {
-        return reply.code(400).send({ message: 'Нужно описание теста.' });
+        return reply.code(400).send({
+          message: 'Нужно описание теста.',
+          messageCode: 'library-test-description-required',
+        });
       }
       return guard(reply, () => {
         const groupId = String(request.body?.groupId ?? '');
@@ -155,9 +158,16 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
       const root = requireRoot(request.body?.path, reply);
       if (!root) return reply;
       const caseIds = idList(request.body?.caseIds);
-      if (!caseIds) return reply.code(400).send({ message: 'Не отмечено ни одного кейса.' });
+      if (!caseIds)
+        return reply.code(400).send({
+          message: 'Не отмечено ни одного кейса.',
+          messageCode: 'library-cases-none-selected',
+        });
       const action = request.body?.action;
-      if (!action) return reply.code(400).send({ message: 'Не указано, что сделать.' });
+      if (!action)
+        return reply
+          .code(400)
+          .send({ message: 'Не указано, что сделать.', messageCode: 'library-action-unspecified' });
 
       return guard(reply, () => {
         const groupId = String(request.body?.groupId ?? '');
@@ -182,7 +192,10 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
       if (!root) return reply;
       const step = request.body?.step;
       if (!step || typeof step !== 'object' || !step.title) {
-        return reply.code(400).send({ message: 'Нужно описание общего шага.' });
+        return reply.code(400).send({
+          message: 'Нужно описание общего шага.',
+          messageCode: 'library-shared-step-required',
+        });
       }
       return guard(reply, () => {
         saveSharedStep(root, { ...step, title: step.title ?? '' }, now());
@@ -212,7 +225,10 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
       if (!root) return reply;
       const environment = request.body?.environment;
       if (!environment || typeof environment !== 'object' || !environment.title) {
-        return reply.code(400).send({ message: 'Нужно описание окружения.' });
+        return reply.code(400).send({
+          message: 'Нужно описание окружения.',
+          messageCode: 'library-environment-required',
+        });
       }
       return guard(reply, () => {
         saveEnvironment(root, { ...environment, title: environment.title ?? '' });
@@ -242,6 +258,8 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
           message:
             `На это окружение ссылаются планы: ${used.map((plan) => plan.title).join(', ')}. ` +
             'Удалить всё равно — план останется без окружения.',
+          messageCode: 'tests-environment-used-by-plans',
+          params: { plans: used.map((plan) => plan.title).join(', ') },
           plans: used.map((plan) => ({ id: plan.id, title: plan.title })),
         });
       }
@@ -261,7 +279,10 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
       if (!root) return reply;
       const schema = request.body?.schema;
       if (!schema || typeof schema !== 'object') {
-        return reply.code(400).send({ message: 'Нужна схема полей и статусов.' });
+        return reply.code(400).send({
+          message: 'Нужна схема полей и статусов.',
+          messageCode: 'library-schema-required',
+        });
       }
       return guard(reply, () => {
         saveSchema(root, schema);
@@ -278,7 +299,9 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
       if (!root) return reply;
       const saved = request.body?.view;
       if (!saved || typeof saved !== 'object' || !saved.title) {
-        return reply.code(400).send({ message: 'Нужно описание вида.' });
+        return reply
+          .code(400)
+          .send({ message: 'Нужно описание вида.', messageCode: 'library-kind-required' });
       }
       return guard(reply, () => {
         saveView(root, { ...saved, title: saved.title ?? '' }, now());

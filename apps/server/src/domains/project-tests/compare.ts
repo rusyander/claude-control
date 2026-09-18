@@ -9,6 +9,8 @@ import type {
 import { summarize } from '@agentdeck/contracts/test-format';
 import { ProjectTestsNotFoundError } from './files.ts';
 import { readRun, readRuns } from './runs-store.ts';
+import { coded } from '../../lib/server-text.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Сравнение двух прогонов.
@@ -78,11 +80,13 @@ function titleOf(groups: ProjectTestGroup[], groupId: string, caseId: string): s
 /** Чем наборы различаются — строка для человека, а не отказ сравнивать. */
 function warningOf(from: ProjectTestRunRecord, to: ProjectTestRunRecord): string | undefined {
   const parts: string[] = [];
-  if ((from.planId ?? '') !== (to.planId ?? '')) parts.push('прогоны шли по разным планам');
-  if ((from.environmentId ?? '') !== (to.environmentId ?? '')) parts.push('окружения разные');
-  if (from.mode !== to.mode) parts.push('это разные режимы');
+  if ((from.planId ?? '') !== (to.planId ?? ''))
+    parts.push(serverText('tests-compare-plans-differ'));
+  if ((from.environmentId ?? '') !== (to.environmentId ?? ''))
+    parts.push(serverText('tests-compare-envs-differ'));
+  if (from.mode !== to.mode) parts.push(serverText('tests-compare-modes-differ'));
   if (parts.length === 0) return undefined;
-  return `${parts.join(', ')} — наборы кейсов не совпадают, и «починилось» может значить «в этот раз не гоняли».`;
+  return serverText('tests-compare-warning', { parts: parts.join(', ') });
 }
 
 /**
@@ -170,15 +174,23 @@ export function diffWithPrevious(
   groups: ProjectTestGroup[] = [],
 ): ProjectTestRunDiff {
   const to = readRun(root, id);
-  if (!to) throw new ProjectTestsNotFoundError(`Прогона «${id}» в истории нет.`);
+  if (!to)
+    throw coded(
+      new ProjectTestsNotFoundError(`Прогона «${id}» в истории нет.`),
+      'run-not-in-history',
+      { id },
+    );
 
   const from = baseId ? readRun(root, baseId) : previousOf(root, to);
   if (!from) {
-    throw new ProjectTestsNotFoundError(
+    const error = new ProjectTestsNotFoundError(
       baseId
-        ? `Прогона «${baseId}» в истории нет.`
-        : 'Сравнивать не с чем: это первый прогон с результатами.',
+        ? serverText('tests-compare-base-missing', { id: baseId })
+        : serverText('tests-compare-first-run'),
     );
+    throw baseId
+      ? coded(error, 'run-base-not-in-history', { baseId })
+      : coded(error, 'compare-first-run');
   }
   return diffRuns(from, to, groups);
 }

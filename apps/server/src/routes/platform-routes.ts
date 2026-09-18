@@ -61,6 +61,9 @@ import {
   writePlatform,
   writeToken,
 } from '../domains/platform/store.ts';
+import { codeOf } from '../lib/server-text.ts';
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
+import { attachTextCodes } from '../lib/server-texts.ts';
 
 /**
  * Контуры: показать, сохранить, проверить связь, удалить.
@@ -74,7 +77,10 @@ import {
  * Сеть здесь ровно в одном месте — `POST /:id/check`, по нажатию человека.
  * Ни один из остальных маршрутов наружу не ходит, и при старте панели не
  * ходит никто: включённый контур не делает ни одного запроса, пока его не
- * попросили (инвариант 7 — мёртвый контур не мешает панели).
+ * попросили (инвариант 7 — мёртвый контур не мешает панели). Фоновая
+ * перепроверка активного контура (A-2) живёт своим таймером в
+ * `domains/platform/watch.ts`, интервалом из настроек и НИКОГДА не на пути
+ * запроса: ни один маршрут её не ждёт.
  */
 export function registerPlatformRoutes(
   app: FastifyInstance,
@@ -142,6 +148,7 @@ export function registerPlatformRoutes(
       return reply.code(409).send({
         code: 'gateway_start_failed',
         message: 'Шлюз не поднялся',
+        messageCode: 'gateway-not-started',
         detail: error instanceof Error ? error.message : String(error),
       });
     }
@@ -162,6 +169,7 @@ export function registerPlatformRoutes(
       return reply.code(409).send({
         code: 'gateway_start_failed',
         message: 'Шлюз не поднялся',
+        messageCode: 'gateway-not-started',
         detail: error instanceof Error ? error.message : String(error),
       });
     }
@@ -236,13 +244,17 @@ export function registerPlatformRoutes(
         throw invalidField(
           'id',
           `идентификатор в адресе («${id}») и в теле («${platform.id}») не совпадают`,
+          'request-id-mismatch',
+          { field: 'id', id, bodyId: platform.id },
         );
       }
       // Всё, что может отказать, проверяется ДО первой записи: иначе отказ на
       // ключе оставил бы сохранённой настройку, которую человек не просил
       // сохранять отдельно от него.
       if (body?.token !== undefined && typeof body.token !== 'string') {
-        throw invalidField('token', 'ключ должен быть строкой');
+        throw invalidField('token', 'ключ должен быть строкой', 'request-key-not-string', {
+          field: 'token',
+        });
       }
       if (typeof body?.token === 'string') assertToken(body.token.trim());
       // Сертификат проверяем ЗДЕСЬ, а не при пробе: человек узнаёт про
@@ -291,7 +303,12 @@ export function registerPlatformRoutes(
    */
   app.post<{ Params: { id: string } }>('/api/platforms/:id/check', async (request, reply) => {
     try {
-      return await checkPlatform(ctx.store, appData(), request.params.id);
+      // Диагностика пробы собрана `serverText` — код к ней восстанавливается
+      // разбором: карточка контура показывает ответ этого маршрута сразу, не
+      // дожидаясь перечитывания списка, и без кода показала бы русскую строку.
+      return attachTextCodes(await checkPlatform(ctx.store, appData(), request.params.id), [
+        'notes',
+      ]);
     } catch (error) {
       return fail(reply, error);
     }
@@ -360,7 +377,9 @@ export function registerPlatformRoutes(
         const overwrite =
           body?.overwrite === undefined ? [] : stringList(body.overwrite, 'overwrite');
         if (body?.model !== undefined && typeof body.model !== 'string') {
-          throw invalidField('model', 'модель должна быть строкой');
+          throw invalidField('model', 'модель должна быть строкой', 'request-model-not-string', {
+            field: 'model',
+          });
         }
         return applyContour(applyDeps(), platform, {
           targets,
@@ -472,7 +491,13 @@ export function registerPlatformRoutes(
       try {
         const platform = requirePlatform(ctx.store, request.params.id);
         const token = requireConnected(ctx.store, appData(), platform.id);
-        const agentId = requireString(body?.agent, 'agent', 'не назван агент');
+        const agentId = requireString(
+          body?.agent,
+          'agent',
+          'не назван агент',
+          'request-agent-missing',
+          { field: 'agent' },
+        );
         const session = optionalString(body?.session, 'session');
         return await askAgent({
           platform,
@@ -548,7 +573,13 @@ export function registerPlatformRoutes(
       try {
         const platform = requirePlatform(ctx.store, request.params.id);
         const token = requireConnected(ctx.store, appData(), platform.id);
-        const model = requireString(body?.model, 'model', 'не названа модель эмбеддингов');
+        const model = requireString(
+          body?.model,
+          'model',
+          'не названа модель эмбеддингов',
+          'request-embedding-model-missing',
+          { field: 'model' },
+        );
         const input =
           typeof body?.input === 'string' ? [body.input] : stringList(body?.input, 'input');
         return (await embedTexts({
@@ -561,7 +592,7 @@ export function registerPlatformRoutes(
         if (error instanceof EmbeddingError) {
           return reply
             .code(error.status)
-            .send({ code: 'embeddings_failed', message: error.message });
+            .send({ code: 'embeddings_failed', message: error.message, ...codeOf(error) });
         }
         return fail(reply, error);
       }
@@ -662,7 +693,12 @@ export function registerPlatformRoutes(
     (request, reply) => {
       const body = request.body as { token?: unknown } | undefined;
       if (typeof body?.token !== 'string') {
-        return fail(reply, invalidField('token', 'ключ должен быть строкой'));
+        return fail(
+          reply,
+          invalidField('token', 'ключ должен быть строкой', 'request-key-not-string', {
+            field: 'token',
+          }),
+        );
       }
       try {
         const platform = requirePlatform(ctx.store, request.params.id);
@@ -686,7 +722,7 @@ function fail(reply: FastifyReply, error: unknown): FastifyReply {
       code: error.code,
       message: error.message,
       detail: error.detail,
-      ...(error.messageCode ? { messageCode: error.messageCode, params: error.params } : {}),
+      ...codeOf(error),
     });
   }
   throw error;
@@ -701,18 +737,23 @@ function fail(reply: FastifyReply, error: unknown): FastifyReply {
 function failWrite(reply: FastifyReply, error: unknown): FastifyReply {
   if (error instanceof EndpointApplyError) {
     const status = error.code === 'unknown_provider' ? 404 : 400;
-    return reply.code(status).send({ code: error.code, message: error.message });
+    return reply.code(status).send({ code: error.code, message: error.message, ...codeOf(error) });
   }
   if (error instanceof EnvKeyNotEncodableError) {
-    return reply.code(400).send({ code: 'invalid_draft', message: error.message });
+    return reply
+      .code(400)
+      .send({ code: 'invalid_draft', message: error.message, ...codeOf(error) });
   }
   if (error instanceof EnvKeyPreservedError) {
-    return reply.code(409).send({ code: 'env_key_preserved', message: error.message });
+    return reply
+      .code(409)
+      .send({ code: 'env_key_preserved', message: error.message, ...codeOf(error) });
   }
   if (error instanceof UnrecognizedFormatError) {
     return reply.code(422).send({
       code: 'format_unrecognized',
       message: 'Формат файла конфигурации не распознан — запись запрещена.',
+      messageCode: 'config-format-unrecognized',
     });
   }
   return fail(reply, error);
@@ -721,14 +762,25 @@ function failWrite(reply: FastifyReply, error: unknown): FastifyReply {
 /** Список идентификаторов из тела запроса: не массив строк — отказ с именем поля. */
 function stringList(value: unknown, field: string): string[] {
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
-    throw invalidField(field, 'ожидается список идентификаторов целей');
+    throw invalidField(
+      field,
+      'ожидается список идентификаторов целей',
+      'request-target-list-expected',
+      { field },
+    );
   }
   return value as string[];
 }
 
 /** Обязательная строка тела: пустая — тот же отказ, что и отсутствующая. */
-function requireString(value: unknown, field: string, why: string): string {
-  if (typeof value !== 'string' || !value.trim()) throw invalidField(field, why);
+function requireString(
+  value: unknown,
+  field: string,
+  why: string,
+  code?: ServerMessageCode,
+  params?: ServerMessageParams,
+): string {
+  if (typeof value !== 'string' || !value.trim()) throw invalidField(field, why, code, params);
   return value.trim();
 }
 
@@ -739,7 +791,8 @@ function requireString(value: unknown, field: string, why: string): string {
  */
 function optionalString(value: unknown, field: string): string {
   if (value === undefined || value === null) return '';
-  if (typeof value !== 'string') throw invalidField(field, 'ожидается строка');
+  if (typeof value !== 'string')
+    throw invalidField(field, 'ожидается строка', 'request-string-expected', { field });
   return value.trim();
 }
 
@@ -753,21 +806,39 @@ function readMessages(
 ): PlatformAgentMessage[] {
   if (typeof body?.message === 'string') {
     const text = body.message.trim();
-    if (!text) throw invalidField('message', 'вопрос пустой');
+    if (!text)
+      throw invalidField('message', 'вопрос пустой', 'request-question-empty', {
+        field: 'message',
+      });
     return [{ role: 'user', content: text }];
   }
   if (!Array.isArray(body?.messages)) {
-    throw invalidField('message', 'нужен вопрос (message) или переписка (messages)');
+    throw invalidField(
+      'message',
+      'нужен вопрос (message) или переписка (messages)',
+      'request-question-or-messages',
+      { field: 'message' },
+    );
   }
   return body.messages.map((raw, index) => {
     const item = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
     const role = item.role;
     const content = item.content;
     if (role !== 'user' && role !== 'assistant' && role !== 'system') {
-      throw invalidField(`messages[${index}].role`, 'роль бывает user, assistant или system');
+      throw invalidField(
+        `messages[${index}].role`,
+        'роль бывает user, assistant или system',
+        'request-role-invalid',
+        { field: `messages[${index}].role` },
+      );
     }
     if (typeof content !== 'string' || !content.trim()) {
-      throw invalidField(`messages[${index}].content`, 'сообщение пустое');
+      throw invalidField(
+        `messages[${index}].content`,
+        'сообщение пустое',
+        'request-message-empty',
+        { field: `messages[${index}].content` },
+      );
     }
     return { role, content };
   });

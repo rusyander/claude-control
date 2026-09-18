@@ -33,7 +33,10 @@ export function registerPanelHelpRoutes(
     '/api/agent/help/search',
     async (request, reply) => {
       const query = (request.query.q ?? '').trim();
-      if (!query) return reply.code(400).send({ message: 'Пустой запрос к справке.' });
+      if (!query)
+        return reply
+          .code(400)
+          .send({ message: 'Пустой запрос к справке.', messageCode: 'panel-help-query-empty' });
       const language = languageOf(request.query.lang);
       const found = await searchHelp(webSrc, language, query, {
         offset: toInt(request.query.offset, 0, 1000),
@@ -67,9 +70,11 @@ export function registerPanelHelpRoutes(
       const topic = await loadHelpTopic(webSrc, language, id);
       if (!topic) {
         const known = readHelpIndex(webSrc).map((ref) => ref.id);
-        return reply
-          .code(404)
-          .send({ message: `Темы справки «${id}» нет. Есть: ${known.join(', ')}.` });
+        return reply.code(404).send({
+          message: `Темы справки «${id}» нет. Есть: ${known.join(', ')}.`,
+          messageCode: 'panel-help-topic-missing',
+          params: { id, known: known.join(', ') },
+        });
       }
       // Окно по строкам документа: длинная тема читается частями.
       const offset = toInt(request.query.offset, 0, topic.lines.length);

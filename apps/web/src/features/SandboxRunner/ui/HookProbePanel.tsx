@@ -10,6 +10,7 @@ import { ResultRow } from './ResultRow';
 import { CUSTOM_EVENT_TEMPLATE } from './HookProbePanel.constants';
 import type { HookProbePanelProps, ProbeMode } from './HookProbePanel.types';
 import styles from './SandboxModal.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Прогон хука на событии.
@@ -97,9 +98,9 @@ export function HookProbePanel({ sandboxId, hookId, scriptName }: HookProbePanel
                 size="sm"
                 variant={selected.includes(fixture.id) ? 'primary' : 'secondary'}
                 onClick={() => toggle(fixture.id)}
-                title={fixture.description}
+                title={serverFieldText(fixture, 'description')}
               >
-                {fixture.title}
+                {serverFieldText(fixture, 'title')}
               </Button>
             ))}
           </Stack>
@@ -155,7 +156,7 @@ export function HookProbePanel({ sandboxId, hookId, scriptName }: HookProbePanel
 
       {probe.data?.error && (
         <Typography variant="body-sm" color="danger">
-          {probe.data.error}
+          {serverFieldText(probe.data, 'error')}
         </Typography>
       )}
 

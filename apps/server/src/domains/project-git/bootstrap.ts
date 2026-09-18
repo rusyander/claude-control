@@ -298,6 +298,12 @@ export class WorktreeBootstraps {
         ...(record.finishedAt ? { finishedAt: record.finishedAt } : {}),
         ...(typeof record.exitCode === 'number' ? { exitCode: record.exitCode } : {}),
         ...(record.timedOut ? { timedOut: true } : {}),
+        // Откат lock-файлов — единственное, что панель СДЕЛАЛА с рабочим
+        // деревом копии; потерять его при перезапуске значит промолчать о
+        // своей же правке.
+        ...(Array.isArray(record.reverted) && record.reverted.length > 0
+          ? { reverted: record.reverted.filter((name) => typeof name === 'string') }
+          : {}),
       };
     } catch {
       return undefined;

@@ -107,6 +107,7 @@ describe('DlpProxy', () => {
       passUnknown: false,
       journal: true,
       appDataDir: dir,
+      language: 'ru',
       ...patch,
     });
 

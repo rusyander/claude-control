@@ -6,6 +6,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { CREDENTIALS_TONE, useClearCredentials, useCredentialsStatus } from '@entities/Credentials';
 import type { AccessStepProps } from './steps.types';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Шаг доступа Claude Code: откуда панель возьмёт доступ для песочницы. Чаще
@@ -58,7 +59,7 @@ export function AccessStep({ onSetManually }: AccessStepProps) {
 
           {data.reason && (
             <Typography variant="body-sm" color="warning">
-              {data.reason}
+              {serverFieldText(data, 'reason')}
             </Typography>
           )}
 

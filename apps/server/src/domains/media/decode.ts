@@ -1,6 +1,7 @@
 import type { MediaImageMime } from '@agentdeck/contracts';
 import { MEDIA_IMAGE_MAX_BYTES, mediaImageMimes } from '@agentdeck/contracts/media';
 import { MediaError } from './errors.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Байты картинки из ответа модели.
@@ -45,11 +46,21 @@ function pngSize(bytes: Buffer): { width: number; height: number } | undefined {
 
 function decodeBase64(data: string): Buffer {
   const bytes = Buffer.from(data, 'base64');
-  if (bytes.length === 0) throw new MediaError(502, 'В ответе модели вместо картинки пустые байты');
+  if (bytes.length === 0)
+    throw coded(
+      new MediaError(502, 'В ответе модели вместо картинки пустые байты'),
+      'media-image-empty-bytes',
+    );
   if (bytes.length > MEDIA_IMAGE_MAX_BYTES) {
-    throw new MediaError(
-      502,
-      `Картинка больше ${Math.round(MEDIA_IMAGE_MAX_BYTES / (1024 * 1024))} МБ — панель её не сохраняет`,
+    // Потолок — единственный отказ этого файла, который человек и правда
+    // встречает, и до ревью Т13 он один из четырёх ехал без кода: английский
+    // экран и телефон показывали русскую строку там, где справка обещает предел
+    // по-английски.
+    const limit = String(Math.round(MEDIA_IMAGE_MAX_BYTES / (1024 * 1024)));
+    throw coded(
+      new MediaError(502, `Картинка больше ${limit} МБ — панель её не сохраняет`),
+      'media-image-too-large',
+      { limit },
     );
   }
   return bytes;
@@ -58,12 +69,19 @@ function decodeBase64(data: string): Buffer {
 function finish(bytes: Buffer, declared?: string): Decoded {
   const mime = sniff(bytes);
   if (!mime) {
-    throw new MediaError(502, 'Ответ модели не картинка: подпись файла панели не знакома');
+    throw coded(
+      new MediaError(502, 'Ответ модели не картинка: подпись файла панели не знакома'),
+      'media-image-signature',
+    );
   }
   // Объявленный тип спорит с байтами — отказ, а не тихое исправление: спор
   // означает, что одна из сторон соврала, и угадать, какая, нельзя.
   if (declared && declared !== mime) {
-    throw new MediaError(502, `Модель объявила ${declared}, а байты — ${mime}`);
+    throw coded(
+      new MediaError(502, `Модель объявила ${declared}, а байты — ${mime}`),
+      'media-image-mime-mismatch',
+      { declared, mime },
+    );
   }
   return { bytes, mime, ...(mime === 'image/png' ? (pngSize(bytes) ?? {}) : {}) };
 }
@@ -87,7 +105,11 @@ export function decodeDataUrl(url: string): Decoded {
   }
   const declared = (match[1] ?? '').toLowerCase();
   if (!(mediaImageMimes as readonly string[]).includes(declared)) {
-    throw new MediaError(502, `Тип ${declared} панель не показывает`);
+    throw coded(
+      new MediaError(502, `Тип ${declared} панель не показывает`),
+      'media-image-type-unshown',
+      { declared },
+    );
   }
   return finish(decodeBase64(match[2] ?? ''), declared);
 }

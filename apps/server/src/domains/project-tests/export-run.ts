@@ -4,6 +4,7 @@ import { readGroups } from './store.ts';
 import { readRun } from './runs-store.ts';
 import { renderPdf } from './pdf.ts';
 import type { ExportedFile } from './export-cases.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Отчёт по ОДНОМУ прогону файлом — то, что отдают наружу.
@@ -268,7 +269,12 @@ ${rows}
 /** Отчёт по прогону файлом. Прогон ищется и по имени файла, и по своему id. */
 export function exportRun(root: string, runId: string, format: RunExportFormat): ExportedFile {
   const run = readRun(root, runId);
-  if (!run) throw new ProjectTestsNotFoundError(`Прогон «${runId}» не найден.`);
+  if (!run)
+    throw coded(
+      new ProjectTestsNotFoundError(`Прогон «${runId}» не найден.`),
+      'publish-run-not-found',
+      { runId },
+    );
 
   const groups = readGroups(root).filter((group) => !group.error);
   const stamp = run.startedAt.replace(/[^0-9]/g, '').slice(0, 12);

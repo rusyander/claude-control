@@ -4,6 +4,7 @@ import { buildCoverage } from '../../domains/project-tests/coverage.ts';
 import { refreshDefectStates } from '../../domains/project-tests/defect-status.ts';
 import { IntegrationError } from '../../domains/integrations/errors.ts';
 import { guardAsync, requireRoot, type TestsDeps } from './shared.ts';
+import { codeOf } from '../../lib/server-text.ts';
 
 /**
  * Покрытие требований и судьба дефектов — два вопроса, на которые раздел тестов
@@ -60,9 +61,12 @@ export function registerTestCoverageRoutes(app: FastifyInstance, deps: TestsDeps
         // Отказ интеграции — состояние, а не поломка маршрута: карточка её
         // назовёт, а раздел останется живым.
         if (error instanceof IntegrationError) {
-          return reply
-            .code(error.statusCode)
-            .send({ code: error.code, message: error.message, detail: error.detail });
+          return reply.code(error.statusCode).send({
+            code: error.code,
+            message: error.message,
+            ...codeOf(error),
+            detail: error.detail,
+          });
         }
         throw error;
       }

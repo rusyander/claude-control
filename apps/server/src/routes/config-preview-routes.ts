@@ -4,6 +4,7 @@ import type { ServerContext } from '../context.ts';
 import { previewConfigWrite, type ConfigPreviewRequest } from '../domains/config-preview.ts';
 import { SkillExistsError } from '../domains/skills.ts';
 import { normalizeHookDraft } from '../domains/hooks.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Предпросмотр записи в конфигурацию Claude Code (правила, скиллы, права, MCP).
@@ -155,6 +156,7 @@ export function registerConfigPreviewRoutes(app: FastifyInstance, ctx: ServerCon
         message: parsed.success
           ? 'Для этого действия не хватает поля (id, draft или isEnabled).'
           : parsed.error.issues.map((issue) => issue.message).join('; '),
+        ...(parsed.success ? { messageCode: 'config-preview-field-missing' } : {}),
       });
     }
 
@@ -163,7 +165,9 @@ export function registerConfigPreviewRoutes(app: FastifyInstance, ctx: ServerCon
     } catch (error) {
       // Коды — те же, что у настоящей записи: предпросмотр не добрее её.
       if (error instanceof SkillExistsError) {
-        return reply.code(409).send({ error: 'skill_exists', message: error.message });
+        return reply
+          .code(409)
+          .send({ error: 'skill_exists', message: error.message, ...codeOf(error) });
       }
       const coded = error as { statusCode?: unknown; code?: unknown; message?: unknown };
       if (typeof coded.statusCode === 'number' && coded.statusCode < 500) {

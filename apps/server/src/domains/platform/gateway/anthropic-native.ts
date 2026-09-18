@@ -2,6 +2,7 @@ import type { IncomingMessage } from 'node:http';
 import type { Platform } from '@agentdeck/contracts';
 import type { PlatformDriver } from '../drivers/driver.ts';
 import { errorBody } from './dialect.ts';
+import type { TextLanguage } from '../../../lib/server-texts.ts';
 
 /**
  * Платформа, говорящая на диалекте Anthropic сама (DRV-07): манифест объявил
@@ -225,6 +226,10 @@ export function messageFacts(payload: unknown): NativeFacts {
 }
 
 /** Кадр ошибки своего диалекта: молча закрытый поток клиент покажет удачным. */
-export function nativeErrorFrame(message: string, code = 'api_error'): string {
-  return `event: error\ndata: ${JSON.stringify(errorBody('anthropic', message, code))}\n\n`;
+export function nativeErrorFrame(
+  message: string,
+  code = 'api_error',
+  language: TextLanguage = 'ru',
+): string {
+  return `event: error\ndata: ${JSON.stringify(errorBody('anthropic', message, code, language))}\n\n`;
 }

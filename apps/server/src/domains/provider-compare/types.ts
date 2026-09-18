@@ -1,4 +1,5 @@
 import type { EnvVar, McpServer, PermissionRule, UniversalMcpServer } from '@agentdeck/contracts';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /** Доступ к данным Claude — его читатели живут на своих файлах и знают про группы. */
 export interface ClaudeSide {
@@ -27,6 +28,8 @@ export interface SideRead {
   supported: boolean;
   filePath?: string;
   note?: string;
+  /** Код `note` — клиент переводит его своим словарём. */
+  noteCode?: ServerMessageCode;
   rows: Row[];
 }
 
@@ -41,6 +44,7 @@ export interface Row {
   opaque?: boolean;
   /** Почему запись нельзя перенести. */
   blocked?: string;
+  blockedCode?: ServerMessageCode;
   /** Данные для переноса. */
   payload?: UniversalMcpServer;
 }

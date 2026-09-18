@@ -12,6 +12,7 @@ import {
 } from '../../lib/provider-keys.ts';
 import { ProjectTestsError } from './files.ts';
 import { brandEnvName, legacyEnvName } from '../../lib/brand.mjs';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Доступы стенда: логин, пароль, токен — то, без чего прогон упирается в форму
@@ -58,15 +59,23 @@ export function environmentSecretsKey(root: string, environmentId: string): stri
 export function assertSecretName(name: string): string {
   const clean = name.trim();
   if (!NAME_RE.test(clean)) {
-    throw new ProjectTestsError(
-      `«${clean}» не годится именем переменной: латиница, цифры и подчёркивание, не начиная с цифры.`,
+    throw coded(
+      new ProjectTestsError(
+        `«${clean}» не годится именем переменной: латиница, цифры и подчёркивание, не начиная с цифры.`,
+      ),
+      'env-secret-name-invalid',
+      { name: clean },
     );
   }
   const upper = clean.toUpperCase();
   if (RESERVED.includes(upper) || RESERVED_PREFIXES.some((prefix) => upper.startsWith(prefix))) {
-    throw new ProjectTestsError(
-      `Переменная «${clean}» занята самой панелью: под ней уезжают доступ к аккаунту и запуск CLI. ` +
-        'Назовите доступ стенда своим именем — например, STAND_PASSWORD.',
+    throw coded(
+      new ProjectTestsError(
+        `Переменная «${clean}» занята самой панелью: под ней уезжают доступ к аккаунту и запуск CLI. ` +
+          'Назовите доступ стенда своим именем — например, STAND_PASSWORD.',
+      ),
+      'env-secret-name-reserved',
+      { name: clean },
     );
   }
   return clean;
@@ -107,7 +116,10 @@ export function writeSecretValue(
 ): void {
   const key = assertSecretName(name);
   if (value.length > MAX_KEY_LENGTH) {
-    throw new ProjectTestsError('Значение длиннее допустимого.');
+    throw coded(
+      new ProjectTestsError('Значение длиннее допустимого.'),
+      'env-secret-value-too-long',
+    );
   }
   const values = readSecretValues(appDataDir, root, environmentId);
   if (value) values[key] = value;

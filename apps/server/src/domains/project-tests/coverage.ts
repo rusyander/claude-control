@@ -153,6 +153,8 @@ export async function buildCoverage(
     source: fromJira?.issues ? 'jira' : 'links',
     jql: fromJira?.jql,
     warning: fromJira?.warning,
+    warningCode: fromJira?.warningCode,
+    warningParams: fromJira?.warningParams,
   };
 }
 
@@ -174,6 +176,8 @@ interface JiraRequirements {
   issues?: { key: string; summary: string; status: string; url: string }[];
   jql?: string;
   warning?: string;
+  warningCode?: string;
+  warningParams?: Record<string, string | number>;
 }
 
 /**
@@ -188,7 +192,10 @@ async function requirementsFromJira(
   const settings = readIntegrations(deps.store).atlassian;
   const token = readToken(deps.appDataDir, 'atlassian');
   if (!settings.enabled || !token) {
-    return { warning: 'Atlassian не подключён: показаны только требования из ссылок кейсов.' };
+    return {
+      warning: 'Atlassian не подключён: показаны только требования из ссылок кейсов.',
+      warningCode: 'coverage-atlassian-off',
+    };
   }
 
   const link = linkForCwd(deps.store, deps.root)?.link;
@@ -196,6 +203,7 @@ async function requirementsFromJira(
   if (!jql) {
     return {
       warning: 'К проекту не привязан проект Jira: показаны только требования из ссылок кейсов.',
+      warningCode: 'coverage-jira-project-unlinked',
     };
   }
 
@@ -213,7 +221,12 @@ async function requirementsFromJira(
   } catch (error) {
     // Jira не ответила — матрица всё равно собирается по ссылкам. Отказ здесь
     // не повод отдать пустой экран: половина ответа полезнее нуля.
-    return { jql, warning: `Jira не ответила: ${error instanceof Error ? error.message : error}` };
+    return {
+      jql,
+      warning: `Jira не ответила: ${error instanceof Error ? error.message : error}`,
+      warningCode: 'coverage-jira-failed',
+      warningParams: { reason: error instanceof Error ? error.message : String(error) },
+    };
   }
 }
 
@@ -246,14 +259,23 @@ const ISSUE_KEY = /^[A-Z][A-Z0-9_]*-\d+$/;
 export async function requirementUpdates(
   deps: CoverageDeps,
   keys: string[],
-): Promise<{ updates: Record<string, { updatedAt: string; url?: string }>; warning?: string }> {
+): Promise<{
+  updates: Record<string, { updatedAt: string; url?: string }>;
+  warning?: string;
+  warningCode?: string;
+  warningParams?: Record<string, string | number>;
+}> {
   const known = keys.filter((key) => ISSUE_KEY.test(key));
   if (known.length === 0) return { updates: {} };
 
   const settings = readIntegrations(deps.store).atlassian;
   const token = readToken(deps.appDataDir, 'atlassian');
   if (!settings.enabled || !token) {
-    return { updates: {}, warning: 'Atlassian не подключён: даты требований не сверялись.' };
+    return {
+      updates: {},
+      warning: 'Atlassian не подключён: даты требований не сверялись.',
+      warningCode: 'coverage-dates-atlassian-off',
+    };
   }
 
   try {
@@ -270,6 +292,8 @@ export async function requirementUpdates(
     return {
       updates: {},
       warning: `Jira не ответила, даты требований не сверялись: ${error instanceof Error ? error.message : error}`,
+      warningCode: 'coverage-dates-jira-failed',
+      warningParams: { reason: error instanceof Error ? error.message : String(error) },
     };
   }
 }

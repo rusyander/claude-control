@@ -12,6 +12,7 @@ import {
 import type { DriverControl, PlatformDriver } from './driver.ts';
 import { buildEnterprisePlatformDriver, enterprisePlatformDriver } from './enterprise-platform.ts';
 import { openAiCompatDriver } from './openai-compat.ts';
+import { serverText } from '../../../lib/server-texts.ts';
 
 /**
  * Реестр драйверов. Ветвление по платформе кончается здесь: дальше все
@@ -41,11 +42,11 @@ function withThinkingField(controls: DriverControl[], path: string): DriverContr
     ? { ...own, wireField: path }
     : {
         id: 'enable_thinking',
-        title: 'Размышления модели',
+        title: serverText('contour-control-thinking-title'),
         kind: 'request',
         field: 'enableThinking',
         wireField: path,
-        detail: `включить или выключить полем «${path}»; по умолчанию не отправляется, решает шаблон модели`,
+        detail: serverText('contour-control-thinking-manifest-detail', { path }),
       };
   return [...rest, control];
 }

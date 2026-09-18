@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { serverFieldText } from '@shared/config/i18n';
 import { Modal } from '@shared/ui/modal';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -147,7 +148,7 @@ export function EnvTransferImportModal({
             <label
               key={entry.archivePath}
               className={styles.entry}
-              title={entry.targetPath ?? entry.problem}
+              title={entry.targetPath ?? serverFieldText(entry, 'problem')}
             >
               <input
                 type="checkbox"

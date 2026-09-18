@@ -37,7 +37,15 @@ export function registerIntegrationExchangeRoutes(
   app.post<{ Body: unknown }>('/api/integrations/ci/import', (request, reply) =>
     guard(reply, async () => {
       const body = request.body as { path?: unknown; environmentId?: unknown } | null;
-      const root = resolve(requireString(body?.path, 'path', 'не указан каталог проекта'));
+      const root = resolve(
+        requireString(
+          body?.path,
+          'path',
+          'не указан каталог проекта',
+          'request-project-dir-missing',
+          { field: 'path' },
+        ),
+      );
       const token = requireConnected(deps.ctx.store, appDataOf(deps), 'ci', 'CI');
       const settings = readIntegrations(deps.ctx.store);
       const baseUrl = settings.forge.kind === settings.ci.kind ? settings.forge.baseUrl : '';
@@ -56,14 +64,28 @@ export function registerIntegrationExchangeRoutes(
   app.post<{ Body: unknown }>('/api/integrations/tms/pull', (request, reply) =>
     guard(reply, async () => {
       const body = request.body as { path?: unknown; groupId?: unknown } | null;
-      const root = resolve(requireString(body?.path, 'path', 'не указан каталог проекта'));
+      const root = resolve(
+        requireString(
+          body?.path,
+          'path',
+          'не указан каталог проекта',
+          'request-project-dir-missing',
+          { field: 'path' },
+        ),
+      );
       const settings = readIntegrations(deps.ctx.store);
       const token = requireConnected(deps.ctx.store, appDataOf(deps), 'tms', 'Тест-менеджмент');
       // Группа из тела сильнее настройки: человек тянет кейсы в ту группу, что
       // открыта у него на экране, а настройка — это лишь значение по умолчанию.
       const groupId =
         optionalString(body?.groupId) ??
-        requireString(settings.tms.groupId, 'groupId', 'не указана группа тестов');
+        requireString(
+          settings.tms.groupId,
+          'groupId',
+          'не указана группа тестов',
+          'request-groupid-missing',
+          { field: 'groupId' },
+        );
 
       const batch = await tmsClient(settings.tms, token).pullCases();
       const result = pullIntoGroup(root, groupId, batch.cases, new Date().toISOString());
@@ -77,8 +99,18 @@ export function registerIntegrationExchangeRoutes(
   app.post<{ Body: unknown }>('/api/integrations/tms/push', (request, reply) =>
     guard(reply, async () => {
       const body = request.body as { path?: unknown; runId?: unknown } | null;
-      const root = resolve(requireString(body?.path, 'path', 'не указан каталог проекта'));
-      const runId = requireString(body?.runId, 'runId', 'не указан прогон');
+      const root = resolve(
+        requireString(
+          body?.path,
+          'path',
+          'не указан каталог проекта',
+          'request-project-dir-missing',
+          { field: 'path' },
+        ),
+      );
+      const runId = requireString(body?.runId, 'runId', 'не указан прогон', 'request-run-missing', {
+        field: 'runId',
+      });
       const settings = readIntegrations(deps.ctx.store);
       const token = requireConnected(deps.ctx.store, appDataOf(deps), 'tms', 'Тест-менеджмент');
       return pushRunToTms(tmsClient(settings.tms, token), root, runId);
@@ -94,7 +126,13 @@ export function registerIntegrationExchangeRoutes(
     guard(reply, async () => {
       const token = requireConnected(deps.ctx.store, appDataOf(deps), 'telegram', 'Telegram');
       const settings = readIntegrations(deps.ctx.store).telegram;
-      const chatId = requireString(settings.chatId, 'chatId', 'не указан чат для уведомлений');
+      const chatId = requireString(
+        settings.chatId,
+        'chatId',
+        'не указан чат для уведомлений',
+        'request-chat-id-missing',
+        { field: 'chatId' },
+      );
       await sendTelegramMessage(token, chatId, '🔔 Проверка связи из панели AgentDeck.');
       return { ok: true };
     }),
@@ -111,7 +149,13 @@ export function registerIntegrationExchangeRoutes(
   app.post('/api/integrations/webhook/test', (_request, reply) =>
     guard(reply, async () => {
       const settings = readIntegrations(deps.ctx.store).webhook;
-      const url = requireString(settings.url, 'url', 'не указан адрес вебхука');
+      const url = requireString(
+        settings.url,
+        'url',
+        'не указан адрес вебхука',
+        'request-webhook-url-missing',
+        { field: 'url' },
+      );
       await sendWebhook(url, readToken(appDataOf(deps), 'webhook'), {
         event: 'test',
         text: 'Проверка связи из панели AgentDeck.',

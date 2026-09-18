@@ -9,6 +9,7 @@ import { readIntegrations, requireConnected } from './store.ts';
 import { toAccess } from './atlassian/client.ts';
 import { commentIssue } from './atlassian/jira.ts';
 import { createPage, readPage } from './atlassian/confluence.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Отчёт по прогону — наружу, туда, где его прочтут без панели.
@@ -46,16 +47,28 @@ export async function publishRun(
   request: PublishRequest,
 ): Promise<IntegrationPublishResult> {
   const root = String(request.path ?? '').trim();
-  if (!root) throw invalidField('path', 'не указан каталог проекта');
+  if (!root)
+    throw invalidField('path', 'не указан каталог проекта', 'request-project-dir-missing', {
+      field: 'path',
+    });
   const runId = String(request.runId ?? '').trim();
-  if (!runId) throw invalidField('id', 'не указан прогон');
+  if (!runId) throw invalidField('id', 'не указан прогон', 'request-run-missing', { field: 'id' });
   if (request.target !== 'confluence' && request.target !== 'jira') {
-    throw invalidField('target', 'публиковать можно в confluence или в jira');
+    throw invalidField(
+      'target',
+      'публиковать можно в confluence или в jira',
+      'request-publish-target',
+      { field: 'target' },
+    );
   }
 
   const run = readRun(root, runId);
   if (!run) {
-    throw new IntegrationError('integration_not_found', `Прогон «${runId}» не найден.`);
+    throw coded(
+      new IntegrationError('integration_not_found', `Прогон «${runId}» не найден.`),
+      'publish-run-not-found',
+      { runId },
+    );
   }
 
   const found = linkForCwd(deps.store, root, request.groupId);

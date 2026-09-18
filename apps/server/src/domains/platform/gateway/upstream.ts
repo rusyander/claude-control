@@ -2,6 +2,7 @@ import type { Platform } from '@agentdeck/contracts';
 import { createCaStreamFetch, type PlatformFetch } from '../ca-fetch.ts';
 import { headerUnsafeKeyReason } from '../errors.ts';
 import { contourHeaders, contourUrl } from '../transport.ts';
+import { serverText } from '../../../lib/server-texts.ts';
 
 /**
  * Поход в контур: единственное место шлюза, где ключ попадает в запрос.
@@ -62,11 +63,7 @@ export function ceilingCutMessage(
   const ceiling = driver.responseCeilingSec;
   if (ceiling === undefined || !Number.isFinite(ceiling) || ceiling <= 0) return undefined;
   if (elapsedMs < ceiling * 1_000 - CEILING_SLACK_MS) return undefined;
-  return (
-    `Ответ контура оборвался на ${ceiling}-й секунде — это потолок самой платформы на любой ` +
-    'ответ, поток тоже. Сеть здесь ни при чём: сократите ход (меньше размышлений, короче ' +
-    'ответ) или попросите владельца контура поднять потолок'
-  );
+  return serverText('gateway-ceiling-cut', { seconds: ceiling });
 }
 
 /** Пауза перед единственной повторной попыткой, когда контур сам её не назвал. */
@@ -120,7 +117,9 @@ export function upstreamUrl(platform: Platform, path: string): string {
   const url = contourUrl(platform, path);
   // Сохранённый контур адрес уже прошёл схему; сюда доезжает только подменённый
   // мимо неё — и отказ называет адрес, а не падает внутри `fetch`.
-  if (url === undefined) throw new UpstreamError(`Адрес контура не http(s): ${platform.baseUrl}`);
+  if (url === undefined) {
+    throw new UpstreamError(serverText('gateway-url-not-http', { url: platform.baseUrl }));
+  }
   return url;
 }
 
@@ -287,7 +286,9 @@ async function assertNoRedirect(response: Response, url: string): Promise<void> 
     where = '';
   }
   throw new UpstreamError(
-    `Контур ответил перенаправлением${where ? ` на ${where}` : ''} (${response.status}) — панель за ним не пошла: запрос ушёл бы на другой адрес. Впишите в настройку контура тот адрес, на который он перенаправляет`,
+    where
+      ? serverText('gateway-redirect-to', { where, status: response.status })
+      : serverText('gateway-redirect', { status: response.status }),
   );
 }
 
@@ -314,15 +315,15 @@ function describeFailure(error: unknown, headersTimeoutMs: number): string {
   if (name === 'TimeoutError' || name === 'AbortError' || name === 'Error') {
     const message = error instanceof Error ? error.message : '';
     if (message === 'timeout' || name === 'TimeoutError') {
-      return `Контур не начал отвечать за ${headersTimeoutMs / 1_000} с`;
+      return serverText('gateway-headers-timeout', { seconds: headersTimeoutMs / 1_000 });
     }
   }
   const reason = error instanceof Error ? error.message : String(error);
   if (/self.signed|unable to verify|CERT_/i.test(reason)) {
-    return `Сертификат контура не проверился: ${reason}. Укажите корневой сертификат компании в настройках контура`;
+    return serverText('gateway-cert-failed', { reason });
   }
   // Ключ, не пролезающий в заголовок, — это не «нет связи»: запрос не ушёл.
   const badKey = headerUnsafeKeyReason(reason);
   if (badKey) return badKey;
-  return `Нет связи с контуром: ${reason.slice(0, 200)}`;
+  return serverText('gateway-no-connection', { reason: reason.slice(0, 200) });
 }

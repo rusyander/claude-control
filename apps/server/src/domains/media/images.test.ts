@@ -10,7 +10,7 @@ import type { PlatformFetch } from '../platform/ca-fetch.ts';
 import { promptText } from '../prompts.ts';
 import { driverFor } from '../platform/drivers/index.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
-import { generateImage, planImage, savePicture, type MediaDeps } from './images.ts';
+import { generateImage, planImage, planImageReady, savePicture, type MediaDeps } from './images.ts';
 import { isMediaError, type MediaError } from './errors.ts';
 import { mediaDir } from './store.ts';
 
@@ -190,6 +190,94 @@ describe('planImage: чем нарисуем и почему нельзя', () =
 
     expect(plan.available).toBe(false);
     expect(plan.rasterReason).toBe('gateway-off');
+  });
+
+  /**
+   * A-1: «шлюз не поднят» — это ДВА разных состояния, и человеку от них нужно
+   * разное. Тумблер выключен — его выбор, и снимает его он. Тумблер включён, а
+   * слушателя нет — поднимать обязана панель, и послать человека «включить шлюз»,
+   * который уже включён, значит послать чинить не то.
+   */
+  it('тумблер включён, слушателя нет — причина другая, и в ней отказ слушателя', () => {
+    useContour(contour(), [model('company-image', true)]);
+    store.updateSettings({
+      platformGateway: { enabled: true, port: 5179, forceStream: true },
+    });
+
+    const plan = planImage(
+      deps({ gatewayPort: () => 0, gatewayFailure: () => 'listen EADDRINUSE 5179' }),
+    );
+
+    expect(plan.rasterReason).toBe('gateway-failed');
+    // Причину отказа панель выдумать не может — она приезжает от слушателя.
+    expect(plan.reasonDetail).toBe('listen EADDRINUSE 5179');
+  });
+
+  it('тумблер включён — план сам поднимает свой шлюз, и ровно один раз', async () => {
+    useContour(contour(), [model('company-image', true)]);
+    store.updateSettings({
+      platformGateway: { enabled: true, port: 5179, forceStream: true },
+    });
+    let raised = 0;
+    let port = 0;
+    const raising = deps({
+      gatewayPort: () => port,
+      raiseGateway: () => {
+        raised += 1;
+        port = 5179;
+        return Promise.resolve();
+      },
+    });
+
+    const plan = await planImageReady(raising);
+    expect(raised).toBe(1);
+    // И тот же расчёт отвечает уже доступной дорогой: замок там, где панель
+    // умеет поднять шлюз одним вызовом, был отказом собственной работе.
+    expect(plan).toMatchObject({ available: true, source: 'contour-chat' });
+
+    // Шлюз жив — второй расчёт ничего не поднимает.
+    await planImageReady(raising);
+    expect(raised).toBe(1);
+  });
+
+  it('тумблер ВЫКЛЮЧЕН — панель не поднимает ничего и оставляет прежний замок', async () => {
+    useContour(contour(), [model('company-image', true)]);
+    let raised = 0;
+    const plan = await planImageReady(
+      deps({
+        gatewayPort: () => 0,
+        raiseGateway: () => {
+          raised += 1;
+          return Promise.resolve();
+        },
+      }),
+    );
+
+    expect(raised).toBe(0);
+    expect(plan.rasterReason).toBe('gateway-off');
+    // Настройка не тронута: включить её за человека — дело активации контура по
+    // его же нажатию, а не расчёта плана картинки.
+    expect(store.getSettings().platformGateway.enabled).toBe(false);
+  });
+
+  it('мешает не шлюз — поднимать нечего и незачем', async () => {
+    useContour(contour(), [model('company-chat', false)]);
+    store.updateSettings({
+      platformGateway: { enabled: true, port: 5179, forceStream: true },
+    });
+    let raised = 0;
+    const plan = await planImageReady(
+      deps({
+        gatewayPort: () => 0,
+        raiseGateway: () => {
+          raised += 1;
+          return Promise.resolve();
+        },
+      }),
+    );
+
+    expect(plan.rasterReason).toBe('no-model');
+    expect(raised).toBe(0);
   });
 
   it('совместимый контур ручку не объявляет — и не запирает дорогу профиля', () => {

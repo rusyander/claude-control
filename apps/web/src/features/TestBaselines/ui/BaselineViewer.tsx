@@ -15,6 +15,7 @@ import { useAcceptBaseline, useTestBaselines } from '@entities/ProjectTest';
 import { baselineTone, isOverThreshold, pickPoint, ratioPercent } from '../model/baselineView';
 import type { BaselineViewerProps } from './BaselineViewer.types';
 import styles from './TestBaselines.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Сверка скриншота с эталоном: было / стало / разница.
@@ -121,7 +122,7 @@ export function BaselineViewer({
               )}
               {point.message && (
                 <Typography variant="caption" color="danger" as="span">
-                  {point.message}
+                  {serverFieldText(point, 'message')}
                 </Typography>
               )}
             </Stack>

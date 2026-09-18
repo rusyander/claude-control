@@ -13,6 +13,7 @@ import {
 } from '../lib/codex-toml.ts';
 import { EnvKeyNotEncodableError, readAiderSetEnv, writeAiderSetEnv } from '../lib/aider-yaml.ts';
 import { readDotenvVars, writeDotenvVars } from '../lib/dotenv-file.ts';
+import { coded } from '../lib/server-text.ts';
 
 /**
  * Универсальный раздел переменных окружения — для провайдеров Codex (TOML),
@@ -73,6 +74,7 @@ export class EnvKeyPreservedError extends Error {
     super(
       `Переменная «${key}» задана в config.toml значением, которое панель не моделирует (число, булево или таблица), — переименуйте её здесь или измените значение в файле вручную. Остальные переменные не сохранены.`,
     );
+    coded(this, 'provider-env-value-unsupported', { key });
     // Явное поле вместо parameter property: рантайм сервера — strip-types.
     this.name = 'EnvKeyPreservedError';
     this.key = key;

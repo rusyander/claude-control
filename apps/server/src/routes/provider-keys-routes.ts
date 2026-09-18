@@ -13,6 +13,7 @@ import {
   deleteProviderKey,
   ProviderKeyError,
 } from '../domains/provider-keys.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * API-ключи провайдеров и резолвинг раннера ассистента (Ф6a).
@@ -32,7 +33,7 @@ export function registerProviderKeysRoutes(app: FastifyInstance, ctx: ServerCont
 
   const sendKeyError = (reply: FastifyReply, error: ProviderKeyError): FastifyReply => {
     const status = error.code === 'unknown_provider' ? 404 : 400;
-    return reply.code(status).send({ error: error.code, message: error.message });
+    return reply.code(status).send({ error: error.code, message: error.message, ...codeOf(error) });
   };
 
   app.get('/api/provider-keys', () => {

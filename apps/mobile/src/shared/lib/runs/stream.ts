@@ -140,6 +140,7 @@ async function readRefusal(response: Response): Promise<Refusal> {
     files?: string[];
     supported?: string[];
     cwd?: string;
+    gaps?: { kind?: string; path?: string }[];
     messageCode?: unknown;
     params?: ServerMessageParams;
   } = {};
@@ -164,6 +165,21 @@ async function readRefusal(response: Response): Promise<Refusal> {
   }
   if (body.code === 'workspace_missing') {
     return { code: body.code, message: t.run.notSent.workspaceMissing(body.cwd ?? '') };
+  }
+  // Параллельная копия репозитория неполная, и добрать её панель уже пробовала
+  // сама. Телефон чинить копию не умеет (раздела копий у него нет вовсе),
+  // поэтому текст называет дыры и отправляет к пульту git на компьютере.
+  if (body.code === 'copy_not_ready') {
+    return {
+      code: body.code,
+      message: t.run.notSent.copyNotReady(
+        body.cwd ?? '',
+        (body.gaps ?? [])
+          .map((gap) => gap.path ?? '')
+          .filter(Boolean)
+          .join(', '),
+      ),
+    };
   }
   // Пустое сообщение и прочие отказы с кодом текста — на языке телефона.
   const detail =

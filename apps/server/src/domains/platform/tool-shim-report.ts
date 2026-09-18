@@ -1,4 +1,5 @@
 import type { PlatformGatewayEvent, PlatformToolShimReport } from '@agentdeck/contracts';
+import { attachTextCodes } from '../../lib/server-texts.ts';
 
 /**
  * Прослойка инструментов — СВОДКА по следу запросов (Т5.5).
@@ -49,7 +50,9 @@ export function toolShimReport(
     calls,
     claimed,
     flaws: [...flaws.entries()]
-      .map(([reason, count]) => ({ reason, count }))
+      // Причина пришла из следа строкой: код к ней восстанавливается разбором,
+      // иначе английский интерфейс показал бы русскую фразу шлюза.
+      .map(([reason, count]) => attachTextCodes({ reason, count }))
       .sort((left, right) => right.count - left.count || left.reason.localeCompare(right.reason)),
     ...(since ? { since } : {}),
   };

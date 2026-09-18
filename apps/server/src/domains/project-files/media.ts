@@ -2,6 +2,7 @@ import { readFileSync, statSync } from 'node:fs';
 import type { ProjectFilePreview } from '@agentdeck/contracts';
 import { MAX_MEDIA_BYTES } from './constants.ts';
 import { ProjectFileError, resolveProjectPath } from './paths.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Файлы, которые показываются не текстом: картинки, PDF, SVG, разметка.
@@ -60,13 +61,17 @@ function mediaTypeOf(file: string): string | undefined {
 /** Байты картинки или PDF вместе с типом содержимого. */
 export function readProjectMedia(root: string, file: string): { bytes: Buffer; mediaType: string } {
   const mediaType = mediaTypeOf(file);
-  if (!mediaType) throw new ProjectFileError('Такой формат панель не показывает.');
+  if (!mediaType)
+    throw coded(
+      new ProjectFileError('Такой формат панель не показывает.'),
+      'file-format-not-shown',
+    );
 
   const path = resolveProjectPath(root, file);
   const stats = statSync(path);
-  if (!stats.isFile()) throw new ProjectFileError('Это не файл.');
+  if (!stats.isFile()) throw coded(new ProjectFileError('Это не файл.'), 'file-not-a-file');
   if (stats.size > MAX_MEDIA_BYTES) {
-    throw new ProjectFileError('Файл слишком велик для просмотра.');
+    throw coded(new ProjectFileError('Файл слишком велик для просмотра.'), 'file-too-large-view');
   }
 
   return { bytes: readFileSync(path), mediaType };

@@ -36,6 +36,7 @@ import {
   type StartTestRunPayload,
 } from '@entities/ProjectTest';
 import { useTestFilters, type TestFilters } from './useTestFilters';
+import { messageFromPayload } from '@shared/api/client';
 
 /**
  * Состояние библиотеки тестов: что открыто, что отобрано, что отмечено.
@@ -141,8 +142,8 @@ export function toggleChecked(checked: string[], id: string): string[] {
 /** Текст ошибки любой из мутаций — одной строкой, как её показывает окно. */
 export function messageOf(error: unknown): string | undefined {
   if (!error) return undefined;
-  const response = (error as { response?: { data?: { message?: string } } }).response;
-  return response?.data?.message ?? (error as Error).message;
+  const response = (error as { response?: { data?: unknown } }).response;
+  return messageFromPayload(response?.data) ?? (error as Error).message;
 }
 
 export function useTestsBoard(projectPath: string | undefined, isOpen: boolean): TestsBoard {

@@ -23,6 +23,7 @@ import {
   readViews,
   repairFutureStamps,
 } from '../../domains/project-tests.ts';
+import { codeOf, coded } from '../../lib/server-text.ts';
 
 /**
  * Общее для всех маршрутов раздела тестов: проверка каталога, перевод ошибок
@@ -64,7 +65,7 @@ export function requireRoot(path: unknown, reply: FastifyReply): string | undefi
 function fail(reply: FastifyReply, error: ProjectTestsError): FastifyReply {
   const status = error.statusCode || (error instanceof ProjectTestsNotFoundError ? 404 : 400);
   const locked = error instanceof ProjectTestsLockedError ? { runId: error.runId } : {};
-  return reply.code(status).send({ message: error.message, ...locked });
+  return reply.code(status).send({ message: error.message, ...codeOf(error), ...locked });
 }
 
 export function guard<T>(reply: FastifyReply, action: () => T): T | FastifyReply {
@@ -99,9 +100,13 @@ export async function guardAsync<T>(
 export function assertUnlocked(deps: TestsDeps, root: string, groupId?: string): void {
   const runId = deps.runs.holds(root, groupId);
   if (!runId) return;
-  throw new ProjectTestsLockedError(
-    `По этой группе идёт прогон (${runId}) — он пишет в тот же файл. Дождись конца или останови его.`,
-    runId,
+  throw coded(
+    new ProjectTestsLockedError(
+      `По этой группе идёт прогон (${runId}) — он пишет в тот же файл. Дождись конца или останови его.`,
+      runId,
+    ),
+    'group-run-in-progress',
+    { runId },
   );
 }
 

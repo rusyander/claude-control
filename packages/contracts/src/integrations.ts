@@ -10,6 +10,8 @@
  * `--experimental-strip-types` упадёт на импорте значения из общего бочонка.
  */
 
+import type { CodedFields } from './server-messages.ts';
+
 /** Какой Atlassian на том конце: облако или своя установка. */
 export type AtlassianDeployment = 'cloud' | 'server';
 
@@ -35,8 +37,30 @@ export interface ForgeSettings {
   repo: string;
 }
 
+/**
+ * События панели, на которые можно подписаться наружу — ОДИН список на все
+ * схемы. Значение, а не только тип: то же перечисление нужно и схеме настроек,
+ * и схеме импорта на сервере, а четыре списанные друг с друга копии уже
+ * разъехались — `budget` добавили в две из них, и собственный снимок панели
+ * перестал импортироваться обратно.
+ */
+export const NOTIFY_EVENTS = [
+  'runDone',
+  'runError',
+  'permission',
+  'question',
+  'testFailed',
+  /**
+   * Бюджет контура: наша оценка расхода перешла порог внимания или дошла до
+   * введённого бюджета. Одно событие на оба порога — подписка отвечает на
+   * вопрос «сообщать ли про бюджет», а не «про какой именно порог»; какой
+   * именно, сказано в тексте.
+   */
+  'budget',
+] as const;
+
 /** Событие панели, на которое можно подписаться наружу. */
-export type NotifyEvent = 'runDone' | 'runError' | 'permission' | 'question' | 'testFailed';
+export type NotifyEvent = (typeof NOTIFY_EVENTS)[number];
 
 /** Прежнее имя того же списка: подписка у Telegram и у вебхука одна и та же. */
 export type TelegramEvent = NotifyEvent;
@@ -127,7 +151,7 @@ export type IntegrationId = keyof IntegrationsSettings;
 /** Итог последней живой проверки связи — то же, что панель хранит по MCP. */
 export type IntegrationState = 'ok' | 'error' | 'unchecked';
 
-export interface IntegrationStatus {
+export interface IntegrationStatus extends CodedFields<'detail'> {
   id: IntegrationId;
   enabled: boolean;
   /** Есть ли сохранённый токен. Сам токен наружу не отдаётся никогда. */

@@ -5,6 +5,7 @@ import type {
   PlatformRules,
 } from '@agentdeck/contracts';
 import type { PlatformDriver } from './drivers/driver.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Правила контура и матрица конфликтов (Т7, решение Р5).
@@ -51,9 +52,9 @@ export interface OurRulesState {
 }
 
 const THINKING_WORDS: Record<PlatformRules['enableThinking'], string> = {
-  default: 'по умолчанию',
-  on: 'включено',
-  off: 'выключено',
+  default: serverText('contour-thinking-default'),
+  on: serverText('contour-thinking-on'),
+  off: serverText('contour-thinking-off'),
 };
 
 /** Значение правила словами: что стоит сегодня. */
@@ -81,7 +82,7 @@ export function platformRuleRows(platform: Platform, driver: PlatformDriver): Pl
     ...(control.field ? { field: control.field } : {}),
     ...(control.options ? { options: control.options } : {}),
     value: valueOf(rules, control),
-    where: control.kind === 'request' ? '' : (control.where ?? 'вне панели'),
+    where: control.kind === 'request' ? '' : (control.where ?? serverText('contour-where-outside')),
   }));
 }
 
@@ -121,10 +122,8 @@ export function ruleConflicts(
       level: 'exclusive',
       platformRule: toolsControl.id,
       ourRule: OUR_RULE_IDS.toolShim,
-      title: 'Инструменты платформы ⟷ наша прослойка инструментов',
-      detail:
-        'Два набора инструментов на один ход: наш едет текстом и собирается обратно из ответа, ' +
-        'набор контура исполняет сам контур. Включить оба нельзя — выберите один.',
+      title: serverText('contour-conflict-tools-title'),
+      detail: serverText('contour-conflict-tools-detail'),
       active: rules.platformTools.length > 0 && ours.toolShim,
     });
   }
@@ -133,7 +132,7 @@ export function ruleConflicts(
   // первой, метки у неё другого вида, чем у контура. До 15.09.2026 строка
   // утверждала, что контур сам подменяет и возвращает свои метки, — проба dev
   // показала другое: по API-ключу модель видит почту, телефон и IP как есть,
-  // кадров карты нет (router.py:596, `is_chat_caller`). Поэтому строка говорит
+  // кадров карты нет: карту контур отдаёт только собственному чату. Поэтому строка говорит
   // «не гарантирована», а маска у такого контура включается сама
   // (`data-mask.ts`).
   if (declared(driver, 'anonymization')) {
@@ -142,12 +141,16 @@ export function ruleConflicts(
       level: 'info',
       platformRule: 'anonymization',
       ourRule: OUR_RULE_IDS.dlp,
-      title: 'Подмена данных контура ⟷ наша маска данных',
-      detail:
-        'Не выбор из двух: слои складываются по порядку. По API-ключу подмена у контура не ' +
-        'гарантирована — проба стенда показала запрос без подмены, а карту подмены клиенту API ' +
-        'контур не отдаёт. Поэтому наша маска у такого контура включается сама: она идёт первой, ' +
-        'обратима, и её метки контур не трогает. Выключать ничего не нужно.',
+      title: serverText('contour-conflict-anonymization-title'),
+      // Текст зависит от НАШЕЙ половины (ревью Т13). «Выключать ничего не нужно»
+      // — правда только пока маска включена, а `dataMask: false` снимает её
+      // одним щелчком на этой же карточке (`data-mask.ts → dataMaskOn`). Строка
+      // рисуется независимо от `oursOnly`, и человек, выключивший маску, читал
+      // бы «включается сама, выключать ничего не нужно» — о персональных
+      // данных, уезжающих в корпоративный контур как есть.
+      detail: ours.dlp
+        ? serverText('contour-conflict-anonymization-detail')
+        : serverText('contour-conflict-anonymization-detail-off'),
       // Включил ли владелец контура подмену — панель не знает: отдельного
       // маршрута нет, и узнаётся это только по сработавшему кадру. Поэтому
       // «включены обе» тут не утверждается (ревью Т7, M3).
@@ -165,10 +168,8 @@ export function ruleConflicts(
       level: 'warning',
       platformRule: 'managed-context',
       ourRule: OUR_RULE_IDS.checkpoints,
-      title: 'Сжатие истории контуром ⟷ наши контрольные точки',
-      detail:
-        'Длинную переписку контур сжимает сам, а контрольная точка панели описывает историю ' +
-        'целиком. После сжатия продолжение может не знать начала задачи — держите точку свежей.',
+      title: serverText('contour-conflict-compaction-title'),
+      detail: serverText('contour-conflict-compaction-detail'),
       // Здесь «обе стороны» сказать МОЖНО: сторона контура — факт из последней
       // пробы (`limits.managedContext`), а контрольные точки в панели есть
       // всегда. Это единственная из трёх строк, где видно обе половины.
@@ -185,10 +186,8 @@ export function ruleConflicts(
       level: 'info',
       platformRule: 'guardrails',
       ourRule: OUR_RULE_IDS.promptGate,
-      title: 'Проверки содержимого контура ⟷ наш гейт промпта',
-      detail:
-        'Проверяют оба и по разным спискам: гейт панели откажет до отправки и назовёт правило, ' +
-        'контур откажет у себя статусом 451. Второй отказ не означает, что первый не сработал.',
+      title: serverText('contour-conflict-guardrails-title'),
+      detail: serverText('contour-conflict-guardrails-detail'),
       // Та же причина, что у подмены: гардрейлы включает владелец контура, и
       // видны они панели только когда сработают (451 в журнале нарушений).
       active: false,

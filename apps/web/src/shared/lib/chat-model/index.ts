@@ -5,6 +5,7 @@ import type {
   PlatformRunLayers,
   PlatformRunPlan,
 } from '@agentdeck/contracts';
+import { chooseRunModel, modelCaptionState } from '@agentdeck/contracts/platform-models';
 import type { PlatformModelChoice } from '@agentdeck/contracts/platform-models';
 
 /**
@@ -66,6 +67,27 @@ export function modelSelectOptions(
   return options;
 }
 
+/**
+ * Чем прогон пойдёт через контур — по тем же двум значениям, из которых
+ * собирается сам запрос: выбор ЭТОГО чата, а пусто — модель из настроек.
+ *
+ * Отдельной функцией, потому что ревью Т13 нашло ровно этот разрыв: шапка
+ * спрашивала маршрут одним оверрайдом чата, а прогон уходил с
+ * `оверрайд || дефолт настроек`. При пустом выборе («как в настройках») шапка
+ * называла модель контура по умолчанию, пока уезжала модель из настроек, и
+ * предупреждение о подмене молчало — badge показывал `qwen2.5:7b`, ехал
+ * `qwen2.5:14b`. Шапка чужого CLI разрыва не знала: там модель чата хранится
+ * готовым значением. Третьего расчёта нет: обе шапки и подпись ожидания зовут
+ * эту функцию.
+ */
+export function platformRunChoice(
+  rules: Parameters<typeof chooseRunModel>[0],
+  model: string,
+  defaultModel?: string,
+): PlatformModelChoice {
+  return chooseRunModel(rules, model || defaultModel || '');
+}
+
 /** Что сказать о модели прогона, идущего через контур (Т6). */
 export interface PlatformModelCaption {
   /** Ключ словаря: подпись выбирается здесь, а не в двух шапках порознь. */
@@ -90,12 +112,20 @@ export function platformModelCaption(
   choice: PlatformModelChoice,
 ): PlatformModelCaption {
   const params = { title, asked: choice.asked, model: choice.model };
-  // Контур модель не назначил: уедет то, что выбрано в панели (или ничего, и
-  // тогда CLI пойдёт своей). Это не подмена, но и не «всё в порядке» — обычно
-  // это непройденная проба, и увидеть её надо до отправки сообщения.
-  if (choice.source === 'none') return { key: 'chat.platformModelUnset', params, warn: true };
-  if (choice.replaced) return { key: 'chat.platformModelReplaced', params, warn: true };
-  return { key: 'chat.platformModel', params, warn: false };
+  // Состояние выбирают КОНТРАКТЫ (`modelCaptionState`), а здесь — только слова:
+  // те же три строки нужны полю ввода телефона, и вторая их развилка разошлась
+  // бы с этой молча (ревью Т13). `unset` — контур модель не назначил: уедет то,
+  // что выбрано в панели (или ничего, и тогда CLI пойдёт своей). Это не
+  // подмена, но и не «всё в порядке» — обычно это непройденная проба, и
+  // увидеть её надо до отправки сообщения.
+  switch (modelCaptionState(choice)) {
+    case 'unset':
+      return { key: 'chat.platformModelUnset', params, warn: true };
+    case 'replaced':
+      return { key: 'chat.platformModelReplaced', params, warn: true };
+    default:
+      return { key: 'chat.platformModel', params, warn: false };
+  }
 }
 
 /**

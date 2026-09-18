@@ -9,6 +9,7 @@ import {
   type ShimCall,
   type ShimFlaw,
 } from './parse.ts';
+import { serverText } from '../../../../lib/server-texts.ts';
 
 /**
  * Потоковый разбор ответа: текст модели → куски текста и готовые вызовы, в том
@@ -90,7 +91,11 @@ function wholeFence(text: string): string | undefined {
     return undefined;
   }
   const inner = trimmed.slice(3, -3);
-  return inner.includes('```') ? undefined : inner;
+  if (inner.includes('```')) return undefined;
+  // Метка забора (```tool_call, ```json) — слово до первого перевода строки.
+  // Снимается здесь, потому что границу она не двигает: приниматься забор с
+  // меткой и без неё обязан одинаково — целым ответом и никак иначе.
+  return inner.replace(/^[a-z_]*\r?\n/i, '');
 }
 
 export class ToolStreamParser {
@@ -108,6 +113,8 @@ export class ToolStreamParser {
    */
   #lone: boolean | undefined;
 
+  /** Внутренности блоков, УШЕДШИХ вызовом: `#noteFencedCall` их не считает. */
+  #executed: string[] = [];
   /** Весь текст ответа — для двух проверок: `#insideFence` и `#noteFencedCall`. */
   #seen = '';
   #noted = false;
@@ -170,6 +177,10 @@ export class ToolStreamParser {
         }
 
         this.calls += 1;
+        // Что ушло вызовом — то уже не «блок, оставшийся текстом». Забор внутри
+        // тега (`<tool_call>` вокруг ```json) — обычная форма, и жаловаться на
+        // него значит называть изъяном исполненный вызов.
+        this.#executed.push(inner);
         events.push({
           type: 'call',
           call: { id: (this.#options.id ?? defaultId)(), ...reading.call },
@@ -188,7 +199,7 @@ export class ToolStreamParser {
           this.#buffer = this.#buffer.slice(upto);
           if (!this.#quoted) {
             this.#quoted = true;
-            this.flaws.push({ reason: 'вызов внутри блока кода не выполняется' });
+            this.flaws.push({ reason: serverText('gateway-flaw-fenced') });
           }
           continue;
         }
@@ -261,7 +272,7 @@ export class ToolStreamParser {
       const text = `${this.#form.open}${this.#buffer}`;
       // У забора без метки незакрытость — не изъян: обычный ответ может
       // кончиться открытым блоком кода, и жаловаться тут не на что.
-      if (!this.#form.loose) this.flaws.push({ reason: 'блок без закрывающего тега' });
+      if (!this.#form.loose) this.flaws.push({ reason: serverText('gateway-flaw-unclosed') });
       this.#buffer = '';
       this.#form = undefined;
       return text ? [{ type: 'text', text }] : [];
@@ -293,14 +304,21 @@ export class ToolStreamParser {
    * ответ, который весь и есть вызов.
    */
   #noteFencedCall(): void {
-    if (this.#noted || this.calls > 0) return;
+    // Раньше запись отменялась и тем, что вызов в ходе УЖЕ был (`calls > 0`).
+    // Ход «один вызов тегом плюс второй забором» из-за этого доезжал с пустыми
+    // изъянами, и невыполненный блок не назывался нигде — ровно тот случай, про
+    // который человек читает «панель съела вызов».
+    if (this.#noted) return;
     this.#noted = true;
 
     for (const match of this.#seen.matchAll(/(?:```|~~~)[a-z_]*\r?\n([\s\S]*?)(?:```|~~~)/gi)) {
+      // Забор, который сам был телом исполненного вызова, блоком «оставшимся
+      // текстом» не является.
+      if (this.#executed.some((inner) => inner.includes(match[0]))) continue;
       const reading = readCall(match[1] ?? '', this.#options.allowed, LOOSE_FORM);
       if ('call' in reading) {
         this.flaws.push({
-          reason: 'вызов забором посреди ответа не выполняется',
+          reason: serverText('gateway-flaw-fence-midanswer'),
           name: reading.call.name,
         });
         return;

@@ -8,6 +8,7 @@ import type {
 import type { McpServer } from '@agentdeck/contracts';
 import { oauthCallbackUrl } from './callback.ts';
 import { oauthStorePath, readRecord, updateRecord } from './store.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Провайдер для одного сервера. SDK зовёт его методы по ходу `auth()`: читает
@@ -91,7 +92,8 @@ export class PanelOAuthProvider implements OAuthClientProvider {
   }
 
   codeVerifier(): string {
-    if (!this.verifier) throw new Error('Авторизация не начата: нет code_verifier');
+    if (!this.verifier)
+      throw coded(new Error('Авторизация не начата: нет code_verifier'), 'mcp-oauth-no-verifier');
     return this.verifier;
   }
 

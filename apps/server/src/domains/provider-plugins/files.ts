@@ -14,6 +14,7 @@ import {
 } from './errors.ts';
 import { hasPluginExtension, pluginBackupName, resolvePluginPath, toRelative } from './paths.ts';
 import type { ProviderPluginsTarget } from './types.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /** Половина сводки, отвечающая за файлы каталога. */
 type PluginFilesSection = Pick<ProviderPluginsInfo, 'files' | 'ignored' | 'filesReadOnly'> &
@@ -69,9 +70,13 @@ export function readProviderPluginFile(
     throw new PluginFileNotFoundError(rawPath);
   }
   if (fileSizeOf(fullPath) > SECTION_MAX_FILE_BYTES) {
-    throw new PluginFileNotEditableError(
-      rawPath,
-      `Файл ${fullPath} слишком большой для правки в панели.`,
+    throw coded(
+      new PluginFileNotEditableError(
+        rawPath,
+        `Файл ${fullPath} слишком большой для правки в панели.`,
+      ),
+      'file-too-large-to-edit',
+      { path: fullPath },
     );
   }
 
@@ -79,7 +84,11 @@ export function readProviderPluginFile(
   // Нулевой байт означает, что под известным расширением лежит не текст —
   // показывать и тем более переписывать такое панель не станет.
   if (content.includes('\0')) {
-    throw new PluginFileNotEditableError(rawPath, `Файл ${fullPath} не является текстовым.`);
+    throw coded(
+      new PluginFileNotEditableError(rawPath, `Файл ${fullPath} не является текстовым.`),
+      'plugin-file-not-text',
+      { fullPath },
+    );
   }
 
   return { path: toRelative(target, fullPath), fullPath, content };

@@ -13,6 +13,7 @@ import {
   unsupportedProxyReason,
   type ProxyEnv,
 } from './proxy.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Поход в контур с СВОИМ корневым сертификатом компании.
@@ -92,7 +93,12 @@ export function readCaCert(path: string): Buffer {
     content = readFileSync(path);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    throw invalidField('caCertPath', `корневой сертификат не прочитан: ${reason}`);
+    throw invalidField(
+      'caCertPath',
+      `корневой сертификат не прочитан: ${reason}`,
+      'request-ca-unreadable',
+      { field: 'caCertPath', reason },
+    );
   }
 
   try {
@@ -101,6 +107,8 @@ export function readCaCert(path: string): Buffer {
     throw invalidField(
       'caCertPath',
       'файл прочитан, но это не сертификат: нужен корневой сертификат компании (PEM или DER)',
+      'request-ca-not-certificate',
+      { field: 'caCertPath' },
     );
   }
   return content;
@@ -249,7 +257,7 @@ function createFetch(
             outgoing.destroy();
             // Причина сигнала — то, по чему вызывающий отличает «вышло время» от
             // «оборвали»: у `AbortSignal.timeout` это TimeoutError.
-            reject(signal.reason ?? new Error('Запрос отменён'));
+            reject(signal.reason ?? new Error(serverText('gateway-request-aborted')));
           };
           if (signal.aborted) abort();
           else signal.addEventListener('abort', abort, { once: true });

@@ -200,7 +200,11 @@ export const chatEn: typeof chatRu = {
       'Exactly one thing locks the mode: there is nobody to do it at all — no conversation beside ' +
       'you, no contour, no endpoint profile. Everything else takes away the raster, not the mode: ' +
       'this contour cannot, the key catalog holds no model with generation, the profile has no ' +
-      'address, the gateway is off, that API kind has no such endpoint. Then the item works by the ' +
+      'address, the gateway is off, that API kind has no such endpoint. “The ' +
+      'gateway is off” is two different reasons and the caption tells them apart: the gateway ' +
+      'switch is off — turn it on from the contour card; the switch is on while no listener is ' +
+      'there — the panel raises the gateway itself, once, and the reason appears only if that ' +
+      'failed, in the gateway’s own words. Then the item works by the ' +
       'agent road, and the raster’s reason stands beside it — which is what can be fixed.',
     imagePrompt: 'The rules of both modes live in Prompts',
     imagePromptText:
@@ -303,7 +307,12 @@ export const chatEn: typeof chatRu = {
         'exactly was dropped, the conversation header says BEFORE you send a ' +
         'message — otherwise an agent working without your rules would look broken. ' +
         'When a run ends in an error, the feed shows the reason the CLI gave in the ' +
-        'answer itself (a contour refusal, say), not a service line from its error stream.',
+        'answer itself (a contour refusal, say), not a service line from its error ' +
+        'stream. One more place the feed speaks up: the model name travels on the ' +
+        'command line and is therefore checked against the allowed characters (the ' +
+        'Windows shell would read a space, `&` or brackets as a command). A name from ' +
+        'the contour catalog passes; one that does not never reaches the CLI, and a ' +
+        'feed notice says the run went with the model the CLI picked for itself.',
 
       basicsTitle: 'One conversation from start to finish',
       basicsCaption:
@@ -563,18 +572,76 @@ export const chatEn: typeof chatRu = {
     parallelMirror: 'The local layer moves by itself',
     parallelMirrorText:
       'A checkout gives the copy only what is in git. Everything the project lives on ' +
-      'locally the panel carries over next, no questions asked: files under ' +
-      'skip-worktree or assume-unchanged (with the same flag set in the copy), ' +
-      '.mcp.json, .claude/, CLAUDE.local.md, .agent/ (without tmp, screenshots, archive ' +
-      'and PROGRESS), .env and .env.*, *.local, .dev/. Never — node_modules, dist, ' +
-      'build, coverage, *.log, files over 8 MB and links. What else to carry and what ' +
-      'to subtract — “Copy settings” under the list, one pattern per line ' +
-      'as in .gitignore; stored per project, and a copy made by task splitting gets the ' +
-      'same. “Refresh local layer” on a copy’s card repeats the transfer into a live ' +
-      'copy — only what is newer in the main copy moves, the copy’s edits stay. The ' +
-      'report under the card names what was carried, what was skipped and why, and ' +
-      'what was “left behind” — top-level git-ignored entries not on the list: that ' +
-      'is what the patterns are written from.',
+      'locally the panel carries over next, no questions asked, and it takes it from FOUR ' +
+      'places at once: files under skip-worktree or assume-unchanged (the flag is set in ' +
+      'the copy too); what git ignores, by the pattern list; what is untracked yet not ' +
+      'ignored (.mcp.json without a line in .gitignore is invisible to both lists — ' +
+      'without this source the copy stayed without its adapters); and what is tracked but ' +
+      'locally modified — the copy’s checkout holds the COMMITTED version, that is, ' +
+      'someone else’s. The third and fourth sources take only what the list names, ' +
+      'otherwise the mirror would drag all uncommitted work into the copy. Carried by ' +
+      'default: .mcp.json, .claude/, CLAUDE.local.md, .agent/ (without tmp, screenshots, ' +
+      'archive and PROGRESS), .env and .env.*, *.local, .dev/, plus the project layer of ' +
+      'the other CLIs (.codex/, .gemini/, .qwen/ and the rest). What else to carry and ' +
+      'what to subtract — “Copy settings” under the list, one pattern per line as in ' +
+      '.gitignore; stored per project, and a copy made by task splitting gets the same. ' +
+      '“Refresh local layer” repeats the transfer into a live copy: only what is newer in ' +
+      'the main copy moves, the copy’s own edits stay.',
+    parallelNever: 'The build environment is built, not received',
+    parallelNeverText:
+      'node_modules, dist, build, coverage, .next, .nuxt, .svelte-kit, .turbo, .cache, ' +
+      '.venv, venv, __pycache__, .pytest_cache, .mypy_cache, .ruff_cache, .gradle, .cxx, ' +
+      'target, Pods, .terraform are NEVER carried over, and a pattern of your own cannot ' +
+      'drag them in: the ban stands before the list. The reason is not size: inside are ' +
+      'the original’s absolute paths and binaries for one platform, so such a directory ' +
+      'has to be BUILT in the copy (that is what the post-create command does) rather than ' +
+      'received ready-made. Also never: *.log, files over 8 MB and links. In the mirror ' +
+      'report the build environment stands as its own explanatory line, not among the ' +
+      'skipped: in an ordinary project it lands there every time, and a healthy copy must ' +
+      'not look broken. “Left behind” then keeps only what you can actually add to the ' +
+      'list — top-level git-ignored entries that are not on it.',
+    parallelLinks: 'Skills and hooks come as a link, not a copy',
+    parallelLinksText:
+      'The .claude/skills and .claude/hooks directories reach the copy as a LINK to the ' +
+      'original (a junction on Windows, no administrator rights needed): the mirror writes ' +
+      'no files there at all. So an edited skill or hook takes effect in EVERY copy at ' +
+      'once, including the one an agent is working in right now — and skills drifting ' +
+      'between copies is exactly an agent working by yesterday’s rules. The flip side is ' +
+      'the same: editing a skill “inside the copy” changes the original, because it is one ' +
+      'directory. The list is deliberately short — a copy’s settings.json is never a link, ' +
+      'or a permission granted in one copy would silently appear in all of them. The ' +
+      'mirror report names the linked directories on their own line; if linking failed ' +
+      '(file system, rights) the files travel as a copy and the report says so.',
+    parallelAccess: 'Trust and MCP: every copy gets its own entry',
+    parallelAccessText:
+      'The answers to “do you trust the files in this folder” and “enable the servers from ' +
+      '.mcp.json” are kept by Claude Code not in the project but in its own .claude.json, ' +
+      'under the working directory key. A fresh copy is a new directory with no entry, so ' +
+      'the human is asked again: files cannot cure that in principle. So the panel creates ' +
+      'the copy’s entry from the original’s — trust, the enabled and disabled .mcp.json ' +
+      'server lists, own MCP servers and allowed tools. Traces of the original’s work ' +
+      '(last*, history) are not carried: to the copy they are lies. Whatever was already ' +
+      'answered in the copy is not overwritten — your answer is older than ours. The entry ' +
+      'is removed together with the copy, so trust in a vanished path never falls to some ' +
+      'later branch with the same name. For the OTHER CLIs the panel fabricates no trust ' +
+      'record: their formats are not documented here and writing into a foreign config is ' +
+      'not its right — the copy does get the project layer (.codex/, .gemini/ and the ' +
+      'rest), and a foreign agent in a fresh copy may ask about trust once.',
+    parallelReady: 'An incomplete copy is not let into work',
+    parallelReadyText:
+      'Before EVERY agent start the copy is checked against the original: are .mcp.json, ' +
+      '.claude/settings.json and .claude/settings.local.json, CLAUDE.local.md and .env in ' +
+      'place, are the shared directories linked, is there an access entry. If something is ' +
+      'missing the panel first fills it in ITSELF and only then, if that failed, refuses ' +
+      'and names the gaps: an agent in an incomplete copy does not crash, it silently does ' +
+      'the work with the wrong environment, which is worse than a refusal. The same state ' +
+      'is always visible on the copy’s card — “copy is complete” or “copy is incomplete” ' +
+      'with the list of what is missing and the “Fill in” button (a fresh transfer of the ' +
+      'local layer plus the access entry). About access the card knows three answers, not ' +
+      'two: present, missing, and “not checked” — when the original itself has no entry ' +
+      '(no .claude.json at all, the panel is driving another CLI). The third answer is a ' +
+      'quiet one: such an entry cannot be invented, and holding runs over it would lock ' +
+      'the work up forever.',
     parallelBootstrap: 'Dependencies are installed before the agent starts',
     parallelBootstrapText:
       'Right after the mirror a preparation command runs in the copy — in the ' +
@@ -765,12 +832,20 @@ export const chatEn: typeof chatRu = {
       'On its verdict the panel creates the copies: groups with no waits right ' +
       'away, waiting ones once their predecessor’s chain ends (the copy then ' +
       'branches from ITS branch, not the main one), held ones after your answer ' +
-      'right in the summary under the parent. Every group opens with a PLAN at ' +
+      'right in the summary under the parent. A waiting group is told in its task ' +
+      'who worked before it, on which branch and which files are already touched — ' +
+      'from the branch comparison; the comparison did not make it in time — the ' +
+      'files are simply not named, and the launch is not held up. Every group opens ' +
+      'with a PLAN at ' +
       'the ceiling: a short look at its own task in its own copy, no edits; the ' +
       'plan goes into the work task and the work follows it step by step. No ' +
       'triage or a broken one — the groups start as proposed; no plan — the work ' +
       'goes without it, and that chat’s feed says so in one line: a level never ' +
-      'blocks the work. A task lost in the triage is returned home, a circular ' +
+      'blocks the work. A triage cut short by a panel restart is its own case: no ' +
+      'verdict will come from it any more, so the groups stand on the question ' +
+      '“start as proposed?” and never start by themselves, and the summary chip ' +
+      'says exactly that — the triage was cut short by a restart and the groups are ' +
+      'waiting for your answer. A task lost in the triage is returned home, a circular ' +
       'wait is cut, and the summary labels that “repaired by the panel”. In the ' +
       'chat list the links are labelled “triage” and “plan”; “Only create the ' +
       'chats” gets no levels.',
@@ -783,7 +858,13 @@ export const chatEn: typeof chatRu = {
       'shows CONVERSATIONS, and the pipeline adds up to three per group — nine rows ' +
       'do not tell you the state of three groups. The agents panel (the “Agents” ' +
       'button in the header) now also says what each running run is being driven ' +
-      'by.',
+      'by. A group waiting for its predecessor carries a “Release” button in its ' +
+      'row: the predecessor’s chain may never end — the run was stopped, the chat ' +
+      'deleted, the panel restarted — and then the wait is lifted by hand. The ' +
+      'panel hides nothing when it happens: the copy is still branched off the ' +
+      'predecessor’s branch, and the task says outright that this work is ' +
+      'unfinished. If the group is no longer waiting, the panel answers that there ' +
+      'is nothing to release and starts nothing.',
     cascadeOverlap: 'Branch overlap after the work',
     cascadeOverlapText:
       'Triage splits the groups by ownership IN ADVANCE — and gets it wrong in ' +
@@ -795,7 +876,10 @@ export const chatEn: typeof chatRu = {
       'is OUTSIDE the group declared ownership — a boundary triage had agreed ' +
       'otherwise. Two rightful owners of one file are not painted red: you will ' +
       'still have to merge them, but nothing was violated. The merge order from the ' +
-      'triage waits is shown next to it. A new overlap is announced once: a ' +
+      'triage waits is shown next to it. The same count goes into the task as well: ' +
+      'a group branched from its predecessor’s branch receives the list of files ' +
+      'that predecessor touched — up to twenty names, the rest as a number. ' +
+      'A new overlap is announced once: a ' +
       'recount after every chain does not repeat what was already said. A branch ' +
       'that could not be read is named separately — “no overlap” in place of ' +
       'something unread would be a lie. Before the first check the section says so.',
@@ -983,7 +1067,10 @@ export const chatEn: typeof chatRu = {
     handoffNote:
       'The panel never wipes context silently, whatever the toggles say: a move ' +
       'is always a NEW conversation, and the old one stays in the list in full. ' +
-      'A conversation’s toggle lives until the server restarts; the “every ' +
+      'A conversation’s toggle survives a panel restart — together with the count ' +
+      'of moves and the checkpoint fingerprint: after a restart the cap of eight ' +
+      'and the “the agent is going in circles” stop do not start counting again. ' +
+      'A chain nobody came back to for a day is forgotten. The “every ' +
       'conversation” setting is the toggle’s default value, not an order.',
 
     codeTitle: 'Project code: what the agent changed, and editing on the spot',
@@ -1436,10 +1523,14 @@ export const chatEn: typeof chatRu = {
       'and on start the server picks up the ones whose process is alive: permission ' +
       'cards are drawn in their chats, Stop works, the end is detected by the process ' +
       'dying. What a picked-up run lacks is its output stream: the answer is read from ' +
-      'the conversation, the feed says so in a line, and no continuation or ' +
-      'work → review → fix pipeline follows it. A run missing from the ledger too gets ' +
-      'an honest refusal — "the panel restarted, send the message again" — and the ' +
-      'same text shows in the conversation as the call result.',
+      'the conversation, and the feed says so in a line. When the run ends the panel ' +
+      "reads the agent's last completed turn out of the conversation — both a clean " +
+      'session continuation and the work → review → fix pipeline follow from it; a turn ' +
+      'cut short on a tool call does not count as a closing one, and then there is ' +
+      'nothing to decide by. A run missing from the ledger is looked up there once more ' +
+      'right on the permission request, and only then refused — "the panel restarted, ' +
+      'send the message again" — the same text showing in the conversation as the call ' +
+      'result.',
     noteLiveTitle: 'A conversation running outside the panel is picked up on its own',
     noteLiveText:
       'The same chat can be driven from a terminal or an editor extension — such a ' +

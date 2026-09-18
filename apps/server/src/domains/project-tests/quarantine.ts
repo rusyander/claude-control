@@ -1,4 +1,5 @@
 import type {
+  CodedMessage,
   ProjectTestCase,
   ProjectTestGroup,
   ProjectTestQuarantineReport,
@@ -89,6 +90,7 @@ function suggestion(
   testCase: ProjectTestCase,
   stats: { stability: number; runs: number; greenStreak: number },
   message: string,
+  text: CodedMessage,
   reason?: string,
 ): ProjectTestQuarantineSuggestion {
   return {
@@ -97,6 +99,7 @@ function suggestion(
     caseId: testCase.id,
     title: testCase.title,
     message,
+    ...text,
     reason,
     muteReason: testCase.muteReason,
     stability: stats.stability,
@@ -194,6 +197,10 @@ export function buildQuarantine(
             testCase,
             stats,
             `Зелёных подряд: ${stats.greenStreak} при пороге ${thresholds.greenStreak}. Поломка, ради которой ставили карантин, больше не воспроизводится.`,
+            {
+              messageCode: 'quarantine-lift',
+              params: { streak: stats.greenStreak, limit: thresholds.greenStreak },
+            },
           ),
         );
         continue;
@@ -207,6 +214,10 @@ export function buildQuarantine(
           testCase,
           stats,
           `Стабильность ${stability}% на ${stats.runs} результатах при пороге ${thresholds.stability}%: кейс то зелёный, то красный, и его провалам никто не верит.`,
+          {
+            messageCode: 'quarantine-suggest',
+            params: { stability, runs: stats.runs, limit: thresholds.stability },
+          },
           `Нестабилен: стабильность ${stability}% на ${stats.runs} результатах.`,
         ),
       );

@@ -20,6 +20,7 @@ import {
   refusalOf,
   type MediaDeps,
 } from './upstream.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Картинка по просьбе человека из чата.
@@ -78,6 +79,7 @@ function blocked(
   title: string,
   model = '',
   promptSent = false,
+  detail = '',
 ): MediaImagePlan {
   return {
     available: false,
@@ -85,6 +87,7 @@ function blocked(
     model,
     promptSent,
     reason,
+    ...(detail ? { reasonDetail: detail } : {}),
     compromise: 'media-by-capability',
   };
 }
@@ -111,6 +114,33 @@ export interface ImagePlanContext {
  * агент есть всюду, и именно он снял прежнюю неправду «рисовать некому» —
  * рисовать было чем и без контура (дописано владельцем 13.09.2026).
  */
+/**
+ * План, но СНАЧАЛА подняв свой шлюз, если его тумблер включён, а слушателя нет.
+ *
+ * Отдельной обёрткой над чистым `planImage`, а не веткой внутри него: расчёт
+ * плана обязан оставаться синхронным и без побочных действий — его зовут и
+ * презентации, и внутренние места, которым поднимать ничего не нужно. Подъём
+ * ждём: следующий за ним расчёт — единственный способ ответить «доступно» вместо
+ * «замок» тому, кто уже открыл меню, а второй заход (опрос телефона) приехал бы
+ * через минуты.
+ *
+ * Защёлка и потолок попыток — в `raiseGateway` (`gateway/auto-start.ts`).
+ */
+export async function planImageReady(
+  deps: MediaDeps,
+  context: ImagePlanContext = {},
+): Promise<MediaImagePlan> {
+  if (!deps.raiseGateway) return planImage(deps, context);
+  const first = planImage(deps, context);
+  // Поднимаем только когда мешает ИМЕННО шлюз: у плана с рабочей дорогой (и у
+  // запертого по другой причине) поднимать нечего и незачем.
+  const blocker = first.reason === 'no-agent' ? first.rasterReason : first.reason;
+  if (blocker !== 'gateway-off' && blocker !== 'gateway-failed') return first;
+  if (!deps.store.getSettings().platformGateway.enabled) return first;
+  await deps.raiseGateway();
+  return planImage(deps, context);
+}
+
 export function planImage(deps: MediaDeps, context: ImagePlanContext = {}): MediaImagePlan {
   const contour = activeContour(deps.store);
   const viaContour = contour ? contourPlan(deps, contour) : undefined;
@@ -172,7 +202,9 @@ function blockedPlan(
   viaContour: MediaImagePlan | undefined,
   viaEndpoint: MediaImagePlan,
 ): MediaImagePlan {
-  if (viaContour?.reason === 'gateway-off') return viaContour;
+  if (viaContour?.reason === 'gateway-off' || viaContour?.reason === 'gateway-failed') {
+    return viaContour;
+  }
   if (ownProfiles(deps.store).length > 0) return viaEndpoint;
   return viaContour ?? viaEndpoint;
 }
@@ -190,7 +222,7 @@ function contourPlan(deps: MediaDeps, contour: Platform): MediaImagePlan {
     // объявлением не является (`drivers/driver.ts → FLAG_FIELDS`).
     if (!drawing) return blocked('no-model', contour.title);
     const port = deps.gatewayPort?.() ?? 0;
-    if (port <= 0) return blocked('gateway-off', contour.title, drawing.id, true);
+    if (port <= 0) return gatewayBlocked(deps, contour.title, drawing.id, true);
     return {
       available: true,
       source: 'contour-chat',
@@ -204,7 +236,7 @@ function contourPlan(deps: MediaDeps, contour: Platform): MediaImagePlan {
   // Ручка контура — тоже через свой шлюз: погашенный шлюз запирает её той же
   // причиной, что и дорогу «частью ответа».
   const imagesPort = deps.gatewayPort?.() ?? 0;
-  if (imagesPort <= 0) return blocked('gateway-off', contour.title, drawing?.id ?? '', false);
+  if (imagesPort <= 0) return gatewayBlocked(deps, contour.title, drawing?.id ?? '', false);
 
   return {
     available: true,
@@ -220,6 +252,26 @@ function contourPlan(deps: MediaDeps, contour: Platform): MediaImagePlan {
     promptSent: false,
     compromise: 'media-by-capability',
   };
+}
+
+/**
+ * Шлюза нет — но причин этому две, и человеку от них требуется разное (A-1).
+ *
+ * Тумблер выключен: это его выбор, и снимает его он же — прежние замок и
+ * подпись. Тумблер включён, а слушателя нет: поднять обязана панель, и она уже
+ * попробовала (`raiseGateway` до расчёта); значит, дело в отказе слушателя, и
+ * называется ОН — «включите шлюз», который включён, послало бы чинить не то.
+ */
+function gatewayBlocked(
+  deps: MediaDeps,
+  title: string,
+  model: string,
+  promptSent: boolean,
+): MediaImagePlan {
+  if (!deps.store.getSettings().platformGateway.enabled) {
+    return blocked('gateway-off', title, model, promptSent);
+  }
+  return blocked('gateway-failed', title, model, promptSent, deps.gatewayFailure?.() ?? '');
 }
 
 function endpointPlan(deps: MediaDeps): MediaImagePlan {
@@ -253,6 +305,7 @@ const REFUSAL: Record<MediaImageBlocker, string> = {
   'endpoint-no-url': 'У профиля эндпоинта не задан адрес генерации картинок.',
   'endpoint-api-kind': 'Картинки умеет только эндпоинт OpenAI-вида.',
   'gateway-off': 'Шлюз панели не поднят: запрос в контур идёт через него.',
+  'gateway-failed': 'Шлюз панели включён, но не поднялся: запрос в контур идёт через него.',
   'no-agent': 'Рисовать некому: нет ни растровой дороги, ни разговора с агентом.',
 };
 
@@ -356,7 +409,10 @@ async function drawNow(
   // может по построению (`planImage` без контекста его не выбирает), и если он
   // однажды появится, отказ назовёт причину вместо запроса в пустоту.
   if (plan.source === 'agent') {
-    throw new MediaError(409, 'Рисунок агента панель не заказывает — он приходит блоком в ответе.');
+    throw coded(
+      new MediaError(409, 'Рисунок агента панель не заказывает — он приходит блоком в ответе.'),
+      'media-agent-image-not-ordered',
+    );
   }
 
   const prompt = request.prompt.trim();
@@ -470,7 +526,10 @@ async function viaImagesApi(
   const first = firstImageRow(body);
   if (typeof first?.b64_json === 'string') return decodeBase64Image(first.b64_json);
   if (typeof first?.url === 'string') return decodeDataUrl(first.url);
-  throw new MediaError(502, 'В ответе ручки картинок нет ни байтов, ни адреса');
+  throw coded(
+    new MediaError(502, 'В ответе ручки картинок нет ни байтов, ни адреса'),
+    'media-images-no-bytes',
+  );
 }
 
 function contourImagesTarget(deps: MediaDeps): {
@@ -516,7 +575,7 @@ function firstImageRow(body: string): { b64_json?: unknown; url?: unknown } | un
       ? (first as { b64_json?: unknown; url?: unknown })
       : undefined;
   } catch {
-    throw new MediaError(502, 'Ответ ручки картинок — не JSON');
+    throw coded(new MediaError(502, 'Ответ ручки картинок — не JSON'), 'media-images-not-json');
   }
 }
 

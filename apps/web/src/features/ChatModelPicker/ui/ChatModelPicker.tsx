@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { chooseRunModel } from '@agentdeck/contracts/platform-models';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { usePlatformRunPlan } from '@entities/Platform';
@@ -10,6 +9,7 @@ import {
   modelSelectOptions,
   platformLayersCaption,
   platformModelCaption,
+  platformRunChoice,
   platformBypassCaption,
   platformRefusalCaption,
   withCurrentValue,
@@ -46,7 +46,9 @@ export function ChatModelPicker({
   // сервере, — второй расчёт разошёлся бы с первым молча.
   const plan = usePlatformRunPlan(consumer);
   const routed = plan.data?.routed === true ? plan.data : undefined;
-  const choice = routed ? chooseRunModel(routed.rules, model) : undefined;
+  // Спрашиваем тем же, с чем уйдёт запрос: пустой выбор чата — это модель из
+  // настроек, а не пустота (ревью Т13).
+  const choice = routed ? platformRunChoice(routed.rules, model, defaultModel) : undefined;
   const caption = routed && choice ? platformModelCaption(routed.title, choice) : undefined;
   // Снятые нами слои (Т8) — здесь же и по той же причине: «агент не читает мои
   // правила» выглядит поломкой агента, пока человек не увидит, что это его

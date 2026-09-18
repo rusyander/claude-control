@@ -15,6 +15,7 @@ import {
 import { IntegrationError } from './errors.ts';
 import { linkForCwd } from './links.ts';
 import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Собственный MCP-сервер панели: то же самое окно наружу, но для АГЕНТА.
@@ -65,9 +66,12 @@ export type McpRegistration = PanelBridgeTarget;
 export function registerAtlassianMcp(options: McpRegistration): string {
   const self = bridge();
   if (!bridgeScriptExists(self)) {
-    throw new IntegrationError(
-      'integration_not_found',
-      'Не найден скрипт переходника tools/mcp/atlassian.mjs — панель запущена не из своего репозитория.',
+    throw coded(
+      new IntegrationError(
+        'integration_not_found',
+        'Не найден скрипт переходника tools/mcp/atlassian.mjs — панель запущена не из своего репозитория.',
+      ),
+      'integrations-bridge-script-missing',
     );
   }
   // Активному CLI без раздела MCP запись не достаётся вовсе: без этой проверки

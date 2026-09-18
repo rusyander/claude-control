@@ -12,6 +12,8 @@ import {
   similarTo,
 } from '../../domains/project-tests.ts';
 import { assertUnlocked, buildView, guard, idList, requireRoot, type TestsDeps } from './shared.ts';
+import { coded } from '../../lib/server-text.ts';
+import { attachTextCodes } from '../../lib/server-texts.ts';
 
 /**
  * Приёмка черновиков генерации.
@@ -55,14 +57,25 @@ export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): 
       return guard(reply, () => {
         const runId = request.query.runId?.trim();
         if (!runId) {
-          return { drafts: readDrafts(root), autoAccept: deps.ctx.store.isTestsAutoAccept(root) };
+          return attachTextCodes(
+            { drafts: readDrafts(root), autoAccept: deps.ctx.store.isTestsAutoAccept(root) },
+            ['warnings'],
+          );
         }
         const draft = readDraft(root, runId);
-        if (!draft) throw new ProjectTestsNotFoundError(`Черновика «${runId}» в проекте нет.`);
-        return {
-          drafts: [withSimilar(root, draft)],
-          autoAccept: deps.ctx.store.isTestsAutoAccept(root),
-        };
+        if (!draft)
+          throw coded(
+            new ProjectTestsNotFoundError(`Черновика «${runId}» в проекте нет.`),
+            'draft-not-found',
+            { runId },
+          );
+        return attachTextCodes(
+          {
+            drafts: [withSimilar(root, draft)],
+            autoAccept: deps.ctx.store.isTestsAutoAccept(root),
+          },
+          ['warnings'],
+        );
       });
     },
   );
@@ -81,7 +94,8 @@ export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): 
     const root = requireRoot(request.body?.path, reply);
     if (!root) return reply;
     const runId = request.body?.runId?.trim();
-    if (!runId) return reply.code(400).send({ message: 'Не указан прогон.' });
+    if (!runId)
+      return reply.code(400).send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
 
     return guard(reply, () => {
       const auto = request.body?.auto === true;
@@ -107,7 +121,10 @@ export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): 
       const root = requireRoot(request.body?.path, reply);
       if (!root) return reply;
       const runId = request.body?.runId?.trim();
-      if (!runId) return reply.code(400).send({ message: 'Не указан прогон.' });
+      if (!runId)
+        return reply
+          .code(400)
+          .send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
       return guard(reply, () => ({
         draft: rejectDraft(root, runId),
         view: buildView(root, deps),
@@ -122,7 +139,10 @@ export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): 
       const root = requireRoot(request.body?.path, reply);
       if (!root) return reply;
       const runId = request.body?.runId?.trim();
-      if (!runId) return reply.code(400).send({ message: 'Не указан прогон.' });
+      if (!runId)
+        return reply
+          .code(400)
+          .send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
       return guard(reply, () => {
         const result = rollbackDraft(root, runId, (groupId) => assertUnlocked(deps, root, groupId));
         return { ...result, view: buildView(root, deps) };

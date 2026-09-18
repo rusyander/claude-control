@@ -59,7 +59,7 @@ export function ScenarioFields({ value, onChange }: ScenarioFieldsProps) {
         label={t('groups.scenarioTrigger')}
         value={value.trigger}
         onChange={(trigger) => onChange({ ...value, trigger })}
-        placeholder="GOR-\d+"
+        placeholder="PRJ-\d+"
         hint={t('groups.scenarioTriggerHint')}
         error={triggerError}
         isMono

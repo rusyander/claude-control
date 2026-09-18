@@ -28,7 +28,8 @@ describe('карта подмены: обе формы, в которых её �
   });
 
   it('список {placeholder, value} — форма platform_deanonymized_entities', () => {
-    // `anonymization.py deanonymized_entities`: список, а не объект. Прежнее чтение
+    // Модуль обезличивания контура шлёт `deanonymized_entities` списком, а не
+    // объектом. Прежнее чтение
     // брало только объект, и карта оказывалась пустой ровно там, где она была.
     expect(
       readSubstitutionMap([

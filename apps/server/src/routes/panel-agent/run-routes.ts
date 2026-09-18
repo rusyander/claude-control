@@ -21,6 +21,8 @@ import { startPanelAgentRun } from '../../domains/panel-agent/runner.ts';
 import { SSE_HEADERS } from '../../domains/chat/ChatStream.ts';
 import type { PanelPendingActions } from '../../domains/panel-agent/pending.ts';
 import { PanelAgentProcesses } from '../../domains/panel-agent/processes.ts';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
+import { singleIssueCode } from '../../lib/zod-issue-codes.ts';
 
 export interface PanelAgentRunRouteDeps {
   /** Адрес панели для переходника: `http://127.0.0.1:<port>`. */
@@ -79,9 +81,14 @@ export function registerPanelAgentRunRoutes(
   const appData = (): string => ctx.location.paths.appData;
   const processes = deps.processes ?? new PanelAgentProcesses(appData);
 
-  const refuse = (code: PanelAgentRunRefusal['error'], message: string): PanelAgentRunRefusal => ({
+  const refuse = (
+    code: PanelAgentRunRefusal['error'],
+    message: string,
+    messageCode?: ServerMessageCode,
+  ): PanelAgentRunRefusal & { messageCode?: ServerMessageCode } => ({
     error: code,
     message,
+    ...(messageCode ? { messageCode } : {}),
   });
 
   app.post<{ Body: unknown }>('/api/agent/run', async (request, reply) => {
@@ -90,14 +97,22 @@ export function registerPanelAgentRunRoutes(
       const message = parsed.error.issues
         .map((issue) => `${issue.path.map(String).join('.') || '(body)'}: ${issue.message}`)
         .join('; ');
-      return reply.code(400).send(refuse('invalid_body', message));
+      return reply
+        .code(400)
+        .send(refuse('invalid_body', message, singleIssueCode(parsed.error.issues)));
     }
     const body = parsed.data;
     const conversationId = body.conversationId ?? randomUUID();
     if (running.has(conversationId)) {
       return reply
         .code(409)
-        .send(refuse('busy', 'В этом разговоре агент ещё отвечает — дождитесь конца хода.'));
+        .send(
+          refuse(
+            'busy',
+            'В этом разговоре агент ещё отвечает — дождитесь конца хода.',
+            'panel-agent-busy',
+          ),
+        );
     }
 
     const launch = resolvePanelAgentLaunch({
@@ -189,7 +204,11 @@ export function registerPanelAgentRunRoutes(
       request.params.id,
     );
     if (!conversation) {
-      return reply.code(404).send({ error: 'not_found', message: 'Такого разговора нет.' });
+      return reply.code(404).send({
+        error: 'not_found',
+        message: 'Такого разговора нет.',
+        messageCode: 'panel-conversation-not-found',
+      });
     }
     return conversation;
   });

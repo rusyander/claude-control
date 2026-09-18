@@ -36,6 +36,10 @@ export const TELEGRAM_EVENTS: readonly TelegramEvent[] = [
   'testFailed',
   'permission',
   'question',
+  // Порог бюджета контура — одно событие на оба порога (85 % и «дошли до
+  // бюджета»): подписываются на «сообщать ли про бюджет», а какой именно порог,
+  // сказано в тексте.
+  'budget',
 ];
 
 export const DEFAULT_INTEGRATIONS: IntegrationsSettings = {

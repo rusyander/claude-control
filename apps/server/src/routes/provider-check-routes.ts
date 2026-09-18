@@ -7,6 +7,7 @@ import type {
 import type { ServerContext } from '../context.ts';
 import { checkProvider } from '../domains/provider-check.ts';
 import { getProvider, isKnownProviderId } from '../providers/registry.ts';
+import { attachTextCodes } from '../lib/server-texts.ts';
 
 /**
  * Проверка провайдера на реальной машине (IDEA-2) и её сохранённые итоги.
@@ -25,7 +26,10 @@ export function registerProviderCheckRoutes(app: FastifyInstance, ctx: ServerCon
     '/api/providers/checks',
     () =>
       ({
-        checks: ctx.store.getProviderChecks(),
+        // Записи из состояния — с теми же кодами, что и свежий прогон: код
+        // восстанавливается разбором, а не хранится, поэтому старая запись
+        // получает его тоже.
+        checks: attachTextCodes(ctx.store.getProviderChecks()),
       }) satisfies ProviderChecksResponse,
   );
 
@@ -37,6 +41,8 @@ export function registerProviderCheckRoutes(app: FastifyInstance, ctx: ServerCon
         return reply.code(404).send({
           error: 'unknown_provider',
           message: `Провайдер «${id}» неизвестен панели.`,
+          messageCode: 'provider-unknown',
+          params: { id },
         });
       }
 
@@ -52,7 +58,10 @@ export function registerProviderCheckRoutes(app: FastifyInstance, ctx: ServerCon
       });
 
       ctx.store.saveProviderCheck(result);
-      return result satisfies ProviderCheckResult;
+      // Причины шагов собраны строкой (`serverText`): код к ним восстанавливается
+      // разбором, и английский интерфейс читает их своим словарём. В состояние
+      // пишется русский текст — запись переживает и старый фронт.
+      return attachTextCodes(result) satisfies ProviderCheckResult;
     },
   );
 }

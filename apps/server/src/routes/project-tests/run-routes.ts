@@ -14,6 +14,8 @@ import {
 } from '../../domains/project-tests.ts';
 import { exportRunPdf } from '../../domains/project-tests/export-run.ts';
 import { buildView, guard, guardAsync, idList, requireRoot, type TestsDeps } from './shared.ts';
+import { coded } from '../../lib/server-text.ts';
+import { attachTextCodes } from '../../lib/server-texts.ts';
 
 /** Режимы прогона: чужое слово в теле не должно запускать неизвестно что. */
 const MODES: ProjectTestRunMode[] = ['generate', 'run', 'explore', 'automate'];
@@ -97,6 +99,8 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       if (!run.groupId || held.has(run.groupId)) {
         return reply.code(409).send({
           message: `Идёт ручной прогон (${manual.runId}) — он пишет в тот же файл. Закончи или отмени его.`,
+          messageCode: 'manual-run-in-progress',
+          params: { runId: manual.runId },
           runId: manual.runId,
         });
       }
@@ -152,7 +156,12 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       return guard(reply, () => {
         const id = String(request.query.id ?? '');
         const run = readRun(root, id);
-        if (!run) throw new ProjectTestsNotFoundError(`Прогона «${id}» в истории нет.`);
+        if (!run)
+          throw coded(
+            new ProjectTestsNotFoundError(`Прогона «${id}» в истории нет.`),
+            'run-not-in-history',
+            { id },
+          );
         return { run };
       });
     },
@@ -171,9 +180,14 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
       const id = request.query.id?.trim();
-      if (!id) return reply.code(400).send({ message: 'Не указан прогон.' });
+      if (!id)
+        return reply
+          .code(400)
+          .send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
       return guard(reply, () =>
-        diffWithPrevious(root, id, request.query.baseId?.trim() || undefined, readGroups(root)),
+        attachTextCodes(
+          diffWithPrevious(root, id, request.query.baseId?.trim() || undefined, readGroups(root)),
+        ),
       );
     },
   );
@@ -243,7 +257,10 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
       const groupId = request.query.groupId?.trim();
-      if (!groupId) return reply.code(400).send({ message: 'Не указана группа.' });
+      if (!groupId)
+        return reply
+          .code(400)
+          .send({ message: 'Не указана группа.', messageCode: 'group-unspecified' });
       return guard(reply, () => ({ entries: historyOf(root, groupId) }));
     },
   );

@@ -38,6 +38,13 @@ import {
 /** Сколько последних сообщений отдавать в ленту чата. */
 const MESSAGE_LIMIT = 400;
 
+/**
+ * Сколько символов закрывающего хода отдавать наружу. Столько же, сколько реестр
+ * прогонов копит по потоку (`TEXT_TAIL`): разборщикам нужен конец ответа, а не
+ * весь разговор.
+ */
+const CLOSING_TURN_MAX = 32_768;
+
 export { findTranscript };
 
 interface CacheEntry {
@@ -124,6 +131,12 @@ export interface MessagesWindow {
   limit?: number;
   /** Сколько самых свежих реплик пропустить (0 — отдаём хвост ленты). */
   offset?: number;
+  /**
+   * Id сообщений модели (`message.id` транскрипта), перед которыми контур сжал
+   * историю. Реплика с таким id получает `contextSummarized`. Сам журнал сжатий
+   * читает маршрут: лента о контурах не знает ничего, кроме этого набора.
+   */
+  summarizedIds?: ReadonlySet<string>;
 }
 
 /**
@@ -185,6 +198,7 @@ export async function readChatMessages(
       };
       continue;
     }
+    const summarized = Boolean(messageId && window.summarizedIds?.has(messageId));
 
     tailId = messageId;
     total += 1;
@@ -196,6 +210,7 @@ export async function readChatMessages(
       parentId: record.parentUuid ?? undefined,
       usage: toUsage(record),
       gitBranch: branchOf(record),
+      ...(summarized ? { contextSummarized: true } : {}),
     });
 
     // Лишнее с начала выбрасываем сразу, не дожидаясь конца файла.
@@ -241,6 +256,70 @@ export function findSessionCwd(projectsDir: string, sessionId: string): string |
  */
 export function readTranscriptRecords(path: string): TranscriptRecord[] {
   return readRecords(path, 0);
+}
+
+/**
+ * Последний ЗАВЕРШЁННЫЙ ход агента из транскрипта — текст ответа, которым он
+ * закончил разговор.
+ *
+ * Нужен усыновлённому прогону: после перезапуска панели поток вывода к живому
+ * CLI не восстановить, а ответ никуда не делся — он в файле Claude Code. По
+ * этому тексту решаются продолжение в чистой сессии, разбор уровня 1, план
+ * группы и ревью по ссылке, и без него панель выбрасывала всё разом.
+ *
+ * «Завершённый» здесь строгое: последняя запись транскрипта должна быть ходом
+ * АГЕНТА и в нём не должно быть вызова инструмента. Вызов без ответа значит,
+ * что процесс оборвали на полуслове, а запись человека (в том числе результат
+ * инструмента) после хода — что ход был серединой работы, а не её концом.
+ * Ветки субагентов (`isSidechain`) пропускаем: там свой разговор.
+ */
+export function readLastAssistantTurn(
+  projectsDir: string,
+  chatId: string,
+  cap = CLOSING_TURN_MAX,
+): string | undefined {
+  const path = findTranscript(projectsDir, chatId);
+  if (!path) return undefined;
+
+  let turnId: string | undefined;
+  let parts: string[] = [];
+  let calledTool = false;
+  // Последняя осмысленная запись — ход агента. Пока false, накопленное не в счёт.
+  let closing = false;
+
+  for (const record of readRecords(path, 0)) {
+    if (record.isSidechain || record.isMeta || record.isCompactSummary) continue;
+    if (!record.message) continue;
+    if (record.type !== 'assistant' && record.type !== 'user') continue;
+    if (record.type === 'user' || record.isApiErrorMessage) {
+      closing = false;
+      continue;
+    }
+
+    const messageId = record.message.id;
+    // Ход агента лежит НЕСКОЛЬКИМИ строками с одним `message.id` (см.
+    // `countDialogMessages`) — склеиваем их, а на новом id начинаем заново.
+    if (!closing || messageId !== turnId) {
+      turnId = messageId;
+      parts = [];
+      calledTool = false;
+    }
+    const content = record.message.content;
+    if (typeof content === 'string') {
+      if (content.trim()) parts.push(content);
+    } else if (Array.isArray(content)) {
+      for (const block of content) {
+        if (block.type === 'text' && block.text?.trim()) parts.push(block.text);
+        else if (block.type === 'tool_use') calledTool = true;
+      }
+    }
+    closing = true;
+  }
+
+  if (!closing || calledTool) return undefined;
+  // Хвостом, как копит текст реестр прогонов: разборщикам нужен конец ответа.
+  const text = parts.join('\n').trim().slice(-cap);
+  return text || undefined;
 }
 
 export type TranscriptRecord = Record;

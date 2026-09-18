@@ -5,6 +5,7 @@ import type { MediaImage } from '@agentdeck/contracts';
 import { MEDIA_KEEP_FILES } from '@agentdeck/contracts/media';
 import { writeBinaryFile, writeJsonFile, removeEntry } from '../../lib/safe-io.ts';
 import { MediaError } from './errors.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Файлы картинок в каталоге данных панели.
@@ -60,7 +61,10 @@ function recordPath(appDataDir: string, id: string): string {
 
 export function assertId(id: string): string {
   if (!ID_RE.test(id))
-    throw new MediaError(400, 'Идентификатор картинки не тот, что выдаёт панель');
+    throw coded(
+      new MediaError(400, 'Идентификатор картинки не тот, что выдаёт панель'),
+      'media-image-id-invalid',
+    );
   return id;
 }
 
@@ -90,7 +94,8 @@ export function readImageRecord(appDataDir: string, id: string): MediaImage | un
 /** Байты картинки. Отсутствие файла при живой записи — тоже «нет картинки». */
 export function readImageBytes(appDataDir: string, image: MediaImage): Buffer {
   const path = imagePath(appDataDir, image);
-  if (!existsSync(path)) throw new MediaError(404, 'Файл картинки панель не нашла');
+  if (!existsSync(path))
+    throw coded(new MediaError(404, 'Файл картинки панель не нашла'), 'media-image-file-missing');
   return readFileSync(path);
 }
 

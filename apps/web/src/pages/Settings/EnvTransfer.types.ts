@@ -1,8 +1,18 @@
 /** Ответы маршрутов переноса окружения (`/api/env-transfer/*`). */
 
+import type {
+  NestedServerMessage,
+  ServerMessageCode,
+  ServerMessageNestedParams,
+} from '@agentdeck/contracts';
+
+/** Коды строк списка: по одному на строку, `null` — строка кодом не читается. */
+export type ServerListCodes = (NestedServerMessage | null)[];
+
 export interface EnvTransferChecklistItem {
   source: string;
   keys: string[];
+  keysCodes?: ServerListCodes;
   /** `panel-key` — ключ контура: он не лежал в файлах и переносу не подлежит. */
   reason: 'redacted' | 'env-file' | 'secret-file' | 'panel-key';
 }
@@ -16,12 +26,15 @@ export interface EnvTransferPlatformEntry {
   status: 'new' | 'same' | 'differs';
   hasToken: boolean;
   notes: string[];
+  notesCodes?: ServerListCodes;
 }
 
 export interface EnvTransferPlatformsPlan {
   entries: EnvTransferPlatformEntry[];
   gateway?: { enabled: boolean; port: number; forceStream: boolean };
   problem?: string;
+  problemCode?: ServerMessageCode;
+  problemParams?: ServerMessageNestedParams;
 }
 
 /**
@@ -79,6 +92,8 @@ export interface EnvTransferPlanEntry {
   bytes: number;
   redactedKeys: string[];
   problem?: string;
+  problemCode?: ServerMessageCode;
+  problemParams?: ServerMessageNestedParams;
 }
 
 export interface EnvTransferPlan {

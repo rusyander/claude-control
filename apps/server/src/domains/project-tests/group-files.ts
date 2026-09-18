@@ -10,6 +10,7 @@ import {
   text,
   writeJson,
 } from './files.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Файлы одной группы: обычно один, а на большом наборе — несколько.
@@ -73,6 +74,8 @@ export interface GroupSource {
   files: string[];
   /** Файл не разобрался: причина словами, ничего не переписываем. */
   error?: string;
+  messageCode?: string;
+  params?: Record<string, string | number>;
 }
 
 function bodyOf(data: unknown): GroupFileBody | undefined {
@@ -124,10 +127,15 @@ export function listGroupIds(root: string): string[] {
 /** Прочитать группу целиком: индекс плюс части. */
 export function readGroupSource(root: string, id: string): GroupSource {
   const indexFile = testsFile(`${id}${SUFFIX}`);
-  const { data, error } = readJson(root, `${id}${SUFFIX}`);
-  if (error) return { cases: [], files: [indexFile], error };
+  const { data, error, messageCode, params } = readJson(root, `${id}${SUFFIX}`);
+  if (error) return { cases: [], files: [indexFile], error, messageCode, params };
   if (data === undefined) {
-    return { cases: [], files: [indexFile], error: 'Файл не читается: файла нет.' };
+    return {
+      cases: [],
+      files: [indexFile],
+      error: 'Файл не читается: файла нет.',
+      messageCode: 'group-file-missing',
+    };
   }
 
   const body = bodyOf(data);
@@ -141,10 +149,22 @@ export function readGroupSource(root: string, id: string): GroupSource {
     if (read.error) {
       // Часть сломана — молчать нельзя: иначе группа тихо потеряет треть
       // кейсов, а следующая запись затрёт сломанный файл целиком.
-      return { cases: [], files, error: `${part.file}: ${read.error}` };
+      return {
+        cases: [],
+        files,
+        error: `${part.file}: ${read.error}`,
+        messageCode: 'group-part-broken',
+        params: { file: part.file, reason: String(read.params?.reason ?? read.error) },
+      };
     }
     if (read.data === undefined) {
-      return { cases: [], files, error: `${part.file}: файла нет, а индекс на него ссылается.` };
+      return {
+        cases: [],
+        files,
+        error: `${part.file}: файла нет, а индекс на него ссылается.`,
+        messageCode: 'group-part-missing',
+        params: { file: part.file },
+      };
     }
     cases.push(...casesOf(bodyOf(read.data)));
   }
@@ -296,6 +316,10 @@ export function assertNotPart(root: string, id: string): void {
   const body = bodyOf(readJson(root, `${id}${SUFFIX}`).data);
   const owner = optional(body?.group);
   if (owner && owner !== id) {
-    throw new ProjectTestsError(`Это часть группы «${owner}» — правь её через саму группу.`);
+    throw coded(
+      new ProjectTestsError(`Это часть группы «${owner}» — правь её через саму группу.`),
+      'group-part-edit-via-owner',
+      { owner },
+    );
   }
 }

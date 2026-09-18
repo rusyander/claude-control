@@ -4,6 +4,7 @@ export {
   useChatTree,
   useCheckOverlap,
   usePauseTree,
+  useReleaseGroup,
   useResumeTree,
   useReviewDecision,
   useReviewPush,

@@ -10,6 +10,7 @@ import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { SelectField } from '@shared/ui/select-field';
 import { toast } from '@shared/lib/toast';
+import { serverFieldText } from '@shared/config/i18n';
 import { useSettings, useUpdateSettings } from '@entities/AppConfig';
 import {
   useEndpoints,
@@ -86,7 +87,7 @@ export function EndpointCard() {
       onSuccess: (result) => {
         setProbes((current) => ({ ...current, [active.id]: result }));
         if (result.ok) toast.success(t('endpoints.probeOk', { count: result.models.length }));
-        else toast.error(result.error ?? t('endpoints.probeFailed'));
+        else toast.error(serverFieldText(result, 'error', t) || t('endpoints.probeFailed'));
       },
       onError: () => toast.error(t('endpoints.probeFailed')),
     });

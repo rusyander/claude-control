@@ -500,7 +500,9 @@ export const testsEn: typeof testsRu = {
     agentTitle: 'Agent runs',
     agentCaption:
       'Four different assignments, not one "start" button. The agent works on this computer: ' +
-      'it brings the app up where the code lives.',
+      "it brings the app up where the code lives. Its route is the chat's route: an enabled " +
+      'contour carries the run too — on its model and with the same layers switched off. The ' +
+      'route is resolved on every start, so a cleared tick takes effect from the next run.',
     agentGenerate: 'Generate',
     agentGenerateText:
       'The agent looks around the app and proposes cases: it extends the similar ones and ' +

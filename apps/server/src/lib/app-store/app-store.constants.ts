@@ -79,6 +79,10 @@ export const DEFAULT_STATE: AppState = {
     // Поток по умолчанию включён — не-потоковый вызов контур рвёт на 120-й
     // секунде, и выключать это значит соглашаться на обрыв длинного ответа.
     platformGateway: { enabled: false, port: 5179, forceStream: true },
+    // Фоновая перепроверка активного контура (A-2): двенадцать часов — это «раз
+    // в несколько часов» из находки. Ноль — не ходить вовсе. При старте панели
+    // не ходит никто и с этой настройкой: первая проба не раньше интервала.
+    platformProbeMinutes: 720,
     assistantEndpointId: '',
     dlp: {
       enabled: false,
@@ -100,14 +104,15 @@ export const DEFAULT_STATE: AppState = {
     // Ни одна внешняя система не подключена: панель остаётся тем, чем была, —
     // местным приложением, которое никуда не ходит, пока его не попросили.
     // Telegram по умолчанию слушает только то, ради чего его и заводят: упавший
-    // прогон и провал теста. «Работа закончена» на каждый чат — это спам.
+    // прогон, провал теста и порог бюджета контура. «Работа закончена» на каждый
+    // чат — это спам.
     integrations: {
       atlassian: { enabled: false, baseUrl: '', email: '', deployment: '', confluenceUrl: '' },
       forge: { enabled: false, kind: '', baseUrl: '', repo: '' },
-      telegram: { enabled: false, chatId: '', events: ['runError', 'testFailed'] },
+      telegram: { enabled: false, chatId: '', events: ['runError', 'testFailed', 'budget'] },
       tms: { enabled: false, kind: '', baseUrl: '', projectKey: '', groupId: '' },
       ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
-      webhook: { enabled: false, url: '', events: ['runError', 'testFailed'] },
+      webhook: { enabled: false, url: '', events: ['runError', 'testFailed', 'budget'] },
     },
   },
 };

@@ -2,6 +2,7 @@ import { request as httpRequest } from 'node:http';
 import { Agent as HttpsAgent } from 'node:https';
 import { connect as tlsConnect, type TLSSocket } from 'node:tls';
 import type { Socket } from 'node:net';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Корпоративный прокси на пути к контуру (`HTTPS_PROXY`/`NO_PROXY`, план §3).
@@ -154,7 +155,10 @@ export function resolveProxy(target: URL, env: ProxyEnv): ProxyRoute {
 export function unsupportedProxyReason(
   route: Extract<ProxyRoute, { kind: 'unsupported' }>,
 ): string {
-  return `Прокси из ${route.source} (${redactProxyValue(route.value)}) панель не умеет: нужен обычный http-прокси. Напрямую в обход названного прокси панель не пойдёт`;
+  return serverText('gateway-proxy-unsupported', {
+    source: route.source,
+    value: redactProxyValue(route.value),
+  });
 }
 
 /** Пароль из `http://user:pass@host` не должен попасть ни в сообщение, ни в след. */
@@ -227,10 +231,15 @@ export function openTunnel(options: {
     };
 
     connect.on('error', (error: Error) =>
-      fail(`прокси ${proxy.host} недоступен: ${error.message}`),
+      fail(serverText('gateway-proxy-unreachable', { host: proxy.host, reason: error.message })),
     );
     connect.on('timeout', () =>
-      fail(`прокси ${proxy.host} не ответил на CONNECT за ${TUNNEL_TIMEOUT_MS / 1_000} с`),
+      fail(
+        serverText('gateway-proxy-connect-timeout', {
+          host: proxy.host,
+          seconds: TUNNEL_TIMEOUT_MS / 1_000,
+        }),
+      ),
     );
     connect.on('connect', (response, socket: Socket) => {
       if (response.statusCode !== 200) {
@@ -238,9 +247,12 @@ export function openTunnel(options: {
         // Тело ответа прокси наверх не несём: там бывает и страница входа
         // целиком, и присланный нами же заголовок.
         fail(
-          `прокси ${proxy.host} не пропустил CONNECT к ${authority}: ${response.statusCode ?? 0}${
-            response.statusCode === 407 ? ' (нужен логин к прокси)' : ''
-          }`,
+          serverText(
+            response.statusCode === 407
+              ? 'gateway-proxy-connect-login'
+              : 'gateway-proxy-connect-refused',
+            { host: proxy.host, authority, status: response.statusCode ?? 0 },
+          ),
         );
         return;
       }
@@ -263,7 +275,11 @@ export function openTunnel(options: {
 
     if (signal) {
       const abort = (): void => {
-        fail(signal.reason instanceof Error ? signal.reason.message : 'запрос отменён');
+        fail(
+          signal.reason instanceof Error
+            ? signal.reason.message
+            : serverText('gateway-request-cancelled'),
+        );
       };
       if (signal.aborted) abort();
       else signal.addEventListener('abort', abort, { once: true });

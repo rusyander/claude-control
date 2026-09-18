@@ -5,6 +5,8 @@ import type { ResourceKind } from './registry.ts';
 import { safeSessionId } from '../../lib/cli-args.ts';
 import { killChildTree } from '../../lib/process-tree.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
+import { coded } from '../../lib/server-text.ts';
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
 /**
  * Помощник конструктора: по описанию задачи собирает или дополняет структуру
@@ -28,6 +30,8 @@ export interface StructureAssistResult {
   files: AssistFile[];
   sessionId?: string;
   error?: string;
+  messageCode?: ServerMessageCode;
+  params?: ServerMessageParams;
 }
 
 export async function assistStructure(
@@ -39,7 +43,12 @@ export async function assistStructure(
   sessionId?: string,
 ): Promise<StructureAssistResult> {
   if (!isWritable(kind)) {
-    return { reply: '', files: [], error: 'Этот вид ресурса доступен только для чтения' };
+    return {
+      reply: '',
+      files: [],
+      error: 'Этот вид ресурса доступен только для чтения',
+      messageCode: 'resource-read-only',
+    };
   }
 
   try {
@@ -144,7 +153,7 @@ function runClaude(prompt: string, command: string, sessionId?: string): Promise
     const timer = setTimeout(() => {
       // Дерево, а не сам процесс: под `cmd.exe` обычный kill оставил бы CLI жить.
       killChildTree(child);
-      reject(new Error('Помощник не ответил за отведённое время'));
+      reject(coded(new Error('Помощник не ответил за отведённое время'), 'assistant-timeout'));
     }, 240_000);
 
     child.stdout.on('data', (chunk: Buffer) => {

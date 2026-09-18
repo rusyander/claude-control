@@ -3,6 +3,7 @@ import type { ConfigProvider } from '../../providers/types.ts';
 import { isDirectory, readJson } from './io.ts';
 import { commandFiles, sortCommands } from './list.ts';
 import { trim } from './parse.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Команды остальных CLI. Берём ровно то, что описано в их документации
@@ -18,7 +19,7 @@ export function readProviderCommands(provider: ConfigProvider): {
 
   const notes: string[] = [];
   const dir = config.dir();
-  if (!isDirectory(dir)) notes.push(`Каталог команд не найден: ${dir}.`);
+  if (!isDirectory(dir)) notes.push(serverText('commands-dir-missing', { path: dir }));
 
   const commands = commandFiles(
     dir,

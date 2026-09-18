@@ -4,6 +4,7 @@ import type { DlpProxy, DlpRuntime } from './dlp/DlpProxy.ts';
 import { AliasVault, maskText } from './dlp/mask.ts';
 import { builtinInfos } from './dlp/default-rules.ts';
 import { readRules } from './dlp/rules-store.ts';
+import { coded } from '../lib/server-text.ts';
 
 /**
  * Защита данных — фасад раздела. Разбор форматов и сам слушатель живут в
@@ -46,7 +47,10 @@ export function resolveDlpUpstream(store: AppStore): string {
   const profile = settings.endpointProfiles.find((item) => item.id === profileId);
   if (profile?.baseUrl) return assertHttpUrl(profile.baseUrl);
 
-  throw new DlpConfigError('не задан адрес, куда пересылать запросы');
+  throw coded(
+    new DlpConfigError('не задан адрес, куда пересылать запросы'),
+    'dlp-upstream-missing',
+  );
 }
 
 function assertHttpUrl(value: string): string {
@@ -54,10 +58,15 @@ function assertHttpUrl(value: string): string {
   try {
     url = new URL(value);
   } catch {
-    throw new DlpConfigError(`адрес «${value}» не разбирается`);
+    throw coded(new DlpConfigError(`адрес «${value}» не разбирается`), 'dlp-upstream-unparsed', {
+      value,
+    });
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new DlpConfigError('адрес должен начинаться с http:// или https://');
+    throw coded(
+      new DlpConfigError('адрес должен начинаться с http:// или https://'),
+      'dlp-upstream-scheme',
+    );
   }
   return url.toString().replace(/\/+$/, '');
 }
@@ -70,7 +79,7 @@ export function buildDlpRuntime(store: AppStore, appDataDir: string): DlpRuntime
   // Пустой список правил — это НЕ защита. Поднимать прокси, который ничего не
   // ищет, значит выдавать за защиту обычную пересылку.
   if (rules.filter((rule) => rule.enabled).length === 0) {
-    throw new DlpConfigError('нет ни одного включённого правила');
+    throw coded(new DlpConfigError('нет ни одного включённого правила'), 'dlp-no-rules');
   }
 
   return {
@@ -79,6 +88,7 @@ export function buildDlpRuntime(store: AppStore, appDataDir: string): DlpRuntime
     rules,
     passUnknown: settings.dlp.passUnknown,
     journal: settings.dlp.journal,
+    language: settings.language,
     appDataDir,
   };
 }

@@ -9,6 +9,7 @@ import { openProject, useWorkspace } from '../../src/shared/lib/workspace';
 import { useFsList, useFsRoots } from '../../src/entities/project/api';
 import { useChatProjects } from '../../src/entities/chat/api';
 import { GitPanel } from '../../src/features/git/GitPanel';
+import { Worktrees } from '../../src/features/git/Worktrees';
 
 /**
  * Выбор проекта: недавние — и обзор файловой системы машины, где стоит панель.
@@ -79,6 +80,8 @@ export default function ProjectsScreen() {
       ) : null}
 
       {workspace.projectPath ? <GitPanel projectPath={workspace.projectPath} /> : null}
+
+      {workspace.projectPath ? <Worktrees projectPath={workspace.projectPath} /> : null}
 
       {recent.data && recent.data.length > 0 ? (
         <Card>

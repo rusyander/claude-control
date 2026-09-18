@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { serverFieldText } from '@shared/config/i18n';
 import type { BadgeTone } from '@shared/ui/badge';
 import type { IntegrationId, IntegrationsSettings, TelegramEvent } from '@agentdeck/contracts';
 import { Card } from '@shared/ui/card';
@@ -216,7 +217,7 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
 
         {status?.detail && (
           <Typography variant="caption" color={state === 'error' ? 'danger' : 'subtle'}>
-            {status.detail}
+            {serverFieldText(status, 'detail')}
           </Typography>
         )}
 

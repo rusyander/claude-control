@@ -44,7 +44,7 @@ describe('missingFields', () => {
   it('адрес тест-менеджмента обязателен только своей установке', () => {
     // Zephyr и Xray живут по общему адресу, и требовать его у них значило бы
     // не дать включить коннектор без выдуманного значения.
-    expect(missingFields('tms', { kind: 'zephyr', baseUrl: '', projectKey: 'GOR' })).toEqual([]);
+    expect(missingFields('tms', { kind: 'zephyr', baseUrl: '', projectKey: 'PRJ' })).toEqual([]);
     expect(missingFields('tms', { kind: 'testit', baseUrl: '', projectKey: 'PRJ' })).toEqual([
       'baseUrl',
     ]);

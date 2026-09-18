@@ -8,6 +8,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { useClearCredentials, useCredentialsStatus, CREDENTIALS_TONE } from '@entities/Credentials';
 import { CredentialsFormModal } from '@features/CredentialsEditor';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Доступ Claude Code к аккаунту.
@@ -58,7 +59,7 @@ export function CredentialsCard() {
 
         {status.data?.reason && (
           <Typography variant="body-sm" color="warning" className="prose">
-            {status.data.reason}
+            {serverFieldText(status.data, 'reason')}
           </Typography>
         )}
 

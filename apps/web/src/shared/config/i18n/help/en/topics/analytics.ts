@@ -203,7 +203,8 @@ export const analyticsEn: typeof analyticsRu = {
     limitPriceText:
       'The price list is fetched from the Anthropic site when the settings are opened, at ' +
       'most once a day; with no network the previous snapshot is used and the settings ' +
-      'honestly show its date. Your own prices, entered in the settings, always win.',
+      'honestly show its date. Your own prices, entered in the settings, beat ' +
+      'everything: the price list and the price published by the contour gateway alike.',
     limitDir: 'The configuration directory was switched — the numbers changed',
     limitDirText:
       'As it should be: the transcripts of the currently selected directory are counted. ' +
@@ -228,7 +229,11 @@ export const analyticsEn: typeof analyticsRu = {
       'hand if your terms differ. Cache writes are counted at two rates: the hourly cache ' +
       'is 1.6 times dearer than the five-minute one in the price list, and in transcripts ' +
       'almost the whole write volume goes into it. Your own price is taken exactly as ' +
-      'entered and multiplied by nothing.',
+      'entered and multiplied by nothing. The “Spend through the contour” card stands ' +
+      'apart and follows its own order: your own prices → the price the gateway ' +
+      'declared in its model catalog → the price list. There is no “unknown model” ' +
+      'rate there at all: tokens of a model with no price are not converted into ' +
+      'money, and the model itself is named.',
     metricRequests: 'Requests and active sessions',
     metricRequestsText:
       'How many calls to the model happened during the period and how many conversations ' +

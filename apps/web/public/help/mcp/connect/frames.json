@@ -9,15 +9,15 @@
       "masked": 0,
       "width": 1400,
       "height": 1200,
-      "shotAt": "2026-09-11T12:47:31.163Z",
-      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка MCP-серверы Внешние источники инструментов для Claude Добавить сервер Как это работает Пусто",
+      "shotAt": "2026-09-17T20:37:03.897Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 3 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка MCP-серверы Внешние источники инструментов для Claude Добавить сервер Как это работает Пусто",
       "en": {
         "file": "01-empty.en.png",
         "masked": 0,
         "width": 1400,
         "height": 1200,
-        "shotAt": "2026-09-11T17:43:38.471Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 3 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help MCP servers External tool providers for Claude Add server How it works Empty"
+        "shotAt": "2026-09-17T20:40:02.367Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 3 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help MCP servers External tool providers for Claude Add server How it works Empty"
       }
     },
     {
@@ -27,14 +27,14 @@
       "masked": 0,
       "width": 1400,
       "height": 1004,
-      "shotAt": "2026-09-11T12:47:33.170Z",
+      "shotAt": "2026-09-17T20:37:05.890Z",
       "text": "Добавить сервер Изменения применятся после перезапуска Claude Code Конструктор Несколько из JSON Готовые серверы Нажмите — поля заполнятся сами. Останется вписать свои значения переменных и токены. Файловая система GitHub GitLab PostgreSQL Playwright Локальный SSE-сервер Имя сервера Под этим именем сервер попадёт в конфиг и в правила доступа Транспорт stdio sse http stdio — сервер запускается как процесс; sse и http — подключение к уже работающему адресу Команда запуска Аргументы Через пробел. Аргументы с пробелами внутри — в кавычках Переменные окружения По строке в формате KEY=VALUE. Секреты сюда не вписывайте — положите их в раздел «Переменные» и сошлитесь как ${VAR} Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "02-form-presets.en.png",
         "masked": 0,
         "width": 1400,
         "height": 986,
-        "shotAt": "2026-09-11T17:43:40.457Z",
+        "shotAt": "2026-09-17T20:40:04.410Z",
         "text": "Add server Changes apply after restarting Claude Code Builder Several from JSON Ready-made servers Click one — the fields fill in. Then put in your own variable values and tokens. Файловая система GitHub GitLab PostgreSQL Playwright Локальный SSE-сервер Server name This name goes into the config and into permission rules Transport stdio sse http stdio — the server runs as a process; sse and http — connect to an address already running Start command Arguments Space separated. Arguments containing spaces go in quotes Environment variables One KEY=VALUE per line. Do not put secrets here — keep them in the Environment section and reference them as ${VAR} Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     },
@@ -45,14 +45,14 @@
       "masked": 0,
       "width": 1400,
       "height": 792,
-      "shotAt": "2026-09-11T12:47:38.019Z",
+      "shotAt": "2026-09-17T20:37:10.716Z",
       "text": "Добавить сервер Изменения применятся после перезапуска Claude Code Конструктор Несколько из JSON Вставьте блок mcpServers из документации сервера Понимаем и обёртку {{\"mcpServers\": …}}, и просто объект серверов. Транспорт определяется сам. 2 серверов найдено stdio warehouse warehouse-mcp --stdio http crm http://127.0.0.1:5196/mcp Добавить все (2) Закрыть",
       "en": {
         "file": "03-import.en.png",
         "masked": 0,
         "width": 1400,
         "height": 792,
-        "shotAt": "2026-09-11T17:43:45.302Z",
+        "shotAt": "2026-09-17T20:40:09.251Z",
         "text": "Add server Changes apply after restarting Claude Code Builder Several from JSON Paste the mcpServers block from the server docs Understands both a {{\"mcpServers\": …}} wrapper and a plain servers object. Transport is detected automatically. 2 servers found stdio warehouse warehouse-mcp --stdio http crm http://127.0.0.1:5196/mcp Add all (2) Close"
       }
     },
@@ -63,15 +63,15 @@
       "masked": 0,
       "width": 1400,
       "height": 1200,
-      "shotAt": "2026-09-11T12:47:42.585Z",
-      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 3 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка MCP-серверы Внешние источники инструментов для Claude Добавить сервер Как это работает crm http http://127.0.0.1:5196/mcp Авторизоваться Проверить Инструменты orders stdio node C:/work/claude-demo/orders-mcp/server.mjs Проверить Инструменты warehouse stdio warehouse-mcp --stdio Проверить Инструменты",
+      "shotAt": "2026-09-17T20:37:15.329Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 3 Права 3 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка MCP-серверы Внешние источники инструментов для Claude Добавить сервер Как это работает crm http http://127.0.0.1:5196/mcp Авторизоваться Проверить Инструменты orders stdio node C:/work/claude-demo/orders-mcp/server.mjs Проверить Инструменты warehouse stdio warehouse-mcp --stdio Проверить Инструменты",
       "en": {
         "file": "04-card-unknown.en.png",
         "masked": 0,
         "width": 1400,
         "height": 1200,
-        "shotAt": "2026-09-11T17:43:49.884Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 3 Permissions 3 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help MCP servers External tool providers for Claude Add server How it works crm http http://127.0.0.1:5196/mcp Authorize Check Tools orders stdio node C:/work/claude-demo/orders-mcp/server.mjs Check Tools warehouse stdio warehouse-mcp --stdio Check Tools"
+        "shotAt": "2026-09-17T20:40:14.191Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 3 Permissions 3 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help MCP servers External tool providers for Claude Add server How it works crm http http://127.0.0.1:5196/mcp Authorize Check Tools orders stdio node C:/work/claude-demo/orders-mcp/server.mjs Check Tools warehouse stdio warehouse-mcp --stdio Check Tools"
       }
     },
     {
@@ -81,15 +81,15 @@
       "masked": 0,
       "width": 1116,
       "height": 144,
-      "shotAt": "2026-09-11T12:47:54.662Z",
-      "text": "orders stdio Отвечает: 5 инструментов node C:/work/claude-demo/orders-mcp/server.mjs Проверено: 11 сент. 2026 г., 17:47 Проверить Инструменты",
+      "shotAt": "2026-09-17T20:37:27.416Z",
+      "text": "orders stdio Отвечает: 5 инструментов node C:/work/claude-demo/orders-mcp/server.mjs Проверено: 18 сент. 2026 г., 01:37 Проверить Инструменты",
       "en": {
         "file": "05-connected.en.png",
         "masked": 0,
         "width": 1116,
         "height": 144,
-        "shotAt": "2026-09-11T17:44:01.933Z",
-        "text": "orders stdio Responding: 5 tools node C:/work/claude-demo/orders-mcp/server.mjs Checked: Sep 11, 2026, 10:43 PM Check Tools"
+        "shotAt": "2026-09-17T20:40:26.258Z",
+        "text": "orders stdio Responding: 5 tools node C:/work/claude-demo/orders-mcp/server.mjs Checked: Sep 18, 2026, 01:40 AM Check Tools"
       }
     },
     {
@@ -99,14 +99,14 @@
       "masked": 0,
       "width": 928,
       "height": 702,
-      "shotAt": "2026-09-11T12:48:00.489Z",
+      "shotAt": "2026-09-17T20:37:33.248Z",
       "text": "Инструменты сервера: orders Изменения применятся после перезапуска Claude Code Выбрать все Снять все Выбрано: 3 Весь сервер сразу mcp__orders list_orders Список заказов за период: номер, дата, сумма и статус. order_details Карточка одного заказа: позиции, оплаты и доставка. export_orders Выгрузка заказов в CSV: колонки те же, что в таблице. refund_order Возврат по заказу. Необратимо: деньги уходят покупателю. sync_stock Сверка остатков со складом и отчёт о расхождениях. Что делать Разрешено Спрашивать Запрещено Claude выполнит это сам, без вопросов. Отмена Создать права (3)",
       "en": {
         "file": "06-tools.en.png",
         "masked": 0,
         "width": 928,
         "height": 702,
-        "shotAt": "2026-09-11T17:44:07.759Z",
+        "shotAt": "2026-09-17T20:40:32.068Z",
         "text": "Server tools: orders Changes apply after restarting Claude Code Select all Clear Selected: 3 Whole server at once mcp__orders list_orders Список заказов за период: номер, дата, сумма и статус. order_details Карточка одного заказа: позиции, оплаты и доставка. export_orders Выгрузка заказов в CSV: колонки те же, что в таблице. refund_order Возврат по заказу. Необратимо: деньги уходят покупателю. sync_stock Сверка остатков со складом и отчёт о расхождениях. What to do Allowed Ask Denied Claude runs it on its own, no questions asked. Cancel Create permissions (3)"
       }
     }

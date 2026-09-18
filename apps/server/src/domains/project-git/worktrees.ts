@@ -4,14 +4,27 @@ import { basename, dirname, join, resolve } from 'node:path';
 import type {
   ProjectWorktree,
   ProjectWorktreesInfo,
+  WorktreeCopyAccess,
   WorktreeMirrorReport,
   WorktreeMirrorSettings,
 } from '@agentdeck/contracts';
+import { serverText } from '../../lib/server-texts.ts';
 import { GIT_NETWORK_TIMEOUT_MS } from './constants.ts';
-import { git, GitError } from './exec.ts';
-import { describeMirror, mirrorLocalLayer } from './mirror-local.ts';
+import { copyProjectAccess, dropProjectAccess } from './copy-access.ts';
+import { checkCopyReady, describeGaps } from './copy-readiness.ts';
+import { GitError, git, gitOutput, type GitOutput } from './exec.ts';
+import {
+  LINK_DIRS,
+  describeMirror,
+  effectiveSettings,
+  mirrorLocalLayer,
+  unlinkSharedDirs,
+  wanted,
+} from './mirror-local.ts';
+import { parseChurn } from './lockfiles.ts';
 import { isGitRepo, requireRepo } from './read.ts';
 import { assertBranchName } from './write.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Параллельные рабочие копии (`git worktree`) — то, чем несколько агентов
@@ -182,6 +195,32 @@ export async function listWorktrees(projectDir: string): Promise<ProjectWorktree
  * Потолок ожидания сетевой: `worktree add` разворачивает всё дерево файлов, и
  * на большом репозитории это дольше обычной локальной команды.
  */
+/**
+ * Завести копии запись доступа и одной строкой сказать, чем кончилось.
+ * Отказ здесь копию не отменяет: без записи агент задаст вопрос, без копии
+ * работать негде вообще.
+ */
+function prepareCopyAccess(
+  mainDir: string,
+  copyDir: string,
+  claudeJsonPath?: string,
+): { line: string; result: WorktreeCopyAccess } | undefined {
+  if (!claudeJsonPath) return undefined;
+  const result = copyProjectAccess(claudeJsonPath, mainDir, copyDir);
+  const line = result.copied
+    ? serverText('worktree-access-copied', { fields: result.fields ?? 0 })
+    : serverText('worktree-access-skipped', {
+        reason: result.reason ?? serverText('worktree-access-reason-unknown'),
+      });
+  const carried: WorktreeCopyAccess = {
+    copied: result.copied,
+    key: result.key,
+    ...(result.reason ? { reason: result.reason } : {}),
+    ...(result.reasonCode ? { reasonCode: result.reasonCode } : {}),
+  };
+  return { line, result: carried };
+}
+
 export async function addWorktree(
   projectDir: string,
   name: string,
@@ -192,33 +231,57 @@ export async function addWorktree(
    * HEAD основной копии, как и раньше; у уже существующей ветки база не в счёт.
    */
   base?: string,
+  /**
+   * Путь к `.claude.json`. По нему копия получает запись доступа оригинала —
+   * доверие к папке и разрешённые серверы `.mcp.json`; без неё агент в копии
+   * начинает с вопросов, на которые человек уже отвечал. Пусто — панель работает
+   * не с Claude Code, запись не заводится и не проверяется.
+   */
+  claudeJsonPath?: string,
 ): Promise<{ path: string; output: string; mirror?: WorktreeMirrorReport }> {
   const info = await requireRepo(projectDir);
   if (info.unborn) {
-    throw new GitError('В репозитории ещё нет коммитов — сначала сделайте первый коммит');
+    throw coded(
+      new GitError('В репозитории ещё нет коммитов — сначала сделайте первый коммит'),
+      'git-no-commits-first',
+    );
   }
   const value = name.trim();
   await assertBranchName(projectDir, value);
 
   const list = await readWorktrees(projectDir);
   const main = list[0];
-  if (!main) throw new GitError('git не назвал ни одной рабочей копии');
+  if (!main) throw coded(new GitError('git не назвал ни одной рабочей копии'), 'git-no-worktrees');
 
   const busy = list.find((item) => item.branch === value);
   if (busy) {
-    throw new GitError(
-      busy.isMain
-        ? `Ветка ${value} занята основной копией — заведите копию под другую ветку`
-        : `Ветка ${value} уже открыта копией ${busy.path}`,
-    );
+    throw busy.isMain
+      ? coded(
+          new GitError(`Ветка ${value} занята основной копией — заведите копию под другую ветку`),
+          'worktree-branch-busy-main',
+          { branch: value },
+        )
+      : coded(
+          new GitError(`Ветка ${value} уже открыта копией ${busy.path}`),
+          'worktree-branch-busy-copy',
+          { branch: value, path: busy.path },
+        );
   }
 
   const target = worktreeDirFor(main.path, value);
   if (list.some((item) => samePath(item.path, target))) {
-    throw new GitError(`Копия ${target} уже есть — откройте её вкладкой`);
+    throw coded(
+      new GitError(`Копия ${target} уже есть — откройте её вкладкой`),
+      'worktree-exists-open',
+      { target },
+    );
   }
   if (existsSync(target)) {
-    throw new GitError(`Каталог ${target} уже существует — выберите другое имя ветки`);
+    throw coded(
+      new GitError(`Каталог ${target} уже существует — выберите другое имя ветки`),
+      'worktree-dir-exists',
+      { target },
+    );
   }
 
   const existed = info.branches.includes(value);
@@ -248,10 +311,46 @@ export async function addWorktree(
     report = await mirrorLocalLayer(main.path, target, mirror);
     mirrorLine = describeMirror(report);
   } catch (error) {
-    mirrorLine = `Локальный слой не перенесён: ${error instanceof Error ? error.message : String(error)}`;
+    mirrorLine = serverText('worktree-mirror-failed', {
+      reason: error instanceof Error ? error.message : String(error),
+    });
   }
 
-  const created = out.trim() || `Копия ${target} готова на ветке ${value}`;
+  const access = prepareCopyAccess(main.path, target, claudeJsonPath);
+  if (access) mirrorLine = `${mirrorLine}\n${access.line}`;
+
+  // Сверка сразу после переноса и ОДИН добор: почти всё, что срывается,
+  // срывается разово (файл был занят, каталог ещё не создан). Второй отказ
+  // подряд — это не везение, а причина, и её человек должен увидеть, а не
+  // получить третью попытку.
+  let readiness = checkCopyReady({
+    mainDir: main.path,
+    copyDir: target,
+    ...(claudeJsonPath ? { claudeJsonPath } : {}),
+  });
+  if (!readiness.ready) {
+    try {
+      await mirrorLocalLayer(main.path, target, mirror, { newerOnly: true });
+    } catch {
+      // Причину назовёт сверка ниже: пересказывать её вторым текстом незачем.
+    }
+    prepareCopyAccess(main.path, target, claudeJsonPath);
+    readiness = checkCopyReady({
+      mainDir: main.path,
+      copyDir: target,
+      ...(claudeJsonPath ? { claudeJsonPath } : {}),
+    });
+  }
+  if (!readiness.ready)
+    mirrorLine = `${mirrorLine}\n${serverText('worktree-copy-incomplete-line', {
+      gaps: describeGaps(readiness.gaps),
+    })}`;
+  if (report) {
+    report.gaps = readiness.gaps;
+    if (access) report.access = access.result;
+  }
+
+  const created = out.trim() || serverText('worktree-created', { target, branch: value });
   return {
     path: resolve(target),
     output: `${created}\n${mirrorLine}`,
@@ -271,11 +370,23 @@ export async function mirrorWorktree(
 ): Promise<{ output: string; mirror: WorktreeMirrorReport }> {
   const list = await readWorktrees(projectDir);
   const main = list[0];
-  if (!main) throw new GitError('git не назвал ни одной рабочей копии');
+  if (!main) throw coded(new GitError('git не назвал ни одной рабочей копии'), 'git-no-worktrees');
   const target = list.find((item) => samePath(item.path, worktreePath));
-  if (!target) throw new GitError(`Копии ${worktreePath} нет в списке git`);
-  if (target.isMain) throw new GitError('Основная копия — источник локального слоя, не приёмник');
-  if (!existsSync(target.path)) throw new GitError(`Каталога ${target.path} больше нет`);
+  if (!target)
+    throw coded(
+      new GitError(`Копии ${worktreePath} нет в списке git`),
+      'worktree-not-in-git-list',
+      { worktreePath },
+    );
+  if (target.isMain)
+    throw coded(
+      new GitError('Основная копия — источник локального слоя, не приёмник'),
+      'worktree-main-not-target',
+    );
+  if (!existsSync(target.path))
+    throw coded(new GitError(`Каталога ${target.path} больше нет`), 'worktree-dir-gone', {
+      path: target.path,
+    });
 
   const report = await mirrorLocalLayer(main.path, target.path, mirror, { newerOnly: true });
   return { output: describeMirror(report), mirror: report };
@@ -354,18 +465,39 @@ async function undoFailedAdd(
  */
 function explainAddFailure(error: unknown, target: string): unknown {
   if (!(error instanceof GitError) || !/filename too long/i.test(error.message)) return error;
-  return new GitError(
-    [
-      `Windows не дал создать копию в ${target}: путь длиннее 260 символов.`,
-      'Панель уже просит git о длинных путях и укорачивает имя каталога, но глубину самого',
-      'репозитория выбирает не она. Включите длинные пути в системе — «Редактор локальной',
-      'групповой политики» → Конфигурация компьютера → Административные шаблоны → Система →',
-      'Файловая система → «Включить длинные пути Win32», либо в реестре',
-      'HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\\LongPathsEnabled = 1, — и повторите.',
-      'Быстрый обходной путь: перенести репозиторий ближе к корню диска.',
-      '',
-      `Ответ git: ${error.message}`,
-    ].join('\n'),
+  return new GitError(serverText('worktree-longpath-refused', { target, error: error.message }));
+}
+
+/**
+ * Грязь копии — только наш же локальный слой?
+ *
+ * Зеркало кладёт в копию `.mcp.json`, `.env`, `CLAUDE.local.md` — для git это
+ * неотслеживаемые или изменённые файлы, и он отказывается убирать такую копию
+ * без `--force`. То есть КАЖДАЯ копия панели с рождения «грязная», и человек,
+ * нажимая «Убрать», всегда упирался во второе подтверждение — а привычка
+ * подтверждать не глядя однажды снесёт копию с настоящей работой.
+ *
+ * Поэтому панель разбирает грязь по именам: всё, что она сама туда положила
+ * (или что лежит под ССЫЛКОЙ на оригинал), за работу не считается. Один путь
+ * вне списка — и вопрос остаётся, потому что это уже чужая правка.
+ */
+async function dirtIsOnlyLocalLayer(
+  copyDir: string,
+  mirror: WorktreeMirrorSettings | undefined,
+): Promise<boolean> {
+  let status: string;
+  try {
+    status = await git(copyDir, ['status', '--porcelain', '-z', '-uall']);
+  } catch {
+    // Не смогли спросить — значит не знаем; вопрос человеку остаётся.
+    return false;
+  }
+  const paths = parseChurn(status).map((item) => item.path.replace(/\\/g, '/'));
+  if (paths.length === 0) return true;
+  const settings = effectiveSettings(mirror);
+  return paths.every(
+    (path) =>
+      wanted(path, settings) || LINK_DIRS.some((dir) => path === dir || path.startsWith(`${dir}/`)),
   );
 }
 
@@ -381,19 +513,43 @@ export async function removeWorktree(
   projectDir: string,
   target: string,
   force = false,
-): Promise<string> {
+  /** Тот же `.claude.json`: вместе с копией уходит и её запись доступа. */
+  claudeJsonPath?: string,
+  /** Шаблоны зеркала проекта: по ним отличаем свой слой от работы человека. */
+  mirror?: WorktreeMirrorSettings,
+): Promise<GitOutput> {
   await requireRepo(projectDir);
   const list = await readWorktrees(projectDir);
   const entry = list.find((item) => samePath(item.path, target));
-  if (!entry) throw new GitError('Такой рабочей копии в этом репозитории нет');
-  if (entry.isMain) throw new GitError('Это основная рабочая копия — её удалить нельзя');
+  if (!entry)
+    throw coded(new GitError('Такой рабочей копии в этом репозитории нет'), 'worktree-not-in-repo');
+  if (entry.isMain)
+    throw coded(
+      new GitError('Это основная рабочая копия — её удалить нельзя'),
+      'worktree-main-undeletable',
+    );
+
+  // Запись доступа снимается ДО удаления каталога: после `worktree remove`
+  // путь уже не проверить, а мёртвая запись досталась бы следующей ветке с тем
+  // же именем — вместе с доверием, которого ей никто не давал.
+  if (claudeJsonPath) dropProjectAccess(claudeJsonPath, entry.path);
 
   if (entry.prunable) {
     await git(projectDir, ['worktree', 'prune']);
-    return `Каталога копии больше нет — запись убрана`;
+    return {
+      output: 'Каталога копии больше нет — запись убрана',
+      outputCode: 'worktree-pruned',
+    };
   }
 
-  const args = ['worktree', 'remove', ...(force ? ['--force'] : []), entry.path];
+  // Ссылки снимаются ДО git: он про них не знает и оставил бы их на диске, а
+  // человек прочитал бы «копия убрана» и не смог завести ту же ветку снова.
+  unlinkSharedDirs(entry.path);
+
+  // Своя же грязь вопросом человеку быть не должна.
+  const forced = force || (await dirtIsOnlyLocalLayer(entry.path, mirror));
+
+  const args = ['worktree', 'remove', ...(forced ? ['--force'] : []), entry.path];
   const out = await git(projectDir, args, GIT_NETWORK_TIMEOUT_MS);
-  return out.trim() || `Копия ${entry.path} убрана`;
+  return gitOutput(out, `Копия ${entry.path} убрана`, 'worktree-removed', { path: entry.path });
 }

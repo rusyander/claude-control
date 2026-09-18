@@ -9,14 +9,14 @@
       "masked": 0,
       "width": 1428,
       "height": 856,
-      "shotAt": "2026-09-11T14:16:57.962Z",
+      "shotAt": "2026-09-17T20:43:09.834Z",
       "text": "Добавить скрипт Файл сохранится в папку hooks/. Перед этим создаётся резервная копия. Конструктор Несколько сразу Готовые каркасы Выберите заготовку кода — останется поправить условие и текст. Пустой каркас Страж команды Формат при сохранении Брифинг при старте Имя файла С расширением: .mjs для Node.js, .ps1 для PowerShell, .sh для оболочки. Код скрипта Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "01-form.en.png",
         "masked": 0,
         "width": 1428,
         "height": 856,
-        "shotAt": "2026-09-11T17:29:50.403Z",
+        "shotAt": "2026-09-17T20:45:41.519Z",
         "text": "Add script The file is saved to the hooks/ folder. A backup is made first. Builder Several at once Ready-made scaffolds Pick a code template — then tweak the condition and text. Пустой каркас Страж команды Формат при сохранении Брифинг при старте File name With an extension: .mjs for Node.js, .ps1 for PowerShell, .sh for the shell. Script code Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     },
@@ -27,14 +27,14 @@
       "masked": 0,
       "width": 1428,
       "height": 856,
-      "shotAt": "2026-09-11T14:16:59.706Z",
+      "shotAt": "2026-09-17T20:43:11.585Z",
       "text": "Добавить скрипт Файл сохранится в папку hooks/. Перед этим создаётся резервная копия. Конструктор Несколько сразу Готовые каркасы Выберите заготовку кода — останется поправить условие и текст. Пустой каркас Страж команды Формат при сохранении Брифинг при старте Имя файла С расширением: .mjs для Node.js, .ps1 для PowerShell, .sh для оболочки. Код скрипта Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "02-template.en.png",
         "masked": 0,
         "width": 1428,
         "height": 856,
-        "shotAt": "2026-09-11T17:29:52.164Z",
+        "shotAt": "2026-09-17T20:45:43.267Z",
         "text": "Add script The file is saved to the hooks/ folder. A backup is made first. Builder Several at once Ready-made scaffolds Pick a code template — then tweak the condition and text. Пустой каркас Страж команды Формат при сохранении Брифинг при старте File name With an extension: .mjs for Node.js, .ps1 for PowerShell, .sh for the shell. Script code Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     },
@@ -45,14 +45,14 @@
       "masked": 0,
       "width": 1428,
       "height": 668,
-      "shotAt": "2026-09-11T14:17:01.646Z",
+      "shotAt": "2026-09-17T20:43:13.577Z",
       "text": "Добавить скрипт Файл сохранится в папку hooks/. Перед этим создаётся резервная копия. Конструктор Несколько сразу Отметьте нужные заготовки — создам их разом. Каждую потом можно править как обычно. Пустой каркас Чтение события со stdin и место под логику. Страж команды Проверяет команду и при совпадении требует подтверждения (код выхода не нужен — решение в JSON). Формат при сохранении Запускает форматтер по изменённому файлу (PostToolUse на Write/Edit). Брифинг при старте Добавляет контекст в начало сессии (SessionStart). Создать выбранные (2) Закрыть",
       "en": {
         "file": "03-bulk.en.png",
         "masked": 0,
         "width": 1428,
         "height": 668,
-        "shotAt": "2026-09-11T17:29:54.154Z",
+        "shotAt": "2026-09-17T20:45:45.244Z",
         "text": "Add script The file is saved to the hooks/ folder. A backup is made first. Builder Several at once Tick the presets you need — I will create them all at once. Each can be edited afterwards. Пустой каркас Чтение события со stdin и место под логику. Страж команды Проверяет команду и при совпадении требует подтверждения (код выхода не нужен — решение в JSON). Формат при сохранении Запускает форматтер по изменённому файлу (PostToolUse на Write/Edit). Брифинг при старте Добавляет контекст в начало сессии (SessionStart). Create selected (2) Close"
       }
     }

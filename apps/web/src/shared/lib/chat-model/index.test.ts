@@ -9,6 +9,7 @@ import {
   platformBypassCaption,
   platformLayersCaption,
   platformModelCaption,
+  platformRunChoice,
   withCurrentValue,
 } from './index';
 
@@ -104,6 +105,53 @@ describe('константы выбора', () => {
   it('первый уровень effort — пустой (по умолчанию)', () => {
     expect(EFFORT_LEVELS[0]).toBe('');
     expect(EFFORT_LEVELS).toContain('max');
+  });
+});
+
+/**
+ * Чем прогон пойдёт через контур. Ревью Т13 нашло здесь разрыв: шапка
+ * спрашивала маршрут одним оверрайдом чата, а прогон уходил с
+ * `оверрайд || дефолт настроек`, — при пустом выборе badge называл модель
+ * контура по умолчанию, пока уезжала модель из настроек.
+ */
+describe('модель прогона через контур', () => {
+  const rules = {
+    model: 'qwen2.5:7b',
+    source: 'default' as const,
+    map: {},
+    catalog: ['qwen2.5:7b', 'qwen2.5:14b'],
+  };
+
+  it('пустой выбор чата спрашивает маршрут моделью из настроек, а не пустотой', () => {
+    expect(platformRunChoice(rules, '', 'qwen2.5:14b')).toEqual({
+      model: 'qwen2.5:14b',
+      asked: 'qwen2.5:14b',
+      source: 'asked',
+      replaced: false,
+    });
+  });
+
+  it('подмена дефолта настроек названа, а не проглочена', () => {
+    expect(platformRunChoice(rules, '', 'sonnet')).toMatchObject({
+      model: 'qwen2.5:7b',
+      asked: 'sonnet',
+      replaced: true,
+    });
+  });
+
+  it('выбор чата сильнее настроек', () => {
+    expect(platformRunChoice(rules, 'qwen2.5:7b', 'qwen2.5:14b')).toMatchObject({
+      model: 'qwen2.5:7b',
+      source: 'asked',
+    });
+  });
+
+  it('ни выбора, ни настроек — модель контура, подмены нет', () => {
+    expect(platformRunChoice(rules, '')).toMatchObject({
+      model: 'qwen2.5:7b',
+      asked: '',
+      replaced: false,
+    });
   });
 });
 

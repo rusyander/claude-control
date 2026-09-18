@@ -1,0 +1,115 @@
+import type { ComposedMessageCode } from '@agentdeck/contracts/server-messages';
+
+export const composedRu: Record<ComposedMessageCode, string> = {
+  'transfer-platform-key': 'ключ контура «{{id}}»',
+  'transfer-platform-address-changed':
+    'адрес другой (было {{baseUrl}}) — сохранённый ключ будет снят, введите ключ нового адреса',
+  'transfer-platform-key-saved': 'ключ этого контура на этой машине уже сохранён',
+  'transfer-platform-key-absent': 'ключ в архив не попадает — введите его после разворота',
+  'transfer-platform-cert-missing': 'файла сертификата нет по пути {{path}}',
+  'transfer-platform-project-paths': 'пути проектов — с прежней машины, проверьте их на этой',
+  'transfer-platform-exclusion':
+    '{{title}}: обе стороны включены — сохранение этого контура будет отклонено, выключите одну на карточке контура',
+  'plugins-list-failed': 'Список плагинов не получен: {{reason}}',
+  'commands-dir-missing': 'Каталог команд не найден: {{path}}.',
+  'integration-check-webhook-ok': 'Приёмник ответил на пробное событие.',
+  'integration-check-webhook-signed': 'Приёмник ответил на пробное событие (тело подписано).',
+  'integration-check-logged-in': 'Вошли как {{account}}.',
+  'integration-check-telegram-ok': 'Бот {{account}} на связи.',
+  'integration-check-tms-ok': '{{detail}} — связь есть.',
+  'integration-check-atlassian-ok': 'Вошли как {{account}} ({{deployment}}).',
+  'integration-deployment-cloud': 'облако',
+  'integration-deployment-own': 'своя установка',
+  'integration-tms-project': '{{system}}, проект {{project}}',
+  'tms-cases-truncated':
+    'список кейсов проекта обрезан на {{max}} — кейс мог остаться за этой границей',
+  'tms-check-marks': 'проверьте, что пометки «tms:» из этого проекта, а не из другого',
+  'env-move-settings-only':
+    'Переносить можно только переменные из settings.json / settings.local.json.',
+  'mcp-handshake-timeout': 'Сервер не ответил на рукопожатие вовремя',
+  'mcp-oauth-timeout': 'Сервер не ответил вовремя',
+  'env-name-invalid':
+    'Имя переменной — латинские буквы, цифры и подчёркивание, не с цифры: MY_TOKEN, а не «my token».',
+  'env-source-invalid':
+    'Куда сохранить: settings, settings-local или secrets. Переменные групп правятся на странице групп.',
+  'env-secret-single-line':
+    'Значение для .mcp-secrets.env — одна строка: перевод строки стал бы отдельной переменной.',
+  'env-key-exists-there': 'В {{file}} уже есть {{key}} — сначала удалите или переименуйте её там.',
+  'panel-mcp-no-section':
+    'У активного CLI ({{provider}}) нет раздела MCP — переходнику некуда записаться. Переключите активный CLI в настройках.',
+  'instructions-file-absent':
+    'Файл {{path}} не существует. Панель не создаёт файлы, которых нет: создайте его сами или уберите запись из списка.',
+  'instructions-path-is-dir': 'Путь {{path}} — каталог, а не файл.',
+  'instructions-file-too-large': 'Файл {{path}} слишком большой для правки в панели.',
+  'instructions-file-not-text': 'Файл {{path}} не является текстовым — панель его не открывает.',
+  'mcp-auth-header-rejected':
+    'Сервер отверг заголовок Authorization (401) — проверьте токен в заголовках',
+  'mcp-oauth-needed': 'Требуется авторизация OAuth — нажмите «Авторизоваться»',
+  'project-dir-empty': 'Путь к проекту не задан',
+  'project-dir-absent': 'Каталог не существует: {{dir}}',
+  'project-dir-not-dir': 'Это не каталог: {{dir}}',
+  'tests-baseline-png-broken': 'Снимок не разобрался',
+  'tests-compare-plans-differ': 'прогоны шли по разным планам',
+  'tests-compare-envs-differ': 'окружения разные',
+  'tests-compare-modes-differ': 'это разные режимы',
+  'tests-compare-warning':
+    '{{parts}} — наборы кейсов не совпадают, и «починилось» может значить «в этот раз не гоняли».',
+  'tests-compare-base-missing': 'Прогона «{{id}}» в истории нет.',
+  'tests-compare-first-run': 'Сравнивать не с чем: это первый прогон с результатами.',
+  'tests-draft-item-unparsed': 'Правка №{{index}} не разобралась.',
+  'tests-draft-op-refused':
+    'Правка №{{index}}: «{{op}}» черновиком не делается — удаление кейсов остаётся человеку.',
+  'tests-draft-group-missing': 'Правка №{{index}}: не названа группа.',
+  'tests-draft-title-missing': 'Правка №{{index}}: кейс без названия.',
+  'tests-draft-moved-to-group':
+    'Новых кейсов перенесено в группу «{{group}}»: {{count}} — её выбрал человек при запуске.',
+  'tests-draft-human-case': 'Кейс написан человеком — правку к нему принимают руками.',
+  'tests-pdf-no-browser':
+    'PDF печатает браузер, а на этой машине его не нашлось. Поставь Google Chrome, Microsoft Edge или Chromium (либо укажи путь к нему в переменной окружения {{env}}) — остальные форматы отчёта работают и без него.',
+  'sandbox-event-custom-title': 'Свой ввод',
+  'chat-run-not-in-ledger':
+    'Панель перезапускалась, прогон не в реестре — отправьте сообщение заново.',
+  'chat-run-stopped-no-answer': 'Прогон остановлен: ответа не было.',
+  'dlp-rule-id-duplicate': 'правило «{{name}}»: идентификатор повторяется',
+  'dlp-rule-regex-broken': 'правило «{{name}}»: выражение не разбирается',
+  'dlp-rule-no-builtin': 'правило «{{name}}»: не выбран встроенный образец',
+  'dlp-rule-dictionary-empty': 'правило «{{name}}»: словарь пуст',
+  'media-block-too-large': 'Блок слишком велик — панель такой не принимает.',
+  'endpoint-probe-timeout': 'Адрес не ответил за {{seconds}} с.',
+  'group-by-id-absent': 'Группы «{{id}}» нет.',
+  'group-name-taken':
+    'Группа «{{name}}» уже есть — по имени её находят и удаляют, двух одинаковых быть не должно.',
+  'automation-not-found': 'Сценария «{{id}}» нет.',
+  'group-env-key-invalid':
+    'Имя переменной «{{key}}» не годится: латиница, цифры и подчёркивание, не с цифры.',
+  'tests-lint-no-oracle': 'Нечем доказать результат',
+  'tests-lint-step-without-expected': 'Шаг без ожидания',
+  'tests-lint-no-code-paths': 'Нет привязки к коду',
+  'tests-lint-no-priority': 'Нет приоритета',
+  'tests-lint-too-many-steps': 'Слишком длинный сценарий',
+  'tests-lint-undeclared-parameter': 'Параметр не объявлен',
+  'tests-lint-unused-parameter': 'Параметр объявлен впустую',
+  'tests-lint-duplicate-title': 'Повтор заголовка в группе',
+  'tests-lint-obsolete-not-archived': 'Устаревший кейс не в архиве',
+  'tests-lint-stale-draft': 'Черновик залежался',
+  'tests-lint-not-run': 'Давно не гонялся',
+  'tests-lint-checklist-with-expected': 'Чек-лист с ожиданием',
+  'worktree-copy-gap-files': 'нет файлов: {{files}}',
+  'worktree-copy-gap-links': 'нет ссылок: {{links}}',
+  'worktree-copy-gap-access': 'нет записи доступа — агент спросит про доверие и MCP',
+  'worktree-mirror-moved': 'Локальный слой: перенесено {{count}}',
+  'worktree-mirror-linked': 'ссылкой: {{paths}}',
+  'worktree-mirror-kept': 'без изменений {{count}}',
+  'worktree-mirror-skipped-count': 'пропущено {{count}}',
+  'worktree-mirror-unlisted': 'за бортом: {{paths}}',
+  'worktree-mirror-failed': 'Локальный слой не перенесён: {{reason}}',
+  'worktree-access-copied': 'Доступ копии: перенесены доверие и настройки MCP ({{fields}} полей)',
+  'worktree-access-skipped': 'Доступ копии не заведён: {{reason}}',
+  'worktree-access-reason-unknown': 'причину git не назвал',
+  'worktree-copy-incomplete-line': 'Копия неполная: {{gaps}}',
+  'worktree-created': 'Копия {{target}} готова на ветке {{branch}}',
+  'worktree-longpath-refused':
+    'Windows не дал создать копию в {{target}}: путь длиннее 260 символов.\nПанель уже просит git о длинных путях и укорачивает имя каталога, но глубину самого\nрепозитория выбирает не она. Включите длинные пути в системе — «Редактор локальной\nгрупповой политики» → Конфигурация компьютера → Административные шаблоны → Система →\nФайловая система → «Включить длинные пути Win32», либо в реестре\nHKLM\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\FileSystem\\\\LongPathsEnabled = 1, — и повторите.\nБыстрый обходной путь: перенести репозиторий ближе к корню диска.\n\nОтвет git: {{error}}',
+  'git-failed-no-output': 'Команда git завершилась с ошибкой',
+  'worktree-install-started': 'Установка запущена: {{command}}',
+};

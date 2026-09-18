@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { serverFieldList, serverFieldText } from '@shared/config/i18n';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Badge } from '@shared/ui/badge';
@@ -40,7 +41,7 @@ export function EnvTransferPlatforms({
           {t('envTransfer.platformsTitle')}
         </Typography>
         <Typography variant="body-sm" color="danger">
-          {plan.problem}
+          {serverFieldText(plan, 'problem')}
         </Typography>
       </Stack>
     );
@@ -68,7 +69,7 @@ export function EnvTransferPlatforms({
                 {entry.title}
               </Typography>
               <Typography variant="body-sm" color="subtle">
-                {entry.notes.join(' · ')}
+                {serverFieldList(entry, 'notes').join(' · ')}
               </Typography>
             </Stack>
             <Badge tone={TONE[entry.status]}>{t(`envTransfer.status_${entry.status}`)}</Badge>

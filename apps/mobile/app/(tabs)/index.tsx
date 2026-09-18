@@ -331,6 +331,7 @@ export default function ChatScreen() {
         {image.shown ? <MediaImageCard image={image.shown} onClose={image.close} /> : null}
 
         <Composer
+          chatId={chatId}
           image={image}
           value={value}
           onChange={setValue}

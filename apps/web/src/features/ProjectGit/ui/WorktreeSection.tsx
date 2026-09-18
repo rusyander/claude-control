@@ -21,7 +21,9 @@ import type { WorktreeSectionProps } from './WorktreeSection.types';
 import { WorktreeMirrorReport } from './WorktreeMirrorReport';
 import { WorktreeMirrorSettings } from './WorktreeMirrorSettings';
 import { WorktreeBootstrapCard } from './WorktreeBootstrapCard';
+import { WorktreeReadiness } from './WorktreeReadiness';
 import styles from './WorktreeSection.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Параллельные ветки: список рабочих копий репозитория и заведение новой.
@@ -43,6 +45,13 @@ import styles from './WorktreeSection.module.scss';
  * Локальный слой (`.mcp.json` под skip-worktree, `.claude/`, `.env`, `.agent/`)
  * сервер переносит в копию сам при создании; кнопка «Обновить локальный слой»
  * повторяет перенос в уже живую копию, а отчёт о нём ложится под её карточку.
+ *
+ * Под каждой копией стоит её ПОЛНОТА — состояние, а не событие. Отчёт зеркала
+ * живёт до перезагрузки вкладки, а отказывает запуску агента сервер по сверке,
+ * которую делает заново перед каждым прогоном: без постоянной строки человек
+ * узнавал бы о неполной копии только отправив сообщение. Кнопка «Добрать» —
+ * то же зеркало, что и «Обновить локальный слой»: оно же заводит и запись
+ * доступа в `.claude.json`, то есть закрывает все три вида дыр.
  */
 /** Тон значка по состоянию агента в копии — тот же язык цвета, что и в пульте. */
 const STATUS_TONE = {
@@ -90,7 +99,7 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
       {
         onSuccess: (result) => {
           setName('');
-          toast.success(result.output);
+          toast.success(serverFieldText(result, 'output'));
           if (result.mirror && result.createdPath) {
             setMirrorReport({ path: result.createdPath, report: result.mirror });
           }
@@ -109,7 +118,7 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
       {
         onSuccess: (result) => {
           setForceFor(undefined);
-          toast.success(result.output);
+          toast.success(serverFieldText(result, 'output'));
         },
         onError: (error) => {
           // Отказ git — обычно «внутри есть незакоммиченное». Не решаем за
@@ -126,7 +135,7 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
       { path, worktreePath: worktree.path },
       {
         onSuccess: (result) => {
-          toast.success(result.output);
+          toast.success(serverFieldText(result, 'output'));
           if (result.mirror) setMirrorReport({ path: worktree.path, report: result.mirror });
         },
         onError: (error) => toast.error(toErrorMessage(error)),
@@ -138,7 +147,7 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
     bootstrap.mutate(
       { path, worktreePath: worktree.path },
       {
-        onSuccess: (result) => toast.success(result.output),
+        onSuccess: (result) => toast.success(serverFieldText(result, 'output')),
         onError: (error) => toast.error(toErrorMessage(error)),
       },
     );
@@ -217,6 +226,15 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
                 )}
               </Stack>
 
+              {/* Полнота копии — раньше отчёта: отказ прогона приходит по ней, а
+                  не по следам последнего зеркала. */}
+              {worktree.copy && (
+                <WorktreeReadiness
+                  state={worktree.copy}
+                  disabled={busy || pending}
+                  onRepair={() => onMirror(worktree)}
+                />
+              )}
               {!worktree.isMain && (
                 <WorktreeBootstrapCard
                   path={path}

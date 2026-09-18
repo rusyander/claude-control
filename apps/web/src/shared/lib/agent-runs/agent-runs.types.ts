@@ -271,9 +271,20 @@ export type ChatEvent =
       /**
        * 'adopted' | 'detachedDone' — прогон подхвачен после перезапуска панели;
        * 'triageApplied' | 'triageMissing' — итог разбора разделения (Т1);
-       * 'planMissing' — работа группы стартовала без плана (Т1).
+       * 'planMissing' — работа группы стартовала без плана (Т1);
+       * 'overlap' — ветки разделения сошлись на одних файлах (Т6);
+       * 'groupsActivated' — набор, привязанный к проекту, включился сам;
+       * 'modelDropped' — имя модели не прошло грамматику аргументов.
        */
-      code: 'adopted' | 'detachedDone' | 'triageApplied' | 'triageMissing' | 'planMissing';
+      code:
+        | 'adopted'
+        | 'detachedDone'
+        | 'triageApplied'
+        | 'triageMissing'
+        | 'planMissing'
+        | 'overlap'
+        | 'groupsActivated'
+        | 'modelDropped';
       text: string;
     }
   | ({ kind: 'handoff' } & HandoffEvent)

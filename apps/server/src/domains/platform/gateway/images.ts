@@ -8,6 +8,7 @@ import { dataMaskOn } from '../data-mask.ts';
 import type { PlatformDriver } from '../drivers/driver.ts';
 import { driverOf } from '../drivers/index.ts';
 import { callUpstream, UpstreamError } from './upstream.ts';
+import { serverText } from '../../../lib/server-texts.ts';
 
 /**
  * Ручка картинок контура (`driver.images = { api }`) — ЧЕРЕЗ шлюз.
@@ -76,6 +77,8 @@ export interface ImagesIo {
   countUsage: (
     model: string,
     tokens: { promptTokens: number; completionTokens: number; totalTokens: number },
+    /** Картинка дошла, а счёта за неё ручка не прислала (MD-09). */
+    unreported?: boolean,
   ) => void;
   respond: (status: number, text: string) => void;
   signal: AbortSignal;
@@ -97,7 +100,7 @@ export async function imagesRequest(
       ...base,
       status: 404,
       code: 'not_found_error',
-      message: `У контура «${platform.title}» ручка картинок манифестом не объявлена`,
+      message: serverText('gateway-images-not-declared', { title: platform.title }),
     });
   }
 
@@ -108,7 +111,7 @@ export async function imagesRequest(
       ...base,
       status: 413,
       code: 'request_too_large',
-      message: 'Тело запроса больше 32 МБ — шлюз его не принимает',
+      message: serverText('gateway-body-too-large'),
     });
   }
   const body = parseObject(raw.toString('utf8'));
@@ -117,7 +120,7 @@ export async function imagesRequest(
       ...base,
       status: 400,
       code: 'invalid_request_error',
-      message: 'Тело запроса не разбирается как JSON',
+      message: serverText('gateway-body-not-json'),
     });
   }
 
@@ -174,7 +177,7 @@ export async function imagesRequest(
       ...base,
       status: 502,
       code: 'api_error',
-      message: 'Ответ ручки картинок больше 16 МБ — шлюз его не собирает',
+      message: serverText('gateway-images-too-large'),
     });
   }
 
@@ -182,7 +185,10 @@ export async function imagesRequest(
 
   const payload = parseObject(text);
   const tokens = usageOf(payload);
-  io.countUsage(model, tokens);
+  // Ответ уже ушёл человеку (`io.respond` выше), значит расход был. Ноль здесь
+  // значит «ручка не отчиталась», и учёт узнаёт об этом тем же признаком, что
+  // и трасса ниже, — иначе полоса бюджета молчала бы о своей неполноте.
+  io.countUsage(model, tokens, tokens.totalTokens === 0);
   const imageBytes = imageBytesOf(payload);
   io.record({
     ...base,
@@ -209,7 +215,7 @@ function maskPrompt(
 
   const set = maskRulesFor(context.appDataDir);
   if (set.source === 'broken') {
-    return { refusal: `Защита данных включена, а правила не читаются (${set.error})` };
+    return { refusal: serverText('gateway-mask-rules-broken', { error: set.error }) };
   }
   // Словарь меток — на запрос: картинка метку обратно не несёт, разворачивать
   // нечего, но вид метки обязан обходить метки самой платформы.
@@ -217,7 +223,7 @@ function maskPrompt(
   const result = maskText(body.prompt, set.rules, vault);
   if (result.blockedBy) {
     return {
-      refusal: `Запрос остановлен правилом «${result.blockedBy.ruleName}» — в нём нашлись данные, которые не должны уходить в модель`,
+      refusal: serverText('gateway-mask-blocked', { rule: result.blockedBy.ruleName }),
     };
   }
   return { body: { ...body, prompt: result.text } };

@@ -23,6 +23,7 @@ import {
 } from '@entities/ChatHandoff';
 import type { HandoffControls } from '@features/ChatMessages';
 import type { ViewTarget } from './useChatSession';
+import { messageFromPayload } from '@shared/api/client';
 
 export interface ChatHandoffInput {
   /** Каталог разговора: продолжать без проекта некуда — карточка станет читальной. */
@@ -68,9 +69,8 @@ export interface ChatHandoffApi {
  */
 /** Текст ошибки для тоста: фраза сервера, если она есть, иначе — сетевая. */
 function apiMessage(error: unknown): string {
-  const response = (error as { response?: { data?: { message?: unknown } } }).response;
-  const message = response?.data?.message;
-  return typeof message === 'string' && message ? message : (error as Error).message;
+  const response = (error as { response?: { data?: unknown } }).response;
+  return messageFromPayload(response?.data) ?? (error as Error).message;
 }
 
 /**

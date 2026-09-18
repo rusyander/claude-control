@@ -16,7 +16,9 @@ export function registerChatBrowseRoutes(app: FastifyInstance, ctx: ServerContex
   app.get<{ Querystring: { path?: string; files?: string } }>('/api/fs/list', (request, reply) => {
     const path = request.query.path;
     if (!path || !isAbsolute(path))
-      return reply.code(400).send({ message: 'Нужен абсолютный путь' });
+      return reply
+        .code(400)
+        .send({ message: 'Нужен абсолютный путь', messageCode: 'path-absolute-required' });
     // `files=.zip,.json` — показать ещё и файлы с такими расширениями (выбор
     // архива переноса). Без параметра поведение прежнее: только каталоги.
     const fileExtensions = (request.query.files ?? '')
@@ -26,7 +28,9 @@ export function registerChatBrowseRoutes(app: FastifyInstance, ctx: ServerContex
     try {
       return listDirectory(path, { fileExtensions });
     } catch {
-      return reply.code(400).send({ message: 'Каталог недоступен' });
+      return reply
+        .code(400)
+        .send({ message: 'Каталог недоступен', messageCode: 'directory-unavailable' });
     }
   });
 
@@ -37,13 +41,17 @@ export function registerChatBrowseRoutes(app: FastifyInstance, ctx: ServerContex
     '/api/projects/open-in-editor',
     (request, reply) => {
       const path = validTargetCwd(request.body.path);
-      if (!path) return reply.code(400).send({ message: 'Каталог не найден' });
+      if (!path)
+        return reply
+          .code(400)
+          .send({ message: 'Каталог не найден', messageCode: 'directory-not-found' });
 
       // Явно заданный редактор → настроенный → первый найденный в системе.
       const command = resolveEditorCommand(request.body.editor || ctx.store.getSettings().editor);
       if (!command) {
         return reply.code(400).send({
           message: 'Редактор кода не найден. Укажите его в настройках или установите code/cursor.',
+          messageCode: 'editor-not-found',
         });
       }
 

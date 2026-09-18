@@ -9,6 +9,8 @@ import type {
 import { GLOB_DEPTH, MAX_TARGETS, isWindows } from './project-runner.constants.ts';
 import { RunnerError, type RunnerTargetSpec, type TargetMemory } from './project-runner.types.ts';
 import { readPackageJson, resolveRunCommand } from './stack.ts';
+import { coded } from '../../lib/server-text.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /* ── Цели запуска: корень и пакеты монорепозитория ───────────────────── */
 
@@ -220,14 +222,18 @@ export function resolveTargetDir(projectPath: string, dir?: string): { dir: stri
     /^[a-zA-Z]:/.test(clean) ||
     dir?.[0] === '/'
   )
-    throw new RunnerError('bad-path', `Подпапка должна лежать внутри проекта: ${dir ?? ''}`);
+    throw coded(
+      new RunnerError('bad-path', `Подпапка должна лежать внутри проекта: ${dir ?? ''}`),
+      'runner-subdir-outside',
+      { dir: dir ?? '' },
+    );
   return { dir: clean, path: resolve(projectPath, clean) };
 }
 
 /** Каталог проекта существует и это каталог, иначе — текст проблемы. */
 export function checkDir(dir: string): string | null {
-  if (!dir.trim()) return 'Путь к проекту не задан';
-  if (!existsSync(dir)) return `Каталог не существует: ${dir}`;
-  if (!isDirectory(dir)) return `Это не каталог: ${dir}`;
+  if (!dir.trim()) return serverText('project-dir-empty');
+  if (!existsSync(dir)) return serverText('project-dir-absent', { dir });
+  if (!isDirectory(dir)) return serverText('project-dir-not-dir', { dir });
   return null;
 }

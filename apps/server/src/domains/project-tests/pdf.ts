@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { detectCliOnPath, pathExists } from '../../providers/detect.ts';
 import { ProjectTestsError, ProjectTestsUnavailableError } from './files.ts';
 import { brandEnv, brandEnvName } from '../../lib/brand.mjs';
+import { coded } from '../../lib/server-text.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * PDF отчёта — тем браузером, который уже стоит на машине.
@@ -72,10 +74,7 @@ function knownPaths(): string[] {
 }
 
 /** Что можно поставить, если ничего не нашлось, — текст для человека. */
-export const NO_BROWSER_MESSAGE =
-  'PDF печатает браузер, а на этой машине его не нашлось. Поставь Google Chrome, ' +
-  'Microsoft Edge или Chromium (либо укажи путь к нему в переменной окружения ' +
-  `${OVERRIDE_ENV}) — остальные форматы отчёта работают и без него.`;
+export const NO_BROWSER_MESSAGE = serverText('tests-pdf-no-browser', { env: OVERRIDE_ENV });
 
 /** Подменяемые зависимости поиска — тест не должен зависеть от машины. */
 export interface BrowserDeps {
@@ -132,7 +131,10 @@ export async function renderPdf(
   deps: BrowserDeps & { render?: Renderer } = {},
 ): Promise<Buffer> {
   const browser = findChromium(deps);
-  if (!browser) throw new ProjectTestsUnavailableError(NO_BROWSER_MESSAGE);
+  if (!browser)
+    throw coded(new ProjectTestsUnavailableError(NO_BROWSER_MESSAGE), 'pdf-no-browser', {
+      env: OVERRIDE_ENV,
+    });
 
   const dir = mkdtempSync(join(tmpdir(), 'cc-report-'));
   const page = join(dir, 'report.html');
@@ -153,12 +155,17 @@ export async function renderPdf(
     ]);
 
     if (!existsSync(out)) {
-      throw new ProjectTestsError(
-        `Браузер не напечатал отчёт (код ${code})${err ? `: ${err.slice(-400)}` : ''}.`,
+      throw coded(
+        new ProjectTestsError(
+          `Браузер не напечатал отчёт (код ${code})${err ? `: ${err.slice(-400)}` : ''}.`,
+        ),
+        'pdf-print-failed',
+        { code: String(code), detail: err ? `: ${err.slice(-400)}` : '' },
       );
     }
     const body = readFileSync(out);
-    if (body.byteLength === 0) throw new ProjectTestsError('Браузер вернул пустой PDF.');
+    if (body.byteLength === 0)
+      throw coded(new ProjectTestsError('Браузер вернул пустой PDF.'), 'pdf-empty');
     return body;
   } finally {
     rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });

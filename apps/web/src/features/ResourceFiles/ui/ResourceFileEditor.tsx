@@ -7,6 +7,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { useResourceFile, useSaveResourceFile } from '@entities/Resource';
 import { toast } from '@shared/lib/toast';
+import { serverFieldText } from '@shared/config/i18n';
 import type { ResourceFileEditorProps } from './ResourceFileEditor.types';
 import styles from './ResourceFileTree.module.scss';
 
@@ -29,12 +30,17 @@ export function ResourceFileEditor({
   const [draft, setDraft] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    setDraft(loaded.data?.content ?? '');
-    setIsEditing(false);
-  }, [loaded.data, file]);
+  // Текст файла может быть не файлом, а объяснением сервера («слишком
+  // большой») — тогда у него есть код и его переводит словарь, а не показывается
+  // русская строка внутри редактора чужого текста.
+  const loadedText = loaded.data ? serverFieldText(loaded.data, 'content', t) : '';
 
-  const isDirty = draft !== (loaded.data?.content ?? '');
+  useEffect(() => {
+    setDraft(loadedText);
+    setIsEditing(false);
+  }, [loadedText, file]);
+
+  const isDirty = draft !== loadedText;
   const isBinary = loaded.data?.isBinary ?? false;
 
   // Тело окна: бинарный файл только объясняем, в режиме правки даём textarea,

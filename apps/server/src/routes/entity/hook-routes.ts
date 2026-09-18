@@ -13,7 +13,10 @@ import { stripLocalPrefix } from '../../lib/settings-source.ts';
 import { done } from '../write-result.ts';
 import { targetOf, type ClaudePaths } from './shared.ts';
 
-const NO_EVENT = { message: 'Не указано событие хука' } as const;
+const NO_EVENT = {
+  message: 'Не указано событие хука',
+  messageCode: 'hook-event-unspecified',
+} as const;
 
 const noEvent = (reply: FastifyReply): FastifyReply => reply.code(400).send(NO_EVENT);
 
@@ -85,7 +88,9 @@ export function registerHookRoutes(app: FastifyInstance, ctx: ServerContext): vo
       // означало «вниз», то есть оборванный запрос молча переставлял хук.
       const direction = request.body.direction;
       if (direction !== 'up' && direction !== 'down') {
-        return reply.code(400).send({ message: 'Не указано направление' });
+        return reply
+          .code(400)
+          .send({ message: 'Не указано направление', messageCode: 'hook-direction-unspecified' });
       }
 
       const id = findHook(lookup(), request.params.id)?.id ?? request.params.id;

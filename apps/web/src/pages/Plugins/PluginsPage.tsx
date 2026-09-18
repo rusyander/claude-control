@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { serverFieldList } from '@shared/config/i18n';
 import type { Plugin } from '@agentdeck/contracts';
 import { useEntityUrl } from '@shared/hooks/use-entity-url';
 import { Stack } from '@shared/ui/stack';
@@ -81,11 +82,12 @@ export function PluginsPage() {
       <ExplainBox title={t('plugins.explainTitle')} text={t('plugins.explain')} />
 
       {/* CLI не ответил — список неполный, и человек должен видеть причину, а не ноль. */}
-      {data?.notes.map((note) => (
-        <Typography key={note} variant="body-sm" color="warning">
-          {note}
-        </Typography>
-      ))}
+      {data &&
+        serverFieldList(data, 'notes').map((note) => (
+          <Typography key={note} variant="body-sm" color="warning">
+            {note}
+          </Typography>
+        ))}
 
       {isLoading && <SkeletonList rows={5} />}
 

@@ -5,6 +5,7 @@ import {
   type DriverReading,
   type PlatformDriver,
 } from './driver.ts';
+import { serverText } from '../../../lib/server-texts.ts';
 
 /**
  * Драйвер любого совместимого с OpenAI шлюза.
@@ -70,7 +71,7 @@ export const openAiCompatDriver: PlatformDriver = {
       capabilities,
       // Ограничений произвольного шлюза панель не знает — и не выдумывает их.
       limits: {},
-      notes: ['Возможности сверх списка моделей у совместимого шлюза не объявлены.'],
+      notes: [serverText('contour-notes-no-capabilities')],
       compromises: ['probe-guess'],
     };
   },

@@ -11,6 +11,7 @@ import { SkeletonList } from '@shared/ui/skeleton';
 import { releaseExportUrl, useTestRelease } from '@entities/ProjectTest';
 import type { TestsReleaseCardProps } from './TestsReleaseCard.types';
 import styles from './TestsPage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /** Цвет состояния требования: «не до конца» — предупреждение, остальное красное. */
 const STATE_TONE: Record<ProjectTestReleaseRequirement['state'], 'success' | 'warning' | 'danger'> =
@@ -263,7 +264,7 @@ export function TestsReleaseCard({ projectPath, releases }: TestsReleaseCardProp
                 считается по прогонам и без единой интеграции. */}
             {doc.warning && (
               <Typography variant="caption" color="subtle">
-                {doc.warning}
+                {serverFieldText(doc, 'warning')}
               </Typography>
             )}
           </Stack>

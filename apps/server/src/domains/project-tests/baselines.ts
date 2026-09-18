@@ -14,6 +14,8 @@ import {
 } from './files.ts';
 import { PngFormatError, decodePng, encodePng, type PngImage } from './png.ts';
 import { readGroups } from './store.ts';
+import { coded } from '../../lib/server-text.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Эталонные скриншоты: сравнение «было/стало» с картинкой-разницей.
@@ -56,14 +58,19 @@ const BACKGROUND_FADE = 0.12;
 /** Имя файла из идентификатора поинта: в нём есть `|`, а это не имя файла. */
 export function baselineSlug(pointId: string): string {
   const cleaned = pointId.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
-  if (!cleaned) throw new ProjectTestsError('Не указан тест-поинт снимка.');
+  if (!cleaned)
+    throw coded(new ProjectTestsError('Не указан тест-поинт снимка.'), 'baseline-point-missing');
   return cleaned.slice(0, 120);
 }
 
 /** Идентификатор кейса как имя папки. */
 function caseSlug(caseId: string): string {
   const cleaned = caseId.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
-  if (!cleaned) throw new ProjectTestsError('Не указан кейс, к которому относится снимок.');
+  if (!cleaned)
+    throw coded(
+      new ProjectTestsError('Не указан кейс, к которому относится снимок.'),
+      'baseline-case-missing',
+    );
   return cleaned;
 }
 
@@ -88,6 +95,8 @@ interface BaselineMeta {
   height?: number;
   updatedAt?: string;
   message?: string;
+  messageCode?: string;
+  params?: Record<string, string | number>;
 }
 
 function readMeta(root: string, relative: string): BaselineMeta | undefined {
@@ -104,6 +113,11 @@ function readMeta(root: string, relative: string): BaselineMeta | undefined {
     height: typeof record.height === 'number' ? record.height : undefined,
     updatedAt: optional(record.updatedAt),
     message: optional(record.message),
+    messageCode: optional(record.messageCode),
+    params:
+      record.params && typeof record.params === 'object'
+        ? (record.params as Record<string, string | number>)
+        : undefined,
   };
 }
 
@@ -113,7 +127,11 @@ function readPng(root: string, relative: string): Buffer | undefined {
   if (!existsSync(path)) return undefined;
   const buffer = readFileSync(path);
   if (buffer.byteLength > MAX_FILE_BYTES * 4) {
-    throw new ProjectTestsError(`Файл ${testsFile(relative)} слишком велик для сравнения.`);
+    throw coded(
+      new ProjectTestsError(`Файл ${testsFile(relative)} слишком велик для сравнения.`),
+      'baseline-file-too-large',
+      { file: testsFile(relative) },
+    );
   }
   return buffer;
 }
@@ -200,7 +218,14 @@ function decodeOrFail(png: Buffer, what: string): PngImage {
   try {
     return decodePng(png);
   } catch (error) {
-    if (error instanceof PngFormatError) throw new ProjectTestsError(`${what}: ${error.message}`);
+    if (error instanceof PngFormatError)
+      throw coded(
+        new ProjectTestsError(`${what}: ${error.message}`),
+        'baseline-snapshot-unparsed',
+        {
+          reason: error.message,
+        },
+      );
     throw error;
   }
 }
@@ -226,6 +251,8 @@ function persist(
     height: meta.height,
     updatedAt: meta.updatedAt,
     message: meta.message,
+    messageCode: meta.messageCode,
+    params: meta.params,
   };
 }
 
@@ -239,7 +266,7 @@ function persist(
  */
 export function compareBaseline(root: string, input: BaselineInput): ProjectTestBaseline {
   const paths = filesOf(input.caseId, input.pointId);
-  const actual = decodeOrFail(input.png, 'Снимок не разобрался');
+  const actual = decodeOrFail(input.png, serverText('tests-baseline-png-broken'));
   const limit = input.maxDiffRatio ?? caseThreshold(root, input.caseId) ?? DEFAULT_MAX_DIFF_RATIO;
 
   const stored = readPng(root, paths.baseline);
@@ -255,6 +282,7 @@ export function compareBaseline(root: string, input: BaselineInput): ProjectTest
       height: actual.height,
       updatedAt: input.now,
       message: 'Эталона не было — снимок принят как эталон.',
+      messageCode: 'baseline-created',
     });
   }
 
@@ -272,6 +300,8 @@ export function compareBaseline(root: string, input: BaselineInput): ProjectTest
       maxDiffRatio: limit,
       updatedAt: input.now,
       message: `Эталон не читается: ${(error as Error).message} Прими снимок эталоном или почини файл.`,
+      messageCode: 'baseline-unreadable',
+      params: { reason: (error as Error).message },
     });
   }
 
@@ -286,6 +316,11 @@ export function compareBaseline(root: string, input: BaselineInput): ProjectTest
       message:
         `Размер снимка ${actual.width}×${actual.height} не совпал с эталоном ` +
         `${baseline.width}×${baseline.height} — сравнивать нечего.`,
+      messageCode: 'baseline-size-mismatch',
+      params: {
+        actual: `${actual.width}×${actual.height}`,
+        baseline: `${baseline.width}×${baseline.height}`,
+      },
     });
   }
 
@@ -315,6 +350,8 @@ export function compareBaseline(root: string, input: BaselineInput): ProjectTest
     height: actual.height,
     updatedAt: input.now,
     message: `Разошлось ${(ratio * 100).toFixed(2)}% пикселей при пороге ${(limit * 100).toFixed(2)}%.`,
+    messageCode: 'baseline-diff-ratio',
+    params: { ratio: (ratio * 100).toFixed(2), limit: (limit * 100).toFixed(2) },
   });
 }
 
@@ -328,9 +365,12 @@ export function acceptBaseline(
   const paths = filesOf(caseId, pointId);
   const actual = readPng(root, paths.actual);
   if (!actual) {
-    throw new ProjectTestsNotFoundError('Нечего принимать: нового снимка по этому поинту нет.');
+    throw coded(
+      new ProjectTestsNotFoundError('Нечего принимать: нового снимка по этому поинту нет.'),
+      'baseline-nothing-to-accept',
+    );
   }
-  const image = decodeOrFail(actual, 'Снимок не разобрался');
+  const image = decodeOrFail(actual, serverText('tests-baseline-png-broken'));
   writePng(root, paths.baseline, actual);
   removeFile(root, paths.actual);
   removeFile(root, paths.diff);
@@ -342,6 +382,7 @@ export function acceptBaseline(
     height: image.height,
     updatedAt: now,
     message: 'Снимок принят эталоном.',
+    messageCode: 'baseline-accepted',
   });
 }
 
@@ -371,6 +412,8 @@ export function readBaselines(root: string, caseId?: string): ProjectTestBaselin
         height: meta?.height,
         updatedAt: meta?.updatedAt,
         message: meta?.message,
+        messageCode: meta?.messageCode,
+        params: meta?.params,
       });
     }
   }

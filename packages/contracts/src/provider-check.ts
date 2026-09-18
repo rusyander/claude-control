@@ -1,4 +1,5 @@
 import { object, string, array, record, literal, union } from 'zod';
+import type { CodedFields } from './server-messages';
 
 /**
  * Проверка провайдера — «доверие, подтверждённое делом».
@@ -43,7 +44,7 @@ export type ProviderCheckStepId =
  */
 export type ProviderCheckStatus = 'pass' | 'warn' | 'fail' | 'skipped';
 
-export interface ProviderCheckStep {
+export interface ProviderCheckStep extends CodedFields<'detail'> {
   id: ProviderCheckStepId;
   status: ProviderCheckStatus;
   /** Пояснение для человека: что именно проверено или почему пропущено. */

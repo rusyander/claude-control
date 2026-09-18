@@ -104,6 +104,8 @@ export type McpToolDetail = Infer<typeof mcpToolDetailSchema>;
 export const mcpToolsResultSchema = object({
   tools: array(mcpToolSchema),
   error: string().optional(),
+  /** Код текста отказа: панель переводит его своим словарём. */
+  messageCode: string().optional(),
 });
 
 export type McpToolsResult = Infer<typeof mcpToolsResultSchema>;

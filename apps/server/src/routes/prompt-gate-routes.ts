@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { PromptGateInfo, PromptGateSettings } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import { applyPromptGate, describePromptGate, type GateLocation } from '../domains/prompt-gate.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Гейт на промпте: состояние и одно действие «привести в соответствие».
@@ -28,10 +29,18 @@ export function registerPromptGateRoutes(app: FastifyInstance, ctx: ServerContex
   app.put<{ Body: unknown }>('/api/prompt-gate', (request, reply) => {
     const body = request.body as { enabled?: unknown; action?: unknown; force?: unknown } | null;
     if (!body || typeof body.enabled !== 'boolean') {
-      return reply.code(400).send({ error: 'invalid_body', message: 'Ожидается поле enabled.' });
+      return reply.code(400).send({
+        error: 'invalid_body',
+        message: 'Ожидается поле enabled.',
+        messageCode: 'prompt-gate-enabled-expected',
+      });
     }
     if (body.action !== 'block' && body.action !== 'warn') {
-      return reply.code(400).send({ error: 'invalid_body', message: 'Действие: block или warn.' });
+      return reply.code(400).send({
+        error: 'invalid_body',
+        message: 'Действие: block или warn.',
+        messageCode: 'prompt-gate-action',
+      });
     }
 
     const settings: PromptGateSettings = { enabled: body.enabled, action: body.action };
@@ -49,6 +58,7 @@ export function registerPromptGateRoutes(app: FastifyInstance, ctx: ServerContex
       return reply.code(500).send({
         error: 'prompt_gate_failed',
         message: error instanceof Error ? error.message : String(error),
+        ...codeOf(error),
       });
     }
   });

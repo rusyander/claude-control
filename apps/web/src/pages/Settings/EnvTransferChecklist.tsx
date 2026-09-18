@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { serverFieldList } from '@shared/config/i18n';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import type { EnvTransferChecklistProps } from './EnvTransferChecklist.types';
@@ -35,7 +36,7 @@ export function EnvTransferChecklist({ items }: EnvTransferChecklistProps) {
               </Typography>
               <Typography variant="body-sm" color="subtle">
                 {t(`envTransfer.checklistReason_${item.reason}`)}
-                {item.keys.length > 0 && `: ${item.keys.join(', ')}`}
+                {item.keys.length > 0 && `: ${serverFieldList(item, 'keys').join(', ')}`}
               </Typography>
             </Stack>
           ))}

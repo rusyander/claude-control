@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import type { NotifyEvent, WebhookPayload, WebhookSettings } from '@agentdeck/contracts';
-import { describeFailure, sendRequest } from '../integrations/http.ts';
-import { invalidField, unreachable } from '../integrations/errors.ts';
+import { failedResponse, sendRequest } from '../integrations/http.ts';
+import { invalidField } from '../integrations/errors.ts';
 import { compose, noticeEvent, type TelegramNotice } from './telegram.ts';
 import { LEGACY_BRAND_NAME } from '../../lib/brand.mjs';
 
@@ -80,7 +80,7 @@ export async function sendWebhook(
     body,
   });
   if (!response.ok) {
-    throw unreachable(describeFailure(SYSTEM, response), response.text.slice(0, 300));
+    throw failedResponse(SYSTEM, response, 300);
   }
 }
 
@@ -95,15 +95,25 @@ export function sign(secret: string, body: string): string {
  */
 export function requireHttpUrl(url: string): string {
   const value = url.trim();
-  if (!value) throw invalidField('url', 'не указан адрес вебхука');
+  if (!value)
+    throw invalidField('url', 'не указан адрес вебхука', 'request-webhook-url-missing', {
+      field: 'url',
+    });
   let parsed: URL;
   try {
     parsed = new URL(value);
   } catch {
-    throw invalidField('url', 'адрес вебхука не разобрался');
+    throw invalidField('url', 'адрес вебхука не разобрался', 'request-webhook-url-unparsed', {
+      field: 'url',
+    });
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw invalidField('url', 'адрес вебхука должен быть http или https');
+    throw invalidField(
+      'url',
+      'адрес вебхука должен быть http или https',
+      'request-webhook-url-scheme',
+      { field: 'url' },
+    );
   }
   return value;
 }

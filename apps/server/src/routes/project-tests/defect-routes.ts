@@ -18,6 +18,7 @@ import {
 } from '../../domains/project-tests/defects.ts';
 import { IntegrationError } from '../../domains/integrations/errors.ts';
 import { guard, requireRoot, type TestsDeps } from './shared.ts';
+import { codeOf, coded } from '../../lib/server-text.ts';
 
 /**
  * Дефект по проваленному кейсу.
@@ -77,13 +78,21 @@ export function registerTestDefectRoutes(app: FastifyInstance, deps: TestsDeps):
     const groupId = String(request.body?.groupId ?? '').trim();
     const caseId = String(request.body?.caseId ?? '').trim();
     if (!groupId || !caseId) {
-      return reply.code(400).send({ message: 'Не указан кейс, по которому заводится дефект.' });
+      return reply.code(400).send({
+        message: 'Не указан кейс, по которому заводится дефект.',
+        messageCode: 'defect-case-unspecified',
+      });
     }
 
     return guard(reply, () => {
       const group = readGroup(root, groupId);
       const testCase = group.cases.find((item) => item.id === caseId);
-      if (!testCase) throw new ProjectTestsNotFoundError(`Кейса «${caseId}» в группе нет.`);
+      if (!testCase)
+        throw coded(
+          new ProjectTestsNotFoundError(`Кейса «${caseId}» в группе нет.`),
+          'case-not-in-group',
+          { caseId },
+        );
 
       const record = request.body?.runId ? readRun(root, request.body.runId) : undefined;
       const result = record?.results.find((item) => item.caseId === caseId);
@@ -127,11 +136,18 @@ export function registerTestDefectRoutes(app: FastifyInstance, deps: TestsDeps):
     if (!root) return reply;
     const target = request.body?.target;
     if (target !== 'github' && target !== 'gitlab' && target !== 'forge' && target !== 'jira') {
-      return reply.code(400).send({ message: 'Не указано, куда заводить задачу.' });
+      return reply.code(400).send({
+        message: 'Не указано, куда заводить задачу.',
+        messageCode: 'defect-target-unspecified',
+      });
     }
     const title = request.body?.title?.trim();
     const body = request.body?.body?.trim();
-    if (!title || !body) return reply.code(400).send({ message: 'Нужен заголовок и описание.' });
+    if (!title || !body)
+      return reply.code(400).send({
+        message: 'Нужен заголовок и описание.',
+        messageCode: 'defect-title-body-required',
+      });
 
     try {
       const url =
@@ -155,10 +171,10 @@ function failCreate(reply: FastifyReply, error: unknown): FastifyReply {
   if (error instanceof IntegrationError) {
     return reply
       .code(error.statusCode)
-      .send({ code: error.code, message: error.message, detail: error.detail });
+      .send({ code: error.code, message: error.message, ...codeOf(error), detail: error.detail });
   }
   if (error instanceof ProjectTestsError) {
-    return reply.code(error.statusCode || 400).send({ message: error.message });
+    return reply.code(error.statusCode || 400).send({ message: error.message, ...codeOf(error) });
   }
   throw error;
 }

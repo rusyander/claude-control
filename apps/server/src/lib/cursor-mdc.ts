@@ -1,5 +1,6 @@
 import { parseDocument, isMap, isSeq, isScalar, type Document } from 'yaml';
 import { stripBom } from './text-form.ts';
+import { coded } from './server-text.ts';
 
 /**
  * Правило Cursor — файл `.mdc`: YAML-frontmatter + markdown-тело.
@@ -99,10 +100,16 @@ export function splitMdc(text: string): { frontmatter: string; body: string } | 
 function parseFrontmatter(text: string): Document {
   const doc = parseDocument(text);
   if (doc.errors.length > 0) {
-    throw new MdcFormatError('malformed', 'Frontmatter правила не разбирается как YAML.');
+    throw coded(
+      new MdcFormatError('malformed', 'Frontmatter правила не разбирается как YAML.'),
+      'mdc-yaml',
+    );
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    throw new MdcFormatError('malformed', 'Frontmatter правила не является отображением ключей.');
+    throw coded(
+      new MdcFormatError('malformed', 'Frontmatter правила не является отображением ключей.'),
+      'mdc-not-map',
+    );
   }
   return doc;
 }
@@ -251,16 +258,25 @@ export function writeMdcRule(original: string, fields: MdcFields, body: string):
     ...(fields.alwaysApply === undefined ? {} : { alwaysApply: fields.alwaysApply }),
   };
   if (JSON.stringify(sortFields(check.fields)) !== JSON.stringify(sortFields(wanted))) {
-    throw new MdcFormatError('malformed', 'Контрольный разбор правила не совпал с намерением.');
+    throw coded(
+      new MdcFormatError('malformed', 'Контрольный разбор правила не совпал с намерением.'),
+      'mdc-roundtrip-intent',
+    );
   }
   if (check.body !== normalizedBody) {
-    throw new MdcFormatError('malformed', 'Контрольный разбор изменил тело правила.');
+    throw coded(
+      new MdcFormatError('malformed', 'Контрольный разбор изменил тело правила.'),
+      'mdc-roundtrip-body',
+    );
   }
   if (
     otherKeysProjection(before) !==
     otherKeysProjection(parseFrontmatter(splitMdc(next)!.frontmatter))
   ) {
-    throw new MdcFormatError('malformed', 'Контрольный разбор потерял ключи frontmatter.');
+    throw coded(
+      new MdcFormatError('malformed', 'Контрольный разбор потерял ключи frontmatter.'),
+      'mdc-roundtrip-keys',
+    );
   }
 
   return next;

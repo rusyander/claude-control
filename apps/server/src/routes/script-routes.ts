@@ -10,6 +10,7 @@ import {
   ScriptExistsError,
 } from '../domains/scripts.ts';
 import { readHooks } from '../domains/hooks.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Отказ по пути — 400 с явной причиной. Молча подставлять «очищенный» путь
@@ -18,10 +19,12 @@ import { readHooks } from '../domains/hooks.ts';
  */
 function replyScriptError(reply: FastifyReply, error: unknown): FastifyReply {
   if (error instanceof UnsafeScriptPathError) {
-    return reply.code(400).send({ error: 'unsafe_path', message: error.message });
+    return reply.code(400).send({ error: 'unsafe_path', message: error.message, ...codeOf(error) });
   }
   if (error instanceof ScriptExistsError) {
-    return reply.code(409).send({ error: 'script_exists', message: error.message });
+    return reply
+      .code(409)
+      .send({ error: 'script_exists', message: error.message, ...codeOf(error) });
   }
   throw error;
 }
@@ -60,7 +63,10 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
       // Тела нет — записывать нечего. Молча сохранить пустоту здесь означало бы
       // затереть работающий хук пользователя оборвавшимся запросом.
       if (typeof request.body.content !== 'string') {
-        return reply.code(400).send({ message: 'Не передано содержимое скрипта' });
+        return reply.code(400).send({
+          message: 'Не передано содержимое скрипта',
+          messageCode: 'script-content-missing',
+        });
       }
 
       try {
@@ -86,7 +92,10 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
     // Имя обязательно и домыслить его нечем: без него запрос уходил в запись и
     // возвращал 500 — «сломалась панель» вместо «не хватает поля».
     const name = typeof request.body.name === 'string' ? request.body.name.trim() : '';
-    if (!name) return reply.code(400).send({ message: 'Не указано имя скрипта' });
+    if (!name)
+      return reply
+        .code(400)
+        .send({ message: 'Не указано имя скрипта', messageCode: 'script-name-unspecified' });
 
     try {
       createScript(ctx.location.paths.hooks, name, request.body.content ?? '');

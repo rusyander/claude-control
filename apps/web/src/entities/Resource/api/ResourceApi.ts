@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
+import type { CodedFields } from '@agentdeck/contracts/server-messages';
 
 /**
  * Файлы ресурса — общий слой для всех видов.
@@ -48,10 +49,9 @@ export function useResourceFile(kind: ResourceKind, id: string | undefined, file
   return useQuery({
     queryKey: [...resourceKey(kind, id ?? ''), 'file', file],
     queryFn: async () => {
-      const { data } = await apiClient.get<{ content: string; isBinary: boolean }>(
-        `/resources/${kind}/${encodeURIComponent(id ?? '')}/file`,
-        { params: { file } },
-      );
+      const { data } = await apiClient.get<
+        { content: string; isBinary: boolean } & CodedFields<'content'>
+      >(`/resources/${kind}/${encodeURIComponent(id ?? '')}/file`, { params: { file } });
       return data;
     },
     enabled: Boolean(id && file),

@@ -14,6 +14,7 @@ import { readEnvironments } from './library.ts';
 import { buildPoints, planCases, readPlan } from './plans.ts';
 import { gitContext, releaseTag } from './impact.ts';
 import { writeRun } from './runs-store.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Ручной прогон: кейсы проходит ЧЕЛОВЕК, панель записывает.
@@ -44,17 +45,28 @@ export class ProjectTestManualRegistry {
   ): ProjectTestManualSession {
     const active = this.sessions.get(root);
     if (active && !active.finishedAt) {
-      throw new ProjectTestsError('Ручной прогон по этому проекту уже идёт.');
+      throw coded(
+        new ProjectTestsError('Ручной прогон по этому проекту уже идёт.'),
+        'manual-already-running',
+      );
     }
 
     const groups = readGroups(root);
     if (request.groupId && !groups.some((group) => group.id === request.groupId)) {
-      throw new ProjectTestsNotFoundError(`Группы «${request.groupId}» в проекте нет.`);
+      throw coded(
+        new ProjectTestsNotFoundError(`Группы «${request.groupId}» в проекте нет.`),
+        'run-group-not-found',
+        { groupId: request.groupId },
+      );
     }
     const environments = readEnvironments(root);
     const plan = request.planId ? readPlan(root, request.planId) : undefined;
     if (request.planId && !plan) {
-      throw new ProjectTestsNotFoundError(`Плана «${request.planId}» в проекте нет.`);
+      throw coded(
+        new ProjectTestsNotFoundError(`Плана «${request.planId}» в проекте нет.`),
+        'run-plan-not-found',
+        { planId: request.planId },
+      );
     }
 
     const chosen = plan
@@ -68,7 +80,8 @@ export class ProjectTestManualRegistry {
             request.caseIds.includes(`${item.groupId}:${item.testCase.id}`),
         );
 
-    if (chosen.length === 0) throw new ProjectTestsError('Прогонять нечего: кейсов нет.');
+    if (chosen.length === 0)
+      throw coded(new ProjectTestsError('Прогонять нечего: кейсов нет.'), 'run-no-cases');
 
     // Агент переписывает файл группы после каждого кейса; отметки человека в тот
     // же файл либо потерялись бы, либо стёрли его результаты. Замок тот же, что у
@@ -98,7 +111,11 @@ export class ProjectTestManualRegistry {
   record(root: string, input: ProjectTestManualResultInput, now: string): ProjectTestManualSession {
     const session = this.require(root, input.runId);
     const point = session.points.find((item) => item.id === input.pointId);
-    if (!point) throw new ProjectTestsNotFoundError('Такого прохода в этом прогоне нет.');
+    if (!point)
+      throw coded(
+        new ProjectTestsNotFoundError('Такого прохода в этом прогоне нет.'),
+        'manual-point-not-found',
+      );
 
     const previous = session.results.find((item) => item.pointId === input.pointId);
     // Разбор провала считается один раз и уходит в ОБА места: в файл кейса и в
@@ -194,8 +211,10 @@ export class ProjectTestManualRegistry {
 
   private require(root: string, runId: string): ProjectTestManualSession {
     const session = this.sessions.get(root);
-    if (!session) throw new ProjectTestsNotFoundError('Ручной прогон не начат.');
-    if (session.runId !== runId) throw new ProjectTestsError('Этот прогон уже не идёт.');
+    if (!session)
+      throw coded(new ProjectTestsNotFoundError('Ручной прогон не начат.'), 'manual-not-started');
+    if (session.runId !== runId)
+      throw coded(new ProjectTestsError('Этот прогон уже не идёт.'), 'manual-run-over');
     return session;
   }
 

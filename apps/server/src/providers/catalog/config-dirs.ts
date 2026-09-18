@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * ПЕРЕОПРЕДЕЛЕНИЯ КАТАЛОГОВ КОНФИГУРАЦИИ ЧЕРЕЗ ОКРУЖЕНИЕ.
@@ -133,8 +134,12 @@ export const AIDER_CONFIG_BASENAME = '.aider.conf.yml';
  */
 export function unimplementedPaths(id: string): () => never {
   return () => {
-    throw new Error(
-      `Провайдер «${id}» на этой фазе только объявлен: файловый адаптер не реализован, чтение/запись запрещены.`,
+    throw coded(
+      new Error(
+        `Провайдер «${id}» на этой фазе только объявлен: файловый адаптер не реализован, чтение/запись запрещены.`,
+      ),
+      'provider-declared-only',
+      { id },
     );
   };
 }

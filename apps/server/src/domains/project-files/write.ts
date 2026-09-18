@@ -3,6 +3,7 @@ import type { ProjectFileSaveResult } from '@agentdeck/contracts';
 import { writeTextFile } from '../../lib/safe-io.ts';
 import { MAX_FILE_BYTES } from './constants.ts';
 import { ProjectFileError, resolveProjectPath } from './paths.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Запись правки человека в файл проекта.
@@ -31,19 +32,23 @@ export function saveProjectFile(
   expectedMtimeMs: number,
   backupDir?: string,
 ): ProjectFileSaveResult {
-  if (typeof content !== 'string') throw new ProjectFileError('Содержимое не передано.');
+  if (typeof content !== 'string')
+    throw coded(new ProjectFileError('Содержимое не передано.'), 'file-content-missing');
   if (Buffer.byteLength(content, 'utf8') > MAX_FILE_BYTES) {
-    throw new ProjectFileError('Файл больше допустимого размера.');
+    throw coded(new ProjectFileError('Файл больше допустимого размера.'), 'file-too-large-write');
   }
 
   const path = resolveProjectPath(root, file);
   const stats = statSync(path);
-  if (!stats.isFile()) throw new ProjectFileError('Это не файл.');
+  if (!stats.isFile()) throw coded(new ProjectFileError('Это не файл.'), 'file-not-a-file');
 
   // Сравнение целочисленное: mtimeMs приходит от клиента через JSON, и дробная
   // часть по дороге теряет точность — из-за неё файл «менялся» бы всегда.
   if (Math.floor(stats.mtimeMs) !== Math.floor(expectedMtimeMs)) {
-    throw new StaleFileError('Файл на диске изменился после открытия.');
+    throw coded(
+      new StaleFileError('Файл на диске изменился после открытия.'),
+      'file-changed-on-disk',
+    );
   }
 
   const backupPath = writeTextFile(path, content, {

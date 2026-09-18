@@ -28,23 +28,27 @@ export function registerProviderPermissionsRoutes(app: FastifyInstance, ctx: Ser
   const SECTION_UNSUPPORTED = {
     error: 'section_unsupported',
     message: 'У активного провайдера нет универсального раздела прав/аппрувов.',
+    messageCode: 'permissions-section-unsupported',
   } as const;
 
   const INVALID_DRAFT = {
     error: 'invalid_draft',
     message: 'Значения прав не прошли проверку: они должны быть из допустимых наборов.',
+    messageCode: 'permissions-draft-invalid',
   } as const;
 
   const MODE_CLI_ONLY = {
     error: 'mode_cli_only',
     message:
       'Режим «yolo» в settings.json записать нельзя: у Gemini он допустим только как флаг командной строки, а в файле настроек вызывает ошибку при запуске CLI. Запускайте его флагом `--yolo`.',
+    messageCode: 'gemini-yolo-cli-only',
   } as const;
 
   const FORMAT_UNRECOGNIZED = {
     error: 'format_unrecognized',
     message:
       'Формат файла конфигурации не распознан — запись запрещена (раздел только для чтения).',
+    messageCode: 'config-format-unrecognized-readonly',
   } as const;
 
   const requireTarget = (reply: FastifyReply): ProviderPermissionsTarget | undefined => {

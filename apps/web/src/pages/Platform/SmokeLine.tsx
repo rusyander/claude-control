@@ -5,6 +5,7 @@ import { Typography } from '@shared/ui/typography';
 import { StatusDot } from '@shared/ui/status-dot';
 import { formatAgo } from './lib/formatAgo';
 import styles from './PlatformPage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 interface SmokeLineProps {
   smoke: PlatformSmokeResult;
@@ -49,7 +50,7 @@ export function SmokeLine({ smoke }: SmokeLineProps) {
             «контур отказал» чинятся в разных местах и разными людьми. */}
         {smoke.detail && (
           <Typography variant="caption" color="muted">
-            {smoke.detail}
+            {serverFieldText(smoke, 'detail')}
           </Typography>
         )}
       </Stack>

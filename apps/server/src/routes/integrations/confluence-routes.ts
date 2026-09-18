@@ -40,7 +40,13 @@ export function registerIntegrationConfluenceRoutes(
       guard(reply, () =>
         searchPages(
           atlassianAccess(deps),
-          requireString(request.query.q, 'q', 'нужен текст поиска'),
+          requireString(
+            request.query.q,
+            'q',
+            'нужен текст поиска',
+            'request-search-text-required',
+            { field: 'q' },
+          ),
           limitOf(request.query.limit),
         ),
       ),
@@ -59,8 +65,20 @@ export function registerIntegrationConfluenceRoutes(
         parentId?: unknown;
       } | null;
       return createPage(atlassianAccess(deps), {
-        spaceKey: requireString(body?.spaceKey, 'spaceKey', 'не указано пространство'),
-        title: requireString(body?.title, 'title', 'не указан заголовок страницы'),
+        spaceKey: requireString(
+          body?.spaceKey,
+          'spaceKey',
+          'не указано пространство',
+          'request-space-missing',
+          { field: 'spaceKey' },
+        ),
+        title: requireString(
+          body?.title,
+          'title',
+          'не указан заголовок страницы',
+          'request-page-title-missing',
+          { field: 'title' },
+        ),
         body: textToStorage(typeof body?.body === 'string' ? body.body : ''),
         parentId: optionalString(body?.parentId),
       });
@@ -80,7 +98,13 @@ export function registerIntegrationConfluenceRoutes(
         return updatePage(atlassianAccess(deps), request.params.id, {
           title: optionalString(body?.title),
           body: textToStorage(
-            requireString(body?.body, 'body', 'пустое тело страницы — так её не перезаписывают'),
+            requireString(
+              body?.body,
+              'body',
+              'пустое тело страницы — так её не перезаписывают',
+              'request-page-body-empty',
+              { field: 'body' },
+            ),
           ),
         });
       }),

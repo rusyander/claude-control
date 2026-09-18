@@ -70,9 +70,20 @@ describe('сводка прослойки инструментов', () => {
       event({ toolFlaws: ['инструмент не объявлен клиентом: Bash', 'блок без закрывающего тега'] }),
     ]);
 
+    // Рядом с причиной — её код: строка пришла из следа, а карточка читает её
+    // на языке панели. Имя инструмента остаётся подстановкой, а не переводится.
     expect(report.flaws).toEqual([
-      { reason: 'инструмент не объявлен клиентом: Bash', count: 2 },
-      { reason: 'блок без закрывающего тега', count: 1 },
+      {
+        reason: 'инструмент не объявлен клиентом: Bash',
+        reasonCode: 'gateway-joined',
+        reasonParams: { message: { messageCode: 'gateway-flaw-undeclared' }, detail: 'Bash' },
+        count: 2,
+      },
+      {
+        reason: 'блок без закрывающего тега',
+        reasonCode: 'gateway-flaw-unclosed',
+        count: 1,
+      },
     ]);
   });
 

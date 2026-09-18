@@ -11,6 +11,7 @@ import { Typography } from '@shared/ui/typography';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useBulkTestCases, useTestQuarantine } from '@entities/ProjectTest';
 import styles from './TestsPage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Карантин и устаревание.
@@ -70,7 +71,7 @@ export function TestsQuarantineCard({ projectPath }: { projectPath: string | und
           </Typography>
         </Stack>
         <Typography variant="caption" color="subtle">
-          {item.message}
+          {serverFieldText(item, 'message')}
         </Typography>
         {action === 'unmute' && item.muteReason && (
           <Typography variant="caption" color="subtle">
@@ -190,7 +191,7 @@ export function TestsQuarantineCard({ projectPath }: { projectPath: string | und
             карантину считаются по истории прогонов и без него. */}
         {data.warning && (
           <Typography variant="caption" color="subtle">
-            {data.warning}
+            {serverFieldText(data, 'warning')}
           </Typography>
         )}
       </Stack>

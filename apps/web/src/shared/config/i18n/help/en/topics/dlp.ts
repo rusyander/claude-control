@@ -394,7 +394,7 @@ export const dlpEn: typeof dlpRu = {
       'not 403: Claude Code reads a 403 as a login failure and appends “Failed to ' +
       'authenticate.” although the key is fine. The journal carries a “blocked” line with the ' +
       'rule name.',
-    refusalUnknown: '“…, request stopped (the ‘pass unparsed’ setting is off)”',
+    refusalUnknown: '“…, the request was stopped (the «let unparsed through» setting is off)”',
     refusalUnknownText:
       'The body was not parsed: a foreign path, not JSON, or an unfamiliar schema. Turn ' +
       'the toggle on if you trust that channel — but then the unparsed goes through as is.',
@@ -402,7 +402,7 @@ export const dlpEn: typeof dlpRu = {
     refusalTooBigText:
       'Over 32 MB. The proxy will not parse a body that size in memory — it could neither ' +
       'pass nor check it honestly.',
-    refusalUpstream: '“the model address is not responding”',
+    refusalUpstream: '“the model address does not answer”',
     refusalUpstreamText:
       'The proxy got as far as forwarding and the destination is silent. Check the ' +
       '“Forward to” field, or the endpoint profile it is taken from.',

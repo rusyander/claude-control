@@ -11,6 +11,7 @@ import { MdcFormatError, readMdcRule } from '../../lib/cursor-mdc.ts';
 import { RuleNotEditableError, RuleNotFoundError } from './errors.ts';
 import { resolveRulePath, ruleExtension, toRelative } from './paths.ts';
 import type { ProviderRulesTarget } from './types.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /** Все файлы каталога правил: `.mdc` — правила, остальное — игнорируемое Cursor. */
 function walkRulesDir(target: ProviderRulesTarget): { rules: string[]; ignored: string[] } {
@@ -92,10 +93,14 @@ export function readProviderRule(target: ProviderRulesTarget, rawPath: string): 
     throw new RuleNotFoundError(rawPath);
   }
   if (fileSizeOf(fullPath) > SECTION_MAX_FILE_BYTES) {
-    throw new RuleNotEditableError(
-      rawPath,
-      'malformed',
-      `Файл ${fullPath} слишком большой для правки в панели.`,
+    throw coded(
+      new RuleNotEditableError(
+        rawPath,
+        'malformed',
+        `Файл ${fullPath} слишком большой для правки в панели.`,
+      ),
+      'file-too-large-to-edit',
+      { path: fullPath },
     );
   }
 

@@ -2,6 +2,7 @@ import type { Platform, PlatformSmokeTools } from '@agentdeck/contracts';
 import { looksLikeToolCall } from '@agentdeck/contracts/platform-tool-hint';
 import type { PlatformFetch } from './ca-fetch.ts';
 import { toolRouteOf } from './models.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Проба инструментов при активации (развилка 3 CONTOUR-DECISIONS): ОДИН вопрос,
@@ -40,8 +41,7 @@ export async function smokeTools(input: SmokeToolsInput): Promise<PlatformSmokeT
     return {
       ok: false,
       reason: 'dropped',
-      detail:
-        'Тип контура выбрасывает поле инструментов — без прослойки агент не сможет править файлы.',
+      detail: serverText('contour-tools-dropped'),
     };
   }
 
@@ -81,7 +81,7 @@ export async function smokeTools(input: SmokeToolsInput): Promise<PlatformSmokeT
       return {
         ok: false,
         reason: 'refused',
-        detail: `Запрос с инструментом отклонён (${response.status}).`,
+        detail: serverText('contour-tools-refused', { status: response.status }),
       };
     }
     const { called, text } = readFrames(body);
@@ -90,15 +90,16 @@ export async function smokeTools(input: SmokeToolsInput): Promise<PlatformSmokeT
       ? {
           ok: false,
           reason: 'call-as-text',
-          detail:
-            'Модель написала вызов текстом: поле инструментов до неё не дошло или она его не понимает.',
+          detail: serverText('contour-tools-call-as-text'),
         }
-      : { ok: false, reason: 'no-call', detail: 'Модель ответила без вызова инструмента.' };
+      : { ok: false, reason: 'no-call', detail: serverText('contour-tools-no-call') };
   } catch (error) {
     return {
       ok: false,
       reason: 'refused',
-      detail: `Проба инструментов не прошла: ${error instanceof Error ? error.message : String(error)}.`,
+      detail: serverText('contour-tools-failed', {
+        reason: error instanceof Error ? error.message : String(error),
+      }),
     };
   }
 }

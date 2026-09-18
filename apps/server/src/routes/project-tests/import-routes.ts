@@ -39,7 +39,10 @@ export function registerProjectTestsImportRoutes(app: FastifyInstance, _ctx: Ser
 
     const format = request.body?.format;
     if (format !== 'junit' && format !== 'playwright' && format !== 'allure') {
-      return reply.code(400).send({ message: 'Формат результатов: junit, playwright или allure.' });
+      return reply.code(400).send({
+        message: 'Формат результатов: junit, playwright или allure.',
+        messageCode: 'import-results-format',
+      });
     }
 
     return guard(reply, () =>
@@ -73,12 +76,17 @@ export function registerProjectTestsImportRoutes(app: FastifyInstance, _ctx: Ser
       format !== 'testrail-csv' &&
       format !== 'markdown'
     ) {
-      return reply
-        .code(400)
-        .send({ message: 'Формат кейсов: csv, xlsx, testrail-csv или markdown.' });
+      return reply.code(400).send({
+        message: 'Формат кейсов: csv, xlsx, testrail-csv или markdown.',
+        messageCode: 'import-cases-format',
+      });
     }
     const groupId = request.body?.groupId?.trim();
-    if (!groupId) return reply.code(400).send({ message: 'Не указана группа, куда класть кейсы.' });
+    if (!groupId)
+      return reply.code(400).send({
+        message: 'Не указана группа, куда класть кейсы.',
+        messageCode: 'import-group-unspecified',
+      });
 
     if (format === 'markdown') {
       return guard(reply, () => importManualCases(root, { groupId, dir: request.body?.file }));
@@ -111,10 +119,16 @@ export function registerProjectTestsImportRoutes(app: FastifyInstance, _ctx: Ser
       // себе, когда браузера для печати на машине нет, а показать отчёт человеку
       // всё равно надо.
       if (format !== 'md' && format !== 'csv' && format !== 'html') {
-        return reply.code(400).send({ message: 'Формат отчёта по прогону: md, csv или html.' });
+        return reply.code(400).send({
+          message: 'Формат отчёта по прогону: md, csv или html.',
+          messageCode: 'export-run-format',
+        });
       }
       const id = request.query.id?.trim();
-      if (!id) return reply.code(400).send({ message: 'Не указан прогон.' });
+      if (!id)
+        return reply
+          .code(400)
+          .send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
 
       return guard(reply, () => {
         const file = exportRun(root, id, format);
@@ -135,10 +149,17 @@ export function registerProjectTestsImportRoutes(app: FastifyInstance, _ctx: Ser
 
       const format = (request.query.format ?? 'csv') as ExportFormat;
       if (format !== 'csv' && format !== 'md' && format !== 'xlsx') {
-        return reply.code(400).send({ message: 'Формат выгрузки: csv, md или xlsx.' });
+        return reply.code(400).send({
+          message: 'Формат выгрузки: csv, md или xlsx.',
+          messageCode: 'export-cases-format',
+        });
       }
       const groupId = request.query.groupId?.trim();
-      if (!groupId) return reply.code(400).send({ message: 'Не указана группа для выгрузки.' });
+      if (!groupId)
+        return reply.code(400).send({
+          message: 'Не указана группа для выгрузки.',
+          messageCode: 'export-group-unspecified',
+        });
 
       return guard(reply, () => {
         const file = exportGroup(root, groupId, format);

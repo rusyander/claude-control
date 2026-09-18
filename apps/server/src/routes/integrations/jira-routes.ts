@@ -57,8 +57,20 @@ export function registerIntegrationJiraRoutes(app: FastifyInstance, deps: Integr
         labels?: unknown;
       } | null;
       return createIssue(atlassianAccess(deps), {
-        projectKey: requireString(body?.projectKey, 'projectKey', 'не указан проект Jira'),
-        summary: requireString(body?.summary, 'summary', 'не указан заголовок задачи'),
+        projectKey: requireString(
+          body?.projectKey,
+          'projectKey',
+          'не указан проект Jira',
+          'request-jira-project-missing',
+          { field: 'projectKey' },
+        ),
+        summary: requireString(
+          body?.summary,
+          'summary',
+          'не указан заголовок задачи',
+          'request-issue-title-missing',
+          { field: 'summary' },
+        ),
         description: typeof body?.description === 'string' ? body.description : '',
         issueType: optionalString(body?.issueType),
         labels: Array.isArray(body?.labels) ? body.labels.map(String).filter(Boolean) : undefined,
@@ -74,7 +86,9 @@ export function registerIntegrationJiraRoutes(app: FastifyInstance, deps: Integr
         await commentIssue(
           atlassianAccess(deps),
           request.params.key,
-          requireString(body, 'body', 'пустой комментарий'),
+          requireString(body, 'body', 'пустой комментарий', 'request-comment-empty', {
+            field: 'body',
+          }),
         );
         return { ok: true };
       }),
@@ -98,7 +112,9 @@ export function registerIntegrationJiraRoutes(app: FastifyInstance, deps: Integr
         await applyTransition(
           atlassianAccess(deps),
           request.params.key,
-          requireString(id, 'id', 'не указан переход'),
+          requireString(id, 'id', 'не указан переход', 'request-transition-missing', {
+            field: 'id',
+          }),
         );
         return { ok: true };
       }),

@@ -20,6 +20,8 @@ import {
   writeAiderReadList,
 } from '../lib/aider-yaml.ts';
 import { isInsideProject } from './projects.ts';
+import { coded } from '../lib/server-text.ts';
+import { serverText } from '../lib/server-texts.ts';
 
 /**
  * Раздел «Инструкции» в модели СПИСКА ССЫЛОК (AIDER-1).
@@ -268,30 +270,48 @@ function requireEditableEntry(
   const entries = readProviderInstructionsEntries(target);
   const entry = entries.find((item) => item.raw === raw);
   if (!entry) {
-    throw new ListedFileNotEditableError(
-      raw,
-      'unlisted',
-      `Записи «${raw}» нет в списке read конфигурации ${target.configPath}.`,
+    throw coded(
+      new ListedFileNotEditableError(
+        raw,
+        'unlisted',
+        `Записи «${raw}» нет в списке read конфигурации ${target.configPath}.`,
+      ),
+      'instructions-entry-unlisted',
+      { raw, configPath: target.configPath },
     );
   }
   if (target.projectRoot !== undefined && !isInsideProject(target.projectRoot, entry.path)) {
-    throw new ListedFileNotEditableError(
-      raw,
-      'unsafe_path',
-      `Путь «${raw}» выходит за пределы каталога проекта — панель его не открывает.`,
+    throw coded(
+      new ListedFileNotEditableError(
+        raw,
+        'unsafe_path',
+        `Путь «${raw}» выходит за пределы каталога проекта — панель его не открывает.`,
+      ),
+      'instructions-entry-outside',
+      { raw },
     );
   }
   if (!entry.editable) {
     const reason = entry.reason ?? 'missing';
     const message =
       reason === 'missing'
-        ? `Файл ${entry.path} не существует. Панель не создаёт файлы, которых нет: создайте его сами или уберите запись из списка.`
+        ? serverText('instructions-file-absent', { path: entry.path })
         : reason === 'directory'
-          ? `Путь ${entry.path} — каталог, а не файл.`
+          ? serverText('instructions-path-is-dir', { path: entry.path })
           : reason === 'too_large'
-            ? `Файл ${entry.path} слишком большой для правки в панели.`
-            : `Файл ${entry.path} не является текстовым — панель его не открывает.`;
-    throw new ListedFileNotEditableError(raw, reason, message);
+            ? serverText('instructions-file-too-large', { path: entry.path })
+            : serverText('instructions-file-not-text', { path: entry.path });
+    const messageCode =
+      reason === 'missing'
+        ? 'instructions-entry-missing'
+        : reason === 'directory'
+          ? 'instructions-entry-directory'
+          : reason === 'too_large'
+            ? 'instructions-entry-too-large'
+            : 'instructions-entry-binary';
+    throw coded(new ListedFileNotEditableError(raw, reason, message), messageCode, {
+      path: entry.path,
+    });
   }
   return entry;
 }

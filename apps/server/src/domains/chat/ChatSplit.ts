@@ -77,6 +77,8 @@ export interface SplitGit {
 export function makeSplitGit(
   mirrorFor: (dir: string) => WorktreeMirrorSettings | undefined = () => undefined,
   bootstrapFor?: (dir: string, copy: string) => Promise<WorktreeBootstrapState | undefined>,
+  /** Путь к `.claude.json`: копия разделения получает запись доступа оригинала. */
+  claudeJsonPath?: string,
 ): SplitGit {
   return {
     ...(bootstrapFor ? { bootstrap: bootstrapFor } : {}),
@@ -89,7 +91,7 @@ export function makeSplitGit(
       ];
     },
     async addWorktree(dir, branch, base) {
-      const created = await addWorktree(dir, branch, mirrorFor(dir), base);
+      const created = await addWorktree(dir, branch, mirrorFor(dir), base, claudeJsonPath);
       return {
         path: created.path,
         ...(created.mirror ? { mirror: describeMirror(created.mirror) } : {}),
@@ -216,6 +218,13 @@ export interface SplitTasksInput {
   groups?: number[];
   /** С какого звена стартуют чаты; нет — с работы. */
   stage?: 'plan' | 'work';
+  /**
+   * Настоящее имя ветки группы — тому, кто ведёт учёт (конвейер уровней).
+   * Зовётся ПОСЛЕ того, как копия заведена, и ДО старта прогона: занятое имя
+   * получает суффикс, а цепочка группы вправе кончиться раньше, чем вернётся
+   * вся порция, — и искать её тогда будут по этому имени.
+   */
+  claimBranch?: (index: number, branch: string) => void;
   /** От какой ветки отвести копии этой порции и что группы знают о предшественниках. */
   context?: SplitGroupContext;
   /**
@@ -283,6 +292,7 @@ export async function splitTasks({
   stage = 'work',
   context,
   resolveReview,
+  claimBranch,
 }: SplitTasksInput): Promise<TaskSplitResult> {
   const chats: TaskSplitStarted[] = [];
   const failures: TaskSplitFailure[] = [];
@@ -345,6 +355,10 @@ export async function splitTasks({
       }
     }
     prepared.push({ index, group, branch, cwd, isWorktree, mirror, ...(review ? { review } : {}) });
+    // Имя ветки известно и больше не изменится — отдаём его СЕЙЧАС, до
+    // подготовки копии и до старта прогона: дальше начинается время, за которое
+    // цепочка группы успевает и начаться, и кончиться.
+    claimBranch?.(index, branch);
   }
 
   const bootstraps = await Promise.all(

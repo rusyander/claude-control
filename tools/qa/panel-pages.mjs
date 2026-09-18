@@ -32,6 +32,41 @@ export const PANEL_PAGES = [
     },
     ready: '[role="tablist"][aria-label="Рабочие пространства"]',
   },
+  {
+    path: '/chat',
+    name: 'Чат — git проекта',
+    slug: 'chat-git',
+    // Окно git проекта живёт только при открытом проекте и закрытым не попадает
+    // ни в один обход, а внутри него самая плотная часть — список параллельных
+    // копий: карточка полноты копии, список недостающего, «Добрать», отчёт
+    // зеркала. Путь проекта берётся из `QA_GIT_PROJECT`, иначе — сам репозиторий
+    // панели: в нём есть git, но копий может не быть, и тогда обход видит список
+    // веток без карточек. Проверять карточку — стенд с копиями и эта переменная.
+    prepare: async (page) => {
+      const project = process.env.QA_GIT_PROJECT || process.cwd();
+      await page.evaluate((path) => {
+        const id = path.toLowerCase().replace(/\\/g, '/');
+        localStorage.setItem(
+          'agentdeck:workspace',
+          JSON.stringify({
+            projectTabs: [{ id, path, name: 'git' }],
+            activeTabId: id,
+            views: {},
+          }),
+        );
+      }, project);
+    },
+    ready: '[role="tablist"][aria-label="Рабочие пространства"]',
+    interact: async (page) => {
+      // Кнопка ветки узнаётся по своей подсказке: её доступное имя — это имя
+      // текущей ветки, которое у каждого проекта своё.
+      const open = page.locator('button[title^="Git проекта"]').first();
+      if ((await open.count()) === 0) return;
+      await open.click();
+      await page.waitForSelector('[role="dialog"][aria-label="Git проекта"]', { timeout: 10000 });
+      await page.waitForTimeout(1200);
+    },
+  },
   { path: '/rules', name: 'Правила' },
   { path: '/claude-md', name: 'CLAUDE.md' },
   { path: '/skills', name: 'Скиллы' },

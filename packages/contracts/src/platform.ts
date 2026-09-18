@@ -10,7 +10,12 @@ import {
   type infer as Infer,
 } from 'zod';
 import type { CompromiseId } from './compromises';
-import type { ServerMessageCode, ServerMessageParams } from './server-messages';
+import type {
+  CodedFields,
+  ServerMessageCode,
+  ServerMessageNestedParams,
+  ServerMessageParams,
+} from './server-messages';
 import type { PlatformModelRules, PlatformModelSource } from './platform-models';
 // Собственным именем пакета, а не соседним путём, — и это единственный такой
 // импорт здесь. Сервер грузит этот модуль подпутём
@@ -265,7 +270,7 @@ export interface PlatformModelInfo {
  * Результат пробы. Возвращается ВСЕГДА, отказом не бросается: недоступный
  * контур — это состояние карточки с причиной, а не 502 в консоли браузера.
  */
-export interface PlatformProbeResult {
+export interface PlatformProbeResult extends CodedFields<'detail'> {
   outcome: PlatformProbeOutcome;
   reachable: boolean;
   /** Адрес, по которому стучались. Ключа в нём нет никогда. */
@@ -319,6 +324,13 @@ export type PlatformHealthRecord = PlatformProbeResult & {
   knownIds?: string[];
   /** Что появилось у контура при последней удачной пробе. */
   newIds?: string[];
+  /**
+   * Пробу завела ПАНЕЛЬ, а не человек (A-2): фоновая перепроверка по расписанию
+   * или после отказа шлюза, пахнущего правами. Стоит на карточке рядом со
+   * временем пробы — иначе «проверено минуту назад» читается как «я нажимал», и
+   * человек не понимает, откуда взялась строка в журнале контура.
+   */
+  background?: true;
 };
 
 /**
@@ -762,8 +774,8 @@ export interface PlatformUsageRecord {
  * Имена таких моделей называются поимённо — человек вносит им цену руками.
  *
  * Той же дисциплины держится и сам контур: он тоже тарифицирует по ценам
- * реестра, prompt и completion раздельно, и модель без цены не списывает вовсе
- * (`inst-api/internal/pipeline/pricer.go`). Расходятся не правила, а прайс —
+ * реестра, prompt и completion раздельно, и модель без цены не списывает вовсе.
+ * Расходятся не правила, а прайс —
  * поэтому наша цифра остаётся ОЦЕНКОЙ его цифры, а не её копией.
  */
 export interface PlatformMoneyEstimate {
@@ -785,6 +797,17 @@ export interface PlatformSpendDay {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /**
+   * Ответов, дошедших до клиента, за которые контур не прислал `usage` (MD-09):
+   * так у платформы компании приходит картинка. Токенов у них нет, и выдумать
+   * их нельзя — поэтому они не входят ни в `requests`, ни в деньги. Это счётчик
+   * того, НА СКОЛЬКО ОТВЕТОВ оценка заведомо неполна: без него полоса бюджета
+   * молча показывала бы цифру ниже настоящей.
+   *
+   * Необязательное: записи учёта, сделанные до появления счётчика, поля не
+   * имеют, и «нет» у них значит «не считали», а не «ноль».
+   */
+  unreportedAnswers?: number;
   money: PlatformMoneyEstimate;
 }
 
@@ -804,7 +827,7 @@ export interface PlatformSpendRecord {
    *
    * ЧТО кончилось, читается из тела отказа по манифесту драйвера
    * (`budgetRefusals`), а не предполагается кодом: у платформы компании на `/v1` 402 —
-   * это бюджет самого ключа (`handler_public_api.go:340`), у другой платформы
+   * это бюджет самого ключа, а не лимит над ним; у другой платформы
    * он может значить лимит над ключом. Не разобралось — ни
    * {@link PlatformSpendRecord.exhaustedScope}, ни уровня нет, и строка
    * говорит просто «лимит расхода».
@@ -817,6 +840,32 @@ export interface PlatformSpendRecord {
   exhaustedScope?: PlatformExhaustedScope;
   /** Название лимита, как его написала платформа. Пусто — не назвала. */
   exhaustedLevel?: string;
+  /**
+   * Пороги бюджета, о которых панель УЖЕ сказала наружу.
+   *
+   * Отметка живёт в записи учёта, а не в памяти процесса, по той же причине,
+   * что и {@link PlatformSpendRecord.exhaustedAt}: перезапуск панели не повод
+   * повторить предупреждение, которое человек уже прочитал. Приём тот же, каким
+   * `SplitOverlap` помнит объявленные пересечения веток.
+   */
+  announcedBudget?: PlatformBudgetAnnounced;
+}
+
+/**
+ * Что о бюджете уже объявлено — и за какой период.
+ *
+ * Период здесь обязателен: человек, сдвинувший `budgetSince`, начал считать
+ * заново, и отметка прошлого периода молчала бы о новом до самого отказа 402.
+ * Колебания округления у самой границы порога отдельной защиты не требуют —
+ * отметка снимается только сменой периода или ручным сбросом.
+ */
+export interface PlatformBudgetAnnounced {
+  /** `budgetSince`, при котором отметки поставлены. Пусто — «с начала учёта». */
+  since: string;
+  /** Сказано про порог внимания (85 % бюджета). */
+  near?: boolean;
+  /** Сказано, что наша оценка дошла до бюджета. */
+  over?: boolean;
 }
 
 /** `key` — бюджет ключа, который держит панель; `limit` — лимит над ключом. */
@@ -887,6 +936,19 @@ export interface PlatformGatewayEvent {
   stages: string[];
   /** Контур сжал историю сам — человек обязан это видеть (`context-managed`). */
   summarized: boolean;
+  /**
+   * Id сообщения, который шлюз САМ выдал клиенту диалекта Anthropic. Уникален
+   * на каждый ответ (id контура у разных ответов бывает одинаковым), и Claude Code
+   * пишет его в транскрипт как `message.id` — по нему лента и находит ответ,
+   * где контур сжал историю. Нет поля — клиент говорил на диалекте OpenAI.
+   */
+  messageId?: string;
+  /**
+   * Метка прогона из адреса (`/<контур>/_run/<метка>/v1/...`): её панель кладёт в
+   * адрес шлюза прогону чужого CLI, у которого транскрипта нет. Нет поля —
+   * запрос пришёл не из прогона панели (терминал, файл настроек CLI).
+   */
+  runTag?: string;
   /** Категории сработавших проверок. Проверявшийся текст сюда не попадает. */
   violations: string[];
   /**
@@ -1004,10 +1066,47 @@ export interface PlatformToolShimReport {
    * после него нет, и без пометки человек ищет поломку в панели.
    */
   claimed: number;
-  /** Блоки, которые вызовом не стали: причина → сколько раз. */
-  flaws: { reason: string; count: number }[];
+  /**
+   * Блоки, которые вызовом не стали: причина → сколько раз. Причину сервер
+   * собирает строкой (она же уезжает в след), поэтому код к ней восстановлен
+   * разбором — клиент переводит `reasonCode`, а `reason` остаётся запасным.
+   */
+  flaws: {
+    reason: string;
+    reasonCode?: ServerMessageCode;
+    reasonParams?: ServerMessageNestedParams;
+    count: number;
+  }[];
   /** Самый старый след, по которому считали. Нет — запросов не было вовсе. */
   since?: string;
+}
+
+/**
+ * К чему привязан случай сжатия истории. `message` — к ответу в чате Claude
+ * (по id сообщения из транскрипта), `run` — к ответу чата чужого CLI (по метке
+ * прогона в адресе), `none` — запрос пришёл мимо прогонов панели, и подписать
+ * в ленте нечего: об этом случае знает только этот раздел.
+ */
+export type PlatformSummarizedLink = 'message' | 'run' | 'none';
+
+export interface PlatformSummarizedEntry {
+  at: string;
+  platformId: string;
+  /** Путь запроса без метки прогона и строки запроса. */
+  path: string;
+  link: PlatformSummarizedLink;
+}
+
+/**
+ * Сводка сжатий истории. Живёт на диске (`<appData>/platform-summarized.json`,
+ * последние записи), а не в журнале запросов: подпись в ленте обязана пережить
+ * перезапуск панели.
+ */
+export interface PlatformSummarizedReport {
+  /** Сколько случаев помнит панель (не больше предела файла). */
+  total: number;
+  /** Последние случаи, новые сверху. */
+  recent: PlatformSummarizedEntry[];
 }
 
 /** Состояние шлюза для панели. */
@@ -1032,6 +1131,8 @@ export interface PlatformGatewayStatus {
   violations: PlatformViolationReport;
   /** Сводка прослойки инструментов — карточка «Инструменты через контур» (Т5.5). */
   toolShim: PlatformToolShimReport;
+  /** Случаи сжатия истории контуром — карточка «Контур сжимал историю». */
+  summarized: PlatformSummarizedReport;
   /**
    * Подписи, которые несёт сам шлюз. Решает это сервер, а не разметка: снятая
    * подпись обязана погаснуть на экране без правки фронта.
@@ -1110,7 +1211,7 @@ export interface PlatformViolationReport {
 export const platformAgentOutcomes = [
   'ok',
   /**
-   * Агенты этому контуру не выданы: лицензия компании без модуля `agentbox`
+   * Агенты этому контуру не выданы: лицензия компании без модуля агентов
    * либо просроченная. Это НЕ ошибка панели и не поломка — это отсутствующая
    * возможность, и красным её показывать нельзя.
    */
@@ -1143,7 +1244,7 @@ export interface PlatformAgentMessage {
  * пишется по-русски и чистится от секретов, потому что чужой текст ошибки
  * вполне может отразить присланный ключ.
  */
-export interface PlatformAgentAnswer {
+export interface PlatformAgentAnswer extends CodedFields<'detail'> {
   outcome: PlatformAgentOutcome;
   /** Человеческая причина. У удачного вызова — короткая справка о ходе. */
   detail: string;
@@ -1238,7 +1339,7 @@ export type PlatformRuleField = keyof PlatformRules;
  * знание о платформе (Р5), и второй его источник в вебе разошёлся бы с первым
  * ровно так же, как разошлись бы два расчёта модели.
  */
-export interface PlatformRuleRow {
+export interface PlatformRuleRow extends CodedFields<'title' | 'detail' | 'where' | 'value'> {
   /** Имя поля у контура: `platform_tools`, `enable_thinking`. */
   id: string;
   title: string;
@@ -1281,7 +1382,7 @@ export type PlatformConflictLevel =
  * (Т8): человек, прочитавший объяснение справа, не должен искать его заново
  * слева другими словами.
  */
-export interface PlatformRuleConflict {
+export interface PlatformRuleConflict extends CodedFields<'title' | 'detail'> {
   id: string;
   level: PlatformConflictLevel;
   /** Правило контура: идентификатор строки `PlatformRuleRow`. */
@@ -1470,7 +1571,7 @@ export interface PlatformRunPlan {
  * диалект, подстановку ключа, защиту данных и разбор потока — то есть про всё,
  * что стоит между CLI и контуром.
  */
-export interface PlatformSmokeResult {
+export interface PlatformSmokeResult extends CodedFields<'detail'> {
   ok: boolean;
   /** Модель, которой задан вопрос. Пусто — спрашивать было нечем. */
   model: string;
@@ -1495,7 +1596,7 @@ export interface PlatformSmokeResult {
  * не понимает), `dropped` — тип контура поле выбрасывает, спрашивать бессмысленно,
  * `refused` — запрос с инструментом отклонён.
  */
-export interface PlatformSmokeTools {
+export interface PlatformSmokeTools extends CodedFields<'detail'> {
   ok: boolean;
   reason?: 'no-call' | 'call-as-text' | 'dropped' | 'refused';
   detail?: string;
@@ -1561,13 +1662,20 @@ export const PLATFORM_ASSISTANT_TARGET = 'assistant';
  * `offered` — список «Где работает контур» из плана. Потребитель, которого там
  * нет, галочкой на экране не стоит и снять его нечем, поэтому он не сохраняется
  * снова (MINOR 12). Плана нет — сохранённое не трогается: отличить сироту не с чем.
+ *
+ * Причина у варианта — то же самое «снять нечем»: недоступный потребитель рисуется
+ * прочерком без галочки (`ConsumerRows`), и сохранить его снова значило бы держать
+ * настройку, которой на экране не противостоит ничего. Поэтому фильтр читает не
+ * присутствие в списке, а отсутствие причины.
  */
 export function finishPlan(
   draft: Platform,
   fileTargets: string[],
-  offered: readonly { id: string }[] | undefined,
+  offered: readonly { id: string; reason?: string }[] | undefined,
 ): { platform: Platform; applyTargets: string[] } {
-  const known = offered ? new Set(offered.map((option) => option.id)) : undefined;
+  const known = offered
+    ? new Set(offered.filter((option) => !option.reason).map((option) => option.id))
+    : undefined;
   const consumers = known ? draft.consumers.filter((id) => known.has(id)) : draft.consumers;
   const assistant = consumers.includes(PLATFORM_ASSISTANT_CONSUMER)
     ? [PLATFORM_ASSISTANT_TARGET]

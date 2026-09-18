@@ -1,6 +1,7 @@
 import type {
   Platform,
   ModelPricing,
+  PlatformBudgetAnnounced,
   PlatformBudgetState,
   PlatformModelInfo,
   PlatformMoneyEstimate,
@@ -23,7 +24,7 @@ import {
  * «внутренней единицы контура» (всего токенов × 0.00001 $, справочник §9),
  * больше нет: контур тарифицирует по ценам реестра моделей, prompt и completion
  * раздельно, и модель без цены не списывает вовсе
- * (`inst-api/internal/pipeline/pricer.go`, VAB-94). Правила у нас с ним теперь
+ * (так считает сам контур). Правила у нас с ним теперь
  * одни; расходится ПРАЙС — его реестр против нашего справочника, — поэтому наша
  * цифра остаётся оценкой его цифры и подписана знаком «≈».
  *
@@ -40,9 +41,9 @@ import {
  *    по ней — {@link declaredPricing}; свои цены человека сильнее и её.
  *
  * 4. Исчерпан ли бюджет ключа — надёжно. У платформы компании 402 на `/v1` значит именно
- *    его (`handler_public_api.go:340`), но приходит лишь в 30-секундном окне
- *    кэша проверки ключа; дальше исчерпанный ключ отклоняется 401 — тем же
- *    кодом, что и отозванный (`inst-admin-api/.../store/keys.go` `ValidateKey`).
+ *    его, но приходит лишь в 30-секундном окне кэша проверки ключа; дальше
+ *    исчерпанный ключ отклоняется 401 — тем же кодом, что и отозванный
+ *    (обе причины сходятся в одной проверке ключа).
  *    Поэтому 402 — отдельная строка с тем, что назвал манифест драйвера, полосу
  *    (оценку) не красит, а 401 сопровождается оговоркой про все причины.
  */
@@ -95,6 +96,12 @@ export interface SpendDelta {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /**
+   * Ответ ДОШЁЛ до клиента, а счёта за него контур не прислал (MD-09). Токенов
+   * у такого ответа нет и придумывать их нечем, но и молчать о нём нельзя:
+   * считается отдельно, деньги и запросы не трогает.
+   */
+  unreported?: true;
 }
 
 const EMPTY_MONEY: PlatformMoneyEstimate = {
@@ -138,6 +145,13 @@ export function addToDay(
   delta: SpendDelta,
   lookup: PricingLookup = {},
 ): PlatformSpendDay {
+  // Неотчитанный ответ — только счётчик. Дописать ему запрос или нулевые
+  // токены значило бы выдать неполноту за посчитанный ноль: у ответа с
+  // картинкой расход был, просто контур его не назвал.
+  if (delta.unreported) {
+    return { ...day, unreportedAnswers: (day.unreportedAnswers ?? 0) + 1 };
+  }
+
   const usd = moneyOf(delta, lookup);
   const priced = usd !== undefined;
   const unpricedModels =
@@ -152,6 +166,9 @@ export function addToDay(
     promptTokens: day.promptTokens + delta.promptTokens,
     completionTokens: day.completionTokens + delta.completionTokens,
     totalTokens,
+    // День пересобирается целиком, поэтому счётчик неотчитанных переносится
+    // руками: посчитанный ответ не имеет права стереть признание неполноты.
+    ...(day.unreportedAnswers ? { unreportedAnswers: day.unreportedAnswers } : {}),
     money: {
       usd: round6(day.money.usd + (usd ?? 0)),
       pricedTokens: day.money.pricedTokens + (priced ? delta.totalTokens : 0),
@@ -203,9 +220,11 @@ export function sumDays(days: PlatformSpendDay[]): PlatformSpendDay {
   let usd = 0;
   let pricedTokens = 0;
   let unpricedTokens = 0;
+  let unreportedAnswers = 0;
 
   for (const day of days) {
     requests += day.requests;
+    unreportedAnswers += day.unreportedAnswers ?? 0;
     promptTokens += day.promptTokens;
     completionTokens += day.completionTokens;
     totalTokens += day.totalTokens;
@@ -223,6 +242,7 @@ export function sumDays(days: PlatformSpendDay[]): PlatformSpendDay {
     promptTokens,
     completionTokens,
     totalTokens,
+    ...(unreportedAnswers > 0 ? { unreportedAnswers } : {}),
     money: { usd: round6(usd), pricedTokens, unpricedTokens, unpricedModels },
   };
 }
@@ -265,6 +285,71 @@ export function budgetVerdict(
     ...(record.exhaustedAt ? { exhaustedAt: record.exhaustedAt } : {}),
     ...(record.exhaustedScope ? { exhaustedScope: record.exhaustedScope } : {}),
     ...(record.exhaustedLevel ? { exhaustedLevel: record.exhaustedLevel } : {}),
+  };
+}
+
+/**
+ * Порог бюджета, о котором ещё не говорили, — и запись с проставленной отметкой.
+ *
+ * Считается ЗДЕСЬ, а не в шлюзе, по той же причине, по какой здесь же считается
+ * сам итог: «дошли до 85 %» — вопрос учёта, а не транспорта. Отметка живёт в
+ * записи (`announcedBudget`), потому что перезапуск панели не повод повторить
+ * сказанное; снимается она только сменой периода (`budgetSince`) или ручным
+ * сбросом — иначе цифра, гуляющая у самой границы порога, слала бы по
+ * уведомлению на каждый ответ модели.
+ *
+ * Оба порога перейдены разом (первый же ответ дороже всего бюджета) — говорим
+ * про СТАРШИЙ и отмечаем оба: два сообщения об одном и том же событии человек
+ * читает как сбой панели.
+ */
+export interface BudgetCrossing {
+  /** `over` — наша оценка дошла до бюджета; `near` — до порога внимания. */
+  level: 'near' | 'over';
+  share: number;
+  spentUsd: number;
+  budgetUsd: number;
+  /** Запись с проставленными отметками — её и нужно сохранить. */
+  record: PlatformSpendRecord;
+}
+
+export function budgetCrossing(
+  platform: Platform,
+  record: PlatformSpendRecord,
+): BudgetCrossing | undefined {
+  const budget = budgetVerdict(platform, record);
+  if (!budget.tracked) return undefined;
+
+  // Отметки чужого периода не значат ничего: человек, сдвинувший начало счёта,
+  // считает заново, и промолчать ему про новый порог было бы враньём.
+  const announced: PlatformBudgetAnnounced =
+    record.announcedBudget?.since === platform.budgetSince
+      ? record.announcedBudget
+      : { since: platform.budgetSince };
+
+  const level: 'near' | 'over' | undefined = budget.overEstimate
+    ? announced.over
+      ? undefined
+      : 'over'
+    : budget.nearLimit && !announced.near
+      ? 'near'
+      : undefined;
+  if (!level) return undefined;
+
+  return {
+    level,
+    share: budget.share,
+    spentUsd: budget.spentUsd,
+    budgetUsd: budget.budgetUsd,
+    record: {
+      ...record,
+      announcedBudget: {
+        since: platform.budgetSince,
+        // Порог внимания пройден и тогда, когда оценка перепрыгнула его разом:
+        // сказать о нём после «бюджет исчерпан» значило бы пугать задним числом.
+        ...(announced.near || budget.nearLimit ? { near: true } : {}),
+        ...(announced.over || budget.overEstimate ? { over: true } : {}),
+      },
+    },
   };
 }
 
@@ -343,6 +428,10 @@ export function clearExhausted(
   delete next.exhaustedAt;
   delete next.exhaustedScope;
   delete next.exhaustedLevel;
+  // Ручной сброс — второй и последний повод снять отметки объявленных порогов
+  // (первый — смена `budgetSince`): человек, продливший бюджет в админке,
+  // говорит об этом именно здесь, и следующий переход порога обязан прозвучать.
+  delete next.announcedBudget;
   store.savePlatformSpend(next);
   return true;
 }

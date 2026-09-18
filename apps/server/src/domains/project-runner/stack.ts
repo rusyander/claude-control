@@ -6,6 +6,7 @@ import {
   type PackageJsonShape,
   type PackageManager,
 } from './project-runner.types.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Чем и как запускается проект: пакетный менеджер, скрипт, итоговая команда.
@@ -95,15 +96,19 @@ export function resolveRunCommand(
   const trimmed = override?.trim();
   if (trimmed) {
     const [file, ...args] = tokenize(trimmed);
-    if (!file) throw new RunnerError('no-script', 'Команда запуска пуста.');
+    if (!file)
+      throw coded(new RunnerError('no-script', 'Команда запуска пуста.'), 'runner-command-empty');
     return { file, args, display: trimmed };
   }
 
   const script = detectRunScript(targetDir);
   if (!script) {
-    throw new RunnerError(
-      'no-script',
-      'В package.json нет скрипта dev или start. Задайте команду запуска вручную.',
+    throw coded(
+      new RunnerError(
+        'no-script',
+        'В package.json нет скрипта dev или start. Задайте команду запуска вручную.',
+      ),
+      'project-dev-script-missing',
     );
   }
   const pm = detectPackageManager(targetDir, projectRoot);

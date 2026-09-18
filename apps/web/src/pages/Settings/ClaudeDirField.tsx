@@ -10,6 +10,7 @@ import { toast } from '@shared/lib/toast';
 import { sourceLabel } from '@shared/lib/location-label';
 import { useLocation, useSetLocation, useUpdateSettings } from '@entities/AppConfig';
 import styles from './SettingsPage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Путь к каталогу .claude. Приложение находит его само, но если автоопределение
@@ -122,7 +123,7 @@ export function ClaudeDirField() {
 
         {setLocation.data && !setLocation.data.isValid && (
           <Typography variant="body-sm" color="danger">
-            {setLocation.data.problem}
+            {serverFieldText(setLocation.data, 'problem')}
           </Typography>
         )}
       </Stack>

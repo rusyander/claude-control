@@ -3,6 +3,8 @@ import { join, resolve, dirname, basename, sep } from 'node:path';
 import type { ClaudeLocation } from '@agentdeck/contracts';
 import { writeTextFile, backupEntry, removeEntry } from '../../lib/safe-io.ts';
 import { layoutOf, safeSegment, type ResourceKind } from './registry.ts';
+import { coded } from '../../lib/server-text.ts';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /**
  * Работа с файлами любого ресурса: чтение дерева, содержимого, запись,
@@ -79,13 +81,17 @@ export function readResourceFile(
   id: string,
   file: string,
   location: ClaudeLocation,
-): { content: string; isBinary: boolean } {
+): { content: string; contentCode?: ServerMessageCode; isBinary: boolean } {
   const target = safePath(kind, id, file, location);
   if (!target || !existsSync(target)) return { content: '', isBinary: false };
 
   if (isBinaryPath(target)) return { content: '', isBinary: true };
   if (statSync(target).size > MAX_READABLE) {
-    return { content: 'Файл слишком большой для просмотра', isBinary: false };
+    return {
+      content: 'Файл слишком большой для просмотра',
+      contentCode: 'file-too-large-to-view' as const,
+      isBinary: false,
+    };
   }
 
   return { content: readFileSync(target, 'utf8'), isBinary: false };
@@ -104,7 +110,7 @@ export function writeResourceFile(
   assertWritable(kind);
 
   const target = safePath(kind, id, file, location);
-  if (!target) throw new Error('Путь выходит за пределы ресурса');
+  if (!target) throw coded(new Error('Путь выходит за пределы ресурса'), 'resource-path-escapes');
   if (skipExisting && existsSync(target)) return;
 
   mkdirSync(dirname(target), { recursive: true });
@@ -150,18 +156,21 @@ export function moveResourceFile(
 
   const source = safePath(kind, id, from, location);
   const target = safePath(kind, id, to, location);
-  if (!source || !target || !existsSync(source)) throw new Error('Неверный путь');
+  if (!source || !target || !existsSync(source))
+    throw coded(new Error('Неверный путь'), 'resource-path-invalid');
 
   // Перенос не должен молча затирать существующий файл — иначе одна опечатка
   // в имени уничтожает чужое содержимое без следа.
-  if (existsSync(target)) throw new Error('Файл с таким именем уже существует');
+  if (existsSync(target))
+    throw coded(new Error('Файл с таким именем уже существует'), 'resource-file-exists');
 
   mkdirSync(dirname(target), { recursive: true });
   renameSync(source, target);
 }
 
 function assertWritable(kind: ResourceKind): void {
-  if (!isWritable(kind)) throw new Error('Этот вид ресурса доступен только для чтения');
+  if (!isWritable(kind))
+    throw coded(new Error('Этот вид ресурса доступен только для чтения'), 'resource-read-only');
 }
 
 /**

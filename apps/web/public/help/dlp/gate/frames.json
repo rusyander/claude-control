@@ -9,15 +9,15 @@
       "masked": 0,
       "width": 1116,
       "height": 342,
-      "shotAt": "2026-09-11T17:38:39.405Z",
-      "text": "Гейт на промпте не установлен Хук UserPromptSubmit проверяет ТОЛЬКО то, что человек набрал руками. Прочитанные агентом файлы, вывод команд и промпты подагентов мимо него проходят — это видит прокси выше. Заменить текст промпта хук не может: событие такого не позволяет, поэтому действий два — отклонить или предупредить. Что делать при совпадении отклонить промпт предупредить и отправить Правило со своим действием «отклонить» остановит промпт в любом случае — общая настройка его не понижает. Правила общие с прокси: включено 7, из них с запретом 1. Скрипт хука C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs",
+      "shotAt": "2026-09-17T20:50:29.866Z",
+      "text": "Гейт на промпте не установлен Хук UserPromptSubmit проверяет ТОЛЬКО то, что человек набрал руками. Прочитанные агентом файлы, вывод команд и промпты подагентов мимо него проходят — это видит прокси выше. Заменить текст промпта хук не может: событие такого не позволяет, поэтому действий два — отклонить или предупредить. Что делать при совпадении отклонить промпт предупредить и отправить Правило со своим действием «отклонить» остановит промпт в любом случае — общая настройка его не понижает. Правила общие с прокси: включено 21, из них с запретом 2. Скрипт хука C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs",
       "en": {
         "file": "01-gate-off.en.png",
         "masked": 0,
         "width": 1116,
         "height": 342,
-        "shotAt": "2026-09-11T17:42:29.544Z",
-        "text": "Prompt gate not installed The UserPromptSubmit hook checks ONLY what a human typed by hand. Files the agent read, command output and subagent prompts go past it — that is what the proxy above sees. The hook cannot rewrite the prompt: the event does not allow it, so there are two actions — reject or warn. On a match reject the prompt warn and send A rule whose own action is “reject” stops the prompt regardless — the shared setting never downgrades it. Rules are shared with the proxy: 7 enabled, 1 of them blocking. Hook script C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs"
+        "shotAt": "2026-09-17T20:54:28.590Z",
+        "text": "Prompt gate not installed The UserPromptSubmit hook checks ONLY what a human typed by hand. Files the agent read, command output and subagent prompts go past it — that is what the proxy above sees. The hook cannot rewrite the prompt: the event does not allow it, so there are two actions — reject or warn. On a match reject the prompt warn and send A rule whose own action is “reject” stops the prompt regardless — the shared setting never downgrades it. Rules are shared with the proxy: 21 enabled, 2 of them blocking. Hook script C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs"
       }
     },
     {
@@ -27,15 +27,15 @@
       "masked": 0,
       "width": 1116,
       "height": 342,
-      "shotAt": "2026-09-11T17:38:43.851Z",
-      "text": "Гейт на промпте установлен Хук UserPromptSubmit проверяет ТОЛЬКО то, что человек набрал руками. Прочитанные агентом файлы, вывод команд и промпты подагентов мимо него проходят — это видит прокси выше. Заменить текст промпта хук не может: событие такого не позволяет, поэтому действий два — отклонить или предупредить. Что делать при совпадении отклонить промпт предупредить и отправить Правило со своим действием «отклонить» остановит промпт в любом случае — общая настройка его не понижает. Правила общие с прокси: включено 7, из них с запретом 1. Скрипт хука C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs",
+      "shotAt": "2026-09-17T20:50:34.315Z",
+      "text": "Гейт на промпте установлен Хук UserPromptSubmit проверяет ТОЛЬКО то, что человек набрал руками. Прочитанные агентом файлы, вывод команд и промпты подагентов мимо него проходят — это видит прокси выше. Заменить текст промпта хук не может: событие такого не позволяет, поэтому действий два — отклонить или предупредить. Что делать при совпадении отклонить промпт предупредить и отправить Правило со своим действием «отклонить» остановит промпт в любом случае — общая настройка его не понижает. Правила общие с прокси: включено 21, из них с запретом 2. Скрипт хука C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs",
       "en": {
         "file": "02-gate-on.en.png",
         "masked": 0,
         "width": 1116,
         "height": 342,
-        "shotAt": "2026-09-11T17:42:33.993Z",
-        "text": "Prompt gate installed The UserPromptSubmit hook checks ONLY what a human typed by hand. Files the agent read, command output and subagent prompts go past it — that is what the proxy above sees. The hook cannot rewrite the prompt: the event does not allow it, so there are two actions — reject or warn. On a match reject the prompt warn and send A rule whose own action is “reject” stops the prompt regardless — the shared setting never downgrades it. Rules are shared with the proxy: 7 enabled, 1 of them blocking. Hook script C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs"
+        "shotAt": "2026-09-17T20:54:33.041Z",
+        "text": "Prompt gate installed The UserPromptSubmit hook checks ONLY what a human typed by hand. Files the agent read, command output and subagent prompts go past it — that is what the proxy above sees. The hook cannot rewrite the prompt: the event does not allow it, so there are two actions — reject or warn. On a match reject the prompt warn and send A rule whose own action is “reject” stops the prompt regardless — the shared setting never downgrades it. Rules are shared with the proxy: 21 enabled, 2 of them blocking. Hook script C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs"
       }
     },
     {
@@ -45,15 +45,15 @@
       "masked": 0,
       "width": 1400,
       "height": 1300,
-      "shotAt": "2026-09-11T17:38:47.490Z",
-      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 1 Скрипты 1 Плагины Интеграции и доступы MCP-серверы 1 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает UserPromptSubmit Гейт на промпте — сгенерирован AgentDeck. Событие: UserPromptSubmit. Смотрит на текст, НАБРАННЫЙ ЧЕЛОВЕКОМ, до отправки. Чего он не видит принципиально: файлы, которые агент прочитал сам, вывод команд, содержимое инструментов, вложения. Всё это уходит в модель мимо хука. Замены меткой здесь нет: событие UserPromptSubmit по документации не умеет подменять промпт — только остановить отправку (код 2) или добавить сообщение. Файл можно править руками: панель заметит расхождение и не перезапишет его без явной переустановки. Правила берутся из файла ниже — их правят в панели. node \"C:/work/claude-demo-providers/.claude/hooks/agentdeck-prompt-gate.mjs\"",
+      "shotAt": "2026-09-17T20:50:37.887Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 1 Скрипты 1 Плагины Интеграции и доступы MCP-серверы 1 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает UserPromptSubmit Гейт на промпте — сгенерирован AgentDeck. Событие: UserPromptSubmit. Смотрит на текст, НАБРАННЫЙ ЧЕЛОВЕКОМ, до отправки. Чего он не видит принципиально: файлы, которые агент прочитал сам, вывод команд, содержимое инструментов, вложения. Всё это уходит в модель мимо хука. Замены меткой здесь нет: событие UserPromptSubmit по документации не умеет подменять промпт — только остановить отправку (код 2) или добавить сообщение. Файл можно править руками: панель заметит расхождение и не перезапишет его без явной переустановки. Правила берутся из файла ниже — их правят в панели. node \"C:/work/claude-demo-providers/.claude/hooks/agentdeck-prompt-gate.mjs\"",
       "en": {
         "file": "03-hook.en.png",
         "masked": 0,
         "width": 1400,
         "height": 1300,
-        "shotAt": "2026-09-11T17:42:37.620Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 1 Scripts 1 Plugins Integrations and access MCP servers 1 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works UserPromptSubmit Гейт на промпте — сгенерирован AgentDeck. Событие: UserPromptSubmit. Смотрит на текст, НАБРАННЫЙ ЧЕЛОВЕКОМ, до отправки. Чего он не видит принципиально: файлы, которые агент прочитал сам, вывод команд, содержимое инструментов, вложения. Всё это уходит в модель мимо хука. Замены меткой здесь нет: событие UserPromptSubmit по документации не умеет подменять промпт — только остановить отправку (код 2) или добавить сообщение. Файл можно править руками: панель заметит расхождение и не перезапишет его без явной переустановки. Правила берутся из файла ниже — их правят в панели. node \"C:/work/claude-demo-providers/.claude/hooks/agentdeck-prompt-gate.mjs\""
+        "shotAt": "2026-09-17T20:54:36.697Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 1 Scripts 1 Plugins Integrations and access MCP servers 1 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works UserPromptSubmit Гейт на промпте — сгенерирован AgentDeck. Событие: UserPromptSubmit. Смотрит на текст, НАБРАННЫЙ ЧЕЛОВЕКОМ, до отправки. Чего он не видит принципиально: файлы, которые агент прочитал сам, вывод команд, содержимое инструментов, вложения. Всё это уходит в модель мимо хука. Замены меткой здесь нет: событие UserPromptSubmit по документации не умеет подменять промпт — только остановить отправку (код 2) или добавить сообщение. Файл можно править руками: панель заметит расхождение и не перезапишет его без явной переустановки. Правила берутся из файла ниже — их правят в панели. node \"C:/work/claude-demo-providers/.claude/hooks/agentdeck-prompt-gate.mjs\""
       }
     },
     {
@@ -63,15 +63,15 @@
       "masked": 0,
       "width": 1116,
       "height": 282,
-      "shotAt": "2026-09-11T17:38:51.868Z",
-      "text": "Гейт на промпте установлен Хук UserPromptSubmit проверяет ТОЛЬКО то, что человек набрал руками. Прочитанные агентом файлы, вывод команд и промпты подагентов мимо него проходят — это видит прокси выше. Заменить текст промпта хук не может: событие такого не позволяет, поэтому действий два — отклонить или предупредить. Гейт ставится в конфигурацию Claude Code: у остальных CLI события «промпт отправлен» с возможностью отказа не задокументировано. Переключите провайдера на Claude, чтобы включить. Правила общие с прокси: включено 7, из них с запретом 1. Скрипт хука C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs",
+      "shotAt": "2026-09-17T20:50:42.381Z",
+      "text": "Гейт на промпте установлен Хук UserPromptSubmit проверяет ТОЛЬКО то, что человек набрал руками. Прочитанные агентом файлы, вывод команд и промпты подагентов мимо него проходят — это видит прокси выше. Заменить текст промпта хук не может: событие такого не позволяет, поэтому действий два — отклонить или предупредить. Гейт ставится в конфигурацию Claude Code: у остальных CLI события «промпт отправлен» с возможностью отказа не задокументировано. Переключите провайдера на Claude, чтобы включить. Правила общие с прокси: включено 21, из них с запретом 2. Скрипт хука C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs",
       "en": {
         "file": "04-claude-only.en.png",
         "masked": 0,
         "width": 1116,
         "height": 262,
-        "shotAt": "2026-09-11T17:42:41.991Z",
-        "text": "Prompt gate installed The UserPromptSubmit hook checks ONLY what a human typed by hand. Files the agent read, command output and subagent prompts go past it — that is what the proxy above sees. The hook cannot rewrite the prompt: the event does not allow it, so there are two actions — reject or warn. The gate is installed into the Claude Code configuration: no other CLI documents a “prompt submitted” event that can refuse. Switch the provider to Claude to enable it. Rules are shared with the proxy: 7 enabled, 1 of them blocking. Hook script C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs"
+        "shotAt": "2026-09-17T20:54:41.270Z",
+        "text": "Prompt gate installed The UserPromptSubmit hook checks ONLY what a human typed by hand. Files the agent read, command output and subagent prompts go past it — that is what the proxy above sees. The hook cannot rewrite the prompt: the event does not allow it, so there are two actions — reject or warn. The gate is installed into the Claude Code configuration: no other CLI documents a “prompt submitted” event that can refuse. Switch the provider to Claude to enable it. Rules are shared with the proxy: 21 enabled, 2 of them blocking. Hook script C:\\work\\claude-demo-providers\\.claude\\hooks\\agentdeck-prompt-gate.mjs"
       }
     }
   ]

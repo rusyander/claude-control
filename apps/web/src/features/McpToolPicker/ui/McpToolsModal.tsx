@@ -9,6 +9,7 @@ import { useMcpServerTools } from '@entities/McpServer';
 import { useCreatePermissions, PERMISSION_DECISIONS } from '@entities/Permission';
 import type { McpToolsModalProps } from './McpToolsModal.types';
 import styles from './McpToolsModal.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Помощник отбора инструментов MCP-сервера. Показывает, что сервер умеет, и
@@ -96,7 +97,7 @@ export function McpToolsModal({ isOpen, onOpenChange, server }: McpToolsModalPro
 
         {tools.data?.error && (
           <Typography variant="body-sm" color="danger">
-            {tools.data.error}
+            {serverFieldText(tools.data, 'error')}
           </Typography>
         )}
 

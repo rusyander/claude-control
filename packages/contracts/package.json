@@ -14,6 +14,7 @@
     "./compromises": "./src/compromises.ts",
     "./env-secret": "./src/env-secret.ts",
     "./foreign-chat-key": "./src/foreign-chat-key.ts",
+    "./integrations": "./src/integrations.ts",
     "./media": "./src/media.ts",
     "./media-block": "./src/media-block.ts",
     "./media-deck": "./src/media-deck.ts",

@@ -37,7 +37,17 @@ function block(json: unknown): string {
   return ['Развёл.', '```' + SPLIT_PLAN_BLOCK_LANG, JSON.stringify(json), '```'].join('\n');
 }
 
-function build(options: { triageStarts?: boolean; failLaunch?: number[] } = {}) {
+function build(
+  options: {
+    triageStarts?: boolean;
+    failLaunch?: number[];
+    /** Что запуск делает ВНУТРИ себя, до возврата: настоящее имя ветки, конец цепочки. */
+    during?: (
+      groups: number[],
+      claimBranch: (index: number, branch: string) => void,
+    ) => void | Promise<void>;
+  } = {},
+) {
   const records = new Map<string, SplitPlanRecord>();
   const launches: { groups: number[]; context?: SplitGroupContext }[] = [];
   /** Кого позвали сверять ветки (Т6) — по концу цепочки, а не по расписанию. */
@@ -51,8 +61,9 @@ function build(options: { triageStarts?: boolean; failLaunch?: number[] } = {}) 
         [...records.values()].find((record) => ids.includes(record.triageChatId ?? '')),
       all: () => Object.fromEntries(records),
     },
-    launch: async (record, groups, context): Promise<TaskSplitResult> => {
+    launch: async (record, groups, context, claimBranch): Promise<TaskSplitResult> => {
       launches.push({ groups, ...(context ? { context } : {}) });
+      await options.during?.(groups, claimBranch);
       return {
         chats: groups.map((index) => ({
           index,
@@ -91,6 +102,23 @@ function build(options: { triageStarts?: boolean; failLaunch?: number[] } = {}) 
   });
   const wait = () => new Promise((done) => setTimeout(done, 5));
   return { conveyor, records, launches, overlapChecks, begin, link, wait };
+}
+
+/** Разбор применён: третья группа ждёт первых двух и стоит на вопросе человеку. */
+async function triaged(options: Parameters<typeof build>[0] = {}) {
+  const built = build(options);
+  await built.begin();
+  built.conveyor.onTriageFinished(
+    finished(
+      block({
+        groups: [{ index: 3, after: [1, 2], hold: 'какие браузеры?' }],
+        order: [1, 2, 3],
+      }),
+    ),
+    ['new-1-triage'],
+  );
+  await built.wait();
+  return built;
 }
 
 describe('SplitConveyor.begin', () => {
@@ -186,22 +214,6 @@ describe('SplitConveyor.onTriageFinished', () => {
 });
 
 describe('SplitConveyor: ожидания и ответ человека', () => {
-  async function triaged(options: Parameters<typeof build>[0] = {}) {
-    const built = build(options);
-    await built.begin();
-    built.conveyor.onTriageFinished(
-      finished(
-        block({
-          groups: [{ index: 3, after: [1, 2], hold: 'какие браузеры?' }],
-          order: [1, 2, 3],
-        }),
-      ),
-      ['new-1-triage'],
-    );
-    await built.wait();
-    return built;
-  }
-
   it('ждавшая группа стартует, когда кончились ВСЕ предшественники, от ветки последнего по порядку', async () => {
     const { conveyor, launches, link, records, wait } = await triaged();
     await conveyor.answerHold('родитель', 2, 'только Chrome');
@@ -296,5 +308,153 @@ describe('SplitConveyor: ожидания и ответ человека', () =>
     const record = records.get('родитель') as SplitPlanRecord;
     expect(record.groups[0]).toMatchObject({ status: 'failed', error: 'прогон не запустился' });
     expect(record.groups[1]?.status).toBe('started');
+  });
+});
+
+describe('SplitConveyor: имя ветки и ручное освобождение', () => {
+  it('настоящее имя ветки уезжает в запись ДО старта — цепочка, кончившаяся внутри запуска, находит свою группу', async () => {
+    let claimed = false;
+    const built = build({
+      during: (groups, claimBranch) => {
+        if (!groups.includes(0) || claimed) return;
+        claimed = true;
+        // git выдал занятому имени суффикс: в записи стоит `feature/login`,
+        // в репозитории — `feature/login-2`, и связь несёт второе.
+        claimBranch(0, 'feature/login-2');
+        // Цепочка кончилась раньше, чем вернулась вся порция (чужой CLI).
+        built.conveyor.onChainEnded({ ...built.link(0), branch: 'feature/login-2' }, true);
+      },
+    });
+    await built.begin();
+    built.conveyor.onTriageFinished(
+      finished(block({ groups: [{ index: 2, after: [1] }], order: [1, 2, 3] })),
+      ['new-1-triage'],
+    );
+    await built.wait();
+
+    // Ждавшая группа поехала: без настоящего имени она стояла бы вечно.
+    expect(built.launches.map((item) => item.groups)).toEqual([[0, 2], [1]]);
+    const record = built.records.get('родитель') as SplitPlanRecord;
+    expect(record.groups[0]?.branch).toBe('feature/login-2');
+  });
+
+  it('отпущенная руками группа стартует от ветки предшественника и знает, что тот не доработал', async () => {
+    const { conveyor, launches, records, wait } = await triaged();
+    await conveyor.answerHold('родитель', 2, 'только Chrome');
+    expect(records.get('родитель')?.groups[2]?.status).toBe('waiting');
+
+    const result = await conveyor.release('родитель', 2);
+    await wait();
+
+    expect(result.chats.map((chat) => chat.index)).toEqual([2]);
+    expect(launches).toHaveLength(2);
+    const context = launches[1]?.context as SplitGroupContext;
+    expect(context.base).toBe('feature/header');
+    expect(context.predecessors).toEqual([
+      { title: 'Форма входа', branch: 'feature/login', unfinished: true },
+      { title: 'Шапка', branch: 'feature/header', unfinished: true },
+    ]);
+    expect(records.get('родитель')?.groups[2]).toMatchObject({ released: true, status: 'started' });
+  });
+
+  it('отпускать нечего: группа не ждёт предшественников', async () => {
+    const { conveyor } = await triaged();
+
+    // Стоит на вопросе человека — у этого своя дверь (`answerHold`).
+    await expect(conveyor.release('родитель', 2)).rejects.toThrow('не ждёт предшественников');
+    // Уже работает.
+    await expect(conveyor.release('родитель', 0)).rejects.toThrow('не ждёт предшественников');
+    await expect(conveyor.release('нет', 0)).rejects.toThrow();
+  });
+
+  it('заметка предшественника несёт задетые им файлы — с потолком и «и ещё N»', async () => {
+    const { conveyor, launches, link, records, wait } = await triaged();
+    await conveyor.answerHold('родитель', 2, 'только Chrome');
+    const record = records.get('родитель') as SplitPlanRecord;
+    const names = Array.from({ length: 20 }, (_, i) => `src/a${i}.ts`);
+    record.overlap = {
+      at: '2026-09-18T10:00:00.000Z',
+      files: [],
+      mergeOrder: [0, 1, 2],
+      counted: [
+        { index: 0, files: 25, names },
+        { index: 1, files: 2, names: ['src/header.tsx', 'src/api.ts'] },
+      ],
+      unread: [],
+      noticed: [],
+    };
+
+    conveyor.onChainEnded(link(0), true);
+    conveyor.onChainEnded(link(1), true);
+    await wait();
+
+    const context = launches[1]?.context as SplitGroupContext;
+    expect(context.predecessors?.[0]).toMatchObject({ files: names, filesTotal: 25 });
+    expect(context.predecessors?.[1]).toMatchObject({
+      files: ['src/header.tsx', 'src/api.ts'],
+      filesTotal: 2,
+    });
+  });
+
+  it('сверка ещё не считалась — заметки живут без файлов, запуск не срывается', async () => {
+    const { conveyor, launches, link, wait } = await triaged();
+    await conveyor.answerHold('родитель', 2, 'только Chrome');
+
+    conveyor.onChainEnded(link(0), true);
+    conveyor.onChainEnded(link(1), true);
+    await wait();
+
+    const context = launches[1]?.context as SplitGroupContext;
+    expect(context.predecessors?.[0]).not.toHaveProperty('files');
+    expect(context.predecessors?.[0]).not.toHaveProperty('filesTotal');
+  });
+});
+
+describe('SplitConveyor.recoverInterruptedTriage', () => {
+  it('разбор не пережил перезапуск — группы встают на вопрос человеку, а не навсегда', async () => {
+    const { conveyor, begin, records, launches } = build();
+    await begin();
+
+    const notices = conveyor.recoverInterruptedTriage(() => false);
+
+    const record = records.get('родитель') as SplitPlanRecord;
+    // Запись разморожена: итога разбора не будет никогда, и об этом сказано.
+    // `interrupted` отдельно от `received`: без него хаб подписывал бы это
+    // «группы пошли как предложено», а они не пошли — они стоят на вопросе.
+    expect(record.triage).toMatchObject({ received: false, interrupted: true });
+    // Ничего не стартует само — дверь открыта человеку, а не агенту.
+    expect(launches).toEqual([]);
+    expect(record.groups.map((group) => group.status)).toEqual(['held', 'held', 'held']);
+    expect(record.groups[0]?.hold).toBeTruthy();
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.parentChatId).toBe('родитель');
+    expect(notices[0]?.event).toMatchObject({ kind: 'notice', code: 'triageMissing' });
+  });
+
+  it('разбор пережил перезапуск — запись не трогаем', async () => {
+    const { conveyor, begin, records } = build();
+    await begin();
+
+    expect(conveyor.recoverInterruptedTriage((chatId) => chatId === 'new-1-triage')).toEqual([]);
+    expect((records.get('родитель') as SplitPlanRecord).triage).toBeUndefined();
+  });
+
+  it('второй запуск панели ничего не повторяет', async () => {
+    const { conveyor, begin } = build();
+    await begin();
+
+    expect(conveyor.recoverInterruptedTriage(() => false)).toHaveLength(1);
+    expect(conveyor.recoverInterruptedTriage(() => false)).toEqual([]);
+  });
+
+  it('после разморозки ответ человека запускает группу обычной дверью', async () => {
+    const { conveyor, begin, launches } = build();
+    await begin();
+    conveyor.recoverInterruptedTriage(() => false);
+
+    const result = await conveyor.answerHold('родитель', 1, 'да, запускай');
+
+    expect(result.chats.map((chat) => chat.index)).toEqual([1]);
+    expect(launches).toEqual([{ groups: [1], context: { holdAnswer: expect.anything() } }]);
   });
 });

@@ -220,7 +220,7 @@ describe('atlassian/jira', () => {
       [/search\/jql/, { status: 410 }],
       [/\/search\?/, { body: { issues: [{ key: 'PRJ-1', fields: { summary: 'Падает' } }] } }],
     ]);
-    const issues = await searchIssues(CLOUD, { jql: 'project = GOR' });
+    const issues = await searchIssues(CLOUD, { jql: 'project = PRJ' });
     expect(issues[0]).toMatchObject({ key: 'PRJ-1', summary: 'Падает' });
     expect(issues[0]?.url).toBe('https://acme.atlassian.net/browse/PRJ-1');
     expect(calls).toHaveLength(2);
@@ -228,7 +228,7 @@ describe('atlassian/jira', () => {
 
   it('отказ по существу (401) НЕ повторяется на соседней ручке', async () => {
     const { calls } = stubApi([[/search/, { status: 401 }]]);
-    await expect(searchIssues(CLOUD, { jql: 'project = GOR' })).rejects.toMatchObject({
+    await expect(searchIssues(CLOUD, { jql: 'project = PRJ' })).rejects.toMatchObject({
       message: expect.stringContaining('токен отклонён'),
     });
     expect(calls).toHaveLength(1);
@@ -271,7 +271,7 @@ describe('atlassian/jira', () => {
       [/rest\/api\/3\/issue$/, { body: { key: 'PRJ-9' } }],
       [/issue\/PRJ-9/, { body: { key: 'PRJ-9', fields: { summary: 'Дефект' } } }],
     ]);
-    await createIssue(CLOUD, { projectKey: 'GOR', summary: 'Дефект', description: 'тело' });
+    await createIssue(CLOUD, { projectKey: 'PRJ', summary: 'Дефект', description: 'тело' });
     const cloudBody = JSON.parse(String(cloud.calls[0]!.init.body)) as {
       fields: { description: unknown; issuetype: { name: string } };
     };
@@ -301,7 +301,7 @@ describe('atlassian/jira', () => {
       createIssue(CLOUD, { projectKey: ' ', summary: 'x', description: '' }),
     ).rejects.toMatchObject({ detail: 'projectKey' });
     await expect(
-      createIssue(CLOUD, { projectKey: 'GOR', summary: ' ', description: '' }),
+      createIssue(CLOUD, { projectKey: 'PRJ', summary: ' ', description: '' }),
     ).rejects.toMatchObject({ detail: 'summary' });
   });
 

@@ -18,6 +18,7 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { formatDuration } from '@shared/lib/format-duration';
+import { ContextSummarizedNote } from '@entities/Platform';
 import type { ProviderChatMessagesProps } from './ProviderChatMessages.types';
 import styles from './ProviderChatPage.module.scss';
 
@@ -47,6 +48,8 @@ export function ProviderChatMessages({
   treeBusy,
   onAnswerHold,
   holdBusy,
+  onRelease,
+  releaseBusy,
   onCheckOverlap,
   overlapBusy,
   reviews,
@@ -243,6 +246,8 @@ export function ProviderChatMessages({
               {...(treeBusy !== undefined ? { treeBusy } : {})}
               {...(onAnswerHold ? { onAnswerHold } : {})}
               {...(holdBusy !== undefined ? { holdBusy } : {})}
+              {...(onRelease ? { onRelease } : {})}
+              {...(releaseBusy !== undefined ? { releaseBusy } : {})}
               {...(onCheckOverlap ? { onCheckOverlap } : {})}
               {...(overlapBusy !== undefined ? { overlapBusy } : {})}
               foreign
@@ -277,6 +282,9 @@ export function ProviderChatMessages({
                   {message.failed ? ` · ${t('providerChat.failed')}` : ''}
                 </Typography>
                 {renderTurn(message)}
+                {message.role === 'assistant' && message.contextSummarized && (
+                  <ContextSummarizedNote scope="run" />
+                )}
                 {renderTime(message)}
               </Stack>
             ),

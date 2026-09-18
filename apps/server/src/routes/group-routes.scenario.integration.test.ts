@@ -35,7 +35,7 @@ describe('маршруты групп: сценарий и привязка к �
     projectPaths: ['c:/work/company'],
     scenario: {
       when: 'прилетел тикет',
-      trigger: 'GOR-\\d+',
+      trigger: 'PRJ-\\d+',
       steps: [
         { title: 'Забрать тикет', body: 'assign + В работе', gate: 'статус «В работе»' },
         { title: 'Ветка от main', body: '', gate: 'git branch показывает новую' },
@@ -112,7 +112,7 @@ describe('маршруты групп: сценарий и привязка к �
   it('негодное выражение триггера отвергается до записи', async () => {
     const res = await createGroup({
       name: 'Сломанный',
-      scenario: { when: '', trigger: 'GOR-(\\d+', steps: [{ title: 'шаг', body: '', gate: '' }] },
+      scenario: { when: '', trigger: 'PRJ-(\\d+', steps: [{ title: 'шаг', body: '', gate: '' }] },
     });
 
     expect(res.statusCode).toBe(400);

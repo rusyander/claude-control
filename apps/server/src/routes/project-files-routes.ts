@@ -17,6 +17,7 @@ import {
   type CollectedEdits,
 } from '../domains/project-files.ts';
 import { projectsDir } from './chat/paths.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Файлы проекта, открытого в чате: дерево, содержимое с диффом правок агента и
@@ -85,13 +86,15 @@ export function registerProjectFilesRoutes(app: FastifyInstance, ctx: ServerCont
   /** Отказ домена — это ответ 400 с его же текстом, а не пятисотка. */
   const failed = (error: unknown, reply: FastifyReply): FastifyReply | undefined => {
     if (error instanceof ProjectFileError) {
-      return reply.code(400).send({ message: error.message });
+      return reply.code(400).send({ message: error.message, ...codeOf(error) });
     }
     if (error instanceof StaleFileError) {
-      return reply.code(409).send({ message: error.message });
+      return reply.code(409).send({ message: error.message, ...codeOf(error) });
     }
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
-      return reply.code(404).send({ message: 'Файл не найден.' });
+      return reply
+        .code(404)
+        .send({ message: 'Файл не найден.', messageCode: 'file-not-found-dot' });
     }
     return undefined;
   };
@@ -106,7 +109,12 @@ export function registerProjectFilesRoutes(app: FastifyInstance, ctx: ServerCont
       try {
         return listProjectDir(root, String(request.query.dir ?? ''));
       } catch (error) {
-        return failed(error, reply) ?? reply.code(400).send({ message: 'Каталог недоступен.' });
+        return (
+          failed(error, reply) ??
+          reply
+            .code(400)
+            .send({ message: 'Каталог недоступен.', messageCode: 'directory-unavailable-dot' })
+        );
       }
     },
   );
@@ -135,7 +143,10 @@ export function registerProjectFilesRoutes(app: FastifyInstance, ctx: ServerCont
       try {
         return readProjectFile(root, file, edits);
       } catch (error) {
-        return failed(error, reply) ?? reply.code(400).send({ message: 'Файл недоступен.' });
+        return (
+          failed(error, reply) ??
+          reply.code(400).send({ message: 'Файл недоступен.', messageCode: 'file-unavailable' })
+        );
       }
     },
   );
@@ -168,7 +179,10 @@ export function registerProjectFilesRoutes(app: FastifyInstance, ctx: ServerCont
           .header('Cache-Control', 'no-store')
           .send(media.bytes);
       } catch (error) {
-        return failed(error, reply) ?? reply.code(400).send({ message: 'Файл недоступен.' });
+        return (
+          failed(error, reply) ??
+          reply.code(400).send({ message: 'Файл недоступен.', messageCode: 'file-unavailable' })
+        );
       }
     },
   );
@@ -195,7 +209,10 @@ export function registerProjectFilesRoutes(app: FastifyInstance, ctx: ServerCont
 
       const view = request.body?.view;
       if (!view || !Array.isArray(view.openDirs)) {
-        return reply.code(400).send({ message: 'Неполный снимок окна кода.' });
+        return reply.code(400).send({
+          message: 'Неполный снимок окна кода.',
+          messageCode: 'code-window-snapshot-incomplete',
+        });
       }
 
       ctx.store.setCodeView(root, {
@@ -217,7 +234,10 @@ export function registerProjectFilesRoutes(app: FastifyInstance, ctx: ServerCont
   app.put<{ Body: { treeWidth?: number } }>('/api/project-files/layout', async (request, reply) => {
     const width = request.body?.treeWidth;
     if (typeof width !== 'number' || !Number.isFinite(width)) {
-      return reply.code(400).send({ message: 'Ширина списка файлов не задана.' });
+      return reply.code(400).send({
+        message: 'Ширина списка файлов не задана.',
+        messageCode: 'file-list-width-missing',
+      });
     }
 
     // Значение приходит из перетаскивания мышью — обрезаем по границам, а не
@@ -250,13 +270,18 @@ export function registerProjectFilesRoutes(app: FastifyInstance, ctx: ServerCont
 
     const { file, content, mtimeMs } = request.body;
     if (typeof file !== 'string' || typeof content !== 'string' || typeof mtimeMs !== 'number') {
-      return reply.code(400).send({ message: 'Неполный запрос на запись.' });
+      return reply
+        .code(400)
+        .send({ message: 'Неполный запрос на запись.', messageCode: 'write-request-incomplete' });
     }
 
     try {
       return saveProjectFile(root, file, content, mtimeMs, ctx.backupDir);
     } catch (error) {
-      return failed(error, reply) ?? reply.code(400).send({ message: 'Записать не удалось.' });
+      return (
+        failed(error, reply) ??
+        reply.code(400).send({ message: 'Записать не удалось.', messageCode: 'write-failed' })
+      );
     }
   });
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { settingsPatchSchema, importStateSchema } from './settings-validation.ts';
+import { NOTIFY_EVENTS } from '@agentdeck/contracts/integrations';
 
 /**
  * Серверная схема PATCH — своя копия контрактной, разъезжаться им нельзя.
@@ -162,5 +163,36 @@ describe('importStateSchema — ничего не теряется при пер
 
   it('отклоняет команды запуска неверного типа', () => {
     expect(importStateSchema.safeParse({ runnerCommands: { 'c:/work': 42 } }).success).toBe(false);
+  });
+
+  /**
+   * Подписка уведомлений перечислена и в контракте, и здесь. Пока это были две
+   * списанные копии, добавленное событие («бюджет») попало только в одну — и
+   * собственный снимок панели переставал импортироваться обратно: экспорт писал
+   * значение по умолчанию, которого импорт не знал. Проверяем КАЖДОЕ событие
+   * поимённо, а не длину списка: список один, разъехаться ему негде.
+   */
+  it('импорт знает каждое событие подписки — и телеграма, и вебхука', () => {
+    for (const event of NOTIFY_EVENTS) {
+      const parsed = importStateSchema.safeParse({
+        settings: {
+          integrations: {
+            atlassian: {
+              enabled: false,
+              baseUrl: '',
+              email: '',
+              deployment: '',
+              confluenceUrl: '',
+            },
+            forge: { enabled: false, kind: '', baseUrl: '', repo: '' },
+            tms: { enabled: false, kind: '', baseUrl: '', projectKey: '', groupId: '' },
+            ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
+            telegram: { enabled: false, chatId: '', events: [event] },
+            webhook: { enabled: false, url: '', events: [event] },
+          },
+        },
+      });
+      expect(parsed.success ? 'ok' : `${event}: ${JSON.stringify(parsed.error.issues)}`).toBe('ok');
+    }
   });
 });

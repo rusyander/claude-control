@@ -107,6 +107,10 @@ describe('WorktreeBootstraps: настоящие процессы', () => {
     expect(done.status).toBe('failed');
     expect(done.reverted).toEqual(['package-lock.json']);
     expect(done.logTail).toContain('lock-файлы откачены: package-lock.json');
+    // Перезапуск панели не должен стирать факт, что панель трогала файлы в
+    // рабочем дереве: состояние читается с диска, и откат обязан пережить это.
+    const restarted = new WorktreeBootstraps(logs);
+    expect(restarted.status(copy)?.reverted).toEqual(['package-lock.json']);
     // Отказ отката не портит итог команды.
     const fragile = new WorktreeBootstraps(logs, {
       afterRun: async () => {

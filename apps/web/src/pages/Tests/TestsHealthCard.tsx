@@ -9,6 +9,7 @@ import { Typography } from '@shared/ui/typography';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useBulkTestCases, useTestLint } from '@entities/ProjectTest';
 import styles from './TestsPage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 const TONE = { error: 'danger', warning: 'warning', info: 'neutral' } as const;
 
@@ -89,7 +90,7 @@ export function TestsHealthCard({ projectPath }: { projectPath: string | undefin
                   onClick={() => setOpenRule(isOpen ? '' : rule.rule)}
                 >
                   <Typography variant="body-sm" as="span">
-                    {rule.title}
+                    {serverFieldText(rule, 'title')}
                   </Typography>
                 </button>
                 <Typography variant="mono" color="subtle" as="span">
@@ -103,7 +104,7 @@ export function TestsHealthCard({ projectPath }: { projectPath: string | undefin
                     title={t('tests.health.fixHint')}
                     onClick={() => fixRule(rule.rule)}
                   >
-                    {fix.label}
+                    {serverFieldText(fix, 'label')}
                   </Button>
                 )}
               </Stack>
@@ -114,7 +115,7 @@ export function TestsHealthCard({ projectPath }: { projectPath: string | undefin
                     variant="caption"
                     color="subtle"
                   >
-                    {item.title} — {item.message}
+                    {item.title} — {serverFieldText(item, 'message')}
                   </Typography>
                 ))}
             </Stack>

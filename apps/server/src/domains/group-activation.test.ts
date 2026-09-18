@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ClaudePaths, Group } from '@agentdeck/contracts';
 import { AppStore } from '../lib/app-store.ts';
-import { activateGroupsForCwd, groupsForCwd, matchesProject } from './group-activation.ts';
+import {
+  activateGroupsForCwd,
+  activateGroupsQuietly,
+  groupsActivatedNotice,
+  groupsForCwd,
+  matchesProject,
+} from './group-activation.ts';
 
 /**
  * Привязка группы к проекту. Проверяется ровно то, из-за чего эта привязка и
@@ -123,6 +129,34 @@ describe('Привязка группы к проекту', () => {
 
       expect(activateGroupsForCwd(deps(), dir).activated).toEqual([]);
       expect(store.getGroups().at(0)?.isEnabled).toBe(false);
+    });
+
+    it('тихий вызов тоже называет включённые наборы: сказать о них надо и там', () => {
+      store.saveGroup(makeGroup({ projectPaths: [dir], isEnabled: false }));
+
+      // Разделение и продолжение в чистой сессии зовут именно его — и раньше
+      // молчали о включении, потому что имён им не доставалось вовсе.
+      expect(activateGroupsQuietly(deps(), dir)).toEqual(['Набор']);
+    });
+  });
+
+  describe('заметка в ленту прогона', () => {
+    it('называет набор и повод — иначе включение выглядит самовольством агента', () => {
+      expect(groupsActivatedNotice(['Ревью фронта'])).toEqual({
+        kind: 'notice',
+        code: 'groupsActivated',
+        text: 'Набор «Ревью фронта» включён сам — он привязан к этому проекту.',
+      });
+    });
+
+    it('несколько наборов — одна строка', () => {
+      expect(groupsActivatedNotice(['A', 'B'])).toMatchObject({
+        text: 'Наборы «A», «B» включены сами — они привязаны к этому проекту.',
+      });
+    });
+
+    it('ничего не включилось — и говорить не о чем', () => {
+      expect(groupsActivatedNotice([])).toBeUndefined();
     });
   });
 });

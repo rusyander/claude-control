@@ -22,6 +22,7 @@ export function requireClaudeProvider(ctx: ServerContext, reply: ErrorReply): bo
   reply.code(400).send({
     error: 'section_unsupported',
     message: 'Проектные файлы Claude доступны только при активном провайдере Claude.',
+    messageCode: 'project-files-claude-only',
   });
   return false;
 }
@@ -39,7 +40,11 @@ export function requireProject(
 
   const project = ctx.store.getProject(id);
   if (!project) {
-    reply.code(404).send({ error: 'not_found', message: 'Проект не найден в реестре' });
+    reply.code(404).send({
+      error: 'not_found',
+      message: 'Проект не найден в реестре',
+      messageCode: 'project-not-in-registry',
+    });
     return undefined;
   }
   return project;

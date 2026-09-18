@@ -10,6 +10,7 @@ import {
 } from '../../domains/project-tests.ts';
 import { linkedRequirements, requirementUpdates } from '../../domains/project-tests/coverage.ts';
 import { guard, guardAsync, requireRoot, type TestsDeps } from './shared.ts';
+import { attachTextCodes } from '../../lib/server-texts.ts';
 
 /**
  * Здоровье набора: замечания линтера, дубликаты, таксономия и карантин.
@@ -28,7 +29,11 @@ export function registerTestHealthRoutes(app: FastifyInstance, deps: TestsDeps):
   app.get<{ Querystring: { path?: string } }>('/api/project-tests/lint', (request, reply) => {
     const root = requireRoot(request.query.path, reply);
     if (!root) return reply;
-    return guard(reply, () => lintLibrary(readGroups(root), { now: new Date().toISOString() }));
+    // Заголовки правил свода собраны по кодам (`serverText`) — код к ним
+    // восстанавливается разбором, и английский экран показывает английское имя.
+    return guard(reply, () =>
+      attachTextCodes(lintLibrary(readGroups(root), { now: new Date().toISOString() })),
+    );
   });
 
   /**

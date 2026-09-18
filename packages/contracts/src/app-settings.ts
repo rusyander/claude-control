@@ -12,6 +12,7 @@ import { endpointProfileSchema } from './endpoints';
 import { modelSources } from './models';
 import { permissionRulesSchema } from './permission-rules';
 import { dlpSettingsSchema } from './dlp';
+import { NOTIFY_EVENTS } from './integrations';
 import { platformGatewaySettingsSchema, platformSchema } from './platform';
 import { promptGateSettingsSchema } from './prompt-gate';
 import { remoteAccessSettingsSchema } from './remote';
@@ -102,9 +103,12 @@ export const forgeSettingsSchema = object({
 export const telegramSettingsSchema = object({
   enabled: boolean().default(false),
   chatId: string().default(''),
-  events: array(zodEnum(['runDone', 'runError', 'permission', 'question', 'testFailed'])).default([
+  events: array(zodEnum(NOTIFY_EVENTS)).default([
     'runError',
     'testFailed',
+    // Бюджет — в подписке по умолчанию: про порог узнают ровно затем, чтобы
+    // успеть до отказа 402, а канал всё равно молчит, пока его не включили.
+    'budget',
   ]),
 });
 
@@ -131,9 +135,12 @@ export const ciSettingsSchema = object({
 export const webhookSettingsSchema = object({
   enabled: boolean().default(false),
   url: string().default(''),
-  events: array(zodEnum(['runDone', 'runError', 'permission', 'question', 'testFailed'])).default([
+  events: array(zodEnum(NOTIFY_EVENTS)).default([
     'runError',
     'testFailed',
+    // Бюджет — в подписке по умолчанию: про порог узнают ровно затем, чтобы
+    // успеть до отказа 402, а канал всё равно молчит, пока его не включили.
+    'budget',
   ]),
 });
 
@@ -367,6 +374,18 @@ export const appSettingsSchema = object({
    * один на все — порт и включённость общие, а контуры на нём различаются
    * первым сегментом адреса.
    */
+  /**
+   * Раз во сколько минут панель САМА перепроверяет активный контур (A-2). Ноль —
+   * не перепроверять вовсе.
+   *
+   * Настройкой, а не константой, ровно по одной причине: проба оставляет след в
+   * журнале контура, и как часто панель вправе там появляться, решает компания, а
+   * не панель. Двенадцать часов по умолчанию — это «раз в несколько часов» из
+   * находки: каталог ключа, объявленные цены и валидность ключа иначе застывают
+   * на моменте последнего нажатия «Обновить», и расход уходит в `unpricedTokens`
+   * по каталогу, которого уже нет.
+   */
+  platformProbeMinutes: number().int().min(0).max(10080).default(720),
   platformGateway: platformGatewaySettingsSchema.default(() =>
     platformGatewaySettingsSchema.parse({}),
   ),

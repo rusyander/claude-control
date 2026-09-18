@@ -151,5 +151,6 @@ spend already counted stays too.
 
 Some of the limits above are not our choice but a property of somebody else's platform. What we ask
 them to publish so those workarounds become unnecessary — and the questions we are left with — is
-one page: [docs/PLATFORM-ЗАПРОС.ru.md](PLATFORM-ЗАПРОС.ru.md). It is written in Russian on purpose:
-it is a letter to that team, not documentation. Nothing on it blocks the panel.
+a separate letter to that team. It is addressed to them rather than to the reader of this page, so
+it is not part of this repository. Nothing in it blocks the panel: every workaround it would retire
+is already in place and signed as a “compromise” card.

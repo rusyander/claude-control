@@ -10,7 +10,7 @@ import {
   RunLedger,
 } from '../domains/chat/run-ledger.ts';
 import { ChatSession } from '../domains/chat/ChatSession.ts';
-import { HandoffChains } from '../domains/chat/ChatHandoff.ts';
+import { HandoffChains, HandoffChainStore } from '../domains/chat/ChatHandoff.ts';
 import { TreePause } from '../domains/chat/tree-pause.ts';
 import { createTreeRuns } from '../domains/chat/tree-runs.ts';
 import { createParentNotice } from '../domains/chat/parent-notice.ts';
@@ -26,8 +26,13 @@ import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/project-tests.ts';
 import { DlpProxy } from '../domains/dlp.ts';
 import { PlatformGateway } from '../domains/platform/gateway/listener.ts';
+import { gatewayPricing } from '../domains/platform/spend.ts';
+import { GatewayAutoStart } from '../domains/platform/gateway/auto-start.ts';
+import { PlatformWatch } from '../domains/platform/watch.ts';
+import { summarizedInRun } from '../domains/platform/gateway/summarized-ledger.ts';
 import {
   resolveRunRoute,
+  runRouteOf,
   type PlatformRoutingDeps,
   type PlatformRunRoute,
 } from '../domains/platform/routing.ts';
@@ -36,7 +41,9 @@ import { createTelegramNotifier, type TelegramNotice } from '../domains/notify/t
 import { createWebhookNotifier } from '../domains/notify/webhook.ts';
 import { activateAtlassianMcp } from '../domains/integrations/mcp-server.ts';
 import { hasWorkSince, readBranchFiles, readCurrentBranch } from '../domains/project-git.ts';
+import { readLastAssistantTurn } from '../domains/chat/ChatHistory.ts';
 import { createHandoffPlanner } from '../routes/chat/handoff-routes.ts';
+import { projectsDir } from '../routes/chat/paths.ts';
 import { SplitConveyor } from '../domains/chat/split-conveyor.ts';
 import { SplitOverlap } from '../domains/chat/split-overlap.ts';
 import { SplitReview } from '../domains/chat/split-review.ts';
@@ -87,6 +94,13 @@ export interface Runtime {
   dlpProxy: DlpProxy;
   /** Шлюз контуров: тот же порядок — создаётся всегда, поднимается по настройке. */
   platformGateway: PlatformGateway;
+  /**
+   * Подъём своего шлюза, когда тумблер уже включён, а слушателя нет (A-1).
+   * Защёлка и потолок попыток живут здесь, а не у каждого, кому шлюз понадобился.
+   */
+  platformGatewayAutoStart: GatewayAutoStart;
+  /** Фоновая перепроверка активного контура (A-2): таймер и отказы по правам. */
+  platformWatch: PlatformWatch;
   /** Подписчики `/api/events` и рассылка об изменениях файлов. */
   events: EventHub;
   /**
@@ -210,9 +224,15 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   /**
    * Цепочки продолжений в чистой сессии: тумблер автомата и номер шага. Объект
    * переживает запрос — тумблер ставится в одном обращении, а срабатывает при
-   * завершении прогона, возможно, уже без открытой вкладки.
+   * завершении прогона, возможно, уже без открытой вкладки. И перезапуск панели:
+   * прогоны его переживают (журнал ниже), а цепочка без диска начинала бы счёт
+   * заново — потолок в восемь продолжений обнулялся бы, а предохранитель
+   * «чекпойнт не изменился» пропускал лишний круг.
    */
-  const handoffChains = new HandoffChains(() => ctx.store.getSettings().handoffAutoDefault);
+  const handoffChains = new HandoffChains(
+    () => ctx.store.getSettings().handoffAutoDefault,
+    new HandoffChainStore(ctx.location.paths.appData),
+  );
   /**
    * Кто решает, продолжать ли работу самому. Реестр знает только, что прогон
    * кончился; предохранители (свежесть файла-опоры, потолок цепочки, успешное
@@ -358,7 +378,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         console.warn('split overlap: check after chain end failed', error);
       });
     },
-    launch: (record, groups, context) => launchFromRecord(ctx, launchDeps, record, groups, context),
+    launch: (record, groups, context, claimBranch) =>
+      launchFromRecord(ctx, launchDeps, record, groups, context, claimBranch),
     startTriage: (record, prompt, claim) =>
       createSplitLauncher(ctx, launchDeps, {
         projectPath: record.projectPath,
@@ -466,6 +487,61 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // только состояние панели.
   const platformGateway = new PlatformGateway();
   /**
+   * Порог бюджета контура — тем же слоем, что и концы прогонов (A-5).
+   *
+   * До этой строки порог считался и лежал в ответе, а читали его только карточка
+   * контура и плитка «Обзор»: человек, работающий в чате, узнавал о лимите из
+   * отказа 402. Push сюда НЕ входит намеренно — его тело открывает разговор, а у
+   * бюджета разговора нет: он свойство контура, и тратят его все прогоны разом.
+   */
+  platformGateway.setBudgetNotifier((notice) => {
+    const outward = {
+      kind: notice.level === 'over' ? ('budgetOver' as const) : ('budgetNear' as const),
+      platformTitle: notice.platformTitle,
+      share: notice.share,
+    };
+    telegram(outward);
+    webhook(outward);
+  });
+  /**
+   * Подъём своего шлюза, когда его тумблер ВКЛЮЧЁН, а слушателя нет (A-1).
+   *
+   * Тумблер здесь не трогается ни разу: включить настройку за человека — дело
+   * активации контура по его нажатию, а не расчёта плана картинки. Защёлка и
+   * потолок попыток — внутри: расчёт зовут на каждое открытие меню чата.
+   */
+  const platformGatewayAutoStart = new GatewayAutoStart({
+    enabled: () => ctx.store.getSettings().platformGateway.enabled,
+    running: () => platformGateway.status().running,
+    start: () =>
+      platformGateway.start({
+        store: ctx.store,
+        appDataDir: ctx.location.paths.appData,
+        port: ctx.store.getSettings().platformGateway.port,
+        pricing: gatewayPricing(ctx.store, ctx.pricing),
+      }),
+  });
+  /**
+   * Фоновая перепроверка активного контура (A-2).
+   *
+   * Заводится здесь, потому что живёт дольше запроса и гаснет вместе с панелью.
+   * На пути запроса её нет ни в одном месте: шлюз только СООБЩАЕТ ей об отказе
+   * по правам и сразу возвращается, а ходит она своим таймером.
+   */
+  const platformWatch = new PlatformWatch({
+    store: ctx.store,
+    appDataDir: ctx.location.paths.appData,
+    onError: (error) =>
+      process.stderr.write(
+        `фоновая проба контура не удалась (${error instanceof Error ? error.message : String(error)})
+`,
+      ),
+  });
+  platformWatch.start();
+  platformGateway.setRightsRefusalNotifier((platformId) =>
+    platformWatch.noteRightsRefusal(platformId),
+  );
+  /**
    * Маршрут контура для прогонов Claude (Т3): реестр спрашивает по
    * происхождению прогона, домен отвечает окружением. Порт берётся у ЖИВОГО
    * слушателя — записанный в состоянии остался бы от прошлого запуска, и
@@ -476,27 +552,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     appDataDir: ctx.location.paths.appData,
     gatewayPort: () => (platformGateway.status().running ? platformGateway.status().port : 0),
   };
-  const runRoute = (origin: string, asked = ''): PlatformRunRoute => {
-    const decision = resolveRunRoute(platformRouting, origin, asked);
-    // Пустой маршрут — законный ответ «не через контур», и он ОБЯЗАН затирать
-    // прежний: продолжение остановленного прогона приходит со старыми
-    // параметрами, и адрес контура пережил бы снятую галочку. Модели и усилия в
-    // таком ответе нет вовсе: выбор человека остаётся его выбором.
-    if (!decision.routed) {
-      return decision.refusal ? { env: {}, refusal: decision.refusal } : { env: {} };
-    }
-    return {
-      env: decision.env,
-      model: decision.model,
-      effort: decision.effort,
-      ...(decision.systemPrompt ? { systemPrompt: decision.systemPrompt } : {}),
-      // Наши слои (Т8) — тем же правилом, что и всё остальное в маршруте:
-      // отсутствие поля означает «прогон идёт со всем нашим», и продолжение
-      // прогона, у которого галочку сняли, обязано получить пустой ответ, а не
-      // прошлые флаги.
-      ...(decision.layers ? { layers: decision.layers } : {}),
-    };
-  };
+  const runRoute = (origin: string, asked = '', runTag = ''): PlatformRunRoute =>
+    runRouteOf(resolveRunRoute(platformRouting, origin, asked, runTag));
   chatRuns.setPlatformRouting(runRoute);
   projectTestRuns.setPlatformRouting(() => runRoute('tests'));
   // Чат чужого CLI спрашивает за себя: потребитель `foreign:<cli>` собирается по
@@ -506,6 +563,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Вызовы инструментов через контур видит только шлюз: чужой CLI их никуда не
   // пишет, а подсказка «модель могла не справиться» без счёта была бы гаданием.
   providerChats.setContourToolCalls((since) => platformGateway.toolCallsSince(since));
+  // Сжатие истории контуром — по метке прогона в адресе шлюза, из журнала сжатий
+  // на диске: у чужого CLI нет транскрипта, куда шлюз мог бы это вписать.
+  providerChats.setContourSummarized((runTag) =>
+    summarizedInRun(ctx.location.paths.appData, runTag),
+  );
   const events = createEventHub();
   const panelPending = new PanelPendingActions(PANEL_ACTION_CONFIRM_TIMEOUT_MS);
 
@@ -523,6 +585,12 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    */
   const runLedger = new RunLedger(ctx.location.paths.appData);
   chatRuns.setLedger(runLedger, (key) => chatSession.autoApproveFor(key));
+  // Ответ усыновлённого прогона: потока у него нет, но текст лежит в транскрипте
+  // Claude Code. Каталог считается на каждое чтение — он меняется на лету
+  // (`ctx.relocate`), и запомненный путь читал бы прежнюю папку до перезапуска.
+  chatRuns.setClosingTurnReader((chatId, sessionId) =>
+    readLastAssistantTurn(projectsDir(ctx), sessionId ?? chatId),
+  );
   const { adopt, drop } = adoptableEntries(runLedger.read(), {
     isAlive: isPidAlive,
     looksLikeCli: pidLooksLikeCli,
@@ -535,6 +603,17 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   for (const entry of adopt) {
     if (entry.autoApprove) chatSession.armAutoApprove(entry.key, entry.autoApprove);
     if (!chatRuns.adopt(entry)) runLedger.remove(entry.key);
+  }
+
+  // Разбор разделения (Т1), не переживший перезапуск, — ровно здесь, ПОСЛЕ
+  // усыновления: до него живой прогон разбора выглядел бы мёртвым, и запись
+  // закрылась бы под идущим разбором. Живой продолжается как ни в чём не
+  // бывало; мёртвый размораживает своё разделение — группы встают на вопрос
+  // человеку в хабе родителя, и ни одна копия не заводится сама.
+  for (const { parentChatId, event } of splitConveyor.recoverInterruptedTriage((chatId) =>
+    chatRuns.isRunning(chatId),
+  )) {
+    sayToParent(parentChatId, event);
   }
 
   // Спавненные dev-серверы проектов, CLI чатов и прогоны тестов живут в памяти
@@ -552,6 +631,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     // закрытая по Ctrl+C или перезапущенная сторожем, унесла бы с собой
     // последние секунды. Запись синхронная, выход она не задерживает.
     platformGateway.flushSpend();
+    // Фоновая проба тоже гаснет: таймер с `unref` выход не задерживает, но
+    // проба, начатая в секунду закрытия, дописала бы `state.json` уже после
+    // того, как его сохранил кто-то другой.
+    platformWatch.stop();
     // Ждущие карточки агента — ответить отменой: иначе запрос переходника висит
     // до таймаута уже мёртвого процесса.
     panelPending.cancelAll();
@@ -572,6 +655,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     splitReview,
     dlpProxy,
     platformGateway,
+    platformGatewayAutoStart,
+    platformWatch,
     events,
     panelPending,
     selfBaseUrl,

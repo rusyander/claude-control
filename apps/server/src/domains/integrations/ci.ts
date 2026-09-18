@@ -1,8 +1,9 @@
 import type { CiSettings } from '@agentdeck/contracts';
 import { readZip } from '../../lib/zip.ts';
 import { invalidField, unreachable } from './errors.ts';
-import { describeFailure, parseJson, sendRequest } from './http.ts';
+import { failedResponse, parseJson, sendRequest } from './http.ts';
 import { repoFromOrigin } from './forge.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Отчёт последнего прогона CI — сюда, в кейсы.
@@ -51,12 +52,22 @@ export interface CiContext {
 function toAccess(settings: CiSettings, token: string, context: CiContext = {}): CiAccess {
   const kind = settings.kind;
   if (kind !== 'github' && kind !== 'gitlab') {
-    throw invalidField('kind', 'не выбрана система CI (github или gitlab)');
+    throw invalidField(
+      'kind',
+      'не выбрана система CI (github или gitlab)',
+      'request-ci-kind-missing',
+      { field: 'kind' },
+    );
   }
   const repo =
     settings.repo.trim() || (context.projectRoot ? repoFromOrigin(context.projectRoot) : '');
   if (!repo) {
-    throw invalidField('repo', 'не указан репозиторий и его не удалось вывести из origin');
+    throw invalidField(
+      'repo',
+      'не указан репозиторий и его не удалось вывести из origin',
+      'request-repo-missing',
+      { field: 'repo' },
+    );
   }
   const site = (context.baseUrl ?? '').trim().replace(/\/+$/, '');
   return {
@@ -91,7 +102,7 @@ async function get<T>(access: CiAccess, path: string): Promise<T> {
     headers: { ...headers(access), Accept: 'application/json' },
   });
   if (!response.ok) {
-    throw unreachable(describeFailure(systemName(access), response), response.text.slice(0, 500));
+    throw failedResponse(systemName(access), response, 500);
   }
   return parseJson<T>(systemName(access), response);
 }
@@ -104,7 +115,7 @@ async function getBytes(access: CiAccess, path: string): Promise<Buffer> {
     binary: true,
   });
   if (!response.ok) {
-    throw unreachable(describeFailure(systemName(access), response), response.text.slice(0, 500));
+    throw failedResponse(systemName(access), response, 500);
   }
   return response.bytes ?? Buffer.alloc(0);
 }
@@ -119,11 +130,14 @@ function pickXml(entries: { path: string; data: Buffer }[], wanted: string): str
     : undefined;
   const found = named ?? entries.find((entry) => entry.path.toLowerCase().endsWith('.xml'));
   if (!found) {
-    throw unreachable(
-      wanted
-        ? `В артефакте нет файла «${wanted}».`
-        : 'В артефакте нет ни одного XML-отчёта — укажите имя файла в настройках CI.',
-    );
+    throw wanted
+      ? coded(unreachable(`В артефакте нет файла «${wanted}».`), 'ci-artifact-file-missing', {
+          name: wanted,
+        })
+      : coded(
+          unreachable('В артефакте нет ни одного XML-отчёта — укажите имя файла в настройках CI.'),
+          'ci-artifact-no-xml',
+        );
   }
   return found.data.toString('utf8');
 }
@@ -146,11 +160,16 @@ async function fetchGithub(access: CiAccess): Promise<CiReport> {
     ? candidates.find((item) => item.name === access.workflow)
     : candidates[0];
   if (!run) {
-    throw unreachable(
-      access.workflow
-        ? `Завершённых прогонов workflow «${access.workflow}» не нашлось.`
-        : 'В репозитории нет ни одного завершённого прогона Actions.',
-    );
+    throw access.workflow
+      ? coded(
+          unreachable(`Завершённых прогонов workflow «${access.workflow}» не нашлось.`),
+          'ci-workflow-runs-missing',
+          { workflow: access.workflow },
+        )
+      : coded(
+          unreachable('В репозитории нет ни одного завершённого прогона Actions.'),
+          'ci-no-finished-runs',
+        );
   }
 
   const artifacts = await get<{ artifacts?: { id: number; name: string }[] }>(
@@ -161,7 +180,10 @@ async function fetchGithub(access: CiAccess): Promise<CiReport> {
   const artifact = access.artifact
     ? (list.find((item) => item.name === access.artifact) ?? list[0])
     : list[0];
-  if (!artifact) throw unreachable(`У прогона ${run.id} нет артефактов.`);
+  if (!artifact)
+    throw coded(unreachable(`У прогона ${run.id} нет артефактов.`), 'ci-run-no-artifacts', {
+      id: run.id,
+    });
 
   const zip = await getBytes(access, `/repos/${access.repo}/actions/artifacts/${artifact.id}/zip`);
   return {
@@ -183,7 +205,7 @@ async function fetchGitlab(access: CiAccess): Promise<CiReport> {
     `/projects/${project}/pipelines?per_page=5&order_by=id&sort=desc`,
   );
   const pipeline = pipelines?.[0];
-  if (!pipeline) throw unreachable('В проекте нет ни одного конвейера.');
+  if (!pipeline) throw coded(unreachable('В проекте нет ни одного конвейера.'), 'ci-no-pipelines');
 
   const jobs = await get<GlJob[]>(
     access,
@@ -194,11 +216,17 @@ async function fetchGitlab(access: CiAccess): Promise<CiReport> {
     ? withArtifacts.find((item) => item.name === access.workflow)
     : withArtifacts[0];
   if (!job) {
-    throw unreachable(
-      access.workflow
-        ? `В конвейере ${pipeline.id} нет задания «${access.workflow}» с артефактами.`
-        : `В конвейере ${pipeline.id} ни одно задание не оставило артефактов.`,
-    );
+    throw access.workflow
+      ? coded(
+          unreachable(`В конвейере ${pipeline.id} нет задания «${access.workflow}» с артефактами.`),
+          'ci-pipeline-job-missing',
+          { pipeline: pipeline.id, workflow: access.workflow },
+        )
+      : coded(
+          unreachable(`В конвейере ${pipeline.id} ни одно задание не оставило артефактов.`),
+          'ci-pipeline-no-artifacts',
+          { pipeline: pipeline.id },
+        );
   }
 
   // Путь к файлу внутри артефактов GitLab отдаёт напрямую — это дешевле, чем

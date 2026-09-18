@@ -18,6 +18,7 @@ import {
 } from '@entities/ProjectTest';
 import styles from './ProjectTests.module.scss';
 import type { TestDraftModalProps } from './TestDraftModal.types';
+import { serverFieldList, serverFieldText } from '@shared/config/i18n';
 
 /**
  * Приёмка черновика генерации: что прогон предложил и что из этого взять.
@@ -69,7 +70,7 @@ export function TestDraftModal({ isOpen, onOpenChange, projectPath, runId }: Tes
 
       {draft?.error && (
         <Typography variant="body" color="danger">
-          {t('tests.drafts.broken', { reason: draft.error })}
+          {t('tests.drafts.broken', { reason: serverFieldText(draft, 'error') })}
         </Typography>
       )}
 
@@ -85,7 +86,7 @@ export function TestDraftModal({ isOpen, onOpenChange, projectPath, runId }: Tes
 
           {/* Что панель отбросила при чтении файла: удаления, кейсы без
               названия. Молчать об этом нельзя — агент считает их сделанными. */}
-          {draft.warnings?.map((warning) => (
+          {serverFieldList(draft, 'warnings', t).map((warning) => (
             <Typography key={warning} variant="caption" color="warning">
               {warning}
             </Typography>
@@ -115,7 +116,10 @@ export function TestDraftModal({ isOpen, onOpenChange, projectPath, runId }: Tes
               </Typography>
               {applied.skipped.map((item) => (
                 <Typography key={item.caseId} variant="caption" color="warning">
-                  {t('tests.drafts.skipped', { caseId: item.caseId, reason: item.reason })}
+                  {t('tests.drafts.skipped', {
+                    caseId: item.caseId,
+                    reason: serverFieldText(item, 'reason'),
+                  })}
                 </Typography>
               ))}
             </Stack>
@@ -131,7 +135,10 @@ export function TestDraftModal({ isOpen, onOpenChange, projectPath, runId }: Tes
               </Typography>
               {rolled.kept.map((item) => (
                 <Typography key={item.caseId} variant="caption" color="warning">
-                  {t('tests.drafts.kept', { caseId: item.caseId, reason: item.reason })}
+                  {t('tests.drafts.kept', {
+                    caseId: item.caseId,
+                    reason: serverFieldText(item, 'reason'),
+                  })}
                 </Typography>
               ))}
             </Stack>

@@ -11,6 +11,7 @@ import {
   parseRows,
   type ParsedCaseRow,
 } from './import-cases.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Ручные кейсы, написанные прямо в репозитории: `QA/…/ТК-*.md`.
@@ -390,20 +391,31 @@ export function importManualCases(
   try {
     base = resolveProjectPath(root, relativeDir);
   } catch (error) {
-    throw new ProjectTestsError(
-      error instanceof ProjectFileError ? error.message : 'Каталог кейсов вне проекта.',
+    throw coded(
+      new ProjectTestsError(
+        error instanceof ProjectFileError ? error.message : 'Каталог кейсов вне проекта.',
+      ),
+      'manual-dir-outside',
     );
   }
   if (!isDirectory(base)) {
-    throw new ProjectTestsError(
-      `Каталога «${relativeDir}» в проекте нет — укажите тот, где лежат файлы ТК-*.md.`,
+    throw coded(
+      new ProjectTestsError(
+        `Каталога «${relativeDir}» в проекте нет — укажите тот, где лежат файлы ТК-*.md.`,
+      ),
+      'manual-dir-missing',
+      { relativeDir },
     );
   }
 
   const files = collect(base, 0);
   if (files.length === 0) {
-    throw new ProjectTestsError(
-      `В «${relativeDir}» не нашлось ни одного файла вида ТК-*.md (искали и во вложенных папках).`,
+    throw coded(
+      new ProjectTestsError(
+        `В «${relativeDir}» не нашлось ни одного файла вида ТК-*.md (искали и во вложенных папках).`,
+      ),
+      'manual-dir-no-files',
+      { relativeDir },
     );
   }
 
@@ -423,8 +435,11 @@ export function importManualCases(
   }
 
   if (rows.length === 0) {
-    throw new ProjectTestsError(
-      'Файлы нашлись, но ни в одном нет заголовка «# Название» — читать нечего.',
+    throw coded(
+      new ProjectTestsError(
+        'Файлы нашлись, но ни в одном нет заголовка «# Название» — читать нечего.',
+      ),
+      'manual-files-no-title',
     );
   }
 

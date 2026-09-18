@@ -10,6 +10,7 @@ import { copyScripts, copySkills, writeRules } from './SandboxContents.ts';
 import { buildSettings } from './SandboxSettings.ts';
 import type { Sandbox, SandboxDescription, SandboxSelection } from './SandboxConfig.types.ts';
 import { brandEnvName, legacyEnvName } from '../../lib/brand.mjs';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Собирает песочницу под выбранные элементы.
@@ -37,7 +38,12 @@ export function createSandbox(
   // Старую песочницу с тем же id сносим ПРОВЕРЕННО: если от неё что-то уцелело,
   // это «что-то» окажется внутри новой — вместе с чужими скиллами и настройками.
   const wiped = removeTree(root);
-  if (!wiped.ok) throw new Error(`Не удалось очистить прежнюю песочницу: ${wiped.error}`);
+  if (!wiped.ok)
+    throw coded(
+      new Error(`Не удалось очистить прежнюю песочницу: ${wiped.error}`),
+      'sandbox-wipe-failed',
+      { reason: wiped.error },
+    );
 
   mkdirSync(configDir, { recursive: true });
   mkdirSync(workDir, { recursive: true });
@@ -102,8 +108,12 @@ export function removeSandbox(id: string): void {
   forgetSandbox(sandboxKey(id));
 
   if (!result.ok) {
-    throw new Error(
-      `Песочницу не удалось удалить (${result.error}). В ней осталась копия доступа к аккаунту — удалите папку ${root} вручную.`,
+    throw coded(
+      new Error(
+        `Песочницу не удалось удалить (${result.error}). В ней осталась копия доступа к аккаунту — удалите папку ${root} вручную.`,
+      ),
+      'sandbox-remove-failed',
+      { reason: result.error, path: root },
     );
   }
 }

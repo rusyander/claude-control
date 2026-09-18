@@ -10,14 +10,14 @@ export const promptsEn: typeof promptsRu = {
       'its own: how to call tools, how to behave inside a corporate contour, what to treat ' +
       'an image description as and how to lay a topic out as slides. Such a text used to live as a string in ' +
       'the code — there was nowhere to read it and no way to adjust it to your contour. ' +
-      'The «Settings → Prompts» tab shows all five in full and lets you rewrite any of ' +
+      'The «Settings → Prompts» tab shows all six in full and lets you rewrite any of ' +
       'them without losing the built-in one.',
 
     guideTitle: 'What this article covers',
     guideText:
       'First, why these texts are kept separately and which two layers they are made of. ' +
       'Then how to rewrite a prompt and how to bring the built-in one back, in frames of ' +
-      'the real tab. After that: which five prompts exist and who reads each of them, ' +
+      'the real tab. After that: which six prompts exist and who reads each of them, ' +
       'what the section is NOT, what lands on disk, the limits, moving prompts to another ' +
       'machine and the refusals word for word.',
 
@@ -174,7 +174,7 @@ export const promptsEn: typeof promptsRu = {
       'needed.',
 
     canRead:
-      'Read any of the five prompts in full — the working text and the built-in one beside it',
+      'Read any of the six prompts in full — the working text and the built-in one beside it',
     canEdit: 'Rewrite a text and save it for this machine',
     canReset: 'Bring the built-in text back with one button',
     canNotice: 'See that a panel update rewrote the built-in text',
@@ -260,7 +260,7 @@ export const promptsEn: typeof promptsRu = {
   shots: {
     library: {
       '01-list':
-        'The «Prompts» tab: five texts, each with what it is for, its size and an «Open» button',
+        'The «Prompts» tab: six texts, each with what it is for, its size and an «Open» button',
       '02-builtin':
         '«Agent behind a contour» is open: the built-in text in full, «Reset to built-in» disabled — there is no edit',
       '03-edited':

@@ -35,12 +35,14 @@ export function registerProviderSkillsRoutes(app: FastifyInstance, ctx: ServerCo
   const SECTION_UNSUPPORTED = {
     error: 'section_unsupported',
     message: 'У активного провайдера нет универсального раздела скиллов.',
+    messageCode: 'skills-section-unsupported',
   } as const;
 
   const INVALID_DRAFT = {
     error: 'invalid_draft',
     message:
       'Скилл не прошёл проверку: нужен путь вида «<имя>/SKILL.md», однострочные имя и описание и текстовое тело.',
+    messageCode: 'skill-draft-invalid',
   } as const;
 
   const requireTarget = (reply: FastifyReply): ProviderSkillsTarget | undefined => {

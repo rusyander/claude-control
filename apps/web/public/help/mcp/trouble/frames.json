@@ -9,15 +9,15 @@
       "masked": 0,
       "width": 1116,
       "height": 184,
-      "shotAt": "2026-09-11T12:48:29.063Z",
-      "text": "warehouse stdio Не отвечает warehouse-mcp --stdio MCP error -32000: Connection closed: \"warehouse-mcp\" не является внутренней или внешней командой, исполняемой программой или пакетным файлом. Проверено: 11 сент. 2026 г., 17:48 Проверить Инструменты",
+      "shotAt": "2026-09-17T20:37:48.789Z",
+      "text": "warehouse stdio Не отвечает warehouse-mcp --stdio MCP error -32000: Connection closed: \"warehouse-mcp\" не является внутренней или внешней командой, исполняемой программой или пакетным файлом. Проверено: 18 сент. 2026 г., 01:37 Проверить Инструменты",
       "en": {
         "file": "01-failed.en.png",
         "masked": 0,
         "width": 1116,
         "height": 184,
-        "shotAt": "2026-09-11T17:44:22.935Z",
-        "text": "warehouse stdio Not responding warehouse-mcp --stdio MCP error -32000: Connection closed: \"warehouse-mcp\" не является внутренней или внешней командой, исполняемой программой или пакетным файлом. Checked: Sep 11, 2026, 10:44 PM Check Tools"
+        "shotAt": "2026-09-17T20:40:47.275Z",
+        "text": "warehouse stdio Not responding warehouse-mcp --stdio MCP error -32000: Connection closed: \"warehouse-mcp\" не является внутренней или внешней командой, исполняемой программой или пакетным файлом. Checked: Sep 18, 2026, 01:40 AM Check Tools"
       }
     },
     {
@@ -27,15 +27,15 @@
       "masked": 0,
       "width": 1116,
       "height": 184,
-      "shotAt": "2026-09-11T12:48:41.126Z",
-      "text": "billing http Не отвечает http://127.0.0.1:5196/mcp Не заданы переменные ${BILLING_TOKEN}: добавьте их в разделе «Переменные» (settings.json → env или .mcp-secrets.env) либо в окружение, из которого запущена панель Проверено: 11 сент. 2026 г., 17:48 Авторизоваться Проверить Инструменты",
+      "shotAt": "2026-09-17T20:38:00.891Z",
+      "text": "billing http Не отвечает http://127.0.0.1:5196/mcp Не заданы переменные ${BILLING_TOKEN}: добавьте их в разделе «Переменные» (settings.json → env или .mcp-secrets.env) либо в окружение, из которого запущена панель Проверено: 18 сент. 2026 г., 01:37 Авторизоваться Проверить Инструменты",
       "en": {
         "file": "02-missing-var.en.png",
         "masked": 0,
         "width": 1116,
         "height": 184,
-        "shotAt": "2026-09-11T17:44:34.999Z",
-        "text": "billing http Not responding http://127.0.0.1:5223/mcp Не заданы переменные ${BILLING_TOKEN}: добавьте их в разделе «Переменные» (settings.json → env или .mcp-secrets.env) либо в окружение, из которого запущена панель Checked: Sep 11, 2026, 10:44 PM Authorize Check Tools"
+        "shotAt": "2026-09-17T20:40:59.342Z",
+        "text": "billing http Not responding http://127.0.0.1:5196/mcp Не заданы переменные ${BILLING_TOKEN}: добавьте их в разделе «Переменные» (settings.json → env или .mcp-secrets.env) либо в окружение, из которого запущена панель Checked: Sep 18, 2026, 01:40 AM Authorize Check Tools"
       }
     },
     {
@@ -45,15 +45,15 @@
       "masked": 0,
       "width": 1116,
       "height": 166,
-      "shotAt": "2026-09-11T12:48:55.209Z",
-      "text": "billing http Не отвечает http://127.0.0.1:5196/mcp Сервер отверг заголовок Authorization (401) — проверьте токен в заголовках Проверено: 11 сент. 2026 г., 17:48 Авторизоваться Проверить Инструменты",
+      "shotAt": "2026-09-17T20:38:15.370Z",
+      "text": "billing http Не отвечает http://127.0.0.1:5196/mcp Сервер отверг заголовок Authorization (401) — проверьте токен в заголовках Проверено: 18 сент. 2026 г., 01:38 Авторизоваться Проверить Инструменты",
       "en": {
         "file": "03-token-rejected.en.png",
         "masked": 0,
         "width": 1116,
         "height": 166,
-        "shotAt": "2026-09-11T17:44:49.049Z",
-        "text": "billing http Not responding http://127.0.0.1:5223/mcp Сервер отверг заголовок Authorization (401) — проверьте токен в заголовках Checked: Sep 11, 2026, 10:44 PM Authorize Check Tools"
+        "shotAt": "2026-09-17T20:41:13.391Z",
+        "text": "billing http Not responding http://127.0.0.1:5196/mcp Сервер отверг заголовок Authorization (401) — проверьте токен в заголовках Checked: Sep 18, 2026, 01:41 AM Authorize Check Tools"
       }
     },
     {
@@ -63,15 +63,15 @@
       "masked": 0,
       "width": 1116,
       "height": 166,
-      "shotAt": "2026-09-11T12:49:07.274Z",
-      "text": "crm http Не отвечает http://127.0.0.1:5196/mcp Требуется авторизация OAuth — нажмите «Авторизоваться» Проверено: 11 сент. 2026 г., 17:48 Авторизоваться Проверить Инструменты",
+      "shotAt": "2026-09-17T20:38:27.482Z",
+      "text": "crm http Не отвечает http://127.0.0.1:5196/mcp Требуется авторизация OAuth — нажмите «Авторизоваться» Проверено: 18 сент. 2026 г., 01:38 Авторизоваться Проверить Инструменты",
       "en": {
         "file": "04-oauth.en.png",
         "masked": 0,
         "width": 1116,
         "height": 166,
-        "shotAt": "2026-09-11T17:45:01.117Z",
-        "text": "crm http Not responding http://127.0.0.1:5223/mcp Требуется авторизация OAuth — нажмите «Авторизоваться» Checked: Sep 11, 2026, 10:44 PM Authorize Check Tools"
+        "shotAt": "2026-09-17T20:41:25.456Z",
+        "text": "crm http Not responding http://127.0.0.1:5196/mcp Требуется авторизация OAuth — нажмите «Авторизоваться» Checked: Sep 18, 2026, 01:41 AM Authorize Check Tools"
       }
     },
     {
@@ -81,14 +81,14 @@
       "masked": 0,
       "width": 1116,
       "height": 122,
-      "shotAt": "2026-09-11T12:49:09.340Z",
+      "shotAt": "2026-09-17T20:38:29.626Z",
       "text": "warehouse stdio Выключено warehouse-mcp --stdio Проверить Инструменты",
       "en": {
         "file": "05-disabled.en.png",
         "masked": 0,
         "width": 1116,
         "height": 122,
-        "shotAt": "2026-09-11T17:45:03.180Z",
+        "shotAt": "2026-09-17T20:41:27.525Z",
         "text": "warehouse stdio Disabled warehouse-mcp --stdio Check Tools"
       }
     },
@@ -99,14 +99,14 @@
       "masked": 0,
       "width": 1400,
       "height": 835,
-      "shotAt": "2026-09-11T12:49:11.010Z",
+      "shotAt": "2026-09-17T20:38:31.401Z",
       "text": "Редактировать: billing Изменения применятся после перезапуска Claude Code Имя сервера Под этим именем сервер попадёт в конфиг и в правила доступа Транспорт stdio sse http stdio — сервер запускается как процесс; sse и http — подключение к уже работающему адресу Адрес Заголовки запроса По строке в формате Имя=значение. Нужны серверам за авторизацией: без них проверка упрётся в 401 Переменные окружения По строке в формате KEY=VALUE. Секреты сюда не вписывайте — положите их в раздел «Переменные» и сошлитесь как ${VAR} Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "06-headers.en.png",
         "masked": 0,
         "width": 1400,
         "height": 817,
-        "shotAt": "2026-09-11T17:45:04.857Z",
+        "shotAt": "2026-09-17T20:41:29.215Z",
         "text": "Edit: billing Changes apply after restarting Claude Code Server name This name goes into the config and into permission rules Transport stdio sse http stdio — the server runs as a process; sse and http — connect to an address already running Address Request headers One Name=value per line. Needed by servers behind auth: without them the check stops at 401 Environment variables One KEY=VALUE per line. Do not put secrets here — keep them in the Environment section and reference them as ${VAR} Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     }

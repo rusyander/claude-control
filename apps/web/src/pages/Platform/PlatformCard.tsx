@@ -32,6 +32,7 @@ import { SmokeLine } from './SmokeLine';
 import { SmokeToolsLine } from './SmokeToolsLine';
 import { formatAgo } from './lib/formatAgo';
 import styles from './PlatformPage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 interface PlatformCardProps {
   status: PlatformStatus;
@@ -73,7 +74,12 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
     activate.mutate(platform.id, {
       onSuccess: (result) => {
         if (result.smoke.ok) toast.success(t('platform.activatedOk', { title: platform.title }));
-        else toast.warning(t('platform.activatedSmokeFailed', { detail: result.smoke.detail }));
+        else
+          toast.warning(
+            t('platform.activatedSmokeFailed', {
+              detail: serverFieldText(result.smoke, 'detail'),
+            }),
+          );
       },
       onError: () => toast.error(t('platform.activateFailed')),
     });
@@ -83,7 +89,8 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
   // вместе с процессом, и после перезапуска панели карточка сообщала бы
   // «потрачено $0» ключу, который уже упёрся в бюджет.
   const budget = platformBudgetOf(status);
-  const money = platformSpendOf(status).money;
+  const periodSpend = platformSpendOf(status);
+  const money = periodSpend.money;
   const health = status.health;
   const applied = plan.data?.targets.filter((target) => target.applied) ?? [];
 
@@ -117,9 +124,12 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
                   ? t('platform.tokenSaved', { masked: status.maskedToken })
                   : t('platform.tokenMissing')}
               </Typography>
+              {/* Кто завёл пробу — часть факта, а не украшение (A-2): «проверен
+                  минуту назад» без этого читается как «я нажимал», и строка,
+                  появившаяся в журнале контура, остаётся без объяснения. */}
               {health && (
                 <Typography variant="caption" color="muted">
-                  {t('platform.checkedAt', {
+                  {t(health.background ? 'platform.checkedAtBackground' : 'platform.checkedAt', {
                     when: formatAgo(health.checkedAt, i18n.language, t),
                   })}
                 </Typography>
@@ -191,7 +201,7 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
             «реестр моделей ещё не поднялся» чинятся в разных местах. */}
         {health && health.outcome !== 'ok' && (
           <Stack gap="var(--spacing-3xs)" className={styles.problem}>
-            <Typography variant="body-sm">{health.detail}</Typography>
+            <Typography variant="body-sm">{serverFieldText(health, 'detail')}</Typography>
             <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
               <Typography variant="caption" color="muted">
                 {t(`platform.fix.${health.outcome}`)}
@@ -274,6 +284,17 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
                 style={{ width: `${budget.share * 100}%` }}
               />
             </div>
+          )}
+
+          {/* Ответы, за которые контур не прислал счёта (MD-09): расход у них
+              был — так приходит картинка, — но панель его не знает и выдумывать
+              не станет. Молчаливый пропуск делал бы полосу выше по-настоящему
+              лживой: занижена и ни одного признака этого на экране. */}
+          {(periodSpend.unreportedAnswers ?? 0) > 0 && (
+            <Typography variant="caption" color="subtle">
+              {/* TODO код: строка ждёт ключа словаря (`platform.spendUnreported`). */}
+              Ответов без счёта от контура: {periodSpend.unreportedAnswers} — оценка занижена.
+            </Typography>
           )}
 
           {/* Токены моделей без цены в оценку НЕ входят — ровно как у контура,

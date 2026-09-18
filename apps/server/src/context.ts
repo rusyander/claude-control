@@ -132,6 +132,8 @@ export class ServerContext {
         ...next,
         isValid: false,
         problem: `Каталог данных панели в ${next.paths.root} не создаётся: ${detail}`,
+        problemCode: 'location-app-data-failed',
+        problemParams: { root: next.paths.root, detail },
       };
     }
     // Свежий каталог наследует политику удалённого доступа: иначе переезд молча

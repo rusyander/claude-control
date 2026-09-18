@@ -52,8 +52,18 @@ export function isManagedProfile(profile: EndpointProfile): boolean {
  * `anthropic` и `google` дописывают версию сами, поэтому им отдаётся корень;
  * openai-совместимые ждут адрес вместе с версией.
  */
-export function gatewayUrlFor(port: number, platformId: string, apiKind: EndpointApiKind): string {
-  const root = `http://127.0.0.1:${port}/${platformId}`;
+export function gatewayUrlFor(
+  port: number,
+  platformId: string,
+  apiKind: EndpointApiKind,
+  /**
+   * Метка ОДНОГО прогона (`/<контур>/_run/<метка>`). Только для окружения
+   * прогона чужого CLI: в файлы и в управляемый профиль она не попадает никогда —
+   * там адрес общий на все запуски.
+   */
+  runTag = '',
+): string {
+  const root = `http://127.0.0.1:${port}/${platformId}${runTag ? `/_run/${runTag}` : ''}`;
   return apiKind === 'openai-compat' ? `${root}/v1` : root;
 }
 

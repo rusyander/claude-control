@@ -102,6 +102,27 @@ describe('каталог: чем можно вести разговор', () => 
     expect(models.map((model) => model.id)).toEqual(['company-mid']);
   });
 
+  it('`text-embedding-…` — эмбеддер, а не чат: слово text не старше семейства', () => {
+    // Ревью Т13: проверка `kind.includes('text')` стояла ПЕРЕД семейным
+    // отсевом, и `text-embedding-3-small` проходил в список первым — то есть
+    // `catalogDefaultModel` делал эмбеддер моделью КАЖДОГО прогона. Тот же
+    // дефект, что Т6 закрыл для рисования, только через другое слово.
+    const models = catalogChatModels([
+      { id: 'text-embedding-3-small', kind: 'text-embedding' },
+      { id: 'company-mid', kind: 'chat' },
+    ]);
+    expect(models.map((model) => model.id)).toEqual(['company-mid']);
+  });
+
+  it('`text-generation` разговором быть не перестаёт', () => {
+    // Отсев семейный, а не «всё, где есть text»: у шлюзов вроде TGI чатовая
+    // модель объявлена именно так, и спрятать её значило бы оставить человека
+    // без единственной модели контура.
+    expect(
+      catalogChatModels([{ id: 'mistral-7b', kind: 'text-generation' }]).map((m) => m.id),
+    ).toEqual(['mistral-7b']);
+  });
+
   it('нераспознанный вид чатом быть не перестаёт: `{"type":"model"}` — это молчание', () => {
     // Поле вида ищется по нескольким именам, и у части шлюзов там лежит совсем
     // другое. Считать такую строку объявлением значило бы спрятать от человека

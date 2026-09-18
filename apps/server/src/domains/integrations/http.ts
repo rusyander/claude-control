@@ -1,4 +1,5 @@
 import { unreachable } from './errors.ts';
+import { coded, type CodedText } from '../../lib/server-text.ts';
 
 /**
  * Единственный способ, которым панель выходит наружу.
@@ -87,10 +88,7 @@ export async function sendRequest(request: OutboundRequest): Promise<OutboundRes
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (error) {
-      throw unreachable(
-        describeNetworkFailure(request.system, error),
-        request.label ?? request.url,
-      );
+      throw networkFailure(request.system, error, request.label ?? request.url);
     }
 
     if (attempt === 1 && RETRYABLE.has(response.status)) {
@@ -120,13 +118,21 @@ export async function sendRequest(request: OutboundRequest): Promise<OutboundRes
 }
 
 /** Не дошли вовсе: нет сети, не разобрался адрес, вышло время. */
-function describeNetworkFailure(system: string, error: unknown): string {
+function networkFailure(system: string, error: unknown, detail: string) {
   const name = error instanceof Error ? error.name : '';
   if (name === 'TimeoutError' || name === 'AbortError') {
-    return `${system} не ответила за ${REQUEST_TIMEOUT_MS / 1_000} с.`;
+    const seconds = REQUEST_TIMEOUT_MS / 1_000;
+    return coded(
+      unreachable(`${system} не ответила за ${seconds} с.`, detail),
+      'integration-timeout',
+      { system, seconds },
+    );
   }
   const reason = error instanceof Error ? error.message : String(error);
-  return `Нет связи с ${system}: ${reason}.`;
+  return coded(unreachable(`Нет связи с ${system}: ${reason}.`, detail), 'integration-network', {
+    system,
+    reason,
+  });
 }
 
 /**
@@ -152,10 +158,33 @@ export function describeFailure(system: string, response: OutboundResponse): str
   return `${system}: запрос отклонён (${response.status})${tail ? `: ${tail}` : ''}.`;
 }
 
+/** Та же фраза кодом — ветви один в один с `describeFailure`. */
+export function failureCode(system: string, response: OutboundResponse): CodedText {
+  const status = response.status;
+  if (status === 401 || status === 403)
+    return { messageCode: 'integration-token-rejected', params: { system, status } };
+  if (status === 404) return { messageCode: 'integration-address-404', params: { system } };
+  if (status === 429) return { messageCode: 'integration-rate-limited', params: { system } };
+  if (status >= 500) return { messageCode: 'integration-server-error', params: { system, status } };
+  const tail = response.text.trim().slice(0, 200);
+  return {
+    messageCode: 'integration-request-rejected',
+    params: { system, status, tail: tail ? `: ${tail}` : '' },
+  };
+}
+
+/** Отказ по коду ответа как ошибка интеграции: русская фраза, код и хвост тела. */
+export function failedResponse(system: string, response: OutboundResponse, detailLength = 500) {
+  return Object.assign(
+    unreachable(describeFailure(system, response), response.text.trim().slice(0, detailLength)),
+    failureCode(system, response),
+  );
+}
+
 /** Ответ обязан быть удачным; иначе — 502 с русской причиной и хвостом тела. */
 export function ensureOk(system: string, response: OutboundResponse): OutboundResponse {
   if (response.ok) return response;
-  throw unreachable(describeFailure(system, response), response.text.trim().slice(0, 500));
+  throw failedResponse(system, response);
 }
 
 /**
@@ -168,9 +197,10 @@ export function parseJson<T>(system: string, response: OutboundResponse): T {
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw unreachable(
-      `${system} ответила не JSON — похоже, адрес ведёт не туда.`,
-      text.slice(0, 200),
+    throw coded(
+      unreachable(`${system} ответила не JSON — похоже, адрес ведёт не туда.`, text.slice(0, 200)),
+      'integration-not-json',
+      { system },
     );
   }
 }

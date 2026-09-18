@@ -2,6 +2,9 @@ import { execFile, execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { GIT_MAX_BUFFER, GIT_TIMEOUT_MS } from './constants.ts';
+import { coded } from '../../lib/server-text.ts';
+import { serverText } from '../../lib/server-texts.ts';
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
 /**
  * Запуск git. Оболочки нет нигде: `execFile('git', [...])` передаёт аргументы
@@ -76,10 +79,15 @@ export async function git(
   } catch (error) {
     const shell = error as { stderr?: string; stdout?: string; code?: string; message?: string };
     if (shell.code === 'ENOENT') {
-      throw new GitError('Команда git не найдена. Установите git или добавьте его в PATH.');
+      throw coded(
+        new GitError('Команда git не найдена. Установите git или добавьте его в PATH.'),
+        'git-command-missing-exec',
+      );
     }
     const text = stripGitProgress(shell.stderr || shell.stdout || shell.message || '');
-    throw new GitError(text || 'Команда git завершилась с ошибкой');
+    throw text
+      ? new GitError(text)
+      : coded(new GitError(serverText('git-failed-no-output')), 'git-failed-no-output');
   }
 }
 
@@ -136,4 +144,28 @@ export function gitSyncOutcome(
     }
     return { ok: false, reason: shell.code === 'ENOENT' ? 'no-git' : 'failed' };
   }
+}
+
+/** Итог операции записи: вывод git, а когда git промолчал — своя строка с кодом. */
+export interface GitOutput {
+  output: string;
+  outputCode?: ServerMessageCode;
+  outputParams?: ServerMessageParams;
+}
+
+/**
+ * Вывод git показывается как есть — он на языке git, не панели. Своя строка
+ * нужна, только когда git промолчал, и только она едет с кодом.
+ */
+export function gitOutput(
+  out: string,
+  fallback: string,
+  outputCode: ServerMessageCode,
+  outputParams?: ServerMessageParams,
+): GitOutput {
+  const text = out.trim();
+  if (text) return { output: text };
+  return outputParams
+    ? { output: fallback, outputCode, outputParams }
+    : { output: fallback, outputCode };
 }

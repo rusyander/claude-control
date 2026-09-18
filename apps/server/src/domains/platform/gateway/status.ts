@@ -15,6 +15,7 @@
  */
 
 import type { DriverStatusRow, DriverViolationName } from '../drivers/driver.ts';
+import { serverText } from '../../../lib/server-texts.ts';
 
 /** Как отвечать клиенту на каждый известный код контура. */
 export interface BridgedStatus {
@@ -38,39 +39,43 @@ export interface BridgedStatus {
  * с пятью причинами), приезжают строками драйвера и ложатся поверх.
  */
 const CODES: Record<number, { status: number; code: string; message: string }> = {
-  400: { status: 400, code: 'invalid_request_error', message: 'Контур не принял запрос' },
+  400: {
+    status: 400,
+    code: 'invalid_request_error',
+    message: serverText('gateway-upstream-400'),
+  },
   401: {
     status: 401,
     code: 'authentication_error',
-    message: 'Контур отклонил ключ. Проверьте сам ключ и его права',
+    message: serverText('gateway-upstream-401'),
   },
   402: {
     status: 402,
     code: 'billing_error',
-    message: 'Контур отказал по лимиту расхода — до вызова модели',
+    message: serverText('gateway-upstream-402'),
   },
   403: {
     status: 403,
     code: 'permission_error',
-    message: 'Ключу не разрешена эта модель на контуре',
+    message: serverText('gateway-upstream-403'),
   },
-  404: { status: 404, code: 'not_found_error', message: 'Контур не знает такого маршрута' },
+  404: { status: 404, code: 'not_found_error', message: serverText('gateway-upstream-404') },
   // 413 приходит от самого шлюза, а не от контура, но клиент читает его тем же
   // разбором, и общий «код 413» ему ничего не объясняет.
   413: {
     status: 413,
     code: 'invalid_request_error',
-    message: 'Запрос больше того, что контур принимает',
+    message: serverText('gateway-upstream-413'),
   },
   422: {
     status: 422,
     code: 'invalid_request_error',
-    message: 'Контур не принял форму запроса',
+    message: serverText('gateway-upstream-422'),
   },
   429: {
     status: 429,
     code: 'rate_limit_error',
-    message: 'Превышен лимит ключа на контуре (запросов или токенов в минуту)',
+    message: serverText('gateway-upstream-429'),
   },
   // 451 стоит в ОБЩЕЙ таблице, хотя перечень проверок из его тела читает только
   // тот, кто про этот перечень объявил. Смысл кода задан RFC 7725, а не
@@ -80,11 +85,11 @@ const CODES: Record<number, { status: number; code: string; message: string }> =
   451: {
     status: 400,
     code: 'content_policy_violation',
-    message: 'Запрос остановлен проверками содержимого на стороне контура',
+    message: serverText('gateway-upstream-451'),
   },
-  500: { status: 502, code: 'api_error', message: 'Контур ответил ошибкой на своей стороне' },
-  502: { status: 502, code: 'api_error', message: 'Контур не смог дозваться до модели' },
-  503: { status: 503, code: 'overloaded_error', message: 'Контур сейчас недоступен' },
+  500: { status: 502, code: 'api_error', message: serverText('gateway-upstream-500') },
+  502: { status: 502, code: 'api_error', message: serverText('gateway-upstream-502') },
+  503: { status: 503, code: 'overloaded_error', message: serverText('gateway-upstream-503') },
 };
 
 /**
@@ -241,11 +246,11 @@ function modelName(model: string | undefined): string {
   return value.length > 64 ? `${value.slice(0, 64)}…` : value;
 }
 
-/** «через 12 с» — если контур сказал, когда повторять. */
-function retryHint(seconds: number | undefined): string {
-  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return '';
+/** «через 12 с» — если контур сказал, когда повторять; иначе текст как есть. */
+function withRetryHint(message: string, seconds: number | undefined): string {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return message;
   const rounded = Math.min(Math.ceil(seconds), 24 * 60 * 60);
-  return `. Контур просит повторить через ${rounded} с`;
+  return serverText('gateway-retry-after', { message, seconds: rounded });
 }
 
 /**
@@ -283,10 +288,10 @@ export function bridgeUpstreamStatus(
   const model = modelName(context.model);
 
   if (model && (status === 403 || status === 404)) {
-    const message =
-      status === 403
-        ? `Ключу не разрешена модель «${model}» на контуре — список разрешённых у ключа в админке платформы, а в разделе «Контур» видно то же самое списком моделей`
-        : `Контур ответил «не найдено» на запрос модели «${model}». Читается это двояко: модель убрали из контура между прогонами (в разделе «Контур» пропавшие помечены и хранят дату последней встречи) — либо адрес контура указывает не на публичный API, а, например, на админку, и тогда не найден маршрут, а не модель`;
+    const message = serverText(
+      status === 403 ? 'gateway-model-forbidden' : 'gateway-model-not-found',
+      { model },
+    );
     // Код и статус берём из таблицы, а не повторяем числами: иначе правка
     // таблицы (451 там уже отдаётся клиенту как 400) тихо разошлась бы с этой
     // веткой, и один и тот же код отвечал бы по-разному в зависимости от того,
@@ -294,7 +299,7 @@ export function bridgeUpstreamStatus(
     return {
       status: known?.status ?? status,
       code: known?.code ?? 'invalid_request_error',
-      message: detail ? `${message}: ${detail}` : message,
+      message: detail ? serverText('gateway-joined', { message, detail }) : message,
       violations,
     };
   }
@@ -303,7 +308,7 @@ export function bridgeUpstreamStatus(
     return {
       status: status >= 400 && status < 600 ? status : 502,
       code: status >= 500 ? 'api_error' : 'invalid_request_error',
-      message: detail || `Контур ответил кодом ${status}`,
+      message: detail || serverText('gateway-upstream-status', { status }),
       violations,
     };
   }
@@ -312,16 +317,16 @@ export function bridgeUpstreamStatus(
   // нему чужую фразу незачем, а вот названия проверок человеку нужны.
   const body = row?.violations
     ? violations.length > 0
-      ? `${known.message}: ${violations.join(', ')}`
+      ? serverText('gateway-joined', { message: known.message, detail: violations.join(', ') })
       : known.message
     : detail
-      ? `${known.message}: ${detail}`
+      ? serverText('gateway-joined', { message: known.message, detail })
       : known.message;
 
   // «Когда повторить» у 429 — половина сценария §8 №9, и знает её только
   // контур: свой авто-повтор шлюз делает молча и ровно один, а дальше решает
   // человек или клиент. Без секунд «слишком часто» не отличается от «сломалось».
-  const message = status === 429 ? `${body}${retryHint(context.retryAfterSeconds)}` : body;
+  const message = status === 429 ? withRetryHint(body, context.retryAfterSeconds) : body;
 
   return { status: known.status, code: known.code, message, violations };
 }

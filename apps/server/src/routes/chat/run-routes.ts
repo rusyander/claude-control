@@ -16,7 +16,12 @@ import {
   buildPromptWithFiles,
   SUPPORTED_UPLOAD_EXTENSIONS,
 } from '../../domains/chat/ChatUploads.ts';
-import { activateGroupsForCwd } from '../../domains/group-activation.ts';
+import { activateGroupsForCwd, groupsActivatedNotice } from '../../domains/group-activation.ts';
+import {
+  describeGaps,
+  readinessForCwd,
+  repairCopy,
+} from '../../domains/project-git/copy-readiness.ts';
 import { cascadeCeilingFor, expandAssignedModel } from '../../domains/model-cascade.ts';
 import { loweredWorkPrompt } from '@agentdeck/contracts/model-cascade';
 import { activeCliCommand } from '../../providers/cli.ts';
@@ -187,6 +192,35 @@ export function registerChatRunRoutes(
         validTargetCwd(projectPath),
       );
 
+      // Копия репозитория обязана быть полной ДО первого хода агента: без
+      // локального слоя и записи доступа он либо спросит человека то, на что
+      // тот уже отвечал, либо молча сделает работу без своих переходников.
+      // Сначала панель добирает недостачу сама и только потом отказывает.
+      const copyState = await readinessForCwd(workspace.cwd, ctx.location.paths.mcpConfig);
+      if (!copyState.ready && copyState.mainDir) {
+        const repaired = await repairCopy({
+          mainDir: copyState.mainDir,
+          copyDir: workspace.cwd,
+          mirror: ctx.store.getWorktreeMirror(copyState.mainDir),
+          claudeJsonPath: ctx.location.paths.mcpConfig,
+        });
+        if (!repaired.ready) {
+          const gaps = describeGaps(repaired.gaps);
+          return refuse(
+            reply,
+            422,
+            'copy_not_ready',
+            `Копия ${workspace.cwd} неполная: ${gaps}. Панель попробовала добрать недостающее и не смогла — агент в такой копии работал бы не с тем окружением.`,
+            {
+              cwd: workspace.cwd,
+              gaps: repaired.gaps,
+              messageCode: 'run-copy-not-ready',
+              params: { cwd: workspace.cwd, gaps },
+            },
+          );
+        }
+      }
+
       if (workspace.isMissing) {
         return refuse(
           reply,
@@ -208,12 +242,13 @@ export function registerChatRunRoutes(
       // включённая группа не трогается вовсе, поэтому вызов на каждом сообщении
       // ничего не стоит. Песочница исключена: у неё свой каталог конфигурации.
       // Осечка тут не имеет права ронять прогон — набор не главнее разговора.
+      let activatedGroups: string[] = [];
       if (!workspace.isSandbox) {
         try {
-          activateGroupsForCwd(
+          activatedGroups = activateGroupsForCwd(
             { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
             cwd,
-          );
+          ).activated;
         } catch (error) {
           app.log.warn({ err: error }, 'group activation failed');
         }
@@ -374,6 +409,12 @@ export function registerChatRunRoutes(
         });
       }
 
+      // Про включившийся набор говорим ПОСЛЕ старта: до него прогона в реестре
+      // нет, и заметке некуда лечь. Буфер реестра держит её наравне с событиями
+      // CLI, поэтому подключение с нуля её не пропустит.
+      const activationNotice = groupsActivatedNotice(activatedGroups);
+      if (activationNotice) registry.emitExternal(chatId, activationNotice);
+
       await streamRun(registry, reply, chatId, 0);
     },
   );
@@ -446,6 +487,18 @@ export function registerChatRunRoutes(
       return reply.send({ behavior: 'deny', message: QUESTION_DENIED });
     }
 
+    // Поздний подхват. Единственный обход журнала при старте панели мог этот
+    // прогон не поймать: pid приезжает в журнал асинхронно, а `tasklist` на
+    // занятой машине отвечает не всегда — и тогда живой агент получал отказ на
+    // КАЖДЫЙ вызов до конца жизни. Пробуем усыновить его по журналу здесь, теми
+    // же проверками; цена — одно чтение файла на неизвестный прогон. Тумблеры
+    // возвращаем из снимка ДО проверки автоподтверждения ниже: иначе подхват
+    // сразу поднял бы карточку там, где до перезапуска панель молчала.
+    if (!registry.isRunning(runId)) {
+      const adopted = registry.adoptFromLedger(runId);
+      if (adopted?.autoApprove) session.armAutoApprove(adopted.key, adopted.autoApprove);
+    }
+
     // Автоподтверждение: обратимый запрос разрешаем молча, не показывая
     // карточку. Человеку остаётся безвозвратное (удаление, затирание истории,
     // снос данных и инфраструктуры, публикация в чужой реестр) и всё, что
@@ -472,8 +525,9 @@ export function registerChatRunRoutes(
       return reply.send({ behavior: 'allow', updatedInput: input });
     }
 
-    // Прогона нет в реестре — ни живого, ни усыновлённого из журнала после
-    // перезапуска (`bootstrap/runtime.ts`). Текст честный и с действием: он
+    // Прогона нет в реестре — ни живого, ни усыновлённого из журнала: ни обходом
+    // при старте (`bootstrap/runtime.ts`), ни поздним подхватом выше. Значит его
+    // процесс мёртв или записи о нём нет вовсе. Текст честный и с действием: он
     // уезжает агенту результатом вызова и в транскрипт, откуда его видит лента.
     // «Разговор не найден» здесь стояло 09.09.2026 на 24 отказах за секунду.
     const shown = registry.emitExternal(runId, { kind: 'permission', toolName, input, toolUseId });

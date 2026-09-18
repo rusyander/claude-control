@@ -10,6 +10,7 @@ import { useMcpTools, useCallMcpTool } from '@entities/Sandbox';
 import { parseToolArgs } from '../model/parseToolArgs';
 import type { McpProbePanelProps } from './McpProbePanel.types';
 import styles from './SandboxModal.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Стенд MCP-сервера: какие инструменты он даёт и что отвечает на вызов.
@@ -60,7 +61,7 @@ export function McpProbePanel({ mcpId }: McpProbePanelProps) {
 
       {tools.data?.error && (
         <Typography variant="body-sm" color="danger">
-          {tools.data.error}
+          {serverFieldText(tools.data, 'error')}
         </Typography>
       )}
 

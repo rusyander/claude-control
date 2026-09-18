@@ -51,6 +51,12 @@ export interface ProviderChatMessagesProps {
   onAnswerHold?: (index: number, answer: string) => void;
   holdBusy?: boolean;
   /**
+   * «Отпустить» группу, которая ждёт предшественников (Т3): цепочка
+   * предшественника может не кончиться никогда, и тогда это единственная дверь.
+   */
+  onRelease?: (index: number) => void;
+  releaseBusy?: boolean;
+  /**
    * Сверить ветки групп (Т4): считает сервер запросами к git, поэтому кнопка, а
    * не постоянный пересчёт. Сам результат приезжает деревом.
    */

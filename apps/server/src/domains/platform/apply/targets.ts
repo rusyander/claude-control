@@ -14,6 +14,7 @@ import type {
 import { buildEndpointPlan, resolveEndpointVars } from '../../endpoints/endpoint-plan.ts';
 import { resolveProviderEnvTargetFor } from '../../provider-env.ts';
 import { gatewayUrlFor, PLACEHOLDER_KEY } from './profile.ts';
+import { serverText } from '../../../lib/server-texts.ts';
 
 /**
  * Куда контур переносится и почему у части CLI стоит прочерк.
@@ -101,11 +102,12 @@ export function targetProfile(
   platformId: string,
   gatewayPort: number,
   apiKind: EndpointApiKind,
+  runTag = '',
 ): EndpointProfile {
   return {
     ...managed,
     apiKind,
-    baseUrl: gatewayUrlFor(gatewayPort, platformId, apiKind),
+    baseUrl: gatewayUrlFor(gatewayPort, platformId, apiKind, runTag),
     writeToken: true,
   };
 }
@@ -167,7 +169,7 @@ export function describeContourTargets(
   const targets: ContourTarget[] = [
     {
       targetId: PLATFORM_ASSISTANT_TARGET,
-      title: 'Ассистент панели',
+      title: serverText('contour-target-assistant'),
       write: { kind: 'assistant' },
       filePath: '',
       plan: [],

@@ -31,13 +31,13 @@ type Story = StoryObj<typeof meta>;
 const GIT_OUTPUT = [
   '[main 9267209] feat(mobile): адрес панели по умолчанию задаётся при сборке',
   ' 124 files changed, 4457 insertions(+), 396 deletions(-)',
-  ' create mode 100644 inst-admin-api/internal/api/handler_guardrails_response_test.go',
-  ' create mode 100644 inst-admin-api/internal/service/guardrail_cp_response_test.go',
-  ' create mode 100644 inst-admin-api/internal/store/guardrails_response_test.go',
-  ' create mode 100644 mod-agentbox/src/agentbox/logging_safe.py',
-  ' create mode 100644 mod-agentbox/tests/test_coordinator_worker.py',
-  ' create mode 100644 mod-kbbox/tests/test_embeddings.py',
-  ' create mode 100644 mod-llmbox/tests/test_error_contract.py',
+  ' create mode 100644 service-api/internal/api/handler_rules_response_test.go',
+  ' create mode 100644 service-api/internal/service/rules_response_test.go',
+  ' create mode 100644 service-api/internal/store/rules_response_test.go',
+  ' create mode 100644 module-agents/src/agents/logging_safe.py',
+  ' create mode 100644 module-agents/tests/test_coordinator_worker.py',
+  ' create mode 100644 module-knowledge/tests/test_embeddings.py',
+  ' create mode 100644 module-models/tests/test_error_contract.py',
 ].join('\n');
 
 export const Песочница: Story = {

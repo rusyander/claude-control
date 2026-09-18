@@ -290,6 +290,19 @@ describe('что уезжает по «Готово»', () => {
     expect(plan.platform.consumers).toEqual(['chat']);
   });
 
+  it('потребитель с причиной недоступности тоже не сохраняется снова', () => {
+    // Ревью Т13: строка с причиной рисуется прочерком БЕЗ галочки
+    // (`ConsumerRows`), то есть снять её человеку нечем ровно так же, как
+    // отсутствующую. Сохранённый `foreign:codex` пережил бы каждое «Готово» и
+    // ожил бы в тот день, когда у codex появится переменная адреса.
+    const plan = finishPlan(
+      { ...DRAFT, consumers: ['chat', 'foreign:codex'] },
+      [],
+      [...OFFERED, { id: 'foreign:codex', reason: 'file_only' }],
+    );
+    expect(plan.platform.consumers).toEqual(['chat']);
+  });
+
   it('список ещё не пришёл — сохранённое не трогается', () => {
     const plan = finishPlan({ ...DRAFT, consumers: ['chat', 'foreign:gone'] }, [], undefined);
     expect(plan.platform.consumers).toEqual(['chat', 'foreign:gone']);

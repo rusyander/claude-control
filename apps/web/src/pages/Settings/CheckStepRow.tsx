@@ -5,6 +5,7 @@ import { Badge } from '@shared/ui/badge';
 import { stepTone } from '@entities/ProviderCheck';
 import type { CheckStepRowProps } from './CheckStepRow.types';
 import styles from './ProviderCheckCard.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /** Одна строка чек-листа: что проверяли, чем кончилось и почему. */
 export function CheckStepRow({ step }: CheckStepRowProps) {
@@ -18,7 +19,7 @@ export function CheckStepRow({ step }: CheckStepRowProps) {
           {t(`providerCheck.step.${step.id}`)}
         </Typography>
         <Typography variant="caption" color="subtle" as="span">
-          {step.detail}
+          {serverFieldText(step, 'detail')}
         </Typography>
         {step.filePath && <span className={styles.path}>{step.filePath}</span>}
       </Stack>

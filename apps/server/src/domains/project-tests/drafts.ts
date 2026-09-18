@@ -23,6 +23,8 @@ import {
 } from './files.ts';
 import { freeCaseId } from './import-cases.ts';
 import { loadForWrite, parseCase, readGroups, writeGroup } from './store.ts';
+import { coded, codedIf } from '../../lib/server-text.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Черновик генерации: что прогон ПРЕДЛОЖИЛ добавить в библиотеку.
@@ -99,7 +101,11 @@ export function draftFile(runId: string): string {
 
 function assertRunId(runId: string): string {
   if (!RUN_ID.test(runId))
-    throw new ProjectTestsError(`Черновик «${runId}»: неверный идентификатор.`);
+    throw coded(
+      new ProjectTestsError(`Черновик «${runId}»: неверный идентификатор.`),
+      'draft-id-invalid',
+      { runId },
+    );
   return runId;
 }
 
@@ -141,25 +147,23 @@ function parseItem(
   warnings: string[],
 ): ProjectTestDraftItem | undefined {
   if (!raw || typeof raw !== 'object') {
-    warnings.push(`Правка №${index + 1} не разобралась.`);
+    warnings.push(serverText('tests-draft-item-unparsed', { index: index + 1 }));
     return undefined;
   }
   const record = raw as Record<string, unknown>;
   const op = optional(record.op) ?? 'add';
   if (op !== 'add' && op !== 'update') {
-    warnings.push(
-      `Правка №${index + 1}: «${op}» черновиком не делается — удаление кейсов остаётся человеку.`,
-    );
+    warnings.push(serverText('tests-draft-op-refused', { index: index + 1, op }));
     return undefined;
   }
   const groupId = validGroupId(record.groupId);
   if (!groupId) {
-    warnings.push(`Правка №${index + 1}: не названа группа.`);
+    warnings.push(serverText('tests-draft-group-missing', { index: index + 1 }));
     return undefined;
   }
   const testCase = parseCase(record.case ?? record.testCase, index);
   if (!testCase) {
-    warnings.push(`Правка №${index + 1}: кейс без названия.`);
+    warnings.push(serverText('tests-draft-title-missing', { index: index + 1 }));
     return undefined;
   }
   const caseId = optional(record.caseId) ?? testCase.id;
@@ -199,9 +203,19 @@ function statusOf(items: ProjectTestDraftItem[], stored: unknown): ProjectTestDr
 export function readDraft(root: string, runId: string): ProjectTestDraft | undefined {
   const relative = draftRelativePath(runId);
   const file = testsFile(relative);
-  const { data, error } = readJson(root, relative);
+  const { data, error, messageCode, params } = readJson(root, relative);
   if (error) {
-    return { version: 1, runId, createdAt: '', items: [], file, status: 'pending', error };
+    return {
+      version: 1,
+      runId,
+      createdAt: '',
+      items: [],
+      file,
+      status: 'pending',
+      error,
+      messageCode,
+      params,
+    };
   }
   if (!data || typeof data !== 'object') return undefined;
 
@@ -242,6 +256,8 @@ export function summarizeDraft(draft: ProjectTestDraft): ProjectTestDraftSummary
     rejected: count('rejected'),
     auto: draft.auto,
     error: draft.error,
+    messageCode: draft.messageCode,
+    params: draft.params,
   };
 }
 
@@ -390,7 +406,7 @@ export function confineDraft(
     items,
     warnings: [
       ...(draft.warnings ?? []),
-      `Новых кейсов перенесено в группу «${groupId}»: ${moved} — её выбрал человек при запуске.`,
+      serverText('tests-draft-moved-to-group', { group: groupId, count: moved }),
     ],
   };
   writeDraft(root, next);
@@ -403,11 +419,17 @@ export function applyDraft(
   options: ApplyDraftOptions,
 ): ProjectTestDraftApplyResult {
   const draft = readDraft(root, runId);
-  if (!draft) throw new ProjectTestsNotFoundError(`Черновика «${runId}» в проекте нет.`);
-  if (draft.error) throw new ProjectTestsError(draft.error);
+  if (!draft)
+    throw coded(
+      new ProjectTestsNotFoundError(`Черновика «${runId}» в проекте нет.`),
+      'draft-not-found',
+      { runId },
+    );
+  if (draft.error)
+    throw codedIf(new ProjectTestsError(draft.error), draft.messageCode, draft.params);
 
   const wanted = options.caseIds?.length ? new Set(options.caseIds) : undefined;
-  const skipped: { caseId: string; reason: string }[] = [];
+  const skipped: ProjectTestDraftApplyResult['skipped'] = [];
   const targets = draft.items.filter(
     (item) => (item.state ?? 'pending') === 'pending' && (!wanted || wanted.has(item.caseId)),
   );
@@ -439,8 +461,8 @@ export function applyDraft(
       // Кейс человека галочка переписывать не имеет права: за галочкой никто не
       // смотрит, а «дополнить» и «переписать» отличает только тот, кто читает.
       if (existing?.source === 'human' && options.auto) {
-        const reason = 'Кейс написан человеком — правку к нему принимают руками.';
-        skipped.push({ caseId: item.caseId, reason });
+        const reason = serverText('tests-draft-human-case');
+        skipped.push({ caseId: item.caseId, reason, reasonCode: 'draft-case-human-written' });
         // Причина остаётся в черновике: автоприёмку никто не смотрел, и без неё
         // висящая правка выглядит как галочка, которая не сработала.
         item.hold = reason;
@@ -503,7 +525,12 @@ export function applyDraft(
 /** Отклонить черновик целиком: правки помечаются, файл уезжает в архив. */
 export function rejectDraft(root: string, runId: string): ProjectTestDraft {
   const draft = readDraft(root, runId);
-  if (!draft) throw new ProjectTestsNotFoundError(`Черновика «${runId}» в проекте нет.`);
+  if (!draft)
+    throw coded(
+      new ProjectTestsNotFoundError(`Черновика «${runId}» в проекте нет.`),
+      'draft-not-found',
+      { runId },
+    );
   const items = draft.items.map((item) =>
     (item.state ?? 'pending') === 'pending' ? { ...item, state: 'rejected' as const } : item,
   );
@@ -530,10 +557,16 @@ export function rollbackDraft(
   assertUnlocked?: (groupId: string) => void,
 ): ProjectTestDraftRollbackResult {
   const draft = readDraft(root, runId);
-  if (!draft) throw new ProjectTestsNotFoundError(`Черновика «${runId}» в проекте нет.`);
-  if (draft.error) throw new ProjectTestsError(draft.error);
+  if (!draft)
+    throw coded(
+      new ProjectTestsNotFoundError(`Черновика «${runId}» в проекте нет.`),
+      'draft-not-found',
+      { runId },
+    );
+  if (draft.error)
+    throw codedIf(new ProjectTestsError(draft.error), draft.messageCode, draft.params);
 
-  const kept: { caseId: string; reason: string }[] = [];
+  const kept: ProjectTestDraftRollbackResult['kept'] = [];
   let removed = 0;
   let restored = 0;
 
@@ -562,7 +595,11 @@ export function rollbackDraft(
     for (const item of items) {
       const existing = cases.find((entry) => entry.id === item.caseId);
       if (!existing) {
-        kept.push({ caseId: item.caseId, reason: 'Кейса в библиотеке уже нет.' });
+        kept.push({
+          caseId: item.caseId,
+          reason: 'Кейса в библиотеке уже нет.',
+          reasonCode: 'draft-revert-case-gone',
+        });
         item.state = 'rolledBack';
         continue;
       }
@@ -571,11 +608,16 @@ export function rollbackDraft(
         kept.push({
           caseId: item.caseId,
           reason: 'Кейс успели прогнать — результат дороже отката.',
+          reasonCode: 'draft-revert-case-run',
         });
         continue;
       }
       if (existing.updatedAt && existing.updatedAt > at) {
-        kept.push({ caseId: item.caseId, reason: 'Кейс успели поправить руками.' });
+        kept.push({
+          caseId: item.caseId,
+          reason: 'Кейс успели поправить руками.',
+          reasonCode: 'draft-revert-case-edited',
+        });
         continue;
       }
 

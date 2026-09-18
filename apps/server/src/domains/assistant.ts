@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { safeSessionId } from '../lib/cli-args.ts';
 import { killChildTree } from '../lib/process-tree.ts';
 import { defaultCliCommand } from '../providers/cli.ts';
+import { coded } from '../lib/server-text.ts';
 
 /**
  * Помощник по заполнению форм. Работает через сам Claude Code в неинтерактивном
@@ -98,7 +99,7 @@ function runClaude(prompt: string, command: string, sessionId?: string): Promise
     const timer = setTimeout(() => {
       // Дерево, а не сам процесс: под `cmd.exe` обычный kill оставил бы CLI жить.
       killChildTree(child);
-      reject(new Error('Помощник не ответил за отведённое время'));
+      reject(coded(new Error('Помощник не ответил за отведённое время'), 'assistant-timeout'));
     }, 180_000);
 
     child.stdout.on('data', (chunk: Buffer) => {

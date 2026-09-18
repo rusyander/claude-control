@@ -9,6 +9,7 @@ import {
   parseStatus,
   pickRemote,
 } from './parse.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Чтение состояния репозитория проекта.
@@ -58,7 +59,7 @@ export function hasWorkSince(projectDir: string, since?: string): boolean {
  */
 export async function requireRepo(projectDir: string): Promise<ProjectGitInfo> {
   if (!isGitRepo(projectDir)) {
-    throw new GitError('В каталоге проекта нет .git — это не репозиторий');
+    throw coded(new GitError('В каталоге проекта нет .git — это не репозиторий'), 'git-not-repo');
   }
   const info = await readProjectGit(projectDir);
   if (info.error) throw new GitError(info.error);

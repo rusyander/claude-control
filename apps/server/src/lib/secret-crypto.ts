@@ -5,6 +5,7 @@ import {
   createDecipheriv,
   timingSafeEqual,
 } from 'node:crypto';
+import { coded } from './server-text.ts';
 
 /**
  * Шифрование резервных копий файла секретов `.mcp-secrets.env`.
@@ -84,7 +85,7 @@ export function isEncryptedBackup(blob: Buffer): boolean {
  */
 export function decryptSecret(blob: Buffer, passphrase: string): string {
   if (!isEncryptedBackup(blob)) {
-    throw new Error('Это не зашифрованная копия');
+    throw coded(new Error('Это не зашифрованная копия'), 'backup-not-encrypted');
   }
 
   let offset = MAGIC.length;

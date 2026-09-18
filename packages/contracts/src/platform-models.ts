@@ -56,7 +56,14 @@ export function catalogChatModels<T extends PlatformCatalogModel>(models: readon
     if (model.retired) return false;
     const kind = model.kind?.toLowerCase() ?? '';
     // Явный чат сильнее семейства: `chat-vision` объявлен чатом и им остаётся.
-    if (kind.includes('chat') || kind.includes('text')) return true;
+    // Слова `text` среди сильных НЕТ (ревью Т13): `text-embedding-3-small`
+    // объявлен эмбеддером и `text` в нём — часть имени семейства, а не признак
+    // разговора. Оно стояло ПЕРЕД семейным отсевом, и такой эмбеддер проходил
+    // в список первым — то есть `catalogDefaultModel` делал его моделью ВСЕХ
+    // прогонов, ровно тот же дефект, что Т6 закрыл для рисования. Отдельной
+    // ветки `text` не нужно: `text-generation` не содержит ни одного семейного
+    // слова и проходит последней строкой.
+    if (kind.includes('chat')) return true;
     return !NOT_CHAT_KINDS.test(kind);
   });
 }
@@ -215,4 +222,23 @@ export function chooseRunModel(rules: PlatformModelRules, asked: string): Platfo
   }
 
   return fallback;
+}
+
+/**
+ * Какой из трёх строк рассказать про модель прогона через контур.
+ *
+ * `unset` — контуру нечем заменять (пробы не было, каталог пуст): подмена,
+ * объявленная на экране, была бы ложью о пустоте. `replaced` — уедет не то, что
+ * человек выбрал. `named` — просто имя.
+ *
+ * В контрактах, а не в каждом экране, потому что экранов уже три (шапка чата,
+ * шапка чужого CLI, поле ввода телефона), и четвёртое состояние, добавленное в
+ * панели, оставило бы телефон молча на трёх (ревью Т13). Слова остаются за
+ * экраном — здесь только выбор состояния.
+ */
+export type PlatformModelCaptionState = 'named' | 'replaced' | 'unset';
+
+export function modelCaptionState(choice: PlatformModelChoice): PlatformModelCaptionState {
+  if (choice.source === 'none') return 'unset';
+  return choice.replaced ? 'replaced' : 'named';
 }

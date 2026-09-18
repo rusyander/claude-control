@@ -24,12 +24,19 @@ export function registerProjectTestsPublishRoutes(app: FastifyInstance, ctx: Ser
     } | null;
 
     const path = typeof body?.path === 'string' ? body.path.trim() : '';
-    if (!path) return reply.code(400).send({ message: 'Не указан каталог проекта.' });
+    if (!path)
+      return reply
+        .code(400)
+        .send({ message: 'Не указан каталог проекта.', messageCode: 'project-dir-unspecified' });
     const runId = typeof body?.id === 'string' ? body.id.trim() : '';
-    if (!runId) return reply.code(400).send({ message: 'Не указан прогон.' });
+    if (!runId)
+      return reply.code(400).send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
     const target = body?.target;
     if (target !== 'confluence' && target !== 'jira') {
-      return reply.code(400).send({ message: 'Публиковать можно в Confluence или в Jira.' });
+      return reply.code(400).send({
+        message: 'Публиковать можно в Confluence или в Jira.',
+        messageCode: 'publish-target-unsupported',
+      });
     }
 
     try {

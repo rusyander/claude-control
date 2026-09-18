@@ -14,6 +14,7 @@ import {
 } from '../../domains/env.ts';
 import { done } from '../write-result.ts';
 import type { ClaudePaths } from './shared.ts';
+import { codeOf } from '../../lib/server-text.ts';
 
 /** Ключ и источник из строки запроса — проверяет домен, здесь они «как пришли». */
 interface EnvRefQuery {
@@ -37,16 +38,24 @@ export function registerEnvRoutes(app: FastifyInstance, ctx: ServerContext): voi
       return run();
     } catch (error) {
       if (error instanceof InvalidEnvDraftError) {
-        return reply.code(400).send({ error: 'invalid_env_draft', message: error.message });
+        return reply
+          .code(400)
+          .send({ error: 'invalid_env_draft', message: error.message, ...codeOf(error) });
       }
       if (error instanceof EnvVarNotFoundError) {
-        return reply.code(404).send({ error: 'env_not_found', message: error.message });
+        return reply
+          .code(404)
+          .send({ error: 'env_not_found', message: error.message, ...codeOf(error) });
       }
       if (error instanceof EnvVarExistsError) {
-        return reply.code(409).send({ error: 'env_exists', message: error.message });
+        return reply
+          .code(409)
+          .send({ error: 'env_exists', message: error.message, ...codeOf(error) });
       }
       if (error instanceof SecretBackupUnavailableError) {
-        return reply.code(409).send({ error: 'secret_backup_unavailable', message: error.message });
+        return reply
+          .code(409)
+          .send({ error: 'secret_backup_unavailable', message: error.message, ...codeOf(error) });
       }
       throw error;
     }
@@ -115,6 +124,7 @@ export function registerEnvRoutes(app: FastifyInstance, ctx: ServerContext): voi
         return reply.code(400).send({
           error: 'not_movable',
           message: 'Переносить можно только переменные из settings.json / settings.local.json.',
+          messageCode: 'env-move-settings-only',
         });
       }
 

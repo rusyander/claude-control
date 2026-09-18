@@ -1,3 +1,4 @@
+import type { CodedMessage } from '@agentdeck/contracts/server-messages';
 /** Один снимок файла: копия на диске плюс разобранное время. */
 export interface Snapshot {
   name: string;
@@ -15,7 +16,7 @@ export interface DiffBase {
 }
 
 /** Результат выборочного отката ханка. Форма — как у restoreBackup. */
-export interface RevertHunkResult {
+export interface RevertHunkResult extends CodedMessage {
   ok: boolean;
   restoredTo?: string;
   backupPath?: string;

@@ -9,6 +9,7 @@ import {
   writeSecretValue,
 } from '../../domains/project-tests.ts';
 import { buildView, guard, requireRoot, type TestsDeps } from './shared.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Доступы стенда: логин, пароль, токен для прогона против настоящего окружения.
@@ -29,7 +30,12 @@ export function registerTestSecretRoutes(app: FastifyInstance, deps: TestsDeps):
   const environmentOf = (root: string, id: unknown) => {
     const environmentId = String(id ?? '').trim();
     const found = readEnvironments(root).find((item) => item.id === environmentId);
-    if (!found) throw new ProjectTestsNotFoundError(`Окружения «${environmentId}» в проекте нет.`);
+    if (!found)
+      throw coded(
+        new ProjectTestsNotFoundError(`Окружения «${environmentId}» в проекте нет.`),
+        'environment-not-found',
+        { environmentId },
+      );
     return found;
   };
 
@@ -65,7 +71,10 @@ export function registerTestSecretRoutes(app: FastifyInstance, deps: TestsDeps):
     const root = requireRoot(request.body?.path, reply);
     if (!root) return reply;
     const name = String(request.body?.name ?? '').trim();
-    if (!name) return reply.code(400).send({ message: 'Нужно имя переменной окружения.' });
+    if (!name)
+      return reply
+        .code(400)
+        .send({ message: 'Нужно имя переменной окружения.', messageCode: 'env-var-name-required' });
 
     return guard(reply, () => {
       const environment = environmentOf(root, request.body?.environmentId);
@@ -90,7 +99,11 @@ export function registerTestSecretRoutes(app: FastifyInstance, deps: TestsDeps):
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
       const name = String(request.query.name ?? '').trim();
-      if (!name) return reply.code(400).send({ message: 'Нужно имя переменной окружения.' });
+      if (!name)
+        return reply.code(400).send({
+          message: 'Нужно имя переменной окружения.',
+          messageCode: 'env-var-name-required',
+        });
 
       return guard(reply, () => {
         const environment = environmentOf(root, request.query.environmentId);

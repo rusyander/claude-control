@@ -33,6 +33,7 @@ import {
 } from '../domains/projects.ts';
 import { requireProject as requireProjectAccess, type ErrorReply } from './project-access.ts';
 import { done } from './write-result.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Маршруты проектного уровня конфигурации.
@@ -98,6 +99,8 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
       return reply.code(409).send({
         error: 'project_exists',
         message: `Этот каталог уже добавлен как «${existing.name}».`,
+        messageCode: 'project-dir-already-added',
+        params: { name: existing.name },
         project: existing,
       });
     }
@@ -107,9 +110,11 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
 
   app.delete<{ Params: { id: string } }>('/api/projects/:id', (request, reply) => {
     if (!ctx.store.getProject(request.params.id)) {
-      return reply
-        .code(404)
-        .send({ error: 'not_found', message: 'Проекта с таким id нет в реестре.' });
+      return reply.code(404).send({
+        error: 'not_found',
+        message: 'Проекта с таким id нет в реестре.',
+        messageCode: 'project-id-not-in-registry',
+      });
     }
     ctx.store.removeProject(request.params.id);
     return { ok: true };
@@ -136,6 +141,7 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
         return reply.code(400).send({
           error: 'invalid_content',
           message: 'Поле content обязано быть строкой (пустая строка допустима).',
+          messageCode: 'content-must-be-string',
         });
       }
 
@@ -162,7 +168,9 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
   // молчаливая замена чужой записи уехала бы в общий коммит.
   const mcpExists = (reply: FastifyReply, error: unknown): FastifyReply => {
     if (error instanceof McpServerExistsError) {
-      return reply.code(409).send({ error: 'server_exists', message: error.message });
+      return reply
+        .code(409)
+        .send({ error: 'server_exists', message: error.message, ...codeOf(error) });
     }
     throw error;
   };

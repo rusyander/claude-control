@@ -4,6 +4,7 @@ import { zephyrClient } from './zephyr.ts';
 import { xrayClient } from './xray.ts';
 import { testitClient } from './testit.ts';
 import type { TmsClient } from './types.ts';
+import { coded } from '../../../lib/server-text.ts';
 
 export type { TmsCase, TmsClient, TmsRunPush } from './types.ts';
 export { externalKeys, keyFromTags, keyLookup, sourceTag } from './types.ts';
@@ -18,9 +19,12 @@ export { externalKeys, keyFromTags, keyLookup, sourceTag } from './types.ts';
  */
 export function tmsClient(settings: TmsSettings, token: string | undefined): TmsClient {
   if (!settings.enabled || !token) {
-    throw new IntegrationError(
-      'integration_not_found',
-      'Тест-менеджмент не подключён: включите его и сохраните токен в настройках панели.',
+    throw coded(
+      new IntegrationError(
+        'integration_not_found',
+        'Тест-менеджмент не подключён: включите его и сохраните токен в настройках панели.',
+      ),
+      'tms-not-connected',
     );
   }
   if (settings.kind === 'zephyr') return zephyrClient(token, settings.projectKey);
@@ -30,8 +34,11 @@ export function tmsClient(settings: TmsSettings, token: string | undefined): Tms
   if (settings.kind === 'testit') {
     return testitClient(token, settings.projectKey, settings.baseUrl);
   }
-  throw new IntegrationError(
-    'integration_not_found',
-    'Тест-менеджмент не подключён: не выбрана система (Zephyr Scale, Xray или Test IT).',
+  throw coded(
+    new IntegrationError(
+      'integration_not_found',
+      'Тест-менеджмент не подключён: не выбрана система (Zephyr Scale, Xray или Test IT).',
+    ),
+    'tms-system-not-chosen',
   );
 }

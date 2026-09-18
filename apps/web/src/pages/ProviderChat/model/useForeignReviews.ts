@@ -4,6 +4,7 @@ import type { TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import { useReviewDecision, useReviewPush } from '@entities/ChatTree';
 import { collectReviews, reviewTreeOf, type ReviewDecisionItem } from '@features/ChatMessages';
+import { toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
 
 /**
@@ -51,7 +52,7 @@ export function useForeignReviews(input: {
   const failed = (error: unknown): void => {
     toast.error(
       t('chat.review.failed', {
-        message: error instanceof Error ? error.message : String(error),
+        message: toErrorMessage(error),
       }),
     );
   };

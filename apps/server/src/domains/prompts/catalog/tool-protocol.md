@@ -6,7 +6,7 @@
 Как вызвать инструмент:
 
 <tool_call>
-{"name": "Write", "arguments": {"file_path": "src/app.ts", "content": "..."}}
+{"name": "Write", "arguments": {"file_path": "/пример/пути/файла.txt", "content": "текст файла"}}
 </tool_call>
 
 Правила, без которых вызов не состоится:

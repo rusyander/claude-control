@@ -256,7 +256,7 @@ export function makeState() {
         projectPaths: [PROJECT.path],
         scenario: {
           when: 'Задача пришла тикетом с номером',
-          trigger: 'GOR-\\d+',
+          trigger: 'PRJ-\\d+',
           compiledSkillId: 'scenario-tikety-magazina',
           steps: [
             {

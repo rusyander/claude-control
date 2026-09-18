@@ -2,6 +2,7 @@ import { statSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../context.ts';
 import { readChats, readChatMessages, findTranscript } from '../../domains/chat/ChatHistory.ts';
+import { summarizedMessageIds } from '../../domains/platform/gateway/summarized-ledger.ts';
 import { readChatProgress } from '../../domains/chat/ChatProgress.ts';
 import { searchChats } from '../../domains/chat/ChatSearch.ts';
 import { listProjects } from '../../domains/chat/ChatProjects.ts';
@@ -105,6 +106,8 @@ export function registerChatTranscriptRoutes(app: FastifyInstance, ctx: ServerCo
       const page = await readChatMessages(projectsDir(ctx), request.params.chatId, {
         limit,
         offset,
+        // Подпись «контур сжал историю» — по журналу сжатий шлюза (`context-managed`).
+        summarizedIds: summarizedMessageIds(ctx.location.paths.appData),
       });
       return { ...page, messages: page.messages.map(withStepCost) };
     },
@@ -156,7 +159,9 @@ export function registerChatTranscriptRoutes(app: FastifyInstance, ctx: ServerCo
         limit: Number.MAX_SAFE_INTEGER,
       });
       if (page.messages.length === 0)
-        return reply.code(404).send({ message: 'Разговор не найден' });
+        return reply
+          .code(404)
+          .send({ message: 'Разговор не найден', messageCode: 'conversation-not-found' });
 
       const title = readChats(projectsDir(ctx)).find((chat) => chat.id === chatId)?.title;
       const file = buildChatExport(page.messages, format, title);

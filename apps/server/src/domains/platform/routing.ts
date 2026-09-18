@@ -14,6 +14,12 @@ import {
   PLATFORM_TERMINAL_CONSUMER,
 } from '@agentdeck/contracts/platform-consumers';
 import type { AppStore } from '../../lib/app-store.ts';
+import {
+  localizeText,
+  serverText,
+  type ServerTextCode,
+  type TextLanguage,
+} from '../../lib/server-texts.ts';
 import { isKnownProviderId, getProvider, listProviders } from '../../providers/registry.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
 import { buildEndpointPlan } from '../endpoints/endpoint-plan.ts';
@@ -74,6 +80,12 @@ export type PlatformRouteSkipReason =
    * Прогон чужого CLI, которого нет в реестре провайдеров (`foreign:<cli>` из
    * устаревшего архива или снятого провайдера). Отдельным словом от `not_a_run`:
    * тот ответ значит «так задумано», а этот — «сохранено то, чего панель не знает».
+   *
+   * Подписи на экране у этого слова нет намеренно, и это не забытый перевод:
+   * чат снятого провайдера не рисуется вовсе (шапке нужен сам провайдер), так
+   * что читает диагноз только тот, кто спросил план маршрутом, — агент панели
+   * и проверки. Шапки же различают ровно то, что человек может исправить:
+   * `gateway_down` и `no_token`.
    */
   | 'unknown_provider'
   | PlatformConsumerReason;
@@ -146,10 +158,20 @@ export function activePlatform(store: AppStore): Platform | undefined {
  * Провайдер, чей CLI поднимает этот потребитель. Прогоны панели ведёт Claude
  * (реестр прогонов и агент тестов — его), чужой чат назван в самом
  * потребителе.
+ *
+ * Правило «чат в панели действительно есть» здесь то же, что в каталоге
+ * (`listConsumerOptions`): чужой CLI без `oneShotArgs` панель не запускает, и
+ * галочки за ним в списке нет — значит, и маршрут ему не собирается. Иначе
+ * сохранённый мимо мастера `foreign:<cli>` получил бы полное окружение контура
+ * в тот день, когда провайдеру допишут секцию переменных.
  */
 function providerOf(consumer: string): ConfigProvider | undefined {
   const foreign = foreignProviderId(consumer);
-  if (foreign) return isKnownProviderId(foreign) ? getProvider(foreign) : undefined;
+  if (foreign) {
+    if (!isKnownProviderId(foreign)) return undefined;
+    const provider = getProvider(foreign);
+    return provider?.assistant?.oneShotArgs ? provider : undefined;
+  }
   return (platformRunConsumers as readonly string[]).includes(consumer)
     ? getProvider('claude')
     : undefined;
@@ -201,16 +223,14 @@ export function contourRunPrompt(appData: string, platform: Platform, model: str
     : '';
 }
 
-const UNREACHABLE_TEXT: Record<'gateway_down' | 'no_token', string> = {
-  gateway_down: 'шлюз панели не поднят',
-  no_token: 'ключ контура не сохранён',
-};
-
-/** Что чинить — к каждой причине своё: без ключа поднимать шлюз бесполезно. */
-const UNREACHABLE_FIX: Record<'gateway_down' | 'no_token', string> = {
-  gateway_down: 'Нажмите «Поднять шлюз» на карточке контура (раздел «Контур»)',
-  no_token: 'Сохраните ключ («Настроить» на карточке контура → шаг «Ключ»)',
-};
+/**
+ * Причина и починка — одним текстом на причину (без ключа поднимать шлюз
+ * бесполезно): две половины одной фразы при переводе разошлись бы. Отказ уезжает
+ * человеку СТРОКОЙ (`new Error(refusal)` в реестре прогонов), кода рядом с ней
+ * нет — поэтому язык панели применяется здесь же.
+ */
+const unreachableCode = (reason: 'gateway_down' | 'no_token'): ServerTextCode =>
+  reason === 'gateway_down' ? 'contour-required-gateway-down' : 'contour-required-no-token';
 
 /**
  * Галочка стоит, а дойти до контура нечем. Только эти две причины: остальные
@@ -221,14 +241,13 @@ const UNREACHABLE_FIX: Record<'gateway_down' | 'no_token', string> = {
 function unreachable(
   platform: Platform,
   reason: 'gateway_down' | 'no_token',
+  language: TextLanguage,
 ): PlatformRouteDecision {
   if (platform.mode === 'best-effort') return { routed: false, reason };
   return {
     routed: false,
     reason,
-    refusal:
-      `Контур «${platform.title}» обязателен, а ${UNREACHABLE_TEXT[reason]} — прогон не запущен, ` +
-      `чтобы не уйти в облако вендора. ${UNREACHABLE_FIX[reason]} либо верните провайдер по умолчанию.`,
+    refusal: localizeText(serverText(unreachableCode(reason), { title: platform.title }), language),
   };
 }
 
@@ -242,24 +261,35 @@ export function resolveRunRoute(
   consumer: string,
   /** Модель, которую назвал сам прогон (шапка чата, каскад, «модель на группу»). */
   asked = '',
+  /**
+   * Метка прогона для адреса шлюза. Её просит чат чужого CLI: транскрипта у него
+   * нет, и узнать, что контур сжимал историю именно в ЭТОМ прогоне, можно только
+   * по метке, с которой пришёл запрос. Прогоны Claude её не берут — их ответ
+   * находится по id сообщения в транскрипте, а адрес остаётся прежним.
+   */
+  runTag = '',
 ): PlatformRouteDecision {
+  const provider = providerOf(consumer);
+  const platform = activePlatform(deps.store);
+  // Порядок: сначала «контура нет вовсе», и только потом диагноз про самого
+  // потребителя. Иначе панель без единого контура отвечала бы про устаревший
+  // `foreign:<cli>` словом, которое к её состоянию отношения не имеет.
+  if (!platform) return { routed: false, reason: 'no_active_platform' };
   const foreign = foreignProviderId(consumer);
   if (foreign && !isKnownProviderId(foreign)) return { routed: false, reason: 'unknown_provider' };
-  const provider = providerOf(consumer);
   if (!provider) return { routed: false, reason: 'not_a_run' };
-
-  const platform = activePlatform(deps.store);
-  if (!platform) return { routed: false, reason: 'no_active_platform' };
   if (!consumersOf(platform).includes(consumer)) return { routed: false, reason: 'consumer_off' };
 
   const unsupported = routeReason(provider);
   if (unsupported) return { routed: false, reason: unsupported };
 
   const port = deps.gatewayPort();
-  if (port <= 0) return unreachable(platform, 'gateway_down');
+  if (port <= 0) return unreachable(platform, 'gateway_down', deps.store.getSettings().language);
   // Ключ читается ТОЛЬКО чтобы ответить «он есть»: в окружение прогона уходит
   // заглушка, а настоящий ключ подставляет шлюз — в этом весь смысл шлюза.
-  if (!readToken(deps.appDataDir, platform.id)) return unreachable(platform, 'no_token');
+  if (!readToken(deps.appDataDir, platform.id)) {
+    return unreachable(platform, 'no_token', deps.store.getSettings().language);
+  }
 
   const apiKind = pickApiKind(provider);
   const vars = apiKind ? provider.endpointConfig?.[apiKind] : undefined;
@@ -279,7 +309,7 @@ export function resolveRunRoute(
     { ...activeGatewaySettings(deps.store), port },
     model.model,
   );
-  const profile = targetProfile(managed, platform.id, port, apiKind);
+  const profile = targetProfile(managed, platform.id, port, apiKind, runTag);
 
   const env: Record<string, string> = {};
   for (const item of buildEndpointPlan(profile, vars, PLACEHOLDER_KEY, false)) {
@@ -304,6 +334,34 @@ export function resolveRunRoute(
     // должна действовать со следующего прогона, а не с перезапуска панели.
     // compromise: rules-partial — личные правила, хуки и права снимаются одним флагом, порознь CLI их не различает
     ...(provider.id === 'claude' ? { layers: runLayers(platform) } : {}),
+  };
+}
+
+/**
+ * Решение маршрута → то, что получает МЕСТО СПАВНА: окружение, модель, усилие,
+ * промпт и снятые слои.
+ *
+ * Отдельной функцией, а не замыканием в сборке сервера (`bootstrap/runtime.ts`),
+ * потому что ревью Т13 нашло здесь дыру проверки: проекцию исполнял только
+ * живой запуск панели, и удаление строки `layers` или `model` оставляло гейт
+ * зелёным — прогон молча уходил бы со всеми нашими слоями и с именем вендора,
+ * которого контур не знает.
+ *
+ * Пустой маршрут ОБЯЗАН затирать прежний: продолжение остановленного прогона
+ * приходит со старыми параметрами, и адрес контура пережил бы снятую галочку.
+ * Модели и усилия в таком ответе нет вовсе — выбор человека остаётся его
+ * выбором.
+ */
+export function runRouteOf(decision: PlatformRouteDecision): PlatformRunRoute {
+  if (!decision.routed) {
+    return decision.refusal ? { env: {}, refusal: decision.refusal } : { env: {} };
+  }
+  return {
+    env: decision.env,
+    model: decision.model,
+    effort: decision.effort,
+    ...(decision.systemPrompt ? { systemPrompt: decision.systemPrompt } : {}),
+    ...(decision.layers ? { layers: decision.layers } : {}),
   };
 }
 

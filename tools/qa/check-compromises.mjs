@@ -181,7 +181,15 @@ export function checkCompromises({
  * русском `revisitWhen`; `compromise: null` — строка, которая не снимает
  * ничего (так на странице и написано, прочерком).
  */
-const REQUEST_DOC = 'docs/PLATFORM-ЗАПРОС.ru.md';
+/**
+ * Письмо команде платформы лежит ВНЕ репозитория, в локальном слое `.agent/private/`:
+ * оно адресовано чужой команде и цитирует её исходники, а репозиторий публичный.
+ *
+ * Поэтому его отсутствие — НЕ поломка: в чужом клоне его и не должно быть. Но и
+ * молчать об этом нельзя: проверка, которая тихо ничего не сверяет, равна своему
+ * отсутствию — строка ниже называет это вслух.
+ */
+const REQUEST_DOC = '.agent/private/PLATFORM-ЗАПРОС.ru.md';
 
 const REQUEST_ROWS = [
   {
@@ -406,7 +414,10 @@ export function checkRequestPage({
 }) {
   const problems = [];
   if (typeof doc !== 'string' || doc.trim() === '') {
-    problems.push(`страница запроса: ${REQUEST_DOC} не найдена или пуста`);
+    console.log(
+      `Страница запроса НЕ СВЕРЯЛАСЬ: ${REQUEST_DOC} нет на диске — ` +
+        'она живёт в локальном слое и в чужом клоне отсутствует по замыслу.',
+    );
     return problems;
   }
 
@@ -912,9 +923,10 @@ async function main() {
   });
 
   const requestDoc = join(ROOT, REQUEST_DOC);
+  const requestSeen = existsSync(requestDoc);
   problems.push(
     ...checkRequestPage({
-      doc: existsSync(requestDoc) ? readFileSync(requestDoc, 'utf8') : undefined,
+      doc: requestSeen ? readFileSync(requestDoc, 'utf8') : undefined,
       registry,
       ru,
     }),
@@ -927,11 +939,17 @@ async function main() {
       `в ответах сервера: ${new Set(served).size} · якорей в коде: ${anchors.length}`,
   );
   // Молчаливая проверка — то же, что её отсутствие: строкой видно, что страница
-  // запроса вообще разобрана и сколько подписей на ней держится.
-  console.log(
-    `Страница запроса: просьб ${REQUEST_ROWS.length} · снимут подписей ${lifting.size} ` +
-      `(${[...lifting].join(', ')})`,
-  );
+  // запроса вообще разобрана и сколько подписей на ней держится. Без самой страницы
+  // та же строка говорила бы полуправду: числа взяты из встроенной таблицы, а не из письма.
+  if (!requestSeen) {
+    console.log(
+      `Страница запроса: сверка пропущена, встроенная таблица ожидает ${REQUEST_ROWS.length} просьб`,
+    );
+  } else
+    console.log(
+      `Страница запроса: просьб ${REQUEST_ROWS.length} · снимут подписей ${lifting.size} ` +
+        `(${[...lifting].join(', ')})`,
+    );
   // Числом «ещё не в коде: 14» отчитаться легко, и через месяц его перестают
   // читать. Именами — нет: видно, какая задача партии за какую подпись должна
   // ответить.

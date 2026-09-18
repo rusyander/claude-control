@@ -13,6 +13,7 @@ import {
   writeToken,
 } from '../../domains/integrations/store.ts';
 import { appDataOf, fail, type IntegrationsDeps } from './shared.ts';
+import { attachTextCodes } from '../../lib/server-texts.ts';
 
 /**
  * Пять карточек интеграций: показать, сохранить, проверить связь, забыть.
@@ -29,7 +30,11 @@ export function registerIntegrationConnectorRoutes(
 ): void {
   const store = (): typeof deps.ctx.store => deps.ctx.store;
 
-  app.get('/api/integrations', () => describeIntegrations(store(), appDataOf(deps)));
+  // Подпись проверки собрана строкой (`serverText`): код к ней восстанавливается
+  // разбором — и у свежей проверки, и у записи, которая лежит в состоянии давно.
+  app.get('/api/integrations', () =>
+    attachTextCodes(describeIntegrations(store(), appDataOf(deps))),
+  );
 
   /**
    * Сохранить карточку. Токен необязателен: пустая строка СТИРАЕТ сохранённый —
@@ -41,6 +46,8 @@ export function registerIntegrationConnectorRoutes(
       return reply.code(404).send({
         code: 'integration_not_found',
         message: `Интеграции «${id}» не существует.`,
+        messageCode: 'integration-not-found',
+        params: { id },
       });
     }
 
@@ -52,7 +59,7 @@ export function registerIntegrationConnectorRoutes(
     try {
       writeSettings(store(), id, settings as IntegrationsSettings[IntegrationId]);
       if (typeof body?.token === 'string') writeToken(appDataOf(deps), id, body.token.trim());
-      return describeIntegration(store(), appDataOf(deps), id);
+      return attachTextCodes(describeIntegration(store(), appDataOf(deps), id));
     } catch (error) {
       return fail(reply, error);
     }
@@ -65,20 +72,26 @@ export function registerIntegrationConnectorRoutes(
   app.post<{ Params: { id: string } }>('/api/integrations/:id/check', async (request, reply) => {
     const id = request.params.id;
     if (!isIntegrationId(id)) {
-      return reply
-        .code(404)
-        .send({ code: 'integration_not_found', message: `Интеграции «${id}» не существует.` });
+      return reply.code(404).send({
+        code: 'integration_not_found',
+        message: `Интеграции «${id}» не существует.`,
+        messageCode: 'integration-not-found',
+        params: { id },
+      });
     }
-    return checkIntegration(store(), appDataOf(deps), id);
+    return attachTextCodes(await checkIntegration(store(), appDataOf(deps), id));
   });
 
   /** Забыть: токен стирается, карточка гасится. Адрес и почта остаются. */
   app.delete<{ Params: { id: string } }>('/api/integrations/:id', (request, reply) => {
     const id = request.params.id;
     if (!isIntegrationId(id)) {
-      return reply
-        .code(404)
-        .send({ code: 'integration_not_found', message: `Интеграции «${id}» не существует.` });
+      return reply.code(404).send({
+        code: 'integration_not_found',
+        message: `Интеграции «${id}» не существует.`,
+        messageCode: 'integration-not-found',
+        params: { id },
+      });
     }
     return forgetIntegration(store(), appDataOf(deps), id);
   });

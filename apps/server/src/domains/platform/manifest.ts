@@ -2,6 +2,7 @@ import {
   platformManifestError,
   type PlatformManifestField,
 } from '@agentdeck/contracts/platform-presets';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 import { invalidField } from './errors.ts';
 
 /**
@@ -13,19 +14,34 @@ import { invalidField } from './errors.ts';
  * идущего как у пресета. Поэтому здесь отказ с именем поля и правилом, без
  * значения — по той же причине, что у транспорта.
  */
-const WHY: Record<PlatformManifestField | 'manifest', string> = {
-  manifest: 'переопределения — объект полей',
-  clientTools: 'инструменты — «native» или «shim»',
-  effort: 'усилие — да или нет',
-  anthropicMessages: 'путь ручки относительно версии: строчная латиница, цифры, «/», «_», «-»',
-  imagesApi: 'путь ручки относительно версии: строчная латиница, цифры, «/», «_», «-»',
-  nonStreamTimeoutSec: 'целое число секунд от 0 до 3600',
-  responseCeilingSec: 'целое число секунд от 0 до 3600',
-  thinkingField: 'поле на проводе: имена через точку, не больше пяти, без служебных имён объекта',
-  vendorPrefix: 'префикс полей: строчная латиница и цифры, первая — буква, до 32 знаков',
+const WHY: Record<PlatformManifestField | 'manifest', [string, ServerMessageCode]> = {
+  manifest: ['переопределения — объект полей', 'manifest-invalid-object'],
+  clientTools: ['инструменты — «native» или «shim»', 'manifest-invalid-client-tools'],
+  effort: ['усилие — да или нет', 'manifest-invalid-effort'],
+  anthropicMessages: [
+    'путь ручки относительно версии: строчная латиница, цифры, «/», «_», «-»',
+    'manifest-invalid-path',
+  ],
+  imagesApi: [
+    'путь ручки относительно версии: строчная латиница, цифры, «/», «_», «-»',
+    'manifest-invalid-path',
+  ],
+  nonStreamTimeoutSec: ['целое число секунд от 0 до 3600', 'manifest-invalid-seconds'],
+  responseCeilingSec: ['целое число секунд от 0 до 3600', 'manifest-invalid-seconds'],
+  thinkingField: [
+    'поле на проводе: имена через точку, не больше пяти, без служебных имён объекта',
+    'manifest-invalid-thinking-field',
+  ],
+  vendorPrefix: [
+    'префикс полей: строчная латиница и цифры, первая — буква, до 32 знаков',
+    'manifest-invalid-vendor-prefix',
+  ],
 };
 
 export function assertManifest(raw: unknown): void {
   const field = platformManifestError(raw);
-  if (field) throw invalidField(field === 'manifest' ? field : `manifest.${field}`, WHY[field]);
+  if (!field) return;
+  const name = field === 'manifest' ? field : `manifest.${field}`;
+  const [why, code] = WHY[field];
+  throw invalidField(name, why, code, { field: name });
 }

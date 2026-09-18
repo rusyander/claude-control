@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  serverMessageAreas,
   serverMessageCodes,
   serverMessageParams,
   templateParams,
@@ -7,7 +8,7 @@ import {
 import { serverMessagesEn } from './server-messages/en';
 import { serverMessagesRu } from './server-messages/ru';
 import { i18n } from './instance';
-import { serverMessageFromPayload, serverMessageText } from './server-message';
+import { serverFieldText, serverMessageFromPayload, serverMessageText } from './server-message';
 
 /**
  * Каждый код сервера переведён на оба языка, и перевод использует ровно те
@@ -47,5 +48,33 @@ describe('тексты сервера по коду', () => {
     expect(serverMessageFromPayload({ messageCode: 'from-a-newer-server' })).toBeUndefined();
     await i18n.changeLanguage('ru');
     expect(serverMessageText('run-empty-prompt')).toBe('Сообщение пустое — отправлять нечего.');
+  });
+
+  it('код уникален между областями: одинаковый ключ двух областей схлопнулся бы в таблице', () => {
+    const perArea = Object.values(serverMessageAreas).map((area) => Object.keys(area));
+    const all = perArea.flat();
+    const repeated = all.filter((code, index) => all.indexOf(code) !== index);
+    expect(repeated).toEqual([]);
+    expect(serverMessageCodes.length).toBe(all.length);
+  });
+
+  it('поле записи: свой код поля, а у текста отказа — общие messageCode + params', async () => {
+    // Записи — переменными: так их и получает экран, из ответа сервера.
+    const committed = { output: 'Коммит создан', outputCode: 'git-committed' };
+    const refused = {
+      error: 'Скилл «x» уже существует',
+      messageCode: 'skill-exists',
+      params: { skillId: 'x' },
+    };
+    const raw = { output: '[main 1a2b] fix' };
+    const newer = { note: 'Новая фраза', noteCode: 'from-a-newer-server' };
+    await i18n.changeLanguage('en');
+    expect(serverFieldText(committed, 'output')).toBe('Commit created');
+    expect(serverFieldText(refused, 'error')).toBe('Skill «x» already exists');
+    // Вывод git кода не несёт — показывается как есть.
+    expect(serverFieldText(raw, 'output')).toBe('[main 1a2b] fix');
+    // Сервер новее клиента: незнакомый код — русский текст как есть.
+    expect(serverFieldText(newer, 'note')).toBe('Новая фраза');
+    await i18n.changeLanguage('ru');
   });
 });

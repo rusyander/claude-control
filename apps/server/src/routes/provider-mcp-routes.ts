@@ -13,6 +13,7 @@ import {
 } from '../domains/provider-mcp.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 import { done } from './write-result.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Универсальный раздел MCP-серверов для провайдеров Gemini (JSON) и Codex (TOML).
@@ -28,6 +29,7 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
   const SECTION_UNSUPPORTED = {
     error: 'section_unsupported',
     message: 'У активного провайдера нет универсального раздела MCP.',
+    messageCode: 'mcp-section-unsupported',
   } as const;
 
   const requireTarget = (reply: FastifyReply): ProviderMcpTarget | undefined => {
@@ -69,6 +71,7 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
           skippedBlocks: [],
           readOnly: true,
           error: error.message,
+          ...codeOf(error),
         } satisfies ProviderMcpInfo;
       }
       throw error;
@@ -79,12 +82,14 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
     error: 'invalid_draft',
     message:
       'Черновик сервера не прошёл проверку: нужны имя, транспорт и команда (stdio) или адрес (http).',
+    messageCode: 'mcp-draft-invalid',
   } as const;
 
   const FORMAT_UNRECOGNIZED = {
     error: 'format_unrecognized',
     message:
       'Формат файла конфигурации не распознан — запись запрещена (раздел только для чтения).',
+    messageCode: 'config-format-unrecognized-readonly',
   } as const;
 
   app.post<{ Body: unknown }>('/api/provider-mcp', (request, reply) => {
@@ -100,7 +105,9 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
       // Имя занято: молча писать поверх — потеря чужого сервера, поэтому
       // конфликт и решение остаётся за человеком (переименовать или открыть тот).
       if (error instanceof McpServerExistsError) {
-        return reply.code(409).send({ error: 'server_exists', message: error.message });
+        return reply
+          .code(409)
+          .send({ error: 'server_exists', message: error.message, ...codeOf(error) });
       }
       if (error instanceof UnrecognizedFormatError)
         return reply.code(422).send(FORMAT_UNRECOGNIZED);
@@ -120,7 +127,9 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
     } catch (error) {
       // Переименование в занятое имя — тот же конфликт, что и создание.
       if (error instanceof McpServerExistsError) {
-        return reply.code(409).send({ error: 'server_exists', message: error.message });
+        return reply
+          .code(409)
+          .send({ error: 'server_exists', message: error.message, ...codeOf(error) });
       }
       if (error instanceof UnrecognizedFormatError)
         return reply.code(422).send(FORMAT_UNRECOGNIZED);
@@ -137,7 +146,9 @@ export function registerProviderMcpRoutes(app: FastifyInstance, ctx: ServerConte
     } catch (error) {
       // Нет такого имени — 404, как у `/api/mcp/:id` Claude, а не «удалено».
       if (error instanceof McpServerNotFoundError) {
-        return reply.code(404).send({ error: 'not_found', message: error.message });
+        return reply
+          .code(404)
+          .send({ error: 'not_found', message: error.message, ...codeOf(error) });
       }
       if (error instanceof UnrecognizedFormatError)
         return reply.code(422).send(FORMAT_UNRECOGNIZED);

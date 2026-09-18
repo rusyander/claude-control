@@ -12,6 +12,7 @@ import {
 } from '../domains/endpoints.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 import { EnvKeyNotEncodableError, EnvKeyPreservedError } from '../domains/provider-env.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Свой эндпоинт: профили адреса модели, проверка связи и применение профиля к
@@ -37,6 +38,7 @@ export function registerEndpointRoutes(app: FastifyInstance, ctx: ServerContext)
   const PROFILE_NOT_FOUND = {
     error: 'profile_not_found',
     message: 'Профиль своего эндпоинта не найден.',
+    messageCode: 'endpoint-profile-not-found',
   } as const;
 
   const requireProfile = (reply: FastifyReply, id: string) => {
@@ -73,9 +75,11 @@ export function registerEndpointRoutes(app: FastifyInstance, ctx: ServerContext)
           : '';
 
       if (!saveEndpointToken(appDataDir(), profile.id, value)) {
-        return reply
-          .code(400)
-          .send({ error: 'invalid_token', message: 'Значение превышает допустимую длину.' });
+        return reply.code(400).send({
+          error: 'invalid_token',
+          message: 'Значение превышает допустимую длину.',
+          messageCode: 'value-too-long',
+        });
       }
       return { ok: true };
     },
@@ -128,22 +132,29 @@ export function registerEndpointRoutes(app: FastifyInstance, ctx: ServerContext)
       } catch (error) {
         if (error instanceof EndpointApplyError) {
           const status = error.code === 'unknown_provider' ? 404 : 400;
-          return reply.code(status).send({ error: error.code, message: error.message });
+          return reply
+            .code(status)
+            .send({ error: error.code, message: error.message, ...codeOf(error) });
         }
         // Чужой конфиг оказался в непонятном формате или занял имя переменной
         // немоделируемой записью — те же отказы, что и у обычного раздела env,
         // и с теми же кодами: раздел один и тот же файл.
         if (error instanceof EnvKeyNotEncodableError) {
-          return reply.code(400).send({ error: 'invalid_draft', message: error.message });
+          return reply
+            .code(400)
+            .send({ error: 'invalid_draft', message: error.message, ...codeOf(error) });
         }
         if (error instanceof EnvKeyPreservedError) {
-          return reply.code(409).send({ error: 'env_key_preserved', message: error.message });
+          return reply
+            .code(409)
+            .send({ error: 'env_key_preserved', message: error.message, ...codeOf(error) });
         }
         if (error instanceof UnrecognizedFormatError) {
           return reply.code(422).send({
             error: 'format_unrecognized',
             message:
               'Формат файла конфигурации не распознан — запись запрещена (раздел только для чтения).',
+            messageCode: 'config-format-unrecognized-readonly',
           });
         }
         throw error;

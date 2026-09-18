@@ -1,5 +1,6 @@
 import type { UniversalMcpServerDraft } from '@agentdeck/contracts';
 import { isStringRecord, stringList } from './values.ts';
+import { coded } from '../../lib/server-text.ts';
 
 // --- Общий разбор черновика (валидация на стороне сервера) -------------------
 
@@ -36,6 +37,7 @@ export class McpServerExistsError extends Error {
 
   constructor(serverName: string) {
     super(`MCP-сервер «${serverName}» уже есть в конфигурации.`);
+    coded(this, 'mcp-server-exists', { name: serverName });
     this.name = 'McpServerExistsError';
     this.serverName = serverName;
   }
@@ -47,6 +49,7 @@ export class McpServerNotFoundError extends Error {
 
   constructor(serverName: string) {
     super(`MCP-сервера «${serverName}» нет в конфигурации.`);
+    coded(this, 'mcp-server-not-in-config', { name: serverName });
     this.name = 'McpServerNotFoundError';
     this.serverName = serverName;
   }

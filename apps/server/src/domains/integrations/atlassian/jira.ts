@@ -1,6 +1,6 @@
 import type { JiraIssue, JiraProject, JiraTransition } from '@agentdeck/contracts';
-import { invalidField, unreachable } from '../errors.ts';
-import { describeFailure, parseJson, type OutboundResponse } from '../http.ts';
+import { invalidField } from '../errors.ts';
+import { failedResponse, parseJson, type OutboundResponse } from '../http.ts';
 import { call, jiraApi, raw, type AtlassianAccess } from './client.ts';
 import { fromAdf, toAdf } from './adf.ts';
 
@@ -100,7 +100,10 @@ export async function searchIssues(
   search: IssueSearch,
 ): Promise<JiraIssue[]> {
   const jql = search.jql?.trim() || (search.q?.trim() ? `text ~ ${quote(search.q.trim())}` : '');
-  if (!jql) throw invalidField('q', 'нужен текст поиска или JQL');
+  if (!jql)
+    throw invalidField('q', 'нужен текст поиска или JQL', 'request-search-or-jql-required', {
+      field: 'q',
+    });
 
   const limit = Math.min(Math.max(search.limit ?? 25, 1), 100);
   const api = jiraApi(access);
@@ -123,7 +126,7 @@ export async function searchIssues(
     if (response.status !== 404 && response.status !== 410) break;
   }
 
-  throw unreachable(describeFailure('Jira', last!), last!.text.slice(0, 500));
+  throw failedResponse('Jira', last!);
 }
 
 export async function readIssue(access: AtlassianAccess, key: string): Promise<JiraIssue> {
@@ -148,8 +151,14 @@ export interface NewIssue {
  * ждёт документ ADF, своя установка — обычный текст с вики-разметкой.
  */
 export async function createIssue(access: AtlassianAccess, draft: NewIssue): Promise<JiraIssue> {
-  if (!draft.projectKey.trim()) throw invalidField('projectKey', 'не указан проект Jira');
-  if (!draft.summary.trim()) throw invalidField('summary', 'не указан заголовок задачи');
+  if (!draft.projectKey.trim())
+    throw invalidField('projectKey', 'не указан проект Jira', 'request-jira-project-missing', {
+      field: 'projectKey',
+    });
+  if (!draft.summary.trim())
+    throw invalidField('summary', 'не указан заголовок задачи', 'request-issue-title-missing', {
+      field: 'summary',
+    });
 
   const created = await call<{ key: string }>(access, {
     url: `${jiraApi(access)}/issue`,
@@ -174,7 +183,8 @@ export async function commentIssue(
   key: string,
   body: string,
 ): Promise<void> {
-  if (!body.trim()) throw invalidField('body', 'пустой комментарий');
+  if (!body.trim())
+    throw invalidField('body', 'пустой комментарий', 'request-comment-empty', { field: 'body' });
   await call<unknown>(access, {
     url: `${jiraApi(access)}/issue/${encodeURIComponent(key)}/comment`,
     method: 'POST',
@@ -203,7 +213,8 @@ export async function applyTransition(
   key: string,
   transitionId: string,
 ): Promise<void> {
-  if (!transitionId.trim()) throw invalidField('id', 'не указан переход');
+  if (!transitionId.trim())
+    throw invalidField('id', 'не указан переход', 'request-transition-missing', { field: 'id' });
   await call<unknown>(access, {
     url: `${jiraApi(access)}/issue/${encodeURIComponent(key)}/transitions`,
     method: 'POST',

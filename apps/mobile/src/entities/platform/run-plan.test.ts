@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PlatformRunPlan } from '@agentdeck/contracts';
 import { ru } from '../../shared/config/i18n/ru';
-import { runPlanView } from './run-plan';
+import { runPlanConsumer, runPlanView } from './run-plan';
 
 /**
  * Подписи контура под полем ввода телефона (Т8 MINOR-5). Модель считает
@@ -145,5 +145,28 @@ describe('runPlanView', () => {
         warn: true,
       },
     ]);
+  });
+});
+
+/**
+ * Ревью Т13: потребитель был жёстко `'chat'`, а сервер маршрутизирует ребёнка
+ * разделения как «Группы». У контура, включённого только для «Чата», открытый
+ * на телефоне ребёнок запирал модель и писал «через контур …» про прогон,
+ * уходивший в облако вендора.
+ */
+describe('потребитель маршрута для этого разговора', () => {
+  const chats = [{ id: 'own' }, { id: 'child', parentId: 'own' }];
+
+  it('ребёнок разделения идёт «Группами»', () => {
+    expect(runPlanConsumer(chats, 'child')).toBe('groups');
+  });
+
+  it('обычный разговор идёт «Чатом»', () => {
+    expect(runPlanConsumer(chats, 'own')).toBe('chat');
+  });
+
+  it('список ещё не приехал — тот же ответ, что у разговора без связи', () => {
+    expect(runPlanConsumer(undefined, 'child')).toBe('chat');
+    expect(runPlanConsumer(chats, 'unknown')).toBe('chat');
   });
 });

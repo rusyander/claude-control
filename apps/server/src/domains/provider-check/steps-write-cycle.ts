@@ -29,6 +29,7 @@ import {
 } from '../provider-instructions.ts';
 import { reason, skipReason, step } from './step.ts';
 import type { ProviderCheckDeps } from './types.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Круги записи «прочитали → записали → прочитали». Настоящие файлы пользователя
@@ -67,7 +68,8 @@ export function checkMcp(providerId: string, deps: ProviderCheckDeps): ProviderC
   const target = resolveProviderMcpTarget(
     providerSettingsSource(providerId, deps.claudeDirOverride),
   );
-  if (!target) return step('mcp', 'skipped', skipReason(providerId, 'mcp', 'MCP-серверы'));
+  if (!target)
+    return step('mcp', 'skipped', skipReason(providerId, 'mcp', serverText('checks-section-mcp')));
 
   return onSandboxCopy(
     target.filePath,
@@ -95,33 +97,29 @@ export function checkMcp(providerId: string, deps: ProviderCheckDeps): ProviderC
       );
       const withProbe = readProviderMcpServers(probeTarget);
       if (!withProbe.some((server) => server.name === PROBE_SERVER)) {
-        return step(
-          'mcp',
-          'fail',
-          'Запись пробного сервера прошла, но при перечитывании его нет — формат файла разобран не полностью.',
-          target.filePath,
-        );
+        return step('mcp', 'fail', serverText('checks-mcp-reread-missing'), target.filePath);
       }
 
       deleteProviderMcpServer(probeTarget, PROBE_SERVER, undefined);
       const after = readProviderMcpServers(probeTarget);
       if (!sameShape(before, after)) {
-        return step(
-          'mcp',
-          'fail',
-          'После добавления и удаления пробного сервера список отличается от исходного — запись меняет соседние записи.',
-          target.filePath,
-        );
+        return step('mcp', 'fail', serverText('checks-mcp-neighbours'), target.filePath);
       }
 
       return step(
         'mcp',
         'pass',
-        `Круг чтения-записи сошёлся на копии файла, серверов в нём: ${before.length}.`,
+        serverText('checks-mcp-ok', { count: before.length }),
         target.filePath,
       );
     },
-    (error) => step('mcp', 'fail', `Формат файла не принят: ${reason(error)}`, target.filePath),
+    (error) =>
+      step(
+        'mcp',
+        'fail',
+        serverText('checks-format-rejected', { reason: reason(error) }),
+        target.filePath,
+      ),
   );
 }
 
@@ -184,7 +182,11 @@ export function checkPermissions(providerId: string, deps: ProviderCheckDeps): P
     providerSettingsSource(providerId, deps.claudeDirOverride),
   );
   if (!target)
-    return step('permissions', 'skipped', skipReason(providerId, 'permissions', 'Права'));
+    return step(
+      'permissions',
+      'skipped',
+      skipReason(providerId, 'permissions', serverText('checks-section-permissions')),
+    );
 
   return onSandboxCopy(
     target.filePath,
@@ -198,19 +200,19 @@ export function checkPermissions(providerId: string, deps: ProviderCheckDeps): P
         return step(
           'permissions',
           'fail',
-          'Перезапись прочитанных прав изменила их смысл — формат разобран не полностью.',
+          serverText('checks-permissions-meaning'),
           target.filePath,
         );
       }
-      return step(
-        'permissions',
-        'pass',
-        'Права прочитаны и записаны обратно на копии файла без изменения смысла.',
-        target.filePath,
-      );
+      return step('permissions', 'pass', serverText('checks-permissions-ok'), target.filePath);
     },
     (error) =>
-      step('permissions', 'fail', `Формат файла не принят: ${reason(error)}`, target.filePath),
+      step(
+        'permissions',
+        'fail',
+        serverText('checks-format-rejected', { reason: reason(error) }),
+        target.filePath,
+      ),
   );
 }
 
@@ -219,7 +221,8 @@ export function checkEnv(providerId: string, deps: ProviderCheckDeps): ProviderC
   const target = resolveProviderEnvTarget(
     providerSettingsSource(providerId, deps.claudeDirOverride),
   );
-  if (!target) return step('env', 'skipped', skipReason(providerId, 'env', 'Переменные окружения'));
+  if (!target)
+    return step('env', 'skipped', skipReason(providerId, 'env', serverText('checks-section-env')));
 
   return onSandboxCopy(
     target.filePath,
@@ -230,33 +233,29 @@ export function checkEnv(providerId: string, deps: ProviderCheckDeps): ProviderC
       saveProviderEnvVars(probeTarget, [...before, { key: PROBE_ENV_KEY, value: 'ok' }], undefined);
       const withProbe = readProviderEnvVars(probeTarget);
       if (!withProbe.some((item) => item.key === PROBE_ENV_KEY)) {
-        return step(
-          'env',
-          'fail',
-          'Пробная переменная записана, но при перечитывании её нет — формат разобран не полностью.',
-          target.filePath,
-        );
+        return step('env', 'fail', serverText('checks-env-reread-missing'), target.filePath);
       }
 
       saveProviderEnvVars(probeTarget, before, undefined);
       const after = readProviderEnvVars(probeTarget);
       if (!sameShape(before, after)) {
-        return step(
-          'env',
-          'fail',
-          'После добавления и удаления пробной переменной набор отличается от исходного.',
-          target.filePath,
-        );
+        return step('env', 'fail', serverText('checks-env-set-differs'), target.filePath);
       }
 
       return step(
         'env',
         'pass',
-        `Круг чтения-записи сошёлся на копии файла, переменных в нём: ${before.length}.`,
+        serverText('checks-env-ok', { count: before.length }),
         target.filePath,
       );
     },
-    (error) => step('env', 'fail', `Формат файла не принят: ${reason(error)}`, target.filePath),
+    (error) =>
+      step(
+        'env',
+        'fail',
+        serverText('checks-format-rejected', { reason: reason(error) }),
+        target.filePath,
+      ),
   );
 }
 
@@ -271,20 +270,17 @@ export function checkInstructions(
   deps: ProviderCheckDeps,
 ): ProviderCheckStep {
   if (provider.capabilities.globalInstructions !== 'ready')
-    return step('instructions', 'skipped', 'Раздел инструкций у этого провайдера не поддержан.');
+    return step('instructions', 'skipped', serverText('checks-instructions-unsupported'));
 
   if (provider.instructionsRules)
-    return step(
-      'instructions',
-      'skipped',
-      'Инструкции Cursor — каталог правил `.mdc`; круг записи по каталогу не выполняется.',
-    );
+    return step('instructions', 'skipped', serverText('checks-instructions-cursor'));
 
   if (provider.instructionsList) {
     const target = resolveProviderInstructionsTarget(
       providerSettingsSource(provider.id, deps.claudeDirOverride),
     );
-    if (!target) return step('instructions', 'skipped', 'Список инструкций не разрешён.');
+    if (!target)
+      return step('instructions', 'skipped', serverText('checks-instructions-list-not-allowed'));
 
     return onSandboxCopy(
       target.configPath,
@@ -301,31 +297,36 @@ export function checkInstructions(
           return step(
             'instructions',
             'fail',
-            'Перезапись списка ссылок изменила его состав.',
+            serverText('checks-instructions-list-changed'),
             target.configPath,
           );
         }
         return step(
           'instructions',
           'pass',
-          `Список ссылок перезаписан без изменений, записей в нём: ${before.length}.`,
+          serverText('checks-instructions-list-ok', { count: before.length }),
           target.configPath,
         );
       },
       (error) =>
-        step('instructions', 'fail', `Формат файла не принят: ${reason(error)}`, target.configPath),
+        step(
+          'instructions',
+          'fail',
+          serverText('checks-format-rejected', { reason: reason(error) }),
+          target.configPath,
+        ),
     );
   }
 
   if (!provider.instructionsFile)
-    return step('instructions', 'skipped', 'Файл инструкций у провайдера не объявлен.');
+    return step('instructions', 'skipped', serverText('checks-instructions-undeclared'));
 
   const filePath = provider.instructionsFile(deps.claudeDirOverride);
   if (!existsSync(filePath))
     return step(
       'instructions',
       'warn',
-      `Файла ${filePath} ещё нет — он появится, когда инструкции будут заданы.`,
+      serverText('checks-instructions-file-absent', { path: filePath }),
       filePath,
     );
 
@@ -341,11 +342,17 @@ export function checkInstructions(
         ? step(
             'instructions',
             'pass',
-            `Файл инструкций читается и записывается без изменений (${text.length} символов).`,
+            serverText('checks-instructions-file-ok', { count: text.length }),
             filePath,
           )
-        : step('instructions', 'fail', 'Перезапись файла инструкций изменила его текст.', filePath);
+        : step('instructions', 'fail', serverText('checks-instructions-file-changed'), filePath);
     },
-    (error) => step('instructions', 'fail', `Файл не прочитан: ${reason(error)}`, filePath),
+    (error) =>
+      step(
+        'instructions',
+        'fail',
+        serverText('checks-instructions-file-unread', { reason: reason(error) }),
+        filePath,
+      ),
   );
 }

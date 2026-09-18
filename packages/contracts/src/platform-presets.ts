@@ -177,7 +177,7 @@ export const PLATFORM_PRESETS: Record<PlatformDriverId, PlatformDriverPreset> = 
     sampleUrl: 'https://api.example.ru',
     defaults: { toolShim: true, contourPrompt: true },
     manifest: {},
-    source: 'исходники контура: mod-llmbox chat/schemas.py, handler_public_api.go',
+    source: 'наблюдения за контуром: схема запроса чата и ветка отказов публичного API',
   },
   'openai-compat': {
     base: 'openai-compat',

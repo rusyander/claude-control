@@ -10,7 +10,8 @@ import { useVoice } from '../../shared/lib/voice';
 import { useT } from '../../shared/config/i18n';
 import { Field, Mono, Row } from '../../shared/ui';
 import { colors, font, radius, space } from '../../shared/config/theme';
-import { runPlanView, usePlatformRunPlan } from '../../entities/platform/api';
+import { runPlanConsumer, runPlanView, usePlatformRunPlan } from '../../entities/platform/api';
+import { useChats } from '../../entities/chat/api';
 import type { ImageModeState } from './useImageMode';
 
 /**
@@ -44,6 +45,7 @@ export function Composer({
   isRunning,
   busy,
   image,
+  chatId,
 }: {
   value: ComposerValue;
   onChange: (next: ComposerValue) => void;
@@ -53,6 +55,8 @@ export function Composer({
   busy?: boolean;
   /** Режим «Картинка» (Т9). Пусто — только сообщения. */
   image?: ImageModeState;
+  /** Этот разговор: по нему решается, каким потребителем спрашивать маршрут. */
+  chatId: string;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -69,7 +73,10 @@ export function Composer({
   // Чем прогон пойдёт НА САМОМ ДЕЛЕ (Т6/Т8) — как шапка чата панели: через
   // контур выбор модели — просьба, а не решение, усилие может не отправляться, а
   // наши слои сняты галочкой на карточке контура. Сказать это надо ДО отправки.
-  const runPlan = usePlatformRunPlan('chat');
+  // Потребитель — не константа: ребёнок разделения идёт «Группами», и сервер
+  // маршрутизирует его именно так (ревью Т13).
+  const chats = useChats();
+  const runPlan = usePlatformRunPlan(runPlanConsumer(chats.data, chatId));
   const plan = runPlanView(runPlan.data, value, t.composer);
   const imageMode = image?.mode === 'image';
 

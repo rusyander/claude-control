@@ -4,6 +4,8 @@ import { withLegacyConsumers } from '../platform/store.ts';
 import { driverOf } from '../platform/drivers/index.ts';
 import { brokenExclusion } from '../platform/rules-matrix.ts';
 import type { ChecklistItem } from './collect/types.ts';
+import { serverText } from '../../lib/server-texts.ts';
+import type { CodedFields } from '@agentdeck/contracts/server-messages';
 
 /**
  * Контуры в архиве переноса: настройка едет, КЛЮЧ не едет.
@@ -64,7 +66,7 @@ export function panelPlatformsFile(document: PanelPlatformsDocument): Buffer {
 export function panelPlatformsChecklist(platforms: Platform[]): ChecklistItem[] {
   return platforms.map((platform) => ({
     source: `${platform.title} (${platform.baseUrl})`,
-    keys: [`ключ контура «${platform.id}»`],
+    keys: [serverText('transfer-platform-key', { id: platform.id })],
     reason: 'panel-key' as const,
   }));
 }
@@ -90,7 +92,7 @@ export interface PlatformImportPlanEntry {
   notes: string[];
 }
 
-export interface PanelPlatformsPlan {
+export interface PanelPlatformsPlan extends CodedFields<'problem'> {
   entries: PlatformImportPlanEntry[];
   /** Настройка шлюза из архива — показывается рядом, применяется вместе с выбором. */
   gateway?: PlatformGatewaySettings;
@@ -117,7 +119,10 @@ export interface PanelPlatformsInput {
 export function planPanelPlatforms(input: PanelPlatformsInput): PanelPlatformsPlan {
   const document = parsePanelPlatforms(input.data);
   if (!document) return { entries: [] };
-  if ('problem' in document) return { entries: [], problem: document.problem };
+  if ('problem' in document) {
+    const { problem, problemCode, problemParams } = document;
+    return { entries: [], problem, problemCode, problemParams };
+  }
 
   const here = new Map(input.current.map((platform) => [platform.id, platform]));
 
@@ -140,26 +145,24 @@ export function planPanelPlatforms(input: PanelPlatformsInput): PanelPlatformsPl
       const addressChanges = Boolean(mine && mine.baseUrl !== platform.baseUrl);
       if (hasToken && addressChanges) {
         notes.push(
-          `адрес другой (было ${mine?.baseUrl}) — сохранённый ключ будет снят, введите ключ нового адреса`,
+          serverText('transfer-platform-address-changed', { baseUrl: mine?.baseUrl ?? '' }),
         );
       } else {
         notes.push(
-          hasToken
-            ? 'ключ этого контура на этой машине уже сохранён'
-            : 'ключ в архив не попадает — введите его после разворота',
+          serverText(hasToken ? 'transfer-platform-key-saved' : 'transfer-platform-key-absent'),
         );
       }
 
       // Путь к сертификату переносится как строка: файла по нему на этой машине
       // может не быть, и тогда контур отвалится на рукопожатии, а не на пробе.
       if (platform.caCertPath && !input.fileExists(platform.caCertPath)) {
-        notes.push(`файла сертификата нет по пути ${platform.caCertPath}`);
+        notes.push(serverText('transfer-platform-cert-missing', { path: platform.caCertPath }));
       }
 
       // Проекты записаны путями прежней машины: на новой они почти наверняка
       // другие, и молча применённый контур ушёл бы «во все проекты».
       if (platform.projectPaths.length > 0) {
-        notes.push('пути проектов — с прежней машины, проверьте их на этой');
+        notes.push(serverText('transfer-platform-project-paths'));
       }
 
       // Взаимное исключение правил (Т7): архив везёт `rules` целиком, а дверь
@@ -170,10 +173,7 @@ export function planPanelPlatforms(input: PanelPlatformsInput): PanelPlatformsPl
       // принадлежит ему (ревью Т7, M5).
       const broken = brokenExclusion(platform, driverOf(platform));
       if (broken) {
-        notes.push(
-          `${broken.title}: обе стороны включены — сохранение этого контура будет отклонено, ` +
-            'выключите одну на карточке контура',
-        );
+        notes.push(serverText('transfer-platform-exclusion', { title: broken.title }));
       }
 
       return {
@@ -232,31 +232,47 @@ export function takePanelGateway(data: Buffer | undefined): PlatformGatewaySetti
 
 function parsePanelPlatforms(
   data: Buffer | undefined,
-): PanelPlatformsDocument | { problem: string } | undefined {
+): PanelPlatformsDocument | ({ problem: string } & CodedFields<'problem'>) | undefined {
   if (!data) return undefined;
 
   let raw: unknown;
   try {
     raw = JSON.parse(data.toString('utf8'));
   } catch {
-    return { problem: 'Секция контуров повреждена: не разбирается как JSON.' };
+    return {
+      problem: 'Секция контуров повреждена: не разбирается как JSON.',
+      problemCode: 'transfer-platforms-broken-json',
+    };
   }
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    return { problem: 'Секция контуров должна быть объектом.' };
+    return {
+      problem: 'Секция контуров должна быть объектом.',
+      problemCode: 'transfer-platforms-not-object',
+    };
   }
 
   const record = raw as Record<string, unknown>;
   if (typeof record.version === 'number' && record.version > PANEL_PLATFORMS_VERSION) {
     return {
       problem: `Секция контуров новее поддерживаемой версии (${record.version} > ${PANEL_PLATFORMS_VERSION}).`,
+      problemCode: 'transfer-platforms-newer',
+      problemParams: { version: record.version, supported: PANEL_PLATFORMS_VERSION },
     };
   }
 
   const platforms = platformsSchema.safeParse(record.platforms ?? []);
-  if (!platforms.success) return { problem: 'Секция контуров не проходит проверку настройки.' };
+  if (!platforms.success)
+    return {
+      problem: 'Секция контуров не проходит проверку настройки.',
+      problemCode: 'transfer-platforms-invalid',
+    };
 
   const gateway = platformGatewaySettingsSchema.safeParse(record.gateway ?? {});
-  if (!gateway.success) return { problem: 'Настройка шлюза в архиве не проходит проверку.' };
+  if (!gateway.success)
+    return {
+      problem: 'Настройка шлюза в архиве не проходит проверку.',
+      problemCode: 'transfer-gateway-invalid',
+    };
 
   return {
     version: PANEL_PLATFORMS_VERSION,

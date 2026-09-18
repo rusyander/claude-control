@@ -12,6 +12,7 @@ import type { SplitOverlap } from '../../domains/chat/split-overlap.ts';
 import type { SplitReview } from '../../domains/chat/split-review.ts';
 import { checkProjectDir } from '../../domains/projects.ts';
 import { createSplitLauncher, type SplitLaunchDeps } from './split-launch.ts';
+import { codeOf } from '../../lib/server-text.ts';
 
 /**
  * Разделение списка задач по нескольким чатам — одним запросом.
@@ -83,9 +84,10 @@ export function registerChatSplitRoutes(
     // формата — два разных набора заведённых веток при одном и том же тексте.
     const proposal = parseSplitProposal(request.body?.proposal);
     if (!proposal) {
-      return reply
-        .code(400)
-        .send({ message: 'Разделение не разобрано: нужны минимум две группы с задачами' });
+      return reply.code(400).send({
+        message: 'Разделение не разобрано: нужны минимум две группы с задачами',
+        messageCode: 'split-proposal-invalid',
+      });
     }
 
     const wantRuns = startRuns !== false;
@@ -190,19 +192,55 @@ export function registerChatSplitRoutes(
     Params: { parent: string };
     Body: { index?: number; answer?: string };
   }>('/api/chat/split/:parent/hold', async (request, reply) => {
-    if (!deps.conveyor) return reply.code(404).send({ message: 'Конвейер уровней выключен' });
+    if (!deps.conveyor)
+      return reply
+        .code(404)
+        .send({ message: 'Конвейер уровней выключен', messageCode: 'split-conveyor-off' });
     const index = Number(request.body?.index);
     const answer = String(request.body?.answer ?? '').trim();
     if (!Number.isInteger(index) || index < 0) {
-      return reply.code(400).send({ message: 'Нужен номер группы' });
+      return reply
+        .code(400)
+        .send({ message: 'Нужен номер группы', messageCode: 'split-group-number-required' });
     }
-    if (!answer) return reply.code(400).send({ message: 'Ответ пустой' });
+    if (!answer)
+      return reply.code(400).send({ message: 'Ответ пустой', messageCode: 'split-answer-empty' });
     try {
       return await deps.conveyor.answerHold(request.params.parent, index, answer);
     } catch (error) {
-      return reply.code(409).send({ message: (error as Error).message });
+      return reply.code(409).send({ message: (error as Error).message, ...codeOf(error) });
     }
   });
+
+  /**
+   * «Отпустить» группу, которая ждёт предшественников.
+   *
+   * Вторая и последняя дверь к стоящей группе, и открывается она ровно там, где
+   * первой не хватает: ответ на вопрос разбора двигает только `held`, а цепочка
+   * предшественника может не кончиться никогда — прогон остановили, чат
+   * удалили, панель перезапустилась. Решение человека, а не панели: она сама
+   * никого не отпускает и ничего при этом не сливает.
+   */
+  app.post<{ Params: { parent: string }; Body: { index?: number } }>(
+    '/api/chat/split/:parent/release',
+    async (request, reply) => {
+      if (!deps.conveyor)
+        return reply
+          .code(404)
+          .send({ message: 'Конвейер уровней выключен', messageCode: 'split-conveyor-off' });
+      const index = Number(request.body?.index);
+      if (!Number.isInteger(index) || index < 0) {
+        return reply
+          .code(400)
+          .send({ message: 'Нужен номер группы', messageCode: 'split-group-number-required' });
+      }
+      try {
+        return await deps.conveyor.release(request.params.parent, index);
+      } catch (error) {
+        return reply.code(409).send({ message: (error as Error).message, ...codeOf(error) });
+      }
+    },
+  );
 
   /**
    * Пересечения веток разделения (Т6) — по кнопке в хабе. Тот же счёт, что
@@ -215,9 +253,15 @@ export function registerChatSplitRoutes(
   app.get<{ Params: { parent: string } }>(
     '/api/chat/split/:parent/overlap',
     async (request, reply) => {
-      if (!deps.overlap) return reply.code(404).send({ message: 'Сверка веток выключена' });
+      if (!deps.overlap)
+        return reply
+          .code(404)
+          .send({ message: 'Сверка веток выключена', messageCode: 'split-overlap-off' });
       const view = await deps.overlap.check(request.params.parent);
-      if (!view) return reply.code(404).send({ message: 'Разделения с уровнями тут нет' });
+      if (!view)
+        return reply
+          .code(404)
+          .send({ message: 'Разделения с уровнями тут нет', messageCode: 'split-levels-missing' });
       return view;
     },
   );
@@ -234,12 +278,20 @@ export function registerChatSplitRoutes(
     Params: { parent: string };
     Body: { chatId?: string; decision?: string; all?: boolean };
   }>('/api/chat/split/:parent/review-decision', async (request, reply) => {
-    if (!deps.review) return reply.code(404).send({ message: 'Ревью по ссылкам выключено' });
+    if (!deps.review)
+      return reply
+        .code(404)
+        .send({ message: 'Ревью по ссылкам выключено', messageCode: 'split-review-off' });
     const chatId = String(request.body?.chatId ?? '').trim();
     const decision = String(request.body?.decision ?? '');
-    if (!chatId) return reply.code(400).send({ message: 'Не указан разговор' });
+    if (!chatId)
+      return reply
+        .code(400)
+        .send({ message: 'Не указан разговор', messageCode: 'conversation-unspecified' });
     if (decision !== 'fix' && decision !== 'post' && decision !== 'both' && decision !== 'none') {
-      return reply.code(400).send({ message: 'Неизвестное решение' });
+      return reply
+        .code(400)
+        .send({ message: 'Неизвестное решение', messageCode: 'split-review-decision-unknown' });
     }
     const outcome = await deps.review.decide({
       chatId,
@@ -253,7 +305,10 @@ export function registerChatSplitRoutes(
     // Ни один чат не подошёл — решение уже принято или карточки не было. Это не
     // ошибка запроса: две вкладки нажимают одну кнопку чаще, чем кажется.
     if (outcome.applied.length === 0) {
-      return reply.code(409).send({ message: 'Решение по этому ревью уже принято' });
+      return reply.code(409).send({
+        message: 'Решение по этому ревью уже принято',
+        messageCode: 'split-review-decided',
+      });
     }
     return outcome;
   });
@@ -268,14 +323,21 @@ export function registerChatSplitRoutes(
   app.post<{ Params: { parent: string }; Body: { chatId?: string } }>(
     '/api/chat/split/:parent/review-push',
     (request, reply) => {
-      if (!deps.review) return reply.code(404).send({ message: 'Ревью по ссылкам выключено' });
+      if (!deps.review)
+        return reply
+          .code(404)
+          .send({ message: 'Ревью по ссылкам выключено', messageCode: 'split-review-off' });
       const chatId = String(request.body?.chatId ?? '').trim();
-      if (!chatId) return reply.code(400).send({ message: 'Не указан разговор' });
+      if (!chatId)
+        return reply
+          .code(400)
+          .send({ message: 'Не указан разговор', messageCode: 'conversation-unspecified' });
       const outcome = deps.review.push({ chatId, parentChatId: request.params.parent });
       if (outcome.applied.length === 0) {
-        return reply
-          .code(409)
-          .send({ message: 'Отправлять нечего: правок по ревью здесь не было' });
+        return reply.code(409).send({
+          message: 'Отправлять нечего: правок по ревью здесь не было',
+          messageCode: 'split-review-nothing-to-send',
+        });
       }
       return outcome;
     },

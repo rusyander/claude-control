@@ -24,10 +24,15 @@ import {
 } from '../../domains/mcp-oauth.ts';
 import { done } from '../write-result.ts';
 import type { ClaudePaths } from './shared.ts';
+import { codeOf } from '../../lib/server-text.ts';
 
 type McpServer = ReturnType<typeof readMcpServers>[number];
 
-const NOT_FOUND = { error: 'not_found', message: 'Сервер не найден' } as const;
+const NOT_FOUND = {
+  error: 'not_found',
+  message: 'Сервер не найден',
+  messageCode: 'mcp-server-not-found',
+} as const;
 
 /** MCP-серверы (~/.claude.json) вместе с их интерактивным входом (OAuth). */
 export function registerMcpRoutes(app: FastifyInstance, ctx: ServerContext): void {
@@ -46,7 +51,9 @@ export function registerMcpRoutes(app: FastifyInstance, ctx: ServerContext): voi
       error instanceof McpServerNotFoundError ||
       error instanceof McpServerExistsError
     ) {
-      return reply.code(error.statusCode).send({ error: error.code, message: error.message });
+      return reply
+        .code(error.statusCode)
+        .send({ error: error.code, message: error.message, ...codeOf(error) });
     }
     throw error;
   };

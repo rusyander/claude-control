@@ -607,6 +607,77 @@ describe('POST /api/chat/split', () => {
       );
     });
 
+    /**
+     * Группа, ждущая предшественника, чья цепочка не кончится никогда
+     * (остановлен, чат удалён): до 18.09.2026 сдвинуть её было нечем — ответ на
+     * вопрос разбора работает только со статусом `held`. Здесь пройден весь
+     * путь: маршрут разделения → разбор с `after` → маршрут «отпустить».
+     */
+    it('ждущую группу отпускает маршрут родителя — с прямым словом об этом в задании', async () => {
+      const conveyor = withConveyor();
+      const instance = await withRoutes(conveyor);
+      const first = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal: kinds,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+      const triageId = (first.json() as { triage: { chatId: string } }).triage.chatId;
+      const block = [
+        '```agentdeck:split-plan',
+        JSON.stringify({ groups: [{ index: 2, after: [1] }], order: [1, 2] }),
+        '```',
+      ].join('\n');
+      conveyor.onTriageFinished(
+        {
+          chatId: triageId,
+          projectPath: project,
+          text: block,
+          ok: true,
+          startedAt: 1,
+          options: { prompt: '', cwd: project },
+          contextTokens: 0,
+        },
+        [triageId],
+      );
+      await new Promise((done) => setTimeout(done, 30));
+      started.length = 0;
+      expect(store.getSplitPlan('parent-1')?.groups[1]?.status).toBe('waiting');
+
+      // Уже работающую отпускать нечего.
+      const refused = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split/parent-1/release',
+        payload: { index: 0 },
+      });
+      expect(refused.statusCode).toBe(409);
+
+      const released = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split/parent-1/release',
+        payload: { index: 1 },
+      });
+      await instance.close();
+
+      expect(released.statusCode).toBe(200);
+      expect(
+        (released.json() as { chats: { index: number }[] }).chats.map((chat) => chat.index),
+      ).toEqual([1]);
+      expect(started).toHaveLength(1);
+      // Агент узнаёт из задания и базу, и то, что работа предшественника не легла.
+      expect(started[0]?.prompt).toContain('цепочка НЕ кончилась');
+      expect(store.getChatLink(started[0]?.chatId ?? '')?.notes).toContain('цепочка НЕ кончилась');
+      expect(store.getSplitPlan('parent-1')?.groups[1]).toMatchObject({
+        released: true,
+        status: 'started',
+      });
+    });
+
     it('ответ на вопрос разбора — маршрутом родителя; без вопроса — 409', async () => {
       const conveyor = withConveyor();
       const instance = await withRoutes(conveyor);
@@ -671,6 +742,56 @@ describe('POST /api/chat/split', () => {
         status: 'started',
         holdAnswer: 'как в шапке',
       });
+    });
+
+    /**
+     * Разбор, оборванный перезапуском панели. Раньше это морозило разделение
+     * навсегда: итог применяет ровно один вызов — завершение прогона разбора,
+     * а он после перезапуска не приедет уже никогда. Дверь человека (ответ на
+     * вопрос) отвечала 409 — группы не `held`. Здесь пройдена та же дорога:
+     * маршрут → перезапуск (новый конвейер поверх ТОГО ЖЕ хранилища, прогона
+     * больше нет) → сверка на старте → маршрут ответа.
+     */
+    it('разбор оборван перезапуском — дверь человека открыта, копии сами не идут', async () => {
+      const instance = await withRoutes(withConveyor());
+      const first = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+      expect((first.json() as { chats: unknown[] }).chats).toEqual([]);
+      await instance.close();
+      started.length = 0;
+
+      // Перезапуск: память процесса пуста, на диске — та же запись разделения.
+      const revived = withConveyor();
+      const notices = revived.recoverInterruptedTriage(() => false);
+      const instance2 = await withRoutes(revived);
+
+      expect(notices).toHaveLength(1);
+      // Ни одной копии само по себе: решение за человеком, а не за панелью.
+      expect(started).toEqual([]);
+      expect(store.getSplitPlan('parent-1')?.groups.map((group) => group.status)).toEqual([
+        'held',
+        'held',
+      ]);
+
+      const answered = await instance2.inject({
+        method: 'POST',
+        url: '/api/chat/split/parent-1/hold',
+        payload: { index: 0, answer: 'да, запускай' },
+      });
+      await instance2.close();
+
+      expect(answered.statusCode).toBe(200);
+      expect(started).toHaveLength(1);
+      expect(store.getSplitPlan('parent-1')?.groups[0]?.status).toBe('started');
     });
 
     it('«только завести чаты» и выключенное правило идут старым путём — без разбора', async () => {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { apiClient } from '@shared/api/client';
+import { apiClient, messageFromPayload } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
@@ -68,8 +68,9 @@ export function BackupsCard() {
     },
     onError: (error: unknown) => {
       // Неверная фраза приходит понятным сообщением с сервера — показываем в поле.
-      const message = (error as { response?: { data?: { error?: string } } })?.response?.data
-        ?.error;
+      const message = messageFromPayload(
+        (error as { response?: { data?: unknown } })?.response?.data,
+      );
       setPassError(message ?? t('settings.backupsDecryptError'));
     },
     meta: { successMessage: 'toasts.restored', silentError: true },

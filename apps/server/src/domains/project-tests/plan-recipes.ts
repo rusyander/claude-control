@@ -13,6 +13,7 @@ import { DEFAULT_CASE_DURATION, pickWithinBudget } from '@agentdeck/contracts/te
 import { ProjectTestsError } from './files.ts';
 import { buildRisk } from './risk.ts';
 import { flakyCases } from './runs-store.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Сборка тест-плана ПРАВИЛОМ, а не агентом.
@@ -361,7 +362,11 @@ function runRecipe(input: PlanRecipeInput): RecipeResult {
     case 'flaky':
       return flakyRecipe(input.groups, input.runs ?? [], input.threshold);
     default:
-      throw new ProjectTestsError(`Неизвестное правило сборки плана: «${String(input.recipe)}».`);
+      throw coded(
+        new ProjectTestsError(`Неизвестное правило сборки плана: «${String(input.recipe)}».`),
+        'plan-recipe-unknown',
+        { recipe: String(input.recipe) },
+      );
   }
 }
 

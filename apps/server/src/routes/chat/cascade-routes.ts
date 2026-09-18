@@ -24,7 +24,10 @@ export function registerChatCascadeRoutes(app: FastifyInstance, ctx: ServerConte
 
   app.put<{ Body: { path?: string; enabled?: boolean } }>('/api/chat/cascade', (request, reply) => {
     const path = String(request.body?.path ?? '').trim();
-    if (!path) return reply.code(400).send({ message: 'Нужен путь проекта' });
+    if (!path)
+      return reply
+        .code(400)
+        .send({ message: 'Нужен путь проекта', messageCode: 'project-path-required' });
 
     // Пишем по ключу ПРОЕКТА, а не по рабочей папке: выключено в копии ветки
     // значит выключено в проекте, иначе следующая копия правила не увидит.

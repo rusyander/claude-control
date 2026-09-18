@@ -5,6 +5,7 @@ import { MAX_DIFF_CHARS, MAX_FILE_BYTES, MAX_MEDIA_BYTES } from './constants.ts'
 import { rebuildBaseline, type AgentEdit } from './edits.ts';
 import { previewKindOf } from './media.ts';
 import { resolveProjectPath } from './paths.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Чтение одного файла проекта вместе со всем, что нужно редактору: текущий
@@ -22,7 +23,7 @@ export function readProjectFile(
 ): ProjectFileContent {
   const path = resolveProjectPath(root, file);
   const stats = statSync(path);
-  if (!stats.isFile()) throw new Error('Это не файл.');
+  if (!stats.isFile()) throw coded(new Error('Это не файл.'), 'file-not-a-file');
 
   const preview = previewKindOf(file);
   const base = {

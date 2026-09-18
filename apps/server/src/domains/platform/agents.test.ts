@@ -137,7 +137,7 @@ describe('askAgent: исходы различимы', () => {
     expect(answer.sessionRecorded).toBeUndefined();
   });
 
-  it('нет лицензии agentbox: «недоступно», а не ошибка', async () => {
+  it('нет лицензии на модуль агентов: «недоступно», а не ошибка', async () => {
     const { fetchImpl } = stub(
       JSON.stringify({
         error: 'module_not_licensed',

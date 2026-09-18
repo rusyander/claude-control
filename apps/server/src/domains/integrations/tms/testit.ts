@@ -2,6 +2,7 @@ import type { TmsPushResult } from '@agentdeck/contracts';
 import { invalidField } from '../errors.ts';
 import { requestJson } from '../http.ts';
 import type { TmsCase, TmsCaseBatch, TmsClient, TmsRunPush } from './types.ts';
+import { serverText } from '../../../lib/server-texts.ts';
 
 /**
  * Test IT: своя установка, `PrivateToken` и ран из выбранных кейсов.
@@ -83,10 +84,20 @@ interface TestRunResult {
 function apiRoot(baseUrl: string): string {
   const value = baseUrl.trim().replace(/\/+$/, '');
   if (!value) {
-    throw invalidField('baseUrl', 'не указан адрес Test IT: у своей установки он у каждого свой');
+    throw invalidField(
+      'baseUrl',
+      'не указан адрес Test IT: у своей установки он у каждого свой',
+      'request-testit-url-missing',
+      { field: 'baseUrl' },
+    );
   }
   if (!/^https?:\/\//i.test(value)) {
-    throw invalidField('baseUrl', 'адрес Test IT должен начинаться с http:// или https://');
+    throw invalidField(
+      'baseUrl',
+      'адрес Test IT должен начинаться с http:// или https://',
+      'request-testit-url-scheme',
+      { field: 'baseUrl' },
+    );
   }
   return `${value}/api/v2`;
 }
@@ -117,7 +128,10 @@ function resultKey(result: TestRunResult): string {
 export function testitClient(token: string, projectKey: string, baseUrl: string): TmsClient {
   const api = apiRoot(baseUrl);
   const project = projectKey.trim();
-  if (!project) throw invalidField('projectKey', 'не указан проект Test IT');
+  if (!project)
+    throw invalidField('projectKey', 'не указан проект Test IT', 'request-testit-project-missing', {
+      field: 'projectKey',
+    });
 
   const site = api.replace(/\/api\/v2$/, '');
   /** Адрес рана в интерфейсе Test IT — он же уходит в предварительную отметку. */
@@ -163,7 +177,10 @@ export function testitClient(token: string, projectKey: string, baseUrl: string)
         system: SYSTEM,
         headers: headers(token),
       });
-      return `${SYSTEM}, проект ${info?.name?.trim() || project}`;
+      return serverText('integration-tms-project', {
+        system: SYSTEM,
+        project: info?.name?.trim() || project,
+      });
     },
 
     /**
@@ -243,12 +260,20 @@ export function testitClient(token: string, projectKey: string, baseUrl: string)
         // Обрезанный список — не то же самое, что чужие пометки, и советовать
         // при нём «проверьте „tms:“» значит отправить человека чинить не то.
         const because = truncated
-          ? `список кейсов проекта обрезан на ${MAX_ITEMS} — кейс мог остаться за этой границей`
-          : 'проверьте, что пометки «tms:» из этого проекта, а не из другого';
+          ? serverText('tms-cases-truncated', { max: MAX_ITEMS })
+          : serverText('tms-check-marks');
         if (workItemIds.length === 0) {
           throw invalidField(
             'projectKey',
             `${SYSTEM}: ни один кейс прогона не найден в этом проекте — ${because}`,
+            'tms-run-cases-not-found',
+            {
+              field: 'projectKey',
+              system: SYSTEM,
+              because: truncated
+                ? serverText('tms-cases-truncated', { max: MAX_ITEMS })
+                : serverText('tms-check-marks'),
+            },
           );
         }
         // Часть кейсов не нашлась. Отправку это не отменяет — из-за одной
@@ -271,7 +296,13 @@ export function testitClient(token: string, projectKey: string, baseUrl: string)
           }),
         });
         const id = created?.id?.trim();
-        if (!id) throw invalidField('projectKey', `${SYSTEM} не вернул идентификатор рана`);
+        if (!id)
+          throw invalidField(
+            'projectKey',
+            `${SYSTEM} не вернул идентификатор рана`,
+            'request-testit-no-run-id',
+            { field: 'projectKey', SYSTEM },
+          );
         return id;
       };
 

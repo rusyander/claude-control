@@ -8,6 +8,7 @@ import {
 } from '../provider-env.ts';
 import { buildEndpointPlan, resolveEndpointVars } from './endpoint-plan.ts';
 import { isLocalHost, parseEndpointUrl } from './endpoint-probe.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Применение профиля своего эндпоинта к конфигурации выбранного CLI.
@@ -43,15 +44,21 @@ export class EndpointApplyError extends Error {
 function assertBaseUrl(profile: EndpointProfile): void {
   const url = parseEndpointUrl(profile.baseUrl.trim());
   if (!url) {
-    throw new EndpointApplyError(
-      'invalid_base_url',
-      'Адрес эндпоинта должен быть корректным http(s)-адресом.',
+    throw coded(
+      new EndpointApplyError(
+        'invalid_base_url',
+        'Адрес эндпоинта должен быть корректным http(s)-адресом.',
+      ),
+      'endpoint-base-url-invalid',
     );
   }
   if (profile.apiKind === 'google' && url.protocol === 'http:' && !isLocalHost(url.hostname)) {
-    throw new EndpointApplyError(
-      'insecure_base_url',
-      'Gemini CLI принимает по своей переменной адреса только https — исключение сделано лишь для localhost.',
+    throw coded(
+      new EndpointApplyError(
+        'insecure_base_url',
+        'Gemini CLI принимает по своей переменной адреса только https — исключение сделано лишь для localhost.',
+      ),
+      'endpoint-google-https-only',
     );
   }
 }
@@ -93,15 +100,23 @@ export function applyEndpointProfile(
   backupDir: string | undefined,
 ): EndpointApplyResult {
   if (!isKnownProviderId(providerId)) {
-    throw new EndpointApplyError('unknown_provider', `Неизвестный провайдер «${providerId}».`);
+    throw coded(
+      new EndpointApplyError('unknown_provider', `Неизвестный провайдер «${providerId}».`),
+      'provider-unknown-quoted',
+      { providerId },
+    );
   }
   const provider = getProvider(providerId);
 
   const resolved = resolveEndpointVars(provider, profile.apiKind);
   if (!('vars' in resolved)) {
-    throw new EndpointApplyError(
-      'unsupported_provider',
-      `У «${provider.name}» нет задокументированной переменной окружения для этого вида API — профиль сюда не переносится.`,
+    throw coded(
+      new EndpointApplyError(
+        'unsupported_provider',
+        `У «${provider.name}» нет задокументированной переменной окружения для этого вида API — профиль сюда не переносится.`,
+      ),
+      'endpoint-provider-no-var',
+      { provider: provider.name },
     );
   }
 
@@ -125,9 +140,13 @@ export function applyEndpointProfile(
 
   const target = resolveProviderEnvTargetFor(provider, paths.override);
   if (!target) {
-    throw new EndpointApplyError(
-      'unsupported_provider',
-      `У «${provider.name}» нет раздела переменных окружения — писать некуда.`,
+    throw coded(
+      new EndpointApplyError(
+        'unsupported_provider',
+        `У «${provider.name}» нет раздела переменных окружения — писать некуда.`,
+      ),
+      'endpoint-provider-no-env',
+      { provider: provider.name },
     );
   }
 

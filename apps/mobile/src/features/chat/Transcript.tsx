@@ -93,6 +93,14 @@ export function Transcript({
               );
             })}
 
+            {/* Контур сжал историю перед этим ответом: без подписи ответ
+                читается как ответ модели, видевшей весь разговор. */}
+            {message.role !== 'user' && message.contextSummarized ? (
+              <Text style={styles.summarized} testID="context-summarized">
+                {t.chat.contextSummarized}
+              </Text>
+            ) : null}
+
             {message.usage ? (
               <TokenBadge
                 usage={message.usage}
@@ -145,5 +153,6 @@ const styles = StyleSheet.create({
   toolRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   tool: { color: colors.accent, fontSize: font.small, fontFamily: font.mono },
   toolError: { color: colors.danger },
+  summarized: { color: colors.warning, fontSize: font.small, lineHeight: 18 },
   toolSummary: { color: colors.textFaint, fontSize: font.small, fontFamily: font.mono, flex: 1 },
 });

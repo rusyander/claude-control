@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type {
   ProviderChatEvent,
   ProviderChatMessage,
@@ -13,6 +14,7 @@ import {
 import type { PlatformRunRoute } from '../platform/routing.ts';
 import { appendMessage, readChat } from './store.ts';
 import { composeUserMessage } from './prompt.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Живые ответы чужих провайдеров: прогон принадлежит серверу, а не запросу.
@@ -60,7 +62,7 @@ function refusedRun(refusal: string): ProviderChatRunLike {
 }
 
 /** След остановленного прогона, который не успел ответить ни словом. */
-const STOPPED_TEXT = 'Прогон остановлен: ответа не было.';
+const STOPPED_TEXT = serverText('chat-run-stopped-no-answer');
 
 /** Разговор, у которого закончился ответ, — то, что видит слушатель. */
 export interface ProviderChatFinished {
@@ -129,11 +131,25 @@ export class ProviderChatService {
    * следующего запуска, а не с перезапуска панели. Слушателя нет — чат ходит
    * своим провайдером, как до контуров.
    */
-  setPlatformRouting(resolve: (consumer: string, asked: string) => PlatformRunRoute): void {
+  setPlatformRouting(
+    resolve: (consumer: string, asked: string, runTag: string) => PlatformRunRoute,
+  ): void {
     this.platformRouting = resolve;
   }
 
-  private platformRouting?: (consumer: string, asked: string) => PlatformRunRoute;
+  private platformRouting?: (consumer: string, asked: string, runTag: string) => PlatformRunRoute;
+
+  /**
+   * Сжимал ли контур историю в прогоне с этой меткой (`context-managed`). Метку
+   * служба выдаёт сама на каждое сообщение, и она уезжает в адрес шлюза только
+   * этому прогону, — поэтому соседний чат через тот же контур чужую подпись не
+   * получит, в отличие от счёта по окну времени.
+   */
+  setContourSummarized(check: (runTag: string) => boolean): void {
+    this.contourSummarized = check;
+  }
+
+  private contourSummarized?: (runTag: string) => boolean;
 
   /**
    * Сколько вызовов инструментов агента видел шлюз контура с момента `sinceMs`
@@ -184,7 +200,12 @@ export class ProviderChatService {
     // только отсюда: у `ProviderChatRunDeps` этого поля нет намеренно — иначе
     // адрес контура протащил бы в новый запуск отложенный вызов конвейера,
     // собранный при прежней галочке. Пустой объект — «не через контур».
-    const route = this.platformRouting?.(foreignConsumerId(providerId), chat.model ?? '') ?? {
+    const runTag = randomUUID();
+    const route = this.platformRouting?.(
+      foreignConsumerId(providerId),
+      chat.model ?? '',
+      runTag,
+    ) ?? {
       env: {},
     };
     // Подобранная модель живёт в шапке разговора и действует на КАЖДОЕ сообщение
@@ -226,6 +247,7 @@ export class ProviderChatService {
             const cut = Boolean(live.stopped) && event.reply.trim() === '';
             const routed = Object.keys(route.env).length > 0 && !route.refusal;
             const toolCalls = routed && !cut ? this.contourToolCalls?.(live.startedAt) : undefined;
+            const summarized = routed && !cut && this.contourSummarized?.(runTag) === true;
             const stored = appendMessage(appDataDir, providerId, chatId, {
               role: 'assistant',
               content: cut ? STOPPED_TEXT : event.reply,
@@ -233,6 +255,7 @@ export class ProviderChatService {
               transport: event.transport,
               durationMs: Date.now() - live.startedAt,
               ...(toolCalls === undefined ? {} : { contourToolCalls: toolCalls }),
+              ...(summarized ? { contextSummarized: true } : {}),
             });
             this.finish(chatId, live, {
               type: 'done',

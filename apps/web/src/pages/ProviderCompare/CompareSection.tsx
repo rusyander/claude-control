@@ -11,6 +11,7 @@ import { stateTone, stateLabelKey, selectableKeys } from '@entities/ProviderComp
 import { SideHead } from './SideHead';
 import type { CompareSectionProps } from './CompareSection.types';
 import styles from './ProviderComparePage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Один раздел сравнения: две колонки значений и, если раздел переносимый, выбор
@@ -59,7 +60,7 @@ export function CompareSection({ section, busy, onMigrate }: CompareSectionProps
 
         {section.note && (
           <Typography variant="body-sm" color="subtle" className="prose">
-            {section.note}
+            {serverFieldText(section, 'note')}
           </Typography>
         )}
 
@@ -97,7 +98,7 @@ export function CompareSection({ section, busy, onMigrate }: CompareSectionProps
 
                 {entry.blocked && (
                   <Typography variant="body-sm" color="subtle" className={styles.blocked}>
-                    {entry.blocked}
+                    {serverFieldText(entry, 'blocked')}
                   </Typography>
                 )}
                 {entry.opaque && !entry.blocked && (

@@ -135,6 +135,22 @@ export function reviewNoticeText(event: Extract<ChatEvent, { kind: 'review' }>):
   return `${head}: замечаний ${event.findings.length} — решение за вами, карточка ниже.`;
 }
 
+/**
+ * Повторная отписка в MR: решение принято, но запись сорвалась и замечания в MR
+ * так и не попали.
+ *
+ * Запрет на перерешивание бережёт не запись, а ЗАВЕДЁННЫЕ ПРАВКИ — вторых быть
+ * не должно. Записи же второй попытки не хватает совсем: отказал фордж (токен
+ * протух, сеть легла), человек починил — и панель отвечала ему «решение уже
+ * принято», навсегда оставляя замечания непереданными, при том что обходного
+ * пути в ней нет. Поэтому повтор разрешён ровно там, где писать ещё некуда: в
+ * связи стоит причина отказа и нет отметки об удавшейся записи.
+ */
+function isPostRetry(review: ChatReviewState, decision: TaskSplitReviewDecision): boolean {
+  if (decision !== 'post' && decision !== 'both') return false;
+  return Boolean(review.postError) && !review.postedAt;
+}
+
 /** Связь под ключом `chatId` и все ключи того же разговора. */
 function keysOf(links: Record<string, ChatLink>, chatId: string): string[] {
   const link = links[chatId];
@@ -258,15 +274,23 @@ export class SplitReview {
       return { applied: [], skipped: [input.chatId] };
     }
 
-    const chats = input.applyToAll ? this.pending(links, target.parentChatId) : [input.chatId];
+    const chats = input.applyToAll
+      ? this.pending(links, target.parentChatId, input.decision)
+      : [input.chatId];
     const outcome: SplitReviewOutcome = { applied: [], skipped: [] };
 
     for (const chatId of chats) {
       const link = this.deps.store.all()[chatId];
       const review = link?.review;
+      if (!link || !review || (review.findings ?? []).length === 0) {
+        outcome.skipped.push(chatId);
+        continue;
+      }
       // Решённое не перерешиваем: «применить ко всем» не должно переписывать
-      // чужой уже сделанный выбор, а повтор того же клика — заводить вторые правки.
-      if (!link || !review || review.decidedAt || (review.findings ?? []).length === 0) {
+      // чужой уже сделанный выбор, а повтор того же клика — заводить вторые
+      // правки. Исключение ровно одно — сорвавшаяся запись в MR (`isPostRetry`).
+      const retry = isPostRetry(review, input.decision);
+      if (review.decidedAt && !retry) {
         outcome.skipped.push(chatId);
         continue;
       }
@@ -274,7 +298,7 @@ export class SplitReview {
       // проходит цикл быстрее миллисекунды, и голого `new-<ts>` на десять групп
       // хватило бы на один чат, десятикратно перезаписанный.
       outcome.applied.push(
-        await this.applyOne(chatId, link, review, input.decision, outcome.applied.length),
+        await this.applyOne(chatId, link, review, input.decision, outcome.applied.length, retry),
       );
     }
     return outcome;
@@ -295,7 +319,10 @@ export class SplitReview {
       return { applied: [], skipped: [input.chatId] };
     }
 
-    const chatId = `new-${Date.now()}-push`;
+    // Ключ несёт исходный разговор по той же причине, по которой ключ правок
+    // несёт номер: отправку нажимают по разным карточкам одного дерева, и голый
+    // `new-<ts>` дал бы двум чатам один ключ — второй затёр бы первый.
+    const chatId = `new-${Date.now()}-push-${input.chatId.replace(/[^\w]+/g, '')}`;
     const aliases = keysOf(links, input.chatId);
     const at = this.now().toISOString();
     this.save(aliases, link, { ...review, pushedAt: at, pushOffer: false });
@@ -341,14 +368,23 @@ export class SplitReview {
     return keysOf(links, parentChatId).includes(link.parentChatId);
   }
 
-  /** Ревью-группы дерева, которые ещё ждут решения. */
-  private pending(links: Record<string, ChatLink>, parentChatId: string): string[] {
+  /**
+   * Ревью-группы дерева, которые ещё ждут решения, — и те, чья запись в MR
+   * сорвалась: отказ форджа накрывает всё дерево разом, и разбирать его
+   * последствия по одной карточке человек не нанимался.
+   */
+  private pending(
+    links: Record<string, ChatLink>,
+    parentChatId: string,
+    decision: TaskSplitReviewDecision,
+  ): string[] {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const [chatId, link] of Object.entries(links)) {
       if (link.parentChatId !== parentChatId) continue;
       const review = link.review;
-      if (!review || review.decidedAt || (review.findings ?? []).length === 0) continue;
+      if (!review || (review.findings ?? []).length === 0) continue;
+      if (review.decidedAt && !isPostRetry(review, decision)) continue;
       // Один разговор двумя ключами — одно решение: без этого «применить ко
       // всем» заводило бы по двое правок на каждую группу.
       const identity = JSON.stringify(link);
@@ -359,19 +395,29 @@ export class SplitReview {
     return out;
   }
 
-  /** Одно решение по одной группе: запись в MR и/или правки. */
+  /**
+   * Одно решение по одной группе: запись в MR и/или правки.
+   *
+   * `retry` — повтор сорвавшейся записи: тогда идёт ТОЛЬКО ветка записи. Правки
+   * первое решение уже завело, и заводить их вторыми значило бы наказать
+   * человека за отказ форджа двумя агентами в одной копии.
+   */
   private async applyOne(
     chatId: string,
     link: ChatLink,
     review: ChatReviewState,
     decision: TaskSplitReviewDecision,
     index: number,
+    retry = false,
   ): Promise<SplitReviewOutcome['applied'][number]> {
     const findings = review.findings ?? [];
     const at = this.now().toISOString();
     const aliases = keysOf(this.deps.store.all(), chatId);
     const result: SplitReviewOutcome['applied'][number] = { chatId, decision };
-    const next: ChatReviewState = { ...review, decision, decidedAt: at };
+    // Повтор записи решения не переписывает: решено было тогда, тем же решением
+    // заведены и правки. Иначе «и то и другое» после отказа форджа превратилось
+    // бы на карточке в «только отписать».
+    const next: ChatReviewState = retry ? { ...review } : { ...review, decision, decidedAt: at };
 
     if (decision === 'post' || decision === 'both') {
       const blocked = this.deps.postBlocked?.(review.url);
@@ -395,7 +441,7 @@ export class SplitReview {
       }
     }
 
-    if (decision === 'fix' || decision === 'both') {
+    if (!retry && (decision === 'fix' || decision === 'both')) {
       const fixChatId = `new-${Date.now()}-fix${index}`;
       this.deps.store.set(fixChatId, {
         ...link,

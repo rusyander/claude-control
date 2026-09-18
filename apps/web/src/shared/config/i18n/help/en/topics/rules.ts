@@ -178,7 +178,9 @@ export const rulesEn: typeof rulesRu = {
     storageReaderValue: 'Claude Code at session start, in full',
     storageDisabled: 'Switched off',
     storageDisabledValue:
-      'a “### Title” inside the “## Отключённые правила (AgentDeck)” section at the end of the file',
+      'a “### Title” inside the “## Отключённые правила (AgentDeck)” section at the end of the ' +
+      'file; a file switched off before the rename carries the heading with the former name — it ' +
+      'is still read, and there is no need to rewrite it by hand',
     storageMarks: 'The panel’s own marks',
     storageMarksValue:
       'what is switched off and which groups contain what — in the panel’s state.json; Claude Code never reads that file',

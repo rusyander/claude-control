@@ -23,6 +23,8 @@ import { PlatformTabs } from './PlatformTabs';
 import { ActivationNotice } from './ActivationNotice';
 import { ViolationsCard } from './ViolationsCard';
 import { ToolShimCard } from './ToolShimCard';
+import { SummarizedCard } from './SummarizedCard';
+import { showsSummarized } from './lib/summarizedView';
 import { AgentsCard } from './AgentsCard';
 import { ModelCard } from './ModelCard';
 import { RulesCard } from './RulesCard';
@@ -121,6 +123,12 @@ export function PlatformPage() {
     enabled.some((status) => toolRouteOf(status) === 'shim'),
     gatewayRunning,
     gateway.data?.status.toolShim,
+  );
+
+  const showSummarized = showsSummarized(
+    enabled.length > 0,
+    gatewayRunning,
+    gateway.data?.status.summarized,
   );
 
   /** Пустая вкладка говорит почему, а не показывает белый лист. */
@@ -263,7 +271,18 @@ export function PlatformPage() {
                   />
                 )}
                 {showShim && <ToolShimCard report={gateway.data?.status.toolShim} />}
-                {!showViolations && !showShim && emptyTab(t('platform.tabEmpty.tools'))}
+                {showSummarized && (
+                  <SummarizedCard
+                    report={gateway.data?.status.summarized}
+                    platformTitles={Object.fromEntries(
+                      platforms.map((status) => [status.platform.id, status.platform.title]),
+                    )}
+                  />
+                )}
+                {!showViolations &&
+                  !showShim &&
+                  !showSummarized &&
+                  emptyTab(t('platform.tabEmpty.tools'))}
               </>
             )}
 

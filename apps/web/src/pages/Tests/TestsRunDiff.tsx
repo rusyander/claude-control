@@ -10,6 +10,7 @@ import { STATUS_TONE, useTestRunDiff } from '@entities/ProjectTest';
 import type { ProjectTestRunDiffCase } from '@agentdeck/contracts';
 import type { TestsRunDiffProps } from './TestsRunDiff.types';
 import styles from './TestsPage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Что изменилось с прошлого прогона.
@@ -84,7 +85,7 @@ export function TestsRunDiff({ projectPath, runId, isOpenByDefault = false }: Te
           набор, и «починилось» там часто значит «в этот раз не гоняли». */}
       {data.warning && (
         <Typography variant="caption" color="warning">
-          {data.warning}
+          {serverFieldText(data, 'warning')}
         </Typography>
       )}
 

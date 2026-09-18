@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { chooseRunModel } from '@agentdeck/contracts/platform-models';
 import { usePlatformRunPlan } from '@entities/Platform';
-import { modelLabel } from '@shared/lib/chat-model';
+import { modelLabel, platformRunChoice } from '@shared/lib/chat-model';
 
 export interface RunModelNameInput {
   /** Потребитель маршрута — тот же, которым спрашивает шапка чата. */
@@ -27,7 +26,7 @@ export function useRunModelName({
   const { t } = useTranslation();
   const plan = usePlatformRunPlan(consumer);
   if (plan.data?.routed === true) {
-    return chooseRunModel(plan.data.rules, model).model || plan.data.title;
+    return platformRunChoice(plan.data.rules, model, defaultModel).model || plan.data.title;
   }
   return modelLabel(model || defaultModel || '') || t('chat.modelClaudeDefault');
 }

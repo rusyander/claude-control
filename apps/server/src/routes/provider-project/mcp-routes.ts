@@ -11,6 +11,7 @@ import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import { done } from '../write-result.ts';
 import { requireTarget } from './target.ts';
 import { FORMAT_UNRECOGNIZED, INVALID_DRAFT, MCP_UNSUPPORTED } from './messages.ts';
+import { codeOf } from '../../lib/server-text.ts';
 
 /** MCP-серверы проекта: тот же универсальный субсет, что и глобально, файл в проекте. */
 export function registerProviderProjectMcpRoutes(app: FastifyInstance, ctx: ServerContext): void {
@@ -41,7 +42,14 @@ export function registerProviderProjectMcpRoutes(app: FastifyInstance, ctx: Serv
     } catch (error) {
       // Формат не распознан — отдаём раздел на чтение (пустой список) с пометкой.
       if (error instanceof UnrecognizedFormatError) {
-        return { ...base, servers: [], skippedBlocks: [], readOnly: true, error: error.message };
+        return {
+          ...base,
+          servers: [],
+          skippedBlocks: [],
+          readOnly: true,
+          error: error.message,
+          ...codeOf(error),
+        };
       }
       throw error;
     }
@@ -55,7 +63,9 @@ export function registerProviderProjectMcpRoutes(app: FastifyInstance, ctx: Serv
       // Имя занято (создание или переименование) — конфликт, а не запись поверх:
       // проектный конфиг такой же чужой файл, что и глобальный.
       if (error instanceof McpServerExistsError) {
-        return reply.code(409).send({ error: 'server_exists', message: error.message });
+        return reply
+          .code(409)
+          .send({ error: 'server_exists', message: error.message, ...codeOf(error) });
       }
       if (error instanceof UnrecognizedFormatError)
         return reply.code(422).send(FORMAT_UNRECOGNIZED);

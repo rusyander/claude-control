@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { AppSettings } from '@agentdeck/contracts';
-import { DEFAULT_INTEGRATIONS, isLinkEmpty, readIntegration, readIntegrations } from './settings';
+import { NOTIFY_EVENTS } from '@agentdeck/contracts/integrations';
+import {
+  DEFAULT_INTEGRATIONS,
+  TELEGRAM_EVENTS,
+  isLinkEmpty,
+  readIntegration,
+  readIntegrations,
+} from './settings';
 
 /** Настройки панели без секции интеграций — конфиг, заведённый прошлой версией. */
 const bare = {} as AppSettings;
@@ -59,6 +66,28 @@ describe('readIntegrations', () => {
     expect(readIntegrations(settings).ci.repo).toBe('');
     expect(readIntegrations(settings).ci.artifact).toBe('');
     expect(readIntegrations(settings).telegram.events).toEqual([]);
+  });
+});
+
+/**
+ * Список событий на вкладке — ПЕРЕСТАНОВКА источника, а не его копия.
+ *
+ * Порядок здесь свой (от частого к редкому) и меняться волен, а состав — нет:
+ * `TELEGRAM_EVENTS` набран руками и типизирован как `readonly TelegramEvent[]`,
+ * поэтому забытое событие не ловится ни типом, ни сборкой — оно просто не
+ * показывается, и подписаться на него человек не может ничем. Лишнее же
+ * попадает в настройки строкой, которой сервер не знает.
+ */
+describe('TELEGRAM_EVENTS', () => {
+  it('те же события, что в NOTIFY_EVENTS: без пропущенных и без лишних', () => {
+    expect([...TELEGRAM_EVENTS].sort()).toEqual([...NOTIFY_EVENTS].sort());
+  });
+
+  // Отдельной проверкой, а не второй строкой предыдущей: там она не дошла бы до
+  // выполнения — повтор роняет сравнение составов раньше, и проверка, которая
+  // не может покраснеть сама, ничего не доказывает.
+  it('без повторов: одно событие — одна галочка', () => {
+    expect(new Set(TELEGRAM_EVENTS).size).toBe(TELEGRAM_EVENTS.length);
   });
 });
 

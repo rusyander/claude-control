@@ -18,6 +18,8 @@
  * сам — панель конфликты не разрешает и не откатывает.
  */
 
+import type { ServerMessageCode, ServerMessageParams } from './server-messages.ts';
+
 /** Что случилось с файлом. `renamed` несёт ещё и прежний путь в `from`. */
 export type ProjectGitFileStatus =
   'added' | 'modified' | 'deleted' | 'renamed' | 'typechange' | 'untracked' | 'conflict';
@@ -84,6 +86,9 @@ export interface ProjectGitResult {
   info: ProjectGitInfo;
   /** Строка вывода git — показывается тостом, чтобы результат не был безмолвным. */
   output: string;
+  /** Код своей строки панели, когда git промолчал; вывод git кода не несёт. */
+  outputCode?: string;
+  outputParams?: Record<string, string | number>;
 }
 
 /**
@@ -112,6 +117,33 @@ export interface ProjectWorktree {
   prunable: boolean;
   /** Бутстрап копии (установка зависимостей): последний запуск, если был. Основной копии нет. */
   bootstrap?: WorktreeBootstrapState;
+  /**
+   * Полнота копии на момент запроса списка. Основной копии нет: ей не с чем
+   * сверяться.
+   */
+  copy?: WorktreeCopyState;
+}
+
+/**
+ * Готова ли копия к работе агента — состояние, а не событие.
+ *
+ * Отчёт зеркала (`WorktreeMirrorReport`) живёт ровно один ответ и умирает
+ * вместе с вкладкой, а отказывает по этому состоянию КАЖДЫЙ запуск прогона.
+ * Поэтому карточка копии обязана показывать его всегда, а не только сразу
+ * после нажатия «Обновить локальный слой».
+ */
+export interface WorktreeCopyState {
+  ready: boolean;
+  /** Чего не хватает; пусто — копия полная. */
+  gaps: WorktreeCopyGap[];
+  /**
+   * Запись каталога копии в `.claude.json`: `ok` — есть, `missing` — нужна и
+   * её нет (агент спросит про доверие и MCP), `unknown` — сверять не с чем:
+   * файла нет или у самого оригинала записи никогда не было. Третье значение
+   * не педантизм: без него «не проверяли» выглядело бы как «нет записи», и
+   * панель держала бы прогоны там, где помочь ничем не может.
+   */
+  access: 'ok' | 'missing' | 'unknown';
 }
 
 export type WorktreeBootstrapStatus = 'running' | 'ok' | 'failed';
@@ -148,6 +180,8 @@ export interface ProjectWorktreesInfo {
 export interface ProjectWorktreesResult {
   info: ProjectWorktreesInfo;
   output: string;
+  outputCode?: string;
+  outputParams?: Record<string, string | number>;
   /** Путь созданной копии — по нему панель сразу открывает вкладку. */
   createdPath?: string;
   /** Что из локального слоя перенесено в копию (создание и повторное зеркало). */
@@ -177,6 +211,23 @@ export interface WorktreeMirrorSkipped {
   path: string;
   /** Почему не перенесено: размер, ссылка, ошибка записи, флаг git. */
   reason: string;
+  /**
+   * Тот же текст кодом — клиент показывает его на своём языке, `reason`
+   * остаётся запасным для записей, кода не несущих (ошибка файловой системы
+   * приходит строкой операционной системы, и переводить её нечем).
+   */
+  reasonCode?: ServerMessageCode;
+  reasonParams?: ServerMessageParams;
+  /**
+   * Род причины — для группировки на экране.
+   *
+   * Интерфейсу нужно отличать объяснение («окружение сборки копия ставит сама»)
+   * от настоящей помехи, и делать это по ДАННЫМ: разбор русского текста
+   * причины ломается от первой же правки формулировки, а она у нас ещё и
+   * переезжает в словарь кодов. Поле необязательное: старый ответ без него
+   * читается как `other`.
+   */
+  kind?: 'build-env' | 'other';
 }
 
 /** Отчёт одного зеркала — карточка копии показывает его целиком. */
@@ -189,4 +240,34 @@ export interface WorktreeMirrorReport {
   unlisted: string[];
   /** Уже было не старее в копии и осталось как есть (повторное зеркало). */
   kept: number;
+  /**
+   * Каталоги, которые копия получила ССЫЛКОЙ на оригинал (скиллы, хуки):
+   * правка в оригинале сразу видна во всех копиях, файлов там нет.
+   */
+  linked?: string[];
+  /** Запись доступа копии в `.claude.json`: без неё агент спросит про доверие и MCP. */
+  access?: WorktreeCopyAccess;
+  /** Чего копии не хватает после переноса; пусто — копия полная. */
+  gaps?: WorktreeCopyGap[];
+}
+
+/** Итог заведения записи доступа для копии. */
+export interface WorktreeCopyAccess {
+  copied: boolean;
+  /** Ключ каталога в `.claude.json`. */
+  key: string;
+  /** Почему не заведена. */
+  reason?: string;
+  /** Та же причина кодом; `reason` — запасной текст. */
+  reasonCode?: ServerMessageCode;
+  reasonParams?: ServerMessageParams;
+}
+
+/**
+ * Чего копии не хватает: файла локального слоя, ссылки на общий каталог или
+ * записи доступа. Пока хоть одна дыра есть, агента в копию не пускают.
+ */
+export interface WorktreeCopyGap {
+  kind: 'file' | 'link' | 'access';
+  path: string;
 }

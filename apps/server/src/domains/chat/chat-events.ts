@@ -66,10 +66,20 @@ export type ChatEvent =
        * 'adopted' | 'detachedDone' — прогон подхвачен после перезапуска панели;
        * 'triageApplied' | 'triageMissing' — итог разбора разделения (Т1);
        * 'planMissing' — работа группы стартовала без плана (Т1);
-       * 'overlap' — ветки разделения сошлись на одних файлах (Т6).
+       * 'overlap' — ветки разделения сошлись на одних файлах (Т6);
+       * 'groupsActivated' — набор, привязанный к проекту, включился сам;
+       * 'modelDropped' — имя модели не прошло грамматику аргументов и до CLI не
+       * доехало: прогон идёт моделью, которую CLI выбрал сам.
        */
       code:
-        'adopted' | 'detachedDone' | 'triageApplied' | 'triageMissing' | 'planMissing' | 'overlap';
+        | 'adopted'
+        | 'detachedDone'
+        | 'triageApplied'
+        | 'triageMissing'
+        | 'planMissing'
+        | 'overlap'
+        | 'groupsActivated'
+        | 'modelDropped';
       text: string;
     }
   /**

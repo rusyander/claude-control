@@ -76,10 +76,16 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
       const release = request.query.release?.trim();
-      if (!release) return reply.code(400).send({ message: 'Не указана веха.' });
+      if (!release)
+        return reply
+          .code(400)
+          .send({ message: 'Не указана веха.', messageCode: 'release-unspecified' });
       const format = (request.query.format ?? 'md') as ReleaseExportFormat;
       if (format !== 'md' && format !== 'html') {
-        return reply.code(400).send({ message: 'Формат документа готовности: md или html.' });
+        return reply.code(400).send({
+          message: 'Формат документа готовности: md или html.',
+          messageCode: 'release-format',
+        });
       }
       return guardAsync(reply, async () => {
         const file = exportRelease(await collect(root, release), format);
@@ -102,7 +108,10 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
       const release = request.query.release?.trim();
-      if (!release) return reply.code(400).send({ message: 'Не указана веха.' });
+      if (!release)
+        return reply
+          .code(400)
+          .send({ message: 'Не указана веха.', messageCode: 'release-unspecified' });
       return guardAsync(reply, async () => {
         const file = await exportReleasePdf(await collect(root, release));
         return reply

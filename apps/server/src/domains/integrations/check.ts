@@ -8,6 +8,8 @@ import { toForgeIdentity, whoAmI } from './forge.ts';
 import { saveHealth } from './health.ts';
 import { describeIntegration, readIntegrations, readToken, writeSettings } from './store.ts';
 import { tmsClient } from './tms/index.ts';
+import { coded } from '../../lib/server-text.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * «Проверить связь» — одна кнопка на карточку и один вход на все пять систем.
@@ -68,25 +70,32 @@ async function probeIntegration(
       text: 'Проверка связи из панели AgentDeck.',
       at: new Date().toISOString(),
     });
-    return { detail: `Приёмник ответил на пробное событие${token ? ' (тело подписано)' : ''}.` };
+    return {
+      detail: serverText(
+        token ? 'integration-check-webhook-signed' : 'integration-check-webhook-ok',
+      ),
+    };
   }
 
   if (!token) {
-    throw new IntegrationError('integration_not_found', 'Токен не сохранён.');
+    throw coded(
+      new IntegrationError('integration_not_found', 'Токен не сохранён.'),
+      'integration-token-not-saved',
+    );
   }
 
   if (id === 'atlassian') return probeAtlassian(store, token);
   if (id === 'forge') {
     const account = await whoAmI(toForgeIdentity(settings.forge, token));
-    return { detail: `Вошли как ${account}.`, account };
+    return { detail: serverText('integration-check-logged-in', { account }), account };
   }
   if (id === 'telegram') {
     const account = await telegramMe(token);
-    return { detail: `Бот ${account} на связи.`, account };
+    return { detail: serverText('integration-check-telegram-ok', { account }), account };
   }
   if (id === 'tms') {
     const detail = await tmsClient(settings.tms, token).ping();
-    return { detail: `${detail} — связь есть.` };
+    return { detail: serverText('integration-check-tms-ok', { detail }) };
   }
   // CI ходит в тот же фордж и тем же токеном; своего адреса у карточки нет
   // намеренно (см. `ci.ts`), поэтому инсталляцию берём у форджа, когда вид
@@ -95,7 +104,7 @@ async function probeIntegration(
   const account = await whoAmI(
     toForgeIdentity({ enabled: true, kind: settings.ci.kind, baseUrl, repo: '' }, token),
   );
-  return { detail: `Вошли как ${account}.`, account };
+  return { detail: serverText('integration-check-logged-in', { account }), account };
 }
 
 /**
@@ -117,7 +126,14 @@ async function probeAtlassian(store: AppStore, token: string): Promise<Probe> {
     writeSettings(store, 'atlassian', { ...settings, deployment: probe.deployment });
   }
   return {
-    detail: `Вошли как ${probe.account} (${probe.deployment === 'cloud' ? 'облако' : 'своя установка'}).`,
+    detail: serverText('integration-check-atlassian-ok', {
+      account: probe.account,
+      deployment: serverText(
+        probe.deployment === 'cloud'
+          ? 'integration-deployment-cloud'
+          : 'integration-deployment-own',
+      ),
+    }),
     account: probe.account,
     deployment: probe.deployment,
   };

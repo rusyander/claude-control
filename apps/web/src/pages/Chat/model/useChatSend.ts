@@ -78,6 +78,11 @@ export function useChatSend({
         names: (outcome.files ?? []).join(', '),
         supported: SUPPORTED_UPLOAD_EXTENSIONS.join(', '),
       });
+    // Неполная копия репозитория: сервер уже назвал, чего не хватает, и уже
+    // попробовал добрать это сам. Человеку нужен следующий шаг, а не повтор
+    // отказа, — поэтому текст ведёт в пульт git, где стоит «Добрать».
+    if (outcome.code === 'copy_not_ready')
+      return t('chat.notSent.copyNotReady', { message: outcome.message });
     return t('chat.notSent.other', { message: outcome.message });
   };
 

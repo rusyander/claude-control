@@ -12,6 +12,7 @@ import {
 } from '../domains/provider-instructions.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 import { done } from './write-result.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Раздел инструкций в модели СПИСКА ССЫЛОК (AIDER-1) — глобальный уровень.
@@ -31,18 +32,21 @@ export function registerProviderInstructionsRoutes(app: FastifyInstance, ctx: Se
   const SECTION_UNSUPPORTED = {
     error: 'section_unsupported',
     message: 'У активного провайдера инструкции не устроены списком ссылок.',
+    messageCode: 'instructions-not-link-list',
   } as const;
 
   const INVALID_DRAFT = {
     error: 'invalid_draft',
     message:
       'Список файлов не прошёл проверку: каждая запись должна быть непустой строкой без переводов строк.',
+    messageCode: 'instructions-list-invalid',
   } as const;
 
   const FORMAT_UNRECOGNIZED = {
     error: 'format_unrecognized',
     message:
       'Формат файла конфигурации не распознан — запись запрещена (раздел только для чтения).',
+    messageCode: 'config-format-unrecognized-readonly',
   } as const;
 
   const requireTarget = (reply: FastifyReply): ProviderInstructionsTarget | undefined => {
@@ -58,7 +62,7 @@ export function registerProviderInstructionsRoutes(app: FastifyInstance, ctx: Se
   const sendEntryError = (reply: FastifyReply, error: ListedFileNotEditableError): FastifyReply =>
     reply
       .code(error.reason === 'unlisted' ? 404 : 400)
-      .send({ error: error.reason, message: error.message });
+      .send({ error: error.reason, message: error.message, ...codeOf(error) });
 
   app.get('/api/provider-instructions', (_request, reply) => {
     const target = requireTarget(reply);
@@ -120,6 +124,7 @@ export function registerProviderInstructionsRoutes(app: FastifyInstance, ctx: Se
         return reply.code(400).send({
           error: 'invalid_content',
           message: 'Поле content обязано быть строкой (пустая строка допустима).',
+          messageCode: 'content-must-be-string',
         });
       }
 

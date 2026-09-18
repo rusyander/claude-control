@@ -28,7 +28,7 @@ import {
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
 import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
-import { activateGroupsQuietly } from '../../domains/group-activation.ts';
+import { activateGroupsQuietly, groupsActivatedNotice } from '../../domains/group-activation.ts';
 import {
   cascadeCeilingFor,
   expandAssignedModel,
@@ -104,6 +104,8 @@ export interface SplitLauncher {
       context?: SplitGroupContext;
       /** С какого звена стартуют чаты; нет — с работы, как до Т1. Уровни ставит конвейер. */
       stage?: 'plan' | 'work';
+      /** Настоящее имя ветки группы — конвейеру, до старта её прогона. */
+      claimBranch?: (index: number, branch: string) => void;
     },
   ) => Promise<TaskSplitResult>;
   /**
@@ -214,6 +216,7 @@ export function createSplitLauncher(
       const command = bootstrapCommandFor(copy, ctx.store.getWorktreeMirror(projectDir).bootstrap);
       return command ? ctx.worktreeBootstraps.run(copy, command) : undefined;
     },
+    ctx.location.paths.mcpConfig,
   );
 
   /**
@@ -594,12 +597,18 @@ export function createSplitLauncher(
   const start: SplitStart = (input) => {
     // Набор, привязанный к проекту, включается и здесь: копия репозитория
     // считается тем же проектом.
-    activateGroupsQuietly(
+    const activated = activateGroupsQuietly(
       { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
       input.cwd,
       (error) => deps.log.warn({ err: error }, 'group activation failed'),
     );
-    return isForeign ? startForeign(input) : startClaude(input);
+    const started = isForeign ? startForeign(input) : startClaude(input);
+    // Заметка — ПОСЛЕ старта: до него прогона в реестре нет. У чужого CLI его
+    // нет вовсе, и `emitExternal` честно отвечает «сказать некуда» — факт
+    // остаётся на странице «Наборы», как и всё прочее, чего чужая лента не умеет.
+    const notice = started ? groupsActivatedNotice(activated) : undefined;
+    if (notice) deps.runs.emitExternal(input.chatId, notice);
+    return started;
   };
 
   return {
@@ -620,6 +629,7 @@ export function createSplitLauncher(
         // План только там, где есть потолок: без него планировать не на чем.
         stage: options.stage === 'plan' && canPlan ? 'plan' : 'work',
         ...(options.context ? { context: options.context } : {}),
+        ...(options.claimBranch ? { claimBranch: options.claimBranch } : {}),
       }),
     startTriage: (prompt, claim) => {
       // У чужого CLI разбор — такой же разговор его хранилища, как и всё
@@ -696,7 +706,7 @@ export function createReviewStarter(
     if (getActiveProvider(ctx.store).id !== DEFAULT_PROVIDER_ID) return { started: false };
 
     const settings = ctx.store.getSettings();
-    activateGroupsQuietly(
+    const activated = activateGroupsQuietly(
       { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
       input.cwd,
       (error) => deps.log.warn({ err: error }, 'group activation failed'),
@@ -719,7 +729,11 @@ export function createReviewStarter(
     // Дерево на паузе — прогон заведён, но ждёт «Продолжить всё»: решение
     // человека при этом не теряется, оно уже записано в связь.
     if (deps.gate?.defer('stage', input.chatId, options, meta)) return { started: true };
-    return { started: deps.runs.start(input.chatId, options, meta) };
+    const started = deps.runs.start(input.chatId, options, meta);
+    // Заметка — после старта: до него прогона в реестре нет (см. `start`).
+    const notice = started ? groupsActivatedNotice(activated) : undefined;
+    if (notice) deps.runs.emitExternal(input.chatId, notice);
+    return { started };
   };
 }
 
@@ -810,6 +824,7 @@ export function launchFromRecord(
   record: SplitPlanRecord,
   groups: number[],
   context?: SplitGroupContext,
+  claimBranch?: (index: number, branch: string) => void,
 ): Promise<TaskSplitResult> {
   const launcher = createSplitLauncher(ctx, deps, {
     projectPath: record.projectPath,
@@ -824,5 +839,6 @@ export function launchFromRecord(
     groups,
     stage: 'plan',
     ...(context ? { context } : {}),
+    ...(claimBranch ? { claimBranch } : {}),
   });
 }

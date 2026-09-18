@@ -7,6 +7,8 @@ import type {
 } from '@agentdeck/contracts';
 import { parametersInSteps } from '@agentdeck/contracts/test-format';
 import { similarCases } from './similar.ts';
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Линтер библиотеки: здоровье набора счётными правилами, без агента.
@@ -25,18 +27,30 @@ import { similarCases } from './similar.ts';
 
 /** Правила: серьёзность и имя для свода. Новое правило заводится ТОЛЬКО здесь. */
 const RULES = {
-  'no-oracle': { severity: 'warning', title: 'Нечем доказать результат' },
-  'step-without-expected': { severity: 'warning', title: 'Шаг без ожидания' },
-  'no-code-paths': { severity: 'info', title: 'Нет привязки к коду' },
-  'no-priority': { severity: 'warning', title: 'Нет приоритета' },
-  'too-many-steps': { severity: 'warning', title: 'Слишком длинный сценарий' },
-  'undeclared-parameter': { severity: 'error', title: 'Параметр не объявлен' },
-  'unused-parameter': { severity: 'warning', title: 'Параметр объявлен впустую' },
-  'duplicate-title': { severity: 'warning', title: 'Повтор заголовка в группе' },
-  'obsolete-not-archived': { severity: 'warning', title: 'Устаревший кейс не в архиве' },
-  'stale-draft': { severity: 'warning', title: 'Черновик залежался' },
-  'not-run': { severity: 'info', title: 'Давно не гонялся' },
-  'checklist-with-expected': { severity: 'warning', title: 'Чек-лист с ожиданием' },
+  'no-oracle': { severity: 'warning', title: serverText('tests-lint-no-oracle') },
+  'step-without-expected': {
+    severity: 'warning',
+    title: serverText('tests-lint-step-without-expected'),
+  },
+  'no-code-paths': { severity: 'info', title: serverText('tests-lint-no-code-paths') },
+  'no-priority': { severity: 'warning', title: serverText('tests-lint-no-priority') },
+  'too-many-steps': { severity: 'warning', title: serverText('tests-lint-too-many-steps') },
+  'undeclared-parameter': {
+    severity: 'error',
+    title: serverText('tests-lint-undeclared-parameter'),
+  },
+  'unused-parameter': { severity: 'warning', title: serverText('tests-lint-unused-parameter') },
+  'duplicate-title': { severity: 'warning', title: serverText('tests-lint-duplicate-title') },
+  'obsolete-not-archived': {
+    severity: 'warning',
+    title: serverText('tests-lint-obsolete-not-archived'),
+  },
+  'stale-draft': { severity: 'warning', title: serverText('tests-lint-stale-draft') },
+  'not-run': { severity: 'info', title: serverText('tests-lint-not-run') },
+  'checklist-with-expected': {
+    severity: 'warning',
+    title: serverText('tests-lint-checklist-with-expected'),
+  },
 } satisfies Record<string, { severity: ProjectTestLintSeverity; title: string }>;
 
 /** Идентификатор правила — только из таблицы выше. */
@@ -78,6 +92,7 @@ function finding(
   groupId: string,
   testCase: ProjectTestCase,
   message: string,
+  text: { messageCode: ServerMessageCode; params?: ServerMessageParams },
   fix?: ProjectTestLintFinding['fix'],
 ): ProjectTestLintFinding {
   return {
@@ -87,6 +102,7 @@ function finding(
     caseId: testCase.id,
     title: testCase.title,
     message,
+    ...text,
     fix,
   };
 }
@@ -135,6 +151,7 @@ function checkShape(
         groupId,
         testCase,
         'Не сказано, чем доказывается результат: проверять придётся «на глаз».',
+        { messageCode: 'lint-no-oracle' },
       ),
     );
   }
@@ -149,6 +166,7 @@ function checkShape(
           groupId,
           testCase,
           `Шагов без ожидания: ${blind} (первый — №${first}). Провал такого шага увидеть не на чем.`,
+          { messageCode: 'lint-step-without-expected', params: { blind, first } },
         ),
       );
     }
@@ -161,6 +179,7 @@ function checkShape(
         groupId,
         testCase,
         'У чек-листа заполнено ожидание: либо оно лишнее, либо это кейс, а не чек-лист.',
+        { messageCode: 'lint-checklist-with-expected' },
       ),
     );
   }
@@ -172,6 +191,7 @@ function checkShape(
         groupId,
         testCase,
         'Нет привязки к коду (`codePaths`): в отбор «прогнать задетое» кейс не попадёт.',
+        { messageCode: 'lint-no-code-paths' },
       ),
     );
   }
@@ -183,10 +203,12 @@ function checkShape(
         groupId,
         testCase,
         'Нет приоритета: отбор по важности кейс не увидит.',
+        { messageCode: 'lint-no-priority' },
         {
           action: 'priority',
           value: 'medium',
           label: 'Проставить приоритет «средний»',
+          labelCode: 'lint-fix-priority-medium',
         },
       ),
     );
@@ -199,6 +221,10 @@ function checkShape(
         groupId,
         testCase,
         `Шагов ${steps.length} при пороге ${limits.maxSteps}: такой сценарий стоит разбить на несколько.`,
+        {
+          messageCode: 'lint-too-many-steps',
+          params: { steps: steps.length, limit: limits.maxSteps },
+        },
       ),
     );
   }
@@ -220,6 +246,10 @@ function checkParameters(groupId: string, testCase: ProjectTestCase): ProjectTes
         groupId,
         testCase,
         `В тексте есть ${undeclared.map((name) => `%${name}`).join(', ')}, но в параметрах кейса такого нет — подставлять нечего.`,
+        {
+          messageCode: 'lint-undeclared-parameter',
+          params: { names: undeclared.map((name) => `%${name}`).join(', ') },
+        },
       ),
     );
   }
@@ -232,6 +262,10 @@ function checkParameters(groupId: string, testCase: ProjectTestCase): ProjectTes
         groupId,
         testCase,
         `Параметры ${unused.map((name) => `%${name}`).join(', ')} объявлены, но нигде не встречаются: прогон размножится на проходы с одинаковым текстом.`,
+        {
+          messageCode: 'lint-unused-parameter',
+          params: { names: unused.map((name) => `%${name}`).join(', ') },
+        },
       ),
     );
   }
@@ -254,7 +288,8 @@ function checkLifecycle(
         groupId,
         testCase,
         'Помечен устаревшим, но лежит среди живых и попадает в прогоны.',
-        { action: 'archive', label: 'Убрать в архив' },
+        { messageCode: 'lint-obsolete-not-archived' },
+        { action: 'archive', label: 'Убрать в архив', labelCode: 'lint-fix-archive' },
       ),
     );
   }
@@ -267,7 +302,13 @@ function checkLifecycle(
         groupId,
         testCase,
         `Черновик не трогали ${draftAge} дней: он либо давно готов, либо больше не нужен.`,
-        { action: 'readiness', value: 'ready', label: 'Пометить готовым' },
+        { messageCode: 'lint-stale-draft', params: { days: draftAge } },
+        {
+          action: 'readiness',
+          value: 'ready',
+          label: 'Пометить готовым',
+          labelCode: 'lint-fix-mark-ready',
+        },
       ),
     );
   }
@@ -280,6 +321,7 @@ function checkLifecycle(
         groupId,
         testCase,
         'Ни разу не гонялся: о его результате ничего не известно.',
+        { messageCode: 'lint-never-run' },
       ),
     );
   } else if (runAge > limits.notRunDays) {
@@ -289,6 +331,7 @@ function checkLifecycle(
         groupId,
         testCase,
         `Не гонялся ${runAge} дней: показанный статус давно ничего не доказывает.`,
+        { messageCode: 'lint-not-run-days', params: { days: runAge } },
       ),
     );
   }
@@ -320,7 +363,12 @@ function checkTitles(group: ProjectTestGroup, cases: ProjectTestCase[]): Project
         group.id,
         testCase,
         `Заголовок повторяет кейс ${first} в этой же группе.`,
-        { action: 'archive', label: 'Убрать повтор в архив' },
+        { messageCode: 'lint-duplicate-title', params: { first } },
+        {
+          action: 'archive',
+          label: 'Убрать повтор в архив',
+          labelCode: 'lint-fix-archive-duplicate',
+        },
       ),
     );
   }
@@ -336,6 +384,7 @@ function rollUp(findings: ProjectTestLintFinding[]): ProjectTestLintReport['byRu
       rule,
       severity: RULES[rule as ProjectTestLintRule].severity,
       title: RULES[rule as ProjectTestLintRule].title,
+      titleCode: `lint-rule-${rule}`,
       count,
     }))
     .sort(

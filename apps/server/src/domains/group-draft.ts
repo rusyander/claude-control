@@ -1,5 +1,7 @@
 import type { Group, GroupDraft, GroupMemberKind } from '@agentdeck/contracts';
 import { ENV_KEY_PATTERN } from '@agentdeck/contracts/env-secret';
+import { coded } from '../lib/server-text.ts';
+import { serverText } from '../lib/server-texts.ts';
 
 /**
  * Проверка черновика группы ДО записи и ошибки домена для маршрутов.
@@ -33,7 +35,8 @@ export class GroupNotFoundError extends Error {
   readonly code = 'not_found';
 
   constructor(id: string) {
-    super(`Группы «${id}» нет.`);
+    super(serverText('group-by-id-absent', { id }));
+    coded(this, 'group-by-id-absent', { id });
     this.name = 'GroupNotFoundError';
   }
 }
@@ -44,9 +47,8 @@ export class GroupExistsError extends Error {
   readonly code = 'group_exists';
 
   constructor(name: string) {
-    super(
-      `Группа «${name}» уже есть — по имени её находят и удаляют, двух одинаковых быть не должно.`,
-    );
+    super(serverText('group-name-taken', { name }));
+    coded(this, 'group-name-taken', { name });
     this.name = 'GroupExistsError';
   }
 }
@@ -57,7 +59,8 @@ export class AutomationNotFoundError extends Error {
   readonly code = 'not_found';
 
   constructor(id: string) {
-    super(`Сценария «${id}» нет.`);
+    super(serverText('automation-not-found', { id }));
+    coded(this, 'automation-not-found', { id });
     this.name = 'AutomationNotFoundError';
   }
 }
@@ -76,13 +79,20 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 function assertOptionalString(body: Record<string, unknown>, field: string, what: string): void {
   if (body[field] !== undefined && typeof body[field] !== 'string') {
-    throw new InvalidGroupDraftError(`Поле ${field} (${what}) — строка.`);
+    throw coded(
+      new InvalidGroupDraftError(`Поле ${field} (${what}) — строка.`),
+      'group-field-string',
+      { field, what },
+    );
   }
 }
 
 function assertMembers(members: unknown): void {
   if (!Array.isArray(members)) {
-    throw new InvalidGroupDraftError('Поле members — список участников.');
+    throw coded(
+      new InvalidGroupDraftError('Поле members — список участников.'),
+      'group-members-list',
+    );
   }
   for (const member of members) {
     if (
@@ -100,33 +110,48 @@ function assertMembers(members: unknown): void {
 
 function assertEnv(env: unknown): void {
   if (!isRecord(env)) {
-    throw new InvalidGroupDraftError('Поле env — объект «имя переменной → значение».');
+    throw coded(
+      new InvalidGroupDraftError('Поле env — объект «имя переменной → значение».'),
+      'group-env-object',
+    );
   }
   for (const [key, value] of Object.entries(env)) {
     if (!ENV_KEY_PATTERN.test(key)) {
-      throw new InvalidGroupDraftError(
-        `Имя переменной «${key}» не годится: латиница, цифры и подчёркивание, не с цифры.`,
+      throw coded(
+        new InvalidGroupDraftError(serverText('group-env-key-invalid', { key })),
+        'group-env-key-invalid',
+        { key },
       );
     }
     if (typeof value !== 'string') {
-      throw new InvalidGroupDraftError(`Значение переменной ${key} — строка.`);
+      throw coded(
+        new InvalidGroupDraftError(`Значение переменной ${key} — строка.`),
+        'group-env-value-string',
+        { key },
+      );
     }
   }
 }
 
 function assertScenario(scenario: unknown): void {
   if (!isRecord(scenario)) {
-    throw new InvalidGroupDraftError('Поле scenario — объект сценария.');
+    throw coded(
+      new InvalidGroupDraftError('Поле scenario — объект сценария.'),
+      'group-scenario-object',
+    );
   }
   assertOptionalString(scenario, 'when', 'когда уместен');
   assertOptionalString(scenario, 'trigger', 'регулярное выражение');
   if (scenario.steps === undefined) return;
   if (!Array.isArray(scenario.steps)) {
-    throw new InvalidGroupDraftError('Шаги сценария — список.');
+    throw coded(new InvalidGroupDraftError('Шаги сценария — список.'), 'group-scenario-steps-list');
   }
   for (const step of scenario.steps) {
     if (!isRecord(step))
-      throw new InvalidGroupDraftError('Шаг сценария — объект {title, body, gate}.');
+      throw coded(
+        new InvalidGroupDraftError('Шаг сценария — объект {title, body, gate}.'),
+        'group-scenario-step-object',
+      );
     assertOptionalString(step, 'title', 'заголовок шага');
     assertOptionalString(step, 'body', 'текст шага');
     assertOptionalString(step, 'gate', 'условие шага');
@@ -136,12 +161,15 @@ function assertScenario(scenario: unknown): void {
 /** Форма тела: имя обязательно, остальное — если пришло, то нужного вида. Имя обрезается. */
 export function assertGroupDraft(draft: unknown): asserts draft is GroupDraft {
   if (!isRecord(draft)) {
-    throw new InvalidGroupDraftError('Тело запроса должно быть объектом с описанием набора.');
+    throw coded(
+      new InvalidGroupDraftError('Тело запроса должно быть объектом с описанием набора.'),
+      'group-body-object',
+    );
   }
   // Набор без имени человеку не опознать: в списке он безымянная строка,
   // выключить которую можно только угадав.
   if (typeof draft.name !== 'string' || draft.name.trim() === '') {
-    throw new InvalidGroupDraftError('Не указано имя набора');
+    throw coded(new InvalidGroupDraftError('Не указано имя набора'), 'group-name-missing');
   }
   draft.name = draft.name.trim();
 
@@ -155,13 +183,19 @@ export function assertGroupDraft(draft: unknown): asserts draft is GroupDraft {
       !Array.isArray(draft.projectPaths) ||
       draft.projectPaths.some((path) => typeof path !== 'string')
     ) {
-      throw new InvalidGroupDraftError('Поле projectPaths — список путей к каталогам (строк).');
+      throw coded(
+        new InvalidGroupDraftError('Поле projectPaths — список путей к каталогам (строк).'),
+        'group-paths-list',
+      );
     }
   }
   // `null` — «сценария нет», как и отсутствие поля: форма шлёт его, снимая сценарий.
   if (draft.scenario !== undefined && draft.scenario !== null) assertScenario(draft.scenario);
   if (draft.isEnabled !== undefined && typeof draft.isEnabled !== 'boolean') {
-    throw new InvalidGroupDraftError('Поле isEnabled — true или false.');
+    throw coded(
+      new InvalidGroupDraftError('Поле isEnabled — true или false.'),
+      'group-enabled-boolean',
+    );
   }
 }
 

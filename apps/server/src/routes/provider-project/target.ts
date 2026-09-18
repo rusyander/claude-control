@@ -8,6 +8,7 @@ import {
 } from '../../domains/provider-projects.ts';
 import { checkProjectDir } from '../../domains/projects.ts';
 import { SECTION_UNSUPPORTED } from './messages.ts';
+import { codeOf } from '../../lib/server-text.ts';
 
 /**
  * Проектная цель активного провайдера по id записи реестра. Undefined означает,
@@ -20,7 +21,11 @@ export const requireTarget = (
 ): ProviderProjectTarget | undefined => {
   const project: Project | undefined = ctx.store.getProject(id);
   if (!project) {
-    void reply.code(404).send({ error: 'not_found', message: 'Проект не найден в реестре' });
+    void reply.code(404).send({
+      error: 'not_found',
+      message: 'Проект не найден в реестре',
+      messageCode: 'project-not-in-registry',
+    });
     return undefined;
   }
 
@@ -41,7 +46,7 @@ export const requireTarget = (
     return target;
   } catch (error) {
     if (error instanceof UnsafeProjectPathError) {
-      void reply.code(400).send({ error: 'unsafe_path', message: error.message });
+      void reply.code(400).send({ error: 'unsafe_path', message: error.message, ...codeOf(error) });
       return undefined;
     }
     throw error;

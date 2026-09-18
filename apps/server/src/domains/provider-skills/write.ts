@@ -19,6 +19,8 @@ import {
 } from './errors.ts';
 import { resolveSkillPath, skillBackupName, toRelative } from './paths.ts';
 import type { ProviderSkillsTarget } from './types.ts';
+import { coded } from '../../lib/server-text.ts';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /**
  * Разобрать черновик скилла из тела запроса. Схему zod в рантайме сервера
@@ -57,6 +59,16 @@ export function parseProviderSkillDraft(body: unknown): ProviderSkillDraft | und
  * (`[\p{L}\p{N}_:.-]+`), и у Kimi. Панель пишет заведомо совместимое имя, а
  * читает любые уже существующие папки как есть.
  */
+/** Код фразы о негодном имени — по виду проблемы, ветви один в один с `detail`. */
+const SKILL_NAME_CODES: Record<string, ServerMessageCode> = {
+  empty: 'skill-name-empty',
+  too_long: 'skill-name-too-long',
+  leading_hyphen: 'skill-name-leading-hyphen',
+  trailing_hyphen: 'skill-name-trailing-hyphen',
+  double_hyphen: 'skill-name-double-hyphen',
+  pattern: 'skill-name-pattern',
+};
+
 export function assertSkillDraft(
   draft: ProviderSkillDraft,
   dirName: string,
@@ -72,26 +84,38 @@ export function assertSkillDraft(
       double_hyphen: 'два дефиса подряд запрещены.',
       pattern: 'допустимы только строчные латинские буквы, цифры и одиночные дефисы.',
     };
-    throw new InvalidSkillDraftError(
-      `name_${nameProblem}`,
-      `Имя скилла «${draft.name}» не годится: ${detail[nameProblem]}`,
+    throw coded(
+      new InvalidSkillDraftError(
+        `name_${nameProblem}`,
+        `Имя скилла «${draft.name}» не годится: ${detail[nameProblem]}`,
+      ),
+      SKILL_NAME_CODES[nameProblem] ?? 'skill-name-pattern',
+      { name: draft.name, max: SKILL_NAME_MAX },
     );
   }
 
   if (draft.name !== dirName) {
-    throw new InvalidSkillDraftError(
-      'name_dir_mismatch',
-      `Имя скилла «${draft.name}» обязано совпадать с именем его папки «${dirName}».`,
+    throw coded(
+      new InvalidSkillDraftError(
+        'name_dir_mismatch',
+        `Имя скилла «${draft.name}» обязано совпадать с именем его папки «${dirName}».`,
+      ),
+      'skill-name-dir-mismatch',
+      { name: draft.name, dirName },
     );
   }
 
   const descriptionProblem = checkSkillDescription(draft.description, descriptionMax);
   if (descriptionProblem) {
-    throw new InvalidSkillDraftError(
-      `description_${descriptionProblem}`,
-      descriptionProblem === 'empty'
-        ? 'Описание скилла обязательно: по нему CLI решает, когда его подключать.'
-        : `Описание скилла длиннее ${descriptionMax} символов.`,
+    throw coded(
+      new InvalidSkillDraftError(
+        `description_${descriptionProblem}`,
+        descriptionProblem === 'empty'
+          ? 'Описание скилла обязательно: по нему CLI решает, когда его подключать.'
+          : `Описание скилла длиннее ${descriptionMax} символов.`,
+      ),
+      descriptionProblem === 'empty' ? 'skill-description-empty' : 'skill-description-too-long',
+      { max: descriptionMax },
     );
   }
 }

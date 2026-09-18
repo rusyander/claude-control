@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { serverFieldList } from '@shared/config/i18n';
 import { useNavigate } from '@tanstack/react-router';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
@@ -92,11 +93,12 @@ export function CommandsPage() {
         </Stack>
       </Stack>
 
-      {data?.notes.map((note) => (
-        <Typography key={note} variant="caption" color="subtle">
-          {note}
-        </Typography>
-      ))}
+      {data &&
+        serverFieldList(data, 'notes').map((note) => (
+          <Typography key={note} variant="caption" color="subtle">
+            {note}
+          </Typography>
+        ))}
 
       {isLoading && <SkeletonList rows={6} />}
 

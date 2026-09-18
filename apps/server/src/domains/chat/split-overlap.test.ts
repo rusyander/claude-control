@@ -244,9 +244,11 @@ describe('SplitOverlap', () => {
 
     const view = await overlap.check('parent');
     expect(view?.files).toEqual([{ path: 'src/shared/api.ts', groups: [0, 1], outside: [0, 1] }]);
+    // Кроме счёта запись несёт и первые имена: из них собирается заметка
+    // группе, которая отведётся от этой ветки следующей.
     expect(view?.counted).toEqual([
-      { index: 0, files: 2 },
-      { index: 1, files: 2 },
+      { index: 0, files: 2, names: ['src/login/a.ts', 'src/shared/api.ts'] },
+      { index: 1, files: 2, names: ['src/build/b.ts', 'src/shared/api.ts'] },
     ]);
     expect(read().overlap?.files).toHaveLength(1);
   });
@@ -319,7 +321,7 @@ describe('SplitOverlap', () => {
 
     const view = await overlap.check('parent');
     expect(view?.files).toEqual([]);
-    expect(view?.counted).toEqual([{ index: 0, files: 1 }]);
+    expect(view?.counted).toEqual([{ index: 0, files: 1, names: ['src/shared/api.ts'] }]);
   });
 
   it('нечитаемая ветка называется причиной и не роняет остальные', async () => {

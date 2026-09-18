@@ -9,6 +9,8 @@ import type {
 import { getProvider } from '../../providers/registry.ts';
 import { envSide, instructionsSide, mcpSide, permissionsSide } from './sections.ts';
 import { CompareRequestError, type CompareDeps, type Row, type SideRead } from './types.ts';
+import { coded } from '../../lib/server-text.ts';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 export function compareProviders(
   leftId: string,
@@ -16,7 +18,10 @@ export function compareProviders(
   deps: CompareDeps,
 ): ProviderCompareResponse {
   if (leftId === rightId) {
-    throw new CompareRequestError('Сравнивать провайдера с самим собой нечего.');
+    throw coded(
+      new CompareRequestError('Сравнивать провайдера с самим собой нечего.'),
+      'compare-self',
+    );
   }
 
   const left = getProvider(leftId);
@@ -28,11 +33,13 @@ export function compareProviders(
       comparable: true,
       migratable: false,
       note: 'Переменные не переносятся: их значения — обычно ключи и токены, а секреты панель в чужие конфигурации не пишет.',
+      noteCode: 'compare-env-note',
     }),
     buildSection('permissions', leftId, rightId, deps, permissionsSide, {
       comparable: false,
       migratable: false,
       note: 'У каждого CLI своя модель согласований. Совпадение имён ключей не означает совпадения смысла, поэтому права показаны рядом, но не переносятся.',
+      noteCode: 'compare-permissions-note',
     }),
     buildSection('instructions', leftId, rightId, deps, instructionsSide, {
       comparable: true,
@@ -53,7 +60,7 @@ function buildSection(
   rightId: string,
   deps: CompareDeps,
   read: (providerId: string, deps: CompareDeps) => SideRead,
-  meta: { comparable: boolean; migratable: boolean; note?: string },
+  meta: { comparable: boolean; migratable: boolean; note?: string; noteCode?: ServerMessageCode },
 ): CompareSectionResult {
   const left = read(leftId, deps);
   const right = read(rightId, deps);
@@ -68,6 +75,7 @@ function buildSection(
     // «перенести» означало бы «угадать, куда».
     migratable: meta.migratable && left.supported && right.supported,
     note: meta.note,
+    noteCode: meta.noteCode,
   };
 }
 
@@ -79,6 +87,7 @@ function sideOf(providerId: string, read: SideRead): CompareSide {
     supported: read.supported,
     filePath: read.filePath,
     note: read.note,
+    noteCode: read.noteCode,
   };
 }
 
@@ -115,14 +124,16 @@ function compareRows(left: SideRead, right: SideRead, migratable: boolean): Comp
         state = 'right-only';
       }
 
-      const blocked = l?.blocked ?? r?.blocked;
+      // Причина и её код берутся с одной стороны — иначе текст и перевод разошлись бы.
+      const blockedBy = l?.blocked !== undefined ? l : r;
       return {
         key,
         left: l?.display,
         right: r?.display,
         state,
         opaque,
-        blocked: migratable ? blocked : undefined,
+        blocked: migratable ? blockedBy?.blocked : undefined,
+        blockedCode: migratable ? blockedBy?.blockedCode : undefined,
       };
     });
 }

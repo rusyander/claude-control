@@ -49,6 +49,7 @@ export type {
   BuiltArchive,
 } from './archive.types.ts';
 import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Собирает архив окружения провайдера. `exportedAt` приходит извне (запрос или
@@ -166,35 +167,52 @@ export function parseEnvironmentArchive(zip: Buffer): ParsedArchive {
   for (const entry of readZip(zip)) files.set(entry.path, entry.data);
 
   const rawManifest = files.get(MANIFEST_PATH);
-  if (!rawManifest) throw archiveError('В архиве нет MANIFEST.json — это не архив окружения.');
+  if (!rawManifest)
+    throw coded(
+      archiveError('В архиве нет MANIFEST.json — это не архив окружения.'),
+      'archive-no-manifest',
+    );
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawManifest.toString('utf8'));
   } catch {
-    throw archiveError('MANIFEST.json повреждён: не разбирается как JSON.');
+    throw coded(
+      archiveError('MANIFEST.json повреждён: не разбирается как JSON.'),
+      'archive-manifest-json',
+    );
   }
-  if (!isRecord(parsed)) throw archiveError('MANIFEST.json должен быть объектом.');
+  if (!isRecord(parsed))
+    throw coded(archiveError('MANIFEST.json должен быть объектом.'), 'archive-manifest-object');
 
   if (parsed.kind !== ARCHIVE_KIND && parsed.kind !== LEGACY_ARCHIVE_KIND) {
-    throw archiveError('Этот архив собран не панелью — в описи другой тип.');
+    throw coded(
+      archiveError('Этот архив собран не панелью — в описи другой тип.'),
+      'archive-foreign',
+    );
   }
   if (typeof parsed.formatVersion !== 'number') {
-    throw archiveError('В описи нет числового formatVersion.');
+    throw coded(archiveError('В описи нет числового formatVersion.'), 'archive-format-version');
   }
   if (parsed.formatVersion > ARCHIVE_FORMAT_VERSION) {
-    throw archiveError(
-      `Версия формата архива (${parsed.formatVersion}) новее поддерживаемой (${ARCHIVE_FORMAT_VERSION}).`,
+    throw coded(
+      archiveError(
+        `Версия формата архива (${parsed.formatVersion}) новее поддерживаемой (${ARCHIVE_FORMAT_VERSION}).`,
+      ),
+      'archive-format-newer',
+      { version: parsed.formatVersion, supported: ARCHIVE_FORMAT_VERSION },
     );
   }
 
   const provider = parsed.provider;
   if (!isRecord(provider) || typeof provider.id !== 'string' || !provider.id.trim()) {
-    throw archiveError('В описи не указан провайдер.');
+    throw coded(archiveError('В описи не указан провайдер.'), 'archive-no-provider');
   }
 
-  if (!Array.isArray(parsed.locations)) throw archiveError('В описи нет списка мест.');
-  if (!Array.isArray(parsed.entries)) throw archiveError('В описи нет списка файлов.');
+  if (!Array.isArray(parsed.locations))
+    throw coded(archiveError('В описи нет списка мест.'), 'archive-no-locations');
+  if (!Array.isArray(parsed.entries))
+    throw coded(archiveError('В описи нет списка файлов.'), 'archive-no-entries');
 
   const locations = parsed.locations.map(parseLocation);
   const entries = parsed.entries.map((entry, index) => parseEntry(entry, index, files));
@@ -240,9 +258,17 @@ function parsePromptsSection(
   if (!isRecord(value)) return undefined;
 
   const archivePath = typeof value.archivePath === 'string' ? value.archivePath : '';
-  if (!archivePath) throw archiveError('В описи есть секция промптов без пути к файлу.');
+  if (!archivePath)
+    throw coded(
+      archiveError('В описи есть секция промптов без пути к файлу.'),
+      'archive-prompts-no-path',
+    );
   if (!files.has(archivePath)) {
-    throw archiveError(`Секция промптов «${archivePath}» есть в описи, но отсутствует в архиве.`);
+    throw coded(
+      archiveError(`Секция промптов «${archivePath}» есть в описи, но отсутствует в архиве.`),
+      'archive-prompts-missing',
+      { archivePath },
+    );
   }
 
   return {
@@ -266,9 +292,17 @@ function parsePanelSection(value: unknown, files: Map<string, Buffer>): Manifest
   if (!isRecord(value)) return undefined;
 
   const archivePath = typeof value.archivePath === 'string' ? value.archivePath : '';
-  if (!archivePath) throw archiveError('В описи есть секция контуров без пути к файлу.');
+  if (!archivePath)
+    throw coded(
+      archiveError('В описи есть секция контуров без пути к файлу.'),
+      'archive-platforms-no-path',
+    );
   if (!files.has(archivePath)) {
-    throw archiveError(`Секция контуров «${archivePath}» есть в описи, но отсутствует в архиве.`);
+    throw coded(
+      archiveError(`Секция контуров «${archivePath}» есть в описи, но отсутствует в архиве.`),
+      'archive-platforms-missing',
+      { archivePath },
+    );
   }
 
   return {
@@ -291,7 +325,11 @@ function isPanelPlatform(value: unknown): value is ManifestPanel['platforms'][nu
 
 function parseLocation(value: unknown, index: number): ManifestLocation {
   if (!isRecord(value) || (value.kind !== 'dir' && value.kind !== 'file')) {
-    throw archiveError(`Место #${index + 1} в описи задано неверно.`);
+    throw coded(
+      archiveError(`Место #${index + 1} в описи задано неверно.`),
+      'archive-location-invalid',
+      { n: index + 1 },
+    );
   }
   return {
     index: typeof value.index === 'number' ? value.index : index,
@@ -308,10 +346,18 @@ function parseEntry(value: unknown, index: number, files: Map<string, Buffer>): 
     typeof value.relative !== 'string' ||
     typeof value.locationIndex !== 'number'
   ) {
-    throw archiveError(`Файл #${index + 1} в описи задан неверно.`);
+    throw coded(
+      archiveError(`Файл #${index + 1} в описи задан неверно.`),
+      'archive-entry-invalid',
+      { n: index + 1 },
+    );
   }
   if (!files.has(value.archivePath)) {
-    throw archiveError(`Файл «${value.archivePath}» есть в описи, но отсутствует в архиве.`);
+    throw coded(
+      archiveError(`Файл «${value.archivePath}» есть в описи, но отсутствует в архиве.`),
+      'archive-entry-missing',
+      { archivePath: value.archivePath },
+    );
   }
 
   const applyMode = value.applyMode === 'json-merge' ? 'json-merge' : 'file';

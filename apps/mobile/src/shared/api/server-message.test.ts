@@ -10,7 +10,7 @@ import { ru } from '../config/i18n/ru';
 let language: 'ru' | 'en' = 'en';
 vi.mock('../config/i18n', () => ({ dict: () => (language === 'en' ? en : ru) }));
 
-const { serverMessage } = await import('./server-message');
+const { serverField, serverMessage } = await import('./server-message');
 
 /**
  * Каждый код сервера переведён на оба языка телефона, и перевод использует ровно
@@ -41,5 +41,23 @@ describe('тексты сервера по коду на телефоне', () =
     expect(serverMessage('newer-server-code')).toBeUndefined();
     language = 'ru';
     expect(serverMessage('platform-not-found', { id: 'dev' })).toBe('Контура «dev» не существует.');
+  });
+
+  it('поле записи: свой код поля, у текста отказа — общие messageCode + params', () => {
+    language = 'en';
+    expect(serverField({ output: 'Коммит создан', outputCode: 'git-committed' }, 'output')).toBe(
+      'Commit created',
+    );
+    expect(
+      serverField(
+        {
+          error: 'Скилл «x» уже существует',
+          messageCode: 'skill-exists',
+          params: { skillId: 'x' },
+        },
+        'error',
+      ),
+    ).toBe('Skill «x» already exists');
+    expect(serverField({ output: '[main 1a2b] fix' }, 'output')).toBe('[main 1a2b] fix');
   });
 });

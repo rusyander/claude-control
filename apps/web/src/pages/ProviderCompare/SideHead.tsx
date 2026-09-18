@@ -2,6 +2,7 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { TruncatedText } from '@shared/ui/truncated-text';
 import type { SideHeadProps } from './SideHead.types';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Шапка колонки: чей это столбец, из какого файла и почему он мог быть пуст.
@@ -20,7 +21,7 @@ export function SideHead({ side }: SideHeadProps) {
       {side.filePath && <TruncatedText text={side.filePath} variant="caption" color="subtle" />}
       {side.note && (
         <Typography variant="caption" color="subtle">
-          {side.note}
+          {serverFieldText(side, 'note')}
         </Typography>
       )}
     </Stack>

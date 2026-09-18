@@ -1,3 +1,8 @@
+import type {
+  CodedMessage,
+  ServerMessageCode,
+  ServerMessageParams,
+} from '@agentdeck/contracts/server-messages';
 import { execFileSync } from 'node:child_process';
 import {
   existsSync,
@@ -48,6 +53,9 @@ export interface CredentialsLookup {
   apiKey?: string;
   /** Почему не нашлось — текст для интерфейса, а не для журнала. */
   reason?: string;
+  /** Код `reason` — клиент переводит его своим словарём. */
+  reasonCode?: ServerMessageCode;
+  reasonParams?: ServerMessageParams;
 }
 
 /**
@@ -100,7 +108,7 @@ export function readClaudeCredentials(configRoot: string): CredentialsLookup {
 
   // Причина от разбора ручного файла точнее общей: она называет конкретную
   // ошибку в том, что человек только что вводил.
-  return panel?.reason ? panel : { source: 'none', reason: notFoundReason(configRoot) };
+  return panel?.reason ? panel : { source: 'none', ...notFoundReason(configRoot) };
 }
 
 /** Штатный источник системы: файл везде, кроме macOS, где это связка ключей. */
@@ -111,7 +119,12 @@ function readStandard(configRoot: string): CredentialsLookup {
     try {
       return { source: 'file', content: readFileSync(path, 'utf8') };
     } catch {
-      return { source: 'none', reason: `Файл ${path} не читается — проверьте права доступа.` };
+      return {
+        source: 'none',
+        reason: `Файл ${path} не читается — проверьте права доступа.`,
+        reasonCode: 'credentials-file-unreadable',
+        reasonParams: { path },
+      };
     }
   }
 
@@ -158,17 +171,29 @@ function readPanelFile(): CredentialsLookup | undefined {
     return {
       source: 'none',
       reason: `Файл ${path} — не JSON. Исправьте его или удалите: панель тогда вернётся к обычному поиску.`,
+      reasonCode: 'credentials-file-not-json',
+      reasonParams: { path },
     };
   }
 
   if (parsed.readFrom) {
     if (!existsSync(parsed.readFrom)) {
-      return { source: 'none', reason: `Указанный файл не найден: ${parsed.readFrom}` };
+      return {
+        source: 'none',
+        reason: `Указанный файл не найден: ${parsed.readFrom}`,
+        reasonCode: 'credentials-read-from-missing',
+        reasonParams: { path: parsed.readFrom },
+      };
     }
     try {
       return { source: 'panel', content: readFileSync(parsed.readFrom, 'utf8') };
     } catch {
-      return { source: 'none', reason: `Файл ${parsed.readFrom} не читается.` };
+      return {
+        source: 'none',
+        reason: `Файл ${parsed.readFrom} не читается.`,
+        reasonCode: 'credentials-read-from-unreadable',
+        reasonParams: { path: parsed.readFrom },
+      };
     }
   }
 
@@ -181,47 +206,86 @@ function readPanelFile(): CredentialsLookup | undefined {
   return {
     source: 'none',
     reason: `В файле ${path} нет ни одного известного поля: ожидается claudeAiOauth, apiKey или readFrom.`,
+    reasonCode: 'credentials-file-no-field',
+    reasonParams: { path },
   };
 }
 
-function notFoundReason(configRoot: string): string {
+function notFoundReason(
+  configRoot: string,
+): Pick<CredentialsLookup, 'reason' | 'reasonCode' | 'reasonParams'> {
   const path = join(configRoot, '.credentials.json');
 
   return process.platform === 'darwin'
-    ? 'Ни в связке ключей macOS, ни в файле доступ не найден. Войдите командой `claude` в терминале ' +
-        'или задайте доступ вручную в настройках панели.'
-    : `Файл ${path} не найден. Войдите командой \`claude\` в терминале ` +
-        'или задайте доступ вручную в настройках панели.';
+    ? {
+        reason:
+          'Ни в связке ключей macOS, ни в файле доступ не найден. Войдите командой `claude` в терминале ' +
+          'или задайте доступ вручную в настройках панели.',
+        reasonCode: 'credentials-not-found-mac',
+      }
+    : {
+        reason:
+          `Файл ${path} не найден. Войдите командой \`claude\` в терминале ` +
+          'или задайте доступ вручную в настройках панели.',
+        reasonCode: 'credentials-not-found',
+        reasonParams: { path },
+      };
 }
 
 /**
  * Проверка того, что ввели руками, — до записи на диск. Ошибку лучше показать
  * сразу, чем потом ловить её отказом песочницы.
  */
-export function validatePanelCredentials(raw: string): { ok: true } | { ok: false; error: string } {
+export function validatePanelCredentials(
+  raw: string,
+): { ok: true } | ({ ok: false; error: string } & CodedMessage) {
   const text = raw.trim();
-  if (!text) return { ok: false, error: 'Пусто: вставьте JSON или ключ API.' };
+  if (!text)
+    return {
+      ok: false,
+      error: 'Пусто: вставьте JSON или ключ API.',
+      messageCode: 'credentials-paste-empty',
+    };
 
   let parsed: PanelCredentials;
   try {
     parsed = JSON.parse(text) as PanelCredentials;
   } catch {
-    return { ok: false, error: 'Это не JSON. Проверьте кавычки и запятые.' };
+    return {
+      ok: false,
+      error: 'Это не JSON. Проверьте кавычки и запятые.',
+      messageCode: 'credentials-paste-not-json',
+    };
   }
 
   if (parsed.readFrom) {
     if (typeof parsed.readFrom !== 'string' || !existsSync(parsed.readFrom)) {
-      return { ok: false, error: `Файл не найден: ${String(parsed.readFrom)}` };
+      return {
+        ok: false,
+        error: `Файл не найден: ${String(parsed.readFrom)}`,
+        messageCode: 'credentials-paste-file-missing',
+        params: { path: String(parsed.readFrom) },
+      };
     }
     // Каталог проходил как «существует», сохранялся и тут же читался как «не
     // найден»: проверяем, что это файл и что его можно прочитать, — до записи.
     try {
       if (!statSync(parsed.readFrom).isFile()) {
-        return { ok: false, error: `Это каталог, а не файл: ${parsed.readFrom}` };
+        return {
+          ok: false,
+          error: `Это каталог, а не файл: ${parsed.readFrom}`,
+          messageCode: 'credentials-paste-directory',
+          params: { path: parsed.readFrom },
+        };
       }
       accessSync(parsed.readFrom, constants.R_OK);
     } catch {
-      return { ok: false, error: `Файл не читается: ${parsed.readFrom}` };
+      return {
+        ok: false,
+        error: `Файл не читается: ${parsed.readFrom}`,
+        messageCode: 'credentials-paste-unreadable',
+        params: { path: parsed.readFrom },
+      };
     }
     return { ok: true };
   }
@@ -229,7 +293,11 @@ export function validatePanelCredentials(raw: string): { ok: true } | { ok: fals
   if (parsed.claudeAiOauth) {
     const token = (parsed.claudeAiOauth as { accessToken?: unknown }).accessToken;
     if (typeof token !== 'string' || !token) {
-      return { ok: false, error: 'В claudeAiOauth нет поля accessToken со строкой.' };
+      return {
+        ok: false,
+        error: 'В claudeAiOauth нет поля accessToken со строкой.',
+        messageCode: 'credentials-paste-no-token',
+      };
     }
     return { ok: true };
   }
@@ -239,6 +307,7 @@ export function validatePanelCredentials(raw: string): { ok: true } | { ok: fals
   return {
     ok: false,
     error: 'Нужно одно из полей: claudeAiOauth (с accessToken), apiKey или readFrom.',
+    messageCode: 'credentials-paste-no-field',
   };
 }
 

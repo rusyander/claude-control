@@ -132,7 +132,7 @@ describe('project-tests/lint: правила описания', () => {
     const report = lintLibrary([group([healthy({ priority: undefined })])], { now: NOW });
 
     expect(report.findings[0]?.rule).toBe('no-priority');
-    expect(report.findings[0]?.fix).toEqual({
+    expect(report.findings[0]?.fix).toMatchObject({
       action: 'priority',
       value: 'medium',
       label: 'Проставить приоритет «средний»',
@@ -185,7 +185,7 @@ describe('project-tests/lint: правила состояния', () => {
     const report = lintLibrary([group([healthy({ readiness: 'obsolete' })])], { now: NOW });
 
     expect(report.findings.map((item) => item.rule)).toEqual(['obsolete-not-archived']);
-    expect(report.findings[0]?.fix).toEqual({ action: 'archive', label: 'Убрать в архив' });
+    expect(report.findings[0]?.fix).toMatchObject({ action: 'archive', label: 'Убрать в архив' });
   });
 
   it('черновик старше тридцати дней', () => {
@@ -227,7 +227,7 @@ describe('project-tests/lint: повторы и дубли', () => {
 
     expect(titles.map((item) => item.caseId)).toEqual(['gui-006']);
     expect(titles[0]?.message).toContain('gui-001');
-    expect(titles[0]?.fix).toEqual({ action: 'archive', label: 'Убрать повтор в архив' });
+    expect(titles[0]?.fix).toMatchObject({ action: 'archive', label: 'Убрать повтор в архив' });
   });
 
   it('одинаковый заголовок в РАЗНЫХ группах повтором не считается', () => {
@@ -275,7 +275,7 @@ describe('project-tests/lint: отчёт', () => {
 
     const report = lintLibrary([group([noPriority, alsoNoPriority, broken])], { now: NOW });
 
-    expect(report.byRule).toEqual([
+    expect(report.byRule).toMatchObject([
       { rule: 'undeclared-parameter', severity: 'error', title: 'Параметр не объявлен', count: 1 },
       { rule: 'no-priority', severity: 'warning', title: 'Нет приоритета', count: 2 },
     ]);

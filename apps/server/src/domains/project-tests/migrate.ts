@@ -4,6 +4,7 @@ import { slugify } from '../../lib/slug.ts';
 import { ProjectTestsError } from './files.ts';
 import { applyRows, parseCsv, parseRows, type ParsedCaseRow } from './import-cases.ts';
 import { createGroup } from './store.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Переезд из чужой TMS: TestRail и Allure TestOps — целиком, вместе с деревом.
@@ -46,8 +47,11 @@ export function migrateTestRail(
 ): MigrationResult {
   const rows = parseRows(parseCsv(content));
   if (rows.length === 0) {
-    throw new ProjectTestsError(
-      'Выгрузка TestRail не разобралась: не нашлось ни заголовков, ни строк с названием кейса.',
+    throw coded(
+      new ProjectTestsError(
+        'Выгрузка TestRail не разобралась: не нашлось ни заголовков, ни строк с названием кейса.',
+      ),
+      'migrate-testrail-empty',
     );
   }
   return distribute(root, rows, input.fallbackGroupId ?? 'testrail', 'testrail-csv', input.now);
@@ -70,7 +74,10 @@ export function migrateAllureTestOps(
   const rows =
     head === '{' || head === '[' ? parseTestOpsJson(content) : parseRows(parseCsv(content));
   if (rows.length === 0) {
-    throw new ProjectTestsError('Выгрузка Allure TestOps не разобралась: кейсов в ней не нашлось.');
+    throw coded(
+      new ProjectTestsError('Выгрузка Allure TestOps не разобралась: кейсов в ней не нашлось.'),
+      'migrate-allure-empty',
+    );
   }
   return distribute(root, rows, input.fallbackGroupId ?? 'allure', 'allure', input.now);
 }
@@ -114,7 +121,11 @@ function parseTestOpsJson(content: string): ParsedCaseRow[] {
   try {
     data = JSON.parse(content) as unknown;
   } catch (error) {
-    throw new ProjectTestsError(`Выгрузка не разобралась: ${(error as Error).message}`);
+    throw coded(
+      new ProjectTestsError(`Выгрузка не разобралась: ${(error as Error).message}`),
+      'migrate-unparsed',
+      { reason: (error as Error).message },
+    );
   }
 
   const container = data as { content?: unknown; testCases?: unknown; items?: unknown };

@@ -54,9 +54,10 @@ export const projectsEn: typeof projectsRu = {
       'Saving edits the repository’s working tree and will land in the branch together ' +
       'with the code. This section itself commits nothing and never checks whether the ' +
       'tree is clean. The panel does have git, just elsewhere: the bar above a project’s ' +
-      'chat can branch, commit, pull and push, and it creates parallel copies of ' +
-      'branches. What the panel never does anywhere is merging — merging branches stays ' +
-      'with you.',
+      'chat can branch, commit, pull and push, it creates parallel copies of branches, ' +
+      'and each copy’s card shows how complete it is — what is missing and whether the ' +
+      'access entry is there; «Fill in» carries the missing part over again. What the ' +
+      'panel never does anywhere is merging — merging branches stays with you.',
 
     guide: {
       mapTitle: 'How it works',

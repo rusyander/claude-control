@@ -17,6 +17,7 @@ import { PLATFORM_TERMINAL_CONSUMER } from '@agentdeck/contracts/platform-consum
 import { modelRulesFor } from './models.ts';
 import { withoutThink } from './gateway/think-tail.ts';
 import { smokeTools } from './smoke-tools.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Активный контур: не режим одной карточки, а режим приложения (Р3).
@@ -149,7 +150,9 @@ async function probeAfterActivation(
     const gatewayError = await raiseGateway(deps);
     const asked = await smokePlatform(deps, platform, probe);
     const smoke =
-      gatewayError && !asked.ok ? { ...asked, detail: `Шлюз не поднялся: ${gatewayError}` } : asked;
+      gatewayError && !asked.ok
+        ? { ...asked, detail: serverText('contour-gateway-not-raised', { reason: gatewayError }) }
+        : asked;
     // Контур могли удалить, пока шли эти два запроса: запись итога вернула бы в
     // состояние строку о том, чего больше нет, и убрать её было бы некому.
     if (readPlatforms(store).some((item) => item.id === platform.id)) {
@@ -329,7 +332,7 @@ export async function smokePlatform(
   const empty = { ok: false, model, answer: '', latencyMs: 0, at };
 
   if (!model) {
-    return { ...empty, detail: 'Контур не назвал ни одной модели: спрашивать нечем.' };
+    return { ...empty, detail: serverText('contour-smoke-no-models') };
   }
 
   // Порт спрашивается у ЖИВОГО слушателя, а не у настроек и не у записанного
@@ -340,7 +343,7 @@ export async function smokePlatform(
   if (port <= 0) {
     return {
       ...empty,
-      detail: 'Шлюз не поднят: пробный запрос идёт через него, как и работа CLI.',
+      detail: serverText('contour-smoke-gateway-down'),
     };
   }
 
@@ -381,8 +384,8 @@ export async function smokePlatform(
       latencyMs,
       detail:
         stopReason === 'max_tokens'
-          ? `Модель израсходовала потолок пробного запроса (${SMOKE_MAX_TOKENS} токенов), не сказав ни слова, — похоже, всё ушло в размышления. Путь прошёл; у рабочих запросов потолок выше.`
-          : 'Модель не сказала ни слова: путь прошёл, ответа нет.',
+          ? serverText('contour-smoke-thinking-cap', { tokens: SMOKE_MAX_TOKENS })
+          : serverText('contour-smoke-silent'),
     };
   } catch (error) {
     const latencyMs = Date.now() - started;
@@ -391,13 +394,15 @@ export async function smokePlatform(
       return {
         ...empty,
         latencyMs,
-        detail: `Ответа не было ${SMOKE_TIMEOUT_MS / 1_000} с — столько же прождёт и CLI.`,
+        detail: serverText('contour-smoke-timeout', { seconds: SMOKE_TIMEOUT_MS / 1_000 }),
       };
     }
     return {
       ...empty,
       latencyMs,
-      detail: `Шлюз не ответил: ${error instanceof Error ? error.message : String(error)}.`,
+      detail: serverText('contour-smoke-gateway-error', {
+        reason: error instanceof Error ? error.message : String(error),
+      }),
     };
   }
 }
@@ -415,16 +420,18 @@ function smokeModel(store: AppStore, platform: Platform, probe: PlatformProbeRes
   return rules.model || (catalogDefaultModel(probe.models)?.id ?? '');
 }
 
-/** Текст отказа шлюза — его же словами: он их и писал по-русски. */
+/** Текст отказа шлюза — его же словами: он их и писал по коду, и код по ним читается. */
 function refusalText(body: string, status: number): string {
   try {
     const parsed = JSON.parse(body) as { error?: { message?: unknown } };
     const message = parsed.error?.message;
-    if (typeof message === 'string' && message) return `${message} (${status}).`;
+    if (typeof message === 'string' && message) {
+      return serverText('contour-smoke-refused', { status, message });
+    }
   } catch {
     // Не JSON — ниже общий текст: тело чужого отказа на экран не выносим.
   }
-  return `Шлюз ответил ${status}.`;
+  return serverText('contour-smoke-status', { status });
 }
 
 /** Собрать ответ из кадров потока Anthropic: текст и причину остановки. */

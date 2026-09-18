@@ -38,18 +38,21 @@ export function registerProviderHooksRoutes(app: FastifyInstance, ctx: ServerCon
   const SECTION_UNSUPPORTED = {
     error: 'section_unsupported',
     message: 'У активного провайдера нет универсального раздела хуков.',
+    messageCode: 'hooks-section-unsupported',
   } as const;
 
   const INVALID_DRAFT = {
     error: 'invalid_draft',
     message:
       'Хуки не прошли проверку. OpenCode: команда — непустой список непустых аргументов, шаблон файлов непустой и не повторяется, имена переменных окружения непустые и уникальные. Qwen и Kimi: событие — из задокументированного списка, команда непустая и в одну строку, матчер только у событий, которые его поддерживают, таймаут — целое в допустимых границах.',
+    messageCode: 'hooks-draft-invalid-foreign',
   } as const;
 
   const FORMAT_UNRECOGNIZED = {
     error: 'format_unrecognized',
     message:
       'Формат файла конфигурации не распознан — запись запрещена (раздел только для чтения).',
+    messageCode: 'config-format-unrecognized-readonly',
   } as const;
 
   const requireTarget = (reply: FastifyReply): ProviderHooksTarget | undefined => {

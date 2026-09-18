@@ -9,15 +9,15 @@
       "masked": 0,
       "width": 1440,
       "height": 950,
-      "shotAt": "2026-09-11T14:17:05.429Z",
-      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 0 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает Хуков пока нет В settings.json нет секции hooks. Добавьте хук кнопкой выше — из пресета или конструктором — или впишите его в файл руками: список обновится сам.",
+      "shotAt": "2026-09-17T20:43:17.686Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 0 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает Хуков пока нет В settings.json нет секции hooks. Добавьте хук кнопкой выше — из пресета или конструктором — или впишите его в файл руками: список обновится сам.",
       "en": {
         "file": "01-empty.en.png",
         "masked": 0,
         "width": 1440,
         "height": 950,
-        "shotAt": "2026-09-11T17:29:57.943Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 0 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works No hooks yet settings.json has no hooks section. Add one with the button above — from a preset or the builder — or write it into the file by hand: the list updates on its own."
+        "shotAt": "2026-09-17T20:45:49.169Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 0 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works No hooks yet settings.json has no hooks section. Add one with the button above — from a preset or the builder — or write it into the file by hand: the list updates on its own."
       }
     },
     {
@@ -27,14 +27,14 @@
       "masked": 0,
       "width": 1428,
       "height": 856,
-      "shotAt": "2026-09-11T14:17:07.079Z",
+      "shotAt": "2026-09-17T20:43:19.350Z",
       "text": "Добавить хук Изменения применятся после перезапуска Claude Code Конструктор Несколько сразу Готовые хуки Выберите заготовку — все поля заполнятся, останется поправить детали. Страж разрушительных команд Страж секретов Формат при сохранении Брифинг при старте Чек-поинт перед сжатием Событие PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Перед тем как Claude вызовет инструмент Может остановить действие Проверки и запреты: не дать выполнить опасную команду, потребовать подтверждения, записать намерение в журнал. Фильтр Bash Write Edit Skill Read Task WebFetch Ограничивает событие: имя инструмента или несколько через вертикальную черту. Пусто — срабатывает всегда. Имя файла хука Файл создастся сам в папке hooks/ с расширением .mjs. Оставьте пустым, если команда запускает уже существующую программу. Что делает этот хук Таймаут, секунд Сколько секунд ждать скрипт, прежде чем оборвать его. Пусто — умолчание Claude Code (60). Что должно происходить Показать подсказку Не пропускать опасное Выполнить команду Пустая заготовка Текст попадёт в контекст агента — так напоминают о правилах и добавляют нужные сведения. Текст подсказки Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "02-form.en.png",
         "masked": 0,
         "width": 1428,
         "height": 856,
-        "shotAt": "2026-09-11T17:29:59.612Z",
+        "shotAt": "2026-09-17T20:45:50.816Z",
         "text": "Add hook Changes apply after restarting Claude Code Builder Several at once Ready-made hooks Pick a preset — every field fills in, then tweak the details. Страж разрушительных команд Страж секретов Формат при сохранении Брифинг при старте Чек-поинт перед сжатием Event PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Перед тем как Claude вызовет инструмент Can block the action Проверки и запреты: не дать выполнить опасную команду, потребовать подтверждения, записать намерение в журнал. Matcher Bash Write Edit Skill Read Task WebFetch Narrows the event: a tool name, or several separated by a pipe. Empty means it always fires. Hook file name The file is created for you in hooks/ with a .mjs extension. Leave empty if the command runs an existing program. What this hook does Timeout, seconds How many seconds to wait for the script before cutting it off. Empty — the Claude Code default (60). What should happen Show a hint Block dangerous actions Run a command Empty scaffold The text goes into the agent context — used to restate rules and add needed facts. Hint text Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     },
@@ -45,14 +45,14 @@
       "masked": 0,
       "width": 1428,
       "height": 856,
-      "shotAt": "2026-09-11T14:17:08.858Z",
+      "shotAt": "2026-09-17T20:43:21.152Z",
       "text": "Добавить хук Изменения применятся после перезапуска Claude Code Конструктор Несколько сразу Готовые хуки Выберите заготовку — все поля заполнятся, останется поправить детали. Страж разрушительных команд Страж секретов Формат при сохранении Брифинг при старте Чек-поинт перед сжатием Событие PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Перед тем как Claude вызовет инструмент Может остановить действие Проверки и запреты: не дать выполнить опасную команду, потребовать подтверждения, записать намерение в журнал. Фильтр Bash Write Edit Skill Read Task WebFetch Bash PowerShell → Bash|PowerShell Ограничивает событие: имя инструмента или несколько через вертикальную черту. Пусто — срабатывает всегда. Имя файла хука Файл создастся сам в папке hooks/ с расширением .mjs. Оставьте пустым, если команда запускает уже существующую программу. Что делает этот хук Таймаут, секунд Сколько секунд ждать скрипт, прежде чем оборвать его. Пусто — умолчание Claude Code (60). Что должно происходить Показать подсказку Не пропускать опасное Выполнить команду Пустая заготовка Если в команде встретится одна из указанных строк, действие остановится и потребует вашего подтверждения. Что перехватывать Через запятую. Срабатывает, если строка встретилась в команде или пути. Что показать при срабатывании Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "03-preset.en.png",
         "masked": 0,
         "width": 1428,
         "height": 856,
-        "shotAt": "2026-09-11T17:30:01.392Z",
+        "shotAt": "2026-09-17T20:45:52.568Z",
         "text": "Add hook Changes apply after restarting Claude Code Builder Several at once Ready-made hooks Pick a preset — every field fills in, then tweak the details. Страж разрушительных команд Страж секретов Формат при сохранении Брифинг при старте Чек-поинт перед сжатием Event PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Перед тем как Claude вызовет инструмент Can block the action Проверки и запреты: не дать выполнить опасную команду, потребовать подтверждения, записать намерение в журнал. Matcher Bash Write Edit Skill Read Task WebFetch Bash PowerShell → Bash|PowerShell Narrows the event: a tool name, or several separated by a pipe. Empty means it always fires. Hook file name The file is created for you in hooks/ with a .mjs extension. Leave empty if the command runs an existing program. What this hook does Timeout, seconds How many seconds to wait for the script before cutting it off. Empty — the Claude Code default (60). What should happen Show a hint Block dangerous actions Run a command Empty scaffold If the command contains one of the listed strings, the action stops and asks for your confirmation. What to intercept Comma separated. Fires when the string appears in a command or path. Message on trigger Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     },
@@ -63,15 +63,15 @@
       "masked": 0,
       "width": 1440,
       "height": 950,
-      "shotAt": "2026-09-11T14:17:11.442Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 1 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Bash|PowerShell Останавливает опасные команды в Bash до выполнения и требует подтверждения. node \"C:/work/claude-help-config/hooks/no-force-push.mjs\" Создано · копия: settings.json.2026-09-11T14-17-08-902Z.bak",
+      "shotAt": "2026-09-17T20:43:23.748Z",
+      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 1 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Bash|PowerShell Останавливает опасные команды в Bash до выполнения и требует подтверждения. node \"C:/work/claude-help-config/hooks/no-force-push.mjs\" Создано · копия: settings.json.2026-09-17T20-43-21-192Z.bak",
       "en": {
         "file": "04-card.en.png",
         "masked": 0,
         "width": 1440,
         "height": 950,
-        "shotAt": "2026-09-11T17:30:03.974Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 1 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Bash|PowerShell Останавливает опасные команды в Bash до выполнения и требует подтверждения. node \"C:/work/claude-help-config/hooks/no-force-push.mjs\" Created · backup: settings.json.2026-09-11T17-30-01-439Z.bak"
+        "shotAt": "2026-09-17T20:45:55.132Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 1 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Bash|PowerShell Останавливает опасные команды в Bash до выполнения и требует подтверждения. node \"C:/work/claude-help-config/hooks/no-force-push.mjs\" Created · backup: settings.json.2026-09-17T20-45-52-601Z.bak"
       }
     },
     {
@@ -81,14 +81,14 @@
       "masked": 0,
       "width": 1428,
       "height": 710,
-      "shotAt": "2026-09-11T14:17:14.453Z",
+      "shotAt": "2026-09-17T20:43:26.898Z",
       "text": "Добавить хук Изменения применятся после перезапуска Claude Code Конструктор Несколько сразу Отметьте нужные заготовки — создам их разом. Каждую потом можно править как обычно. Страж разрушительных команд Останавливает опасные команды в Bash до выполнения и требует подтверждения. Страж секретов Проверяет запись файлов на похожие на токены строки. Формат при сохранении Запускает форматтер после правки файла. Брифинг при старте Показывает напоминание или контекст в начале сессии. Чек-поинт перед сжатием Просит выписать состояние перед сжатием контекста. Создать выбранные (2) Закрыть",
       "en": {
         "file": "05-bulk.en.png",
         "masked": 0,
         "width": 1428,
         "height": 710,
-        "shotAt": "2026-09-11T17:30:07.002Z",
+        "shotAt": "2026-09-17T20:45:58.163Z",
         "text": "Add hook Changes apply after restarting Claude Code Builder Several at once Tick the presets you need — I will create them all at once. Each can be edited afterwards. Страж разрушительных команд Останавливает опасные команды в Bash до выполнения и требует подтверждения. Страж секретов Проверяет запись файлов на похожие на токены строки. Формат при сохранении Запускает форматтер после правки файла. Брифинг при старте Показывает напоминание или контекст в начале сессии. Чек-поинт перед сжатием Просит выписать состояние перед сжатием контекста. Create selected (2) Close"
       }
     }

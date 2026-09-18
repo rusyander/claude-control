@@ -70,9 +70,9 @@ export const platformEn: typeof platformRu = {
       'see “Section access” below.',
     tabTools: 'Tools and checks',
     tabToolsText:
-      'The tool shim summary and the contour’s content checks. Shown once a contour is active, ' +
-      'the panel gateway is up and a request went through it; until then the tab says what is ' +
-      'missing.',
+      'The tool shim summary, the contour’s content checks and the cases where the contour ' +
+      'compressed history. Shown once a contour is active, the panel gateway is up and a request ' +
+      'went through it; until then the tab says what is missing.',
     tabAgents: 'Agents',
     tabAgentsText:
       'Platform agents of the active contour and the MCP bridge — one for all contours.',
@@ -123,7 +123,13 @@ export const platformEn: typeof platformRu = {
     screenCardText:
       'Name, address, connection state and the date of the last probe. “Not answering” and ' +
       '“never answered” are different lines: the first carries the date of the last successful ' +
-      'probe next to it, the second has no date at all.',
+      'probe next to it, the second has no date at all. The date is not always yours: the ' +
+      'panel re-probes the ACTIVE contour itself, in the background, on an interval from the ' +
+      'settings (zero means do not go at all), and the card calls such a probe a background ' +
+      'one — otherwise “checked a minute ago” would read as “I pressed that”. The second ' +
+      'reason to go is a contour refusal that smells of rights (401 or 403): that is exactly ' +
+      'what a revoked key and a model taken off it look like, and until the next interval the ' +
+      'card would keep saying “checked, all good”.',
     screenMatrix: 'What is available',
     screenMatrixText:
       'The contour’s capabilities. The contour type declares the set of rows: for the company platform it is ' +
@@ -161,7 +167,11 @@ export const platformEn: typeof platformRu = {
       'when the contour resets its own counter is not visible from outside. At 85% the card ' +
       'warns in words and figures, not by the bar’s colour alone, and the same warning ' +
       'reaches the overview — before the refusal, not after. The budget is a number: write ' +
-      'a fraction with a dot or a comma.',
+      'a fraction with a dot or a comma. The panel also says a crossing outside this screen: ' +
+      '85% and “the estimate reached the budget” go to Telegram and the webhook — once per ' +
+      'crossing, not on every request. The mark is cleared by changing the day the period is ' +
+      'counted from, or by the refusal reset button. Phone push is deliberately left out: its ' +
+      'body opens a conversation, and a budget has none — every run spends it at once.',
     screenSpend: 'Spend',
     screenSpendText:
       'One figure, and it is an ESTIMATE — money by our own price book, carrying the “≈” sign. ' +
@@ -510,7 +520,10 @@ export const platformEn: typeof platformRu = {
       'built-in set of twenty patterns; an unreadable rules file refuses the request with the ' +
       'reason instead of sending it in the clear. Our labels are reversible and of another shape, ' +
       'the contour leaves them alone. The mask can be turned off in the same row, but the global ' +
-      'switch beats the toggle. The contour’s history compaction versus our checkpoints is a ' +
+      'switch beats the toggle. A mask that is off changes the matrix row itself: it says the ' +
+      'request goes to the contour AS IT IS right now, and names the switch. Promising the mask ' +
+      'under a mask that is off would be the worst possible text — about personal data leaving ' +
+      'for a corporate contour. The contour’s history compaction versus our checkpoints is a ' +
       'warning: after a compaction the continuation may not know the start of the task. Content ' +
       'checks versus the prompt gate is simply a fact: both refuse, by different lists, and the ' +
       'second refusal does not mean the first one failed. In those two rows the panel marks only ' +
@@ -639,8 +652,10 @@ export const platformEn: typeof platformRu = {
       'in the chat header stays a “not sent” caption through the contour.',
     asksDocTitle: 'The full list — a letter to the platform team',
     asksDocText:
-      'All seventeen asks, plus the questions the code does not answer, live in the panel ' +
-      'repository: docs/PLATFORM-ЗАПРОС.ru.md (in Russian). Each row names the signature an ' +
+      'All seventeen asks, plus the questions the code does not answer, are collected in a letter ' +
+      'to the platform team (in Russian). It is not in the panel repository and never will be: the ' +
+      'letter dissects someone else’s stand and the repository is public — it sits next to the ' +
+      'panel, under .agent/private/, and never reaches a fresh clone. Each row names the signature an ' +
       'answer would lift, the place in the platform code it rests on, and what it costs the ' +
       'platform. None of the asks blocks work: ' +
       'everything already runs through workarounds, and each workaround is signed in the list ' +
@@ -880,7 +895,11 @@ export const platformEn: typeof platformRu = {
       'endpoint profile with a generation address field. ' +
       'A contour request travels through the panel gateway, so it is in the gateway journal. It ' +
       'reaches the key’s spend only if the contour sent a bill: the company platform sends an image as part ' +
-      'of an answer without one, so such an image is not in the key’s spend.',
+      'of an answer without one, so such an image is not in the key’s spend. The gateway has ' +
+      'to be up for this — and when its switch is on while no listener is there, the panel ' +
+      'raises it itself, once: the lock with a reason appears only after that failed, and it ' +
+      'names the reason in the gateway’s own words. A switch left off the panel does not turn ' +
+      'on for you — the lock says exactly that: the gateway is off.',
     workDecks: 'Presentations on a topic from chat',
     workDecksWhy:
       'The deck itself asks the contour for no capability: the panel sends an ordinary chat ' +
@@ -973,9 +992,46 @@ export const platformEn: typeof platformRu = {
       'agent that edits files is verified on models from 27B; a model whose name carries a ' +
       'smaller size gets a yellow caption.',
 
+    summarizedTitle: 'The contour compressed history',
+    summarizedCaption:
+      'A conversation longer than the model limit is shortened by the contour itself: its start ' +
+      'is replaced with a summary, and the model answers without seeing the original text. The ' +
+      'panel cannot switch this off — it is the signed compromise “context-managed”. The panel ' +
+      'learns about a compression from a service frame in the answer stream and says so where ' +
+      'you read the answer.',
+    summarizedColumn: 'Where it shows',
+    summarizedMeaningColumn: 'What it says and how the answer is found',
+    summarizedClaude: 'Claude chat',
+    summarizedClaudeText:
+      'A caption under THE answer the contour compressed history before. The answer is found by ' +
+      'message id: the gateway issues it to the client itself, Claude Code writes it to the ' +
+      'transcript, and the feed matches it against the compression log. Neighbouring answers get ' +
+      'no caption.',
+    summarizedForeign: 'Foreign CLI chat',
+    summarizedForeignText:
+      'A caption “while this answer was prepared, the contour compressed history”. Every message ' +
+      'goes to the gateway with its own run tag in the address, so a compression in another chat ' +
+      '— even at the same time through the same contour — never lands here. It cannot be tied ' +
+      'closer than the run: one foreign CLI answer can take several requests.',
+    summarizedPhone: 'Phone',
+    summarizedPhoneText: 'The same caption under a Claude answer as in the web chat.',
+    summarizedCard: '“Tools and checks” tab',
+    summarizedCardText:
+      'The “The contour compressed history” card: how many cases the log holds, the last ten, and ' +
+      'for each whether an answer was marked. A request that came from outside the panel chats (a ' +
+      'terminal, a CLI configured through the section) has nowhere to be marked — it shows up ' +
+      'only here.',
+    summarizedLimitsTitle: 'What the caption does not know',
+    summarizedLimitsText:
+      'What exactly went into the summary the panel cannot see — the contour compresses, and only ' +
+      'the fact comes out. The compression log keeps the last 500 cases on disk and survives a ' +
+      'panel restart; older ones lose their caption. Conversations that went through the contour ' +
+      'before the log existed get no captions.',
+
     errorsTitle: 'Refusals and what to do',
     errorsCaption:
-      'The codes come from the contour, and the panel turns them into a reason in words. Here ' +
+      'The codes come from the contour, and the panel turns them into a reason in the ' +
+      'interface language — the same text the refusal carries to your CLI. Here ' +
       'is what stands behind each and where to go.',
     errorsColumn: 'Code',
     errorsActionColumn: 'What happened and what to do',

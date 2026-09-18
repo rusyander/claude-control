@@ -296,3 +296,65 @@ ${turn('u1', 'а теперь вопрос')}
     expect(readChats(projectsDir).find((item) => item.id === 'two')?.title).toBe('а теперь вопрос');
   });
 });
+
+describe('подпись «контур сжал историю»', () => {
+  let projectsDir: string;
+
+  beforeEach(() => {
+    projectsDir = mkdtempSync(join(tmpdir(), 'cc-chat-summarized-'));
+  });
+
+  afterEach(() => {
+    rmSync(projectsDir, { recursive: true, force: true });
+  });
+
+  function write(records: unknown[]): void {
+    const dir = join(projectsDir, 'proj');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 's.jsonl'), `${records.map((r) => JSON.stringify(r)).join('\n')}\n`);
+  }
+
+  const answer = (uuid: string, id: string, content: unknown[]): unknown => ({
+    type: 'assistant',
+    uuid,
+    timestamp: '2026-09-17T10:00:00.000Z',
+    message: { id, role: 'assistant', content },
+  });
+
+  it('подписан ровно ответ с id из журнала, а не соседний', async () => {
+    write([
+      { type: 'user', uuid: 'u0', message: { role: 'user', content: 'раз' } },
+      answer('a1', 'msg_c1-aaaaaaaaaaaa', [{ type: 'text', text: 'первый' }]),
+      { type: 'user', uuid: 'u2', message: { role: 'user', content: 'два' } },
+      answer('a3', 'msg_c1-bbbbbbbbbbbb', [{ type: 'text', text: 'второй' }]),
+    ]);
+    const page = await readChatMessages(projectsDir, 's', {
+      summarizedIds: new Set(['msg_c1-bbbbbbbbbbbb']),
+    });
+    expect(page.messages.map((m) => [m.id, m.contextSummarized ?? false])).toEqual([
+      ['u0', false],
+      ['a1', false],
+      ['u2', false],
+      ['a3', true],
+    ]);
+  });
+
+  it('ответ, записанный несколькими строками одного id, подписан один раз', async () => {
+    write([
+      { type: 'user', uuid: 'u0', message: { role: 'user', content: 'раз' } },
+      answer('a1', 'msg_x-cccccccccccc', [{ type: 'thinking', thinking: 'думаю' }]),
+      answer('a2', 'msg_x-cccccccccccc', [{ type: 'text', text: 'ответ' }]),
+    ]);
+    const page = await readChatMessages(projectsDir, 's', {
+      summarizedIds: new Set(['msg_x-cccccccccccc']),
+    });
+    const flagged = page.messages.filter((m) => m.contextSummarized);
+    expect(flagged).toHaveLength(1);
+  });
+
+  it('без журнала поля нет вовсе', async () => {
+    write([answer('a1', 'msg_c1-aaaaaaaaaaaa', [{ type: 'text', text: 'ответ' }])]);
+    const page = await readChatMessages(projectsDir, 's');
+    expect(page.messages[0]).not.toHaveProperty('contextSummarized');
+  });
+});

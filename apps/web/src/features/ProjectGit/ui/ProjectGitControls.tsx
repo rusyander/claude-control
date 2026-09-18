@@ -20,6 +20,7 @@ import { pullBody } from '../model/projectGitView';
 import { WorktreeSection } from './WorktreeSection';
 import type { ProjectGitControlsProps } from './ProjectGitControls.types';
 import styles from './ProjectGitControls.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Git проекта в ряду вкладки: кнопка с текущей веткой, а под ней — всё
@@ -43,6 +44,15 @@ export function ProjectGitControls({
 }: ProjectGitControlsProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
+  // Поповер намеренно НЕ модальный: страница за ним живая, Tab из него выходит
+  // на неё. С клавиатуры от такого окна требуется одно — Escape закрывает, а
+  // фокус возвращается на кнопку ветки, а не падает на тело страницы, иначе
+  // следующий Tab начинает обход панели заново.
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const close = (): void => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
   const [newBranch, setNewBranch] = useState('');
   const [message, setMessage] = useState('');
   // Пусто — «текущая ветка», то есть обычный git pull по её upstream.
@@ -82,7 +92,7 @@ export function ProjectGitControls({
    * выглядел как две ошибки.
    */
   const done = (result: { output: string }): void => {
-    toast.success(result.output);
+    toast.success(serverFieldText(result, 'output'));
   };
 
   const onCheckout = (branch: string): void => {
@@ -131,6 +141,7 @@ export function ProjectGitControls({
   return (
     <div className={isStrip ? `${styles.wrap} ${styles.wrapStrip}` : styles.wrap}>
       <Button
+        ref={triggerRef}
         variant="ghost"
         size="sm"
         fullWidth={isStrip}
@@ -172,7 +183,13 @@ export function ProjectGitControls({
           <div
             className={isStrip ? `${styles.panel} ${styles.panelLeft}` : styles.panel}
             role="dialog"
+            aria-modal="false"
             aria-label={t('git.title')}
+            onKeyDown={(event) => {
+              if (event.key !== 'Escape') return;
+              event.stopPropagation();
+              close();
+            }}
           >
             <Stack gap="var(--spacing-sm)" padding="var(--spacing-sm)">
               {info.error ? (
@@ -193,7 +210,15 @@ export function ProjectGitControls({
                       говорит о том, что именно уйдёт в коммит. Список свой
                       скроллится, чтобы поповер не рос на весь экран. */}
                   {info.changedFiles.length > 0 && (
-                    <div className={styles.files} aria-label={t('git.files')}>
+                    <div
+                      className={styles.files}
+                      // Свой скролл без фокуса недоступен с клавиатуры вовсе:
+                      // мышью список листают, а Tab проходит мимо, и нижние
+                      // файлы не увидеть. Отсюда tabIndex и подписанная группа.
+                      role="group"
+                      tabIndex={0}
+                      aria-label={t('git.files')}
+                    >
                       {info.changedFiles.map((file) => {
                         const { dir, name } = splitPath(file.path);
                         return (

@@ -235,15 +235,19 @@ describe('collectChildStages', () => {
       'Тесты',
     ]);
     expect(rows[0]).toMatchObject({ chatId: 'triage', stages: ['triage'] });
+    // Номер группы — из конвейера, а не порядок строки: отпускание и ответ
+    // адресуются им, а «Шапка» стоит второй строкой, будучи группой №1.
     expect(rows[1]).toMatchObject({
       chatId: '',
       pending: 'held',
+      groupIndex: 1,
       hold: { index: 1, question: 'Цвет?' },
     });
     expect(rows[2]).toMatchObject({ chatId: 'plan-a', stages: ['plan'], branch: 'feature/login' });
     expect(rows[3]).toMatchObject({
       chatId: '',
       pending: 'waiting',
+      groupIndex: 2,
       waitsFor: ['Шапка', 'Форма входа'],
       holdAnswered: true,
       base: 'feature/login',

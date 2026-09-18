@@ -27,6 +27,8 @@ import {
   GroupNotFoundError,
   InvalidGroupDraftError,
 } from '../domains/group-draft.ts';
+import { codeOf } from '../lib/server-text.ts';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /**
  * Что доменные функции переключения берут от контекста. Собираем на каждом
@@ -51,7 +53,9 @@ function fail(reply: FastifyReply, error: unknown): FastifyReply {
     error instanceof GroupExistsError ||
     error instanceof AutomationNotFoundError
   ) {
-    return reply.code(error.statusCode).send({ error: error.code, message: error.message });
+    return reply
+      .code(error.statusCode)
+      .send({ error: error.code, message: error.message, ...codeOf(error) });
   }
   throw error;
 }
@@ -137,10 +141,12 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
       // Вложенная группа может замкнуть цикл (A→B→A) — тогда обход состава не
       // завершился бы. Отвергаем ещё до сохранения, а не чиним на обходе.
       if (wouldCreateCycle(groups, id, body.members ?? [])) {
-        return reply.code(400).send({ error: 'Вложение групп образует цикл' });
+        return reply
+          .code(400)
+          .send({ error: 'Вложение групп образует цикл', messageCode: 'group-cycle' });
       }
       const invalid = triggerError(body.scenario);
-      if (invalid) return reply.code(400).send({ error: invalid });
+      if (invalid) return reply.code(400).send(invalid);
 
       const saved = persist({ ...withDefaults(body), id, order: nextOrder(groups) }, []);
       // Переменные включённой группы применяются сразу при создании. Раньше POST
@@ -171,10 +177,12 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
       // Группа не может входить сама в себя ни напрямую, ни через цепочку вложенных
       // — иначе включение/выключение зациклилось бы по ветке.
       if (wouldCreateCycle(groups, existing.id, body.members ?? [])) {
-        return reply.code(400).send({ error: 'Вложение групп образует цикл' });
+        return reply
+          .code(400)
+          .send({ error: 'Вложение групп образует цикл', messageCode: 'group-cycle' });
       }
       const invalid = triggerError(body.scenario);
-      if (invalid) return reply.code(400).send({ error: invalid });
+      if (invalid) return reply.code(400).send(invalid);
 
       // Скомпилированный скилл держится за группой, а не за телом запроса:
       // клиент про его id не знает, и без этого каждая правка заводила бы новый.
@@ -216,13 +224,16 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     '/api/groups/:id/enabled',
     (request, reply) => {
       const group = ctx.store.getGroups().find((item) => item.id === request.params.id);
-      if (!group) return reply.code(404).send({ error: 'Группа не найдена' });
+      if (!group)
+        return reply.code(404).send({ error: 'Группа не найдена', messageCode: 'group-not-found' });
 
       // Состояние обязано прийти явно: домыслить его тут значило бы переключить
       // группу не туда, куда просили, — а это правка настоящего ~/.claude.
       const isEnabled = request.body?.isEnabled;
       if (typeof isEnabled !== 'boolean') {
-        return reply.code(400).send({ error: 'Не указано состояние группы' });
+        return reply
+          .code(400)
+          .send({ error: 'Не указано состояние группы', messageCode: 'group-state-unspecified' });
       }
 
       const result = setGroupEnabled(toggleDeps(ctx), group, isEnabled);
@@ -277,10 +288,13 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
    * быть не должно: без события и команды в конфиг ушёл бы хук, который ничего
    * не ловит и ничего не делает, а в списке появилась бы безымянная строка.
    */
-  const automationError = (body: Partial<Automation>): string | undefined => {
-    if (!body.name?.trim()) return 'Не указано имя сценария';
-    if (!body.trigger?.event) return 'Не указано событие сценария';
-    if (!body.action?.command?.trim()) return 'Не указана команда сценария';
+  const automationError = (body: Partial<Automation>): CodedRefusal | undefined => {
+    if (!body.name?.trim())
+      return { error: 'Не указано имя сценария', messageCode: 'automation-name-missing' };
+    if (!body.trigger?.event)
+      return { error: 'Не указано событие сценария', messageCode: 'automation-event-missing' };
+    if (!body.action?.command?.trim())
+      return { error: 'Не указана команда сценария', messageCode: 'automation-command-missing' };
     return undefined;
   };
 
@@ -289,7 +303,7 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
 
   app.post<{ Body: Partial<Omit<Automation, 'id'>> }>('/api/automations', (request, reply) => {
     const invalid = automationError(request.body);
-    if (invalid) return reply.code(400).send({ error: invalid });
+    if (invalid) return reply.code(400).send(invalid);
 
     const automation: Automation = {
       ...(request.body as Omit<Automation, 'id'>),
@@ -307,7 +321,7 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
       // пустой запрос получает один ответ независимо от того, есть ли такой id.
       // Правка неизвестного сценария — 404, а не создание под чужим id.
       const invalid = automationError(request.body);
-      if (invalid) return reply.code(400).send({ error: invalid });
+      if (invalid) return reply.code(400).send(invalid);
       if (!hasAutomation(request.params.id)) {
         return fail(reply, new AutomationNotFoundError(request.params.id));
       }
@@ -355,9 +369,18 @@ function normalizeScenario(
 }
 
 /** Текст отказа для негодного выражения триггера — или пусто, если всё в порядке. */
-function triggerError(scenario?: Partial<GroupScenario>): string | undefined {
+function triggerError(scenario?: Partial<GroupScenario>): CodedRefusal | undefined {
   if (!scenario?.trigger || isValidTrigger(scenario.trigger)) return undefined;
-  return 'Выражение триггера не является регулярным выражением';
+  return {
+    error: 'Выражение триггера не является регулярным выражением',
+    messageCode: 'scenario-trigger-not-regex',
+  };
+}
+
+/** Отказ проверки тела: русская строка в `error` и код для перевода на клиенте. */
+interface CodedRefusal {
+  error: string;
+  messageCode: ServerMessageCode;
 }
 
 /**

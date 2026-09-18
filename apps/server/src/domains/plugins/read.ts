@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { Marketplace, Plugin, PluginsState } from '@agentdeck/contracts';
 import { defaultCliCommand } from '../../providers/cli.ts';
 import { runClaude } from './cli.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Чтение каталога плагинов: что установлено, что доступно и какие маркетплейсы
@@ -67,7 +68,7 @@ export async function readPlugins(
     marketplaces: readMarketplaces(claudeRoot),
     // Отказ CLI — не «плагинов нет», а «список не получен». Молчаливый ноль
     // читался бы как правда и отправлял бы человека искать пропавшие плагины.
-    notes: error ? [`Список плагинов не получен: ${error}`] : [],
+    notes: error ? [serverText('plugins-list-failed', { reason: error })] : [],
   };
 }
 

@@ -12,6 +12,7 @@ import { SKILL_FILE_NAME, SkillFormatError, readOpencodeSkill } from '../../lib/
 import { SkillNotEditableError, SkillNotFoundError } from './errors.ts';
 import { resolveSkillPath, toRelative } from './paths.ts';
 import type { ProviderSkillsTarget } from './types.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /** Папки каталога: со `SKILL.md` — скиллы, без него — прочие (показываем, не трогаем). */
 function walkSkillsDir(target: ProviderSkillsTarget): { skills: string[]; ignored: string[] } {
@@ -117,10 +118,14 @@ export function readProviderSkill(target: ProviderSkillsTarget, rawPath: string)
     throw new SkillNotFoundError(rawPath);
   }
   if (fileSizeOf(fullPath) > SECTION_MAX_FILE_BYTES) {
-    throw new SkillNotEditableError(
-      rawPath,
-      'malformed',
-      `Файл ${fullPath} слишком большой для правки в панели.`,
+    throw coded(
+      new SkillNotEditableError(
+        rawPath,
+        'malformed',
+        `Файл ${fullPath} слишком большой для правки в панели.`,
+      ),
+      'file-too-large-to-edit',
+      { path: fullPath },
     );
   }
 

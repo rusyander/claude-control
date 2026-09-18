@@ -2,6 +2,7 @@ import type { Group } from '@agentdeck/contracts';
 import { normalizeProjectPath } from '../lib/app-store/projects.ts';
 import { WORKTREES_DIR_SUFFIX } from './project-git/worktrees.ts';
 import type { EntityToggleDeps } from './entity-toggle.ts';
+import type { ChatEvent } from './chat/chat-events.ts';
 import { setGroupEnabled } from './group-toggle.ts';
 
 /**
@@ -73,16 +74,44 @@ export function activateGroupsForCwd(deps: EntityToggleDeps, cwd: string): { act
  * только со следующего сообщения, набранного руками.
  *
  * Осечка не имеет права ронять прогон: набор не главнее разговора. Поэтому
- * ошибка уходит в `onError` вызывающего (там есть логгер), а не наружу.
+ * ошибка уходит в `onError` вызывающего (там есть логгер), а не наружу, а имена
+ * включённых наборов возвращаются так же, как из обычного вызова: сказать о них
+ * человеку тут надо ровно то же самое.
  */
 export function activateGroupsQuietly(
   deps: EntityToggleDeps,
   cwd: string,
   onError?: (error: unknown) => void,
-): void {
+): string[] {
   try {
-    activateGroupsForCwd(deps, cwd);
+    return activateGroupsForCwd(deps, cwd).activated;
   } catch (error) {
     onError?.(error);
+    return [];
   }
+}
+
+/**
+ * Заметка в ленту прогона: панель включила набор сама.
+ *
+ * Без неё включение остаётся невидимым совсем: тумблера никто не трогал,
+ * страница «Наборы» в этот момент не открыта, а агент вдруг ведёт себя иначе —
+ * и объяснить это человеку нечем. Заметка, а не ошибка: включение задумано.
+ *
+ * Строка одна на ФАКТ, а не на сообщение: уже включённый набор активация не
+ * трогает вовсе, поэтому второй раз про него ничего не скажут. Пусто — панель
+ * ничего не меняла, и говорить не о чем.
+ */
+export function groupsActivatedNotice(activated: readonly string[]): ChatEvent | undefined {
+  if (activated.length === 0) return undefined;
+  const names = activated.map((name) => `«${name}»`).join(', ');
+
+  return {
+    kind: 'notice',
+    code: 'groupsActivated',
+    text:
+      activated.length === 1
+        ? `Набор ${names} включён сам — он привязан к этому проекту.`
+        : `Наборы ${names} включены сами — они привязаны к этому проекту.`,
+  };
 }

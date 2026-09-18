@@ -5,6 +5,8 @@ import type { DlpRule } from '@agentdeck/contracts';
 import { writeJsonFile } from '../../lib/safe-io.ts';
 import { DLP_BUILTIN_IDS } from './builtins.mjs';
 import { compileRulePattern } from './rules.ts';
+import { coded } from '../../lib/server-text.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Правила на диске — файл панели, не чужой формат.
@@ -53,11 +55,16 @@ export function readRules(appDataDir: string): DlpRule[] {
   try {
     parsed = JSON.parse(readFileSync(path, 'utf8'));
   } catch (error) {
-    throw new DlpRulesError(`файл правил не разбирается (${(error as Error).message})`);
+    throw coded(
+      new DlpRulesError(`файл правил не разбирается (${(error as Error).message})`),
+      'dlp-rules-unparsed',
+      { reason: (error as Error).message },
+    );
   }
 
   const result = fileSchema.safeParse(parsed);
-  if (!result.success) throw new DlpRulesError('файл правил не соответствует схеме');
+  if (!result.success)
+    throw coded(new DlpRulesError('файл правил не соответствует схеме'), 'dlp-rules-schema-file');
   return result.data.rules;
 }
 
@@ -70,7 +77,12 @@ export function parseRules(rules: readonly unknown[]): DlpRule[] | DlpRulesError
   const out: DlpRule[] = [];
   for (const [index, raw] of rules.entries()) {
     const parsed = ruleSchema.safeParse(raw);
-    if (!parsed.success) return new DlpRulesError(`${nameOf(raw, index)}: не соответствует схеме`);
+    if (!parsed.success)
+      return coded(
+        new DlpRulesError(`${nameOf(raw, index)}: не соответствует схеме`),
+        'dlp-rule-schema',
+        { rule: nameOf(raw, index) },
+      );
     out.push(parsed.data);
   }
   return out;
@@ -88,17 +100,17 @@ export function validateRules(rules: readonly unknown[]): string | undefined {
 
   const seen = new Set<string>();
   for (const rule of parsed) {
-    if (seen.has(rule.id)) return `правило «${rule.name}»: идентификатор повторяется`;
+    if (seen.has(rule.id)) return serverText('dlp-rule-id-duplicate', { name: rule.name });
     seen.add(rule.id);
 
     if (rule.kind === 'regex' && !compileRulePattern(rule.pattern)) {
-      return `правило «${rule.name}»: выражение не разбирается`;
+      return serverText('dlp-rule-regex-broken', { name: rule.name });
     }
     if (rule.kind === 'builtin' && !rule.builtin) {
-      return `правило «${rule.name}»: не выбран встроенный образец`;
+      return serverText('dlp-rule-no-builtin', { name: rule.name });
     }
     if (rule.kind === 'terms' && rule.terms.filter((term) => term.trim()).length === 0) {
-      return `правило «${rule.name}»: словарь пуст`;
+      return serverText('dlp-rule-dictionary-empty', { name: rule.name });
     }
   }
   return undefined;
@@ -111,7 +123,8 @@ export function saveRules(appDataDir: string, rules: readonly unknown[]): void {
   // Пишем РАЗОБРАННЫЕ правила, а не присланные: файл читает ещё и скрипт хука,
   // у которого нет схемы. Недостающее поле там стало бы догадкой.
   const parsed = fileSchema.safeParse({ version: 1, rules });
-  if (!parsed.success) throw new DlpRulesError('правила не соответствуют схеме');
+  if (!parsed.success)
+    throw coded(new DlpRulesError('правила не соответствуют схеме'), 'dlp-rules-schema');
   writeJsonFile(rulesPath(appDataDir), parsed.data);
 }
 

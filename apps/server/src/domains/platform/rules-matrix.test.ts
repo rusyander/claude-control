@@ -143,6 +143,23 @@ describe('матрица конфликтов — по ячейке на стр�
     // единственное, что на этом пути данные закрывает.
     expect(cell?.detail).toContain('не гарантирована');
     expect(cell?.detail).not.toContain('сам возвращает значениями');
+    expect(cell?.detail).toContain('Выключать ничего не нужно');
+  });
+
+  it('маска выключена — строка говорит это, а не «выключать ничего не нужно»', () => {
+    // Ревью Т13: «Поэтому наша маска включается сама … Выключать ничего не
+    // нужно» было безусловным, а `dataMask: false` снимает маску одним щелчком
+    // на той же карточке. Строка рисуется независимо от `oursOnly`, и человек
+    // читал бы обещание маски про запрос, уходящий открытым.
+    const cell = ruleConflicts(PLATFORM, enterprise, { ...OURS, dlp: false }).find(
+      (row) => row.id === 'anonymization',
+    );
+    expect(cell?.oursOnly).toBe(false);
+    expect(cell?.detail).toContain('СЕЙЧАС она выключена');
+    expect(cell?.detail).not.toContain('Выключать ничего не нужно');
+    // Пропажа причины была бы худшим исходом: строка обязана остаться о порядке
+    // слоёв, а не превратиться в голое «маска выключена».
+    expect(cell?.detail).toContain('не гарантирована');
   });
 
   it('сжатие истории ⟷ контрольные точки: предупреждение, и загорается по пробе', () => {
@@ -245,10 +262,10 @@ describe('подмешивание управляемых правил в тел
   });
 
   describe('размышления: путь на проводе и три состояния (аудит GW-09/DRV-09/MD-02)', () => {
-    // Схема контура: `mod-llmbox/src/llmbox/api/chat/schemas.py:115-120` — поля
-    // `enable_thinking` верхнего уровня у неё нет, есть только
-    // `chat_template_kwargs`, а незнакомый ключ выбрасывается (`extra=ignore`).
-    // Штатное употребление поля в самом контуре — `false` (`context/manager.py:225`).
+    // Схема запроса чата у контура: поля `enable_thinking` верхнего уровня у
+    // неё нет, есть только `chat_template_kwargs`, а незнакомый ключ
+    // выбрасывается (`extra=ignore`). Штатное употребление поля в самом
+    // контуре — `false`.
     it('выключено уезжает значением false, а не отсутствием поля', () => {
       const body = applyManagedRules({}, withRules({ enableThinking: 'off' }), enterprise);
       expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });

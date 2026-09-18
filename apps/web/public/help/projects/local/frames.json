@@ -9,15 +9,15 @@
       "masked": 0,
       "width": 1440,
       "height": 1100,
-      "shotAt": "2026-09-11T12:46:08.365Z",
-      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Проекты — конфигурация Правила, права и MCP-серверы конкретного проекта: его CLAUDE.md, .claude/settings.json и .mcp.json. Хуки, скиллы и файлы правил из .claude показываются для чтения Добавить проект Что это Проектов: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина проектный уровень C:/work/shop-front Внешние привязки Ничего не привязано Привязать Правила MCP-серверы Права Из проекта только чтение Скиллы, хуки и правила из каталога .claude этого проекта — Claude Code загружает их вместе с пользовательскими. Панель их только показывает: набор принадлежит гиту проекта и правится там, как остальной код. Скиллы 2 release-notes файлов: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import выключен Разбор старого формата прайса. Выключен до конца переезда. Хуки 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json скрипт не найден node .claude/hooks/notify-me.mjs Правила 2 Витрина: правила фронтенда frontend.md Показать текст src/**/*.tsx Формат коммитов release/commits.md Показать текст",
+      "shotAt": "2026-09-17T20:55:09.611Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Проекты — конфигурация Правила, права и MCP-серверы конкретного проекта: его CLAUDE.md, .claude/settings.json и .mcp.json. Хуки, скиллы и файлы правил из .claude показываются для чтения Добавить проект Что это Проектов: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина проектный уровень C:/work/shop-front Внешние привязки Ничего не привязано Привязать Правила MCP-серверы Права Из проекта только чтение Скиллы, хуки и правила из каталога .claude этого проекта — Claude Code загружает их вместе с пользовательскими. Панель их только показывает: набор принадлежит гиту проекта и правится там, как остальной код. Скиллы 2 release-notes файлов: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import выключен Разбор старого формата прайса. Выключен до конца переезда. Хуки 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json скрипт не найден node .claude/hooks/notify-me.mjs Правила 2 Витрина: правила фронтенда frontend.md Показать текст src/**/*.tsx Формат коммитов release/commits.md Показать текст",
       "en": {
         "file": "01-tab.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-09-11T17:22:18.159Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Projects — configuration A specific project's rules, permissions and MCP servers: its CLAUDE.md, .claude/settings.json and .mcp.json. Hooks, skills and rule files from .claude are shown read-only Add project What is this Projects: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина project level C:/work/shop-front External links Nothing linked Link Rules MCP servers Permissions From the project read-only Skills, hooks and rules from this project's .claude directory — Claude Code loads them together with the user-level ones. The panel only shows them: the set belongs to the project's git and is edited there, like the rest of the code. Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда. Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs Rules 2 Витрина: правила фронтенда frontend.md Show text src/**/*.tsx Формат коммитов release/commits.md Show text"
+        "shotAt": "2026-09-17T20:56:16.590Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Projects — configuration A specific project's rules, permissions and MCP servers: its CLAUDE.md, .claude/settings.json and .mcp.json. Hooks, skills and rule files from .claude are shown read-only Add project What is this Projects: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина project level C:/work/shop-front External links Nothing linked Link Rules MCP servers Permissions From the project read-only Skills, hooks and rules from this project's .claude directory — Claude Code loads them together with the user-level ones. The panel only shows them: the set belongs to the project's git and is edited there, like the rest of the code. Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда. Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs Rules 2 Витрина: правила фронтенда frontend.md Show text src/**/*.tsx Формат коммитов release/commits.md Show text"
       }
     },
     {
@@ -27,14 +27,14 @@
       "masked": 0,
       "width": 1038,
       "height": 438,
-      "shotAt": "2026-09-11T12:46:08.410Z",
+      "shotAt": "2026-09-17T20:55:09.637Z",
       "text": "Скиллы 2 release-notes файлов: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import выключен Разбор старого формата прайса. Выключен до конца переезда.",
       "en": {
         "file": "02-skills.en.png",
         "masked": 0,
         "width": 1038,
         "height": 438,
-        "shotAt": "2026-09-11T17:22:18.212Z",
+        "shotAt": "2026-09-17T20:56:16.635Z",
         "text": "Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда."
       }
     },
@@ -45,14 +45,14 @@
       "masked": 0,
       "width": 1038,
       "height": 461,
-      "shotAt": "2026-09-11T12:46:08.437Z",
+      "shotAt": "2026-09-17T20:55:09.686Z",
       "text": "Хуки 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json скрипт не найден node .claude/hooks/notify-me.mjs",
       "en": {
         "file": "03-hooks.en.png",
         "masked": 0,
         "width": 1038,
         "height": 461,
-        "shotAt": "2026-09-11T17:22:18.262Z",
+        "shotAt": "2026-09-17T20:56:16.683Z",
         "text": "Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs"
       }
     },
@@ -63,14 +63,14 @@
       "masked": 0,
       "width": 1038,
       "height": 537,
-      "shotAt": "2026-09-11T12:46:09.032Z",
+      "shotAt": "2026-09-17T20:55:10.253Z",
       "text": "Правила 2 Витрина: правила фронтенда frontend.md Свернуть текст src/**/*.tsx # Витрина: правила фронтенда Один компонент — один файл. Радиус скругления числом, не токеном. Формат коммитов release/commits.md Показать текст",
       "en": {
         "file": "04-rules.en.png",
         "masked": 0,
         "width": 1038,
         "height": 537,
-        "shotAt": "2026-09-11T17:22:18.842Z",
+        "shotAt": "2026-09-17T20:56:17.253Z",
         "text": "Rules 2 Витрина: правила фронтенда frontend.md Hide text src/**/*.tsx # Витрина: правила фронтенда Один компонент — один файл. Радиус скругления числом, не токеном. Формат коммитов release/commits.md Show text"
       }
     }

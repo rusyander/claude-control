@@ -12,6 +12,7 @@ import { resolveProviderMcpTarget, upsertProviderMcpServer } from '../provider-m
 import { resolveInstructionsTarget, writeInstructions } from '../instructions.ts';
 import { mcpSide } from './sections.ts';
 import { CompareRequestError, type CompareDeps } from './types.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Перенос записей из одного провайдера в другой.
@@ -29,12 +30,16 @@ export function migrateProvider(
 ): ProviderMigrateResponse {
   const { from, to, section, mode } = assertMigrateRequest(request);
 
-  if (from === to) throw new CompareRequestError('Источник и приёмник совпадают.');
+  if (from === to)
+    throw coded(new CompareRequestError('Источник и приёмник совпадают.'), 'migrate-same');
   if (section !== 'mcp' && section !== 'instructions') {
-    throw new CompareRequestError(
-      section === 'env'
-        ? 'Переменные окружения панель не переносит: в них хранятся ключи.'
-        : 'Права не переносятся: у CLI разные модели согласований.',
+    throw coded(
+      new CompareRequestError(
+        section === 'env'
+          ? 'Переменные окружения панель не переносит: в них хранятся ключи.'
+          : 'Права не переносятся: у CLI разные модели согласований.',
+      ),
+      section === 'env' ? 'migrate-env-refused' : 'migrate-permissions-refused',
     );
   }
 
@@ -60,21 +65,33 @@ export function assertMigrateRequest(
   const { from, to, section, keys, mode } = raw;
 
   if (typeof from !== 'string' || typeof to !== 'string' || !from || !to) {
-    throw new CompareRequestError('Поля from и to обязаны быть непустыми строками.');
+    throw coded(
+      new CompareRequestError('Поля from и to обязаны быть непустыми строками.'),
+      'migrate-from-to',
+    );
   }
   if (typeof section !== 'string' || !SECTIONS.has(section)) {
-    throw new CompareRequestError(
-      'Поле section обязано быть одним из: mcp, env, permissions, instructions.',
+    throw coded(
+      new CompareRequestError(
+        'Поле section обязано быть одним из: mcp, env, permissions, instructions.',
+      ),
+      'migrate-section',
     );
   }
   if (mode !== undefined && (typeof mode !== 'string' || !MODES.has(mode))) {
-    throw new CompareRequestError('Поле mode обязано быть preview или apply.');
+    throw coded(
+      new CompareRequestError('Поле mode обязано быть preview или apply.'),
+      'migrate-mode',
+    );
   }
   if (
     keys !== undefined &&
     (!Array.isArray(keys) || keys.some((key) => typeof key !== 'string' || !key))
   ) {
-    throw new CompareRequestError('Поле keys обязано быть списком непустых строк.');
+    throw coded(
+      new CompareRequestError('Поле keys обязано быть списком непустых строк.'),
+      'migrate-keys',
+    );
   }
 
   return {
@@ -94,7 +111,11 @@ function migrateMcp(
   deps: CompareDeps,
 ): ProviderMigrateResponse {
   const source = mcpSide(from, deps);
-  if (!source.supported) throw new CompareRequestError('У источника нет раздела MCP-серверов.');
+  if (!source.supported)
+    throw coded(
+      new CompareRequestError('У источника нет раздела MCP-серверов.'),
+      'migrate-source-no-mcp',
+    );
 
   const skipped: MigrateSkip[] = [];
   const chosen: UniversalMcpServer[] = [];
@@ -103,11 +124,15 @@ function migrateMcp(
   for (const key of keys) {
     const row = byKey.get(key);
     if (!row?.payload) {
-      skipped.push({ key, reason: 'У источника такого сервера нет.' });
+      skipped.push({
+        key,
+        reason: 'У источника такого сервера нет.',
+        reasonCode: 'migrate-source-server-missing',
+      });
       continue;
     }
     if (row.blocked) {
-      skipped.push({ key, reason: row.blocked });
+      skipped.push({ key, reason: row.blocked, reasonCode: row.blockedCode });
       continue;
     }
     chosen.push(row.payload);
@@ -155,7 +180,11 @@ function mcpWriter(
   }
 
   const target = resolveProviderMcpTarget(providerSettingsSource(to, deps.claudeDirOverride));
-  if (!target) throw new CompareRequestError('У приёмника нет раздела MCP-серверов.');
+  if (!target)
+    throw coded(
+      new CompareRequestError('У приёмника нет раздела MCP-серверов.'),
+      'migrate-target-no-mcp',
+    );
 
   const draftOf = (server: UniversalMcpServer) => ({
     name: server.name,
@@ -206,10 +235,21 @@ function migrateInstructions(
     deps.claude.claudeMdPath,
   );
 
-  if (!sourceTarget) throw new CompareRequestError('У источника нет файла глобальных инструкций.');
-  if (!targetTarget) throw new CompareRequestError('У приёмника нет файла глобальных инструкций.');
+  if (!sourceTarget)
+    throw coded(
+      new CompareRequestError('У источника нет файла глобальных инструкций.'),
+      'migrate-source-no-instructions',
+    );
+  if (!targetTarget)
+    throw coded(
+      new CompareRequestError('У приёмника нет файла глобальных инструкций.'),
+      'migrate-target-no-instructions',
+    );
   if (!existsSync(sourceTarget.filePath)) {
-    throw new CompareRequestError('Файл инструкций источника не существует — переносить нечего.');
+    throw coded(
+      new CompareRequestError('Файл инструкций источника не существует — переносить нечего.'),
+      'migrate-instructions-missing',
+    );
   }
 
   const content = readTextFile(sourceTarget.filePath);

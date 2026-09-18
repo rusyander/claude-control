@@ -2,6 +2,7 @@ import type { TmsPushResult } from '@agentdeck/contracts';
 import { invalidField } from '../errors.ts';
 import { requestJson } from '../http.ts';
 import type { TmsCaseBatch, TmsClient, TmsRunPush } from './types.ts';
+import { serverText } from '../../../lib/server-texts.ts';
 
 /**
  * Xray (облако): импорт результатов документом и чтение кейсов через GraphQL.
@@ -38,6 +39,8 @@ function splitToken(token: string): { clientId: string; clientSecret: string } {
     throw invalidField(
       'token',
       'токен Xray задаётся парой «clientId:clientSecret» через двоеточие',
+      'request-xray-token-pair',
+      { field: 'token' },
     );
   }
   return { clientId: token.slice(0, at).trim(), clientSecret: token.slice(at + 1).trim() };
@@ -57,7 +60,10 @@ async function authenticate(token: string): Promise<string> {
     body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
   });
   const value = String(jwt ?? '').replace(/^"|"$/g, '');
-  if (!value) throw invalidField('token', 'Xray не выдал ключ по этой паре');
+  if (!value)
+    throw invalidField('token', 'Xray не выдал ключ по этой паре', 'request-xray-no-key', {
+      field: 'token',
+    });
   return value;
 }
 
@@ -69,7 +75,13 @@ interface XrayTestNode {
 
 export function xrayClient(token: string, projectKey: string): TmsClient {
   const key = projectKey.trim();
-  if (!key) throw invalidField('projectKey', 'не указан ключ проекта Jira');
+  if (!key)
+    throw invalidField(
+      'projectKey',
+      'не указан ключ проекта Jira',
+      'request-jira-project-key-missing',
+      { field: 'projectKey' },
+    );
 
   return {
     kind: 'xray',
@@ -78,7 +90,7 @@ export function xrayClient(token: string, projectKey: string): TmsClient {
     /** Проверка = выдача JWT: пара принята, значит связь есть. */
     async ping(): Promise<string> {
       await authenticate(token);
-      return `${SYSTEM}, проект ${key}`;
+      return serverText('integration-tms-project', { system: SYSTEM, project: key });
     },
 
     /**
@@ -110,7 +122,11 @@ export function xrayClient(token: string, projectKey: string): TmsClient {
         });
 
         const failure = payload.errors?.[0]?.message;
-        if (failure) throw invalidField('projectKey', `Xray отказал: ${failure}`);
+        if (failure)
+          throw invalidField('projectKey', `Xray отказал: ${failure}`, 'request-xray-refused', {
+            field: 'projectKey',
+            failure,
+          });
 
         const results = payload.data?.getTests?.results ?? [];
         nodes.push(...results);

@@ -31,12 +31,14 @@ export function registerProviderRulesRoutes(app: FastifyInstance, ctx: ServerCon
   const SECTION_UNSUPPORTED = {
     error: 'section_unsupported',
     message: 'У активного провайдера инструкции не устроены каталогом правил.',
+    messageCode: 'instructions-not-rules-dir',
   } as const;
 
   const INVALID_DRAFT = {
     error: 'invalid_draft',
     message:
       'Правило не прошло проверку: нужен путь внутри каталога правил и текстовое тело; description и globs — однострочные, alwaysApply — булево.',
+    messageCode: 'rule-draft-invalid',
   } as const;
 
   const requireTarget = (reply: FastifyReply): ProviderRulesTarget | undefined => {

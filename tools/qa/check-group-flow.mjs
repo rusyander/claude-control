@@ -35,7 +35,7 @@ const hasBinding = await dialog.getByText('Проекты', { exact: true }).isV
 const hasOrder = await dialog.getByText('Порядок работы', { exact: true }).isVisible();
 console.log('Блоки привязки и порядка работы на месте:', hasBinding && hasOrder ? 'да' : 'НЕТ');
 
-await page.getByLabel('Триггер по тексту запроса').fill('GOR-(\\d+');
+await page.getByLabel('Триггер по тексту запроса').fill('PRJ-(\\d+');
 await page.waitForTimeout(200);
 const showsTriggerError = await page.getByText('Это не регулярное выражение').isVisible();
 console.log('Сломанное выражение триггера подсвечено:', showsTriggerError ? 'да' : 'НЕТ');

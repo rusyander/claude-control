@@ -1,6 +1,7 @@
 import type { ConfluencePage, ConfluenceSpace } from '@agentdeck/contracts';
 import { invalidField, unreachable } from '../errors.ts';
 import { call, confluenceRoot, type AtlassianAccess } from './client.ts';
+import { coded } from '../../../lib/server-text.ts';
 
 /**
  * Confluence: пространства, поиск, чтение и запись страницы.
@@ -80,7 +81,8 @@ export async function searchPages(
   limit = 25,
 ): Promise<ConfluencePage[]> {
   const text = query.trim();
-  if (!text) throw invalidField('q', 'нужен текст поиска');
+  if (!text)
+    throw invalidField('q', 'нужен текст поиска', 'request-search-text-required', { field: 'q' });
   const cql = `type=page and text ~ "${text.replace(/"/g, '\\"')}"`;
   // Поиск по CQL живёт в старом content-API у ОБОИХ диалектов: у облака v2 его
   // не заводили вовсе. Разницу берёт на себя корень (`/wiki` у облака).
@@ -141,8 +143,14 @@ export interface NewPage {
 }
 
 export async function createPage(access: AtlassianAccess, draft: NewPage): Promise<ConfluencePage> {
-  if (!draft.spaceKey.trim()) throw invalidField('spaceKey', 'не указано пространство');
-  if (!draft.title.trim()) throw invalidField('title', 'не указан заголовок страницы');
+  if (!draft.spaceKey.trim())
+    throw invalidField('spaceKey', 'не указано пространство', 'request-space-missing', {
+      field: 'spaceKey',
+    });
+  if (!draft.title.trim())
+    throw invalidField('title', 'не указан заголовок страницы', 'request-page-title-missing', {
+      field: 'title',
+    });
   const root = confluenceRoot(access);
 
   if (isCloud(access)) {
@@ -256,7 +264,11 @@ async function spaceIdByKey(access: AtlassianAccess, key: string): Promise<strin
   });
   const found = (page.results ?? []).find((space) => space.key === key) ?? page.results?.[0];
   if (!found) {
-    throw unreachable(`Confluence: пространства «${key}» нет или к нему нет доступа.`);
+    throw coded(
+      unreachable(`Confluence: пространства «${key}» нет или к нему нет доступа.`),
+      'confluence-space-missing',
+      { key },
+    );
   }
   return String(found.id);
 }

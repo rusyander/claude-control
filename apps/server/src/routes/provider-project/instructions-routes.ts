@@ -23,12 +23,13 @@ import {
   INVALID_CONTENT,
   INVALID_LIST_DRAFT,
 } from './messages.ts';
+import { codeOf } from '../../lib/server-text.ts';
 
 /** Отказ по одной записи списка: «нет в списке» → 404, прочее (нет файла, бинарь) → 400. */
 const sendEntryError = (reply: FastifyReply, error: ListedFileNotEditableError): FastifyReply =>
   reply
     .code(error.reason === 'unlisted' ? 404 : 400)
-    .send({ error: error.reason, message: error.message });
+    .send({ error: error.reason, message: error.message, ...codeOf(error) });
 
 /**
  * Инструкции проекта в двух видах: файл в корне (AGENTS.md / GEMINI.md) и список

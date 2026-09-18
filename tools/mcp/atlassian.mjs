@@ -146,8 +146,8 @@ server.registerTool(
   'jira_issue',
   {
     title: 'Задача Jira',
-    description: 'Прочитать задачу целиком по ключу (например PRJ-1234): описание, статус, тип.',
-    inputSchema: { key: z.string().describe('Ключ задачи, например PRJ-1234.') },
+    description: 'Прочитать задачу целиком по ключу (например ABC-123): описание, статус, тип.',
+    inputSchema: { key: z.string().describe('Ключ задачи, например ABC-123.') },
   },
   async ({ key }) =>
     render(await call('GET', `/api/integrations/jira/issue/${encodeURIComponent(key)}`)),
@@ -161,7 +161,7 @@ server.registerTool(
       'Завести дефект. Проект бери из qa_links — угадывать его нельзя, дефект уйдёт не той команде. ' +
       'Тип по умолчанию Bug.',
     inputSchema: {
-      projectKey: z.string().describe('Ключ проекта Jira, например GOR.'),
+      projectKey: z.string().describe('Ключ проекта Jira, например PRJ.'),
       summary: z.string().describe('Заголовок одной строкой.'),
       description: z.string().describe('Шаги, ожидание и что получилось на самом деле.'),
       issueType: z.string().optional(),

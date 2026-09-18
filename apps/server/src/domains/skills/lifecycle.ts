@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path';
 import { backupEntry, copyRecursive, removeEntry } from '../../lib/safe-io.ts';
 import type { AppStore } from '../../lib/app-store.ts';
 import { assertSkillId, disabledSkillsDir, SKILLS_DISABLED_DIR } from './paths.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Судьба папки скилла: включение, переименование, удаление. Содержимое
@@ -62,7 +63,7 @@ export function renameSkill(
   // или выведет за пределы skills/ — отвергаем до любых файловых операций.
   // Ошибка своя, а не `InvalidSkillIdError`: текст уходит человеку в форму.
   if (!newId || /[/\\]/.test(newId) || newId === '.' || newId === '..' || newId.includes('\0')) {
-    throw skillError('invalid_name', 'Недопустимое имя скилла.');
+    throw coded(skillError('invalid_name', 'Недопустимое имя скилла.'), 'skill-name-invalid');
   }
 
   const disabledDir = disabledSkillsDir(skillsDir);
@@ -71,7 +72,7 @@ export function renameSkill(
     : existsSync(join(disabledDir, oldId))
       ? disabledDir
       : undefined;
-  if (!base) throw skillError('not_found', 'Скилл не найден.');
+  if (!base) throw coded(skillError('not_found', 'Скилл не найден.'), 'skill-not-found');
 
   const source = join(base, oldId);
   const target = join(base, newId);
@@ -82,7 +83,7 @@ export function renameSkill(
 
   const caseOnly = pathsEqual(source, target);
   if (!caseOnly && existsSync(target)) {
-    throw skillError('name_taken', 'Скилл с таким именем уже есть.');
+    throw coded(skillError('name_taken', 'Скилл с таким именем уже есть.'), 'skill-name-taken');
   }
 
   const backupPath = backupDir

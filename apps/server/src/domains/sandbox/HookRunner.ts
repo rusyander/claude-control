@@ -4,6 +4,7 @@ import { killChildTree } from '../../lib/process-tree.ts';
 import { readDecision, tryParse } from './HookDecision.ts';
 import { CUSTOM_FIXTURE_ID, TIMEOUT_MS, isWindows } from './HookProbe.constants.ts';
 import type { EventFixture, ProbeResult } from './HookProbe.types.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 export async function runHookProbe(
   command: string,
@@ -60,6 +61,7 @@ export async function runHookProbe(
         // Процесс не поднялся вовсе — это не «пропустил», а несостоявшийся прогон.
         decision: 'error',
         reason: 'Хук не запустился',
+        reasonCode: 'sandbox-hook-not-started',
         matchesExpectation: false,
         durationMs: Date.now() - startedAt,
         timedOut,
@@ -121,7 +123,7 @@ export function runCustomHookProbe(
     {
       id: CUSTOM_FIXTURE_ID,
       event,
-      title: 'Свой ввод',
+      title: serverText('sandbox-event-custom-title'),
       description: '',
       // У произвольного ввода нет «правильного» ответа, поэтому и ожидания нет.
       expectsBlock: false,

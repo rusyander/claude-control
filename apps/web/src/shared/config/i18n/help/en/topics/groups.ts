@@ -180,8 +180,9 @@ export const groupsEn: typeof groupsRu = {
 
     bindTitle: 'Binding to a project',
     bindCaption:
-      'The section’s only automation, and at the moment it fires nothing is visible on ' +
-      'screen: the group simply turns out to be on. Hence — in words.',
+      'The section’s only automation: nobody touched a toggle, yet the group turns out ' +
+      'to be on. The one place it shows is the run’s feed, where the panel drops a line ' +
+      'about it; in the section itself nothing is visible, hence — in words.',
     bindProject: 'When it fires',
     bindProjectText:
       'When a message is sent to the agent: the panel looks at the run’s working ' +
@@ -190,6 +191,13 @@ export const groupsEn: typeof groupsRu = {
       'session switch the bundle on the same way, or such a chat would start with the ' +
       'project’s rules and skills off. A group that is already on is not touched at all — ' +
       'not a single write to disk.',
+    bindNotice: 'The panel says so in the feed',
+    bindNoticeText:
+      'Having switched a bundle on, the panel drops a line into the run’s feed: «Набор ' +
+      '„X“ включён сам — он привязан к этому проекту»; several at once are named in one ' +
+      'line. One line per fact: a bundle that is already on is not touched and is never ' +
+      'announced a second time. A foreign CLI has no feed for the panel’s notices, so ' +
+      'there the fact stays on the «Bundles» page only.',
     bindWorktree: 'Branch copies count too',
     bindWorktreeText:
       'A branch copy lives next to the repository, in the neighbouring ' +

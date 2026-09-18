@@ -35,6 +35,7 @@ import {
   type ClaudePaths,
   type ConfigPreviewFile,
 } from './sandbox-diff.ts';
+import { codeOf, coded } from '../../lib/server-text.ts';
 
 /**
  * Предпросмотр второго набора видов (волна A, 17.09.2026): хуки, переменные
@@ -73,14 +74,17 @@ export interface ExtraPreview {
 const sha = (data: string | Buffer): string => createHash('sha256').update(data).digest('hex');
 const fileHash = (path: string): string => (existsSync(path) ? sha(readFileSync(path)) : 'absent');
 
-/** Ошибки доменов без кода → те же статусы, что отдают маршруты записи. */
-function coded(error: unknown): unknown {
+/** Ошибки доменов без статуса → те же статусы, что отдают маршруты записи; код текста едет дальше. */
+function withStatus(error: unknown): unknown {
+  const keep = <T extends object>(target: T): T => Object.assign(target, codeOf(error));
   if (error instanceof InvalidEnvDraftError)
-    return failure(400, 'invalid_env_draft', error.message);
-  if (error instanceof EnvVarNotFoundError) return failure(404, 'env_not_found', error.message);
-  if (error instanceof EnvVarExistsError) return failure(409, 'env_exists', error.message);
-  if (error instanceof UnsafeScriptPathError) return failure(400, 'unsafe_path', error.message);
-  if (error instanceof ScriptExistsError) return failure(409, 'script_exists', error.message);
+    return keep(failure(400, 'invalid_env_draft', error.message));
+  if (error instanceof EnvVarNotFoundError)
+    return keep(failure(404, 'env_not_found', error.message));
+  if (error instanceof EnvVarExistsError) return keep(failure(409, 'env_exists', error.message));
+  if (error instanceof UnsafeScriptPathError)
+    return keep(failure(400, 'unsafe_path', error.message));
+  if (error instanceof ScriptExistsError) return keep(failure(409, 'script_exists', error.message));
   return error;
 }
 
@@ -98,7 +102,7 @@ export function previewExtraWrite(
       fingerprint: sha(JSON.stringify({ sources, notes: preview.notes })),
     };
   } catch (error) {
-    throw coded(error);
+    throw withStatus(error);
   }
 }
 
@@ -151,7 +155,8 @@ function previewHook(
 ): Omit<ExtraPreview, 'fingerprint'> {
   const found =
     request.id === undefined ? undefined : findHook({ paths, store: state }, request.id);
-  if (request.id !== undefined && !found) throw failure(404, 'hook_not_found', 'Хук не найден');
+  if (request.id !== undefined && !found)
+    throw coded(failure(404, 'hook_not_found', 'Хук не найден'), 'hook-not-found');
   const id = found?.id ?? request.id ?? '';
   const target = (sandbox: ClaudePaths) =>
     isLocalId(id)
@@ -162,7 +167,10 @@ function previewHook(
     // Скрипт по имени агент не создаёт: это запись второго файла, которую
     // карточка одного диффа не показала бы.
     if (request.draft.scriptName?.trim()) {
-      throw failure(400, 'script_not_supported', 'Скрипт хука создаётся отдельным действием.');
+      throw coded(
+        failure(400, 'script_not_supported', 'Скрипт хука создаётся отдельным действием.'),
+        'hook-script-separate',
+      );
     }
     return {
       files: onCopies(paths, ['settings', 'settingsLocal'], (sandbox) => {
@@ -245,7 +253,11 @@ function previewScript(
   const real = resolveScriptPath(paths.hooks, request.id);
   const existed = existsSync(real);
   if (request.action !== 'create' && !existed) {
-    throw failure(404, 'script_not_found', `Скрипт «${request.id}» не найден`);
+    throw coded(
+      failure(404, 'script_not_found', `Скрипт «${request.id}» не найден`),
+      'script-not-found-quoted',
+      { id: request.id },
+    );
   }
   const root = mkdtempSync(join(tmpdir(), 'agentdeck-preview-'));
   try {
@@ -286,7 +298,11 @@ function previewEntityToggle(
     const off = join(disabledSkillsDir(paths.skills), id);
     const [from, to] = effective ? [off, on] : [on, off];
     if (!existsSync(from) && !existsSync(to)) {
-      throw failure(404, 'skill_not_found', `Скилл «${id}» не найден`);
+      throw coded(
+        failure(404, 'skill_not_found', `Скилл «${id}» не найден`),
+        'skill-not-found-quoted',
+        { id },
+      );
     }
     return {
       files: [],

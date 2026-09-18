@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { execFile, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { writeJsonFile } from '../../lib/safe-io.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Журнал идущих прогонов на диске — чтобы реестр пережил перезапуск панели.
@@ -63,8 +64,7 @@ export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
  * уезжает агенту как результат вызова — и в транскрипт, откуда его показывает
  * лента: это и есть системная заметка о случившемся.
  */
-export const RUN_UNKNOWN_DENIED =
-  'Панель перезапускалась, прогон не в реестре — отправьте сообщение заново.';
+export const RUN_UNKNOWN_DENIED = serverText('chat-run-not-in-ledger');
 
 /**
  * `file` — имя файла журнала: у процессов агента панели свой файл

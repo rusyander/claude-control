@@ -1,4 +1,5 @@
 import type { EndpointApiKind, EndpointProbeResult, EndpointProfile } from '@agentdeck/contracts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Проверка связи со своим эндпоинтом: панель спрашивает у адреса СПИСОК МОДЕЛЕЙ.
@@ -94,6 +95,7 @@ export async function probeEndpoint(
       models: [],
       tokenSent: false,
       error: 'Адрес должен быть корректным http(s)-адресом.',
+      messageCode: 'endpoint-base-url-invalid',
     };
   }
 
@@ -137,6 +139,13 @@ export async function probeEndpoint(
         models: [],
         tokenSent,
         error: `Адрес ответил ${res.status}${detail ? `: ${detail}` : ''}`,
+        messageCode: 'endpoint-probe-status' as const,
+        // Разделитель уезжает ВНУТРИ значения, а не шаблоном: шаблон
+        // (`{{status}}{{detail}}`) условий не знает, и при пустом теле «401: »
+        // повисло бы двоеточием в никуда. Без этого клиент рисовал
+        // «Адрес ответил 401Unauthorized» там, где запасная строка сервера
+        // говорит «401: Unauthorized» (ревью Т0→Т13, находка лейна справки).
+        params: { status: res.status, detail: detail ? `: ${detail}` : '' },
       };
     }
 
@@ -153,6 +162,7 @@ export async function probeEndpoint(
         models: [],
         tokenSent,
         error: 'Ответ не является JSON — по адресу отвечает не модельный API.',
+        messageCode: 'endpoint-probe-not-json',
       };
     }
 
@@ -165,12 +175,21 @@ export async function probeEndpoint(
     };
   } catch (error) {
     // `AbortSignal.timeout` бросает TimeoutError — отличаем от «не достучались».
-    const message =
-      error instanceof Error && error.name === 'TimeoutError'
-        ? `Адрес не ответил за ${PROBE_TIMEOUT_MS / 1000} с.`
-        : error instanceof Error
-          ? error.message
-          : String(error);
+    // Свой текст пишется по коду, чужой (сообщение fetch) остаётся как есть:
+    // переводить чужую строку нечем, а прятать её — прятать причину.
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      const seconds = PROBE_TIMEOUT_MS / 1000;
+      return {
+        ok: false,
+        url: target,
+        models: [],
+        tokenSent,
+        error: serverText('endpoint-probe-timeout', { seconds }),
+        messageCode: 'endpoint-probe-timeout' as const,
+        params: { seconds },
+      };
+    }
+    const message = error instanceof Error ? error.message : String(error);
     return { ok: false, url: target, models: [], tokenSent, error: message };
   }
 }

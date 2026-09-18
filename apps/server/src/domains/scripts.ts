@@ -3,6 +3,7 @@ import { join, extname, relative, sep, isAbsolute, dirname } from 'node:path';
 import { readTextFile, writeTextFile, backupEntry, removeEntry } from '../lib/safe-io.ts';
 import { readScriptDescription } from '../lib/script-description.ts';
 import { safeSegment } from './resources/registry.ts';
+import { coded } from '../lib/server-text.ts';
 
 /**
  * Скрипты в каталоге hooks/. Это обычные файлы, которые запускают хуки, но
@@ -233,6 +234,7 @@ export class ScriptNotFoundError extends Error {
 
   constructor(id: string) {
     super(`Скрипт «${id}» не найден`);
+    coded(this, 'script-not-found-quoted', { id });
     this.name = 'ScriptNotFoundError';
   }
 }
@@ -241,6 +243,7 @@ export class ScriptNotFoundError extends Error {
 export class ScriptExistsError extends Error {
   constructor(id: string) {
     super(`Скрипт «${id}» уже есть. Выберите другое имя или откройте его для правки.`);
+    coded(this, 'script-exists', { id });
     this.name = 'ScriptExistsError';
   }
 }

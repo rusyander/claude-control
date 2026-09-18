@@ -32,6 +32,7 @@ import {
 import { managedProfileId } from './apply/profile.ts';
 import { driverOf } from './drivers/index.ts';
 import { effortAccepted, toolRouteOf } from './models.ts';
+import { attachTextCodes } from '../../lib/server-texts.ts';
 import { dataMaskOn, describeDataMask } from './data-mask.ts';
 import { layerOn, runLayers } from './layers.ts';
 import { platformRuleRows, ruleConflicts } from './rules-matrix.ts';
@@ -282,9 +283,17 @@ export const MIN_KEY_LENGTH = 8;
  * Пустая строка проходит: это осознанное «выкинуть ключ», а не короткий ключ.
  */
 export function assertToken(token: string): void {
-  if (token.length > MAX_KEY_LENGTH) throw invalidField('token', 'ключ длиннее допустимого');
+  if (token.length > MAX_KEY_LENGTH)
+    throw invalidField('token', 'ключ длиннее допустимого', 'request-key-too-long', {
+      field: 'token',
+    });
   if (token.length > 0 && token.length < MIN_KEY_LENGTH) {
-    throw invalidField('token', `ключ короче ${MIN_KEY_LENGTH} символов — это не ключ контура`);
+    throw invalidField(
+      'token',
+      `ключ короче ${MIN_KEY_LENGTH} символов — это не ключ контура`,
+      'request-key-too-short',
+      { field: 'token', MIN_KEY_LENGTH },
+    );
   }
   // Ключ уходит заголовком `Authorization`, а заголовок — это байты. Символ
   // вне печатного ASCII не отправится вовсе, и транспорт скажет об этом
@@ -294,6 +303,8 @@ export function assertToken(token: string): void {
     throw invalidField(
       'token',
       'в ключе есть символы вне латиницы — такой ключ не уйдёт в заголовке запроса',
+      'request-key-non-latin',
+      { field: 'token' },
     );
   }
 }
@@ -458,34 +469,43 @@ export function describePlatform(
   const smoke = store.getPlatformSmoke()[platform.id];
   const settings = store.getSettings();
   const driver = driverOf(platform);
-  return {
-    platform,
-    hasToken: Boolean(token),
-    maskedToken: token ? maskKey(token) : '',
-    health,
-    active: settings.activePlatformId === platform.id,
-    ...(smoke ? { smoke } : {}),
-    budget: budgetVerdict(platform, spend),
-    periodSpend: sumDays(daysSince(spend.days, platform.budgetSince)),
-    effort: effortAccepted(platform),
-    agents: driver.agents !== undefined,
-    toolRoute: toolRouteOf(platform),
-    rules: platformRuleRows(platform, driver),
-    // Сжатие истории берётся из ПРОБЫ, а не из наличия ручки: ручку контур
-    // объявляет всегда, а сжимает ли он историю этому ключу — говорит ответ.
-    conflicts: ruleConflicts(platform, driver, {
-      dlp: dataMaskOn(platform, driver, settings.dlp.enabled),
-      // Гейт промпта — НАШ ХУК в `~/.claude/settings.json`, поэтому снятый слой
-      // личных настроек снимает и его (Т8). Строка матрицы обязана это знать:
-      // иначе человек, выключивший наши слои, читал бы «наша сторона включена»
-      // про проверку, которой в этом прогоне нет.
-      promptGate: settings.promptGate.enabled && layerOn(platform.rules.ours, 'settings'),
-      toolShim: platform.toolShim,
-      managedContext: health?.limits.managedContext === true,
-    }),
-    layers: runLayers(platform),
-    dataMask: describeDataMask(platform, driver, settings.dlp.enabled, appDataDir),
-  };
+  // Причины пробы, строки матрицы правил и подписи манифеста собраны СТРОКОЙ
+  // (`serverText`) и через несколько слоёв едут строкой же. Код к ним
+  // восстанавливается разбором на выходе — иначе английский интерфейс показал
+  // бы русские фразы, а протягивать `detailCode` через каждый слой значило бы
+  // переписать их типы ради перевода. `notes` — массив строк, ему нужен
+  // `notesCodes` той же длины.
+  return attachTextCodes<PlatformStatus>(
+    {
+      platform,
+      hasToken: Boolean(token),
+      maskedToken: token ? maskKey(token) : '',
+      health,
+      active: settings.activePlatformId === platform.id,
+      ...(smoke ? { smoke } : {}),
+      budget: budgetVerdict(platform, spend),
+      periodSpend: sumDays(daysSince(spend.days, platform.budgetSince)),
+      effort: effortAccepted(platform),
+      agents: driver.agents !== undefined,
+      toolRoute: toolRouteOf(platform),
+      rules: platformRuleRows(platform, driver),
+      // Сжатие истории берётся из ПРОБЫ, а не из наличия ручки: ручку контур
+      // объявляет всегда, а сжимает ли он историю этому ключу — говорит ответ.
+      conflicts: ruleConflicts(platform, driver, {
+        dlp: dataMaskOn(platform, driver, settings.dlp.enabled),
+        // Гейт промпта — НАШ ХУК в `~/.claude/settings.json`, поэтому снятый слой
+        // личных настроек снимает и его (Т8). Строка матрицы обязана это знать:
+        // иначе человек, выключивший наши слои, читал бы «наша сторона включена»
+        // про проверку, которой в этом прогоне нет.
+        promptGate: settings.promptGate.enabled && layerOn(platform.rules.ours, 'settings'),
+        toolShim: platform.toolShim,
+        managedContext: health?.limits.managedContext === true,
+      }),
+      layers: runLayers(platform),
+      dataMask: describeDataMask(platform, driver, settings.dlp.enabled, appDataDir),
+    },
+    ['notes'],
+  );
 }
 
 /** Все карточки — то, чем отвечает `GET /api/platforms`. */

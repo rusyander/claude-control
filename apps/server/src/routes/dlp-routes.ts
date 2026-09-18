@@ -15,6 +15,8 @@ import {
   validateRules,
   type DlpProxy,
 } from '../domains/dlp.ts';
+import { codeOf, errorBody } from '../lib/server-text.ts';
+import { attachTextCodes } from '../lib/server-texts.ts';
 
 /**
  * Защита данных: правила, предпросмотр, журнал, запуск и остановка прокси.
@@ -40,19 +42,27 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
   app.put<{ Body: unknown }>('/api/dlp/rules', (request, reply) => {
     const rules = rulesOf(request.body);
     if (!rules) {
-      return reply.code(400).send({ error: 'invalid_body', message: 'Ожидается список правил.' });
+      return reply.code(400).send({
+        error: 'invalid_body',
+        message: 'Ожидается список правил.',
+        messageCode: 'dlp-rules-list-expected',
+      });
     }
 
     // Форма проверяется до всего остального: `null` вместо правила или словарь
     // без поля `terms` раньше падали в 500 уже внутри смысловой проверки.
     const problem = validateRules(rules);
-    if (problem) return reply.code(400).send({ error: 'invalid_rule', message: problem });
+    // Причина собрана по коду (`serverText`) — код к ней восстанавливается разбором.
+    if (problem)
+      return reply.code(400).send(attachTextCodes({ error: 'invalid_rule', message: problem }));
 
     try {
       saveRules(appDataDir(), rules);
     } catch (error) {
       if (error instanceof DlpRulesError) {
-        return reply.code(400).send({ error: 'invalid_rule', message: error.message });
+        return reply
+          .code(400)
+          .send({ error: 'invalid_rule', message: error.message, ...codeOf(error) });
       }
       throw error;
     }
@@ -67,7 +77,11 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
   app.post<{ Body: unknown }>('/api/dlp/preview', (request, reply) => {
     const body = request.body as { text?: unknown; rules?: unknown } | null;
     if (!body || typeof body.text !== 'string') {
-      return reply.code(400).send({ error: 'invalid_body', message: 'Ожидается поле text.' });
+      return reply.code(400).send({
+        error: 'invalid_body',
+        message: 'Ожидается поле text.',
+        messageCode: 'dlp-text-field-expected',
+      });
     }
 
     // Правила можно прислать в теле — тогда видно результат ЧЕРНОВИКА, до
@@ -79,7 +93,7 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
     if (draft) {
       const parsed = parseRules(draft);
       if (parsed instanceof DlpRulesError) {
-        return reply.code(400).send({ error: 'invalid_rule', message: parsed.message });
+        return reply.code(400).send({ error: 'invalid_rule', ...errorBody(parsed) });
       }
       rules = parsed;
     } else {
@@ -105,13 +119,16 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
       rememberEnabled(true);
     } catch (error) {
       if (error instanceof DlpConfigError || error instanceof DlpRulesError) {
-        return reply.code(400).send({ error: 'dlp_misconfigured', message: error.message });
+        return reply
+          .code(400)
+          .send({ error: 'dlp_misconfigured', message: error.message, ...codeOf(error) });
       }
       // Занятый порт и отказ привязки — самая частая причина; текст системы
       // понятнее любой нашей формулировки.
       return reply.code(409).send({
         error: 'dlp_start_failed',
         message: error instanceof Error ? error.message : String(error),
+        ...codeOf(error),
       });
     }
     return describeDlp(ctx.store, appDataDir(), proxy) satisfies DlpInfo;

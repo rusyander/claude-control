@@ -1,7 +1,7 @@
 import type { ForgeSettings } from '@agentdeck/contracts';
 import { gitSync } from '../project-git/exec.ts';
 import { invalidField, unreachable } from './errors.ts';
-import { describeFailure, parseJson, sendRequest } from './http.ts';
+import { failedResponse, parseJson, sendRequest } from './http.ts';
 
 /**
  * Фордж по ТОКЕНУ: дефекты и комментарии без установленных `gh`/`glab`.
@@ -58,12 +58,22 @@ export function toForgeAccess(
 ): ForgeAccess {
   const kind = settings.kind;
   if (kind !== 'github' && kind !== 'gitlab') {
-    throw invalidField('kind', 'не выбран вид форджа (github или gitlab)');
+    throw invalidField(
+      'kind',
+      'не выбран вид форджа (github или gitlab)',
+      'request-forge-kind-missing',
+      { field: 'kind' },
+    );
   }
 
   const repo = settings.repo.trim() || (projectRoot ? repoFromOrigin(projectRoot) : '');
   if (!repo) {
-    throw invalidField('repo', 'не указан репозиторий и его не удалось вывести из origin');
+    throw invalidField(
+      'repo',
+      'не указан репозиторий и его не удалось вывести из origin',
+      'request-repo-missing',
+      { field: 'repo' },
+    );
   }
 
   const site = trim(settings.baseUrl) || (kind === 'github' ? GITHUB_CLOUD : GITLAB_CLOUD);
@@ -86,7 +96,12 @@ function apiRoot(kind: ForgeKind, site: string): string {
 export function toForgeIdentity(settings: ForgeSettings, token: string): ForgeIdentity {
   const kind = settings.kind;
   if (kind !== 'github' && kind !== 'gitlab') {
-    throw invalidField('kind', 'не выбран вид форджа (github или gitlab)');
+    throw invalidField(
+      'kind',
+      'не выбран вид форджа (github или gitlab)',
+      'request-forge-kind-missing',
+      { field: 'kind' },
+    );
   }
   const site = trim(settings.baseUrl) || (kind === 'github' ? GITHUB_CLOUD : GITLAB_CLOUD);
   return { kind, api: apiRoot(kind, site), token };
@@ -121,7 +136,7 @@ async function post<T>(access: ForgeAccess, path: string, body: unknown): Promis
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw unreachable(describeFailure(systemName(access), response), response.text.slice(0, 500));
+    throw failedResponse(systemName(access), response, 500);
   }
   return parseJson<T>(systemName(access), response);
 }
@@ -138,7 +153,8 @@ export async function createForgeIssue(
   title: string,
   body: string,
 ): Promise<ForgeIssue> {
-  if (!title.trim()) throw invalidField('title', 'не указан заголовок');
+  if (!title.trim())
+    throw invalidField('title', 'не указан заголовок', 'request-title-missing', { field: 'title' });
 
   if (access.kind === 'github') {
     const created = await post<{ html_url?: string; number?: number }>(
@@ -190,7 +206,7 @@ export async function readForgeIssue(
     headers: { ...headers(access), Accept: 'application/json' },
   });
   if (!response.ok) {
-    throw unreachable(describeFailure(systemName(access), response), response.text.slice(0, 300));
+    throw failedResponse(systemName(access), response, 300);
   }
   const issue = parseJson<{
     state?: string;
@@ -214,7 +230,8 @@ export async function commentForgeIssue(
   issueNumber: number,
   body: string,
 ): Promise<void> {
-  if (!body.trim()) throw invalidField('body', 'пустой комментарий');
+  if (!body.trim())
+    throw invalidField('body', 'пустой комментарий', 'request-comment-empty', { field: 'body' });
   const path =
     access.kind === 'github'
       ? `/repos/${projectRef(access)}/issues/${issueNumber}/comments`
@@ -233,7 +250,8 @@ export async function commentMergeRequest(
   mergeRequestNumber: number,
   body: string,
 ): Promise<void> {
-  if (!body.trim()) throw invalidField('body', 'пустой комментарий');
+  if (!body.trim())
+    throw invalidField('body', 'пустой комментарий', 'request-comment-empty', { field: 'body' });
   const path =
     access.kind === 'github'
       ? `/repos/${projectRef(access)}/issues/${mergeRequestNumber}/comments`
@@ -354,7 +372,7 @@ export async function readMergeRequest(
     headers: { ...headers(access), Accept: 'application/json' },
   });
   if (!response.ok) {
-    throw unreachable(describeFailure(systemName(access), response), response.text.slice(0, 300));
+    throw failedResponse(systemName(access), response, 300);
   }
   const mr = parseJson<{
     title?: string;
@@ -414,7 +432,12 @@ export async function commentMergeRequestByUrl(
   const ref = parseMergeRequestUrl(url);
   const access = forgeAccessForUrl(url, token);
   if (!ref || !access) {
-    throw invalidField('url', 'ссылка не похожа на запрос на слияние');
+    throw invalidField(
+      'url',
+      'ссылка не похожа на запрос на слияние',
+      'request-url-not-merge-request',
+      { field: 'url' },
+    );
   }
   await commentMergeRequest(access, ref.number, body);
 }
@@ -428,7 +451,7 @@ export async function whoAmI(access: ForgeIdentity): Promise<string> {
     headers: { ...headers(access), Accept: 'application/json' },
   });
   if (!response.ok) {
-    throw unreachable(describeFailure(systemName(access), response), response.text.slice(0, 500));
+    throw failedResponse(systemName(access), response, 500);
   }
   const me = parseJson<{ login?: string; username?: string; name?: string }>(
     systemName(access),

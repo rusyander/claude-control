@@ -43,13 +43,22 @@ function hasGit(): boolean {
 const GIT_AVAILABLE = hasGit();
 
 /**
- * Из контекста маршрутам нужно одно — шаблоны зеркала копий по проекту; они
- * держатся в памяти двойника, чтобы тест не трогал настоящий `state.json`.
+ * Из контекста маршрутам нужны две вещи: шаблоны зеркала копий по проекту и
+ * путь к `.claude.json` — по нему копия получает запись доступа (доверие и
+ * MCP), без которой агент в ней начинал бы с вопросов, на которые человек уже
+ * отвечал. Оба держатся в двойнике, чтобы тест не трогал ни настоящий
+ * `state.json`, ни настоящий `~/.claude.json`.
+ *
+ * Двойник ОБЯЗАН нести `location`: настоящий сервер разбирает расположение в
+ * конструкторе, и контекст без него — не «упрощение», а другая программа.
+ * Пока его тут не было, маршрут создания копии отвечал пятисоткой, и тест
+ * читал это как поломку git.
  */
-function storeContext(): ServerContext {
+function storeContext(claudeJsonPath: string): ServerContext {
   const mirrors = new Map<string, WorktreeMirrorSettings>();
   return {
     worktreeBootstraps: new WorktreeBootstraps(mkdtempSync(join(tmpdir(), 'cc-wt-boot-'))),
+    location: { paths: { mcpConfig: claudeJsonPath } },
     store: {
       getWorktreeMirror: (path: string) => mirrors.get(path) ?? { include: [], exclude: [] },
       setWorktreeMirror: (path: string, settings: WorktreeMirrorSettings) => {
@@ -63,11 +72,14 @@ function storeContext(): ServerContext {
 describe('project-git-routes', () => {
   let app: FastifyInstance;
   let dir: string;
+  /** Свой `.claude.json` на каждый тест: настоящий трогать нельзя. */
+  let claudeJson: string;
 
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'cc-git-routes-'));
+    claudeJson = join(mkdtempSync(join(tmpdir(), 'cc-git-home-')), '.claude.json');
     app = Fastify();
-    registerProjectGitRoutes(app, storeContext());
+    registerProjectGitRoutes(app, storeContext(claudeJson));
     await app.ready();
   });
 
@@ -245,6 +257,8 @@ describe('project-git-routes: рабочие копии', () => {
   let app: FastifyInstance;
   let dir: string;
   let siblings: string;
+  /** Свой `.claude.json` на каждый тест: настоящий трогать нельзя. */
+  let claudeJson: string;
   /** Что «сейчас занято агентом» — подменяется в самом тесте. */
   let busyPath: string | undefined;
   /** Прогон в этой копии ещё идёт (иначе он лишь досиживает в буфере догона). */
@@ -257,6 +271,7 @@ describe('project-git-routes: рабочие копии', () => {
   beforeEach(async () => {
     // Длинная форма пути: git отвечает ею, а сравнение путей и есть защита.
     dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-wt-routes-')));
+    claudeJson = join(mkdtempSync(join(tmpdir(), 'cc-wt-home-')), '.claude.json');
     siblings = join(dirname(dir), `${basename(dir)}-worktrees`);
     busyPath = undefined;
     busyRunning = true;
@@ -264,7 +279,7 @@ describe('project-git-routes: рабочие копии', () => {
     // Двойник реестра повторяет его существенное свойство: `active()` держит
     // прогон ещё минуту ПОСЛЕ завершения (буфер догона), и «занято» решает не
     // он, а `isRunning`.
-    registerProjectGitRoutes(app, storeContext(), {
+    registerProjectGitRoutes(app, storeContext(claudeJson), {
       active: () => (busyPath ? [{ chatId: 'run-1', projectPath: busyPath }] : []),
       isRunning: () => busyRunning,
     });

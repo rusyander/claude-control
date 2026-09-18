@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { writeBinaryFile } from '../../lib/safe-io.ts';
 import { ProjectTestsError, testsFile, testsPath } from './files.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Доказательства к кейсу: скриншоты и логи в `.agent/tests/attachments/<кейс>/`.
@@ -26,12 +27,16 @@ const MAX_BYTES = 8 * 1024 * 1024;
 function safeName(name: string): string {
   const base = name.split(/[/\\]/).pop()?.trim() ?? '';
   const cleaned = base.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
-  if (!cleaned) throw new ProjectTestsError('У файла нет имени.');
+  if (!cleaned) throw coded(new ProjectTestsError('У файла нет имени.'), 'attachment-name-missing');
   const dot = cleaned.lastIndexOf('.');
   const extension = dot >= 0 ? cleaned.slice(dot).toLowerCase() : '';
   if (!ALLOWED.includes(extension)) {
-    throw new ProjectTestsError(
-      `Такие файлы к кейсу не прикладываются: ${extension || 'без расширения'}.`,
+    throw coded(
+      new ProjectTestsError(
+        `Такие файлы к кейсу не прикладываются: ${extension || 'без расширения'}.`,
+      ),
+      'attachment-type-unsupported',
+      { extension: extension || '—' },
     );
   }
   return cleaned;
@@ -49,11 +54,17 @@ export function saveAttachment(
   now: string,
 ): string {
   const cleanCase = caseId.replace(/[^A-Za-z0-9._-]+/g, '-');
-  if (!cleanCase) throw new ProjectTestsError('Не указан кейс, к которому прикладывается файл.');
+  if (!cleanCase)
+    throw coded(
+      new ProjectTestsError('Не указан кейс, к которому прикладывается файл.'),
+      'attachment-case-missing',
+    );
 
   const buffer = Buffer.from(contentBase64, 'base64');
-  if (buffer.byteLength === 0) throw new ProjectTestsError('Файл пустой.');
-  if (buffer.byteLength > MAX_BYTES) throw new ProjectTestsError('Файл больше 8 МБ.');
+  if (buffer.byteLength === 0)
+    throw coded(new ProjectTestsError('Файл пустой.'), 'attachment-empty');
+  if (buffer.byteLength > MAX_BYTES)
+    throw coded(new ProjectTestsError('Файл больше 8 МБ.'), 'attachment-too-large');
 
   // Время в имени: один и тот же скриншот кладут повторно при перепрохождении,
   // и затирать прошлое доказательство нельзя — по нему сравнивают «было/стало».

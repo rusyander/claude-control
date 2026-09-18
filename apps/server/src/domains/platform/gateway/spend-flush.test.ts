@@ -105,6 +105,22 @@ describe('SpendFlusher', () => {
     expect(store.getPlatformSpend()['company-dev']).toBeUndefined();
   });
 
+  it('ответ, за который контур не прислал счёт, из учёта НЕ исчезает', () => {
+    const flusher = new SpendFlusher({ store, flushMs: 0 });
+    // Так у платформы компании приходит картинка: 200, ответ дошёл, `usage`
+    // нет. Токенов у него нет и выдумывать их нельзя — но и молчать нельзя:
+    // без этого счётчика полоса бюджета уверенно показывает цифру ниже
+    // настоящей и ничем не выдаёт своей неполноты.
+    flusher.add('company-dev', { ...delta(0), unreported: true });
+
+    const day = store.getPlatformSpend()['company-dev']!.days[0]!;
+    expect(day.unreportedAnswers).toBe(1);
+    // Ничего выдуманного: ни токенов, ни денег, ни запроса в общем счёте.
+    expect(day.totalTokens).toBe(0);
+    expect(day.money.usd).toBe(0);
+    expect(day.requests).toBe(0);
+  });
+
   it('отказ 402 пишется НЕМЕДЛЕННО и уносит с собой накопленное', () => {
     vi.useFakeTimers();
     const flusher = new SpendFlusher({ store, flushMs: 5_000 });
@@ -189,6 +205,136 @@ describe('SpendFlusher', () => {
     });
     flusher.add('company-dev', delta(1_000_000));
     expect(store.getPlatformSpend()['company-dev']!.days[0]!.money.usd).toBe(3);
+  });
+});
+
+/**
+ * Порог бюджета говорит наружу — ОДИН раз на переход (A-5).
+ *
+ * До этого порог считался и лежал в ответе, а читали его только карточка контура
+ * и плитка «Обзор»: человек в чате узнавал о лимите из отказа 402. Здесь заперто
+ * ровно то, чем это опасно чинить: повтор на каждый ответ модели.
+ */
+describe('SpendFlusher: порог бюджета наружу', () => {
+  // Доллар за миллион входных токенов — цифра расхода считается сама, а не
+  // подставляется в запись: порог обязан считаться от того же числа, что видит
+  // карточка.
+  const dollarPerMillion = () => ({
+    entries: [
+      {
+        id: 'company-corp-l',
+        label: 'Company L',
+        price: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+      },
+    ],
+  });
+  const flusherWith = (notices: unknown[]) =>
+    new SpendFlusher({
+      store,
+      flushMs: 0,
+      lookup: dollarPerMillion,
+      notifyBudget: (notice) => notices.push(notice),
+    });
+
+  it('переход 85 % бюджета называется один раз, а не на каждый ответ', () => {
+    const notices: unknown[] = [];
+    const flusher = flusherWith(notices);
+
+    // 80 $ из 100 — порог ещё не перейдён, и молчание здесь обязательно:
+    // предупреждение до порога обесценивает сам порог.
+    flusher.add('company-dev', delta(80_000_000));
+    expect(notices).toEqual([]);
+
+    // 86 $ — перешли.
+    flusher.add('company-dev', delta(6_000_000));
+    expect(notices).toEqual([
+      { platformId: 'company-dev', platformTitle: 'Company · dev', level: 'near', share: 0.86 },
+    ]);
+
+    // Ещё три ответа внутри того же порога: повтор человек читает как сбой.
+    flusher.add('company-dev', delta(1_000_000));
+    flusher.add('company-dev', delta(1_000_000));
+    flusher.add('company-dev', delta(1_000_000));
+    expect(notices).toHaveLength(1);
+
+    // Отметка лежит в ЗАПИСИ, а не в памяти процесса: перезапуск панели не
+    // повод повторить сказанное.
+    const saved = store.getPlatformSpend()['company-dev']!;
+    expect(saved.announcedBudget).toEqual({ since: '', near: true });
+    const afterRestart: unknown[] = [];
+    flusherWith(afterRestart).add('company-dev', delta(1_000_000));
+    expect(afterRestart).toEqual([]);
+  });
+
+  it('оценка дошла до бюджета — говорится отдельно от порога внимания', () => {
+    const notices: unknown[] = [];
+    const flusher = flusherWith(notices);
+    flusher.add('company-dev', delta(90_000_000));
+    flusher.add('company-dev', delta(15_000_000));
+
+    expect(notices).toEqual([
+      { platformId: 'company-dev', platformTitle: 'Company · dev', level: 'near', share: 0.9 },
+      { platformId: 'company-dev', platformTitle: 'Company · dev', level: 'over', share: 1 },
+    ]);
+  });
+
+  it('оба порога разом — одно сообщение про старший, отмечены оба', () => {
+    const notices: Array<{ level: string }> = [];
+    const flusher = flusherWith(notices as unknown[]);
+    // Первый же ответ дороже всего бюджета: двух сообщений об одном событии
+    // человек не ждёт, а «85 %» после «бюджет исчерпан» пугает задним числом.
+    flusher.add('company-dev', delta(200_000_000));
+
+    expect(notices).toEqual([
+      { platformId: 'company-dev', platformTitle: 'Company · dev', level: 'over', share: 1 },
+    ]);
+    expect(store.getPlatformSpend()['company-dev']!.announcedBudget).toEqual({
+      since: '',
+      near: true,
+      over: true,
+    });
+  });
+
+  it('бюджет не введён — порога нет и сказать нечего', () => {
+    store.updateSettings({ platforms: [{ ...PLATFORM, budgetUsd: 0 }] });
+    const notices: unknown[] = [];
+    flusherWith(notices).add('company-dev', delta(900_000_000));
+    expect(notices).toEqual([]);
+  });
+
+  it('сменился период счёта — порог звучит заново', () => {
+    const notices: Array<{ level: string }> = [];
+    flusherWith(notices as unknown[]).add('company-dev', delta(90_000_000));
+    expect(notices).toHaveLength(1);
+
+    // Человек сдвинул начало периода: расход прежних дней в него уже не входит,
+    // и отметка прошлого периода молчала бы про новый до самого отказа 402.
+    store.updateSettings({ platforms: [{ ...PLATFORM, budgetSince: '2099-01-01' }] });
+    const after: Array<{ level: string }> = [];
+    const flusher = new SpendFlusher({
+      store,
+      flushMs: 0,
+      lookup: dollarPerMillion,
+      now: () => new Date('2099-01-02T10:00:00.000Z'),
+      notifyBudget: (notice) => after.push(notice),
+    });
+    flusher.add('company-dev', delta(90_000_000));
+    expect(after.map((notice) => notice.level)).toEqual(['near']);
+  });
+
+  it('запись не удалась — наружу не сказано: сказать и не запомнить значит повторить', () => {
+    const notices: unknown[] = [];
+    const flusher = flusherWith(notices);
+    const save = vi.spyOn(store, 'savePlatformSpend').mockImplementation(() => {
+      throw new Error('EPERM: rename state.json.tmp-1 -> state.json');
+    });
+    flusher.add('company-dev', delta(90_000_000));
+    expect(notices).toEqual([]);
+
+    // Диск отпустило — порог звучит со следующей пачкой, ровно один раз.
+    save.mockRestore();
+    flusher.add('company-dev', delta(1_000_000));
+    expect(notices).toHaveLength(1);
   });
 });
 

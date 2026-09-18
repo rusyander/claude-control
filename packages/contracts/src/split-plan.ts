@@ -494,6 +494,41 @@ export interface PredecessorNote {
   branch: string;
   /** Цепочка предшественника кончилась ошибкой или остановкой. */
   failed?: boolean;
+  /**
+   * Цепочка предшественника НЕ кончилась: человек отпустил эту группу руками.
+   * Отдельно от `failed` намеренно — «упал» и «ещё пишет» требуют от агента
+   * разного: в первом случае работы может не быть вовсе, во втором она растёт
+   * под ним прямо сейчас.
+   */
+  unfinished?: boolean;
+  /**
+   * Файлы, которые предшественник уже задел, — то, ради чего сверка веток и
+   * считается: «этот файл уже трогали» меняет работу преемника сильнее, чем имя
+   * ветки. Список обрезан потолком, настоящий счёт — в `filesTotal`.
+   */
+  files?: string[];
+  /** Сколько файлов задето всего: список короче — значит, обрезан. */
+  filesTotal?: number;
+}
+
+/**
+ * Сколько задетых файлов называть предшественнику в заметках. Потолок здесь, а
+ * не у вызывающего: раздувать задание сотней путей нельзя, а решает это формат
+ * заметки, а не тот, кто её собирает.
+ */
+export const PREDECESSOR_FILES_SHOWN = 20;
+
+/** «a.ts, b.ts и ещё 5» — файлы предшественника с потолком. */
+function touchedFiles(item: PredecessorNote): string {
+  const shown = (item.files ?? []).slice(0, PREDECESSOR_FILES_SHOWN);
+  const total = item.filesTotal ?? shown.length;
+  if (shown.length === 0) {
+    // Счёт без имён — законное состояние: сверка веток считает и те группы,
+    // чьи пути в запись не поместились.
+    return total > 0 ? `; задето файлов: ${total}` : '';
+  }
+  const rest = Math.max(0, total - shown.length);
+  return `; уже задеты: ${shown.join(', ')}${rest > 0 ? ` и ещё ${rest}` : ''}`;
 }
 
 /**
@@ -514,10 +549,14 @@ export function composeGroupNotes(input: {
   if (input.notes) parts.push(input.notes);
   if (input.predecessors && input.predecessors.length > 0) {
     const names = input.predecessors
-      .map(
-        (item) =>
-          `«${item.title}» (ветка ${item.branch}${item.failed ? ', завершилась ошибкой или остановкой — проверь состояние' : ''})`,
-      )
+      .map((item) => {
+        const state = item.failed
+          ? ', завершилась ошибкой или остановкой — проверь состояние'
+          : item.unfinished
+            ? ', цепочка НЕ кончилась — человек отпустил тебя, не дожидаясь её'
+            : '';
+        return `«${item.title}» (ветка ${item.branch}${state}${touchedFiles(item)})`;
+      })
       .join(', ');
     parts.push(
       `Раньше этой группы работали: ${names}.${input.base ? ` Копия отведена от ветки ${input.base} — их правки уже здесь.` : ''} Слияние веток остаётся человеку.`,

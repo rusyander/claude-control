@@ -1,5 +1,6 @@
 import { parseDocument, isMap, isScalar, type Document } from 'yaml';
 import { stripBom } from './text-form.ts';
+import { coded } from './server-text.ts';
 
 /**
  * Скилл OpenCode — файл `SKILL.md` внутри папки скилла (OPENCODE-5).
@@ -103,10 +104,16 @@ export function splitSkillFile(text: string): { frontmatter: string; body: strin
 function parseFrontmatter(text: string): Document {
   const doc = parseDocument(text);
   if (doc.errors.length > 0) {
-    throw new SkillFormatError('malformed', 'Шапка скилла не разбирается как YAML.');
+    throw coded(
+      new SkillFormatError('malformed', 'Шапка скилла не разбирается как YAML.'),
+      'skill-head-yaml',
+    );
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    throw new SkillFormatError('malformed', 'Шапка скилла не является отображением ключей.');
+    throw coded(
+      new SkillFormatError('malformed', 'Шапка скилла не является отображением ключей.'),
+      'skill-head-not-map',
+    );
   }
   return doc;
 }
@@ -116,13 +123,25 @@ function readRequired(doc: Document, key: 'name' | 'description'): string {
   const missing: SkillProblem = key === 'name' ? 'missing_name' : 'missing_description';
   const node = doc.get(key, true);
   if (node === undefined || node === null) {
-    throw new SkillFormatError(missing, `В шапке скилла нет обязательного поля «${key}».`);
+    throw coded(
+      new SkillFormatError(missing, `В шапке скилла нет обязательного поля «${key}».`),
+      'skill-head-field-missing',
+      { key },
+    );
   }
   if (!isScalar(node) || typeof node.value !== 'string') {
-    throw new SkillFormatError('malformed', `Поле «${key}» в шапке скилла — не строка.`);
+    throw coded(
+      new SkillFormatError('malformed', `Поле «${key}» в шапке скилла — не строка.`),
+      'skill-head-field-string',
+      { key },
+    );
   }
   if (!node.value.trim()) {
-    throw new SkillFormatError(missing, `Обязательное поле «${key}» в шапке скилла пустое.`);
+    throw coded(
+      new SkillFormatError(missing, `Обязательное поле «${key}» в шапке скилла пустое.`),
+      'skill-head-field-empty',
+      { key },
+    );
   }
   return node.value;
 }
@@ -144,9 +163,12 @@ function readOtherKeys(doc: Document): string[] {
 export function readOpencodeSkill(text: string): OpencodeSkill {
   const parts = splitSkillFile(text);
   if (!parts) {
-    throw new SkillFormatError(
-      'no_frontmatter',
-      'В файле нет блока frontmatter между строками «---» — OpenCode такой скилл не подключает.',
+    throw coded(
+      new SkillFormatError(
+        'no_frontmatter',
+        'В файле нет блока frontmatter между строками «---» — OpenCode такой скилл не подключает.',
+      ),
+      'skill-no-frontmatter',
     );
   }
   const doc = parseFrontmatter(parts.frontmatter);
@@ -234,16 +256,25 @@ export function writeOpencodeSkill(original: string, fields: SkillFields, body: 
   // не изменилось, чужие ключи шапки на месте.
   const check = readOpencodeSkill(next);
   if (check.fields.name !== fields.name || check.fields.description !== fields.description) {
-    throw new SkillFormatError('malformed', 'Контрольный разбор скилла не совпал с намерением.');
+    throw coded(
+      new SkillFormatError('malformed', 'Контрольный разбор скилла не совпал с намерением.'),
+      'skill-roundtrip-intent',
+    );
   }
   if (check.body !== normalizedBody) {
-    throw new SkillFormatError('malformed', 'Контрольный разбор изменил тело скилла.');
+    throw coded(
+      new SkillFormatError('malformed', 'Контрольный разбор изменил тело скилла.'),
+      'skill-roundtrip-body',
+    );
   }
   if (
     otherKeysProjection(before) !==
     otherKeysProjection(parseFrontmatter(splitSkillFile(next)!.frontmatter))
   ) {
-    throw new SkillFormatError('malformed', 'Контрольный разбор потерял ключи шапки скилла.');
+    throw coded(
+      new SkillFormatError('malformed', 'Контрольный разбор потерял ключи шапки скилла.'),
+      'skill-roundtrip-keys',
+    );
   }
 
   return next;

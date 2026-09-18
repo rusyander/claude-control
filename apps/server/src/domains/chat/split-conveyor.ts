@@ -10,6 +10,7 @@ import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.ty
 import type { ChatEvent } from './ChatRunner.ts';
 import type { RunFinished } from './ChatRunRegistry.ts';
 import type { SplitGroupContext } from './ChatSplit.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Конвейер уровней разделения (Т1): разбор ПЕРЕД копиями, порции запуска
@@ -47,11 +48,19 @@ export interface SplitConveyorDeps {
   /**
    * Завести копии и запустить ПЛАН для групп записи (индексы). Одна порция —
    * один контекст: от какой ветки отводить и что группы знают о предшественниках.
+   *
+   * `claimBranch` зовётся, как только у группы появилось НАСТОЯЩЕЕ имя ветки, и
+   * ДО старта её прогона — той же причины, что и `claim` у `startTriage`:
+   * занятое имя получает суффикс (`feature/auth-2`), а цепочка группы может
+   * кончиться раньше, чем вернётся вся порция. Конец цепочки ищет группу по
+   * ветке, и без этого вызова он искал бы по имени, которого в git нет: группа
+   * не закрывалась бы никогда, а её преемники с `after` стояли бы вечно.
    */
   launch: (
     record: SplitPlanRecord,
     groups: number[],
-    context?: SplitGroupContext,
+    context: SplitGroupContext | undefined,
+    claimBranch: (index: number, branch: string) => void,
   ) => Promise<TaskSplitResult>;
   /**
    * Запустить разбор (уровень 1); `deferred` — дерево на паузе, старт отложен.
@@ -267,6 +276,65 @@ export class SplitConveyor {
   }
 
   /**
+   * Разбор, оборванный перезапуском панели: разморозить разделение.
+   *
+   * Итог разбора применяет РОВНО ОДИН вызов — завершение его прогона. Штатное
+   * закрытие панели гасит CLI (`chatRuns.stopAll`), журнал прогонов на старте
+   * выбрасывает запись без живого pid, и завершение не приедет уже никогда:
+   * запись остаётся с `triage: undefined`, все группы — `pending`, копий нет, и
+   * сдвинуть это нечем (ответ на вопрос отвечает 409 — группы не `held`).
+   *
+   * Поэтому на старте, когда живые прогоны уже усыновлены, каждая такая запись
+   * закрывается: «разбор не получен» — и группы встают на вопрос ЧЕЛОВЕКУ.
+   * Автоматически здесь не заводится ничего: разбор обещал развести границы,
+   * его нет, и запустить группы за человека значило бы принять за него решение,
+   * которое он полчаса назад доверил умной модели. Возраст записи не при чём
+   * ровно потому, что без его клика ничего не стартует.
+   *
+   * `alive` — жив ли чат разбора (усыновлённый прогон). Повторный запуск панели
+   * ничего не повторяет: `record.triage` уже стоит.
+   */
+  recoverInterruptedTriage(
+    alive: (chatId: string) => boolean,
+  ): { parentChatId: string; event: ChatEvent }[] {
+    const notices: { parentChatId: string; event: ChatEvent }[] = [];
+    const at = this.now().toISOString();
+
+    for (const record of Object.values(this.deps.store.all())) {
+      if (!record.triageChatId || record.triage) continue;
+      if (alive(record.triageChatId)) continue;
+
+      let frozen = 0;
+      for (const group of record.groups) {
+        // Трогаем только нерешённые: всё остальное разбор и не держал.
+        if (group.status !== 'pending') continue;
+        group.status = 'held';
+        // TODO код: вопрос ждёт ключа словаря (`split.triageInterrupted`).
+        group.hold =
+          'Разбор оборвался при перезапуске панели и итога не даст. ' +
+          'Запустить группу как предложено? Ответ уедет в её задачу.';
+        frozen += 1;
+      }
+      record.triage = { at, received: false, interrupted: true, repairs: [], conflicts: [] };
+      this.deps.store.set(record);
+
+      notices.push({
+        parentChatId: record.parentChatId,
+        event: {
+          kind: 'notice',
+          code: 'triageMissing',
+          // TODO код: строка ждёт ключа словаря (`split.triageInterruptedNotice`).
+          text:
+            `Разбор оборвался перезапуском панели — итога не будет. ` +
+            `Групп ждёт вашего ответа: ${frozen}; сами они не стартуют.`,
+        },
+      });
+    }
+
+    return notices;
+  }
+
+  /**
    * Цепочка группы кончилась (работа → ревью → правки, либо оборвалась):
    * отметить и запустить тех, кто её ждал. Зовётся планировщиком стадий там,
    * где следующего звена нет; повторный вызов по той же ветке ничего не меняет.
@@ -304,10 +372,13 @@ export class SplitConveyor {
     const record = this.deps.store.get(parentChatId);
     const group = record?.groups[index];
     if (!record || !group || group.status !== 'held') {
-      throw new Error('Группа не ждёт ответа: вопроса нет или на него уже ответили');
+      throw coded(
+        new Error('Группа не ждёт ответа: вопроса нет или на него уже ответили'),
+        'split-hold-not-waiting',
+      );
     }
     group.holdAnswer = answer;
-    group.status = this.unmet(record, group.after).length > 0 ? 'waiting' : 'pending';
+    group.status = this.unmet(record, group).length > 0 ? 'waiting' : 'pending';
     this.deps.store.set(record);
 
     const ready = await this.launchReady(record);
@@ -316,6 +387,32 @@ export class SplitConveyor {
       chats: [...ready.chats, ...unblocked.chats],
       failures: [...ready.failures, ...unblocked.failures],
     };
+  }
+
+  /**
+   * Человек отпускает группу, не дожидаясь предшественников.
+   *
+   * Единственная дверь у группы со статусом `waiting`: ответ на вопрос разбора
+   * работает только с `held`, а цепочка предшественника может не кончиться
+   * никогда — его остановили, чат удалили, прогон умер вместе с панелью. До
+   * 18.09.2026 такая группа стояла вечно и сдвинуть её было нечем.
+   *
+   * Панель здесь ничего не решает за человека и ничего не скрывает от агента:
+   * копия по-прежнему отводится от ветки предшественника, а в задание уезжает
+   * прямым текстом, что та работа не закончена (`contextFor` → `unfinished`).
+   */
+  async release(parentChatId: string, index: number): Promise<TaskSplitResult> {
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups[index];
+    if (!record || !group || group.status !== 'waiting') {
+      throw coded(
+        new Error('Группа не ждёт предшественников: отпускать нечего'),
+        'split-release-not-waiting',
+      );
+    }
+    group.released = true;
+    this.deps.store.set(record);
+    return this.launchUnblocked(record);
   }
 
   /** Запись для пульта: по любому разговору дерева, новейшая из подходящих. */
@@ -360,8 +457,11 @@ export class SplitConveyor {
   }
 
   /** Предшественники, чья цепочка ещё не кончилась. */
-  private unmet(record: SplitPlanRecord, after: readonly number[]): number[] {
-    return after.filter((ref) => {
+  private unmet(record: SplitPlanRecord, group: SplitPlanRecord['groups'][number]): number[] {
+    // Отпущенную руками группу не держит никто: человек решил, что ждать не
+    // будет, и то, что предшественник не доработал, уезжает ей в заметки.
+    if (group.released) return [];
+    return group.after.filter((ref) => {
       const dep = record.groups[ref];
       return dep && dep.status !== 'done' && dep.status !== 'failed';
     });
@@ -370,7 +470,7 @@ export class SplitConveyor {
   /** Порция без ожиданий: всё, что `pending` и ни от кого не зависит. */
   private async launchReady(record: SplitPlanRecord): Promise<TaskSplitResult> {
     const ready = record.groups
-      .filter((group) => group.status === 'pending' && this.unmet(record, group.after).length === 0)
+      .filter((group) => group.status === 'pending' && this.unmet(record, group).length === 0)
       .map((group) => group.index);
     if (ready.length === 0) return { chats: [], failures: [] };
 
@@ -398,7 +498,7 @@ export class SplitConveyor {
   private async launchUnblocked(record: SplitPlanRecord): Promise<TaskSplitResult> {
     const results: TaskSplitResult[] = [];
     for (const group of record.groups) {
-      if (group.status !== 'waiting' || this.unmet(record, group.after).length > 0) continue;
+      if (group.status !== 'waiting' || this.unmet(record, group).length > 0) continue;
       results.push(
         await this.runPortion(record, [group.index], this.contextFor(record, group.index)),
       );
@@ -422,6 +522,12 @@ export class SplitConveyor {
         title: dep.title,
         branch: dep.branch,
         ...(dep.status === 'failed' ? { failed: true } : {}),
+        // Отпущенная группа идёт по ветке, где работа ещё пишется: сказать об
+        // этом обязаны заданию, а не только карточке.
+        ...(group.released && dep.status !== 'done' && dep.status !== 'failed'
+          ? { unfinished: true }
+          : {}),
+        ...this.touchedBy(record, dep.index),
       }));
     // База — последний предшественник, у которого копия действительно была.
     const base = [...ordered]
@@ -435,6 +541,42 @@ export class SplitConveyor {
       ...(group.holdAnswer && question
         ? { holdAnswer: { question, answer: group.holdAnswer } }
         : {}),
+    };
+  }
+
+  /**
+   * Настоящее имя ветки — в запись, ДО старта прогона группы.
+   *
+   * Запись заводится с ИМЕНЕМ ИЗ ПРЕДЛОЖЕНИЯ (`safeBranchName`), а git выдаёт
+   * занятому имени суффикс, и до 18.09.2026 разница узнавалась только из ответа
+   * всей порции. Между этими двумя моментами цепочка группы успевала кончиться
+   * (у чужого CLI прогон падает на первом же вздохе), `onChainEnded` не находил
+   * группу по ветке, и всё, что её ждало, стояло навсегда.
+   */
+  private claimBranch(record: SplitPlanRecord, index: number, branch: string): void {
+    const group = record.groups[index];
+    if (!group || !branch || group.branch === branch) return;
+    group.branch = branch;
+    this.deps.store.set(record);
+  }
+
+  /**
+   * Что предшественник уже задел — из сверки веток (Т6).
+   *
+   * Порядок тут правильный сам собой: сверка зовётся по концу цепочки ДО
+   * запуска ждавших, — но считается она асинхронно и может не успеть или
+   * отказать вовсе. Поэтому отсутствие счёта — законное состояние: заметка
+   * тогда просто не называет файлов, а не срывает запуск группы.
+   */
+  private touchedBy(
+    record: SplitPlanRecord,
+    index: number,
+  ): { files?: string[]; filesTotal?: number } {
+    const counted = record.overlap?.counted.find((item) => item.index === index);
+    if (!counted) return {};
+    return {
+      ...(counted.names && counted.names.length > 0 ? { files: counted.names } : {}),
+      filesTotal: counted.files,
     };
   }
 
@@ -457,7 +599,9 @@ export class SplitConveyor {
 
     let result: TaskSplitResult;
     try {
-      result = await this.deps.launch(record, groups, context);
+      result = await this.deps.launch(record, groups, context, (index, branch) =>
+        this.claimBranch(record, index, branch),
+      );
     } catch (error) {
       for (const index of groups) {
         const group = record.groups[index];

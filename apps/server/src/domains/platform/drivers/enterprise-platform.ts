@@ -12,6 +12,7 @@ import {
   type DriverReading,
   type PlatformDriver,
 } from './driver.ts';
+import { serverText } from '../../../lib/server-texts.ts';
 
 /**
  * Драйвер корпоративной платформы: публичная поверхность по ключу.
@@ -38,17 +39,10 @@ import {
  * исходниках: у произвольного совместимого шлюза пяти причин нет, и
  * подставлять их ему значило бы утверждать непроверенное.
  */
-export const KEY_REJECTED_DETAIL =
-  'Контур отклонил ключ, и причину он не называет. Их пять: ключ неизвестен или отозван, ' +
-  'истёк по сроку, исчерпал свой бюджет, его владельца удалили — либо сверка владельца на ' +
-  'стороне контура не удалась (тогда ключ в порядке, и стоит повторить). Проверьте ключ, ' +
-  'его срок, бюджет и владельца в админке платформы';
+export const KEY_REJECTED_DETAIL = serverText('gateway-key-rejected');
 
 /** Текст 402 — одной строкой по той же причине, что и у 401. */
-export const KEY_BUDGET_DETAIL =
-  'Исчерпан бюджет ключа — контур отказал до вызова модели. Поднять бюджет или дождаться ' +
-  'нового периода ключа можно в админке платформы; через полминуты контур начнёт ' +
-  'отклонять этот ключ кодом 401';
+export const KEY_BUDGET_DETAIL = serverText('gateway-key-budget');
 
 /**
  * Строка матрицы. `evidence` обязателен и не имеет умолчания намеренно: это
@@ -75,7 +69,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Потолок ответа сервера контура: `http.Server{WriteTimeout: 120s}` без продления
- * на потоке (`inst-api/cmd/inst-api/main.go`). Режет ЛЮБОЙ ответ, поток тоже, —
+ * на потоке (так настроен его пограничный сервис). Режет ЛЮБОЙ ответ, поток тоже, —
  * поэтому одно число служит и пределом цельного ответа, и потолком потока.
  */
 const PLATFORM_RESPONSE_CEILING_SEC = 120;
@@ -361,7 +355,7 @@ export function buildEnterprisePlatformDriver(
       if (payload[f('tools_unavailable')] !== undefined) {
         return { kind: 'tools-dropped', field: f('tools_unavailable') };
       }
-      // Итоговый текст ответа (`router.py:1086–1088`): проверки вывода поправили
+      // Итоговый текст ответа (его шлёт сам маршрут чата контура): проверки вывода поправили
       // текст уже после потока, либо поток разошёлся с проверенным. Клиент обязан
       // заменить им отданное — выброшенный, кадр оставлял обрезок под видом целого.
       const replaced = payload[f('deanonymized')];
@@ -372,8 +366,9 @@ export function buildEnterprisePlatformDriver(
           text: typeof replaced === 'string' ? replaced : '',
         };
       }
-      // Обе карты подмены приходят ТОЛЬКО чату самой платформы (`is_chat_caller`,
-      // `router.py:1094,1114`): клиенту API значения возвращаются прямо в потоке.
+      // Обе карты подмены приходят ТОЛЬКО чату самой платформы: её маршрут
+      // различает собственный интерфейс и чужой вызов по ключу, и клиенту API
+      // значения возвращаются прямо в потоке.
       // Читаются они всё равно — ключ-метка, значение-оригинал, объектом
       // (`<префикс>_anonymization_mapping`) или списком `{placeholder, value}`
       // (`<префикс>_deanonymized_entities`): метка, доехавшая до аргумента `Write`,
@@ -402,8 +397,8 @@ export function buildEnterprisePlatformDriver(
 
     vendorFields: [f('guardrails'), f('sanitized'), f('status'), f('tools_unavailable')],
 
-    // `mod-guardrailsbox/.../models.py:226 RuleViolation`: название правила пишет
-    // администратор, тип — перечисление. `message` не читается никогда: это текст
+    // Нарушение в том виде, в каком его описывает модуль правил контура:
+    // название правила пишет администратор, тип — перечисление. `message` не читается никогда: это текст
     // сканера, и в нём бывает найденное.
     violationNames: [
       { field: 'rule_name', label: true },
@@ -411,7 +406,7 @@ export function buildEnterprisePlatformDriver(
       { field: 'scanner_name' },
     ],
 
-    // Трёхуровневое «budget exceeded: <level>» (`inst-api/internal/budget/budget.go`)
+    // Трёхуровневое «budget exceeded: <level>» (так его считает сам контур)
     // отдают только JWT-маршруты интерфейса — ключом туда не попасть, строки для
     // него нет.
     budgetRefusals: [{ message: /^budget exceeded for this API key$/i, scope: 'key' }],
@@ -419,18 +414,18 @@ export function buildEnterprisePlatformDriver(
     statusRows: [
       // 401 значит ПЯТЬ разных вещей, и различить их снаружи нечем — причём не
       // потому, что контур их не знает, а потому, что он их теряет по дороге.
-      // Тексты живут в двух местах: `inst-admin-api/.../store/keys.go`
-      // `ValidateKey` отвечает «key expired» и «budget exceeded», а
-      // `.../service/key_service.go` `Validate` добавляет «invalid API key»
-      // (ключ неизвестен), «key owner is deleted» и «key owner check failed»
-      // (сверка владельца не прошла — база не ответила). Всё это теряет
-      // `inst-api/internal/auth/apikey.go`: на 401 от админки он отдаёт
-      // `nil, nil`, и middleware пишет клиенту одно плоское «invalid API key».
+      // Тексты живут в двух местах: проверка самого ключа отвечает «key
+      // expired» и «budget exceeded», а слой сервиса над ней добавляет
+      // «invalid API key» (ключ неизвестен), «key owner is deleted» и «key
+      // owner check failed» (сверка владельца не прошла — база не ответила).
+      // Всё это теряет пограничная служба контура: на 401 от админской части
+      // она отдаёт пустой результат без ошибки, и клиенту уходит одно плоское
+      // «invalid API key».
       { upstream: 401, status: 401, code: 'authentication_error', message: KEY_REJECTED_DETAIL },
-      // На `/v1` 402 — ТОЛЬКО бюджет ключа (`handler_public_api.go:338-341`,
-      // `handler_agent_api.go:447`). Окно у него узкое: проверку ключа inst-api
-      // помнит 30 с (`auth/apikey.go:63`), а свежая проверка на исчерпанном ключе
-      // даёт уже 401 (`inst-admin-api/.../store/keys.go:235`).
+      // На `/v1` 402 — ТОЛЬКО бюджет ключа (так отвечают обработчики публичной
+      // и агентской частей контура). Окно у него узкое: результат проверки
+      // ключа контур помнит 30 с, а свежая проверка на исчерпанном ключе даёт
+      // уже 401.
       {
         upstream: 402,
         status: 402,
@@ -444,14 +439,14 @@ export function buildEnterprisePlatformDriver(
         upstream: 451,
         status: 400,
         code: 'content_policy_violation',
-        message: 'Проверки контента контура остановили запрос',
+        message: serverText('gateway-content-checks-request'),
         violations: true,
       },
       {
         upstream: 503,
         status: 503,
         code: 'overloaded_error',
-        message: 'Контур ещё поднимается: реестр моделей не готов',
+        message: serverText('gateway-registry-not-ready'),
       },
     ],
 
@@ -485,14 +480,14 @@ export function buildEnterprisePlatformDriver(
     // compromise: no-effort — усилие не объявлено публичной схемой контура, и панель его не отправляет (просьба добавить — Т12)
     effort: false,
 
-    // Агенты — модуль agentbox за тем же ключом; списка агентов маршруты не
+    // Агенты — отдельный модуль контура за тем же ключом; списка агентов маршруты не
     // отдают (`agents-manual-roster`).
     agents: { completions: 'agent/completions', sessions: 'agent/sessions' },
 
     controls: [
       {
         id: f('tools'),
-        title: 'Инструменты платформы',
+        title: serverText('contour-control-tools-title'),
         kind: 'request',
         field: 'platformTools',
         // Имена, а не схемы: реестр инструментов контура закрыт ключом другого
@@ -505,69 +500,64 @@ export function buildEnterprisePlatformDriver(
         // частом случае — обычное сообщение без инструментов — наверх не уходило
         // ничего, и контур брал свои по умолчанию. Теперь выключение отправляется
         // полем `whenEmpty`, и подпись описывает провод.
-        detail: 'имена инструментов контура; пусто — наверх уходит «tool_choice: none»',
+        detail: serverText('contour-control-tools-detail'),
         whenEmpty: { field: 'tool_choice', value: 'none' },
       },
       {
         id: f('tool_mode'),
-        title: 'Цикл вызовов платформы',
+        title: serverText('contour-control-toolmode-title'),
         kind: 'request',
         field: 'toolMode',
         options: platformToolModes,
-        // `mod-llmbox/.../chat/router.py:237-243`: с потоком — 400.
+        // Маршрут чата контура: с потоком — 400.
         streamless: ['single_turn'],
-        detail:
-          '«loop» — контур ходит по кругу сам, «single_turn» — возвращает вызов клиенту; такой ход идёт к контуру не потоком',
+        detail: serverText('contour-control-toolmode-detail'),
       },
       {
         id: 'generation_preset',
-        title: 'Пресет генерации',
+        title: serverText('contour-control-preset-title'),
         kind: 'request',
         field: 'generationPreset',
-        detail: 'именованный набор параметров на стороне контура; пусто — контур берёт свой',
+        detail: serverText('contour-control-preset-detail'),
       },
       {
         id: 'enable_thinking',
-        title: 'Размышления модели',
+        title: serverText('contour-control-thinking-title'),
         kind: 'request',
         field: 'enableThinking',
         // Верхнего поля `enable_thinking` схема контура не знает и выбрасывает
-        // молча (`chat/schemas.py:103` extra=ignore, `:120` — только вложенное), а
-        // до модели его доносит лишь самохостед vLLM (`llm_router.py:1331`).
+        // молча (лишние ключи его схема запроса игнорирует, знает она только
+        // вложенное), а до модели его доносит лишь самохостед vLLM.
         wireField: 'chat_template_kwargs.enable_thinking',
-        detail:
-          'включить или выключить доходит только до моделей на самохостед vLLM — остальным ' +
-          'провайдерам контур поле не передаёт; по умолчанию не отправляется, решает шаблон ' +
-          'модели. Размышления наружу не уходят',
+        detail: serverText('contour-control-thinking-detail'),
       },
       {
         id: 'guardrails',
-        title: 'Проверки содержимого',
+        title: serverText('contour-control-guardrails-title'),
         kind: 'observed',
-        where: 'включает владелец контура',
-        detail: 'включает владелец контура; отказ приходит статусом 451',
+        where: serverText('contour-control-owner-enables'),
+        detail: serverText('contour-control-guardrails-detail'),
       },
       {
         id: 'anonymization',
-        title: 'Подмена данных',
+        title: serverText('contour-control-anonymization-title'),
         kind: 'observed',
-        where: 'включает владелец контура',
-        detail:
-          'контур заменяет найденное метками и сам возвращает значения в потоке ответа; карту клиенту API не отдаёт',
+        where: serverText('contour-control-owner-enables'),
+        detail: serverText('contour-control-anonymization-detail'),
       },
       {
         id: 'knowledge',
-        title: 'Знания компании',
+        title: serverText('contour-control-knowledge-title'),
         kind: 'observed',
-        where: 'подмешивает владелец ключа',
-        detail: 'подмешиваются владельцем ключа, отдельного маршрута нет',
+        where: serverText('contour-control-knowledge-where'),
+        detail: serverText('contour-control-knowledge-detail'),
       },
       {
         id: 'managed-context',
-        title: 'Сжатие истории',
+        title: serverText('contour-control-context-title'),
         kind: 'observed',
-        where: 'решает контур',
-        detail: 'длинную переписку контур сжимает сам — наши контрольные точки об этом не знают',
+        where: serverText('contour-control-context-where'),
+        detail: serverText('contour-control-context-detail'),
       },
     ],
 
@@ -584,7 +574,7 @@ export function buildEnterprisePlatformDriver(
         const host = new URL(url).hostname.toLowerCase();
         if (host.startsWith('api.') || host.startsWith('127.') || host === 'localhost')
           return undefined;
-        return 'Похоже, это адрес админки: публичный API живёт на отдельном хосте (обычно api.<домен>).';
+        return serverText('contour-address-admin');
       } catch {
         return undefined;
       }

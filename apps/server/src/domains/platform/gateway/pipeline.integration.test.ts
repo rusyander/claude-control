@@ -11,6 +11,8 @@ import { writePlatform, writeToken } from '../store.ts';
 import type { PlatformFetch } from '../ca-fetch.ts';
 import { gatewayPricing } from '../spend.ts';
 import { PlatformGateway } from './listener.ts';
+import { splitPath } from './pipeline.ts';
+import { summarizedInRun, summarizedMessageIds } from './summarized-ledger.ts';
 import { driverFor } from '../drivers/index.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
@@ -416,7 +418,7 @@ describe('поток клиенту', () => {
   });
 
   it('расход внутри кадра с ответом не теряется: журнал и итог клиенту видят токены', async () => {
-    // Так отдаёт настоящий контур (router.py:898–912) и litellm: `usage` едет в
+    // Так отдаёт настоящий контур и litellm: `usage` едет в
     // кадре с НЕпустым `choices`. Разбор ждал пустого и записывал ноль токенов.
     await start(
       upstream([
@@ -481,6 +483,82 @@ describe('поток клиенту', () => {
   });
 });
 
+describe('сжатие истории привязано к ответу точно', () => {
+  const SUMMARIZING = [
+    '{"platform_status":"summarizing"}',
+    DELTA,
+    '{"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}',
+    USAGE,
+    '[DONE]',
+  ];
+
+  it('метка прогона в адресе снимается с пути и не путается с контуром', () => {
+    expect(splitPath('/c/_run/abc-1/v1/chat/completions?key=1')).toEqual({
+      platformId: 'c',
+      rest: '/v1/chat/completions',
+      runTag: 'abc-1',
+    });
+    expect(splitPath('/c/v1/messages')).toEqual({ platformId: 'c', rest: '/v1/messages' });
+    // Не метка — обычный путь: иначе запрос ушёл бы не туда молча.
+    expect(splitPath('/c/_run/a b/v1/messages').runTag).toBeUndefined();
+    expect(splitPath('/c/_run/a.b/v1/messages').runTag).toBeUndefined();
+  });
+
+  it('Claude: журнал хранит тот id сообщения, который получил клиент', async () => {
+    await start(upstream(SUMMARIZING));
+    const answer = await ask('/enterprise-platform/v1/messages', {
+      model: 'gpt-x',
+      max_tokens: 50,
+      messages: [{ role: 'user', content: 'привет' }],
+      stream: true,
+    });
+    const sent = /"id":"(msg_c1-[0-9a-f]{12})"/.exec(answer.text)?.[1];
+    expect(sent).toBeDefined();
+    expect([...summarizedMessageIds(appData)]).toEqual([sent]);
+    expect(gateway.status().events[0]).toMatchObject({ summarized: true, messageId: sent });
+    expect(gateway.status().summarized.recent[0]).toMatchObject({ link: 'message' });
+  });
+
+  it('два ответа с одинаковым id контура получают разные id — подпись не расползается', async () => {
+    await start(upstream(SUMMARIZING));
+    const body = { model: 'gpt-x', max_tokens: 50, messages: [{ role: 'user', content: 'x' }] };
+    const first = await ask('/enterprise-platform/v1/messages', { ...body, stream: true });
+    const second = await ask('/enterprise-platform/v1/messages', { ...body, stream: true });
+    const idOf = (text: string): string | undefined => /"id":"(msg_[^"]+)"/.exec(text)?.[1];
+    expect(idOf(first.text)).not.toBe(idOf(second.text));
+    expect(summarizedMessageIds(appData).size).toBe(2);
+  });
+
+  it('чужой CLI: сжатие записано под меткой прогона, путь в следе без неё', async () => {
+    await start(upstream(SUMMARIZING));
+    await ask('/enterprise-platform/_run/tag-1/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
+    expect(summarizedInRun(appData, 'tag-1')).toBe(true);
+    expect(summarizedInRun(appData, 'tag-2')).toBe(false);
+    // Клиент OpenAI не получает id Anthropic — привязка у него только по метке.
+    expect(summarizedMessageIds(appData).size).toBe(0);
+    const event = gateway.status().events[0];
+    expect(event).toMatchObject({
+      runTag: 'tag-1',
+      path: '/enterprise-platform/v1/chat/completions',
+    });
+    // Адрес наверх — тот же, что без метки.
+    expect(calls[0]?.url).not.toContain('_run');
+  });
+
+  it('без кадра сжатия журнал пуст, даже с меткой прогона', async () => {
+    await start(upstream([DELTA, USAGE, '[DONE]']));
+    await ask('/enterprise-platform/_run/tag-1/v1/chat/completions', {
+      model: 'gpt-x',
+      stream: true,
+    });
+    expect(summarizedInRun(appData, 'tag-1')).toBe(false);
+    expect(gateway.status().summarized.total).toBe(0);
+  });
+});
+
 describe('клиент просил не поток', () => {
   it('наверх всё равно уходит поток, а ответ собирается целиком', async () => {
     await start(
@@ -531,7 +609,7 @@ describe('клиент просил не поток', () => {
   });
 
   describe('прочитанный из кэша вход доезжает до клиента Anthropic', () => {
-    // Контур отдаёт тело модели как есть (inst-api `handler_public_api.go`), и
+    // Контур отдаёт тело модели как есть (его публичная часть ничего не переписывает), и
     // OpenAI-совместимый апстрим кладёт кэш в `prompt_tokens_details`. Мост терял
     // его, и транскрипт CLI записывал весь вход свежим: у Anthropic
     // `input_tokens` кэша НЕ включает, а `cache_read_input_tokens` оставался нулём.
@@ -823,17 +901,16 @@ describe('отказы контура', () => {
   });
 
   // Исчерпанный бюджет ключа контур отдаёт кодом 401 — тем же, что и отозванный
-  // ключ (`inst-admin-api/internal/store/keys.go` `ValidateKey`), и различить их
+  // ключ (обе причины сходятся в его проверке ключа), и различить их
   // снаружи нечем. Совет «перевыпустите ключ» отправлял бы человека с кончившимся
   // бюджетом чинить не то.
   /**
    * §8 №5, №6, №7 разом. Контур ЗНАЕТ, какая из причин сработала — тексты
-   * лежат в двух местах: `inst-admin-api/.../store/keys.go` `ValidateKey`
-   * отвечает «key expired» и «budget exceeded», а `.../service/key_service.go`
-   * `Validate` добавляет «invalid API key», «key owner is deleted» и «key
-   * owner check failed». Всё это теряет `inst-api/internal/auth/apikey.go`: на
-   * 401 от админки он отдаёт `nil, nil`, и клиент видит плоское «invalid API
-   * key». Поэтому «истёк по сроку» отдельным текстом (§8 №6) панель дать НЕ
+   * лежат в двух местах: проверка самого ключа отвечает «key expired» и
+   * «budget exceeded», а слой сервиса над ней добавляет «invalid API key»,
+   * «key owner is deleted» и «key owner check failed». Всё это теряет
+   * пограничная служба контура: на 401 от админской части она отдаёт пустой
+   * результат без ошибки, и клиент видит плоское «invalid API key». Поэтому «истёк по сроку» отдельным текстом (§8 №6) панель дать НЕ
    * МОЖЕТ — и называет все пять причин, вместо того чтобы выбрать одну наугад.
    * Пятая («сверка владельца не удалась») тем и важна, что она НЕ про ключ:
    * человек, которому назвали бы только четыре, чинил бы исправный ключ.
@@ -848,6 +925,31 @@ describe('отказы контура', () => {
     for (const cause of ['отозван', 'срок', 'бюджет', 'владельца', 'сверка владельца']) {
       expect(answer.text).toContain(cause);
     }
+  });
+
+  /**
+   * A-2: отказ, пахнущий ПРАВАМИ, — повод перепроверить контур в фоне.
+   *
+   * Проверяется на настоящем сокете и настоящем конвейере, потому что вопрос
+   * ровно один: доходит ли сигнал ОТТУДА, где шлюз видит чужой код ответа. И
+   * вторая половина обещания не менее важна первой: 402 и 429 — не про права, и
+   * проба по ним была бы походом в чужой журнал без причины.
+   */
+  it('401 и 403 зовут фоновую перепроверку, 402 и 429 — нет', async () => {
+    const asked: string[] = [];
+    gateway.setRightsRefusalNotifier((platformId) => asked.push(platformId));
+
+    for (const status of [401, 403]) {
+      await start(upstream([JSON.stringify({ error: { message: 'no' } })], status));
+      await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    }
+    expect(asked).toEqual(['enterprise-platform', 'enterprise-platform']);
+
+    for (const status of [402, 429]) {
+      await start(upstream([JSON.stringify({ error: { message: 'no' } })], status));
+      await ask('/enterprise-platform/v1/chat/completions', { model: 'gpt-x', stream: true });
+    }
+    expect(asked).toHaveLength(2);
   });
 
   /**
@@ -1537,8 +1639,8 @@ describe('постоянный учёт расхода (Т8)', () => {
     expect(record.exhaustedScope).toBeUndefined();
   });
 
-  // Тело дословно из `inst-api/internal/api/handler_public_api.go:340`. На `/v1`
-  // это ЕДИНСТВЕННЫЙ 402: трёхуровневый бюджет (`budget.go`) проверяется только
+  // Тело дословно такое, как его отдаёт публичная часть контура. На `/v1`
+  // это ЕДИНСТВЕННЫЙ 402: трёхуровневый бюджет контура проверяется только
   // на JWT-маршрутах, куда панель не ходит. Что это бюджет ключа, говорит
   // манифест драйвера, а не шлюз.
   const KEY_BUDGET_402 =
@@ -2046,7 +2148,7 @@ describe('правила контура в теле запроса (Т7)', () =>
     await ask('/enterprise-platform/v1/messages', ASK_SIMPLE);
 
     expect(sent().generation_preset).toBe('creative');
-    // Поле контура — вложенное (`schemas.py:120`), верхнего уровня он не знает.
+    // Поле контура — вложенное (так описано в его схеме запроса), верхнего уровня он не знает.
     expect(sent().chat_template_kwargs).toEqual({ enable_thinking: false });
     expect(sent()).not.toHaveProperty('enable_thinking');
   });
@@ -2064,7 +2166,7 @@ describe('правила контура в теле запроса (Т7)', () =>
   ];
 
   /**
-   * Контур с поведением `mod-llmbox/.../chat/router.py:237-243`: `single_turn`
+   * Контур с поведением его маршрута чата: `single_turn`
    * с `stream: true` — 400 с FastAPI `detail`, без потока — цельное тело, где
    * вызов лежит в `message.tool_calls` целиком, а не кусками.
    */

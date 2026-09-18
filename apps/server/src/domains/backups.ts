@@ -1,3 +1,4 @@
+import type { CodedMessage } from '@agentdeck/contracts/server-messages';
 import {
   existsSync,
   readdirSync,
@@ -19,6 +20,7 @@ import {
 } from '../lib/safe-io.ts';
 import { isEncryptedBackup, decryptSecret } from '../lib/secret-crypto.ts';
 import { SKILLS_DISABLED_DIR } from './skills.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Резервные копии и откат к ним.
@@ -225,7 +227,7 @@ function stageDirectory(source: string, backupDir: string): string {
   return staged;
 }
 
-export interface RestoreResult {
+export interface RestoreResult extends CodedMessage {
   ok: boolean;
   /** Куда восстановили. */
   restoredTo?: string;
@@ -257,10 +259,21 @@ export function restoreBackup(
 ): RestoreResult {
   const source = join(backupDir, name);
   if (!BACKUP_NAME.test(name) || !existsSync(source))
-    return { ok: false, notFound: true, error: 'Копия не найдена' };
+    return {
+      ok: false,
+      notFound: true,
+      error: 'Копия не найдена',
+      messageCode: 'backup-copy-not-found',
+    };
 
   const entry = listBackups(backupDir, knownPaths, skillsDir).find((item) => item.name === name);
-  if (!entry) return { ok: false, notFound: true, error: 'Копия не найдена' };
+  if (!entry)
+    return {
+      ok: false,
+      notFound: true,
+      error: 'Копия не найдена',
+      messageCode: 'backup-copy-not-found',
+    };
 
   const isDirectory = statSync(source).isDirectory();
   // Разбор имени делаем ОДИН раз: дальше мы сами меняем диск (снимаем копии,
@@ -270,20 +283,33 @@ export function restoreBackup(
     ? skill?.target
     : resolveBackupTarget(entry.target, isDirectory, knownPaths, skillsDir);
   if (!target) {
-    return { ok: false, error: `Непонятно, куда возвращать копию «${entry.target}»` };
+    return {
+      ok: false,
+      error: `Непонятно, куда возвращать копию «${entry.target}»`,
+      messageCode: 'backup-restore-target-unknown',
+      params: { target: entry.target },
+    };
   }
 
   // Зашифрованную копию расшифровываем ДО того, как трогать целевой файл: если
   // фраза неверна, отказываемся, ничего не записав.
   let decrypted: string | undefined;
   if (entry.encrypted) {
-    if (!passphrase) return { ok: false, error: 'Нужна парольная фраза для расшифровки копии' };
+    if (!passphrase)
+      return {
+        ok: false,
+        error: 'Нужна парольная фраза для расшифровки копии',
+        messageCode: 'backup-passphrase-required',
+      };
     try {
       decrypted = decryptSecret(readFileSync(source), passphrase);
     } catch (error) {
       return {
         ok: false,
         error: error instanceof Error ? error.message : 'Не удалось расшифровать',
+        ...(error instanceof Error
+          ? codeOf(error)
+          : { messageCode: 'backup-decrypt-failed' as const }),
       };
     }
     // Фраза подошла: запоминаем в памяти, чтобы копия «состояния до» тоже

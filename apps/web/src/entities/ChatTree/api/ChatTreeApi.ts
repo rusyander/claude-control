@@ -78,6 +78,26 @@ export function useAnswerHold() {
 }
 
 /**
+ * «Отпустить» группу, которая ждёт предшественников (Т1).
+ *
+ * Вторая и последняя дверь к стоящей группе: ответ на вопрос разбора двигает
+ * только `held`, а цепочка предшественника может не кончиться никогда — прогон
+ * остановили, чат удалили, панель перезапустилась. Адресуется, как и ответ,
+ * РОДИТЕЛЮ с номером группы: чата у стоящей группы ещё нет.
+ */
+export function useReleaseGroup() {
+  return useMutation({
+    mutationFn: async (input: { parentChatId: string; index: number }) => {
+      const { data } = await apiClient.post<TaskSplitResult>(
+        `/chat/split/${encodeURIComponent(input.parentChatId)}/release`,
+        { index: input.index },
+      );
+      return data;
+    },
+  });
+}
+
+/**
  * Пересечения веток разделения (Т6) по кнопке в хабе.
  *
  * Это ЧТЕНИЕ, а не действие, и всё же мутация: считает его сервер запросами к

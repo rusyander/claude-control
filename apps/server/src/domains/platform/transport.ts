@@ -7,6 +7,7 @@ import {
   type PlatformTransport,
   type PlatformTransportErrorCode,
 } from '@agentdeck/contracts/platform-transport';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 import { driverOf } from './drivers/index.ts';
 import { invalidField } from './errors.ts';
 
@@ -41,11 +42,14 @@ export function contourHeaders(
   return platformRequestHeaders(transportOf(platform), driverOf(platform).auth, token);
 }
 
-const WHY: Record<PlatformTransportErrorCode, string> = {
-  token: 'не имя заголовка HTTP',
-  line: 'не вида «Имя: значение» (номер строки или параметра)',
-  secret: 'под этим именем едет ключ, а ключ хранится зашифрованным и идёт своим полем',
-  reserved: 'этот заголовок панель ставит сама',
+const WHY: Record<PlatformTransportErrorCode, [string, ServerMessageCode]> = {
+  token: ['не имя заголовка HTTP', 'transport-header-token'],
+  line: ['не вида «Имя: значение» (номер строки или параметра)', 'transport-header-line'],
+  secret: [
+    'под этим именем едет ключ, а ключ хранится зашифрованным и идёт своим полем',
+    'transport-header-secret',
+  ],
+  reserved: ['этот заголовок панель ставит сама', 'transport-header-reserved'],
 };
 
 /**
@@ -55,6 +59,12 @@ const WHY: Record<PlatformTransportErrorCode, string> = {
 export function assertTransport(platform: Addressed): void {
   const driver = driverOf(platform);
   const [first] = platformTransportErrors(transportOf(platform), driver.auth.header);
-  if (first)
-    throw invalidField(`transport.${first.field}`, `«${first.subject}» — ${WHY[first.code]}`);
+  if (first) {
+    const name = `transport.${first.field}`;
+    const [why, code] = WHY[first.code];
+    throw invalidField(name, `«${first.subject}» — ${why}`, code, {
+      field: name,
+      subject: first.subject,
+    });
+  }
 }

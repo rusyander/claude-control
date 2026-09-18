@@ -1,4 +1,5 @@
 import type { TmsKind } from './integrations';
+import type { CodedList } from './server-messages';
 
 /**
  * Тест-кейсы проекта: что проверяют, чем это кончилось и как это шло.
@@ -261,6 +262,9 @@ export interface ProjectTestGroup {
   cases: ProjectTestCase[];
   /** Файл не разобрался: вкладка показывает причину вместо списка. */
   error?: string;
+  /** Код причины для перевода; `error` — запасной текст. */
+  messageCode?: string;
+  params?: Record<string, string | number>;
 }
 
 /**
@@ -296,6 +300,9 @@ export interface ProjectTestBaseline {
   maxDiffRatio?: number;
   /** Причина словами — её показывают человеку. */
   message?: string;
+  /** Код причины: клиент переводит его, строка выше — запасная. */
+  messageCode?: string;
+  params?: Record<string, string | number>;
 }
 
 /** Общий шаг: кусок сценария, который повторяется в десятке кейсов. */
@@ -659,6 +666,8 @@ export interface ProjectTestRunDiff {
   comparable: boolean;
   /** Чем именно наборы различаются — строка для человека. */
   warning?: string;
+  warningCode?: string;
+  warningParams?: Record<string, string | number>;
 }
 
 /** Что панель проставляет кейсам черновика сама, зная источник генерации. */
@@ -739,7 +748,7 @@ export interface ProjectTestDraftItem {
  * групп ни при какой галочке, а человек видит предложенное списком, а не
  * `git diff`.
  */
-export interface ProjectTestDraft {
+export interface ProjectTestDraft extends CodedList<'warnings'> {
   version: 1;
   /** Прогон-автор. */
   runId: string;
@@ -757,6 +766,8 @@ export interface ProjectTestDraft {
   auto?: boolean;
   /** Файл не разобрался: черновик показывает причину и гасит только себя. */
   error?: string;
+  messageCode?: string;
+  params?: Record<string, string | number>;
   /** Что панель отбросила при чтении: удаления, кейсы без заголовка. */
   warnings?: string[];
 }
@@ -781,13 +792,20 @@ export interface ProjectTestDraftSummary {
   rejected: number;
   auto?: boolean;
   error?: string;
+  messageCode?: string;
+  params?: Record<string, string | number>;
 }
 
 /** Итог применения черновика. */
 export interface ProjectTestDraftApplyResult {
   applied: number;
   /** Что не применилось и почему: занятая группа, кейс человека, битая правка. */
-  skipped: { caseId: string; reason: string }[];
+  skipped: {
+    caseId: string;
+    reason: string;
+    reasonCode?: string;
+    reasonParams?: Record<string, string | number>;
+  }[];
   draft: ProjectTestDraft;
 }
 
@@ -798,7 +816,12 @@ export interface ProjectTestDraftRollbackResult {
   /** Сколько изменённых возвращено из снимка. */
   restored: number;
   /** Кейсы, которых откат не тронул: их успели поправить или прогнать. */
-  kept: { caseId: string; reason: string }[];
+  kept: {
+    caseId: string;
+    reason: string;
+    reasonCode?: string;
+    reasonParams?: Record<string, string | number>;
+  }[];
   draft: ProjectTestDraft;
 }
 
@@ -829,12 +852,20 @@ export interface ProjectTestLintFinding {
   title: string;
   /** Что именно не так — по-русски, словами человека. */
   message: string;
+  /** Код текста для перевода; `message` — запасная строка. */
+  messageCode?: string;
+  params?: Record<string, string | number>;
   /**
    * Чем это чинится массово. Линтер НИЧЕГО не правит сам: он только называет
    * кнопку, которую нажмёт человек, — иначе «уборка» однажды сотрёт то, что
    * кто-то писал руками.
    */
-  fix?: { action: ProjectTestBulkInput['action']; value?: string; label: string };
+  fix?: {
+    action: ProjectTestBulkInput['action'];
+    value?: string;
+    label: string;
+    labelCode?: string;
+  };
 }
 
 /** Здоровье набора: замечания, дубликаты и счёт по правилам. */
@@ -845,6 +876,7 @@ export interface ProjectTestLintReport {
     rule: string;
     severity: ProjectTestLintSeverity;
     title: string;
+    titleCode?: string;
     count: number;
   }[];
   duplicates: ProjectTestDuplicate[];
@@ -911,6 +943,8 @@ export interface ProjectTestQuarantineReport {
   thresholds: { greenStreak: number; stability: number; minRuns: number };
   /** Почему требования не сверялись: Atlassian выключен или Jira не ответила. */
   warning?: string;
+  warningCode?: string;
+  warningParams?: Record<string, string | number>;
   checkedAt: string;
 }
 
@@ -1265,6 +1299,8 @@ export interface ProjectTestReleaseDocument {
   runs: ProjectTestReleaseRun[];
   /** Почему часть документа неполна — Atlassian выключен, Jira молчала. */
   warning?: string;
+  warningCode?: string;
+  warningParams?: Record<string, string | number>;
 }
 
 /**
@@ -1487,6 +1523,8 @@ export interface ProjectTestCoverage {
   jql?: string;
   /** Почему список требований неполон: интеграция выключена, Jira не ответила. */
   warning?: string;
+  warningCode?: string;
+  warningParams?: Record<string, string | number>;
 }
 
 /**

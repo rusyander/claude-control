@@ -7,6 +7,7 @@ import type {
   AssistantRunResult,
   RunAssistantDeps,
 } from './types.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /** Актуальное поколение зашитой модели — или она сама, если каталога нет. */
 function assistantModel(deps: RunAssistantDeps, fallback: string): string {
@@ -152,7 +153,8 @@ export async function runProviderApi(
 }
 
 function finalizeApi(providerId: string, reply: string): AssistantRunResult {
-  if (!reply) return apiError(providerId, 'Модель вернула пустой ответ.');
+  if (!reply)
+    return coded(apiError(providerId, 'Модель вернула пустой ответ.'), 'assistant-empty-reply');
   return { ok: true, providerId, mode: 'api', reply, experimental: false, reason: 'ok' };
 }
 

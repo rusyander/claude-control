@@ -66,11 +66,17 @@ export function registerTestManualRoutes(app: FastifyInstance, deps: TestsDeps):
       if (!root) return reply;
       const body = request.body;
       if (!body?.runId || !body.pointId) {
-        return reply.code(400).send({ message: 'Не указано, какой проход отмечается.' });
+        return reply.code(400).send({
+          message: 'Не указано, какой проход отмечается.',
+          messageCode: 'manual-pass-unspecified',
+        });
       }
       const status = body.status;
       if (!status || !STATUSES.includes(status)) {
-        return reply.code(400).send({ message: 'Неизвестный статус результата.' });
+        return reply.code(400).send({
+          message: 'Неизвестный статус результата.',
+          messageCode: 'manual-status-unknown',
+        });
       }
       return guard(reply, () => ({
         session: deps.manual.record(
@@ -128,7 +134,10 @@ export function registerTestManualRoutes(app: FastifyInstance, deps: TestsDeps):
       if (!root) return reply;
       const { caseId, name, contentBase64 } = request.body ?? {};
       if (!caseId || !name || !contentBase64) {
-        return reply.code(400).send({ message: 'Нужен кейс, имя файла и содержимое.' });
+        return reply.code(400).send({
+          message: 'Нужен кейс, имя файла и содержимое.',
+          messageCode: 'manual-attachment-incomplete',
+        });
       }
       return guard(reply, () => ({
         file: saveAttachment(root, caseId, name, contentBase64, now()),
@@ -157,13 +166,19 @@ export function registerTestManualRoutes(app: FastifyInstance, deps: TestsDeps):
     if (!root) return reply;
     const { caseId, pointId, contentBase64, maxDiffRatio } = request.body ?? {};
     if (!caseId || !pointId || !contentBase64) {
-      return reply.code(400).send({ message: 'Нужен кейс, тест-поинт и сам снимок.' });
+      return reply.code(400).send({
+        message: 'Нужен кейс, тест-поинт и сам снимок.',
+        messageCode: 'manual-snapshot-incomplete',
+      });
     }
     if (
       maxDiffRatio !== undefined &&
       (typeof maxDiffRatio !== 'number' || maxDiffRatio < 0 || maxDiffRatio > 1)
     ) {
-      return reply.code(400).send({ message: 'Порог расхождения — доля от 0 до 1.' });
+      return reply.code(400).send({
+        message: 'Порог расхождения — доля от 0 до 1.',
+        messageCode: 'manual-threshold-range',
+      });
     }
     return guard(reply, () => ({
       baseline: compareBaseline(root, {
@@ -184,7 +199,9 @@ export function registerTestManualRoutes(app: FastifyInstance, deps: TestsDeps):
       if (!root) return reply;
       const { caseId, pointId } = request.body ?? {};
       if (!caseId || !pointId) {
-        return reply.code(400).send({ message: 'Нужен кейс и тест-поинт.' });
+        return reply
+          .code(400)
+          .send({ message: 'Нужен кейс и тест-поинт.', messageCode: 'manual-case-point-required' });
       }
       return guard(reply, () => ({ baseline: acceptBaseline(root, caseId, pointId, now()) }));
     },

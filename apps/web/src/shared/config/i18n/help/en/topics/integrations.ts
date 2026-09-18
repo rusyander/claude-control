@@ -160,13 +160,18 @@ export const integrationsEn: typeof integrationsRu = {
       'conversation, nor the panel’s startup suffers for it.',
     noteMcpTitle: 'The MCP server is registered by hand',
     noteMcpText:
-      'The button in the Atlassian card adds the server to the MCP page as an ordinary ' +
-      'one, with a health probe. After that the panel enables it itself when a run starts ' +
-      'in an attached project, but it never disables anything — switching off stays yours.',
+      'The button in the Atlassian card adds the server as an ordinary one, with a health ' +
+      'probe — into the ACTIVE CLI’s MCP configuration, not always into Claude Code’s. A ' +
+      'CLI with no MCP section at all gets a refusal that names it: writing into someone ' +
+      'else’s file would read as success while the agent gained no tool. After that the ' +
+      'panel enables the server itself when a run starts in an attached project, but it ' +
+      'never disables anything — switching off stays yours.',
     noteSignatureTitle: 'The webhook signature',
     noteSignatureText:
       'With a secret set, X-AgentDeck-Signature carries an HMAC-SHA256 of the body in ' +
-      'hex: the receiver verifies exactly what arrived. With no secret we send unsigned — ' +
+      'hex: the receiver verifies exactly what arrived. The same HMAC also goes in a ' +
+      'second header under the product’s former name, so a receiver set up before the ' +
+      'rename keeps verifying without edits. With no secret we send unsigned — ' +
       'an internal bus usually expects nothing else, and demanding a key where there is ' +
       'none to be had means turning notifications off altogether.',
 
@@ -293,7 +298,8 @@ export const integrationsEn: typeof integrationsRu = {
     storageLinks: 'Project links',
     storageLinksValue: 'agentdeck/state.json → keyed by the normalised project path',
     storageMcp: 'The “Connect MCP” button',
-    storageMcpValue: '.claude.json next to the configuration directory — like any other MCP server',
+    storageMcpValue:
+      'the active CLI’s MCP configuration; for Claude Code that is .claude.json next to the configuration directory',
 
     canCheck: 'Check the connection and show which account the panel signed in as',
     canDetect: 'Detect cloud or Server/DC by a live probe and remember the answer',

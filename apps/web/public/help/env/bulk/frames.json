@@ -9,14 +9,14 @@
       "masked": 0,
       "width": 1400,
       "height": 796,
-      "shotAt": "2026-09-11T12:50:41.642Z",
+      "shotAt": "2026-09-17T20:38:48.607Z",
       "text": "Добавить переменную Изменения применятся после перезапуска Claude Code Одно Несколько сразу Список — по одному Переменные окружения на строку Каждая строка — отдельная запись. Пустые строки пропускаются. 5 распознано .mcp-secrets.env WAREHOUSE_TOKEN = •••• .mcp-secrets.env DELIVERY_API_KEY = •••• settings.json ORDERS_API_URL = http://127.0.0.1:8080 settings.json BASH_MAX_TIMEOUT_MS = 600000 settings.json DISABLE_TELEMETRY = 1 Создать все (5) Закрыть",
       "en": {
         "file": "01-bulk.en.png",
         "masked": 0,
         "width": 1400,
         "height": 796,
-        "shotAt": "2026-09-11T17:45:20.402Z",
+        "shotAt": "2026-09-17T20:41:45.025Z",
         "text": "Add variable Changes apply after restarting Claude Code One Several at once A list — one Environment variables per line Each line is a separate entry. Empty lines are skipped. 5 recognised .mcp-secrets.env WAREHOUSE_TOKEN = •••• .mcp-secrets.env DELIVERY_API_KEY = •••• settings.json ORDERS_API_URL = http://127.0.0.1:8080 settings.json BASH_MAX_TIMEOUT_MS = 600000 settings.json DISABLE_TELEMETRY = 1 Create all (5) Close"
       }
     },
@@ -27,15 +27,15 @@
       "masked": 0,
       "width": 1400,
       "height": 1100,
-      "shotAt": "2026-09-11T12:50:47.671Z",
-      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Переменные окружения Настройки среды и секреты MCP-серверов Добавить переменную Где что хранится BASH_DEFAULT_TIMEOUT_MS settings.json 120000 ORDERS_API_URL settings.json http://127.0.0.1:8080 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93",
+      "shotAt": "2026-09-17T20:38:54.870Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 4 Права 1 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Переменные окружения Настройки среды и секреты MCP-серверов Добавить переменную Где что хранится BASH_DEFAULT_TIMEOUT_MS settings.json 120000 ORDERS_API_URL settings.json http://127.0.0.1:8080 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93",
       "en": {
         "file": "02-list-mixed.en.png",
         "masked": 0,
         "width": 1400,
         "height": 1100,
-        "shotAt": "2026-09-11T17:45:26.390Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 4 Permissions 1 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Environment variables Environment settings and MCP server secrets Add variable Where things live BASH_DEFAULT_TIMEOUT_MS settings.json 120000 ORDERS_API_URL settings.json http://127.0.0.1:8080 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93"
+        "shotAt": "2026-09-17T20:41:51.107Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 4 Permissions 1 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Environment variables Environment settings and MCP server secrets Add variable Where things live BASH_DEFAULT_TIMEOUT_MS settings.json 120000 ORDERS_API_URL settings.json http://127.0.0.1:8080 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93"
       }
     },
     {
@@ -45,15 +45,15 @@
       "masked": 0,
       "width": 1400,
       "height": 1100,
-      "shotAt": "2026-09-11T12:50:49.743Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Переменные окружения Настройки среды и секреты MCP-серверов Добавить переменную Где что хранится BASH_DEFAULT_TIMEOUT_MS settings.json 120000 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 ORDERS_API_URL локальные http://127.0.0.1:8080 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93 Перемещено · копия: settings.json.2026-09-11T12-50-47-689Z.bak",
+      "shotAt": "2026-09-17T20:38:56.951Z",
+      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 4 Права 1 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Переменные окружения Настройки среды и секреты MCP-серверов Добавить переменную Где что хранится BASH_DEFAULT_TIMEOUT_MS settings.json 120000 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 ORDERS_API_URL локальные http://127.0.0.1:8080 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93 Перемещено · копия: settings.json.2026-09-17T20-38-54-903Z.bak",
       "en": {
         "file": "03-local.en.png",
         "masked": 0,
         "width": 1400,
         "height": 1100,
-        "shotAt": "2026-09-11T17:45:28.459Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 4 Permissions 1 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Environment variables Environment settings and MCP server secrets Add variable Where things live BASH_DEFAULT_TIMEOUT_MS settings.json 120000 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 ORDERS_API_URL local http://127.0.0.1:8080 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93 Moved · backup: settings.json.2026-09-11T17-45-26-414Z.bak"
+        "shotAt": "2026-09-17T20:41:53.167Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 4 Permissions 1 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Environment variables Environment settings and MCP server secrets Add variable Where things live BASH_DEFAULT_TIMEOUT_MS settings.json 120000 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 ORDERS_API_URL local http://127.0.0.1:8080 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93 Moved · backup: settings.json.2026-09-17T20-41-51-124Z.bak"
       }
     },
     {
@@ -63,15 +63,15 @@
       "masked": 0,
       "width": 1400,
       "height": 1100,
-      "shotAt": "2026-09-11T12:50:51.789Z",
-      "text": "AgentDeck Свернуть панель Уведомления Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Настройки Защита данных Контур Справка Переменные окружения Настройки среды и секреты MCP-серверов Добавить переменную Где что хранится BASH_DEFAULT_TIMEOUT_MS settings.json 120000 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 TEST_MODE группа: Проверка релиза record PLAYWRIGHT_BASE_URL группа: Проверка релиза http://127.0.0.1:8080 ORDERS_API_URL локальные http://127.0.0.1:8080 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93",
+      "shotAt": "2026-09-17T20:38:59.283Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 4 Права 1 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Настройки Защита данных Контур Справка Переменные окружения Настройки среды и секреты MCP-серверов Добавить переменную Где что хранится BASH_DEFAULT_TIMEOUT_MS settings.json 120000 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 TEST_MODE группа: Проверка релиза record PLAYWRIGHT_BASE_URL группа: Проверка релиза http://127.0.0.1:8080 ORDERS_API_URL локальные http://127.0.0.1:8080 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93",
       "en": {
         "file": "04-group.en.png",
         "masked": 0,
         "width": 1400,
         "height": 1100,
-        "shotAt": "2026-09-11T17:45:30.461Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 4 Permissions 1 Environment Projects Testing Application Groups 1 Change history Comparison Settings Data protection Contour Help Environment variables Environment settings and MCP server secrets Add variable Where things live BASH_DEFAULT_TIMEOUT_MS settings.json 120000 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 TEST_MODE group: Проверка релиза record PLAYWRIGHT_BASE_URL group: Проверка релиза http://127.0.0.1:8080 ORDERS_API_URL local http://127.0.0.1:8080 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93"
+        "shotAt": "2026-09-17T20:41:55.288Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 4 Permissions 1 Environment Projects Testing Application Groups 1 Change history Comparison Settings Data protection Contour Help Environment variables Environment settings and MCP server secrets Add variable Where things live BASH_DEFAULT_TIMEOUT_MS settings.json 120000 BASH_MAX_TIMEOUT_MS settings.json 600000 DISABLE_TELEMETRY settings.json 1 TEST_MODE group: Проверка релиза record PLAYWRIGHT_BASE_URL group: Проверка релиза http://127.0.0.1:8080 ORDERS_API_URL local http://127.0.0.1:8080 WAREHOUSE_TOKEN .mcp-secrets.env whk_••••••••••••a1d2 DELIVERY_API_KEY .mcp-secrets.env dl_7•••••••aa93"
       }
     },
     {
@@ -81,14 +81,14 @@
       "masked": 0,
       "width": 468,
       "height": 339,
-      "shotAt": "2026-09-11T12:50:52.873Z",
+      "shotAt": "2026-09-17T20:39:00.408Z",
       "text": "Удалить безвозвратно? Переменная будет удалена из файла. Серверы, которые её используют, перестанут получать это значение. Введите «DELIVERY_API_KEY», чтобы подтвердить Отмена Удалить",
       "en": {
         "file": "05-delete.en.png",
         "masked": 0,
         "width": 468,
         "height": 339,
-        "shotAt": "2026-09-11T17:45:31.532Z",
+        "shotAt": "2026-09-17T20:41:56.375Z",
         "text": "Delete permanently? The variable will be removed from the file. Servers using it will stop receiving this value. Type \"DELIVERY_API_KEY\" to confirm Cancel Delete"
       }
     }

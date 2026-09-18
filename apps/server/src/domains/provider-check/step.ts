@@ -1,5 +1,6 @@
 import type { ProviderCheckStep } from '@agentdeck/contracts';
 import { getProvider } from '../../providers/registry.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /** Один шаг проверки: путь к файлу добавляем, только если он есть. */
 export function step(
@@ -28,6 +29,6 @@ export function skipReason(
 ): string {
   const provider = getProvider(providerId);
   return provider.capabilities[capability] === 'ready'
-    ? `${title}: раздел обслуживается собственными маршрутами панели, универсальный круг записи к нему не применяется.`
-    : `${title}: у этого провайдера такого раздела нет.`;
+    ? serverText('checks-skip-own-routes', { title })
+    : serverText('checks-skip-absent', { title });
 }

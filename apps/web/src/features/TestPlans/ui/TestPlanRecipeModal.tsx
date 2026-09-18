@@ -11,6 +11,7 @@ import { SelectField } from '@shared/ui/select-field';
 import { useBuildTestPlan } from '@entities/ProjectTest';
 import type { TestPlanRecipeModalProps } from './TestPlanRecipeModal.types';
 import styles from './TestPlans.module.scss';
+import { messageFromPayload } from '@shared/api/client';
 
 const RECIPES: ProjectTestPlanRecipe[] = ['smoke', 'diff', 'release', 'flaky'];
 
@@ -225,6 +226,6 @@ function numberOr(value: string, fallback: number): number {
 
 /** Текст отказа сервера одной строкой — например «правила „магия“ нет». */
 function messageOf(error: unknown): string {
-  const response = (error as { response?: { data?: { message?: string } } }).response;
-  return response?.data?.message ?? (error as Error).message;
+  const response = (error as { response?: { data?: unknown } }).response;
+  return messageFromPayload(response?.data) ?? (error as Error).message;
 }

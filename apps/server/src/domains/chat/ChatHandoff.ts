@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { join, resolve, sep } from 'node:path';
+import { writeJsonFile } from '../../lib/safe-io.ts';
 import {
   buildHandoffPrompt,
   HANDOFF_MAX_CHAIN,
@@ -92,20 +93,45 @@ const NOTICE_STEP = 25_000;
 const MAX_CHAINS = 200;
 
 /**
+ * Старше этого цепочка не восстанавливается. Тот же срок, что у журнала прогонов
+ * (`run-ledger.MAX_AGE_MS`), и по той же причине: застарелая цепочка держала бы
+ * потолок и предохранитель «чекпойнт не изменился» над работой, к которой она
+ * давно не относится.
+ */
+export const CHAIN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/** Одна цепочка на диске: состояние плюс все ключи, под которыми оно известно. */
+export interface PersistedChain extends ChainState {
+  aliases: string[];
+}
+
+/** Куда цепочки пишутся между перезапусками. Файл знает `HandoffChainStore`. */
+export interface HandoffChainSink {
+  read(): PersistedChain[];
+  write(chains: PersistedChain[]): void;
+}
+
+/**
  * Память цепочек продолжений.
  *
- * Живёт в памяти сервера — там же, где и сами прогоны: пережить его перезапуск
- * цепочка всё равно не смогла бы, потому что вместе с ним умирают и агенты.
+ * Переживает перезапуск сервера — с тех пор, как его переживают сами прогоны:
+ * живой CLI после перезапуска усыновляется из журнала (`run-ledger`), а
+ * `pnpm keepalive` поднимает упавшую половину стенда сам. Пока цепочки жили
+ * только в памяти, перезапуск обнулял номер шага (потолок в восемь продолжений
+ * начинал считать заново) и терял отпечаток файла-опоры — предохранитель
+ * «агент ходит по кругу» пропускал лишний круг.
  *
  * Ключей у одного разговора несколько, и это не небрежность: свежий чат стартует
  * под временным `new-<ts>`, а он же, открытый из списка, известен по `sessionId`
  * — тумблер, поставленный в одном написании, обязан действовать и в другом.
  * Поэтому состояние кладётся под каждый псевдоним ОДНИМ И ТЕМ ЖЕ объектом:
- * глубина, выросшая на продолжении, видна по любому ключу.
+ * глубина, выросшая на продолжении, видна по любому ключу. На диск это едет
+ * группами (`aliases` + состояние), иначе общий объект разъехался бы на копии.
  */
 export class HandoffChains {
   private states = new Map<string, ChainState>();
   private autoByDefault: () => boolean;
+  private sink: HandoffChainSink | undefined;
 
   /**
    * Значение тумблера для разговора, в котором его не трогали, — настройка
@@ -113,10 +139,54 @@ export class HandoffChains {
    * настройку меняют при живом сервере, и запомненное число врало бы до
    * перезапуска. Тумблер конкретного разговора всегда сильнее: выключенный
    * руками остаётся выключенным, что бы ни стояло глобально.
+   *
+   * `sink` не задан — цепочки живут только в памяти, как до Т-волны: так их
+   * заводят тесты, которым диск не нужен.
    */
-  constructor(autoByDefault: () => boolean = () => false) {
+  constructor(autoByDefault: () => boolean = () => false, sink?: HandoffChainSink) {
     // Node в режиме strip-only не поддерживает parameter properties.
     this.autoByDefault = autoByDefault;
+    this.sink = sink;
+    if (sink) this.restore(sink.read());
+  }
+
+  /**
+   * Поднять цепочки с диска. Протухшие пропускаем по тому же правилу возраста,
+   * что и записи журнала прогонов; запись без ключей поднимать некуда.
+   */
+  private restore(chains: PersistedChain[], now = Date.now()): void {
+    for (const chain of chains) {
+      const { aliases, ...state } = chain;
+      if (!Array.isArray(aliases) || aliases.length === 0) continue;
+      if (typeof state.depth !== 'number' || typeof state.touchedAt !== 'number') continue;
+      if (now - state.touchedAt > CHAIN_MAX_AGE_MS) continue;
+      // Один объект на все псевдонимы — ровно та же связь, что и в памяти.
+      for (const alias of aliases) if (alias) this.states.set(alias, state);
+    }
+    this.prune();
+  }
+
+  /**
+   * Сохранить карту группами по общему состоянию. Идентичность объекта здесь и
+   * есть связь «это один и тот же разговор», поэтому группируем по ней, а не по
+   * равенству полей: два разных разговора с одинаковой глубиной — не одна цепочка.
+   */
+  private persist(): void {
+    if (!this.sink) return;
+    const groups = new Map<ChainState, string[]>();
+    for (const [alias, state] of this.states) {
+      const aliases = groups.get(state);
+      if (aliases) aliases.push(alias);
+      else groups.set(state, [alias]);
+    }
+    const chains: PersistedChain[] = [];
+    for (const [state, aliases] of groups) chains.push({ ...state, aliases });
+    try {
+      this.sink.write(chains);
+    } catch {
+      // Файл — страховка, а не часть работы: отказ диска не имеет права
+      // уронить ни тумблер, ни заведение продолжения.
+    }
   }
 
   /** Включить или выключить автопродолжение для разговора (по всем ключам). */
@@ -189,6 +259,7 @@ export class HandoffChains {
   /** Забыть разговор: цепочка закрыта человеком. */
   forget(aliases: string[]): void {
     for (const alias of aliases) this.states.delete(alias);
+    this.persist();
   }
 
   private stateOf(aliases: string[]): ChainState | undefined {
@@ -204,6 +275,7 @@ export class HandoffChains {
       if (alias) this.states.set(alias, state);
     }
     this.prune();
+    this.persist();
   }
 
   /** Самые давние записи выбрасываем: карта не должна расти бесконечно. */
@@ -211,6 +283,36 @@ export class HandoffChains {
     if (this.states.size <= MAX_CHAINS) return;
     const sorted = [...this.states.entries()].sort((a, b) => a[1].touchedAt - b[1].touchedAt);
     for (const [key] of sorted.slice(0, this.states.size - MAX_CHAINS)) this.states.delete(key);
+  }
+}
+
+/** Имя файла цепочек — рядом с журналом прогонов, в каталоге данных панели. */
+export const HANDOFF_CHAINS_FILE = 'handoff-chains.json';
+
+/**
+ * Цепочки на диске. Форма и правила те же, что у журнала прогонов: свой файл в
+ * каталоге данных, битый или отсутствующий — пустой список без крика (потерять
+ * номер шага не страшнее, чем не иметь его вовсе, а вот упасть на старте — да).
+ */
+export class HandoffChainStore implements HandoffChainSink {
+  private readonly path: string;
+
+  constructor(appDataDir: string, file: string = HANDOFF_CHAINS_FILE) {
+    this.path = join(appDataDir, file);
+  }
+
+  read(): PersistedChain[] {
+    try {
+      if (!existsSync(this.path)) return [];
+      const parsed: unknown = JSON.parse(readFileSync(this.path, 'utf8'));
+      return Array.isArray(parsed) ? (parsed as PersistedChain[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  write(chains: PersistedChain[]): void {
+    writeJsonFile(this.path, chains);
   }
 }
 

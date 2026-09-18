@@ -8,6 +8,7 @@ import { ProjectTestsError } from './files.ts';
 import type { ExportedFile } from './export-cases.ts';
 import { PRINT_CSS, escapeHtml } from './export-run.ts';
 import { renderPdf } from './pdf.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Документ готовности вехи файлом — то, что уходит туда, где панели нет.
@@ -342,7 +343,7 @@ export function exportRelease(
       body: Buffer.from(releaseToHtml(doc), 'utf8'),
     };
   }
-  throw new ProjectTestsError('Формат документа готовности: md или html.');
+  throw coded(new ProjectTestsError('Формат документа готовности: md или html.'), 'release-format');
 }
 
 /**

@@ -95,6 +95,8 @@ export function ChatThread({
       treeBusy={child.treeBusy}
       onAnswerHold={child.answerHold}
       holdBusy={child.holdBusy}
+      onRelease={child.release}
+      releaseBusy={child.releaseBusy}
       onCheckOverlap={child.checkOverlap}
       overlapBusy={child.overlapBusy}
       // Ревью чужих MR (Т7): в родителе — карточки всех групп, в самой группе —

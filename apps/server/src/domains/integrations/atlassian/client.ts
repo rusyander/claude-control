@@ -1,6 +1,6 @@
 import type { AtlassianDeployment, AtlassianSettings } from '@agentdeck/contracts';
-import { invalidField, unreachable } from '../errors.ts';
-import { describeFailure, parseJson, sendRequest, type OutboundResponse } from '../http.ts';
+import { invalidField } from '../errors.ts';
+import { failedResponse, parseJson, sendRequest, type OutboundResponse } from '../http.ts';
 
 /**
  * Один клиент Atlassian на два диалекта: облако и своя установка (Server/DC).
@@ -69,8 +69,7 @@ export interface AtlassianCall {
 /** Запрос к Atlassian: заголовки, JSON-тело, разбор ответа, русский отказ. */
 export async function call<T>(access: AtlassianAccess, request: AtlassianCall): Promise<T> {
   const response = await raw(access, request);
-  if (!response.ok)
-    throw unreachable(describeFailure(request.system, response), response.text.slice(0, 500));
+  if (!response.ok) throw failedResponse(request.system, response, 500);
   return parseJson<T>(request.system, response);
 }
 
@@ -117,8 +116,14 @@ export interface DeploymentProbe {
 export async function detectDeployment(
   access: Omit<AtlassianAccess, 'deployment'>,
 ): Promise<DeploymentProbe> {
-  if (!access.baseUrl) throw invalidField('baseUrl', 'не указан адрес Atlassian');
-  if (!access.token) throw invalidField('token', 'не сохранён токен Atlassian');
+  if (!access.baseUrl)
+    throw invalidField('baseUrl', 'не указан адрес Atlassian', 'request-atlassian-url-missing', {
+      field: 'baseUrl',
+    });
+  if (!access.token)
+    throw invalidField('token', 'не сохранён токен Atlassian', 'request-atlassian-token-missing', {
+      field: 'token',
+    });
 
   const cloud: AtlassianAccess = { ...access, deployment: 'cloud' };
   const cloudResponse = access.email
@@ -139,7 +144,7 @@ export async function detectDeployment(
   // Показываем отказ ОБЛАКА, если почта была задана: человек, вводивший почту,
   // метил в облако, и «токен отклонён» ему понятнее, чем ответ второй попытки.
   const decisive = cloudResponse ?? serverResponse;
-  throw unreachable(describeFailure('Atlassian', decisive), decisive.text.slice(0, 500));
+  throw failedResponse('Atlassian', decisive, 500);
 }
 
 function accountName(me: MyselfResponse): string {
@@ -153,7 +158,10 @@ function accountName(me: MyselfResponse): string {
  */
 export function toAccess(settings: AtlassianSettings, token: string): AtlassianAccess {
   const baseUrl = trimUrl(settings.baseUrl);
-  if (!baseUrl) throw invalidField('baseUrl', 'не указан адрес Atlassian');
+  if (!baseUrl)
+    throw invalidField('baseUrl', 'не указан адрес Atlassian', 'request-atlassian-url-missing', {
+      field: 'baseUrl',
+    });
   return {
     baseUrl,
     email: settings.email.trim(),

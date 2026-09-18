@@ -36,6 +36,7 @@ import {
   type RunPermissionGate,
   type RunScope,
 } from './run-permissions.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Прогоны тестов: генерация кейсов, их проверка, свободный поиск, автоматизация.
@@ -146,17 +147,25 @@ export class ProjectTestRunRegistry {
     resolveSecrets?: RunSecretsResolver,
   ): ProjectTestRun {
     const root = request.projectPath;
-    if (!existsSync(root)) throw new ProjectTestsError('Каталог проекта не найден.');
+    if (!existsSync(root))
+      throw coded(new ProjectTestsError('Каталог проекта не найден.'), 'project-dir-not-found');
 
     const active = this.runs.get(root);
     if (active?.view.status === 'running') {
-      throw new ProjectTestsError('Прогон по этому проекту уже идёт.');
+      throw coded(
+        new ProjectTestsError('Прогон по этому проекту уже идёт.'),
+        'run-already-running',
+      );
     }
 
     const all = readGroups(root);
     const scoped = request.groupId ? all.filter((group) => group.id === request.groupId) : all;
     if (request.groupId && scoped.length === 0) {
-      throw new ProjectTestsNotFoundError(`Группы «${request.groupId}» в проекте нет.`);
+      throw coded(
+        new ProjectTestsNotFoundError(`Группы «${request.groupId}» в проекте нет.`),
+        'run-group-not-found',
+        { groupId: request.groupId },
+      );
     }
     const caseIds = this.pickCases(root, all, request);
 
@@ -164,21 +173,33 @@ export class ProjectTestRunRegistry {
     // приносит десяток кейсов ни о чём. Хартию задаёт то же поле пожелания, и
     // отказ здесь дешевле такого прогона.
     if (request.mode === 'explore' && !request.scope?.trim()) {
-      throw new ProjectTestsError(
-        'Исследование идёт по хартии: напишите в поле пожелания, что именно смотреть ' +
-          '(«вложения в чате», «права на страницах проекта»).',
+      throw coded(
+        new ProjectTestsError(
+          'Исследование идёт по хартии: напишите в поле пожелания, что именно смотреть ' +
+            '(«вложения в чате», «права на страницах проекта»).',
+        ),
+        'run-explore-charter-required',
       );
     }
 
     if (request.mode === 'run' || request.mode === 'automate') {
-      if (scoped.length === 0) throw new ProjectTestsError('Прогонять нечего: кейсов нет.');
+      if (scoped.length === 0)
+        throw coded(new ProjectTestsError('Прогонять нечего: кейсов нет.'), 'run-no-cases');
       const broken = scoped.find((group) => group.error);
-      if (broken) throw new ProjectTestsError(`Группа «${broken.id}»: ${broken.error}`);
+      if (broken)
+        throw coded(
+          new ProjectTestsError(`Группа «${broken.id}»: ${broken.error}`),
+          'run-group-broken',
+          { groupId: broken.id, reason: broken.error ?? '' },
+        );
       if (caseIds && caseIds.length === 0) {
-        throw new ProjectTestsError(
-          request.changedOnly
-            ? 'Правки рабочей копии не задели ни одного кейса.'
-            : 'Прогонять нечего: под отбор не попал ни один кейс.',
+        throw coded(
+          new ProjectTestsError(
+            request.changedOnly
+              ? 'Правки рабочей копии не задели ни одного кейса.'
+              : 'Прогонять нечего: под отбор не попал ни один кейс.',
+          ),
+          request.changedOnly ? 'run-changed-none' : 'run-selection-empty',
         );
       }
     }
@@ -187,7 +208,10 @@ export class ProjectTestRunRegistry {
     // тесты заново. Кейс с `automated` задание и так велит пропускать — но
     // прогон, у которого таких кейсов ВСЕ, запускать незачем.
     if (request.mode === 'automate' && !hasWorkToAutomate(scoped, caseIds)) {
-      throw new ProjectTestsError('Автоматизировать нечего: кейсы отбора уже помечены automated.');
+      throw coded(
+        new ProjectTestsError('Автоматизировать нечего: кейсы отбора уже помечены automated.'),
+        'run-automate-nothing',
+      );
     }
 
     if (request.mode === 'run' && request.full) {
@@ -411,8 +435,12 @@ export class ProjectTestRunRegistry {
       }
       const missing = ids.filter((id) => !known.has(id));
       if (missing.length > 0) {
-        throw new ProjectTestsError(
-          `Кейсов «${missing.slice(0, 5).join('», «')}» в отборе нет — проверьте id.`,
+        throw coded(
+          new ProjectTestsError(
+            `Кейсов «${missing.slice(0, 5).join('», «')}» в отборе нет — проверьте id.`,
+          ),
+          'run-cases-missing',
+          { ids: missing.slice(0, 5).join('», «') },
         );
       }
       ids = [...new Set(ids.map((id) => known.get(id) as string))];
@@ -420,7 +448,12 @@ export class ProjectTestRunRegistry {
 
     if (request.planId) {
       const plan = readPlan(root, request.planId);
-      if (!plan) throw new ProjectTestsNotFoundError(`Плана «${request.planId}» в проекте нет.`);
+      if (!plan)
+        throw coded(
+          new ProjectTestsNotFoundError(`Плана «${request.planId}» в проекте нет.`),
+          'run-plan-not-found',
+          { planId: request.planId },
+        );
       const fromPlan = planCases(groups, plan).map((item) => item.testCase.id);
       ids = ids ? ids.filter((id) => fromPlan.includes(id)) : fromPlan;
     }

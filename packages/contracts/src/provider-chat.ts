@@ -59,6 +59,12 @@ export const providerChatMessageSchema = object({
    * справиться с инструментами. Нет поля — прогон шёл мимо контура.
    */
   contourToolCalls: number().optional(),
+  /**
+   * Контур сжал историю хотя бы в одном запросе ЭТОГО прогона. Прогон узнаётся
+   * по метке в адресе шлюза, которую панель выдала только ему, — не по окну
+   * времени: соседний чат через тот же контур подписи не получит.
+   */
+  contextSummarized: boolean().optional(),
 });
 export type ProviderChatMessage = Infer<typeof providerChatMessageSchema>;
 

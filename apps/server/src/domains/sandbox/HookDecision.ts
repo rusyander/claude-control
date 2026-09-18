@@ -1,4 +1,8 @@
 import type { HookDecision } from './HookProbe.types.ts';
+import type {
+  ServerMessageCode,
+  ServerMessageNestedParams,
+} from '@agentdeck/contracts/server-messages';
 
 interface HookOutput {
   hookSpecificOutput?: {
@@ -28,8 +32,15 @@ interface HookOutput {
 export function readDecision(
   exitCode: number,
   parsed: unknown,
-): { decision: HookDecision; reason?: string; addedContext?: string } {
-  if (exitCode === 2) return { decision: 'block', reason: 'Хук вышел с кодом 2' };
+): {
+  decision: HookDecision;
+  reason?: string;
+  reasonCode?: ServerMessageCode;
+  reasonParams?: ServerMessageNestedParams;
+  addedContext?: string;
+} {
+  if (exitCode === 2)
+    return { decision: 'block', reason: 'Хук вышел с кодом 2', reasonCode: 'sandbox-hook-exit-2' };
 
   const output = parsed as HookOutput | undefined;
   const specific = output?.hookSpecificOutput;
@@ -47,6 +58,9 @@ export function readDecision(
     return {
       decision: 'error',
       reason: reason ?? `Хук завершился с кодом ${exitCode} и решения не вернул`,
+      ...(reason
+        ? {}
+        : { reasonCode: 'sandbox-hook-no-decision' as const, reasonParams: { code: exitCode } }),
       addedContext,
     };
   }

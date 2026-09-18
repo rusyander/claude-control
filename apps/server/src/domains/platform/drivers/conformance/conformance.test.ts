@@ -37,9 +37,62 @@ import {
  * по-прежнему нет — драйвер по договору в неё не ходит.
  */
 
+/**
+ * ЧТО КАЖДЫЙ ДРАЙВЕР ОБЪЯВЛЯЕТ САМ — закреплено числом.
+ *
+ * Пять строк ниже подставляют в мост то, что драйвер объявил: вендорные поля,
+ * свои строки отказа, свои названия нарушений. У драйвера без объявлений такой
+ * цикл проходит по пустому массиву — `it` зеленеет, не проверив НИЧЕГО. Восемь
+ * пресетов из девяти стоят на `openai-compat` и не объявляют ничего, то есть
+ * около сорока зелёных строк набора покраснеть не могут в принципе.
+ *
+ * Сама пустота законна: у этих контуров вендорной формы нет, и придумывать её
+ * ради строки было бы театром. Незаконно — НЕ ЗНАТЬ о ней. Пресет, получивший
+ * своё объявление через `PLATFORM_PRESETS[...].manifest` (механизм живой,
+ * `drivers/index.ts`), обязан покраснить эту таблицу: иначе его мост так и
+ * останется непроверенным, а набор — зелёным, и автор не узнает, что его
+ * драйвер не гонялся ни разу.
+ */
+const DECLARED: Record<string, { vendorFields: number; statusRows: number; violations: number }> = {
+  'enterprise-platform': { vendorFields: 4, statusRows: 4, violations: 3 },
+  'openai-compat': { vendorFields: 0, statusRows: 0, violations: 0 },
+  litellm: { vendorFields: 0, statusRows: 0, violations: 0 },
+  vllm: { vendorFields: 0, statusRows: 0, violations: 0 },
+  ollama: { vendorFields: 0, statusRows: 0, violations: 0 },
+  openrouter: { vendorFields: 0, statusRows: 0, violations: 0 },
+  'azure-openai': { vendorFields: 0, statusRows: 0, violations: 0 },
+  dashscope: { vendorFields: 0, statusRows: 0, violations: 0 },
+  together: { vendorFields: 0, statusRows: 0, violations: 0 },
+};
+
 /** Кадр потока в проводном виде. */
 function frame(payload: unknown): string {
   return `data: ${JSON.stringify(payload)}\n\n`;
+}
+
+/**
+ * Название проверки, каким его увидит человек, для объявленного драйвером поля.
+ * `label: true` значит «поле несёт фразу», остальные — идентификатор, и
+ * разборщик отсеивает всё, что на идентификатор не похоже.
+ */
+function violationNameFor(field: string, label: boolean | undefined): string {
+  return label ? `правило «${field}» сработало` : `rule_${field}`;
+}
+
+/**
+ * Элементы перечня нарушений в форме ЭТОГО драйвера — по одному на каждое
+ * объявленное поле, с проверявшимся текстом в соседних значениях. Драйвер без
+ * объявления возвращает пусто: его живой путь читает встроенный список, и
+ * проверяет его вторая половина того же тела.
+ */
+function declaredViolations(driver: PlatformDriver): Record<string, string>[] {
+  return (driver.violationNames ?? []).map(({ field, label }) => ({
+    [field]: violationNameFor(field, label),
+    // Соседние значения — то самое, ради чего проверка стояла. Мост обязан
+    // взять имя и не взять их.
+    text: SECRET_IN_BODY,
+    input: SECRET_IN_BODY,
+  }));
 }
 
 /** Прогнать кадры через настоящий разборщик от имени этого драйвера. */
@@ -63,6 +116,59 @@ function runStream(
 describe.each(allDrivers)('набор соответствия: $id', (driver: PlatformDriver) => {
   it('называет себя человеку', () => {
     expect(driver.title.trim()).not.toBe('');
+  });
+
+  it('объявления драйвера совпадают с закреплённой таблицей — пустой цикл не молчит', () => {
+    const pinned = DECLARED[driver.id];
+    expect(pinned, `драйвер ${driver.id} не записан в таблицу объявлений`).toBeDefined();
+    expect({
+      vendorFields: driver.vendorFields.length,
+      statusRows: driver.statusRows.length,
+      violations: (driver.violationNames ?? []).length,
+    }).toEqual(pinned);
+  });
+
+  it('драйвер без своих строк отказа отвечает общей таблицей, а не пустотой', () => {
+    if (driver.statusRows.length > 0) return;
+    // Восемь пресетов из девяти сюда и попадают, и до этой строки мост на них
+    // не гонялся ни разу: цикл по `statusRows` проходил по пустому массиву.
+    // Ожидание записано КОДАМИ, а не «непусто»: общий откат на любой незнакомый
+    // код отвечает непустой фразой всегда, и проверка «строка не пуста» зеленела
+    // бы и с выломанной таблицей. 451 стоит здесь ради главного: наружу он не
+    // уходит никогда — его не ждёт ни один CLI.
+    const expected: Record<number, { status: number; code: string }> = {
+      400: { status: 400, code: 'invalid_request_error' },
+      401: { status: 401, code: 'authentication_error' },
+      403: { status: 403, code: 'permission_error' },
+      404: { status: 404, code: 'not_found_error' },
+      429: { status: 429, code: 'rate_limit_error' },
+      451: { status: 400, code: 'content_policy_violation' },
+      500: { status: 502, code: 'api_error' },
+    };
+    for (const [upstream, want] of Object.entries(expected)) {
+      const bridged = bridgeUpstreamStatus(Number(upstream), {}, { driverRows: driver.statusRows });
+      expect({ status: bridged.status, code: bridged.code }, `отказ ${upstream}`).toEqual(want);
+      expect(bridged.message.trim(), `текст отказа ${upstream} пуст`).not.toBe('');
+      expect(bridged.status).not.toBe(451);
+    }
+  });
+
+  it('драйвер без объявленных нарушений не читает чужое тело наугад', () => {
+    if ((driver.violationNames ?? []).length > 0) return;
+    // Тот же провал молчания с другой стороны: перечень нарушений читается
+    // ТОЛЬКО там, где драйвер сказал, что он в теле есть. У этих восьми такого
+    // объявления нет — значит, тело с `violations` обязано проехать мимо, и
+    // проверявшийся текст не должен оказаться в отказе.
+    const body = {
+      message: 'запрос остановлен проверками',
+      violations: [{ category: 'secrets', text: SECRET_IN_BODY }],
+    };
+    const bridged = bridgeUpstreamStatus(451, body, {
+      driverRows: driver.statusRows,
+      violationNames: driver.violationNames,
+    });
+    expect(bridged.violations).toEqual([]);
+    expect(JSON.stringify(bridged)).not.toContain(SECRET_IN_BODY);
   });
 
   it('адрес моделей не удваивает версию', () => {
@@ -320,10 +426,22 @@ describe.each(allDrivers)('набор соответствия: $id', (driver: P
         { category: 'secrets', text: SECRET_IN_BODY },
         SECRET_IN_BODY,
         'internal-network',
+        // По элементу на КАЖДОЕ объявленное драйвером поле: разборщик читает у
+        // элемента первое совпавшее поле и уходит, поэтому одним элементом со
+        // всеми полями сразу проверилось бы только первое. Проверявшийся текст
+        // лежит в соседних значениях — там, где его кладёт настоящий контур.
+        // Драйвер без объявления не приносит сюда ни одного элемента.
+        ...declaredViolations(driver),
       ],
     };
     for (const row of driver.statusRows) {
-      const bridged = bridgeUpstreamStatus(row.upstream, body, { driverRows: driver.statusRows });
+      const bridged = bridgeUpstreamStatus(row.upstream, body, {
+        driverRows: driver.statusRows,
+        // Ровно то, что передаёт живой путь (`gateway/pipeline.ts`). Без этого
+        // мост откатывался бы на встроенный список полей, и объявление драйвера
+        // — единственное, что здесь и проверяется, — не исполнялось бы вовсе.
+        violationNames: driver.violationNames,
+      });
       const all = JSON.stringify(bridged);
       // Единственное, что уезжает наружу, — НАЗВАНИЯ проверок. Проверявшийся
       // текст в теле отказа лежит рядом с ними, и любой его кусок на экране
@@ -332,6 +450,15 @@ describe.each(allDrivers)('набор соответствия: $id', (driver: P
       if (row.violations) {
         expect(bridged.violations).toContain('secrets');
         expect(bridged.violations).toContain('internal-network');
+        // И то, что объявил САМ драйвер. Без этой строки поле манифеста читал
+        // бы только встроенный список, а объявление проезжало бы мимо: новый
+        // контур назвал бы своё поле, набор остался бы зелёным, а на экране
+        // панели перечень был бы пуст.
+        for (const { field, label } of driver.violationNames ?? []) {
+          expect(bridged.violations, `объявленное поле ${field} не прочитано мостом`).toContain(
+            violationNameFor(field, label),
+          );
+        }
       } else {
         expect(bridged.violations).toEqual([]);
       }

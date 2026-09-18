@@ -1,7 +1,13 @@
 import type { PlatformExhaustedScope, PlatformSpendRecord } from '@agentdeck/contracts';
 import type { AppStore } from '../../../lib/app-store.ts';
 import type { PricingLookup } from '../../analytics/pricing.ts';
-import { addSpend, declaredPricing, emptySpend, type SpendDelta } from '../spend.ts';
+import {
+  addSpend,
+  budgetCrossing,
+  declaredPricing,
+  emptySpend,
+  type SpendDelta,
+} from '../spend.ts';
 import { readPlatforms } from '../store.ts';
 
 /**
@@ -29,6 +35,19 @@ export interface BudgetRefusal {
   level?: string;
 }
 
+/**
+ * Порог бюджета, перейденный этой пачкой, — наружу, тем же слоем, что и концы
+ * прогонов. Ставится снаружи (`PlatformGateway.setBudgetNotifier`) по той же
+ * причине, что и у реестра прогонов: устройства, Telegram и вебхук живут в
+ * настройках панели, а учёт про них не знает. Не задан — считаем молча.
+ */
+export interface BudgetCrossingNotice {
+  platformId: string;
+  platformTitle: string;
+  level: 'near' | 'over';
+  share: number;
+}
+
 /** Раз во сколько сбрасываем накопленное. */
 export const SPEND_FLUSH_MS = 5_000;
 
@@ -48,6 +67,8 @@ export interface SpendFlusherOptions {
   lookup?: () => PricingLookup;
   flushMs?: number;
   now?: () => Date;
+  /** Куда сказать о перейденном пороге бюджета. Не задан — тишина. */
+  notifyBudget?: (notice: BudgetCrossingNotice) => void;
 }
 
 interface Pending {
@@ -60,6 +81,7 @@ export class SpendFlusher {
   readonly #lookup: () => PricingLookup;
   readonly #flushMs: number;
   readonly #now: () => Date;
+  readonly #notifyBudget?: (notice: BudgetCrossingNotice) => void;
   #pending = new Map<string, Pending[]>();
   #timer?: NodeJS.Timeout;
 
@@ -68,6 +90,7 @@ export class SpendFlusher {
     this.#lookup = options.lookup ?? (() => ({}));
     this.#flushMs = options.flushMs ?? SPEND_FLUSH_MS;
     this.#now = options.now ?? (() => new Date());
+    if (options.notifyBudget) this.#notifyBudget = options.notifyBudget;
   }
 
   /** Прибавить расход одного ответа. На диск он уедет вместе с соседями. */
@@ -75,7 +98,13 @@ export class SpendFlusher {
     // Пустой расход не копим: контур не прислал `usage` (оборванный поток,
     // отказ до модели) — считать нечего, а лишний день в записи означал бы
     // «в этот день что-то потратили».
-    if (delta.totalTokens <= 0) return;
+    //
+    // Исключение — ответ, который ДОШЁЛ до клиента без счёта (MD-09): у него
+    // расход был, просто контур его не назвал. Такой ответ уходит в учёт
+    // отдельным счётчиком (`unreportedAnswers`), без единого выдуманного
+    // токена: иначе полоса бюджета молчаливо занижала бы цифру, и по ней было
+    // бы не отличить «потратили мало» от «панель не знает, сколько потратили».
+    if (delta.totalTokens <= 0 && !delta.unreported) return;
     const queue = this.#pending.get(platformId) ?? [];
     queue.push({ delta, at });
     this.#pending.set(platformId, queue);
@@ -159,7 +188,7 @@ export class SpendFlusher {
       const lookup = { ...this.#lookup(), declared: declaredPricing(health?.models ?? []) };
       let record = this.#read(platformId);
       for (const item of queue) record = addSpend(record, item.delta, item.at, lookup);
-      return this.#write(record);
+      return this.#announce(platformId, record);
     } catch (error) {
       process.stderr.write(
         `расход контура ${platformId} не посчитан (${(error as Error).message}); ` +
@@ -167,6 +196,30 @@ export class SpendFlusher {
       );
       return false;
     }
+  }
+
+  /**
+   * Записать пачку и, если она перешла порог бюджета, сказать об этом — ОДИН
+   * раз на переход.
+   *
+   * Отметка о сказанном едет на диск ВМЕСТЕ с расходом, одной записью: два
+   * сохранения подряд означали бы, что панель, убитая между ними, повторит
+   * предупреждение. Уведомление уходит только после удачной записи — сказать и
+   * не запомнить хуже, чем промолчать: молчание повторится со следующей пачкой,
+   * а повтор человек читает как сбой панели.
+   */
+  #announce(platformId: string, record: PlatformSpendRecord): boolean {
+    const platform = readPlatforms(this.#store).find((item) => item.id === platformId);
+    const crossing = platform && this.#notifyBudget ? budgetCrossing(platform, record) : undefined;
+    if (!crossing || !platform) return this.#write(record);
+    if (!this.#write(crossing.record)) return false;
+    this.#notifyBudget?.({
+      platformId,
+      platformTitle: platform.title,
+      level: crossing.level,
+      share: crossing.share,
+    });
+    return true;
   }
 
   /** Единственная запись на диск, и она тоже огорожена — см. `#flushOne`. */

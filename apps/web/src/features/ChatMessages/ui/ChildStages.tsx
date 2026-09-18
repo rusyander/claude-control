@@ -8,6 +8,7 @@ import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { StatusDot } from '@shared/ui/status-dot';
 import { formatDuration } from '@shared/lib/format-duration';
+import { triageChipState } from '../lib/triageChipState';
 import { SplitOverlapPanel } from './SplitOverlapPanel';
 import type { ChildStageGroup, ChildStagesProps } from './ChildStages.types';
 import styles from './ChildStages.module.scss';
@@ -38,6 +39,8 @@ export function ChildStages({
   treeBusy,
   onAnswerHold,
   holdBusy,
+  onRelease,
+  releaseBusy,
   onCheckOverlap,
   overlapBusy,
   foreign,
@@ -131,6 +134,25 @@ export function ChildStages({
                   onSend={(answer) => onAnswerHold(group.hold?.index ?? 0, answer)}
                 />
               )}
+              {/* Группа ждёт предшественников — единственная кнопка, которой её
+                  можно сдвинуть: цепочка предшественника могла не кончиться
+                  вовсе (прогон остановили, чат удалили, панель перезапустили), и
+                  тогда ждать нечего. Решение человека, и подпись говорит, чем
+                  он платит: копия всё равно отводится от ветки предшественника,
+                  а в задании сказано, что та работа не закончена. */}
+              {group.pending === 'waiting' && group.groupIndex !== undefined && onRelease && (
+                <div className={styles.holdActions} data-release-group>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    isLoading={releaseBusy}
+                    title={t('chat.cascade.hub.releaseHint')}
+                    onClick={() => onRelease(group.groupIndex ?? 0)}
+                  >
+                    {t('chat.cascade.hub.release')}
+                  </Button>
+                </div>
+              )}
             </Stack>
           </div>
         ),
@@ -150,20 +172,22 @@ export function ChildStages({
 }
 
 /**
- * Итог разбора одной фишкой: идёт, применён, не получен. Что панель в разборе
- * поправила (потерянные задачи, снятые круги ожиданий) — по наведению: это
- * оправдание её самоуправства, а не новость, ради которой стоит занимать строку.
+ * Итог разбора одной фишкой: идёт, применён, не получен, оборван перезапуском.
+ * Что панель в разборе поправила (потерянные задачи, снятые круги ожиданий) —
+ * по наведению: это оправдание её самоуправства, а не новость, ради которой
+ * стоит занимать строку.
+ *
+ * Оборванный разбор — отдельная подпись, а не оттенок «не получен»: там группы
+ * ПОШЛИ как предложено, здесь они не пошли вовсе и ждут ответа человека.
  */
 function TriageChip({ triage }: { triage: SplitPlanView['triage'] }) {
   const { t } = useTranslation();
-  // Разбора нет — он ещё идёт: запись конвейера заводится ДО его прогона, а
-  // поле `triage` появляется только когда прогон кончился, чем бы ни кончился.
-  let state: 'running' | 'applied' | 'missing' = 'running';
-  if (triage) state = triage.received ? 'applied' : 'missing';
+  const state = triageChipState(triage);
   const label = {
     running: t('chat.cascade.hub.triageRunning'),
     applied: t('chat.cascade.hub.triageApplied'),
     missing: t('chat.cascade.hub.triageMissing'),
+    interrupted: t('chat.cascade.hub.triageInterrupted'),
   }[state];
   const repairs = triage?.repairs ?? [];
 

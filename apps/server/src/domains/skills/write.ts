@@ -6,6 +6,7 @@ import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
 import { slugify } from '../../lib/slug.ts';
 import { splitFrontmatter } from './frontmatter.ts';
 import { assertSkillId, disabledSkillsDir } from './paths.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /** Имя нового скилла уже занято — маршрут отвечает 409, а не пишет поверх. */
 export class SkillExistsError extends Error {
@@ -15,6 +16,7 @@ export class SkillExistsError extends Error {
     // Текст уходит человеку в тост: «сейчас выключен» — только когда это правда,
     // иначе про включённый скилл сообщалось бы, что он выключен.
     super(`Скилл «${skillId}» уже существует${isDisabled ? ' и сейчас выключен' : ''}`);
+    coded(this, isDisabled ? 'skill-exists-disabled' : 'skill-exists', { skillId });
     this.name = 'SkillExistsError';
     this.skillId = skillId;
   }

@@ -11,6 +11,7 @@ import {
 import { resolveProviderEnvTarget, readProviderEnvVars } from '../provider-env.ts';
 import { resolveInstructionsTarget } from '../instructions.ts';
 import type { CompareDeps, Row, SideRead } from './types.ts';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /**
  * Чтение одного раздела у одной стороны: у Claude — внедрёнными читателями
@@ -25,8 +26,8 @@ const INSTRUCTIONS_KEY = 'Файл инструкций';
 /** Имена, по которым переменная считается секретом. Тот же признак, что в разделе env. */
 const SECRET_HINT = /(TOKEN|SECRET|KEY|PASSWORD|PAT|CREDENTIAL)/i;
 
-function unsupported(note: string): SideRead {
-  return { supported: false, note, rows: [] };
+function unsupported(note: string, noteCode: ServerMessageCode): SideRead {
+  return { supported: false, note, noteCode, rows: [] };
 }
 
 /** Формат файла не распознан — читать его панель не станет (одинаково у всех разделов). */
@@ -35,6 +36,7 @@ function unreadable(filePath: string): SideRead {
     supported: false,
     filePath,
     note: 'Формат файла не распознан — читать его панель не станет.',
+    noteCode: 'compare-format-unreadable',
     rows: [],
   };
 }
@@ -50,6 +52,7 @@ function absent(filePath: string): SideRead {
     supported: true,
     filePath,
     note: 'Файла нет — CLI не установлен или ещё ничего не настроил. Перенос сюда создаст файл.',
+    noteCode: 'compare-file-absent',
     rows: [],
   };
 }
@@ -67,7 +70,8 @@ export function mcpSide(providerId: string, deps: CompareDeps): SideRead {
   const target = resolveProviderMcpTarget(
     providerSettingsSource(providerId, deps.claudeDirOverride),
   );
-  if (!target) return unsupported('У этого CLI панель не ведёт MCP-серверы.');
+  if (!target)
+    return unsupported('У этого CLI панель не ведёт MCP-серверы.', 'compare-mcp-unsupported');
   if (!existsSync(target.filePath)) return absent(target.filePath);
 
   try {
@@ -105,6 +109,12 @@ function mcpRow(server: UniversalMcpServer, claude?: McpServer): Row {
       : claude && !claude.isEnabled
         ? 'Сервер выключен — переносим только включённые.'
         : undefined;
+  const blockedCode: ServerMessageCode | undefined =
+    claude && claude.transport === 'sse'
+      ? 'compare-sse-blocked'
+      : claude && !claude.isEnabled
+        ? 'compare-disabled-blocked'
+        : undefined;
 
   return {
     key: server.name,
@@ -121,6 +131,7 @@ function mcpRow(server: UniversalMcpServer, claude?: McpServer): Row {
       headers: server.headers,
     }),
     blocked,
+    blockedCode,
     payload: server,
   };
 }
@@ -143,7 +154,11 @@ export function envSide(providerId: string, deps: CompareDeps): SideRead {
   const target = resolveProviderEnvTarget(
     providerSettingsSource(providerId, deps.claudeDirOverride),
   );
-  if (!target) return unsupported('У этого CLI панель не ведёт переменные окружения.');
+  if (!target)
+    return unsupported(
+      'У этого CLI панель не ведёт переменные окружения.',
+      'compare-env-unsupported',
+    );
   if (!existsSync(target.filePath)) return absent(target.filePath);
 
   try {
@@ -179,7 +194,8 @@ export function permissionsSide(providerId: string, deps: CompareDeps): SideRead
   const target = resolveProviderPermissionsTarget(
     providerSettingsSource(providerId, deps.claudeDirOverride),
   );
-  if (!target) return unsupported('У этого CLI панель не ведёт права.');
+  if (!target)
+    return unsupported('У этого CLI панель не ведёт права.', 'compare-permissions-unsupported');
   if (!existsSync(target.filePath)) return absent(target.filePath);
 
   try {
@@ -243,7 +259,10 @@ export function instructionsSide(providerId: string, deps: CompareDeps): SideRea
     deps.claude.claudeMdPath,
   );
   if (!target) {
-    return unsupported('У этого CLI глобальные инструкции устроены иначе — не одним файлом.');
+    return unsupported(
+      'У этого CLI глобальные инструкции устроены иначе — не одним файлом.',
+      'compare-instructions-unsupported',
+    );
   }
 
   // Файла нет — записей нет: строка появится только у стороны, где файл есть,

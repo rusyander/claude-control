@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { resolveAppDataDir } from './brand.mjs';
 import type { ClaudeLocation, ClaudePaths, DetectionSource } from '@agentdeck/contracts';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /**
  * Ищем каталог конфигурации Claude Code. Порядок приоритетов:
@@ -33,7 +34,15 @@ export function detectClaudeLocation(override?: string): ClaudeLocation {
       // Путь, заданный руками, разбираем подробно: пользователь ждёт объяснения,
       // почему именно его вариант не подошёл.
       if (source === 'manual') {
-        return { paths: buildPaths(dir), source, isValid: false, missing: [], problem };
+        return {
+          paths: buildPaths(dir),
+          source,
+          isValid: false,
+          missing: [],
+          problem: problem.text,
+          problemCode: problem.code,
+          problemParams: { dir },
+        };
       }
       continue;
     }
@@ -50,23 +59,29 @@ export function detectClaudeLocation(override?: string): ClaudeLocation {
     missing: [],
     problem:
       'Каталог .claude не найден автоматически. Укажите путь к нему вручную в настройках приложения.',
+    problemCode: 'location-not-found',
   };
 }
 
-/** Возвращает описание проблемы или null, если каталог пригоден. */
-function checkDirectory(dir: string): string | null {
-  if (!existsSync(dir)) return `Каталог не существует: ${dir}`;
+/**
+ * Возвращает описание проблемы или null, если каталог пригоден. Код — для
+ * перевода на клиенте, подстановка у всех одна: `dir`.
+ */
+function checkDirectory(dir: string): { text: string; code: ServerMessageCode } | null {
+  if (!existsSync(dir))
+    return { text: `Каталог не существует: ${dir}`, code: 'location-dir-missing' };
   // Файл вместо каталога проходил проверку «существует и читается», а дальше
   // `mkdir <файл>/agentdeck` падал ENOTDIR уже после смены расположения.
   try {
-    if (!statSync(dir).isDirectory()) return `Это файл, а не каталог: ${dir}`;
+    if (!statSync(dir).isDirectory())
+      return { text: `Это файл, а не каталог: ${dir}`, code: 'location-is-file' };
   } catch {
-    return `Каталог недоступен: ${dir}`;
+    return { text: `Каталог недоступен: ${dir}`, code: 'location-dir-unavailable' };
   }
   try {
     accessSync(dir, constants.R_OK);
   } catch {
-    return `Нет прав на чтение каталога: ${dir}`;
+    return { text: `Нет прав на чтение каталога: ${dir}`, code: 'location-dir-unreadable' };
   }
   return null;
 }

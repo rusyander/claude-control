@@ -79,7 +79,10 @@ export function registerRemoteRoutes(
    */
   app.patch<{ Body: unknown }>('/api/remote', async (request, reply) => {
     const patch = parseSettings(request.body);
-    if (!patch) return reply.code(400).send({ message: 'Настройки заданы неверно' });
+    if (!patch)
+      return reply
+        .code(400)
+        .send({ message: 'Настройки заданы неверно', messageCode: 'remote-settings-invalid' });
 
     const current = ctx.store.getSettings().remoteAccess;
     ctx.store.updateSettings({ remoteAccess: { ...current, ...patch } });
@@ -98,7 +101,10 @@ export function registerRemoteRoutes(
   /** Приложение представилось: запомнить его push-токен. */
   app.post<{ Body: unknown }>('/api/remote/devices', async (request, reply) => {
     const device = parseDevice(request.body);
-    if (!device) return reply.code(400).send({ message: 'Устройство описано неверно' });
+    if (!device)
+      return reply
+        .code(400)
+        .send({ message: 'Устройство описано неверно', messageCode: 'remote-device-invalid' });
 
     ctx.store.addPushDevice({ ...device, registeredAt: new Date().toISOString() });
     return status();
@@ -112,7 +118,10 @@ export function registerRemoteRoutes(
   app.delete<{ Body: { token?: string } }>('/api/remote/devices', async (request, reply) => {
     const token = request.body?.token;
     if (typeof token !== 'string' || !token) {
-      return reply.code(400).send({ message: 'Не указан токен устройства' });
+      return reply.code(400).send({
+        message: 'Не указан токен устройства',
+        messageCode: 'remote-device-token-unspecified',
+      });
     }
     ctx.store.removePushDevice(token);
     return status();

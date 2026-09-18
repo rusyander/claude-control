@@ -199,7 +199,11 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
 
       const failure = ctx.pricing.lastError();
       if (force && failure)
-        return reply.code(502).send({ message: `Не удалось обновить прайс: ${failure}` });
+        return reply.code(502).send({
+          message: `Не удалось обновить прайс: ${failure}`,
+          messageCode: 'analytics-pricing-refresh-failed',
+          params: { failure },
+        });
 
       const custom = ctx.store.getSettings().modelPricing;
 

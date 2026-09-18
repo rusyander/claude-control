@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Platform, PlatformGatewayEvent } from '@agentdeck/contracts';
 import type { AppStore } from '../../../lib/app-store.ts';
@@ -47,6 +48,8 @@ import {
 } from './upstream.ts';
 import type { BudgetRefusal, SpendFlusher } from './spend-flush.ts';
 import type { GatewayJournal } from './usage.ts';
+import { noteSummarized } from './summarized-ledger.ts';
+import { serverText, type TextLanguage } from '../../../lib/server-texts.ts';
 
 /**
  * Конвейер одного запроса: распознать диалект → перевести → правила защиты
@@ -105,6 +108,13 @@ export interface PipelineDeps {
    * шлюз поднял слушатель.
    */
   spend?: SpendFlusher;
+  /**
+   * Контур отказал так, как отказывает ПРАВАМ (401/403 на модель) — A-2. Повод
+   * перепроверить контур в фоне: именно так выглядит отозванный ключ и снятая с
+   * ключа модель, а карточка до следующего интервала говорила бы «проверено, всё
+   * хорошо». Зовётся с пути запроса, поэтому обязан возвращаться немедленно.
+   */
+  onRightsRefusal?: (platformId: string) => void;
   /** Подстановка транспорта для тестов. */
   fetchImpl?: PlatformFetch;
   now?: () => Date;
@@ -139,10 +149,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** Разобрать адрес: первый сегмент — контур, остальное — маршрут API. */
-export function splitPath(url: string): { platformId: string; rest: string } {
+/** Сегмент адреса, за которым идёт метка прогона: `/<контур>/_run/<метка>/v1/...`. */
+export const RUN_TAG_SEGMENT = '_run';
+const RUN_TAG = /^[A-Za-z0-9-]{1,64}$/;
+
+/**
+ * Разобрать адрес: первый сегмент — контур, остальное — маршрут API.
+ *
+ * Между ними может стоять метка прогона (`_run/<метка>`): её панель выдаёт
+ * прогону чужого CLI в адресе шлюза, потому что другого канала от процесса к
+ * запросу нет, а транскрипта, куда шлюз мог бы что-то вписать, у такого CLI нет.
+ * По метке ответ чата узнаёт, что контур сжимал историю именно в ЕГО прогоне.
+ */
+export function splitPath(url: string): { platformId: string; rest: string; runTag?: string } {
   const path = url.split('?')[0] ?? url;
   const parts = path.split('/').filter(Boolean);
+  const tag = parts[1] === RUN_TAG_SEGMENT ? parts[2] : undefined;
+  if (tag !== undefined && RUN_TAG.test(tag)) {
+    return { platformId: parts[0] ?? '', rest: `/${parts.slice(3).join('/')}`, runTag: tag };
+  }
   return { platformId: parts[0] ?? '', rest: `/${parts.slice(1).join('/')}` };
 }
 
@@ -152,11 +177,12 @@ export async function handleGatewayRequest(
   deps: PipelineDeps,
 ): Promise<void> {
   const url = request.url ?? '/';
-  const { platformId, rest } = splitPath(url);
+  const { platformId, rest, runTag } = splitPath(url);
   const route = platformId ? resolveRoute(rest) : undefined;
   // В след запроса путь идёт БЕЗ строки запроса: часть CLI носит в ней свой
-  // ключ (`?key=…`), а журнал шлюза уезжает на экран панели целиком.
-  const path = url.split('?')[0] ?? url;
+  // ключ (`?key=…`), а журнал шлюза уезжает на экран панели целиком. Метка
+  // прогона из пути тоже убрана — у следа для неё своё поле.
+  const path = runTag ? `/${platformId}${rest}` : (url.split('?')[0] ?? url);
 
   // Проверка связи CLI: Claude Code при старте зовёт `<базовый адрес>/api/hello`.
   // Вопрос в ней — «жив ли адрес», и живой шлюз отвечает на него сам: в контур
@@ -177,7 +203,7 @@ export async function handleGatewayRequest(
       dialect: 'openai-compat',
       status: 404,
       code: 'not_found_error',
-      message: `Шлюз панели принимает только ${GATEWAY_ROUTES.join(', ')} по адресу /<контур>/v1/...`,
+      message: serverText('gateway-route-unknown', { routes: GATEWAY_ROUTES.join(', ') }),
     });
   }
 
@@ -190,7 +216,7 @@ export async function handleGatewayRequest(
       dialect,
       status: 404,
       code: 'not_found_error',
-      message: `Контур «${platformId}» в панели не заведён`,
+      message: serverText('gateway-contour-unknown', { id: platformId }),
     });
   }
 
@@ -202,9 +228,10 @@ export async function handleGatewayRequest(
       dialect,
       status: 502,
       code: 'api_error',
-      message: !platform.enabled
-        ? `Контур «${platform.title}» выключен в панели`
-        : `У контура «${platform.title}» не сохранён ключ`,
+      message: serverText(
+        !platform.enabled ? 'gateway-contour-disabled' : 'gateway-contour-no-key',
+        { title: platform.title },
+      ),
     });
   }
 
@@ -226,7 +253,8 @@ export async function handleGatewayRequest(
         refuseStatus: (upstream, context) =>
           refuseUpstreamStatus(response, deps, upstream, context),
         record: (event) => record(deps, event),
-        countUsage: (model, tokens) => countUsage(deps, platform.id, model, tokens),
+        countUsage: (model, tokens, unreported) =>
+          countUsage(deps, platform.id, model, tokens, unreported),
         respond: (status, text) => {
           response.writeHead(status, { 'content-type': 'application/json' });
           response.end(text);
@@ -235,7 +263,7 @@ export async function handleGatewayRequest(
       },
     );
   }
-  return chat(request, response, deps, platform, token, path, dialect);
+  return chat(request, response, deps, platform, token, path, dialect, runTag);
 }
 
 /**
@@ -257,6 +285,10 @@ function noteExhausted(
   status: number,
   body?: unknown,
 ): void {
+  // Отказ прав — не расход, но узнаётся здесь же, на единственном месте, через
+  // которое проходит КАЖДЫЙ отказ контура. Проба отсюда не идёт и идти не может:
+  // это путь запроса, а проба — пятнадцать секунд.
+  if (status === 401 || status === 403) deps.onRightsRefusal?.(platform.id);
   if (status !== 402) return;
   deps.spend?.markExhausted(
     platform.id,
@@ -347,6 +379,7 @@ async function chat(
   token: string,
   path: string,
   dialect: Dialect,
+  runTag?: string,
 ): Promise<void> {
   // Объявленный размер проверяется ДО чтения: 40-мегабайтное тело незачем
   // тянуть в память ради того, чтобы отказать в конце.
@@ -359,7 +392,7 @@ async function chat(
       dialect,
       status: 413,
       code: 'request_too_large',
-      message: 'Тело запроса больше 32 МБ — шлюз его не принимает',
+      message: serverText('gateway-body-too-large'),
     });
     // Остаток тела читать некому: клиент, дописывающий свои сорок мегабайт в
     // закрытый ответ, ждал бы конца отправки, чтобы увидеть отказ.
@@ -375,7 +408,7 @@ async function chat(
       dialect,
       status: 400,
       code: 'invalid_request_error',
-      message: 'Тело запроса не разбирается как JSON',
+      message: serverText('gateway-body-not-json'),
     });
   }
 
@@ -532,11 +565,16 @@ async function chat(
     });
   }
 
+  // Суффикс id сообщения ЭТОГО запроса: id контура у разных ответов бывает
+  // одинаковым, а лента Claude находит ответ со сжатием истории именно по id.
+  const messageIdSuffix = randomBytes(6).toString('hex');
   const translator = new StreamTranslator({
     dialect,
     model,
     includeUsage,
+    messageIdSuffix,
     driver,
+    language: settings.language,
     truncatedReason: ceilingReason,
     // Модель, уже пойманная на голом `</think>`, держится до тега с первого
     // куска; остальные — только если ответ начат с `<think>` (L9).
@@ -573,7 +611,7 @@ async function chat(
       dialect,
       status: 502,
       code: 'api_error',
-      message: 'Контур ответил не потоком, и его тело не разбирается как ответ модели',
+      message: serverText('gateway-answer-not-model'),
       lost,
     });
   }
@@ -585,20 +623,33 @@ async function chat(
   let failure: string | undefined;
   try {
     if (wantsStream) await streamToClient(response, source, translator, restore);
-    else await collectForClient(response, source, translator, vault, dialect, model);
+    else {
+      await collectForClient(response, source, translator, vault, dialect, model, messageIdSuffix);
+    }
   } catch (error) {
     failure = response.destroyed
-      ? 'Клиент отключился до конца ответа'
+      ? serverText('gateway-client-gone')
       : (ceilingReason() ??
-        `Ответ контура оборвался: ${error instanceof Error ? error.message : String(error)}`);
+        serverText('gateway-answer-broken', {
+          reason: error instanceof Error ? error.message : String(error),
+        }));
     finishBroken(response, translator, restore, dialect, failure);
   }
 
   const facts = translator.facts;
+  // Сжатие истории — в журнал сжатий: по нему лента подписывает ТОТ ответ (`context-managed`).
+  if (facts.summarized) {
+    noteSummarized(deps.appDataDir, {
+      at: (deps.now?.() ?? new Date()).toISOString(),
+      platformId: platform.id,
+      path,
+      ...(dialect === 'anthropic' && facts.messageId ? { messageId: facts.messageId } : {}),
+      ...(runTag ? { runTag } : {}),
+    });
+  }
   // Первый такой ответ уже ушёл с размышлением в тексте — исправить его нечем,
   // но следующие ответы этой модели шлюз держит до тега.
   if (facts.bareThinkClose) deps.store.markThinkTail(platform.id, model);
-  countUsage(deps, platform.id, model, facts);
   const status = failure
     ? response.destroyed
       ? 499
@@ -610,14 +661,20 @@ async function chat(
         : facts.truncated
           ? 502
           : 200;
+  // Счёт — ПОСЛЕ статуса: «дошло без счёта» и «счёта не было вовсе» различает
+  // именно он, и у учёта с трассой это обязан быть один и тот же ответ.
+  const unreported = usageUnreported(status, facts);
+  countUsage(deps, platform.id, model, facts, unreported);
   record(deps, {
     platformId: platform.id,
     path,
     dialect,
     status,
-    ...(usageUnreported(status, facts) ? { usageUnreported: true as const } : {}),
+    ...(unreported ? { usageUnreported: true as const } : {}),
     stages: facts.stages,
     summarized: facts.summarized,
+    ...(dialect === 'anthropic' && facts.messageId ? { messageId: facts.messageId } : {}),
+    ...(runTag ? { runTag } : {}),
     violations: facts.violations,
     ...(facts.violations.length > 0 ? { violationActions: facts.violationActions } : {}),
     masked: facts.masked,
@@ -659,11 +716,11 @@ async function chat(
     error:
       failure ??
       (facts.upstreamError
-        ? `Контур прервал ответ: ${facts.upstreamError.message}`
+        ? serverText('gateway-upstream-aborted', { message: facts.upstreamError.message })
         : facts.maskStop.length > 0
           ? maskStopMessage(facts.maskStop.join(', '))
           : facts.interrupted
-            ? 'Проверки контента контура остановили ответ'
+            ? serverText('gateway-checks-stopped')
             : facts.truncated
               ? translator.truncationMessage()
               : undefined),
@@ -733,6 +790,8 @@ function countUsage(
   platformId: string,
   model: string,
   facts: { promptTokens: number; completionTokens: number; totalTokens: number },
+  /** Ответ дошёл, а счёта за него контур не прислал — см. `usageUnreported`. */
+  unreported = false,
 ): void {
   const at = deps.now?.() ?? new Date();
   const tokens = {
@@ -744,7 +803,7 @@ function countUsage(
   // Постоянный учёт — ПОСЛЕ ответа клиенту и пачкой (см. `spend-flush.ts`):
   // ответ модели не имеет права ждать нашу бухгалтерию. Модель называем ту, что
   // ушла наверх: по ней ищется цена, и без неё расход виден только в токенах.
-  deps.spend?.add(platformId, { model, ...tokens }, at);
+  deps.spend?.add(platformId, { model, ...tokens, ...(unreported ? { unreported } : {}) }, at);
 }
 
 interface NativeRequest {
@@ -776,6 +835,7 @@ async function nativeChat(
 ): Promise<void> {
   const { platform, path, driver } = native;
   const dialect: Dialect = 'anthropic';
+  const language = deps.store.getSettings().language;
   const { body: stripped, lost } = nativeRequestBody(
     native.clientBody,
     platform.rules.platform.platformTools.length > 0,
@@ -835,20 +895,16 @@ async function nativeChat(
   try {
     if ((upstream.headers.get('content-type') ?? '').includes('event-stream')) {
       thought = think;
-      await streamNative(response, upstream, meter, restore, think);
+      await streamNative(response, upstream, meter, restore, think, language);
     } else {
       const text = await readCappedAnswer(upstream, () => response.destroyed);
       if (text === undefined) {
-        return refusal(
-          413,
-          'request_too_large',
-          'Ответ контура больше 8 МБ — шлюз не собирает его целиком. Тот же запрос потоком приходит без этого потолка',
-        );
+        return refusal(413, 'request_too_large', serverText('gateway-answer-too-large'));
       }
       const payload = safeJson(text);
       whole = messageFacts(payload);
       if (!whole.complete) {
-        return refusal(502, 'api_error', 'Платформа ответила не сообщением диалекта Anthropic');
+        return refusal(502, 'api_error', serverText('gateway-not-anthropic'));
       }
       const split = withoutThinkMessage(payload, thinkMode);
       thought = split;
@@ -856,21 +912,24 @@ async function nativeChat(
     }
   } catch (error) {
     failure = response.destroyed
-      ? 'Клиент отключился до конца ответа'
-      : `Ответ контура оборвался: ${error instanceof Error ? error.message : String(error)}`;
+      ? serverText('gateway-client-gone')
+      : serverText('gateway-answer-broken', {
+          reason: error instanceof Error ? error.message : String(error),
+        });
     if (!response.destroyed && !response.writableEnded) {
       if (response.headersSent) {
         response.end(
-          restore.push(think.end()) + restore.end() + nativeErrorFrame(`AgentDeck: ${failure}`),
+          restore.push(think.end()) +
+            restore.end() +
+            nativeErrorFrame(`AgentDeck: ${failure}`, 'api_error', language),
         );
       } else {
-        respond(response, 502, errorBody(dialect, `AgentDeck: ${failure}`, 'api_error'));
+        respond(response, 502, errorBody(dialect, `AgentDeck: ${failure}`, 'api_error', language));
       }
     }
   }
 
   const facts = whole ?? meter.facts;
-  countUsage(deps, platform.id, model, facts);
   if (thought.sawBareClose) deps.store.markThinkTail(platform.id, model);
   const status = failure
     ? response.destroyed
@@ -881,12 +940,15 @@ async function nativeChat(
       : facts.complete
         ? 200
         : 502;
+  // Тот же порядок, что и на мосту: учёт узнаёт о «дошло без счёта» из статуса.
+  const unreported = usageUnreported(status, facts);
+  countUsage(deps, platform.id, model, facts, unreported);
   record(deps, {
     platformId: platform.id,
     path,
     dialect,
     status,
-    ...(usageUnreported(status, facts) ? { usageUnreported: true as const } : {}),
+    ...(unreported ? { usageUnreported: true as const } : {}),
     // Снятое размышление видно в следе той же стадией, что и на мосту.
     ...(thought.reasoningChars > 0 ? { stages: ['reasoning'] } : {}),
     lost,
@@ -895,7 +957,7 @@ async function nativeChat(
     error:
       failure ??
       (facts.upstreamError
-        ? `Контур прервал ответ: ${facts.upstreamError.message}`
+        ? serverText('gateway-upstream-aborted', { message: facts.upstreamError.message })
         : facts.complete
           ? undefined
           : TRUNCATED_MESSAGE),
@@ -913,6 +975,7 @@ async function streamNative(
   meter: AnthropicStreamMeter,
   restore: ResponseStreamFilter,
   think: NativeThinkFilter,
+  language: TextLanguage,
 ): Promise<void> {
   response.writeHead(200, {
     'content-type': 'text/event-stream',
@@ -935,7 +998,7 @@ async function streamNative(
   const tail =
     complete || upstreamError || response.destroyed
       ? ''
-      : nativeErrorFrame(`AgentDeck: ${TRUNCATED_MESSAGE}`);
+      : nativeErrorFrame(`AgentDeck: ${TRUNCATED_MESSAGE}`, 'api_error', language);
   response.end(restore.push(think.end()) + restore.end() + tail);
 }
 
@@ -1066,7 +1129,11 @@ function finishBroken(
 ): void {
   if (response.destroyed || response.writableEnded) return;
   if (!response.headersSent) {
-    respond(response, 502, errorBody(dialect, `AgentDeck: ${message}`, 'api_error'));
+    respond(
+      response,
+      502,
+      errorBody(dialect, `AgentDeck: ${message}`, 'api_error', translator.language),
+    );
     return;
   }
   response.end(restore.push(translator.fail(`AgentDeck: ${message}`)) + restore.end());
@@ -1131,7 +1198,9 @@ async function collectForClient(
   vault: AliasVault,
   dialect: Dialect,
   model: string,
+  messageIdSuffix = '',
 ): Promise<void> {
+  const language = translator.language;
   // Счёт идёт по кускам, а не по собранному телу: смысл потолка в том, чтобы
   // не дорасти до него, а не узнать о превышении, уже держа всё в памяти.
   let collected = 0;
@@ -1157,11 +1226,7 @@ async function collectForClient(
     respond(
       response,
       413,
-      errorBody(
-        dialect,
-        'Ответ контура больше 8 МБ — шлюз не собирает его целиком. Тот же запрос потоком приходит без этого потолка',
-        'request_too_large',
-      ),
+      errorBody(dialect, serverText('gateway-answer-too-large'), 'request_too_large', language),
     );
     return;
   }
@@ -1174,7 +1239,12 @@ async function collectForClient(
     respond(
       response,
       statusOfErrorCode(upstreamError.code),
-      errorBody(dialect, `Контур прервал ответ: ${upstreamError.message}`, upstreamError.code),
+      errorBody(
+        dialect,
+        serverText('gateway-upstream-aborted', { message: upstreamError.message }),
+        upstreamError.code,
+        language,
+      ),
     );
     return;
   }
@@ -1189,6 +1259,7 @@ async function collectForClient(
         dialect,
         maskStopMessage(translator.facts.maskStop.join(', ')),
         'content_policy_violation',
+        language,
       ),
     );
     return;
@@ -1196,9 +1267,9 @@ async function collectForClient(
   if (translator.facts.interrupted) {
     const names = translator.facts.violations.join(', ');
     const message = names
-      ? `Проверки контента контура остановили ответ: ${names}`
-      : 'Проверки контента контура остановили ответ';
-    respond(response, 400, errorBody(dialect, message, 'content_policy_violation'));
+      ? serverText('gateway-checks-stopped-named', { names })
+      : serverText('gateway-checks-stopped');
+    respond(response, 400, errorBody(dialect, message, 'content_policy_violation', language));
     return;
   }
 
@@ -1208,7 +1279,7 @@ async function collectForClient(
     respond(
       response,
       502,
-      errorBody(dialect, `AgentDeck: ${translator.truncationMessage()}`, 'api_error'),
+      errorBody(dialect, `AgentDeck: ${translator.truncationMessage()}`, 'api_error', language),
     );
     return;
   }
@@ -1256,8 +1327,11 @@ async function collectForClient(
 
   const body =
     dialect === 'anthropic'
-      ? openAiResponseToAnthropic(completion, answer.model || model)
+      ? openAiResponseToAnthropic(completion, answer.model || model, messageIdSuffix)
       : completion;
+  if (dialect === 'anthropic' && isRecord(body) && typeof body.id === 'string') {
+    translator.facts.messageId = body.id;
+  }
   // Обратная подстановка меток — в форме того диалекта, в котором отвечаем.
   respond(response, 200, restoreJsonResponse(body, dialect, vault.reverse()));
 }
@@ -1336,17 +1410,17 @@ function applyRules(
   // списком, пропускала бы всё, называясь защитой.
   const set = maskRulesFor(deps.appDataDir);
   if (set.source === 'broken') {
-    return { refusal: `Защита данных включена, а правила не читаются (${set.error})` };
+    return { refusal: serverText('gateway-mask-rules-broken', { error: set.error }) };
   }
   const { rules } = set;
 
   // Вид тела — тот, что уходит наверх: маскируются документированные поля ЕГО
   // диалекта, и тело Anthropic, прочитанное как OpenAI, ушло бы немаскированным.
   const masked = maskRequestBody(bodyText, kind, rules, vault);
-  if (!masked) return { refusal: 'Защита данных не разобрала тело запроса' };
+  if (!masked) return { refusal: serverText('gateway-mask-unparsed') };
   if (masked.blockedBy) {
     return {
-      refusal: `Запрос остановлен правилом «${masked.blockedBy.ruleName}» — в нём нашлись данные, которые не должны уходить в модель`,
+      refusal: serverText('gateway-mask-blocked', { rule: masked.blockedBy.ruleName }),
     };
   }
   return { body: masked.body };
@@ -1370,7 +1444,12 @@ function refuse(response: ServerResponse, deps: PipelineDeps, refusal: Refusal):
   respond(
     response,
     refusal.status,
-    errorBody(refusal.dialect, `AgentDeck: ${refusal.message}`, refusal.code),
+    errorBody(
+      refusal.dialect,
+      `AgentDeck: ${refusal.message}`,
+      refusal.code,
+      deps.store.getSettings().language,
+    ),
   );
   record(deps, {
     platformId: refusal.platformId,
@@ -1399,6 +1478,8 @@ function record(deps: PipelineDeps, event: Partial<PlatformGatewayEvent>): void 
     status: event.status ?? 0,
     stages: event.stages ?? [],
     summarized: event.summarized ?? false,
+    ...(event.messageId ? { messageId: event.messageId } : {}),
+    ...(event.runTag ? { runTag: event.runTag } : {}),
     violations: event.violations ?? [],
     ...(event.violationActions ? { violationActions: event.violationActions } : {}),
     masked: event.masked ?? false,

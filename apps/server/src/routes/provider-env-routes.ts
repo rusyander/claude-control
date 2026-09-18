@@ -12,6 +12,7 @@ import {
 } from '../domains/provider-env.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 import { done } from './write-result.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Универсальный раздел переменных окружения для провайдеров Codex (TOML), Aider
@@ -30,17 +31,20 @@ export function registerProviderEnvRoutes(app: FastifyInstance, ctx: ServerConte
   const SECTION_UNSUPPORTED = {
     error: 'section_unsupported',
     message: 'У активного провайдера нет универсального раздела переменных окружения.',
+    messageCode: 'env-section-unsupported',
   } as const;
 
   const INVALID_DRAFT = {
     error: 'invalid_draft',
     message: 'Набор переменных не прошёл проверку: у каждой нужны непустой ключ и значение.',
+    messageCode: 'env-draft-invalid',
   } as const;
 
   const FORMAT_UNRECOGNIZED = {
     error: 'format_unrecognized',
     message:
       'Формат файла конфигурации не распознан — запись запрещена (раздел только для чтения).',
+    messageCode: 'config-format-unrecognized-readonly',
   } as const;
 
   const requireTarget = (reply: FastifyReply): ProviderEnvTarget | undefined => {
@@ -75,6 +79,7 @@ export function registerProviderEnvRoutes(app: FastifyInstance, ctx: ServerConte
           vars: [],
           readOnly: true,
           error: error.message,
+          ...codeOf(error),
         } satisfies ProviderEnvInfo;
       }
       throw error;
@@ -94,13 +99,17 @@ export function registerProviderEnvRoutes(app: FastifyInstance, ctx: ServerConte
       // Имя переменной непредставимо в формате провайдера — это ошибка ввода
       // (400), а не сломанный файл: сообщение объясняет, что именно не так.
       if (error instanceof EnvKeyNotEncodableError) {
-        return reply.code(400).send({ error: 'invalid_draft', message: error.message });
+        return reply
+          .code(400)
+          .send({ error: 'invalid_draft', message: error.message, ...codeOf(error) });
       }
       // Имя занято немоделируемой записью файла — конфликт одного ключа (409), а
       // не сломанный формат: раздел остаётся на запись, и пользователь узнаёт,
       // какую именно переменную поправить. Общий 422 говорил ему неправду.
       if (error instanceof EnvKeyPreservedError) {
-        return reply.code(409).send({ error: 'env_key_preserved', message: error.message });
+        return reply
+          .code(409)
+          .send({ error: 'env_key_preserved', message: error.message, ...codeOf(error) });
       }
       if (error instanceof UnrecognizedFormatError)
         return reply.code(422).send(FORMAT_UNRECOGNIZED);

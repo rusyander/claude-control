@@ -23,6 +23,7 @@ import {
   platformToolModes,
 } from '@agentdeck/contracts/platform';
 import { platformConsumerSchema } from '@agentdeck/contracts/platform-consumers';
+import { NOTIFY_EVENTS } from '@agentdeck/contracts/integrations';
 import {
   platformDrivers,
   platformManifestOf,
@@ -269,7 +270,7 @@ export const integrationSettingsSchemas = {
   telegram: object({
     enabled: boolean(),
     chatId: string(),
-    events: array(zodEnum(['runDone', 'runError', 'permission', 'question', 'testFailed'])),
+    events: array(zodEnum(NOTIFY_EVENTS)),
   }),
   tms: object({
     enabled: boolean(),
@@ -310,7 +311,7 @@ export const integrationSettingsSchemas = {
   webhook: object({
     enabled: boolean(),
     url: string(),
-    events: array(zodEnum(['runDone', 'runError', 'permission', 'question', 'testFailed'])),
+    events: array(zodEnum(NOTIFY_EVENTS)),
   }),
 };
 

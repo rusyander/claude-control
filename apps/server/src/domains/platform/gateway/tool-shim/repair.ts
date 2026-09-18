@@ -1,3 +1,4 @@
+import { serverText } from '../../../../lib/server-texts.ts';
 /**
  * Ремонт JSON вызова — не больше двух раундов, и оба местные.
  *
@@ -145,7 +146,9 @@ export function repairJson(text: string): RepairResult {
   const fixed = strictObject(fixSyntax(text));
   if (fixed) return { value: fixed, round: 'syntax' };
 
-  return { reason: text.includes('{') ? 'не разбирается как JSON' : 'внутри блока нет объекта' };
+  return {
+    reason: serverText(text.includes('{') ? 'gateway-flaw-not-json' : 'gateway-flaw-no-object'),
+  };
 }
 
 export function repaired(result: RepairResult): result is RepairSuccess {

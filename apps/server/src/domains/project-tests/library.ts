@@ -23,6 +23,7 @@ import {
   text,
   writeJson,
 } from './files.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Обвязка библиотеки тестов: общие шаги, окружения, свои поля и статусы,
@@ -78,9 +79,13 @@ export function readLibraryIssues(root: string): { file: string; error: string }
 function assertWritable(root: string, file: string): void {
   const { error } = readJson(root, file);
   if (!error) return;
-  throw new ProjectTestsError(
-    `Файл ${FILE_TITLES[file] ?? file} не разобрался, и переписывать его целиком нельзя: ` +
-      `${error} Почините ${testsFile(file)} — правка ждёт.`,
+  throw coded(
+    new ProjectTestsError(
+      `Файл ${FILE_TITLES[file] ?? file} не разобрался, и переписывать его целиком нельзя: ` +
+        `${error} Почините ${testsFile(file)} — правка ждёт.`,
+    ),
+    'library-file-broken',
+    { file: testsFile(file), reason: error },
   );
 }
 
@@ -121,9 +126,14 @@ export function saveSharedStep(
   now: string,
 ): ProjectTestSharedStep {
   const title = input.title?.trim();
-  if (!title) throw new ProjectTestsError('У общего шага должно быть название.');
+  if (!title)
+    throw coded(
+      new ProjectTestsError('У общего шага должно быть название.'),
+      'shared-step-title-required',
+    );
   const steps = toSteps(input.steps ?? []) as ProjectTestStep[];
-  if (steps.length === 0) throw new ProjectTestsError('В общем шаге нет ни одного шага.');
+  if (steps.length === 0)
+    throw coded(new ProjectTestsError('В общем шаге нет ни одного шага.'), 'shared-step-empty');
 
   assertWritable(root, SHARED_FILE);
   const all = readSharedSteps(root);
@@ -163,7 +173,11 @@ export function removeSharedStep(root: string, id: string): void {
   assertWritable(root, SHARED_FILE);
   const all = readSharedSteps(root);
   if (!all.some((item) => item.id === id)) {
-    throw new ProjectTestsNotFoundError(`Общего шага «${id}» в проекте нет.`);
+    throw coded(
+      new ProjectTestsNotFoundError(`Общего шага «${id}» в проекте нет.`),
+      'shared-step-id-not-found',
+      { id },
+    );
   }
   writeJson(root, SHARED_FILE, { version: 1, steps: all.filter((item) => item.id !== id) });
 }
@@ -238,7 +252,11 @@ export function saveEnvironment(
   input: Partial<ProjectTestEnvironment> & { title: string },
 ): ProjectTestEnvironment {
   const title = input.title?.trim();
-  if (!title) throw new ProjectTestsError('У окружения должно быть название.');
+  if (!title)
+    throw coded(
+      new ProjectTestsError('У окружения должно быть название.'),
+      'environment-title-required',
+    );
   assertWritable(root, ENVIRONMENTS_FILE);
   const all = readEnvironments(root);
   const id = input.id ? assertId(input.id, 'Идентификатор окружения') : nextId(all, title, 'env');
@@ -279,7 +297,11 @@ export function removeEnvironment(root: string, id: string): void {
   assertWritable(root, ENVIRONMENTS_FILE);
   const all = readEnvironments(root);
   if (!all.some((item) => item.id === id)) {
-    throw new ProjectTestsNotFoundError(`Окружения «${id}» в проекте нет.`);
+    throw coded(
+      new ProjectTestsNotFoundError(`Окружения «${id}» в проекте нет.`),
+      'environment-id-not-found',
+      { id },
+    );
   }
   writeJson(root, ENVIRONMENTS_FILE, {
     version: 1,
@@ -290,7 +312,12 @@ export function removeEnvironment(root: string, id: string): void {
 /** Окружение по имени — или отказ: оно называет то, чего в проекте нет. */
 function requireEnvironment(root: string, id: string): ProjectTestEnvironment {
   const found = readEnvironments(root).find((item) => item.id === id);
-  if (!found) throw new ProjectTestsNotFoundError(`Окружения «${id}» в проекте нет.`);
+  if (!found)
+    throw coded(
+      new ProjectTestsNotFoundError(`Окружения «${id}» в проекте нет.`),
+      'environment-id-not-found',
+      { id },
+    );
   return found;
 }
 
@@ -401,12 +428,21 @@ export function saveSchema(root: string, schema: ProjectTestSchema): ProjectTest
   const cleaned: ProjectTestSchema = {
     attributes: attributes.map((item) => {
       const key = assertId(item.key.trim(), 'Ключ своего поля');
-      if (seen.has(key)) throw new ProjectTestsError(`Поле с ключом «${key}» уже есть.`);
+      if (seen.has(key))
+        throw coded(
+          new ProjectTestsError(`Поле с ключом «${key}» уже есть.`),
+          'attribute-key-duplicate',
+          { key },
+        );
       seen.add(key);
       const type = pick(item.type, ATTRIBUTE_TYPES, 'text');
       const options = stringList(item.options);
       if (type === 'select' && options.length === 0) {
-        throw new ProjectTestsError(`У поля «${item.title || key}» не задано ни одного варианта.`);
+        throw coded(
+          new ProjectTestsError(`У поля «${item.title || key}» не задано ни одного варианта.`),
+          'attribute-no-options',
+          { field: item.title || key },
+        );
       }
       return {
         key,
@@ -454,7 +490,8 @@ export function saveView(
   now: string,
 ): ProjectTestView {
   const title = input.title?.trim();
-  if (!title) throw new ProjectTestsError('У фильтра должно быть название.');
+  if (!title)
+    throw coded(new ProjectTestsError('У фильтра должно быть название.'), 'view-title-required');
   const all = readViews(root);
   const id = input.id ? assertId(input.id, 'Идентификатор фильтра') : nextId(all, title, 'view');
   const next: ProjectTestView = {
@@ -475,7 +512,9 @@ export function saveView(
 export function removeView(root: string, id: string): void {
   const all = readViews(root);
   if (!all.some((item) => item.id === id)) {
-    throw new ProjectTestsNotFoundError(`Фильтра «${id}» в проекте нет.`);
+    throw coded(new ProjectTestsNotFoundError(`Фильтра «${id}» в проекте нет.`), 'view-not-found', {
+      id,
+    });
   }
   assertWritable(root, VIEWS_FILE);
   writeJson(root, VIEWS_FILE, { version: 1, views: all.filter((item) => item.id !== id) });

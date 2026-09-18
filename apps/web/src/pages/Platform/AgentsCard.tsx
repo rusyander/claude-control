@@ -25,6 +25,7 @@ import {
   warnsSessionGap,
 } from './lib/agentsView';
 import styles from './PlatformPage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 interface AgentsCardProps {
   platform: Platform;
@@ -213,7 +214,7 @@ export function AgentsCard({ platform, hasToken }: AgentsCardProps) {
                 {t(`platform.agentsOutcome.${answer.outcome}`)}
               </Badge>
               <Typography variant="caption" color="muted" as="span">
-                {answer.detail}
+                {serverFieldText(answer, 'detail')}
               </Typography>
             </Stack>
             {answer.text && (

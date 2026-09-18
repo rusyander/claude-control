@@ -27,7 +27,13 @@ export function registerIntegrationLinkRoutes(app: FastifyInstance, deps: Integr
   app.put<{ Body: unknown }>('/api/integrations/links', (request, reply) => {
     const body = request.body as { path?: unknown; groupId?: unknown; link?: unknown } | null;
     try {
-      const path = requireString(body?.path, 'path', 'не указан каталог проекта');
+      const path = requireString(
+        body?.path,
+        'path',
+        'не указан каталог проекта',
+        'request-project-dir-missing',
+        { field: 'path' },
+      );
       return writeLink(deps.ctx.store, path, optionalString(body?.groupId), toLink(body?.link));
     } catch (error) {
       return fail(reply, error);
@@ -37,7 +43,13 @@ export function registerIntegrationLinkRoutes(app: FastifyInstance, deps: Integr
   app.delete<{ Body: unknown }>('/api/integrations/links', (request, reply) => {
     const body = request.body as { path?: unknown; groupId?: unknown } | null;
     try {
-      const path = requireString(body?.path, 'path', 'не указан каталог проекта');
+      const path = requireString(
+        body?.path,
+        'path',
+        'не указан каталог проекта',
+        'request-project-dir-missing',
+        { field: 'path' },
+      );
       return dropLink(deps.ctx.store, path, optionalString(body?.groupId));
     } catch (error) {
       return fail(reply, error);

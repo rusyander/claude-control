@@ -204,6 +204,25 @@ describe('заметки и задания уровней', () => {
     expect(composeGroupNotes({})).toBeUndefined();
   });
 
+  it('заметка называет задетые файлы с потолком и незаконченную цепочку отдельно от упавшей', () => {
+    const many = Array.from({ length: 25 }, (_, index) => `src/a${index}.ts`);
+    const notes = composeGroupNotes({
+      predecessors: [
+        { title: 'Шапка', branch: 'feature/header', files: many.slice(0, 20), filesTotal: 25 },
+        { title: 'Тесты', branch: 'feature/tests', unfinished: true, filesTotal: 3 },
+      ],
+    });
+
+    expect(notes).toContain('уже задеты: src/a0.ts');
+    expect(notes).toContain('src/a19.ts и ещё 5');
+    // Обрезанного хвоста в задании быть не должно — на то и потолок.
+    expect(notes).not.toContain('src/a20.ts');
+    // «Ещё пишет» и «упала» — разные новости для агента.
+    expect(notes).toContain('цепочка НЕ кончилась');
+    expect(notes).not.toContain('завершилась ошибкой');
+    expect(notes).toContain('задето файлов: 3');
+  });
+
   it('разбор просит ровно один блок, ничего не правит и нумерует группы с единицы', () => {
     const prompt = triageStagePrompt({
       shared: 'Общее',

@@ -117,13 +117,13 @@ describe('Сценарий группы', () => {
 
   describe('триггер', () => {
     it('годное выражение принимается, негодное — нет', () => {
-      expect(isValidTrigger('GOR-\\d+')).toBe(true);
+      expect(isValidTrigger('PRJ-\\d+')).toBe(true);
       expect(isValidTrigger('')).toBe(true);
-      expect(isValidTrigger('GOR-(\\d+')).toBe(false);
+      expect(isValidTrigger('PRJ-(\\d+')).toBe(false);
     });
 
     it('включённая группа с триггером получает хук и скрипт рядом со скиллом', () => {
-      const group = makeGroup({ scenario: scenario({ trigger: 'GOR-\\d+' }) });
+      const group = makeGroup({ scenario: scenario({ trigger: 'PRJ-\\d+' }) });
       compileScenarioSkill(deps(), group);
       store.saveGroup(group);
 
@@ -132,7 +132,7 @@ describe('Сценарий группы', () => {
       const script = join(paths.skills, 'scenario-zadacha-iz-jira', 'trigger.mjs');
       expect(existsSync(script)).toBe(true);
       // Выражение уходит в скрипт как данные: кавычки и слэши в нём — норма.
-      expect(readFileSync(script, 'utf8')).toContain('new RegExp("GOR-\\\\d+", \'i\')');
+      expect(readFileSync(script, 'utf8')).toContain('new RegExp("PRJ-\\\\d+", \'i\')');
 
       const hooks = readHooks(paths.settings, store);
       expect(hooks).toHaveLength(1);
@@ -151,7 +151,7 @@ describe('Сценарий группы', () => {
         'utf8',
       );
 
-      const group = makeGroup({ scenario: scenario({ trigger: 'GOR-\\d+' }) });
+      const group = makeGroup({ scenario: scenario({ trigger: 'PRJ-\\d+' }) });
       compileScenarioSkill(deps(), group);
       store.saveGroup(group);
       compileScenarioHooks(deps());

@@ -17,7 +17,7 @@ import type { ChatRunRegistry, RunFinished } from '../../domains/chat/ChatRunReg
 import type { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
 import { planContextRotation } from '../../domains/chat/context-rotation.ts';
-import { activateGroupsQuietly } from '../../domains/group-activation.ts';
+import { activateGroupsQuietly, groupsActivatedNotice } from '../../domains/group-activation.ts';
 import {
   checkpointInside,
   evaluateHandoff,
@@ -453,9 +453,10 @@ export function registerChatHandoffRoutes(
     // формата — два разных задания новой сессии при одном и том же тексте.
     const proposal = parseHandoffProposal(request.body?.proposal);
     if (!proposal) {
-      return reply
-        .code(400)
-        .send({ message: 'Предложение не разобрано: нужны «что закрыто» и «чем продолжить»' });
+      return reply.code(400).send({
+        message: 'Предложение не разобрано: нужны «что закрыто» и «чем продолжить»',
+        messageCode: 'handoff-proposal-invalid',
+      });
     }
 
     const fromAliases = aliasesOf(chatId, sessionId);
@@ -511,6 +512,7 @@ export function registerChatHandoffRoutes(
     if (fromAliases.some((key) => deps.runs.isRunning(key))) {
       return reply.code(409).send({
         message: 'Прогон ещё идёт: дождитесь конца хода или остановите его, потом перезапускайте',
+        messageCode: 'restart-run-in-progress',
       });
     }
     const problem = checkProjectDir(String(projectPath ?? ''));
@@ -572,7 +574,10 @@ export function registerChatHandoffRoutes(
     async (request, reply) => {
       const { chatId, sessionId, enabled } = request.body ?? {};
       const aliases = aliasesOf(chatId, sessionId);
-      if (aliases.length === 0) return reply.code(400).send({ message: 'Не указан разговор' });
+      if (aliases.length === 0)
+        return reply
+          .code(400)
+          .send({ message: 'Не указан разговор', messageCode: 'conversation-unspecified' });
 
       deps.chains.setAuto(aliases, enabled === true);
       return { auto: deps.chains.isAuto(aliases), depth: deps.chains.depth(aliases) };
@@ -709,13 +714,20 @@ function continuationStarter(
     // Продолжение идёт в том же каталоге, и набор проекта нужен ему ровно так
     // же, как исходному разговору: иначе после «чистой сессии» правила и скиллы
     // молча переставали действовать.
-    activateGroupsQuietly(
+    const activated = activateGroupsQuietly(
       { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
       cwd,
       (error) => app.log.warn({ err: error }, 'group activation failed'),
     );
-    return provider.id === 'claude'
-      ? startClaude(nextId, prompt, cwd)
-      : startForeign(nextId, prompt, cwd);
+    const started =
+      provider.id === 'claude'
+        ? startClaude(nextId, prompt, cwd)
+        : startForeign(nextId, prompt, cwd);
+    // Заметка — ПОСЛЕ старта: до него прогона в реестре нет, и сказать некуда.
+    // У чужого CLI его нет вовсе — `emitExternal` отвечает «некуда», и факт
+    // остаётся на странице «Наборы».
+    const notice = started ? groupsActivatedNotice(activated) : undefined;
+    if (notice) deps.runs.emitExternal(nextId, notice);
+    return started;
   };
 }

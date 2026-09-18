@@ -38,6 +38,10 @@ export const en: Dictionary = {
     blank: 'Empty. Write a task — it goes to the agent on your computer.',
     queued: (prompt: string) => `Queued: ${prompt} ✕`,
     image: '[image]',
+    contextSummarized:
+      'The contour compressed the history before this answer: the model saw a summary of the ' +
+      'start of the conversation, not the full text. What went into the summary the panel cannot ' +
+      'tell — the platform does the compressing.',
     // Предложения панели: карточек на телефоне нет, решают в панели, — но и
     // сырой JSON вместо них показывать незачем.
     offerSplit: 'The agent offered to split the tasks across chats — decide in the panel.',
@@ -141,6 +145,7 @@ export const en: Dictionary = {
         'no-model': 'The key catalog has no image-generation model',
         'endpoint-no-url': 'The endpoint profile has no image generation address',
         'gateway-off': 'The panel gateway is off, and contour requests go through it',
+        'gateway-failed': 'The panel gateway is on but did not come up',
         'endpoint-api-kind': 'This API kind has no separate images endpoint',
         'no-agent': 'No raster route and no chat to ask an agent in',
       },
@@ -150,6 +155,7 @@ export const en: Dictionary = {
         'no-model': 'no raster: the key catalog has no image-generation model',
         'endpoint-no-url': 'no raster: the endpoint profile has no generation address',
         'gateway-off': 'no raster: the panel gateway is off',
+        'gateway-failed': 'no raster: the panel gateway did not come up',
         'endpoint-api-kind': 'no raster: this API kind has no images endpoint',
         'no-agent': 'no raster: nobody to draw',
       },
@@ -207,6 +213,29 @@ export const en: Dictionary = {
     push: 'Push',
     newBranch: 'New branch',
     create: 'Create',
+  },
+
+  worktrees: {
+    title: 'Project copies',
+    count: (count: number) => `${count}`,
+    detached: 'HEAD detached',
+    ready: 'complete',
+    notReady: 'incomplete',
+    locked: 'locked',
+    prunable: 'directory gone',
+    access: {
+      ok: 'access entry present',
+      missing: 'no access entry',
+      unknown: 'access not compared',
+    },
+    gap: {
+      file: (path: string) => `file ${path} is missing`,
+      link: (path: string) => `shared directory ${path} is not linked`,
+      access: (path: string) => `no ${path} entry in .claude.json`,
+    },
+    bootstrapRunning: (command: string) => `install running: ${command}`,
+    bootstrapFailed: (command: string) => `install failed: ${command}`,
+    hint: 'Copies are created and removed from the computer. An incomplete one the panel tries to repair itself before every run.',
   },
 
   code: {
@@ -569,6 +598,10 @@ export const en: Dictionary = {
         `Allowed extensions: ${supported}.`,
       workspaceMissing: (cwd: string) =>
         `The working folder of this conversation was not found: ${cwd}. It can only be continued from there.`,
+      copyNotReady: (cwd: string, gaps: string) =>
+        `The copy ${cwd} is incomplete${gaps ? `: ${gaps} missing` : ''}. The panel tried to fill ` +
+        'it in and could not: an agent there would work with the wrong environment. ' +
+        'Fill it in from the panel on the computer — the project git panel, the button under the copy.',
       other: (message: string) => `The message was not sent: ${message}`,
     },
   },

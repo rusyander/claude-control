@@ -24,6 +24,7 @@
     "negatives": "node tools/qa/check-negative-scenarios.mjs && node tools/qa/check-negative-scenarios.mjs --selftest",
     "shots": "node tools/qa/check-help-shots.mjs && node tools/qa/check-help-shots.mjs --selftest",
     "brand": "node tools/qa/check-brand.mjs && node tools/qa/check-brand.mjs --selftest",
+    "citations": "node tools/qa/check-citations.mjs && node tools/qa/check-citations.mjs --selftest",
     "check": "pnpm format:check && pnpm type-check && pnpm lint && pnpm depcruise && pnpm compromises && pnpm negatives && pnpm shots && pnpm build",
     "doctor": "node tools/doctor.mjs",
     "tests": "node tools/tests-cli.mjs",

@@ -1,4 +1,5 @@
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
+import { coded } from './server-text.ts';
 
 /**
  * Минимальный ZIP: сборка и разбор архива без внешних зависимостей.
@@ -51,7 +52,11 @@ export function createZip(entries: ZipEntry[], modifiedAt: Date): Buffer {
     const name = Buffer.from(normalizeEntryPath(entry.path), 'utf8');
     const raw = entry.data;
     if (raw.length > MAX_SIZE) {
-      throw zipError(`Файл «${entry.path}» больше 4 ГБ — формат ZIP без Zip64 его не вместит.`);
+      throw coded(
+        zipError(`Файл «${entry.path}» больше 4 ГБ — формат ZIP без Zip64 его не вместит.`),
+        'zip-entry-too-large',
+        { path: entry.path },
+      );
     }
 
     // Сжимаем, но если сжатое не меньше исходного (уже сжатые картинки, архивы),
@@ -98,7 +103,10 @@ export function createZip(entries: ZipEntry[], modifiedAt: Date): Buffer {
 
     offset += local.length + name.length + payload.length;
     if (offset > MAX_SIZE) {
-      throw zipError('Архив вышел больше 4 ГБ — формат ZIP без Zip64 его не вместит.');
+      throw coded(
+        zipError('Архив вышел больше 4 ГБ — формат ZIP без Zip64 его не вместит.'),
+        'zip-archive-too-large',
+      );
     }
   }
 
@@ -132,7 +140,7 @@ export function readZip(buffer: Buffer): ZipEntry[] {
   const entries: ZipEntry[] = [];
   for (let index = 0; index < count; index += 1) {
     if (pointer + 46 > buffer.length || buffer.readUInt32LE(pointer) !== SIGNATURE_CENTRAL) {
-      throw zipError('Повреждён центральный каталог архива.');
+      throw coded(zipError('Повреждён центральный каталог архива.'), 'zip-central-damaged');
     }
 
     const method = buffer.readUInt16LE(pointer + 10);
@@ -166,7 +174,7 @@ interface LocalEntryHeader {
 function readLocalEntry(buffer: Buffer, header: LocalEntryHeader): ZipEntry {
   const { localOffset, path } = header;
   if (localOffset + 30 > buffer.length || buffer.readUInt32LE(localOffset) !== SIGNATURE_LOCAL) {
-    throw zipError(`Повреждён заголовок записи «${path}».`);
+    throw coded(zipError(`Повреждён заголовок записи «${path}».`), 'zip-header-damaged', { path });
   }
 
   const nameLength = buffer.readUInt16LE(localOffset + 26);
@@ -174,7 +182,9 @@ function readLocalEntry(buffer: Buffer, header: LocalEntryHeader): ZipEntry {
   const start = localOffset + 30 + nameLength + extraLength;
   const payload = buffer.subarray(start, start + header.compressedSize);
   if (payload.length !== header.compressedSize) {
-    throw zipError(`Запись «${path}» обрывается за концом архива.`);
+    throw coded(zipError(`Запись «${path}» обрывается за концом архива.`), 'zip-entry-truncated', {
+      path,
+    });
   }
 
   let data: Buffer;
@@ -183,11 +193,17 @@ function readLocalEntry(buffer: Buffer, header: LocalEntryHeader): ZipEntry {
   } else if (header.method === METHOD_DEFLATE) {
     data = inflateRawSync(payload);
   } else {
-    throw zipError(`Запись «${path}» сжата неподдерживаемым методом (${header.method}).`);
+    throw coded(
+      zipError(`Запись «${path}» сжата неподдерживаемым методом (${header.method}).`),
+      'zip-method-unsupported',
+      { path, method: header.method },
+    );
   }
 
   if (data.length !== header.originalSize || crc32(data) !== header.crc) {
-    throw zipError(`Запись «${path}» не прошла проверку целостности.`);
+    throw coded(zipError(`Запись «${path}» не прошла проверку целостности.`), 'zip-crc-failed', {
+      path,
+    });
   }
   return { path, data };
 }
@@ -201,7 +217,7 @@ function findEndRecord(buffer: Buffer): number {
   for (let offset = buffer.length - 22; offset >= min; offset -= 1) {
     if (buffer.readUInt32LE(offset) === SIGNATURE_END) return offset;
   }
-  throw zipError('Это не ZIP-архив: не найдена запись конца каталога.');
+  throw coded(zipError('Это не ZIP-архив: не найдена запись конца каталога.'), 'zip-not-zip');
 }
 
 /**
@@ -211,10 +227,16 @@ function findEndRecord(buffer: Buffer): number {
 function normalizeEntryPath(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/^\/+/, '');
   if (!normalized || normalized.includes('\0')) {
-    throw zipError(`Недопустимое имя записи архива: «${path}».`);
+    throw coded(zipError(`Недопустимое имя записи архива: «${path}».`), 'zip-entry-name-invalid', {
+      path,
+    });
   }
   if (normalized.split('/').some((segment) => segment === '..')) {
-    throw zipError(`Имя записи архива выходит за его пределы: «${path}».`);
+    throw coded(
+      zipError(`Имя записи архива выходит за его пределы: «${path}».`),
+      'zip-entry-name-escapes',
+      { path },
+    );
   }
   return normalized;
 }

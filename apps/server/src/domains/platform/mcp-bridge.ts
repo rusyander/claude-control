@@ -11,6 +11,7 @@ import {
 } from '../panel-mcp.ts';
 import { PlatformError } from './errors.ts';
 import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Переходник к контуру для АГЕНТА: то же окно наружу, что у человека в разделе
@@ -50,10 +51,7 @@ function bridge(): PanelBridge {
 export function registerPlatformMcp(options: PanelBridgeTarget): string {
   const self = bridge();
   if (!bridgeScriptExists(self)) {
-    throw new PlatformError(
-      'platform_not_found',
-      'Не найден скрипт переходника tools/mcp/platform.mjs — панель запущена не из своего репозитория.',
-    );
+    throw new PlatformError('platform_not_found', serverText('contour-bridge-script-missing'));
   }
   // Активному CLI без раздела MCP запись не достаётся вовсе: молчаливая запись
   // в чужой файл выглядела бы успехом, а инструмента у человека не появлялось бы.

@@ -1,3 +1,5 @@
+import { serverMessageAreas, serverMessageParams } from './server-messages/table.ts';
+
 /**
  * Человеческие тексты сервера — кодом, а не только русской строкой.
  *
@@ -11,54 +13,18 @@
  * отказа (`platform_not_found`, `run_busy`), по которому клиенты принимают
  * решения, — а текст у одного вида бывает разный.
  *
- * Модуль без zod и без импортов: его значения нужны серверу (он грузит
- * контракты без сборки) и телефону (у Metro нет zod).
+ * Модуль без zod и без пакетов (только свои области рядом): его значения нужны
+ * серверу (он грузит контракты без сборки) и телефону (у Metro нет zod).
  */
 
 /**
  * Код → имена подстановок. Список подстановок — часть контракта: тест словарей
  * сверяет, что перевод использует ровно их, и забытое `{{title}}` краснеет в
- * тесте, а не на экране пустым местом.
+ * тесте, а не на экране пустым местом. Сама таблица разложена по областям
+ * (`server-messages/<область>.ts`) и собрана в `server-messages/table.ts`.
  */
-export const serverMessageParams = {
-  // Возможности контура (строка матрицы, `PlatformCapabilityFinding.detail`).
-  'capability-models-key-scoped': [],
-  'capability-models-gateway-listed': [],
-  'capability-kind-undeclared': [],
-  'capability-chat-listed': [],
-  'capability-chat-none': [],
-  'capability-embeddings-listed': [],
-  'capability-embeddings-none': [],
-  'capability-agents-call-only': [],
-  'capability-guardrails-in-band': [],
-  'capability-knowledge-via-owner': [],
-  'capability-client-tools-rejected': [],
-  'capability-undeclared-by-gateway': [],
-  'capability-image-flag-undeclared': [],
-  'capability-image-no-models': [],
-  'capability-image-listed': [],
-  'capability-image-none': [],
-  // Отказы маршрутов контура.
-  'platform-not-found': ['id'],
-  'platform-not-connected': ['title'],
-  'platform-agents-not-declared': ['title'],
-  // Отказы отправки сообщения в чат.
-  'run-busy': [],
-  'run-empty-prompt': [],
-  'run-unsupported-upload': ['names', 'supported'],
-  'run-workspace-missing': ['cwd'],
-  // Отказы картинок и презентаций.
-  'media-block-too-large': [],
-  'media-image-not-found': [],
-  'media-deck-not-found': [],
-  'media-deck-file-missing': [],
-  'media-deck-format-unknown': [],
-  'media-deck-revise-unspecified': [],
-  'media-deck-revise-gone': [],
-  'media-deck-block-invalid': [],
-  'media-topic-empty': [],
-  'media-prompt-kind-unknown': [],
-} as const satisfies Record<string, readonly string[]>;
+export { serverMessageAreas, serverMessageParams };
+export type * from './server-messages/table.ts';
 
 export type ServerMessageCode = keyof typeof serverMessageParams;
 
@@ -85,4 +51,78 @@ export function formatServerMessage(template: string, params: ServerMessageParam
   return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, name: string) =>
     params[name] === undefined ? '' : String(params[name]),
   );
+}
+
+/**
+ * Код текста рядом с русской строкой в записи или отказе: `message`/`error` →
+ * `messageCode` + `params`. Для других полей код зовётся по полю
+ * (`detailCode` + `detailParams`, `reasonCode` + `reasonParams`…).
+ */
+export interface CodedMessage {
+  messageCode?: ServerMessageCode;
+  params?: ServerMessageParams;
+}
+
+/**
+ * Код и подстановки рядом с текстовым полем записи: `detail` + `detailCode` +
+ * `detailParams`. Поля необязательные: сервер вешает код там, где узнал свою же
+ * строку, а старая запись из `state.json` приезжает без кода — тогда клиент
+ * показывает русский текст поля.
+ */
+export type CodedFields<F extends string> = {
+  [K in `${F}Code`]?: ServerMessageCode;
+} & {
+  [K in `${F}Params`]?: ServerMessageNestedParams;
+};
+
+/**
+ * Коды строк списка: `warnings` → `warningsCodes` той же длины, `null` на месте
+ * строки, которую сервер шаблоном не прочитал. Список переводится по индексу,
+ * поэтому массив кодов никогда не короче самого списка.
+ */
+export type CodedList<F extends string> = {
+  [K in `${F}Codes`]?: (NestedServerMessage | null)[];
+};
+
+/**
+ * Подстановка, которая сама — текст сервера. Так приходят причины, собранные из
+ * чужой фразы и своей («Нет связи с контуром: …» внутри шага пробы): сервер
+ * разбирает готовую строку и кладёт вложенный код, чтобы клиент перевёл и его.
+ */
+export interface NestedServerMessage {
+  messageCode: ServerMessageCode;
+  params?: ServerMessageNestedParams;
+}
+
+export type ServerMessageNestedParams = Record<
+  string,
+  string | number | NestedServerMessage | undefined
+>;
+
+/**
+ * Вложенные подстановки → плоские, каждая уже переведённая. `undefined` —
+ * вложенный код клиенту неизвестен (сервер новее): тогда переводить нечего и
+ * показывается русская строка поля целиком, а не фраза с дырой посередине.
+ */
+export function resolveServerParams(
+  params: unknown,
+  render: (code: ServerMessageCode, params?: ServerMessageParams) => string | undefined,
+): ServerMessageParams | undefined {
+  if (typeof params !== 'object' || params === null) return {};
+  const out: ServerMessageParams = {};
+  for (const [name, value] of Object.entries(params as Record<string, unknown>)) {
+    if (typeof value === 'string' || typeof value === 'number') {
+      out[name] = value;
+      continue;
+    }
+    if (typeof value !== 'object' || value === null) continue;
+    const nested = value as { messageCode?: unknown; params?: unknown };
+    if (!isServerMessageCode(nested.messageCode)) return undefined;
+    const inner = resolveServerParams(nested.params, render);
+    if (!inner) return undefined;
+    const text = render(nested.messageCode, inner);
+    if (text === undefined) return undefined;
+    out[name] = text;
+  }
+  return out;
 }

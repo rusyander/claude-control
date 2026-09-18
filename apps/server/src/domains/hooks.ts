@@ -8,6 +8,7 @@ import type { AppStore } from '../lib/app-store.ts';
 import { generateHookScript, hookScriptPath } from './hook-scripts.ts';
 import { compiledHookOrigin } from './compiled-markers.ts';
 import { readScriptDescription } from '../lib/script-description.ts';
+import { coded } from '../lib/server-text.ts';
 
 /**
  * Имя файла из формы совпало с существующим скриптом. Маршрут отвечает 409:
@@ -22,6 +23,7 @@ export class HookScriptExistsError extends Error {
     super(
       `Файл hooks/${fileName} уже есть. Укажите другое имя файла или оставьте поле пустым и задайте команду.`,
     );
+    coded(this, 'hook-file-exists', { name: fileName });
     this.name = 'HookScriptExistsError';
   }
 }

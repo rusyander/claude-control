@@ -6,6 +6,7 @@ import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
 import type { LocationCardProps } from './LocationCard.types';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Карточка расположения конфигурации. Показывает не только путь, но и как он
@@ -40,7 +41,7 @@ export function LocationCard({ location }: LocationCardProps) {
 
         {location.problem && (
           <Typography variant="caption" color="danger" as="span">
-            {location.problem}
+            {serverFieldText(location, 'problem')}
           </Typography>
         )}
       </Stack>

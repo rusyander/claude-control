@@ -156,7 +156,7 @@ describe('domains/integrations/links: привязка проекта', () => {
   });
 
   it('привязка проекта и привязка группы живут отдельно, группа сильнее', () => {
-    writeLink(store, project, undefined, { jiraProjectKey: 'GOR', jiraIssueKey: 'PRJ-1' });
+    writeLink(store, project, undefined, { jiraProjectKey: 'PRJ', jiraIssueKey: 'PRJ-1' });
     writeLink(store, project, 'smoke', { jiraIssueKey: 'PRJ-99' });
 
     const links = readLinks(store, project);
@@ -164,7 +164,7 @@ describe('domains/integrations/links: привязка проекта', () => {
     expect(links.groups.smoke?.jiraIssueKey).toBe('PRJ-99');
 
     const found = linkForCwd(store, project, 'smoke');
-    expect(found?.link).toMatchObject({ jiraProjectKey: 'GOR', jiraIssueKey: 'PRJ-99' });
+    expect(found?.link).toMatchObject({ jiraProjectKey: 'PRJ', jiraIssueKey: 'PRJ-99' });
   });
 
   it('копия ветки — тот же проект: тикет от смены ветки не меняется', () => {

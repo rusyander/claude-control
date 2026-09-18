@@ -464,7 +464,7 @@ describe.skipIf(!GIT_AVAILABLE)('pull на настоящих репозитор
 
   it('отправлять нечего — это не ошибка: git отвечает «всё уже там»', async () => {
     const output = await pushBranch(dir);
-    expect(output.length).toBeGreaterThan(0);
+    expect(output.output.length).toBeGreaterThan(0);
   });
 });
 

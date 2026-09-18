@@ -27,8 +27,8 @@ afterEach(() => {
 const NOW = '2026-09-07T10:00:00.000Z';
 
 const cases = [
-  { key: 'GOR-T1', title: 'Вход', steps: [{ action: 'нажать', expected: 'открылось' }] },
-  { key: 'GOR-T2', title: 'Выход', steps: [] },
+  { key: 'PRJ-T1', title: 'Вход', steps: [{ action: 'нажать', expected: 'открылось' }] },
+  { key: 'PRJ-T2', title: 'Выход', steps: [] },
 ];
 
 /** Клиент-заглушка: запоминает, о чём его попросили, и отвечает заданным. */
@@ -54,16 +54,16 @@ describe('tms/sync: забор кейсов', () => {
     const result = pullIntoGroup(
       project,
       'gui',
-      [{ ...cases[0]!, url: 'https://jira/GOR-T1' }],
+      [{ ...cases[0]!, url: 'https://jira/PRJ-T1' }],
       NOW,
     );
     expect(result).toEqual({ imported: 1, skipped: 0 });
 
     const stored = readGroup(project, 'gui').cases[0]!;
     expect(stored.title).toBe('Вход');
-    expect(stored.tags).toEqual(['tms:GOR-T1']);
+    expect(stored.tags).toEqual(['tms:PRJ-T1']);
     expect(stored.steps[0]).toMatchObject({ action: 'нажать', expected: 'открылось' });
-    expect(stored.links?.[0]).toMatchObject({ url: 'https://jira/GOR-T1', title: 'GOR-T1' });
+    expect(stored.links?.[0]).toMatchObject({ url: 'https://jira/PRJ-T1', title: 'PRJ-T1' });
   });
 
   it('повторный забор ничего не дублирует и не затирает правку человека', () => {
@@ -119,7 +119,7 @@ describe('tms/sync: отправка прогона', () => {
     await pushRunToTms(fakeClient(seen), project, 'run-1');
     const keyOf = seen[0]!.keyOf;
     expect(keyOf({ pointId: 'p1', groupId: 'gui', caseId: stored[0]!.id, status: 'failed' })).toBe(
-      'GOR-T1',
+      'PRJ-T1',
     );
     expect(
       keyOf({ pointId: 'p2', groupId: 'gui', caseId: 'нет-такого', status: 'passed' }),

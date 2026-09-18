@@ -34,24 +34,28 @@ export function registerProviderPluginsRoutes(app: FastifyInstance, ctx: ServerC
   const SECTION_UNSUPPORTED = {
     error: 'section_unsupported',
     message: 'У активного провайдера нет универсального раздела плагинов.',
+    messageCode: 'plugins-section-unsupported',
   } as const;
 
   const INVALID_FILE_DRAFT = {
     error: 'invalid_draft',
     message:
       'Файл плагина не прошёл проверку: нужен путь внутри каталога плагинов (.js, .ts или .mjs) и текстовое содержимое.',
+    messageCode: 'plugin-file-draft-invalid',
   } as const;
 
   const INVALID_PACKAGES_DRAFT = {
     error: 'invalid_draft',
     message:
       'Список npm-плагинов не прошёл проверку: каждое имя — непустая строка без пробелов и кавычек, повторы недопустимы.',
+    messageCode: 'plugin-npm-list-invalid',
   } as const;
 
   const FORMAT_UNRECOGNIZED = {
     error: 'format_unrecognized',
     message:
       'Формат файла конфигурации не распознан — запись запрещена (список только для чтения).',
+    messageCode: 'config-format-unrecognized-list-readonly',
   } as const;
 
   const requireTarget = (reply: FastifyReply): ProviderPluginsTarget | undefined => {
@@ -77,6 +81,7 @@ export function registerProviderPluginsRoutes(app: FastifyInstance, ctx: ServerC
         error: 'write_disabled',
         message:
           'Плагины Kimi Code панель только показывает: устанавливать, включать и выключать их нужно командой /plugins внутри CLI — форма реестра установленного не задокументирована.',
+        messageCode: 'kimi-plugins-readonly',
       });
       return undefined;
     }

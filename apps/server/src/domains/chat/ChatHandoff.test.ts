@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   buildHandoffPrompt,
   HANDOFF_DEFAULT_CHECKPOINT,
@@ -9,7 +12,14 @@ import {
   scanHandoffProse,
   type HandoffProposal,
 } from '@agentdeck/contracts/chat-handoff';
-import { evaluateHandoff, HandoffChains, startHandoff } from './ChatHandoff.ts';
+import {
+  CHAIN_MAX_AGE_MS,
+  evaluateHandoff,
+  HandoffChains,
+  HandoffChainStore,
+  HANDOFF_CHAINS_FILE,
+  startHandoff,
+} from './ChatHandoff.ts';
 
 /**
  * Продолжение работы в чистой сессии. Проверяем ровно то, чем эта штука может
@@ -474,5 +484,100 @@ describe('заведение продолжения', () => {
 
     expect(result.started).toBe(false);
     expect(result.prompt).toContain(PROPOSAL.next);
+  });
+});
+
+/**
+ * Цепочки переживают перезапуск панели.
+ *
+ * Прогоны его переживают с тех пор, как их усыновляют из журнала, а стенд
+ * поднимает `keepalive`; цепочка же начинала счёт заново — потолок в восемь
+ * продолжений обнулялся, а отпечаток файла-опоры терялся, и предохранитель
+ * «агент ходит по кругу» пропускал лишний круг. Проверяем на НАСТОЯЩЕМ файле:
+ * подменённое хранилище доказало бы карту в памяти, а не то, что панель
+ * поднимает цепочку со старта.
+ */
+describe('HandoffChains на диске', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'cc-chains-'));
+  });
+
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  const boot = (): HandoffChains => new HandoffChains(() => false, new HandoffChainStore(dir));
+
+  it('номер шага, задание и отпечаток чекпойнта поднимаются после перезапуска', () => {
+    const before = boot();
+    before.setAuto(['new-1', 'sess-1'], true);
+    const depth = before.link(['new-1', 'sess-1'], 'new-2', {
+      rootTask: 'Собери отчёт',
+      checkpointHash: 'abc123',
+    });
+    expect(depth).toBe(1);
+    expect(existsSync(join(dir, HANDOFF_CHAINS_FILE))).toBe(true);
+
+    // Тот же каталог, новый объект — это и есть перезапуск сервера.
+    const after = boot();
+    expect(after.depth(['new-2'])).toBe(1);
+    expect(after.isAuto(['sess-1'])).toBe(true);
+    expect(after.rootTaskOf(['new-2'])).toBe('Собери отчёт');
+    expect(after.lastCheckpointHash(['new-2'])).toBe('abc123');
+    // Псевдонимы остались одним состоянием: шаг по одному ключу виден по другому.
+    after.setAuto(['new-1'], false);
+    expect(after.isAuto(['sess-1'])).toBe(false);
+  });
+
+  it('предохранитель «чекпойнт не изменился» держится через перезапуск', () => {
+    const before = boot();
+    before.link(['new-1'], 'new-2', { checkpointHash: 'same-hash' });
+
+    const after = boot();
+    const verdict = evaluateHandoff({
+      proposal: PROPOSAL,
+      cwd: 'C:/work/проект',
+      ok: true,
+      startedAt: 1_000,
+      auto: true,
+      depth: after.depth(['new-2']),
+      ...(after.lastCheckpointHash(['new-2']) !== undefined
+        ? { previousHash: after.lastCheckpointHash(['new-2']) as string }
+        : {}),
+      stat: () => 2_000,
+      hash: () => 'same-hash',
+    });
+
+    // До этой правки после перезапуска отпечатка не было, и круг заводился снова.
+    expect(verdict).toEqual({ ok: false, reason: 'checkpoint_unchanged', proposal: PROPOSAL });
+  });
+
+  it('цепочка старше суток не поднимается: потолок не держит вчерашнюю работу', () => {
+    writeFileSync(
+      join(dir, HANDOFF_CHAINS_FILE),
+      JSON.stringify([
+        { aliases: ['old'], depth: 7, touchedAt: Date.now() - CHAIN_MAX_AGE_MS - 1_000 },
+        { aliases: ['fresh'], depth: 3, touchedAt: Date.now() - 1_000 },
+      ]),
+      'utf8',
+    );
+
+    const chains = boot();
+    expect(chains.depth(['old'])).toBe(0);
+    expect(chains.depth(['fresh'])).toBe(3);
+  });
+
+  it('битый файл — пустая память, а не падение старта', () => {
+    writeFileSync(join(dir, HANDOFF_CHAINS_FILE), '{не json', 'utf8');
+    expect(() => boot()).not.toThrow();
+    expect(boot().depth(['что угодно'])).toBe(0);
+  });
+
+  it('«забыть цепочку» стирает её и на диске', () => {
+    const before = boot();
+    before.link(['new-1'], 'new-2', { checkpointHash: 'hash' });
+    before.forget(['new-2']);
+
+    expect(boot().lastCheckpointHash(['new-2'])).toBeUndefined();
   });
 });

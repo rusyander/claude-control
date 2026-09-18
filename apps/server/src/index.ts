@@ -6,6 +6,7 @@ import { readApiToken } from './lib/api-token.ts';
 import { registerAccessGate } from './lib/access-gate.ts';
 import { createConfigWatcher } from './lib/config-watcher.ts';
 import { registerEmptyBodyGuard } from './lib/empty-body.ts';
+import { registerCodedErrors } from './lib/server-text.ts';
 import { detectProviders } from './providers/detect.ts';
 import { autostartProjects } from './domains/project-runner.ts';
 import { buildDlpRuntime } from './domains/dlp.ts';
@@ -45,6 +46,9 @@ registerAccessGate(app, access);
 // Пустое тело — `{}`, а не `undefined`: почему это хук, а не правка по месту,
 // написано в самом модуле.
 registerEmptyBodyGuard(app);
+
+// Ошибка с кодом текста, не пойманная маршрутом, уезжает с кодом (`server-text.ts`).
+registerCodedErrors(app);
 
 // Объекты, живущие дольше запроса, — только отсюда их можно погасить при выходе.
 const runtime = createRuntime(ctx, `http://${HOST}:${PORT}`);

@@ -8,6 +8,7 @@ import {
 } from '../domains/provider-preview.ts';
 import { McpServerExistsError } from '../domains/provider-mcp.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Предпросмотр записи в конфигурацию активного провайдера.
@@ -27,15 +28,23 @@ export function registerProviderPreviewRoutes(app: FastifyInstance, ctx: ServerC
       return previewProviderWrite(ctx.store, request.body) satisfies ProviderPreviewResponse;
     } catch (error) {
       if (error instanceof SectionUnsupportedError)
-        return reply.code(400).send({ error: 'section_unsupported', message: error.message });
+        return reply
+          .code(400)
+          .send({ error: 'section_unsupported', message: error.message, ...codeOf(error) });
       if (error instanceof InvalidDraftError)
-        return reply.code(400).send({ error: 'invalid_draft', message: error.message });
+        return reply
+          .code(400)
+          .send({ error: 'invalid_draft', message: error.message, ...codeOf(error) });
       // Имя занято: настоящая запись отвечает конфликтом — предпросмотр тоже,
       // иначе он показывал бы дифф операции, которую сохранить всё равно нельзя.
       if (error instanceof McpServerExistsError)
-        return reply.code(409).send({ error: 'server_exists', message: error.message });
+        return reply
+          .code(409)
+          .send({ error: 'server_exists', message: error.message, ...codeOf(error) });
       if (error instanceof UnrecognizedFormatError)
-        return reply.code(422).send({ error: 'format_unrecognized', message: error.message });
+        return reply
+          .code(422)
+          .send({ error: 'format_unrecognized', message: error.message, ...codeOf(error) });
       throw error;
     }
   });

@@ -25,10 +25,16 @@ export function registerHistoryRoutes(app: FastifyInstance, ctx: ServerContext):
 
   app.get<{ Querystring: { name?: string } }>('/api/history/diff', (request, reply) => {
     const name = request.query.name;
-    if (!name) return reply.code(400).send({ error: 'Не указана копия' });
+    if (!name)
+      return reply
+        .code(400)
+        .send({ error: 'Не указана копия', messageCode: 'history-copy-unspecified' });
 
     const diff = buildDiff(ctx.store.backupDir, name, trackedTargets());
-    if (!diff) return reply.code(404).send({ error: 'Копия не найдена' });
+    if (!diff)
+      return reply
+        .code(404)
+        .send({ error: 'Копия не найдена', messageCode: 'backup-copy-not-found' });
 
     return diff;
   });
@@ -47,7 +53,9 @@ export function registerHistoryRoutes(app: FastifyInstance, ctx: ServerContext):
     (request, reply) => {
       const { name, hunk } = request.body;
       if (!name || typeof hunk !== 'number' || !Number.isInteger(hunk) || hunk < 0) {
-        return reply.code(400).send({ error: 'Не указан ханк для отката' });
+        return reply
+          .code(400)
+          .send({ error: 'Не указан ханк для отката', messageCode: 'history-hunk-unspecified' });
       }
 
       const result = revertHunk(ctx.store.backupDir, name, hunk, trackedTargets(), ctx.backupDir);

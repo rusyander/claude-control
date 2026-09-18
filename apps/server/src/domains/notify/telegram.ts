@@ -1,8 +1,9 @@
 import { basename } from 'node:path';
 import type { TelegramEvent, TelegramSettings } from '@agentdeck/contracts';
 import type { RunNotice } from '../chat/ChatRunRegistry.ts';
-import { describeFailure, parseJson, sendRequest } from '../integrations/http.ts';
+import { describeFailure, failureCode, parseJson, sendRequest } from '../integrations/http.ts';
 import { unreachable } from '../integrations/errors.ts';
+import type { CodedText } from '../../lib/server-text.ts';
 
 /**
  * Уведомления в Telegram — второй адресат тех же событий, что уходят на телефон.
@@ -33,7 +34,23 @@ export interface TestFailedNotice {
   total?: number;
 }
 
-export type TelegramNotice = RunNotice | TestFailedNotice;
+/**
+ * Бюджет контура перешёл порог — повод, которого у прогонов нет вовсе.
+ *
+ * Ни чата, ни проекта у него не бывает: бюджет — свойство КОНТУРА, а тратят его
+ * все прогоны разом. Поэтому `projectPath` объявлен невозможным, а не пустым:
+ * подставленное сюда имя папки читалось бы как «этот проект исчерпал бюджет».
+ */
+export interface BudgetNotice {
+  kind: 'budgetNear' | 'budgetOver';
+  /** Контур по имени, которое дал ему человек: идентификатор он не читает. */
+  platformTitle: string;
+  /** Доля бюджета от 0 до 1 — единственное число в тексте. */
+  share: number;
+  projectPath?: undefined;
+}
+
+export type TelegramNotice = RunNotice | TestFailedNotice | BudgetNotice;
 
 export interface TelegramDeps {
   settings: () => TelegramSettings;
@@ -59,6 +76,11 @@ export function noticeEvent(notice: TelegramNotice): TelegramEvent {
       return 'permission';
     case 'question':
       return 'question';
+    case 'budgetNear':
+    case 'budgetOver':
+      // Одно событие подписки на оба порога: подписка отвечает на вопрос
+      // «сообщать ли про бюджет», а какой именно порог — сказано в тексте.
+      return 'budget';
     default:
       return 'testFailed';
   }
@@ -76,6 +98,14 @@ export function compose(notice: TelegramNotice): string {
       return `🔐 Нужно разрешение — ${project}${notice.toolName ? `: ${notice.toolName}` : ''}`;
     case 'question':
       return `❓ Агент задал вопрос — ${project}`;
+    // Оценка, а не факт: остатка бюджета контур наружу не отдаёт (подпись
+    // `budget-manual`), и обещать здесь точную цифру было бы враньём.
+    case 'budgetNear':
+      return `⚠️ Бюджет контура «${notice.platformTitle}» израсходован примерно на ${Math.round(
+        notice.share * 100,
+      )} %`;
+    case 'budgetOver':
+      return `⛔ Оценка расхода контура «${notice.platformTitle}» дошла до введённого бюджета`;
     default:
       return `🔴 Тесты провалены (${notice.failed}${
         notice.total ? ` из ${notice.total}` : ''
@@ -103,7 +133,10 @@ export async function sendTelegramMessage(
     body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
   });
   if (!response.ok) {
-    throw unreachable(safeDetail(describeFailure(SYSTEM, response)), safeDetail(response.text));
+    throw Object.assign(
+      unreachable(safeDetail(describeFailure(SYSTEM, response)), safeDetail(response.text)),
+      safeCode(failureCode(SYSTEM, response)),
+    );
   }
 }
 
@@ -119,7 +152,10 @@ export async function telegramMe(token: string): Promise<string> {
     headers: { Accept: 'application/json' },
   });
   if (!response.ok) {
-    throw unreachable(safeDetail(describeFailure(SYSTEM, response)), safeDetail(response.text));
+    throw Object.assign(
+      unreachable(safeDetail(describeFailure(SYSTEM, response)), safeDetail(response.text)),
+      safeCode(failureCode(SYSTEM, response)),
+    );
   }
   const me = parseJson<{ result?: { username?: string; first_name?: string } } | null>(
     SYSTEM,
@@ -155,6 +191,17 @@ export function createTelegramNotifier(deps: TelegramDeps): (notice: TelegramNot
  * Хвост ответа для подробности отказа — с вырезанным токеном на случай, если
  * Telegram вернул его в тексте ошибки (он это делает, отвечая на битый адрес).
  */
+/** Параметры кода — тот же текст по частям: токен из них вычищается так же. */
+function safeCode(code: CodedText): CodedText {
+  const params = Object.fromEntries(
+    Object.entries(code.params ?? {}).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? safeDetail(value) : value,
+    ]),
+  );
+  return { ...code, params };
+}
+
 function safeDetail(text: string): string {
   return text.replace(/bot\d+:[\w-]+/g, 'bot<токен>').slice(0, 300);
 }

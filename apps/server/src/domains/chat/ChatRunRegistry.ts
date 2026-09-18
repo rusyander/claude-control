@@ -7,7 +7,14 @@ import type { PlatformRunRoute } from '../platform/routing.ts';
 import { ChatRun, type ChatEvent, type RunOptions } from './ChatRunner.ts';
 import { DetachedRun, type DetachedRunDeps } from './detached-run.ts';
 import { looksLikeCheck } from './lowered-journal.ts';
-import { resolveCliPid, type LedgerAutoApprove, type RunLedgerEntry } from './run-ledger.ts';
+import {
+  adoptableEntries,
+  isPidAlive,
+  pidLooksLikeCli,
+  resolveCliPid,
+  type LedgerAutoApprove,
+  type RunLedgerEntry,
+} from './run-ledger.ts';
 
 /**
  * Реестр прогонов Claude Code, отвязанный от HTTP-запроса.
@@ -217,8 +224,9 @@ interface RegisteredRun {
   checks: string[];
   /**
    * Усыновлён после перезапуска панели (см. `adopt`): процесс жив, но stdout
-   * умер вместе с прежним сервером. Текста ответа у такого прогона нет, поэтому
-   * планировщик продолжений и журнал сдачи его не видят.
+   * умер вместе с прежним сервером. Текст ответа у такого прогона копится не в
+   * потоке, а в транскрипте — на конце его дочитывает `closingTurnOf`; журнал
+   * сдачи усыновлённого по-прежнему не видит (проверок панель не наблюдала).
    */
   detached?: boolean;
 }
@@ -234,6 +242,8 @@ export interface RunSnapshot {
 }
 
 export interface RunLedgerSink {
+  /** Перечитать журнал: поздний подхват ищет в нём запись по ключу прогона. */
+  read(): RunLedgerEntry[];
   upsert(entry: RunLedgerEntry): void;
   remove(key: string): void;
 }
@@ -424,6 +434,17 @@ export class ChatRunRegistry {
   private snapshotAutoApprove?: (key: string) => LedgerAutoApprove | undefined;
   private resolvePid: (wrapperPid: number) => Promise<number> = resolveCliPid;
 
+  /**
+   * Ответ усыновлённого прогона: потока у него нет, но текст лежит в транскрипте
+   * Claude Code. Крючок ставит bootstrap — каталог транскриптов знает он, а
+   * реестр о каталогах конфигурации не знает ничего.
+   */
+  private readClosingTurn?: (chatId: string, sessionId?: string) => string | undefined;
+
+  setClosingTurnReader(read: (chatId: string, sessionId?: string) => string | undefined): void {
+    this.readClosingTurn = read;
+  }
+
   setLedger(
     ledger: RunLedgerSink,
     snapshotAutoApprove?: (key: string) => LedgerAutoApprove | undefined,
@@ -514,6 +535,38 @@ export class ChatRunRegistry {
       .then(() => this.finish(registered))
       .catch(() => this.finish(registered));
     return true;
+  }
+
+  /**
+   * Поздний подхват: живой CLI, которого единственный обход при старте не поймал.
+   *
+   * Обход был ровно один, и промахнуться он мог по двум причинам: pid приезжает в
+   * журнал асинхронно (поиск процесса под оболочкой идёт через CIM, ~0,8 с), а
+   * `tasklist` на занятой машине отвечает не всегда. Промах стоил дорого: агент
+   * получал отказ на КАЖДЫЙ запрос прав до конца своей жизни, и человеку
+   * оставалось переслать сообщение. Проверки те же, что у обхода (возраст, живой
+   * pid, похожий на CLI образ), цена — одно чтение файла на неизвестный прогон.
+   *
+   * Запись при неудаче НЕ вычищаем: чистка — дело обхода при старте, а здесь
+   * промах может быть гонкой с ещё дописывающимся pid.
+   */
+  adoptFromLedger(
+    runId: string,
+    probe: { isAlive: (pid: number) => boolean; looksLikeCli: (pid: number) => boolean } = {
+      isAlive: isPidAlive,
+      looksLikeCli: pidLooksLikeCli,
+    },
+    deps: DetachedRunDeps = {},
+  ): RunLedgerEntry | undefined {
+    if (!this.ledger) return undefined;
+    if (this.runs.has(this.resolveKey(runId))) return undefined;
+    // Ключ прогона в журнале записан дважды: временным `new-…` и настоящим
+    // `sessionId`. Брокер прав знает то написание, с которым прогон стартовал.
+    const entry = this.ledger.read().find((item) => item.key === runId || item.sessionId === runId);
+    if (!entry) return undefined;
+    const [adoptable] = adoptableEntries([entry], probe).adopt;
+    if (!adoptable || !this.adopt(adoptable, deps)) return undefined;
+    return adoptable;
   }
 
   /**
@@ -817,6 +870,19 @@ export class ChatRunRegistry {
     for (const subscriber of run.subscribers) subscriber.send(buffered);
   }
 
+  /**
+   * Ответ усыновлённого прогона из транскрипта. Ошибка чтения — пусто: чужой
+   * файл не имеет права уронить завершение прогона.
+   */
+  private closingTurnOf(run: RegisteredRun): string {
+    if (run.errored || !this.readClosingTurn) return '';
+    try {
+      return this.readClosingTurn(run.chatId, run.sessionId) ?? '';
+    } catch {
+      return '';
+    }
+  }
+
   /** Прогон завершился сам (процесс закрылся). */
   private finish(run: RegisteredRun): void {
     if (run.status !== 'running') return;
@@ -830,17 +896,25 @@ export class ChatRunRegistry {
     // чужой, поэтому его падение не имеет права утащить завершение прогона:
     // без этого исключение оставило бы слушателей открытыми навсегда.
     //
-    // Усыновлённый прогон сюда не ходит: текста ответа у него нет (труба умерла
-    // с прежним сервером), и планировщик читал бы пустоту — ни блока
-    // продолжения, ни ревью по нему завести нельзя честно. Журнал сдачи — тоже:
-    // проверок панель не видела не потому, что их не было.
-    if (this.planHandoff && !run.detached) {
+    // У усыновлённого прогона потока не было, но ответ агента никуда не делся —
+    // он в транскрипте Claude Code, который лента и так читает. Берём оттуда
+    // ПОСЛЕДНИЙ ЗАВЕРШЁННЫЙ ход: по нему решаются продолжение в чистой сессии,
+    // разбор уровня 1, план группы и ревью по ссылке — всё это панель раньше
+    // выбрасывала разом. Недописанный транскрипт закрывающего хода не даёт
+    // (`readLastAssistantTurn`), и тогда молчим, как и раньше. Дважды применить
+    // решение перезапуск не даёт: одноразовость держат отметки конвейера
+    // (`reviewedAt`/`plannedAt`), а `finish` у прогона случается один раз.
+    const text = run.detached ? this.closingTurnOf(run) : run.text;
+
+    // Журнал сдачи усыновлённому по-прежнему не полагается: проверок панель не
+    // видела не потому, что их не было, — их скрыл умерший поток.
+    if (this.planHandoff && (!run.detached || text)) {
       try {
         const event = this.planHandoff({
           chatId: run.chatId,
           sessionId: run.sessionId,
           projectPath: run.meta.projectPath,
-          text: run.text,
+          text,
           ok: !run.errored,
           startedAt: run.startedAt,
           options: run.options,

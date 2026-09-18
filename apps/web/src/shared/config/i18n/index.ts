@@ -4,6 +4,11 @@
  */
 export { i18n, toLanguage } from './instance';
 export type { Language } from './instance';
-export { serverMessageFromPayload, serverMessageText } from './server-message';
+export {
+  serverFieldList,
+  serverFieldText,
+  serverMessageFromPayload,
+  serverMessageText,
+} from './server-message';
 export { hasHelp, loadHelp } from './help-loader';
 export { useHelpDictionary } from './useHelpDictionary';

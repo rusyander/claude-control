@@ -145,6 +145,12 @@ export interface ChatMessagesProps {
    */
   onAnswerHold?: (index: number, answer: string) => void;
   holdBusy?: boolean;
+  /**
+   * «Отпустить» группу, которая ждёт предшественников (Т1): их цепочка могла не
+   * кончиться вовсе, и тогда это единственное, чем группу можно сдвинуть.
+   */
+  onRelease?: (index: number) => void;
+  releaseBusy?: boolean;
   /** Пересчитать пересечения веток разделения (Т6) — кнопка в сводке групп. */
   onCheckOverlap?: () => void;
   overlapBusy?: boolean;

@@ -10,7 +10,7 @@ import { resolveWorkspace } from '../../domains/chat/ChatWorkspace.ts';
 import { projectsDir } from './paths.ts';
 
 /** Файл не найден — один и тот же ответ на всё, что нельзя отдать наружу. */
-const NOT_FOUND = { message: 'Файл не найден' } as const;
+const NOT_FOUND = { message: 'Файл не найден', messageCode: 'file-not-found' } as const;
 
 /**
  * Артефакты показываем только у чатов песочницы. Разговор из настоящего

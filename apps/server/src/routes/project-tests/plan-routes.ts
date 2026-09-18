@@ -17,6 +17,7 @@ import {
 } from '../../domains/project-tests.ts';
 import { buildCoverage } from '../../domains/project-tests/coverage.ts';
 import { guard, guardAsync, requireRoot, type TestsDeps } from './shared.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Планы и тест-поинты.
@@ -46,7 +47,9 @@ export function registerTestPlanRoutes(app: FastifyInstance, deps: TestsDeps): v
       if (!root) return reply;
       const plan = request.body?.plan;
       if (!plan || typeof plan !== 'object' || !plan.title) {
-        return reply.code(400).send({ message: 'Нужно название плана.' });
+        return reply
+          .code(400)
+          .send({ message: 'Нужно название плана.', messageCode: 'plan-title-required' });
       }
       return guard(reply, () => {
         const saved = savePlan(
@@ -144,7 +147,12 @@ export function registerTestPlanRoutes(app: FastifyInstance, deps: TestsDeps): v
       return guard(reply, () => {
         const id = String(request.query.id ?? '');
         const plan = readPlan(root, id);
-        if (!plan) throw new ProjectTestsNotFoundError(`Плана «${id}» в проекте нет.`);
+        if (!plan)
+          throw coded(
+            new ProjectTestsNotFoundError(`Плана «${id}» в проекте нет.`),
+            'plan-not-found',
+            { id },
+          );
         const points = buildPoints(planCases(readGroups(root), plan), readEnvironments(root), {
           plan,
           environmentId: request.query.environmentId || undefined,

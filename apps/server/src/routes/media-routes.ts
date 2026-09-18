@@ -15,7 +15,7 @@ import {
   PICTURE_MAX_CHARS,
 } from '@agentdeck/contracts/media-block';
 import type { ServerContext } from '../context.ts';
-import { generateImage, planImage, savePicture } from '../domains/media/images.ts';
+import { generateImage, planImageReady, savePicture } from '../domains/media/images.ts';
 import type { MediaDeps } from '../domains/media/images.ts';
 import {
   deckFile,
@@ -28,6 +28,9 @@ import { DECK_MIME } from '../domains/media/deck/store.ts';
 import { isMediaError } from '../domains/media/errors.ts';
 import { promptText } from '../domains/prompts.ts';
 import { assertId, readImageBytes, readImageRecord } from '../domains/media/store.ts';
+import { codeOf } from '../lib/server-text.ts';
+import { issueBody } from '../lib/zod-issue-codes.ts';
+import { serverText } from '../lib/server-texts.ts';
 
 /**
  * Потолок тела у приёма блоков агента. Рисунок меряется в ЗНАКАХ
@@ -40,7 +43,7 @@ import { assertId, readImageBytes, readImageRecord } from '../domains/media/stor
 const BLOCK_BODY_LIMIT = PICTURE_MAX_CHARS * 6 + 256 * 1024;
 
 /** Отказ по размеру тела — своими словами, а не фреймворка. */
-const BODY_TOO_LARGE = 'Блок слишком велик — панель такой не принимает.';
+const BODY_TOO_LARGE = serverText('media-block-too-large');
 
 /**
  * Параметры маршрута приёма блока: поднятый потолок и перехват отказа по
@@ -84,23 +87,33 @@ export function registerMediaRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
   gatewayPort: () => number,
+  /**
+   * Подъём своего шлюза, когда его тумблер включён, а слушателя нет (A-1).
+   * Приходит извне, потому что слушатель живёт дольше запроса; не задан —
+   * маршруты отвечают по тому, что есть, как отвечали раньше.
+   */
+  gateway?: { raise: () => Promise<void>; failure: () => string | undefined },
 ): void {
   const deps = (): MediaDeps => ({
     appDataDir: ctx.location.paths.appData,
     store: ctx.store,
     gatewayPort,
+    ...(gateway ? { raiseGateway: gateway.raise, gatewayFailure: gateway.failure } : {}),
   });
 
   const failed = (error: unknown, reply: FastifyReply): FastifyReply => {
     if (isMediaError(error)) {
       return reply.code(error.status).send({
         message: error.message,
+        ...codeOf(error),
         ...(error.reason ? { reason: error.reason } : {}),
-        ...(error.messageCode ? { messageCode: error.messageCode, params: error.params } : {}),
       });
     }
+    const reason = error instanceof Error ? error.message : String(error);
     return reply.code(500).send({
-      message: `Не получилось: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Не получилось: ${reason}`,
+      messageCode: 'media-failed',
+      params: { reason },
     });
   };
 
@@ -110,16 +123,28 @@ export function registerMediaRoutes(
    */
   const wantsAgent = (value: unknown): boolean => value === '1' || value === 'true';
 
+  /**
+   * Чем нарисуем и почему нет. Единственный маршрут плана, который ещё и
+   * ДЕЙСТВУЕТ: погашенный слушатель своего шлюза панель поднимает сама (A-1) —
+   * замок «шлюз не поднят» там, где панель умеет его поднять одним вызовом, был
+   * отказом собственной работе. Тумблер при этом не трогается ни разу.
+   */
   app.get<{ Querystring: { agent?: string } }>('/api/media/images/plan', (request) =>
-    planImage(deps(), { agent: wantsAgent(request.query.agent) }),
+    planImageReady(deps(), { agent: wantsAgent(request.query.agent) }),
   );
 
   app.post<{ Body: unknown }>('/api/media/images', async (request, reply) => {
     const parsed = mediaImageRequestSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
-      return reply.code(400).send({
-        message: parsed.error.issues[0]?.message ?? 'Запрос на картинку не разобран.',
-      });
+      return reply
+        .code(400)
+        .send(
+          issueBody(
+            parsed.error.issues,
+            'Запрос на картинку не разобран.',
+            'media-image-request-invalid',
+          ),
+        );
     }
     try {
       return await generateImage(deps(), parsed.data);
@@ -134,7 +159,13 @@ export function registerMediaRoutes(
     if (!parsed.success) {
       return reply
         .code(400)
-        .send({ message: parsed.error.issues[0]?.message ?? 'Блок с рисунком не разобран.' });
+        .send(
+          issueBody(
+            parsed.error.issues,
+            'Блок с рисунком не разобран.',
+            'media-picture-block-invalid',
+          ),
+        );
     }
     try {
       return savePicture(deps(), parsed.data);
@@ -185,7 +216,13 @@ export function registerMediaRoutes(
     if (!parsed.success) {
       return reply
         .code(400)
-        .send({ message: parsed.error.issues[0]?.message ?? 'Запрос на презентацию не разобран.' });
+        .send(
+          issueBody(
+            parsed.error.issues,
+            'Запрос на презентацию не разобран.',
+            'media-deck-request-invalid',
+          ),
+        );
     }
     try {
       return await generateDeck(deps(), parsed.data);
@@ -200,7 +237,13 @@ export function registerMediaRoutes(
     if (!parsed.success) {
       return reply
         .code(400)
-        .send({ message: parsed.error.issues[0]?.message ?? 'Блок с колодой не разобран.' });
+        .send(
+          issueBody(
+            parsed.error.issues,
+            'Блок с колодой не разобран.',
+            'media-deck-block-body-invalid',
+          ),
+        );
     }
     try {
       return await deckFromBlock(deps(), parsed.data);

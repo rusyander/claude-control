@@ -169,6 +169,32 @@ export function PlatformLimitsSections({ tr }: SectionProps) {
         </Callout>
       </HelpSection>
 
+      {/* Сжатие истории — единственное, что контур меняет в СМЫСЛЕ ответа молча:
+          человек должен знать, где панель это показывает и насколько точно. */}
+      <HelpSection title={tr('summarizedTitle')} caption={tr('summarizedCaption')}>
+        <FieldTable
+          nameHeader={tr('summarizedColumn')}
+          descriptionHeader={tr('summarizedMeaningColumn')}
+          rows={[
+            {
+              name: tr('summarizedClaude'),
+              description: tr('summarizedClaudeText'),
+              isMono: false,
+            },
+            {
+              name: tr('summarizedForeign'),
+              description: tr('summarizedForeignText'),
+              isMono: false,
+            },
+            { name: tr('summarizedPhone'), description: tr('summarizedPhoneText'), isMono: false },
+            { name: tr('summarizedCard'), description: tr('summarizedCardText'), isMono: false },
+          ]}
+        />
+        <Callout tone="info" title={tr('summarizedLimitsTitle')}>
+          {tr('summarizedLimitsText')}
+        </Callout>
+      </HelpSection>
+
       <HelpSection title={tr('errorsTitle')} caption={tr('errorsCaption')}>
         <FieldTable
           nameHeader={tr('errorsColumn')}

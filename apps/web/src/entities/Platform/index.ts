@@ -24,6 +24,7 @@ export {
 } from './api/PlatformApi';
 export { CapabilityMatrix } from './ui/CapabilityMatrix';
 export { TurnToolHintLine } from './ui/TurnToolHintLine';
+export { ContextSummarizedNote } from './ui/ContextSummarizedNote';
 export {
   turnToolHint,
   lastTurnFacts,

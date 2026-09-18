@@ -31,6 +31,7 @@ import {
   type ConfigPreviewFile,
 } from './config-preview/sandbox-diff.ts';
 import { previewExtraWrite, type ExtraPreviewRequest } from './config-preview/extra.ts';
+import { coded } from '../lib/server-text.ts';
 
 /**
  * Предпросмотр записи в конфигурацию Claude Code — для карточки агента панели.
@@ -129,7 +130,7 @@ function previewRule(
 ): Omit<ConfigPreviewResponse, 'fingerprint'> {
   const id = request.id;
   if (id !== undefined && !readRules(paths.claudeMd, state).some((rule) => rule.id === id)) {
-    throw failure(404, 'rule_not_found', 'Правило не найдено');
+    throw coded(failure(404, 'rule_not_found', 'Правило не найдено'), 'rule-not-found');
   }
 
   if (request.action === 'save') {
@@ -188,7 +189,12 @@ function previewSkill(
 
   if (request.action === 'delete') {
     const dir = places.find((place) => existsSync(place));
-    if (!dir) throw failure(404, 'skill_not_found', `Скилл «${id}» не найден`);
+    if (!dir)
+      throw coded(
+        failure(404, 'skill_not_found', `Скилл «${id}» не найден`),
+        'skill-not-found-quoted',
+        { id },
+      );
     const skillFile = join(dir, 'SKILL.md');
     // У удаления папки сериализатора нет: дифф — уходящий SKILL.md, остальные
     // файлы названы списком. Папка целиком уезжает в резервную копию.

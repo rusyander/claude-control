@@ -193,6 +193,13 @@ export interface SplitPlanGroupRecord {
    * кончилась; `failed` — копию завести не удалось или цепочка оборвалась ошибкой.
    */
   status: 'pending' | 'waiting' | 'held' | 'started' | 'done' | 'failed';
+  /**
+   * Человек отпустил группу, не дождавшись предшественников: их цепочки
+   * считаются пройденными. Хранится, а не решается на лету, потому что запуск
+   * может отложиться (дерево на паузе), а факт «отпущена руками» уезжает ей в
+   * заметки — без него агент считал бы, что работа предшественника уже легла.
+   */
+  released?: boolean;
   chatId?: string;
   path?: string;
   /** От какой ветки отведена копия (группа с `after`). */
@@ -219,6 +226,8 @@ export interface SplitPlanRecord {
   triage?: {
     at: string;
     received: boolean;
+    /** Разбор оборван перезапуском панели — группы стоят на вопросе, а не идут. */
+    interrupted?: boolean;
     repairs: string[];
     conflicts: { paths: string[]; resolvedBy: number; why: string }[];
   };

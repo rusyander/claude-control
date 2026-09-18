@@ -209,7 +209,12 @@ export function applyContour(
 
   for (const targetId of wanted) {
     if (!plan.targets.some((item) => item.targetId === targetId)) {
-      throw invalidField('targets', `панель не знает цели «${targetId}»`);
+      throw invalidField(
+        'targets',
+        `панель не знает цели «${targetId}»`,
+        'request-target-unknown',
+        { field: 'targets', targetId },
+      );
     }
   }
 

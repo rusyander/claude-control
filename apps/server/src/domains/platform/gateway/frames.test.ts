@@ -522,3 +522,63 @@ describe('пометка заявки без вызова', () => {
     expect(say("I didn't create the file: the path is not writable.", false)).toBe(false);
   });
 });
+/**
+ * Изъяны разбора — это то, чем карточка отвечает на «панель съела вызов». Два
+ * пути теряли их целиком, и оба найдены враждебным ревью Т13: ход, оборванный
+ * контуром, и ход, остановленный чужой меткой в аргументах.
+ */
+describe('изъяны разбора доезжают до следа и на оборванном, и на остановленном ходе', () => {
+  const FENCED_QUOTE = [
+    '```',
+    'Пример протокола: <tool_call>{"name": "Write", "arguments": {}}</tool_call>',
+    '```',
+    '',
+  ].join('\n');
+
+  function translator(aliases?: ReadonlyMap<string, string>): StreamTranslator {
+    return new StreamTranslator({
+      driver: enterprisePlatformDriver,
+      dialect: 'openai-compat',
+      model: 'gpt-x',
+      includeUsage: false,
+      shim: { allowed: new Set(['Write']), ...(aliases ? { aliases } : {}) },
+    });
+  }
+
+  const delta = (text: string): string =>
+    `{"choices":[{"index":0,"delta":{"content":${JSON.stringify(text)}}}]}`;
+
+  it('обрыв связи не стирает изъян, записанный до него', () => {
+    const t = translator();
+    // Цитата протокола в заборе — изъян записан разборщиком ещё в потоке.
+    // Ответ начат словами: с забора он был бы придержан до конца целиком, а
+    // конца здесь и не будет.
+    t.push(sse(delta('Покажу пример вызова.\n'), delta(FENCED_QUOTE), delta('Продолжаю…')));
+    // Контур умер на полуслове: клиент получит терминальную ошибку, а след —
+    // то, что уже было правдой. «Всё было чисто» здесь и есть ложь.
+    t.fail('socket hang up');
+
+    expect(t.facts.toolFlaws.join(' ')).toContain('внутри блока кода');
+  });
+
+  it('остановка чужой меткой не проглатывает изъяны своего же хода', () => {
+    const t = translator(new Map([['[ИМЯ_1]', 'Иванов']]));
+    // Ответ начинается с забора (разбор придержан до конца ответа), внутри —
+    // цитата протокола, а НАСТОЯЩИЙ вызов идёт следом тегом и несёт метку,
+    // которой панель не выдавала: ход останавливается в хвосте разбора.
+    t.push(
+      sse(
+        delta(FENCED_QUOTE),
+        delta(
+          'Теперь пишу: <tool_call>{"name": "Write", "arguments": {"file_path": "a.md", "content": "[ИМЯ_9]"}}</tool_call>',
+        ),
+        '[DONE]',
+      ),
+    );
+    const out = t.end();
+
+    // Остановка состоялась — вызов до клиента не доехал.
+    expect(out).not.toContain('tool_calls');
+    expect(t.facts.toolFlaws.join(' ')).toContain('внутри блока кода');
+  });
+});

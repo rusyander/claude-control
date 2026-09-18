@@ -214,6 +214,7 @@ export function registerPanelAgentRoutes(
         return reply.code(403).send({
           error: 'decision_not_allowed',
           message: 'Решение по карточке принимается только кликом в окне панели.',
+          messageCode: 'panel-card-click-only',
         });
       }
       const body = parseBody(decisionSchema, request.body, reply);
@@ -227,19 +228,24 @@ export function registerPanelAgentRoutes(
           error: 'preview_truncated',
           message:
             'Карточка показывает не всё, что будет выполнено, — одобрить её нельзя. Отклоните и попросите агента разбить действие на части.',
+          messageCode: 'panel-card-truncated',
         });
       }
 
       const verdict = deps.pending.decide(request.params.id, body.decision);
       if (verdict === 'not-found') {
-        return reply
-          .code(404)
-          .send({ error: 'not_found', message: 'Такой карточки нет — возможно, она уже снята.' });
+        return reply.code(404).send({
+          error: 'not_found',
+          message: 'Такой карточки нет — возможно, она уже снята.',
+          messageCode: 'panel-card-not-found',
+        });
       }
       if (verdict === 'already-decided') {
-        return reply
-          .code(409)
-          .send({ error: 'already_decided', message: 'По этой карточке уже принято решение.' });
+        return reply.code(409).send({
+          error: 'already_decided',
+          message: 'По этой карточке уже принято решение.',
+          messageCode: 'panel-card-decided',
+        });
       }
       return { ok: true };
     },

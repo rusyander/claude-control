@@ -1,6 +1,8 @@
 import type { EnvVar, EnvVarDraft, Group } from '@agentdeck/contracts';
 import { ENV_KEY_PATTERN, isSecretEnvKey } from '@agentdeck/contracts/env-secret';
 import { readTextFile, writeTextFile, readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
+import { coded } from '../lib/server-text.ts';
+import { serverText } from '../lib/server-texts.ts';
 
 /**
  * Переменные окружения живут в двух местах: settings.json → env (их видит сам
@@ -24,10 +26,8 @@ const FILE_NAMES: Record<WritableSource, string> = {
   secrets: '.mcp-secrets.env',
 };
 
-const BAD_KEY_MESSAGE =
-  'Имя переменной — латинские буквы, цифры и подчёркивание, не с цифры: MY_TOKEN, а не «my token».';
-const BAD_SOURCE_MESSAGE =
-  'Куда сохранить: settings, settings-local или secrets. Переменные групп правятся на странице групп.';
+const BAD_KEY_MESSAGE = serverText('env-name-invalid');
+const BAD_SOURCE_MESSAGE = serverText('env-source-invalid');
 
 function isWritableSource(source: unknown): source is WritableSource {
   return source === 'settings' || source === 'settings-local' || source === 'secrets';
@@ -43,21 +43,23 @@ function isWritableSource(source: unknown): source is WritableSource {
  */
 export function assertEnvDraft(draft: unknown): asserts draft is EnvVarDraft {
   if (!draft || typeof draft !== 'object') {
-    throw new InvalidEnvDraftError('Тело запроса пустое: нужны key, value и source.');
+    throw coded(
+      new InvalidEnvDraftError('Тело запроса пустое: нужны key, value и source.'),
+      'env-body-empty',
+    );
   }
   const { key, value, source, comment } = draft as Record<string, unknown>;
   if (typeof key !== 'string' || !ENV_KEY_PATTERN.test(key)) {
     throw new InvalidEnvDraftError(BAD_KEY_MESSAGE);
   }
-  if (typeof value !== 'string') throw new InvalidEnvDraftError('Значение переменной — строка.');
+  if (typeof value !== 'string')
+    throw coded(new InvalidEnvDraftError('Значение переменной — строка.'), 'env-value-string');
   if (!isWritableSource(source)) throw new InvalidEnvDraftError(BAD_SOURCE_MESSAGE);
   if (source === 'secrets' && /[\r\n]/.test(value)) {
-    throw new InvalidEnvDraftError(
-      'Значение для .mcp-secrets.env — одна строка: перевод строки стал бы отдельной переменной.',
-    );
+    throw new InvalidEnvDraftError(serverText('env-secret-single-line'));
   }
   if (comment !== undefined && typeof comment !== 'string') {
-    throw new InvalidEnvDraftError('Комментарий — строка.');
+    throw coded(new InvalidEnvDraftError('Комментарий — строка.'), 'env-comment-string');
   }
 }
 
@@ -74,7 +76,11 @@ function assertEnvRef(key: unknown, source: unknown): asserts source is Writable
 }
 
 const notFound = (key: string, source: WritableSource): EnvVarNotFoundError =>
-  new EnvVarNotFoundError(`Переменной ${key} нет в ${FILE_NAMES[source]}.`);
+  coded(
+    new EnvVarNotFoundError(`Переменной ${key} нет в ${FILE_NAMES[source]}.`),
+    'env-var-not-found',
+    { key, file: FILE_NAMES[source] },
+  );
 
 interface RawSettings {
   env?: Record<string, string>;
@@ -301,9 +307,7 @@ export function moveEnvVar(
   settingsLocalPath?: string,
 ): string | undefined {
   if (source !== 'settings' && source !== 'settings-local') {
-    throw new InvalidEnvDraftError(
-      'Переносить между файлами настроек можно только переменные settings.json / settings.local.json.',
-    );
+    throw new InvalidEnvDraftError(serverText('env-move-settings-only'));
   }
   assertEnvRef(key, source);
   if (!settingsLocalPath) throw new Error('Не задан путь к settings.local.json');
@@ -319,7 +323,7 @@ export function moveEnvVar(
   // (общее и личное), и молчаливая перезапись уносила бы одно из них без следа.
   if (readJsonFile<RawSettings>(targetPath, {}).env?.[key] !== undefined) {
     throw new EnvVarExistsError(
-      `В ${FILE_NAMES[targetSource]} уже есть ${key} — сначала удалите или переименуйте её там.`,
+      serverText('env-key-exists-there', { file: FILE_NAMES[targetSource], key }),
     );
   }
 

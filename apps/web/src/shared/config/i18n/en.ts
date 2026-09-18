@@ -442,6 +442,7 @@ export const en: TranslationSchema = {
         'no-model': 'The key catalog holds no model with image generation',
         'endpoint-no-url': 'The endpoint profile has no image generation address',
         'gateway-off': 'The panel gateway is off, and the contour request goes through it',
+        'gateway-failed': 'The panel gateway is on but did not come up',
         'endpoint-api-kind': 'This API kind has no separate images endpoint',
         'no-agent': 'Neither a raster route nor a conversation whose agent could be asked',
       },
@@ -451,6 +452,7 @@ export const en: TranslationSchema = {
         'no-model': 'no raster: the key catalog holds no image model',
         'endpoint-no-url': 'no raster: the endpoint profile has no generation address',
         'gateway-off': 'no raster: the panel gateway is off',
+        'gateway-failed': 'no raster: the panel gateway did not come up',
         'endpoint-api-kind': 'no raster: this API kind has no images endpoint',
         'no-agent': 'no raster: nothing to draw with',
       },
@@ -458,6 +460,7 @@ export const en: TranslationSchema = {
         'no-route': 'No agent conversation, no contour, no endpoint of your own',
         'no-model': 'The contour is active, but no model is named for the request',
         'gateway-off': 'The panel gateway is off, and the contour request goes through it',
+        'gateway-failed': 'The panel gateway is on but did not come up',
         'endpoint-api-kind': 'Only an OpenAI-kind endpoint can hold this conversation',
       },
       noPdf: {
@@ -500,6 +503,7 @@ export const en: TranslationSchema = {
           'no-model': 'the key catalog holds no model with image generation',
           'endpoint-no-url': 'the endpoint profile has no generation address',
           'gateway-off': 'the panel gateway is off',
+          'gateway-failed': 'the panel gateway did not come up',
           'endpoint-api-kind': 'this API kind has no images endpoint',
           'no-agent': 'nothing to draw with',
           'draw-failed': 'the drawing endpoint refused',
@@ -629,6 +633,7 @@ export const en: TranslationSchema = {
         triageRunning: 'triage in progress',
         triageApplied: 'triage applied',
         triageMissing: 'no triage received — the groups went as proposed',
+        triageInterrupted: 'triage interrupted by a restart — the groups await your answer',
         repairs: 'repaired by the panel: {{count}}',
         pending: 'waiting for the triage',
         waiting: 'waiting for: {{names}}',
@@ -641,6 +646,12 @@ export const en: TranslationSchema = {
         holdStarted: 'Answer accepted — “{{title}}” is starting',
         holdQueued: 'Answer accepted — the group starts once its predecessors finish',
         holdFailed: 'Answer not accepted: {{message}}',
+        release: 'Release',
+        releaseHint:
+          'Start now without waiting for the predecessors: the copy is still branched off the predecessor’s branch, and the task says that work is unfinished',
+        releaseStarted: 'Group released — “{{title}}” is starting',
+        releaseQueued: 'Group released, but it has not started yet — check its row',
+        releaseFailed: 'Release failed: {{message}}',
       },
       overlap: {
         idle: 'Branch overlap not checked',
@@ -772,7 +783,7 @@ export const en: TranslationSchema = {
     branchSwitched: 'Switched to branch {{branch}}',
     showFromHistory: 'Show from the history',
     detachedNotice:
-      'The panel restarted: this run was picked up without its output stream. The answer is read from the conversation, permission requests still work; no continuation or pipeline follows this run.',
+      'The panel restarted: this run was picked up without its output stream. The answer is read from the conversation, permission requests still work.',
     progress: {
       title: "The agent's plan",
       count: '{{done}} of {{total}} done',
@@ -962,6 +973,8 @@ export const en: TranslationSchema = {
         'The panel cannot pass these attachments: {{names}}. Message not sent. Allowed extensions: {{supported}}.',
       tooLarge:
         'The panel does not pass attachments over {{limit}}, so the file was not attached: {{names}}.',
+      copyNotReady:
+        'Message not sent: {{message}} Open this project’s git panel — under the copy it names what is missing, and the “Fill in” button is right there.',
       other: 'Message not sent: {{message}}',
     },
     kind: {
@@ -1928,7 +1941,7 @@ export const en: TranslationSchema = {
       access:
         'Which panel sections go through the selected contour — chat, groups, tests, assistant, foreign CLIs, terminal — and what gets written for that.',
       tools:
-        'Tool shim and the contour’s content checks. Shown while the contour is active and the panel gateway is up.',
+        'Tool shim, the contour’s content checks and the cases where the contour compressed history. Shown while the contour is active and the panel gateway is up.',
       agents: 'Platform agents of the active contour and the MCP bridge for CLI agents.',
     },
     tabEmpty: {
@@ -2197,6 +2210,7 @@ export const en: TranslationSchema = {
     notCheckedText:
       'The panel claims nothing about a contour it has not visited. Press “Check the connection” — the matrix fills with your contour’s answer to your key.',
     checkedAt: 'checked {{when}}',
+    checkedAtBackground: 'checked {{when}}, by the panel itself',
     lastOkAt: 'last successful check — {{when}}',
     justNow: 'just now',
     minutesAgo: '{{count}} min ago',
@@ -2392,6 +2406,32 @@ export const en: TranslationSchema = {
     toolShimSince:
       'Counted over the requests with tools the gateway still remembers, starting {{date}}: the ' +
       'trace is length-capped, and restarting the panel clears it entirely.',
+    summarizedAnswer:
+      'The contour compressed the history before this answer: the model saw a summary of the ' +
+      'start of the conversation, not the full text. What went into the summary the panel cannot ' +
+      'tell — the platform does the compressing.',
+    summarizedRun:
+      'While this answer was prepared, the contour compressed the history: the model saw a summary ' +
+      'of the start of the conversation, not the full text. What went into the summary the panel ' +
+      'cannot tell — the platform does the compressing.',
+    summarizedTitle: 'The contour compressed history',
+    summarizedText:
+      'A conversation longer than the model limit is shortened by the contour itself: its start is ' +
+      'replaced with a summary. The panel learns this from a frame in the stream and marks the ' +
+      'answer in the feed. The link is exact, never a guess by time: a Claude answer is found by the ' +
+      'message id the gateway issued, a foreign CLI answer by the run tag in the gateway address. ' +
+      'A request that came from outside the panel chats (a terminal, a CLI settings file) has ' +
+      'nowhere to be marked — it shows up only here.',
+    summarizedEmpty: 'The contour has not compressed any history through the gateway yet.',
+    summarizedTotal: 'cases in the log: {{total}}',
+    summarizedKept:
+      'The compression log keeps the last 500 cases on disk and survives a panel restart — the ' +
+      'mark in the feed does not vanish together with the request trace.',
+    summarizedLink: {
+      message: 'marked on a Claude chat answer',
+      run: 'marked on a foreign CLI chat answer',
+      none: 'not from a panel chat — nowhere to mark',
+    },
     modelTitle: 'Contour model · {{title}}',
     modelText:
       'What the contour answers with, and for whom. The default model goes into the CLI configs ' +
@@ -4935,6 +4975,7 @@ export const en: TranslationSchema = {
         testFailed: 'Case failed',
         permission: 'Agent asks for rights',
         question: 'Agent asked a question',
+        budget: 'Contour budget running out',
       },
       test: 'Send a test message',
       sent: 'Test message sent',
@@ -5091,6 +5132,31 @@ export const en: TranslationSchema = {
       mirrorSkipped_few: 'Skipped: {{count}} files',
       mirrorSkipped_many: 'Skipped: {{count}} files',
       mirrorSkipped_other: 'Skipped: {{count}} files',
+      mirrorLinked: 'Linked to the original: {{paths}}',
+      mirrorLinkedHint:
+        'Not a copy but the original directory itself: editing a skill or a hook in the original takes effect in every copy at once — including the one an agent is working in right now. The mirror writes no files there',
+      mirrorAccessOn:
+        'Access entry created ({{key}}): directory trust and the .mcp.json server lists were taken from the original — the agent will not ask about them again',
+      mirrorAccessOff:
+        'Access entry not created: {{reason}}. The agent in the copy will ask about directory trust and about .mcp.json servers',
+      mirrorGapsLeft: 'Still missing after the transfer: {{gaps}}',
+      mirrorBuilt:
+        'The build environment is never carried over and cannot be added to the list: {{paths}}. It holds the original’s absolute paths and binaries, so the copy builds it with the post-create command instead of receiving it ready-made',
+      copyStateTitle: 'Copy completeness',
+      copyReady: 'copy is complete',
+      copyNotReady: 'copy is incomplete',
+      copyReadyHint:
+        'The local layer is in place and shared directories are linked — the agent starts straight on the task.',
+      copyNotReadyHint:
+        'While a gap remains, no agent is let into the copy: the panel tries to fill it in before every start and refuses if that failed — in an incomplete copy the agent silently works with the wrong environment. “Fill in” re-mirrors the local layer and creates the access entry.',
+      copyRepair: 'Fill in',
+      copyGapFile: 'file {{path}} is missing',
+      copyGapLink:
+        'shared directory {{path}} is not linked (skills and hooks come as a link to the original)',
+      copyGapAccess: 'no access entry {{path}} in .claude.json',
+      copyAccessOk: 'access: the copy has an entry in .claude.json',
+      copyAccessMissing: 'access: the copy has no entry in .claude.json',
+      copyAccessUnknown: 'access: not checked — the original has no entry either',
       mirrorUnlisted: 'Left behind — git-ignored and not on the list:',
       mirrorUnlistedHint:
         'Needed in the copy — add it under “Copy settings”. node_modules, dist, build, coverage and *.log are never carried over',

@@ -1,4 +1,5 @@
 import { object, string, boolean, array, enum as zodEnum, type infer as Infer } from 'zod';
+import type { CodedMessage } from './server-messages.ts';
 
 /**
  * Свой эндпоинт — адрес, по которому CLI ходит в модель вместо облака вендора:
@@ -132,7 +133,7 @@ export interface EndpointsInfo {
 }
 
 /** Результат проверки связи с эндпоинтом. */
-export interface EndpointProbeResult {
+export interface EndpointProbeResult extends CodedMessage {
   ok: boolean;
   /** Адрес, по которому стучались. Токена в нём НЕТ никогда. */
   url: string;

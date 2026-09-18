@@ -11,8 +11,10 @@ import type { PricingLookup } from '../../analytics/pricing.ts';
 import { driverOf } from '../drivers/index.ts';
 import { nativeMessagesPath } from './anthropic-native.ts';
 import { GATEWAY_ROUTES, handleGatewayRequest } from './pipeline.ts';
-import { SpendFlusher } from './spend-flush.ts';
+import { SpendFlusher, type BudgetCrossingNotice } from './spend-flush.ts';
+import { summarizedReport } from './summarized-ledger.ts';
 import { GatewayJournal } from './usage.ts';
+import { localizeText, serverText } from '../../../lib/server-texts.ts';
 
 /**
  * Слушатель шлюза: один порт на все контуры, различаемые первым сегментом
@@ -95,6 +97,27 @@ export class PlatformGateway {
    * слушатель, продолжавший держать порт.
    */
   #queue: Promise<void> = Promise.resolve();
+  /**
+   * Куда сказать о перейденном пороге бюджета. Ставится снаружи, как нотификатор
+   * реестра прогонов, и ПЕРЕЖИВАЕТ перезапуск шлюза: подписка — свойство панели,
+   * а не конкретного слушателя, и терять её на смене порта было бы нечестно.
+   */
+  #notifyBudget?: (notice: BudgetCrossingNotice) => void;
+
+  setBudgetNotifier(notify: (notice: BudgetCrossingNotice) => void): void {
+    this.#notifyBudget = notify;
+  }
+
+  /**
+   * Кому сказать, что контур отказал по правам (401/403) — A-2. Той же
+   * расстановкой и по той же причине: фоновая перепроверка живёт в домене, а
+   * слушатель знает только про запросы.
+   */
+  #onRightsRefusal?: (platformId: string) => void;
+
+  setRightsRefusalNotifier(notify: (platformId: string) => void): void {
+    this.#onRightsRefusal = notify;
+  }
 
   #enqueue(task: () => Promise<void>): Promise<void> {
     const next = this.#queue.then(task, task);
@@ -150,6 +173,11 @@ export class PlatformGateway {
       // смотрит, а выключение обязано возвращать раздел к прежнему виду.
       violations: violationReport(this.#journal.events(), { platformIds: this.#enabledIds() }),
       toolShim: toolShimReport(this.#journal.events(), { platformIds: this.#enabledIds() }),
+      // Сжатия — с диска, а не из журнала запросов: карточка и подписи в ленте
+      // обязаны пережить перезапуск панели. Шлюз ни разу не поднимали — сводка пуста.
+      summarized: this.#runtime
+        ? summarizedReport(this.#runtime.appDataDir)
+        : { total: 0, recent: [] },
       compromises: this.#compromises(),
     };
   }
@@ -170,6 +198,9 @@ export class PlatformGateway {
       store: runtime.store,
       ...(runtime.pricing ? { lookup: runtime.pricing } : {}),
       ...(runtime.spendFlushMs === undefined ? {} : { flushMs: runtime.spendFlushMs }),
+      // Через замыкание, а не значением: подписку ставят один раз при сборке
+      // приложения, а слушатель пересоздаётся на каждой смене порта.
+      notifyBudget: (notice) => this.#notifyBudget?.(notice),
     });
 
     const server = createServer((request, response) => {
@@ -178,6 +209,7 @@ export class PlatformGateway {
         appDataDir: runtime.appDataDir,
         journal: this.#journal,
         spend: this.#spend,
+        onRightsRefusal: (platformId) => this.#onRightsRefusal?.(platformId),
         fetchImpl: runtime.fetchImpl,
         ...(runtime.now ? { now: runtime.now } : {}),
       }).catch(() => {
@@ -192,7 +224,14 @@ export class PlatformGateway {
         }
         response.writeHead(502, { 'content-type': 'application/json' });
         response.end(
-          JSON.stringify({ error: { message: 'AgentDeck: шлюз не смог обработать запрос' } }),
+          JSON.stringify({
+            error: {
+              message: localizeText(
+                serverText('gateway-failed'),
+                runtime.store.getSettings().language,
+              ),
+            },
+          }),
         );
       });
     });
@@ -318,7 +357,11 @@ async function listen(server: Server, port: number): Promise<number> {
   }
 
   throw new Error(
-    `порты ${port}–${port + PORT_ATTEMPTS - 1} заняты: ${lastError?.message ?? 'причина неизвестна'}`,
+    serverText('gateway-ports-busy', {
+      from: port,
+      to: port + PORT_ATTEMPTS - 1,
+      reason: lastError?.message ?? serverText('gateway-ports-busy-unknown'),
+    }),
   );
 }
 

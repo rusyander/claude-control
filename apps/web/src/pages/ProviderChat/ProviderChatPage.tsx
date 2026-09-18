@@ -7,6 +7,7 @@ import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
+import { toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
 import { FolderPicker } from '@features/FolderPicker';
 import { useProviderRunner } from '@entities/ProviderKeys';
@@ -40,6 +41,7 @@ import { ProviderChatHeader } from './ProviderChatHeader';
 import { ProviderChatMessages } from './ProviderChatMessages';
 import { ProviderChatComposer } from './ProviderChatComposer';
 import { collectForeignStages } from './lib/foreignStages';
+import { useForeignRelease } from './model/useForeignRelease';
 import { useForeignReviews } from './model/useForeignReviews';
 import styles from './ProviderChatPage.module.scss';
 
@@ -268,7 +270,7 @@ export function ProviderChatPage() {
   const treeFailed = (error: unknown): void => {
     toast.error(
       t('chat.cascade.tree.failed', {
-        message: error instanceof Error ? error.message : String(error),
+        message: toErrorMessage(error),
       }),
     );
   };
@@ -277,6 +279,13 @@ export function ProviderChatPage() {
    * `model/useForeignReviews` — здесь остаётся то, чем страница СОБИРАЕТСЯ, а не
    * то, как она решает; правило «родителю все, группе своё» одно на оба чата.
    */
+  // «Отпустить» ждущую группу (Т3) — своим модулем рядом с карточками ревью:
+  // страница собирает ленту, а переписку с сервером ведут они.
+  const release = useForeignRelease({
+    ...(treeKey ? { treeKey } : {}),
+    settle: settleTree,
+  });
+
   const reviews = useForeignReviews({
     ...(tree.data ? { tree: tree.data } : {}),
     ...(treeKey ? { treeKey } : {}),
@@ -320,7 +329,7 @@ export function ProviderChatPage() {
         onError: (error) =>
           toast.error(
             t('chat.cascade.hub.holdFailed', {
-              message: error instanceof Error ? error.message : String(error),
+              message: toErrorMessage(error),
             }),
           ),
       },
@@ -345,7 +354,7 @@ export function ProviderChatPage() {
       onError: (error) =>
         toast.error(
           t('chat.cascade.overlap.failed', {
-            message: error instanceof Error ? error.message : String(error),
+            message: toErrorMessage(error),
           }),
         ),
     });
@@ -437,6 +446,8 @@ export function ProviderChatPage() {
             treeBusy={pause.isPending || resume.isPending}
             onAnswerHold={answerHold}
             holdBusy={hold.isPending}
+            onRelease={release.release}
+            releaseBusy={release.busy}
             onCheckOverlap={checkOverlap}
             overlapBusy={overlap.isPending}
             reviews={reviews.items}

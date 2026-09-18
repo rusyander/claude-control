@@ -35,7 +35,7 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
     typeof value === 'string' && value.trim() ? value : undefined;
 
   const noFile = (reply: FastifyReply): FastifyReply =>
-    reply.code(400).send({ message: 'Не указан файл' });
+    reply.code(400).send({ message: 'Не указан файл', messageCode: 'resource-file-unspecified' });
 
   // Заготовки структуры: начинать с пустого файла тяжело, а форма скилла
   // с модулями повторяется от скилла к скиллу.
@@ -55,7 +55,10 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
     (request, reply) => {
       const kind = kindOf(request.params);
       const template = templateById(request.body.templateId);
-      if (!kind || !template) return reply.code(404).send({ message: 'Шаблон не найден' });
+      if (!kind || !template)
+        return reply
+          .code(404)
+          .send({ message: 'Шаблон не найден', messageCode: 'resource-template-not-found' });
 
       try {
         // Существующие файлы не трогаем: SKILL.md уже создан формой с введённым
@@ -93,7 +96,10 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
     { bodyLimit: 4 * 1024 * 1024 },
     async (request, reply) => {
       const kind = kindOf(request.params);
-      if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
+      if (!kind)
+        return reply
+          .code(404)
+          .send({ message: 'Неизвестный вид ресурса', messageCode: 'resource-kind-unknown' });
 
       const result = await assistStructure(
         kind,
@@ -130,7 +136,10 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
 
   app.get<{ Params: Params }>('/api/resources/:kind/:id/files', (request, reply) => {
     const kind = kindOf(request.params);
-    if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
+    if (!kind)
+      return reply
+        .code(404)
+        .send({ message: 'Неизвестный вид ресурса', messageCode: 'resource-kind-unknown' });
 
     return {
       files: listResourceFiles(kind, request.params.id, ctx.location),
@@ -143,7 +152,10 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
     '/api/resources/:kind/:id/file',
     (request, reply) => {
       const kind = kindOf(request.params);
-      if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
+      if (!kind)
+        return reply
+          .code(404)
+          .send({ message: 'Неизвестный вид ресурса', messageCode: 'resource-kind-unknown' });
 
       const file = fileOf(request.query.file);
       if (!file) return noFile(reply);
@@ -159,7 +171,10 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
     '/api/resources/:kind/:id/file',
     (request, reply) => {
       const kind = kindOf(request.params);
-      if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
+      if (!kind)
+        return reply
+          .code(404)
+          .send({ message: 'Неизвестный вид ресурса', messageCode: 'resource-kind-unknown' });
 
       const file = fileOf(request.body?.file);
       if (!file) return noFile(reply);
@@ -186,7 +201,10 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
     '/api/resources/:kind/:id/file',
     (request, reply) => {
       const kind = kindOf(request.params);
-      if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
+      if (!kind)
+        return reply
+          .code(404)
+          .send({ message: 'Неизвестный вид ресурса', messageCode: 'resource-kind-unknown' });
 
       const file = fileOf(request.query.file);
       if (!file) return noFile(reply);
@@ -210,7 +228,10 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
     '/api/resources/:kind/:id/move',
     (request, reply) => {
       const kind = kindOf(request.params);
-      if (!kind) return reply.code(404).send({ message: 'Неизвестный вид ресурса' });
+      if (!kind)
+        return reply
+          .code(404)
+          .send({ message: 'Неизвестный вид ресурса', messageCode: 'resource-kind-unknown' });
 
       try {
         moveResourceFile(kind, request.params.id, request.body.from, request.body.to, ctx.location);

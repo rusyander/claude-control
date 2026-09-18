@@ -6,6 +6,7 @@ import { Typography } from '@shared/ui/typography';
 import { Badge } from '@shared/ui/badge';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
 import { formatDate } from '@shared/lib/format';
+import { serverFieldText } from '@shared/config/i18n';
 import { shimEmptyKind } from './lib/toolShimView';
 
 interface ToolShimCardProps {
@@ -82,7 +83,7 @@ export function ToolShimCard({ report }: ToolShimCardProps) {
             wrap
           >
             <Typography variant="body-sm" color="muted" as="span">
-              {flaw.reason}
+              {serverFieldText(flaw, 'reason')}
             </Typography>
             <Typography variant="caption" color="muted" as="span">
               {t('platform.toolShimFlaw', { count: flaw.count })}

@@ -15,6 +15,7 @@ import { gitContext } from './impact.ts';
 import { findElements, textContent } from './import-xml.ts';
 import { writeRun } from './runs-store.ts';
 import { applyResults, readGroups, type CaseResultPatch } from './store.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Результаты автотестов из CI — в статусы кейсов.
@@ -440,7 +441,11 @@ function parseByFormat(
   if (format === 'junit') return sources.flatMap((source) => parseJUnit(source));
   if (format === 'playwright') return sources.flatMap((source) => parsePlaywrightJson(source));
   if (format === 'allure') return parseAllure(sources);
-  throw new ProjectTestsError(`Неизвестный формат результатов: ${String(format)}.`);
+  throw coded(
+    new ProjectTestsError(`Неизвестный формат результатов: ${String(format)}.`),
+    'import-results-format-unknown',
+    { format: String(format) },
+  );
 }
 
 /** Содержимое отчёта: из тела запроса или из файла (каталога) внутри проекта. */
@@ -448,7 +453,10 @@ function readSources(root: string, input: ImportResultsInput): string[] {
   if (typeof input.content === 'string' && input.content.trim()) return [input.content];
   const file = input.file?.trim();
   if (!file) {
-    throw new ProjectTestsError('Нечего импортировать: нет ни содержимого, ни пути к файлу.');
+    throw coded(
+      new ProjectTestsError('Нечего импортировать: нет ни содержимого, ни пути к файлу.'),
+      'import-results-nothing',
+    );
   }
 
   let path: string;
@@ -458,12 +466,21 @@ function readSources(root: string, input: ImportResultsInput): string[] {
     if (error instanceof ProjectFileError) throw new ProjectTestsError(error.message);
     throw error;
   }
-  if (!existsSync(path)) throw new ProjectTestsError(`Файл результатов не найден: ${file}`);
+  if (!existsSync(path))
+    throw coded(
+      new ProjectTestsError(`Файл результатов не найден: ${file}`),
+      'import-results-file-missing',
+      { file },
+    );
 
   if (statSync(path).isDirectory()) {
     const names = readdirSync(path).filter((name) => name.endsWith('-result.json'));
     if (names.length === 0) {
-      throw new ProjectTestsError(`В каталоге «${file}» нет файлов *-result.json.`);
+      throw coded(
+        new ProjectTestsError(`В каталоге «${file}» нет файлов *-result.json.`),
+        'import-results-dir-empty',
+        { file },
+      );
     }
     return names.map((name) => readFileSync(join(path, name), 'utf8'));
   }
@@ -555,6 +572,10 @@ function safeJson(content: string): unknown {
   try {
     return JSON.parse(content) as unknown;
   } catch (error) {
-    throw new ProjectTestsError(`Файл результатов не разобрался: ${(error as Error).message}`);
+    throw coded(
+      new ProjectTestsError(`Файл результатов не разобрался: ${(error as Error).message}`),
+      'import-results-unparsed',
+      { reason: (error as Error).message },
+    );
   }
 }

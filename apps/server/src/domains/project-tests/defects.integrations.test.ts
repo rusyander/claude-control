@@ -103,9 +103,9 @@ describe('project-tests/defects: назначения по токену', () => 
     connectJira();
     expect(availableTargets(deps())).not.toContain('jira');
 
-    writeLink(store, project(), undefined, { jiraProjectKey: 'GOR' });
+    writeLink(store, project(), undefined, { jiraProjectKey: 'PRJ' });
     expect(availableTargets(deps())).toContain('jira');
-    expect(buildDraft(CASE, { groupId: 'gui', deps: deps() }).hint).toContain('Jira GOR');
+    expect(buildDraft(CASE, { groupId: 'gui', deps: deps() }).hint).toContain('Jira PRJ');
   });
 
   it('фордж по токену не требует привязки — репозиторий у него в настройке', () => {
@@ -129,7 +129,7 @@ describe('project-tests/defects: назначения по токену', () => 
   it('Jira идёт первой: команда с трекером ждёт дефект именно там', () => {
     connectJira();
     connectForge();
-    writeLink(store, project(), undefined, { jiraProjectKey: 'GOR' });
+    writeLink(store, project(), undefined, { jiraProjectKey: 'PRJ' });
     const targets = availableTargets(deps());
     expect(targets.indexOf('jira')).toBeLessThan(targets.indexOf('forge'));
   });
@@ -138,7 +138,7 @@ describe('project-tests/defects: назначения по токену', () => 
 describe('project-tests/defects: заведение по токену', () => {
   it('Jira: проект берётся из привязки, ссылка возвращается наружу', async () => {
     connectJira();
-    writeLink(store, project(), undefined, { jiraProjectKey: 'GOR' });
+    writeLink(store, project(), undefined, { jiraProjectKey: 'PRJ' });
     const { calls } = stubApi([
       [/rest\/api\/3\/issue$/, { body: { key: 'PRJ-5' } }],
       [/issue\/PRJ-5/, { body: { key: 'PRJ-5', fields: { summary: 'Дефект' } } }],
@@ -150,7 +150,7 @@ describe('project-tests/defects: заведение по токену', () => {
     const body = JSON.parse(String(calls[0]!.init.body)) as {
       fields: { project: { key: string } };
     };
-    expect(body.fields.project.key).toBe('GOR');
+    expect(body.fields.project.key).toBe('PRJ');
   });
 
   it('Jira без привязки — отказ, а не дефект в чужом проекте', async () => {

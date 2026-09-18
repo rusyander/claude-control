@@ -44,13 +44,18 @@ export function registerBackupRoutes(app: FastifyInstance, ctx: ServerContext): 
     (request, reply) => {
       const passphrase = request.body.passphrase ?? '';
       if (passphrase.length < 8) {
-        return reply.code(400).send({ error: 'Парольная фраза должна быть не короче 8 символов' });
+        return reply.code(400).send({
+          error: 'Парольная фраза должна быть не короче 8 символов',
+          messageCode: 'backup-passphrase-short',
+        });
       }
 
       const verifier = ctx.store.getSecretBackupVerifier();
       if (verifier) {
         if (!verifyPassphrase(passphrase, verifier)) {
-          return reply.code(400).send({ error: 'Неверная парольная фраза' });
+          return reply
+            .code(400)
+            .send({ error: 'Неверная парольная фраза', messageCode: 'backup-passphrase-wrong' });
         }
       } else {
         ctx.store.setSecretBackupVerifier(makeVerifier(passphrase));
@@ -97,7 +102,10 @@ export function registerBackupRoutes(app: FastifyInstance, ctx: ServerContext): 
   app.delete<{ Params: { name: string } }>('/api/backups/:name', (request, reply) => {
     // То же самое, что и в откате: имя уже раскодировано маршрутизатором.
     const removed = deleteBackup(ctx.store.backupDir, request.params.name);
-    if (!removed) return reply.code(404).send({ error: 'Копия не найдена' });
+    if (!removed)
+      return reply
+        .code(404)
+        .send({ error: 'Копия не найдена', messageCode: 'backup-copy-not-found' });
 
     return { ok: true };
   });

@@ -40,7 +40,7 @@
  */
 
 export { CHANGED_FILES_MAX, COMMIT_MESSAGE_MAX } from './project-git/constants.ts';
-export { GitError, stripGitProgress } from './project-git/exec.ts';
+export { GitError, stripGitProgress, type GitOutput } from './project-git/exec.ts';
 export { describeMirror } from './project-git/mirror-local.ts';
 export { LOCKFILES, parseChurn, revertLockfileChurn } from './project-git/lockfiles.ts';
 export {

@@ -23,6 +23,7 @@ import {
 } from './files.ts';
 import { selectCases } from './store.ts';
 import { defaultEnvironment } from './library.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Тест-планы и разворачивание их в тест-поинты.
@@ -98,13 +99,17 @@ export function savePlan(
   now: string,
 ): ProjectTestPlan {
   const title = input.title?.trim();
-  if (!title) throw new ProjectTestsError('У плана должно быть название.');
+  if (!title)
+    throw coded(new ProjectTestsError('У плана должно быть название.'), 'plan-title-missing');
 
   const all = readPlans(root);
   const id = input.id ? assertId(input.id, 'Идентификатор плана') : nextPlanId(all, title);
   const existing = all.find((item) => item.id === id);
   if (existing?.locked && input.locked !== false) {
-    throw new ProjectTestsError('План закрыт для правок. Снимите замок, чтобы менять состав.');
+    throw coded(
+      new ProjectTestsError('План закрыт для правок. Снимите замок, чтобы менять состав.'),
+      'plan-locked',
+    );
   }
 
   const next: ProjectTestPlan = {
@@ -131,7 +136,10 @@ export function savePlan(
 /** Удалить план. История прогонов по нему остаётся. */
 export function removePlan(root: string, id: string): void {
   const path = testsPath(root, `${PLANS_DIR}/${assertId(id, 'Идентификатор плана')}${SUFFIX}`);
-  if (!existsSync(path)) throw new ProjectTestsNotFoundError(`Плана «${id}» в проекте нет.`);
+  if (!existsSync(path))
+    throw coded(new ProjectTestsNotFoundError(`Плана «${id}» в проекте нет.`), 'plan-not-found', {
+      id,
+    });
   rmSync(path, { force: true });
 }
 

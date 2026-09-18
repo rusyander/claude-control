@@ -8,6 +8,7 @@ import { contourHeaders, contourUrl } from './transport.ts';
 import { catalogItems, type PlatformDriver } from './drivers/driver.ts';
 import { bridgeUpstreamStatus } from './gateway/status.ts';
 import { retryAfterSeconds } from './gateway/upstream.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Проба контура: панель спрашивает у него СПИСОК МОДЕЛЕЙ.
@@ -46,7 +47,9 @@ export interface ProbeOptions {
  */
 function notApiDetail(driver: PlatformDriver, url: string, status: number, hint: string): string {
   const address = driver.addressHint?.(url);
-  return `Адрес ответил ${status}, но это не список моделей: ${hint}.${address ? ` ${address}` : ''}`;
+  return address
+    ? serverText('contour-probe-not-api-address', { status, hint, address })
+    : serverText('contour-probe-not-api', { status, hint });
 }
 
 /** Пустой каркас ответа: у неудачной пробы всё, кроме исхода и причины, пусто. */
@@ -84,7 +87,7 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
     return {
       ...base,
       outcome: 'unreachable',
-      detail: 'Адрес контура должен быть корректным http(s)-адресом.',
+      detail: serverText('contour-probe-bad-url'),
     };
   }
 
@@ -113,7 +116,7 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
       reachable: true,
       status,
       outcome: 'no-key',
-      detail: `Адрес отвечает как API контура и без ключа отказал (${status}) — так и должно быть: ключ ещё не введён. Введите его на следующем шаге.`,
+      detail: serverText('contour-probe-no-key', { status }),
     };
   }
 
@@ -134,8 +137,10 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
             // человека с кончившимся бюджетом чинить не то), у произвольного
             // шлюза панель их не знает и не выдумывает — оба случая уже решены
             // одним переводом.
-            `${bridgeUpstreamStatus(401, {}, { driverRows: driver.statusRows }).message} (401).`
-          : 'Ключу не разрешено то, что запросила панель (403). Проверьте права ключа.',
+            serverText('contour-probe-unauthorized', {
+              message: bridgeUpstreamStatus(401, {}, { driverRows: driver.statusRows }).message,
+            })
+          : serverText('contour-probe-forbidden'),
     };
   }
 
@@ -156,7 +161,7 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
       reachable: true,
       status,
       outcome: 'not-ready',
-      detail: `${bridged.message} (${status}). Повторите проверку.`,
+      detail: serverText('contour-probe-not-ready', { message: bridged.message, status }),
     };
   }
 
@@ -166,7 +171,7 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
       reachable: true,
       status,
       outcome: 'not-ready',
-      detail: `Контур ответил ошибкой ${status}. Это его сторона — повторите позже.`,
+      detail: serverText('contour-probe-server-error', { status }),
     };
   }
 
@@ -180,7 +185,7 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
         driver,
         url,
         status,
-        tail(text, token) || 'список моделей по этому пути не найден',
+        tail(text, token) || serverText('contour-probe-no-catalog-path'),
       ),
     };
   }
@@ -193,7 +198,7 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
       reachable: true,
       status,
       outcome: 'not-api',
-      detail: notApiDetail(driver, url, status, 'вернулась HTML-страница, а не JSON'),
+      detail: notApiDetail(driver, url, status, serverText('contour-probe-html')),
     };
   }
 
@@ -206,7 +211,7 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
       reachable: true,
       status,
       outcome: 'not-api',
-      detail: notApiDetail(driver, url, status, 'ответ не разбирается как JSON'),
+      detail: notApiDetail(driver, url, status, serverText('contour-probe-not-json')),
     };
   }
 
@@ -216,12 +221,7 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
       reachable: true,
       status,
       outcome: 'not-api',
-      detail: notApiDetail(
-        driver,
-        url,
-        status,
-        'в ответе нет списка моделей (ни поля data, ни массива)',
-      ),
+      detail: notApiDetail(driver, url, status, serverText('contour-probe-no-models-field')),
     };
   }
 
@@ -236,7 +236,7 @@ export async function probePlatform(options: ProbeOptions): Promise<PlatformProb
     reachable: true,
     url,
     status,
-    detail: `Контур ответил: моделей ${reading.models.length}.`,
+    detail: serverText('contour-probe-ok', { count: reading.models.length }),
     models: reading.models,
     capabilities: reading.capabilities,
     limits: reading.limits,
@@ -268,7 +268,7 @@ async function readBody(response: Response): Promise<string> {
 function describeNetworkFailure(error: unknown, token: string | undefined): string {
   const name = error instanceof Error ? error.name : '';
   if (name === 'TimeoutError' || name === 'AbortError') {
-    return `Контур не ответил за ${PROBE_TIMEOUT_MS / 1_000} с.`;
+    return serverText('contour-probe-timeout', { seconds: PROBE_TIMEOUT_MS / 1_000 });
   }
   // Текст ошибки транспорта тоже чужой: прокси и шлюзы кладут в него заголовки
   // запроса целиком, вместе с `Authorization`.
@@ -276,11 +276,11 @@ function describeNetworkFailure(error: unknown, token: string | undefined): stri
   // Свой корневой сертификат компании — законная настройка, и подсказать про
   // неё надо ровно там, где узел доверия и ломается.
   if (/self.signed|unable to verify|CERT_/i.test(reason)) {
-    return `Сертификат контура не проверился: ${reason}. Укажите корневой сертификат компании в настройках контура.`;
+    return serverText('gateway-cert-failed', { reason });
   }
   // Запрос с таким ключом не ушёл вовсе — это не свойство контура, и назвать
   // его надо ключом, иначе человек пойдёт чинить сеть.
   const badKey = headerUnsafeKeyReason(reason);
   if (badKey) return `${badKey}.`;
-  return `Нет связи с контуром: ${reason}.`;
+  return serverText('gateway-no-connection', { reason });
 }

@@ -244,7 +244,9 @@ export const endpointsEn: typeof endpointsRu = {
       'the address points at the panel’s local gateway, and the owning contour is named ' +
       'above it. Such a profile cannot be deleted by hand, and editing its fields takes the ' +
       'CLI past the contour; its only button is “Back to the default provider”, the same ' +
-      'action as on the contour card.',
+      'action as on the contour card. One exception: the contour is gone and the profile ' +
+      'stayed — the panel says so, and the ordinary delete button comes back: there is ' +
+      'nothing left to return.',
 
     storageProfiles: 'Profiles',
     storageProfilesValue: 'agentdeck/state.json → endpointProfiles (address, API kind, model)',
@@ -272,7 +274,7 @@ export const endpointsEn: typeof endpointsRu = {
     refusalsCaption: 'Exactly what the panel shows, and what to do about it.',
     refusalsColumn: 'What is shown',
     refusalsMeaningColumn: 'Reason and way out',
-    refusalUrl: '“The address must be a valid http(s) address”',
+    refusalUrl: '“The endpoint address must be a valid http(s) address”',
     refusalUrlText:
       'This is what “Check connection” answers when the address does not parse as http ' +
       'or https. “Apply” with such an address is refused too, but only shows “Could not ' +

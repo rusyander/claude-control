@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MediaImage, MediaImagePlan } from '@agentdeck/contracts';
+import { mediaImageBlockers } from '@agentdeck/contracts/media';
+import { en } from '../../shared/config/i18n/en';
 import { ru } from '../../shared/config/i18n/ru';
 import {
   formatBytes,
@@ -38,6 +40,20 @@ describe('imageModeView', () => {
     expect(imageModeView(undefined, words)).toEqual({ available: false, byAgent: false });
   });
 
+  // Причины заводит сервер, и новая доезжает до телефона только словарём: пока
+  // `gateway-failed` в нём не было, подпись у запертого пункта просто не
+  // находилась — экран молчал о том, чего человеку ждать. Поэтому проверяется
+  // ВЕСЬ список кодов, а не тот, что вспомнили.
+  it('переводит каждую причину сервера — и запертый пункт, и отсутствие растра', () => {
+    for (const language of [ru, en]) {
+      const words = language.composer.mode;
+      for (const reason of mediaImageBlockers) {
+        expect(words.blocked[reason], `blocked.${reason}`).toBeTruthy();
+        expect(words.noRaster[reason], `noRaster.${reason}`).toBeTruthy();
+      }
+    }
+  });
+
   it('называет причину сервера словами, а без кода — общим «рисовать нечем»', () => {
     const blocked = { ...raster, available: false, reason: 'gateway-off' as const };
     expect(imageModeView(blocked, words)).toEqual({
@@ -47,6 +63,26 @@ describe('imageModeView', () => {
     });
     const { reason: _reason, ...noCode } = blocked;
     expect(imageModeView(noCode, words).reasonText).toBe('Рисовать нечем');
+  });
+
+  it('дописывает отказ слушателя к нашей причине — и запертым пунктом, и без растра', () => {
+    // Ревью Т13: панель дописывает `reasonDetail` (`withDetail`), телефон терял
+    // его целиком. «Шлюз панели не поднялся» без слова о том, ЧЕМ именно, не
+    // даёт человеку ни одного следующего шага.
+    const blocked = {
+      ...raster,
+      available: false,
+      reason: 'gateway-failed' as const,
+      reasonDetail: 'порт 5199 занят',
+    };
+    expect(imageModeView(blocked, words).reasonText).toContain('порт 5199 занят');
+
+    const noRaster = {
+      ...raster,
+      rasterReason: 'gateway-failed' as const,
+      reasonDetail: 'порт 5199 занят',
+    };
+    expect(imageModeView(noRaster, words).sourceText).toContain('порт 5199 занят');
   });
 
   it('на растровой дороге говорит кто, какой моделью и что промпт не уезжает', () => {

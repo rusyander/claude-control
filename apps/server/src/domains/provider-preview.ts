@@ -27,6 +27,7 @@ import {
   parseProviderInstructionsDraft,
   saveProviderInstructionsEntries,
 } from './provider-instructions.ts';
+import { coded } from '../lib/server-text.ts';
 
 /**
  * Предпросмотр записи в чужой конфиг (IDEA-10).
@@ -134,7 +135,11 @@ function previewMcp(
   request: ProviderPreviewRequest,
 ): ProviderPreviewResponse {
   const target = resolveProviderMcpTarget(store);
-  if (!target) throw new SectionUnsupportedError('У активного провайдера нет раздела MCP.');
+  if (!target)
+    throw coded(
+      new SectionUnsupportedError('У активного провайдера нет раздела MCP.'),
+      'preview-no-mcp',
+    );
 
   const meta = {
     providerId: target.provider.id,
@@ -144,7 +149,11 @@ function previewMcp(
 
   if (request.action === 'delete') {
     const serverId = typeof request.serverId === 'string' ? request.serverId : '';
-    if (!serverId) throw new InvalidDraftError('Не указан сервер для удаления.');
+    if (!serverId)
+      throw coded(
+        new InvalidDraftError('Не указан сервер для удаления.'),
+        'preview-server-unspecified',
+      );
     return runPreview(meta, (path) =>
       deleteProviderMcpServer(
         { ...target, filePath: path, backupName: undefined },
@@ -155,7 +164,11 @@ function previewMcp(
   }
 
   const draft = parseUniversalDraft(request.draft);
-  if (!draft) throw new InvalidDraftError('Черновик сервера не прошёл проверку.');
+  if (!draft)
+    throw coded(
+      new InvalidDraftError('Черновик сервера не прошёл проверку.'),
+      'preview-server-draft-invalid',
+    );
 
   const serverId =
     typeof request.serverId === 'string' && request.serverId ? request.serverId : null;
@@ -174,12 +187,20 @@ function previewPermissions(
   request: ProviderPreviewRequest,
 ): ProviderPreviewResponse {
   const target = resolveProviderPermissionsTarget(store);
-  if (!target) throw new SectionUnsupportedError('У активного провайдера нет раздела прав.');
+  if (!target)
+    throw coded(
+      new SectionUnsupportedError('У активного провайдера нет раздела прав.'),
+      'preview-no-permissions',
+    );
 
   // Форму черновика задаёт ФАЙЛ провайдера, а не клиент, — ровно как на записи:
   // так подложить codex-черновик в gemini-файл нельзя и в предпросмотре.
   const draft = parseProviderPermissionsDraft(request.draft, target.format);
-  if (!draft) throw new InvalidDraftError('Черновик прав не прошёл проверку.');
+  if (!draft)
+    throw coded(
+      new InvalidDraftError('Черновик прав не прошёл проверку.'),
+      'preview-permissions-draft-invalid',
+    );
 
   return runPreview(
     {
@@ -202,10 +223,17 @@ function previewEnv(
 ): ProviderPreviewResponse {
   const target = resolveProviderEnvTarget(store);
   if (!target)
-    throw new SectionUnsupportedError('У активного провайдера нет раздела переменных окружения.');
+    throw coded(
+      new SectionUnsupportedError('У активного провайдера нет раздела переменных окружения.'),
+      'preview-no-env',
+    );
 
   const vars = parseProviderEnvDraft(request.draft);
-  if (!vars) throw new InvalidDraftError('Черновик переменных не прошёл проверку.');
+  if (!vars)
+    throw coded(
+      new InvalidDraftError('Черновик переменных не прошёл проверку.'),
+      'preview-env-draft-invalid',
+    );
 
   return runPreview(
     {
@@ -224,10 +252,17 @@ function previewInstructions(
 ): ProviderPreviewResponse {
   const target = resolveProviderInstructionsTarget(store);
   if (!target)
-    throw new SectionUnsupportedError('У активного провайдера нет списка файлов инструкций.');
+    throw coded(
+      new SectionUnsupportedError('У активного провайдера нет списка файлов инструкций.'),
+      'preview-no-instructions-list',
+    );
 
   const entries = parseProviderInstructionsDraft(request.draft);
-  if (!entries) throw new InvalidDraftError('Черновик списка не прошёл проверку.');
+  if (!entries)
+    throw coded(
+      new InvalidDraftError('Черновик списка не прошёл проверку.'),
+      'preview-list-draft-invalid',
+    );
 
   return runPreview(
     {

@@ -15,6 +15,8 @@ import { sha256 } from './collect.ts';
 import { providerLocations } from './locations.ts';
 import { planPanelPlatforms, type PanelPlatformsPlan } from './platforms.ts';
 import { planPanelPrompts, type PanelPromptsPlan } from './prompts.ts';
+import { coded } from '../../lib/server-text.ts';
+import type { CodedFields } from '@agentdeck/contracts/server-messages';
 
 /**
  * Разворот архива окружения на этой машине.
@@ -29,7 +31,7 @@ import { planPanelPrompts, type PanelPromptsPlan } from './prompts.ts';
  * или путь выводит за его пределы — запись помечается нерешённой и не пишется.
  */
 
-export interface ImportPlanEntry {
+export interface ImportPlanEntry extends CodedFields<'problem'> {
   archivePath: string;
   /** Путь внутри места — как он выглядит в архиве. */
   relative: string;
@@ -44,10 +46,9 @@ export interface ImportPlanEntry {
   bytes: number;
   /** Ключи, чьи значения заменены меткой при экспорте. */
   redactedKeys: string[];
-  /** Почему запись нерешённая. */
+  /** Почему запись нерешённая, и код этого текста для перевода. */
   problem?: string;
 }
-
 export interface ImportPlan {
   provider: { id: string; name: string };
   exportedAt: string;
@@ -121,7 +122,12 @@ export function planEnvironmentImport(
 
     const location = byIndex.get(entry.locationIndex);
     if (!location) {
-      return { ...base, problem: `На этой машине нет места №${entry.locationIndex}.` };
+      return {
+        ...base,
+        problem: `На этой машине нет места №${entry.locationIndex}.`,
+        problemCode: 'transfer-import-location-missing',
+        problemParams: { index: entry.locationIndex },
+      };
     }
 
     let targetPath: string;
@@ -132,7 +138,12 @@ export function planEnvironmentImport(
     }
 
     const data = parsed.files.get(entry.archivePath);
-    if (!data) return { ...base, problem: 'Файла нет в архиве.' };
+    if (!data)
+      return {
+        ...base,
+        problem: 'Файла нет в архиве.',
+        problemCode: 'transfer-import-file-absent',
+      };
 
     return { ...base, targetPath, status: compare(targetPath, data, entry.applyMode) };
   });
@@ -227,10 +238,19 @@ export function applyEnvironmentImport(
   for (const entry of plan.entries) {
     if (!selected.has(entry.archivePath)) continue;
     if (entry.status === 'unresolved' || !entry.targetPath) {
-      throw archiveError(`Запись «${entry.archivePath}» некуда положить: ${entry.problem ?? ''}`);
+      throw coded(
+        archiveError(`Запись «${entry.archivePath}» некуда положить: ${entry.problem ?? ''}`),
+        'import-entry-nowhere',
+        { archivePath: entry.archivePath, problem: entry.problem ?? '' },
+      );
     }
     const data = parsed.files.get(entry.archivePath);
-    if (!data) throw archiveError(`Файла «${entry.archivePath}» нет в архиве.`);
+    if (!data)
+      throw coded(
+        archiveError(`Файла «${entry.archivePath}» нет в архиве.`),
+        'import-entry-missing',
+        { archivePath: entry.archivePath },
+      );
     ready.push({ entry, data });
   }
 
@@ -269,8 +289,12 @@ export function applyEnvironmentImport(
 /** Архив одного провайдера не разворачивается в другого: форматы несовместимы. */
 function assertSameProvider(manifest: ArchiveManifest, provider: ConfigProvider): void {
   if (manifest.provider.id !== provider.id) {
-    throw archiveError(
-      `Архив собран для провайдера «${manifest.provider.name}», а разворачивается в «${provider.name}».`,
+    throw coded(
+      archiveError(
+        `Архив собран для провайдера «${manifest.provider.name}», а разворачивается в «${provider.name}».`,
+      ),
+      'transfer-import-provider-mismatch',
+      { archive: manifest.provider.name, target: provider.name },
     );
   }
 }
@@ -282,19 +306,32 @@ function assertSameProvider(manifest: ArchiveManifest, provider: ConfigProvider)
  */
 function resolveTarget(locationPath: string, kind: 'dir' | 'file', relative: string): string {
   const trimmed = relative.trim();
-  if (!trimmed || trimmed.includes('\0')) throw archiveError('Пустой путь записи в архиве.');
+  if (!trimmed || trimmed.includes('\0'))
+    throw coded(archiveError('Пустой путь записи в архиве.'), 'import-entry-empty-path');
 
   const normalized = trimmed.replace(/\\/g, '/');
   if (normalized.startsWith('/') || /^[a-zA-Z]:/.test(normalized)) {
-    throw archiveError(`Абсолютный путь записи запрещён: «${relative}».`);
+    throw coded(
+      archiveError(`Абсолютный путь записи запрещён: «${relative}».`),
+      'import-entry-absolute',
+      { relative },
+    );
   }
   if (normalized.split('/').some((segment) => segment === '..')) {
-    throw archiveError(`Путь записи выходит за пределы места: «${relative}».`);
+    throw coded(
+      archiveError(`Путь записи выходит за пределы места: «${relative}».`),
+      'import-entry-escapes',
+      { relative },
+    );
   }
 
   if (kind === 'file') {
     if (normalized !== basename(locationPath)) {
-      throw archiveError(`Запись «${relative}» не совпадает с именем файла места.`);
+      throw coded(
+        archiveError(`Запись «${relative}» не совпадает с именем файла места.`),
+        'import-entry-name-mismatch',
+        { relative },
+      );
     }
     return locationPath;
   }
@@ -302,7 +339,11 @@ function resolveTarget(locationPath: string, kind: 'dir' | 'file', relative: str
   const base = resolve(locationPath);
   const target = resolve(base, ...normalized.split('/'));
   if (target !== base && !target.startsWith(`${base}${sep}`)) {
-    throw archiveError(`Путь записи выходит за пределы места: «${relative}».`);
+    throw coded(
+      archiveError(`Путь записи выходит за пределы места: «${relative}».`),
+      'import-entry-escapes',
+      { relative },
+    );
   }
   return target;
 }
@@ -345,6 +386,10 @@ function parseJson(text: string, archivePath: string): Record<string, unknown> {
     }
     return parsed as Record<string, unknown>;
   } catch {
-    throw archiveError(`Запись «${archivePath}» должна быть JSON-объектом.`);
+    throw coded(
+      archiveError(`Запись «${archivePath}» должна быть JSON-объектом.`),
+      'import-entry-not-object',
+      { archivePath },
+    );
   }
 }

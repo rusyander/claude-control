@@ -164,3 +164,46 @@ describe('ChatRun.start: сбой запуска CLI', () => {
     await finished;
   });
 });
+
+/**
+ * Имя модели, не прошедшее грамматику аргументов, до 18.09.2026 уезжало МОЛЧА:
+ * шапка чата показывала выбранное имя, `--model` в командную строку не
+ * попадал, и прогон шёл моделью, которую CLI выбирает сам. Узнать об этом было
+ * неоткуда — ни строки в ленте, ни следа (ревью Т0→Т13, R3 MINOR-2).
+ */
+describe('ChatRun.start: имя модели, отброшенное грамматикой', () => {
+  /** Прогон до закрытия процесса, с записью всех событий. */
+  async function runWith(model: string): Promise<{ kind: string; code?: string; text?: string }[]> {
+    const events: { kind: string; code?: string; text?: string }[] = [];
+    const run = new ChatRun();
+    const finished = run.start(
+      { prompt: 'привет', cwd: process.cwd(), command: 'fake-cli', model },
+      (event) => events.push(event as { kind: string }),
+    );
+    process.nextTick(() => {
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', 0);
+    });
+    await finished;
+    return events;
+  }
+
+  it('отброшенное имя названо лентой, а в командную строку не уезжает', async () => {
+    // Пробел — ровно то, что оболочка Windows разберёт как второй аргумент.
+    const events = await runWith('qwen 2.5:7b');
+    const notice = events.find((event) => event.kind === 'notice');
+    expect(notice?.code).toBe('modelDropped');
+    expect(notice?.text).toContain('qwen 2.5:7b');
+    const args = (spawnMock.mock.calls[0] as unknown as [string, string[]])[1];
+    expect(args).not.toContain('--model');
+  });
+
+  it('имя из каталога контура проходит и заметки не рождает', async () => {
+    const events = await runWith('qwen2.5:7b');
+    expect(events.find((event) => event.kind === 'notice')).toBeUndefined();
+    const args = (spawnMock.mock.calls[0] as unknown as [string, string[]])[1];
+    expect(args).toContain('--model');
+    expect(args).toContain('qwen2.5:7b');
+  });
+});

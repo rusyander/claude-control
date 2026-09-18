@@ -8,6 +8,7 @@ import type {
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
 import { LOCAL_ID_PREFIX, isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 import type { AppStore } from '../lib/app-store.ts';
+import { coded } from '../lib/server-text.ts';
 
 /**
  * Правила доступа из settings.json. Приоритет в Claude Code: deny > ask > allow,
@@ -47,6 +48,7 @@ export class PermissionExistsError extends Error {
 
   constructor(pattern: string) {
     super(`Правило «${pattern}» с таким решением уже есть`);
+    coded(this, 'permission-rule-exists', { pattern });
     this.name = 'PermissionExistsError';
   }
 }
@@ -58,6 +60,7 @@ export class PermissionNotFoundError extends Error {
 
   constructor(id: string) {
     super(`Право «${id}» не найдено`);
+    coded(this, 'permission-not-found', { id });
     this.name = 'PermissionNotFoundError';
   }
 }
@@ -70,9 +73,14 @@ export class PermissionNotFoundError extends Error {
 export function assertPermissionDraft(draft: unknown): PermissionDraft {
   const value = (draft ?? {}) as Partial<PermissionDraft>;
   const pattern = typeof value.pattern === 'string' ? value.pattern.trim() : '';
-  if (!pattern) throw new InvalidPermissionError('Пустой шаблон права');
+  if (!pattern)
+    throw coded(new InvalidPermissionError('Пустой шаблон права'), 'permission-pattern-empty');
   if (!DECISIONS.includes(value.decision as PermissionDecision)) {
-    throw new InvalidPermissionError(`Неизвестное решение: ${String(value.decision)}`);
+    throw coded(
+      new InvalidPermissionError(`Неизвестное решение: ${String(value.decision)}`),
+      'permission-decision-unknown',
+      { decision: String(value.decision) },
+    );
   }
   const groupIds = Array.isArray(value.groupIds)
     ? value.groupIds.filter((id): id is string => typeof id === 'string')

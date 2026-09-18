@@ -19,6 +19,7 @@ import { useProviderCompare, useMigrateProvider } from '@entities/ProviderCompar
 import { WritePreviewDialog } from '@features/WritePreview';
 import { CompareSection } from './CompareSection';
 import styles from './ProviderComparePage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Сравнение конфигураций двух провайдеров и перенос записей между ними
@@ -87,7 +88,8 @@ export function ProviderComparePage() {
           void queryClient.invalidateQueries({ queryKey: ['providers', 'compare'] });
           if (result.applied.length === 0) toast.info(t('providerCompare.migrateNothing'));
           else toast.success(t('providerCompare.migrateDone', { count: result.applied.length }));
-          for (const skip of result.skipped) toast.info(`${skip.key}: ${skip.reason}`);
+          for (const skip of result.skipped)
+            toast.info(`${skip.key}: ${serverFieldText(skip, 'reason')}`);
         },
         // Тост об ошибке даёт глобальный MutationCache (`app/queryClient.ts`) —
         // с причиной от сервера («формат приёмника не распознан»); свой второй,

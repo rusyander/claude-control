@@ -5,6 +5,7 @@ import { Button, Card, Field, Loading, Mono, Muted, Row, Title } from '../../sha
 import { colors, font, radius, space } from '../../shared/config/theme';
 import { useT, type Dictionary } from '../../shared/config/i18n';
 import { useGitAction, useProjectGit } from '../../entities/project/api';
+import { serverField } from '../../shared/api/server-message';
 
 /**
  * Пульт git выбранного проекта: где мы, что изменилось, и шесть операций, что
@@ -43,7 +44,7 @@ export function GitPanel({ projectPath }: { projectPath: string }) {
       { path: projectPath, ...body },
       {
         onSuccess: (result) => {
-          setOutput(result.output);
+          setOutput(serverField(result, 'output'));
           after?.();
         },
         onError: (error: Error) => setFailed(error.message),

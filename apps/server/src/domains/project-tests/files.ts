@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { writeJsonFile } from '../../lib/safe-io.ts';
 import { ProjectFileError, resolveProjectPath } from '../project-files/paths.ts';
+import { coded } from '../../lib/server-text.ts';
+import type { CodedMessage } from '@agentdeck/contracts';
 
 /**
  * Общая работа с файлами тестового хозяйства проекта.
@@ -70,8 +72,10 @@ export class ProjectTestsUnavailableError extends ProjectTestsError {
 /** Идентификатор файла или сущности = имя файла: диапазон сужен намеренно. */
 export function assertId(id: string, what = 'Идентификатор'): string {
   if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(id)) {
-    throw new ProjectTestsError(
-      `${what}: латиница в нижнем регистре, цифры и дефис, до 40 символов.`,
+    throw coded(
+      new ProjectTestsError(`${what}: латиница в нижнем регистре, цифры и дефис, до 40 символов.`),
+      'id-format-invalid',
+      { id },
     );
   }
   return id;
@@ -113,21 +117,33 @@ export function stringList(value: unknown): string[] {
 }
 
 /** Разбор JSON-файла раздела. Ошибка — это причина, а не исключение. */
-export function readJson(root: string, relative: string): { data?: unknown; error?: string } {
+export function readJson(
+  root: string,
+  relative: string,
+): { data?: unknown; error?: string } & CodedMessage {
   const path = testsPath(root, relative);
   if (!existsSync(path)) return {};
   let raw: Buffer;
   try {
     raw = readFileSync(path);
   } catch (error) {
-    return { error: `Файл не читается: ${(error as Error).message}` };
+    return {
+      error: `Файл не читается: ${(error as Error).message}`,
+      messageCode: 'file-unreadable',
+      params: { reason: (error as Error).message },
+    };
   }
-  if (raw.byteLength > MAX_FILE_BYTES) return { error: 'Файл слишком велик.' };
+  if (raw.byteLength > MAX_FILE_BYTES)
+    return { error: 'Файл слишком велик.', messageCode: 'file-too-large' };
   try {
     return { data: JSON.parse(raw.toString('utf8')) as unknown };
   } catch (error) {
     // Файл НЕ чиним и не перезаписываем: за сломанным JSON стоит чья-то работа.
-    return { error: `Файл не разобрался: ${(error as Error).message}` };
+    return {
+      error: `Файл не разобрался: ${(error as Error).message}`,
+      messageCode: 'file-unparsed',
+      params: { reason: (error as Error).message },
+    };
   }
 }
 

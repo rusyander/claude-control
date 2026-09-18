@@ -1,5 +1,6 @@
 import { isWindows } from './HookProbe.constants.ts';
 import type { EventFixture } from './HookProbe.types.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Путь в примере события — в стиле той системы, где панель запущена.
@@ -25,8 +26,8 @@ export const EVENT_FIXTURES: EventFixture[] = [
   {
     id: 'bash-safe',
     event: 'PreToolUse',
-    title: 'Безобидная команда',
-    description: 'Обычный вызов Bash — страж не должен вмешиваться.',
+    title: serverText('sandbox-event-bash-safe-title'),
+    description: serverText('sandbox-event-bash-safe-description'),
     expectsBlock: false,
     payload: {
       hook_event_name: 'PreToolUse',
@@ -37,8 +38,8 @@ export const EVENT_FIXTURES: EventFixture[] = [
   {
     id: 'bash-destructive',
     event: 'PreToolUse',
-    title: 'Рекурсивное удаление',
-    description: 'Опасная команда — страж разрушительных операций должен остановить.',
+    title: serverText('sandbox-event-bash-destructive-title'),
+    description: serverText('sandbox-event-bash-destructive-description'),
     expectsBlock: true,
     payload: {
       hook_event_name: 'PreToolUse',
@@ -49,8 +50,8 @@ export const EVENT_FIXTURES: EventFixture[] = [
   {
     id: 'bash-git-push',
     event: 'PreToolUse',
-    title: 'Мутирующая операция git',
-    description: 'Пуш в удалённый репозиторий — по правилам агент этого делать не должен.',
+    title: serverText('sandbox-event-git-push-title'),
+    description: serverText('sandbox-event-git-push-description'),
     expectsBlock: true,
     payload: {
       hook_event_name: 'PreToolUse',
@@ -61,8 +62,8 @@ export const EVENT_FIXTURES: EventFixture[] = [
   {
     id: 'write-secret',
     event: 'PreToolUse',
-    title: 'Запись секрета в файл',
-    description: 'В содержимом похожий на токен ключ — страж секретов должен вмешаться.',
+    title: serverText('sandbox-event-write-secret-title'),
+    description: serverText('sandbox-event-write-secret-description'),
     expectsBlock: true,
     payload: {
       hook_event_name: 'PreToolUse',
@@ -84,8 +85,8 @@ export const EVENT_FIXTURES: EventFixture[] = [
   {
     id: 'write-placeholder',
     event: 'PreToolUse',
-    title: 'Ключ-заготовка в примере',
-    description: 'Значение-плейсхолдер в .env.example — страж не должен мешать.',
+    title: serverText('sandbox-event-write-placeholder-title'),
+    description: serverText('sandbox-event-write-placeholder-description'),
     expectsBlock: false,
     payload: {
       hook_event_name: 'PreToolUse',
@@ -99,8 +100,8 @@ export const EVENT_FIXTURES: EventFixture[] = [
   {
     id: 'write-plain',
     event: 'PostToolUse',
-    title: 'Обычная правка файла',
-    description: 'Правка исходника — сюда обычно вешают автоформатирование.',
+    title: serverText('sandbox-event-write-plain-title'),
+    description: serverText('sandbox-event-write-plain-description'),
     expectsBlock: false,
     payload: {
       hook_event_name: 'PostToolUse',
@@ -112,8 +113,8 @@ export const EVENT_FIXTURES: EventFixture[] = [
   {
     id: 'prompt-figma',
     event: 'UserPromptSubmit',
-    title: 'Запрос со ссылкой на Figma',
-    description: 'Подсказки на ввод пользователя срабатывают здесь.',
+    title: serverText('sandbox-event-prompt-figma-title'),
+    description: serverText('sandbox-event-prompt-figma-description'),
     expectsBlock: false,
     payload: {
       hook_event_name: 'UserPromptSubmit',
@@ -123,16 +124,16 @@ export const EVENT_FIXTURES: EventFixture[] = [
   {
     id: 'session-start',
     event: 'SessionStart',
-    title: 'Начало сессии',
-    description: 'Брифинги и напоминания при старте.',
+    title: serverText('sandbox-event-session-start-title'),
+    description: serverText('sandbox-event-session-start-description'),
     expectsBlock: false,
     payload: { hook_event_name: 'SessionStart', source: 'startup' },
   },
   {
     id: 'stop',
     event: 'Stop',
-    title: 'Конец ответа',
-    description: 'Проверки, которые запускаются после ответа модели.',
+    title: serverText('sandbox-event-stop-title'),
+    description: serverText('sandbox-event-stop-description'),
     expectsBlock: false,
     payload: { hook_event_name: 'Stop', stop_hook_active: false },
   },
@@ -159,13 +160,13 @@ export function parseCustomEvent(
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { ok: false, error: 'Не удалось разобрать JSON: проверьте синтаксис события.' };
+    return { ok: false, error: serverText('sandbox-event-bad-json') };
   }
 
   if (!isEventObject(parsed)) {
     return {
       ok: false,
-      error: 'Событие должно быть JSON-объектом вида {"hook_event_name": "…"}.',
+      error: serverText('sandbox-event-not-object'),
     };
   }
 

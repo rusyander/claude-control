@@ -9,6 +9,7 @@ import {
 } from '../../lib/provider-keys.ts';
 import { IntegrationError, invalidField } from './errors.ts';
 import { readHealth } from './health.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Одна учётная запись на внешнюю систему: видимая настройка — в состоянии
@@ -72,7 +73,9 @@ export function readToken(appDataDir: string, id: IntegrationId): string | undef
  */
 export function writeToken(appDataDir: string, id: IntegrationId, token: string): void {
   if (token.length > MAX_KEY_LENGTH) {
-    throw invalidField('token', 'токен длиннее допустимого');
+    throw invalidField('token', 'токен длиннее допустимого', 'request-token-too-long', {
+      field: 'token',
+    });
   }
   setStoredKey(appDataDir, tokenId(id), token);
 }
@@ -158,9 +161,13 @@ export function requireConnected(
   const settings = readIntegrations(store)[id];
   const token = readToken(appDataDir, id);
   if (!settings.enabled || (needsToken(id) && !token)) {
-    throw new IntegrationError(
-      'integration_not_found',
-      `${title} не подключена: включите её и сохраните токен в настройках панели.`,
+    throw coded(
+      new IntegrationError(
+        'integration_not_found',
+        `${title} не подключена: включите её и сохраните токен в настройках панели.`,
+      ),
+      'integration-not-connected',
+      { title },
     );
   }
   return token ?? '';

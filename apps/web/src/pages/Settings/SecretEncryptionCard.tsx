@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { apiClient } from '@shared/api/client';
+import { apiClient, messageFromPayload } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
@@ -58,8 +58,9 @@ export function SecretEncryptionCard() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.backups });
     },
     onError: (mutationError: unknown) => {
-      const message = (mutationError as { response?: { data?: { error?: string } } })?.response
-        ?.data?.error;
+      const message = messageFromPayload(
+        (mutationError as { response?: { data?: unknown } })?.response?.data,
+      );
       setError(message ?? t('settings.encryptSecretsError'));
     },
     meta: { silentError: true },

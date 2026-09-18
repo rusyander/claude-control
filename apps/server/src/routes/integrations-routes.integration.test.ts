@@ -131,7 +131,7 @@ describe('integrations-routes: поверхность', () => {
     it('Zephyr адреса не требует: у облака он общий на всех', async () => {
       const response = await put(
         '/api/integrations/tms',
-        tms({ kind: 'zephyr', baseUrl: '', projectKey: 'GOR' }),
+        tms({ kind: 'zephyr', baseUrl: '', projectKey: 'PRJ' }),
       );
       expect(response.statusCode).toBe(200);
     });

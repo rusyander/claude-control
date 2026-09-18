@@ -1,0 +1,17 @@
+// Полнота копии — свойство самой копии, а не событие: без отбивки «цитатой»,
+// которой помечены отчёт зеркала и лог установки, и всегда на карточке.
+.card {
+  margin-top: var(--spacing-3xs);
+  min-width: 0;
+}
+
+// Дыры — короткий список путей: моноширинные, с переносом, без скролла
+// (их единицы, и каждая держит прогон).
+.gaps {
+  margin: 2px 0 0;
+  padding-left: var(--spacing-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-muted);
+  word-break: break-all;
+}

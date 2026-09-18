@@ -21,6 +21,7 @@ import { TestHistoryModal } from './TestHistoryModal';
 import { TestExchangeModal } from './TestExchangeModal';
 import type { TestLibraryProps } from './TestLibrary.types';
 import styles from './ProjectTests.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Библиотека кейсов целиком: вкладки-группы, дерево секций, отбор, таблица.
@@ -154,7 +155,7 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
       {board.active?.error && (
         <Stack gap="var(--spacing-3xs)">
           <Typography variant="body" color="danger">
-            {t('projectTests.broken', { error: board.active.error })}
+            {t('projectTests.broken', { error: serverFieldText(board.active, 'error') })}
           </Typography>
           <Typography variant="caption" color="subtle">
             {t('projectTests.brokenHint')}

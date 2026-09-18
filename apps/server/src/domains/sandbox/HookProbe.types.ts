@@ -1,5 +1,10 @@
+import type { CodedFields } from '@agentdeck/contracts/server-messages';
+import type {
+  ServerMessageCode,
+  ServerMessageNestedParams,
+} from '@agentdeck/contracts/server-messages';
 /** Готовые события: по одному на каждый распространённый случай. */
-export interface EventFixture {
+export interface EventFixture extends CodedFields<'title' | 'description'> {
   id: string;
   event: string;
   title: string;
@@ -30,8 +35,10 @@ export interface ProbeResult {
   stdout: string;
   stderr: string;
   decision: HookDecision;
-  /** Пояснение хука: почему он вмешался. */
+  /** Пояснение хука: почему он вмешался, и код этого текста, если его написала панель. */
   reason?: string;
+  reasonCode?: ServerMessageCode;
+  reasonParams?: ServerMessageNestedParams;
   /** Текст, который хук добавляет в контекст (подсказки и брифинги). */
   addedContext?: string;
   /** Вмешался ли хук так, как задумано заготовкой. */

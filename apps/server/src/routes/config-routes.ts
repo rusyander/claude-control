@@ -27,6 +27,18 @@ import {
 } from '../lib/safe-io.ts';
 import { basename } from 'node:path';
 import { issuesOf } from '../lib/request-body.ts';
+import { codeOf } from '../lib/server-text.ts';
+import type { CredentialsLookup } from '../lib/credentials.ts';
+
+/** Источник доступа и причина с кодом — без самого токена. */
+function credentialsReply(found: CredentialsLookup) {
+  return {
+    source: found.source,
+    reason: found.reason,
+    reasonCode: found.reasonCode,
+    reasonParams: found.reasonParams,
+  };
+}
 
 /** Маршруты про само приложение: расположение конфигов, настройки, сводка. */
 export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): void {
@@ -64,6 +76,7 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       return reply.code(400).send({
         error: 'invalid_path',
         message: 'Укажите путь к каталогу конфигурации.',
+        messageCode: 'config-dir-path-required',
       });
     }
 
@@ -139,6 +152,7 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       return reply.code(400).send({
         error: 'invalid_settings',
         message: 'Настройки не прошли проверку и не сохранены.',
+        messageCode: 'settings-invalid',
         issues: issuesOf(parsed.error),
       });
     }
@@ -164,6 +178,11 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
         return reply.code(400).send({
           error: 'invalid_path',
           message: result.problem ?? 'Каталог конфигурации не подходит.',
+          ...(result.problemCode
+            ? { messageCode: result.problemCode, params: result.problemParams }
+            : result.problem
+              ? {}
+              : { messageCode: 'config-dir-unsuitable' as const }),
         });
       }
       ctx.rememberDirOverride(claudeDirOverride);
@@ -218,6 +237,7 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       return reply.code(400).send({
         error: 'invalid_state',
         message: 'Импортируемое состояние не прошло проверку и не применено.',
+        messageCode: 'state-import-invalid',
         issues: issuesOf(parsed.error),
       });
     }
@@ -274,6 +294,8 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     return {
       source: found.source,
       reason: found.reason,
+      reasonCode: found.reasonCode,
+      reasonParams: found.reasonParams,
       hasManual: existsSync(panelCredentialsPath()),
       manualPath: panelCredentialsPath(),
       platform: process.platform,
@@ -284,21 +306,24 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     // Не строка (число, объект) роняла `.trim()` пятисоткой — это 400.
     const value = request.body?.value;
     if (typeof value !== 'string') {
-      return reply.code(400).send({ message: 'Пусто: вставьте JSON или ключ API.' });
+      return reply.code(400).send({
+        message: 'Пусто: вставьте JSON или ключ API.',
+        messageCode: 'credentials-paste-empty',
+      });
     }
     const check = validatePanelCredentials(value);
-    if (!check.ok) return reply.code(400).send({ message: check.error });
+    if (!check.ok) return reply.code(400).send({ message: check.error, ...codeOf(check) });
 
     savePanelCredentials(value);
     const found = readClaudeCredentials(ctx.location.paths.root);
 
-    return { source: found.source, reason: found.reason, hasManual: true };
+    return { ...credentialsReply(found), hasManual: true };
   });
 
   app.delete('/api/credentials', () => {
     removePanelCredentials();
     const found = readClaudeCredentials(ctx.location.paths.root);
 
-    return { source: found.source, reason: found.reason, hasManual: false };
+    return { ...credentialsReply(found), hasManual: false };
   });
 }

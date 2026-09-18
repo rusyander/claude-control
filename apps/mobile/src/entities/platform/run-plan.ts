@@ -1,5 +1,6 @@
+import { ourLayerIds } from '@agentdeck/contracts/platform';
 import type { PlatformRunPlan } from '@agentdeck/contracts';
-import { chooseRunModel } from '@agentdeck/contracts/platform-models';
+import { chooseRunModel, modelCaptionState } from '@agentdeck/contracts/platform-models';
 import type { Dictionary } from '../../shared/config/i18n/ru';
 
 /**
@@ -30,6 +31,28 @@ export interface RunPlanView {
   lines: RunPlanLine[];
 }
 
+/**
+ * Потребителем какого маршрута спрашивать план ЭТОГО разговора.
+ *
+ * Сервер маршрутизирует любой чат со связью разделения как «Группы»
+ * (`routes/chat/run-routes.ts`), а телефон показывает все чаты подряд, детей
+ * разделения включительно. Ревью Т13: здесь стояло жёстко `'chat'`, и у
+ * контура, включённого только для «Чата», открытый на телефоне ребёнок запирал
+ * модель и писал «через контур …» про прогон, уходивший в облако вендора со
+ * всеми нашими слоями; у контура для одних «Групп» — молчал и предлагал
+ * свободный выбор модели прогону, которому контур модель всё равно подменит.
+ *
+ * Список ещё не приехал — отвечаем «Чат»: это тот же ответ, что у разговора без
+ * связи, и подписи появятся сами, когда список догрузится.
+ */
+export function runPlanConsumer(
+  chats: readonly { id: string; parentId?: string }[] | undefined,
+  chatId: string,
+): 'chat' | 'groups' {
+  const chat = chats?.find((item) => item.id === chatId);
+  return chat?.parentId ? 'groups' : 'chat';
+}
+
 export function runPlanView(
   plan: PlatformRunPlan | undefined,
   chosen: { model: string; effort: string },
@@ -40,17 +63,21 @@ export function runPlanView(
   const choice = routed ? chooseRunModel(routed.rules, chosen.model) : undefined;
 
   if (routed && choice) {
-    // Три состояния различаются так же, как в `platformModelCaption` панели:
-    // у контура без модели заменять нечем, и подмену объявлять нельзя.
-    if (choice.source === 'none') {
-      lines.push({ text: words.platformModelUnset(routed.title), warn: true });
-    } else if (choice.replaced) {
-      lines.push({
-        text: words.platformModelReplaced(routed.title, choice.asked, choice.model),
-        warn: true,
-      });
-    } else {
-      lines.push({ text: words.platformModel(routed.title, choice.model), warn: false });
+    // Состояние выбирают КОНТРАКТЫ — той же функцией, что и панель: второй
+    // разбор «у контура без модели заменять нечем» разошёлся бы с ней молча, и
+    // состояние, добавленное в панели, телефон бы не узнал (ревью Т13).
+    switch (modelCaptionState(choice)) {
+      case 'unset':
+        lines.push({ text: words.platformModelUnset(routed.title), warn: true });
+        break;
+      case 'replaced':
+        lines.push({
+          text: words.platformModelReplaced(routed.title, choice.asked, choice.model),
+          warn: true,
+        });
+        break;
+      default:
+        lines.push({ text: words.platformModel(routed.title, choice.model), warn: false });
     }
   }
 
@@ -82,9 +109,12 @@ export function runPlanView(
 
   const dropped = routed?.layers?.dropped ?? [];
   if (routed && dropped.length > 0) {
-    // Полный набор — отдельной фразой; число слоёв берётся из словаря названий,
-    // который типизирован по всем идентификаторам слоёв.
-    const all = dropped.length === Object.keys(words.layerTitle).length;
+    // Полный набор — отдельной фразой; число слоёв берётся из КОНТРАКТА, как в
+    // панели (`platformLayersCaption`). По словарю названий это было правдой
+    // только пока словарь полон: пропущенный ключ (ровно так на телефоне
+    // потерялась причина `gateway-failed` в волне D) молча делал бы «снято
+    // всё» из неполного набора.
+    const all = dropped.length === ourLayerIds.length;
     lines.push({
       text: all
         ? words.platformLayersAll(routed.title)

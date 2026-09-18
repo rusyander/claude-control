@@ -2,6 +2,7 @@ import type { Platform, PlatformEmbeddingResult } from '@agentdeck/contracts';
 import type { PlatformFetch } from './ca-fetch.ts';
 import { foreignTail } from './redact.ts';
 import { callUpstream, UpstreamError } from './gateway/upstream.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Эмбеддинги контура: числа для НАШЕГО поиска, а не для показа.
@@ -43,14 +44,22 @@ export class EmbeddingError extends Error {
 
 export async function embedTexts(options: EmbedOptions): Promise<PlatformEmbeddingResult> {
   const { platform, token, model, input } = options;
-  if (input.length === 0) throw new EmbeddingError('Нечего считать: список текстов пуст.', 400);
+  if (input.length === 0)
+    throw coded(
+      new EmbeddingError('Нечего считать: список текстов пуст.', 400),
+      'embeddings-empty',
+    );
   if (input.length > MAX_EMBEDDING_INPUTS) {
     throw new EmbeddingError(
       `За один раз считается не больше ${MAX_EMBEDDING_INPUTS} текстов, прислано ${input.length}.`,
       400,
     );
   }
-  if (!model.trim()) throw new EmbeddingError('Не названа модель эмбеддингов.', 400);
+  if (!model.trim())
+    throw coded(
+      new EmbeddingError('Не названа модель эмбеддингов.', 400),
+      'embeddings-model-missing',
+    );
 
   let response: Response;
   try {
@@ -103,7 +112,10 @@ export async function embedTexts(options: EmbedOptions): Promise<PlatformEmbeddi
   }
 
   if (vectors.length === 0) {
-    throw new EmbeddingError('В ответе контура нет ни одного вектора.', 502);
+    throw coded(
+      new EmbeddingError('В ответе контура нет ни одного вектора.', 502),
+      'embeddings-no-vectors',
+    );
   }
   // Недосчитались — отказ, а не короткий список: какой из текстов остался без
   // вектора, в ответе не написано, и молчаливый сдвиг на один снова перепутал

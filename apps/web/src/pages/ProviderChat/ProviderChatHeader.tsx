@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { chooseRunModel } from '@agentdeck/contracts/platform-models';
 import { foreignConsumerId } from '@agentdeck/contracts/platform-consumers';
 import { usePlatformRunPlan } from '@entities/Platform';
 import {
   platformBypassCaption,
   platformModelCaption,
+  platformRunChoice,
   platformRefusalCaption,
 } from '@shared/lib/chat-model';
 import { Stack } from '@shared/ui/stack';
@@ -46,7 +46,7 @@ export function ProviderChatHeader({
   const plan = usePlatformRunPlan(providerId ? foreignConsumerId(providerId) : '');
   const routed = plan.data?.routed === true ? plan.data : undefined;
   const caption = routed
-    ? platformModelCaption(routed.title, chooseRunModel(routed.rules, chat?.model ?? ''))
+    ? platformModelCaption(routed.title, platformRunChoice(routed.rules, chat?.model ?? ''))
     : undefined;
   const refusal = platformRefusalCaption(plan.data);
   // Уход мимо контура — той же меткой, что и в шапке своего чата (решение №4).

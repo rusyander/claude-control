@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { findSystemBrowser } from '../../../lib/system-browser.ts';
 import { MediaError } from '../errors.ts';
+import { coded } from '../../../lib/server-text.ts';
 
 /**
  * HTML колоды → PDF печатью системного браузера (решение В3).
@@ -133,7 +134,13 @@ function run(browser: string, args: string[], target: string): Promise<Buffer> {
 
       if (exited && exit) {
         return finish(() =>
-          reject(new MediaError(502, `Браузер не напечатал PDF: ${exit?.message ?? ''}`)),
+          reject(
+            coded(
+              new MediaError(502, `Браузер не напечатал PDF: ${exit?.message ?? ''}`),
+              'media-pdf-print-failed',
+              { reason: exit?.message ?? '' },
+            ),
+          ),
         );
       }
       if (Date.now() - started > PRINT_TIMEOUT_MS) {

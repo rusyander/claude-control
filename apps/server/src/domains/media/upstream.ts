@@ -3,6 +3,7 @@ import type { AppStore } from '../../lib/app-store.ts';
 import type { PlatformFetch } from '../platform/ca-fetch.ts';
 import { readPlatforms } from '../platform/store.ts';
 import { MediaError } from './errors.ts';
+import { coded } from '../../lib/server-text.ts';
 
 /**
  * Общее для картинок и презентаций: куда панель ходит и как читает чужой ответ.
@@ -23,6 +24,15 @@ export interface MediaDeps {
    * процессу (та же ловушка, что закрыта в `apply/profile.ts`).
    */
   gatewayPort?: () => number;
+  /**
+   * Поднять СВОЙ шлюз, если его тумблер включён, а слушателя нет (A-1). Защёлка
+   * и потолок попыток — внутри (`platform/gateway/auto-start.ts`): расчёт плана
+   * идёт на каждое открытие меню, и подъём без потолка превратил бы занятый порт
+   * в бесконечную череду попыток. Не задан — план отвечает по тому, что есть.
+   */
+  raiseGateway?: () => Promise<void>;
+  /** Чем кончился НАШ последний подъём. Пусто — не пробовали или получилось. */
+  gatewayFailure?: () => string | undefined;
   /** Транспорт: и к своему шлюзу, и к чужой ручке. Подставляется в тестах. */
   fetchImpl?: PlatformFetch;
   now?: () => Date;
@@ -81,7 +91,11 @@ export async function askUpstream(
         `${subject} не пришло за ${timeoutMs / 1_000} с — панель не ждёт дольше`,
       );
     }
-    throw new MediaError(502, `До адреса не дошли: ${String(error)}`);
+    throw coded(
+      new MediaError(502, `До адреса не дошли: ${String(error)}`),
+      'media-upstream-unreachable',
+      { reason: String(error) },
+    );
   }
 }
 

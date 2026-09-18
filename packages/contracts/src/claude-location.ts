@@ -1,4 +1,14 @@
-import { object, string, boolean, array, enum as zodEnum, type infer as Infer } from 'zod';
+import {
+  object,
+  string,
+  boolean,
+  array,
+  number,
+  record,
+  union,
+  enum as zodEnum,
+  type infer as Infer,
+} from 'zod';
 
 /**
  * Как был найден каталог `.claude`. Показывается в настройках, чтобы пользователь
@@ -38,6 +48,9 @@ export const claudeLocationSchema = object({
   missing: array(string()),
   /** Человекочитаемая причина, если isValid = false. */
   problem: string().optional(),
+  /** Код причины для перевода на клиенте (`server-messages.ts`); `problem` — запасной текст. */
+  problemCode: string().optional(),
+  problemParams: record(string(), union([string(), number()])).optional(),
 });
 
 export type ClaudeLocation = Infer<typeof claudeLocationSchema>;

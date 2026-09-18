@@ -28,6 +28,13 @@ import type { ChatEvent } from './ChatRunner.ts';
  * настоящее чтение живёт в `project-git`, где ему и место.
  */
 
+/**
+ * Сколько задетых путей запоминать на группу. Потолок общий с заметкой
+ * преемнику (`PREDECESSOR_FILES_SHOWN`): хранить больше, чем когда-либо будет
+ * сказано, незачем — запись живёт в `state.json` рядом со всем остальным.
+ */
+const COUNTED_NAMES_MAX = 20;
+
 /** Одна группа глазами пересечений: ветка, копия и объявленное владение. */
 export interface OverlapGroup {
   index: number;
@@ -329,7 +336,14 @@ export class SplitOverlap {
           branch: group.branch,
         });
         scanned.push({ index: group.index, files, ...(group.owns ? { owns: group.owns } : {}) });
-        counted.push({ index: group.index, files: files.length });
+        // Не только счёт, но и первые имена: по ним группа, которая отведётся от
+        // этой ветки следующей, узнаёт в своём задании, что тут уже трогали.
+        // Потолок — чтобы запись в `state.json` не росла на дифф большой ветки.
+        counted.push({
+          index: group.index,
+          files: files.length,
+          ...(files.length > 0 ? { names: files.slice(0, COUNTED_NAMES_MAX) } : {}),
+        });
       } catch (error) {
         unread.push({ index: group.index, reason: reasonOf(error) });
       }

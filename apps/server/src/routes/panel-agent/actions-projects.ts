@@ -16,6 +16,7 @@ import {
   type StreamHead,
 } from './registry.ts';
 import { dataField, summaryText, textField } from './texts.ts';
+import { codeOf } from '../../lib/server-text.ts';
 
 /**
  * Действия раздела «Проекты, чат» (А4): чаты, идущие прогоны и новый чат с
@@ -224,7 +225,7 @@ const startChat = definePanelAction({
       started: !error,
       ...(session?.sessionId ? { sessionId: session.sessionId } : {}),
       ...(session?.model ? { model: session.model } : {}),
-      ...(error?.message ? { error: error.message } : {}),
+      ...(error?.message ? { error: error.message, ...codeOf(error) } : {}),
       ...(head.timedOut && !session
         ? { note: 'The CLI has not named the session yet; see list_active_runs.' }
         : {}),

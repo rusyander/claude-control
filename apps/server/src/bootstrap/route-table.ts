@@ -177,8 +177,14 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // настроек: запрос в контур идёт через шлюз, а задуманный порт мог быть
     // занят — тогда настройка указывает на чужой процесс.
     (instance, context) =>
-      registerMediaRoutes(instance, context, () =>
-        platformGateway.status().running ? platformGateway.status().port : 0,
+      registerMediaRoutes(
+        instance,
+        context,
+        () => (platformGateway.status().running ? platformGateway.status().port : 0),
+        {
+          raise: () => runtime.platformGatewayAutoStart.ensure(),
+          failure: () => runtime.platformGatewayAutoStart.state().error,
+        },
       ),
     (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
     registerPromptGateRoutes,

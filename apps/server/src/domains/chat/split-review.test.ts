@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   SplitReview,
   reviewNoticeText,
@@ -290,6 +290,46 @@ describe('решение человека', () => {
     expect(second.skipped).toEqual(['c1']);
   });
 
+  it('после отказа форджа отписать можно ещё раз — и вторых правок это не заводит', async () => {
+    let refuse = true;
+    const bodies: string[] = [];
+    const { review, links, started } = stand({
+      post: async (_url, body) => {
+        bodies.push(body);
+        if (refuse) throw new Error('502 Bad Gateway');
+      },
+    });
+    links.c1 = waiting();
+
+    const first = await review.decide({ chatId: 'c1', decision: 'both' });
+    expect(first.applied[0]?.postError).toBe('502 Bad Gateway');
+    expect(started).toHaveLength(1);
+
+    // Фордж поднялся — человек жмёт «Отписать» ещё раз. Замечания обязаны
+    // уехать: иначе они не попадут в MR уже никогда.
+    refuse = false;
+    const second = await review.decide({ chatId: 'c1', decision: 'post' });
+
+    expect(second.applied[0]?.posted).toBe(true);
+    expect(bodies).toHaveLength(2);
+    expect(links.c1?.review?.postedAt).toBe('2026-09-09T12:00:00.000Z');
+    expect(links.c1?.review?.postError).toBeUndefined();
+    // Повтор — только ветка записи: правки уже заведены первым решением.
+    expect(started).toHaveLength(1);
+  });
+
+  it('удавшуюся запись в MR повтором не дублируем', async () => {
+    const { review, links, posted } = stand();
+    links.c1 = waiting();
+
+    await review.decide({ chatId: 'c1', decision: 'post' });
+    const second = await review.decide({ chatId: 'c1', decision: 'post' });
+
+    expect(posted).toHaveLength(1);
+    expect(second.applied).toEqual([]);
+    expect(second.skipped).toEqual(['c1']);
+  });
+
   it('«применить ко всем» решает ждущие группы дерева и не трогает решённые', async () => {
     const { review, links, started } = stand();
     links.c1 = waiting(['первое']);
@@ -414,6 +454,35 @@ describe('отправка правок в MR', () => {
 
     expect(started).toHaveLength(1);
     expect(second.applied).toEqual([]);
+  });
+
+  it('две отправки в одну миллисекунду получают разные ключи', () => {
+    const { review, links, started } = stand();
+    // Группы разные: одинаковое содержимое связи домен считает ОДНИМ
+    // разговором под двумя ключами — тогда вторая отправка и не должна идти.
+    for (const key of ['fix1', 'fix2']) {
+      links[key] = reviewLink({
+        stage: 'fix',
+        title: `MR ${key}`,
+        branch: `feature/${key}`,
+        review: { url: `${URL}${key}`, path: `/copy-${key}`, findings: ['одно'], pushOffer: true },
+      });
+    }
+
+    // Часы фиксируем: гонка воспроизводится только когда обе отправки
+    // пришлись на одну миллисекунду, а ловить её случайно — не проверка.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1758000000000);
+    try {
+      review.push({ chatId: 'fix1' });
+      review.push({ chatId: 'fix2' });
+    } finally {
+      clock.mockRestore();
+    }
+
+    // Ключ из одного только `Date.now()` был бы один на двоих, и второй чат
+    // отправки затёр бы первый.
+    expect(started).toHaveLength(2);
+    expect(started[0]?.chatId).not.toBe(started[1]?.chatId);
   });
 
   it('без предложения (правок не было) отправлять нечего', () => {

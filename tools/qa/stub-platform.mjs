@@ -89,7 +89,7 @@ const MODELS = [
   { id: 'stub-503', kind: 'chat', owned_by: 'stub' },
 ];
 
-/** Нарушение в форме `RuleViolation` (`mod-guardrailsbox/.../models.py:226`). */
+/** Нарушение в той форме `RuleViolation`, которую отдаёт модуль проверок содержимого платформы. */
 function ruleViolation(ruleName, ruleType, message) {
   return {
     rule_id: `r-${ruleType.toLowerCase()}`,
@@ -115,7 +115,8 @@ function ruleViolation(ruleName, ruleType, message) {
  */
 const REFUSALS = {
   401: { error: { message: 'invalid API key', type: 'authentication_error' } },
-  // `inst-api/internal/api/handler_public_api.go:340` дословно.
+  // Дословно то, что платформа отдаёт на исчерпанный бюджет ключа: менять текст
+  // нельзя — панель узнаёт причину по нему.
   402: {
     error: {
       message: 'budget exceeded for this API key',
@@ -124,8 +125,8 @@ const REFUSALS = {
     },
   },
   429: { error: { message: 'rate limit exceeded', type: 'rate_limit_error' } },
-  // Форма `mod-llmbox/.../guardrails/helpers.py:35-43`: перечень рядом с `error`,
-  // элементы — `RuleViolation` (models.py:226). Найденное лежит в `message`
+  // Форма отказа по проверкам содержимого на стороне платформы: перечень нарушений
+  // рядом с `error`, каждый элемент — `RuleViolation`. Найденное лежит в `message`
   // сканера — панель его не читает никогда.
   451: {
     error: {
@@ -269,7 +270,7 @@ function quoteShimReply(rawBody) {
 /**
  * Вызов, чей хвост контур отдаёт ПОСЛЕ кадра с причиной остановки (сценарий
  * `tool-tail`). Контур с проверками вывода придерживает конец ответа и
- * досылает его после `finish_reason` (router.py:988–996): прослойка, закрывавшая
+ * досылает его после `finish_reason`: прослойка, закрывавшая
  * разбор на причине остановки, теряла вызов целиком.
  */
 function tailShimReply(rawBody) {
@@ -440,7 +441,7 @@ function streamFrames(scenario, model, rawBody = '', png = PNG_1X1) {
   }
   if (scenario === 'anonymized') {
     // Подмена сущностей: контур шлёт и словарь замен, и пары возвращённого
-    // обратно — СПИСКОМ `{placeholder, value}`, как router.py:1094–1108. Наружу
+    // обратно — СПИСКОМ `{placeholder, value}`, ровно как платформа. Наружу
     // не уходит ни то ни другое — в словаре лежат сами исходные данные, ради
     // которых подмена и делалась.
     out.push(
@@ -476,9 +477,9 @@ function streamFrames(scenario, model, rawBody = '', png = PNG_1X1) {
 
   out.push(frame({ ...head, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }));
   // Картинку частью ответа платформа компании отдаёт дорогой Responses API, и кадра расхода
-  // там нет вовсе (`responses_api.py stream_responses_api`, аудит MD-09).
+  // там нет вовсе — это другая ветка ответа платформы (аудит MD-09).
   if (scenario !== 'image') out.push(frame(usageChunk(head)));
-  // Итоговый текст шлётся после расхода и перед `[DONE]` (router.py:1086–1088).
+  // Итоговый текст шлётся после расхода и перед `[DONE]` — такой порядок у платформы.
   if (scenario === 'rewritten') out.push(frame({ platform_deanonymized: REWRITTEN_FINAL }));
   out.push('data: [DONE]\n\n');
   return out;
@@ -486,7 +487,7 @@ function streamFrames(scenario, model, rawBody = '', png = PNG_1X1) {
 
 /**
  * Кадр расхода в форме контура: `usage` рядом с НЕпустым `choices` — контур
- * отдаёт кадр litellm как есть (router.py:898–912). Пустой `choices`, как у
+ * отдаёт кадр litellm как есть. Пустой `choices`, как у
  * OpenAI, стаб не шлёт: на нём разбор зеленел, а живой контур записывал ноль.
  */
 function usageChunk(head) {
@@ -779,8 +780,8 @@ export function startStubPlatform({
       return;
     }
 
-    // `mod-llmbox/.../chat/router.py:237-243` дословно: `single_turn` с потоком —
-    // 400 FastAPI, без потока — цельное тело, вызов в `message.tool_calls`.
+    // Дословно поведение платформы: `single_turn` с потоком — 400 от её схемы,
+    // без потока — цельное тело, вызов в `message.tool_calls`.
     if (json[field('tool_mode')] === 'single_turn') {
       if (json.stream === true) {
         sendJson(response, 400, {

@@ -9,6 +9,7 @@ import { Icon } from '@shared/ui/icon';
 import { TextField } from '@shared/ui/text-field';
 import { sourceLabel } from '@shared/lib/location-label';
 import type { LocationStepProps } from './steps.types';
+import { serverFieldText } from '@shared/config/i18n';
 
 /**
  * Шаг каталога конфигурации. Те же три дороги, что в карточке «Настроек»:
@@ -56,7 +57,7 @@ export function LocationStep({
 
       {!isValid && (
         <Typography variant="body-sm" color="danger">
-          {location.problem ?? t('errors.locationHint')}
+          {location.problem ? serverFieldText(location, 'problem') : t('errors.locationHint')}
         </Typography>
       )}
 

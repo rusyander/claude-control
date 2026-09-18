@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Badge } from '@shared/ui/badge';
+import { serverFieldText } from '@shared/config/i18n';
 import { toneOf } from '../lib/decisionTone';
 import type { ResultRowProps } from './ResultRow.types';
 import styles from './SandboxModal.module.scss';
@@ -34,9 +35,11 @@ export function ResultRow({ result, title }: ResultRowProps) {
           </Stack>
         </Stack>
 
+        {/* Причина решения: свою панель переводит по коду, чужую (то, что написал
+            сам хук) показывает как есть — переводить её нечем. */}
         {result.reason && (
           <Typography variant="caption" color="muted">
-            {result.reason}
+            {serverFieldText(result, 'reason', t)}
           </Typography>
         )}
 

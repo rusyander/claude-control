@@ -17,6 +17,7 @@ import { readMcpServers, saveMcpServer } from '../domains/mcp.ts';
 import { readEnvVars } from '../domains/env.ts';
 import { readPermissions } from '../domains/permissions.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Сравнение конфигураций двух провайдеров и перенос записей между ними
@@ -73,9 +74,11 @@ export function registerProviderCompareRoutes(app: FastifyInstance, ctx: ServerC
       const right = request.query.right ?? '';
 
       if (!isKnownProviderId(left) || !isKnownProviderId(right)) {
-        return reply
-          .code(400)
-          .send({ error: 'unknown_provider', message: 'Такого провайдера панель не знает.' });
+        return reply.code(400).send({
+          error: 'unknown_provider',
+          message: 'Такого провайдера панель не знает.',
+          messageCode: 'provider-unknown-to-panel',
+        });
       }
 
       try {
@@ -85,7 +88,9 @@ export function registerProviderCompareRoutes(app: FastifyInstance, ctx: ServerC
         }) satisfies ProviderCompareResponse;
       } catch (error) {
         if (error instanceof CompareRequestError) {
-          return reply.code(400).send({ error: 'bad_request', message: error.message });
+          return reply
+            .code(400)
+            .send({ error: 'bad_request', message: error.message, ...codeOf(error) });
         }
         throw error;
       }
@@ -96,9 +101,11 @@ export function registerProviderCompareRoutes(app: FastifyInstance, ctx: ServerC
     const body = request.body;
 
     if (!isKnownProviderId(body?.from ?? '') || !isKnownProviderId(body?.to ?? '')) {
-      return reply
-        .code(400)
-        .send({ error: 'unknown_provider', message: 'Такого провайдера панель не знает.' });
+      return reply.code(400).send({
+        error: 'unknown_provider',
+        message: 'Такого провайдера панель не знает.',
+        messageCode: 'provider-unknown-to-panel',
+      });
     }
 
     try {
@@ -115,12 +122,15 @@ export function registerProviderCompareRoutes(app: FastifyInstance, ctx: ServerC
       }) satisfies ProviderMigrateResponse;
     } catch (error) {
       if (error instanceof CompareRequestError) {
-        return reply.code(400).send({ error: 'bad_request', message: error.message });
+        return reply
+          .code(400)
+          .send({ error: 'bad_request', message: error.message, ...codeOf(error) });
       }
       if (error instanceof UnrecognizedFormatError) {
         return reply.code(422).send({
           error: 'format_unrecognized',
           message: 'Формат файла приёмника не распознан — панель в него не пишет.',
+          messageCode: 'compare-target-format-unrecognized',
         });
       }
       throw error;

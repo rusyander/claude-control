@@ -31,7 +31,12 @@ export function revertHunk(
   backupTargetDir?: string,
 ): RevertHunkResult {
   if (basename(name) !== name || !BACKUP_NAME.test(name)) {
-    return { ok: false, notFound: true, error: 'Копия не найдена' };
+    return {
+      ok: false,
+      notFound: true,
+      error: 'Копия не найдена',
+      messageCode: 'backup-copy-not-found',
+    };
   }
 
   const byFile = collectSnapshots(backupDir, targets);
@@ -40,39 +45,65 @@ export function revertHunk(
     if (!snapshot) continue;
 
     const target = targets.find((item) => item.backupBase === file);
-    if (!target) return { ok: false, notFound: true, error: 'Копия не найдена' };
+    if (!target)
+      return {
+        ok: false,
+        notFound: true,
+        error: 'Копия не найдена',
+        messageCode: 'backup-copy-not-found',
+      };
     if (!target.canRevert) {
       return {
         ok: false,
         error: `Копия файла провайдера «${target.file}» доступна только для просмотра — откат отсюда не выполняется.`,
+        messageCode: 'history-provider-copy-readonly',
+        params: { file: target.file },
       };
     }
 
     const currentPath = target.path;
     if (!existsSync(currentPath)) {
-      return { ok: false, error: 'Текущий файл не найден' };
+      return {
+        ok: false,
+        error: 'Текущий файл не найден',
+        messageCode: 'history-current-file-missing',
+      };
     }
 
     const snapshotText = readText(snapshot.path);
     const currentText = readText(currentPath);
 
     if (isBinary(snapshotText) || isBinary(currentText)) {
-      return { ok: false, error: 'Бинарный файл — построчный откат недоступен' };
+      return {
+        ok: false,
+        error: 'Бинарный файл — построчный откат недоступен',
+        messageCode: 'history-binary-no-hunks',
+      };
     }
     if (tooBig(snapshotText, currentText)) {
-      return { ok: false, error: 'Файл слишком большой — построчный откат недоступен' };
+      return {
+        ok: false,
+        error: 'Файл слишком большой — построчный откат недоступен',
+        messageCode: 'history-too-large-no-hunks',
+      };
     }
 
     // before = копия, after = текущий файл: та же ориентация, что у диффа самой
     // свежей копии в ленте, поэтому индексы ханков совпадают.
     const { lines } = diffLines(snapshotText, currentText);
     const built = buildRevertedText(lines, hunkIndex, currentText);
-    if (built === undefined) return { ok: false, error: 'Изменение не найдено' };
+    if (built === undefined)
+      return { ok: false, error: 'Изменение не найдено', messageCode: 'history-hunk-not-found' };
     if (built === currentText) return { ok: true, restoredTo: currentPath };
 
     const backupPath = writeTextFile(currentPath, built, { backupDir: backupTargetDir });
     return { ok: true, restoredTo: currentPath, backupPath };
   }
 
-  return { ok: false, notFound: true, error: 'Копия не найдена' };
+  return {
+    ok: false,
+    notFound: true,
+    error: 'Копия не найдена',
+    messageCode: 'backup-copy-not-found',
+  };
 }

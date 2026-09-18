@@ -14,7 +14,7 @@ import { api } from '../../shared/api/client';
  * уходит трафик ДЕВЯТИ CLI, а телефон человек достаёт в дороге. Поэтому ни
  * одной мутации: маршрутов записи телефон не зовёт вовсе.
  */
-export { runPlanView, type RunPlanLine, type RunPlanView } from './run-plan';
+export { runPlanConsumer, runPlanView, type RunPlanLine, type RunPlanView } from './run-plan';
 export { budgetPercent, platformProblem, platformTone, type PlatformProblem } from './state';
 
 /** Контуры панели с бюджетом и итогом последней пробы. */

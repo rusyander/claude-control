@@ -14,6 +14,7 @@ import {
   scaffoldPlugin,
 } from '../domains/plugins.ts';
 import { activeCliCommand } from '../providers/cli.ts';
+import { attachTextCodes } from '../lib/server-texts.ts';
 
 /**
  * Маршруты плагинов. Каждая операция — вызов CLI, а он ходит в сеть и клонирует
@@ -21,14 +22,23 @@ import { activeCliCommand } from '../providers/cli.ts';
  * ход выполнения, а не подвисать молча.
  */
 export function registerPluginRoutes(app: FastifyInstance, ctx: ServerContext): void {
-  app.get('/api/plugins', () => readPlugins(ctx.location.paths.root, activeCliCommand(ctx.store)));
+  // Заметка «список не получен» собрана строкой: код к ней восстанавливается
+  // разбором, и английская страница читает её своим словарём.
+  app.get('/api/plugins', async () =>
+    attachTextCodes(await readPlugins(ctx.location.paths.root, activeCliCommand(ctx.store)), [
+      'notes',
+    ]),
+  );
 
   app.get('/api/plugins/available', () => readAvailablePlugins(activeCliCommand(ctx.store)));
 
   app.post<{ Body: { id?: string } }>('/api/plugins/install', (request, reply) => {
     // Без идентификатора установка ушла бы в CLI пустой строкой: он клонирует
     // репозитории и ходит в сеть, поэтому отказываем до запуска.
-    if (!request.body.id) return reply.code(400).send({ message: 'Не указан плагин' });
+    if (!request.body.id)
+      return reply
+        .code(400)
+        .send({ message: 'Не указан плагин', messageCode: 'plugin-unspecified' });
 
     return installPlugin(request.body.id, activeCliCommand(ctx.store));
   });
@@ -42,7 +52,10 @@ export function registerPluginRoutes(app: FastifyInstance, ctx: ServerContext): 
     (request, reply) => {
       // Состояние домысливать нельзя: пустое тело раньше означало «выключить».
       if (typeof request.body.isEnabled !== 'boolean') {
-        return reply.code(400).send({ message: 'Не указано состояние плагина' });
+        return reply.code(400).send({
+          message: 'Не указано состояние плагина',
+          messageCode: 'plugin-state-unspecified',
+        });
       }
 
       return request.body.isEnabled
@@ -57,7 +70,10 @@ export function registerPluginRoutes(app: FastifyInstance, ctx: ServerContext): 
 
   // Маркетплейсы: раньше источник добавляли только командой claude в терминале.
   app.post<{ Body: { source?: string } }>('/api/plugins/marketplaces', (request, reply) => {
-    if (!request.body.source) return reply.code(400).send({ message: 'Не указан источник' });
+    if (!request.body.source)
+      return reply
+        .code(400)
+        .send({ message: 'Не указан источник', messageCode: 'plugin-source-unspecified' });
 
     return addMarketplace(request.body.source, activeCliCommand(ctx.store));
   });
@@ -75,7 +91,11 @@ export function registerPluginRoutes(app: FastifyInstance, ctx: ServerContext): 
     // писать некуда, а без имени нечего называть папкой и манифестом. Обрезанное
     // тело падало пятисоткой в записи вместо честного отказа.
     if (!request.body.dir || !request.body.name) {
-      return reply.code(400).send({ ok: false, error: 'Не указан каталог или имя плагина' });
+      return reply.code(400).send({
+        ok: false,
+        error: 'Не указан каталог или имя плагина',
+        messageCode: 'plugin-dir-or-name-unspecified',
+      });
     }
 
     return scaffoldPlugin({

@@ -55,6 +55,9 @@ const VALUE_MODULES = [
   'server-messages',
   // Лента разговора с агентом панели (А8): тот же разбор кадров, что у окна панели.
   'panel-agent-feed',
+  // Идентификаторы наших слоёв: телефон считает по ним «сняты все слои или часть».
+  // Отдельный модуль, а не `contracts/platform`, — тот тянет zod, которого здесь нет.
+  'platform-layers',
 ];
 const aliases = new Map(
   VALUE_MODULES.map((name) => [

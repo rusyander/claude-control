@@ -1,4 +1,4 @@
-import { ourLayerIds } from '@agentdeck/contracts/platform';
+import { ourLayerIds } from '@agentdeck/contracts/platform-layers';
 import type { PlatformRunPlan } from '@agentdeck/contracts';
 import { chooseRunModel, modelCaptionState } from '@agentdeck/contracts/platform-models';
 import type { Dictionary } from '../../shared/config/i18n/ru';

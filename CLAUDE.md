@@ -98,6 +98,20 @@ subpath (`@agentdeck/contracts/<module>`), adding it to `exports` in
 `server-contracts-barrel-types-only` rule in `.dependency-cruiser.cjs` — `pnpm depcruise` names the
 offending edge, so this must never reach a running panel again.
 
+**APK build dies at `createBundleReleaseJsAndAssets`: `Unable to resolve module @agentdeck/contracts/X`**
+— the mobile twin of the entry above, and the nastier one: `pnpm mobile:type-check` and the mobile
+tests stay GREEN on a tree whose APK no longer builds, because tsc resolves the subpath through the
+package while Metro does not. Mobile lives outside the pnpm workspace with its own npm linkage, so a
+contracts module needed AS A VALUE is resolved straight to source via `VALUE_MODULES` in
+`apps/mobile/metro.config.js` — a hand-kept list. A module missing from it fails to resolve; a module
+on it that (transitively, through non-type imports) reaches an outside package fails too, because
+mobile's `node_modules` has no zod. Type-only imports are erased and never reach Metro, so they are
+free. Fix: put the value in a module with no external imports (`packages/contracts/src/platform-layers.ts`
+is the pattern — it re-exports from `platform.ts`, so every existing import keeps working), add it to
+the package `exports` and to `VALUE_MODULES`. Guard `pnpm mobile:contracts`
+(`tools/qa/check-mobile-contracts.mjs`, selftest included) — it reads the list out of the config
+itself, skips test files (not in Metro's graph) and follows relative imports to find the outside one.
+
 **Settings/token/keys "lost" after the rename, or the pre-rename product name reappears** — the product
 had another name until 17.09.2026 (`LEGACY_BRAND_*` in `apps/server/src/lib/brand.mjs`). The old name is
 NEVER written literally anywhere in the tree — it is built from parts (`LEGACY_PARTS`), tests spell it
@@ -421,7 +435,7 @@ reads as «my prompt edit did not work».
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
 
 Gate before "done": `pnpm type-check && pnpm lint && pnpm test && pnpm depcruise && pnpm compromises
-&& pnpm negatives && pnpm shots && pnpm brand && node tools/qa/audit-layout.mjs && node tools/qa/check-a11y.mjs && node tools/qa/check-keyboard.mjs && node
+&& pnpm negatives && pnpm shots && pnpm brand && pnpm mobile:contracts && node tools/qa/audit-layout.mjs && node tools/qa/check-a11y.mjs && node tools/qa/check-keyboard.mjs && node
 tools/qa/check-etag.mjs` (the last four drive the live stand; `check-etag` reads the wire status through CDP,
 because Playwright reports a 304 revalidation as the cached 200). `pnpm test` measures coverage every run and fails below the thresholds
 pinned in each `vitest.config.ts` (raise them when coverage grows, never lower silently). The same

@@ -10,6 +10,7 @@ import {
   type infer as Infer,
 } from 'zod';
 import type { CompromiseId } from './compromises';
+import type { OurLayerId } from './platform-layers';
 import type {
   CodedFields,
   ServerMessageCode,
@@ -468,9 +469,13 @@ export const ourRulesSchema = object({
 
 export type OurRules = Infer<typeof ourRulesSchema>;
 
-/** Идентификаторы слоёв — общий словарь сервера, экрана и следа запроса. */
-export const ourLayerIds = ['settings', 'skills', 'mcp', 'systemPrompt'] as const;
-export type OurLayerId = (typeof ourLayerIds)[number];
+/**
+ * Идентификаторы слоёв — общий словарь сервера, экрана и следа запроса. Живут
+ * в отдельном модуле без зависимостей: телефон берёт их значением, а сюда
+ * тянется zod (см. `platform-layers.ts`). Реэкспорт оставлен, чтобы все прежние
+ * импорты — и из бочки, и из `contracts/platform` — продолжали работать.
+ */
+export { ourLayerIds, type OurLayerId } from './platform-layers.ts';
 
 /**
  * Чем обернётся настройка слоёв в ЗАПУСКЕ: флаги CLI и судьба нашей дописки к

@@ -35,6 +35,7 @@
     "keepalive:off": "node tools/keepalive.mjs --uninstall",
     "keepalive:status": "node tools/keepalive.mjs --status",
     "mobile": "npm --prefix apps/mobile run android",
+    "mobile:contracts": "node tools/qa/check-mobile-contracts.mjs && node tools/qa/check-mobile-contracts.mjs --selftest",
     "mobile:type-check": "npm --prefix apps/mobile run type-check",
     "mobile:test": "npm --prefix apps/mobile run test",
     "mobile:apk": "node tools/build-mobile-apk.mjs",

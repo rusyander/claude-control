@@ -24,6 +24,7 @@
     "./panel-agent-feed": "./src/panel-agent-feed.ts",
     "./permission-rules": "./src/permission-rules.ts",
     "./platform": "./src/platform.ts",
+    "./platform-layers": "./src/platform-layers.ts",
     "./platform-consumers": "./src/platform-consumers.ts",
     "./platform-legacy": "./src/platform-legacy.ts",
     "./platform-models": "./src/platform-models.ts",

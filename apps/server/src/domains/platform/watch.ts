@@ -88,9 +88,15 @@ export class PlatformWatch {
    * НИЧЕГО не ждёт: ставит отложенную пробу и возвращается.
    */
   noteRightsRefusal(platformId: string): void {
-    if (platformId !== this.#activeId()) return;
+    // Порядок отсева — от дешёвого к дорогому, и это не вкусовщина: `#activeId()`
+    // читает ключ с диска, а хранилище ключей расшифровывается через scrypt —
+    // сотня миллисекунд синхронно. Отказ, пахнущий правами, приходит на КАЖДЫЙ
+    // запрос упавшего CLI, так что проверка «уже назначено» и пол по частоте —
+    // обе чисто в памяти — обязаны стоять раньше: иначе путь запроса платит
+    // scrypt за каждый отказ, который всё равно будет отброшен.
     if (this.#rights) return;
     if (this.#lastRightsProbeAt && this.#now() - this.#lastRightsProbeAt < RIGHTS_FLOOR_MS) return;
+    if (platformId !== this.#activeId()) return;
     this.#lastRightsProbeAt = this.#now();
     this.#rights = setTimeout(() => {
       this.#rights = undefined;

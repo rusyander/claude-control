@@ -10,6 +10,25 @@ import { writeToken } from './store.ts';
 import { PlatformWatch, RIGHTS_DELAY_MS, RIGHTS_FLOOR_MS } from './watch.ts';
 
 /**
+ * Счётчик походов за ключом. Не подмена: настоящий `readToken` зовётся как был,
+ * счётчик только считает. Считаем именно его, потому что хранилище ключей
+ * расшифровывается через scrypt — это сотня миллисекунд СИНХРОННО, и цена
+ * отказа на пути запроса измеряется в этих походах, а не в чём-то ещё.
+ */
+const keyReads = vi.hoisted(() => ({ count: 0 }));
+
+vi.mock('./store.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./store.ts')>();
+  return {
+    ...actual,
+    readToken: (...args: Parameters<typeof actual.readToken>) => {
+      keyReads.count += 1;
+      return actual.readToken(...args);
+    },
+  };
+});
+
+/**
  * Фоновая перепроверка активного контура (A-2).
  *
  * Проверяется не «функция позвалась», а то, ЧТО УШЛО В СЕТЬ и сколько раз:
@@ -169,6 +188,28 @@ describe('PlatformWatch: отказ, пахнущий правами', () => {
     probe.noteRightsRefusal('company-dev');
     await vi.advanceTimersByTimeAsync(RIGHTS_DELAY_MS);
     expect(calls).toHaveLength(2);
+  });
+
+  it('путь запроса не платит расшифровкой ключа за каждый отказ', async () => {
+    vi.useFakeTimers();
+    let now = 1_000_000;
+    const probe = watch(() => now);
+
+    keyReads.count = 0;
+    for (let attempt = 0; attempt < 50; attempt += 1) probe.noteRightsRefusal('company-dev');
+    // Один поход за ключом на весь залп: остальные сорок девять отсеяны в памяти
+    // («проба уже назначена»), не дойдя до диска.
+    expect(keyReads.count).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(RIGHTS_DELAY_MS);
+    keyReads.count = 0;
+    for (let attempt = 0; attempt < 50; attempt += 1) probe.noteRightsRefusal('company-dev');
+    // Внутри пола по частоте — ни одного похода: отказ отброшен раньше диска.
+    expect(keyReads.count).toBe(0);
+
+    now += RIGHTS_FLOOR_MS;
+    probe.noteRightsRefusal('company-dev');
+    expect(keyReads.count).toBe(1);
   });
 
   it('отказ НЕ активного контура пробу не заводит', () => {

@@ -56,6 +56,18 @@ export interface CliSpawnOptions {
    */
   env?: Record<string, string>;
   /**
+   * Переменные и ключи переносимой среды (П3.5) — ФУНКЦИЯ, а не объект.
+   *
+   * Собирает её `portability/supervisor/env-inject.ts`, и зовётся она в момент
+   * запуска. Строкой значение ключа сюда попасть не может намеренно: параметры
+   * прогона панель СОХРАНЯЕТ (остановленный прогон продолжается ими же и
+   * переживает перезапуск), и ключ, положенный полем, уехал бы в `state.json` —
+   * то есть ровно туда, где секрета быть не должно. Функция такого переезда не
+   * переживает, и окружение собирается заново — как заново пересобирается
+   * маршрут контура.
+   */
+  portableEnv?: () => Record<string, string>;
+  /**
    * `false` — `env` и есть ВСЁ окружение процесса, без `process.env` сервера.
    * Для агента панели: его CLI не должен унаследовать ни ключ API, ни переменные
    * контура и интеграций, лежащие в окружении панели. Список нужного CLI собирает
@@ -75,21 +87,29 @@ export function spawnCliProcess(
   options: CliSpawnOptions = {},
 ): CliSpawnOutcome {
   const spawnImpl = options.spawnImpl ?? nodeSpawn;
-  // `env` уходит в spawn ТОЛЬКО целиком: node не умеет «добавить переменную», он
-  // заменяет окружение целиком. Поэтому добавку кладём поверх копии process.env —
-  // иначе CLI лишился бы PATH и входа в аккаунт. Ключа нет — options.env не
-  // передаём вовсе, чтобы ребёнок унаследовал окружение сервера как раньше.
-  const base = {
-    windowsHide: true,
-    ...(options.cwd ? { cwd: options.cwd } : {}),
-    ...(options.inheritEnv === false
-      ? { env: { ...options.env } }
-      : options.env
-        ? { env: { ...process.env, ...options.env } }
-        : {}),
-  };
 
   try {
+    // Канон переносимой среды ложится ПОД `options.env`: адрес шлюза контура
+    // сильнее переменной из файла цели — иначе перенесённый `OPENAI_BASE_URL`
+    // увёл бы трафик мимо контура. Сборка внутри try: у запуска один ответ
+    // (`CliSpawnOutcome`), и падение сборщика окружения обязано приехать
+    // ошибкой, а не исключением наружу.
+    const extra = { ...options.portableEnv?.(), ...options.env };
+
+    // `env` уходит в spawn ТОЛЬКО целиком: node не умеет «добавить переменную», он
+    // заменяет окружение целиком. Поэтому добавку кладём поверх копии process.env —
+    // иначе CLI лишился бы PATH и входа в аккаунт. Добавки нет — `env` не
+    // передаём вовсе, чтобы ребёнок унаследовал окружение сервера как раньше.
+    const base = {
+      windowsHide: true,
+      ...(options.cwd ? { cwd: options.cwd } : {}),
+      ...(options.inheritEnv === false
+        ? { env: extra }
+        : Object.keys(extra).length > 0
+          ? { env: { ...process.env, ...extra } }
+          : {}),
+    };
+
     if (!isWindows()) {
       return { child: spawnImpl(command, args, base) as ChildProcessWithoutNullStreams };
     }

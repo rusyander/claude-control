@@ -12,7 +12,26 @@ import { providerCliCommand } from '../../providers/cli.ts';
 import { resolveRunner, getRawKey } from '../provider-keys.ts';
 import { runProviderApi } from '../assistant-runner/api.ts';
 import { opencodeServe, type OpencodeServe } from '../opencode-serve.ts';
+import type {
+  SessionStartSource,
+  SupervisorEventInput,
+  SupervisorRun,
+} from '../portability/supervisor/payload.ts';
+import { runSupervisorEvent, type SupervisorHook } from '../portability/supervisor/run.ts';
+import {
+  planSkillTurn,
+  type SkillCatalogEntry,
+  type SkillBodySource,
+} from '../portability/supervisor/skills-router.ts';
 import { buildPrompt } from './prompt.ts';
+
+/** Откуда прогон берёт каталог скиллов и тело названного (П3.4). */
+export interface SkillTurnSource {
+  readonly entries: readonly SkillCatalogEntry[];
+  /** Бюджет каталога в символах — он же предел того, что уедет в argv. */
+  readonly budgetChars: number;
+  readonly readBody: (name: string) => SkillBodySource | undefined;
+}
 
 /**
  * Один ответ чужого провайдера.
@@ -79,6 +98,37 @@ export interface ProviderChatRunOptions {
    * платный запрос в корпоративный шлюз.
    */
   platformEnv?: Record<string, string>;
+  /**
+   * Надзиратель рантайма (П3.2): события вокруг ЭТОГО прогона.
+   *
+   * Собирает вызывающий — набор скриптов зависит от разделов панели, а описание
+   * прогона от разговора; здесь они только отыгрываются. Не задан — надзиратель
+   * молчит, и прогон идёт точно так же, как шёл до него.
+   */
+  supervisor?: {
+    readonly run: SupervisorRun;
+    readonly hooks: readonly SupervisorHook[];
+    /** Чем начат разговор — уходит в `SessionStart`. Не задан — события не будет. */
+    readonly sessionStart?: SessionStartSource;
+    readonly timeoutMs?: number;
+  };
+  /**
+   * Переменные канона для окружения чужого CLI (П3.5).
+   *
+   * Функция, а не готовый объект, намеренно: снимок настроек прогона панель
+   * сохраняет, и значение секрета в таком снимке уехало бы в `state.json`.
+   * Вызывается в момент запуска и никуда не записывается.
+   */
+  portableEnv?: () => Record<string, string>;
+  /**
+   * Скиллы для цели без своего механизма (П3.4): каталог в инструкции, тело —
+   * по имени в следующий запрос.
+   *
+   * Собирает вызывающий: каталог зависит от раздела скиллов панели, а он читает
+   * диск и знает про области видимости. Здесь только отыгрывается — не задан,
+   * и прогон идёт точно так же, как шёл без скиллов.
+   */
+  skills?: SkillTurnSource;
   /** Подменяемые зависимости: в тестах ничего настоящего не запускается. */
   spawnImpl?: typeof nodeSpawn;
   fetchImpl?: typeof fetch;
@@ -109,7 +159,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
     options: ProviderChatRunOptions,
     onEvent: (event: ProviderChatRunEvent) => void,
   ): Promise<void> {
-    const { provider, appDataDir } = options;
+    const { provider } = options;
 
     if (provider.id === 'claude') {
       onEvent({
@@ -120,6 +170,15 @@ export class ProviderChatRun implements ProviderChatRunLike {
       return;
     }
 
+    // Каталог скиллов и тело названного встают тем же способом, что и указание, —
+    // и РАНЬШЕ него: первой репликой цель должна прочитать свою роль, а список
+    // доступных ей скиллов уже после. Порядок наложения обратный порядку строк:
+    // каждый блок дописывается в начало, поэтому последний из них окажется первым.
+    const skillPrefixes = this.planSkills(options);
+    if (skillPrefixes.length > 0) {
+      options = { ...options, history: [...skillPrefixes.map(prefixMessage), ...options.history] };
+    }
+
     // Указание встаёт первой репликой и дальше живёт как часть переписки: все
     // пути ниже строят промпт из `history`, поэтому подмешать его надо ровно
     // здесь — иначе про него пришлось бы помнить в каждом из них по отдельности.
@@ -127,6 +186,61 @@ export class ProviderChatRun implements ProviderChatRunLike {
       options = { ...options, history: [prefixMessage(options.systemPrefix), ...options.history] };
     }
 
+    // Надзиратель рантайма отыгрывает события ПЕРЕД выбором раннера: отказ
+    // блокирующего хука обязан остановить прогон до того, как чужой CLI будет
+    // запущен, — иначе запрет сработал бы уже после действия.
+    const supervised = await this.runSupervisorBefore(options, onEvent);
+    if (supervised.blocked) return;
+
+    // Контекст, дописанный хуком, встаёт перед перепиской тем же способом, что и
+    // `systemPrefix`: у чужого CLI другого канала для этого нет.
+    if (supervised.addedContext.length > 0) {
+      options = {
+        ...options,
+        history: [...supervised.addedContext.map(prefixMessage), ...options.history],
+      };
+    }
+
+    try {
+      await this.dispatch(options, onEvent);
+    } finally {
+      // `Stop` отыгрывается и когда прогон упал: событие конца принадлежит
+      // прогону, а не его успеху, и потерять его молча нельзя.
+      await this.runSupervisorAfter(options, onEvent);
+    }
+  }
+
+  /**
+   * Каталог скиллов и — если скилл назван — его тело, текстами для врезки (П3.4).
+   *
+   * Имя ищется в ПОСЛЕДНЕЙ реплике человека: скилл, названный три хода назад,
+   * уже отработал, и подкладывать его тело в каждый следующий запрос значило бы
+   * съедать контекст цели тем, о чём никто не просил.
+   *
+   * Тело не попадает в argv ни при каком его размере: отсюда уезжают только
+   * каталог (ограничен бюджетом) и ОДНА строка с путём до `SKILL.md`. Файлом
+   * инструкций цели прогон не распоряжается — он её не переписывает, поэтому
+   * `instructionsBudget` здесь не задаётся и канал остаётся один.
+   */
+  private planSkills(options: ProviderChatRunOptions): readonly string[] {
+    const source = options.skills;
+    if (!source) return [];
+
+    const lastUser = [...options.history].reverse().find((message) => message.role === 'user');
+    return planSkillTurn({
+      entries: source.entries,
+      budgetChars: source.budgetChars,
+      ...(lastUser ? { prompt: lastUser.content } : {}),
+      readBody: source.readBody,
+    }).prefixes;
+  }
+
+  /** Выбор пути и сам прогон. Вынесено, чтобы события конца отыграл один `finally`. */
+  private async dispatch(
+    options: ProviderChatRunOptions,
+    onEvent: (event: ProviderChatRunEvent) => void,
+  ): Promise<void> {
+    const { provider, appDataDir } = options;
     const resolution = resolveRunner(provider, appDataDir, options.detect);
 
     if (resolution.mode === 'cli') {
@@ -180,6 +294,104 @@ export class ProviderChatRun implements ProviderChatRunLike {
     this.stopped = true;
     this.abort.abort();
     if (this.child) killChildTree(this.child);
+  }
+
+  /**
+   * События надзирателя ДО прогона: `SessionStart` (если разговор начинается) и
+   * `UserPromptSubmit`.
+   *
+   * Возвращает `true`, если прогон отказан. Причина уходит человеку событием
+   * `error` с поводом `hook_blocked` — это не ошибка запуска: CLI не запускался
+   * вовсе, и показывать «CLI упал» здесь значило бы соврать.
+   *
+   * Контекст, дописанный хуком (`additionalContext`), встаёт в переписку тем же
+   * способом, что и `systemPrefix`: у чужого CLI другого канала для этого нет.
+   */
+  private async runSupervisorBefore(
+    options: ProviderChatRunOptions,
+    onEvent: (event: ProviderChatRunEvent) => void,
+  ): Promise<{ blocked: boolean; addedContext: readonly string[] }> {
+    const supervisor = options.supervisor;
+    if (!supervisor) return { blocked: false, addedContext: [] };
+
+    const lastUser = [...options.history].reverse().find((message) => message.role === 'user');
+
+    const events: SupervisorEventInput[] = [
+      ...(supervisor.sessionStart
+        ? [{ event: 'SessionStart' as const, source: supervisor.sessionStart }]
+        : []),
+      // Текста может не быть вовсе (прогон без нового вопроса) — тогда поля
+      // `prompt` в нагрузке не будет, а пустой строки там быть не должно:
+      // «данных нет» и «данные пустые» скрипт обязан различать.
+      {
+        event: 'UserPromptSubmit' as const,
+        ...(lastUser ? { prompt: lastUser.content } : {}),
+      },
+    ];
+
+    const addedContext: string[] = [];
+
+    for (const input of events) {
+      const outcome = await runSupervisorEvent({
+        provider: options.provider,
+        run: supervisor.run,
+        input,
+        hooks: supervisor.hooks,
+        // `spawnImpl` здесь НЕ передаётся намеренно. Подменяем только внешнюю
+        // границу — чужой CLI; исполнение хука это и есть то, что проверяется,
+        // и подменённый хук доказывал бы подмену, а не запрет.
+        ...(supervisor.timeoutMs ? { timeoutMs: supervisor.timeoutMs } : {}),
+      });
+
+      if (outcome.blocked) {
+        onEvent({
+          type: 'error',
+          error: outcome.reason ?? `Хук события ${outcome.event} отказал действию.`,
+          reason: 'hook_blocked',
+        });
+        return { blocked: true, addedContext };
+      }
+
+      addedContext.push(...outcome.addedContext);
+    }
+
+    return { blocked: false, addedContext };
+  }
+
+  /**
+   * Событие `Stop` — прогон кончился.
+   *
+   * У Claude код 2 на `Stop` заставляет агента продолжить работу. Одиночный
+   * прогон чужого CLI продолжать НЕЧЕМ: процесс закончился, второго вопроса
+   * панель сама не задаёт. Поэтому отказ здесь не прячется и не выдаётся за
+   * продолжение — он приезжает человеку заметкой, чтобы причина была видна.
+   *
+   * `SessionEnd`, `SubagentStop`, `Notification` и `PreCompact` отыгрываются не
+   * здесь: они принадлежат закрытию разговора, конвейеру разделения и чек-пойнту
+   * передачи — то есть другим точкам, у каждой свой вызывающий.
+   */
+  private async runSupervisorAfter(
+    options: ProviderChatRunOptions,
+    onEvent: (event: ProviderChatRunEvent) => void,
+  ): Promise<void> {
+    const supervisor = options.supervisor;
+    if (!supervisor) return;
+
+    const outcome = await runSupervisorEvent({
+      provider: options.provider,
+      run: supervisor.run,
+      input: { event: 'Stop', stopHookActive: false },
+      hooks: supervisor.hooks,
+      ...(supervisor.timeoutMs ? { timeoutMs: supervisor.timeoutMs } : {}),
+    });
+
+    if (outcome.blocked) {
+      onEvent({
+        type: 'error',
+        error: outcome.reason ?? 'Хук события Stop потребовал продолжения, а продолжать нечем.',
+        reason: 'hook_blocked',
+      });
+    }
   }
 
   /**
@@ -279,6 +491,10 @@ export class ProviderChatRun implements ProviderChatRunLike {
       ...(options.platformEnv && Object.keys(options.platformEnv).length > 0
         ? { env: options.platformEnv }
         : {}),
+      // Канон ложится ПОД `env`: адрес контура собран для этого прогона и обязан
+      // побеждать. Значения секретов живут только в окружении процесса — на диск
+      // из этого пути не попадает ничего.
+      ...(options.portableEnv ? { portableEnv: options.portableEnv } : {}),
     });
 
     if (spawned.error) {

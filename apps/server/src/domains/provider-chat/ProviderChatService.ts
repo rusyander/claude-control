@@ -12,6 +12,7 @@ import {
   type ProviderChatRunOptions,
 } from './ProviderChatRun.ts';
 import type { PlatformRunRoute } from '../platform/routing.ts';
+import { expandCommand, type SupervisorCommand } from '../portability/supervisor/commands.ts';
 import { appendMessage, readChat } from './store.ts';
 import { composeUserMessage } from './prompt.ts';
 import { serverText } from '../../lib/server-texts.ts';
@@ -88,7 +89,14 @@ export interface ProviderChatFinished {
 export type ProviderChatRunDeps = Omit<
   ProviderChatRunOptions,
   'history' | 'chatId' | 'appDataDir' | 'workdir' | 'model' | 'effort' | 'platformEnv'
->;
+> & {
+  /**
+   * Слэш-команды панели (П3.4). Разворачиваются ЗДЕСЬ, а не в прогоне: тело
+   * команды обязано попасть в переписку, а переписку ведёт служба. В опции
+   * прогона это поле не уходит — ему там нечего делать.
+   */
+  commands?: readonly SupervisorCommand[];
+};
 
 export interface SendOutcome {
   ok: boolean;
@@ -179,7 +187,13 @@ export class ProviderChatService {
     const chat = readChat(appDataDir, providerId, chatId);
     if (!chat) return { ok: false, reason: 'not_found' };
 
-    const content = composeUserMessage(input.text, input.attachments);
+    // Команда разворачивается ДО записи реплики, и в переписку ложится её ТЕЛО:
+    // человек видит ровно тот текст, который уехал модели, и по нему же читает
+    // ответ. Записать «/review», а отправить две страницы значило бы спрятать
+    // половину разговора от того, кто его ведёт.
+    const { commands, ...runDeps } = deps;
+    const expanded = commands ? expandCommand(input.text, commands) : undefined;
+    const content = composeUserMessage(expanded?.text ?? input.text, input.attachments);
     const message = appendMessage(appDataDir, providerId, chatId, { role: 'user', content });
     if (!message) return { ok: false, reason: 'not_found' };
 
@@ -221,7 +235,7 @@ export class ProviderChatService {
     void live.run
       .start(
         {
-          ...deps,
+          ...runDeps,
           history,
           chatId,
           appDataDir,

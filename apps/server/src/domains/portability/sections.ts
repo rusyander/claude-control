@@ -29,6 +29,7 @@ import {
   type HookInput,
 } from './normalize-hooks.ts';
 import { normalizeMcpServers } from './normalize-mcp.ts';
+import { readHookShimCommand } from './emit/hook-shim.ts';
 import { normalizePermissions } from './normalize-permissions.ts';
 import {
   commandItem,
@@ -318,15 +319,23 @@ function readHooks(deps: ImportDeps, targets: SectionTargets): ImportResult {
   const inputs: HookInput[] =
     info.shape === 'opencode-events'
       ? opencodeHookInputs({ fileEdited: info.fileEdited, sessionCompleted: info.sessionCompleted })
-      : info.rules.map((rule) => ({
-          event: rule.event,
-          matcher: rule.matcher ?? null,
-          command: rule.command,
-          timeout: rule.timeout ?? null,
-          scriptPath: scriptPathOf(rule.command),
-          enabled: true,
-          raw: JSON.stringify(rule),
-        }));
+      : info.rules.map((rule) => {
+          // Переходник (П3.3) в конфиге цели стоит ВМЕСТО команды человека.
+          // В канон обязана вернуться команда человека: иначе повторный импорт
+          // записал бы в канон сгенерированный посредник, и перенос подменил бы
+          // людям их же хуки. `raw` остаётся как в файле — это то, что там
+          // действительно лежит.
+          const command = readHookShimCommand(rule.command) ?? rule.command;
+          return {
+            event: rule.event,
+            matcher: rule.matcher ?? null,
+            command,
+            timeout: rule.timeout ?? null,
+            scriptPath: scriptPathOf(command),
+            enabled: true,
+            raw: JSON.stringify(rule),
+          };
+        });
 
   const normalized = normalizeHooks(inputs, {
     source,

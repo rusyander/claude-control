@@ -115,7 +115,10 @@ function writeSourceHome(root: string): void {
     join(claude, 'hooks', 'mark.mjs'),
     [
       "import { writeFileSync } from 'node:fs';",
-      `writeFileSync(process.argv[2], ${JSON.stringify(HOOK_MARK)}, 'utf8');`,
+      // Путь метки приезжает окружением, а не аргументом: между конфигом цели и
+      // этим скриптом теперь стоит переходник (П3.3), и нагрузку он передаёт
+      // через stdin — argv до скрипта человека не доходит и доходить не должен.
+      `writeFileSync(process.env.HOOK_MARK_PATH ?? process.argv[2], ${JSON.stringify(HOOK_MARK)}, 'utf8');`,
       '',
     ].join('\n'),
   );
@@ -528,11 +531,16 @@ describe('перенос в чужие CLI', () => {
     }
   });
 
-  it('путь скрипта хука у цели ИСПОЛНЯЕТСЯ — команда запускается оболочкой', () => {
+  it('команда хука у цели ИСПОЛНЯЕТСЯ и доводит до скрипта человека', () => {
     // Скрипты хуков не копируются: у цели остаётся ссылка на файл источника, и
     // единственная честная проверка «написание целевой ОС» — запустить то, что
     // записано, из ЧУЖОГО рабочего каталога. Относительный путь здесь не найдёт
     // скрипт, а обратная косая в строке команды будет съедена оболочкой.
+    //
+    // С П3.3 в конфиге стоит не скрипт человека, а переходник рядом с конфигом:
+    // он приводит нагрузку хозяина к форме Claude и зовёт исходный скрипт по его
+    // пути. Поэтому цепочка проверяется целиком — исполняется то, что записано в
+    // конфиг, а доказательством остаётся файл, который написал скрипт ЧЕЛОВЕКА.
     for (const id of ['qwen', 'kimi']) {
       const plan = emitAndApply(id);
       const write = plan.writes.find((entry) => entry.kind === 'hook');
@@ -541,13 +549,19 @@ describe('перенос в чужие CLI', () => {
       const filePath = write?.filePath ?? '';
       const text = readFileSync(filePath, 'utf8');
       const parsed: unknown = filePath.endsWith('.toml') ? parseToml(text) : JSON.parse(text);
-      const [command] = stringsWith(parsed, 'mark.mjs');
+      const [command] = stringsWith(parsed, 'hook-shim');
       expect(command, `${id}: команды хука в ${filePath} нет`).toBeDefined();
+      // Путь скрипта человека в конфиг больше не пишется — он живёт в переходнике.
+      expect(stringsWith(parsed, 'mark.mjs'), id).toHaveLength(0);
 
       const marker = join(home, `запуск-${id}.txt`);
-      const run = spawnSync('sh', ['-c', `${command ?? ''} "${marker}"`], {
+      const run = spawnSync('sh', ['-c', command ?? ''], {
         cwd: home,
         encoding: 'utf8',
+        // Нагрузка хозяина уходит переходнику через stdin — тем же способом, каким
+        // её отдаст сам CLI.
+        input: JSON.stringify({ event: 'UserPromptSubmit', prompt: 'вопрос' }),
+        env: { ...process.env, HOOK_MARK_PATH: marker },
       });
       expect(run.status, `${id}: ${command ?? ''} → ${run.stderr}`).toBe(0);
       expect(readFileSync(marker, 'utf8'), id).toBe(HOOK_MARK);

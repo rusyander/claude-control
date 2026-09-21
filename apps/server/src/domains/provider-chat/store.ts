@@ -105,6 +105,25 @@ function chatFile(appDataDir: string, providerId: string, chatId: string): strin
   return dir && isSafeId(chatId) ? join(dir, `${chatId}.jsonl`) : undefined;
 }
 
+/**
+ * Путь транскрипта разговора — для тех, кто его не читает, а НАЗЫВАЕТ.
+ *
+ * Заведено надзирателем рантайма (П3.1): в нагрузке события `transcript_path`
+ * показывает на этот файл, и скрипт хука вправе его открыть. Раскладкой владеет
+ * этот модуль, поэтому путь отдаётся отсюда — второй копии `provider-chats/<id>`
+ * в проекте быть не должно.
+ *
+ * `undefined` — идентификатор непригоден для пути (см. `SAFE_ID`), а не «файла
+ * нет»: существование здесь не проверяется, разговор мог ещё не начаться.
+ */
+export function chatTranscriptPath(
+  appDataDir: string,
+  providerId: string,
+  chatId: string,
+): string | undefined {
+  return chatFile(appDataDir, providerId, chatId);
+}
+
 /** Название по первому вопросу: список разговоров должен читаться без открытия. */
 export function titleFromText(text: string): string {
   const line = text.trim().split('\n')[0]?.trim() ?? '';

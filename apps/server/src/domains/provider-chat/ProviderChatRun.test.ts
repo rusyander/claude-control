@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProviderChatMessage } from '@agentdeck/contracts';
@@ -82,6 +82,99 @@ describe('ProviderChatRun', () => {
     );
     return events;
   };
+
+  /**
+   * Надзиратель рантайма (П3.2). Хук здесь НАСТОЯЩИЙ — скрипт на диске,
+   * запущенный настоящей оболочкой: подменённый хук доказывал бы подмену, а не
+   * запрет. Подменён только чужой CLI, то есть внешняя граница.
+   */
+  const hookAt = (name: string, body: string): string => {
+    const path = join(dir, name);
+    writeFileSync(path, body, 'utf8');
+    return `node "${path}"`;
+  };
+
+  const supervisorSetup = (hooks: { event: string; command: string }[]) => ({
+    run: {
+      providerId: 'gemini',
+      sessionId: 'chat',
+      cwd: dir,
+      transcriptPath: join(dir, 'chat.jsonl'),
+    },
+    hooks,
+  });
+
+  it('хук, отказавший на UserPromptSubmit, не даёт прогону начаться', async () => {
+    const spawn = fakeSpawn({ chunks: ['ответ, которого быть не должно'] });
+    const trace = join(dir, 'trace.json');
+    const command = hookAt(
+      'deny.cjs',
+      `const fs = require('node:fs');
+const chunks = [];
+process.stdin.on('data', (c) => chunks.push(c));
+process.stdin.on('end', () => {
+  fs.writeFileSync(${JSON.stringify(trace)}, Buffer.concat(chunks).toString('utf8'), 'utf8');
+  process.stderr.write('запрос запрещён политикой');
+  process.exit(2);
+});`,
+    );
+
+    const events = await collect('gemini', {
+      detect: yesCli,
+      spawnImpl: spawn.fn,
+      supervisor: supervisorSetup([{ event: 'UserPromptSubmit', command }]),
+    });
+
+    // Хук действительно сработал и получил нагрузку — иначе «не запустилось»
+    // означало бы, что прогон отказан по другой причине.
+    const seen = JSON.parse(readFileSync(trace, 'utf8')) as Record<string, unknown>;
+    expect(seen.hook_event_name).toBe('UserPromptSubmit');
+    expect(seen.prompt).toBe('Вопрос');
+
+    // Чужой CLI не запускался вовсе.
+    expect(spawn.handles).toHaveLength(0);
+
+    const last = events.at(-1);
+    expect(last?.type).toBe('error');
+    if (last?.type === 'error') {
+      expect(last.reason).toBe('hook_blocked');
+      // Человеку показывают причину, а не «CLI упал».
+      expect(last.error.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('промолчавший хук прогон не отказывает', async () => {
+    // Второе утверждение этого случая — про КАНАЛ контекста — здесь не делается
+    // намеренно. `additionalContext` встаёт отдельной репликой, то есть делает
+    // запрос многострочным, а многострочный запрос панель отказывается отправлять
+    // через `.cmd`-обёртку (Windows обрезает команду на первом переводе строки).
+    // Ограничение это платформенное и общее с `systemPrefix`, поэтому исход
+    // прогона тут зависит от того, как установлен CLI на машине, — проверять по
+    // нему нечего. Здесь доказывается только то, за что отвечает надзиратель:
+    // промолчавший хук прогон не отказывает.
+    const spawn = fakeSpawn({ chunks: ['ок'] });
+    const command = hookAt(
+      'context.cjs',
+      `process.stdin.on('data', () => {});
+process.stdin.on('end', () => {
+  process.stdout.write(JSON.stringify({
+    hookSpecificOutput: { additionalContext: 'СЕГОДНЯ ПЯТНИЦА' },
+  }));
+  process.exit(0);
+});`,
+    );
+
+    const events = await collect('gemini', {
+      detect: yesCli,
+      spawnImpl: spawn.fn,
+      supervisor: supervisorSetup([{ event: 'UserPromptSubmit', command }]),
+    });
+
+    const blockedByHook = events.some(
+      (event) => event.type === 'error' && event.reason === 'hook_blocked',
+    );
+    expect(blockedByHook).toBe(false);
+  });
 
   it('отдаёт текст кусками по мере печати', async () => {
     const spawn = fakeSpawn({ chunks: ['Пер', 'вый ответ'] });

@@ -44,7 +44,10 @@ export type AssistantRunRequest = Infer<typeof assistantRunRequestSchema>;
  * - `no_key_no_cli` / `unsupported` — раннер `none` (нужна подписка или ключ);
  * - `cli_not_scriptable` — CLI есть, но one-shot-флаг для него не задокументирован;
  * - `cli_error` — CLI завершился ошибкой/пустым выводом/таймаутом;
- * - `api_error` — модельный API вернул ошибку.
+ * - `api_error` — модельный API вернул ошибку;
+ * - `hook_blocked` — прогон не начался: хук надзирателя отказал действию. Это не
+ *   ошибка запуска, и путать её с `cli_error` нельзя — CLI не запускался вовсе, а
+ *   человеку нужно показать причину отказа, а не «CLI упал».
  */
 export const assistantRunReasons = [
   'ok',
@@ -53,6 +56,7 @@ export const assistantRunReasons = [
   'cli_not_scriptable',
   'cli_error',
   'api_error',
+  'hook_blocked',
 ] as const;
 export type AssistantRunReason = (typeof assistantRunReasons)[number];
 

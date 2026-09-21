@@ -339,6 +339,10 @@
     "n": 7,
     "why": "emit-plan invariants thrown at the developer (catalog promises a mechanism no adapter writes, verdict missing, an item answered twice or not at all, two writes of one layer into one file) plus ticket labels for kinds not yet emitted; never an answer to the person"
   },
+  "domains/portability/emit/hook-shim.ts": {
+    "n": 1,
+    "why": "the GENERATED hook shim as one template: its Russian comments land in a file beside the target config and its single stderr note reaches the CLI output a person reads; never an API answer (same case as domains/prompt-gate/script.ts)"
+  },
   "domains/portability/emit/text-block.ts": {
     "n": 4,
     "why": "text that LANDS IN THE TARGET FILE: the panel-owned block warning and the headings a degraded item becomes; the target CLI reads it, not an API client (moved here from emit/write-instructions.ts, which the Claude emitter now shares)"
@@ -418,6 +422,18 @@
   "domains/portability/subagents.ts": {
     "n": 4,
     "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/supervisor/run.ts": {
+    "n": 2,
+    "why": "the reason a person reads when a supervisor hook denies the run or is killed on timeout — it reaches the chat, never an API answer (П3.2)"
+  },
+  "domains/portability/supervisor/skills-router.ts": {
+    "n": 2,
+    "why": "the skill catalog heading and the 'read this file' pointer — text the TARGET model reads inside the prompt, not panel UI, so it is not a server-texts key (П3.4)"
+  },
+  "domains/portability/supervisor/subagents.ts": {
+    "n": 1,
+    "why": "the skills heading inside a subagent's own instructions — read by the target model, same channel as the prompt (П3.4)"
   },
   "domains/portability/types.ts": {
     "n": 1,
@@ -559,6 +575,10 @@
     "n": 1,
     "why": "agent prompt / text the model reads"
   },
+  "domains/provider-chat/ProviderChatRun.ts": {
+    "n": 8,
+    "why": "agent prompt / text the model reads, plus the supervisor refusal reason a person reads in the chat when a hook denies the run (П3.2)"
+  },
   "domains/provider-chat/cascade.ts": {
     "n": 7,
     "why": "agent prompt / text the model reads"
@@ -569,10 +589,6 @@
   },
   "domains/provider-chat/prompt.ts": {
     "n": 1,
-    "why": "agent prompt / text the model reads"
-  },
-  "domains/provider-chat/ProviderChatRun.ts": {
-    "n": 6,
     "why": "agent prompt / text the model reads"
   },
   "domains/provider-chat/store.ts": {
